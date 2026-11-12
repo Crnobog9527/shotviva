@@ -4,6 +4,19 @@
 -- anyone else, call the admin's own sale function with that actor, and audit each change in
 -- admin_audit_log (1273) with the reason "T93 sync from preview run <run id>". New functions only.
 
+-- The audit rows. service_role may read admin_audit_log but not write it, so the writes go through
+-- this definer function, as the affiliate and templates:apply audits do: service_role only, and only
+-- the three sync actions.
+create or replace function admin.template_sync_audit(p_actor uuid, p_action text, p_target text, p_reason text)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
+    raise exception 'FORBIDDEN';
+  end if;
+  if p_action not in ('template_sync_active', 'template_sync_sale', 'series_sync_active') then raise exception 'INVALID_INPUT'; end if;
+  insert into public.admin_audit_log(action, user_id, target_id, reason) values(p_action, p_actor, p_target, p_reason);
+end $$;
+
 -- One template's sale and publication. Going down: unpublish first, then close the sale (the admin
 -- sale function refuses the other order). Going up: open the sale (admin_set_template_sale: floors,
 -- unpriced tiers, its own event log), then publish, with the deferred publication checks (price
@@ -31,15 +44,13 @@ begin
   v_sale := exists(select from public.template_sale_approvals where template_id = p_id and enabled);
   if t.is_active and not p_active then
     update public.templates set is_active = false, featured_rank = null where id = p_id;
-    insert into public.admin_audit_log(action, user_id, target_id, reason)
-      values('template_sync_active', p_actor, p_id, v_reason || ': unpublished');
+    perform admin.template_sync_audit(p_actor, 'template_sync_active', p_id, v_reason || ': unpublished');
     v_result := v_result || jsonb_build_object('active', 'unpublished');
     t.is_active := false;
   end if;
   if v_sale is distinct from p_sale then
     perform public.admin_set_template_sale(p_actor, p_id, p_sale);
-    insert into public.admin_audit_log(action, user_id, target_id, reason)
-      values('template_sync_sale', p_actor, p_id, v_reason || case when p_sale then ': sale opened' else ': sale closed' end);
+    perform admin.template_sync_audit(p_actor, 'template_sync_sale', p_id, v_reason || case when p_sale then ': sale opened' else ': sale closed' end);
     v_result := v_result || jsonb_build_object('sale', case when p_sale then 'opened' else 'closed' end);
   end if;
   if p_active and not t.is_active then
@@ -52,8 +63,7 @@ begin
     if 'web' = any(t.visible_in) and not admin.web_standard_sale_allowed(p_id) then
       raise exception 'SALE_ROUTE_NOT_ALLOWED';
     end if;
-    insert into public.admin_audit_log(action, user_id, target_id, reason)
-      values('template_sync_active', p_actor, p_id, v_reason || ': published');
+    perform admin.template_sync_audit(p_actor, 'template_sync_active', p_id, v_reason || ': published');
     v_result := v_result || jsonb_build_object('active', 'published');
   end if;
   if p_validate_only then raise exception using errcode = 'Z9301'; end if;
@@ -80,9 +90,8 @@ begin
   if previous.id is null then raise exception 'SERIES_MISSING'; end if;
   if previous.is_active is distinct from p_active then
     update public.template_series set is_active = p_active where id = previous.id;
-    insert into public.admin_audit_log(action, user_id, target_id, reason)
-      values('series_sync_active', p_actor, p_slug,
-        'T93 sync from preview run ' || p_run_id || case when p_active then ': published' else ': unpublished' end);
+    perform admin.template_sync_audit(p_actor, 'series_sync_active', p_slug,
+      'T93 sync from preview run ' || p_run_id || case when p_active then ': published' else ': unpublished' end);
     v_result := case when p_active then 'published' else 'unpublished' end;
   end if;
   if p_validate_only then raise exception using errcode = 'Z9301'; end if;
@@ -90,6 +99,8 @@ begin
 exception when sqlstate 'Z9301' then return v_result;
 end $$;
 
+revoke all on function admin.template_sync_audit(uuid, text, text, text) from public, anon, authenticated;
+grant execute on function admin.template_sync_audit(uuid, text, text, text) to service_role;
 revoke all on function public.sync_preview_template_state(uuid, text, boolean, boolean, text, text[], boolean) from public, anon, authenticated;
 grant execute on function public.sync_preview_template_state(uuid, text, boolean, boolean, text, text[], boolean) to service_role;
 revoke all on function public.sync_preview_series_active(uuid, text, boolean, text, boolean) from public, anon, authenticated;

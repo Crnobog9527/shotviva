@@ -27,20 +27,32 @@ async function draft(visible: string[] = ['partner'], extra: Record<string, unkn
   await db.query("insert into public.template_prompts(template_id,body) values($1,'fixture')", [id])
   return id
 }
+// As PostgREST calls it: under the service_role role, with that role's grants (it may read
+// admin_audit_log but not write it). A refusal rolls back to before the call, the role included.
+async function asService(sql: string, params: unknown[]) {
+  await db.query('savepoint service_call')
+  try {
+    await db.query('set local role service_role')
+    const result = await db.query(sql, params)
+    await db.query('reset role')
+    await db.query('release savepoint service_call')
+    return result.rows[0]?.r
+  } catch (error) {
+    await db.query('rollback to savepoint service_call')
+    throw error
+  }
+}
 const state = (id: string, sale: boolean, active: boolean, validate = false, actor = admin) =>
-  db.query('select public.sync_preview_template_state($1,$2,$3,$4,$5,$6,$7) as r', [actor, id, sale, active, run, ['en', 'zh'], validate])
-    .then((result) => result.rows[0].r)
+  asService('select public.sync_preview_template_state($1,$2,$3,$4,$5,$6,$7) as r', [actor, id, sale, active, run, ['en', 'zh'], validate])
 const row = async (id: string) => (await db.query(`select t.is_active, coalesce(s.enabled,false) as sale from public.templates t
   left join public.template_sale_approvals s on s.template_id=t.id where t.id=$1`, [id])).rows[0]
 const audit = async (target: string) => (await db.query(
   'select action,user_id,reason from public.admin_audit_log where target_id=$1 order by id', [target])).rows
 async function refused(work: () => Promise<unknown>) {
-  await db.query('savepoint attempt')
   try {
     await work()
     return null
   } catch (error) {
-    await db.query('rollback to attempt')
     return (error as Error).message
   }
 }
@@ -103,8 +115,8 @@ it('dry run reports the change and keeps nothing', async () => {
 it('takes a series up and down by slug, audited, and dry run keeps nothing', async () => {
   const slug = `sync-state-${randomUUID().slice(0, 8)}`
   await db.query("insert into public.template_series(slug,name_en,name_zh,category_key) values($1,'Set','套系','pets')", [slug])
-  const series = (active: boolean, validate = false) => db.query('select public.sync_preview_series_active($1,$2,$3,$4,$5) as r',
-    [admin, slug, active, run, validate]).then((result) => result.rows[0].r)
+  const series = (active: boolean, validate = false) => asService('select public.sync_preview_series_active($1,$2,$3,$4,$5) as r',
+    [admin, slug, active, run, validate])
   expect(await series(true, true)).toBe('published')
   expect(await series(true)).toBe('published')
   expect(await series(true)).toBe('unchanged')
@@ -112,5 +124,15 @@ it('takes a series up and down by slug, audited, and dry run keeps nothing', asy
   expect((await audit(slug)).map((entry) => entry.action + ' ' + entry.reason)).toEqual([
     `series_sync_active T93 sync from preview run ${run}: published`, `series_sync_active T93 sync from preview run ${run}: unpublished`,
   ])
-  expect(await refused(() => db.query('select public.sync_preview_series_active($1,$2,true,$3)', [admin, `missing-${slug}`, run]))).toBe('SERIES_MISSING')
+  expect(await refused(() => asService('select public.sync_preview_series_active($1,$2,true,$3) as r', [admin, `missing-${slug}`, run]))).toBe('SERIES_MISSING')
+})
+
+it('lets service_role write only the sync actions to the audit log, and nobody else', async () => {
+  expect(await refused(() => asService("select admin.template_sync_audit($1,'ban_user','x','r') as r", [admin]))).toBe('INVALID_INPUT')
+  expect(await refused(() => asService("insert into public.admin_audit_log(action,user_id,target_id,reason) values('template_sync_active',$1,'x','r') returning 1 as r", [admin])))
+    .toMatch(/permission denied/)
+  await db.query('savepoint anon_call')
+  await db.query('set local role anon')
+  await expect(db.query("select admin.template_sync_audit($1,'template_sync_active','x','r')", [admin])).rejects.toThrow(/permission denied/)
+  await db.query('rollback to savepoint anon_call')
 })
