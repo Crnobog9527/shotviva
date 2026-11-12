@@ -13,7 +13,8 @@ import type { AnnouncementRow, BannerAnnouncement, BannerLocale } from './rules'
 // The admin page expires this tag on every save and switch (updateTag).
 export const ANNOUNCEMENTS_CACHE_TAG = 'announcements'
 
-const BANNER_COLUMNS = 'id, message_en, message_zh, link_url, link_label_en, link_label_zh, tone, starts_at, ends_at'
+const BANNER_COLUMNS =
+  'id, message_en, message_zh, link_url, link_label_en, link_label_zh, tone, starts_at, ends_at, dismissible, reshow_after_days'
 
 // Active rows that have not ended yet, soonest first: the live one plus any scheduled after it,
 // so the browser can switch on time without waiting for the cache. Partial index
