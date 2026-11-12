@@ -18,6 +18,7 @@ import { FeishuError, sendFeishu, type FeishuDeps } from './feishu'
 import { isSpike, readFailureStats, spikeAlert } from './failure-spike'
 import { schedule } from './schedule'
 import { areaOf, createErrorWindow, sentryIssuesUrl, siteErrorsAlert, type ErrorBreach, type ErrorWindow } from './site-errors'
+import { readSaleFloorHidden, SALE_FLOOR_CHECK_EVERY_MS, saleFloorAlert } from './sale-floor'
 import { renderAlert } from './templates'
 
 // notifyOwner (ARCHITECTURE §16.4, T72): the Owner's plain-Chinese business alert, posted to the
@@ -48,6 +49,8 @@ export type NotifyDeps = {
   sleep: (ms: number) => Promise<void>
   // When this instance last ran the failure-rate counts.
   lastSpikeCheck: { at: number }
+  // When this instance last read which published templates are hidden (1295).
+  lastSaleFloorCheck?: { at: number }
 }
 
 async function post(deps: NotifyDeps & { config: FeishuConfig }, text: string, money: boolean): Promise<void> {
@@ -117,6 +120,26 @@ export async function noteGenerationFailureWith(deps: NotifyDeps): Promise<void>
   }
 }
 
+// 1295: which published templates the catalogue leaves out, alerted once per hidden set. The cron
+// passes force (it runs every 10 minutes anyway); a settled job checks at most every 10 minutes
+// per instance. Returns how many are hidden (null: not checked), for the cron's log.
+export async function checkSaleFloorWith(deps: NotifyDeps, opts: { force?: boolean } = {}): Promise<number | null> {
+  if (!deps.config) return null
+  const now = deps.now()
+  const last = (deps.lastSaleFloorCheck ??= { at: 0 })
+  if (!opts.force && (deps.backoff.paused(now) || now - last.at < SALE_FLOOR_CHECK_EVERY_MS)) return null
+  last.at = now
+  try {
+    const rows = await readSaleFloorHidden(deps.db())
+    const alert = saleFloorAlert(rows)
+    if (alert) await notifyOwnerWith(deps, alert)
+    return rows.length
+  } catch (error) {
+    logger.warn('sale floor check failed', { error })
+    return null
+  }
+}
+
 // Every server error passes here synchronously (core/analytics signalServerError): counted in the
 // window; a breach is returned only when an alert could go out now.
 export function recordServerError(deps: NotifyDeps, window: ErrorWindow, signal: ServerErrorSignal): ErrorBreach | null {
@@ -154,6 +177,7 @@ function defaultDeps(): NotifyDeps | null {
       now: Date.now,
       sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
       lastSpikeCheck: { at: 0 },
+      lastSaleFloorCheck: { at: 0 },
     }
   } catch (error) {
     logger.warn('owner alert setup failed', { error })
@@ -172,6 +196,18 @@ export function notifyOwner(alert: OwnerAlert): void {
 export function noteGenerationFailure(): void {
   const deps = defaultDeps()
   if (deps?.config) schedule(() => noteGenerationFailureWith(deps))
+}
+
+// After a job settled with its cost: the job may have moved a route's p95 past a floor.
+export function noteSaleFloorCheck(): void {
+  const deps = defaultDeps()
+  if (deps?.config) schedule(() => checkSaleFloorWith(deps).then(() => undefined))
+}
+
+// The cron's run: awaited, so the function stays up until the alert is sent.
+export async function checkSaleFloor(): Promise<number | null> {
+  const deps = defaultDeps()
+  return deps?.config ? checkSaleFloorWith(deps, { force: true }) : null
 }
 
 const errorWindow = createErrorWindow()

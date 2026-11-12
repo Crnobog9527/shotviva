@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { noteGenerationFailure } from '../alerts'
+import { noteGenerationFailure, noteSaleFloorCheck } from '../alerts'
 import { captureError } from '../analytics'
 import { logger } from '../logger'
 import { scheduleScreen } from '../moderation'
@@ -168,6 +168,9 @@ export function settleGeneration(
   // A finished public work goes to the content screen right after the response (§9 第 5 条).
   return settleProviderCall(deps, ledger, call, decision).then((settled) => {
     scheduleScreen(settled)
+    // Its cost may have moved a route's p95 past a template's floor (1295): checked after the
+    // response, at most every 10 minutes per instance.
+    noteSaleFloorCheck()
     return settled
   })
 }

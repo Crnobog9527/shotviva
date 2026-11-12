@@ -16,4 +16,14 @@ describe('model price floors', () => {
     expect(modelCreditFloor({ openAI: true, resolutions: ['1k', '2k', '3k'], estimates: {}, p95: { '1k': 0.001 } }, budget).high)
       .toEqual({ '1k': 2, '2k': 4, '3k': 6 })
   })
+  it('judges each quality on its own jobs when the read has the per-quality p95 (1295)', () => {
+    // Pricey high runs on the route must not raise the medium floor; medium without ten samples of
+    // its own falls back to the estimate, not to the mixed p95.
+    const floor = modelCreditFloor({
+      openAI: false, resolutions: ['1k', '2k'], estimates: { '1k': 0.019, '2k': 0.019 },
+      p95: { '1k': 0.0715, '2k': 0.0715 }, p95ByQuality: { high: { '1k': 0.0715 }, medium: { '1k': 0.0095 } },
+    }, centBudget)
+    expect(floor.medium).toEqual({ '1k': 6, '2k': 12, '3k': 1 })
+    expect(floor.high).toEqual({ '1k': 44, '2k': 12, '3k': 1 })
+  })
 })

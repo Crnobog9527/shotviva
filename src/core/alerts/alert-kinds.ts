@@ -113,6 +113,28 @@ export type RenewalReviewAlert = {
   currency: string | null
 }
 
+// 1295 (ARCHITECTURE §6.1): published web templates missing from the catalogue, most often because
+// the 1K price is below the route's cost floor. fingerprint names the set (ids and reasons), so
+// the Owner hears once per change and again daily while it lasts. examples: the first few, with
+// what the floor rests on (the p95 of how many jobs, or an estimate).
+export type SaleFloorReason = 'sale_closed' | 'unpriced' | 'no_route' | 'route_unsupported' | 'below_floor'
+export type SaleFloorExample = {
+  templateId: string
+  reason: SaleFloorReason
+  quality: string
+  price: number | null
+  floor: number | null
+  basis: 'p95' | 'estimate' | 'catalog' | 'list' | null
+  samples: number | null
+}
+export type SaleFloorHiddenAlert = {
+  kind: 'sale_floor_hidden'
+  fingerprint: string
+  total: number
+  belowFloor: number
+  examples: SaleFloorExample[]
+}
+
 export type OwnerAlert =
   | { kind: 'template_fallback'; templateId: string; reason: string; rejected: boolean }
   | { kind: 'checkout_catalog_failed'; code: string }
@@ -128,6 +150,7 @@ export type OwnerAlert =
   | CancelFailedAlert
   | SiteErrorsAlert
   | BusinessInquiryAlert
+  | SaleFloorHiddenAlert
   // T108 (ARCHITECTURE §9 第 8 条): a visitor reported a work shown in the public gallery.
   | { kind: 'work_reported'; jobId: string; reason: string }
 
@@ -166,6 +189,8 @@ const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }
   site_errors: () => ({ key: 'site_errors', cooldownMs: 30 * MINUTE, money: false }),
   business_inquiry: (a) => ({ key: `business_inquiry:${a.inquiryId}`, budget: 'inquiries', money: false }),
   // One message per work per hour however many people report it; the review page has them all.
+  // Once per hidden set; a set that lasts is reported again a day later.
+  sale_floor_hidden: (a) => ({ key: `sale_floor_hidden:${a.fingerprint}`, cooldownMs: 24 * 60 * MINUTE, requireShared: true, money: false }),
   work_reported: (a) => ({ key: `work_reported:${a.jobId}`, cooldownMs: 60 * MINUTE, budget: 'reports', money: false }),
 }
 
