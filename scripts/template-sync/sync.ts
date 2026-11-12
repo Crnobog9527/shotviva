@@ -65,7 +65,8 @@ export async function syncTemplate(id: string, runId: string, source: SyncTarget
   const parsed = prompt.safeParse(sourcePrompt)
   if (!parsed.success) throw new SyncError('PROMPT_MISSING_OR_INVALID')
   const { provider_id, ...revision } = parsed.data
-  if (provider_id && !provider) throw new SyncError('PROVIDER_NOT_UNIQUE')
+  // The test site's own binding points at no image model row (deleted, or another module).
+  if (provider_id && !provider) throw new SyncError('SOURCE_PROVIDER_MISSING')
   const fields = templateFieldsSchema.safeParse(row.fields)
   if (!fields.success || toggleSetupProblems(fields.data.toggles, revision.body, revision.model_params).length) {
     throw new SyncError('INVALID_FIELDS_OR_TOGGLES')
@@ -82,7 +83,7 @@ export async function syncTemplate(id: string, runId: string, source: SyncTarget
     if (write.error) {
       const known = ['CATEGORY_MISSING', 'SUBCATEGORY_MISSING', 'SERIES_MISSING', 'MODEL_CREDIT_FLOOR', 'MODEL_CHANGED', 'MODEL_REFERENCE_LIMIT',
         'STALE_TARGET', 'PRICE_QUOTE_CHANGED', 'CATALOG_MISMATCH', 'TEMPLATE_RETIRED', 'FEATURED_WEB_REQUIRED', 'LIVE_TEMPLATE_INCOMPLETE', 'PROVIDER_NOT_UNIQUE',
-        'INVALID_STYLE_REFS']
+        'PROVIDER_MISSING', 'INVALID_STYLE_REFS']
       throw new SyncError(known.includes(write.error.message) ? write.error.message : 'TARGET_WRITE_FAILED')
     }
     return z.int().positive().parse(write.data)
