@@ -149,6 +149,7 @@ describe('the batch on each plan (Batch create, Owner 2026-11-12)', () => {
     expect(pickTemplate(max, 'c', 5).templateIds).toEqual(['a', 'b', 'd', 'e'])
     const pro = pickTemplate({ ...EMPTY_MATRIX, templateIds: ['poster'], copy: { poster: { headline: 'Sale' } }, toggles: { poster: { plate: true } } }, 'white', 1)
     expect(pro).toMatchObject({ templateIds: ['white'], copy: {}, toggles: {} })
-    expect(pickTemplate(pro, 'white', 1).templateIds).toEqual([])
+    // Tapping the chosen one on Pro keeps it (the row's ✕ removes it).
+    expect(pickTemplate(pro, 'white', 1)).toBe(pro)
   })
 })

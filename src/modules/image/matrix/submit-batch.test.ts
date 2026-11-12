@@ -46,3 +46,12 @@ describe('submitBatch (Batch create Generate, #515 latch)', () => {
     expect(submitBatch(latch, async () => ({ started: true }), { refused: vi.fn(), started: vi.fn() })).toBe(true)
   })
 })
+
+describe('submitBatch when start throws', () => {
+  it('gives the latch back so Generate is not dead', async () => {
+    const latch = createSubmitLatch()
+    submitBatch(latch, async () => Promise.reject(new Error('network')), { refused: vi.fn(), started: vi.fn() })
+    await flush()
+    expect(latch.take()).toBe(true)
+  })
+})
