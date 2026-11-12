@@ -2,8 +2,11 @@ import Image from 'next/image'
 import { useTranslations } from 'next-intl'
 
 import type { Fact, HomePage } from '../page-content'
+import { CardVisual } from './card-visual'
 
-// H2-1: "How ... Works in 3 Steps", one H3 per step (建站规格 §4).
+// H2-1: "How ... Works in 3 Steps", one H3 per step (建站规格 §4), each with what the step
+// looks like under its line of text (under the text on phones, across the step's width when the
+// steps stand side by side).
 export function StepsSection({ steps }: { steps: HomePage['steps'] }) {
   return (
     <section className="mk-block mk-reveal" aria-labelledby="how-h">
@@ -20,6 +23,7 @@ export function StepsSection({ steps }: { steps: HomePage['steps'] }) {
               <h3>{step.heading}</h3>
               <p>{step.text}</p>
             </div>
+            <CardVisual visual={step.visual} />
           </li>
         ))}
       </ol>

@@ -51,7 +51,7 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
     draft.change(step.values)
     if (step.clearPhotos) draft.photos.clear()
   }
-  const batch = limitsFor(context.tier).batchMax > 1 && draft.photos.photos.length === 0
+  const batch = limitsFor(context.tier).batchMax > 1 && template.photoInput !== 'none' && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
   const workspace = `/generate/${template.id}`
   // Generate moves to the chosen member's workspace page, kept prefetched while the dialog is open.

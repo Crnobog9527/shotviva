@@ -12,6 +12,24 @@ export type AnnouncementForm = {
   // datetime-local values in the admin's browser time; '' = open-ended.
   startsAt: string
   endsAt: string
+  // One select for the close rule: a number of days, 'changed' or 'never' (closeRuleOf).
+  closeRule: string
+}
+
+export const DEFAULT_RESHOW_DAYS = 7
+export const RESHOW_PRESETS = [1, 3, 7, 30] as const
+
+// The table keeps two columns (dismissible, reshow_after_days); the form shows them as one choice.
+export function closeRuleOf(dismissible: boolean, reshowAfterDays: number | null): string {
+  if (!dismissible) return 'never'
+  return reshowAfterDays === null ? 'changed' : String(reshowAfterDays)
+}
+
+export function fromCloseRule(rule: string): { dismissible: boolean; reshowAfterDays: number | null } {
+  if (rule === 'never') return { dismissible: false, reshowAfterDays: null }
+  if (rule === 'changed') return { dismissible: true, reshowAfterDays: null }
+  const days = Number(rule)
+  return { dismissible: true, reshowAfterDays: Number.isInteger(days) && days > 0 ? days : DEFAULT_RESHOW_DAYS }
 }
 
 // datetime-local carries no zone; the form labels say Beijing time and it is read as UTC+8.
@@ -20,7 +38,17 @@ export const toLocal = (iso: string | null) => (iso ? toBeijingLocal(iso) : '')
 export { formatBeijing }
 
 export function emptyForm(): AnnouncementForm {
-  return { messageEn: '', messageZh: '', linkUrl: '', linkLabelEn: '', linkLabelZh: '', tone: 'info', startsAt: '', endsAt: '' }
+  return {
+    messageEn: '',
+    messageZh: '',
+    linkUrl: '',
+    linkLabelEn: '',
+    linkLabelZh: '',
+    tone: 'info',
+    startsAt: '',
+    endsAt: '',
+    closeRule: String(DEFAULT_RESHOW_DAYS),
+  }
 }
 
 export function toForm(row: AdminAnnouncementRow): AnnouncementForm {
@@ -33,11 +61,13 @@ export function toForm(row: AdminAnnouncementRow): AnnouncementForm {
     tone: row.tone,
     startsAt: toLocal(row.starts_at),
     endsAt: toLocal(row.ends_at),
+    closeRule: closeRuleOf(row.dismissible, row.reshow_after_days),
   }
 }
 
 export function toSaveInput(form: AnnouncementForm, id: string | undefined) {
-  return { ...form, id, startsAt: toIso(form.startsAt), endsAt: toIso(form.endsAt) }
+  const { closeRule, ...fields } = form
+  return { ...fields, ...fromCloseRule(closeRule), id, startsAt: toIso(form.startsAt), endsAt: toIso(form.endsAt) }
 }
 
 type Window = Pick<AdminAnnouncementRow, 'starts_at' | 'ends_at'>

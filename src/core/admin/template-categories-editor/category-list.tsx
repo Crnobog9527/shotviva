@@ -18,14 +18,15 @@ type Props = {
 export function CategoryList({ categories, pending, onMove, onAdd, onEdit, onDelete }: Props) {
   if (!categories.length) return <p className="text-sm text-muted-foreground">{COPY.empty}</p>
   const parents = new Set(categories.map(node => node.parentId))
-  return <CategoryTree nodes={categories} labelOf={node => node.nameZh} disabled={pending}
+  return <CategoryTree nodes={categories} labelOf={node => node.nameZh} disabled={pending} storageKey="template-categories"
     onMove={onMove} rootOnly={node => node.key === 'art-styles'}
-    renderRow={node => <>
+    renderRow={(node, meta) => <>
       <div className="mr-auto min-w-36 flex-1 text-sm">
         <span className="font-medium">{node.nameZh}</span> · {node.nameEn}
         <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
           <span>{COPY.count(node.templateCount)}</span>
           {node.seriesCount > 0 && <span> · {COPY.seriesCount(node.seriesCount)}</span>}
+          {meta.collapsed && <span> · {COPY.childCount(meta.childCount)}</span>}
           {!node.isVisible && <Badge variant="outline">{COPY.hidden}</Badge>}
         </div>
       </div>

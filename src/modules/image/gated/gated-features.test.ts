@@ -17,26 +17,29 @@ const Intl = NextIntlClientProvider as unknown as FunctionComponent<{ locale: st
 const render = (element: ReactElement) => renderToStaticMarkup(createElement(Intl, { locale: 'en', messages: en, timeZone: 'UTC' }, element))
 
 const LOCK = /needs (Pro|Max)/g
+const TUTORIAL = 'aria-label="Batch create tutorial"'
 
-describe('GatedFeatures (Create page, Owner 2026-11-12)', () => {
-  it('shows both features locked below Pro, as buttons that open an intro (never a link to the paywall)', () => {
+describe('GatedFeatures (Create page, one Batch create card, Owner 2026-11-12)', () => {
+  it('is one card naming both plans, locked below Pro, opening the intro (never a link)', () => {
     const html = render(createElement(GatedFeatures, { tier: null }))
-    expect(html).toContain('Batch photos')
-    expect(html).toContain('Up to 10 / 30 photos at once')
-    expect(html).toContain('Several templates at once')
+    expect(html).toContain('Batch create')
+    expect(html).toContain('10 photos')
+    expect(html).toContain('30 photos · 5 templates')
     expect(html.match(LOCK)).toEqual(['needs Pro', 'needs Max'])
     expect(html).not.toContain('<a ')
+    expect(html).toContain(TUTORIAL)
   })
 
-  it('unlocks batch on Pro (its guide still opens in place) and keeps several templates locked on Max', () => {
+  it('sends Pro straight into Batch create, with Max still marked locked', () => {
     const html = render(createElement(GatedFeatures, { tier: 'pro' }))
     expect(html.match(LOCK)).toEqual(['needs Max'])
-    expect(html).not.toContain('<a ')
+    expect(html.match(/<a href="\/generate\/batch"/g)).toHaveLength(1)
+    expect(html).toContain(TUTORIAL)
   })
 
-  it('sends Max straight into the batch workspace from both cards', () => {
+  it('sends Max straight into Batch create with nothing locked', () => {
     const html = render(createElement(GatedFeatures, { tier: 'max' }))
     expect(html.match(LOCK)).toBeNull()
-    expect(html.match(/<a href="\/generate\/batch"/g)).toHaveLength(2)
+    expect(html.match(/<a href="\/generate\/batch"/g)).toHaveLength(1)
   })
 })

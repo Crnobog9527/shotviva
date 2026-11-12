@@ -2,16 +2,18 @@
 
 /* eslint-disable @next/next/no-img-element -- template covers from the catalogue */
 import { useTranslations } from 'next-intl'
+import type { ReactNode } from 'react'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
-import { MATRIX_MAX_TEMPLATES } from './matrix-state'
-
-type Props = { chosen: readonly CatalogueTemplate[]; failedId: string | null; onAdd(): void; onRemove(id: string): void }
+// `max` is the plan's number of templates; `more` takes the add button's place once it is
+// reached on a plan that holds one (Pro: the locked way to Max's several templates).
+// `onSwap` (a plan that holds one template) puts Change on the row: the picker, where a tap swaps it.
+type Props = { chosen: readonly CatalogueTemplate[]; max: number; failedId: string | null; onAdd(): void; onSwap?: () => void; onRemove(id: string): void; more?: ReactNode }
 
 // The batch's templates (T107): one row each with its cover, name and per-photo credits at the
-// chosen resolution, a remove control, then Add template while fewer than five are in. A template
+// chosen resolution, a remove control, then Add template while there is room. A template
 // the preflight found unavailable is marked so the user can take it out.
-export function TemplatesSection({ chosen, failedId, onAdd, onRemove }: Props) {
+export function TemplatesSection({ chosen, max, failedId, onAdd, onSwap, onRemove, more }: Props) {
   const t = useTranslations('app.matrix')
   return (
     <div className="grid gap-2">
@@ -30,6 +32,11 @@ export function TemplatesSection({ chosen, failedId, onAdd, onRemove }: Props) {
                     {failedId === template.id ? t('templateUnavailable') : template.categoryName}
                   </span>
                 </span>
+                {onSwap ? (
+                  <button type="button" onClick={onSwap} aria-label={t('swapTemplate', { name: template.name })} className="press -mr-1 inline-flex min-h-11 flex-none items-center rounded-full px-2 text-caption font-semibold text-foreground hover:underline hover:underline-offset-3">
+                    {t('swap')}
+                  </button>
+                ) : null}
                 <button type="button" onClick={() => onRemove(template.id)} aria-label={t('removeTemplate', { name: template.name })} className="press -mr-2 grid size-11 flex-none place-items-center rounded-full text-muted-foreground hover:text-foreground">
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
                     <path d="M7 7l10 10M17 7 7 17" />
@@ -40,15 +47,15 @@ export function TemplatesSection({ chosen, failedId, onAdd, onRemove }: Props) {
           })}
         </ul>
       ) : null}
-      {chosen.length < MATRIX_MAX_TEMPLATES ? (
+      {chosen.length < max ? (
         <button type="button" onClick={onAdd} className="press flex min-h-14 w-full items-center justify-center gap-2 rounded-tile bg-wash-faint text-label font-semibold text-foreground shadow-[inset_0_0_0_1px_var(--input)]">
           <svg viewBox="0 0 24 24" aria-hidden="true" className="size-[18px] text-primary" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
             <path d="M12 5v14M5 12h14" />
           </svg>
-          {t(chosen.length ? 'addTemplate' : 'chooseTemplates')}
-          <span className="font-mono text-caption font-normal text-muted-foreground">{t('templatesLeft', { count: MATRIX_MAX_TEMPLATES - chosen.length })}</span>
+          {t(chosen.length ? 'addTemplate' : max > 1 ? 'chooseTemplates' : 'chooseTemplate')}
+          <span className="font-mono text-caption font-normal text-muted-foreground">{t('templatesLeft', { count: max - chosen.length })}</span>
         </button>
-      ) : null}
+      ) : (more ?? null)}
     </div>
   )
 }
