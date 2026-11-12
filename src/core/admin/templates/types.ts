@@ -1,3 +1,4 @@
+import type { SaleFloorExample } from '@/core/alerts/alert-kinds'
 import type { StyleRef } from '@/core/templates/style-refs'
 import type { Template } from '@/core/templates'
 
@@ -11,6 +12,8 @@ export type AdminTemplate = Template & {
   seriesId?: string | null
   seriesSortOrder?: number
   saleEnabled?: boolean
+  // Published but missing from the catalogue, and why (1295); absent when it is listed.
+  catalogueGap?: SaleFloorExample
   // null only if a template was created outside the admin flow without a prompt.
   prompt: { styleRefs: StyleRef[]; providerId: string | null; body: string; version: number; modelParams: Record<string, unknown> } | null
 }

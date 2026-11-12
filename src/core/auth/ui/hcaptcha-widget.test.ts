@@ -37,7 +37,11 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals())
 
-const load = async () => ({ ...(await import('./hcaptcha-script')), ...(await import('./hcaptcha-widget')) })
+const load = async () => {
+  const modules = { ...(await import('./captcha-light')), ...(await import('./hcaptcha-script')), ...(await import('./hcaptcha-widget')) }
+  // What use-captcha.ts does: a form holds the widget, and the last release removes it.
+  return { ...modules, retainHCaptcha: () => modules.retainCaptcha(modules.releaseWarm) }
+}
 const rendered = (sitekey: string, hl: string) => ({ sitekey, size: 'invisible', hl, 'open-callback': expect.any(Function) })
 
 describe('hCaptcha language', () => {
@@ -115,6 +119,16 @@ describe('prepared ahead', () => {
     vi.useRealTimers()
   })
 
+  it('keeps the prepared widget when a form mounts again before the release runs', async () => {
+    const { prepareHCaptcha, retainCaptcha, releaseWarm } = await load()
+    const release = retainCaptcha(releaseWarm)
+    await prepareHCaptcha('site', 'en')
+    release()
+    retainCaptcha(releaseWarm) // log-in swapped for "check your email"
+    releaseWarm()
+    expect(api.remove).not.toHaveBeenCalled()
+  })
+
   it('prepares once however many forms on the page ask', async () => {
     const { prepareHCaptcha } = await load()
     await Promise.all([prepareHCaptcha('site', 'en'), prepareHCaptcha('site', 'en')])
@@ -152,6 +166,12 @@ describe('a stuck network', () => {
     await vi.advanceTimersByTimeAsync(EXECUTE_TIMEOUT_MS * 3)
     answer({ response: 'late' })
     await expect(token).resolves.toBe('late')
+  })
+
+  it('names its network error so the form can tell it apart without loading this code', async () => {
+    const { CaptchaNetworkError, isCaptchaNetworkError } = await load()
+    expect(isCaptchaNetworkError(new CaptchaNetworkError('timeout'))).toBe(true)
+    expect(isCaptchaNetworkError(new Error('challenge-closed'))).toBe(false)
   })
 
   it('reports a script that cannot load as a network error, and loads it again next time', async () => {

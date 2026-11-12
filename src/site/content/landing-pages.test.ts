@@ -31,7 +31,7 @@ function expectCaseFile(image: ImageRef) {
 
 // The three SEO landing pages (T44, design/comps-v3-b/landing.html, ARCHITECTURE §12, §17).
 describe('landing pages', () => {
-  it('exist in both languages with the same slugs; only /zh/image-to-image-generator is indexable in Chinese', () => {
+  it('exist in both languages with the same slugs; each indexable in Chinese too (SEO patch v5)', () => {
     const slugs = (locale: 'en' | 'zh') => contentPagesIn(locale).map((page) => page.slug)
     expect(slugs('en')).toEqual(['image-to-image-generator', 'commercial-photography', 'ai-restaurant-menu'])
     expect(slugs('zh')).toEqual(slugs('en'))
@@ -39,8 +39,7 @@ describe('landing pages', () => {
       expect(site.indexing.indexablePaths).toContain(`/${slug}`)
       expect(site.locales.zhPaths).toContain(`/${slug}`)
     }
-    expect(site.indexing.zhIndexablePaths).not.toContain('/commercial-photography')
-    expect(site.indexing.zhIndexablePaths).not.toContain('/ai-restaurant-menu')
+    for (const slug of slugs('en')) expect(site.indexing.zhIndexablePaths).toContain(`/${slug}`)
   })
 
   // Owner 2026-11-11: the inner pages show their own cases (public/cases), never the home tote,

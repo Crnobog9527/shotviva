@@ -32,11 +32,17 @@ export function zhSitemapUrls(site: SiteConfig, gates: readonly PageGate[] = [])
   return zhIndexablePaths(site, gates).map((path) => absoluteUrl(site, path))
 }
 
-export function urlsetXml(urls: readonly string[]): string {
+// `lastmod`: the page's last content change by address path ("/", "/zh/pricing"), W3C date
+// (YYYY-MM-DD), from the site's own table (site/content/page-dates.ts), never the deploy date.
+// An address without one is written without <lastmod>.
+export function urlsetXml(urls: readonly string[], lastmod: Readonly<Record<string, string>> = {}): string {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ...urls.map((url) => `  <url><loc>${escapeXml(url)}</loc></url>`),
+    ...urls.map((url) => {
+      const date = lastmod[new URL(url).pathname]
+      return `  <url><loc>${escapeXml(url)}</loc>${date ? `<lastmod>${date}</lastmod>` : ''}</url>`
+    }),
     '</urlset>',
     '',
   ].join('\n')

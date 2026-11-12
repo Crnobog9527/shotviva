@@ -1,9 +1,9 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { buttonVariants } from '../../ui/button'
-import { cn } from '../../ui/cn'
-import { ResponsiveSheet } from '../../ui/responsive-sheet'
+import { buttonVariants } from '../../../ui/button'
+import { cn } from '../../../ui/cn'
+import { ResponsiveSheet } from '../../../ui/responsive-sheet'
 import type { useDeleteAccount } from './use-delete-account'
 
 export function DeleteAccountDialog({ del }: { del: ReturnType<typeof useDeleteAccount> }) {

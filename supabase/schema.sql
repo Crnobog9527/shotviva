@@ -95,37 +95,59 @@ $$;
 ALTER FUNCTION "admin"."activate_template_price_catalog_v2"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "admin"."alternate_route_meets_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_price" integer) RETURNS boolean
+CREATE OR REPLACE FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") RETURNS "jsonb"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
   with route as (
-    select p.adapter, p.capabilities, p.estimated_image_costs,
-      (select to_jsonb(percentile_cont(0.95) within group (order by g.cost_usd)) #>> '{}'
-         from public.generation_jobs g
-        where g.provider=p_tag and coalesce(g.inputs->>'resolution','1k')=p_resolution
-          and g.created_at>=now()-interval '30 days' and g.status='succeeded' and g.cost_usd is not null
-       having count(*)>=10) as p95
+    select p.adapter, p.capabilities, p.estimated_image_costs
     from public.ai_providers p
     where p.module='image' and p.id::text||'/'||p.model=p_tag
       and p.resolutions @> array[p_resolution] and p.capabilities<>'{}'::jsonb
       and p_resolution in ('1k','2k','3k')
-  ), priced as (
-    select adapter,coalesce(p95::numeric,(estimated_image_costs->>p_resolution)::numeric,
-      case when adapter='openrouter_images' and jsonb_typeof(capabilities->'catalogImageCosts'->p_resolution)='number'
-        and (capabilities->'catalogImageCosts'->>p_resolution)::numeric > 0
-        then (capabilities->'catalogImageCosts'->>p_resolution)::numeric end,
-      case when adapter='openai_images' then
+  ), measured as (
+    select count(*) as n, percentile_cont(0.95) within group (order by g.cost_usd) as p95
+    from public.generation_jobs g
+    where g.provider=p_tag and g.inputs->>'resolution'=p_resolution
+      and g.inputs ? 'quality' and g.inputs->>'quality'=p_quality
+      and g.created_at>=now()-interval '30 days' and g.status='succeeded' and g.cost_usd is not null
+  ), sources as (
+    select r.adapter, m.n,
+      -- Through jsonb as admin_image_provider_pricing returns it, so the rounding is unchanged.
+      case when m.n>=10 then (to_jsonb(m.p95) #>> '{}')::numeric end as p95,
+      (r.estimated_image_costs->>p_resolution)::numeric as estimate,
+      case when r.adapter='openrouter_images' and jsonb_typeof(r.capabilities->'catalogImageCosts'->p_resolution)='number'
+        and (r.capabilities->'catalogImageCosts'->>p_resolution)::numeric > 0
+        then (r.capabilities->'catalogImageCosts'->>p_resolution)::numeric end as catalog,
+      case when r.adapter='openai_images' then
         ((case when p_quality='medium' then '{"1k":0.055,"2k":0.095,"3k":0.135}'
-                    else '{"1k":0.081,"2k":0.135,"3k":0.206}' end)::jsonb->>p_resolution)::numeric end) as usd
-    from route
+                    else '{"1k":0.081,"2k":0.135,"3k":0.206}' end)::jsonb->>p_resolution)::numeric end as list
+    from route r cross join measured m
+  ), priced as (
+    select adapter, n, coalesce(p95,estimate,catalog,list) as usd,
+      case when p95 is not null then 'p95' when estimate is not null then 'estimate'
+           when catalog is not null then 'catalog' when list is not null then 'list' end as basis
+    from sources
   ), budget as (
     select admin.lowest_credit_price()*0.761*0.4 as usd
   )
-  select coalesce((select p_price >= ceil(priced.usd*1.10/nullif(budget.usd,0))
-    and (priced.adapter<>'openai_images' or p_price>=(case when p_quality='medium' then
-      '{"1k":1,"2k":2,"3k":3}' else '{"1k":2,"2k":4,"3k":6}' end::jsonb->>p_resolution)::int)
-    from priced,budget),false)
+  select jsonb_build_object('usd',priced.usd,'basis',priced.basis,'samples',priced.n,
+    'credits',case when priced.usd is not null and budget.usd>0 then greatest(
+      ceil(priced.usd*1.10/budget.usd)::int,
+      case when priced.adapter='openai_images' then (case when p_quality='medium' then
+        '{"1k":1,"2k":2,"3k":3}' else '{"1k":2,"2k":4,"3k":6}' end::jsonb->>p_resolution)::int else 0 end) end)
+  from priced, budget
+$$;
+
+
+ALTER FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."alternate_route_meets_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_price" integer) RETURNS boolean
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select coalesce(p_price >= (admin.alternate_route_floor(p_tag,p_resolution,p_quality)->>'credits')::int, false)
 $$;
 
 
@@ -409,7 +431,8 @@ begin
   approved := admin.template_approved_prices(bound)->t.id;
 
   -- With no database provider the server uses its OpenAI environment model. SQL cannot
-  -- see that setting. Take the highest eligible model p95 per tier in that case.
+  -- see that setting. Take the highest eligible model p95 per tier in that case, at the
+  -- template's own quality (1295).
   if bound is null then
     budget := admin.lowest_credit_price()*0.761*0.4;
     select jsonb_object_agg(r, cost) into env_p95 from (
@@ -418,6 +441,7 @@ begin
           percentile_cont(0.95) within group (order by cost_usd) p95
         from public.generation_jobs where provider like 'env/%' and status='succeeded'
           and cost_usd is not null and created_at >= now()-interval '30 days'
+          and inputs ? 'quality' and inputs->>'quality'=t.quality
         group by 1,2 having count(*)>=10
       ) per_model group by r
     ) per_tier;
@@ -1830,6 +1854,62 @@ $$;
 
 
 ALTER FUNCTION "admin"."rollback_template_price_catalog_v2"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."route_p95_by_quality"("p_tag" "text") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select coalesce(jsonb_object_agg(quality,tiers),'{}'::jsonb) from (
+    select quality,jsonb_object_agg(res,cost) tiers from (
+      select g.inputs->>'quality' quality, g.inputs->>'resolution' res,
+        percentile_cont(0.95) within group (order by g.cost_usd) cost
+      from public.generation_jobs g
+      where g.provider=p_tag and g.inputs ? 'quality' and g.inputs->>'quality' in ('medium','high')
+        and g.inputs->>'resolution' in ('1k','2k','3k')
+        and g.created_at>=now()-interval '30 days' and g.status='succeeded' and g.cost_usd is not null
+      group by 1,2 having count(*)>=10
+    ) per_tier group by quality
+  ) per_quality
+$$;
+
+
+ALTER FUNCTION "admin"."route_p95_by_quality"("p_tag" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."sale_floor_hidden"() RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  m record; t public.templates; sale public.template_sale_approvals; p public.ai_providers;
+  route text; reason text; floor jsonb; result jsonb:='[]'::jsonb;
+begin
+  for m in select pm.id from admin.published_web_members pm order by pm.id loop
+    if admin.web_standard_sale_allowed(m.id) then continue; end if;
+    select * into t from public.templates where id=m.id;
+    select * into sale from public.template_sale_approvals where template_id=m.id;
+    route:=null; floor:=null; p:=null;
+    select a.id::text||'/'||a.model into route from public.ai_providers a where a.module='image' and
+      a.id=coalesce((select tp.provider_id from public.template_prompts tp where tp.template_id=t.id and t.id<>'edit'),
+                    (select b.id from public.ai_providers b where b.module='image' and b.is_active));
+    if not coalesce(sale.enabled,false) then reason:='sale_closed';
+    elsif '1k'=any(sale.unpriced_resolutions) then reason:='unpriced';
+    elsif route is null then reason:='no_route';
+    else
+      select * into p from public.ai_providers a where a.module='image' and a.id::text||'/'||a.model=route;
+      if not ('1k'=any(admin.sale_route_resolutions(p))) then reason:='route_unsupported';
+      else reason:='below_floor'; floor:=admin.alternate_route_floor(route,'1k',t.quality);
+      end if;
+    end if;
+    result:=result||jsonb_build_array(jsonb_build_object('template_id',t.id,'quality',t.quality,
+      'price',(t.credits_cost->>'1k')::int,'route',route,'reason',reason,'floor',floor));
+  end loop;
+  return result;
+end $$;
+
+
+ALTER FUNCTION "admin"."sale_floor_hidden"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."sale_route_resolutions"("p" "public"."ai_providers") RETURNS "text"[]
@@ -5493,6 +5573,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_image_pricing_catalog"("p_env_model" 
   select jsonb_build_object('version',case when admin.is_template_catalog_v2() then 'v2' else 'v1' end,
     'unit_price',admin.lowest_credit_price(),'tariffs',admin.template_catalog_minimums(),
     'providers',coalesce((select jsonb_agg(to_jsonb(p)||jsonb_build_object('approved',admin.template_approved_prices(p.provider_id))
+      || jsonb_build_object('p95_by_quality',admin.route_p95_by_quality(coalesce(p.provider_id::text,'env')||'/'||p.model))
       || case when p.is_active then jsonb_build_object('fallback_floors',(
         select jsonb_object_agg(quality,tiers) from (
           select quality,jsonb_object_agg(res,admin.fallback_route_floor(coalesce(p.provider_id::text,'env')||'/'||p.model,res,quality)) tiers
@@ -6582,6 +6663,15 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_sale_floor_hidden"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$ select admin.sale_floor_hidden() $$;
+
+
+ALTER FUNCTION "public"."admin_sale_floor_hidden"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb") RETURNS "uuid"
@@ -14419,6 +14509,10 @@ CREATE INDEX "generation_jobs_route_p95_idx" ON "public"."generation_jobs" USING
 
 
 
+CREATE INDEX "generation_jobs_route_quality_p95_idx" ON "public"."generation_jobs" USING "btree" ("provider", (("inputs" ->> 'resolution'::"text")), (("inputs" ->> 'quality'::"text")), "created_at") INCLUDE ("cost_usd") WHERE (("status" = 'succeeded'::"text") AND ("cost_usd" IS NOT NULL) AND ("inputs" ? 'quality'::"text"));
+
+
+
 CREATE INDEX "generation_jobs_running_created_at_idx" ON "public"."generation_jobs" USING "btree" ("created_at") WHERE ("status" = 'running'::"text");
 
 
@@ -15815,6 +15909,11 @@ REVOKE ALL ON FUNCTION "admin"."activate_template_price_catalog_v2"() FROM PUBLI
 
 
 
+REVOKE ALL ON FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."alternate_route_meets_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_price" integer) FROM PUBLIC;
 
 
@@ -16092,6 +16191,16 @@ REVOKE ALL ON FUNCTION "admin"."restore_approved_wallets_v2"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "admin"."rollback_template_price_catalog_v2"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."route_p95_by_quality"("p_tag" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."route_p95_by_quality"("p_tag" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."sale_floor_hidden"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."sale_floor_hidden"() TO "service_role";
 
 
 
@@ -16780,6 +16889,11 @@ GRANT ALL ON FUNCTION "public"."admin_revenue_stats"("p_days" integer) TO "servi
 
 REVOKE ALL ON FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_review_template_request"("p_request_id" "uuid", "p_status" "text", "p_template_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_sale_floor_hidden"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_sale_floor_hidden"() TO "service_role";
 
 
 
