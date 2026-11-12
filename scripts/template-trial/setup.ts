@@ -3,7 +3,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AdminTemplate } from '../../src/core/admin/templates/types'
 import type { GenerationProvider } from '../../src/core/jobs'
 import { estimateRunUsd } from '../../src/modules/image/test-run/estimate'
-import { imageProvider } from '../../src/modules/image/provider'
 import { readPricingOptions } from '../../src/site/template-pricing'
 import { RunError } from '../template-apply/batch-file'
 import type { Cell, EffectiveModel } from './cells'
@@ -26,18 +25,19 @@ export async function effectiveModels(db: SupabaseClient): Promise<EffectiveMode
 }
 
 // One estimate per cell: the trial's own estimate (estimateRunUsd) with the prices of the provider
-// it will call, plus the face-swap screen. Providers are resolved once per binding.
-export async function estimates(cells: Cell[], templates: Map<string, AdminTemplate>) {
-  const providers = new Map<string, Promise<GenerationProvider>>()
+// it will call, plus the face-swap screen. A bound template counts the dearer of its provider and
+// the default it may fall back to. Providers are resolved once per binding.
+export async function estimates(cells: Cell[], templates: Map<string, AdminTemplate>, bound: (id: string | null) => Promise<GenerationProvider[]>) {
+  const providers = new Map<string, Promise<GenerationProvider[]>>()
   const perCell = new Map<Cell, number>()
   for (const cell of cells) {
     const template = templates.get(cell.templateId)
     if (!template) continue
     const binding = template.prompt?.providerId ?? null
     const key = binding ?? 'default'
-    if (!providers.has(key)) providers.set(key, imageProvider(binding))
-    const provider = await providers.get(key)!
-    perCell.set(cell, estimateRunUsd(cell.resolution, template.quality, provider.prices) + JUDGE_ALLOWANCE_USD)
+    if (!providers.has(key)) providers.set(key, bound(binding))
+    const prices = (await providers.get(key)!).map(p => estimateRunUsd(cell.resolution, template.quality, p.prices))
+    perCell.set(cell, Math.max(...prices) + JUDGE_ALLOWANCE_USD)
   }
   return (cell: Cell) => perCell.get(cell) ?? Number.POSITIVE_INFINITY
 }

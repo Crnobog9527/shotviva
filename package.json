@@ -16,7 +16,7 @@
     "db:schema": "tsx scripts/db-schema.ts",
     "import:prompts": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/import-prompts.ts",
     "templates:apply": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/template-apply/run.ts",
-    "templates:trial": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/template-trial/run.ts",
+    "templates:trial": "NODE_USE_ENV_PROXY=1 tsx --conditions=react-server --env-file-if-exists=.env.local scripts/template-trial/run.ts",
     "pricing:waffo": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/check-waffo-catalog.ts",
     "pricing:prepromote": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/check-pricing-promotion.ts",
     "qa:accounts": "tsx --env-file=.env.local scripts/qa/accounts.ts",

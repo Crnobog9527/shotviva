@@ -16,9 +16,6 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { listAdminTemplates } from '../../src/core/admin/templates/repository'
-// The two server pieces only: the module's barrel also exports client components.
-import { identityJudge } from '../../src/modules/image/edit/classifier-provider'
-import { imageProvider } from '../../src/modules/image/provider'
 import { readBatchFile, RunError, targetStores } from '../template-apply/batch-file'
 import { envSchema, localBatchPath, targetOf } from '../template-apply/options'
 import { planCells, type Cell } from './cells'
@@ -28,6 +25,7 @@ import { readTrialState, recordResults, trialsRoot } from './results'
 import { peekCell, runAll, type CellResult, type RunContext } from './runner'
 import { summaryTable } from './summary'
 import { assertAdmin, effectiveModels, estimates } from './setup'
+import { scriptProviders } from './providers'
 import { AppError } from '../../src/core/errors'
 import { formatTable } from '../template-apply/report'
 
@@ -117,7 +115,7 @@ async function finish(p: Prepared, store: PrivateStore, ctx: RunContext, results
   await recordResults(store, p.root, state, results)
   await writeFile(join(p.root, 'index.html'), buildPage(state, p.batch.templates, p.root, p.baseDir))
   const stopped = ctx.stopped ? `（${ctx.stopped}，已停止开新任务）` : ''
-  process.stdout.write(`\n${summaryTable(results)}\n本次花费约 $${ctx.spentUsd.toFixed(3)}${stopped}。对照页：${relative(process.cwd(), join(p.root, 'index.html'))}\n`)
+  process.stdout.write(`\n${summaryTable(results)}\n本次预算占用约 $${ctx.spentUsd.toFixed(3)}（有实际成本按实际，否则按估价；没有费用的失败实际不收费，以后台成本对账为准）${stopped}。对照页：${relative(process.cwd(), join(p.root, 'index.html'))}\n`)
   if (results.some(r => r.outcome === 'failed') || p.problems.length) process.exitCode = 1
 }
 
@@ -127,10 +125,11 @@ async function main() {
   const { privateStore } = await targetStores(p.target)
   if (!privateStore) throw new RunError('缺测试站 R2 密钥（TEMPLATE_TOOLS_R2_*）：测试照片和结果都在测试站的私有桶里，没有调用模型')
   await assertAdmin(p.db, p.env.SHOTVIVA_IMPORT_ADMIN_ID)
-  const deps = { db: p.db, store: privateStore, provider: imageProvider, identityJudge: await identityJudge() }
+  const providers = scriptProviders(p.db)
+  const deps = { db: p.db, store: privateStore, provider: providers.provider, identityJudge: await providers.judge() }
   const ctx: RunContext = {
     deps, actorId: p.env.SHOTVIVA_IMPORT_ADMIN_ID, photoIds: await uploadPhotos(p, deps), budgetUsd: p.options.budget,
-    spentUsd: 0, reservedUsd: 0, estimateOf: await estimates(p.cells, p.templates), retryFailed: p.options['retry-failed'],
+    spentUsd: 0, reservedUsd: 0, estimateOf: await estimates(p.cells, p.templates, providers.bound), retryFailed: p.options['retry-failed'],
   }
   onInterrupt(ctx)
   await finish(p, privateStore, ctx, await runAll(p.cells, ctx, p.options.concurrency, r => process.stdout.write(line(r))))

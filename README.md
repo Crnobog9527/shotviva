@@ -68,7 +68,8 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
   ```
 
   At start the tools check the token cannot reach the production bucket `shotviva-assets`; if it
-  can, they stop.
+  can, they stop. `pnpm templates:trial` runs with `NODE_USE_ENV_PROXY=1`, so on a machine that
+  reaches the model provider through `HTTPS_PROXY` its calls use that proxy too.
 - Production is never written by this script: templates, categories and series reach
   production through the "Sync preview templates to production" workflow (Owner approval).
 
