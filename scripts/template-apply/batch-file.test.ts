@@ -13,8 +13,8 @@ it('refuses a token that can reach the production bucket, and one it cannot chec
 })
 
 it('accepts a token the production bucket refuses or does not know', async () => {
-  await expect(assertTestOnlyToken(failing(403))).resolves.toBeUndefined()
-  await expect(assertTestOnlyToken(failing(404))).resolves.toBeUndefined()
+  await expect(assertTestOnlyToken(failing(403))).resolves.toBe(403)
+  await expect(assertTestOnlyToken(failing(404))).resolves.toBe(404)
 })
 
 it('opens no buckets without the tool\'s own keys or on a local stack', async () => {

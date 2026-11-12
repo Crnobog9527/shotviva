@@ -22,17 +22,16 @@ export const PRODUCTION_BUCKET = 'shotviva-assets'
 
 type Sender = { send: (command: HeadBucketCommand) => Promise<unknown> }
 
-export async function assertTestOnlyToken(client: Sender): Promise<void> {
-  let reachable: boolean
+// Returns the status the production bucket refused with (403 or 404); anything else stops the run.
+export async function assertTestOnlyToken(client: Sender): Promise<number> {
   try {
     await client.send(new HeadBucketCommand({ Bucket: PRODUCTION_BUCKET }))
-    reachable = true
   } catch (error) {
     const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
-    if (status !== 403 && status !== 404) throw new RunError('连不上 R2，无法确认 TEMPLATE_TOOLS_R2_* 令牌的范围，停止')
-    reachable = false
+    if (status === 403 || status === 404) return status
+    throw new RunError('连不上 R2，无法确认 TEMPLATE_TOOLS_R2_* 令牌的范围，停止')
   }
-  if (reachable) throw new RunError(`TEMPLATE_TOOLS_R2_* 的令牌能访问正式站的桶 ${PRODUCTION_BUCKET}：范围给大了，请改成只限 shotviva-preview 和 shotviva-assets-preview`)
+  throw new RunError(`TEMPLATE_TOOLS_R2_* 的令牌能访问正式站的桶 ${PRODUCTION_BUCKET}：范围给大了，请改成只限 shotviva-preview 和 shotviva-assets-preview`)
 }
 
 // The target's own buckets with this tool's R2 keys: TEMPLATE_TOOLS_R2_*, never the shell's R2_*
@@ -44,6 +43,8 @@ export async function targetStores(target: Target, env: Record<string, string | 
   const secretAccessKey = env.TEMPLATE_TOOLS_R2_SECRET_ACCESS_KEY
   if (!target.storage || !accountId || !accessKeyId || !secretAccessKey) return {}
   const client = createR2Client({ accountId, accessKeyId, secretAccessKey })
-  await assertTestOnlyToken(client)
+  const refused = await assertTestOnlyToken(client)
+  // Status codes only, never the key.
+  process.stdout.write(`R2 令牌检查：正式桶 ${PRODUCTION_BUCKET} 拒绝访问（HTTP ${refused}），只用测试站的桶。\n`)
   return { privateStore: createR2Store(client, target.storage.privateBucket), publicStore: createR2Store(client, target.storage.publicBucket) }
 }
