@@ -14,7 +14,7 @@ import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { batchCaps, type BatchCaps } from '../gated/feature-access'
 import { GuideButton } from '../gated/guide-button'
 import { CloseButton } from '../workspace/create-sheet'
-import { keepBatchTemplates } from './batch-query'
+import { keepBatchTemplates, restoreOpener } from './batch-query'
 import { MatrixAction } from './matrix-action'
 import { MatrixForm, MatrixStage, useBatchLede } from './matrix-form'
 import { MatrixResults } from './matrix-results'
@@ -110,6 +110,11 @@ type FrameProps = {
   children: ReactNode
 }
 
+// Closing gives focus back to what opened Batch create (the card, a template's link).
+function giveFocusBack(event: Event) {
+  if (restoreOpener()) event.preventDefault()
+}
+
 function BatchFrame(props: FrameProps) {
   const desktop = useMediaQuery('(min-width: 768px)')
   return desktop ? <DesktopFrame {...props} /> : <PhoneFrame {...props} />
@@ -122,7 +127,7 @@ function DesktopFrame({ open, onClose, title, lede, guide, scroller, stage, bar,
     <DialogPrimitive.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="scrim-motion fixed inset-0 z-90 bg-[var(--scrim)] backdrop-blur-[2px]" />
-        <DialogPrimitive.Content className="dialog-motion shadow-sheet fixed top-1/2 left-1/2 z-100 flex h-[min(calc(100dvh-64px),900px)] w-[min(1120px,calc(100%-32px))] -translate-1/2 flex-col overflow-hidden rounded-panel bg-popover outline-none">
+        <DialogPrimitive.Content onCloseAutoFocus={giveFocusBack} className="dialog-motion shadow-sheet fixed top-1/2 left-1/2 z-100 flex h-[min(calc(100dvh-64px),900px)] w-[min(1120px,calc(100%-32px))] -translate-1/2 flex-col overflow-hidden rounded-panel bg-popover outline-none">
           <div className="flex flex-none items-center gap-4 py-4 pr-16 pl-6 shadow-[inset_0_-1px_0_var(--border)]">
             <div className="min-w-0 flex-1">
               <DialogPrimitive.Title className="font-display text-h1 leading-[1.05] tracking-[-0.02em]">{title}</DialogPrimitive.Title>
@@ -156,7 +161,7 @@ function DesktopFrame({ open, onClose, title, lede, guide, scroller, stage, bar,
 function PhoneFrame({ open, onClose, title, lede, guide, scroller, bar, children }: FrameProps) {
   return (
     <Drawer open={open} onOpenChange={(next) => !next && onClose()} repositionInputs>
-      <DrawerContent className="h-[calc(100dvh-var(--sat)-12px)]">
+      <DrawerContent onCloseAutoFocus={giveFocusBack} className="h-[calc(100dvh-var(--sat)-12px)]">
         <div ref={scroller} className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-pb-6 px-4', bar ? 'pb-4' : 'pb-[calc(var(--sab)+16px)]')}>
           <DrawerTitle className="mr-12">{title}</DrawerTitle>
           <DrawerDescription className="mt-1 text-pretty">{lede}</DrawerDescription>
