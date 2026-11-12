@@ -7,9 +7,7 @@ import type { Identity } from './identity'
 // when Auth or the database cannot answer. The check itself is identity.test.ts.
 const mocks = vi.hoisted(() => ({ identity: { status: 'signed_out' } as Identity, verify: vi.fn() }))
 vi.mock('./identity', async (original) => ({ ...(await original<typeof import('./identity')>()), verifyIdentity: mocks.verify }))
-vi.mock('@supabase/ssr', () => ({
-  createServerClient: () => ({ auth: { getSession: async () => ({ data: { session: { access_token: 'eyJ.token.a' } }, error: null }) } }),
-}))
+vi.mock('@supabase/ssr', async (original) => ({ ...(await original<typeof import('@supabase/ssr')>()), createServerClient: () => ({ auth: {} }) }))
 vi.mock('../public-env', () => ({ publicEnv: { NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon' } }))
 
 const { proxyGate } = await import('./proxy-gates')
@@ -22,7 +20,10 @@ const forward = (request: NextRequest) => {
   forwarded = request.headers.get(IDENTITY_HEADER)
   return NextResponse.next({ request })
 }
-const SESSION = 'sb-127-auth-token=base64-x'
+// A session cookie as @supabase/ssr writes it; the proxy seals for the access token inside.
+const jwt = (exp: number) => `h.${Buffer.from(JSON.stringify({ sub: 'u1', exp })).toString('base64url')}.s`
+const TOKEN = jwt(Math.floor(Date.now() / 1000) + 3600)
+const SESSION = `sb-127-auth-token=base64-${Buffer.from(JSON.stringify({ access_token: TOKEN, refresh_token: 'r' })).toString('base64url')}`
 function gate(path: string, headers: Record<string, string> = {}) {
   return proxyGate(new NextRequest(`http://localhost:3000${path}`, { headers }), { translatedPaths: ['/account'], forward, identitySecret: secret })
 }
@@ -39,12 +40,12 @@ describe('proxyGate session check', () => {
     const response = await gate('/account', { cookie: SESSION })
     expect(response.status).toBe(200)
     expect(mocks.verify).toHaveBeenCalledTimes(1)
-    expect(openIdentity(forwarded ?? '', 'eyJ.token.a', secret)).toEqual(user)
-    expect(openIdentity(forwarded ?? '', 'eyJ.token.b', secret)).toBeNull()
+    expect(openIdentity(forwarded ?? '', TOKEN, secret)).toEqual(user)
+    expect(openIdentity(forwarded ?? '', jwt(1), secret)).toBeNull()
   })
 
   it("drops a client's own identity header on every path", async () => {
-    const forged = sealIdentity({ ...user, role: 'admin' }, 'eyJ.token.a', 'guessed-key')
+    const forged = sealIdentity({ ...user, role: 'admin' }, TOKEN, 'guessed-key')
     await gate('/pricing', { [IDENTITY_HEADER]: forged })
     expect(forwarded).toBeNull()
     mocks.identity = { status: 'signed_out' }

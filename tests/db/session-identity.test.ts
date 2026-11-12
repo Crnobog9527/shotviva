@@ -4,7 +4,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import type { Client } from 'pg'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { connectAdmin, localSupabase, retryAuth } from './helpers'
 import { serviceSupabase } from './supabase-env'
@@ -123,7 +123,7 @@ describe('proxy session check with a real session', () => {
     ;({ IDENTITY_HEADER: identityHeader, openIdentity } = await import('@/core/auth/forwarded-identity'))
   })
 
-  async function cookieFor(who: Account): Promise<{ cookie: string; token: string }> {
+  async function cookieFor(who: Account): Promise<{ cookie: string; token: string; refresh: string }> {
     let jar: { name: string; value: string }[] = []
     const { apiUrl, anonKey } = localSupabase()
     const client = createServerClient(apiUrl, anonKey, {
@@ -134,7 +134,7 @@ describe('proxy session check with a real session', () => {
       if (result.error) throw result.error
       return result
     })
-    return { cookie: jar.map(({ name, value }) => `${name}=${value}`).join('; '), token: data.session?.access_token ?? '' }
+    return { cookie: jar.map(({ name, value }) => `${name}=${value}`).join('; '), token: data.session?.access_token ?? '', refresh: data.session?.refresh_token ?? '' }
   }
 
   it('lets a signed-in page through with one database call and no Auth round trip, and seals it for the page', async () => {
@@ -156,6 +156,60 @@ describe('proxy session check with a real session', () => {
     expect(urls.filter((url) => url.includes('/auth/v1/'))).toEqual([])
     expect(urls.filter((url) => url.includes('/rest/v1/'))).toEqual([expect.stringContaining('/rest/v1/rpc/session_identity')])
     expect(openIdentity(forwarded ?? '', token, secret)).toMatchObject({ id: who.id, verified: true, role: 'user', locale: 'zh' })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  // Review of #542: Auth answers 429 when the proxy must refresh an expired token. The proxy lets
+  // the page through without touching the cookies; the page checks without refreshing (a refresh
+  // there would rotate the refresh token and lose the new one); the session is still alive after.
+  it('survives a rate-limited refresh: no cookie change, no refresh in the page, session still usable', async () => {
+    const who = await account()
+    const { cookie, refresh } = await cookieFor(who)
+    const { verifyCookieIdentity } = await import('@/core/auth/identity')
+    const real = globalThis.fetch.bind(globalThis)
+    const refreshes: string[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input instanceof Request ? input.url : input)
+      if (url.includes('/auth/v1/token')) {
+        refreshes.push(url)
+        return Response.json({ code: 429, error_code: 'over_request_rate_limit', msg: 'Request rate limit reached' }, { status: 429 })
+      }
+      return real(input, init)
+    })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.now() + 2 * 3600 * 1000) // the access token is now expired
+
+    let forwardedCookies: { name: string; value: string }[] = []
+    // A signed-in page (the gate) and a public one (refresh only, updateSession).
+    for (const path of ['/pricing', '/account']) {
+      const response = await proxyGate(new NextRequest(`http://localhost:3000${path}`, { headers: { cookie } }), {
+        translatedPaths: [],
+        forward: (request) => {
+          forwardedCookies = request.cookies.getAll()
+          return NextResponse.next({ request })
+        },
+        identitySecret: 'local-service-key',
+      })
+      expect(response.status, path).toBe(200)
+      expect(response.headers.get('location'), path).toBeNull()
+      expect(response.cookies.getAll(), path).toEqual([])
+      expect(forwardedCookies.map(({ name, value }) => `${name}=${value}`).join('; '), path).toBe(cookie)
+    }
+    expect(refreshes.length).toBeGreaterThan(0)
+
+    const before = refreshes.length
+    const { apiUrl, anonKey } = localSupabase()
+    expect(await verifyCookieIdentity(forwardedCookies, { url: apiUrl, anonKey })).toEqual({ status: 'unavailable', source: 'auth' })
+    expect(refreshes.length).toBe(before)
+
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+    const { error } = await createClient(apiUrl, anonKey, { auth: { persistSession: false } }).auth.refreshSession({ refresh_token: refresh })
+    expect(error).toBeNull()
   })
 
   it('sends a signed-out session to the login page', async () => {

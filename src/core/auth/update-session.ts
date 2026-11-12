@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { publicEnv } from '../public-env'
+import { authUnavailable } from './identity'
 
 const SESSION_COOKIE = /^sb-.+-auth-token(\.\d+)?$/
 
@@ -23,7 +24,11 @@ export function withCookies(target: NextResponse, from: NextResponse): NextRespo
 // A request-scoped client whose refreshed cookies land on `response()`. Server Components
 // cannot write cookies, so the token refresh (and its rotated cookies) happens in the proxy.
 // The rotated cookies are also written into the request itself, which every forward copies.
+// `discard()` undoes what a failed refresh wrote: on a 429 with an expired access token the SDK
+// deletes the session cookies as if the refresh token were dead, but nothing was rotated, so the
+// browser keeps its cookies and the next request tries again (ARCHITECTURE §7「会话校验」).
 export function proxySupabase(request: NextRequest) {
+  const original = request.cookies.getAll()
   let response = NextResponse.next({ request })
   const supabase = createServerClient(publicEnv.NEXT_PUBLIC_SUPABASE_URL, publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
     cookies: {
@@ -35,7 +40,15 @@ export function proxySupabase(request: NextRequest) {
       },
     },
   })
-  return { supabase, response: () => response }
+  // Through request.cookies, which keeps its parsed copy and the Cookie header in step.
+  const discard = () => {
+    request.cookies.getAll().forEach(({ name }) => {
+      if (!original.some((cookie) => cookie.name === name)) request.cookies.delete(name)
+    })
+    original.forEach(({ name, value }) => request.cookies.set(name, value))
+    response = NextResponse.next({ request })
+  }
+  return { supabase, response: () => response, discard }
 }
 
 // Visitors without a session cookie skip the session work, keeping marketing pages fast. With a
@@ -44,7 +57,8 @@ export function proxySupabase(request: NextRequest) {
 // Who the visitor is gets decided where it matters, by the page or route (identity.ts).
 export async function updateSession(request: NextRequest, forward: Forward = forwardRequest): Promise<NextResponse> {
   if (!hasSessionCookie(request) || !publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY) return forward(request)
-  const { supabase, response } = proxySupabase(request)
-  await supabase.auth.getClaims()
+  const { supabase, response, discard } = proxySupabase(request)
+  const { error } = await supabase.auth.getClaims()
+  if (error && authUnavailable(error)) discard()
   return withCookies(forward(request), response())
 }

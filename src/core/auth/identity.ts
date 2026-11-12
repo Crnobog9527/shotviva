@@ -1,14 +1,17 @@
-import { isAuthRetryableFetchError, isAuthSessionMissingError, type AuthError, type SupabaseClient, type User } from '@supabase/supabase-js'
+import { createClient, isAuthRetryableFetchError, isAuthSessionMissingError, type AuthError, type SupabaseClient, type User } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { logger } from '../logger'
+import { cookieToken } from './cookie-token'
 import { toSessionUser, type SessionUser } from './session-user'
 
 // Who sent this request, checked once (ARCHITECTURE §7「会话校验」). Used by the proxy and, when
-// the proxy did not forward an answer, by the page itself. No Auth round trip for a live token:
+// the proxy did not forward an answer, by the page or route itself. No Auth round trip for a
+// live token:
 //   1. getClaims() checks the access token's signature against the project's JWKS (asymmetric
-//      ES256 key, fetched once per instance and cached 10 minutes) and refreshes an expired
-//      session first, the one time it talks to Auth;
+//      ES256 key, fetched once per instance and cached 10 minutes). In the proxy it refreshes an
+//      expired session first, the one time it talks to Auth; anywhere else nothing refreshes
+//      (verifyCookieIdentity);
 //   2. session_identity() (migration 1285) reads the account, its profile and the session row in
 //      one PostgREST call. No row: the account was deleted or Auth-banned, or the session was
 //      signed out, revoked or timed out. That is what getUser() used to tell us, plus the profile.
@@ -65,8 +68,10 @@ export function rowToSessionUser(row: Row): SessionUser {
   return toSessionUser(user, row.role === null ? null : { role: row.role, banned_at: row.banned_at })
 }
 
-async function claimsOf(supabase: SupabaseClient): Promise<{ sub: string } | Identity> {
-  const { data, error } = await supabase.auth.getClaims()
+// `token`: check this access token rather than the client's session (which getClaims() would
+// refresh when it is near expiry).
+async function claimsOf(supabase: SupabaseClient, token?: string): Promise<{ sub: string } | Identity> {
+  const { data, error } = await supabase.auth.getClaims(token)
   if (error) {
     if (!authUnavailable(error)) return SIGNED_OUT
     logger.warn('auth.identity_unavailable', { source: 'auth', status: error.status, name: error.name })
@@ -92,10 +97,11 @@ async function profileOf(supabase: SupabaseClient, sub: string): Promise<Identit
   return row && row.id === sub ? { status: 'signed_in', user: rowToSessionUser(row) } : SIGNED_OUT
 }
 
-// `supabase` is bound to the request's cookies (the proxy's client or createServerSupabase()).
-export async function verifyIdentity(supabase: SupabaseClient): Promise<Identity> {
+// The proxy's check. `supabase` is bound to the request's cookies and may refresh the session:
+// the proxy writes the rotated cookies onto both the forwarded request and the response.
+export async function verifyIdentity(supabase: SupabaseClient, token?: string): Promise<Identity> {
   try {
-    const claims = await claimsOf(supabase)
+    const claims = await claimsOf(supabase, token)
     if ('status' in claims) return claims
     return await profileOf(supabase, claims.sub)
   } catch (error) {
@@ -105,4 +111,32 @@ export async function verifyIdentity(supabase: SupabaseClient): Promise<Identity
     logger.error('auth.identity_failed', { error })
     return { status: 'unavailable', source: 'auth' }
   }
+}
+
+// The same check for pages, Server Actions and route handlers, which must never refresh: the
+// access token comes straight from the cookie and the session read carries exactly that token.
+// A token already expired here is one the proxy could not refresh just now (Auth busy or down),
+// so it is "unavailable", not a sign-out; a refresh token Auth rejected never gets this far,
+// since the proxy clears those cookies on the request it forwards.
+export async function verifyCookieIdentity(
+  cookies: readonly { name: string; value: string }[],
+  env: { url: string; anonKey: string },
+  now = Date.now(),
+): Promise<Identity> {
+  const found = await cookieToken(cookies, env.url)
+  if (!found) return SIGNED_OUT
+  // A few seconds of slack, so a token that lapses before getClaims() reads it is not a sign-out.
+  if (found.expiresAt <= now + 10_000) {
+    logger.warn('auth.identity_unavailable', { source: 'auth', reason: 'expired_unrefreshed' })
+    return { status: 'unavailable', source: 'auth' }
+  }
+  return verifyIdentity(bearerClient(env, found.token), found.token)
+}
+
+// No session storage, no refresh: every request carries the cookie's own access token.
+function bearerClient(env: { url: string; anonKey: string }, token: string): SupabaseClient {
+  return createClient(env.url, env.anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
 }

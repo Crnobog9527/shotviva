@@ -1,34 +1,40 @@
 import 'server-only'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
+import { connection } from 'next/server'
 import { cache } from 'react'
 
 import { serverEnv } from '../env'
 import { AppError } from '../errors'
 import { localized } from '../i18n/server'
+import { publicEnv } from '../public-env'
+import { cookieToken } from './cookie-token'
 import { IDENTITY_HEADER, openIdentity } from './forwarded-identity'
-import { verifyIdentity, type Identity } from './identity'
+import { verifyCookieIdentity, type Identity } from './identity'
 import { loginPath } from './redirect-target'
 import type { SessionUser } from './session-user'
-import { createServerSupabase } from './supabase-server'
+
+type Cookies = { name: string; value: string }[]
 
 // The proxy's answer, when it checked this request and sealed it for us (forwarded-identity.ts).
-async function forwardedUser(supabase: Awaited<ReturnType<typeof createServerSupabase>>): Promise<SessionUser | null> {
+async function forwardedUser(jar: Cookies): Promise<SessionUser | null> {
   const value = (await headers()).get(IDENTITY_HEADER)
   const secret = serverEnv().SUPABASE_SERVICE_ROLE_KEY
   if (!value || !secret) return null
-  // Read from the cookie only: the proxy refreshed it, so nothing goes over the network here.
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-  return token ? openIdentity(value, token, secret) : null
+  const found = await cookieToken(jar, publicEnv.NEXT_PUBLIC_SUPABASE_URL)
+  return found ? openIdentity(value, found.token, secret) : null
 }
 
 // One session check per request, however many components ask, and none at all when the proxy
 // already made it: no Auth round trip and at most one database read (ARCHITECTURE §7「会话校验」).
+// Never refreshes the session: only the proxy can hand rotated cookies to the browser.
 export const sessionIdentity = cache(async (): Promise<Identity> => {
-  const supabase = await createServerSupabase()
-  const forwarded = await forwardedUser(supabase)
-  return forwarded ? { status: 'signed_in', user: forwarded } : verifyIdentity(supabase)
+  // The check reads the clock; Cache Components requires the render to be request-time first.
+  await connection()
+  const jar = (await cookies()).getAll()
+  const forwarded = await forwardedUser(jar)
+  if (forwarded) return { status: 'signed_in', user: forwarded }
+  return verifyCookieIdentity(jar, { url: publicEnv.NEXT_PUBLIC_SUPABASE_URL, anonKey: publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY })
 })
 
 // null when signed out. When Auth or the database could not answer it throws AUTH_UNAVAILABLE

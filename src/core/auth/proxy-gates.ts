@@ -5,6 +5,7 @@ import { localeRedirect } from '../i18n/locale-redirect'
 import { DEFAULT_LOCALE, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, type Locale } from '../i18n/locales'
 import { localizePath, matchesPaths, splitLocale } from '../i18n/paths'
 import { publicEnv } from '../public-env'
+import { cookieToken } from './cookie-token'
 import { IDENTITY_HEADER, sealIdentity } from './forwarded-identity'
 import { SIGNED_OUT, verifyIdentity, type Identity } from './identity'
 import { loginPath } from './redirect-target'
@@ -55,9 +56,11 @@ export function notFoundResponse(): NextResponse {
 // One check for the request (identity.ts). `user` is null when signed out and when the check could
 // not run; `identity` tells the two apart.
 export async function currentProxyUser(request: NextRequest) {
-  const { supabase, response } = proxySupabase(request)
+  const { supabase, response, discard } = proxySupabase(request)
   const identity = await verifyIdentity(supabase)
-  return { identity, user: identity.status === 'signed_in' ? identity.user : null, response, supabase }
+  // Could not tell: keep the browser's cookies exactly as they came (update-session.ts).
+  if (identity.status === 'unavailable') discard()
+  return { identity, user: identity.status === 'signed_in' ? identity.user : null, response }
 }
 
 // Pure decision so every branch is unit-tested without a network. `pathname` is the address
@@ -146,14 +149,14 @@ export async function proxyGate(request: NextRequest, options: ProxyGateOptions)
   return withCookies(gatedAnswer(request, verdict, chosen ? null : user, options), response())
 }
 
-// The proxy's check, and on success the sealed answer on the request it forwards. The access
-// token is read after getClaims(), so it is the refreshed one the page will see in its cookies.
+// The proxy's check, and on success the sealed answer on the request it forwards. The token is
+// read from the request's cookies after the check, so it is the refreshed one, read the same way
+// the page reads it (cookie-token.ts).
 async function checkedRequest(request: NextRequest, secret: string | undefined) {
-  const { identity, response, supabase } = await currentProxyUser(request)
+  const { identity, response } = await currentProxyUser(request)
   if (identity.status === 'signed_in' && secret) {
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (token) request.headers.set(IDENTITY_HEADER, sealIdentity(identity.user, token, secret))
+    const found = await cookieToken(request.cookies.getAll(), publicEnv.NEXT_PUBLIC_SUPABASE_URL)
+    if (found) request.headers.set(IDENTITY_HEADER, sealIdentity(identity.user, found.token, secret))
   }
   return { identity, response }
 }
