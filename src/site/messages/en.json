@@ -344,6 +344,8 @@
       "moreTemplates": "Add another template",
       "morePhotos": "Up to {count, number} at once on Max",
       "removeTemplate": "Remove {name}",
+      "swap": "Change",
+      "swapTemplate": "Change {name}",
       "templateUnavailable": "Not available right now. Remove it to go on.",
       "pickerTitle": "Choose templates",
       "pickerLine": "{count, number} of {max, number} chosen. Each one runs on every photo.",

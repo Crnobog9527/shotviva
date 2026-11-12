@@ -7,8 +7,7 @@ import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
-import { cachedWebTemplates } from '@/core/templates'
-import { GuideButton, MatrixWorkspace, toCatalogueTemplate } from '@/modules/image'
+import { GuideButton, loadBatchCatalogue, MatrixWorkspace } from '@/modules/image'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.matrix'))('metaTitle') }
@@ -27,16 +26,14 @@ async function Matrix({ searchParams }: { searchParams: Promise<Record<string, s
   const user = await requireUser('/generate/batch')
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
-  const [query, found, balance, tier] = await Promise.all([
-    searchParams,
-    cachedWebTemplates(await currentLocale(), false),
+  const query = await searchParams
+  const [{ templates, initial }, balance, tier] = await Promise.all([
+    // Series members included: a series dialog's link arrives with a member's id (?t=).
+    loadBatchCatalogue(await currentLocale(), query.t),
     readBalance(supabase, user.id),
     // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
     effectiveTier(admin, user.id),
   ])
-  const templates = found.map(toCatalogueTemplate).filter((template) => template.photoInput !== 'none')
-  const wanted = typeof query.t === 'string' ? query.t.split(',') : []
-  const initial = [...new Set(wanted)].filter((id) => templates.some((template) => template.id === id)).slice(0, 5)
   return (
     <>
       <Nav

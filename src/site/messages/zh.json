@@ -344,6 +344,8 @@
       "moreTemplates": "再加模板",
       "morePhotos": "Max 一次最多 {count, number} 张",
       "removeTemplate": "去掉{name}",
+      "swap": "换模板",
+      "swapTemplate": "换掉{name}",
       "templateUnavailable": "暂时不可用，去掉它才能继续。",
       "pickerTitle": "选择模板",
       "pickerLine": "已选 {count, number} / {max, number} 个，每个模板都会用到每张照片上。",

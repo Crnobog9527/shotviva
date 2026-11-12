@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- small static example images from /public/intros */
 import { useLocale, useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 
 import { usePaywall } from '@/core/billing/paywall/provider'
 import type { MembershipTier } from '@/core/config'
@@ -54,10 +54,22 @@ export function FeatureGuide({ tab: initial, tier, upgrade, open, onOpenChange }
   )
 }
 
+// Tabs the ARIA way: the selected one is in the tab order and names the one panel on screen;
+// Left / Right (and Home / End) move to the other tab and show it.
 function Tabs({ tab, onChange }: { tab: GatedFeature; onChange(tab: GatedFeature): void }) {
   const t = useTranslations('app.gated.guide')
+  const move = (event: KeyboardEvent<HTMLDivElement>) => {
+    const index = GATED_FEATURES.indexOf(tab)
+    const last = GATED_FEATURES.length - 1
+    const next = { ArrowRight: index === last ? 0 : index + 1, ArrowLeft: index === 0 ? last : index - 1, Home: 0, End: last }[event.key]
+    if (next === undefined) return
+    event.preventDefault()
+    const option = GATED_FEATURES[next]!
+    onChange(option)
+    document.getElementById(`guide-tab-${option}`)?.focus()
+  }
   return (
-    <div role="tablist" aria-label={t('tabsLabel')} className="hairline mt-1 grid grid-cols-2 gap-1 rounded-tile p-1">
+    <div role="tablist" aria-label={t('tabsLabel')} onKeyDown={move} className="hairline mt-1 grid grid-cols-2 gap-1 rounded-tile p-1">
       {GATED_FEATURES.map((option) => (
         <button
           key={option}
@@ -65,7 +77,8 @@ function Tabs({ tab, onChange }: { tab: GatedFeature; onChange(tab: GatedFeature
           type="button"
           role="tab"
           aria-selected={tab === option}
-          aria-controls={`guide-${option}`}
+          aria-controls={tab === option ? `guide-${option}` : undefined}
+          tabIndex={tab === option ? 0 : -1}
           onClick={() => onChange(option)}
           className={cn('press min-h-11 rounded-[10px] px-2 text-caption leading-[1.2] font-semibold', tab === option ? 'bg-wash-strong text-foreground' : 'text-bone-dim')}
         >

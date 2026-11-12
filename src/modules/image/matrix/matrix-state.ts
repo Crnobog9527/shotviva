@@ -115,9 +115,10 @@ export function withoutTemplate(values: MatrixValues, templateId: string): Matri
 }
 
 // A tap in the template picker: a chosen template leaves; a new one joins while there is room.
-// With room for one (Pro) a new template takes the place of the one chosen before.
+// With room for one (Pro) the picker is a choice, not a toggle: a new template takes the place of
+// the one chosen before, and the chosen one stays (removing it is the row's ✕).
 export function pickTemplate(values: MatrixValues, templateId: string, max: number): MatrixValues {
-  if (values.templateIds.includes(templateId)) return withoutTemplate(values, templateId)
+  if (values.templateIds.includes(templateId)) return max === 1 ? values : withoutTemplate(values, templateId)
   const room = max === 1 ? values.templateIds.reduce(withoutTemplate, values) : values
   return withTemplate(room, templateId, max)
 }

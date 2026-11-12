@@ -48,7 +48,8 @@ export function MatrixForm({ draft, templates, balancePaid, tier }: Props) {
 }
 
 // The batch's templates and their picker. With room for one (Pro) a tap in the picker is the
-// choice and closes it; once one is in, the add button gives way to the locked way to Max.
+// choice and closes it; once one is in, its row offers Change (the picker again, a tap swaps it)
+// and the add button gives way to the locked way to Max.
 function TemplatesBlock({ draft, templates, tier }: { draft: MatrixDraft; templates: readonly CatalogueTemplate[]; tier: MembershipTier | null }) {
   const t = useTranslations('app.matrix')
   const [picking, setPicking] = useState(false)
@@ -61,6 +62,7 @@ function TemplatesBlock({ draft, templates, tier }: { draft: MatrixDraft; templa
         max={caps.templates}
         failedId={draft.error?.template_id ?? null}
         onAdd={() => setPicking(true)}
+        onSwap={single ? () => setPicking(true) : undefined}
         onRemove={(id) => change((v) => withoutTemplate(v, id))}
         more={single && chosen.length === 1 ? <MoreLocked tier={tier} tab="templates" /> : null}
       />
@@ -72,7 +74,8 @@ function TemplatesBlock({ draft, templates, tier }: { draft: MatrixDraft; templa
         max={caps.templates}
         onToggle={(id) => {
           change((v) => pickTemplate(v, id, caps.templates))
-          if (single && !values.templateIds.includes(id)) setPicking(false)
+          // With room for one a tap is the choice (or keeps it): the picker closes on it.
+          if (single) setPicking(false)
         }}
       />
     </Section>
