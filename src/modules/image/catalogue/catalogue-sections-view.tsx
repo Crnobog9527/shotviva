@@ -57,7 +57,10 @@ export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: 
               </ul>
             ) : (
               <ul className={cn(
-                'no-scrollbar mt-2 flex snap-x snap-mandatory scroll-px-(--gutter) gap-3 overflow-x-auto px-(--gutter) pb-1',
+                // relative: the rail is the containing block for anything absolutely placed in its cards
+                // (the sr-only category name in the end card), so its scroll clips them; otherwise
+                // they sit at the rail's far end against the page and widen it on phones.
+                'no-scrollbar relative mt-2 flex snap-x snap-mandatory scroll-px-(--gutter) gap-3 overflow-x-auto px-(--gutter) pb-1',
                 'md:mt-3 md:grid md:snap-none md:grid-cols-2 md:gap-4 md:overflow-visible md:pb-0 lg:grid-cols-3',
               )}>
                 {section.entries.map((entry, index) => (
