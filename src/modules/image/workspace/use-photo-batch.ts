@@ -163,3 +163,58 @@ function useBatchHolds(entries: Entry[]) {
   useUpdateHold('upload', entries.some((entry) => entry.upload.phase === 'compressing' || entry.upload.phase === 'uploading'))
   useUpdateHold('photos', entries.some((entry) => entry.file !== null))
 }
+
+// A slot template's photos (§5.1e): at most one per named slot, each uploading on its own like a
+// batch photo (same three-at-a-time limit, same holds). Entries are keyed by slot, so a photo can
+// only ever be in its own box. `kept` (Make again) puts each kept photo back in its slot.
+export type SlotKept = { photos: readonly { inputKey: string; bytes: number; url: string; slot?: string }[]; madeAt: string }
+
+export function useSlotPhotos(slots: readonly { key: string; required: boolean }[], kept?: SlotKept) {
+  const [entries, setEntries] = useState<Entry[]>(() => keptSlotEntries(kept))
+  const patch = useCallback((id: string, change: Partial<Entry>) => {
+    setEntries((list) => list.map((entry) => (entry.id === id ? { ...entry, ...change } : entry)))
+  }, [])
+  const cancel = useBatchUploads(entries, patch)
+  useBatchHolds(entries)
+
+  const drop = (slot: string) => {
+    cancel(slot)
+    const gone = entries.find((entry) => entry.id === slot)
+    if (gone?.file) URL.revokeObjectURL(gone.url)
+  }
+  const set = (slot: string, file: File) => {
+    drop(slot)
+    setEntries((list) => [...list.filter((entry) => entry.id !== slot), { ...newEntry(file, patch), id: slot }])
+  }
+  const remove = (slot: string) => {
+    drop(slot)
+    setEntries((list) => list.filter((entry) => entry.id !== slot))
+  }
+  // Switching series members (or a template edit) keeps only slots the template still has.
+  const keys = slots.map((slot) => slot.key)
+  const shown = entries.filter((entry) => keys.includes(entry.id))
+  return { byKey: Object.fromEntries(shown.map((entry) => [entry.id, entry as BatchPhoto])), status: slotStatus(slots, shown), uploads: slotUploads(keys, shown), set, remove }
+}
+
+export type SlotPhotos = ReturnType<typeof useSlotPhotos>
+
+function keptSlotEntries(kept: SlotKept | undefined): Entry[] {
+  return (kept?.photos ?? []).flatMap((photo) => (photo.slot
+    ? [{ id: photo.slot, file: null, url: photo.url, bytes: photo.bytes, ratio: null, upload: { phase: 'done' as const, inputKey: photo.inputKey }, keptFrom: kept?.madeAt }]
+    : []))
+}
+
+// What Generate waits for: a required slot still empty, or any slot still uploading.
+export function slotStatus(slots: readonly { key: string; required: boolean }[], entries: readonly BatchPhoto[]): 'none' | 'uploading' | 'ready' {
+  if (entries.some((entry) => entry.upload.phase === 'compressing' || entry.upload.phase === 'uploading' || entry.upload.phase === 'idle')) return 'uploading'
+  const done = new Set(entries.filter((entry) => entry.upload.phase === 'done').map((entry) => entry.id))
+  return slots.some((slot) => slot.required && !done.has(slot.key)) ? 'none' : 'ready'
+}
+
+// input_slots for /api/generate: the uploaded slots, in slot order.
+export function slotUploads(keys: readonly string[], entries: readonly BatchPhoto[]): Record<string, string> {
+  return Object.fromEntries(keys.flatMap((key) => {
+    const entry = entries.find((candidate) => candidate.id === key)
+    return entry?.upload.phase === 'done' ? [[key, entry.upload.inputKey]] : []
+  }))
+}

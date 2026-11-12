@@ -7,7 +7,7 @@ import { limitsFor } from '@/core/billing/tier-limits'
 import { useRouter } from '@/core/i18n'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
-import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { CatalogueSeries } from '../catalogue/catalogue-view'
 import { isCompareSample, TemplateSample } from '../catalogue/template-sample'
 import { FavoriteButton } from '../favorites/favorite-button'
@@ -45,13 +45,13 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
   // what belonged to the template before (its text fields and on/off choices).
   const draft = useWorkspaceDraft({ template, ...context, single: true })
   const choose = (id: string) => {
-    const step = memberSwitch(series.members, template.id, id)
+    const step = memberSwitch(series.members, template.id, id, draft.values.copy)
     if (!step) return
     setMemberId(step.memberId)
     draft.change(step.values)
     if (step.clearPhotos) draft.photos.clear()
   }
-  const batch = limitsFor(context.tier).batchMax > 1 && template.photoInput !== 'none' && draft.photos.photos.length === 0
+  const batch = limitsFor(context.tier).batchMax > 1 && template.photoInput !== 'none' && !isSlotTemplate(template) && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
   const workspace = `/generate/${template.id}`
   // Generate moves to the chosen member's workspace page, kept prefetched while the dialog is open.
@@ -82,6 +82,7 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
           balance={context.balance}
           tier={context.tier}
           photos={draft.photos}
+          slots={draft.slots}
           values={draft.values}
           onChange={draft.change}
           surface="create_dialog"

@@ -757,6 +757,12 @@
       },
       "toggles": {
         "cancel": "Cancel"
+      },
+      "slots": {
+        "upload": "Upload",
+        "oneAtATime": "This template makes one image at a time.",
+        "remove": "Remove",
+        "replace": "Replace"
       }
     },
     "errors": {

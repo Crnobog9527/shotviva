@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { trackTemplateView } from '@/core/analytics/browser'
 import { useReveal } from '@/core/ui/reveal'
 
+import { isSlotTemplate } from '../catalogue/catalogue-template'
 import type { TrackedJob } from '../generation/job-model'
 import { retryJob, setWorkspaceJobs } from '../generation/job-store'
 import { useJob, useWorkspaceJobs } from '../generation/use-jobs'
@@ -62,6 +63,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
           balance={balance}
           tier={tier}
           photos={draft.photos}
+          slots={draft.slots}
           values={draft.values}
           onChange={draft.change}
           again={input.again}
@@ -84,7 +86,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
 
 // Under the photos: the way to several templates at once (T107), locked below Max.
 function MatrixLink({ template, tier }: Pick<WorkspaceProps, 'template' | 'tier'>) {
-  if (template.photoInput === 'none') return null
+  if (template.photoInput === 'none' || isSlotTemplate(template)) return null
   return <MatrixEntry tier={tier} templateId={template.id} className="mt-3" />
 }
 
