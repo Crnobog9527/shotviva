@@ -155,5 +155,14 @@ export function templateSyncEnv() {
     actorId: z.uuid().parse(process.env.SYNC_PRODUCTION_ACTOR_ID),
     preview: read('SYNC_PREVIEW_', process.env.SYNC_PREVIEW_ASSETS_BASE),
     production: read('SYNC_PRODUCTION_', 'https://shotviva.com/assets'),
+    productionPrivateBucket: syncPrivateBucket(process.env.SYNC_PRODUCTION_PRIVATE_BUCKET),
   }
+}
+
+// Production's private uploads bucket, for style references (2026-11-12): only the one production
+// generates from, so a wrong name fails here instead of syncing references production never reads.
+// Unset (or empty), only templates without style references can sync.
+export const SYNC_PRODUCTION_PRIVATE_BUCKET = 'shotviva-production'
+export function syncPrivateBucket(value: string | undefined) {
+  return z.literal(SYNC_PRODUCTION_PRIVATE_BUCKET).optional().parse(value || undefined)
 }

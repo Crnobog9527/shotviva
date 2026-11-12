@@ -17,6 +17,9 @@ import { isWishlistEnabled } from '@/core/wishlist'
 import { HomeGeneratorSlot } from './home-generator-slot'
 import { HomeWishCtaSlot } from './home-wish-cta-slot'
 
+// The pictures of the home how-to blocks (card-visual.tsx); only this page draws them.
+import './explainer.css'
+
 // The copy with "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4).
 async function load() {
   const locale = await currentLocale()

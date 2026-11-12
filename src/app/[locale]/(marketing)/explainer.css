@@ -1,0 +1,66 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
+/* The picture that leads a how-to point (core/content/blocks/card-visual.tsx, Owner 2026-11-12):
+   a dark plate of one fixed shape (16:10), so the headings of a row of cards line up whatever the
+   picture is. Its own sheet, loaded by the home route only, not marketing.css (every marketing
+   page) and no Tailwind utilities, so the public Tailwind sheet's budget is untouched. */
+@layer components {
+  .xv {
+    /* overflow: hidden also keeps the 16:10 against the pictures' own size (aspect-ratio's auto
+       minimum height) */
+    display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); aspect-ratio: 16 / 10; overflow: hidden; margin: 0; padding: 10px;
+    border-radius: var(--radius); background: color-mix(in srgb, var(--foreground) 2.5%, var(--background)); box-shadow: inset 0 0 0 1px var(--border);
+    font: 500 13px/1.2 var(--font-sans); color: var(--muted-foreground);
+  }
+  .xv img { display: block; }
+  .mk-free .xv + h3 { margin-top: 16px; }
+  .mk-steps .xv { grid-column: 2; margin-top: -2px; background: var(--card); }
+
+  /* upload: the phone photo dropped into the dashed upload area */
+  .xv-up {
+    display: flex; align-items: center; justify-content: center; gap: 16px; border-radius: 10px;
+    border: 1px dashed color-mix(in srgb, var(--foreground) 22%, transparent);
+  }
+  .xv-up img { height: 78%; width: auto; border-radius: 6px; rotate: -4deg; box-shadow: 0 10px 20px -8px rgba(0, 0, 0, 0.8); }
+  .xv-file { display: grid; justify-items: start; gap: 8px; font: 400 12px/1 var(--font-mono); color: var(--bone-dim); }
+  .xv-file svg, .xv-to svg, .xv-on svg { width: 18px; height: 18px; }
+  .xv-file svg { box-sizing: content-box; padding: 7px; border-radius: 50%; background: var(--safelight-wash); color: var(--primary); }
+
+  /* picker: three templates as listed in the app, the picked one lit in safelight */
+  .xv-pick { display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; }
+  /* .xv in front: marketing.css styles every li inside .mk-steps as a step */
+  .xv .xv-pick li { display: flex; align-items: center; gap: 10px; min-height: 0; padding: 4px 10px 4px 4px; border-radius: 10px; }
+  .xv-pick img { height: 100%; width: auto; border-radius: 6px; opacity: 0.6; }
+  .xv-pick .xv-on { background: var(--safelight-wash); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 50%, transparent); color: var(--foreground); }
+  .xv-on img { opacity: 1; }
+  .xv-on svg { margin-left: auto; flex: none; color: var(--primary); }
+
+  /* pair: as shot → result, the arrow on the seam */
+  .xv-pair { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .xv-pair > span { position: relative; min-height: 0; overflow: hidden; border-radius: 8px; }
+  .xv-pair img { width: 100%; height: 100%; object-fit: cover; }
+  .xv-tag {
+    position: absolute; left: 6px; bottom: 6px; padding: 4px 7px; border-radius: 6px; font: 600 12px/1 var(--font-sans); white-space: nowrap;
+    color: var(--foreground); background: var(--frost); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .xv-to {
+    position: absolute; z-index: 1; left: 50%; top: 50%; translate: -50% -50%; display: grid; place-items: center; width: 30px; height: 30px;
+    border-radius: 50%; background: var(--background); box-shadow: 0 0 0 1px var(--border), 0 6px 14px -6px rgba(0, 0, 0, 0.8); color: var(--primary);
+  }
+
+  /* sizes: three copies at true scale, labels in a column on the right (room kept by margin) */
+  .xv-sizes { position: relative; height: 100%; aspect-ratio: 4 / 5; justify-self: center; margin-right: 92px; }
+  .xv-size { position: absolute; left: 0; bottom: 0; width: calc(var(--r) * 100%); aspect-ratio: 4 / 5; }
+  .xv-size img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent), 0 8px 18px -8px rgba(0, 0, 0, 0.85); }
+  .xv-rule { position: absolute; top: 0; left: 100%; width: calc(100% / var(--r) - 100% + 10px); height: 1px; background: var(--primary); }
+  .xv-rule::before { content: ""; position: absolute; left: -2.5px; top: -2px; width: 5px; height: 5px; border-radius: 50%; background: var(--primary); }
+  .xv-lbl { position: absolute; top: 0; left: calc(100% / var(--r) + 14px); translate: 0 -50%; white-space: nowrap; font-size: 12px; }
+  .xv-lbl b { font: 400 12px/1 var(--font-mono); color: var(--foreground); }
+
+  /* side-by-side steps are narrow: the picture takes the number's column too, and each step
+     spans two rows of the list so the three pictures line up however long the text is */
+  @media (min-width: 768px) {
+    .mk-steps > li { grid-row: span 2; grid-template-rows: subgrid; row-gap: 16px; }
+    .mk-steps .xv { grid-column: 1 / -1; margin-top: 0; }
+  }
+}

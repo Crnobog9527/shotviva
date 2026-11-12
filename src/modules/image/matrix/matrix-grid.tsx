@@ -8,14 +8,14 @@ import { cn } from '@/core/ui/cn'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { BatchPhoto } from '../workspace/photo-batch'
-import { cellKey, MATRIX_MAX_CELLS, type CellKey, type MatrixCell } from './matrix-state'
+import { cellKey, type CellKey, type MatrixCell } from './matrix-state'
 
-type Props = { templates: readonly CatalogueTemplate[]; photos: readonly BatchPhoto[]; cells: readonly MatrixCell[]; total: number; count: number; onToggle(key: CellKey): void }
+type Props = { templates: readonly CatalogueTemplate[]; photos: readonly BatchPhoto[]; cells: readonly MatrixCell[]; total: number; count: number; max: number; onToggle(key: CellKey): void }
 
 // The batch before it runs (T107): photos down, templates across, each square one photo the
 // batch will make with its credits. Tapping a square leaves it out (and back in). The line under
 // it is the total, which is what Generate charges.
-export function MatrixGrid({ templates, photos, cells, total, count, onToggle }: Props) {
+export function MatrixGrid({ templates, photos, cells, total, count, max, onToggle }: Props) {
   const t = useTranslations('app.matrix')
   const byKey = new Map(cells.map((cell) => [cell.key, cell]))
   const columns = { gridTemplateColumns: `2.75rem repeat(${templates.length}, minmax(0, 1fr))` }
@@ -47,8 +47,8 @@ export function MatrixGrid({ templates, photos, cells, total, count, onToggle }:
         ))}
       </div>
       <p aria-live="polite" className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1 text-caption text-muted-foreground">
-        <b className={cn('font-medium', count > MATRIX_MAX_CELLS ? 'text-destructive' : 'text-foreground')}>
-          {t.rich('gridTotal', { count, max: MATRIX_MAX_CELLS, total, mono: (chunks) => <span className="font-mono">{chunks}</span> })}
+        <b className={cn('font-medium', count > max ? 'text-destructive' : 'text-foreground')}>
+          {t.rich('gridTotal', { count, max, total, mono: (chunks) => <span className="font-mono">{chunks}</span> })}
         </b>
         <span>{t('gridHint')}</span>
       </p>
