@@ -1894,6 +1894,22 @@ $$;
 ALTER FUNCTION "admin"."template_series_revision"("p_series" "public"."template_series") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."template_sync_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
+    raise exception 'FORBIDDEN';
+  end if;
+  if p_action not in ('template_sync_active', 'template_sync_sale', 'series_sync_active') then raise exception 'INVALID_INPUT'; end if;
+  insert into public.admin_audit_log(action, user_id, target_id, reason) values(p_action, p_actor, p_target, p_reason);
+end $$;
+
+
+ALTER FUNCTION "admin"."template_sync_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."template_sync_catalog"() RETURNS "text"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -11332,9 +11348,8 @@ begin
   if previous.id is null then raise exception 'SERIES_MISSING'; end if;
   if previous.is_active is distinct from p_active then
     update public.template_series set is_active = p_active where id = previous.id;
-    insert into public.admin_audit_log(action, user_id, target_id, reason)
-      values('series_sync_active', p_actor, p_slug,
-        'T93 sync from preview run ' || p_run_id || case when p_active then ': published' else ': unpublished' end);
+    perform admin.template_sync_audit(p_actor, 'series_sync_active', p_slug,
+      'T93 sync from preview run ' || p_run_id || case when p_active then ': published' else ': unpublished' end);
     v_result := case when p_active then 'published' else 'unpublished' end;
   end if;
   if p_validate_only then raise exception using errcode = 'Z9301'; end if;
@@ -11549,15 +11564,13 @@ begin
   v_sale := exists(select from public.template_sale_approvals where template_id = p_id and enabled);
   if t.is_active and not p_active then
     update public.templates set is_active = false, featured_rank = null where id = p_id;
-    insert into public.admin_audit_log(action, user_id, target_id, reason)
-      values('template_sync_active', p_actor, p_id, v_reason || ': unpublished');
+    perform admin.template_sync_audit(p_actor, 'template_sync_active', p_id, v_reason || ': unpublished');
     v_result := v_result || jsonb_build_object('active', 'unpublished');
     t.is_active := false;
   end if;
   if v_sale is distinct from p_sale then
     perform public.admin_set_template_sale(p_actor, p_id, p_sale);
-    insert into public.admin_audit_log(action, user_id, target_id, reason)
-      values('template_sync_sale', p_actor, p_id, v_reason || case when p_sale then ': sale opened' else ': sale closed' end);
+    perform admin.template_sync_audit(p_actor, 'template_sync_sale', p_id, v_reason || case when p_sale then ': sale opened' else ': sale closed' end);
     v_result := v_result || jsonb_build_object('sale', case when p_sale then 'opened' else 'closed' end);
   end if;
   if p_active and not t.is_active then
@@ -11570,8 +11583,7 @@ begin
     if 'web' = any(t.visible_in) and not admin.web_standard_sale_allowed(p_id) then
       raise exception 'SALE_ROUTE_NOT_ALLOWED';
     end if;
-    insert into public.admin_audit_log(action, user_id, target_id, reason)
-      values('template_sync_active', p_actor, p_id, v_reason || ': published');
+    perform admin.template_sync_audit(p_actor, 'template_sync_active', p_id, v_reason || ': published');
     v_result := v_result || jsonb_build_object('active', 'published');
   end if;
   if p_validate_only then raise exception using errcode = 'Z9301'; end if;
@@ -15874,6 +15886,11 @@ GRANT SELECT ON TABLE "public"."template_series" TO "authenticated";
 
 REVOKE ALL ON FUNCTION "admin"."template_series_revision"("p_series" "public"."template_series") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."template_series_revision"("p_series" "public"."template_series") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_sync_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_sync_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") TO "service_role";
 
 
 
