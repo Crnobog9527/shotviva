@@ -67,7 +67,7 @@ function AgainForm({ context }: { context: AgainContext }) {
   return (
     <>
       <div className="md:min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain [&>section:first-child]:pt-0">
-        <WorkspaceForm template={context.template} balance={context.balance} tier={context.tier} photos={draft.photos} values={draft.values} onChange={draft.change} again={context.again} />
+        <WorkspaceForm template={context.template} balance={context.balance} tier={context.tier} photos={draft.photos} slots={draft.slots} values={draft.values} onChange={draft.change} again={context.again} />
       </div>
       <div className="sticky bottom-0 z-10 md:static">
         <FormAction

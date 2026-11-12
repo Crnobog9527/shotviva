@@ -12,7 +12,7 @@ import type { MembershipTier } from '@/core/config'
 import { AgainNote } from '../again/again-note'
 import type { AgainStart } from '../again/again-start'
 import { MissingPhoto } from '../again/missing-photo'
-import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
+import { allowsNoPhoto, isSlotTemplate, slotsOfTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { TemplateToggles, type ToggleSurface } from '../toggles'
 import { BatchHint } from './batch-hint'
 import { BatchPhotos } from './batch-photos'
@@ -21,7 +21,8 @@ import { PhotoCard } from './photo-card'
 import { PhotoPickers } from './photo-pickers'
 import { CopyFields, NoteField } from './text-fields'
 import { canOpenOnOverPick, useOverPick } from './use-over-pick'
-import type { PhotoBatch } from './use-photo-batch'
+import { SlotBoxes } from './slot-boxes'
+import type { PhotoBatch, SlotPhotos } from './use-photo-batch'
 import { chosenAspect, templateOptions } from './output-choice'
 import { notePlaceholder, sizeLabel } from './workspace-options'
 
@@ -33,6 +34,8 @@ type Props = {
   balance: Balance
   tier: MembershipTier | null
   photos: PhotoBatch
+  // A slot template's photos by slot (§5.1e); its boxes take the photo section's place.
+  slots?: SlotPhotos
   values: FormValues
   onChange(next: Partial<FormValues>): void
   // Opened with Make again (T40): the note on top, and the photo slot when the photo is missing.
@@ -47,7 +50,7 @@ type Props = {
 // options (T89) → the optional note → size → resolution, then the balance line above the action bar. The one form
 // source (T38): the workspace page and the creation dialog both render it, and their frames
 // set the side padding.
-export function WorkspaceForm({ template, balance, tier, photos, values, onChange, again, photoExtra, surface = 'workspace' }: Props) {
+export function WorkspaceForm({ template, balance, tier, photos, slots, values, onChange, again, photoExtra, surface = 'workspace' }: Props) {
   const t = useTranslations('app')
   const balanceT = useTranslations('app.balance')
   const noteT = useTranslations('app.workspace.notePlaceholder')
@@ -58,12 +61,12 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
   return (
     <>
       {again ? <AgainNote again={again} template={template} photoRatio={ratioForSize} /> : null}
-      <PhotoSection template={template} photos={photos} again={again} tier={tier} photoExtra={photoExtra} />
-      {template.copyFields.length > 0 ? (
-        <div className="pt-6">
-          <CopyFields fields={template.copyFields} values={values.copy} onChange={(copy) => onChange({ copy })} />
-        </div>
-      ) : null}
+      {slots && isSlotTemplate(template) ? (
+        <SlotBoxes slots={slotsOfTemplate(template)} photos={slots} fields={template.copyFields} copy={values.copy} onCopy={(copy) => onChange({ copy })} />
+      ) : (
+        <PhotoSection template={template} photos={photos} again={again} tier={tier} photoExtra={photoExtra} />
+      )}
+      <TextFields template={template} values={values} onChange={onChange} />
       <TemplateToggles className="pt-6" template={template} values={values.toggles} onChange={(toggles) => onChange({ toggles })} surface={surface} />
       <div className="pt-6">
         <NoteField value={values.note} placeholder={notePlaceholder(template.category, noteT)} onChange={(note) => onChange({ note })} />
@@ -90,6 +93,18 @@ export function WorkspaceForm({ template, balance, tier, photos, values, onChang
         {balanceSentence(balance, balanceT)}
       </p>
     </>
+  )
+}
+
+// The template's text fields, less the notes drawn under their image slots.
+function TextFields({ template, values, onChange }: Pick<Props, 'template' | 'values' | 'onChange'>) {
+  const notes = new Set(slotsOfTemplate(template).flatMap((slot) => (slot.note ? [slot.note] : [])))
+  const fields = template.copyFields.filter((field) => !notes.has(field.key))
+  if (fields.length === 0) return null
+  return (
+    <div className="pt-6">
+      <CopyFields fields={fields} values={values.copy} onChange={(copy) => onChange({ copy })} />
+    </div>
   )
 }
 
