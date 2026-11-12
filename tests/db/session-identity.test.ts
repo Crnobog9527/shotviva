@@ -7,6 +7,12 @@ import type { Client } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { connectAdmin, localSupabase, retryAuth } from './helpers'
+
+// What a page would see: the forwarded request's cookies and headers (set per test).
+const page = vi.hoisted(() => ({ cookies: [] as { name: string; value: string }[], headers: new Headers() }))
+vi.mock('server-only', () => ({}))
+vi.mock('next/headers', () => ({ cookies: async () => ({ getAll: () => page.cookies }), headers: async () => page.headers }))
+vi.mock('next/server', async (original) => ({ ...(await original<typeof import('next/server')>()), connection: async () => {} }))
 import { serviceSupabase } from './supabase-env'
 
 // ARCHITECTURE §7「会话校验」, migration 1285: session_identity() answers what GoTrue's GET /user
@@ -210,6 +216,95 @@ describe('proxy session check with a real session', () => {
     vi.restoreAllMocks()
     const { error } = await createClient(apiUrl, anonKey, { auth: { persistSession: false } }).auth.refreshSession({ refresh_token: refresh })
     expect(error).toBeNull()
+  })
+
+  // Re-review of #542, 1: the proxy's refresh is refused while the token still has 10–90 s left
+  // (inside the SDK's refresh margin). The proxy keeps the session and seals the old token; the
+  // page's own reads, through the data client, must not refresh either.
+  it('never refreshes in a page, even inside the refresh margin when the proxy could not', async () => {
+    const who = await account()
+    const { cookie, token, refresh } = await cookieFor(who)
+    const exp = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString()).exp as number
+    const real = globalThis.fetch.bind(globalThis)
+    const refreshes: string[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input instanceof Request ? input.url : input)
+      if (url.includes('/auth/v1/token')) {
+        refreshes.push(url)
+        return Response.json({ code: 429, error_code: 'over_request_rate_limit', msg: 'Request rate limit reached' }, { status: 429 })
+      }
+      return real(input, init)
+    })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime((exp - 60) * 1000)
+
+    const secret = process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'local-service-key'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = secret
+    let forwarded: NextRequest | null = null
+    const response = await proxyGate(new NextRequest('http://localhost:3000/account', { headers: { cookie } }), {
+      translatedPaths: [],
+      forward: (request) => {
+        forwarded = request
+        return NextResponse.next({ request })
+      },
+      identitySecret: secret,
+    })
+    expect(response.status).toBe(200)
+    expect(response.cookies.getAll()).toEqual([])
+    expect(refreshes.length).toBeGreaterThan(0) // the proxy tried, and was refused
+    const seen = forwarded as NextRequest | null
+    page.cookies = seen?.cookies.getAll() ?? []
+    page.headers = new Headers(seen?.headers)
+
+    const before = refreshes.length
+    const { getSessionUser } = await import('@/core/auth/session')
+    const { createServerSupabase } = await import('@/core/auth/supabase-server')
+    expect(await getSessionUser()).toMatchObject({ id: who.id })
+    const db = await createServerSupabase()
+    const { data, error } = await db.from('profiles').select('id').eq('id', who.id).maybeSingle()
+    expect(error).toBeNull()
+    expect(data).toEqual({ id: who.id })
+    await db.rpc('session_identity')
+    expect(refreshes.length).toBe(before)
+
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+    const { apiUrl, anonKey } = localSupabase()
+    const { error: refreshError } = await createClient(apiUrl, anonKey, { auth: { persistSession: false } }).auth.refreshSession({ refresh_token: refresh })
+    expect(refreshError).toBeNull()
+  })
+
+  // Re-review of #542, 2: the refresh went through (the token rotated), then session_identity()
+  // failed. The rotated cookies must still reach the browser and the page.
+  it('keeps a rotated session when the database fails after the refresh', async () => {
+    const who = await account()
+    const { cookie, token } = await cookieFor(who)
+    const exp = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString()).exp as number
+    const real = globalThis.fetch.bind(globalThis)
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input instanceof Request ? input.url : input)
+      if (url.includes('/rest/v1/rpc/session_identity')) return new Response('{"message":"upstream timeout"}', { status: 504 })
+      return real(input, init)
+    })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime((exp - 60) * 1000)
+
+    let forwardedCookies: { name: string; value: string }[] = []
+    const response = await proxyGate(new NextRequest('http://localhost:3000/account', { headers: { cookie } }), {
+      translatedPaths: [],
+      forward: (request) => {
+        forwardedCookies = request.cookies.getAll()
+        return NextResponse.next({ request })
+      },
+      identitySecret: 'local-service-key',
+    })
+    expect(response.status).toBe(200)
+    const written = response.cookies.getAll().filter(({ value }) => value !== '')
+    expect(written.length).toBeGreaterThan(0)
+    const original = cookie.split('; ').map((pair) => pair.slice(pair.indexOf('=') + 1))
+    expect(written.every(({ value }) => !original.includes(value))).toBe(true)
+    const forwardedValues = forwardedCookies.map(({ value }) => value)
+    expect(written.every(({ value }) => forwardedValues.includes(value))).toBe(true)
   })
 
   it('sends a signed-out session to the login page', async () => {

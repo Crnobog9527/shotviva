@@ -58,7 +58,8 @@ export function notFoundResponse(): NextResponse {
 export async function currentProxyUser(request: NextRequest) {
   const { supabase, response, discard } = proxySupabase(request)
   const identity = await verifyIdentity(supabase)
-  // Could not tell: keep the browser's cookies exactly as they came (update-session.ts).
+  // Could not tell: undo what a failed refresh deleted, never a refresh that went through
+  // (update-session.ts).
   if (identity.status === 'unavailable') discard()
   return { identity, user: identity.status === 'signed_in' ? identity.user : null, response }
 }

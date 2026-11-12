@@ -1,8 +1,9 @@
-import { createClient, isAuthRetryableFetchError, isAuthSessionMissingError, type AuthError, type SupabaseClient, type User } from '@supabase/supabase-js'
+import { isAuthRetryableFetchError, isAuthSessionMissingError, type AuthError, type SupabaseClient, type User } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { logger } from '../logger'
-import { cookieToken } from './cookie-token'
+import { bearerClient } from './bearer-client'
+import { cookieToken, usable } from './cookie-token'
 import { toSessionUser, type SessionUser } from './session-user'
 
 // Who sent this request, checked once (ARCHITECTURE §7「会话校验」). Used by the proxy and, when
@@ -125,18 +126,9 @@ export async function verifyCookieIdentity(
 ): Promise<Identity> {
   const found = await cookieToken(cookies, env.url)
   if (!found) return SIGNED_OUT
-  // A few seconds of slack, so a token that lapses before getClaims() reads it is not a sign-out.
-  if (found.expiresAt <= now + 10_000) {
+  if (!usable(found, now)) {
     logger.warn('auth.identity_unavailable', { source: 'auth', reason: 'expired_unrefreshed' })
     return { status: 'unavailable', source: 'auth' }
   }
   return verifyIdentity(bearerClient(env, found.token), found.token)
-}
-
-// No session storage, no refresh: every request carries the cookie's own access token.
-function bearerClient(env: { url: string; anonKey: string }, token: string): SupabaseClient {
-  return createClient(env.url, env.anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  })
 }

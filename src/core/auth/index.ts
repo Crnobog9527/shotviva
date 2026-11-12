@@ -1,11 +1,11 @@
 // Server-side entry. Client components live in core/auth/ui (import '@/core/auth/ui').
-export { getSessionUser, requireAdmin, requireUser } from './session'
+export { getSessionUser, isAuthUnavailable, requireAdmin, requireUser } from './session'
 export { EMAIL_LINK_HOURS } from './link-expiry'
 export { arrivedFrom, loginPath, nextIn, sanitizeNext, signedInTarget, type ArrivedFrom } from './redirect-target'
 export type { Role, SessionUser } from './session-user'
 export { markOnboardingSeen } from './onboarding-store'
 export type { Onboarding, OnboardingFlag } from './onboarding'
-export { createServerSupabase } from './supabase-server'
+export { createServerSupabase, createSessionSupabase } from './supabase-server'
 export { createAdminSupabase } from './supabase-admin'
 export { handleAuthCallback } from './flows/callback'
 export { handleAuthConfirm } from './flows/confirm'

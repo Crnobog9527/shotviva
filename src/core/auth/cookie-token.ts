@@ -39,3 +39,8 @@ export async function cookieToken(cookies: readonly Cookie[], supabaseUrl: strin
   const raw = await combineChunks(name, (chunk) => cookies.find((cookie) => cookie.name === chunk)?.value ?? null)
   return raw ? decode(raw) : null
 }
+
+// A token about to lapse is treated as already lapsed (a few seconds of slack), so a page never
+// starts work with a token that expires before its queries reach the database.
+export const EXPIRY_SLACK_MS = 10_000
+export const usable = (found: NonNullable<CookieToken>, now: number) => found.expiresAt > now + EXPIRY_SLACK_MS

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('../session', () => ({ getSessionUser: vi.fn() }))
-vi.mock('../supabase-server', () => ({ createServerSupabase: vi.fn() }))
+vi.mock('../supabase-server', () => ({ createSessionSupabase: vi.fn() }))
 
 const { handleAccountLocale } = await import('./account-locale')
 

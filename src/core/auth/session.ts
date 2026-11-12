@@ -8,21 +8,24 @@ import { serverEnv } from '../env'
 import { AppError } from '../errors'
 import { localized } from '../i18n/server'
 import { publicEnv } from '../public-env'
-import { cookieToken } from './cookie-token'
+import { cookieToken, usable } from './cookie-token'
 import { IDENTITY_HEADER, openIdentity } from './forwarded-identity'
 import { verifyCookieIdentity, type Identity } from './identity'
 import { loginPath } from './redirect-target'
+import { isAuthUnavailable } from './session-errors'
 import type { SessionUser } from './session-user'
 
 type Cookies = { name: string; value: string }[]
 
 // The proxy's answer, when it checked this request and sealed it for us (forwarded-identity.ts).
-async function forwardedUser(jar: Cookies): Promise<SessionUser | null> {
+// A token about to lapse is not taken from the header either: the cookie check then reports it as
+// unavailable, the same as a token the proxy could not refresh.
+async function forwardedUser(jar: Cookies, now: number): Promise<SessionUser | null> {
   const value = (await headers()).get(IDENTITY_HEADER)
   const secret = serverEnv().SUPABASE_SERVICE_ROLE_KEY
   if (!value || !secret) return null
   const found = await cookieToken(jar, publicEnv.NEXT_PUBLIC_SUPABASE_URL)
-  return found ? openIdentity(value, found.token, secret) : null
+  return found && usable(found, now) ? openIdentity(value, found.token, secret, now) : null
 }
 
 // One session check per request, however many components ask, and none at all when the proxy
@@ -32,9 +35,10 @@ export const sessionIdentity = cache(async (): Promise<Identity> => {
   // The check reads the clock; Cache Components requires the render to be request-time first.
   await connection()
   const jar = (await cookies()).getAll()
-  const forwarded = await forwardedUser(jar)
+  const now = Date.now()
+  const forwarded = await forwardedUser(jar, now)
   if (forwarded) return { status: 'signed_in', user: forwarded }
-  return verifyCookieIdentity(jar, { url: publicEnv.NEXT_PUBLIC_SUPABASE_URL, anonKey: publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY })
+  return verifyCookieIdentity(jar, { url: publicEnv.NEXT_PUBLIC_SUPABASE_URL, anonKey: publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY }, now)
 })
 
 // null when signed out. When Auth or the database could not answer it throws AUTH_UNAVAILABLE
@@ -46,9 +50,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   return identity.status === 'signed_in' ? identity.user : null
 })
 
-export function isAuthUnavailable(error: unknown): boolean {
-  return error instanceof AppError && error.code === 'AUTH_UNAVAILABLE'
-}
+export { isAuthUnavailable }
 
 // Unverified email accounts never get into the (app) group (T1 acceptance). `next` is the
 // logical path; both it and the login page follow the current language.
