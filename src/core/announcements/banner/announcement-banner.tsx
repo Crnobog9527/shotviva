@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import { bannerState } from '../banner-read'
 // The plain module, never the 'use client' view: a value imported from a client module into this
 // server component is a client reference, not the string (dismissal.ts).
-import { HIDE_CLOSED_SCRIPT, HIDE_ENDED_SCRIPT } from '../rules/dismissal'
+import { HIDE_CLOSED_SCRIPT, HIDE_ENDED_SCRIPT } from '../rules/dismissal-scripts'
 import type { BannerLocale } from '../rules'
 import { BannerView } from './banner-view'
 

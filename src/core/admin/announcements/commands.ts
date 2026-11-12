@@ -59,9 +59,10 @@ const toColumns = (input: AnnouncementInput, actorId: string) => ({
   tone: input.tone,
   starts_at: input.startsAt,
   ends_at: input.endsAt,
-  dismissible: input.dismissible,
-  reshow_after_days: input.reshowAfterDays,
   updated_by: actorId,
+  // Only when given: see announcementInputSchema (omitted keeps the row's rule / the defaults).
+  ...(input.dismissible === undefined ? {} : { dismissible: input.dismissible }),
+  ...(input.reshowAfterDays === undefined ? {} : { reshow_after_days: input.reshowAfterDays }),
 })
 
 // Insert or update in one statement. New rows start switched off; switching on goes through

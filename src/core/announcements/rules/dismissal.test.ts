@@ -1,15 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  BANNER_ELEMENT_ID,
-  CLOSED_STORAGE_KEY,
-  HIDE_CLOSED_SCRIPT,
-  HIDE_ENDED_SCRIPT,
-  isClosed,
-  parseClosed,
-  recordClose,
-  versionKey,
-} from './dismissal'
+import { BANNER_ELEMENT_ID, CLOSED_STORAGE_KEY, isClosed, parseClosed, recordClose, versionKey } from './dismissal'
+import { HIDE_CLOSED_SCRIPT, HIDE_ENDED_SCRIPT } from './dismissal-scripts'
 import { localize } from './rules'
 import type { AnnouncementRow } from './types'
 

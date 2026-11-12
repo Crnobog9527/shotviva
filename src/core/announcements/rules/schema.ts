@@ -31,9 +31,11 @@ export const announcementInputSchema = z
     tone: z.enum(TONES),
     startsAt: optionalInstant,
     endsAt: optionalInstant,
-    // Older callers (and a stale admin tab) omit these: the table's own defaults then hold.
-    dismissible: z.boolean().default(true),
-    reshowAfterDays: z.number().int().min(1).max(RESHOW_DAYS_MAX).nullable().default(7),
+    // Close rule. Omitted (an older caller, a stale admin tab) means "leave it": an update keeps the
+    // row's rule and an insert takes the table defaults, so a missing field never quietly turns a
+    // non-closable or until-changed banner back into the 7-day default. null days = until changed.
+    dismissible: z.boolean().optional(),
+    reshowAfterDays: z.number().int().min(1).max(RESHOW_DAYS_MAX).nullable().optional(),
   })
   .refine((input) => !input.startsAt || !input.endsAt || Date.parse(input.startsAt) < Date.parse(input.endsAt), {
     message: 'window',

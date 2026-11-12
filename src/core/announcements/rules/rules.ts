@@ -8,8 +8,11 @@ export const LINK_LABEL_MAX = 40
 export const RESHOW_DAYS_MAX = 365
 
 // A site path ("/pricing") or an https URL without userinfo, matching the table's check.
-// Protocol-relative "//host" is an off-site link dressed as a path, so it is refused.
+// Protocol-relative "//host" is an off-site link dressed as a path, so it is refused. So is any
+// backslash: browsers read "/\evil.example" as "//evil.example" (and "https://a\@b" puts the
+// host after the @), so it is refused anywhere in the link (1280).
 export function isAllowedLink(url: string): boolean {
+  if (url.includes('\\')) return false
   if (url.startsWith('/')) return !url.startsWith('//') && !/\s/.test(url)
   try {
     const parsed = new URL(url)

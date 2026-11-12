@@ -1,7 +1,7 @@
 import { isValidElement, Suspense, type ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { HIDE_CLOSED_SCRIPT, HIDE_ENDED_SCRIPT } from '../rules/dismissal'
+import { HIDE_CLOSED_SCRIPT, HIDE_ENDED_SCRIPT } from '../rules/dismissal-scripts'
 import { AnnouncementBanner } from './announcement-banner'
 import { BannerView } from './banner-view'
 
