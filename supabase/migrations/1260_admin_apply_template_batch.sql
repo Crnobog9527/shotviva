@@ -9,6 +9,11 @@
 -- one pass; if any item failed, or with p_validate_only (--dry-run), the whole batch is rolled
 -- back at the end: the same functions run against the same rows and nothing is kept.
 --
+-- Deferred checks (the publish floor, sale and style-reference triggers are DEFERRABLE INITIALLY
+-- DEFERRED) are forced at the end of every item, so a dry run reports them and a real run fails on
+-- the item that caused them instead of at commit. Publishing, unpublishing and cover changes are
+-- audited in admin_audit_log like the sync's (1273); the actions are allowed by 1275.
+--
 -- Errors: only our own upper-case codes and their details (written by our functions, never row
 -- data) are returned; anything else is reported as DB_ERROR with its SQLSTATE and constraint
 -- name. A failing row's detail could otherwise echo a private prompt.
@@ -52,22 +57,31 @@ begin
       cover_after_url = case when p_step ? 'after' then p_step->>'after' else t.cover_after_url end
       where t.id = v_id;
     if not found then raise exception 'TEMPLATE_NOT_FOUND'; end if;
+    insert into public.admin_audit_log(action, user_id, target_id, reason)
+      values('template_apply_cover', p_actor, v_id, 'templates:apply: cover');
   when 'test_run_cover' then
     -- 「设为封面」 on a trial run of this template, never of another one.
     if not exists(select from public.admin_test_runs r where r.id = (p_step->>'run_id')::uuid and r.template_id = v_id) then
       raise exception 'TEST_RUN_NOT_FOUND';
     end if;
     perform public.admin_set_test_run_cover(p_actor, (p_step->>'run_id')::uuid, p_step->>'before', p_step->>'after', null);
+    insert into public.admin_audit_log(action, user_id, target_id, reason)
+      values('template_apply_cover', p_actor, v_id, 'templates:apply: cover from trial run ' || (p_step->>'run_id'));
   when 'set_sale' then
     perform public.admin_set_template_sale(p_actor, v_id, (p_step->>'enabled')::boolean);
   when 'set_active' then
     -- The 上架 switch's update (setTemplatesActive); the table's triggers re-check the floor.
     v_active := (p_step->>'active')::boolean;
     if v_active is null then raise exception 'INVALID_INPUT'; end if;
+    -- Unpublishing needs a reason, as on the admin page.
+    if not v_active and nullif(btrim(p_step->>'reason'), '') is null then raise exception 'UNPUBLISH_REASON_REQUIRED'; end if;
     update public.templates t set is_active = v_active,
       featured_rank = case when v_active then t.featured_rank end
       where t.id = v_id;
     if not found then raise exception 'TEMPLATE_NOT_FOUND'; end if;
+    insert into public.admin_audit_log(action, user_id, target_id, reason)
+      values('template_apply_active', p_actor, v_id,
+        'templates:apply: ' || case when v_active then 'published' else 'unpublished: ' || btrim(p_step->>'reason') end);
   when 'save_series' then
     -- The file is the source of truth for a series it names (by slug): the revision is the row's
     -- own, read under the series lock in the admin function's lock order, so a save earlier in
@@ -104,16 +118,21 @@ begin
   if not exists(select from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
     raise exception 'NOT_ADMIN';
   end if;
-  if p_validate_only is null or jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) > 300 then
-    raise exception 'INVALID_INPUT';
-  end if;
+  if p_validate_only is null or jsonb_typeof(p_items) is distinct from 'array' then raise exception 'INVALID_INPUT'; end if;
+  -- MAX_BATCH_ITEMS in scripts/template-apply/schema.ts.
+  if jsonb_array_length(p_items) > 300 then raise exception 'BATCH_TOO_LARGE'; end if;
   begin
     for item in select value from jsonb_array_elements(p_items) loop
       begin
+        set constraints all deferred;
         if jsonb_typeof(item->'ops') is distinct from 'array' then raise exception 'INVALID_INPUT'; end if;
         for step in select value from jsonb_array_elements(item->'ops') loop
           perform admin.apply_template_step(p_actor, step);
         end loop;
+        -- Run this item's deferred checks now, so their failure is this item's (every deferrable
+        -- constraint in the schema is INITIALLY DEFERRED, so `deferred` restores the default).
+        set constraints all immediate;
+        set constraints all deferred;
         results := results || jsonb_build_array(jsonb_build_object('ref', item->>'ref', 'ok', true));
       exception when others then
         get stacked diagnostics v_message = message_text, v_detail = pg_exception_detail,

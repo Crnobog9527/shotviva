@@ -37,13 +37,16 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
 ```
 
 - Format: [`scripts/templates.example.json`](scripts/templates.example.json). Batch files hold
-  private prompts, so they live in the gitignored `.local/`; never commit one.
+  private prompts, so they must live under a gitignored `.local/` folder; the script refuses others.
 - Needs `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `SHOTVIVA_IMPORT_ADMIN_ID`
-  (your admin user id on that site) in `.env.local`. Covers and style references also need the
-  R2 keys, `R2_BUCKET`, `R2_PUBLIC_BUCKET` and `NEXT_PUBLIC_ASSETS_BASE_URL`.
-- The script writes only to the test site or a local stack. A batch is all or nothing: every
-  item (category, series, template) is listed with its result, and if any item fails nothing is
-  kept and the exit code is 1. `--dry-run` runs the whole batch in one transaction and rolls it back.
+  (your admin user id on that site) in `.env.local`. Uploading covers and style references also
+  needs the test site's R2 keys; the buckets and the cover address are fixed in the script, and a
+  `.env.local` set up for another site stops it. `TEMPLATE_SYNC_REVALIDATE_SECRET` (optional)
+  refreshes the test site's catalogue right after a run; without it the site catches up within the hour.
+- The script writes only to the test site or a local stack. It first runs the whole batch and
+  rolls it back, uploads files only if that passed, then writes. A batch is all or nothing: every
+  item is listed with its result, and if any item fails nothing is kept and the exit code is 1.
+  `--dry-run` stops after the check. At most 300 items per batch (a series counts twice).
 - Re-running a file is safe: unchanged items are reported as unchanged.
 - Production is never written by this script: templates, categories and series reach
   production through the "Sync preview templates to production" workflow (Owner approval).

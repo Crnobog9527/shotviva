@@ -78,6 +78,12 @@ export const templateItemSchema = templateFields.extend({
   unpublishReason: reason.optional(),
 }).strict()
 
+// Items one admin_apply_template_batch call takes (the same 300 in migration 1260): every category,
+// reference category and template, and each series twice (its fields, then its member order).
+export const MAX_BATCH_ITEMS = 300
+export const batchItemCount = (b: { categories: unknown[]; referenceCategories: unknown[]; series: unknown[]; templates: unknown[] }) =>
+  b.categories.length + b.referenceCategories.length + b.templates.length + 2 * b.series.length
+
 export const batchSchema = z.strictObject({
   $comment: z.string().optional(),
   categories: z.array(categorySchema).max(100).default([]),
@@ -95,6 +101,7 @@ export const batchSchema = z.strictObject({
   unique(batch.categories.map(c => c.key), 'categories')
   unique(batch.series.map(s => s.slug), 'series')
   unique(batch.templates.map(t => t.id), 'templates')
+  if (batchItemCount(batch) > MAX_BATCH_ITEMS) ctx.addIssue({ code: 'custom', path: [], message: `BATCH_TOO_LARGE：一批最多 ${MAX_BATCH_ITEMS} 项（系列算两项），请拆成几个文件` })
 })
 
 export type Batch = z.infer<typeof batchSchema>

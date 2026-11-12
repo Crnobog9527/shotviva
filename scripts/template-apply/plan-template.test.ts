@@ -51,4 +51,14 @@ describe('planTemplate', () => {
     expect(planTemplate(item({ id: 'missing-body', name: 'x' }), ctx(), {}).problems[0]).toContain('prompt.body')
     expect(planTemplate(item({ ...fresh, isActive: true }), ctx(), {}).notes[0]).toContain('isActive')
   })
+
+  it('does not set a cover the row already has, and needs a prompt to publish', () => {
+    const db = state([stored('dish', { saleEnabled: true }), stored('bare', { saleEnabled: true, prompt: null })])
+    const same = { op: 'set_cover' as const, before: 'https://assets.test/covers/x/before.webp', after: 'https://assets.test/covers/x/after.webp' }
+    expect(planTemplate(item({ id: 'dish' }), ctx(db), { cover: same }).actions).toEqual(['无变化'])
+    expect(planTemplate(item({ id: 'dish' }), ctx(db), { cover: { ...same, after: 'https://assets.test/covers/x/new.webp' } }).ops)
+      .toEqual([{ op: 'set_cover', after: 'https://assets.test/covers/x/new.webp', id: 'dish' }])
+    expect(planTemplate(item({ id: 'bare', publish: true }), ctx(db), {}).problems.join()).toContain('缺提示词')
+    expect(planTemplate(item({ id: 'dish', publish: true }), ctx(db), {}).ops).toEqual([{ op: 'set_active', id: 'dish', active: true }])
+  })
 })

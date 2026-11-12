@@ -62,7 +62,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await pg.query('delete from public.templates where id=any($1)', [[first, second, broken]])
   await pg.query('delete from public.template_series where slug=$1', [slug])
-  await pg.query('delete from public.template_categories where key=any($1)', [[leaf, root]])
+  await pg.query('delete from public.template_categories where key=any($1)', [[leaf, root, `apply-deferred-${tag}`]])
+  await pg.query('delete from public.admin_audit_log where user_id=$1', [actor])
   await pg.query('delete from public.ai_providers where id=$1', [provider])
   await pg.query('delete from auth.users where id=$1', [actor])
   await pg.end()
@@ -109,6 +110,33 @@ describe('templates:apply', () => {
     const down = batch({ categories: [], series: [], templates: [{ id: first, openSale: false, publish: false, unpublishReason: 'test' }] })
     expect((await run(down, false)).every(r => r.ok)).toBe(true)
     expect((await rows()).find(r => r.id === first)).toMatchObject({ is_active: false, sale: false })
+    const audit = await pg.query(`select action,reason from public.admin_audit_log where target_id=$1 and user_id=$2 order by id`, [first, actor])
+    expect(audit.rows).toEqual([{ action: 'template_apply_active', reason: 'templates:apply: published' },
+      { action: 'template_apply_active', reason: 'templates:apply: unpublished: test' }])
+  })
+
+  // The publish floor and sale checks are deferred triggers: without forcing them per item, a dry run
+  // would roll them back unchecked and a real run would fail at commit with no item to blame.
+  it('reports a deferred trigger failure on its item, in a dry run and in a real run', async () => {
+    for (const validateOnly of [true, false]) {
+      const items = [{ ref: 'ok', ops: [{ op: 'save_category', is_new: true,
+        category: { key: `apply-deferred-${tag}`, name_en: `Deferred ${tag}`, name_zh: `延${tag}`, card_style: 'pair' } }] },
+        { ref: 'live', ops: [{ op: 'set_active', id: second, active: true }] }]
+      const { data, error } = await db.rpc('admin_apply_template_batch', { p_actor: actor, p_items: items, p_validate_only: validateOnly })
+      expect(error).toBeNull()
+      const [ok, live] = batchResultSchema.parse(data)
+      expect(ok).toEqual({ ref: 'ok', ok: true })
+      expect(live).toMatchObject({ ref: 'live', ok: false })
+      expect(['TEMPLATE_RETIRED', 'TEMPLATE_PRICE_BELOW_FLOOR']).toContain(live.code)
+      expect((await rows()).find(r => r.id === second)?.is_active).toBe(false)
+      expect((await pg.query('select 1 from public.template_categories where key=$1', [`apply-deferred-${tag}`])).rowCount).toBe(0)
+    }
+  })
+
+  it('needs a reason to unpublish', async () => {
+    const items = [{ ref: 'down', ops: [{ op: 'set_active', id: first, active: false }] }]
+    const { data } = await db.rpc('admin_apply_template_batch', { p_actor: actor, p_items: items, p_validate_only: true })
+    expect(batchResultSchema.parse(data)[0]).toMatchObject({ ok: false, code: 'UNPUBLISH_REASON_REQUIRED' })
   })
 
   it('refuses a non-admin actor and is not callable by anonymous or signed-in clients', async () => {

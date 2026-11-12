@@ -26,6 +26,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_SERIES_CATEGORY: '系列分类不能用', INVALID_SERIES_MEMBERS: '系列成员里有不存在或内置的模板',
   SERIES_MEMBER_TAKEN: '成员已在别的系列（在模板上写 series 把它移过来）', SERIES_REASON_REQUIRED: '系列下架要写原因',
   TEST_RUN_NOT_FOUND: '试跑记录不存在、未成功或不属于这个模板', TRANSLATE_TARGET_ONLY: '翻译试跑只能做该语言的后图',
+  UNPUBLISH_REASON_REQUIRED: '下架要写原因', BATCH_TOO_LARGE: '一批最多 300 项，请拆成几个文件',
   INVALID_INPUT: '参数不符合要求',
 }
 

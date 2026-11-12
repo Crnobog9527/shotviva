@@ -56,7 +56,7 @@ function publishProblem(item: TemplateItem, current: AdminTemplate | undefined, 
     coverBeforeUrl: covers.before ?? current?.coverBeforeUrl ?? null, coverAfterUrl: covers.after ?? current?.coverAfterUrl ?? null,
     coverLocales: current?.coverLocales ?? {}, isActive: current?.isActive ?? false,
     unpricedResolutions: t?.unpricedResolutions ?? current?.unpricedResolutions ?? [],
-    saleEnabled: item.openSale ?? current?.saleEnabled ?? false, hasPrompt: true,
+    saleEnabled: item.openSale ?? current?.saleEnabled ?? false, hasPrompt: Boolean(plan) || Boolean(current?.prompt),
     category: t?.category ?? current?.category, providerId: plan ? plan.providerId : current?.prompt?.providerId,
   }, ctx.state.floors)
   return blockers.length > 0 ? `不能上架：${describeBlockers(blockers)}` : null
@@ -65,12 +65,25 @@ function publishProblem(item: TemplateItem, current: AdminTemplate | undefined, 
 function unpublishStep(item: TemplateItem, current: AdminTemplate | undefined, problems: string[]) {
   if (item.publish !== false || !current?.isActive) return []
   if (!item.unpublishReason) problems.push('下架要写 unpublishReason（和后台一样必须填原因）')
-  return [{ op: 'set_active', id: item.id, active: false }]
+  return [{ op: 'set_active', id: item.id, active: false, reason: item.unpublishReason ?? null }]
+}
+
+// A cover the row already has is not set again, so a re-run reports 无变化.
+function changedCover(cover: CoverOp | undefined, current: AdminTemplate | undefined): CoverOp | undefined {
+  if (!cover || !current) return cover
+  if (cover.op === 'test_run_cover') {
+    return cover.after === current.coverAfterUrl && (cover.before ?? current.coverBeforeUrl) === current.coverBeforeUrl ? undefined : cover
+  }
+  const next: CoverOp = { op: 'set_cover' }
+  if (cover.before !== undefined && cover.before !== current.coverBeforeUrl) next.before = cover.before
+  if (cover.after !== undefined && cover.after !== current.coverAfterUrl) next.after = cover.after
+  return next.before || next.after ? next : undefined
 }
 
 function laterSteps(item: TemplateItem, current: AdminTemplate | undefined, ctx: Ctx, save: ReturnType<typeof saveStep>, assets: TemplateAssets, problems: string[]) {
   const steps: Record<string, unknown>[] = []
-  if (assets.cover) steps.push({ ...assets.cover, id: item.id })
+  const cover = changedCover(assets.cover, current)
+  if (cover) steps.push({ ...cover, id: item.id })
   if (item.openSale !== undefined && item.openSale !== (current?.saleEnabled ?? false)) steps.push({ op: 'set_sale', id: item.id, enabled: item.openSale })
   if (item.publish && !current?.isActive) {
     const problem = publishProblem(item, current, ctx, save?.plan, assets.cover)

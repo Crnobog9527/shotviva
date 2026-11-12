@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { contentImageId } from './assets'
 import { isStyleRefKey } from '../../src/core/templates/style-refs'
 import { parseBatch } from './schema'
-import { targetOf, type Env } from './options'
+import { readOptions, targetOf, type Env } from './options'
 import { failureText } from './report'
 
 describe('batch file', () => {
@@ -16,6 +16,11 @@ describe('batch file', () => {
 
   it('names the path of a problem but never the value, and refuses duplicates and typos', () => {
     const secret = 'SECRET PROMPT TEXT'
+    const templates = Array.from({ length: 200 }, (_, i) => ({ id: `t-${i}` }))
+    const categories = Array.from({ length: 51 }, (_, i) => ({ key: `c-${i}`, nameEn: `C${i}`, nameZh: `类${i}` }))
+    const series = Array.from({ length: 25 }, (_, i) => ({ slug: `s-${i}` }))
+    expect(() => parseBatch({ templates, categories, series })).toThrow('BATCH_TOO_LARGE')
+    expect(parseBatch({ templates, categories: categories.slice(0, 50), series }).templates).toHaveLength(200)
     for (const input of [{ templates: [{ id: 'a', prompt: { body: secret, extra: 1 } }] },
       { templates: [{ id: 'a' }, { id: 'a' }] }, { templates: [{ id: 'a', styleRefs: ['x.gif'] }] }, { nope: [] }]) {
       expect(() => parseBatch(input)).toThrow()
@@ -27,11 +32,22 @@ describe('batch file', () => {
 describe('target', () => {
   const env = (url: string, extra: Partial<Env> = {}) => ({ NEXT_PUBLIC_SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: 'k',
     SHOTVIVA_IMPORT_ADMIN_ID: '11111111-1111-4111-8111-111111111111', ...extra }) as Env
-  it('writes the test site or a local stack, never production', () => {
-    expect(targetOf(env('https://pnzkiqvktkzznfbyhphe.supabase.co'))).toBe('preview')
-    expect(targetOf(env('http://127.0.0.1:54321'))).toBe('local')
+  it('writes the test site or a local stack, never production, with the target\'s own buckets', () => {
+    expect(targetOf(env('https://pnzkiqvktkzznfbyhphe.supabase.co'))).toMatchObject({ name: 'preview', storage: { publicBucket: 'shotviva-assets-preview' } })
+    expect(targetOf(env('http://127.0.0.1:54321'))).toMatchObject({ name: 'local', storage: null })
     expect(() => targetOf(env('https://irbqamjuazkkyvnnzupf.supabase.co'))).toThrow('T93')
+    expect(() => targetOf(env('http://pnzkiqvktkzznfbyhphe.supabase.co'))).toThrow()
     expect(() => targetOf(env('https://other.supabase.co'))).toThrow()
+    const jwt = (ref: string) => ['x', Buffer.from(JSON.stringify({ ref, role: 'service_role' })).toString('base64url'), 'y'].join('.')
+    expect(() => targetOf(env('https://pnzkiqvktkzznfbyhphe.supabase.co', { SUPABASE_SERVICE_ROLE_KEY: jwt('irbqamjuazkkyvnnzupf') }))).toThrow()
+    expect(() => targetOf(env('https://pnzkiqvktkzznfbyhphe.supabase.co', { R2_PUBLIC_BUCKET: 'shotviva-assets' }))).toThrow('R2_PUBLIC_BUCKET')
+    expect(() => targetOf(env('https://pnzkiqvktkzznfbyhphe.supabase.co', { NEXT_PUBLIC_ASSETS_BASE_URL: 'https://shotviva.com/assets' }))).toThrow('NEXT_PUBLIC_ASSETS_BASE_URL')
+  })
+
+  it('reads batch files only from a .local folder', () => {
+    expect(readOptions(['.local/templates/a.json', '--dry-run'], '/repo')).toEqual({ file: '/repo/.local/templates/a.json', dryRun: true })
+    expect(() => readOptions(['scripts/a.json'], '/repo')).toThrow('.local')
+    expect(() => readOptions([], '/repo')).toThrow()
   })
 })
 
