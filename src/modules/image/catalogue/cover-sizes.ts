@@ -10,6 +10,12 @@ export const COVER_SIZES = {
   // The Art Styles compare spans two rows from md: taller than wide, so a 3:4 cover fills it by
   // height and shows about 1.2 times the card's width.
   artCard: '(min-width: 1024px) 440px, (min-width: 768px) 60vw, 100vw',
+  // Create's All sections (Owner 2026-11-12): a phone rail card is the row less 4rem (about 279 px
+  // on a 375 phone, so a plate is about 38vw); from md the rail is the ordinary grid row. A section
+  // of drag compares is two columns on phones, three from md, four from lg (248 px each).
+  railPlate: '(min-width: 1024px) 182px, (min-width: 768px) 25vw, 38vw',
+  railFrame: '(min-width: 1024px) 364px, (min-width: 768px) 50vw, 75vw',
+  artSection: '(min-width: 1024px) 248px, (min-width: 768px) 30vw, 44vw',
   featurePlate: '(min-width: 1024px) 560px, 50vw',
   featureFrame: '(min-width: 1024px) 1120px, 100vw',
   dialogPlate: '(min-width: 768px) 215px, 50vw',

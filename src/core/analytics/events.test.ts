@@ -38,6 +38,7 @@ const valid: { [E in EventName]: unknown } = {
   generate_refused: { reason: 'identity_swap', source: 'partner' },
   paywall_view: { trigger: 'insufficient_credits' },
   gallery_view: { page: 2 },
+  catalogue_see_all: { category: 'food-drink' },
   gallery_work_view: { template_id: 'grilled-dish', category: 'food' },
   gallery_reuse: { template_id: 'grilled-dish', surface: 'work' },
   work_report: { reason: 'privacy' },
@@ -57,6 +58,7 @@ const valid: { [E in EventName]: unknown } = {
 const EVENT_NAMES = [
       'app_update_prompt',
       'business_inquiry_submit',
+      'catalogue_see_all',
       'checkout_cancel',
       'checkout_start',
       'code_redeem',
