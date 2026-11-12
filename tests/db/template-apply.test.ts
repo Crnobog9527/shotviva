@@ -105,7 +105,7 @@ describe('templates:apply', () => {
   it('opens sale and publishes with the switch rules, and unpublishes before closing the sale', async () => {
     await pg.query("update public.templates set cover_before_url='https://assets.test/b.webp',cover_after_url='https://assets.test/a.webp' where id=$1", [first])
     const live = batch({ categories: [], series: [], templates: [{ id: first, openSale: true, publish: true }] })
-    expect((await run(live, false)).every(r => r.ok)).toBe(true)
+    const liveResults = await run(live, false); expect(liveResults, JSON.stringify(liveResults)).toEqual([{ ref: `template:${first}`, ok: true }])
     expect((await rows()).find(r => r.id === first)).toMatchObject({ is_active: true, sale: true })
     const down = batch({ categories: [], series: [], templates: [{ id: first, openSale: false, publish: false, unpublishReason: 'test' }] })
     expect((await run(down, false)).every(r => r.ok)).toBe(true)
@@ -126,7 +126,7 @@ describe('templates:apply', () => {
       expect(error).toBeNull()
       const [ok, live] = batchResultSchema.parse(data)
       expect(ok).toEqual({ ref: 'ok', ok: true })
-      expect(live).toMatchObject({ ref: 'live', ok: false })
+      expect(live, JSON.stringify(live)).toMatchObject({ ref: 'live', ok: false })
       expect(['TEMPLATE_RETIRED', 'TEMPLATE_PRICE_BELOW_FLOOR']).toContain(live.code)
       expect((await rows()).find(r => r.id === second)?.is_active).toBe(false)
       expect((await pg.query('select 1 from public.template_categories where key=$1', [`apply-deferred-${tag}`])).rowCount).toBe(0)
@@ -147,5 +147,14 @@ describe('templates:apply', () => {
     const grants = await pg.query(`select has_function_privilege('anon','public.admin_apply_template_batch(uuid,jsonb,boolean)','execute') a,
       has_function_privilege('authenticated','public.admin_apply_template_batch(uuid,jsonb,boolean)','execute') b`)
     expect(grants.rows[0]).toEqual({ a: false, b: false })
+    const audit = await pg.query(`select has_function_privilege('anon','admin.template_apply_audit(uuid,text,text,text)','execute') a,
+      has_function_privilege('authenticated','admin.template_apply_audit(uuid,text,text,text)','execute') b`)
+    expect(audit.rows[0]).toEqual({ a: false, b: false })
+    // A definer function: it refuses any other role even if a grant were added by mistake.
+    await pg.query('begin')
+    await pg.query("grant execute on function admin.template_apply_audit(uuid,text,text,text) to authenticated")
+    await pg.query('set local role authenticated')
+    await expect(pg.query("select admin.template_apply_audit($1,'template_apply_cover','x','y')", [actor])).rejects.toThrow()
+    await pg.query('rollback')
   })
 })

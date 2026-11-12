@@ -194,22 +194,28 @@ begin
       cover_after_url = case when p_step ? 'after' then p_step->>'after' else t.cover_after_url end
       where t.id = v_id;
     if not found then raise exception 'TEMPLATE_NOT_FOUND'; end if;
+    perform admin.template_apply_audit(p_actor, 'template_apply_cover', v_id, 'templates:apply: cover');
   when 'test_run_cover' then
     -- 「设为封面」 on a trial run of this template, never of another one.
     if not exists(select from public.admin_test_runs r where r.id = (p_step->>'run_id')::uuid and r.template_id = v_id) then
       raise exception 'TEST_RUN_NOT_FOUND';
     end if;
     perform public.admin_set_test_run_cover(p_actor, (p_step->>'run_id')::uuid, p_step->>'before', p_step->>'after', null);
+    perform admin.template_apply_audit(p_actor, 'template_apply_cover', v_id, 'templates:apply: cover from trial run ' || (p_step->>'run_id'));
   when 'set_sale' then
     perform public.admin_set_template_sale(p_actor, v_id, (p_step->>'enabled')::boolean);
   when 'set_active' then
     -- The 上架 switch's update (setTemplatesActive); the table's triggers re-check the floor.
     v_active := (p_step->>'active')::boolean;
     if v_active is null then raise exception 'INVALID_INPUT'; end if;
+    -- Unpublishing needs a reason, as on the admin page.
+    if not v_active and nullif(btrim(p_step->>'reason'), '') is null then raise exception 'UNPUBLISH_REASON_REQUIRED'; end if;
     update public.templates t set is_active = v_active,
       featured_rank = case when v_active then t.featured_rank end
       where t.id = v_id;
     if not found then raise exception 'TEMPLATE_NOT_FOUND'; end if;
+    perform admin.template_apply_audit(p_actor, 'template_apply_active', v_id,
+      'templates:apply: ' || case when v_active then 'published' else 'unpublished: ' || btrim(p_step->>'reason') end);
   when 'save_series' then
     -- The file is the source of truth for a series it names (by slug): the revision is the row's
     -- own, read under the series lock in the admin function's lock order, so a save earlier in
@@ -1863,6 +1869,22 @@ $$;
 
 
 ALTER FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_apply_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
+    raise exception 'FORBIDDEN';
+  end if;
+  if p_action not in ('template_apply_active', 'template_apply_cover') then raise exception 'INVALID_INPUT'; end if;
+  insert into public.admin_audit_log(action, user_id, target_id, reason) values(p_action, p_actor, p_target, p_reason);
+end $$;
+
+
+ALTER FUNCTION "admin"."template_apply_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_approved_price"("p_provider" "uuid", "p_template" "text") RETURNS "jsonb"
@@ -3558,16 +3580,21 @@ begin
   if not exists(select from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
     raise exception 'NOT_ADMIN';
   end if;
-  if p_validate_only is null or jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) > 300 then
-    raise exception 'INVALID_INPUT';
-  end if;
+  if p_validate_only is null or jsonb_typeof(p_items) is distinct from 'array' then raise exception 'INVALID_INPUT'; end if;
+  -- MAX_BATCH_ITEMS in scripts/template-apply/schema.ts.
+  if jsonb_array_length(p_items) > 300 then raise exception 'BATCH_TOO_LARGE'; end if;
   begin
     for item in select value from jsonb_array_elements(p_items) loop
       begin
+        set constraints all deferred;
         if jsonb_typeof(item->'ops') is distinct from 'array' then raise exception 'INVALID_INPUT'; end if;
         for step in select value from jsonb_array_elements(item->'ops') loop
           perform admin.apply_template_step(p_actor, step);
         end loop;
+        -- Run this item's deferred checks now, so their failure is this item's (every deferrable
+        -- constraint in the schema is INITIALLY DEFERRED, so `deferred` restores the default).
+        set constraints all immediate;
+        set constraints all deferred;
         results := results || jsonb_build_array(jsonb_build_object('ref', item->>'ref', 'ok', true));
       exception when others then
         get stacked diagnostics v_message = message_text, v_detail = pg_exception_detail,
@@ -12360,7 +12387,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -15745,6 +15772,11 @@ GRANT ALL ON FUNCTION "admin"."sale_route_resolutions"("p" "public"."ai_provider
 
 REVOKE ALL ON FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_apply_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_apply_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") TO "service_role";
 
 
 

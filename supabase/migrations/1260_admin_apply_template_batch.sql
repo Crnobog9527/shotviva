@@ -18,6 +18,22 @@
 -- data) are returned; anything else is reported as DB_ERROR with its SQLSTATE and constraint
 -- name. A failing row's detail could otherwise echo a private prompt.
 
+-- service_role may read admin_audit_log but not write it; audit rows go through definer functions
+-- (as _affiliate_audit). This one writes only the two templates:apply actions, and only for a
+-- service-role request (PostgREST's SET ROLE) or the database owner.
+create or replace function admin.template_apply_audit(p_actor uuid, p_action text, p_target text, p_reason text) returns void
+    language plpgsql
+    security definer
+    set search_path to ''
+    as $$
+begin
+  if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
+    raise exception 'FORBIDDEN';
+  end if;
+  if p_action not in ('template_apply_active', 'template_apply_cover') then raise exception 'INVALID_INPUT'; end if;
+  insert into public.admin_audit_log(action, user_id, target_id, reason) values(p_action, p_actor, p_target, p_reason);
+end $$;
+
 create or replace function admin.apply_template_step(p_actor uuid, p_step jsonb) returns void
     language plpgsql
     set search_path to ''
@@ -57,16 +73,14 @@ begin
       cover_after_url = case when p_step ? 'after' then p_step->>'after' else t.cover_after_url end
       where t.id = v_id;
     if not found then raise exception 'TEMPLATE_NOT_FOUND'; end if;
-    insert into public.admin_audit_log(action, user_id, target_id, reason)
-      values('template_apply_cover', p_actor, v_id, 'templates:apply: cover');
+    perform admin.template_apply_audit(p_actor, 'template_apply_cover', v_id, 'templates:apply: cover');
   when 'test_run_cover' then
     -- 「设为封面」 on a trial run of this template, never of another one.
     if not exists(select from public.admin_test_runs r where r.id = (p_step->>'run_id')::uuid and r.template_id = v_id) then
       raise exception 'TEST_RUN_NOT_FOUND';
     end if;
     perform public.admin_set_test_run_cover(p_actor, (p_step->>'run_id')::uuid, p_step->>'before', p_step->>'after', null);
-    insert into public.admin_audit_log(action, user_id, target_id, reason)
-      values('template_apply_cover', p_actor, v_id, 'templates:apply: cover from trial run ' || (p_step->>'run_id'));
+    perform admin.template_apply_audit(p_actor, 'template_apply_cover', v_id, 'templates:apply: cover from trial run ' || (p_step->>'run_id'));
   when 'set_sale' then
     perform public.admin_set_template_sale(p_actor, v_id, (p_step->>'enabled')::boolean);
   when 'set_active' then
@@ -79,9 +93,8 @@ begin
       featured_rank = case when v_active then t.featured_rank end
       where t.id = v_id;
     if not found then raise exception 'TEMPLATE_NOT_FOUND'; end if;
-    insert into public.admin_audit_log(action, user_id, target_id, reason)
-      values('template_apply_active', p_actor, v_id,
-        'templates:apply: ' || case when v_active then 'published' else 'unpublished: ' || btrim(p_step->>'reason') end);
+    perform admin.template_apply_audit(p_actor, 'template_apply_active', v_id,
+      'templates:apply: ' || case when v_active then 'published' else 'unpublished: ' || btrim(p_step->>'reason') end);
   when 'save_series' then
     -- The file is the source of truth for a series it names (by slug): the revision is the row's
     -- own, read under the series lock in the admin function's lock order, so a save earlier in
@@ -153,6 +166,8 @@ begin
   return results;
 end $$;
 
+revoke all on function admin.template_apply_audit(uuid, text, text, text) from public, anon, authenticated;
+grant execute on function admin.template_apply_audit(uuid, text, text, text) to service_role;
 revoke all on function admin.apply_template_step(uuid, jsonb) from public, anon, authenticated;
 grant execute on function admin.apply_template_step(uuid, jsonb) to service_role;
 revoke all on function public.admin_apply_template_batch(uuid, jsonb, boolean) from public, anon, authenticated;
