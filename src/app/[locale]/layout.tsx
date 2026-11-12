@@ -7,7 +7,7 @@ import { locale as rootLocale } from 'next/root-params'
 import { ConsentSlot } from '@/core/analytics/browser'
 import { SignupCodeResult } from '@/core/auth/signup-result'
 import { UpdateSlot } from '@/core/app-update'
-import { clientMessages, htmlLang, isLocale } from '@/core/i18n'
+import { htmlLang, isLocale, publicClientMessages } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata, ShortcutTitleSync } from '@/core/seo'
 import { InstrumentSerifPreload } from '@/core/ui/instrument-serif'
@@ -41,8 +41,9 @@ export function generateStaticParams() {
 
 export default async function RootLayout({ children }: LayoutProps<'/[locale]'>) {
   const locale = await rootLocale()
-  // Everything but the server-only namespaces (the admin entry's label, spec #186).
-  const messages = clientMessages(await getMessages())
+  // What public pages' client components read: not the server-only namespaces (the admin entry's
+  // label, spec #186), nor what only the logged-in app reads, which the (app) layout adds.
+  const messages = publicClientMessages(await getMessages())
   const lang = isLocale(locale) ? locale : site.locales.default
   return (
     <html lang={htmlLang(lang)} className={`${fontVariables} h-full antialiased`}>
