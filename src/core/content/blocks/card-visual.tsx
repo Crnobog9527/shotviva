@@ -3,11 +3,11 @@ import type { CSSProperties } from 'react'
 
 import type { CardVisual as Visual, ImageRef } from '../page-content'
 
-import './explainer.css'
-
 // The picture that leads a how-to point (Owner 2026-11-12): what the step looks like, so the
 // line of text under it only has to name it. Every picture sits below the fold, so next/image
-// loads it lazily; the plate keeps its size before it arrives, so nothing shifts.
+// loads it lazily; the plate keeps its size before it arrives, so nothing shifts. The styles
+// (app/[locale]/(marketing)/explainer.css) are loaded by the home route alone: imported here they
+// would reach every page, since every page imports @/core/content, which exports HomePageView.
 export function CardVisual({ visual }: { visual: Visual }) {
   return <figure className="xv">{body(visual)}</figure>
 }

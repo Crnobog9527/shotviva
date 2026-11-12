@@ -1,9 +1,9 @@
 /* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
 @layer properties, theme, base, components, utilities;
-/* The picture that leads a how-to point (card-visual.tsx, Owner 2026-11-12): a dark plate of one
-   fixed shape (16:10), so the headings of a row of cards line up whatever the picture is. Its own
-   sheet, not marketing.css, and no Tailwind utilities, so the public Tailwind sheet's budget is
-   untouched. */
+/* The picture that leads a how-to point (core/content/blocks/card-visual.tsx, Owner 2026-11-12):
+   a dark plate of one fixed shape (16:10), so the headings of a row of cards line up whatever the
+   picture is. Its own sheet, loaded by the home route only, not marketing.css (every marketing
+   page) and no Tailwind utilities, so the public Tailwind sheet's budget is untouched. */
 @layer components {
   .xv {
     /* overflow: hidden also keeps the 16:10 against the pictures' own size (aspect-ratio's auto
