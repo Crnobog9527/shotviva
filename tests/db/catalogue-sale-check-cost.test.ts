@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest'
 import { connectAdmin, createPricedTemplate, createUser } from './helpers'
 
 // 1250–1253: the catalogue reads run the sale check once per requested template, and a route's
-// floor samples that route's own jobs. The decisions themselves are covered by
+// floor samples that route's own jobs (at the template's quality since 1295). The decisions themselves are covered by
 // web-template-sale.test.ts and the price-floor tests; these pin the cost and the sampling.
 const provider = randomUUID()
 const other = randomUUID()
@@ -72,14 +72,17 @@ async function jobs(route: string, inputs: object, cost: number, n = 10) {
 const meetsFloor = async () => (await db.query(
   "select admin.alternate_route_meets_floor($1,'1k','medium',120) ok", [tag])).rows[0].ok
 
-it("prices a route from its own jobs' p95, legacy rows without a resolution counting as 1k", async () => {
+it("prices a route from its own jobs' p95 at the template's quality (1295)", async () => {
   await db.query('set local session_replication_role = replica')
   expect(await meetsFloor()).toBe(true)
   await jobs(other + '/t1250-other', { resolution: '1k', quality: 'medium' }, 5)
   expect(await meetsFloor()).toBe(true)
   await jobs(tag, { resolution: '1k', quality: 'medium' }, 5, 9)
   expect(await meetsFloor()).toBe(true) // nine samples: below the ten the p95 needs
-  await jobs(tag, {}, 5, 1)
+  await jobs(tag, {}, 5, 1) // a legacy row records no quality and no longer counts
+  await jobs(tag, { resolution: '1k', quality: 'high' }, 5, 1)
+  expect(await meetsFloor()).toBe(true)
+  await jobs(tag, { resolution: '1k', quality: 'medium' }, 5, 1)
   expect(await meetsFloor()).toBe(false)
 })
 
