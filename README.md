@@ -25,6 +25,32 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build
 pnpm db:start && pnpm test:db   # needs Docker
 ```
 
+## Template batch script
+
+Templates, their categories and series can be created and edited from a local JSON file
+instead of the admin pages. Every change goes through the same database functions and checks
+the admin uses; nothing is written by hand.
+
+```bash
+pnpm templates:apply .local/templates/<batch>.json --dry-run   # check everything, keep nothing
+pnpm templates:apply .local/templates/<batch>.json             # apply to the test site
+```
+
+- Format: [`scripts/templates.example.json`](scripts/templates.example.json). Batch files hold
+  private prompts, so they must live under a gitignored `.local/` folder; the script refuses others.
+- Needs `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `SHOTVIVA_IMPORT_ADMIN_ID`
+  (your admin user id on that site) in `.env.local`. Uploading covers and style references also
+  needs the test site's R2 keys; the buckets and the cover address are fixed in the script, and a
+  `.env.local` set up for another site stops it. `TEMPLATE_SYNC_REVALIDATE_SECRET` (optional)
+  refreshes the test site's catalogue right after a run; without it the site catches up within the hour.
+- The script writes only to the test site or a local stack. It first runs the whole batch and
+  rolls it back, uploads files only if that passed, then writes. A batch is all or nothing: every
+  item is listed with its result, and if any item fails nothing is kept and the exit code is 1.
+  `--dry-run` stops after the check. At most 300 items per batch (a series counts twice).
+- Re-running a file is safe: unchanged items are reported as unchanged.
+- Production is never written by this script: templates, categories and series reach
+  production through the "Sync preview templates to production" workflow (Owner approval).
+
 ## License
 
 Proprietary. The source is public to read, but it is not open source: using, copying, modifying or hosting it needs a written commercial license from Grayscale Luminary LLC. See [LICENSE](LICENSE).
