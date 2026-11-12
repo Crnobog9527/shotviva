@@ -17,29 +17,30 @@ const Intl = NextIntlClientProvider as unknown as FunctionComponent<{ locale: st
 const render = (element: ReactElement) => renderToStaticMarkup(createElement(Intl, { locale: 'en', messages: en, timeZone: 'UTC' }, element))
 
 const LOCK = /needs (Pro|Max)/g
-const TUTORIAL = 'aria-label="Batch create tutorial"'
+const DEMO = 'See how it works'
 
 describe('GatedFeatures (Create page, one Batch create card, Owner 2026-11-12)', () => {
-  it('is one card naming both plans, locked below Pro, opening the intro (never a link)', () => {
+  it('is one card naming both plans, locked below Pro, with no link to another page', () => {
     const html = render(createElement(GatedFeatures, { tier: null }))
     expect(html).toContain('Batch create')
     expect(html).toContain('10 photos')
     expect(html).toContain('30 photos · 5 templates')
     expect(html.match(LOCK)).toEqual(['needs Pro', 'needs Max'])
     expect(html).not.toContain('<a ')
-    expect(html).toContain(TUTORIAL)
   })
 
-  it('sends Pro straight into Batch create, with Max still marked locked', () => {
-    const html = render(createElement(GatedFeatures, { tier: 'pro' }))
-    expect(html.match(LOCK)).toEqual(['needs Max'])
-    expect(html.match(/<a href="\/generate\/batch"/g)).toHaveLength(1)
-    expect(html).toContain(TUTORIAL)
+  it('shows "See how it works" as words on a button on every plan', () => {
+    for (const tier of [null, 'starter', 'pro', 'max'] as const) {
+      const html = render(createElement(GatedFeatures, { tier }))
+      expect(html).toMatch(new RegExp(`<button[^>]*>(?:(?!</button>).)*${DEMO}`, 's'))
+    }
   })
 
-  it('sends Max straight into Batch create with nothing locked', () => {
-    const html = render(createElement(GatedFeatures, { tier: 'max' }))
-    expect(html.match(LOCK)).toBeNull()
-    expect(html.match(/<a href="\/generate\/batch"/g)).toHaveLength(1)
+  it('opens Batch create in place for Pro (Max still marked locked) and Max, never by a link', () => {
+    const pro = render(createElement(GatedFeatures, { tier: 'pro' }))
+    expect(pro.match(LOCK)).toEqual(['needs Max'])
+    const max = render(createElement(GatedFeatures, { tier: 'max' }))
+    expect(max.match(LOCK)).toBeNull()
+    for (const html of [pro, max]) expect(html).not.toContain('/generate/batch')
   })
 })

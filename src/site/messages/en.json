@@ -270,9 +270,9 @@
         "max": "{count, number} photos · {templates, number} templates"
       },
       "guide": {
-        "title": "Tutorial",
-        "lede": "How Batch create works, with example results. Open it again any time from the ? button.",
-        "open": "Batch create tutorial",
+        "title": "See how it works",
+        "lede": "How Batch create works, with example results. Open it again any time from See how it works.",
+        "demo": "See how it works",
         "tabsLabel": "Ways to use Batch create",
         "tabs": {
           "batch": "1 template × photos",
@@ -410,6 +410,7 @@
       "newBatch": "New batch",
       "openPhotos": "Open Photos",
       "backToCreate": "Back to Create",
+      "closeWhileRunning": "Close (it keeps generating)",
       "lockedTitle": "Batch create comes with Pro and Max",
       "lockedPro": "One template on up to {count, number} photos at once.",
       "lockedMax": "Up to {templates, number} templates on your photos, {count, number} photos a batch.",
