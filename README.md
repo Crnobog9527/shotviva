@@ -73,8 +73,11 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
   It first checks the picked result is still in the bucket. Publication follows the test site, so a
   template finalized as published goes live on production with the next T93 sync; finalize lists
   those ids and never starts a sync itself. `status` shows each template's production sync state
-  (not synced / synced / changed since) from the sync workflow's successful runs on GitHub, read
-  only; it never reads production.
+  (not synced / synced / changed since): it takes the last successful "Sync preview templates to
+  production" run on GitHub whose title names the template id or its series slug, and compares its
+  time with the template's or prompt's last change on the test site. It never reads production
+  (the sync's own history lives there). The column errs towards "changed since": any change to the
+  row counts (an order or category tweak too), so it may ask for a sync that would change nothing.
 - R2 keys for the tools, in `.env.local` (fill in your own; never paste them anywhere):
 
   ```bash
