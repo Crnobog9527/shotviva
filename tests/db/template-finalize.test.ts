@@ -11,6 +11,7 @@ import { batchResultSchema } from '../../scripts/template-apply/report'
 import { parseBatch } from '../../scripts/template-apply/schema'
 import { readState } from '../../scripts/template-apply/state'
 import { readProgress } from '../../scripts/template-review/progress'
+import { missingPicks } from '../../scripts/template-review/picks'
 import { finalizeBatch, stageOf } from '../../scripts/template-review/stages'
 import { planCells } from '../../scripts/template-trial/cells'
 import { ensureTestPhoto } from '../../scripts/template-trial/photos'
@@ -117,5 +118,17 @@ describe('templates:finalize', () => {
     const { problems } = finalizeBatch(batch, await readProgress(service, [good, bad]))
     expect(problems.map(p => p.templateId)).toEqual([bad])
     expect((await db.query('select is_active from public.templates where id=$1', [good])).rows[0].is_active).toBe(false)
+  })
+
+  it('stops before writing when the picked result is no longer in the bucket', async () => {
+    const id = await draft()
+    const run = await trial(id)
+    const batch = parseBatch({ templates: [{ id, review: { status: 'pass', version: run.promptVersion!, pick: run.id } }] })
+    const progress = await readProgress(service, [id])
+    expect(await missingPicks(batch, progress, [id], privateBucket.store)).toEqual([])
+    await privateBucket.store.delete(run.outputKey!)
+    const [problem] = await missingPicks(batch, progress, [id], privateBucket.store)
+    expect(problem).toMatchObject({ templateId: id })
+    expect(problem.problem).toContain('已不在桶里')
   })
 })

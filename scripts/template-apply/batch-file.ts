@@ -37,14 +37,20 @@ export async function assertTestOnlyToken(client: Sender): Promise<number> {
 // The target's own buckets with this tool's R2 keys: TEMPLATE_TOOLS_R2_*, never the shell's R2_*
 // (Node's --env-file does not override variables the shell already has, and those may belong to
 // another project). None on a local stack, or without the keys. The token is checked first.
+// The token check runs once per process: finalize opens the buckets twice.
+let checked: Promise<number> | null = null
+
 export async function targetStores(target: Target, env: Record<string, string | undefined> = process.env) {
   const accountId = env.TEMPLATE_TOOLS_R2_ACCOUNT_ID
   const accessKeyId = env.TEMPLATE_TOOLS_R2_ACCESS_KEY_ID
   const secretAccessKey = env.TEMPLATE_TOOLS_R2_SECRET_ACCESS_KEY
   if (!target.storage || !accountId || !accessKeyId || !secretAccessKey) return {}
   const client = createR2Client({ accountId, accessKeyId, secretAccessKey })
-  const refused = await assertTestOnlyToken(client)
-  // Status codes only, never the key.
-  process.stdout.write(`R2 令牌检查：正式桶 ${PRODUCTION_BUCKET} 拒绝访问（HTTP ${refused}），只用测试站的桶。\n`)
+  if (!checked) {
+    checked = assertTestOnlyToken(client)
+    // Status codes only, never the key.
+    process.stdout.write(`R2 令牌检查：正式桶 ${PRODUCTION_BUCKET} 拒绝访问（HTTP ${await checked}），只用测试站的桶。\n`)
+  }
+  await checked
   return { privateStore: createR2Store(client, target.storage.privateBucket), publicStore: createR2Store(client, target.storage.publicBucket) }
 }

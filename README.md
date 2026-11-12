@@ -70,6 +70,11 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
 
   `finalize` goes through the same path as `templates:apply` (the admin's 「设为封面」, sale switch
   and 上架 rules, all or nothing); a file's explicit `"openSale": false` or `"publish": false` wins.
+  It first checks the picked result is still in the bucket. Publication follows the test site, so a
+  template finalized as published goes live on production with the next T93 sync; finalize lists
+  those ids and never starts a sync itself. `status` shows each template's production sync state
+  (not synced / synced / changed since) from the sync workflow's successful runs on GitHub, read
+  only; it never reads production.
 - R2 keys for the tools, in `.env.local` (fill in your own; never paste them anywhere):
 
   ```bash

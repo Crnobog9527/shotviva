@@ -3,13 +3,19 @@ import type { Batch, TemplateItem } from '../template-apply/schema'
 // Where each template of a batch stands in the pipeline (apply → trial → review → finalize), and
 // the finalize batch built from the reviews. Pure: the commands read the database and print.
 
-export type TrialRun = { id: string; templateId: string; promptVersion: number | null; status: string; costUsd: number | null; estimateUsd: number }
+export type TrialRun = {
+  id: string; templateId: string; promptVersion: number | null; status: string; costUsd: number | null; estimateUsd: number
+  outputKey?: string | null
+}
 
 export type Progress = {
   exists: boolean
   active: boolean
   version: number | null
   runs: TrialRun[]
+  // When the template or its prompt last changed on the test site, and its series, for the sync column.
+  changedAt?: string | null
+  seriesSlug?: string | null
 }
 
 export type ReviewState = 'none' | 'pass' | 'fail' | 'stale'
