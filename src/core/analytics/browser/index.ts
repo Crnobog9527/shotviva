@@ -6,6 +6,7 @@ export {
   resetIdentity,
   track,
   trackBusinessInquiry,
+  trackCatalogueSeeAll,
   trackContactSales,
   trackPaywallSelect,
   trackPaywallView,

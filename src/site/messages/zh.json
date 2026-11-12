@@ -562,6 +562,9 @@
       "filter": "筛选模板",
       "filterWithin": "在「{name}」里筛选",
       "all": "全部",
+      "seeAll": "查看全部",
+      "seeAllWhich": "「{name}」",
+      "seeAllCount": "共 {count} 个",
       "illustrative": "每张卡片左边是手机原图，右边是 AI 出图。模板图片仅为效果示例。"
     },
     "series": {
