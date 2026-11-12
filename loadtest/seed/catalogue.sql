@@ -125,9 +125,10 @@ from public.templates t where t.id like 'lt-%' or t.id in (select id from admin.
 on conflict (template_id) do nothing;
 
 -- One applied price batch covering the medium templates.
-insert into admin.template_price_batches default values;
+-- At most one unreverted batch may exist (template_price_one_batch): reuse it on a re-seed.
+insert into admin.template_price_batches select where not exists (select from admin.template_price_batches where reverted_at is null);
 insert into admin.template_price_snapshots (batch_id, template_id, previous, applied, provider_id, provider_endpoint_hash)
-select (select max(id) from admin.template_price_batches), t.id, '{}', '{}',
+select (select id from admin.template_price_batches where reverted_at is null), t.id, '{}', '{}',
   '11111111-0000-4000-8000-000000000001', md5('https://api.openai.com/v1')
 from public.templates t where t.quality = 'medium' and t.id not like 'lt-tpl-%' and t.id <> 'edit'
 on conflict do nothing;
