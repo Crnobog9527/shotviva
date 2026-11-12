@@ -238,7 +238,7 @@ it('refuses invalid destination data without committing any row', async () => {
   const cases = [
     [{ p_template: { ...invalid, category_key: 'missing-' + invalid.id } }, 'CATEGORY_MISSING'],
     [{ p_template: { ...invalid, quality: 'high' } }, 'MODEL_CREDIT_FLOOR'],
-    [{ p_provider: { ...binding, model: 'missing-' + providerId } }, 'PROVIDER_NOT_UNIQUE'],
+    [{ p_provider: { ...binding, model: 'missing-' + providerId } }, 'PROVIDER_MISSING'],
     [{ p_template: { ...invalid, cover_media_type: 'video' } }, 'templates_cover_motion_complete'],
   ] as const
   for (const [overrides, reason] of cases) expect((await write({ ...args, ...overrides })).error?.message).toContain(reason)

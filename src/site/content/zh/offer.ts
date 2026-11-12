@@ -14,8 +14,8 @@ export const ZH_TIERS = OUTPUT_TIERS.map((tier, i) => ({
   use: (['社交媒体和外卖平台', '官网和网店', '印刷和放大查看'] as const)[i] ?? tier.use,
 }))
 
-// 「1K、2K或4K」
-export const zhTierList = `${ZH_TIERS.slice(0, -1).map((t) => t.name).join('、')}或 ${ZH_TIERS.at(-1)?.name}`
+// 「1K、2K 或 4K」
+export const zhTierList = `${ZH_TIERS.slice(0, -1).map((t) => t.name).join('、')} 或 ${ZH_TIERS.at(-1)?.name}`
 
 const zhTierSize = (tier: (typeof ZH_TIERS)[number]) => (tier.longPx > tier.px ? `最长 ${tier.longPx} px` : `${tier.px} px`)
 

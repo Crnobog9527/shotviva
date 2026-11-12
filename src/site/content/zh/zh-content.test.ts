@@ -34,10 +34,11 @@ function strings(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(strings)
   // Addresses and ids are not copy: slugs, hrefs, module and template ids and the stored
   // category names (`key`, `categoryKeys`) stay English (建站规格 R4); `file` is the demo
-  // photo's camera file name (IMG_2047.jpg), shown as is.
+  // photo's camera file name (IMG_2047.jpg), shown as is; `kind` names which picture a how-to
+  // point draws (upload, picker, pair, sizes).
   if (value && typeof value === 'object') {
     return Object.entries(value)
-      .filter(([key]) => !['slug', 'href', 'path', 'module', 'src', 'id', 'file', 'key', 'categoryKeys', 'keyword'].includes(key))
+      .filter(([key]) => !['slug', 'href', 'path', 'module', 'src', 'id', 'file', 'key', 'categoryKeys', 'keyword', 'kind'].includes(key))
       .flatMap(([, inner]) => strings(inner))
   }
   return []
