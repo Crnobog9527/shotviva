@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { breadcrumbListLd, organizationLd, serializeJsonLd, softwareApplicationLd } from './json-ld'
 import { llmsTxt } from './llms-txt'
 import { appShellMetadata, pageMetadata } from './metadata'
-import { AI_CRAWLERS, robotsRules } from './robots'
+import { AI_CRAWLERS, PRIVATE_PATHS, robotsRules } from './robots'
 import { testSite } from './test-site'
 
 // These cases describe the open site (SITE_INDEXING=on in production); the closed, pre-launch
@@ -14,13 +14,22 @@ const site = testSite()
 const page = { path: '/', title: 'T', description: 'D' }
 
 describe('robots', () => {
-  it('allows every named AI crawler and never disallows /', () => {
+  // SEO patch v5 item 3: everyone may fetch but the private routes; the AI crawlers are named and
+  // allowed; Bytespider is out; Sitemap stays; no Host line.
+  it('allows every named AI crawler, blocks only private routes and Bytespider, no Host line', () => {
     const rules = [robotsRules(site).rules].flat()
     for (const bot of AI_CRAWLERS) {
       expect(rules).toContainEqual({ userAgent: bot, allow: '/' })
     }
-    expect(JSON.stringify(rules)).not.toContain('disallow')
+    expect(rules).toContainEqual({ userAgent: '*', allow: '/', disallow: [...PRIVATE_PATHS] })
+    expect(rules).toContainEqual({ userAgent: 'Bytespider', disallow: '/' })
+    const everyoneElse = rules.filter((rule) => rule.userAgent !== 'Bytespider')
+    expect(everyoneElse.flatMap((rule) => [rule.disallow ?? []].flat())).not.toContain('/')
+    for (const open of ['/_next/', '/login', '/signup', '/generate', '/wishlist', '/assets/', '/cases/']) {
+      expect(PRIVATE_PATHS.some((path) => open.startsWith(path))).toBe(false)
+    }
     expect(robotsRules(site).sitemap).toBe('https://example.com/sitemap.xml')
+    expect(robotsRules(site).host).toBeUndefined()
   })
 })
 
