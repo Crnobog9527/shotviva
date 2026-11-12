@@ -8,28 +8,30 @@ import { cn } from '@/core/ui/cn'
 import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
-import { MATRIX_MAX_TEMPLATES } from './matrix-state'
 
 type Props = {
   open: boolean
   onOpenChange(open: boolean): void
   templates: readonly CatalogueTemplate[]
   chosen: readonly string[]
+  // The plan's number of templates: Max picks up to five, Pro one (a tap swaps it and closes).
+  max: number
   onToggle(id: string): void
 }
 
 // Choosing the batch's templates (T107): every template that takes a photo, as a grid of covers
-// with a check; up to five, the rest wait greyed once five are in. One Done closes it.
-export function TemplatePicker({ open, onOpenChange, templates, chosen, onToggle }: Props) {
+// with a check; up to the plan's number, the rest wait greyed once it is reached. One Done
+// closes it. On a plan that holds one template a tap chooses it, so nothing waits greyed.
+export function TemplatePicker({ open, onOpenChange, templates, chosen, max, onToggle }: Props) {
   const t = useTranslations('app.matrix')
-  const full = chosen.length >= MATRIX_MAX_TEMPLATES
+  const full = max > 1 && chosen.length >= max
   return (
     <ResponsiveSheet
       open={open}
       onOpenChange={onOpenChange}
       wide
-      title={t('pickerTitle')}
-      description={t('pickerLine', { count: chosen.length, max: MATRIX_MAX_TEMPLATES })}
+      title={t(max > 1 ? 'pickerTitle' : 'pickerTitleOne')}
+      description={max > 1 ? t('pickerLine', { count: chosen.length, max }) : t('pickerLineOne')}
       footer={
         <button type="button" onClick={() => onOpenChange(false)} className={buttonVariants({ variant: 'cta', size: 'cta' })}>
           {t('pickerDone', { count: chosen.length })}
