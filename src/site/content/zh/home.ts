@@ -19,9 +19,9 @@ import {
   zhPlansSentence,
   zhTierList,
   zhTierPixels,
-  zhUploadLimits,
 } from './offer'
 import { withFirstFrame } from '../landing-shared'
+import { whiteBackgroundGuide, zhSteps, zhTote } from './home-explainers'
 import { zhTextEdits } from './home-edits'
 import { zhHomeWishlist } from './home-wishlist'
 import { zhSharedFacts } from './shared'
@@ -32,7 +32,6 @@ import { zhHomePlans } from '../plan-strip'
 // changes (light, scene, style), what stays (the subject) and that templates replace prompts,
 // so nobody expects free-form editing (中文用户真实问法 C7). Numbers come from offer.ts.
 const brand = site.brand.name
-const [standard, hd, max] = ZH_TIERS
 
 function plansText(offers: OfferFacts): HeadedText {
   const { planFrom, yearlySaving } = offers
@@ -44,10 +43,9 @@ function plansText(offers: OfferFacts): HeadedText {
   }
 }
 
-// The same illustrative tote set as the English home (public/home/hero-set-*.webp).
+// The hero's pictures (public/home, all 1080×1350); the tote set itself is in home-explainers.
 const photo = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 1080, height: 1350 })
-const phoneShot = photo('hero-set-phone', '手机随手拍：厨房台面上的一只编织皮托特包，窗边自然光（示意图）')
-const listingShot = photo('hero-set-listing', '同一只编织皮托特包的白底商品图，柔和影棚光（示意图）')
+const phoneShot = zhTote.phone
 
 // 首屏 AI 那一半：同一张手机照片做出的三个场景轮流展示（Owner 2026-11-11），和英文首页一致。
 const heroScenes = [
@@ -63,9 +61,9 @@ export const shoot: ShootDemo = {
   phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: '手机原图：窗边光线，台面很乱，钥匙和杯子都入镜了。' },
   arrow: '三个模板，同一只包',
   results: [
-    { image: listingShot, title: '电商主图', template: '纯白底图模板' },
-    { image: photo('hero-set-lifestyle', '同一只包放在窗边的咖啡馆椅子上，早晨暖光（示意图）'), title: '生活场景图', template: '生活场景模板' },
-    { image: photo('hero-set-promo', '同一只包做成新品促销海报，明亮影棚光（示意图）'), title: '促销海报', template: '促销海报模板' },
+    { image: zhTote.listing, title: '电商主图', template: '纯白底图模板' },
+    { image: zhTote.lifestyle, title: '生活场景图', template: '生活场景模板' },
+    { image: zhTote.promo, title: '促销海报', template: '促销海报模板' },
   ],
   bill: {
     photographer: { who: '摄影师', amount: '一整场拍摄', note: '预约、影棚、造型和精修' },
@@ -105,35 +103,8 @@ export function productBills({ planFrom }: OfferFacts, heading: string, intro: s
   }
 }
 
-const steps = {
-  heading: 'AI改图怎么用：3 步完成',
-  items: [
-    { heading: '上传一张照片', text: `用手机拍一张，或者从相册里选：${zhUploadLimits}。让主体完整地留在画面里。` },
-    {
-      heading: '选一个模板',
-      text: '选餐饮、商品、美妆、房间、宠物或画风模板。光线、场景或画风由模板决定，什么都不用写。',
-    },
-    {
-      heading: `下载${zhTierList}`,
-      text: `${standard.name} ${standard.px} px，适合${standard.use}；${hd.name} ${hd.px} px，适合${hd.use}；${max.name} ${max.px} px，适合${max.use}。`,
-    },
-  ],
-} as const satisfies HomePage['steps']
-
-// 「白底图、电商主图怎么做」 (SEO launch handbook G9): the white-background template, the
-// product kept as shot, and the three export sizes.
-const whiteBackgroundGuide = {
-  id: 'white-bg',
-  heading: '白底图、电商主图怎么做',
-  cards: [
-    { heading: '选「纯白底图」模板', text: '上传一张商品照片，选「纯白底图」模板，背景换成干净的纯白，适合做电商平台的主图。不用自己抠图，也不用写提示词。' },
-    { heading: '商品主体保持原样', text: '商品的形状、颜色、标签和文字按你拍的样子保留，只换背景和光线。拍的时候让商品完整入镜、对上焦。' },
-    { heading: `${ZH_TIERS.length} 档导出尺寸`, text: `每张图导出为 PNG，分 ${ZH_TIERS.length} 档：${zhTierPixels}。主图需要放大看细节时，选更高一档。` },
-  ],
-} as const satisfies HomePage['topics']
-
 // 「3 步」 in FAQ A is the length of the steps block, never typed.
-const STEP_COUNT = steps.items.length
+const STEP_COUNT = zhSteps.items.length
 
 const copy = {
   slug: '',
@@ -154,7 +125,7 @@ const copy = {
   },
   shoot,
   edits: zhTextEdits,
-  steps,
+  steps: zhSteps,
   templateGrid: {
     heading: 'AI改图模板：不用写提示词',
     intro: `每个模板都从你的手机照片开始，到一张成品图结束。选一个，剩下的交给 ${brand}。`,
