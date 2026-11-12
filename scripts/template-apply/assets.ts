@@ -30,6 +30,16 @@ export type CoverOp =
   | { op: 'set_cover'; before?: string; after?: string }
   | { op: 'test_run_cover'; run_id: string; before: string | null; after: string }
 
+// A bucket call that fails says which part to check, not the SDK's own text (which may be just
+// "UnknownError" for a key without access).
+export async function bucket<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call()
+  } catch {
+    throw new Error('R2 访问失败：TEMPLATE_TOOLS_R2_* 的密钥对测试站的桶没有读写权限，或网络不通')
+  }
+}
+
 async function readImage(ctx: AssetContext, path: string) {
   const full = resolve(ctx.baseDir, path)
   const info = await stat(full).catch(() => null)
@@ -59,8 +69,9 @@ export async function resolveStyleRefs(ctx: AssetContext, id: string, paths: str
     const kept = current.find(ref => ref.key === encoded.key)
     if (kept) { refs.push(kept); continue }
     if (ctx.write) {
-      if (!ctx.privateStore) throw new Error('上传参考图需要本机配置 R2（R2_ACCOUNT_ID、R2_ACCESS_KEY_ID、R2_SECRET_ACCESS_KEY、R2_BUCKET）')
-      if (!(await ctx.privateStore.head(encoded.key))) await ctx.privateStore.put(encoded.key, encoded.data, 'image/webp')
+      if (!ctx.privateStore) throw new Error('上传参考图需要本机配置 TEMPLATE_TOOLS_R2_ACCOUNT_ID、TEMPLATE_TOOLS_R2_ACCESS_KEY_ID、TEMPLATE_TOOLS_R2_SECRET_ACCESS_KEY')
+      const store = ctx.privateStore
+      if (!(await bucket(() => store.head(encoded.key)))) await bucket(() => store.put(encoded.key, encoded.data, 'image/webp'))
     }
     refs.push({ key: encoded.key, width: encoded.width, height: encoded.height, uploadedAt: new Date().toISOString() })
   }
@@ -76,23 +87,25 @@ async function coverUrl(ctx: AssetContext, id: string, slot: 'before' | 'after',
   const base = requireBase(ctx)
   const target = { templateId: id, slot }
   if (!ctx.write) return `${base}/${(await planStillCover(target, bytes)).key}`
-  if (!ctx.publicStore) throw new Error('上传封面需要本机配置 R2 和 R2_PUBLIC_BUCKET')
-  return (await publishNewStillCover(ctx.publicStore, base, target, bytes)).url
+  if (!ctx.publicStore) throw new Error('上传封面需要本机配置 TEMPLATE_TOOLS_R2_* 密钥')
+  const store = ctx.publicStore
+  return (await bucket(() => publishNewStillCover(store, base, target, bytes))).url
 }
 
 // 「设为封面」 on a trial run, converted as setTestRunCover does. The run is checked again in SQL.
 async function testRunCover(ctx: AssetContext, id: string, runId: string): Promise<CoverOp> {
   const base = requireBase(ctx)
   if (!ctx.privateStore) {
-    if (ctx.write) throw new Error('用试跑结果做封面需要本机配置 R2')
+    if (ctx.write) throw new Error('用试跑结果做封面需要本机配置 TEMPLATE_TOOLS_R2_* 密钥')
     // Dry run without bucket access: the URLs only have to be well-formed for the checks.
     return { op: 'test_run_cover', run_id: runId, before: `${base}/covers/${id}/before-dry-run.webp`, after: `${base}/covers/${id}/after-dry-run.webp` }
   }
   const run = await findTestRun(ctx.db, runId)
   if (!run || run.templateId !== id || run.status !== 'succeeded' || !run.outputKey) throw new Error('试跑记录不存在、未成功或不属于这个模板')
   const photo = run.photoId ? await findTestPhoto(ctx.db, run.photoId) : null
-  const after = await coverUrl(ctx, id, 'after', await ctx.privateStore.get(run.outputKey))
-  const before = photo ? await coverUrl(ctx, id, 'before', await ctx.privateStore.get(photo.objectKey)) : null
+  const store = ctx.privateStore
+  const after = await coverUrl(ctx, id, 'after', await bucket(() => store.get(run.outputKey as string)))
+  const before = photo ? await coverUrl(ctx, id, 'before', await bucket(() => store.get(photo.objectKey))) : null
   return { op: 'test_run_cover', run_id: runId, before, after }
 }
 

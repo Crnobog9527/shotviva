@@ -16,12 +16,16 @@ export const USAGE = '用法：pnpm templates:apply .local/<路径>/<批次文�
 export type Options = { file: string; dryRun: boolean }
 
 // Batch files carry private prompts: only from a gitignored .local/ folder.
+export function localBatchPath(raw: string, cwd = process.cwd()): string {
+  const file = resolve(cwd, raw)
+  if (!file.split(sep).includes('.local')) throw new Error(`批次文件要放在 .local/ 下（不进 git）：${relative(cwd, file)}`)
+  return file
+}
+
 export function readOptions(args: string[], cwd = process.cwd()): Options {
   const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { 'dry-run': { type: 'boolean' } } })
   if (positionals.length !== 1) throw new Error(USAGE)
-  const file = resolve(cwd, positionals[0])
-  if (!file.split(sep).includes('.local')) throw new Error(`批次文件要放在 .local/ 下（不进 git）：${relative(cwd, file)}`)
-  return { file, dryRun: values['dry-run'] === true }
+  return { file: localBatchPath(positionals[0], cwd), dryRun: values['dry-run'] === true }
 }
 
 const blank = (value: unknown) => (value === '' ? undefined : value)

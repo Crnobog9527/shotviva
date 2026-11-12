@@ -4,6 +4,7 @@ import { CARD_STYLES, CATEGORY_KEY_PATTERN, CATEGORY_LIMITS } from '../../src/co
 import { TEMPLATE_QUALITIES } from '../../src/core/templates/pricing'
 import { promptInputSchema, TEMPLATE_MODULES, templateInputSchema } from '../../src/core/templates/schema'
 import { MAX_STYLE_REFS } from '../../src/core/templates/style-refs'
+import { trialSchema } from './trial-schema'
 
 // The batch file `pnpm templates:apply` reads (format: scripts/templates.example.json). It lives
 // in .local/ because templates carry their private prompts; nothing here is ever printed.
@@ -72,6 +73,8 @@ export const templateItemSchema = templateFields.extend({
   // 'default' follows the site's default image model; otherwise a provider id, label or model name.
   model: z.string().trim().min(1).max(120).optional(),
   styleRefs: z.array(localFile).max(MAX_STYLE_REFS).optional(),
+  // templates:trial only (sample inputs and benchmarks); apply ignores it.
+  trial: trialSchema.optional(),
   cover: coverSchema.optional(),
   openSale: z.boolean().optional(),
   publish: z.boolean().optional(),
