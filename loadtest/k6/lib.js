@@ -5,6 +5,11 @@ import http from 'k6/http'
 export const BASE = __ENV.BASE_URL || 'http://localhost:3100'
 export const SUPABASE = __ENV.SUPABASE_URL || 'http://127.0.0.1:54321'
 export const ANON_KEY = __ENV.SUPABASE_ANON_KEY
+// Local targets only: the scripts sign in seeded accounts and drive real writes.
+const LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/
+for (const [name, url] of [['BASE_URL', BASE], ['SUPABASE_URL', SUPABASE]]) {
+  if (!LOCAL.test(url)) throw new Error(`${name} must be http(s)://localhost or 127.0.0.1, got ${url}`)
+}
 const PASSWORD = 'loadtest-password'
 const CHUNK = 3180
 

@@ -12,6 +12,14 @@
 \if :{?jobs} \else \set jobs 32 \endif
 \if :{?users} \else \set users 50 \endif
 
+-- Refuse anything but a disposable local database: one with a real account in it is not one.
+do $guard$
+begin
+  if exists (select from auth.users where email is null or email not like 'loadtest-%@example.test') then
+    raise exception 'refusing to seed: this database has accounts other than loadtest-N@example.test (run it only on a fresh `supabase db reset`)';
+  end if;
+end $guard$;
+
 begin;
 -- Users first, with triggers on, so profiles are created the normal way.
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,

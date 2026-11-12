@@ -6,6 +6,14 @@ or preview traffic, no real storage, no model spend. Never point these scripts a
 project. The seed creates accounts `loadtest-N@example.test` with the password
 `loadtest-password`, on the local stack only.
 
+Guards against running it anywhere else:
+- `seed/catalogue.sql` stops before writing anything if the database has any account that is
+  not `loadtest-N@example.test` (seed only a fresh `supabase db reset`).
+- `k6/lib.js` refuses a `BASE_URL` or `SUPABASE_URL` that is not `localhost` / `127.0.0.1`.
+- `run/env.sh` prints every other variable from `.env.example` and the checkout's `.env*` files
+  empty (or, for the three URL-typed public ones, a closed local port), so a `.env.local` with
+  real keys is never picked up by the build or the server.
+
 Local Docker follows AGENTS §7: take the lock `/tmp/shotviva-db-lock`, and when you are done
 stop the stack (`supabase stop --no-backup`) and remove the lock.
 
