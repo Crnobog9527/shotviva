@@ -6,8 +6,8 @@ import { categoriesOf, type CatalogueTemplate } from './catalogue-template'
 // category path (slugs from the root) it sits under, and the category tree for the filter chips,
 // trimmed to the branches that hold a card. Plain data, built on the server, filtered in the
 // browser without another read.
-// `key` (the stable category key analytics uses) and `intro` (分类管理's 首页说明, shown under the
-// section heading in All) come from the category tree; the flat fallback has neither.
+// `key` (the stable category key analytics uses) and, on roots, `intro` (分类管理's 首页说明,
+// shown under the section heading in All) come from the category tree; the flat fallback has neither.
 export type FilterNode = { slug: string; name: string; children: FilterNode[]; key?: string; intro?: string | null }
 
 export type CatalogueSeries = {
@@ -46,7 +46,9 @@ function trim(tree: readonly CategoryNode[], entries: readonly GridEntry[], zh: 
   return tree
     .filter((node) => entries.some((entry) => startsWith(entry.path, node.path)))
     .map((node) => ({
-      slug: node.slug, key: node.key, name: zh ? node.nameZh : node.nameEn, intro: (zh ? node.introZh : node.introEn) ?? null,
+      slug: node.slug, key: node.key, name: zh ? node.nameZh : node.nameEn,
+      // Only a root's intro is drawn (the section heading in All); deeper levels do not carry it.
+      ...(node.path.length === 1 ? { intro: (zh ? node.introZh : node.introEn) ?? null } : {}),
       children: trim(node.children, entries, zh),
     }))
 }

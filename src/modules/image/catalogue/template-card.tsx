@@ -11,7 +11,10 @@ import { COVER_SIZES } from './cover-sizes'
 import { PairMedia } from './pair-media'
 import { useHoverWipe } from './use-hover-wipe'
 
-type Props = { template: CatalogueTemplate; onOpen(id: string): void; eager?: boolean }
+// Cover widths when the card is drawn narrower than the grid's (Create's All sections).
+export type CardSizes = { plate?: string; frame?: string; art?: string }
+
+type Props = { template: CatalogueTemplate; onOpen(id: string): void; eager?: boolean; sizes?: CardSizes }
 
 // A template card (DESIGN §4.2 and §6.9 items 1–3, B comp create.html). A 'compare' category
 // (画风) keeps the drag compare; every other template is the side-by-side pair that plays its change on hover.
@@ -23,7 +26,7 @@ export function TemplateCard(props: Props) {
   return <PairCard {...props} />
 }
 
-function PairCard({ template, onOpen, eager }: Props) {
+function PairCard({ template, onOpen, eager, sizes }: Props) {
   const ref = useRef<HTMLButtonElement>(null)
   const alt = useTranslations('app.template')('cardAlt', { name: template.name })
   useHoverWipe(ref)
@@ -38,9 +41,9 @@ function PairCard({ template, onOpen, eager }: Props) {
         className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house active:scale-[.97]"
       >
         {before && after ? (
-          <PairMedia before={before} after={after} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} video={type === 'video' && motion ? motion : undefined} className="transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]" />
+          <PairMedia before={before} after={after} alt={alt} eager={eager} sizes={sizes?.plate ?? COVER_SIZES.cardPlate} video={type === 'video' && motion ? motion : undefined} className="transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]" />
         ) : isMotion(template) ? (
-          <LoopPlate template={template} alt={alt} sizes={COVER_SIZES.cardFrame} />
+          <LoopPlate template={template} alt={alt} sizes={sizes?.frame ?? COVER_SIZES.cardFrame} />
         ) : (
           <span className="hairline block aspect-[8/5] rounded-control bg-muted" />
         )}
@@ -54,7 +57,7 @@ function PairCard({ template, onOpen, eager }: Props) {
 // The one card with the drag compare (画风 / Art Styles): a tap on the photo opens the dialog, a drag
 // compares; the name and price below are their own button for the keyboard. From md up it is the
 // tall card spanning two rows (the grid sets the span).
-function ArtCard({ template, onOpen, eager }: Props) {
+function ArtCard({ template, onOpen, eager, sizes }: Props) {
   const t = useTranslations('app.template')
   return (
     <div className="relative flex h-full flex-col rounded-tile">
@@ -65,7 +68,7 @@ function ArtCard({ template, onOpen, eager }: Props) {
         afterAlt={t('resultAlt', { name: template.name })}
         onTap={() => onOpen(template.id)}
         tagsAt="bottom"
-        cover={{ sizes: COVER_SIZES.artCard, lazy: !eager }}
+        cover={{ sizes: sizes?.art ?? COVER_SIZES.artCard, lazy: !eager }}
         className="hairline rounded-control md:aspect-auto md:min-h-[280px] md:flex-1"
       />
       <button type="button" aria-haspopup="dialog" onClick={() => onOpen(template.id)} className="press block w-full rounded-inner text-left">

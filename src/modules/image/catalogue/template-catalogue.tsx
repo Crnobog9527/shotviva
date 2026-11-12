@@ -20,6 +20,7 @@ import { CategoryChips } from './category-chips'
 import { FeatureCard } from './feature-card'
 import { SeriesCard } from './series-card'
 import { TemplateCard } from './template-card'
+import { useSeeAllLanding } from './use-see-all-landing'
 import { useCatalogueQuery } from './use-catalogue-query'
 
 // The series panel is only fetched once a series is opened (scripts/js-budget.json).
@@ -51,10 +52,12 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
   if (series && !sheetLoaded) setSheetLoaded(true)
   const { sentinel, stuck } = useStuck()
   const sections = useMemo(() => catalogueSections(view.filters, view.entries), [view.filters, view.entries])
+  const bar = useRef<HTMLDivElement>(null)
+  const landAfter = useSeeAllLanding(active.saved ? undefined : active.path[0], sentinel, bar)
   const seeAll = (section: CatalogueSection) => {
     trackCatalogueSeeAll(section.key)
+    landAfter(section.slug)
     query.select({ saved: false, path: [section.slug] })
-    scrollBackTo(sentinel.current)
   }
 
   if (view.entries.length === 0) {
@@ -68,7 +71,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
         </Reveal>
       ) : null}
       <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
-      <div data-stuck={stuck || undefined} className="sticky top-0 z-40 py-2 data-[stuck]:nav-material data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
+      <div ref={bar} data-stuck={stuck || undefined} className="sticky top-0 z-40 py-2 data-[stuck]:nav-material data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
         <CategoryChips filters={view.filters} saved={saved.length > 0} value={active} onChange={query.select} />
       </div>
       <h2 className="sr-only">{t('templates')}</h2>
@@ -114,11 +117,6 @@ function CatalogueGrid({ entries, endCard, className, onOpen, onOpenSeries }: Gr
       {endCard ? <Reveal as="li">{endCard}</Reveal> : null}
     </ul>
   )
-}
-
-// Back to the top of the grid when 「查看全部」 was tapped further down the page.
-function scrollBackTo(sentinel: HTMLElement | null) {
-  if (sentinel && sentinel.getBoundingClientRect().top < 0) sentinel.scrollIntoView({ block: 'start' })
 }
 
 // The featured card: the first single video template in the catalogue's order.

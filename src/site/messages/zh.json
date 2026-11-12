@@ -552,7 +552,7 @@
       "filterWithin": "在「{name}」里筛选",
       "all": "全部",
       "seeAll": "查看全部",
-      "seeAllAria": "查看「{name}」的全部 {count} 个模板",
+      "seeAllWhich": "「{name}」",
       "seeAllCount": "共 {count} 个",
       "illustrative": "每张卡片左边是手机原图，右边是 AI 出图。模板图片仅为效果示例。"
     },

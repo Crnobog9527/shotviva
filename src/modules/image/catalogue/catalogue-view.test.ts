@@ -57,9 +57,9 @@ describe('Create grid entries (T102)', () => {
   })
 
   it('shows only category branches that hold a card, in the page language', () => {
-    const leaf = { slug: 'chinese', key: 'food-dark-cn', name: 'food-dark-cn en', intro: null, children: [] }
+    const leaf = { slug: 'chinese', key: 'food-dark-cn', name: 'food-dark-cn en', children: [] }
     expect(view.filters).toEqual([
-      { slug: 'food', key: 'food', name: 'food en', intro: 'Dishes', children: [{ slug: 'dark', key: 'food-dark', name: 'food-dark en', intro: null, children: [leaf] }] },
+      { slug: 'food', key: 'food', name: 'food en', intro: 'Dishes', children: [{ slug: 'dark', key: 'food-dark', name: 'food-dark en', children: [leaf] }] },
       { slug: 'pets', key: 'pets', name: 'pets en', intro: null, children: [] },
     ])
     expect(buildCatalogueView(index, templates, true).filters[0]).toMatchObject({ name: 'food 中', intro: '菜品' })

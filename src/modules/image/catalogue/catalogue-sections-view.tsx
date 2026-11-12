@@ -9,7 +9,8 @@ import { Reveal } from '@/core/ui/reveal-item'
 import type { CatalogueSection } from './catalogue-sections'
 import type { GridEntry } from './catalogue-view'
 import { SeriesCard } from './series-card'
-import { TemplateCard } from './template-card'
+import { COVER_SIZES } from './cover-sizes'
+import { TemplateCard, type CardSizes } from './template-card'
 
 type Props = {
   sections: readonly CatalogueSection[]
@@ -30,16 +31,19 @@ export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: 
     <div className="mt-2 grid gap-8 md:mt-3 md:gap-10">
       {sections.map((section, sectionIndex) => {
         const headingId = `create-section-${section.slug}`
-        const seeAll = t('seeAllAria', { name: section.name, count: section.total })
+        // Read as 「查看全部 12「美食」」 / "See all 12 in Food": the visible words first, then the
+        // category, so the accessible name starts with what is on screen (WCAG 2.5.3).
+        const which = <span className="sr-only"> {t('seeAllWhich', { name: section.name })}</span>
         return (
           <section key={section.slug} aria-labelledby={headingId} className="min-w-0">
             <Reveal className="flex items-baseline gap-2 px-(--gutter)">
               <h3 id={headingId} className="shrink-0 text-body leading-[1.25] font-semibold tracking-[-0.015em]">{section.name}</h3>
               {section.intro ? <p className="min-w-0 flex-1 truncate text-caption text-muted-foreground">{section.intro}</p> : <span className="flex-1" />}
-              <button type="button" aria-label={seeAll} onClick={() => onSeeAll(section)}
+              <button type="button" onClick={() => onSeeAll(section)}
                 className="press -my-2 inline-flex min-h-11 shrink-0 items-center gap-1 rounded-inner ps-2 text-caption font-medium text-foreground">
-                {t('seeAll')}
+                {t('seeAll')}{' '}
                 <span className="font-mono text-muted-foreground">{section.total}</span>
+                {which}
                 <ChevronRight aria-hidden className="size-3.5 text-muted-foreground" />
               </button>
             </Reveal>
@@ -47,7 +51,7 @@ export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: 
               <ul className="mt-2 grid grid-cols-2 gap-3 px-(--gutter) md:mt-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
                 {section.entries.slice(0, COMPARE_SHOWN).map((entry, index) => (
                   <li key={entryKey(entry)} className={cn(index === COMPARE_SHOWN - 1 && 'md:hidden lg:block')}>
-                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} onOpen={onOpen} onOpenSeries={onOpenSeries} />
+                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} sizes={COMPARE_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
                   </li>
                 ))}
               </ul>
@@ -58,15 +62,15 @@ export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: 
               )}>
                 {section.entries.map((entry, index) => (
                   <li key={entryKey(entry)} className={cn('w-[calc(100%-4rem)] max-w-96 flex-none snap-start md:w-auto md:max-w-none', fromMd(index))}>
-                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} onOpen={onOpen} onOpenSeries={onOpenSeries} />
+                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} sizes={RAIL_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
                   </li>
                 ))}
                 {section.total > section.entries.length ? (
                   <li className="flex w-28 flex-none snap-start md:hidden">
-                    <button type="button" aria-label={seeAll} onClick={() => onSeeAll(section)}
+                    <button type="button" onClick={() => onSeeAll(section)}
                       className="press hairline flex w-full flex-col items-center justify-center gap-1 rounded-tile bg-wash text-caption font-medium">
-                      {t('seeAll')}
-                      <span className="font-mono text-muted-foreground">{t('seeAllCount', { count: section.total })}</span>
+                      <span>{t('seeAll')}</span>
+                      <span className="font-mono text-muted-foreground">{t('seeAllCount', { count: section.total })}{which}</span>
                     </button>
                   </li>
                 ) : null}
@@ -84,11 +88,16 @@ const entryKey = (entry: GridEntry) => (entry.type === 'series' ? `series-${entr
 // Drag compares shown: four on phones (two rows of two), three from md, four from lg.
 const COMPARE_SHOWN = 4
 
-type CardProps = { entry: GridEntry; eager: boolean; onOpen(id: string): void; onOpenSeries(slug: string): void }
+// Cover widths for the section cards' srcset: a rail card is about 279 px on a 375 phone (the
+// row less 4rem, half of it a plate) and a grid cell from md; a compare is a quarter-to-half column.
+const RAIL_SIZES = { plate: COVER_SIZES.railPlate, frame: COVER_SIZES.railFrame }
+const COMPARE_SIZES = { art: COVER_SIZES.artSection }
 
-function Card({ entry, eager, onOpen, onOpenSeries }: CardProps) {
+type CardProps = { entry: GridEntry; eager: boolean; sizes: CardSizes; onOpen(id: string): void; onOpenSeries(slug: string): void }
+
+function Card({ entry, eager, sizes, onOpen, onOpenSeries }: CardProps) {
   if (entry.type === 'series') return <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={eager} />
-  return <TemplateCard template={entry.template} onOpen={onOpen} eager={eager} />
+  return <TemplateCard template={entry.template} onOpen={onOpen} eager={eager} sizes={sizes} />
 }
 
 // From md up a rail becomes one row: two cards at md, three from lg; the rest stay in the
