@@ -24,6 +24,7 @@ export { ImageWorkspace, type WorkspaceProps } from './workspace/image-workspace
 export { MatrixWorkspaceLazy as MatrixWorkspace } from './matrix/matrix-lazy'
 export type { MatrixWorkspaceProps } from './matrix/matrix-workspace'
 export { GatedFeatures, TEMPLATES_ANCHOR } from './gated/gated-features'
+export { GuideButton } from './gated/guide-button'
 // Make again (T40): server only; reads the work and copies its kept photos back.
 export { loadAgain } from './again/load-again'
 export { loadReuse } from './again/load-reuse'
