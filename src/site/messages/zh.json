@@ -627,7 +627,7 @@
       "doneState": {
         "hud": "已完成",
         "saved": "已存进「作品」",
-        "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · 用了 {count} 积分。{pool, select, free {用的是免费积分，所以会公开展示，并带水印。} paid {用的是付费积分，所以是私密的，没有水印。} other {}}",
+        "line": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono> px}} · 用了 {count} 积分。{pool, select, free {用的是免费积分，所以会公开展示，并带水印。} paid {用的是付费积分，所以是私密的，没有水印。} other {}}",
         "caption": "手机照片 → {name}。",
         "edit": "继续编辑"
       },
@@ -645,7 +645,7 @@
       "freeNotice": "这张图用的是免费积分：会公开展示，并带水印。<b>用付费积分生成的图是私密的，没有水印。</b>",
       "needsCredits": "{tier} 需要 {count} 积分。<b>用付费积分生成的图是私密的，没有水印。</b>",
       "counter": "{count, number} / {max, number}",
-      "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>",
+      "developingSize": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono>}}",
       "yourPhotos": "你的照片",
       "addPhotos": "添加你拍的照片",
       "chooseGalleryMany": "从相册选多张",
@@ -806,7 +806,7 @@
       "makeAnotherWith": "用 {name} 再做一张",
       "shareText": "用 {brand} 制作 {url}",
       "makeAgain": "再做一张",
-      "tierPx": "{tier} · {px}",
+      "tierPx": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off}}}",
       "when": {
         "today": "今天",
         "yesterday": "昨天",
@@ -831,7 +831,7 @@
         "template": "模板",
         "size": "尺寸",
         "resolution": "清晰度",
-        "resolutionValue": "{tier} · {px} px",
+        "resolutionValue": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off} px}}",
         "format": "格式",
         "formatPng": "PNG，透明背景",
         "formatJpgWhite": "JPG，白底",
@@ -1062,6 +1062,7 @@
     "units": {
       "px": "{px, number, ::group-off} px",
       "size": "{width, number, ::group-off}×{height, number, ::group-off}",
+      "sizeApprox": "约 {width, number, ::group-off}×{height, number, ::group-off}",
       "megabytes": "{size} MB",
       "percent": "{value, number, ::percent}"
     },

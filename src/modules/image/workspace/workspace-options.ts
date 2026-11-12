@@ -45,16 +45,16 @@ export const TIER_OPTIONS: readonly TierOption[] = [
   { id: '4k', px: 2880 },
 ]
 
-// The tier's square edge, or the long edge of the real output when the ratio is known (4K at
-// 16:9 is 3840 px, at 1:1 2880 px). 'original' without the photo's size keeps the square edge.
+// The long edge of a work's output when its ratio is fixed (4K at 16:9 is 3840 px, at 1:1 2880 px).
+// 0 when it followed the photo's own ratio: jobs do not record the output size, and the square
+// edge would understate a wide 4K photo. Messages drop the pixel part for 0.
 export function tierPx(id: Resolution, aspect?: string | null): number {
-  const square = TIER_OPTIONS.find((tier) => tier.id === id)?.px ?? 1024
-  if (!aspect || aspect === 'original' || !/^\d{1,2}:\d{1,2}$/.test(aspect)) return square
+  if (!aspect || aspect === 'original' || !/^\d{1,2}:\d{1,2}$/.test(aspect)) return 0
   try {
     const { width, height } = outputSize(id, aspect)
     return Math.max(width, height)
   } catch {
-    return square // a stored ratio beyond 3:1
+    return 0 // a stored ratio beyond 3:1
   }
 }
 

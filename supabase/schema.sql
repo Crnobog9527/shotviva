@@ -1946,7 +1946,8 @@ CREATE OR REPLACE FUNCTION "admin"."template_image_options"("public"."templates"
     'resolutions', array(select r from unnest(admin.sale_route_resolutions(p)) r where not(r=any(coalesce(s.unpriced_resolutions,'{}')))),
     'aspectRatios',case when p.adapter='openrouter_images' then coalesce(p.capabilities->'aspectRatios','[]'::jsonb)
       else '["16:9","4:5","1:1","9:16","3:2","4:3","2:3"]'::jsonb end,
-    'originalRatio',case when p.adapter='openrouter_images' then coalesce(p.capabilities->'originalRatio','false'::jsonb) else 'true'::jsonb end)
+    'originalRatio',case when p.adapter='openrouter_images' then coalesce(p.capabilities->'originalRatio','false'::jsonb) else 'true'::jsonb end,
+    'exactPixels',p.adapter is distinct from 'openrouter_images')
   from public.templates t left join public.template_sale_approvals s on s.template_id=t.id
   left join public.template_prompts tp on tp.template_id=t.id
   left join public.ai_providers p on p.id=coalesce(case when t.id<>'edit' then tp.provider_id end,

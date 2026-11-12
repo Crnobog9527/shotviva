@@ -35,9 +35,15 @@ describe('template output options on the Data API', () => {
     const { data, error } = await anonSupabase().from('templates').select('template_image_options,partner_image_aspects').eq('id',templateId).single()
     expect(error).toBeNull()
     expect(data).toEqual({
-      template_image_options: { resolutions: ['1k'], aspectRatios: ['1:1'], originalRatio: false },
+      // OpenRouter answers with native sizes at 1K/2K: the picker shows them as approximate (1290).
+      template_image_options: { resolutions: ['1k'], aspectRatios: ['1:1'], originalRatio: false, exactPixels: false },
       partner_image_aspects: ['4:5','1:1'],
     })
+  })
+
+  it('reports exact pixels for a template on the default OpenAI route', async () => {
+    const row = await db.query(`select public.template_image_options(t) as options from public.templates t where t.id='edit'`)
+    expect(row.rows[0].options).toMatchObject({ exactPixels: true })
   })
 
   it('allows a partner ratio supported by the default although the web model lacks it', async () => {

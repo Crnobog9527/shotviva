@@ -4,9 +4,10 @@ import { accountPrefixes } from '../../src/core/auth/account-deletion'
 import type { QaEnv } from './env'
 import type { Persona } from './personas'
 import type { QaStorage } from './storage'
+import { withDbTiers } from '../../src/core/templates/db-resolution'
 
 export function adminClient(env: QaEnv): SupabaseClient {
-  return createClient(env.supabaseUrl, env.serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
+  return createClient(env.supabaseUrl, env.serviceKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: withDbTiers() } })
 }
 
 const TRANSIENT = /timed out|unexpected error|fetch failed|ECONNRESET|50[234]/i

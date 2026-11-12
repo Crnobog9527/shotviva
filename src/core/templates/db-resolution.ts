@@ -13,7 +13,7 @@ const DB_TOP_TIER = '3k'
 const TIER_LIST_KEYS = new Set(['resolution', 'resolutions', 'unpriced_resolutions', 'unpricedResolutions', 'p_resolution', 'p_unpriced'])
 
 function isTierId(value: unknown): value is string {
-  return typeof value === 'string' && ((RESOLUTIONS as readonly string[]).includes(value) || value in LEGACY_RESOLUTIONS)
+  return typeof value === 'string' && ((RESOLUTIONS as readonly string[]).includes(value) || Object.hasOwn(LEGACY_RESOLUTIONS, value))
 }
 
 // Renames tier keys in objects, and tier ids under the known tier fields (directly or as array

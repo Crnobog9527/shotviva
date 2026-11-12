@@ -39,6 +39,16 @@ describe('tier ids between the site (4k) and the database (3k until the contract
     expect(fromDbTiers(site)).toEqual(site)
   })
 
+  it('never treats an inherited property name as a tier id', () => {
+    for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      expect(normalizeResolution(name)).toBe(name)
+      expect(resolutionSchema.safeParse(name).success).toBe(false)
+    }
+    const row = JSON.parse('{"constructor":"a","toString":"b","__proto__":"c","resolution":"toString"}')
+    expect(fromDbTiers(row)).toEqual(row)
+    expect(JSON.stringify(toDbTiers(row))).toBe(JSON.stringify(row))
+  })
+
   it('renames a bare tier id or tier list returned by an RPC', () => {
     expect(fromDbTiers(['1k', '3k'])).toEqual(['1k', '4k'])
     expect(fromDbTiers('3k')).toBe('4k')

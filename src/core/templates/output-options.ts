@@ -13,7 +13,7 @@ export const DEFAULT_RESOLUTION: Resolution = '1k'
 export const LEGACY_RESOLUTIONS: Readonly<Record<string, Resolution>> = { '3k': '4k' }
 
 export function normalizeResolution<T>(value: T): T | Resolution {
-  return typeof value === 'string' && value in LEGACY_RESOLUTIONS ? LEGACY_RESOLUTIONS[value]! : value
+  return typeof value === 'string' && Object.hasOwn(LEGACY_RESOLUTIONS, value) ? LEGACY_RESOLUTIONS[value]! : value
 }
 
 export const isResolution = (value: unknown): value is Resolution =>

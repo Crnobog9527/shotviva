@@ -106,9 +106,16 @@ describe('zh messages', () => {
     expect(broken).toEqual([])
   })
 
+  // ICU arguments at any depth (a plural whose branch formats a number nests three levels).
+  const stripArguments = (text: string) => {
+    let rest = text
+    while (/\{[^{}]*\}/.test(rest)) rest = rest.replace(/\{[^{}]*\}/g, '')
+    return rest
+  }
+
   it('leaves no English sentence behind (one language per page)', () => {
     const leftovers = keys(zh as Tree).filter((key) => {
-      const text = lookup(zh as Tree, key).replace(/\{[^{}]*(\{[^{}]*\}[^{}]*)*\}/g, '').replace(/<\/?[a-z]+>/g, '')
+      const text = stripArguments(lookup(zh as Tree, key)).replace(/<\/?[a-z]+>/g, '')
       const words = text.match(/[A-Za-z][A-Za-z']+/g) ?? []
       return words.some((word) => !LATIN_OK.test(word)) && !/[\u4e00-\u9fff]/.test(text)
     })

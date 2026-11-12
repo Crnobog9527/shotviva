@@ -45,6 +45,7 @@ export function sharedOptions(templates: readonly CatalogueTemplate[]): ImageOpt
     resolutions: RESOLUTIONS.filter((tier) => all.every((options) => options.resolutions.includes(tier))),
     aspectRatios: all[0]!.aspectRatios.filter((ratio) => all.every((options) => options.aspectRatios.includes(ratio))),
     originalRatio: all.every((options) => options.originalRatio),
+    ...(all.some((options) => options.exactPixels === false) && { exactPixels: false }),
   }
 }
 

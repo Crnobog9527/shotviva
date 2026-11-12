@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { publicEnv } from '../public-env'
+import { withDbTiers } from '../templates/db-resolution'
 
 const SESSION_COOKIE = /^sb-.+-auth-token(\.\d+)?$/
 
@@ -26,6 +27,7 @@ export function withCookies(target: NextResponse, from: NextResponse): NextRespo
 export function proxySupabase(request: NextRequest) {
   let response = NextResponse.next({ request })
   const supabase = createServerClient(publicEnv.NEXT_PUBLIC_SUPABASE_URL, publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+    global: { fetch: withDbTiers() },
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll(cookiesToSet) {

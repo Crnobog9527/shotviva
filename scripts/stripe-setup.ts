@@ -43,6 +43,7 @@ import {
 } from '../src/core/billing/stripe/setup-plan'
 import { missingWebhookEvents } from '../src/core/billing/stripe/webhook-events'
 import { site } from '../src/site/site.config'
+import { withDbTiers } from '../src/core/templates/db-resolution'
 
 const env = z
   .object({ STRIPE_SECRET_KEY: z.string().regex(/^(sk|rk)_(test|live)_/, 'must be a Stripe secret key') })
@@ -62,7 +63,7 @@ const apply = process.argv.includes('--apply')
 const stripe = new Stripe(key, { maxNetworkRetries: 2 })
 async function databaseCatalog() {
   const config = z.object({ NEXT_PUBLIC_SUPABASE_URL: z.url(), SUPABASE_SERVICE_ROLE_KEY: z.string().min(1) }).parse(process.env)
-  const db = createClient(config.NEXT_PUBLIC_SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+  const db = createClient(config.NEXT_PUBLIC_SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false }, global: { fetch: withDbTiers() } })
   const { data: marker, error: markerError } = await db.from('system_settings').select('value').eq('key','pricing_catalog_version').maybeSingle()
   if (markerError || (marker?.value ?? 'v1') !== (site.billing.pricingVersion ?? 'v1')) throw new Error('Database and configured pricing versions differ')
   const { data, error } = await db.rpc('read_product_catalog', { p_version: marker?.value ?? 'v1' })

@@ -42,11 +42,11 @@ describe('tier pixels (4K is the model\'s largest size per ratio)', () => {
     expect(tierSize('4k', 'original')).toBeNull()
   })
 
-  it('gives the long edge for a known ratio and the square edge otherwise', () => {
+  it('gives the long edge for a fixed ratio and nothing when the photo set the ratio', () => {
     expect(tierPx('4k', '9:16')).toBe(3840)
     expect(tierPx('4k', '1:1')).toBe(2880)
-    expect(tierPx('4k', 'original')).toBe(2880)
-    expect(tierPx('4k')).toBe(2880)
-    expect(tierPx('1k', '21:5')).toBe(1024)
+    expect(tierPx('4k', 'original')).toBe(0)
+    expect(tierPx('4k')).toBe(0)
+    expect(tierPx('1k', '21:5')).toBe(0)
   })
 })

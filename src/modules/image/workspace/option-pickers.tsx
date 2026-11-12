@@ -66,7 +66,7 @@ export function ResolutionPicker({ value, costs, balance, onChange, options, asp
             <span className={cn('grid min-h-16 grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 rounded-control py-4 pr-4 pl-4 transition-[box-shadow,background]', focusRing, value === tier.id ? 'chosen' : 'hairline bg-card')}>
               <span className="flex items-baseline gap-2 text-body leading-[1.2] font-semibold">
                 {t(`tiers.${tier.id}.name`)}
-                <span className="font-mono text-caption leading-none font-normal text-muted-foreground">{size ? t('units.size', size) : t('units.px', { px: tier.px })}</span>
+                <span className="font-mono text-caption leading-none font-normal text-muted-foreground">{size ? t(options.exactPixels === false ? 'units.sizeApprox' : 'units.size', size) : t('units.px', { px: tier.px })}</span>
               </span>
               <span className={cn('col-start-2 row-span-2 row-start-1 text-right font-display text-[24px] leading-none', !affordable && 'text-muted-foreground')}>
                 {format.number(cost)}

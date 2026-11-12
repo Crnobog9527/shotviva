@@ -627,7 +627,7 @@
       "doneState": {
         "hud": "Done",
         "saved": "Saved to Photos",
-        "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
+        "line": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono> px}} · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
         "caption": "Phone photo → {name}.",
         "edit": "Edit this photo"
       },
@@ -645,7 +645,7 @@
       "freeNotice": "This photo uses free credits: it's shown publicly with a watermark. <b>Paid credits make it private and watermark-free.</b>",
       "needsCredits": "{tier} needs {count, plural, one {# credit} other {# credits}}. <b>Paid credits make photos private and watermark-free.</b>",
       "counter": "{count, number} / {max, number}",
-      "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>",
+      "developingSize": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono>}}",
       "yourPhotos": "Your photos",
       "addPhotos": "Add the photos you shot",
       "chooseGalleryMany": "Choose photos from gallery",
@@ -806,7 +806,7 @@
       "makeAnotherWith": "Make another with {name}",
       "shareText": "Made with {brand} {url}",
       "makeAgain": "Make again",
-      "tierPx": "{tier} · {px}",
+      "tierPx": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off}}}",
       "when": {
         "today": "Today",
         "yesterday": "Yesterday",
@@ -831,7 +831,7 @@
         "template": "Template",
         "size": "Size",
         "resolution": "Resolution",
-        "resolutionValue": "{tier} · {px} px",
+        "resolutionValue": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off} px}}",
         "format": "Format",
         "formatPng": "PNG, transparent background",
         "formatJpgWhite": "JPG, white background",
@@ -1062,6 +1062,7 @@
     "units": {
       "px": "{px, number, ::group-off} px",
       "size": "{width, number, ::group-off}×{height, number, ::group-off}",
+      "sizeApprox": "≈ {width, number, ::group-off}×{height, number, ::group-off}",
       "megabytes": "{size} MB",
       "percent": "{value, number, ::percent}"
     },
