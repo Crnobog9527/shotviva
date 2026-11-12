@@ -119,6 +119,16 @@ describe('prepared ahead', () => {
     vi.useRealTimers()
   })
 
+  it('keeps the prepared widget when a form mounts again before the release runs', async () => {
+    const { prepareHCaptcha, retainCaptcha, releaseWarm } = await load()
+    const release = retainCaptcha(releaseWarm)
+    await prepareHCaptcha('site', 'en')
+    release()
+    retainCaptcha(releaseWarm) // log-in swapped for "check your email"
+    releaseWarm()
+    expect(api.remove).not.toHaveBeenCalled()
+  })
+
   it('prepares once however many forms on the page ask', async () => {
     const { prepareHCaptcha } = await load()
     await Promise.all([prepareHCaptcha('site', 'en'), prepareHCaptcha('site', 'en')])

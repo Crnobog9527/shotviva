@@ -54,7 +54,9 @@ export function prepareHCaptcha(siteKey: string, language: string): Promise<void
 }
 
 // Called once the last form holding the widget has unmounted (captcha-light.ts retainCaptcha).
+// A form that mounted meanwhile holds it again, and it stays.
 export function releaseWarm() {
+  if (captchaHolders() > 0) return
   const slot = warm
   warm = null
   if (slot) void slot.widget.then(dispose, () => undefined)
