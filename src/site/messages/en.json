@@ -551,6 +551,9 @@
       "filter": "Filter templates",
       "filterWithin": "Filter within {name}",
       "all": "All",
+      "seeAll": "See all",
+      "seeAllWhich": "in {name}",
+      "seeAllCount": "{count} in all",
       "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are illustrative examples."
     },
     "series": {

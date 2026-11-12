@@ -9,9 +9,9 @@ import { CreditBuys, FaqSection, PricingHero } from '@/core/content'
 import { BusinessSection } from '@/core/content/business'
 import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
-import { JsonLdScript, breadcrumbListLd, faqPageLd, pageMetadata } from '@/core/seo'
+import { JsonLdScript, breadcrumbListLd, faqPageLd, pageMetadata, softwareApplicationLd } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
-import { creditFacts, fillCredits, homePageIn, pricingFaqIn, pricingPageIn } from '@/site/content'
+import { creditFacts, fillCredits, freeImagesIn, homePageIn, pricingFaqIn, pricingPageIn } from '@/site/content'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
@@ -51,7 +51,15 @@ export default async function PricingPage() {
   ]
   return (
     <article className="mx-auto w-full max-w-[1120px] px-4 pb-16 md:px-8 lg:px-10">
-      <JsonLdScript data={[breadcrumbListLd(site, crumbs), faqPageLd(faq)]} />
+      {/* The offers this page's server HTML shows (03-S2): the monthly plans and the packs. Yearly
+          prices appear only after the Yearly toggle, so they stay out. */}
+      <JsonLdScript
+        data={[
+          breadcrumbListLd(site, crumbs),
+          softwareApplicationLd(site, { path, title: page.title, description: page.description }, products.filter((p) => p.interval !== 'year'), fillCredits(freeImagesIn(locale), credits)),
+          faqPageLd(faq),
+        ]}
+      />
       <CheckoutCancelToast />
       <PricingHero text={page} />
       <PaywallProvider products={products} perkFacts={{ wishlistLive, photoPrices: photoPrices(catalogue) }} channel={channel} wechatPay={wechatPay}>
