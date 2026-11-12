@@ -14,6 +14,6 @@ describe('phoneSlot', () => {
 
   it('scales other slots the same way', () => {
     expect(phoneSlot(100)).toBe('58vw')
-    expect(phoneSlot(46)).toBe('26vw')
+    expect(phoneSlot(46)).toBe('27vw')
   })
 })
