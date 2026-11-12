@@ -34,8 +34,10 @@ export function Categories({ categories, selected, onSelect, onChange }: Props) 
     </div>
     <Button variant={!selected ? 'secondary' : 'ghost'} aria-pressed={!selected} onClick={() => onSelect(null)}>{copy.all}</Button>
     <CategoryTree nodes={categories} labelOf={node => node.nameZh} onMove={move => void save({ op: 'move', ...move })} disabled={busy}
-      renderRow={node => <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+      storageKey="reference-library"
+      renderRow={(node, meta) => <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
         <Button variant={selected === node.key ? 'secondary' : 'ghost'} size="sm" aria-pressed={selected === node.key} onClick={() => onSelect(node.key)}>{node.nameZh}</Button>
+        {meta.collapsed && <span className="text-xs text-muted-foreground">{copy.childCount(meta.childCount)}</span>}
         {node.level < 3 && <Button size="xs" variant="outline" disabled={busy} onClick={() => open({ mode: 'create', node })}>{copy.child}</Button>}
         <Button size="xs" variant="ghost" disabled={busy} onClick={() => open({ mode: 'rename', node })}>{copy.rename}</Button>
         <Button size="xs" variant="ghost" disabled={busy || categories.some(item => item.parentId === node.key)} onClick={() => open({ mode: 'delete', node })}>{copy.removeCategory}</Button>
