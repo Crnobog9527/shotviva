@@ -8,9 +8,15 @@ export type HCaptchaApi = {
   remove(widgetId: string): void
 }
 
+// hCaptcha calls this (the `onload` in the script URL) once its API is fully ready. The script
+// element's own load event comes earlier, and a widget rendered then can misbehave (hCaptcha warns
+// "should not render before js api is fully loaded").
+const READY_CALLBACK = '__shotvivaHCaptchaReady'
+
 declare global {
   interface Window {
     hcaptcha?: HCaptchaApi
+    [READY_CALLBACK]?: () => void
   }
 }
 
@@ -31,7 +37,7 @@ export function hcaptchaLanguage(locale: Locale): string {
 }
 
 export function scriptSrc(language: string): string {
-  return `https://js.hcaptcha.com/1/api.js?render=explicit&hl=${encodeURIComponent(language)}`
+  return `https://js.hcaptcha.com/1/api.js?render=explicit&onload=${READY_CALLBACK}&hl=${encodeURIComponent(language)}`
 }
 
 let loading: { language: string; api: Promise<HCaptchaApi> } | null = null
@@ -55,7 +61,7 @@ export function loadHCaptcha(language: string): Promise<HCaptchaApi> {
       loading = null
       reject(error)
     }
-    script.onload = () => {
+    window[READY_CALLBACK] = () => {
       clearTimeout(timer)
       if (window.hcaptcha) resolve(window.hcaptcha)
       else fail(new Error('hCaptcha missing after load'))

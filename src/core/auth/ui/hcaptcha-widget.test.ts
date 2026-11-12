@@ -6,7 +6,7 @@ import type { HCaptchaApi } from './hcaptcha-script'
 // page's language, removed again whether or not the challenge completes; one is rendered ahead
 // (prepareHCaptcha) so the submit only executes it. A minimal DOM stands in for the browser (unit
 // tests run in Node).
-type FakeScript = { id: string; src: string; async: boolean; onload?: () => void; onerror?: () => void; remove: () => void }
+type FakeScript = { id: string; src: string; async: boolean; onerror?: () => void; remove: () => void }
 
 let scripts: FakeScript[]
 let api: { [K in keyof HCaptchaApi]: ReturnType<typeof vi.fn> }
@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.resetModules()
   scripts = []
   api = { render: vi.fn(() => 'w1'), execute: vi.fn(), reset: vi.fn(), remove: vi.fn() }
-  const win: { hcaptcha?: unknown } = {}
+  const win: { hcaptcha?: unknown; __shotvivaHCaptchaReady?: () => void } = {}
   vi.stubGlobal('window', win)
   vi.stubGlobal('document', {
     getElementById: (id: string) => scripts.find((script) => script.id === id) ?? null,
@@ -27,7 +27,8 @@ beforeEach(() => {
       appendChild(script: FakeScript) {
         scripts.push(script)
         win.hcaptcha = api
-        queueMicrotask(() => script.onload?.())
+        // hCaptcha calls the `onload` named in the URL once its API is ready.
+        queueMicrotask(() => win.__shotvivaHCaptchaReady?.())
       },
     },
     body: { appendChild: vi.fn() },
@@ -44,7 +45,7 @@ describe('hCaptcha language', () => {
     const { hcaptchaLanguage, scriptSrc } = await load()
     expect(hcaptchaLanguage('en')).toBe('en')
     expect(hcaptchaLanguage('zh')).toBe('zh-CN')
-    expect(scriptSrc('zh-CN')).toBe('https://js.hcaptcha.com/1/api.js?render=explicit&hl=zh-CN')
+    expect(scriptSrc('zh-CN')).toBe('https://js.hcaptcha.com/1/api.js?render=explicit&onload=__shotvivaHCaptchaReady&hl=zh-CN')
   })
 })
 
@@ -55,7 +56,7 @@ describe('invisibleToken', () => {
     await expect(invisibleToken('site', 'en')).resolves.toBe('tok')
     expect(api.render).toHaveBeenCalledWith(expect.anything(), rendered('site', 'en'))
     expect(api.remove).toHaveBeenCalledWith('w1')
-    expect(scripts.map((script) => script.src)).toEqual(['https://js.hcaptcha.com/1/api.js?render=explicit&hl=en'])
+    expect(scripts.map((script) => script.src)).toEqual(['https://js.hcaptcha.com/1/api.js?render=explicit&onload=__shotvivaHCaptchaReady&hl=en'])
   })
 
   it('rejects when the challenge is closed or expires, and leaves no widget behind', async () => {
@@ -74,7 +75,7 @@ describe('invisibleToken', () => {
     api.execute.mockResolvedValue({ response: 'tok' })
     await invisibleToken('site', 'en')
     await invisibleToken('site', 'zh-CN')
-    expect(scripts.map((script) => script.src)).toEqual(['https://js.hcaptcha.com/1/api.js?render=explicit&hl=zh-CN'])
+    expect(scripts.map((script) => script.src)).toEqual(['https://js.hcaptcha.com/1/api.js?render=explicit&onload=__shotvivaHCaptchaReady&hl=zh-CN'])
     expect(api.render).toHaveBeenLastCalledWith(expect.anything(), rendered('site', 'zh-CN'))
   })
 })
@@ -120,10 +121,13 @@ describe('a stuck network', () => {
     const { invisibleToken, EXECUTE_TIMEOUT_MS } = await load()
     let answer: (value: { response: string }) => void = () => undefined
     api.execute.mockReturnValue(new Promise((resolve) => (answer = resolve)))
-    const token = invisibleToken('site', 'en')
+    const onChallenge = vi.fn()
+    const token = invisibleToken('site', 'en', onChallenge)
     await vi.advanceTimersByTimeAsync(0)
     const options = api.render.mock.calls[0]?.[1] as { 'open-callback': () => void }
     options['open-callback']()
+    // The form now says to finish the check in that window, not that the network is slow.
+    expect(onChallenge).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(EXECUTE_TIMEOUT_MS * 3)
     answer({ response: 'late' })
     await expect(token).resolves.toBe('late')

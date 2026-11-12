@@ -11,6 +11,8 @@ export function useCaptchaStep(needed: boolean) {
   const captcha = useCaptcha()
   const [checking, setChecking] = useState(false)
   const [miss, setMiss] = useState<'failed' | 'network' | null>(null)
+  // hCaptcha's challenge window is open: the wait is the visitor's, not the network's.
+  const [challenge, setChallenge] = useState(false)
 
   useCaptchaWarmup(captcha.prepare, needed && captcha.enabled)
 
@@ -18,13 +20,14 @@ export function useCaptchaStep(needed: boolean) {
   async function attachToken(form: FormData): Promise<boolean> {
     if (!needed) return true
     setChecking(true)
-    const outcome = await captcha.tryToken()
+    const outcome = await captcha.tryToken(() => setChallenge(true))
     setChecking(false)
+    setChallenge(false)
     const missed = outcome.status === 'failed' || outcome.status === 'network' ? outcome.status : null
     setMiss(missed)
     if (outcome.status === 'token') form.set('captchaToken', outcome.token)
     return missed === null
   }
 
-  return { enabled: captcha.enabled, checking, miss, attachToken }
+  return { enabled: captcha.enabled, checking, challenge, miss, attachToken }
 }

@@ -157,6 +157,8 @@ export function SubmitButton({ pending, children }: { pending: boolean; children
 
 const PHASE_KEYS = {
   checking: { normal: 'checking', slow: 'checkingSlow' },
+  // hCaptcha's own window is open: no "slow network" wording, the visitor is the one we wait for.
+  challenge: { normal: 'challenge', slow: 'challenge' },
   sending: { normal: 'sending', slow: 'sendingSlow' },
 } as const
 

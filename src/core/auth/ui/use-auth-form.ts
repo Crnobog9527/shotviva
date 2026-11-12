@@ -21,7 +21,7 @@ type Options = { captcha: boolean; validate?: (form: FormData) => FieldErrors | 
 export function useAuthForm(action: FormAction, { captcha: needsCaptcha, validate }: Options) {
   const [state, dispatch, pending] = useActionState(action, IDLE)
   const captcha = useCaptchaStep(needsCaptcha)
-  const { checking, miss } = captcha
+  const { checking, challenge, miss } = captcha
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [email, setEmail] = useState('')
 
@@ -56,7 +56,7 @@ export function useAuthForm(action: FormAction, { captcha: needsCaptcha, validat
     // The network, not the challenge: "couldn't load … Try again".
     captchaNetwork: !busy && miss === 'network',
     // What the status line under the button says while the form works.
-    phase: phaseOf(checking, pending),
+    phase: phaseOf(checking, challenge, pending),
     slow,
     // The server's answer for the notice above the form; a captcha failure has its own line.
     errorCode: (state.status === 'error' && !rejected ? state.code : null) as ErrorCode | null,
@@ -66,8 +66,8 @@ export function useAuthForm(action: FormAction, { captcha: needsCaptcha, validat
   }
 }
 
-function phaseOf(checking: boolean, pending: boolean): 'checking' | 'sending' | null {
-  if (checking) return 'checking'
+function phaseOf(checking: boolean, challenge: boolean, pending: boolean): 'checking' | 'challenge' | 'sending' | null {
+  if (checking) return challenge ? 'challenge' : 'checking'
   return pending ? 'sending' : null
 }
 
