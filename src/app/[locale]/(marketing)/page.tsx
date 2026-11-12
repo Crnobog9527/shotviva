@@ -8,7 +8,7 @@ import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
 import { toCatalogueTemplate } from '@/modules/image/marketing'
-import { creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled } from '@/site/content'
+import { creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
 import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 
@@ -44,7 +44,8 @@ export default async function HomePage() {
   const initialCovers = await openingCovers(live.find((template) => template.id === defaultId))
   return (
     <>
-      <JsonLdScript data={[softwareApplicationLd(site, ldMeta, products, free), organizationLd(site), faqPageLd(page.faq)]} />
+      {/* Offers: the plans this page shows (the three monthly cards), never the whole catalog (03-S2). */}
+      <JsonLdScript data={[softwareApplicationLd(site, ldMeta, offersShownIn(page, products), free), organizationLd(site), faqPageLd(page.faq)]} />
       <HomePageView
         page={page}
         brand={site.brand.name}

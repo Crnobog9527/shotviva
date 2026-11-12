@@ -6,7 +6,8 @@ import { caseImage, SIZE_COUNT, withFirstFrame } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
 import { photoSeconds, SET_PHOTOS } from '../../offer'
 import { productBills } from '../home'
-import { zhFreeImages, zhTierList, zhTierPixels, zhUploadLimits } from '../offer'
+import { zhFreeImages, zhPlansSentence, zhTierList, zhTierPixels, zhUploadLimits } from '../offer'
+import { PLATFORM_SPECS, PLATFORM_SPECS_CHECKED, px } from '../../platform-specs'
 
 // /zh/image-to-image-generator (T21). Keyword 「图生图」 with its family (ai图生图, 图生图ai,
 // 以图生图, 图生图 在线) in the headings. People who search 图生图 are often after open-source
@@ -83,12 +84,29 @@ const copy = {
   facts: [
     { label: `一张照片：${zhUploadLimits}`, value: '手机拍的就行。不用抠图，不用白底，也不用先修图。' },
     { label: '选模板，不用描述', value: '光线、场景或画风都由模板决定。只有一行选填的「有什么想改的？」，写一句小要求就行。' },
-    { label: `${zhTierList}，导出 PNG`, value: `长边分别是 ${zhTierPixels}，${SIZE_COUNT} 种尺寸，从方形主图到 9:16 竖版。每张 ${photoSeconds} 秒左右。` },
+    { label: `${zhTierList}，导出 PNG`, value: `长边分别是 ${zhTierPixels}，${SIZE_COUNT} 种尺寸，从方形主图到 9:16 竖版。${brand} 每张图大约 ${photoSeconds} 秒出图。` },
   ],
+  headings: {
+    facts: 'AI图生图：你只需要准备这些',
+    faq: '以图生图常见问题',
+    related: `${brand} 的其他页面`,
+  },
+  landing: {
+    // GEO (03-S3): one platform rule with the date it was checked.
+    factsNote: `这些是 ${brand} 自己的上传限制和出图尺寸，本站每一页都一样。Shopify 说方形商品图用 ${px(PLATFORM_SPECS.shopify.squarePx)} × ${px(PLATFORM_SPECS.shopify.squarePx)} px 显示效果通常最好，Amazon 建议最长边超过 ${px(PLATFORM_SPECS.amazon.zoomPx)} px，买家才能放大看（均为 ${PLATFORM_SPECS_CHECKED.zh}核对）。`,
+    shoot: catStyles,
+    edits,
+  },
+} as const
+
+export const makeZhImageToImageGenerator = (offers: OfferFacts) => defineContentPage({
+  ...copy,
+  costBills: productBills(offers,`${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用图生图对比`, `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`),
+  // In the builder so the price answer reads the live plans (03-S3: a starting price per page).
   faq: [
     {
       question: '图生图有免费的吗？',
-      answer: `新用户送 ${zhFreeImages}。`,
+      answer: `${brand} 给新用户送 ${zhFreeImages}，只送一次。${zhPlansSentence(offers)}`,
     },
     {
       question: '以图生图用哪个 AI 工具好？',
@@ -100,7 +118,7 @@ const copy = {
     },
     {
       question: '图生图需要写提示词吗？',
-      answer: '不需要。选模板就行，剩下的交给我们。个别模板会让你填一行字，比如海报上的标题和价格。',
+      answer: `${brand} 不需要写提示词，选模板就行，剩下的交给我们。个别模板会让你填一行字，比如海报上的标题和价格。`,
       link: { href: '/', anchor: '看看 AI改图 的全部模板。' },
     },
     {
@@ -108,21 +126,6 @@ const copy = {
       answer: '模板专门保留你拍的主体：形状、颜色、标签、摆盘或房间布局，只改光线、背景、场景或画风。',
     },
   ],
-  headings: {
-    facts: 'AI图生图：你只需要准备这些',
-    faq: '以图生图常见问题',
-    related: `${brand} 的其他页面`,
-  },
-  landing: {
-    factsNote: `这些是 ${brand} 自己的上传限制和出图尺寸，本站每一页都一样。`,
-    shoot: catStyles,
-    edits,
-  },
-} as const
-
-export const makeZhImageToImageGenerator = (offers: OfferFacts) => defineContentPage({
-  ...copy,
-  costBills: productBills(offers,`${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用图生图对比`, `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`),
   related: [
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
     { href: '/commercial-photography', anchor: '商业摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },

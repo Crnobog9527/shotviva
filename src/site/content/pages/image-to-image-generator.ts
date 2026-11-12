@@ -5,12 +5,14 @@ import { site } from '../../site.config'
 import { productBills } from '../home'
 import { caseImage, sizeCountWord, withFirstFrame } from '../landing-shared'
 import { pricingRelated } from '../shared'
+import { PLATFORM_SPECS, PLATFORM_SPECS_CHECKED, px } from '../platform-specs'
 import { freeImagesLabel, FreeImagesLabel, photoSeconds, plansSentence, SET_PHOTOS, tierList, tierPixels, uploadLimits } from '../offer'
 
 // Final SEO copy (T11): Title, H1, answer and FAQ own "image to image generator" so the home
 // page never targets it (建站规格 R1). Layout and the facts / bills / links blocks follow the
 // v3-b landing comp (T44). No audience in the Title / H1: a general tool page (G2, §4).
 const brand = site.brand.name
+const { amazon, shopify } = PLATFORM_SPECS
 
 // The cases on this page (public/cases, Owner 2026-11-11): one cat photo in three art styles,
 // then four precise edits of finished pictures. Every brand in them is made up.
@@ -94,7 +96,7 @@ const copy = {
     },
     {
       label: `${tierList}, as PNG`,
-      value: `${tierPixels} on the long side, in ${sizeCountWord} sizes from a square listing to a 9:16 story. About ${photoSeconds} seconds a photo.`,
+      value: `${tierPixels} on the long side, in ${sizeCountWord} sizes from a square listing to a 9:16 story. ${brand} makes each photo in about ${photoSeconds} seconds.`,
     },
   ],
   headings: {
@@ -103,7 +105,8 @@ const copy = {
     related: `More From ${brand}`,
   },
   landing: {
-    factsNote: `These are ${brand}'s own limits and sizes, the same on every page of this site.`,
+    // GEO (03-S3): one platform rule with the date it was checked.
+    factsNote: `These are ${brand}'s own limits and sizes, the same on every page of this site. Shopify says ${px(shopify.squarePx)} × ${px(shopify.squarePx)} px usually displays best for square product images, and Amazon prefers more than ${px(amazon.zoomPx)} px on the longest side for zoom (both checked ${PLATFORM_SPECS_CHECKED.en}).`,
     shoot: catStyles,
     edits,
   },
@@ -119,11 +122,11 @@ export const makeImageToImageGenerator = (offers: OfferFacts) => defineContentPa
     {
       question: 'What is an image to image generator?',
       answer:
-        'It is a tool that takes a photo you already have and makes a new version of it, instead of starting from a text description. You keep the real subject and get a new look.',
+        'An image to image generator is a tool that takes a photo you already have and makes a new version of it, instead of starting from a text description. You keep the real subject and get a new look.',
     },
     {
       question: 'Do I need to write a prompt?',
-      answer: `No. You pick a template and ${brand} handles the rest. Some templates ask for a short line of text, such as a headline and a price for a poster.`,
+      answer: `${brand} needs no prompt: you pick a template and it handles the rest. Some templates ask for a short line of text, such as a headline and a price for a poster.`,
       link: { href: '/', anchor: 'Browse every template in our image to image AI studio.' },
     },
     {
@@ -137,7 +140,7 @@ export const makeImageToImageGenerator = (offers: OfferFacts) => defineContentPa
     },
     {
       question: 'How much does the image to image generator cost?',
-      answer: `New users get ${freeImagesLabel}. ${plansSentence(offers)}`,
+      answer: `${brand} gives new users ${freeImagesLabel}. ${plansSentence(offers)}`,
     },
   ],
   related: [
