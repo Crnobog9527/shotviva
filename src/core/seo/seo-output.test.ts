@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { breadcrumbListLd, organizationLd, serializeJsonLd, softwareApplicationLd } from './json-ld'
 import { llmsTxt } from './llms-txt'
 import { appShellMetadata, pageMetadata } from './metadata'
-import { AI_CRAWLERS, robotsRules } from './robots'
+import { AI_CRAWLERS, OPEN_DISALLOWED_PATHS, robotsRules } from './robots'
 import { testSite } from './test-site'
 
 // These cases describe the open site (SITE_INDEXING=on in production); the closed, pre-launch
@@ -14,13 +14,18 @@ const site = testSite()
 const page = { path: '/', title: 'T', description: 'D' }
 
 describe('robots', () => {
-  it('allows every named AI crawler and never disallows /', () => {
+  // SEO launch handbook 02-L2: one `*` group with the private paths, Bytespider out, Sitemap.
+  it('lets every crawler but Bytespider in, keeps private paths out, and lists the sitemap', () => {
     const rules = [robotsRules(site).rules].flat()
-    for (const bot of AI_CRAWLERS) {
-      expect(rules).toContainEqual({ userAgent: bot, allow: '/' })
-    }
-    expect(JSON.stringify(rules)).not.toContain('disallow')
+    expect(rules).toEqual([
+      { userAgent: '*', allow: '/', disallow: [...OPEN_DISALLOWED_PATHS] },
+      { userAgent: ['Bytespider'], disallow: '/' },
+    ])
+    for (const bot of AI_CRAWLERS) expect(JSON.stringify(rules)).not.toContain(bot)
+    expect(OPEN_DISALLOWED_PATHS).toContain('/api/')
+    expect(OPEN_DISALLOWED_PATHS.some((path) => path.includes('*') || path.startsWith('/_next'))).toBe(false)
     expect(robotsRules(site).sitemap).toBe('https://example.com/sitemap.xml')
+    expect(robotsRules(site).host).toBeUndefined()
   })
 })
 

@@ -16,9 +16,12 @@ const closedRobots = ['User-Agent: *', 'Allow: /', '', ...PRELAUNCH_BLOCKED_CRAW
 const openRobots = [
   'User-Agent: *',
   'Allow: /',
+  'Disallow: /api/',
+  'Disallow: /account',
   '',
-  ...AI_CRAWLERS.flatMap((b) => [`User-Agent: ${b}`, 'Allow: /', '']),
-  'Host: https://shotviva.com',
+  'User-Agent: Bytespider',
+  'Disallow: /',
+  '',
   'Sitemap: https://shotviva.com/sitemap.xml',
 ].join('\n')
 
@@ -58,6 +61,16 @@ describe('seo:check', () => {
     expect(problems).toContain('/ still sends X-Robots-Tag: noindex')
     expect(problems).toContain('robots.txt disallows GPTBot')
     expect(problems).toContain('/sitemap-pages.xml answered 404, expected 200')
+  })
+
+  // SEO launch handbook 02-L2: once open, only Bytespider stays out.
+  it('fails an open site that still blocks an AI crawler or lets Bytespider in', () => {
+    for (const bot of AI_CRAWLERS) {
+      const blocked = { ...open, robots: file(200, `${openRobots}\nUser-Agent: ${bot}\nDisallow: /\n`) }
+      expect(evaluate(blocked, 'open')).toEqual([`robots.txt disallows ${bot}`])
+    }
+    const noBytespider = { ...open, robots: file(200, openRobots.replace('User-Agent: Bytespider\nDisallow: /\n', '')) }
+    expect(evaluate(noBytespider, 'open')).toEqual(['robots.txt does not disallow Bytespider'])
   })
 
   it('catches a closed site that blocks Google too, or misses one AI crawler', () => {

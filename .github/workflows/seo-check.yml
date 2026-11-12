@@ -12,7 +12,8 @@ permissions:
   contents: read
 
 env:
-  EXPECT: closed
+  # Launch (SEO launch handbook 02): indexing is open once SITE_INDEXING=on is deployed.
+  EXPECT: open
   # Production's project address; once shotviva.com is bound it 308s there and the check
   # follows. Override with the SEO_CHECK_URL repository variable if needed.
   SEO_CHECK_URL: ${{ vars.SEO_CHECK_URL || 'https://shotviva.vercel.app' }}
