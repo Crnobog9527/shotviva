@@ -100,11 +100,18 @@ CREATE OR REPLACE FUNCTION "admin"."alternate_route_meets_floor"("p_tag" "text",
     SET "search_path" TO ''
     AS $$
   with route as (
-    select p.* from public.admin_image_provider_pricing('') p
-    where p.provider_id::text||'/'||p.model=p_tag
+    select p.adapter, p.capabilities, p.estimated_image_costs,
+      (select to_jsonb(percentile_cont(0.95) within group (order by g.cost_usd)) #>> '{}'
+         from public.generation_jobs g
+        where g.provider=p_tag and coalesce(g.inputs->>'resolution','1k')=p_resolution
+          and g.created_at>=now()-interval '30 days' and g.status='succeeded' and g.cost_usd is not null
+       having count(*)>=10) as p95
+    from public.ai_providers p
+    where p.module='image' and p.id::text||'/'||p.model=p_tag
       and p.resolutions @> array[p_resolution] and p.capabilities<>'{}'::jsonb
+      and p_resolution in ('1k','2k','3k')
   ), priced as (
-    select adapter,coalesce((p95->>p_resolution)::numeric,(estimated_image_costs->>p_resolution)::numeric,
+    select adapter,coalesce(p95::numeric,(estimated_image_costs->>p_resolution)::numeric,
       case when adapter='openrouter_images' and jsonb_typeof(capabilities->'catalogImageCosts'->p_resolution)='number'
         and (capabilities->'catalogImageCosts'->>p_resolution)::numeric > 0
         then (capabilities->'catalogImageCosts'->>p_resolution)::numeric end,
@@ -1184,7 +1191,7 @@ begin
   select * into p from public.ai_providers
     where module='image' and id::text=split_part(route,'/',1) and id::text||'/'||model=route;
   if not found or not (tier=any(admin.sale_route_resolutions(p))) then return false; end if;
-  approved:=admin.template_approved_prices(p.id)->t.id;
+  approved:=admin.template_approved_price(p.id,t.id);
   if approved->>'quality'=t.quality and (approved->'costs'->>tier)::int=price then return true; end if;
   return admin.alternate_route_meets_floor(route,tier,t.quality,price);
 end $$;
@@ -1658,7 +1665,7 @@ begin
     where b.reverted_at is null and s.template_id=t.id and c.quality=t.quality
       and c.costs->tier=t.credits_cost->tier and
       (route is distinct from s.provider_id::text||'/gpt-image-2.6-sunburst'
-        or not (admin.template_approved_prices(s.provider_id) ? t.id))
+        or admin.template_approved_price(s.provider_id,t.id) is null)
   ) then return admin.alternate_route_meets_floor(route,tier,t.quality,price); end if;
   return true;
 end $$;
@@ -1780,6 +1787,24 @@ $$;
 
 
 ALTER FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_approved_price"("p_provider" "uuid", "p_template" "text") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object('quality',c.quality,'costs',c.costs)
+  from admin.template_price_batches b join admin.template_price_snapshots s on s.batch_id=b.id
+  join admin.template_tariffs_v2 c on c.id=s.template_id
+  join public.ai_providers p on p.id=s.provider_id
+  where b.reverted_at is null and admin.is_template_catalog_v2() and p.id=p_provider and s.template_id=p_template
+    and p.module='image' and p.adapter='openai_images' and p.model='gpt-image-2.6-sunburst'
+    and md5(p.base_url) is not distinct from s.provider_endpoint_hash
+    and (p.capabilities->'resolutions') ?& array['1k','2k','3k']
+$$;
+
+
+ALTER FUNCTION "admin"."template_approved_price"("p_provider" "uuid", "p_template" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_approved_prices"("p_provider" "uuid") RETURNS "jsonb"
@@ -8480,6 +8505,15 @@ ALTER VIEW "public"."web_template_members" OWNER TO "postgres";
 
 
 CREATE OR REPLACE VIEW "public"."web_catalogue_entries" WITH ("security_invoker"='true') AS
+ WITH "members" AS MATERIALIZED (
+         SELECT "web_template_members"."id",
+            "web_template_members"."series_id",
+            "web_template_members"."series_sort_order",
+            "web_template_members"."sort_order",
+            "web_template_members"."category_key",
+            "web_template_members"."standalone"
+           FROM "public"."web_template_members"
+        )
  SELECT 'template'::"text" AS "type",
     ('template-'::"text" || "m"."id") AS "entry_key",
     "m"."sort_order",
@@ -8487,7 +8521,7 @@ CREATE OR REPLACE VIEW "public"."web_catalogue_entries" WITH ("security_invoker"
     "m"."id" AS "template_id",
     NULL::"uuid" AS "series_id",
     NULL::"text" AS "cover_template_id"
-   FROM "public"."web_template_members" "m"
+   FROM "members" "m"
   WHERE "m"."standalone"
 UNION ALL
  SELECT 'series'::"text" AS "type",
@@ -8500,7 +8534,7 @@ UNION ALL
    FROM (("public"."template_series" "s"
      JOIN "public"."template_category_paths" "c" ON ((("c"."key" = "s"."category_key") AND "c"."web_visible")))
      CROSS JOIN LATERAL ( SELECT "m"."id"
-           FROM "public"."web_template_members" "m"
+           FROM "members" "m"
           WHERE ("m"."series_id" = "s"."id")
           ORDER BY "m"."series_sort_order", "m"."id"
          LIMIT 1) "cover")
@@ -11644,10 +11678,17 @@ ALTER FUNCTION "public"."web_generation_template"("p_template_id" "text") OWNER 
 CREATE OR REPLACE FUNCTION "public"."web_templates"("p_series_id" "uuid" DEFAULT NULL::"uuid", "p_template_id" "text" DEFAULT NULL::"text", "p_include_members" boolean DEFAULT false) RETURNS SETOF "public"."templates"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
-    AS $$
-  select t.* from public.web_template_members m join public.templates t on t.id=m.id
-  where (p_series_id is null and p_template_id is null and (m.standalone or p_include_members)) or m.series_id=p_series_id or m.id=p_template_id
-$$;
+    BEGIN ATOMIC
+ WITH "candidates" AS MATERIALIZED (
+          SELECT "m"."id"
+            FROM "admin"."published_web_members" "m"
+           WHERE ((("web_templates"."p_series_id" IS NULL) AND ("web_templates"."p_template_id" IS NULL) AND ("m"."standalone" OR "web_templates"."p_include_members")) OR ("m"."series_id" = "web_templates"."p_series_id") OR ("m"."id" = "web_templates"."p_template_id"))
+         )
+  SELECT "t".*::"public"."templates" AS "t"
+    FROM ("candidates" "c"
+      JOIN "public"."templates" "t" ON (("t"."id" = "c"."id")))
+   WHERE "admin"."web_standard_sale_allowed"("c"."id");
+END;
 
 
 ALTER FUNCTION "public"."web_templates"("p_series_id" "uuid", "p_template_id" "text", "p_include_members" boolean) OWNER TO "postgres";
@@ -13853,6 +13894,10 @@ CREATE INDEX "generation_jobs_route_cost_idx" ON "public"."generation_jobs" USIN
 
 
 
+CREATE INDEX "generation_jobs_route_p95_idx" ON "public"."generation_jobs" USING "btree" ("provider", COALESCE(("inputs" ->> 'resolution'::"text"), '1k'::"text"), "created_at") INCLUDE ("cost_usd") WHERE (("status" = 'succeeded'::"text") AND ("cost_usd" IS NOT NULL));
+
+
+
 CREATE INDEX "generation_jobs_running_created_at_idx" ON "public"."generation_jobs" USING "btree" ("created_at") WHERE ("status" = 'running'::"text");
 
 
@@ -15531,6 +15576,11 @@ GRANT ALL ON FUNCTION "admin"."sale_route_resolutions"("p" "public"."ai_provider
 
 REVOKE ALL ON FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_approved_price"("p_provider" "uuid", "p_template" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_approved_price"("p_provider" "uuid", "p_template" "text") TO "service_role";
 
 
 

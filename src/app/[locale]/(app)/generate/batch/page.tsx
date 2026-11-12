@@ -7,7 +7,7 @@ import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
-import { listTemplatesIn } from '@/core/templates'
+import { cachedWebTemplates } from '@/core/templates'
 import { MatrixWorkspace, toCatalogueTemplate } from '@/modules/image'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -27,7 +27,7 @@ async function Matrix({ searchParams }: { searchParams: Promise<Record<string, s
   const admin = createAdminSupabase()
   const [query, found, balance, tier] = await Promise.all([
     searchParams,
-    listTemplatesIn(supabase, await currentLocale()),
+    cachedWebTemplates(await currentLocale(), false),
     readBalance(supabase, user.id),
     // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
     effectiveTier(admin, user.id),
