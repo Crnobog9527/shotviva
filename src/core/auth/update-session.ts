@@ -38,10 +38,13 @@ export function proxySupabase(request: NextRequest) {
   return { supabase, response: () => response }
 }
 
-// Visitors without a session cookie skip the Auth round trip, keeping marketing pages fast.
+// Visitors without a session cookie skip the session work, keeping marketing pages fast. With a
+// cookie, getClaims() refreshes an expired session (the only Auth call, its rotated cookies land
+// on the response) and otherwise checks the token locally against the JWKS: no Auth round trip.
+// Who the visitor is gets decided where it matters, by the page or route (identity.ts).
 export async function updateSession(request: NextRequest, forward: Forward = forwardRequest): Promise<NextResponse> {
   if (!hasSessionCookie(request) || !publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY) return forward(request)
   const { supabase, response } = proxySupabase(request)
-  await supabase.auth.getUser()
+  await supabase.auth.getClaims()
   return withCookies(forward(request), response())
 }

@@ -11038,6 +11038,27 @@ $$;
 ALTER FUNCTION "public"."resume_catalog_checkout"("p_user" "uuid", "p_token" "uuid", "p_hash" "text", "p_channel" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."session_identity"() RETURNS TABLE("id" "uuid", "email" "text", "phone" "text", "email_confirmed_at" timestamp with time zone, "phone_confirmed_at" timestamp with time zone, "app_metadata" "jsonb", "user_metadata" "jsonb", "role" "text", "banned_at" timestamp with time zone)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select u.id, u.email::text, u.phone::text, u.email_confirmed_at, u.phone_confirmed_at,
+    coalesce(u.raw_app_meta_data, '{}'::jsonb), coalesce(u.raw_user_meta_data, '{}'::jsonb),
+    p.role, p.banned_at
+  from auth.users u
+  -- Primary keys on both sides. A JWT without session_id (never one Auth issues to a user) matches nothing.
+  join auth.sessions s on s.id = (auth.jwt() ->> 'session_id')::uuid and s.user_id = u.id
+  left join public.profiles p on p.id = u.id
+  where u.id = auth.uid()
+    and u.deleted_at is null
+    and (u.banned_until is null or u.banned_until <= now())
+    and (s.not_after is null or s.not_after > now())
+$$;
+
+
+ALTER FUNCTION "public"."session_identity"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."set_job_visibility"("p_job_id" "uuid", "p_user_id" "uuid", "p_visibility" "text") RETURNS "public"."generation_jobs"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -17412,6 +17433,11 @@ GRANT ALL ON FUNCTION "public"."reserve_credits"("p_job_id" "uuid", "p_user_id" 
 
 REVOKE ALL ON FUNCTION "public"."resume_catalog_checkout"("p_user" "uuid", "p_token" "uuid", "p_hash" "text", "p_channel" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."resume_catalog_checkout"("p_user" "uuid", "p_token" "uuid", "p_hash" "text", "p_channel" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."session_identity"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."session_identity"() TO "authenticated";
 
 
 

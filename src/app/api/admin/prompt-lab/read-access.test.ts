@@ -2,10 +2,18 @@ import { NextRequest } from 'next/server'
 import { beforeEach, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ profile: { role: 'admin', banned_at: null as string | null }, read: vi.fn(), db: vi.fn() }))
+// The session check (core/auth/identity.ts): a verified JWT, then session_identity()'s one row.
 vi.mock('@/core/auth/supabase-server', () => ({ createServerSupabase: async () => ({
-  auth: { getUser: async () => ({ data: { user: { id: 'actor', email_confirmed_at: '2026-01-01', app_metadata: {} } } }) },
-  from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: mocks.profile }) }) }) }),
+  auth: {
+    getClaims: async () => ({ data: { claims: { sub: 'actor' } }, error: null }),
+    getSession: async () => ({ data: { session: null }, error: null }),
+  },
+  rpc: async () => ({
+    data: [{ id: 'actor', email: null, phone: null, email_confirmed_at: '2026-01-01', phone_confirmed_at: null, app_metadata: {}, user_metadata: {}, ...mocks.profile }],
+    error: null, status: 200,
+  }),
 }) }))
+vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
 vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: mocks.db }))
 vi.mock('@/core/i18n/server', () => ({ localized: async (path: string) => path }))
 vi.mock('@/core/admin/prompt-lab/store', () => ({

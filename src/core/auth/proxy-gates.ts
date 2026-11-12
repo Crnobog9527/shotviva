@@ -5,8 +5,10 @@ import { localeRedirect } from '../i18n/locale-redirect'
 import { DEFAULT_LOCALE, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, type Locale } from '../i18n/locales'
 import { localizePath, matchesPaths, splitLocale } from '../i18n/paths'
 import { publicEnv } from '../public-env'
+import { IDENTITY_HEADER, sealIdentity } from './forwarded-identity'
+import { SIGNED_OUT, verifyIdentity, type Identity } from './identity'
 import { loginPath } from './redirect-target'
-import { toSessionUser, type SessionUser } from './session-user'
+import type { SessionUser } from './session-user'
 import { NOT_FOUND_PAGE, NOT_FOUND_RENDER_HEADER, localizedNotFound, plainNotFound, type FetchPage } from './not-found-page'
 import { forwardRequest, hasSessionCookie, proxySupabase, updateSession, withCookies, type Forward } from './update-session'
 
@@ -34,6 +36,9 @@ export type ProxyGateOptions = {
   devPages?: boolean
   // Tests pass their own; the proxy uses fetch.
   fetchPage?: FetchPage
+  // Key material for the identity header handed to the page (forwarded-identity.ts): the
+  // service-role key. Without it the page checks the session itself.
+  identitySecret?: string
 }
 
 // `pathname` is the logical path, without the /zh prefix.
@@ -47,12 +52,12 @@ export function notFoundResponse(): NextResponse {
   return plainNotFound()
 }
 
+// One check for the request (identity.ts). `user` is null when signed out and when the check could
+// not run; `identity` tells the two apart.
 export async function currentProxyUser(request: NextRequest) {
   const { supabase, response } = proxySupabase(request)
-  const { data } = await supabase.auth.getUser()
-  if (!data.user) return { user: null, response }
-  const { data: profile } = await supabase.from('profiles').select('role, banned_at').eq('id', data.user.id).maybeSingle()
-  return { user: toSessionUser(data.user, profile), response }
+  const identity = await verifyIdentity(supabase)
+  return { identity, user: identity.status === 'signed_in' ? identity.user : null, response, supabase }
 }
 
 // Pure decision so every branch is unit-tested without a network. `pathname` is the address
@@ -68,6 +73,14 @@ export function decide(
   if (!user) return { redirect: localizePath(loginPath(`${pathname}${search}`), locale) }
   if (!user.verified) return { redirect: localizePath('/login?error=unverified', locale) }
   return 'pass'
+}
+
+// When Auth or the database could not answer: /admin stays a 404 (it never reveals itself), any
+// other gated page goes through without an identity, so the page checks again and shows its
+// retry state instead of the login page.
+export function decideIdentity(gate: Exclude<Gate, null>, identity: Identity, pathname: string, search: string, locale: Locale = DEFAULT_LOCALE) {
+  if (identity.status === 'unavailable') return gate === 'admin' ? 'not_found' : 'pass'
+  return decide(gate, identity.status === 'signed_in' ? identity.user : null, pathname, search, locale)
 }
 
 // Page addresses are lowercase by rule (建站规格 R4) and the gates below match lowercase only,
@@ -112,6 +125,8 @@ export function toAccountLocale(request: NextRequest, user: SessionUser | null, 
 }
 
 export async function proxyGate(request: NextRequest, options: ProxyGateOptions): Promise<NextResponse> {
+  // Only this proxy may say who the visitor is (forwarded-identity.ts).
+  request.headers.delete(IDENTITY_HEADER)
   const { pathname, search } = request.nextUrl
   if (NOT_A_PAGE.test(pathname)) return updateSession(request, forwardRequest)
   const early = await addressAnswer(request, options)
@@ -123,11 +138,24 @@ export async function proxyGate(request: NextRequest, options: ProxyGateOptions)
   const gate = gateFor(path)
   if (!gate) return updateSession(request, options.forward)
   const configured = Boolean(publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-  const { user, response } = hasSessionCookie(request) && configured
-    ? await currentProxyUser(request)
-    : { user: null, response: () => NextResponse.next({ request }) }
-  const verdict = decide(gate, user, pathname, search, locale)
+  const { identity, response } = hasSessionCookie(request) && configured
+    ? await checkedRequest(request, options.identitySecret)
+    : { identity: SIGNED_OUT, response: () => NextResponse.next({ request }) }
+  const verdict = decideIdentity(gate, identity, pathname, search, locale)
+  const user = identity.status === 'signed_in' ? identity.user : null
   return withCookies(gatedAnswer(request, verdict, chosen ? null : user, options), response())
+}
+
+// The proxy's check, and on success the sealed answer on the request it forwards. The access
+// token is read after getClaims(), so it is the refreshed one the page will see in its cookies.
+async function checkedRequest(request: NextRequest, secret: string | undefined) {
+  const { identity, response, supabase } = await currentProxyUser(request)
+  if (identity.status === 'signed_in' && secret) {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (token) request.headers.set(IDENTITY_HEADER, sealIdentity(identity.user, token, secret))
+  }
+  return { identity, response }
 }
 
 // What a gated page answers once the session is known. `user` is passed only when no language
