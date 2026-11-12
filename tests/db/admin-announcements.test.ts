@@ -56,12 +56,46 @@ describe('site_announcements access', () => {
     await expect(
       db.query("insert into public.site_announcements (message_en, message_zh, link_url) values ('a', 'b', '//evil.example')"),
     ).rejects.toThrow(/link_url/)
+    // A backslash reads as a slash in browsers: "/\evil.example" leaves the site (1280).
+    await expect(
+      db.query("insert into public.site_announcements (message_en, message_zh, link_url) values ('a', 'b', $1)", ['/\\evil.example']),
+    ).rejects.toThrow(/link_url/)
+    await expect(saveAnnouncement(service, admin, draft({ linkUrl: '/\\evil.example' }))).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     await expect(
       db.query(
         "insert into public.site_announcements (message_en, message_zh, starts_at, ends_at) values ('a', 'b', now(), now() - interval '1 hour')",
       ),
     ).rejects.toThrow(/window_order/)
     await expect(saveAnnouncement(service, admin, draft({ linkUrl: 'javascript:alert(1)' }))).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  })
+})
+
+describe('close rule (1280)', () => {
+  it('defaults to closable, back after 7 days, and keeps what the admin picks', async () => {
+    const inserted = await db.query<{ id: string }>("insert into public.site_announcements (message_en, message_zh) values ('a', 'b') returning id")
+    const read = async (rowId: string) =>
+      (await db.query('select dismissible, reshow_after_days from public.site_announcements where id = $1', [rowId])).rows[0]
+    expect(await read(inserted.rows[0]?.id ?? '')).toEqual({ dismissible: true, reshow_after_days: 7 })
+    const urgent = await saveAnnouncement(service, admin, draft({ dismissible: false, reshowAfterDays: null }))
+    expect(await read(urgent)).toEqual({ dismissible: false, reshow_after_days: null })
+    await setAnnouncementActive(service, admin, { id: urgent, active: true })
+    const [live] = await loadBannerCandidates(service, new Date())
+    expect(live?.id).toBe(urgent)
+    expect(live && localize(live, 'en').closeKey).toBeNull()
+  })
+
+  it('keeps the rule when a save does not send it (an older caller or a stale admin tab)', async () => {
+    const id = await saveAnnouncement(service, admin, draft({ dismissible: true, reshowAfterDays: null }))
+    await saveAnnouncement(service, admin, draft({ id, messageEn: 'edited' }))
+    const { rows } = await db.query('select dismissible, reshow_after_days, message_en from public.site_announcements where id = $1', [id])
+    expect(rows[0]).toEqual({ dismissible: true, reshow_after_days: null, message_en: 'edited' })
+  })
+
+  it('refuses a reshow time outside 1 to 365 days', async () => {
+    await expect(db.query("insert into public.site_announcements (message_en, message_zh, reshow_after_days) values ('a', 'b', 0)")).rejects.toThrow(
+      /reshow_after_days/,
+    )
+    await expect(saveAnnouncement(service, admin, draft({ reshowAfterDays: 400 }))).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   })
 })
 

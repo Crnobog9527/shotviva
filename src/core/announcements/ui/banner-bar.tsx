@@ -11,6 +11,7 @@ type Props = {
   link: { url: string; label: string | null } | null
   tone: AnnouncementTone
   dismissLabel: string
+  // No handler, no ✕: an announcement the admin set as not closable (ARCHITECTURE §10).
   onDismiss?: () => void
 } & Omit<HTMLAttributes<HTMLDivElement>, 'children'>
 
@@ -55,11 +56,13 @@ export function BannerBar({ message, link, tone, dismissLabel, onDismiss, classN
       {ICONS[tone]}
       <p>{message}</p>
       {link ? <BannerLink url={link.url} label={link.label} name={message} /> : null}
-      <button type="button" onClick={onDismiss} aria-label={dismissLabel} className="sv-ann-x">
-        <svg viewBox="0 0 24 24" aria-hidden {...stroke} strokeWidth={2.2}>
-          <path d="M6 6l12 12M18 6L6 18" />
-        </svg>
-      </button>
+      {onDismiss ? (
+        <button type="button" onClick={onDismiss} aria-label={dismissLabel} className="sv-ann-x">
+          <svg viewBox="0 0 24 24" aria-hidden {...stroke} strokeWidth={2.2}>
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      ) : null}
     </div>
   )
 }
