@@ -6,7 +6,7 @@ import { useCallback } from 'react'
 import { isLocale } from '../../i18n/locales'
 import { publicEnv } from '../../public-env'
 import { CaptchaNetworkError, hcaptchaLanguage } from './hcaptcha-script'
-import { invisibleToken, prepareHCaptcha } from './hcaptcha-widget'
+import { invisibleToken, prepareHCaptcha, retainHCaptcha } from './hcaptcha-widget'
 
 // `off`: no site key. `failed`: the challenge was closed, expired or failed. `network`: the script
 // or the check could not get through in time (slow or blocked network).
@@ -40,5 +40,8 @@ export function useCaptcha(siteKey: string = publicEnv.NEXT_PUBLIC_HCAPTCHA_SITE
     if (siteKey) prepareHCaptcha(siteKey, language).catch(() => undefined)
   }, [siteKey, language])
 
-  return { enabled: Boolean(siteKey), getToken, tryToken, prepare }
+  // A form that may submit holds the prepared widget while it is mounted (release on unmount).
+  const retain = useCallback(() => (siteKey ? retainHCaptcha() : () => undefined), [siteKey])
+
+  return { enabled: Boolean(siteKey), getToken, tryToken, prepare, retain }
 }

@@ -14,7 +14,7 @@ export function useCaptchaStep(needed: boolean) {
   // hCaptcha's challenge window is open: the wait is the visitor's, not the network's.
   const [challenge, setChallenge] = useState(false)
 
-  useCaptchaWarmup(captcha.prepare, needed && captcha.enabled)
+  useCaptchaWarmup(captcha, needed && captcha.enabled)
 
   // false when the check did not complete; true when there is a token or captcha is off.
   async function attachToken(form: FormData): Promise<boolean> {

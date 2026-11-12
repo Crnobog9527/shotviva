@@ -52,6 +52,30 @@ export function prepareHCaptcha(siteKey: string, language: string): Promise<void
   return slot.widget.then(() => undefined)
 }
 
+// Forms that may submit hold the warm widget; when the last one unmounts (signed in, moved on to
+// another page) it is removed, so no hidden hCaptcha frame stays on the pages after. The release
+// waits a tick: a form swapped for another (log-in → check your email) holds it again first.
+let holders = 0
+
+function releaseWarm() {
+  const slot = warm
+  warm = null
+  if (slot) void slot.widget.then(dispose, () => undefined)
+}
+
+export function retainHCaptcha(): () => void {
+  holders += 1
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    holders -= 1
+    setTimeout(() => {
+      if (holders === 0) releaseWarm()
+    }, 0)
+  }
+}
+
 // Tokens are single use, so each attempt takes the warm widget (or makes one) for itself.
 function takeWidget(siteKey: string, language: string): Promise<Widget> {
   const key = keyOf(siteKey, language)
@@ -91,7 +115,8 @@ export async function invisibleToken(siteKey: string, language: string, onChalle
     return await execute(widget, onChallenge)
   } finally {
     dispose(widget)
-    // A resend or a retry starts warm again.
-    prepareHCaptcha(siteKey, language).catch(() => undefined)
+    // A retry (a wrong password, say) or a resend starts warm, while a form is still on the page;
+    // once the last one unmounts (signed in, moved on) retainHCaptcha's release removes it.
+    if (holders > 0) prepareHCaptcha(siteKey, language).catch(() => undefined)
   }
 }

@@ -82,7 +82,8 @@ describe('invisibleToken', () => {
 
 describe('prepared ahead', () => {
   it('renders the widget before the submit, which then only executes it', async () => {
-    const { prepareHCaptcha, invisibleToken } = await load()
+    const { prepareHCaptcha, invisibleToken, retainHCaptcha } = await load()
+    retainHCaptcha() // a sign-in form is on the page
     await prepareHCaptcha('site', 'zh-CN')
     expect(api.render).toHaveBeenCalledTimes(1)
     expect(api.execute).not.toHaveBeenCalled()
@@ -92,6 +93,26 @@ describe('prepared ahead', () => {
     // Used once, removed, and the next one is rendered for a resend or retry.
     expect(api.remove).toHaveBeenCalledWith('w1')
     await vi.waitFor(() => expect(api.render).toHaveBeenCalledTimes(2))
+  })
+
+  it('removes the prepared widget once the last form leaves, and prepares none for no form', async () => {
+    vi.useFakeTimers()
+    const { prepareHCaptcha, invisibleToken, retainHCaptcha } = await load()
+    const releaseLogin = retainHCaptcha()
+    const releasePhone = retainHCaptcha()
+    await prepareHCaptcha('site', 'en')
+    releaseLogin()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(api.remove).not.toHaveBeenCalled() // the phone form still holds it
+    releasePhone()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(api.remove).toHaveBeenCalledWith('w1') // signed in and gone: no hidden frame stays
+    // With no form left, a token (the business form) leaves nothing prepared behind.
+    api.execute.mockResolvedValue({ response: 'tok' })
+    await invisibleToken('site', 'en')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(api.render).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
   })
 
   it('prepares once however many forms on the page ask', async () => {
