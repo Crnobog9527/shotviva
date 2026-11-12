@@ -6,7 +6,8 @@ import { templateFieldsSchema, toggleSetupProblems } from '../../src/core/templa
 import { readTemplateQuote } from '../../src/site/template-pricing'
 import { copyCovers, SyncError, type Assets } from './covers'
 
-export const slug = z.string().max(64).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
+// Template ids (up to 64) and series slugs (up to 128, as the series editor allows) share this list.
+export const slug = z.string().max(128).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
 export function parseIds(input: string) {
   return [...new Set(z.array(slug).min(1).parse(input.trim().split(/[\s,]+/)))]
 }
