@@ -8,11 +8,11 @@ import type { TreeItem } from './tree'
 
 type Props = {
   node: TreeItem; label: string; siblings: readonly TreeItem[]
-  disabled: boolean; onReorder: (beforeKey: string | null) => void; children: ReactNode
+  disabled: boolean; onReorder: (beforeKey: string | null) => void; leading: ReactNode; children: ReactNode
 }
 
 // Keyboard moves stay within a sibling list. Pointer input uses the tree's explicit drop targets.
-export function TreeHandleRow({ node, label, siblings, disabled, onReorder, children }: Props) {
+export function TreeHandleRow({ node, label, siblings, disabled, onReorder, leading, children }: Props) {
   const instructionsId = useId()
   const [lifted, setLifted] = useState<Lifted | null>(null)
   const [notice, setNotice] = useState('')
@@ -30,6 +30,7 @@ export function TreeHandleRow({ node, label, siblings, disabled, onReorder, chil
   const pressed = Boolean(lifted) || isDragging
   return <div ref={setNodeRef} onTouchStart={onTouchStart as TouchEventHandler} data-lifted={pressed || undefined}
     className={`flex flex-wrap items-center gap-1.5 py-2 ${sortableRowClass}`}>
+    {leading}
     <DragHandle handle={{ ...handleListeners, ref: setActivatorNodeRef, onKeyDown, onBlur: () => setLifted(null),
       'aria-label': sortableCopy.handle(label), 'aria-describedby': instructionsId, 'aria-roledescription': sortableCopy.roleDescription,
       'aria-pressed': pressed, 'aria-disabled': disabled, title: undefined, lifted: pressed, blocked: false }} />
