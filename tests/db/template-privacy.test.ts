@@ -82,7 +82,7 @@ describe('template privacy', () => {
     const live = (await listTemplates(anonClient(), 'web')).find((template) => template.id === WEB_LIVE)
     expect(live).toMatchObject({
       quality: 'medium',
-      creditsCost: { '1k': 1, '2k': 2, '3k': 3 },
+      creditsCost: { '1k': 1, '2k': 2, '4k': 3 },
       coverMediaType: 'image',
       coverVideoUrl: null,
       coverPosterUrl: null,

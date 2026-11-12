@@ -5,6 +5,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { readTemplateQuote } from '../../src/site/template-pricing'
 import { connectAdmin, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
+import { toDbTiers } from '../../src/core/templates/db-resolution'
 
 // T93 sync carries the sub-category and series (2026-11-12). One database plays both projects, as
 // in template-sync.test.ts: the RPCs are what changes, not the HTTP hops between them.
@@ -35,7 +36,7 @@ async function args(template: Record<string, unknown>, run: string) {
   const { token } = read.data as { token: string }
   const { floors, receipt, envModel } = await readTemplateQuote(serviceSupabase())
   return { p_template: template, p_prompt: prompt, p_provider: binding,
-    p_floors: { ...floors, quote_receipt: receipt, env_model: envModel }, p_run_id: run,
+    p_floors: toDbTiers({ ...floors, quote_receipt: receipt, env_model: envModel }), p_run_id: run,
     p_locales: ['en', 'zh'], p_target_token: token, p_catalog_version: 'v1' }
 }
 const write = async (template: Record<string, unknown>, run: string, validate = false) =>

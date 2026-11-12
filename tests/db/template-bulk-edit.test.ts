@@ -22,7 +22,7 @@ const template = (id: string, over: Record<string, unknown> = {}) => ({
   // A seeded T75 category key; the batch-category case moves templates to 'pets'.
   category: 'food-drink',
   quality: 'high',
-  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 2, '2k': 4, '4k': 6 },
   visibleIn: ['web'],
   fields: { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'] },
   description: 'Test template.',
@@ -80,7 +80,7 @@ describe('batch edit of templates', () => {
   })
 
   it('checks the new quality floor even when no price changes', async () => {
-    await bulkEditTemplates(client, admin, { ids: ids.slice(0, 1), patch: { creditsCost: { '1k': 1, '2k': 2, '3k': 3 }, quality: 'medium' } }, CREDITS_FLOOR)
+    await bulkEditTemplates(client, admin, { ids: ids.slice(0, 1), patch: { creditsCost: { '1k': 1, '2k': 2, '4k': 3 }, quality: 'medium' } }, CREDITS_FLOOR)
     const outcome = await bulkEditTemplates(client, admin, { ids: ids.slice(0, 2), patch: { quality: 'high' } }, CREDITS_FLOOR)
     expect(outcome.failures.map((failure) => failure.id)).toEqual([ids[0], ids[0], ids[0]])
     expect((await rows())[ids[1]!]?.quality).toBe('medium')
