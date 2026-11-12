@@ -96,7 +96,7 @@ const copy = {
     },
     {
       label: `${tierList}, as PNG`,
-      value: `${tierPixels} on the long side, in ${sizeCountWord} sizes from a square listing to a 9:16 story. ${brand} makes each photo in about ${photoSeconds} seconds.`,
+      value: `${tierPixels} for a square photo, in ${sizeCountWord} sizes from a square listing to a 9:16 story. ${brand} makes each photo in about ${photoSeconds} seconds.`,
     },
   ],
   headings: {

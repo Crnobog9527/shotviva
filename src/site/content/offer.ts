@@ -8,12 +8,13 @@ import { site } from '../site.config'
 // Live pages pass published offers; offline copy uses the phase-one baseline.
 
 // Per-template capabilities and charges come from the live catalogue.
-// `px` is the square size; 4K reaches 3840 px on the long side of a 16:9 photo (`longPx`).
-// Which tiers a template offers depends on its model, so copy says "up to".
+// `px` is each tier's square size, the number the site has always published (2880 for 4K; a
+// 16:9 4K photo is 3840×2160, which the workspace shows next to the tier). Which tiers a
+// template offers depends on its model.
 export const OUTPUT_TIERS = [
-  { name: '1K', px: 1024, longPx: 1024, use: 'social posts and delivery apps' },
-  { name: '2K', px: 2048, longPx: 2048, use: 'websites and online stores' },
-  { name: '4K', px: 2880, longPx: 3840, use: 'print and zoom' },
+  { name: '1K', px: 1024, use: 'social posts and delivery apps' },
+  { name: '2K', px: 2048, use: 'websites and online stores' },
+  { name: '4K', px: 2880, use: 'print and zoom' },
 ] as const
 
 export const tierNames = OUTPUT_TIERS.map((tier) => tier.name)
@@ -21,10 +22,8 @@ export const tierNames = OUTPUT_TIERS.map((tier) => tier.name)
 // "1K, 2K or 4K"
 export const tierList = `${tierNames.slice(0, -1).join(', ')} or ${tierNames.at(-1)}`
 
-const tierSize = (tier: (typeof OUTPUT_TIERS)[number]) => (tier.longPx > tier.px ? `up to ${tier.longPx} px` : `${tier.px} px`)
-
-// "1K 1024 px, 2K 2048 px, 4K up to 3840 px"
-export const tierPixels = OUTPUT_TIERS.map((tier) => `${tier.name} ${tierSize(tier)}`).join(', ')
+// "1K 1024 px, 2K 2048 px, 4K 2880 px" (square sizes)
+export const tierPixels = OUTPUT_TIERS.map((tier) => `${tier.name} ${tier.px} px`).join(', ')
 
 // "from N credits" / "From N credits": N is the cheapest Standard price among the published web
 // templates (建站规格 G4, gap audit A1), known only when the page renders. Copy carries these

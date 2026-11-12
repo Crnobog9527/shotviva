@@ -17,10 +17,8 @@ export const ZH_TIERS = OUTPUT_TIERS.map((tier, i) => ({
 // 「1K、2K 或 4K」
 export const zhTierList = `${ZH_TIERS.slice(0, -1).map((t) => t.name).join('、')} 或 ${ZH_TIERS.at(-1)?.name}`
 
-const zhTierSize = (tier: (typeof ZH_TIERS)[number]) => (tier.longPx > tier.px ? `最长 ${tier.longPx} px` : `${tier.px} px`)
-
-// 「1K 1024 px、2K 2048 px、4K 最长 3840 px」
-export const zhTierPixels = ZH_TIERS.map((tier) => `${tier.name} ${zhTierSize(tier)}`).join('、')
+// 「1K 1024 px、2K 2048 px、4K 2880 px」（方图边长）
+export const zhTierPixels = ZH_TIERS.map((tier) => `${tier.name} ${tier.px} px`).join('、')
 
 // 「N 积分起」: filled when the page renders, like fromCredits (../credits).
 export const zhFromCredits = '⟦积分起价⟧'

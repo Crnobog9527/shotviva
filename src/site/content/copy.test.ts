@@ -73,7 +73,7 @@ describe('public numbers', () => {
     expect(fillCredits(freeImagesLabel, LIVE)).toBe('100 free credits')
     expect(fillCredits(fromCredits, LIVE)).toBe('from 1 credit')
     expect(tierList).toBe('1K, 2K or 4K')
-    expect(tierPixels).toBe('1K 1024 px, 2K 2048 px, 4K up to 3840 px')
+    expect(tierPixels).toBe('1K 1024 px, 2K 2048 px, 4K 2880 px')
     expect(uploadLimits).toBe('JPG, PNG or WebP, up to 20MB')
   })
 

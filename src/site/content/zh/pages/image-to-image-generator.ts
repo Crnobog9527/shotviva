@@ -84,7 +84,7 @@ const copy = {
   facts: [
     { label: `一张照片：${zhUploadLimits}`, value: '手机拍的就行。不用抠图，不用白底，也不用先修图。' },
     { label: '选模板，不用描述', value: '光线、场景或画风都由模板决定。只有一行选填的「有什么想改的？」，写一句小要求就行。' },
-    { label: `${zhTierList}，导出 PNG`, value: `长边分别是 ${zhTierPixels}，${SIZE_COUNT} 种尺寸，从方形主图到 9:16 竖版。${brand} 每张图大约 ${photoSeconds} 秒出图。` },
+    { label: `${zhTierList}，导出 PNG`, value: `方图边长 ${zhTierPixels}，${SIZE_COUNT} 种尺寸，从方形主图到 9:16 竖版。${brand} 每张图大约 ${photoSeconds} 秒出图。` },
   ],
   headings: {
     facts: 'AI图生图：你只需要准备这些',

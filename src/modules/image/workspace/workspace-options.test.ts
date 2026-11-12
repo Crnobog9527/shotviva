@@ -48,5 +48,8 @@ describe('tier pixels (4K is the model\'s largest size per ratio)', () => {
     expect(tierPx('4k', 'original')).toBe(0)
     expect(tierPx('4k')).toBe(0)
     expect(tierPx('1k', '21:5')).toBe(0)
+    // A job from a session saved before the rename.
+    expect(tierPx('3k' as never, '16:9')).toBe(3840)
+    expect(tierName('3k' as never, echoTranslate())).toBe('tiers.4k.name')
   })
 })

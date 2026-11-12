@@ -1,7 +1,7 @@
 import type { ImageOptions } from '@/core/templates/image-options'
 import { closestAspect } from './output-choice'
 import type { Translate } from '@/core/translate'
-import type { OutputAspect, Resolution } from '@/core/templates/output-options'
+import { normalizeResolution, type OutputAspect, type Resolution } from '@/core/templates/output-options'
 
 import { outputSize, type OutputSize } from '../provider/output-size'
 
@@ -51,7 +51,7 @@ export const TIER_OPTIONS: readonly TierOption[] = [
 export function tierPx(id: Resolution, aspect?: string | null): number {
   if (!aspect || aspect === 'original' || !/^\d{1,2}:\d{1,2}$/.test(aspect)) return 0
   try {
-    const { width, height } = outputSize(id, aspect)
+    const { width, height } = outputSize(normalizeResolution(id), aspect)
     return Math.max(width, height)
   } catch {
     return 0 // a stored ratio beyond 3:1
@@ -66,7 +66,8 @@ export function tierSize(id: Resolution, aspect: OutputAspect, photoRatio?: numb
 }
 
 // `t` scoped to `app`: "Standard", "Banner 16:9", "Original".
-export const tierName = (id: Resolution, t: Translate) => t(`tiers.${id}.name`)
+// A job restored from a session saved before the 4K rename may still say '3k'.
+export const tierName = (id: Resolution, t: Translate) => t(`tiers.${normalizeResolution(id)}.name`)
 
 export function sizeLabel(id: OutputAspect, t: Translate): string {
   const name = t(`sizes.${id}`)

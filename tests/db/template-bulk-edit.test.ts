@@ -70,6 +70,13 @@ describe('batch edit of templates', () => {
     }
   })
 
+  it('takes the pre-rename 3k key from an admin tab opened before the deploy', async () => {
+    const outcome = await bulkEditTemplates(client, admin, { ids: ids.slice(0, 1), patch: { creditsCost: { '3k': 7 } } as never }, CREDITS_FLOOR)
+    expect(outcome).toEqual({ changed: 1, failures: [] })
+    expect((await rows())[ids[0]!]).toMatchObject({ credits_cost: { '1k': 2, '2k': 5, '3k': 7 } })
+    await bulkEditTemplates(client, admin, { ids: ids.slice(0, 1), patch: { creditsCost: { '4k': 6 } } }, CREDITS_FLOOR)
+  })
+
   it('saves nothing when one tier would fall below the floor, and lists every template', async () => {
     const before = await rows()
     const outcome = await bulkEditTemplates(client, admin, { ids, patch: { creditsCost: { '1k': 1 }, quality: 'high' } }, CREDITS_FLOOR)
