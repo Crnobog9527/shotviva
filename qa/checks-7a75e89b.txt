@@ -1,0 +1,106 @@
+
+104/104 checks passed
+PASS | en 375 | steps: three pictures upload/picker/sizes | ["upload","picker","sizes"]
+PASS | en 375 | topic: three pictures | ["pair","pair","pair"]
+PASS | en 375 | steps: all images loaded | 7 imgs, broken []
+PASS | en 375 | steps: images lazy | 0 eager
+PASS | en 375 | steps: plates 16:10 | [1.6,1.6,1.6]
+PASS | en 375 | steps: no clipped/overflowing label | []
+PASS | en 375 | steps: tags and size labels on one line | []
+PASS | en 375 | topic: all images loaded | 6 imgs, broken []
+PASS | en 375 | topic: images lazy | 0 eager
+PASS | en 375 | topic: plates 16:10 | [1.6,1.6,1.6]
+PASS | en 375 | topic: no clipped/overflowing label | []
+PASS | en 375 | topic: tags and size labels on one line | []
+PASS | en 375 | steps: picked template | ["Lifestyle Table"]
+PASS | en 375 | size labels | ["Max 2880","HD 2048","Standard 1024"]
+PASS | en 375 | use-case links | ["/ai-restaurant-menu","/commercial-photography","/image-to-image-generator"]
+PASS | en 375 | no horizontal page scroll | 
+PASS | en 375 | no layout shift from the explainer blocks | explainer CLS 0.0000, whole page 0.0000
+PASS | zh 375 | steps: three pictures upload/picker/sizes | ["upload","picker","sizes"]
+PASS | zh 375 | topic: three pictures | ["picker","pair","sizes"]
+PASS | zh 375 | steps: all images loaded | 7 imgs, broken []
+PASS | zh 375 | steps: images lazy | 0 eager
+PASS | zh 375 | steps: plates 16:10 | [1.6,1.6,1.6]
+PASS | zh 375 | steps: no clipped/overflowing label | []
+PASS | zh 375 | steps: tags and size labels on one line | []
+PASS | zh 375 | topic: all images loaded | 8 imgs, broken []
+PASS | zh 375 | topic: images lazy | 0 eager
+PASS | zh 375 | topic: plates 16:10 | [1.6,1.6,1.6]
+PASS | zh 375 | topic: no clipped/overflowing label | []
+PASS | zh 375 | topic: tags and size labels on one line | []
+PASS | zh 375 | steps: picked template | ["生活场景"]
+PASS | zh 375 | topic: picked template | ["纯白底图"]
+PASS | zh 375 | size labels | ["超清 2880","高清 2048","标准 1024","超清 2880","高清 2048","标准 1024"]
+PASS | zh 375 | no horizontal page scroll | 
+PASS | zh 375 | no layout shift from the explainer blocks | explainer CLS 0.0000, whole page 0.0206
+PASS | en 1280 | steps: three pictures upload/picker/sizes | ["upload","picker","sizes"]
+PASS | en 1280 | topic: three pictures | ["pair","pair","pair"]
+PASS | en 1280 | steps: all images loaded | 7 imgs, broken []
+PASS | en 1280 | steps: images lazy | 0 eager
+PASS | en 1280 | steps: plates 16:10 | [1.6,1.6,1.6]
+PASS | en 1280 | steps: no clipped/overflowing label | []
+PASS | en 1280 | steps: tags and size labels on one line | []
+PASS | en 1280 | steps: pictures same height and top-aligned in the row | tops 2924,2924,2924 heights 137,137,137
+PASS | en 1280 | topic: all images loaded | 6 imgs, broken []
+PASS | en 1280 | topic: images lazy | 0 eager
+PASS | en 1280 | topic: plates 16:10 | [1.6,1.6,1.6]
+PASS | en 1280 | topic: no clipped/overflowing label | []
+PASS | en 1280 | topic: tags and size labels on one line | []
+PASS | en 1280 | topic: pictures same height and top-aligned in the row | tops 3862,3862,3862 heights 125,125,125
+PASS | en 1280 | steps: picked template | ["Lifestyle Table"]
+PASS | en 1280 | size labels | ["Max 2880","HD 2048","Standard 1024"]
+PASS | en 1280 | use-case links | ["/ai-restaurant-menu","/commercial-photography","/image-to-image-generator"]
+PASS | en 1280 | no layout shift from the explainer blocks | explainer CLS 0.0000, whole page 0.0000
+PASS | zh 1280 | steps: three pictures upload/picker/sizes | ["upload","picker","sizes"]
+PASS | zh 1280 | topic: three pictures | ["picker","pair","sizes"]
+PASS | zh 1280 | steps: all images loaded | 7 imgs, broken []
+PASS | zh 1280 | steps: images lazy | 0 eager
+PASS | zh 1280 | steps: plates 16:10 | [1.6,1.6,1.6]
+PASS | zh 1280 | steps: no clipped/overflowing label | []
+PASS | zh 1280 | steps: tags and size labels on one line | []
+PASS | zh 1280 | steps: pictures same height and top-aligned in the row | tops 2885,2885,2885 heights 137,137,137
+PASS | zh 1280 | topic: all images loaded | 8 imgs, broken []
+PASS | zh 1280 | topic: images lazy | 0 eager
+PASS | zh 1280 | topic: plates 16:10 | [1.6,1.6,1.6]
+PASS | zh 1280 | topic: no clipped/overflowing label | []
+PASS | zh 1280 | topic: tags and size labels on one line | []
+PASS | zh 1280 | topic: pictures same height and top-aligned in the row | tops 3805,3805,3805 heights 125,125,125
+PASS | zh 1280 | steps: picked template | ["生活场景"]
+PASS | zh 1280 | topic: picked template | ["纯白底图"]
+PASS | zh 1280 | size labels | ["超清 2880","高清 2048","标准 1024","超清 2880","高清 2048","标准 1024"]
+PASS | zh 1280 | no layout shift from the explainer blocks | explainer CLS 0.0000, whole page 0.0177
+PASS | en 375 reduced-motion | steps: three pictures upload/picker/sizes | ["upload","picker","sizes"]
+PASS | en 375 reduced-motion | topic: three pictures | ["pair","pair","pair"]
+PASS | en 375 reduced-motion | steps: all images loaded | 7 imgs, broken []
+PASS | en 375 reduced-motion | steps: images lazy | 0 eager
+PASS | en 375 reduced-motion | steps: plates 16:10 | [1.6,1.6,1.6]
+PASS | en 375 reduced-motion | steps: no clipped/overflowing label | []
+PASS | en 375 reduced-motion | steps: tags and size labels on one line | []
+PASS | en 375 reduced-motion | topic: all images loaded | 6 imgs, broken []
+PASS | en 375 reduced-motion | topic: images lazy | 0 eager
+PASS | en 375 reduced-motion | topic: plates 16:10 | [1.6,1.6,1.6]
+PASS | en 375 reduced-motion | topic: no clipped/overflowing label | []
+PASS | en 375 reduced-motion | topic: tags and size labels on one line | []
+PASS | en 375 reduced-motion | steps: picked template | ["Lifestyle Table"]
+PASS | en 375 reduced-motion | size labels | ["Max 2880","HD 2048","Standard 1024"]
+PASS | en 375 reduced-motion | use-case links | ["/ai-restaurant-menu","/commercial-photography","/image-to-image-generator"]
+PASS | en 375 reduced-motion | no horizontal page scroll | 
+PASS | en 375 reduced-motion | no layout shift from the explainer blocks | explainer CLS 0.0000, whole page 0.0000
+PASS | zh 375 reduced-motion | steps: three pictures upload/picker/sizes | ["upload","picker","sizes"]
+PASS | zh 375 reduced-motion | topic: three pictures | ["picker","pair","sizes"]
+PASS | zh 375 reduced-motion | steps: all images loaded | 7 imgs, broken []
+PASS | zh 375 reduced-motion | steps: images lazy | 0 eager
+PASS | zh 375 reduced-motion | steps: plates 16:10 | [1.6,1.6,1.6]
+PASS | zh 375 reduced-motion | steps: no clipped/overflowing label | []
+PASS | zh 375 reduced-motion | steps: tags and size labels on one line | []
+PASS | zh 375 reduced-motion | topic: all images loaded | 8 imgs, broken []
+PASS | zh 375 reduced-motion | topic: images lazy | 0 eager
+PASS | zh 375 reduced-motion | topic: plates 16:10 | [1.6,1.6,1.6]
+PASS | zh 375 reduced-motion | topic: no clipped/overflowing label | []
+PASS | zh 375 reduced-motion | topic: tags and size labels on one line | []
+PASS | zh 375 reduced-motion | steps: picked template | ["生活场景"]
+PASS | zh 375 reduced-motion | topic: picked template | ["纯白底图"]
+PASS | zh 375 reduced-motion | size labels | ["超清 2880","高清 2048","标准 1024","超清 2880","高清 2048","标准 1024"]
+PASS | zh 375 reduced-motion | no horizontal page scroll | 
+PASS | zh 375 reduced-motion | no layout shift from the explainer blocks | explainer CLS 0.0000, whole page 0.1078
