@@ -4,30 +4,50 @@ import { useTranslations } from 'next-intl'
 
 import { ActionBar } from '@/core/app-shell'
 import { PaywallButton } from '@/core/billing/paywall/provider'
-import { limitsFor } from '@/core/billing/tier-limits'
+import type { MembershipTier } from '@/core/config'
 import { buttonVariants } from '@/core/ui/button'
 
+import { batchCounts, MATRIX_TEMPLATES } from '../gated/feature-access'
+import { IntroTrigger } from '../gated/intro-trigger'
+import { TierBadge } from '../gated/tier-badge'
 import { MatrixHead } from './matrix-form'
-import { MaxBadge } from './max-badge'
-import { MATRIX_MAX_TEMPLATES } from './matrix-state'
 
-// The multi-template batch below Max (T107): what it does, drawn as the grid it makes, the Max
-// badge locked, and one primary that opens the paywall on Max. Nothing pretends to work.
-export function MatrixLocked() {
+// Batch create below Pro (Owner 2026-11-12): what it does, drawn as the grid it makes, what each
+// plan holds with its locked mark, a way to watch the demo, and one primary that opens the
+// paywall on Pro (the plan that starts batches); Max is a quiet second line. Nothing pretends
+// to work.
+export function MatrixLocked({ tier }: { tier: MembershipTier | null }) {
   const t = useTranslations('app.matrix')
+  const counts = batchCounts()
   return (
     <section aria-labelledby="matrix-locked-h" className="px-(--gutter) lg:mx-auto lg:max-w-[560px]">
-      <MatrixHead />
+      <MatrixHead caps={null} />
       <div className="hairline-lit mt-5 rounded-panel bg-card p-5">
-        <MaxBadge locked />
-        <h2 id="matrix-locked-h" className="mt-3 text-headline leading-[1.25] font-semibold tracking-[-0.01em]">{t('lockedTitle')}</h2>
-        <p className="mt-2 text-body leading-[1.5] text-bone-dim">{t('lockedLine', { templates: MATRIX_MAX_TEMPLATES, cells: limitsFor('max').batchMax })}</p>
+        <h2 id="matrix-locked-h" className="text-headline leading-[1.25] font-semibold tracking-[-0.01em]">{t('lockedTitle')}</h2>
+        <ul className="mt-3 grid gap-2 text-body leading-[1.45] text-bone-dim">
+          <li className="flex items-start gap-2">
+            <TierBadge tier="pro" locked className="mt-px" />
+            <span>{t('lockedPro', { count: counts.pro })}</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <TierBadge tier="max" locked className="mt-px" />
+            <span>{t('lockedMax', { count: counts.max, templates: MATRIX_TEMPLATES })}</span>
+          </li>
+        </ul>
         <GridDrawing />
-        <p className="mt-3 text-caption leading-[1.4] text-muted-foreground">{t('lockedPro', { count: limitsFor('pro').batchMax })}</p>
+        <IntroTrigger tab="batch" tier={tier} className="press mt-2 inline-flex min-h-11 items-center gap-1.5 text-caption font-semibold text-foreground hover:underline hover:underline-offset-3">
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 text-primary" fill="currentColor">
+            <path d="M8 5.5v13l10.5-6.5z" />
+          </svg>
+          {t('lockedDemo')}
+        </IntroTrigger>
       </div>
       <ActionBar className="md:px-0">
-        <PaywallButton trigger="tier_required" options={{ step: 'period', tier: 'max', moment: 'templates' }} className={buttonVariants({ variant: 'cta', size: 'cta' })}>
-          {t('lockedCta')}
+        <PaywallButton trigger="tier_required" options={{ step: 'period', tier: 'pro', moment: 'photos' }} className={buttonVariants({ variant: 'cta', size: 'cta' })}>
+          {t('lockedCta', { count: counts.pro })}
+        </PaywallButton>
+        <PaywallButton trigger="tier_required" options={{ step: 'period', tier: 'max', moment: 'templates' }} className="press mt-1 flex min-h-11 w-full items-center justify-center text-caption font-semibold text-foreground underline-offset-4 hover:underline">
+          {t('lockedSeeMax')}
         </PaywallButton>
       </ActionBar>
     </section>

@@ -7,7 +7,6 @@ import { ActionBar, ActionNotice } from '@/core/app-shell'
 import { PaywallButton } from '@/core/billing/paywall/provider'
 import { buttonVariants } from '@/core/ui/button'
 
-import { MATRIX_MAX_CELLS } from './matrix-state'
 import type { MatrixCta } from './matrix-cta'
 
 const mono = (chunks: ReactNode) => <span className="font-mono text-caption font-medium opacity-[.72]">{chunks}</span>
@@ -18,12 +17,12 @@ const PAGE = 'md:px-0 lg:sticky lg:bottom-0 lg:z-10 lg:mt-4 lg:bg-[linear-gradie
 // The batch's one primary (DESIGN §4.3, The One Primary Rule): Generate with the count and the
 // total the grid shows, Get credits when the paid pool does not cover it (a batch is paid
 // credits only), or a disabled label saying what is missing. One notice line above it at most.
-export function MatrixAction({ cta, error, onGenerate }: { cta: MatrixCta; error: string | null; onGenerate(): void }) {
+export function MatrixAction({ cta, max, error, onGenerate }: { cta: MatrixCta; max: number; error: string | null; onGenerate(): void }) {
   const t = useTranslations('app.matrix')
   const notice = error ? <span role="alert">{error}</span>
     : cta.kind === 'generate' ? t.rich('noticeGenerate', { b })
     : cta.kind === 'get-credits' ? t.rich('noticeCredits', { b, count: cta.count, total: cta.total })
-    : cta.kind === 'blocked' && cta.block === 'too-many' ? t.rich('noticeTooMany', { b, max: MATRIX_MAX_CELLS })
+    : cta.kind === 'blocked' && cta.block === 'too-many' ? t.rich('noticeTooMany', { b, max })
     : null
   return (
     <ActionBar className={PAGE}>

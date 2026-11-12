@@ -14,6 +14,10 @@ export type AnnouncementRow = {
   tone: AnnouncementTone
   starts_at: string | null
   ends_at: string | null
+  // Close rule (ARCHITECTURE §10「关闭规则」): no ✕ when not dismissible; a closed banner comes
+  // back after reshow_after_days, or only when its content changes when that is null.
+  dismissible: boolean
+  reshow_after_days: number | null
 }
 
 export type AdminAnnouncementRow = AnnouncementRow & {
@@ -30,4 +34,8 @@ export type BannerAnnouncement = {
   tone: AnnouncementTone
   startsAt: string | null
   endsAt: string | null
+  // This version's key in the browser's closed list (dismissal.ts), or null when it cannot be
+  // closed.
+  closeKey: string | null
+  reshowAfterDays: number | null
 }

@@ -18,7 +18,7 @@ import { ANNOUNCEMENT_ERRORS } from './errors'
 // every client role. Each action is one database round trip.
 
 const ADMIN_COLUMNS =
-  'id, message_en, message_zh, link_url, link_label_en, link_label_zh, tone, starts_at, ends_at, is_active, created_at, updated_at'
+  'id, message_en, message_zh, link_url, link_label_en, link_label_zh, tone, starts_at, ends_at, dismissible, reshow_after_days, is_active, created_at, updated_at'
 
 const fail = (what: string, error: { message: string }): never => {
   throw new AppError('INTERNAL', `site_announcements ${what} failed`, { cause: new Error(error.message) })
@@ -60,6 +60,9 @@ const toColumns = (input: AnnouncementInput, actorId: string) => ({
   starts_at: input.startsAt,
   ends_at: input.endsAt,
   updated_by: actorId,
+  // Only when given: see announcementInputSchema (omitted keeps the row's rule / the defaults).
+  ...(input.dismissible === undefined ? {} : { dismissible: input.dismissible }),
+  ...(input.reshowAfterDays === undefined ? {} : { reshow_after_days: input.reshowAfterDays }),
 })
 
 // Insert or update in one statement. New rows start switched off; switching on goes through

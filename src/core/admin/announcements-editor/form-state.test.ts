@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { AdminAnnouncementRow } from '@/core/announcements/rules'
 
-import { overlaps, statusOf, toIso, toLocal, wouldStop } from './form-state'
+import { closeRuleOf, emptyForm, fromCloseRule, overlaps, statusOf, toForm, toIso, toLocal, toSaveInput, wouldStop } from './form-state'
 
 const row = (id: string, starts: string | null, ends: string | null, active = true): AdminAnnouncementRow => ({
   id,
@@ -14,12 +14,31 @@ const row = (id: string, starts: string | null, ends: string | null, active = tr
   tone: 'info',
   starts_at: starts,
   ends_at: ends,
+  dismissible: true,
+  reshow_after_days: 7,
   is_active: active,
   created_at: '2026-11-01T00:00:00Z',
   updated_at: '2026-11-01T00:00:00Z',
 })
 
 describe('announcement form state', () => {
+  it('shows the two close columns as one choice and back', () => {
+    expect(closeRuleOf(true, 7)).toBe('7')
+    expect(closeRuleOf(true, null)).toBe('changed')
+    expect(closeRuleOf(false, 7)).toBe('never')
+    expect(fromCloseRule('30')).toEqual({ dismissible: true, reshowAfterDays: 30 })
+    expect(fromCloseRule('changed')).toEqual({ dismissible: true, reshowAfterDays: null })
+    expect(fromCloseRule('never')).toEqual({ dismissible: false, reshowAfterDays: null })
+    expect(fromCloseRule('junk')).toEqual({ dismissible: true, reshowAfterDays: 7 })
+  })
+
+  it('defaults a new announcement to coming back 7 days after it is closed', () => {
+    expect(emptyForm().closeRule).toBe('7')
+    const input = toSaveInput({ ...toForm(row('a', null, null)), closeRule: 'never' }, 'a')
+    expect(input).toMatchObject({ id: 'a', dismissible: false, reshowAfterDays: null })
+    expect(input).not.toHaveProperty('closeRule')
+  })
+
   it('reads datetime-local as Beijing time', () => {
     expect(toIso('2026-11-27T08:00')).toBe('2026-11-27T00:00:00.000Z')
     expect(toLocal('2026-11-27T00:00:00Z')).toBe('2026-11-27T08:00')

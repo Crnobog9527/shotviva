@@ -16,7 +16,12 @@ type Props = {
   onSwitch: (row: AdminAnnouncementRow) => void
 }
 
-const COLUMNS = ['message', 'tone', 'window', 'status'] as const
+const COLUMNS = ['message', 'tone', 'close', 'window', 'status'] as const
+
+function closeText(row: AdminAnnouncementRow) {
+  if (!row.dismissible) return COPY.closeRules.never
+  return row.reshow_after_days === null ? COPY.closeRules.changed : COPY.closeRules.days(row.reshow_after_days)
+}
 
 function windowText(row: AdminAnnouncementRow) {
   return `${formatBeijing(row.starts_at) ?? COPY.open} → ${formatBeijing(row.ends_at) ?? COPY.open}`
@@ -44,6 +49,7 @@ export function AnnouncementsTable({ rows, now, pending, onEdit, onSwitch }: Pro
                 <div className="truncate text-xs text-muted-foreground">{row.message_en}</div>
               </TableCell>
               <TableCell>{COPY.tones[row.tone]}</TableCell>
+              <TableCell className="whitespace-nowrap">{closeText(row)}</TableCell>
               <TableCell className="font-mono text-xs whitespace-nowrap">{windowText(row)}</TableCell>
               <TableCell>
                 <Badge variant={status === 'live' ? 'default' : 'secondary'}>{COPY.status[status]}</Badge>

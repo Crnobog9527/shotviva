@@ -4,12 +4,13 @@ import { CATEGORY_LIMITS } from '@/core/templates/categories'
 // Chinese-only (DESIGN §7).
 export const CATEGORIES_COPY = {
   title: '分类管理',
-  body: '拖动可调整同级顺序或移到其他分类下，最多可建三级。创作页的分类条和首页的模板分组都按这里的顺序和名称显示。没有已上架模板的分类不会出现在页面上。改名只改显示，标识不变。',
+  body: '拖动可调整同级顺序或移到其他分类下，最多可建三级。点分类前的箭头展开或收起子分类，拖到收起的分类上也能放进去。创作页的分类条和首页的模板分组都按这里的顺序和名称显示。没有已上架模板的分类不会出现在页面上。改名只改显示，标识不变。',
   add: '新增分类',
   addChild: '新增子分类',
   hidden: '隐藏',
   hasChildren: '请先移走子分类',
   seriesCount: (n: number) => `${n} 个系列`,
+  childCount: (n: number) => `${n} 个子分类`,
   empty: '还没有分类。',
   moveUp: (name: string) => `上移 ${name}`,
   moveDown: (name: string) => `下移 ${name}`,
