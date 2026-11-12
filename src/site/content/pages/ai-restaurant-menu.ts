@@ -1,4 +1,4 @@
-import { baselineOffers, planLabel, type OfferFacts } from '../offer'
+import { baselineOffers, planLabel, plansSentence, type OfferFacts } from '../offer'
 import { defineContentPage, type CostBills, type ShootDemo } from '@/core/content'
 
 import { site } from '../../site.config'
@@ -116,30 +116,6 @@ const copy = {
       value: `Delivery apps want photos of the food you actually serve. ${brand} starts from your own phone photo and changes the bowl, the light and the background, not the food.`,
     },
   ],
-  faq: [
-    {
-      question: 'Can I use AI photos on my delivery-app menu?',
-      answer: `Delivery apps ask for photos that show the dish you actually serve. ${brand} starts from your own phone photo and keeps the food as served, changing the bowl, the light and the background, so the photo is still of your food. Check your app's current photo rules before you upload.`,
-    },
-    {
-      question: 'What size should restaurant menu photos be?',
-      answer: `DoorDash wants landscape ${doordash.ratio} at ${px(doordash.minW)} × ${px(doordash.minH)} px or more, Uber Eats ${uberEats.ratio}, Grubhub square. Printed menus and Instagram use 4:5 or 1:1. ${brand} exports PNG in ${tierList}, in ${sizeCountWord} sizes.`,
-    },
-    {
-      question: 'How much does a food photographer cost?',
-      answer: `Published US rates are about ${usdRange(foodHalfDayUsd)} for a half day, with a food stylist usually billed separately. ${brand} makes a menu photo from your phone shot.`,
-    },
-    {
-      question: 'Do I need to write prompts?',
-      answer:
-        'No. Pick Delivery Menu, Dark Dining or Promo Poster and the template carries the light and the styling. One optional line, "Anything to change?", takes a note like "keep the chilli oil visible".',
-      link: { href: '/', anchor: 'See every template in our image to image AI studio.' },
-    },
-    {
-      question: 'Can it make the whole menu?',
-      answer: `It makes photos, one dish at a time, and a single promo poster. Laying out a multi-dish menu or a price list is not something ${brand} does.`,
-    },
-  ],
   headings: {
     facts: 'Menu and Delivery-App Photo Sizes',
     faq: 'AI Restaurant Menu Photo FAQ',
@@ -159,6 +135,30 @@ const copy = {
 export const makeAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
   ...copy,
   costBills: menuBills(offers),
+  // In the builder so the price answer reads the live plans (03-S3: a starting price per page).
+  faq: [
+    {
+      question: 'Can I use AI photos on my delivery-app menu?',
+      answer: `Delivery apps ask for photos that show the dish you actually serve. ${brand} starts from your own phone photo and keeps the food as served, changing the bowl, the light and the background, so the photo is still of your food. Check your app's current photo rules before you upload.`,
+    },
+    {
+      question: 'What size should restaurant menu photos be?',
+      answer: `DoorDash wants landscape ${doordash.ratio} at ${px(doordash.minW)} × ${px(doordash.minH)} px or more, Uber Eats ${uberEats.ratio}, Grubhub square. Printed menus and Instagram use 4:5 or 1:1. ${brand} exports PNG in ${tierList}, in ${sizeCountWord} sizes.`,
+    },
+    {
+      question: 'How much does a food photographer cost?',
+      answer: `Published US rates are about ${usdRange(foodHalfDayUsd)} for a half day, with a food stylist usually billed separately. ${brand} makes a menu photo from your phone shot in about ${photoSeconds} seconds. ${plansSentence(offers)}`,
+    },
+    {
+      question: 'Do I need to write prompts?',
+      answer: `${brand} needs no prompts. Pick Delivery Menu, Dark Dining or Promo Poster and the template carries the light and the styling. One optional line, "Anything to change?", takes a note like "keep the chilli oil visible".`,
+      link: { href: '/', anchor: 'See every template in our image to image AI studio.' },
+    },
+    {
+      question: 'Can it make the whole menu?',
+      answer: `${brand} makes photos, one dish at a time, and a single promo poster. Laying out a multi-dish menu or a price list is not something it does.`,
+    },
+  ],
   related: [
     { href: '/', anchor: 'AI image to image', note: 'The studio: templates for food, products, rooms, pets and art styles.' },
     { href: '/commercial-photography', anchor: 'Commercial photography', note: 'For shops and sellers who need studio product shots without a photographer.' },

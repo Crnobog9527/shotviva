@@ -5,7 +5,7 @@ import { site } from '../../site.config'
 import { productBills } from '../home'
 import { caseImage, CATEGORY, withFirstFrame } from '../landing-shared'
 import { pricingRelated } from '../shared'
-import { dayRateUsd, freeImagesLabel, FreeImagesShort, OUTPUT_TIERS, packshotUsd, plansSentence, SET_PHOTOS, styledShotUsd, tierList, usdRange } from '../offer'
+import { dayRateUsd, freeImagesLabel, FreeImagesShort, OUTPUT_TIERS, packshotUsd, photoSeconds, plansSentence, SET_PHOTOS, styledShotUsd, tierList, usdRange } from '../offer'
 import { PLATFORM_SPECS, px } from '../platform-specs'
 
 // /commercial-photography (建站规格 §4 第一批: "替代方案页 + 成本对比", keyword "commercial
@@ -134,7 +134,7 @@ export const makeCommercialPhotography = (offers: OfferFacts) => defineContentPa
   faq: [
     {
       question: 'How much does commercial product photography cost?',
-      answer: `Published 2026 US rates run ${usdRange(packshotUsd)} for a plain packshot, ${usdRange(styledShotUsd)} for a styled shot and ${usdRange(dayRateUsd)} for a studio day. ${brand} makes a styled, retouched photo from your own phone shot. ${plansSentence(offers)}`,
+      answer: `Published 2026 US rates run ${usdRange(packshotUsd)} for a plain packshot, ${usdRange(styledShotUsd)} for a styled shot and ${usdRange(dayRateUsd)} for a studio day. ${brand} makes a styled, retouched photo from your own phone shot in about ${photoSeconds} seconds. ${plansSentence(offers)}`,
     },
     {
       question: 'Can AI replace a product photographer?',
@@ -147,7 +147,7 @@ export const makeCommercialPhotography = (offers: OfferFacts) => defineContentPa
     },
     {
       question: 'Do I own the photos?',
-      answer: `Yes. Photos made with paid credits are private, watermark-free and yours to use in listings, ads and social posts. Photos made with the free credits are public with a watermark.`,
+      answer: `Photos made with paid ${brand} credits are private, watermark-free and yours to use in listings, ads and social posts. Photos made with the free credits are public with a watermark.`,
     },
     {
       question: 'What should my phone photo look like?',

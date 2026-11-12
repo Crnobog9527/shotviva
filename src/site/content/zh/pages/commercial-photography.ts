@@ -137,7 +137,7 @@ export const makeZhCommercialPhotography = (offers: OfferFacts) => defineContent
     },
     {
       question: '生成的图片版权归我吗？',
-      answer: `归你。用付费积分生成的图私密、无水印，可以用在商品页、广告和社交媒体上。用免费积分生成的图公开展示，带水印。`,
+      answer: `用付费积分生成的图归你：私密、无水印，可以用在商品页、广告和社交媒体上。用免费积分生成的图公开展示，带水印。`,
     },
     {
       question: '手机照片要怎么拍？',

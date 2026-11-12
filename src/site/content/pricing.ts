@@ -4,7 +4,7 @@ import type { BusinessBlock } from '@/core/content/business'
 
 import { site } from '../site.config'
 import { businessForm } from './business-form'
-import { freeImagesLabel, offerFacts, perHundredCredits, usd } from './offer'
+import { freeImagesLabel, offerFacts, perHundredCredits, plansSentence, usd } from './offer'
 
 // Final /pricing copy (T11, laid out as comps-v3-b pricing.html in T37). Every number is read
 // from site.config through offer.ts; the plan and pack cards themselves render from the
@@ -60,7 +60,7 @@ function faqs(products: readonly SiteProduct[]) {
   const faq: readonly FaqItem[] = [
     {
       question: 'Do credits expire?',
-      answer: 'No. Paid credits never expire. An annual plan includes twelve months of base credits. Unused credits stay on your account.',
+      answer: `Paid ${brand} credits never expire. A yearly plan includes all 12 months of base credits. Unused credits stay on your account.`,
     },
     {
       question: 'What do the free images include?',
@@ -68,8 +68,8 @@ function faqs(products: readonly SiteProduct[]) {
     },
     {
       question: 'Can I buy credits without a subscription?',
-      answer: site.billing.pricingVersion ? `Yes. Credit packs are one-time payments, open to everyone, and they give paid credits just like a plan. At list price, 100 credits cost about ${perHundredCredits('pack_s', products)}. The small pack is full price. On medium and large packs, active Starter members save 5%, Pro members 10%, and Max members 15%. The pack contains the same credits at every tier.`
-        : 'Yes. Credit packs are one-time payments, open to everyone, and they give paid credits just like a plan.',
+      answer: site.billing.pricingVersion ? `Credit packs are one-time payments, open to everyone, and they give paid credits just like a plan. At list price, 100 credits cost about ${perHundredCredits('pack_s', products)}. The small pack is full price. On medium and large packs, active Starter members save 5%, Pro members 10%, and Max members 15%. The pack contains the same credits at every tier.`
+        : 'Credit packs are one-time payments, open to everyone, and they give paid credits just like a plan.',
     },
     {
       question: 'How do I cancel my plan?',
@@ -89,10 +89,11 @@ function faqs(products: readonly SiteProduct[]) {
 }
 
 export function makePricingPage(products: readonly SiteProduct[]): PricingContent {
-  const { planFrom, packFrom, yearlySaving } = offerFacts(products)
+  const offers = offerFacts(products)
+  const { planFrom, yearlySaving } = offers
   const titlePrice = planFrom ? `Plans From ${usd(planFrom.priceUsd)} a Month` : 'Plans and Credit Packs'
-  const yearly = yearlySaving ? ` Yearly plans save up to ${yearlySaving}%.` : ''
-  const packs = packFrom ? ` Credit packs start at ${usd(packFrom.priceUsd)}.` : ''
+  // GEO (03-S3): whole sentences a search answer can quote, every number from the catalog.
+  const yearly = yearlySaving ? ` Yearly ${brand} plans save up to ${yearlySaving}% compared with paying monthly.` : ''
 
   return {
     path: '/pricing',
@@ -101,7 +102,7 @@ export function makePricingPage(products: readonly SiteProduct[]): PricingConten
     description: `${brand} pricing: Starter, Pro and Max plans, monthly or yearly, plus credit packs. New users get ${freeImagesLabel}. Credits never expire.`,
     h1: `${brand} Pricing: pay monthly, pay yearly, or buy credits once`,
     h1Em: 'or buy credits once',
-    intro: `Every photo made with paid credits is private and watermark-free.${yearly}${packs}`,
+    intro: `Every photo made with paid credits is private and watermark-free. ${plansSentence(offers)}${yearly}`,
     gift: `New users get ${freeImagesLabel}. No card needed.`,
     creditBuys,
     business,

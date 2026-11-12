@@ -16,7 +16,7 @@ import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
 import { toCatalogueTemplate } from '@/modules/image/marketing'
-import { contentPagesIn, creditFacts, featuredSections, fillCredits, findContentPageIn, freeImagesIn, homePageIn, isLinkEnabled } from '@/site/content'
+import { contentPagesIn, creditFacts, featuredSections, fillCredits, findContentPageIn, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
 import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 
@@ -68,7 +68,8 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   const meta = { path: localizePath(path, locale), title: page.title, description: page.description }
   const ldCrumbs = crumbs.map((crumb) => ({ ...crumb, path: localizePath(crumb.path, locale) }))
   const ld = [breadcrumbListLd(site, ldCrumbs), faqPageLd(page.faq)]
-  if (page.module) ld.push(softwareApplicationLd(site, meta, products, free))
+  // Offers: only the plans and packs this page's copy shows, price and credits (03-S2).
+  if (page.module) ld.push(softwareApplicationLd(site, meta, offersShownIn(page, products), free))
   const catalogue = live.map(toCatalogueTemplate)
   // The page's own categories' featured templates; the generator opens on the first of them.
   const { defaultId, ...sections } = featuredSections(live, page.landing.templates?.categoryKeys, series)
