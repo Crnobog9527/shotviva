@@ -36,6 +36,9 @@ out/
 coverage/
 *.tsbuildinfo
 next-env.d.ts
+# the public pages' Tailwind source list: written by `pnpm css:sources`, which `pnpm dev` and
+# `pnpm build` run first (scripts/public-css-sources.ts)
+/src/app/public-sources.generated.css
 
 # supabase local state
 supabase/.branches/
@@ -50,3 +53,7 @@ supabase/.temp/
 /规范/
 /seo资料/
 /docs/
+
+# Load-test stub certificates and images (loadtest/README.md)
+/loadtest/.stub/
+/loadtest/results/

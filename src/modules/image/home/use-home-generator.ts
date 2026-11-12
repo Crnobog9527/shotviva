@@ -8,6 +8,8 @@ import type { OutputAspect } from '@/core/templates/output-options'
 import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { enqueueJobs, setWorkspaceJobs } from '../generation/job-store'
 import { useJobs } from '../generation/use-jobs'
+import { rememberTemplate } from '../workspace/pending-template'
+import { useWarmRoute } from '../workspace/use-warm-route'
 import { chosenAspect, closestResolution, hasOutputOptions, selectedAspect, templateOptions } from '../workspace/output-choice'
 import { useOriginalRatio } from '../workspace/use-original-ratio'
 import { startInputs } from '../workspace/batch-request'
@@ -57,6 +59,13 @@ function readyHomePhoto(photo: HomePhoto) {
 
 function useStart(viewer: HomeViewer | null, template: CatalogueTemplate | null, photo: HomePhoto) {
   const router = useRouter()
+  // Signed in with a template chosen: keep that template's workspace route warm, as the creation
+  // dialogs do, so Generate's jump to the developing view is a client move on the click (#515).
+  // Not only once the photo is in: a visitor who presses Generate the moment the upload ends
+  // found it still cold (1.35 s from the click to the move on the test site, 2026-11-12).
+  // Switching templates moves the warm-up to the new one; signed out nothing is fetched, and
+  // useWarmRoute asks nothing while the tab is in the background.
+  useWarmRoute(`/generate/${template?.id ?? ''}`, viewer !== null && template !== null)
   return useCallback(
     (aspect: OutputAspect | null, note: string) => {
       if (!viewer || !template || !aspect) return
@@ -66,6 +75,9 @@ function useStart(viewer: HomeViewer | null, template: CatalogueTemplate | null,
       // create page or dialog), so a photo started from the home bar has them all off (Owner 2026-11-12).
       const ids = enqueueJobs(startInputs(template, { aspect, resolution: '1k', note, copy: {}, toggles: {} }, ready), viewer.concurrency.limit)
       setWorkspaceJobs(template.id, ids)
+      // The workspace page's pending view draws this template's full head (thumbnail, name,
+      // category and use) until the server's page takes over, as after a dialog's Generate.
+      rememberTemplate(template)
       router.push(`/generate/${template.id}`)
     },
     [viewer, template, photo, router],

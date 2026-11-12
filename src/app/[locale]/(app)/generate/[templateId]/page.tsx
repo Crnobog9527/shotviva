@@ -8,9 +8,9 @@ import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/a
 import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
-import { listTemplatesIn, loadEditOffer } from '@/core/templates'
+import { findWebTemplate, loadEditOffer } from '@/core/templates'
 import { r2Store } from '@/core/storage'
-import { ImageWorkspace, loadAgain, loadReuse, toCatalogueTemplate, WorkspaceHead } from '@/modules/image'
+import { ImageWorkspace, loadAgain, loadReuse, toCatalogueTemplate, WorkspaceHead, WorkspacePending } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 function Nav({ title, aside }: { title: string; aside?: ReactNode }) {
@@ -27,7 +27,8 @@ async function Workspace({ params, searchParams }: RouteProps) {
   const [{ templateId }, query] = await Promise.all([params, searchParams])
   const user = await requireUser(`/generate/${templateId}`)
   const supabase = await createServerSupabase()
-  const [found] = await listTemplatesIn(supabase, await currentLocale(), { id: templateId })
+  // The cached catalogue, members included; a template the cache has not seen yet is read live.
+  const found = await findWebTemplate(supabase, await currentLocale(), templateId)
   if (!found) notFound()
   const template = toCatalogueTemplate(found)
   const againId = typeof query.again === 'string' ? query.again : undefined
@@ -64,7 +65,16 @@ async function Workspace({ params, searchParams }: RouteProps) {
 export default function WorkspacePage({ params, searchParams }: PageProps<'/[locale]/generate/[templateId]'>) {
   return (
     <AppPage wide>
-      <Suspense fallback={<Nav title="" />}>
+      {/* While the server reads: a photo this tab has just queued is already developing
+          (WorkspacePending reads the route's template id on the client, hence its own boundary:
+          the prerendered shell keeps the empty nav row). */}
+      <Suspense
+        fallback={
+          <Suspense fallback={<Nav title="" />}>
+            <WorkspacePending />
+          </Suspense>
+        }
+      >
         <Workspace params={params} searchParams={searchParams} />
       </Suspense>
     </AppPage>

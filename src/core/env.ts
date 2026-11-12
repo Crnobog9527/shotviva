@@ -17,6 +17,9 @@ const optionalSecret = z.preprocess(blankAsUnset, z.string().min(1).optional())
 // in the codebase may read process.env directly (enforced by ESLint).
 const serverEnvSchema = z.object({
   CRON_SECRET: optionalSecret,
+  // The T93 sync workflow's call that expires the template catalogue cache after a sync
+  // (/api/template-sync/revalidate). Production only; unset means the route answers 401.
+  TEMPLATE_SYNC_REVALIDATE_SECRET: optionalSecret,
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   // Optional at parse time so `next build` runs without secrets; createAdminSupabase() requires it.
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
@@ -110,14 +113,25 @@ export function serverEnv(): ServerEnv {
 }
 
 // Only the dispatch runner invokes this reader. A normal web deployment has no sync keys.
+// What one dispatch syncs: template ids and/or whole series by slug (2026-11-12), each a list
+// separated by commas or spaces; at least one of the two.
+function syncSelection() {
+  const selection = z.object({ ids: z.string().default(''), series: z.string().default('') })
+    .refine((value) => value.ids.trim() !== '' || value.series.trim() !== '', 'nothing to sync')
+  return selection.parse({ ids: process.env.SYNC_IDS || undefined, series: process.env.SYNC_SERIES || undefined })
+}
+
 // The template sync's dry run (2026-11-12): the preview project as both source and target, every
 // write rolled back, so only the preview's service key is needed and no cover is copied.
 export function templateSyncDryRunEnv() {
   return {
-    ids: z.string().min(1).parse(process.env.SYNC_IDS),
+    ...syncSelection(),
     // Any number not used by a real run: the write's receipt check keys on it, and nothing is kept.
     runId: z.string().regex(/^\d+$/).parse(process.env.GITHUB_RUN_ID ?? String(Date.now())),
     serviceKey: z.string().min(1).parse(process.env.SYNC_PREVIEW_SERVICE_KEY),
+    // A preview admin's profile id: the dry run checks 上下架 and 开放售卖 as that admin.
+    actorId: z.uuid().parse(process.env.SYNC_ACTOR_ID),
+    assetsBase: z.url({ protocol: /^https$/ }).transform((url) => url.replace(/\/+$/, '')).parse(process.env.SYNC_PREVIEW_ASSETS_BASE),
   }
 }
 
@@ -135,8 +149,10 @@ export function templateSyncEnv() {
     })
   }
   return {
-    ids: z.string().min(1).parse(process.env.SYNC_IDS),
+    ...syncSelection(),
     runId: z.string().regex(/^\d+$/).parse(process.env.GITHUB_RUN_ID),
+    // The production admin (profile id) that 上下架 and 开放售卖 changes are made and audited as.
+    actorId: z.uuid().parse(process.env.SYNC_PRODUCTION_ACTOR_ID),
     preview: read('SYNC_PREVIEW_', process.env.SYNC_PREVIEW_ASSETS_BASE),
     production: read('SYNC_PRODUCTION_', 'https://shotviva.com/assets'),
   }

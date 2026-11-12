@@ -29,8 +29,9 @@ export async function listAdminCategories(client: SupabaseClient): Promise<Admin
   return data.map((row) => ({ ...toCategory(row), templateCount: row.templates[0]?.count ?? 0 }))
 }
 
-export async function saveCategory(client: SupabaseClient, actor: string, category: NodeInput, isNew: boolean): Promise<void> {
-  const p_category = {
+// The admin_save_template_category payload for a validated node (also built by templates:apply).
+export function categoryPayload(category: NodeInput) {
+  return {
     key: category.key,
     name_en: category.nameEn,
     name_zh: category.nameZh,
@@ -41,6 +42,10 @@ export async function saveCategory(client: SupabaseClient, actor: string, catego
     seo_title_en: category.seoTitleEn, seo_title_zh: category.seoTitleZh,
     seo_description_en: category.seoDescriptionEn, seo_description_zh: category.seoDescriptionZh,
   }
+}
+
+export async function saveCategory(client: SupabaseClient, actor: string, category: NodeInput, isNew: boolean): Promise<void> {
+  const p_category = categoryPayload(category)
   const { error } = await client.rpc('admin_save_template_category', { p_category, p_is_new: isNew, p_actor: actor })
   if (error) throw categoryRpcError('admin_save_template_category', error)
 }

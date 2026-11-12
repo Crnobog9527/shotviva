@@ -13,6 +13,8 @@ import { isCompareSample, TemplateSample } from '../catalogue/template-sample'
 import { FavoriteButton } from '../favorites/favorite-button'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
+import { useSubmitOnce } from './use-submit-once'
+import { useWarmRoute } from './use-warm-route'
 import { useWorkspaceDraft, type DraftInput } from './use-workspace-draft'
 import { WorkspaceForm } from './workspace-form'
 
@@ -39,12 +41,18 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   const t = useTranslations('app.template')
   const router = useRouter()
   const draft = useWorkspaceDraft({ template, ...context, single: true })
+  const workspace = `/generate/${template.id}`
+  // Generate moves to the template's workspace page, kept prefetched while the dialog is open.
+  useWarmRoute(workspace, open)
   const batch = limitsFor(context.tier).batchMax > 1 && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
+  const submitOnce = useSubmitOnce(open)
   const generate = () => {
+    // The dialog stays on screen while it closes: a second press must not queue a second photo.
+    if (!submitOnce()) return
     void draft.start()
     onClose()
-    router.push(`/generate/${template.id}`, { transitionTypes: navTypesFor(`/generate/${template.id}`) })
+    router.push(workspace, { transitionTypes: navTypesFor(workspace) })
   }
   return (
     <CreateSheet
