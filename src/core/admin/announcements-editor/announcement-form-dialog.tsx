@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 
 import { ANNOUNCEMENTS_COPY } from './copy'
 import { FormField, LanguageColumn } from './form-fields'
-import type { AnnouncementForm } from './form-state'
+import { CloseRuleField } from './close-rule-field'
+import { fromCloseRule, type AnnouncementForm } from './form-state'
 
 const COPY = ANNOUNCEMENTS_COPY.form
 
@@ -28,6 +29,8 @@ export function AnnouncementFormDialog({ open, isNew, initial, pending, error, o
   const [form, setForm] = useState(initial)
   const set = (patch: Partial<AnnouncementForm>) => setForm((prev) => ({ ...prev, ...patch }))
   const link = (label: string) => (form.linkUrl ? { url: form.linkUrl, label: label || null } : null)
+  // The preview shows the ✕ only when visitors will be able to close it.
+  const onDismiss = fromCloseRule(form.closeRule).dismissible ? () => undefined : undefined
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onCancel()}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
@@ -56,8 +59,8 @@ export function AnnouncementFormDialog({ open, isNew, initial, pending, error, o
         <SharedFields form={form} set={set} />
         <div className="grid gap-2">
           <p className="text-sm font-medium">{COPY.preview}</p>
-          <BannerBar message={form.messageZh || '—'} link={link(form.linkLabelZh)} tone={form.tone} dismissLabel="" />
-          <BannerBar message={form.messageEn || '—'} link={link(form.linkLabelEn)} tone={form.tone} dismissLabel="" />
+          <BannerBar message={form.messageZh || '—'} link={link(form.linkLabelZh)} tone={form.tone} dismissLabel="" onDismiss={onDismiss} />
+          <BannerBar message={form.messageEn || '—'} link={link(form.linkLabelEn)} tone={form.tone} dismissLabel="" onDismiss={onDismiss} />
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <DialogFooter>
@@ -90,6 +93,7 @@ function SharedFields({ form, set }: { form: AnnouncementForm; set: (patch: Part
       </label>
       <FormField label={COPY.startsAt} type="datetime-local" value={form.startsAt} onChange={(startsAt) => set({ startsAt })} />
       <FormField label={COPY.endsAt} type="datetime-local" value={form.endsAt} onChange={(endsAt) => set({ endsAt })} />
+      <CloseRuleField value={form.closeRule} onChange={(closeRule) => set({ closeRule })} />
     </div>
   )
 }

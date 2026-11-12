@@ -83,22 +83,23 @@ export const missingCellCopy = (cell: MatrixCell) => missingRequiredCopy(cell.te
 // uploaded ones; the grid counts every picked photo, so the limit shows before uploads end.
 export type MatrixBlock = 'templates' | 'photos' | 'empty' | 'too-many' | 'uploading' | 'copy' | 'options'
 
-export function matrixBlock(cells: readonly MatrixCell[], templates: number, photos: { picked: number; uploading: boolean }, options: ImageOptions): MatrixBlock | null {
+// `maxCells` is the plan's batch size (Pro 10, Max 30; feature-access batchCaps).
+export function matrixBlock(cells: readonly MatrixCell[], templates: number, photos: { picked: number; uploading: boolean }, options: ImageOptions, maxCells: number): MatrixBlock | null {
   const kept = keptCells(cells)
   if (templates === 0) return 'templates'
   if (photos.picked === 0) return 'photos'
   if (kept.length === 0) return 'empty'
-  if (kept.length > MATRIX_MAX_CELLS) return 'too-many'
+  if (kept.length > maxCells) return 'too-many'
   if (options.resolutions.length === 0 || (options.aspectRatios.length === 0 && !options.originalRatio)) return 'options'
   if (photos.uploading) return 'uploading'
   if (kept.some(missingCellCopy)) return 'copy'
   return null
 }
 
-// Adding and removing templates; at most five, each once. A template that leaves takes its
-// removed cells, text and toggles with it.
-export function withTemplate(values: MatrixValues, templateId: string): MatrixValues {
-  if (values.templateIds.includes(templateId) || values.templateIds.length >= MATRIX_MAX_TEMPLATES) return values
+// Adding and removing templates; at most the plan's number (Max five, Pro one), each once. A
+// template that leaves takes its removed cells, text and toggles with it.
+export function withTemplate(values: MatrixValues, templateId: string, max = MATRIX_MAX_TEMPLATES): MatrixValues {
+  if (values.templateIds.includes(templateId) || values.templateIds.length >= max) return values
   return { ...values, templateIds: [...values.templateIds, templateId] }
 }
 
@@ -112,6 +113,15 @@ export function withoutTemplate(values: MatrixValues, templateId: string): Matri
     overrides: keep(values.overrides) as MatrixValues['overrides'],
     toggles: keep(values.toggles),
   }
+}
+
+// A tap in the template picker: a chosen template leaves; a new one joins while there is room.
+// With room for one (Pro) the picker is a choice, not a toggle: a new template takes the place of
+// the one chosen before, and the chosen one stays (removing it is the row's ✕).
+export function pickTemplate(values: MatrixValues, templateId: string, max: number): MatrixValues {
+  if (values.templateIds.includes(templateId)) return max === 1 ? values : withoutTemplate(values, templateId)
+  const room = max === 1 ? values.templateIds.reduce(withoutTemplate, values) : values
+  return withTemplate(room, templateId, max)
 }
 
 export function toggleCell(values: MatrixValues, key: CellKey): MatrixValues {

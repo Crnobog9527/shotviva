@@ -22,23 +22,20 @@ type Props = { ids: readonly string[]; onRetry(id: string): void; onApply(templa
 // again with only that template and its text kept. Leaving is fine: the jobs live in the store.
 export function MatrixResults({ ids, onRetry, onApply, onNew }: Props) {
   const t = useTranslations('app.matrix')
-  const [view, setView] = useState<ResultView>('template')
+  const [chosenView, setView] = useState<ResultView>('template')
   const byId = new Map(useJobs().map((job) => [job.id, job]))
   const jobs = ids.map((id) => byId.get(id)).filter((job): job is TrackedJob => job !== undefined)
   const tally = batchTally(jobs)
   const numbers = photoNumbers(jobs)
   const batchId = jobs[0]?.batchId
+  // One template (a plain batch) has one group either way: no switch, results by that template.
+  const several = new Set(jobs.map((job) => job.templateId)).size > 1
+  const view = several ? chosenView : 'template'
   // The section keeps the page gutter at every width: unlike the form, nothing outside adds it back on lg.
   return (
     <section aria-labelledby="matrix-results-h" className="px-(--gutter) pt-4">
-      <div role="status" className="hairline-lit rounded-panel bg-card p-4">
-        <h2 id="matrix-results-h" className="text-body leading-[1.25] font-semibold">
-          {tally.settled ? t('resultsDone', { done: tally.done, count: tally.count }) : t('resultsRunning', { done: tally.done, count: tally.count })}
-        </h2>
-        <p className="mt-1.5 text-caption leading-[1.4] text-muted-foreground">{t('resultsLine', { credits: tally.creditsUsed, failed: tally.failed, queued: tally.queued + tally.developing })}</p>
-        {tally.settled && batchId && tally.done > 0 ? <ZipButton batchId={batchId} count={tally.done} className="mt-3" /> : null}
-      </div>
-      <ViewSwitch view={view} onChange={setView} />
+      <Summary tally={tally} batchId={batchId} />
+      {several ? <ViewSwitch view={view} onChange={setView} /> : null}
       <div className="mt-2 grid gap-5">
         {resultGroups(jobs, view).map((group) => (
           <Group key={group.key} group={group} view={view} numbers={numbers} onRetry={onRetry} onApply={onApply} />
@@ -55,6 +52,20 @@ export function MatrixResults({ ids, onRetry, onApply, onNew }: Props) {
         </Link>
       </ActionBar>
     </section>
+  )
+}
+
+// Where the batch stands, and once settled its one ZIP.
+function Summary({ tally, batchId }: { tally: ReturnType<typeof batchTally>; batchId: string | undefined }) {
+  const t = useTranslations('app.matrix')
+  return (
+    <div role="status" className="hairline-lit rounded-panel bg-card p-4">
+      <h2 id="matrix-results-h" className="text-body leading-[1.25] font-semibold">
+        {tally.settled ? t('resultsDone', { done: tally.done, count: tally.count }) : t('resultsRunning', { done: tally.done, count: tally.count })}
+      </h2>
+      <p className="mt-1.5 text-caption leading-[1.4] text-muted-foreground">{t('resultsLine', { credits: tally.creditsUsed, failed: tally.failed, queued: tally.queued + tally.developing })}</p>
+      {tally.settled && batchId && tally.done > 0 ? <ZipButton batchId={batchId} count={tally.done} className="mt-3" /> : null}
+    </div>
   )
 }
 

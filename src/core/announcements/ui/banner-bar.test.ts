@@ -8,13 +8,19 @@ import { BannerBar } from './banner-bar'
 // be the message's sibling, not inside its paragraph; only short messages get phrase-level breaks.
 
 const render = (message: string, link: { url: string; label: string | null } | null) =>
-  renderToStaticMarkup(createElement(BannerBar, { message, link, tone: 'promo', dismissLabel: 'Close' }))
+  renderToStaticMarkup(createElement(BannerBar, { message, link, tone: 'promo', dismissLabel: 'Close', onDismiss: () => undefined }))
 
 describe('BannerBar', () => {
   it('renders the link after the message paragraph, not inside it', () => {
     const html = render('Launch offer: up to 40% off yearly plans.', { url: 'https://example.test/deal', label: 'Lock in the deal' })
     expect(html).toContain('<p>Launch offer: up to 40% off yearly plans.</p><a href="https://example.test/deal" class="sv-ann-pill"')
     expect(html.indexOf('sv-ann-pill')).toBeLessThan(html.indexOf('sv-ann-x'))
+  })
+
+  it('has a close button only when it can be closed', () => {
+    expect(render('Maintenance tonight.', null)).toContain('aria-label="Close"')
+    const fixed = renderToStaticMarkup(createElement(BannerBar, { message: 'Outage', link: null, tone: 'info', dismissLabel: 'Close' }))
+    expect(fixed).not.toContain('sv-ann-x')
   })
 
   it('renders no pill without a link', () => {

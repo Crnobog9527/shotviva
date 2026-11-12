@@ -29,7 +29,7 @@ export function MatrixEntry({ tier, templateId, className }: Props) {
   )
   if (locked) {
     return (
-      <IntroTrigger feature="templates" tier={tier} className={style}>
+      <IntroTrigger tab="templates" tier={tier} upgrade="max" className={style}>
         {body}
       </IntroTrigger>
     )

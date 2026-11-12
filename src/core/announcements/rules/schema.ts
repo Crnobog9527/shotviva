@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { isAllowedLink, LINK_LABEL_MAX, MESSAGE_MAX } from './rules'
+import { isAllowedLink, LINK_LABEL_MAX, MESSAGE_MAX, RESHOW_DAYS_MAX } from './rules'
 
 export const TONES = ['info', 'promo'] as const
 
@@ -31,6 +31,11 @@ export const announcementInputSchema = z
     tone: z.enum(TONES),
     startsAt: optionalInstant,
     endsAt: optionalInstant,
+    // Close rule. Omitted (an older caller, a stale admin tab) means "leave it": an update keeps the
+    // row's rule and an insert takes the table defaults, so a missing field never quietly turns a
+    // non-closable or until-changed banner back into the 7-day default. null days = until changed.
+    dismissible: z.boolean().optional(),
+    reshowAfterDays: z.number().int().min(1).max(RESHOW_DAYS_MAX).nullable().optional(),
   })
   .refine((input) => !input.startsAt || !input.endsAt || Date.parse(input.startsAt) < Date.parse(input.endsAt), {
     message: 'window',
@@ -51,6 +56,8 @@ const rowFields = {
   tone: z.enum(TONES),
   starts_at: z.string().nullable(),
   ends_at: z.string().nullable(),
+  dismissible: z.boolean(),
+  reshow_after_days: z.number().int().nullable(),
 }
 
 export const bannerRowSchema = z.object(rowFields)

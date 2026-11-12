@@ -5,7 +5,7 @@ import type { ReadyPhoto } from '../workspace/photo-batch'
 import { matrixCta } from './matrix-cta'
 import { matrixStartInputs } from './matrix-request'
 import {
-  cellKey, EMPTY_MATRIX, matrixBlock, matrixCells, matrixTotal, MATRIX_MAX_CELLS, onlyTemplate, sharedOptions,
+  cellKey, EMPTY_MATRIX, matrixBlock, matrixCells, matrixTotal, MATRIX_MAX_CELLS, onlyTemplate, pickTemplate, sharedOptions,
   toggleCell, totalsByResolution, withoutTemplate, withTemplate, type MatrixValues,
 } from './matrix-state'
 
@@ -44,16 +44,16 @@ describe('the multi-template grid', () => {
   it('blocks Generate in the order the user fixes things, and at the Max cell limit', () => {
     const options = sharedOptions([poster, white])
     const cells = (v: MatrixValues) => matrixCells([poster, white], photos.map(({ photo }) => photo), v)
-    expect(matrixBlock([], 0, { picked: 0, uploading: false }, options)).toBe('templates')
-    expect(matrixBlock([], 2, { picked: 0, uploading: false }, options)).toBe('photos')
-    expect(matrixBlock(cells(values()), 2, { picked: 2, uploading: true }, options)).toBe('uploading')
-    expect(matrixBlock(cells(values()), 2, { picked: 2, uploading: false }, options)).toBe('copy')
-    expect(matrixBlock(cells(values({ copy: { poster: { headline: 'Hi' } } })), 2, { picked: 2, uploading: false }, options)).toBeNull()
+    expect(matrixBlock([], 0, { picked: 0, uploading: false }, options, MATRIX_MAX_CELLS)).toBe('templates')
+    expect(matrixBlock([], 2, { picked: 0, uploading: false }, options, MATRIX_MAX_CELLS)).toBe('photos')
+    expect(matrixBlock(cells(values()), 2, { picked: 2, uploading: true }, options, MATRIX_MAX_CELLS)).toBe('uploading')
+    expect(matrixBlock(cells(values()), 2, { picked: 2, uploading: false }, options, MATRIX_MAX_CELLS)).toBe('copy')
+    expect(matrixBlock(cells(values({ copy: { poster: { headline: 'Hi' } } })), 2, { picked: 2, uploading: false }, options, MATRIX_MAX_CELLS)).toBeNull()
     const all = cells(values()).map((cell) => cell.key)
-    expect(matrixBlock(cells(values({ removed: all })), 2, { picked: 2, uploading: false }, options)).toBe('empty')
+    expect(matrixBlock(cells(values({ removed: all })), 2, { picked: 2, uploading: false }, options, MATRIX_MAX_CELLS)).toBe('empty')
     const many = Array.from({ length: 16 }, (_, i) => ({ id: `x${i}` }))
     expect(matrixCells([poster, white], many, values()).length).toBe(32)
-    expect(matrixBlock(matrixCells([poster, white], many, values()), 2, { picked: 16, uploading: false }, options)).toBe('too-many')
+    expect(matrixBlock(matrixCells([poster, white], many, values()), 2, { picked: 16, uploading: false }, options, MATRIX_MAX_CELLS)).toBe('too-many')
     expect(MATRIX_MAX_CELLS).toBe(30)
   })
 
@@ -125,11 +125,31 @@ describe('the grid\'s text fields', () => {
     ] })
     const options = sharedOptions([sized])
     const block = (copy: Record<string, string>) =>
-      matrixBlock(matrixCells([sized], photos.map(({ photo }) => photo), values({ templateIds: ['sized'], copy: { sized: copy } })), 1, { picked: 2, uploading: false }, options)
+      matrixBlock(matrixCells([sized], photos.map(({ photo }) => photo), values({ templateIds: ['sized'], copy: { sized: copy } })), 1, { picked: 2, uploading: false }, options, MATRIX_MAX_CELLS)
     expect(block({ size: 'Huge' })).toBe('copy')
     expect(block({ guests: '50' })).toBe('copy')
     expect(block({ guests: 'four' })).toBe('copy')
     expect(block({ size: 'Large', guests: '4' })).toBeNull()
     expect(block({})).toBeNull()
+  })
+})
+
+describe('the batch on each plan (Batch create, Owner 2026-11-12)', () => {
+  it('stops a Pro batch at its own size: one template on up to 10 photos', () => {
+    const options = sharedOptions([white])
+    const eleven = Array.from({ length: 11 }, (_, i) => ({ id: `x${i}` }))
+    const one = values({ templateIds: ['white'] })
+    expect(matrixBlock(matrixCells([white], eleven.slice(0, 10), one), 1, { picked: 10, uploading: false }, options, 10)).toBeNull()
+    expect(matrixBlock(matrixCells([white], eleven, one), 1, { picked: 11, uploading: false }, options, 10)).toBe('too-many')
+  })
+
+  it('picks templates up to the plan: Max adds up to five, Pro swaps its one template', () => {
+    const max = ['a', 'b', 'c', 'd', 'e', 'f'].reduce((v, id) => pickTemplate(v, id, 5), EMPTY_MATRIX)
+    expect(max.templateIds).toEqual(['a', 'b', 'c', 'd', 'e'])
+    expect(pickTemplate(max, 'c', 5).templateIds).toEqual(['a', 'b', 'd', 'e'])
+    const pro = pickTemplate({ ...EMPTY_MATRIX, templateIds: ['poster'], copy: { poster: { headline: 'Sale' } }, toggles: { poster: { plate: true } } }, 'white', 1)
+    expect(pro).toMatchObject({ templateIds: ['white'], copy: {}, toggles: {} })
+    // Tapping the chosen one on Pro keeps it (the row's ✕ removes it).
+    expect(pickTemplate(pro, 'white', 1)).toBe(pro)
   })
 })

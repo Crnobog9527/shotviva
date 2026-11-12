@@ -13320,11 +13320,14 @@ CREATE TABLE IF NOT EXISTS "public"."site_announcements" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_by" "uuid",
+    "dismissible" boolean DEFAULT true NOT NULL,
+    "reshow_after_days" smallint DEFAULT 7,
     CONSTRAINT "site_announcements_link_label_en_check" CHECK ((("link_label_en" IS NULL) OR (("char_length"("link_label_en") >= 1) AND ("char_length"("link_label_en") <= 40)))),
     CONSTRAINT "site_announcements_link_label_zh_check" CHECK ((("link_label_zh" IS NULL) OR (("char_length"("link_label_zh") >= 1) AND ("char_length"("link_label_zh") <= 40)))),
-    CONSTRAINT "site_announcements_link_url_check" CHECK ((("link_url" IS NULL) OR (("char_length"("link_url") <= 500) AND (("link_url" ~ '^/([^/\s]\S*)?$'::"text") OR ("link_url" ~ '^https://[^\s/?#@]+([/?#]\S*)?$'::"text"))))),
+    CONSTRAINT "site_announcements_link_url_check" CHECK ((("link_url" IS NULL) OR (("char_length"("link_url") <= 500) AND ("strpos"("link_url", "chr"(92)) = 0) AND (("link_url" ~ '^/([^/\s]\S*)?$'::"text") OR ("link_url" ~ '^https://[^\s/?#@]+([/?#]\S*)?$'::"text"))))),
     CONSTRAINT "site_announcements_message_en_check" CHECK ((("char_length"("message_en") >= 1) AND ("char_length"("message_en") <= 140))),
     CONSTRAINT "site_announcements_message_zh_check" CHECK ((("char_length"("message_zh") >= 1) AND ("char_length"("message_zh") <= 140))),
+    CONSTRAINT "site_announcements_reshow_after_days_check" CHECK ((("reshow_after_days" IS NULL) OR (("reshow_after_days" >= 1) AND ("reshow_after_days" <= 365)))),
     CONSTRAINT "site_announcements_tone_check" CHECK (("tone" = ANY (ARRAY['info'::"text", 'promo'::"text"]))),
     CONSTRAINT "site_announcements_window_order" CHECK ((("starts_at" IS NULL) OR ("ends_at" IS NULL) OR ("starts_at" < "ends_at")))
 );

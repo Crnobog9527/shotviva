@@ -1,12 +1,19 @@
 // /admin/announcements copy (DESIGN §7: Chinese only, kept out of site/messages).
 export const ANNOUNCEMENTS_COPY = {
   title: '公告横幅',
-  intro: '全站顶部的一条公告或促销。同一时间最多一条生效；关闭过的访客不会再看到同一条，换新公告会重新出现。后台、结账和出图过程中不显示。',
+  intro:
+    '全站顶部的一条公告或促销。同一时间最多一条生效。访客关闭后按「关闭后」的设置再出现；改了文字、链接或样式，关闭过的访客也会重新看到（只改时间不算）。后台、结账和出图过程中不显示。',
   add: '新增公告',
   empty: '还没有公告。',
   loadMore: '下一页',
-  columns: { message: '内容', tone: '样式', window: '时间段', status: '状态', actions: '操作' },
+  columns: { message: '内容', tone: '样式', close: '关闭后', window: '时间段', status: '状态', actions: '操作' },
   tones: { info: '普通公告', promo: '促销' },
+  // Close rule (ARCHITECTURE §10「关闭规则」): the short form for the list, the long one for the form.
+  closeRules: {
+    days: (days: number) => `${days} 天后再出现`,
+    changed: '内容改了才再出现',
+    never: '不能关闭',
+  },
   status: { live: '正在显示', scheduled: '已排期', ended: '已结束', off: '未启用' },
   open: '不限',
   edit: '编辑',
@@ -23,6 +30,13 @@ export const ANNOUNCEMENTS_COPY = {
     linkUrl: '链接地址（可空）',
     linkHint: '站内路径如 /pricing，或 https:// 开头的地址',
     tone: '样式',
+    close: '访客关闭后',
+    closeOptions: {
+      days: (days: number) => `${days} 天后再出现`,
+      changed: '不再出现，内容改了才再出现',
+      never: '不能关闭（紧急通知，没有 ✕）',
+    },
+    closeHint: '改了文字、链接或样式后，关闭过的访客都会重新看到。',
     startsAt: '开始时间（可空，北京时间）',
     endsAt: '结束时间（可空，北京时间）',
     preview: '预览',

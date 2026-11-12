@@ -252,19 +252,41 @@
       },
       "lockedSr": " (needs {tier})",
       "replay": "Play again",
+      "create": {
+        "title": "Batch create",
+        "line": "One template on a batch of photos, or several templates × several photos.",
+        "pro": "{count, number} photos",
+        "max": "{count, number} photos · {templates, number} templates"
+      },
+      "guide": {
+        "title": "Tutorial",
+        "lede": "How Batch create works, with example results. Open it again any time from the ? button.",
+        "open": "Batch create tutorial",
+        "tabsLabel": "Ways to use Batch create",
+        "tabs": {
+          "batch": "1 template × photos",
+          "templates": "Templates × photos"
+        },
+        "samples": "Example results",
+        "samplesNote": "Examples",
+        "done": "Got it",
+        "cta": {
+          "pro": "Get Pro · {pro, number} photos at once",
+          "max": "Get Max · {templates, number} templates, {max, number} photos"
+        },
+        "quiet": {
+          "pro": "Get Pro · {pro, number} photos at once",
+          "max": "Need {max, number} at once or several templates? See Max"
+        }
+      },
       "batch": {
         "title": "Batch photos",
-        "line": "Up to {pro, number} / {max, number} photos at once",
         "lede": "Upload a set of product photos, pick one template, and get them all back together in one ZIP. Made for shops that list many products at once.",
-        "ledeGuide": "Your Pro plan takes {count, number} photos at a time: open any template and pick several photos when you add them.",
         "step1": "Upload them in one go: up to {pro, number} photos on Pro, {max, number} on Max.",
         "step2": "Pick one template. The whole batch gets the same size and quality.",
         "step3": "They generate together. Each photo is charged on its own, and any photo that fails is refunded.",
         "step4": "When they're done, one button downloads them all as a ZIP.",
         "note": "Batches use paid credits only.",
-        "cta": "Get Pro · {pro, number} photos at once",
-        "seeMax": "Need {max, number} at once? See Max",
-        "start": "Pick a template",
         "demo": {
           "label": "Demo: {count, number} product photos go through one white background template together and come back as one ZIP.",
           "caption": "Shown at Max size, {count, number} photos. Example images.",
@@ -277,7 +299,6 @@
       },
       "templates": {
         "title": "Several templates at once",
-        "line": "One photo, up to {templates, number} templates",
         "lede": "Put one photo through several templates, or several photos through several templates, and get every result in one batch.",
         "scenes": "Ways to use it",
         "tabs": {
@@ -289,7 +310,6 @@
         "step3": "Before anything runs, check each result and the total credits; tap one to leave it out.",
         "step4": "See the results by template or by photo, and download them all as a ZIP.",
         "note": "Several templates at once is part of Max and uses paid credits only.",
-        "cta": "Get Max",
         "demo": {
           "photo": "Photo",
           "names": {
@@ -310,18 +330,27 @@
       }
     },
     "matrix": {
-      "lede": "Up to {templates, number} templates on the same photos, {max, number} photos a batch.",
-      "metaTitle": "Several templates",
-      "title": "Several templates",
+      "lede": "One template is a plain batch; choose up to {templates, number} to run them all on your photos, {max, number} photos a batch.",
+      "ledeOne": "One template on up to {max, number} photos, generated together and downloaded as one ZIP.",
+      "ledeLocked": "One template on a batch of photos (Pro, {pro, number} at once), or up to {templates, number} templates × photos (Max, {max, number} at once).",
+      "metaTitle": "Batch create",
+      "title": "Batch create",
       "entryLink": "Use more templates on these photos",
       "templatesTitle": "Templates",
       "chooseTemplates": "Choose templates",
+      "chooseTemplate": "Choose a template",
       "addTemplate": "Add a template",
       "templatesLeft": "{count, number} left",
+      "moreTemplates": "Add another template",
+      "morePhotos": "Up to {count, number} at once on Max",
       "removeTemplate": "Remove {name}",
+      "swap": "Change",
+      "swapTemplate": "Change {name}",
       "templateUnavailable": "Not available right now. Remove it to go on.",
       "pickerTitle": "Choose templates",
       "pickerLine": "{count, number} of {max, number} chosen. Each one runs on every photo.",
+      "pickerTitleOne": "Choose a template",
+      "pickerLineOne": "It runs on every photo in the batch.",
       "pickerDone": "{count, plural, =0 {Done} one {Done · # template} other {Done · # templates}}",
       "gridTitle": "Check before you run",
       "gridLabel": "Photos and templates in this batch",
@@ -329,6 +358,7 @@
       "gridTotal": "{count, plural, one {# photo} other {# photos}} of {max, number} · <mono>{total, plural, one {# credit} other {# credits}}</mono>",
       "gridHint": "Tap a square to leave it out.",
       "gridEmpty": "Choose templates and add photos: each photo runs through each template, up to {max, number} photos and {templates, number} templates in one batch.",
+      "gridEmptyOne": "Choose a template and add photos: up to {max, number} photos in one batch.",
       "cellOn": "Photo {index, number} with {template}, {count, plural, one {# credit} other {# credits}}. Tap to leave it out.",
       "cellOff": "Photo {index, number} with {template}, left out. Tap to put it back.",
       "photoN": "Photo {index, number}",
@@ -342,7 +372,7 @@
       "resolutionAside": "For the whole batch",
       "noticeGenerate": "<b>Paid credits only.</b> Each photo is charged on its own; a failed one is refunded on its own.",
       "noticeCredits": "A batch uses paid credits only: {count, plural, one {# photo} other {# photos}} need <b>{total, plural, one {# credit} other {# credits}}</b>.",
-      "noticeTooMany": "<b>Max runs up to {max, number} photos in one batch.</b> Leave some squares out or remove a template.",
+      "noticeTooMany": "<b>Up to {max, number} photos in one batch.</b> Leave some squares out or remove a template.",
       "generate": "Generate {count, plural, one {# photo} other {# photos}} · <mono>{total, plural, one {# credit} other {# credits}}</mono>",
       "getCredits": "Get credits · <mono>{count, number} needed</mono>",
       "checking": "Checking every photo…",
@@ -369,10 +399,12 @@
       "newBatch": "New batch",
       "openPhotos": "Open Photos",
       "backToCreate": "Back to Create",
-      "lockedTitle": "Several templates on the same photos",
-      "lockedLine": "With Max you choose up to {templates, number} templates and run them on your photos in one go: up to {cells, number} photos a batch, with every price shown before it runs.",
-      "lockedPro": "Pro runs one template on up to {count, number} photos at once.",
-      "lockedCta": "See Max",
+      "lockedTitle": "Batch create comes with Pro and Max",
+      "lockedPro": "One template on up to {count, number} photos at once.",
+      "lockedMax": "Up to {templates, number} templates on your photos, {count, number} photos a batch.",
+      "lockedCta": "Get Pro · {count, number} photos at once",
+      "lockedSeeMax": "Need several templates? See Max",
+      "lockedDemo": "Watch how it works",
       "lockedDrawing": "Three photos down, three templates across: nine photos in one batch"
     },
     "batchZip": {
@@ -701,7 +733,7 @@
         "savedLine": "{done, number} of {count, number} saved · {tier} · {credits, plural, one {# credit} other {# credits}} used.{failed, plural, =0 {} one { One failed and was refunded.} other { # failed and were refunded.}}",
         "refunded": "Refunded",
         "openPhotos": "Open Photos",
-        "onPage": "Several photos at once? Add them on the full page"
+        "onPage": "Several photos at once? Use Batch create"
       },
       "tile": {
         "add": "Add a photo",
