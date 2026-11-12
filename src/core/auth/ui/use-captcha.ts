@@ -19,10 +19,11 @@ export function useCaptcha(siteKey: string = publicEnv.NEXT_PUBLIC_HCAPTCHA_SITE
   const locale = useLocale()
   const language = hcaptchaLanguage(isLocale(locale) ? locale : 'en')
 
-  const tryToken = useCallback(async (): Promise<CaptchaOutcome> => {
+  // `onChallenge`: hCaptcha opened its own challenge window, which the visitor now has to finish.
+  const tryToken = useCallback(async (onChallenge?: () => void): Promise<CaptchaOutcome> => {
     if (!siteKey) return { status: 'off' }
     try {
-      return { status: 'token', token: await invisibleToken(siteKey, language) }
+      return { status: 'token', token: await invisibleToken(siteKey, language, onChallenge) }
     } catch (error) {
       return { status: error instanceof CaptchaNetworkError ? 'network' : 'failed' }
     }

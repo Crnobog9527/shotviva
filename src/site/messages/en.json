@@ -160,6 +160,7 @@
       "loading": "Still loading the page…",
       "checking": "Getting the security check ready…",
       "checkingSlow": "Slow connection. Still loading the security check…",
+      "challenge": "Finish the security check in the window that opened.",
       "sending": "Sending…",
       "sendingSlow": "Slow connection. Still waiting for the server…"
     },

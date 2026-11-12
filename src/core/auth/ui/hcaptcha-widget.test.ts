@@ -120,10 +120,13 @@ describe('a stuck network', () => {
     const { invisibleToken, EXECUTE_TIMEOUT_MS } = await load()
     let answer: (value: { response: string }) => void = () => undefined
     api.execute.mockReturnValue(new Promise((resolve) => (answer = resolve)))
-    const token = invisibleToken('site', 'en')
+    const onChallenge = vi.fn()
+    const token = invisibleToken('site', 'en', onChallenge)
     await vi.advanceTimersByTimeAsync(0)
     const options = api.render.mock.calls[0]?.[1] as { 'open-callback': () => void }
     options['open-callback']()
+    // The form now says to finish the check in that window, not that the network is slow.
+    expect(onChallenge).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(EXECUTE_TIMEOUT_MS * 3)
     answer({ response: 'late' })
     await expect(token).resolves.toBe('late')

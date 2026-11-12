@@ -160,6 +160,7 @@
       "loading": "页面还在加载…",
       "checking": "正在准备安全验证…",
       "checkingSlow": "网络较慢，安全验证还在加载…",
+      "challenge": "请在弹出的窗口里完成安全验证。",
       "sending": "正在提交…",
       "sendingSlow": "网络较慢，还在等服务器回应…"
     },

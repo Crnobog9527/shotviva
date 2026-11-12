@@ -61,10 +61,13 @@ function takeWidget(siteKey: string, language: string): Promise<Widget> {
   return widget
 }
 
-function execute(widget: Widget): Promise<string> {
+function execute(widget: Widget, onChallenge?: () => void): Promise<string> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new CaptchaNetworkError('hCaptcha execute timeout')), EXECUTE_TIMEOUT_MS)
-    widget.onOpen = () => clearTimeout(timer)
+    widget.onOpen = () => {
+      clearTimeout(timer)
+      onChallenge?.()
+    }
     widget.api.execute(widget.id, { async: true }).then(
       ({ response }) => {
         clearTimeout(timer)
@@ -80,11 +83,12 @@ function execute(widget: Widget): Promise<string> {
 }
 
 // When hCaptcha wants a challenge it opens its own popup; closing it, letting it expire or failing
-// it rejects (the caller says "try again" under the form). Nothing is ever drawn on our page.
-export async function invisibleToken(siteKey: string, language: string): Promise<string> {
+// it rejects (the caller says "try again" under the form); `onChallenge` hears when it opens.
+// Nothing is ever drawn on our page.
+export async function invisibleToken(siteKey: string, language: string, onChallenge?: () => void): Promise<string> {
   const widget = await takeWidget(siteKey, language)
   try {
-    return await execute(widget)
+    return await execute(widget, onChallenge)
   } finally {
     dispose(widget)
     // A resend or a retry starts warm again.
