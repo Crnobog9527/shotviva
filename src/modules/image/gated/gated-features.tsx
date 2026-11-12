@@ -47,7 +47,7 @@ function Entry({ tier }: { tier: MembershipTier | null }) {
   const title = <b className="block text-body leading-[1.25] font-semibold">{t('title')}</b>
   if (batchCaps(tier)) {
     return (
-      <button type="button" onClick={() => openBatch()} onPointerEnter={preloadBatchDialog} onFocus={preloadBatchDialog} className={ENTRY}>
+      <button type="button" data-batch-entry onClick={() => openBatch()} onPointerEnter={preloadBatchDialog} onFocus={preloadBatchDialog} className={ENTRY}>
         {title}
       </button>
     )

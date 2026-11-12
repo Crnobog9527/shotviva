@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { Dialog as DialogPrimitive } from 'radix-ui'
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useEffect, useEffectEvent, useRef, type ReactNode, type RefObject } from 'react'
 
 import type { Balance } from '@/core/billing/pools'
 import type { MembershipTier } from '@/core/config'
@@ -77,16 +77,20 @@ function BatchDialogBody({ open, onClose, requested, templates, balance, tier, l
 }
 
 // Opened again with ?t= (a template's "Use Batch create"): those templates replace the choice,
-// photos and the kept templates' text stay. Opened without (the Create card): the draft as left.
+// photos and the kept templates' text stay. If a batch's results were showing, it goes back to
+// the form with them (the batch itself is in Photos). Opened without (the Create card, a
+// refresh): the draft or results as left.
 function useOpening(open: boolean, requested: string[], session: BatchSession, caps: BatchCaps) {
-  const [seen, setSeen] = useState(open)
-  if (open !== seen) {
-    setSeen(open)
-    const current = session.draft.values.templateIds
-    if (open && requested.length && requested.join(',') !== current.join(',')) {
-      session.draft.setValues((values) => withTemplates(values, requested, caps.templates))
-    }
-  }
+  const wasOpen = useRef(open)
+  const opened = useEffectEvent(() => {
+    if (!requested.length) return
+    if (session.ids.length > 0) return session.startWith(requested)
+    if (requested.join(',') !== session.draft.values.templateIds.join(',')) session.draft.setValues((values) => withTemplates(values, requested, caps.templates))
+  })
+  useEffect(() => {
+    if (open && !wasOpen.current) opened()
+    wasOpen.current = open
+  }, [open])
 }
 
 // While open, the chosen templates ride in the address (?t=), so a refresh reopens with them.
