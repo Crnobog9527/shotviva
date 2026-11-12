@@ -51,12 +51,16 @@ export function openBatch(templateIds: readonly string[] = []) {
 
 export const closeBatch = () => write(null)
 
-// For the dialog's onCloseAutoFocus: focus the opener if it is still on the page (a template's
-// dialog that opened it has gone), and say whether it did.
+// Where focus goes when the opener is gone (a template's dialog that opened it has closed) or
+// was never known (Safari does not focus a tapped button): the Batch create card on Create.
+export const BATCH_ENTRY_ATTR = 'data-batch-entry'
+
+// For the dialog's onCloseAutoFocus: focus the opener if it is still on the page, else the card;
+// say whether it did.
 export function restoreOpener(): boolean {
-  const target = opener
+  const target = opener?.isConnected ? opener : document.querySelector<HTMLElement>(`[${BATCH_ENTRY_ATTR}]`)
   opener = null
-  if (!target?.isConnected) return false
+  if (!target) return false
   target.focus({ preventScroll: true })
   return true
 }

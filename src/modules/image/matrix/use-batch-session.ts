@@ -10,7 +10,7 @@ import type { BatchCaps } from '../gated/feature-access'
 import { retryJob, setWorkspaceJobs } from '../generation/job-store'
 import { useWorkspaceJobs } from '../generation/use-jobs'
 import { createSubmitLatch } from '../workspace/submit-latch'
-import { onlyTemplate } from './matrix-state'
+import { onlyTemplate, withTemplates } from './matrix-state'
 import { submitBatch } from './submit-batch'
 import { MATRIX_VIEW, useMatrixDraft } from './use-matrix-draft'
 
@@ -36,6 +36,12 @@ export function useBatchSession({ templates, initial, balance, limit, caps, onSt
     retry: (id: string) => void retryJob(id, limit),
     newBatch: () => {
       draft.photos.clear()
+      back()
+    },
+    // Opened from another template while a batch's results show: back to the form with it.
+    startWith: (templateIds: readonly string[]) => {
+      draft.photos.clear()
+      draft.setValues((current) => withTemplates(current, templateIds, caps.templates))
       back()
     },
     applyMore: (templateId: string) => {
