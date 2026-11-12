@@ -19,5 +19,8 @@ export const PLATFORM_SPECS = {
   grubhub: { minPx: 200 },
 } as const
 
+// When the figures above were last checked against the platforms' pages (shown with them).
+export const PLATFORM_SPECS_CHECKED = { en: 'November 2026', zh: '2026 年 11 月' } as const
+
 // "1,400" (English thousands); Chinese copy uses the same digits.
 export const px = (n: number) => n.toLocaleString('en-US')

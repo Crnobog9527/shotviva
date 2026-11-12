@@ -116,6 +116,8 @@ export const eventSchemas = {
     code: campaignCode.optional(), discount_percent: z.number().int().min(1).max(90).optional() }),
   // T74: the template workspace opened, or a template picked in the home generator's picker.
   template_view: z.strictObject({ template_id: slug, category: slug, surface: z.enum(TEMPLATE_VIEW_SURFACES) }),
+  // Create's All (Owner 2026-11-12): 「查看全部」 on a category section, by root category key.
+  catalogue_see_all: z.strictObject({ category: slug }),
   // T83: a template saved or unsaved (sent once the server has it, so a rolled-back tap is not counted).
   template_favorite: z.strictObject({
     template_id: slug,
@@ -157,6 +159,7 @@ export const BROWSER_EVENTS = [
   'paywall_view',
   'paywall_select',
   'template_view',
+  'catalogue_see_all',
   'template_favorite',
   'template_toggle',
   'contact_sales_click',

@@ -108,6 +108,11 @@ export function trackTemplateView(template: { id: string; category: string }, su
   track('template_view', { template_id: template.id, category: categorySlug(template.category), surface })
 }
 
+// Create's All: 「查看全部」 on a root category's section (Owner 2026-11-12).
+export function trackCatalogueSeeAll(category: string): void {
+  track('catalogue_see_all', { category: categorySlug(category) })
+}
+
 export function trackTemplateFavorite(
   template: { id: string; category: string },
   action: EventProps<'template_favorite'>['action'],
