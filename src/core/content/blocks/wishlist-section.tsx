@@ -2,9 +2,10 @@ import Image from 'next/image'
 import type { ReactNode } from 'react'
 
 import type { WishExample, WishlistPromo } from '../page-content'
+import { phoneSlot } from './phone-sizes'
 
 // Each print is a quarter of the content column from 768px; half the phone width below it.
-const PRINT_SIZES = '(min-width: 1024px) 170px, (min-width: 768px) 22vw, 46vw'
+const PRINT_SIZES = `(min-width: 1024px) 170px, (min-width: 768px) 22vw, ${phoneSlot(46)}`
 
 const Heart = () => (
   <svg viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">

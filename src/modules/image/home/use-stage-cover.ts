@@ -14,9 +14,10 @@ export type StageCover = { url: string; ratio: number; firstFrame?: string | nul
 // the 320 px desktop frame and the ~340 px phone frame. Decoding the 2x copy to read its size also
 // warms it for the <img> on a 2x screen.
 const STAGE_WIDTH = 320
-export function stageImage(url: string): { src: string; srcSet: string | undefined } {
+// Width and height also go on the <img> (SEO patch v5 item 4); .mk-stage-pic sizes it either way.
+export function stageImage(url: string): { src: string; srcSet: string | undefined; width: number; height: number } {
   const { props } = getImageProps({ src: url, alt: '', width: STAGE_WIDTH, height: STAGE_WIDTH })
-  return { src: props.src, srcSet: props.srcSet }
+  return { src: props.src, srcSet: props.srcSet, width: STAGE_WIDTH, height: STAGE_WIDTH }
 }
 
 // The cover on screen: the server's measured one at first (no layout shift), then, when the

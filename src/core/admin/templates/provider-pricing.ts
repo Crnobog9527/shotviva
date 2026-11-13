@@ -17,6 +17,7 @@ const rowSchema = z.object({
   approved: tariffs.optional(), fallback_floors: z.record(z.enum(TEMPLATE_QUALITIES), fallbackTiers).optional(),
   estimated_image_costs: estimatedImageCostsSchema,
   p95: z.partialRecord(z.enum(RESOLUTIONS), z.number().nonnegative()),
+  p95_by_quality: z.partialRecord(z.enum(TEMPLATE_QUALITIES), z.partialRecord(z.enum(RESOLUTIONS), z.number().nonnegative())).optional(),
 })
 
 const receiptSchema = z.object({
@@ -37,7 +38,7 @@ function optionsFromInput(input: unknown, legacyBudget?: number): ImageProviderO
     const openAI = row.adapter === 'openai_images'
     const estimates = { ...caps.data?.catalogImageCosts, ...row.estimated_image_costs }
     const resolutions = openAI ? row.resolutions : row.resolutions.filter(tier => caps.data?.resolutions.includes(tier))
-    const floor = modelCreditFloor({ openAI, resolutions, estimates, p95: row.p95 }, budget)
+    const floor = modelCreditFloor({ openAI, resolutions, estimates, p95: row.p95, p95ByQuality: row.p95_by_quality }, budget)
     return {
       fallbackFloors: row.fallback_floors, approved: row.approved, version: catalog?.version, tariffs: row.is_active ? catalog?.tariffs : undefined,
       id: row.provider_id ?? 'env', label: row.label, model: row.model, isActive: row.is_active,

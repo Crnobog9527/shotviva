@@ -6,8 +6,10 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from '../../i18n/ui'
 import { AuthTabs } from './auth-tabs'
 import { CheckEmail } from './check-email'
-import { CaptchaFailed, CaptchaLine, Divider, EmailField, Notice, PasswordField, SubmitButton } from './form-parts'
+import { CaptchaFailed, CaptchaLine, Divider, EmailField, FormStatus, Notice, PasswordField, SubmitButton } from './form-parts'
 import { GoogleButton } from './google-button'
+import { GoogleMainlandNote } from './google-mainland-note'
+import type { GoogleProps } from './google-props'
 import { AlertIcon } from './icons'
 import { PhoneSignIn, type PhoneActions } from './phone-sign-in'
 import { useAuthForm, type AuthForm, type FormAction } from './use-auth-form'
@@ -15,7 +17,8 @@ import { validateEmail, validateLogin } from './validate'
 
 type Props = {
   action: FormAction
-  googleAction: FormAction
+  // Google sign-in, and whether to say under it that it does not load in mainland China.
+  google: GoogleProps
   resendAction: FormAction
   next: string
   // A fixed code from /auth/callback or /auth/confirm (`?error=`), never free text.
@@ -30,7 +33,7 @@ type Props = {
 const addr = (chunks: ReactNode) => <span className="au-addr">{chunks}</span>
 
 // /login (design/comps-v3-b/auth.html `?v=login`, `?err=creds|unverified`, `?captcha=1`).
-export function LoginForm({ action, googleAction, resendAction, next, notice, arrived, sender, phone }: Props) {
+export function LoginForm({ action, google, resendAction, next, notice, arrived, sender, phone }: Props) {
   const t = useTranslations('auth')
   const form = useAuthForm(action, { captcha: true, validate: validateLogin })
   const [verifying, setVerifying] = useState<string | null>(null)
@@ -64,10 +67,10 @@ export function LoginForm({ action, googleAction, resendAction, next, notice, ar
         <AuthTabs
           initial={notice ? 'email' : 'phone'}
           phone={<PhoneSignIn actions={phone} next={next} submitLabel={t('login.submit')} />}
-          email={<EmailLogin form={form} googleAction={googleAction} next={next} />}
+          email={<EmailLogin form={form} google={google} next={next} />}
         />
       ) : (
-        <EmailLogin form={form} googleAction={googleAction} next={next} />
+        <EmailLogin form={form} google={google} next={next} />
       )}
       <p className="au-swap">
         {t.rich('login.toSignup', { link: (chunks) => <Link href={`/signup?next=${encodeURIComponent(next)}`}>{chunks}</Link> })}
@@ -78,13 +81,14 @@ export function LoginForm({ action, googleAction, resendAction, next, notice, ar
 }
 
 // Google, then email and password: the whole page in English, the 邮箱 tab in Chinese.
-function EmailLogin({ form, googleAction, next }: { form: AuthForm; googleAction: FormAction; next: string }) {
+function EmailLogin({ form, google, next }: { form: AuthForm; google: GoogleProps; next: string }) {
   const t = useTranslations('auth')
   return (
     <>
-      <GoogleButton action={googleAction} next={next} appearance="auth" />
+      <GoogleButton action={google.action} next={next} appearance="auth" />
+      <GoogleMainlandNote show={google.mainlandNote} />
       <Divider />
-      <form onSubmit={form.onSubmit} noValidate className="au-form">
+      <form method="post" onSubmit={form.onSubmit} noValidate className="au-form">
         <input type="hidden" name="next" value={next} />
         <EmailField form={form} name="email" label={t('fields.email')} autoComplete="email" placeholder={t('placeholders.email')} />
         <PasswordField
@@ -96,7 +100,8 @@ function EmailLogin({ form, googleAction, next }: { form: AuthForm; googleAction
           aside={<Link href="/reset">{t('login.forgot')}</Link>}
         />
         <SubmitButton pending={form.pending}>{t('login.submit')}</SubmitButton>
-        <CaptchaFailed show={form.captchaFailed} />
+        <FormStatus form={form} />
+        <CaptchaFailed form={form} />
       </form>
     </>
   )
@@ -127,7 +132,7 @@ function UnverifiedNotice({ email, resendAction, next, onResent }: UnverifiedPro
     if (resend.state.status === 'sent') onResent(email)
   }, [resend.state, email, onResent])
   return (
-    <form role="alert" onSubmit={resend.onSubmit} className="au-notice">
+    <form method="post" role="alert" onSubmit={resend.onSubmit} className="au-notice">
       <AlertIcon />
       <div className="grid gap-2">
         <p>
@@ -144,7 +149,7 @@ function UnverifiedNotice({ email, resendAction, next, onResent }: UnverifiedPro
         <input type="hidden" name="email" value={email} />
         <input type="hidden" name="next" value={next} />
         {resend.errorCode ? <p>{t(`errors.${resend.errorCode}`)}</p> : null}
-        {resend.captchaFailed ? <p>{t('captcha.failed')}</p> : null}
+        {resend.captchaFailed ? <p>{t(resend.captchaNetwork ? 'captcha.network' : 'captcha.failed')}</p> : null}
       </div>
     </form>
   )

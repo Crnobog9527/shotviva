@@ -43,14 +43,27 @@ export function minimumCredits(costUsd: number, budget: number): number {
   return Math.max(1, Math.ceil(costUsd * 1.10 / budget))
 }
 
-type ModelCosts = { openAI: boolean; resolutions: readonly Resolution[]; p95: Costs; estimates: Costs }
+// p95ByQuality (1295): the route's p95 per quality, from jobs that recorded it. When the read
+// has it, a template's floor follows only its own quality's jobs (as the database check does) and
+// the mixed p95 is not used; older reads without it keep the mixed p95.
+type ModelCosts = {
+  openAI: boolean
+  resolutions: readonly Resolution[]
+  p95: Costs
+  p95ByQuality?: Partial<Record<(typeof TEMPLATE_QUALITIES)[number], Costs>>
+  estimates: Costs
+}
+
+function measuredCost(model: ModelCosts, quality: (typeof TEMPLATE_QUALITIES)[number], resolution: Resolution) {
+  return model.p95ByQuality ? model.p95ByQuality[quality]?.[resolution] : model.p95[resolution]
+}
 
 export function modelCreditFloor(model: ModelCosts, budget: number): CreditsFloor {
   const floor: CreditsFloor = { high: {} as CreditsCost, medium: {} as CreditsCost, resolutions: model.resolutions }
   for (const quality of TEMPLATE_QUALITIES) {
     for (const resolution of RESOLUTIONS) {
       const fallback = model.openAI ? OPENAI_ESTIMATES[quality][resolution] : undefined
-      const cost = model.p95[resolution] ?? model.estimates[resolution] ?? fallback
+      const cost = measuredCost(model, quality, resolution) ?? model.estimates[resolution] ?? fallback
       let min = cost === undefined ? MISSING_COST : minimumCredits(cost, budget)
       if (model.openAI) min = Math.max(min, OPENAI_MINIMUM[quality][resolution])
       floor[quality][resolution] = model.resolutions.includes(resolution) ? min : 1
