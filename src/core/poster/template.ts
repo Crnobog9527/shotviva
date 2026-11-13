@@ -19,6 +19,9 @@ export const posterKindSchema = z.object({
   name: z.object({ en: z.string().min(1).max(40), zh: z.string().min(1).max(20) }),
   blocks: z.array(z.enum(POSTER_BLOCKS)).min(1),
   capacity: posterCapacitySchema.default({}),
+  // The template's image slots (fields.images.slots) this page sends to the model, e.g. the prize
+  // photo on the prize page only; every other page sends none.
+  slots: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(4).default([]),
 })
 
 export const posterFieldsSchema = z.object({

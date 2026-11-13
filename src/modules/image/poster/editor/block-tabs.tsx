@@ -1,7 +1,7 @@
 'use client'
 
 import { useLocale, useTranslations } from 'next-intl'
-import { useState, type ComponentType } from 'react'
+import { useState, type ComponentType, type ReactNode } from 'react'
 
 import type { PosterBlock, PosterFields } from '@/core/poster'
 import { cn } from '@/core/ui/cn'
@@ -18,11 +18,12 @@ const EDITORS: Record<PosterBlock, ComponentType<BlockProps>> = {
   header: HeaderEditor, prizes: PrizesEditor, sections: SectionsEditor, table: TableEditor, footer: FooterEditor,
 }
 
-type Props = BlockProps & { poster: PosterFields; unverified: readonly string[] }
+// `pageExtra`: what a page shows under its blocks (its upload boxes, e.g. the prize photo).
+type Props = BlockProps & { poster: PosterFields; unverified: readonly string[]; pageExtra?: (kind: string) => ReactNode }
 
 // One tab for what both pages share, then one per page of the set; a dot marks a tab with lines
 // still to check. Each tab shows its blocks one under the other, each under its own heading.
-export function BlockTabs({ poster, unverified, ...props }: Props) {
+export function BlockTabs({ poster, unverified, pageExtra, ...props }: Props) {
   const groups = pageGroups(poster)
   const [current, setCurrent] = useState(groups[0]?.key ?? 'shared')
   const group = groups.find((item) => item.key === current) ?? groups[0]
@@ -37,6 +38,7 @@ export function BlockTabs({ poster, unverified, ...props }: Props) {
       </div>
       <div role="tabpanel" className="grid gap-6">
         {group?.blocks.map((block) => <BlockSection key={block} block={block} {...props} />)}
+        {group?.kind && pageExtra ? pageExtra(group.kind) : null}
       </div>
     </div>
   )

@@ -55,7 +55,7 @@ function infoLines(info: PosterContent['info']): string[] {
 }
 
 export function partText(content: PosterContent, part: PosterPart): string {
-  const pageNote = part.pages > 1 ? ` (poster ${part.page} of ${part.pages})` : ''
+  const pageNote = part.pages > 1 ? ` (page ${part.page} of ${part.pages})` : ''
   const blocks = [
     ['[Header]', ...headerLines(content.header)],
     part.prizes ? ['[Prizes]', ...prizeLines(part.prizes)] : [],

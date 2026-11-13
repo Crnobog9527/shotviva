@@ -1,6 +1,8 @@
 'use client'
 
-import { useFormatter, useLocale, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
+
+import { pagesReady } from '@/core/poster'
 
 import type { Balance } from '@/core/billing/pools'
 import { Button } from '@/core/ui/button'
@@ -9,6 +11,7 @@ import { Checkbox } from '@/core/ui/checkbox'
 import { canAfford } from '../../workspace/cta-state'
 import { ResolutionPicker, SizePicker } from '../../workspace/option-pickers'
 import type { PosterStudioState, StudioTemplate } from '../use-poster-studio'
+import { PageStatus } from './page-status'
 
 type Props = { studio: PosterStudioState; template: StudioTemplate; balance: Balance }
 
@@ -16,18 +19,11 @@ type Props = { studio: PosterStudioState; template: StudioTemplate; balance: Bal
 // the dialog's pinned bar (GenerateBar).
 export function GeneratePanel({ studio, template, balance }: Props) {
   const t = useTranslations('app.poster')
-  const locale = useLocale()
   const options = { resolutions: template.resolutions, aspectRatios: template.aspects, originalRatio: false }
-  const oversized = studio.parts.some((part) => part.oversized)
   return (
     <section className="grid gap-4 rounded-card bg-card p-4 hairline">
       <h2 className="text-body font-semibold">{t('split.count', { count: studio.parts.length })}</h2>
-      <ul className="grid gap-1 text-caption text-muted-foreground">
-        {studio.parts.map((part, i) => (
-          <li key={i}>{t('split.part', { name: kindName(template, part.kind, locale), page: part.page, pages: part.pages })}</li>
-        ))}
-      </ul>
-      {oversized ? <p className="text-caption text-destructive">{t('split.oversized')}</p> : null}
+      <PageStatus parts={studio.parts} template={template} />
       <h3 id="size-h" className="text-caption font-medium">{t('size')}</h3>
       <SizePicker options={options} value={studio.aspect} onChange={studio.setAspect} />
       <h3 id="res-h" className="text-caption font-medium">{t('resolution')}</h3>
@@ -57,13 +53,12 @@ export function GenerateButton({ studio, template, balance }: Props) {
   )
 }
 
-// Valid text that makes at least one poster, flagged lines confirmed, credits enough for all.
+// Every picked photo has finished uploading (a failed one must be picked again or removed).
+const slotsReady = (studio: PosterStudioState) => studio.photos.status !== 'uploading' && !Object.values(studio.photos.byKey).some((photo) => photo.upload.phase === 'error')
+
+// Valid text that makes every page, flagged lines confirmed, credits enough for all.
 function canStart(studio: PosterStudioState, balance: Balance, total: number) {
   const mustReview = studio.draft.unverified.length > 0 && !studio.draft.reviewed
-  return studio.valid && studio.parts.length > 0 && !mustReview && canAfford(balance, total)
+  return studio.valid && pagesReady(studio.parts) && slotsReady(studio) && !mustReview && canAfford(balance, total)
 }
 
-const kindName = (template: StudioTemplate, key: string, locale: string) => {
-  const name = template.poster.kinds.find((kind) => kind.key === key)?.name
-  return name ? (locale === 'zh' ? name.zh : name.en) : key
-}

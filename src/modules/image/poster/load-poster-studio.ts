@@ -24,7 +24,8 @@ export function toStudioTemplate(template: LocalizedTemplate): StudioTemplate | 
   // Only the sizes the template lists (tall posters first), and only those its model can make.
   const aspects = template.fields.aspectRatios.filter((ratio): ratio is OutputAspect => (options.aspectRatios as string[]).includes(ratio))
   // Every tier the template's model makes, 1K included; the editor starts on 2K (defaultResolution).
-  return { id: template.id, name: template.name, poster, aspects, resolutions: options.resolutions, creditsCost: template.creditsCost }
+  const slots = (template.fields.images.slots ?? []).map(({ key, label, help, required }) => ({ key, label, required, ...(help ? { help } : {}) }))
+  return { id: template.id, name: template.name, poster, aspects, resolutions: options.resolutions, creditsCost: template.creditsCost, slots }
 }
 
 // Only the sizes /api/generate will take for this template's model: the offered list comes from
