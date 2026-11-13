@@ -7,7 +7,10 @@ import type { PosterPart } from './split'
 // normalized form (NFKC, no whitespace) sits inside the normalized reading. For one that is not,
 // the closest line read is shown next to it, so the user sees what the poster says instead.
 
-export type PosterDiff = { path: string; expected: string; seen: string }
+// kind: absent for a confirmed line not found (or found changed); 'extra' for a line on the poster
+// that is in none of the confirmed text (an invented header row, a made-up table row); 'repeated'
+// for a table row drawn more often than it was confirmed.
+export type PosterDiff = { path: string; expected: string; seen: string; kind?: 'extra' | 'repeated' }
 
 // The confirmed strings this poster shows: header and footer, and only its own blocks. A table
 // row is compared as one line (its cells in order), so a wrong number points at its row.
@@ -44,9 +47,51 @@ function closest(expected: string, lines: readonly string[]): string {
   return best.score >= 0.5 ? best.line : ''
 }
 
-export function compareReading(expected: readonly { path: string; text: string }[], lines: readonly string[]): PosterDiff[] {
+type Expected = readonly { path: string; text: string }[]
+
+export function compareReading(expected: Expected, lines: readonly string[]): PosterDiff[] {
   const reading = normalizeForMatch(lines.join(''))
-  return expected
+  const extras = extraLines(expected, lines)
+  const unexplained = extras.map((diff) => diff.seen)
+  // A changed line is usually one of the lines nothing confirmed explains: shown next to it there,
+  // and not reported a second time as added.
+  const missing = expected
     .filter(({ text }) => !reading.includes(normalizeForMatch(text)))
-    .map(({ path, text }) => ({ path, expected: text, seen: closest(text, lines) }))
+    .map(({ path, text }): PosterDiff => ({ path, expected: text, seen: closest(text, unexplained) || closest(text, lines) }))
+  const shown = new Set(missing.map((diff) => diff.seen))
+  return [...missing, ...repeatedRows(expected, lines), ...extras.filter((diff) => !shown.has(diff.seen))]
+}
+
+// Punctuation, symbols and a drawn list number ("1." before a numbered line) are layout, not text
+// the user typed: ignored when deciding whether a line read off the poster was confirmed.
+const LIST_NUMBER = /^\s*\d{1,2}\s*[.、．)]\s*/u
+const loose = (text: string) => normalizeForMatch(text.replace(LIST_NUMBER, '')).replace(/[\p{P}\p{S}]/gu, '')
+
+// A line counts as confirmed once every confirmed string it contains is taken out and what is left
+// is under two characters or part of the confirmed text (a reader may merge "开赛时间" and "14:00",
+// or read one wrapped line as two). Anything else is text the model added.
+function extraLines(expected: Expected, lines: readonly string[]): PosterDiff[] {
+  const pieces = [...new Set(expected.map(({ text }) => loose(text)).filter(Boolean))].sort((a, b) => b.length - a.length)
+  const all = expected.map(({ text }) => loose(text)).join('')
+  return lines.flatMap((line, i) => {
+    const read = loose(line)
+    const rest = pieces.reduce((left, piece) => left.split(piece).join(''), read)
+    // A long line the poster wraps is read as pieces of one confirmed line: still confirmed.
+    const added = !all.includes(read) && [...rest].length >= 2 && !all.includes(rest)
+    return added ? [{ path: `extra.${i}`, expected: '', seen: line, kind: 'extra' as const }] : []
+  })
+}
+
+// A table row read on more lines than it was confirmed (one row drawn twice).
+function repeatedRows(expected: Expected, lines: readonly string[]): PosterDiff[] {
+  const rows = expected.filter(({ path }) => /^table\.rows\.\d+$/.test(path))
+  const read = lines.map(loose)
+  const reported = new Set<string>()
+  return rows.flatMap(({ path, text }) => {
+    const key = loose(text)
+    const confirmed = rows.filter((row) => loose(row.text) === key).length
+    if (reported.has(key) || read.filter((line) => line === key).length <= confirmed) return []
+    reported.add(key)
+    return [{ path: `${path}.repeated`, expected: text, seen: text, kind: 'repeated' as const }]
+  })
 }

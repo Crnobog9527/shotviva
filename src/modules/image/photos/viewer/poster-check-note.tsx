@@ -33,8 +33,7 @@ export function PosterCheckNote({ poster, templateName, onRedraw }: { poster: Po
         <ul className="grid gap-2">
           {poster.diffs.slice(0, 8).map((diff) => (
             <li key={diff.path} className="grid gap-0.5">
-              <span>{t('expected')}{diff.expected}</span>
-              <span className="text-muted-foreground">{diff.seen ? `${t('seen')}${diff.seen}` : t('notFound')}</span>
+              <DiffLine diff={diff} />
             </li>
           ))}
         </ul>
@@ -47,5 +46,19 @@ export function PosterCheckNote({ poster, templateName, onRedraw }: { poster: Po
         <Link href={`/generate?poster=${encodeURIComponent(poster.redo.templateId)}`} className={buttonVariants({ variant: 'ghost', size: 'touch' })}>{t('editText')}</Link>
       </div>
     </section>
+  )
+}
+
+// A changed or missing line (confirmed text, then what the poster shows), a line the poster added,
+// or a table row it drew more than once.
+function DiffLine({ diff }: { diff: PosterWork['diffs'][number] }) {
+  const t = useTranslations('app.poster.check')
+  if (diff.kind === 'extra') return <span>{t('extra')}{diff.seen}</span>
+  if (diff.kind === 'repeated') return <span>{t('repeated')}{diff.expected}</span>
+  return (
+    <>
+      <span>{t('expected')}{diff.expected}</span>
+      <span className="text-muted-foreground">{diff.seen ? `${t('seen')}${diff.seen}` : t('notFound')}</span>
+    </>
   )
 }

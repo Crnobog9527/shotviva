@@ -23,7 +23,7 @@ const posterInputs = z.object({
   resolution: z.enum(RESOLUTIONS),
 })
 
-const checkRow = z.object({ status: z.enum(['match', 'mismatch', 'unchecked']), diffs: z.array(z.object({ path: z.string(), expected: z.string(), seen: z.string() })) })
+const checkRow = z.object({ status: z.enum(['match', 'mismatch', 'unchecked']), diffs: z.array(z.object({ path: z.string(), expected: z.string(), seen: z.string(), kind: z.enum(['extra', 'repeated']).optional() })) })
 
 export async function loadPosterWork(admin: SupabaseClient, job: Job): Promise<PosterWork | null> {
   const inputs = posterInputs.safeParse(job.inputs)

@@ -803,6 +803,8 @@
         "expected": "Confirmed: ",
         "seen": "On the poster: ",
         "notFound": "Not found on the poster",
+        "extra": "Added on the poster: ",
+        "repeated": "Row drawn more than once: ",
         "redraw": "Redraw this poster · {credits} credits",
         "redrawFree": "Redraw this poster for free",
         "freeNote": "Your first redraw of a poster that failed the check is free: {credits} credits are held while it draws and all given back once it is done.",
