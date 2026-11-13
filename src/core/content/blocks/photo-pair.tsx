@@ -39,7 +39,7 @@ export function BeforePane({ image, preload, sizes }: { image: ImageRef; preload
   return (
     <span className="mk-pane">
       {/* eslint-disable-next-line @next/next/no-img-element -- a data: URI, nothing for next/image to resize */}
-      {preload && image.firstFrame ? <img className="mk-ff" src={image.firstFrame} alt="" aria-hidden decoding="sync" /> : null}
+      {preload && image.firstFrame ? <img className="mk-ff" src={image.firstFrame} width={image.width} height={image.height} alt="" aria-hidden decoding="sync" /> : null}
       <Image className="mk-b" src={image.src} alt={image.alt} width={image.width} height={image.height} sizes={sizes} preload={preload} loading={preload ? undefined : 'lazy'} />
     </span>
   )

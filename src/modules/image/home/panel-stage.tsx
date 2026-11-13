@@ -13,6 +13,9 @@ import { stageImage, useStageCover, type StageCover } from './use-stage-cover'
 // height range the CSS sets (so the panel never jumps more than that between templates).
 const clampRatio = (ratio: number) => Math.min(Math.max(ratio, 0.5), 2)
 
+// The first frame's width / height attributes: its shape at the stage's width (CSS sizes the box).
+const STAGE_PX = 320
+
 type Inset = { url: string; ratio: number | null; label: string; mine: boolean } | null
 type Props = { name: string; after: string | null; initial: StageCover | null; inset: Inset }
 
@@ -36,7 +39,7 @@ export function PanelStage({ name, after, initial, inset }: Props) {
                 every other cover; the blurred fill shows only outside it. */}
             <span className="mk-stage-pic">
               {/* The opening cover's first frame, painted with the document, under the full picture. */}
-              {cover.firstFrame ? <img className="mk-stage-ff" src={cover.firstFrame} alt="" aria-hidden decoding="sync" /> : null}
+              {cover.firstFrame ? <img className="mk-stage-ff" src={cover.firstFrame} width={STAGE_PX} height={Math.round(STAGE_PX / cover.ratio)} alt="" aria-hidden decoding="sync" /> : null}
               <img key={cover.url} className="mk-stage-img" {...stageImage(cover.url)} alt={t('stageAlt', { name })} loading="lazy" decoding="async" />
             </span>
           </>
@@ -57,7 +60,7 @@ export function PanelStage({ name, after, initial, inset }: Props) {
 function StageInset({ inset }: { inset: NonNullable<Inset> }) {
   const [loaded, setLoaded] = useState<number | null>(null)
   const style = { '--ir': clampRatio(inset.ratio ?? loaded ?? 4 / 5) } as CSSProperties
-  const image = inset.mine ? { src: inset.url } : thumbImage(inset.url, 120)
+  const image = inset.mine ? { src: inset.url, width: 120, height: 150 } : thumbImage(inset.url, 120)
   return (
     <span className="mk-inset" style={style}>
       <img className={inset.mine ? `${REPLAY_BLOCK_CLASS} mk-inset-img` : 'mk-inset-img'} {...image} alt="" loading="lazy" decoding="async"

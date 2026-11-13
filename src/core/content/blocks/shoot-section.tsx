@@ -1,8 +1,9 @@
 import Image from 'next/image'
 
 import type { ShootDemo } from '../page-content'
+import { phoneSlot } from './phone-sizes'
 
-const RESULT_SIZES = '(min-width: 1024px) 236px, (min-width: 768px) 33vw, 50vw'
+const RESULT_SIZES = `(min-width: 1024px) 236px, (min-width: 768px) 33vw, ${phoneSlot(50)}`
 
 // "One phone photo → a full shoot" (ARCHITECTURE §13 item 2): the phone snapshot as large as a
 // result, the three results from three templates, and the two-line bill under them when the

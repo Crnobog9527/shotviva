@@ -22,3 +22,25 @@ export const PRELAUNCH_BLOCKED_CRAWLERS = [
   'Bytespider',
   'Amazonbot',
 ] as const
+
+// Open site (SEO patch v5 item 3): the one crawler kept out entirely. Bytespider crawls hard and
+// sends next to no visitors.
+export const BLOCKED_CRAWLERS = ['Bytespider'] as const
+
+// Open site: private routes no crawler needs, one path each, English and /zh. Not here on purpose:
+// /_next/, images, /login, /signup, /generate and /wishlist; public pages link to those, and a
+// crawler must be able to fetch them to see their noindex.
+export const PRIVATE_PATHS = [
+  '/api/',
+  '/auth/',
+  '/admin',
+  '/account',
+  '/checkout',
+  '/photos',
+  '/connect',
+  '/zh/admin',
+  '/zh/account',
+  '/zh/checkout',
+  '/zh/photos',
+  '/zh/connect',
+] as const
