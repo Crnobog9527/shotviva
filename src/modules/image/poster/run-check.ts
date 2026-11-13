@@ -17,7 +17,7 @@ import { postResponses, readResponsesOutput } from '../edit/openai-responses'
 // finished poster back, line by line, without seeing what it should say (so it cannot "read" the
 // expected text into a blurry line), and the server compares that with the confirmed text. The
 // instructions are the template's own, private (model_params.poster_check.instructions). One
-// row per job in poster_checks (1316); a failure is 'unchecked', never an error for the user.
+// row per job in poster_checks (1346); a failure is 'unchecked', never an error for the user.
 
 export type CheckDeps = {
   db: SupabaseClient
