@@ -26,7 +26,7 @@ const toCard = (template: Template, locale: Locale) => toCatalogueTemplate(local
 // template (create-dialog.tsx / series-create-dialog.tsx), drawn inline from the editor's unsaved
 // draft with the same panes, sample, series strip, form and action bar. The admin frame makes it
 // inert, so nothing in it uploads or generates.
-export function TemplateCreatePreview({ template, series, width }: TemplatePreviewProps) {
+export function TemplateCreatePreview({ template, series, width }: Omit<TemplatePreviewProps, 'locale'>) {
   const locale = useLocale() as Locale
   const shown = toCard(template, locale)
   const members = series && series.members.length > 1 ? series.members.map(member => (member.id === template.id ? shown : toCard(member, locale))) : null

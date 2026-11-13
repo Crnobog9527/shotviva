@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import Link from 'next/link'
+import type { AbstractIntlMessages } from 'next-intl'
+import { getMessages } from 'next-intl/server'
 
 import { CategoriesPanel, listAdminTemplates, TemplatesEditor } from '@/core/admin'
 import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
@@ -29,12 +31,18 @@ const COVER_LANGUAGES = [
   ...(site.locales.upcoming ?? []).map((code) => ({ code, label: zhName.of(code) ?? code, upcoming: true })),
 ]
 
+// The zh copy the 实时预览's Chinese creation dialog reads (the admin itself renders in English).
+async function previewMessages() {
+  const { app, paywall } = await getMessages({ locale: 'zh' })
+  return { app, paywall } as AbstractIntlMessages
+}
+
 export function loadCatalogue(db: SupabaseClient) {
-  return Promise.all([listAdminTemplates(db), listAdminCategoryTree(db), listAdminSeriesOptions(db), readPricingOptions(db)])
+  return Promise.all([listAdminTemplates(db), listAdminCategoryTree(db), listAdminSeriesOptions(db), readPricingOptions(db), previewMessages()])
 }
 
 export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCatalogue>; edit?: string }) {
-  const [templates, categories, series, providers] = await data
+  const [templates, categories, series, providers, zhMessages] = await data
   return (
     <div className="mx-auto grid w-full min-w-0 max-w-6xl grid-cols-1 gap-6 p-6">
       <div className="flex flex-wrap items-center gap-3">
@@ -49,7 +57,7 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
         actions={{ save: saveTemplateCategoryAction, move: moveTemplateCategoryAction, remove: deleteTemplateCategoryAction }}
       />
       <ModelSyncProvider action={syncTemplateModel}>
-      <AdminTemplatePreview>
+      <AdminTemplatePreview zhMessages={zhMessages}>
       <TemplatesEditor initialEdit={edit}
         templates={templates} series={series}
         providers={providers}

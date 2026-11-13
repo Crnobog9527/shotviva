@@ -54,7 +54,7 @@ export function FormColumn(props: FormColumnProps) {
   const sections = useOpenSections()
   const budget = referenceBudget(providers, values.providerId, values.fieldsJson, values.styleRefs.length)
   return (
-    <div className="grid min-h-0 content-start gap-3 p-6 pt-2 lg:overflow-y-auto">
+    <div className="grid min-h-0 content-start gap-3 px-6 pb-6 lg:overflow-y-auto">
       <SectionNav sections={sections} shown={SHOWN} />
       <DialogHeader className="pt-2">
         <DialogTitle>{existing ? `编辑「${existing.name}」` : '新建模板'}</DialogTitle>

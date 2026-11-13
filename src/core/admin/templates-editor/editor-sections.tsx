@@ -16,7 +16,7 @@ export function EditorSection({ id, sections, children }: { id: SectionId; secti
   const open = sections.open.has(id)
   return (
     <details id={anchor(id)} open={open} onToggle={event => event.currentTarget.open !== open && sections.set(id, event.currentTarget.open)}
-      className="group scroll-mt-14 rounded-lg border">
+      className="group scroll-mt-28 rounded-lg border">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
         <ChevronRight className="size-4 transition-transform group-open:rotate-90" aria-hidden="true" />
         {sectionCopy[id]}
@@ -34,7 +34,7 @@ export function SectionNav({ sections, shown }: { sections: OpenSections; shown:
     requestAnimationFrame(() => document.getElementById(anchor(id))?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
   return (
-    <nav aria-label={sectionNavCopy.label} className="bg-background/95 sticky top-0 z-10 -mx-6 -mt-2 flex flex-wrap items-center gap-1.5 border-b px-6 py-2 backdrop-blur">
+    <nav aria-label={sectionNavCopy.label} className="bg-background/95 sticky top-0 z-10 -mx-6 flex flex-wrap items-center gap-1.5 border-b px-6 py-2 backdrop-blur">
       {SECTION_IDS.filter(id => shown.includes(id)).map(id => (
         <button key={id} type="button" onClick={() => go(id)}
           className={cn('rounded-full border px-2.5 py-1 text-xs', sections.open.has(id) ? 'text-foreground' : 'text-muted-foreground')}>
