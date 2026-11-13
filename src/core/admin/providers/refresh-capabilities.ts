@@ -3,6 +3,7 @@ import 'server-only'
 import { assertPublicBaseUrl, fetchImageCapabilities, findProvider, listProviders, persistRefreshedCapabilities, ProviderSettingError, type AdminProvider } from '@/core/providers'
 import { CapabilityWriteConflict } from '@/core/providers/repository'
 import { nextCapabilitySync } from '@/core/providers/capability-expiry'
+import { staticCapabilities } from '@/core/providers/types'
 import { logger } from '@/core/logger'
 
 import type { ProviderCommandDeps } from './commands'
@@ -30,13 +31,13 @@ export async function refreshProviderCapabilities(deps: ProviderCommandDeps, inp
 
 function winnerNeedsSync(row: AdminProvider, now: AdminProvider) {
   const sameIdentity = row.model === now.model && row.baseUrl === now.baseUrl && row.adapter === now.adapter
-  return now.updatedAt === row.updatedAt || (sameIdentity && nextCapabilitySync(now.adapter === 'openai_images', now.capabilities) <= Date.now())
+  return now.updatedAt === row.updatedAt || (sameIdentity && nextCapabilitySync(staticCapabilities(now.adapter), now.capabilities) <= Date.now())
 }
 
 export async function syncDueProvider(deps: ProviderCommandDeps, input: unknown, retry = false) {
   const row = await imageRow(deps, input)
   const failedQuote = row.capabilities?.catalogPricing?.status === 'unavailable'
-  if (!(retry && failedQuote) && nextCapabilitySync(row.adapter === 'openai_images', row.capabilities) > Date.now()) return false
+  if (!(retry && failedQuote) && nextCapabilitySync(staticCapabilities(row.adapter), row.capabilities) > Date.now()) return false
   try {
     await refresh(deps, row, retry)
   } catch (error) {

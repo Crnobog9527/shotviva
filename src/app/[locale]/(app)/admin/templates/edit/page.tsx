@@ -30,7 +30,7 @@ export default async function AdminEditTemplatePage() {
         {EDIT_TEMPLATE_COPY.back}
       </Link>
       <h1 className="text-xl font-semibold">{EDIT_TEMPLATE_COPY.title}</h1>
-      {active && !active.openAI && <ModelSyncProvider action={syncTemplateModel}>
+      {active && !active.openAI && !active.fixedCapabilities && <ModelSyncProvider action={syncTemplateModel}>
         <ModelSyncStatus key={active.id + active.model + active.capabilities?.fetchedAt} provider={active} />
       </ModelSyncProvider>}
       <EditTemplateEditor settings={settings} floor={providerFloor(floor, null, 'edit')} setSale={setTemplateSaleAction} save={saveEditTemplateAction} />
