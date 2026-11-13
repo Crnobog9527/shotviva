@@ -67,14 +67,18 @@ export function compareReading(expected: Expected, lines: readonly string[]): Po
 const LIST_NUMBER = /^\s*\d{1,2}\s*[.、．)]\s*/u
 const loose = (text: string) => normalizeForMatch(text.replace(LIST_NUMBER, '')).replace(/[\p{P}\p{S}]/gu, '')
 
-// A line counts as confirmed once every confirmed string it contains is taken out and fewer than
-// two characters are left (a reader may merge "开赛时间" and "14:00", or a rank and its prize).
-// What stays is text the model added.
+// A line counts as confirmed once every confirmed string it contains is taken out and what is left
+// is under two characters or part of the confirmed text (a reader may merge "开赛时间" and "14:00",
+// or read one wrapped line as two). Anything else is text the model added.
 function extraLines(expected: Expected, lines: readonly string[]): PosterDiff[] {
   const pieces = [...new Set(expected.map(({ text }) => loose(text)).filter(Boolean))].sort((a, b) => b.length - a.length)
+  const all = expected.map(({ text }) => loose(text)).join('')
   return lines.flatMap((line, i) => {
-    const rest = pieces.reduce((left, piece) => left.split(piece).join(''), loose(line))
-    return [...rest].length >= 2 ? [{ path: `extra.${i}`, expected: '', seen: line, kind: 'extra' as const }] : []
+    const read = loose(line)
+    const rest = pieces.reduce((left, piece) => left.split(piece).join(''), read)
+    // A long line the poster wraps is read as pieces of one confirmed line: still confirmed.
+    const added = !all.includes(read) && [...rest].length >= 2 && !all.includes(rest)
+    return added ? [{ path: `extra.${i}`, expected: '', seen: line, kind: 'extra' as const }] : []
   })
 }
 

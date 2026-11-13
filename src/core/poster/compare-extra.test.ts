@@ -30,6 +30,14 @@ describe('compareReading on the full sample', () => {
     expect(compareReading(partStrings(content, infoPage!), infoLines)).toEqual([])
   })
 
+  it('passes lines the poster wrapped, read as two (test site, 2026-11-14)', () => {
+    const wrapped = infoLines.flatMap((line) => (line === '参赛规则：截止报名前每位运动员最多可重新参赛3次' ? ['参赛规则：截止报名前每位运动员最多可重新', '参赛3次']
+      : line.startsWith('2. 生日当天') ? ['2. 生日当天凭有效证件可享半价参赛一次，', '不与其他优惠叠加']
+        : line.startsWith('2. 预置分') ? ['2. 预置分级别开始后，基础分位运动员需额外', '投入一个基础分作为全场预置分'] : [line]))
+    expect(wrapped.length).toBe(infoLines.length + 3)
+    expect(compareReading(partStrings(content, infoPage!), wrapped)).toEqual([])
+  })
+
   it('reports a header row the model invented', () => {
     const lines = [...prizeLines.slice(0, 10), '排名 RANK 奖励', ...prizeLines.slice(10)]
     expect(compareReading(partStrings(content, prizePage!), lines)).toEqual([{ path: 'extra.10', expected: '', seen: '排名 RANK 奖励', kind: 'extra' }])
