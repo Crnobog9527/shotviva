@@ -8,7 +8,7 @@ import type { OriginalSource } from './photo-detail'
 // preview of the upload, whole (never cropped), or the empty tray once it is gone (T32).
 export function OriginalLayer({ source, alt }: { source: OriginalSource; alt: string }) {
   const t = useTranslations('app.result')
-  if (source.kind !== 'deleted') {
+  if (source.kind === 'preview' || source.kind === 'source') {
     return <img src={source.url} alt={alt} decoding="async" className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full bg-photo-ground object-contain`} />
   }
   return (

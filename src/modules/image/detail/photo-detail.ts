@@ -5,7 +5,9 @@ import type { Translate } from '@/core/translate'
 // An edit (T30) has no upload: its "Original" is the work it was edited from ('source').
 // keptWithWork: the full upload is kept next to the result for Make again (T40); works made
 // before that only have the preview, or nothing.
-export type OriginalSource = { kind: 'preview'; url: string } | { kind: 'source'; url: string } | { kind: 'deleted' }
+// 'none': nothing was uploaded for this work (a dense-text poster, a text-only template), so
+// there is no original to show or to have been deleted.
+export type OriginalSource = { kind: 'preview'; url: string } | { kind: 'source'; url: string } | { kind: 'deleted' } | { kind: 'none' }
 // reference: the work's reference number (T78), read on the server; absent where not shown.
 export type PhotoDetail = { note: string | null; original: OriginalSource; keptWithWork: boolean; reference?: string }
 
@@ -20,7 +22,7 @@ export function noteOf(inputs: Record<string, unknown>): string | null {
 export function toPhotoDetail(job: Pick<Job, 'inputs'>, previewUrl: string | null, keptWithWork = false): PhotoDetail {
   return {
     note: noteOf(job.inputs),
-    original: previewUrl ? { kind: 'preview', url: previewUrl } : { kind: 'deleted' },
+    original: previewUrl ? { kind: 'preview', url: previewUrl } : typeof job.inputs.input_key === 'string' ? { kind: 'deleted' } : { kind: 'none' },
     keptWithWork,
   }
 }
