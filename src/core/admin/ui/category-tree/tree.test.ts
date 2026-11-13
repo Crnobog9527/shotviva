@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parentKeys, parseExpanded, revealPath, treeOrder, validParents, type TreeItem } from './tree'
+import { dropBefore, parentKeys, parseExpanded, positionBefore, revealPath, treeOrder, validParents, type TreeItem } from './tree'
 
 const node = (key: string, parentId: string | null, level: number, sortOrder = 10): TreeItem => ({ key, parentId, level, sortOrder })
 const root = node('root', null, 1)
@@ -35,5 +35,30 @@ describe('collapsible branches', () => {
     expect(parseExpanded('not json', parents)).toEqual(new Set())
     expect(parseExpanded('{"root":true}', parents)).toEqual(new Set())
     expect(parseExpanded('["root","leaf","gone",3]', parents)).toEqual(new Set(['root']))
+  })
+})
+
+describe('sibling positions', () => {
+  const keys = ['a', 'b', 'c', 'd']
+  it('moves a row to a typed 1-based position and renumbers the rest', () => {
+    expect(positionBefore(keys, 'd', 1)).toBe('a')
+    expect(positionBefore(keys, 'a', 3)).toBe('d')
+    expect(positionBefore(keys, 'b', 4)).toBeNull()
+    expect(positionBefore(keys, 'c', 2)).toBe('b')
+  })
+  it('clamps out-of-range numbers and ignores no-ops and junk', () => {
+    expect(positionBefore(keys, 'b', 99)).toBeNull()
+    expect(positionBefore(keys, 'c', 0)).toBe('a')
+    expect(positionBefore(keys, 'b', 2)).toBeUndefined()
+    expect(positionBefore(keys, 'b', Number.NaN)).toBeUndefined()
+    expect(positionBefore(keys, 'x', 1)).toBeUndefined()
+  })
+  it('turns a drop above or below a sibling into the key to insert before', () => {
+    expect(dropBefore(keys, 'd', 'a', false)).toBe('a')
+    expect(dropBefore(keys, 'a', 'c', true)).toBe('d')
+    expect(dropBefore(keys, 'a', 'd', true)).toBeNull()
+    expect(dropBefore(keys, 'b', 'a', true)).toBeUndefined()
+    expect(dropBefore(keys, 'b', 'c', false)).toBeUndefined()
+    expect(dropBefore(keys, 'b', 'zz', false)).toBeUndefined()
   })
 })

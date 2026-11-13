@@ -53,3 +53,23 @@ export function parseExpanded(raw: string | null, parents: ReadonlySet<string>):
     return new Set()
   }
 }
+
+// Where a sibling must land so it ends up at `position` (1-based, clamped) in its list: the key it goes
+// before, null for the end, or undefined when it is already there. Feeds the same TreeMove as a drag.
+export function positionBefore(siblingKeys: readonly string[], key: string, position: number): string | null | undefined {
+  const from = siblingKeys.indexOf(key)
+  if (from < 0 || !Number.isFinite(position)) return undefined
+  const to = Math.min(Math.max(Math.round(position), 1), siblingKeys.length) - 1
+  if (to === from) return undefined
+  return siblingKeys.filter(item => item !== key)[to] ?? null
+}
+
+// A drag dropped on `overKey`, above (after = false) or below it: the key it goes before, or undefined for no change.
+export function dropBefore(siblingKeys: readonly string[], key: string, overKey: string, after: boolean): string | null | undefined {
+  const rest = siblingKeys.filter(item => item !== key)
+  const at = rest.indexOf(overKey)
+  if (at < 0 || !siblingKeys.includes(key)) return undefined
+  const before = rest[after ? at + 1 : at] ?? null
+  const current = siblingKeys[siblingKeys.indexOf(key) + 1] ?? null
+  return before === current ? undefined : before
+}
