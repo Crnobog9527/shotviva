@@ -34,8 +34,15 @@ export function coverImage(url: string, sizes: string, base?: string, cdn: strin
 
 // Next's own default-loader URL (url, w, q in that order; covers are remote, so no dpl), on the
 // CDN's host. The optimiser validates url against images.remotePatterns exactly as before.
-export function cdnLoader(cdn: string): ImageLoader {
-  return ({ src, width, quality }) => `${cdn}/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=${quality ?? 75}`
+export function cdnLoader(cdn: string): ImageLoader & { origin: string } {
+  const loader: ImageLoader = ({ src, width, quality }) => `${cdn}/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=${quality ?? 75}`
+  return Object.assign(loader, { origin: cdn })
+}
+
+// The CDN loader for a next/image src that is a cover, or undefined (switch off, a static import,
+// a public/ picture, another host).
+export function coverLoaderFor(src: unknown, base?: string, cdn: string | undefined = publicEnv.NEXT_PUBLIC_IMAGE_CDN_URL) {
+  return cdn && typeof src === 'string' && isCoverUrl(src, base) ? cdnLoader(cdn) : undefined
 }
 
 // One optimised URL at least `width` px wide, for the places that take no srcset (a <video>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { coverImage, coverSrc, isCoverUrl } from './cover-image'
+import { coverImage, coverLoaderFor, coverSrc, isCoverUrl } from './cover-image'
 
 const BASE = 'https://shotviva.com/assets'
 const COVER = `${BASE}/covers/korean-manhwa/after-8c988390aa621eda.webp`
@@ -42,6 +42,9 @@ describe('coverImage through the image CDN (NEXT_PUBLIC_IMAGE_CDN_URL)', () => {
   it('leaves non-covers alone and is off when unset', () => {
     expect(coverImage('/api/files/job-1', '100vw', BASE, CDN)).toEqual({ src: '/api/files/job-1' })
     expect(coverImage(COVER, '100vw', BASE).src).toMatch(/^\/_next\/image\?/)
+    expect(coverLoaderFor('/home/hero.webp', BASE, CDN)).toBeUndefined()
+    expect(coverLoaderFor(COVER, BASE, undefined)).toBeUndefined()
+    expect(coverLoaderFor(COVER, BASE, CDN)?.({ src: COVER, width: 384, quality: 75 })).toBe(`${CDN}/_next/image?url=${encodeURIComponent(COVER)}&w=384&q=75`)
     expect(coverSrc(COVER, 700, BASE, CDN)).toBe(`${CDN}/_next/image?url=${encodeURIComponent(COVER)}&w=750&q=75`)
   })
 })
