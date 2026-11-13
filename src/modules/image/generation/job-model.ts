@@ -1,6 +1,6 @@
 import type { CreditPool } from '@/core/billing/pools'
 import type { MembershipTier } from '@/core/config'
-import type { JobView } from '@/core/jobs'
+import type { JobView, JobVisibility } from '@/core/jobs'
 import type { OutputAspect, Resolution } from '@/core/templates'
 
 import type { JobBody } from './job-api'
@@ -39,6 +39,8 @@ export type TrackedJob = {
   body?: JobBody
   fileUrl: string | null
   creditPool: CreditPool | null
+  // The work's visibility once it succeeded: a free poster work is private (§9 第 7 条).
+  visibility?: JobVisibility | null
   // A cut-out (transparent background): its downloads offer 白底 / 透明底. Unknown when absent.
   transparent?: boolean | null
   failure: JobFailure | null
@@ -55,7 +57,7 @@ const settled = (now: number) => ({ retryAt: undefined, settledAt: now })
 
 export function applyView(job: TrackedJob, view: JobView, now = Date.now()): TrackedJob {
   if (view.status === 'running') return job
-  if (view.status === 'succeeded') return { ...job, ...settled(now), status: 'succeeded', fileUrl: view.file_url, creditPool: view.credit_pool, transparent: view.transparent ?? null }
+  if (view.status === 'succeeded') return { ...job, ...settled(now), status: 'succeeded', fileUrl: view.file_url, creditPool: view.credit_pool, visibility: view.visibility, transparent: view.transparent ?? null }
   return { ...job, ...settled(now), status: 'failed', failure: { code: view.error_code ?? 'GENERATION_FAILED', message: '', refunded: true } }
 }
 

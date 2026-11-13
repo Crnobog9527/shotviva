@@ -76,6 +76,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
           addFirst={draft.missingPhoto ? template.creditsCost[draft.values.resolution] : null}
           limit={concurrency.limit}
           error={refusal.message(draft.error)}
+          privateOnly={template.privateOnly}
           onGenerate={generate}
         />
       </div>

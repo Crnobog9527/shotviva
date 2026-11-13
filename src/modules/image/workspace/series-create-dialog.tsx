@@ -89,7 +89,7 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
           photoExtra={batch ? <BatchLink templateId={template.id} onGo={onClose} /> : null}
         />
       }
-      bar={<FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} placement="sheet" limit={context.concurrency.limit} />}
+      bar={<FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} placement="sheet" limit={context.concurrency.limit} privateOnly={template.privateOnly} />}
     />
   )
 }

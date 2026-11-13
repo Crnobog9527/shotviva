@@ -674,7 +674,7 @@
       "doneState": {
         "hud": "已完成",
         "saved": "已存进「作品」",
-        "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · 用了 {count} 积分。{pool, select, free {用的是免费积分，所以会公开展示，并带水印。} paid {用的是付费积分，所以是私密的，没有水印。} other {}}",
+        "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · 用了 {count} 积分。{pool, select, free {用的是免费积分，所以会公开展示，并带水印。} freePrivate {用的是免费积分，所以带水印；海报类作品只自己可见。} paid {用的是付费积分，所以是私密的，没有水印。} other {}}",
         "caption": "手机照片 → {name}。",
         "edit": "继续编辑"
       },
@@ -690,6 +690,7 @@
       "generateCta": "生成 <cost>· {count} 积分</cost>",
       "getCreditsCta": "获取积分 <cost>· 需要 <mono>{count, number}</mono></cost>",
       "freeNotice": "这张图用的是免费积分：会公开展示，并带水印。<b>用付费积分生成的图是私密的，没有水印。</b>",
+      "freeNoticePrivate": "这张图用的是免费积分，会带水印。<b>海报类作品只自己可见，不会进入公开创作库。</b>",
       "needsCredits": "{tier}需要 {count} 积分。<b>用付费积分生成的图是私密的，没有水印。</b>",
       "counter": "{count, number} / {max, number}",
       "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>",
@@ -804,7 +805,7 @@
       "done": "已完成",
       "newest": "最新的在前",
       "count": "{running, plural, =0 {} other {# 张生成中 · }}{done} 张已完成",
-      "footnote": "用免费积分生成的图会公开并带水印；用付费积分生成的图是私密的，没有水印。",
+      "footnote": "用免费积分生成的图会公开并带水印（海报类作品只自己可见）；用付费积分生成的图是私密的，没有水印。",
       "photoAlt": "{name} 作品",
       "empty": "选一个模板，上传一张手机照片，第一张作品 60 秒左右就会出现在这里。",
       "emptyCta": "做第一张图",
@@ -837,6 +838,7 @@
     },
     "work": {
       "freePublic": "公开 · 带水印",
+      "freePrivate": "私密 · 带水印",
       "private": "私密",
       "public": "公开"
     },
@@ -891,6 +893,7 @@
         "credits": "积分",
         "visibility": "可见性",
         "visibilityFree": "公开，带水印",
+        "visibilityFreePrivate": "私密，带水印",
         "visibilityPrivate": "私密",
         "visibilityPublic": "公开",
         "original": "原图",
@@ -1248,6 +1251,7 @@
       "noticeEmpty": "用任何语言写下要改的地方。<b>原图会保留。</b>",
       "noticeReady": "会生成一张新照片，原图仍在作品里。",
       "noticeFree": "会生成一张新照片，原图仍在作品里。<b>使用免费积分：公开并带水印。</b>",
+      "noticeFreePrivate": "会生成一张新照片，原图仍在作品里。<b>使用免费积分：带水印，和原海报一样只自己可见。</b>",
       "failTitle": "修改失败。",
       "failUntouched": "原图没有变。",
       "changeRequest": "改一下要求",
