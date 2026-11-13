@@ -65,11 +65,12 @@ export async function reviewRequest(deps: WishlistDeps, input: unknown): Promise
 }
 
 // Templates a shipped request can link to: every template, published or not, since the Owner
-// may mark it shipped right before publishing.
+// may mark it shipped right before publishing. Deleted templates (1401) are left out.
 export async function listTemplateOptions(db: SupabaseClient): Promise<{ id: string; name: string }[]> {
   const { data, error } = await db
     .from('templates')
     .select('id, name')
+    .is('deleted_at', null)
     .order('sort_order', { ascending: true })
     .returns<{ id: string; name: string }[]>()
   if (error) throw new AppError('INTERNAL', `listTemplateOptions failed: ${error.message}`)

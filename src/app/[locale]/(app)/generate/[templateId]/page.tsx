@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
@@ -6,11 +6,12 @@ import { Suspense, type ReactNode } from 'react'
 import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
+import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
 import { findWebTemplate, loadEditOffer } from '@/core/templates'
 import { r2Store } from '@/core/storage'
-import { ImageWorkspace, loadAgain, loadReuse, toCatalogueTemplate, WorkspaceHead, WorkspacePending } from '@/modules/image'
+import { ImageWorkspace, loadAgain, loadReuse, posterHref, toCatalogueTemplate, WorkspaceHead, WorkspacePending } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 function Nav({ title, aside }: { title: string; aside?: ReactNode }) {
@@ -28,9 +29,13 @@ async function Workspace({ params, searchParams }: RouteProps) {
   const user = await requireUser(`/generate/${templateId}`)
   const supabase = await createServerSupabase()
   // The cached catalogue, members included; a template the cache has not seen yet is read live.
-  const found = await findWebTemplate(supabase, await currentLocale(), templateId)
+  const locale = await currentLocale()
+  const found = await findWebTemplate(supabase, locale, templateId)
   if (!found) notFound()
   const template = toCatalogueTemplate(found)
+  // A poster template is made in its own editor (ARCHITECTURE §5.3), never in this workspace.
+  const posterPath = posterHref(template)
+  if (posterPath) redirect(localizePath(posterPath, locale))
   const againId = typeof query.again === 'string' ? query.again : undefined
   const reuseId = !againId && typeof query.reuse === 'string' ? query.reuse : undefined
   const admin = createAdminSupabase()

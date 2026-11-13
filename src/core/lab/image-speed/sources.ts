@@ -1,19 +1,21 @@
 // The image-speed lab (/api/lab/image-speed): which origins it compares and which covers it
 // loads from each. Pure, so the choice can be tested without a deployment.
 //
-// Every origin serves the same object key from the public covers bucket: today's path (the
-// site's /assets rewrite to r2.dev), the r2.dev origin itself, and two trial CDN domains the
-// Owner may create in front of the bucket (Tencent EdgeOne and Alibaba Cloud CDN, overseas
-// nodes only, no ICP filing). A trial domain that does not exist yet just shows as failed.
+// The original-file rows serve the same object key from the public covers bucket: today's path
+// (the site's /assets rewrite to r2.dev) and the r2.dev origin itself. The small-image rows load
+// the card-sized file from this site's /_next/image and from the image CDN in front of it.
 
-export type LabOrigin = { id: string; label: string; base: string }
-export type LabConfig = { origins: LabOrigin[]; keys: string[] }
+// `small`: the card-sized file (/_next/image, AVIF/WebP at w=384, what a catalogue card loads)
+// from `base` + /_next/image, for the cover at assetsBase/key; otherwise the stored original at
+// base/key. An empty base is this page's own origin.
+export type LabOrigin = { id: string; label: string; base: string; small?: boolean }
+export type LabConfig = { origins: LabOrigin[]; keys: string[]; assetsBase?: string }
 
-// Fixed names so the console steps and the page agree; changing one is a code change.
-export const TRIAL_CDN_ORIGINS: LabOrigin[] = [
-  { id: 'eo', label: 'EdgeOne 香港/境外（img-eo）', base: 'https://img-eo.shotviva.com' },
-  { id: 'ali', label: '阿里云 CDN 境外（img-ali）', base: 'https://img-ali.shotviva.com' },
-]
+export const SMALL_WIDTH = 384
+
+// The image CDN (Tencent EdgeOne, overseas nodes only, no ICP filing). Since 2026-11-13 it
+// forwards only /_next/image to shotviva.com (plan A1), so it has no original-file row any more.
+export const IMAGE_CDN_ORIGIN = 'https://img-eo.shotviva.com'
 
 export const LAB_IMAGE_COUNT = 6
 
@@ -44,11 +46,21 @@ const isR2Dev = (url: string) => new URL(url).hostname.endsWith('.r2.dev')
 
 // Production: the base is https://shotviva.com/assets and R2_PUBLIC_ORIGIN is its r2.dev origin.
 // Preview: the base is the preview bucket's r2.dev itself, so there is no separate rewrite row.
-export function labOrigins(env: { assetsBase?: string; r2Origin?: string }): LabOrigin[] {
+//
+// Then the small-image pair, when there are covers: this site's own /_next/image (Vercel, today)
+// against the same URL on the image CDN (the switch's value when set, else img-eo). The CDN
+// forwards /_next/image to production, so that row is only meaningful on shotviva.com.
+export function labOrigins(env: { assetsBase?: string; r2Origin?: string; imageCdn?: string }): LabOrigin[] {
   const origins: LabOrigin[] = []
   const base = env.assetsBase && trimSlash(env.assetsBase)
   if (base && !isR2Dev(base)) origins.push({ id: 'site', label: '现在：本站 /assets（Vercel 转 R2）', base })
   const r2 = env.r2Origin ? trimSlash(env.r2Origin) : base && isR2Dev(base) ? base : undefined
   if (r2) origins.push({ id: 'r2', label: 'R2 直连（r2.dev）', base: r2 })
-  return [...origins, ...TRIAL_CDN_ORIGINS]
+  const small: LabOrigin[] = base
+    ? [
+        { id: 'site-s', label: '小图：本站 /_next/image（Vercel，现在）', base: '', small: true },
+        { id: 'eo-s', label: '小图：img-eo /_next/image（EdgeOne 转 Vercel）', base: trimSlash(env.imageCdn ?? IMAGE_CDN_ORIGIN), small: true },
+      ]
+    : []
+  return [...origins, ...small]
 }

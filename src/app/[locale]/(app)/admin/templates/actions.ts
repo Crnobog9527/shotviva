@@ -6,6 +6,7 @@ import {
   applyCover,
   bulkEditTemplates,
   createCoverUpload,
+  deleteTemplate,
   deleteTemplateCategory,
   reorderTemplateCategories,
   saveTemplateCategory,
@@ -164,5 +165,15 @@ export async function applyCoverAction(input: ApplyCoverRequest): Promise<Action
     }
     await applyCover(deps, input)
     catalogueChanged()
+  })
+}
+
+// 删除 an unpublished template (Owner 2026-11-13). Unpublished templates are on no public page, so
+// only the admin list re-renders.
+export async function deleteTemplateAction(input: { id: string }): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(async () => {
+    await deleteTemplate(createAdminSupabase(), admin.id, input)
+    refresh()
   })
 }

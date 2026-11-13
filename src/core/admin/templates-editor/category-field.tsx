@@ -5,6 +5,7 @@ import { Label } from '@/core/ui/label'
 import { categoryChoices, type CategoryOption } from './category-options'
 export type { CategoryOption } from './category-options'
 
+import { CategoryPicker } from './category-picker'
 import { categoryCopy as COPY } from './copy'
 
 const SELECT = 'border-input h-9 rounded-md border bg-transparent px-3 text-sm'
@@ -19,21 +20,11 @@ type Props = { value: string; categories: readonly CategoryOption[]; onChange: (
 export function CategoryField({ value, categories, onChange }: Props) {
   const system = categories.find((category) => category.key === value && category.isSystem)
   if (system) return <LockedCategory category={system} />
-  const offered = categoryChoices(categories)
-  const known = offered.some((category) => category.key === value)
+  const known = categoryChoices(categories).some((category) => category.key === value)
   return (
     <div className="grid gap-1.5">
       <Label htmlFor="tpl-category">{COPY.label}</Label>
-      <select id="tpl-category" className={SELECT} value={known ? value : ''} onChange={(event) => onChange(event.target.value)}>
-        <option value="" disabled>
-          {COPY.placeholder}
-        </option>
-        {offered.map((category) => (
-          <option key={category.key} value={category.key}>
-            {category.label} · {category.nameEn}
-          </option>
-        ))}
-      </select>
+      <CategoryPicker id="tpl-category" value={known ? value : ''} categories={categories} placeholder={COPY.placeholder} onChange={onChange} />
       <p className="text-muted-foreground text-xs">{COPY.hint}</p>
     </div>
   )

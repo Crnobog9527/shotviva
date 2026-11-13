@@ -29,6 +29,17 @@ describe('autoCovers', () => {
     const [item] = autoCovers([row('a')], [{ ...member('a', null), cover_locales: { zh: { after: 'https://x/zh.webp' } } }])
     expect(item?.thumb).toEqual({ url: 'https://x/zh.webp', kind: 'auto' })
   })
+
+  it('carries the member 原图 for the large preview, never for a custom cover', () => {
+    const rows = autoCovers([row('a'), row('b', 'https://x/own.webp')], [
+      { ...member('a', 'https://x/a.webp'), cover_before_url: 'https://x/a-before.webp' },
+      { ...member('b', 'https://x/b.webp'), cover_before_url: 'https://x/b-before.webp' },
+    ])
+    expect(rows.map(r => r.thumb)).toEqual([
+      { url: 'https://x/a.webp', before: 'https://x/a-before.webp', kind: 'auto' },
+      { url: 'https://x/own.webp', kind: 'custom' },
+    ])
+  })
 })
 
 it('lists the checked series names in list order', () => {

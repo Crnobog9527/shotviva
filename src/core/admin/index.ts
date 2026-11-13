@@ -10,6 +10,7 @@ export {
   setTemplatesFeatured,
   setTemplateActive,
   setTemplateOrder,
+  deleteTemplate,
   setTemplatesActive,
 } from './templates'
 export type {
@@ -27,7 +28,7 @@ export type {
   TemplateOrderGroup,
 } from './templates'
 export { applyCover, createCoverUpload, publishStillCover, type ApplyCoverInput, type CoverDeps, type CoverUploadTicket } from './covers'
-export { TemplatesEditor } from './templates-editor'
+export { TemplatesEditor, type TemplatePreviewProps } from './templates-editor'
 export {
   deleteTemplateCategory,
   listAdminCategories,

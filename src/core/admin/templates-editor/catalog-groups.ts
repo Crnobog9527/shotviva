@@ -1,7 +1,7 @@
 import type { AdminTemplate } from '../templates/types'
 import { catalogCopy } from './copy'
 
-export type CatalogStatus = 'active' | 'inactive' | 'all'
+export type CatalogStatus = 'active' | 'inactive' | 'all' | 'deleted'
 export type SeriesOption = { id: string; nameZh: string }
 export const SINGLE_TEMPLATES = 'single'
 
@@ -45,6 +45,7 @@ function bySeries<T extends CatalogRow>(rows: T[], options: readonly SeriesOptio
 export function catalogSections<T extends CatalogRow>(
   rows: T[], status: CatalogStatus, grouped: boolean, series: readonly SeriesOption[],
 ) {
+  if (status === 'deleted') return [{ id: 'deleted', title: null, orderGroup: null, rows }]
   const statuses = status === 'all' ? (['active', 'inactive'] as const) : [status]
   if (grouped) {
     const matching = status === 'all' ? rows : rows.filter(t => t.isActive === (status === 'active'))

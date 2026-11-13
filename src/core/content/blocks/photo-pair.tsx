@@ -1,4 +1,4 @@
-import Image from 'next/image'
+import { SiteImage as Image } from '@/core/ui/site-image'
 import { useTranslations } from 'next-intl'
 
 import { cn } from '../../ui/cn'
