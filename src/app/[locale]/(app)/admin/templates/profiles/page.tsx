@@ -16,14 +16,16 @@ import { profileDetailAction, saveProfileAction, switchProfilesAction } from './
 export const instant = false
 export const metadata: Metadata = { title: profileCopy.title }
 
-export default async function AdminTemplateProfilesPage() {
+export default async function AdminTemplateProfilesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAdmin()
+  const q = (await searchParams).q
+  const initialFilter = typeof q === 'string' ? q.slice(0, 64) : ''
   const db = createAdminSupabase()
   const [templates, models, providers, categories, series, drift] = await Promise.all([
     listProfileTemplates(db), listImageModels(db), readPricingOptions(db), listAdminCategoryTree(db), listAdminSeriesOptions(db), readProfileDrift(db),
   ])
   return (
-    <ProfilesPage templates={templates} models={models} floors={pricingFromOptions(providers)} drift={drift}
+    <ProfilesPage initialFilter={initialFilter} templates={templates} models={models} floors={pricingFromOptions(providers)} drift={drift}
       categories={categoryChoices(categories).filter(choice => choice.path[0] !== 'art-styles').map(choice => ({ key: choice.key, label: choice.label }))}
       series={series.map(item => ({ key: item.id, label: item.nameZh }))}
       production={serverEnv().VERCEL_ENV === 'production'}

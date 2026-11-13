@@ -20,6 +20,7 @@ type Choice = { key: string; label: string }
 type Props = {
   templates: ProfileTemplate[]; models: ImageModel[]; floors: ProviderFloors; categories: Choice[]; series: Choice[]
   production: boolean; drift: DriftRow[]; actions: ProfileEditorActions & { switch: SwitchAction }
+  initialFilter?: string
 }
 
 function prices(summary: ProfileSummary) {
@@ -29,9 +30,9 @@ function prices(summary: ProfileSummary) {
 
 // 供应商配置 (Owner 2026-11-13): each template's two setups side by side, the bulk switch, and the
 // editor for the setup that is not live.
-export function ProfilesPage({ templates, models, floors, categories, series, production, drift, actions }: Props) {
+export function ProfilesPage({ templates, models, floors, categories, series, production, drift, actions, initialFilter = '' }: Props) {
   const router = useRouter()
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useState(initialFilter)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<{ template: ProfileTemplate; profile: ProfileKey } | null>(null)
   const [single, setSingle] = useState<{ ids: string[]; target: ProfileKey } | null>(null)
