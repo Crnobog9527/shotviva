@@ -6474,6 +6474,33 @@ $$;
 ALTER FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_reorder_template_series"("p_actor" "uuid", "p_ids" "uuid"[]) RETURNS integer
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare v_moved integer;
+begin
+  if not exists(select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  perform 1 from public.template_series order by id for update;
+  if p_ids is null or cardinality(p_ids) <> (select count(distinct i) from unnest(p_ids) i)
+     or cardinality(p_ids) <> (select count(*) from public.template_series)
+     or exists(select 1 from unnest(p_ids) i where not exists(select 1 from public.template_series s where s.id = i)) then
+    raise exception 'SERIES_CHANGED';
+  end if;
+  update public.template_series s set sort_order = m.ord::integer * 10
+    from unnest(p_ids) with ordinality as m(id, ord) where s.id = m.id and s.sort_order <> m.ord * 10;
+  get diagnostics v_moved = row_count;
+  return v_moved;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_reorder_template_series"("p_actor" "uuid", "p_ids" "uuid"[]) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) RETURNS "void"
     LANGUAGE "sql"
     SET "search_path" TO ''
@@ -7678,6 +7705,53 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_set_template_sale"("p_actor" "uuid", "p_template_id" "text", "p_enabled" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_template_series_flag"("p_actor" "uuid", "p_ids" "uuid"[], "p_field" "text", "p_value" boolean, "p_reason" "text") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_ids uuid[];
+  v_reason text := nullif(btrim(p_reason), '');
+begin
+  if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
+    raise exception 'FORBIDDEN';
+  end if;
+  if not exists(select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_field not in ('is_active', 'show_members') or p_value is null or p_ids is null
+     or cardinality(p_ids) not between 1 and 200
+     or cardinality(p_ids) <> (select count(distinct i) from unnest(p_ids) i) then
+    raise exception 'INVALID_INPUT';
+  end if;
+  if p_field = 'is_active' and not p_value and v_reason is null then raise exception 'SERIES_REASON_REQUIRED'; end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  perform 1 from public.template_series where id = any(p_ids) order by id for update;
+  if (select count(*) from public.template_series where id = any(p_ids)) <> cardinality(p_ids) then
+    raise exception 'SERIES_CHANGED';
+  end if;
+  if p_field = 'is_active' then
+    with changed as (update public.template_series set is_active = p_value
+      where id = any(p_ids) and is_active <> p_value returning id) select array_agg(id) into v_ids from changed;
+  else
+    with changed as (update public.template_series set show_members = p_value
+      where id = any(p_ids) and show_members <> p_value returning id) select array_agg(id) into v_ids from changed;
+  end if;
+  insert into public.admin_audit_log(action, user_id, target_id, reason)
+    select case p_field when 'is_active' then 'series_set_active' else 'series_set_show_members' end,
+      p_actor, i::text, format('系列管理批量%s：%s', case when p_field = 'is_active' then
+        case when p_value then '上架' else '下架' end else
+        case when p_value then '开启成员单独展示' else '关闭成员单独展示' end end,
+        coalesce(v_reason, '无备注'))
+    from unnest(coalesce(v_ids, '{}')) i;
+  return coalesce(cardinality(v_ids), 0);
+end $$;
+
+
+ALTER FUNCTION "public"."admin_set_template_series_flag"("p_actor" "uuid", "p_ids" "uuid"[], "p_field" "text", "p_value" boolean, "p_reason" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_test_run_cover"("p_actor" "uuid", "p_run_id" "uuid", "p_before_url" "text", "p_after_url" "text", "p_locale" "text" DEFAULT NULL::"text") RETURNS "text"
@@ -12896,7 +12970,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -16976,6 +17050,11 @@ GRANT ALL ON FUNCTION "public"."admin_reorder_template_categories"("p_keys" "tex
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_reorder_template_series"("p_actor" "uuid", "p_ids" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_reorder_template_series"("p_actor" "uuid", "p_ids" "uuid"[]) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) TO "service_role";
 
@@ -17128,6 +17207,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_i
 
 REVOKE ALL ON FUNCTION "public"."admin_set_template_sale"("p_actor" "uuid", "p_template_id" "text", "p_enabled" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_template_sale"("p_actor" "uuid", "p_template_id" "text", "p_enabled" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_template_series_flag"("p_actor" "uuid", "p_ids" "uuid"[], "p_field" "text", "p_value" boolean, "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_template_series_flag"("p_actor" "uuid", "p_ids" "uuid"[], "p_field" "text", "p_value" boolean, "p_reason" "text") TO "service_role";
 
 
 
