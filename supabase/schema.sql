@@ -2074,12 +2074,12 @@ CREATE OR REPLACE FUNCTION "admin"."route_slot_costs"("p_tag" "text") RETURNS "j
     'p95_full', coalesce((select jsonb_object_agg(quality,tiers) from (
       select quality, jsonb_object_agg(res,slots) tiers from (
         select quality, res, jsonb_object_agg(n::text,cost) slots from (
-          select g.inputs->>'quality' quality, g.inputs->>'resolution' res, jsonb_array_length(g.inputs->'input_slots') n,
+          select g.inputs->>'quality' quality, g.inputs->>'resolution' res, admin.slot_count(g.inputs) n,
             percentile_cont(0.95) within group (order by g.cost_usd) cost
           from public.generation_jobs g
           where g.provider=p_tag and g.inputs->>'quality' in ('medium','high') and g.inputs->>'resolution' in ('1k','2k','3k')
             and g.status='succeeded' and g.cost_usd is not null and g.created_at>=now()-interval '30 days'
-            and jsonb_typeof(g.inputs->'input_slots')='array' and jsonb_array_length(g.inputs->'input_slots') between 2 and 4
+            and admin.slot_count(g.inputs) between 2 and 4
           group by 1,2,3 having count(*)>=10
         ) per_n group by quality, res
       ) per_res group by quality
@@ -2168,6 +2168,17 @@ $$;
 ALTER FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."slot_count"("p_inputs" "jsonb") RETURNS integer
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select case when jsonb_typeof(p_inputs->'input_slots')='array' then jsonb_array_length(p_inputs->'input_slots') end
+$$;
+
+
+ALTER FUNCTION "admin"."slot_count"("p_inputs" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."slot_floor_credits"("t" "public"."templates", "p_tag" "text", "p_resolution" "text", "p_single" integer) RETURNS integer
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -2204,7 +2215,7 @@ CREATE OR REPLACE FUNCTION "admin"."slot_route_floor"("p_tag" "text", "p_resolut
       where g.provider=p_tag and g.inputs->>'resolution'=p_resolution
         and g.inputs ? 'quality' and g.inputs->>'quality'=p_quality
         and g.status='succeeded' and g.cost_usd is not null and g.created_at>=now()-interval '30 days'
-        and jsonb_typeof(g.inputs->'input_slots')='array' and jsonb_array_length(g.inputs->'input_slots')=p_slots
+        and admin.slot_count(g.inputs)=p_slots
       having count(*)>=10
   ), extra as (
     select p.extra_input_image_usd as usd from public.ai_providers p
@@ -17908,6 +17919,11 @@ GRANT ALL ON FUNCTION "admin"."sale_route_resolutions"("p" "public"."ai_provider
 
 REVOKE ALL ON FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."slot_count"("p_inputs" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."slot_count"("p_inputs" "jsonb") TO "service_role";
 
 
 
