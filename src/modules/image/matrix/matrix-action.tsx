@@ -17,7 +17,8 @@ const PAGE = 'md:px-0 lg:sticky lg:bottom-0 lg:z-10 lg:mt-4 lg:bg-[linear-gradie
 // The batch's one primary (DESIGN §4.3, The One Primary Rule): Generate with the count and the
 // total the grid shows, Get credits when the paid pool does not cover it (a batch is paid
 // credits only), or a disabled label saying what is missing. One notice line above it at most.
-export function MatrixAction({ cta, max, error, onGenerate }: { cta: MatrixCta; max: number; error: string | null; onGenerate(): void }) {
+// `inline`: pinned under the Batch create dialog's scrolling form instead of the page's bar.
+export function MatrixAction({ cta, max, error, onGenerate, inline = false }: { cta: MatrixCta; max: number; error: string | null; onGenerate(): void; inline?: boolean }) {
   const t = useTranslations('app.matrix')
   const notice = error ? <span role="alert">{error}</span>
     : cta.kind === 'generate' ? t.rich('noticeGenerate', { b })
@@ -25,7 +26,7 @@ export function MatrixAction({ cta, max, error, onGenerate }: { cta: MatrixCta; 
     : cta.kind === 'blocked' && cta.block === 'too-many' ? t.rich('noticeTooMany', { b, max })
     : null
   return (
-    <ActionBar className={PAGE}>
+    <ActionBar className={inline ? undefined : PAGE} inline={inline}>
       {notice ? <ActionNotice>{notice}</ActionNotice> : null}
       <Primary cta={cta} onGenerate={onGenerate} />
     </ActionBar>

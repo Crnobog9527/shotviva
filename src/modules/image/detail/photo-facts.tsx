@@ -12,7 +12,7 @@ import type { OriginalSource } from './photo-detail'
 import { PhotoWhen } from './photo-when'
 
 const ROW = 'flex min-h-11 items-baseline justify-between gap-3 py-2.5 [&+&]:border-t [&+&]:border-hairline'
-const VISIBILITY = { freePublic: 'visibilityFree', private: 'visibilityPrivate', public: 'visibilityPublic' } as const
+const VISIBILITY = { freePublic: 'visibilityFree', freePrivate: 'visibilityFreePrivate', private: 'visibilityPrivate', public: 'visibilityPublic' } as const
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (

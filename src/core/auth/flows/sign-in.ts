@@ -8,7 +8,7 @@ import { currentOrigin } from '../../request-origin'
 import { onVerifiedSignIn } from '../first-sign-in'
 import { sanitizeNext } from '../redirect-target'
 import { isVerified, metadataLocale } from '../session-user'
-import { createServerSupabase } from '../supabase-server'
+import { createSessionSupabase } from '../supabase-server'
 import { classifyAuthError } from './classify-auth-error'
 import { callbackUrl } from './callback-url'
 import { failed, type FormState } from './form-state'
@@ -22,7 +22,7 @@ export async function signInWithPassword(form: FormData, options: SignInOptions)
   if (!parsed.success) return failed('INVALID_INPUT')
   const { email, password, captchaToken } = parsed.data
 
-  const supabase = await createServerSupabase()
+  const supabase = await createSessionSupabase()
   const { data, error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } })
   if (error || !data.user) {
     const code = classifyAuthError(error)
@@ -39,7 +39,7 @@ export async function signInWithPassword(form: FormData, options: SignInOptions)
 }
 
 export async function signInWithGoogle(form: FormData): Promise<FormState> {
-  const supabase = await createServerSupabase()
+  const supabase = await createSessionSupabase()
   // The PKCE verifier cookie is written here; /auth/callback exchanges the code with it.
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -55,7 +55,7 @@ export async function signInWithGoogle(form: FormData): Promise<FormState> {
 // `then`: where to land afterwards, a same-site path (sanitised; the home page otherwise), e.g.
 // the login page on the way back to /connect/graylum ("Not you?").
 export async function signOut(then?: string): Promise<never> {
-  const supabase = await createServerSupabase()
+  const supabase = await createSessionSupabase()
   await supabase.auth.signOut()
   redirect(await localized(then ? sanitizeNext(then) : '/'))
 }

@@ -4,9 +4,10 @@ import { cn } from '@/core/ui/cn'
 
 import type { CreditPool } from '@/core/billing/pools'
 
-// Message key under app.work: free works are public with a watermark; paid ones private or public.
-export function workTagKey(pool: CreditPool, visibility: 'public' | 'private'): 'freePublic' | 'private' | 'public' {
-  if (pool === 'free') return 'freePublic'
+// Message key under app.work: free works are public with a watermark, except a poster work
+// (gallery-excluded, always private); paid ones private or public.
+export function workTagKey(pool: CreditPool, visibility: 'public' | 'private'): 'freePublic' | 'freePrivate' | 'private' | 'public' {
+  if (pool === 'free') return visibility === 'private' ? 'freePrivate' : 'freePublic'
   return visibility === 'private' ? 'private' : 'public'
 }
 

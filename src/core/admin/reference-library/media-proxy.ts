@@ -40,12 +40,21 @@ export async function referenceMedia(request: NextRequest) {
   const result = path.startsWith('/admin-media/prompt-lab/')
   const id = z.uuid().safeParse(path.slice((result ? '/admin-media/prompt-lab/' : '/admin-media/references/').length))
   if (!id.success || request.method !== 'GET' || !hasSessionCookie(request)) return empty(404)
+  return adminOnly(request, (session) => streamReference(id.data, request, result).then((answer) => withCookies(answer, session())))
+}
+
+// The session check may have refreshed and rotated the session: every answer from here on, the
+// 503 included, carries its cookies, or the browser keeps a refresh token Auth already used
+// (ARCHITECTURE §7「会话校验」).
+async function adminOnly(request: NextRequest, serve: (session: () => NextResponse) => Promise<NextResponse>) {
+  let session: (() => NextResponse) | null = null
   try {
     const { user, response } = await currentProxyUser(request)
+    session = response
     if (user?.role !== 'admin' || !user.verified || user.banned) return withCookies(empty(404), response())
-    return withCookies(await streamReference(id.data, request, result), response())
+    return await serve(response)
   } catch {
     // In particular, keep signed upstream URLs out of exception logs and browser responses.
-    return empty(503)
+    return session ? withCookies(empty(503), session()) : empty(503)
   }
 }
