@@ -370,6 +370,36 @@ html:lang(zh-Hans) :is(em, i, .italic) {
   background: linear-gradient(var(--nav-top), var(--nav-bottom));
   @apply backdrop-blur-[20px];
 }
+/* A sticky bar inside the content column that, once stuck, reads as the lower half of the top
+   chrome (Create's search and chips): the tab bar's material across the whole window, not just
+   the 1120px column, fading out over 16px below instead of ending on a hard edge. The layer sits
+   behind the bar's own content (the bar is sticky with a z-index, so a stacking context);
+   body's overflow-x: hidden keeps the 100vw layer from adding a sideways scroll. */
+@utility chrome-bleed {
+  &::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    bottom: -16px;
+    left: 50%;
+    width: 100vw;
+    translate: -50% 0;
+    pointer-events: none;
+    background: var(--bar-material);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-mask-image: linear-gradient(#000 calc(100% - 16px), transparent);
+    mask-image: linear-gradient(#000 calc(100% - 16px), transparent);
+  }
+}
+/* While such a bar is stuck under the desktop tab bar, the tab bar drops its bottom hairline so
+   the two read as one surface. Phones keep theirs: there the tab bar sits at the bottom. */
+@media (min-width: 48rem) {
+  html:has([data-chrome][data-stuck]) [data-tabbar] {
+    box-shadow: none;
+  }
+}
 /* Transparency checkerboard behind a cut-out result, 8px squares. */
 @utility checker-ground {
   background-color: var(--checker-light);
