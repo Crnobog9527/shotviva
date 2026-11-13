@@ -4,7 +4,7 @@ import type { PosterContent, PosterPart } from '@/core/poster'
 // editor can show its own words.
 
 export type ExtractReply =
-  | { status: 'ok'; content: PosterContent; unverified: string[] }
+  | { status: 'ok'; content: PosterContent; unverified: string[]; clipped?: string[] }
   | { status: 'unavailable' | 'failed' }
   | { status: 'error'; code: string }
 

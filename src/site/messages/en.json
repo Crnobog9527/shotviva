@@ -629,7 +629,7 @@
         "footer": "Footer",
         "pending": "has lines to check"
       },
-      "flagged": "Not found in your pasted text. Check it.",
+      "flagged": "Not found in your pasted text, or cut to fit. Check it.",
       "header": {
         "brand": "Organiser",
         "brandEn": "Organiser in English",
@@ -707,6 +707,7 @@
       },
       "notice": {
         "sortFailed": "We couldn't sort this automatically. Fill in the blocks below; your text is above.",
+        "clipped": "Some items were over their length limit, so they were cut to fit and marked in yellow. Check them against your text above, and shorten them if you need to.",
         "rateLimited": "Too many tries in an hour. Please wait a little.",
         "invalid": "Some text is too long or a table row is incomplete. Check the blocks.",
         "notEnough": "Not enough credits.",

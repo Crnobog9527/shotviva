@@ -23,9 +23,40 @@ const answer = {
 
 describe('toContent', () => {
   it('turns break rows into full-width rows, pads short rows and drops empty blocks', () => {
-    const content = toContent(answer)
+    const { content, clipped } = toContent(answer)
     expect(content.table?.rows).toEqual([['1', '100'], { break: '休息10分钟' }, ['2', '']])
-    expect(toContent(empty)).toMatchObject({ prizes: null, table: null, sections: [] })
+    expect(clipped).toEqual([])
+    expect(toContent(empty).content).toMatchObject({ prizes: null, table: null, sections: [] })
+  })
+
+  it('takes a 时间 line of up to 40 characters as it is', () => {
+    const datetime = '2026年11月15日（星期六）下午14:00准时开赛，13:30签到'
+    expect(toContent({ ...answer, header: { ...answer.header, datetime } })).toEqual(expect.objectContaining({ clipped: [] }))
+  })
+
+  it('cuts values and lists past their limit to fit and names them, instead of failing', () => {
+    const long = { ...answer,
+      header: { ...answer.header, datetime: '时'.repeat(50), title: '周六大师赛'.repeat(4) },
+      prizes: { ...answer.prizes, rows: Array.from({ length: 22 }, (_, i) => ({ rank: String(i + 1), rankEn: '', prize: '奖'.repeat(i === 0 ? 45 : 2) })) },
+    }
+    const { content, clipped } = toContent(long)
+    expect(content.header.datetime).toBe('时'.repeat(40))
+    expect(content.header.title).toBe('周六大师赛周六大师赛周六大师赛周')
+    expect(content.prizes?.rows).toHaveLength(20)
+    expect(content.prizes?.rows[0]?.prize).toBe('奖'.repeat(40))
+    expect(clipped.sort()).toEqual(['header.datetime', 'header.title', 'prizes.rows', 'prizes.rows.0.prize'].sort())
+  })
+
+  it('counts an emoji as one character and never splits one when cutting', () => {
+    const fits = toContent({ ...answer, header: { ...answer.header, title: `${'星'.repeat(15)}🏆` } })
+    expect(fits).toMatchObject({ content: { header: { title: `${'星'.repeat(15)}🏆` } }, clipped: [] })
+    const { content } = toContent({ ...answer, header: { ...answer.header, title: `🏆${'星'.repeat(16)}` } })
+    expect(content.header.title).toBe(`🏆${'星'.repeat(15)}`)
+  })
+
+  it('still throws on what cutting cannot fix', () => {
+    const sections = Array.from({ length: 8 }, () => ({ title: '规则', style: 'plain', lines: Array.from({ length: 10 }, () => '字'.repeat(60)) }))
+    expect(() => toContent({ ...answer, sections })).toThrow()
   })
 })
 
@@ -69,6 +100,14 @@ describe('runExtract', () => {
     expect(inserted[0]).toMatchObject({ status: 'ok', input_tokens: 2000, output_tokens: 3000, cost_usd: 0.0052, input_chars: text.length })
     const init = (fetch.mock.calls[0] as unknown as [string, RequestInit])[1]
     expect(JSON.parse(String(init.body))).toMatchObject({ instructions: 'Sort the text.', store: false })
+  })
+
+  it('flags a value cut to fit for review even though the paste contains it', async () => {
+    const datetime = '时'.repeat(50)
+    const fetch = vi.fn(async () => reply({ ...answer, header: { ...answer.header, datetime } }))
+    const text = `周6大师赛 ${datetime} 奖励前3名 冠军 平板电脑 亚军 智能手表 级别 基础分 1 100 休息10分钟 2`
+    const result = await runExtract({ db: fakeDb().db, credentials, fetch }, { userId: 'u', templateId: 't', text })
+    expect(result).toMatchObject({ status: 'ok', unverified: ['header.datetime'], clipped: ['header.datetime'] })
   })
 
   it('gives up after one retry, records the failure and returns failed', async () => {
