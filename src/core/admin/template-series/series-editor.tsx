@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, type ReactNode } from 'react'
 
 import { Link } from '@/core/i18n/navigation'
 import { Button } from '@/core/ui/button'
@@ -21,9 +21,10 @@ const empty: Fields = {
   category_key: '', sort_order: 0, is_active: false, show_members: false,
 }
 
-type Props = { detail: SeriesDetail | null; choices: SeriesCategoryChoice[]; initial: CandidatePage; actions: SeriesActions }
+// `embedded`: inside the list's dialog, which has its own title and close (Owner 2026-11-12).
+type Props = { detail: SeriesDetail | null; choices: SeriesCategoryChoice[]; initial: CandidatePage; actions: SeriesActions; embedded?: boolean }
 
-export function SeriesEditor({ detail, choices, initial, actions }: Props) {
+export function SeriesEditor({ detail, choices, initial, actions, embedded = false }: Props) {
   const [fields, setFields] = useState<Fields>(detail ?? empty)
   const [members, setMembers] = useState(detail?.members ?? [])
   const [confirm, setConfirm] = useState(false)
@@ -43,17 +44,13 @@ export function SeriesEditor({ detail, choices, initial, actions }: Props) {
     run(async () => {
       try {
         const result = await actions.save(input.data)
-        if (result.ok) router.replace(pathname + '?saved=1')
+        if (result.ok) router.replace(pathname + '?saved=1', { scroll: false })
         else setError(result.message)
       } catch { setError(copy.transient) }
     })
   }
   return (
-    <main className="mx-auto grid w-full max-w-5xl gap-5 p-6">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">{detail ? copy.edit : copy.create}</h1>
-        <Link href="/admin/templates/series" className="text-sm underline">{copy.back}</Link>
-      </header>
+    <Shell embedded={embedded} title={detail ? copy.edit : copy.create}>
       <fieldset disabled={pending} className="grid min-w-0 gap-6">
         <SeriesFields fields={fields} patch={patch} choices={choices} />
         <CoverField url={fields.cover_url} change={cover_url => patch({ cover_url })} />
@@ -68,6 +65,20 @@ export function SeriesEditor({ detail, choices, initial, actions }: Props) {
         </footer>
       </fieldset>
       {confirm && <UnpublishSheet open close={() => setConfirm(false)} submit={save} />}
+    </Shell>
+  )
+}
+
+// The page around the editor; inside the list's dialog, which has its own title, just a grid.
+function Shell({ embedded, title, children }: { embedded: boolean; title: string; children: ReactNode }) {
+  if (embedded) return <div className="grid min-w-0 gap-5">{children}</div>
+  return (
+    <main className="mx-auto grid w-full max-w-5xl gap-5 p-6">
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold">{title}</h1>
+        <Link href="/admin/templates/series" className="text-sm underline">{copy.back}</Link>
+      </header>
+      {children}
     </main>
   )
 }

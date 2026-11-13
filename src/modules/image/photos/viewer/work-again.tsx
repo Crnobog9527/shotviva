@@ -78,6 +78,7 @@ function AgainForm({ context }: { context: AgainContext }) {
           limit={context.concurrency.limit}
           onGenerate={generate}
           placement="sheet"
+          privateOnly={context.template.privateOnly}
         />
       </div>
     </>

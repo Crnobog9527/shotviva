@@ -29,6 +29,9 @@ export type Job = {
   // Pool the job was charged from; decides watermark and whether it may be private.
   creditPool: CreditPool
   visibility: JobVisibility
+  // From a gallery-excluded category, or an edit of such a work (migration 1320): always private,
+  // whichever pool paid. Decided when the job was reserved.
+  galleryExcluded?: boolean
   creditsCost: number
   outputKey: string | null
   errorCode: string | null
@@ -39,7 +42,7 @@ export type Job = {
 }
 
 export const JOB_COLUMNS = 'id,user_id,module,template_id,parent_job_id,inputs,provider,source,idempotency_key,' +
-  'status,credit_pool,visibility,credits_cost,output_key,error_code,created_at,finished_at,deleted_at'
+  'status,credit_pool,visibility,gallery_excluded,credits_cost,output_key,error_code,created_at,finished_at,deleted_at'
 
 const toDate = (value: string | null): Date | null => (value === null ? null : new Date(value))
 
@@ -67,6 +70,8 @@ export const jobRowSchema = z
     status: z.enum(JOB_STATUSES),
     credit_pool: z.enum(CREDIT_POOLS),
     visibility: z.enum(JOB_VISIBILITIES),
+    // Absent on rows read before migration 1320.
+    gallery_excluded: z.boolean().optional(),
     credits_cost: z.number().int().positive(),
     output_key: z.string().nullable(),
     error_code: z.string().nullable(),
@@ -90,6 +95,7 @@ export const jobRowSchema = z
       status: row.status,
       creditPool: row.credit_pool,
       visibility: row.visibility,
+      galleryExcluded: row.gallery_excluded ?? false,
       creditsCost: row.credits_cost,
       outputKey: row.output_key,
       errorCode: row.error_code,

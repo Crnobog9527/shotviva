@@ -18,11 +18,13 @@ const rich = {
 
 // The panel's bottom bar (T6 comp): one notice line, then the one primary. An empty field keeps
 // Generate dim but pressable (aria-disabled), so the press can point at the field.
-export function EditAction({ cta, tier, onGenerate, onEmpty }: { cta: EditCta; tier: string; onGenerate(): void; onEmpty(): void }) {
+type Props = { cta: EditCta; tier: string; privateOnly: boolean; onGenerate(): void; onEmpty(): void }
+
+export function EditAction({ cta, tier, privateOnly, onGenerate, onEmpty }: Props) {
   const t = useTranslations('app')
   return (
     <div className="relative border-t border-hairline bg-popover pt-4 pb-[calc(var(--sab)+16px)] before:pointer-events-none before:absolute before:inset-x-0 before:-top-5 before:h-5 before:bg-gradient-to-t before:from-popover md:pb-0">
-      <ActionNotice>{notice(cta, tier, t)}</ActionNotice>
+      <ActionNotice>{notice(cta, tier, privateOnly, t)}</ActionNotice>
       {cta.kind === 'get-credits' ? (
         <PaywallButton trigger="insufficient_credits" options={{ moment: 'credits', needed: cta.needed }} className={buttonVariants({ variant: 'cta-neutral', size: 'cta' })}>
           <span>{t.rich('workspace.getCreditsCta', { ...rich, count: cta.needed })}</span>
@@ -41,8 +43,9 @@ export function EditAction({ cta, tier, onGenerate, onEmpty }: { cta: EditCta; t
   )
 }
 
-function notice(cta: EditCta, tier: string, t: ReturnType<typeof useTranslations<'app'>>): ReactNode {
+function notice(cta: EditCta, tier: string, privateOnly: boolean, t: ReturnType<typeof useTranslations<'app'>>): ReactNode {
   if (cta.kind === 'get-credits') return t.rich('workspace.needsCredits', { ...rich, tier, count: cta.cost })
   if (cta.kind === 'empty') return t.rich('edit.noticeEmpty', rich)
-  return cta.pool === 'free' ? t.rich('edit.noticeFree', rich) : t('edit.noticeReady')
+  if (cta.pool !== 'free') return t('edit.noticeReady')
+  return t.rich(privateOnly ? 'edit.noticeFreePrivate' : 'edit.noticeFree', rich)
 }
