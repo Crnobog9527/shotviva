@@ -58,6 +58,12 @@ describe('vercel-ignore-build.sh', () => {
     expect(decide({ VERCEL_GIT_PREVIOUS_SHA: prev })).toBe('skip')
   })
 
+  it('skips when only agent notes, lint or test config changed', () => {
+    const prev = git('rev-parse', 'HEAD')
+    commit({ 'AGENTS.md': 'x', 'eslint.config.mjs': 'x', 'vitest.config.mts': 'x', 'lighthouserc.json': '{}' })
+    expect(decide({ VERCEL_GIT_PREVIOUS_SHA: prev })).toBe('skip')
+  })
+
   it('skips a redeploy of the same commit', () => {
     expect(decide({ VERCEL_GIT_PREVIOUS_SHA: git('rev-parse', 'HEAD') })).toBe('skip')
   })
