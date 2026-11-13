@@ -1,13 +1,14 @@
 'use client'
 
-import { DndContext, DragOverlay, MouseSensor, TouchSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core'
-import { useId, useState, type ReactNode } from 'react'
+import { DndContext, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type CollisionDetection } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { useId, type ReactNode } from 'react'
 
 import { Button } from '@/core/ui/button'
+import { cn } from '@/core/ui/cn'
 import { treeCopy as copy } from './copy'
-import { DropTarget, type DropPosition } from './drop-target'
 import { TreeRow, type RowToggle } from './tree-row'
-import { treeOrder, validParents, type TreeItem, type TreeMove } from './tree'
+import { dropBefore, treeOrder, type TreeItem, type TreeMove } from './tree'
 import { useExpansion, type Expansion } from './use-expansion'
 
 // What a row's content may show beside the name: the direct children, and whether they are hidden.
@@ -30,8 +31,6 @@ type Branch<T extends TreeItem> = Omit<Props<T>, 'nodes' | 'storageKey' | 'maxLe
   ordered: readonly T[]
   branches: ReadonlyMap<string | null, readonly T[]>
   expansion: Expansion
-  active: T | undefined
-  targets: ReadonlySet<string>
   maxLevel: number
 }
 
@@ -44,31 +43,32 @@ export function CategoryTree<T extends TreeItem>({ nodes, storageKey, maxLevel =
   const branches = new Map<string | null, T[]>()
   for (const node of ordered) branches.set(node.parentId, [...(branches.get(node.parentId) ?? []), node])
   const expansion = useExpansion(storageKey, ordered)
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const active = ordered.find(node => node.key === activeId)
-  const targets = new Set(active && !rest.rootOnly?.(active) ? validParents(ordered, active, maxLevel).map(item => item.key) : [])
   const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } }))
-  const canDrop = (parent: string | null) => parent === null || targets.has(parent)
+  // Dragging reorders within one sibling list; moving to another parent stays with 「移动」.
+  const collisions: CollisionDetection = args => {
+    const parent = args.active.data.current?.parentId
+    return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter(container =>
+      container.data.current?.parentId === parent) })
+  }
   // Landing inside a collapsed branch opens it, so the moved row stays in view.
   const move = (input: TreeMove) => {
     if (input.parentId) expansion.reveal(input.parentId)
     onMove(input)
   }
-  const branch = { ...rest, treeId, ordered, branches, expansion, active, targets, maxLevel, disabled, onMove: move }
+  const branch = { ...rest, treeId, ordered, branches, expansion, maxLevel, disabled, onMove: move }
   return (
-    <DndContext id={treeId} sensors={sensors} collisionDetection={pointerWithin}
-      onDragStart={event => setActiveId(String(event.active.id))}
-      onDragCancel={() => setActiveId(null)}
-      onDragEnd={({ over }) => {
-        setActiveId(null)
-        const position = over?.data.current as DropPosition | undefined
-        if (active && position && canDrop(position.parentId)) move({ key: active.key, fromParent: active.parentId, ...position })
+    <DndContext id={treeId} sensors={sensors} collisionDetection={collisions}
+      onDragEnd={({ active, over }) => {
+        const node = ordered.find(item => item.key === active.id)
+        if (!node || !over) return
+        const siblings = (branches.get(node.parentId) ?? []).map(item => item.key)
+        const after = siblings.indexOf(String(over.id)) > siblings.indexOf(node.key)
+        const beforeKey = dropBefore(siblings, node.key, String(over.id), after)
+        if (beforeKey !== undefined) move({ key: node.key, fromParent: node.parentId, parentId: node.parentId, beforeKey })
       }}>
       <ExpandControls expansion={expansion} />
       <TreeBranch parent={null} {...branch} />
-      {active && <DropTarget label={copy.append} position={{ parentId: null, beforeKey: null }} />}
-      <DragOverlay dropAnimation={null}>{active && <div className="inline-flex rounded border bg-card px-3 py-2 text-sm shadow">{rest.labelOf(active)}</div>}</DragOverlay>
     </DndContext>
   )
 }
@@ -84,9 +84,13 @@ function ExpandControls({ expansion: { expanded, parents, setAll } }: { expansio
 }
 
 function TreeBranch<T extends TreeItem>({ parent, listId, ...branch }: Branch<T> & { parent: string | null; listId?: string }) {
+  const siblings = branch.branches.get(parent) ?? []
   return (
     <ol id={listId} className={parent === null ? 'divide-y rounded-md border px-2' : 'ms-5 divide-y border-t'}>
-      {(branch.branches.get(parent) ?? []).map(node => <TreeNode key={node.key} node={node} {...branch} />)}
+      {/* Siblings slide aside while one is dragged, so the gap shows where it lands. */}
+      <SortableContext items={siblings.map(node => node.key)} strategy={verticalListSortingStrategy}>
+        {siblings.map(node => <TreeNode key={node.key} node={node} {...branch} />)}
+      </SortableContext>
     </ol>
   )
 }
@@ -101,29 +105,23 @@ function toggleFor(key: string, label: string, childCount: number, listId: strin
   }
 }
 
-// Which drop targets this row offers while something is being dragged.
-function dropsFor(node: TreeItem, active: TreeItem | undefined, targets: ReadonlySet<string>) {
-  if (!active) return { before: false, inside: false }
-  return {
-    before: active.key !== node.key && (node.parentId === null || targets.has(node.parentId)),
-    inside: targets.has(node.key),
-  }
-}
-
 function TreeNode<T extends TreeItem>({ node, ...branch }: Branch<T> & { node: T }) {
-  const { treeId, ordered, branches, expansion, active, targets, labelOf, renderRow, onMove, maxLevel, disabled, rootOnly } = branch
+  const { treeId, ordered, branches, expansion, labelOf, renderRow, onMove, maxLevel, disabled, rootOnly } = branch
   const childCount = branches.get(node.key)?.length ?? 0
   const listId = `${treeId}-${node.key}`
   const label = labelOf(node)
   const toggle = toggleFor(node.key, label, childCount, listId, expansion)
-  const drops = dropsFor(node, active, targets)
+  // The whole item moves, sub-categories included; only the row's grip (or a long press) starts it.
+  const { setNodeRef, setActivatorNodeRef, listeners, isDragging, transform, transition } =
+    useSortable({ id: node.key, disabled, data: { parentId: node.parentId } })
+  const y = transform ? Math.round(transform.y) : 0
   return (
-    <li>
-      {drops.before && <DropTarget label={copy.before} position={{ parentId: node.parentId, beforeKey: node.key }} />}
+    <li ref={setNodeRef} style={{ transform: y ? `translate3d(0, ${y}px, 0)` : undefined, transition }}
+      className={cn('motion-reduce:transition-none', isDragging && 'relative z-20 rounded-md bg-card shadow-lg ring-1 ring-primary/50')}>
       <TreeRow node={node} items={ordered} label={label} toggle={toggle} onMove={onMove}
+        drag={{ setActivatorNodeRef, listeners, isDragging }}
         content={renderRow(node, { childCount, collapsed: toggle !== null && !toggle.open })}
         options={{ maxLevel, labelOf, rootOnly: Boolean(rootOnly?.(node)), disabled: Boolean(disabled) }} />
-      {drops.inside && <DropTarget label={copy.inside} position={{ parentId: node.key, beforeKey: null }} />}
       {toggle?.open && <TreeBranch parent={node.key} listId={listId} {...branch} />}
     </li>
   )

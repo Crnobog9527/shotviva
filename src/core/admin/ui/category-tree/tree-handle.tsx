@@ -1,22 +1,26 @@
 'use client'
 
-import { useDraggable } from '@dnd-kit/core'
+import type { useSortable } from '@dnd-kit/sortable'
 import { useId, useState, type KeyboardEvent, type ReactNode, type TouchEventHandler } from 'react'
 
 import { DragHandle, keyboardSort, sortableCopy, sortableRowClass, type Lifted } from '../sortable'
 import type { TreeItem } from './tree'
 
 type Props = {
-  node: TreeItem; label: string; siblings: readonly TreeItem[]
+  node: TreeItem; label: string; siblings: readonly TreeItem[]; drag: RowDrag
   disabled: boolean; onReorder: (beforeKey: string | null) => void; leading: ReactNode; children: ReactNode
 }
 
-// Keyboard moves stay within a sibling list. Pointer input uses the tree's explicit drop targets.
-export function TreeHandleRow({ node, label, siblings, disabled, onReorder, leading, children }: Props) {
+// The tree item's sortable state; the item (row plus sub-categories) is what moves, this row holds the grip.
+export type RowDrag = Pick<ReturnType<typeof useSortable>, 'setActivatorNodeRef' | 'listeners' | 'isDragging'>
+
+// Pointer drags reorder within the sibling list (the tree slides siblings aside); keyboard moves
+// (space, arrows) stay within it too.
+export function TreeHandleRow({ node, label, siblings, drag, disabled, onReorder, leading, children }: Props) {
   const instructionsId = useId()
   const [lifted, setLifted] = useState<Lifted | null>(null)
   const [notice, setNotice] = useState('')
-  const { setNodeRef, setActivatorNodeRef, listeners, isDragging } = useDraggable({ id: node.key, disabled })
+  const { setActivatorNodeRef, listeners, isDragging } = drag
   const { onTouchStart, ...handleListeners } = listeners ?? {}
   function onKeyDown(event: KeyboardEvent) {
     if (disabled) return
@@ -28,7 +32,7 @@ export function TreeHandleRow({ node, label, siblings, disabled, onReorder, lead
     if (step.commit) onReorder(step.commit[step.commit.indexOf(node.key) + 1] ?? null)
   }
   const pressed = Boolean(lifted) || isDragging
-  return <div ref={setNodeRef} onTouchStart={onTouchStart as TouchEventHandler} data-lifted={pressed || undefined}
+  return <div onTouchStart={onTouchStart as TouchEventHandler} data-lifted={pressed || undefined}
     className={`flex flex-wrap items-center gap-1.5 py-2 ${sortableRowClass}`}>
     {leading}
     <DragHandle handle={{ ...handleListeners, ref: setActivatorNodeRef, onKeyDown, onBlur: () => setLifted(null),
