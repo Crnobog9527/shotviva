@@ -22,13 +22,25 @@ export type SeriesListActions = {
 }
 type Props = { items: SeriesListItem[]; saved: boolean; production: boolean; actions: SeriesListActions }
 
+// Saving in the dialog lands on ?saved=1 with the list still mounted, so the note follows the prop,
+// not just its first value.
+function useSavedMessage(saved: boolean) {
+  const [message, setMessage] = useState(saved ? copy.saved : '')
+  const [savedSeen, setSavedSeen] = useState(saved)
+  if (saved !== savedSeen) {
+    setSavedSeen(saved)
+    if (saved) setMessage(copy.saved)
+  }
+  return [message, setMessage] as const
+}
+
 // 系列管理 (Owner 2026-11-12): drag the whole list into order (saved in one call), check series for
 // a batch flag change, open a series in a dialog from its name.
 export function SeriesCatalogue({ items, saved, production, actions }: Props) {
   const router = useRouter()
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [message, setMessage] = useState(saved ? copy.saved : '')
+  const [message, setMessage] = useSavedMessage(saved)
   const [pending, run] = useTransition()
   const byId = useMemo(() => new Map(items.map(item => [item.id, item])), [items])
   const ids = items.map(item => item.id)
