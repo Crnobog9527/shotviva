@@ -13,6 +13,7 @@ import type { ActionValue } from '../templates'
 import { SortableList } from '../ui/sortable'
 import { BatchBar, type BatchChoice } from './batch-bar'
 import { seriesCopy as copy } from './copy'
+import { OrderHelp } from './order-help'
 import { selectionNames, type SeriesListItem } from './list-rules'
 import { SERIES_PATH, SeriesRow } from './series-row'
 
@@ -80,6 +81,7 @@ export function SeriesCatalogue({ items, saved, production, actions }: Props) {
         <Button asChild><Link href={SERIES_PATH + '?new=1'} scroll={false}>{copy.create}</Link></Button>
       </header>
       {production && <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">{copy.productionNote}</p>}
+      <OrderHelp />
       {message && <p role="status" className="text-sm">{message}</p>}
       <Input type="search" className="max-w-md" aria-label={copy.seriesSearch} placeholder={copy.seriesSearch} maxLength={160}
         value={filter} onChange={event => setFilter(event.target.value)} />
