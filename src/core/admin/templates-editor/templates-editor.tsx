@@ -12,7 +12,6 @@ import type { CategoryOption } from './category-field'
 import { orderCopy } from './copy'
 import { FeaturedPanel } from './featured-panel'
 import { FEATURED_LIMIT } from './featured-state'
-import { matchesSearch } from './form-state'
 import { selectedInOrder, toggleId, toggleVisible } from './selection-state'
 import { TemplateFormDialog, type EditTarget } from './template-form-dialog'
 import type { SeriesOption } from './catalog-groups'
@@ -62,7 +61,6 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const { pending, error, notice, run, clearError } = useTemplateActions()
   const duplicate = useDuplicateTemplate(actions.duplicate, run, receipt => setEditing({ mode: 'saved', ...receipt }))
-  const visible = templates.filter((template) => matchesSearch(template, query))
   const target = currentTarget(editing, templates)
 
   const openEditor = (target: EditTarget) => {
@@ -81,7 +79,7 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
 
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4">
-      <Toolbar query={query} onQuery={setQuery} onNew={() => openEditor({ mode: 'new' })} />
+      <Toolbar onNew={() => openEditor({ mode: 'new' })} />
       {floor.version === 'v2' && <details className="text-muted-foreground text-sm">
         <summary className="cursor-pointer">尚未上架的规划价格</summary>
         <p>精细文字海报（high）：1K 120、2K 240、4K 360 积分。目前没有绑定此价目的模板。</p>
@@ -102,9 +100,9 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
         categories={categories}
         onClear={() => setSelected(new Set())}
       />
-      <CatalogView query={query} series={series} categories={categories}
+      <CatalogView query={query} onQuery={setQuery} series={series} categories={categories}
         floor={floor}
-        templates={visible}
+        templates={templates}
         selection={{
           selected,
           onSelect: (id, on) => setSelected((current) => toggleId(current, id, on)),
