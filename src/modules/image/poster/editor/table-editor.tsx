@@ -37,7 +37,7 @@ export function TableEditor({ content, onChange, flagged }: BlockProps) {
       <InsertPoint open={insertAfter === -1} onOpen={() => setInsertAfter(-1)} onInsert={(kind) => insert(-1, kind)} />
       {table.rows.map((row, r) => (
         <div key={r} className="grid gap-1">
-          <RowEditor row={row} index={r} columns={table.columns.length} {...{ content, onChange, flagged }} />
+          <RowEditor row={row} index={r} columns={table.columns} {...{ content, onChange, flagged }} />
           <InsertPoint open={insertAfter === r} onOpen={() => setInsertAfter(r)} onInsert={(kind) => insert(r, kind)} />
         </div>
       ))}
@@ -47,7 +47,7 @@ export function TableEditor({ content, onChange, flagged }: BlockProps) {
   )
 }
 
-function RowEditor({ row, index, columns, content, onChange, flagged }: BlockProps & { row: TableRow; index: number; columns: number }) {
+function RowEditor({ row, index, columns, content, onChange, flagged }: BlockProps & { row: TableRow; index: number; columns: readonly string[] }) {
   const t = useTranslations('app.poster')
   const remove = <Button variant="ghost" size="sm" aria-label={t('remove')} onClick={() => onChange(removeRow(content, index), `table.rows.${index}`)}>✕</Button>
   if (!Array.isArray(row)) {
@@ -60,9 +60,9 @@ function RowEditor({ row, index, columns, content, onChange, flagged }: BlockPro
     )
   }
   return (
-    <div className="grid items-center gap-1" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr)) auto` }}>
+    <div className="grid items-center gap-1" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr)) auto` }}>
       {row.map((cell, c) => (
-        <PosterField key={c} compact inputMode="numeric" label={`${t('table.row')} ${index + 1} · ${c + 1}`} value={cell}
+        <PosterField key={c} compact inputMode="numeric" label={columns[c] || `${t('table.column')} ${c + 1}`} value={cell}
           flagged={flagged(`table.rows.${index}.${c}`)} onChange={(value) => onChange(setCell(content, index, c, value), `table.rows.${index}.${c}`)} />
       ))}
       {remove}

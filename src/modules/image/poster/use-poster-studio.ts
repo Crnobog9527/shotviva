@@ -25,28 +25,48 @@ type Draft = { step: 'paste' | 'edit'; source: string; content: PosterContent; u
 
 const storageKey = (id: string) => `poster-draft:${id}`
 
-function loadDraft(template: StudioTemplate): Draft {
-  const fresh: Draft = { step: 'paste', source: '', content: emptyContent(template.poster), unverified: [], reviewed: false, sorted: false }
+const freshDraft = (template: StudioTemplate): Draft =>
+  ({ step: 'paste', source: '', content: emptyContent(template.poster), unverified: [], reviewed: false, sorted: false })
+
+function storedDraft(template: StudioTemplate): Draft | null {
   try {
     const raw = sessionStorage.getItem(storageKey(template.id))
-    return raw ? { ...fresh, ...(JSON.parse(raw) as Partial<Draft>) } : fresh
+    return raw ? { ...freshDraft(template), ...(JSON.parse(raw) as Partial<Draft>) } : null
   } catch {
-    return fresh
+    return null
   }
+}
+
+// The stored draft is read after the first render, so the server's HTML and the browser's first
+// render agree. Saving waits until that read has been applied (ready), so a fresh draft never
+// overwrites the stored one, even when development mode runs effects twice.
+function useStoredDraft(template: StudioTemplate) {
+  const [draft, setDraft] = useState<Draft>(() => freshDraft(template))
+  const [ready, setReady] = useState(false)
+  const id = template.id
+  useEffect(() => {
+    const stored = storedDraft(template)
+    /* eslint-disable react-hooks/set-state-in-effect -- sessionStorage exists only after mount */
+    if (stored) setDraft(stored)
+    setReady(true)
+    /* eslint-enable react-hooks/set-state-in-effect */
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read once per template
+  }, [id])
+  useEffect(() => {
+    if (!ready) return
+    try { sessionStorage.setItem(storageKey(id), JSON.stringify(draft)) } catch { /* private mode: no draft */ }
+  }, [draft, ready, id])
+  return [draft, setDraft] as const
 }
 
 export type StudioNotice = 'sortFailed' | 'rateLimited' | 'invalid' | 'notEnough' | 'error' | null
 
 export function usePosterStudio(template: StudioTemplate, concurrency: number, onStarted: () => void) {
-  const [draft, setDraft] = useState<Draft>(() => loadDraft(template))
+  const [draft, setDraft] = useStoredDraft(template)
   const [aspect, setAspect] = useState<OutputAspect>(template.aspects[0] ?? '9:16')
   const [resolution, setResolution] = useState<Resolution>(template.resolutions[0] ?? '2k')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<StudioNotice>(null)
-
-  useEffect(() => {
-    try { sessionStorage.setItem(storageKey(template.id), JSON.stringify(draft)) } catch { /* private mode: no draft */ }
-  }, [draft, template.id])
 
   const parsed = useMemo(() => posterContentSchema.safeParse(tidyContent(draft.content)), [draft.content])
   const parts: PosterPart[] = useMemo(() => (parsed.success ? splitPoster(parsed.data, template.poster) : []), [parsed, template.poster])

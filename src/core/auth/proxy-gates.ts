@@ -18,7 +18,7 @@ const ADMIN = /^\/admin(\/|$)/
 // (DESIGN §8.1).
 // /connect/graylum is gated as a page only: its form POST (…/authorize) handles a lost
 // session itself, since a 307 here would replay the POST against the login page.
-const SIGNED_IN = /^\/(account|checkout|generate|photos|wishlist|reset\/update)(\/|$)|^\/connect\/graylum\/?$/
+const SIGNED_IN = /^\/(account|checkout|generate|photos|posters|wishlist|reset\/update)(\/|$)|^\/connect\/graylum\/?$/
 // Development-only harnesses (the T4 upload test): a real 404 everywhere else, in any language.
 const DEV_ONLY = /^\/generate\/upload-test\/?$/
 // Route handlers and files outside the locale tree: session refresh only, no locale routing.

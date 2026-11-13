@@ -18,7 +18,8 @@ async function Posters() {
   return (
     <>
       <FlowNav back={{ href: '/generate', label: t('back') }} title={t('title')} />
-      <ul className="grid gap-3">
+      <h1 className="px-(--gutter) pt-2 pb-4 text-title font-semibold">{t('title')}</h1>
+      <ul className="grid gap-3 px-(--gutter)">
         {templates.map((template) => (
           <li key={template.id}>
             <Link href={`/posters/${template.id}`} className="grid min-h-16 gap-1 rounded-card bg-card p-4 hairline">
@@ -28,7 +29,7 @@ async function Posters() {
           </li>
         ))}
       </ul>
-      {templates.length === 0 ? <p className="text-caption text-muted-foreground">{t('noStyles')}</p> : null}
+      {templates.length === 0 ? <p className="px-(--gutter) text-caption text-muted-foreground">{t('noStyles')}</p> : null}
     </>
   )
 }

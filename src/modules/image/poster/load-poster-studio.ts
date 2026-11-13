@@ -7,6 +7,7 @@ import { featureAllowed } from '@/core/features'
 import { POSTER_FEATURE } from '@/core/poster/sets'
 import { listTemplatesIn, type LocalizedTemplate } from '@/core/templates'
 import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
+import type { OutputAspect } from '@/core/templates/output-options'
 
 import type { StudioTemplate } from './use-poster-studio'
 
@@ -24,10 +25,9 @@ export function toStudioTemplate(template: LocalizedTemplate): StudioTemplate | 
   const poster = template.fields.poster
   if (!poster) return null
   const options = template.imageOptions ?? FULL_IMAGE_OPTIONS
-  return {
-    id: template.id, name: template.name, poster,
-    aspects: options.aspectRatios, resolutions: options.resolutions, creditsCost: template.creditsCost,
-  }
+  // Only the sizes the template lists (tall posters first), and only those its model can make.
+  const aspects = template.fields.aspectRatios.filter((ratio): ratio is OutputAspect => (options.aspectRatios as string[]).includes(ratio))
+  return { id: template.id, name: template.name, poster, aspects, resolutions: options.resolutions, creditsCost: template.creditsCost }
 }
 
 export async function loadStudioTemplate(db: SupabaseClient, locale: Locale, id: string): Promise<StudioTemplate | null> {

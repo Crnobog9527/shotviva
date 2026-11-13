@@ -25,7 +25,8 @@ async function Studio({ params }: RouteProps) {
   if (!template) notFound()
   return (
     <>
-      <FlowNav back={{ href: '/posters', label: t('back') }} title={template.name} aside={<BalanceChip balance={balance} />} />
+      <FlowNav back={{ href: '/posters', label: t('back') }} title={t('title')} aside={<BalanceChip balance={balance} />} />
+      <h1 className="px-(--gutter) pt-2 text-caption text-muted-foreground">{template.name}</h1>
       <PosterStudio template={template} balance={balance} concurrency={limitsFor(tier).concurrency} />
     </>
   )
