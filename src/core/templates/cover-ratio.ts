@@ -4,7 +4,7 @@ import { cacheLife } from 'next/cache'
 
 import { logger } from '../logger'
 import { isCoverUrl } from '../ui/cover-image'
-import { registerFirstFrame } from '../ui/first-frame-store'
+import { firstFrameOf, registerFirstFrame } from '../ui/first-frame-store'
 import { CATALOGUE_LIFE } from './cached-catalogue'
 
 // The home generator's preview reads the opening template's covers on the server (Owner
@@ -87,4 +87,13 @@ export async function openingCovers(template: Covers | undefined) {
   // there is one, so its bytes are in the HTML once (the <img>) and not again in the page data.
   const framed = url ? registerFirstFrame(url, after.firstFrame) : false
   return { templateId: template.id, after: url && after.ratio ? { url, ratio: after.ratio, firstFrame: framed } : null, beforeRatio: before.ratio }
+}
+
+// The streamed half of a page (the generator once the visitor is known) can be written by another
+// server process than the one that prerendered the shell, and that process has not seen the
+// frame. Called there before the generator renders again, so the picture that replaces the
+// shell's keeps its first frame; the read is the cached one above.
+export async function restoreOpeningFrame(url: string | null): Promise<void> {
+  if (!url || firstFrameOf(url)) return
+  registerFirstFrame(url, (await coverPreview(url, true)).firstFrame)
 }

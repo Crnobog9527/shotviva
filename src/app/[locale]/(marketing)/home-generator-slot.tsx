@@ -11,6 +11,7 @@ import { paymentChannel } from '@/core/billing/waffo'
 import { listFavoriteIdsOrEmpty } from '@/core/favorites'
 import { listRunningJobIds } from '@/core/jobs'
 import { logger } from '@/core/logger'
+import { restoreOpeningFrame } from '@/core/templates/cover-ratio'
 import { HomeGenerator, type HomeGeneratorProps, type HomeViewer } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
 
@@ -50,7 +51,8 @@ async function safeViewer(): Promise<HomeViewer | null> {
 }
 
 async function WithViewer(props: Base) {
-  const viewer = await safeViewer()
+  const opening = props.initialCovers?.after
+  const [viewer] = await Promise.all([safeViewer(), restoreOpeningFrame(opening?.firstFrame ? opening.url : null)])
   if (!viewer) return <HomeGenerator {...props} viewer={null} googleAction={googleAction} />
   const [perkFacts, products] = await Promise.all([paywallPerkFacts(), displayProducts()])
   // "Get credits · N needed" opens the same paywall as the workspace (DESIGN §6.9 item 9).
