@@ -37,7 +37,7 @@ export default async function SignupPage() {
   }
   return (
     <SignupCodeProvider>
-      <Suspense fallback={<SignupForm {...form} next={nextIn(null, locale)} initialTab="phone" />}>
+      <Suspense fallback={<SignupForm {...form} google={{ ...form.google, mainlandNote: form.google.mainlandNote || 'zone' }} next={nextIn(null, locale)} initialTab="phone" />}>
         <SignupScreen {...form} locale={locale} connectPath={CONNECT_PAGE_PATH} />
       </Suspense>
     </SignupCodeProvider>
