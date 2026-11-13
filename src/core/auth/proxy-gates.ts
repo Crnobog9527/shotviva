@@ -6,6 +6,7 @@ import { DEFAULT_LOCALE, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, type Locale } fro
 import { localizePath, matchesPaths, splitLocale } from '../i18n/paths'
 import { publicEnv } from '../public-env'
 import { cookieToken } from './cookie-token'
+import { GUEST_PAGE, guestRedirect } from './guest-gate'
 import { IDENTITY_HEADER, sealIdentity } from './forwarded-identity'
 import { SIGNED_OUT, verifyIdentity, type Identity } from './identity'
 import { loginPath } from './redirect-target'
@@ -140,7 +141,7 @@ export async function proxyGate(request: NextRequest, options: ProxyGateOptions)
   if (moved) return moved
   const { locale, path } = splitLocale(pathname)
   const gate = gateFor(path)
-  if (!gate) return updateSession(request, options.forward)
+  if (!gate) return ungatedAnswer(request, path, locale, options)
   const configured = Boolean(publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY)
   const { identity, response } = hasSessionCookie(request) && configured
     ? await checkedRequest(request, options.identitySecret)
@@ -148,6 +149,21 @@ export async function proxyGate(request: NextRequest, options: ProxyGateOptions)
   const verdict = decideIdentity(gate, identity, pathname, search, locale)
   const user = identity.status === 'signed_in' ? identity.user : null
   return withCookies(gatedAnswer(request, verdict, chosen ? null : user, options), response())
+}
+
+// A page without a gate: the session refresh, except /login and /signup with a session cookie.
+function ungatedAnswer(request: NextRequest, path: string, locale: Locale, options: ProxyGateOptions) {
+  const configured = Boolean(publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  if (GUEST_PAGE.test(path) && configured && hasSessionCookie(request)) return guestAnswer(request, path, locale, options)
+  return updateSession(request, options.forward)
+}
+
+// /login or /signup with a session cookie (guest-gate.ts): a signed-in, verified visitor goes on
+// to their `next`; anyone else gets the static page, with the refreshed cookies.
+async function guestAnswer(request: NextRequest, path: string, locale: Locale, options: ProxyGateOptions) {
+  const { identity, response } = await currentProxyUser(request)
+  const target = guestRedirect(identity, path, request.nextUrl.searchParams, locale)
+  return withCookies(target ? NextResponse.redirect(new URL(target, request.url)) : options.forward(request), response())
 }
 
 // The proxy's check, and on success the sealed answer on the request it forwards. The token is
