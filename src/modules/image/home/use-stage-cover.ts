@@ -1,6 +1,8 @@
 'use client'
 
 import { getImageProps } from 'next/image'
+
+import { coverLoaderFor } from '@/core/ui/cover-image'
 import { useEffect, useState } from 'react'
 
 import { naturalSize } from '../workspace/photo-ratio'
@@ -16,7 +18,7 @@ export type StageCover = { url: string; ratio: number; firstFrame?: string | nul
 const STAGE_WIDTH = 320
 // Width and height also go on the <img> (SEO patch v5 item 4); .mk-stage-pic sizes it either way.
 export function stageImage(url: string): { src: string; srcSet: string | undefined; width: number; height: number } {
-  const { props } = getImageProps({ src: url, alt: '', width: STAGE_WIDTH, height: STAGE_WIDTH })
+  const { props } = getImageProps({ src: url, alt: '', width: STAGE_WIDTH, height: STAGE_WIDTH , loader: coverLoaderFor(url) })
   return { src: props.src, srcSet: props.srcSet, width: STAGE_WIDTH, height: STAGE_WIDTH }
 }
 

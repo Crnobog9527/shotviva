@@ -1,6 +1,6 @@
 'use client'
 
-import Image from 'next/image'
+import { SiteImage as Image } from '@/core/ui/site-image'
 import { useTranslations } from 'next-intl'
 import { useState, type CSSProperties } from 'react'
 
