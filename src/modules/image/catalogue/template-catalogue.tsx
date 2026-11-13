@@ -20,6 +20,7 @@ import { CatalogueSections } from './catalogue-sections-view'
 import { batchableTemplates, isMotion, posterHref, type CatalogueTemplate } from './catalogue-template'
 import { findSeries, type CatalogueView, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
+import { SavedEmpty } from './saved-empty'
 import { SearchBox } from './search-box'
 import { FeatureCard } from './feature-card'
 import { SeriesCard } from './series-card'
@@ -96,10 +97,10 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
         <div className="mb-2 px-(--gutter)">
           <SearchBox value={search.query} onChange={search.setQuery} label={t('search')} clear={t('searchClear')} className="md:max-w-[420px]" />
         </div>
-        <CategoryChips hidden={search.results !== null} filters={view.filters} saved={saved.length > 0} value={active} onChange={query.select} labels={chipLabels(t)} />
+        <CategoryChips hidden={search.results !== null} filters={view.filters} saved={showSaved(saved.length, active.saved)} value={active} onChange={query.select} labels={chipLabels(t)} />
       </div>
       <h2 className="sr-only">{t('templates')}</h2>
-      <CatalogueBody search={search} sections={sectionsFor(active, sections)} shown={shown} endCard={endCard} onOpen={open} onOpenSeries={query.openSeries} onSeeAll={seeAll} />
+      <CatalogueBody search={search} sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={query.openSeries} onSeeAll={seeAll} />
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
@@ -139,12 +140,20 @@ type BodyProps = Omit<GridProps, 'entries' | 'className'> & {
   search: ReturnType<typeof useCatalogueSearch>
   sections: CatalogueSection[] | null
   shown: readonly GridEntry[]
+  // Saved is chosen: when it holds nothing, its empty state with the way back to All.
+  saved: boolean
+  onBrowse(): void
   onSeeAll(section: CatalogueSection): void
 }
 
-// A search replaces the sections and the chosen category's grid with its matches.
-function CatalogueBody({ search, sections, shown, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
+// The Saved chip shows while something is saved, and stays while Saved is chosen (我的收藏).
+const showSaved = (count: number, chosen: boolean) => count > 0 || chosen
+
+// A search replaces the sections and the chosen category's grid with its matches; Saved with
+// nothing saved shows its empty state.
+function CatalogueBody({ search, sections, shown, saved, onBrowse, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
   if (search.results) return <SearchResults query={search.query.trim()} results={search.results} endCard={endCard} onOpen={onOpen} />
+  if (saved && shown.length === 0) return <SavedEmpty onBrowse={onBrowse} />
   if (!sections) return <CatalogueGrid entries={shown} endCard={endCard} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
   return (
     <>

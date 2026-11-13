@@ -70,8 +70,8 @@ describe('catalogue filter (ARCHITECTURE §5, §5.1b)', () => {
     expect(shown.map((entry) => entry.type === 'template' && entry.template.id)).toEqual(['m2', 'a'])
   })
 
-  it('falls back to All once the last saved template is removed', () => {
-    expect(filterCatalogue(entries, [], { saved: true, path: [] })).toEqual({ active: ALL, shown: entries })
+  it('stays on Saved with nothing in it once the last saved template is removed', () => {
+    expect(filterCatalogue(entries, [], { saved: true, path: [] })).toEqual({ active: { saved: true, path: [] }, shown: [] })
   })
 
   it('can open every grid template and every series member, once each', () => {

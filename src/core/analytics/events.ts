@@ -53,6 +53,11 @@ export const APP_UPDATE_REASONS = ['version', 'error'] as const
 // T108 (ARCHITECTURE §16.2): where 「一键复用」 was clicked, and why a work was reported.
 export const GALLERY_REUSE_SURFACES = ['work', 'gallery'] as const
 export const WORK_REPORT_REASONS = ['sexual', 'violence', 'hate', 'minor', 'privacy', 'ip', 'spam', 'other'] as const
+// Template share links (Owner 2026-11-13): how a link left, and the share's own random id.
+export const TEMPLATE_SHARE_METHODS = ['copy', 'native'] as const
+export const shareIdSchema = z.string().regex(/^[a-z0-9]{8}$/)
+// The referring site's host only (no path, no www.), never a full address.
+const referrerHost = z.string().regex(/^(?!www\.)[a-z0-9.-]+$/).max(100)
 export const UPLOAD_ERROR_REASONS = ['too_large', 'unsupported', 'ticket_failed', 'transfer_failed', 'unknown'] as const
 
 const campaignCode = z.string().regex(/^[A-Z0-9]{4,20}$/)
@@ -67,7 +72,11 @@ const checkoutProps = {
 }
 
 export const eventSchemas = {
-  signup: z.strictObject({ method: z.enum(['email', 'google', 'phone']), code_kind: z.enum(['invite', 'campaign']).nullable().optional() }),
+  signup: z.strictObject({
+    method: z.enum(['email', 'google', 'phone']), code_kind: z.enum(['invite', 'campaign']).nullable().optional(),
+    // The template share link this browser opened before signing up (sv_share cookie), if any.
+    share_template_id: slug.optional(), share_id: shareIdSchema.nullable().optional(),
+  }),
   code_redeem: z.strictObject({
     kind: z.enum(['invite', 'campaign']).nullable(), code: campaignCode.optional(),
     context: z.enum(['signup', 'account', 'paywall']), status: slug, credits: z.number().int().nonnegative(),
@@ -127,6 +136,11 @@ export const eventSchemas = {
     action: z.enum(['add', 'remove']),
     surface: z.enum(TEMPLATE_FAVORITE_SURFACES),
   }),
+  // Template share links (Owner 2026-11-13): the funnel from a shared link to a first photo.
+  template_share: z.strictObject({ template_id: slug, category: slug, method: z.enum(TEMPLATE_SHARE_METHODS), share_id: shareIdSchema }),
+  template_share_open: z.strictObject({ template_id: slug, share_id: shareIdSchema.nullable(), signed_in: z.boolean(), referrer_host: referrerHost.nullable() }),
+  template_share_signup_start: z.strictObject({ template_id: slug, share_id: shareIdSchema.nullable() }),
+  template_share_generate: z.strictObject({ template_id: slug, share_id: shareIdSchema.nullable() }),
   // T89: a toggle's confirm dialog shown, accepted or cancelled, or the toggle turned off.
   template_toggle: z.strictObject({
     template_id: slug,
@@ -170,6 +184,10 @@ export const BROWSER_EVENTS = [
   'gallery_view',
   'gallery_work_view',
   'gallery_reuse',
+  'template_share',
+  'template_share_open',
+  'template_share_signup_start',
+  'template_share_generate',
 ] as const
 export type ServerEventName = (typeof SERVER_EVENTS)[number]
 export type BrowserEventName = (typeof BROWSER_EVENTS)[number]

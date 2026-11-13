@@ -608,7 +608,13 @@
       "hintCompare": "Drag across the photo to compare.",
       "makeOne": "Make one",
       "animatedMeta": "{category} · animated",
-      "hintPair": "Phone photo on the left, the AI result on the right."
+      "hintPair": "Phone photo on the left, the AI result on the right.",
+      "viewerOpen": "View {name} full screen",
+      "viewerTitle": "{name}, full screen",
+      "viewerClose": "Close full screen",
+      "viewerSwitch": "Switch between the phone photo and the AI result",
+      "viewerHint": "Tap the image to zoom. Swipe to switch between Phone and AI.",
+      "viewerHintZoomed": "Drag to look around. Tap again to zoom out."
     },
     "tiers": {
       "1k": {
@@ -1463,7 +1469,17 @@
       "unavailable": "That template isn’t available right now, so it wasn’t saved.",
       "failed": "Couldn’t save that change. Check your connection and try again.",
       "close": "Close",
-      "pickerGroup": "Saved"
+      "pickerGroup": "Saved",
+      "emptyTitle": "No saved templates yet",
+      "emptyText": "Tap the heart on a template card or in its dialog to save it here.",
+      "emptyBrowse": "Browse templates",
+      "mine": "Saved templates"
+    },
+    "share": {
+      "button": "Share",
+      "copied": "Link copied",
+      "text": "A phone photo made into this with the {name} template on Shotviva:",
+      "copyByHand": "Copy this link to share it:"
     },
     "giftClaim": {
       "title": "Claim your signup credits",
@@ -2096,5 +2112,29 @@
       "failed": "The report did not go through. Please try again."
     },
     "footerLink": "Gallery"
+  },
+  "share": {
+    "metaTitle": "{name} · Shotviva template",
+    "metaDescription": "Turn a phone photo into a polished image with the {name} template on Shotviva.",
+    "ogAlt": "An AI result made with the {name} template",
+    "kicker": "Shotviva template · {category}",
+    "hint": "Left: the phone photo. Right: the AI result. Tap the image to zoom.",
+    "series": "Series · {name} · {count, plural, one {# template} other {# templates}}",
+    "make": "Make one with this template",
+    "browse": "Browse all templates",
+    "signUp": "Sign up free to use this template",
+    "signUpNote": "You come straight back to this template after signing up. Add a photo and go.",
+    "look": "Look at other templates first",
+    "missingTitle": "This template isn’t available",
+    "missingText": "It may have been taken down or changed. Have a look at the other templates.",
+    "missingBrowse": "See other templates"
+  },
+  "supportEmail": {
+    "subject": "You have a reply from Shotviva support",
+    "title": "Your ticket has a new reply",
+    "body": "We've replied to your support ticket. Open it to read the reply and continue the conversation.",
+    "button": "View the reply",
+    "fallback": "If the button doesn't work, copy and paste this link into your browser:",
+    "footer": "This is an automated email, please don't reply to it. Reply in your ticket on Shotviva instead."
   }
 }
