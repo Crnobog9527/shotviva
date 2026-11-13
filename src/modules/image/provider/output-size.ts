@@ -38,7 +38,7 @@ export const OUTPUT_SIZES: Record<Resolution, Record<string, string>> = {
   '4k': {
     '1:1': '2880x2880', '16:9': '3840x2160', '9:16': '2160x3840', '4:5': '2576x3216',
     '3:2': '3520x2352', '2:3': '2352x3520', '4:3': '3312x2480', '3:4': '2480x3312',
-    // Tall posters: the 3840 edge cap, not the pixel budget, limits Max here.
+    // Tall posters: the 3840 edge cap, not the pixel budget, limits 4K here.
     '1:2': '1920x3840', '1:3': '1280x3840',
   },
 }
