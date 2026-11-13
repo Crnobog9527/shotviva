@@ -5,7 +5,7 @@ import type { ReadyPhoto } from '../workspace/photo-batch'
 import { matrixCta } from './matrix-cta'
 import { matrixStartInputs } from './matrix-request'
 import {
-  cellKey, EMPTY_MATRIX, matrixBlock, matrixCells, matrixTotal, MATRIX_MAX_CELLS, onlyTemplate, pickTemplate, sharedOptions,
+  cellKey, EMPTY_MATRIX, matrixBlock, matrixCells, matrixTotal, MATRIX_MAX_CELLS, onlyTemplate, pickTemplate, sharedOptions, withTemplates,
   toggleCell, totalsByResolution, withoutTemplate, withTemplate, type MatrixValues,
 } from './matrix-state'
 
@@ -151,5 +151,12 @@ describe('the batch on each plan (Batch create, Owner 2026-11-12)', () => {
     expect(pro).toMatchObject({ templateIds: ['white'], copy: {}, toggles: {} })
     // Tapping the chosen one on Pro keeps it (the row's ✕ removes it).
     expect(pickTemplate(pro, 'white', 1)).toBe(pro)
+  })
+
+  it('opens on the asked templates, keeping a staying template\'s text, up to the plan', () => {
+    const v = { ...EMPTY_MATRIX, templateIds: ['poster', 'white'], copy: { poster: { headline: 'Sale' } } }
+    expect(withTemplates(v, ['poster'], 5)).toMatchObject({ templateIds: ['poster'], copy: { poster: { headline: 'Sale' } } })
+    expect(withTemplates(v, ['scene'], 5)).toMatchObject({ templateIds: ['scene'], copy: {} })
+    expect(withTemplates(EMPTY_MATRIX, ['a', 'b'], 1).templateIds).toEqual(['a'])
   })
 })

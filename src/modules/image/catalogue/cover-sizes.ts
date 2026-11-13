@@ -12,10 +12,10 @@ export const COVER_SIZES = {
   artCard: '(min-width: 1024px) 440px, (min-width: 768px) 60vw, 100vw',
   // Create's All sections (Owner 2026-11-12): a phone rail card is the row less 4rem (about 279 px
   // on a 375 phone, so a plate is about 38vw); from md the rail is the ordinary grid row. A section
-  // of drag compares is two columns on phones, three from md, four from lg (248 px each).
+  // of drag compares is two columns on phones and three from md (336 px each from lg).
   railPlate: '(min-width: 1024px) 182px, (min-width: 768px) 25vw, 38vw',
   railFrame: '(min-width: 1024px) 364px, (min-width: 768px) 50vw, 75vw',
-  artSection: '(min-width: 1024px) 248px, (min-width: 768px) 30vw, 44vw',
+  artSection: '(min-width: 1024px) 336px, (min-width: 768px) 30vw, 44vw',
   featurePlate: '(min-width: 1024px) 560px, 50vw',
   featureFrame: '(min-width: 1024px) 1120px, 100vw',
   dialogPlate: '(min-width: 768px) 215px, 50vw',

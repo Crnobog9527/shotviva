@@ -119,16 +119,21 @@ function OutputSections({ draft, balancePaid, firstRatio }: { draft: MatrixDraft
 // saying what this plan's batch holds (no caps: the locked page, which says what the plans hold).
 export function MatrixHead({ caps }: { caps: BatchCaps | null }) {
   const t = useTranslations('app.matrix')
-  const counts = batchCounts()
-  const lede = !caps ? t('ledeLocked', { pro: counts.pro, max: counts.max, templates: MATRIX_TEMPLATES })
-    : caps.templates > 1 ? t('lede', { templates: caps.templates, max: caps.cells })
-    : t('ledeOne', { max: caps.cells, more: counts.max, templates: MATRIX_TEMPLATES })
+  const lede = useBatchLede(caps)
   return (
     <div className="pt-2 pb-1 lg:pt-6">
       <h1 className="font-display text-title leading-none tracking-[-0.02em]">{t('title')}</h1>
       <p className="mt-1.5 text-caption text-pretty text-muted-foreground">{lede}</p>
     </div>
   )
+}
+
+// The one line under Batch create's title: what this plan's batch holds.
+export function useBatchLede(caps: BatchCaps | null): string {
+  const t = useTranslations('app.matrix')
+  const counts = batchCounts()
+  if (!caps) return t('ledeLocked', { pro: counts.pro, max: counts.max, templates: MATRIX_TEMPLATES })
+  return caps.templates > 1 ? t('lede', { templates: caps.templates, max: caps.cells }) : t('ledeOne', { max: caps.cells })
 }
 
 // Where a Pro member reaches for more than Pro holds: a second template, or photos past 10.
@@ -154,11 +159,12 @@ function MoreLocked({ tier, tab }: { tier: MembershipTier | null; tab: 'batch' |
 }
 
 // The grid beside the form from lg up (the stage column of the workspace).
-export function MatrixStage({ draft }: { draft: MatrixDraft }) {
+// `className` replaces the page's sticky column (the dialog gives it a scrolling column).
+export function MatrixStage({ draft, className = 'hidden lg:sticky lg:top-20 lg:block lg:max-w-[560px] lg:pt-6' }: { draft: MatrixDraft; className?: string }) {
   const t = useTranslations('app.matrix')
   const shown = draft.photos.photos.filter((photo) => photo.upload.phase !== 'error')
   return (
-    <aside aria-labelledby="grid-lg-h" className="hidden lg:sticky lg:top-20 lg:block lg:max-w-[560px] lg:pt-6">
+    <aside aria-labelledby="grid-lg-h" className={className}>
       <h2 id="grid-lg-h" className="mb-3 text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('gridTitle')}</h2>
       {draft.chosen.length > 0 && shown.length > 0 ? (
         <MatrixGrid templates={draft.chosen} photos={shown} cells={draft.cells} total={draft.total} count={draft.count} max={draft.caps.cells} onToggle={(key) => draft.change((v) => toggleCell(v, key))} />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { summarize, takeBatch, uploadsToStart, type BatchPhoto } from './photo-batch'
+import { previewsToRevoke, summarize, takeBatch, uploadsToStart, type BatchPhoto } from './photo-batch'
 import type { UploadState } from './use-upload'
 
 const photo = (id: string, upload: UploadState): BatchPhoto => ({ id, url: `blob:${id}`, bytes: 1, ratio: null, upload })
@@ -45,5 +45,14 @@ describe('summarize', () => {
 
   it('a batch whose every upload failed has no photo to generate', () => {
     expect(summarize([photo('a', { phase: 'error', code: 'UPLOAD_FAILED', message: '' })]).photo).toBe('none')
+  })
+})
+
+describe('previewsToRevoke (leaving /generate, Batch create review)', () => {
+  it('frees picked previews no job shows, never a kept R2 photo or a job\'s preview', () => {
+    const picked = (url: string) => ({ url, file: {} })
+    const kept = { url: 'https://cdn/x.jpg', file: null }
+    expect(previewsToRevoke([picked('blob:a'), picked('blob:b'), kept], new Set(['blob:b']))).toEqual(['blob:a'])
+    expect(previewsToRevoke([], new Set())).toEqual([])
   })
 })

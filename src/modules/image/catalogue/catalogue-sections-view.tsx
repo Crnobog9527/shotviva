@@ -22,9 +22,9 @@ type Props = {
 // Create's All (Owner 2026-11-12): a section per root category in 分类管理's order, its heading,
 // 首页说明 and 「查看全部 N」 (the same as tapping that category's chip). On phones each section is
 // a horizontal rail (CSS scroll-snap, no script) whose next card peeks in and which ends on a
-// 「查看全部」 card; from md up it is one row of the grid. Cards keep the catalogue's own order.
-// A section of drag compares (画风) is a two-column grid of four on phones instead: the compare
-// takes horizontal drags, so it cannot sit in a rail that scrolls sideways.
+// 「查看全部」 card; from md up it is the grid, at most six cards (SECTION_LIMIT). Cards keep the
+// catalogue's own order. A section of drag compares (画风) is a two-column grid of four on phones
+// instead: the compare takes horizontal drags, so it cannot sit in a rail that scrolls sideways.
 export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: Props) {
   const t = useTranslations('app.create')
   return (
@@ -48,9 +48,9 @@ export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: 
               </button>
             </Reveal>
             {section.compare ? (
-              <ul className="mt-2 grid grid-cols-2 gap-3 px-(--gutter) md:mt-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
-                {section.entries.slice(0, COMPARE_SHOWN).map((entry, index) => (
-                  <li key={entryKey(entry)} className={cn(index === COMPARE_SHOWN - 1 && 'md:hidden lg:block')}>
+              <ul className="mt-2 grid grid-cols-2 gap-3 px-(--gutter) md:mt-3 md:grid-cols-3 md:gap-4">
+                {section.entries.map((entry, index) => (
+                  <li key={entryKey(entry)} className={cn(index >= COMPARE_PHONE && 'hidden md:block')}>
                     <Card entry={entry} eager={sectionIndex === 0 && index < 2} sizes={COMPARE_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
                   </li>
                 ))}
@@ -64,7 +64,7 @@ export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: 
                 'md:mt-3 md:grid md:snap-none md:grid-cols-2 md:gap-4 md:overflow-visible md:pb-0 lg:grid-cols-3',
               )}>
                 {section.entries.map((entry, index) => (
-                  <li key={entryKey(entry)} className={cn('w-[calc(100%-4rem)] max-w-96 flex-none snap-start md:w-auto md:max-w-none', fromMd(index))}>
+                  <li key={entryKey(entry)} className="w-[calc(100%-4rem)] max-w-96 flex-none snap-start md:w-auto md:max-w-none">
                     <Card entry={entry} eager={sectionIndex === 0 && index < 2} sizes={RAIL_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
                   </li>
                 ))}
@@ -88,8 +88,8 @@ export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: 
 
 const entryKey = (entry: GridEntry) => (entry.type === 'series' ? `series-${entry.series.id}` : entry.template.id)
 
-// Drag compares shown: four on phones (two rows of two), three from md, four from lg.
-const COMPARE_SHOWN = 4
+// Drag compares shown on phones: four (two rows of two); from md every one the section holds.
+const COMPARE_PHONE = 4
 
 // Cover widths for the section cards' srcset: a rail card is about 279 px on a 375 phone (the
 // row less 4rem, half of it a plate) and a grid cell from md; a compare is a quarter-to-half column.
@@ -101,12 +101,4 @@ type CardProps = { entry: GridEntry; eager: boolean; sizes: CardSizes; onOpen(id
 function Card({ entry, eager, sizes, onOpen, onOpenSeries }: CardProps) {
   if (entry.type === 'series') return <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={eager} />
   return <TemplateCard template={entry.template} onOpen={onOpen} eager={eager} sizes={sizes} />
-}
-
-// From md up a rail becomes one row: two cards at md, three from lg; the rest stay in the
-// phone's rail only.
-function fromMd(index: number): string {
-  if (index >= 3) return 'md:hidden'
-  if (index >= 2) return 'md:hidden lg:block'
-  return ''
 }

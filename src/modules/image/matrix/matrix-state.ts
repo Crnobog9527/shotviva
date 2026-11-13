@@ -124,6 +124,14 @@ export function pickTemplate(values: MatrixValues, templateId: string, max: numb
   return withTemplate(room, templateId, max)
 }
 
+// Batch create opened on these templates (a template's "Use Batch create"): the ones not asked
+// for leave, the asked ones join in order up to the plan's number; text and toggles of a template
+// that stays are kept, and so are the photos (they are not in these values).
+export function withTemplates(values: MatrixValues, templateIds: readonly string[], max: number): MatrixValues {
+  const kept = values.templateIds.filter((id) => !templateIds.includes(id)).reduce(withoutTemplate, values)
+  return templateIds.reduce((current, id) => withTemplate(current, id, max), kept)
+}
+
 export function toggleCell(values: MatrixValues, key: CellKey): MatrixValues {
   const removed = values.removed.includes(key) ? values.removed.filter((current) => current !== key) : [...values.removed, key]
   return { ...values, removed }

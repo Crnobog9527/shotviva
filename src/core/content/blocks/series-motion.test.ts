@@ -21,7 +21,9 @@ function frame(n: number, images: () => unknown[] = () => []) {
   return { el: el as unknown as HTMLElement, layers, own }
 }
 
-const state = (layers: { classes: Set<string> }[]) => layers.map((layer) => [...layer.classes].join(' '))
+// The fade classes only; mk-ld (may load) is checked on its own below.
+const state = (layers: { classes: Set<string> }[]) => layers.map((layer) => [...layer.classes].filter((c) => c !== 'mk-ld').join(' '))
+const loading = (layers: { classes: Set<string> }[]) => layers.map((layer) => layer.classes.has('mk-ld'))
 
 describe('series card crossfade', () => {
   beforeEach(() => {
@@ -62,6 +64,18 @@ describe('series card crossfade', () => {
     const still = frame(0)
     cycler(still.el, ...timers()).start(0, 1000)
     expect(still.own.has('mk-armed')).toBe(false)
+  })
+
+  it('lets only the next layer load, one turn ahead, instead of the whole series at once', async () => {
+    const { el, layers } = frame(4)
+    const run = cycler(el, ...timers())
+    run.start(200, 1000)
+    expect(loading(layers)).toEqual([true, false, false, false])
+    await vi.advanceTimersByTimeAsync(200)
+    // Showing the first layer; the second starts loading while it rests.
+    expect(loading(layers)).toEqual([true, true, false, false])
+    await vi.advanceTimersByTimeAsync(1000 + FADE_MS)
+    expect(loading(layers)).toEqual([true, true, true, false])
   })
 
   it('moves on past a broken picture (complete, nothing decoded) instead of stopping', async () => {

@@ -5,6 +5,8 @@
 // fades out over it.
 
 export const FADE_MS = 700
+// On a layer that may load its pictures (marketing.css shows only these).
+export const LOADING_CLASS = 'mk-ld'
 // How long a pair rests: quicker under a resting pointer, gentler when it plays on its own in view.
 export const HOVER_HOLD_MS = 1500
 export const VIEW_HOLD_MS = 2600
@@ -38,6 +40,11 @@ export function cycler(
   cancel: Cancel = (id) => window.clearTimeout(id),
 ): Cycler {
   const layers = [...frame.querySelectorAll<HTMLElement>('.mk-sl')]
+  // A layer joins the layout (still transparent) only just before its turn, so its lazy images
+  // load then: one pair ahead, not the whole series the moment the card is armed. From mainland
+  // China, where the site moves a few KB/s, arming every layer at once queued all of a series'
+  // pictures on the first view of /zh (2026-11-12).
+  const arm = (layer: number) => layers[layer]?.classList.add(LOADING_CLASS)
   let index = 0
   let timer: number | undefined
   let run = 0
@@ -58,7 +65,10 @@ export function cycler(
 
   const step = async (hold: number, token: number) => {
     const next = (index + 1) % (layers.length + 1)
+    arm(next - 1)
     if (next > 0) await ready(layers[next - 1] as HTMLElement)
+    // The one after starts loading while this one rests.
+    arm(next)
     if (token !== run) return
     if (!document.hidden) show(next)
     timer = schedule(() => void step(hold, token), hold + FADE_MS)
@@ -68,8 +78,9 @@ export function cycler(
     start(delay, hold) {
       if (!layers.length || timer !== undefined) return
       const token = ++run
-      // Armed: the layers join the layout (still transparent), so their lazy images load now.
+      // Armed: the first layer starts loading now; each later one a turn ahead (arm above).
       frame.classList.add('mk-armed')
+      arm(0)
       timer = schedule(() => void step(hold, token), delay)
     },
     stop() {
