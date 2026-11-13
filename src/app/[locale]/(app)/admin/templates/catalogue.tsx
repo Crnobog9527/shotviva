@@ -6,7 +6,7 @@ import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
 import { readPricingOptions } from '@/site/template-pricing'
 import { ModelSyncProvider } from '@/core/admin/image-provider-field/model-sync'
 import { listAdminCategoryTree } from '@/core/admin/template-categories'
-import { listAdminSeriesOptions, seriesCopy } from '@/core/admin/template-series'
+import { listAdminSeriesOptions, OrderHelp, seriesCopy } from '@/core/admin/template-series'
 import { moveTemplateCategoryAction } from './category-actions'
 import { setTemplateSaleAction } from './sale-action'
 import { syncTemplateModel } from './sync-model-action'
@@ -43,6 +43,7 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
           作品编辑的判断题和约束段落 →
         </Link>
       </div>
+      <OrderHelp />
       <CategoriesPanel
         categories={categories}
         actions={{ save: saveTemplateCategoryAction, move: moveTemplateCategoryAction, remove: deleteTemplateCategoryAction }}

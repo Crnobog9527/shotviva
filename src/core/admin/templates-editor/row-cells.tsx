@@ -2,11 +2,13 @@
 
 import { CopyPlus } from 'lucide-react'
 
+import { effectiveStillCover } from '@/core/templates/client'
 import { Button } from '@/core/ui/button'
 import { CopyText } from '@/core/ui/copy-text'
 import { TableCell } from '@/core/ui/table'
 
 import type { AdminTemplate } from '../templates/types'
+import { beforeAfter, PreviewThumb } from '../ui/image-preview'
 import { rowCopy } from './copy'
 import { TemplateThumb } from './template-thumb'
 import { versionCopy } from './version-copy'
@@ -24,7 +26,9 @@ export function NameCell({ template }: { template: AdminTemplate }) {
   return (
     <TableCell>
       <div className="flex min-w-0 items-center gap-3">
-        <TemplateThumb template={template} className="size-11" px={44} />
+        <PreviewThumb title={name} images={previewImages(template)}>
+          <TemplateThumb template={template} className="size-11" px={44} />
+        </PreviewThumb>
         <div className="grid w-max min-w-32 max-w-52 gap-0.5">
           <span className="truncate font-medium" title={name}>{name}</span>
           <CopyText value={template.id} label={rowCopy.copyId} copied={rowCopy.copied} className="text-muted-foreground max-w-full text-xs">
@@ -33,6 +37,14 @@ export function NameCell({ template }: { template: AdminTemplate }) {
         </div>
       </div>
     </TableCell>
+  )
+}
+
+// The covers the Chinese pages show, as the thumbnail does (Owner 2026-11-13: click to enlarge).
+function previewImages(template: AdminTemplate) {
+  return beforeAfter(
+    effectiveStillCover(template.coverLocales, 'zh', 'before', template.coverBeforeUrl),
+    effectiveStillCover(template.coverLocales, 'zh', 'after', template.coverAfterUrl),
   )
 }
 
