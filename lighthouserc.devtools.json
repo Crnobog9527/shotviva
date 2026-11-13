@@ -1,0 +1,21 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "node scripts/ci/lighthouse-server.mjs",
+      "startServerReadyPattern": "Lighthouse proxy ready",
+      "url": ["https://localhost:3443/", "https://localhost:3443/zh"],
+      "numberOfRuns": 3,
+      "settings": {
+        "onlyCategories": ["performance"],
+        "throttlingMethod": "devtools",
+        "chromeFlags": "--no-sandbox --headless=new --ignore-certificate-errors"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "largest-contentful-paint": ["error", { "maxNumericValue": 1000, "aggregationMethod": "median-run" }]
+      }
+    },
+    "upload": { "target": "filesystem", "outputDir": ".lighthouseci-devtools" }
+  }
+}
