@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { trackCatalogueSeeAll } from '@/core/analytics/browser'
+import { useRouter } from '@/core/i18n/navigation'
 import { cn } from '@/core/ui/cn'
 import { Reveal } from '@/core/ui/reveal-item'
 
@@ -16,7 +17,7 @@ import { filterCatalogue, openableTemplates } from './catalogue-filter'
 import { buildSearchIndex, searchTemplates } from './catalogue-search'
 import { catalogueSections, isTall, sectionsFor, type CatalogueSection } from './catalogue-sections'
 import { CatalogueSections } from './catalogue-sections-view'
-import { isMotion, isSlotTemplate, type CatalogueTemplate } from './catalogue-template'
+import { batchableTemplates, isMotion, posterHref, type CatalogueTemplate } from './catalogue-template'
 import { findSeries, type CatalogueView, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
 import { SearchBox } from './search-box'
@@ -44,11 +45,17 @@ type Props = { view: CatalogueView; create: CreateContext; endCard?: ReactNode }
 export function TemplateCatalogue({ view, create, endCard }: Props) {
   const t = useTranslations('app.create')
   const query = useCatalogueQuery(view.filters)
+  const router = useRouter()
   const [openId, setOpenId] = useState<string | null>(null)
   const openable = useMemo(() => openableTemplates(view.entries), [view.entries])
-  // Batch create takes every template that uses a photo, series members included.
-  // Slot templates are single-run only (§5.1e): never in the batch dialog.
-  const batchable = useMemo(() => openable.filter((template) => template.photoInput !== 'none' && !isSlotTemplate(template)), [openable])
+  const batchable = useMemo(() => batchableTemplates(openable), [openable])
+  // A poster template's card goes to its editor (ARCHITECTURE §5.3); every other card opens the dialog.
+  const open = (id: string) => {
+    const found = openable.find((item) => item.id === id)
+    const href = found ? posterHref(found) : null
+    if (href) router.push(href)
+    else setOpenId(id)
+  }
   const featured = featuredOf(view.entries)
   const favoriteIds = useFavorites()?.ids
   const saved = useMemo(() => (favoriteIds ? savedIn(favoriteIds, openable) : []), [favoriteIds, openable])
@@ -81,7 +88,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
     <>
       {featured ? (
         <Reveal className="px-(--gutter)">
-          <FeatureCard template={featured} onOpen={setOpenId} />
+          <FeatureCard template={featured} onOpen={open} />
         </Reveal>
       ) : null}
       <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
@@ -92,7 +99,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
         <CategoryChips hidden={search.results !== null} filters={view.filters} saved={saved.length > 0} value={active} onChange={query.select} labels={chipLabels(t)} />
       </div>
       <h2 className="sr-only">{t('templates')}</h2>
-      <CatalogueBody search={search} sections={sectionsFor(active, sections)} shown={shown} endCard={endCard} onOpen={setOpenId} onOpenSeries={query.openSeries} onSeeAll={seeAll} />
+      <CatalogueBody search={search} sections={sectionsFor(active, sections)} shown={shown} endCard={endCard} onOpen={open} onOpenSeries={query.openSeries} onSeeAll={seeAll} />
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
