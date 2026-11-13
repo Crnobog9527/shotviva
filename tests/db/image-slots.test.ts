@@ -72,7 +72,7 @@ describe('a slot template job', () => {
     expect(view.status).toBe('succeeded')
     const [call] = fake.calls
     expect(call!.images.map((image) => image.width)).toEqual([1000, 800])
-    expect(call!.prompt).toContain('Image 1: 1st prize photo; Image 2: 2nd prize photo')
+    expect(call!.prompt).toContain('Image 1 is the 1st prize photo; Image 2 is the 2nd prize photo. These names only say which attached image is which')
     const job = (await findOwnJob(service, userId, view.id))!
     expect(job.inputs.input_key).toBeNull()
     expect((job.inputs.input_slots as { key: string }[]).map((slot) => slot.key)).toEqual(['prize_1', 'prize_2'])
