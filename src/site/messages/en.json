@@ -691,6 +691,20 @@
       "proofread": "The posters are drawn by AI. Check every word on them before you print or share.",
       "generate": "{count, plural, one {Make # poster} other {Make # posters}} · {credits} credits",
       "starting": "Starting…",
+      "check": {
+        "pending": "Checking the text on this poster…",
+        "match": "Text checked: every line matches what you confirmed.",
+        "mismatch": "{count, plural, one {# line differs from what you confirmed} other {# lines differ from what you confirmed}}",
+        "unchecked": "The text could not be checked automatically. Please read it through.",
+        "expected": "Confirmed: ",
+        "seen": "On the poster: ",
+        "notFound": "Not found on the poster",
+        "redraw": "Redraw this poster · {credits} credits",
+        "redrawFree": "Redraw this poster for free",
+        "freeNote": "Your first redraw of a poster that failed the check is free: {credits} credits are held while it draws and all given back once it is done.",
+        "dismiss": "I've checked it",
+        "editText": "Change the text"
+      },
       "notice": {
         "sortFailed": "We couldn't sort this automatically. Fill in the blocks below; your text is above.",
         "rateLimited": "Too many tries in an hour. Please wait a little.",

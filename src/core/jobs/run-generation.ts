@@ -35,6 +35,9 @@ import { backgroundInput } from './job-background'
 import { recordJobClientIp } from './job-download'
 import type { TemplateProvider } from './provider'
 import { reserveJob } from './settlement'
+import { callRpc } from '../billing/rpc'
+import { logger } from '../logger'
+import { z } from 'zod'
 import { partText } from '../poster'
 import { loadPosterPart, POSTER_FEATURE } from '../poster/sets'
 import { requireFeature } from '../features'
@@ -50,6 +53,8 @@ export type GenerationDeps = Omit<SettleDeps, 'provider'> & {
   identityJudgeTimeoutMs?: number
   // The invite-only gate of poster templates (ARCHITECTURE §5.3); tests pass their own reads.
   allowPoster?: (userId: string) => Promise<void>
+  // A finished poster's text check (§5.3 自动核对), scheduled after the response by the route.
+  afterPoster?: (job: Job) => void
 }
 
 const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'partner' }
@@ -61,18 +66,58 @@ function requestAspects(req: GenerationRequest, template: Template) {
 
 // A poster template writes its text from the caller's own saved set (ARCHITECTURE §5.3), never
 // from text the browser sends; every other template refuses a poster reference.
-async function posterPart(deps: GenerationDeps, req: GenerationRequest, template: Template) {
+async function posterPart(deps: GenerationDeps, req: GenerationRequest, template: Template, aspectRatio: string) {
   if (!template.fields.poster) {
     if (req.poster) throw new AppError('INVALID_INPUT', 'This template does not make posters')
     return null
   }
-  if (!req.poster || req.source !== 'web') throw new AppError('INVALID_INPUT', 'Confirm the poster text first')
-  // Dense small text needs at least HD (ARCHITECTURE §5.3), whatever the template's prices say.
-  if ((req.resolution ?? DEFAULT_RESOLUTION) === '1k') throw new AppError('INVALID_INPUT', 'Posters are made in HD or Max')
+  const resolution = posterResolution(req)
   await (deps.allowPoster ?? ((userId: string) => requireFeature(userId, POSTER_FEATURE)))(req.userId)
-  const { setId, part: index } = req.poster
+  const { setId, part: index, redrawOf } = req.poster as NonNullable<GenerationRequest['poster']>
   const { content, part } = await loadPosterPart(deps.db, req.userId, { setId, part: index, templateId: template.id })
-  return { text: partText(content, part), record: { set_id: setId, part: index, kind: part.kind, page: part.page, pages: part.pages } }
+  if (redrawOf) await assertSamePoster(deps, req.userId, redrawOf, { setId, part: index, templateId: template.id, resolution, aspectRatio })
+  const record = { set_id: setId, part: index, kind: part.kind, page: part.page, pages: part.pages, ...(redrawOf ? { redraw_of: redrawOf } : {}) }
+  return { text: partText(content, part), record }
+}
+
+// A poster job comes from the website with its set, at HD or Max: dense small text needs at least
+// HD (ARCHITECTURE §5.3), whatever the template's prices say.
+function posterResolution(req: GenerationRequest): Resolution {
+  if (!req.poster || req.source !== 'web') throw new AppError('INVALID_INPUT', 'Confirm the poster text first')
+  const resolution = req.resolution ?? DEFAULT_RESOLUTION
+  if (resolution === '1k') throw new AppError('INVALID_INPUT', 'Posters are made in HD or Max')
+  return resolution
+}
+
+type SamePoster = { setId: string; part: number; templateId: string; resolution: string; aspectRatio: string }
+
+// A redraw names a finished poster of the caller's: the same set, poster and template, at the
+// same resolution and size (a free redraw can never be an upgrade).
+async function assertSamePoster(deps: GenerationDeps, userId: string, jobId: string, same: SamePoster) {
+  const source = await findOwnJob(deps.db, userId, jobId)
+  const poster = source?.inputs.poster as { set_id?: unknown; part?: unknown } | undefined
+  const matches = source?.status === 'succeeded' && source.templateId === same.templateId && poster?.set_id === same.setId
+    && poster.part === same.part && source.inputs.resolution === same.resolution && source.inputs.aspect_ratio === same.aspectRatio
+  if (!matches) throw new AppError('INVALID_INPUT', 'Unknown poster to redraw')
+}
+
+// The first redraw of a poster whose text check failed is free (Owner 2026-11-13): once it has
+// succeeded, grant_poster_free_redraw (1347) gives back what it reserved, at most once per poster.
+// A failed grant only means the redraw stays paid; it never fails the finished work.
+async function grantFreeRedraw(deps: GenerationDeps, job: Job): Promise<void> {
+  try {
+    await callRpc(deps.db, 'grant_poster_free_redraw', { p_job_id: job.id }, z.boolean())
+  } catch (error) {
+    logger.error('poster.free_redraw.failed', { jobId: job.id, error })
+  }
+}
+
+// After a poster job succeeds: a free redraw's refund (on this request, so the balance the user
+// sees next is right), then its text check, scheduled after the response.
+async function finishPoster(deps: GenerationDeps, poster: Prepared['poster'], job: Job) {
+  if (!poster || job.status !== 'succeeded') return
+  if (poster.redraw_of) await grantFreeRedraw(deps, job)
+  deps.afterPoster?.(job)
 }
 
 // Everything that can be rejected without touching credits: template, fields, key
@@ -95,7 +140,7 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
     imageCount: req.inputKey ? 1 : 0,
     aspects: requestAspects(req, template),
   })
-  const { inputs, poster } = withPoster(validated, await posterPart(deps, req, template))
+  const { inputs, poster } = withPoster(validated, await posterPart(deps, req, template, validated.aspectRatio))
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
   if (req.inputKey && !isOwnInputKey(req.userId, req.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')
   await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limitsFor(membership), {
@@ -219,5 +264,6 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     locale: req.locale,
   })
   await keepInputPreview(deps, settled, image)
+  await finishPoster(deps, prepared.poster, settled)
   return toJobView(settled)
 }
