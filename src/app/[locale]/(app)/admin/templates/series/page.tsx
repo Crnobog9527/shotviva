@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 import { listAdminCategoryTree } from '@/core/admin/template-categories'
 import { categoryChoices } from '@/core/admin/templates-editor'
-import { getAdminSeries, listAdminSeries, searchSeriesCandidates, seriesCopy, SeriesCatalogue, SeriesDialog, SeriesEditor } from '@/core/admin/template-series'
+import { CoverPicker, getAdminSeries, listAdminSeries, searchSeriesCandidates, seriesCopy, SeriesCatalogue, SeriesDialog, SeriesEditor } from '@/core/admin/template-series'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { serverEnv } from '@/core/env'
 import { reorderSeriesAction, saveSeriesAction, searchMembersAction, setSeriesFlagAction } from './actions'
@@ -11,7 +11,7 @@ import { reorderSeriesAction, saveSeriesAction, searchMembersAction, setSeriesFl
 export const instant = false
 export const metadata = { title: seriesCopy.title }
 
-const paramsSchema = z.object({ id: z.uuid().optional(), new: z.literal('1').optional(), saved: z.literal('1').optional() })
+const paramsSchema = z.object({ id: z.uuid().optional(), cover: z.uuid().optional(), new: z.literal('1').optional(), saved: z.literal('1').optional() })
   .loose()
 
 // The whole list, with the editor in a dialog over it for ?id= / ?new=1 (Owner 2026-11-12).
@@ -23,7 +23,8 @@ export default async function AdminSeriesPage({ searchParams }: {
   if (!parsed.success) notFound()
   const p = parsed.data
   const db = createAdminSupabase()
-  const [items, editor] = await Promise.all([listAdminSeries(db), p.id || p.new ? editorDialog(db, p.id) : null])
+  const dialog = p.cover ? coverDialog(db, p.cover) : p.id || p.new ? editorDialog(db, p.id) : null
+  const [items, editor] = await Promise.all([listAdminSeries(db), dialog])
   // Production's series follow the test site (T93): edits there are overwritten by the next sync.
   const production = serverEnv().VERCEL_ENV === 'production'
   return (
@@ -44,6 +45,17 @@ async function editorDialog(db: ReturnType<typeof createAdminSupabase>, id: stri
     <SeriesDialog title={detail ? seriesCopy.edit : seriesCopy.create}>
       <SeriesEditor embedded key={detail?.revision ?? 'new'} detail={detail} initial={initial}
         choices={categoryChoices(categories)} actions={{ save: saveSeriesAction, search: searchMembersAction }} />
+    </SeriesDialog>
+  )
+}
+
+// 换封面 from the list (Owner 2026-11-13): only the cover choice, saved like the editor saves it.
+async function coverDialog(db: ReturnType<typeof createAdminSupabase>, id: string) {
+  const detail = await getAdminSeries(db, id)
+  if (!detail) notFound()
+  return (
+    <SeriesDialog title={seriesCopy.changeCoverTitle(detail.name_zh)}>
+      <CoverPicker key={detail.revision} detail={detail} save={saveSeriesAction} />
     </SeriesDialog>
   )
 }

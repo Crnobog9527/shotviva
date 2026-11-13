@@ -26,6 +26,9 @@ export function TemplateCard(props: Props) {
   return <PairCard {...props} />
 }
 
+// A poster card goes to its editor (a new page), every other card opens the creation dialog.
+const popupOf = (template: CatalogueTemplate) => (template.poster ? undefined : ('dialog' as const))
+
 function PairCard({ template, onOpen, eager, sizes }: Props) {
   const ref = useRef<HTMLButtonElement>(null)
   const alt = useTranslations('app.template')('cardAlt', { name: template.name })
@@ -36,7 +39,7 @@ function PairCard({ template, onOpen, eager, sizes }: Props) {
       <button
         ref={ref}
         type="button"
-        aria-haspopup="dialog"
+        aria-haspopup={popupOf(template)}
         onClick={() => onOpen(template.id)}
         className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house active:scale-[.97]"
       >

@@ -8,7 +8,7 @@ import { TableCell, TableRow } from '@/core/ui/table'
 
 import type { AdminTemplate } from '../templates/types'
 import { DragHandle, MoveButtons, sortableRowClass, useSortableItem } from '../ui/sortable'
-import { bulkCopy, featuredCopy } from './copy'
+import { bulkCopy, featuredCopy, rowCopy } from './copy'
 import { summaryPrice } from './tier-price'
 import { canFeature } from './featured-state'
 import { ActionsCell, NameCell } from './row-cells'
@@ -53,6 +53,7 @@ export function TemplateRow(props: Props) {
           <DragHandle handle={item.handle} />
           <MoveButtons item={item} />
         </div>
+        <span className="text-muted-foreground block text-xs tabular-nums" title={rowCopy.orderNumberHint}>{rowCopy.orderNumber(template.sortOrder)}</span>
       </TableCell>
       <NameCell template={template} />
       <TableCell>
