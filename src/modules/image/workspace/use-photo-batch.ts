@@ -148,6 +148,7 @@ export function useSlotPhotos(slots: readonly { key: string; required: boolean }
   }, [])
   const cancel = useBatchUploads(entries, patch)
   useBatchHolds(entries)
+  useRevokeSlotPreviews(entries)
 
   const drop = (slot: string) => {
     cancel(slot)
@@ -170,15 +171,34 @@ export function useSlotPhotos(slots: readonly { key: string; required: boolean }
 
 export type SlotPhotos = ReturnType<typeof useSlotPhotos>
 
+// On leaving the form: the slot photos' local previews go. A slot job never shows its uploads
+// (no input preview, §5.1e), so none is still in use. (#543's useRevokeOnLeave does the same for
+// the photo list; the two can share one helper once both are on main.)
+function useRevokeSlotPreviews(entries: Entry[]) {
+  const latest = useRef(entries)
+  useEffect(() => {
+    latest.current = entries
+  }, [entries])
+  useEffect(() => {
+    const current = latest
+    return () => {
+      for (const entry of current.current) if (entry.file) URL.revokeObjectURL(entry.url)
+    }
+  }, [])
+}
+
 function keptSlotEntries(kept: SlotKept | undefined): Entry[] {
   return (kept?.photos ?? []).flatMap((photo) => (photo.slot
     ? [{ id: photo.slot, file: null, url: photo.url, bytes: photo.bytes, ratio: null, upload: { phase: 'done' as const, inputKey: photo.inputKey }, keptFrom: kept?.madeAt }]
     : []))
 }
 
-// What Generate waits for: a required slot still empty, or any slot still uploading.
+// What Generate waits for: a required slot still empty, any slot still uploading, or any slot
+// whose upload failed (optional or not: it must be picked again or removed, never silently
+// dropped from a paid job).
 export function slotStatus(slots: readonly { key: string; required: boolean }[], entries: readonly BatchPhoto[]): 'none' | 'uploading' | 'ready' {
   if (entries.some((entry) => entry.upload.phase === 'compressing' || entry.upload.phase === 'uploading' || entry.upload.phase === 'idle')) return 'uploading'
+  if (entries.some((entry) => entry.upload.phase === 'error')) return 'none'
   const done = new Set(entries.filter((entry) => entry.upload.phase === 'done').map((entry) => entry.id))
   return slots.some((slot) => slot.required && !done.has(slot.key)) ? 'none' : 'ready'
 }
