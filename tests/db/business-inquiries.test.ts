@@ -4,6 +4,7 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { listAdminInquiries, loadAdminInquiry, newInquiryCount, updateInquiry } from '@/core/inquiries/admin'
+import { exportInquiries, setInquiriesStatus } from '@/core/inquiries/bulk'
 import { submitInquiry, type InquiryContext } from '@/core/inquiries/submit'
 import { EMPTY_INQUIRY, type InquiryValues } from '@/core/inquiries/validate'
 
@@ -143,5 +144,33 @@ describe('admin reads and writes', () => {
     await expect(updateInquiry(service, { id: randomUUID(), status: 'won', note: '' })).rejects.toMatchObject({ code: 'NOT_FOUND' })
     await expect(updateInquiry(service, { id: older.id, status: 'archived', note: '' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     expect(await loadAdminInquiry(service, 'not-a-uuid')).toBeNull()
+  })
+})
+
+describe('admin batches (the list\'s ticks)', () => {
+  it('sets one status on several inquiries, keeps their notes, and says what it skipped and why', async () => {
+    const ipHash = hash()
+    for (const company of ['Batch A', 'Batch B', 'Batch C']) await submit(values({ company }), ctx({ ipHash }))
+    const { rows } = await db.query<{ id: string }>('select id from public.business_inquiries where ip_hash = $1 order by created_at', [ipHash])
+    const [a, b, c] = rows.map((row) => row.id)
+    if (!a || !b || !c) throw new Error('inquiries missing')
+    await updateInquiry(service, { id: a, status: 'new', note: 'Keep me' })
+    await updateInquiry(service, { id: c, status: 'contacted', note: '' })
+    const gone = randomUUID()
+
+    const outcome = await setInquiriesStatus(service, { ids: [a, b, c, gone], status: 'contacted' })
+    expect(outcome.done).toEqual([a, b])
+    expect(outcome.skipped).toEqual([
+      { id: c, reason: 'same' },
+      { id: gone, reason: 'missing' },
+    ])
+    expect(await loadAdminInquiry(service, a)).toMatchObject({ status: 'contacted', admin_note: 'Keep me' })
+    expect(await loadAdminInquiry(service, b)).toMatchObject({ status: 'contacted' })
+
+    const exported = await exportInquiries(service, [a, c])
+    expect(exported.map((row) => row.id).sort()).toEqual([a, c].sort())
+    expect(exported.find((row) => row.id === a)).toMatchObject({ admin_note: 'Keep me', company: 'Batch A' })
+    await expect(setInquiriesStatus(service, { ids: [a], status: 'archived' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(setInquiriesStatus(service, { ids: Array.from({ length: 31 }, () => randomUUID()), status: 'won' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   })
 })
