@@ -1,4 +1,5 @@
-import { getImageProps } from 'next/image'
+import { getImageProps, type ImageLoader } from 'next/image'
+import { preconnect } from 'react-dom'
 
 import { publicEnv } from '../public-env'
 
@@ -8,6 +9,11 @@ import { publicEnv } from '../public-env'
 // The caller keeps its own <img> and classes, so nothing on screen changes. Only covers on the
 // assets base (images.remotePatterns) are rewritten: a user's photo on an auth-gated route or a
 // blob: preview passes through as given.
+//
+// With NEXT_PUBLIC_IMAGE_CDN_URL set (the image CDN switch, core/public-env-schema.ts) the same
+// optimiser URLs are put on the CDN's host instead: the CDN forwards /_next/image?… to this site
+// and caches what it returns, so the files are byte for byte the ones served today. Nothing in
+// the database changes; unsetting the variable and redeploying turns it off.
 
 export type CoverImage = { sizes?: string; srcSet?: string; src: string }
 
@@ -17,16 +23,25 @@ export function isCoverUrl(url: string, base: string | undefined = publicEnv.NEX
 
 // Keys in the order next/image renders them (sizes, srcSet, src), so the browser has the
 // srcset before it could start fetching src.
-export function coverImage(url: string, sizes: string, base?: string): CoverImage {
+export function coverImage(url: string, sizes: string, base?: string, cdn: string | undefined = publicEnv.NEXT_PUBLIC_IMAGE_CDN_URL): CoverImage {
   if (!isCoverUrl(url, base)) return { src: url }
-  const { props } = getImageProps({ src: url, alt: '', fill: true, sizes })
+  // The CDN is a new origin for the page: start its DNS + TLS while the HTML is still arriving
+  // (React hoists this into <head>; repeated calls collapse into one link).
+  if (cdn) preconnect(cdn)
+  const { props } = getImageProps({ src: url, alt: '', fill: true, sizes, ...(cdn ? { loader: cdnLoader(cdn) } : {}) })
   return { sizes: props.sizes, srcSet: props.srcSet, src: props.src }
+}
+
+// Next's own default-loader URL (url, w, q in that order; covers are remote, so no dpl), on the
+// CDN's host. The optimiser validates url against images.remotePatterns exactly as before.
+export function cdnLoader(cdn: string): ImageLoader {
+  return ({ src, width, quality }) => `${cdn}/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=${quality ?? 75}`
 }
 
 // One optimised URL at least `width` px wide, for the places that take no srcset (a <video>
 // poster). The stored file when it is not a cover.
-export function coverSrc(url: string, width: number, base?: string): string {
-  const { srcSet, src } = coverImage(url, `${width}px`, base)
+export function coverSrc(url: string, width: number, base?: string, cdn?: string): string {
+  const { srcSet, src } = coverImage(url, `${width}px`, base, ...(cdn === undefined ? [] : [cdn]))
   const candidates = (srcSet ?? '').split(', ').map((entry) => {
     const [href = '', descriptor = ''] = entry.split(' ')
     return { href, width: Number.parseInt(descriptor, 10) }

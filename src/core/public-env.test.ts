@@ -16,6 +16,7 @@ const unset: RawPublicEnv = {
   NEXT_PUBLIC_POSTHOG_HOST: undefined,
   NEXT_PUBLIC_SENTRY_DSN: undefined,
   NEXT_PUBLIC_ASSETS_BASE_URL: undefined,
+  NEXT_PUBLIC_IMAGE_CDN_URL: undefined,
   NEXT_PUBLIC_APP_VERSION: undefined,
 }
 
@@ -32,6 +33,7 @@ const configured: RawPublicEnv = {
   NEXT_PUBLIC_POSTHOG_HOST: 'https://eu.i.posthog.com',
   NEXT_PUBLIC_SENTRY_DSN: 'https://key@o1.ingest.sentry.io/1',
   NEXT_PUBLIC_ASSETS_BASE_URL: 'https://shotviva.com/assets//',
+  NEXT_PUBLIC_IMAGE_CDN_URL: 'https://img-eo.shotviva.com/',
   NEXT_PUBLIC_APP_VERSION: 'dpl_abc',
 }
 

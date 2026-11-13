@@ -28,6 +28,24 @@ describe('coverImage (covers at the size they are shown)', () => {
   })
 })
 
+describe('coverImage through the image CDN (NEXT_PUBLIC_IMAGE_CDN_URL)', () => {
+  const CDN = 'https://img-eo.shotviva.com'
+
+  it('puts the very same optimiser URLs on the CDN host', () => {
+    const plain = coverImage(COVER, '50vw', BASE, '')
+    const viaCdn = coverImage(COVER, '50vw', BASE, CDN)
+    expect(viaCdn.sizes).toBe(plain.sizes)
+    expect(viaCdn.srcSet).toBe(plain.srcSet?.replaceAll('/_next/image?', `${CDN}/_next/image?`))
+    expect(viaCdn.src).toBe(`${CDN}${plain.src}`)
+  })
+
+  it('leaves non-covers alone and is off when unset', () => {
+    expect(coverImage('/api/files/job-1', '100vw', BASE, CDN)).toEqual({ src: '/api/files/job-1' })
+    expect(coverImage(COVER, '100vw', BASE).src).toMatch(/^\/_next\/image\?/)
+    expect(coverSrc(COVER, 700, BASE, CDN)).toBe(`${CDN}/_next/image?url=${encodeURIComponent(COVER)}&w=750&q=75`)
+  })
+})
+
 describe('coverSrc (one URL, for a video poster)', () => {
   it('picks the smallest optimised width that covers the request', () => {
     expect(coverSrc(COVER, 1080, BASE)).toMatch(/^\/_next\/image\?url=.+&w=1080&q=75$/)
