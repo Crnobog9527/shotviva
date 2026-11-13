@@ -1,18 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { AdminTemplate } from '../../src/core/admin/templates/types'
-import type { GenerationProvider } from '../../src/core/jobs'
-import { estimateRunUsd } from '../../src/modules/image/test-run/estimate'
 import { readPricingOptions } from '../../src/site/template-pricing'
 import { RunError } from '../template-apply/batch-file'
 import type { Cell, EffectiveModel } from './cells'
+import { cellEstimateUsd, type EstimateSource } from './estimate'
 
 // What a trial run needs to know before it starts: which model each template will really use (the
 // bound provider, or the site default as it is now), what one call may cost, and that the actor is
 // an admin there (checked before any photo is uploaded).
 
 // The face-swap screen's call is small; this keeps the reservation above any real call.
-const JUDGE_ALLOWANCE_USD = 0.005
 
 export async function effectiveModels(db: SupabaseClient): Promise<EffectiveModel> {
   const options = await readPricingOptions(db)
@@ -24,11 +22,8 @@ export async function effectiveModels(db: SupabaseClient): Promise<EffectiveMode
   }
 }
 
-// One estimate per cell: the trial's own estimate (estimateRunUsd) with the prices of the provider
-// it will call, plus the face-swap screen. A bound template counts the dearer of its provider and
-// the default it may fall back to. Providers are resolved once per binding.
-export async function estimates(cells: Cell[], templates: Map<string, AdminTemplate>, bound: (id: string | null) => Promise<GenerationProvider[]>) {
-  const providers = new Map<string, Promise<GenerationProvider[]>>()
+export async function estimates(cells: Cell[], templates: Map<string, AdminTemplate>, bound: (id: string | null) => Promise<EstimateSource>) {
+  const providers = new Map<string, Promise<EstimateSource>>()
   const perCell = new Map<Cell, number>()
   for (const cell of cells) {
     const template = templates.get(cell.templateId)
@@ -36,8 +31,7 @@ export async function estimates(cells: Cell[], templates: Map<string, AdminTempl
     const binding = template.prompt?.providerId ?? null
     const key = binding ?? 'default'
     if (!providers.has(key)) providers.set(key, bound(binding))
-    const prices = (await providers.get(key)!).map(p => estimateRunUsd(cell.resolution, template.quality, p.prices))
-    perCell.set(cell, Math.max(...prices) + JUDGE_ALLOWANCE_USD)
+    perCell.set(cell, cellEstimateUsd(cell, template.quality, await providers.get(key)!))
   }
   return (cell: Cell) => perCell.get(cell) ?? Number.POSITIVE_INFINITY
 }

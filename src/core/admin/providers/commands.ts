@@ -53,12 +53,12 @@ export async function lookupProviderModel(input: unknown) {
 const declaredTiers = (caps: ImageCapabilities | null) =>
   caps?.resolutionSource === 'declared' ? caps.resolutions.filter((tier) => !UNKNOWN_MODEL_TIERS.includes(tier)) : []
 
-// The slot floor's cost per extra input image (1392); undefined (an older editor) keeps it.
+// The slot floor's cost per extra input image (1440); undefined (an older editor) keeps it.
 async function saveExtraInputCost(deps: ProviderCommandDeps, adminId: string, id: string,
   { module, extraInputImageUsd: usd }: { module: string; extraInputImageUsd?: number | null }) {
   if (module !== 'image' || usd === undefined) return
   const { error } = await deps.db.rpc('admin_set_provider_extra_input_cost', { p_actor: adminId, p_id: id, p_usd: usd })
-  // A database without migration 1390 has no such field; an empty one has nothing to save.
+  // A database without migration 1440 has no such field; an empty one has nothing to save.
   if (error?.code === 'PGRST202' && usd === null) return
   if (error) throw new ProviderSettingError('internal', 'Saving the extra input image cost failed')
 }
