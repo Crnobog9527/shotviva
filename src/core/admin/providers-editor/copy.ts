@@ -88,7 +88,7 @@ export const PROVIDERS_COPY = {
     tiersDeclared: (tiers: string) => `人工声明：${tiers}（保存时写入审计）`,
     baseUrl: '接口根地址',
     baseUrlHint: '请填写供应商的 HTTPS API 根地址。',
-    arkModelHint: '例如 doubao-seedream-5-5-261028（须先在火山方舟控制台开通）。按张的官方价写在代码价目表里，目前只收录 5.5。',
+    arkModelHint: '例如 doubao-seedream-5-5-261028（须先在火山方舟控制台开通）。按张的官方价写在代码价目表里，目前收录 5.5 和 5.0 flash（doubao-seedream-5-0-flash-260915）。',
     arkPrices: '按张计费：用代码里的火山方舟官方价目（人民币），按环境变量 CNY_PER_USD 的汇率折成美元记成本，不用填 token 单价。',
     routerModelHint: '例如 google/gemini-3.1-flash-image。保存时自动读取该模型支持的清晰度、比例和参考图数量。',
     lookupPending: '正在查询模型能力与报价…',
