@@ -4,6 +4,7 @@ import '../../globals-public.css'
 
 import { AnnouncementBanner } from '@/core/announcements'
 import { currentLocale } from '@/core/i18n/server'
+import { NoLinkPrefetch } from '@/core/i18n/ui'
 import { LivingBackground } from '@/core/ui/living-background'
 
 import { MarketingFooter, MarketingHeader } from '../marketing-chrome'
@@ -14,13 +15,14 @@ import './legal.css'
 // background (DESIGN §5, T54) mounts under it all after first paint.
 export default async function MarketingLayout({ children }: LayoutProps<'/[locale]'>) {
   const locale = await currentLocale()
+  // Public pages load a link on the click only (core/i18n/ui/link-prefetch.tsx: mainland China).
   return (
-    <>
+    <NoLinkPrefetch>
       <AnnouncementBanner />
       <MarketingHeader locale={locale} />
       <main className="flex flex-1 flex-col">{children}</main>
       <MarketingFooter locale={locale} />
       <LivingBackground />
-    </>
+    </NoLinkPrefetch>
   )
 }

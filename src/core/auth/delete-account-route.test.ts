@@ -18,7 +18,7 @@ vi.mock('./supabase-admin', () => ({
   createAdminSupabase: () => ({ auth: { admin: { deleteUser: mocks.deleteUser } } }),
 }))
 vi.mock('./supabase-server', () => ({
-  createServerSupabase: async () => ({ auth: { signOut: mocks.signOut } }),
+  createSessionSupabase: async () => ({ auth: { signOut: mocks.signOut } }),
 }))
 
 const { handleDeleteAccount } = await import('./delete-account-route')

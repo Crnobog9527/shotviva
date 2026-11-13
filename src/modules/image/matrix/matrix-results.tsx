@@ -15,12 +15,14 @@ import { batchTally } from '../workspace/batch-tally'
 import { photoNumbers, resultGroups, type ResultGroup, type ResultView } from './result-groups'
 import { ResultTile } from './result-tile'
 
-type Props = { ids: readonly string[]; onRetry(id: string): void; onApply(templateId: string): void; onNew(): void }
+// `onClose`: shown inside the Batch create dialog, which pads it and pins nothing; leaving is
+// closing the dialog rather than a link back to Create.
+type Props = { ids: readonly string[]; onRetry(id: string): void; onApply(templateId: string): void; onNew(): void; onClose?: () => void }
 
 // The multi-template batch after Generate (T107): where it stands, the results by template or
 // by photo, and once settled its ZIP. Each template group offers "Use on more photos", the form
 // again with only that template and its text kept. Leaving is fine: the jobs live in the store.
-export function MatrixResults({ ids, onRetry, onApply, onNew }: Props) {
+export function MatrixResults({ ids, onRetry, onApply, onNew, onClose }: Props) {
   const t = useTranslations('app.matrix')
   const [chosenView, setView] = useState<ResultView>('template')
   const byId = new Map(useJobs().map((job) => [job.id, job]))
@@ -33,7 +35,7 @@ export function MatrixResults({ ids, onRetry, onApply, onNew }: Props) {
   const view = several ? chosenView : 'template'
   // The section keeps the page gutter at every width: unlike the form, nothing outside adds it back on lg.
   return (
-    <section aria-labelledby="matrix-results-h" className="px-(--gutter) pt-4">
+    <section aria-labelledby="matrix-results-h" className={onClose ? 'pt-2 pb-4' : 'px-(--gutter) pt-4'}>
       <Summary tally={tally} batchId={batchId} />
       {several ? <ViewSwitch view={view} onChange={setView} /> : null}
       <div className="mt-2 grid gap-5">
@@ -46,12 +48,28 @@ export function MatrixResults({ ids, onRetry, onApply, onNew }: Props) {
           {t('newBatch')}
         </button>
       </div>
-      <ActionBar className="md:px-0">
-        <Link href={tally.settled ? '/photos' : '/generate'} className={buttonVariants({ variant: tally.settled ? 'cta' : 'glass', size: 'cta', className: tally.settled ? undefined : 'w-full rounded-control' })}>
-          {t(tally.settled ? 'openPhotos' : 'backToCreate')}
-        </Link>
-      </ActionBar>
+      {onClose ? <SheetLeave settled={tally.settled} onClose={onClose} /> : (
+        <ActionBar className="md:px-0">
+          <Link href={tally.settled ? '/photos' : '/generate'} className={buttonVariants({ variant: tally.settled ? 'cta' : 'glass', size: 'cta', className: tally.settled ? undefined : 'w-full rounded-control' })}>
+            {t(tally.settled ? 'openPhotos' : 'backToCreate')}
+          </Link>
+        </ActionBar>
+      )}
     </section>
+  )
+}
+
+// The dialog's way out: Open Photos once it is settled, else Close (the jobs keep running).
+function SheetLeave({ settled, onClose }: { settled: boolean; onClose(): void }) {
+  const t = useTranslations('app.matrix')
+  return settled ? (
+    <Link href="/photos" className={buttonVariants({ variant: 'cta', size: 'cta', className: 'mt-3' })}>
+      {t('openPhotos')}
+    </Link>
+  ) : (
+    <button type="button" onClick={onClose} className={buttonVariants({ variant: 'glass', size: 'cta', className: 'mt-3 w-full rounded-control' })}>
+      {t('closeWhileRunning')}
+    </button>
   )
 }
 

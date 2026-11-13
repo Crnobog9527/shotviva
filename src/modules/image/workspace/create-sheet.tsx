@@ -92,8 +92,8 @@ function phoneStrip(tall: boolean, folded: boolean): CSSProperties {
   return { height: 'min(calc((100vw - 32px) * 5 / 8), 40dvh)', width: 'min(100%, calc(40dvh * 8 / 5))' }
 }
 
-// 44px target with a 30px disc, like the other sheets.
-function CloseButton({ Close, className }: { Close: typeof DialogPrimitive.Close | typeof DrawerClose; className: string }) {
+// 44px target with a 30px disc, like the other sheets (Batch create uses it too).
+export function CloseButton({ Close, className }: { Close: typeof DialogPrimitive.Close | typeof DrawerClose; className: string }) {
   const t = useTranslations('app.sheet')
   return (
     <Close aria-label={t('close')} className={cn('absolute z-10 grid size-11 place-items-center rounded-full text-bone-dim', className)}>
