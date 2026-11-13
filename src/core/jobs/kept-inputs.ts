@@ -27,9 +27,9 @@ const PREVIEW_SECONDS = 3600
 // slot: for a slot template's work (§5.1e), which box the photo goes back to.
 export type AgainPhoto = { inputKey: string; bytes: number; url: string; slot?: string }
 
-// The slot a kept copy came from: kept copy n is the n-th image sent, and inputs.input_slots
-// lists the filled slots in send order. A failed copy is missing from kept_inputs, so the
-// number in the key decides, never the position in the list.
+// The slot a kept copy came from: kept copy n is the n-th image sent, and inputs.input_slots (an
+// ordered array) lists the filled slots in send order. A failed copy is missing from
+// kept_inputs, so the number in the key decides, never the position in the list.
 function slotOfKept(job: Job, kept: string): string | undefined {
   const order = storedSlotOrder(job.inputs.input_slots)
   const index = keptSlotIndex(kept)

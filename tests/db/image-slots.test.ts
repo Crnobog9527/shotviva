@@ -74,7 +74,7 @@ describe('a slot template job', () => {
     expect(call!.prompt).toContain('Image 1: 1st prize photo; Image 2: 2nd prize photo')
     const job = (await findOwnJob(service, userId, view.id))!
     expect(job.inputs.input_key).toBeNull()
-    expect(Object.keys(job.inputs.input_slots as object)).toEqual(['prize_1', 'prize_2'])
+    expect((job.inputs.input_slots as { key: string }[]).map((slot) => slot.key)).toEqual(['prize_1', 'prize_2'])
     expect(keptInputsOf(job)).toEqual([`outputs/${userId}/${view.id}-in-1.jpg`, `outputs/${userId}/${view.id}-in-2.jpg`])
     expect(r2.objects.has(inputPreviewKeyFor(userId, view.id))).toBe(false)
     expect((await profileOf(db, userId)).credits).toBe(4)
@@ -127,6 +127,32 @@ describe('Make again, delete and admin view of a slot work', () => {
     expect(kept).toHaveLength(3)
     await deleteWorkFiles(r2.store, job)
     expect(kept.some((key) => r2.objects.has(key))).toBe(false)
+  })
+})
+
+describe('slot order survives jsonb (keys jsonb would re-sort)', () => {
+  it('puts the logo back in the logo slot when its key sorts after the prize key', async () => {
+    // jsonb orders object keys shorter-first: an object { venue_logo, prize_1 } reads back as
+    // { prize_1, venue_logo }. The order is stored as an array, so Make again maps -in-1 to the logo.
+    const id = await seedTemplate(db, {
+      images: { min: 0, max: 2, slots: [{ key: 'venue_logo', label: 'Venue logo', required: false }, { key: 'prize_1', label: '1st prize photo', required: false }] },
+      copy: [], body: 'WRAPPED poster {{image_slots}}',
+    })
+    const userId = await createUser(db, { credits: 5 })
+    const r2 = createMemoryStore()
+    const logo = newInputKey(userId, 'image/jpeg')
+    const prize = newInputKey(userId, 'image/jpeg')
+    r2.upload(logo, await jpeg(700, 700), 'image/jpeg')
+    r2.upload(prize, await jpeg(900, 600), 'image/jpeg')
+    const fake = fakeProvider()
+    const deps = { db: service, store: r2.store, provider: fake.provider, providerTimeoutMs: 200 }
+    const view = await runGeneration(deps, { userId, source: 'web', templateId: id, inputSlots: { prize_1: prize, venue_logo: logo }, copy: {}, aspectRatio: '1:1', resolution: '1k' })
+    expect(fake.calls[0]!.images.map((image) => image.width)).toEqual([700, 900])
+    const tpl = { ...template(), id, imageSlots: [{ key: 'venue_logo', label: 'Venue logo', required: false }, { key: 'prize_1', label: '1st prize photo', required: false }] } as unknown as CatalogueTemplate
+    const again = await loadAgain({ db: service, store: () => r2.store }, { userId, jobId: view.id, template: tpl })
+    const bySlot = Object.fromEntries((again?.photos ?? []).map((photo) => [photo.slot, photo.bytes]))
+    expect(bySlot.venue_logo).toBe(r2.objects.get(logo)!.body.length)
+    expect(bySlot.prize_1).toBe(r2.objects.get(prize)!.body.length)
   })
 })
 
