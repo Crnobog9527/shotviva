@@ -15,6 +15,8 @@ import type { SlotPhotos } from './use-photo-batch'
 
 type Props = {
   slots: readonly CatalogueImageSlot[]
+  // Make again whose photos could not come back: say so above the boxes (they stay pickable).
+  missing?: 'old' | 'failed' | null
   photos: SlotPhotos
   // The template's text fields: a slot's paired note is drawn under its box.
   fields: readonly CatalogueCopyField[]
@@ -25,10 +27,11 @@ type Props = {
 // Named image slots (ARCHITECTURE §5.1e, DESIGN §4.3): one labelled box per slot, each taking one
 // image (picked or dropped onto that box only), with its help line and paired note right under
 // it. Replaces the photo section for such a template, which makes one image at a time.
-export function SlotBoxes({ slots, photos, fields, copy, onCopy }: Props) {
+export function SlotBoxes({ slots, photos, fields, copy, onCopy, missing = null }: Props) {
   const t = useTranslations('app.workspace')
   return (
     <div className="grid gap-6 pt-6">
+      {missing ? <MissingSlotPhotos reason={missing} /> : null}
       {slots.map((slot) => {
         const note = slot.note ? fields.find((field) => field.key === slot.note) : undefined
         return (
@@ -45,6 +48,17 @@ export function SlotBoxes({ slots, photos, fields, copy, onCopy }: Props) {
       })}
       <p className="text-caption text-muted-foreground">{t('slots.oneAtATime')}</p>
     </div>
+  )
+}
+
+// Make again without its photos (T40): the same words as the single-photo template's notice.
+function MissingSlotPhotos({ reason }: { reason: 'old' | 'failed' }) {
+  const t = useTranslations('app.workspace.again')
+  return (
+    <p role="status" className="hairline-lit grid gap-1 rounded-panel bg-card px-4 py-3.5">
+      <b className="text-body leading-[1.3] font-semibold">{t('missingTitle')}</b>
+      <span className="text-caption leading-[1.4] text-muted-foreground">{t(reason === 'old' ? 'missingOld' : 'missingFailed')}</span>
+    </p>
   )
 }
 
@@ -67,12 +81,12 @@ function SlotBox({ slot, photos }: { slot: CatalogueImageSlot; photos: SlotPhoto
   if (!photo) {
     return (
       <div onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
-        <button type="button" onClick={() => input.current?.click()}
+        <button type="button" onClick={() => input.current?.click()} aria-label={`${t('workspace.slots.upload')} · ${slot.label}`}
           className="press hairline-lit flex min-h-[72px] w-full items-center justify-center gap-2 rounded-panel bg-card px-4 text-body font-semibold text-foreground md:hover:bg-wash">
           <svg viewBox="0 0 24 24" aria-hidden="true" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
             {ICONS.gallery}
           </svg>
-          {t('workspace.slots.upload')} · {slot.label}
+          {t('workspace.slots.upload')}
         </button>
         {chooser}
       </div>
@@ -87,10 +101,12 @@ function SlotBox({ slot, photos }: { slot: CatalogueImageSlot; photos: SlotPhoto
         <UploadStage upload={photo.upload} kept={photo.keptFrom !== undefined} />
         <PhotoSize size={t('units.megabytes', { size: (photo.bytes / 1024 / 1024).toFixed(1) })} keptFrom={photo.keptFrom} className="mt-2" />
         <div className="mt-2 flex gap-2">
-          <button type="button" onClick={() => input.current?.click()} className="press hairline inline-flex min-h-9 items-center rounded-full bg-wash px-4 text-caption font-semibold">
+          <button type="button" onClick={() => input.current?.click()} aria-label={`${t('workspace.slots.replace')} · ${slot.label}`}
+            className="press hairline inline-flex min-h-11 items-center rounded-full bg-wash px-4 text-caption font-semibold">
             {t('workspace.slots.replace')}
           </button>
-          <button type="button" onClick={() => photos.remove(slot.key)} className="press min-h-9 px-2 text-caption">{t('workspace.slots.remove')}</button>
+          <button type="button" onClick={() => photos.remove(slot.key)} aria-label={`${t('workspace.slots.remove')} · ${slot.label}`}
+            className="press inline-flex min-h-11 items-center px-3 text-caption">{t('workspace.slots.remove')}</button>
         </div>
         {chooser}
       </div>

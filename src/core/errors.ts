@@ -67,6 +67,9 @@ export const ERROR_CODES = [
   'TEST_BUDGET_EXCEEDED',
   // The Owner closed this support ticket: its author can no longer add to it (start a new one).
   'TICKET_CLOSED',
+  // Auth or the database could not say who is signed in (an outage, not a sign-out); retry
+  // (ARCHITECTURE §7「会话校验」).
+  'AUTH_UNAVAILABLE',
   'INTERNAL',
 ] as const
 
@@ -118,6 +121,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   FAVORITES_LIMIT: 409,
   TEST_BUDGET_EXCEEDED: 429,
   TICKET_CLOSED: 409,
+  AUTH_UNAVAILABLE: 503,
   INTERNAL: 500,
 }
 

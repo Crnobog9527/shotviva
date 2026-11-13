@@ -262,6 +262,8 @@ describe('the 开关 cards (T89)', () => {
 describe('图片格子 cards (§5.1e)', () => {
   const slotted: AdminTemplate = {
     ...template,
+    // Two slots: the floor is the single-image floor × 2 (migration 1310).
+    creditsCost: { '1k': 6, '2k': 12, '3k': 18 },
     visibleIn: ['web'],
     fields: {
       images: { min: 1, max: 2, slots: [
@@ -299,5 +301,14 @@ describe('图片格子 cards (§5.1e)', () => {
     ['a note that names no text field', { copyFields: [] }, 'prize_1_note'],
   ])('refuses %s before the round trip', (_, patch, message) => {
     expect(buildPayload({ ...toFormValues(slotted), ...patch }, false, FLOOR)).toMatchObject({ ok: false, message: expect.stringContaining(message) })
+  })
+})
+
+describe('cost floor of a slot template (§5.1e, migration 1310)', () => {
+  it('holds each tier to the single-image floor × its slots before the round trip', () => {
+    const slots = [{ key: 'a', label: 'A', labelZh: '', help: '', helpZh: '', required: false, note: '' }, { key: 'b', label: 'B', labelZh: '', help: '', helpZh: '', required: false, note: '' }]
+    const values = { ...toFormValues(template), credits: { '1k': '3', '2k': '8', '3k': '12' }, imageSlots: slots }
+    expect(creditProblems(values, FLOOR)['1k']).toContain('4')
+    expect(creditProblems({ ...values, credits: { '1k': '4', '2k': '8', '3k': '12' } }, FLOOR)).toEqual({})
   })
 })

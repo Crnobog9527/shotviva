@@ -759,7 +759,7 @@
         "cancel": "Cancel"
       },
       "slots": {
-        "upload": "Upload",
+        "upload": "Upload image",
         "oneAtATime": "This template makes one image at a time.",
         "remove": "Remove",
         "replace": "Replace"

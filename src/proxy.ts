@@ -50,6 +50,8 @@ export async function proxy(request: NextRequest) {
     forward: localeRouter,
     // /generate/upload-test only under `next dev`.
     devPages: env.NODE_ENV === 'development',
+    // Seals the proxy's session check for the page, so the page does not repeat it (ARCHITECTURE §7).
+    identitySecret: env.SUPABASE_SERVICE_ROLE_KEY,
   })
   // Whether analytics may use cookies for this visitor (ARCHITECTURE §16.1, T70); the test
   // site and local dev accept ?sv_country=XX to act as a visitor from that country.

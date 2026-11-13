@@ -61,6 +61,7 @@ export {
   assertPricedTier,
   assertTemplateQuote,
   creditsBelowFloor,
+  slotFloorFactor,
   creditsCostSchema,
   type ApprovedTariff,
   type CreditsCost,
@@ -97,6 +98,8 @@ export {
   slotsOf,
   slotSurfaceProblems,
   storedSlotOrder,
+  toStoredSlots,
+  type StoredSlot,
   type ImageSlot,
   type SlotUploads,
 } from './image-slots'

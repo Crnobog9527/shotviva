@@ -61,11 +61,7 @@ export function WorkspaceForm({ template, balance, tier, photos, slots, values, 
   return (
     <>
       {again ? <AgainNote again={again} template={template} photoRatio={ratioForSize} /> : null}
-      {slots && isSlotTemplate(template) ? (
-        <SlotBoxes slots={slotsOfTemplate(template)} photos={slots} fields={template.copyFields} copy={values.copy} onCopy={(copy) => onChange({ copy })} />
-      ) : (
-        <PhotoSection template={template} photos={photos} again={again} tier={tier} photoExtra={photoExtra} />
-      )}
+      <ImagesSection template={template} photos={photos} slots={slots} values={values} onChange={onChange} again={again} tier={tier} photoExtra={photoExtra} />
       <TextFields template={template} values={values} onChange={onChange} />
       <TemplateToggles className="pt-6" template={template} values={values.toggles} onChange={(toggles) => onChange({ toggles })} surface={surface} />
       <div className="pt-6">
@@ -94,6 +90,12 @@ export function WorkspaceForm({ template, balance, tier, photos, slots, values, 
       </p>
     </>
   )
+}
+
+// The named image slots (§5.1e) for a slot template, else the photo section.
+function ImagesSection({ template, photos, slots, values, onChange, again, tier, photoExtra }: Pick<Props, 'template' | 'photos' | 'slots' | 'values' | 'onChange' | 'again' | 'tier' | 'photoExtra'>) {
+  if (!slots || !isSlotTemplate(template)) return <PhotoSection template={template} photos={photos} again={again} tier={tier} photoExtra={photoExtra} />
+  return <SlotBoxes slots={slotsOfTemplate(template)} photos={slots} fields={template.copyFields} copy={values.copy} onCopy={(copy) => onChange({ copy })} missing={again?.missing ?? null} />
 }
 
 // The template's text fields, less the notes drawn under their image slots.

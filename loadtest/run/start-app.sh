@@ -9,7 +9,8 @@ cd "$root"
 export NODE_EXTRA_CA_CERTS="$root/loadtest/.stub/cert.pem"
 export NODE_OPTIONS="--import $root/loadtest/stub/preload.mjs ${NODE_OPTIONS:-}"
 case "$1" in
-  build) exec pnpm exec next build ;;
+  # Same steps as `pnpm build`: the generated public CSS sources and the Waffo price check first.
+  build) pnpm css:sources && pnpm pricing:waffo --build && exec pnpm exec next build ;;
   start) NODE_ENV=production exec node "$root/loadtest/run/serve.mjs" ;;
   *) echo "usage: $0 build|start" >&2; exit 2 ;;
 esac

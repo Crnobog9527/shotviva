@@ -14,6 +14,8 @@ describe('slot photos (§5.1e)', () => {
     expect(slotStatus(slots, [done('logo')])).toBe('none')
     expect(slotStatus(slots, [done('prize_1'), photo('logo', { phase: 'uploading', progress: 0.5 })])).toBe('uploading')
     expect(slotStatus(slots, [done('prize_1')])).toBe('ready')
+    // A failed optional upload blocks Generate until it is picked again or removed.
+    expect(slotStatus(slots, [done('prize_1'), photo('logo', { phase: 'error', code: 'UPLOAD_FAILED', message: '' })])).toBe('none')
   })
 
   it('sends only uploaded slots, in slot order', () => {
