@@ -26,7 +26,7 @@ const rowsSchema = z.array(z.object({
 }))
 const membersSchema = z.array(z.object({
   series_id: z.uuid(), series_sort_order: z.int32(), is_active: z.boolean(), visible_in: z.array(z.string()),
-  cover_after_url: z.string().nullable(), cover_locales: z.record(z.string(), z.unknown()).nullable(),
+  cover_after_url: z.string().nullable(), cover_before_url: z.string().nullable(), cover_locales: z.record(z.string(), z.unknown()).nullable(),
 }))
 
 export async function listAdminSeries(db: SupabaseClient): Promise<SeriesListItem[]> {
@@ -36,7 +36,7 @@ export async function listAdminSeries(db: SupabaseClient): Promise<SeriesListIte
   const rows = rowsSchema.parse(series.data)
   if (!rows.length) return []
   const members = await db.from('templates')
-    .select('series_id,series_sort_order,is_active,visible_in,cover_after_url,cover_locales')
+    .select('series_id,series_sort_order,is_active,visible_in,cover_after_url,cover_before_url,cover_locales')
     .in('series_id', rows.map(row => row.id)).order('series_sort_order').order('id')
   if (members.error) throw new AppError('INTERNAL', 'list series members failed', { cause: members.error })
   return autoCovers(rows, membersSchema.parse(members.data))
