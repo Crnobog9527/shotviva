@@ -2103,5 +2103,13 @@
     "missingTitle": "This template isn’t available",
     "missingText": "It may have been taken down or changed. Have a look at the other templates.",
     "missingBrowse": "See other templates"
+  },
+  "supportEmail": {
+    "subject": "You have a reply from Shotviva support",
+    "title": "Your ticket has a new reply",
+    "body": "We've replied to your support ticket. Open it to read the reply and continue the conversation.",
+    "button": "View the reply",
+    "fallback": "If the button doesn't work, copy and paste this link into your browser:",
+    "footer": "This is an automated email, please don't reply to it. Reply in your ticket on Shotviva instead."
   }
 }
