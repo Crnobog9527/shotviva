@@ -3,11 +3,46 @@
   "framework": "nextjs",
   "installCommand": "pnpm install --frozen-lockfile",
   "crons": [
-    { "path": "/api/cron/affiliate", "schedule": "5 0 * * *" },
-    { "path": "/api/cron/provider-capabilities", "schedule": "15 0 * * *" },
-    { "path": "/api/cron/moderation", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/sale-floor", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/daily-brief", "schedule": "0 14 * * *" }
+    {
+      "path": "/api/cron/affiliate",
+      "schedule": "5 0 * * *"
+    },
+    {
+      "path": "/api/cron/provider-capabilities",
+      "schedule": "15 0 * * *"
+    },
+    {
+      "path": "/api/cron/moderation",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/sale-floor",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/daily-brief",
+      "schedule": "0 14 * * *"
+    }
   ],
-  "regions": ["sfo1"]
+  "regions": [
+    "sfo1"
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "feat/*": false,
+      "fix/*": false,
+      "perf/*": false,
+      "chore/*": false,
+      "claude/*": false,
+      "assets/*": false,
+      "spec/*": false,
+      "codex/*": false,
+      "copy/*": false,
+      "test/*": false,
+      "seo/*": false,
+      "screenshots/*": false,
+      "docs/*": false,
+      "refactor/*": false
+    }
+  }
 }
