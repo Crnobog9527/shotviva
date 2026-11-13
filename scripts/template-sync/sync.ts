@@ -45,6 +45,8 @@ const profilesSchema = z.object({ active: profileKey, inactive: z.array(inactive
 
 async function readProfiles(id: string, version: number, source: SyncTarget) {
   const result = await source.db.rpc('read_template_sync_profiles', { p_id: id, p_version: version })
+  // A test site without migration 1393: sync as before (no profiles; the 9-argument function).
+  if (result.error?.code === 'PGRST202') return null
   if (result.error) throw new SyncError(result.error.message === 'SOURCE_CHANGED' ? 'SOURCE_CHANGED' : 'SOURCE_READ_FAILED')
   const parsed = profilesSchema.safeParse(result.data)
   if (!parsed.success) throw new SyncError('INVALID_PROFILES')
@@ -99,14 +101,14 @@ export async function syncTemplate(id: string, runId: string, source: SyncTarget
   }
   const styleRefs = await readStyleRefs(id, revision.version, source)
   const profiles = await readProfiles(id, revision.version, source)
-  const otherRefs = profiles.inactive.flatMap(entry => entry.style_refs)
+  const otherRefs = profiles?.inactive.flatMap(entry => entry.style_refs) ?? []
   async function apply(template: Record<string, unknown>, validate: boolean) {
     // An upload can outlast a model estimate or p95 update. Price again at the write,
     // through exactly the editor's read-and-save path, including its approved exceptions.
     const { floors, receipt, envModel } = await readTemplateQuote(target.db)
     const write = await target.db.rpc('sync_preview_template', {
       p_template: template, p_prompt: { ...revision, style_refs: styleRefs }, p_provider: provider, p_floors: { ...floors, quote_receipt: receipt, env_model: envModel },
-      p_run_id: runId, p_locales: site.locales.enabled, p_target_token: token, p_catalog_version: catalog, p_profiles: profiles, p_validate_only: validate,
+      p_run_id: runId, p_locales: site.locales.enabled, p_target_token: token, p_catalog_version: catalog, ...(profiles ? { p_profiles: profiles } : {}), p_validate_only: validate,
     })
     if (write.error) {
       const known = ['CATEGORY_MISSING', 'SUBCATEGORY_MISSING', 'SERIES_MISSING', 'MODEL_CREDIT_FLOOR', 'MODEL_CHANGED', 'MODEL_REFERENCE_LIMIT',

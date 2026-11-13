@@ -27,7 +27,7 @@ import type { AdminTemplate, SaveTemplatePayload, TemplateOrderGroup } from './t
 
 // Every function expects a service-role client; callers must have passed requireAdmin().
 
-type PromptRow = { style_refs: StyleRef[]; provider_id: string | null; body: string; version: number; model_params: Record<string, unknown>; active_profile?: 'openai' | 'seedream' }
+type PromptRow = { style_refs: StyleRef[]; provider_id: string | null; body: string; version: number; model_params: Record<string, unknown> }
 type SaleRow = { template_sale_approvals: { enabled: boolean; unpriced_resolutions: Resolution[] } | null }
 type AdminRow = SaleRow & { subcategory_key: string | null; series_id: string | null; series_sort_order: number; deleted_at?: string | null } & (TemplateRow | PreT75TemplateRow) & { template_prompts: PromptRow | null }
 
@@ -42,7 +42,7 @@ async function readAdminPage(client: SupabaseClient, after: string | null) {
       .order('id').limit(CATALOGUE_PAGE_SIZE)
     if (after) page.gt('id', after)
     return page.returns<AdminRow[]>()
-  }, ', template_sale_approvals(enabled,unpriced_resolutions), template_prompts(body, version, model_params, provider_id, style_refs, active_profile)')
+  }, ', template_sale_approvals(enabled,unpriced_resolutions), template_prompts(body, version, model_params, provider_id, style_refs)')
   if (error || !data) throw new AppError('INTERNAL', `listAdminTemplates failed: ${error?.message ?? 'no data'}`)
   return data
 }
@@ -57,11 +57,25 @@ async function readCatalogueGaps(client: SupabaseClient): Promise<Map<string, Sa
   }
 }
 
+// Provider profiles (1390): which profile is live, for the editor's note. Read on its own so the
+// list still loads on a database without the column (the test site before the merge): all ChatGPT.
+async function readActiveProfiles(client: SupabaseClient): Promise<Map<string, 'openai' | 'seedream'>> {
+  const { data, error } = await client.from('template_prompts').select('template_id, active_profile').eq('active_profile', 'seedream')
+  if (error) {
+    logger.warn('admin templates: active profiles not read', { code: error.code })
+    return new Map()
+  }
+  return new Map((data as { template_id: string }[]).map((row) => [row.template_id, 'seedream' as const]))
+}
+
 export async function listAdminTemplates(client: SupabaseClient): Promise<AdminTemplate[]> {
-  const [rows, gaps] = await Promise.all([readAllAdminRows(client), readCatalogueGaps(client)])
+  const [rows, gaps, profiles] = await Promise.all([readAllAdminRows(client), readCatalogueGaps(client), readActiveProfiles(client)])
   // Stable sort preserves the database id order within each rank.
   const data = rows.sort((a, b) => a.sort_order - b.sort_order)
-  return data.map((row) => toAdminTemplate(row, gaps.get(row.id)))
+  return data.map((row) => {
+    const template = toAdminTemplate(row, gaps.get(row.id))
+    return template.prompt ? { ...template, prompt: { ...template.prompt, activeProfile: profiles.get(row.id) ?? 'openai' } } : template
+  })
 }
 
 async function readAllAdminRows(client: SupabaseClient): Promise<AdminRow[]> {
@@ -93,7 +107,6 @@ function toAdminTemplate(row: AdminRow, gap: SaleFloorExample | undefined): Admi
           body: row.template_prompts.body,
           version: row.template_prompts.version,
           modelParams: row.template_prompts.model_params,
-          activeProfile: row.template_prompts.active_profile ?? 'openai',
         }
       : null,
   }

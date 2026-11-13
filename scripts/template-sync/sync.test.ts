@@ -149,3 +149,18 @@ describe('syncTemplate with provider profiles (1393)', () => {
     await expect(syncTemplate('demo', '1', source, side())).rejects.toMatchObject({ message: 'SOURCE_PROVIDER_MISSING' })
   })
 })
+
+describe('syncTemplate before migration 1393 on the test site', () => {
+  it('syncs as before, without profiles, when the source has no profile reader', async () => {
+    const source = side()
+    source.rpc.mockImplementation(async (name: string) => {
+      if (name === 'read_template_sync_source') return { data: snapshot, error: null }
+      if (name === 'read_template_sync_style_refs') return { data: [], error: null }
+      if (name === 'read_template_sync_profiles') return { data: null, error: { message: 'not found', code: 'PGRST202' } }
+      return { data: { token: 'missing', version: null }, error: null }
+    })
+    const target = side()
+    await syncTemplate('demo', '1', source, target)
+    expect(writesOf(target).every(([, args]) => args && !('p_profiles' in args))).toBe(true)
+  })
+})

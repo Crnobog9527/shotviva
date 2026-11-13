@@ -38,6 +38,15 @@ const toSummary = (row: z.infer<typeof summaryRow>) => ({
 const zhName = (translations: unknown) => z.object({ zh: z.object({ name: z.string() }) }).safeParse(translations).data?.zh.name ?? null
 const slotCount = (fields: unknown) => z.object({ images: z.object({ slots: z.array(z.unknown()) }) }).safeParse(fields).data?.images.slots.length ?? 0
 
+// Whether this database has provider profiles (migrations 1390–1394). The test site's database
+// gets migrations only from a merge to main, so a branch deployed there before can lack them.
+export async function profilesInstalled(db: SupabaseClient): Promise<boolean> {
+  const { error } = await db.from('template_profiles').select('template_id').limit(1)
+  if (!error) return true
+  if (['42P01', 'PGRST205'].includes(error.code ?? '')) return false
+  throw new AppError('INTERNAL', 'profilesInstalled failed', { cause: error })
+}
+
 // Every template that can carry profiles (the built-in edit and freeform templates cannot).
 export async function listProfileTemplates(db: SupabaseClient): Promise<ProfileTemplate[]> {
   const rows: z.infer<typeof templateRow>[] = []

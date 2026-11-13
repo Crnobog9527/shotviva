@@ -51,6 +51,8 @@ async function saveExtraInputCost(deps: ProviderCommandDeps, adminId: string, id
   { module, extraInputImageUsd: usd }: { module: string; extraInputImageUsd?: number | null }) {
   if (module !== 'image' || usd === undefined) return
   const { error } = await deps.db.rpc('admin_set_provider_extra_input_cost', { p_actor: adminId, p_id: id, p_usd: usd })
+  // A database without migration 1390 has no such field; an empty one has nothing to save.
+  if (error?.code === 'PGRST202' && usd === null) return
   if (error) throw new ProviderSettingError('internal', 'Saving the extra input image cost failed')
 }
 
