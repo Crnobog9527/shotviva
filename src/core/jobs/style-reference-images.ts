@@ -1,6 +1,6 @@
 import 'server-only'
 
-import type { ObjectStore } from '../storage'
+import { opaqueWebp, type ObjectStore } from '../storage'
 import { AppError } from '../errors'
 import type { StyleRef } from '../templates/style-refs'
 import type { ProviderImage } from './provider'
@@ -23,7 +23,9 @@ function readRef(store: ObjectStore, version: number, ref: StyleRef): Promise<Pr
   const hit = cache.get(cacheKey)
   if (hit) return hit
   if (cache.size >= CACHE_ENTRIES) cache.delete(cache.keys().next().value!)
-  const pending = store.get(ref.key).then(
+  // Flattened once per cache entry: a reference with alpha would reach the model with its
+  // transparent area as black or guessed (see-through.ts).
+  const pending = store.get(ref.key).then(opaqueWebp).then(
     (bytes) => ({ bytes, contentType: 'image/webp', width: ref.width, height: ref.height }),
     () => {
       if (cache.get(cacheKey) === pending) cache.delete(cacheKey)

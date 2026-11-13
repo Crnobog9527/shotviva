@@ -25,3 +25,5 @@ export const UPLOAD_URL_TTL_SECONDS = 60
 // Long edge of the preview kept with each result once the upload itself is deleted
 // (ARCHITECTURE §8 「原图小图」); the photo page states it in its facts.
 export const INPUT_PREVIEW_PX = 768
+
+export { MATTE_DARK, MATTE_WHITE, matteCss, matteFor, type Matte } from './alpha-matte'
