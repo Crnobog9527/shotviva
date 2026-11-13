@@ -24,6 +24,10 @@ import { tierName, tierPx } from './workspace-options'
 // a quiet Make another, then before/after (DESIGN §4.4 keeps it). Share is the one primary on a
 // phone, Download from lg. With editing on, "Edit this photo" sits beside Make another (Owner
 // 2026-11-08), as Edit does on the photo's page, and opens that page with the edit panel up.
+// doneState.line's pool and the photo's tag: a free poster work is private (gallery-excluded,
+// §9 第 7 条), so both read the job's own visibility rather than the pool's default.
+const donePool = (job: TrackedJob) => (job.creditPool === 'free' && job.visibility === 'private' ? 'freePrivate' : (job.creditPool ?? 'none'))
+
 type SuccessProps = { job: TrackedJob; shareText: string; editable: boolean; onAgain(): void }
 
 export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps) {
@@ -33,7 +37,7 @@ export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps)
   const size = t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px, mono: monoTag })
   const tray = (
     <>
-      <ResultPhoto src={fileUrl} alt={t('workspace.resultAlt', { name: job.templateName })} pool={job.creditPool} cutOut={job.transparent} hud={[t('workspace.doneState.hud'), size]} fit />
+      <ResultPhoto src={fileUrl} alt={t('workspace.resultAlt', { name: job.templateName })} pool={job.creditPool} visibility={job.visibility ?? undefined} cutOut={job.transparent} hud={[t('workspace.doneState.hud'), size]} fit />
       <TrayCaption>{t('workspace.doneState.caption', { name: job.templateName })}</TrayCaption>
     </>
   )
@@ -53,7 +57,7 @@ export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps)
       <h2 id="done-h" className="sr-only">{t('workspace.readyTitle')}</h2>
       <ResultPanel tone="done" title={t('workspace.doneState.saved')}>
         <p className="text-caption leading-[1.4] text-muted-foreground">
-          {t.rich('workspace.doneState.line', { tier: tierName(job.resolution, t), px, count: job.credits, pool: job.creditPool ?? 'none', mono: monoTag })}
+          {t.rich('workspace.doneState.line', { tier: tierName(job.resolution, t), px, count: job.credits, pool: donePool(job), mono: monoTag })}
         </p>
         <DoneActions jobId={job.id} editable={editable} onAgain={onAgain} />
       </ResultPanel>

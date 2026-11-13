@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { categoryInputSchema, localizeCategory, preT75Category, suggestCategoryKey, toCategory, type Category } from './categories'
 
 // T75: categories are rows in template_categories (ARCHITECTURE §5 「模板分类由后台管理」).
-const art: Category = { key: 'art-styles', nameEn: 'Art Styles', nameZh: '画风', introEn: 'Drawings.', introZh: null, cardStyle: 'compare', sortOrder: 10, isSystem: false }
+const art: Category = { key: 'art-styles', nameEn: 'Art Styles', nameZh: '画风', introEn: 'Drawings.', introZh: null, cardStyle: 'compare', sortOrder: 10, isSystem: false, galleryExcluded: false }
 
 describe('template categories', () => {
   it('maps a row and shows it in each language, a missing intro as none', () => {
@@ -12,6 +12,14 @@ describe('template categories', () => {
     expect(localizeCategory(art, 'en')).toEqual({ key: 'art-styles', name: 'Art Styles', intro: 'Drawings.', compare: true, sortOrder: 10 })
     expect(localizeCategory(art, 'zh')).toEqual({ key: 'art-styles', name: '画风', intro: '', compare: true, sortOrder: 10 })
     expect(localizeCategory({ ...art, cardStyle: 'pair' }, 'en').compare).toBe(false)
+  })
+
+  // Migration 1320: the posters root keeps its works private; a database before it has no flag.
+  it('reads gallery_excluded, false when the column is absent', () => {
+    const row = { key: 'posters', name_en: 'Posters', name_zh: '海报', intro_en: null, intro_zh: null, card_style: 'pair' as const, sort_order: 5, is_system: false }
+    expect(toCategory({ ...row, gallery_excluded: true }).galleryExcluded).toBe(true)
+    expect(toCategory(row).galleryExcluded).toBe(false)
+    expect(preT75Category('Posters').galleryExcluded).toBe(false)
   })
 
   it('proposes the English name as a slug for a new key, as analytics already sent it', () => {

@@ -18,8 +18,8 @@ const { amazon, etsy, shopify } = PLATFORM_SPECS
 
 // The sneaker set (public/cases, Owner 2026-11-11): one phone snapshot in a hallway and three
 // deliverables made from it, so this page no longer repeats the home page's tote.
-const sneakerPhone = caseImage('sneaker-phone', 'Example phone photo: an off-white leather sneaker with a sage-green heel tab on a hallway floor, hard morning sun, keys and an open shoe box in frame')
-const sneakerLifestyle = caseImage('sneaker-lifestyle', 'AI example: the same sneaker on a sunlit concrete step outside a café, a linen jacket blurred behind it')
+const sneakerPhone = caseImage('sneaker-phone', 'Real phone photo: an off-white leather sneaker with a sage-green heel tab on a hallway floor, hard morning sun, keys and an open shoe box in frame')
+const sneakerLifestyle = caseImage('sneaker-lifestyle', 'Real example: the same sneaker on a sunlit concrete step outside a café, a linen jacket blurred behind it')
 
 const shoot: ShootDemo = {
   heading: { lead: 'One phone photo → ', emphasis: 'a full shoot' },
@@ -28,13 +28,13 @@ const shoot: ShootDemo = {
   arrow: 'Three looks, same sneaker',
   results: [
     {
-      image: caseImage('sneaker-listing', 'AI example: the same sneaker on a pure white background, soft studio light, a marketplace main image'),
+      image: caseImage('sneaker-listing', 'Real example: the same sneaker on a pure white background, soft studio light, a marketplace main image'),
       title: 'Marketplace listing',
       template: 'Studio Product Shot',
     },
     { image: sneakerLifestyle, title: 'Lifestyle scene', template: 'Lifestyle Scene' },
     {
-      image: caseImage('sneaker-promo-en', 'AI example: the same sneaker floating over a sage-green backdrop on a poster headed New In, The everyday sneaker'),
+      image: caseImage('sneaker-promo-en', 'Real example: the same sneaker floating over a sage-green backdrop on a poster headed New In, The everyday sneaker'),
       title: 'Promo poster',
       template: 'Promo Poster',
     },
@@ -57,21 +57,21 @@ const whiteCases: EditCases = {
     {
       title: 'A speaker on a cluttered desk',
       change: 'The cables, the desk mat and the room are gone; the speaker keeps its grille, tweeter and finish. A transparent PNG, ready for any marketplace background.',
-      before: caseImage('white-speaker-before', 'Example phone photo: a dark grey studio speaker on a green desk mat, cables and a chair behind it'),
-      after: caseImage('white-speaker-after', 'AI example: the same speaker cut out on a transparent background with a soft shadow beneath it'),
+      before: caseImage('white-speaker-before', 'Real phone photo: a dark grey studio speaker on a green desk mat, cables and a chair behind it'),
+      after: caseImage('white-speaker-after', 'Real example: the same speaker cut out on a transparent background with a soft shadow beneath it'),
       transparent: true,
     },
     {
       title: 'A dress on a bedroom door',
       change: 'Off the hanger and the door, onto pure white: the same dress, steamed smooth, with every embroidered flower, the tassels and the crochet lace where they were.',
-      before: caseImage('white-dress-before', 'Example phone photo: an ivory tiered maxi dress with folk flower embroidery hanging on a bedroom door, a bed and a laundry basket in frame'),
-      after: caseImage('white-dress-after', 'AI example: the same embroidered dress on a pure white background'),
+      before: caseImage('white-dress-before', 'Real phone photo: an ivory tiered maxi dress with folk flower embroidery hanging on a bedroom door, a bed and a laundry basket in frame'),
+      after: caseImage('white-dress-after', 'Real example: the same embroidered dress on a pure white background'),
     },
     {
       title: 'Flyaway hair on a busy street',
       change: 'The hardest cut-out: backlit hair blowing across a city street. The street, the light stand and the passers-by are gone; the fine strands stay, as soft see-through edges in a transparent PNG.',
-      before: caseImage('white-hair-before', 'Example phone photo: a model in a camel coat on a city street at golden hour, backlit hair blowing, a light stand and a scooter behind her'),
-      after: caseImage('white-hair-after', 'AI example: the same model cut out on a transparent background, every flyaway strand of hair kept'),
+      before: caseImage('white-hair-before', 'Real phone photo: a model in a camel coat on a city street at golden hour, backlit hair blowing, a light stand and a scooter behind her'),
+      after: caseImage('white-hair-after', 'Real example: the same model cut out on a transparent background, every flyaway strand of hair kept'),
       transparent: true,
     },
   ],

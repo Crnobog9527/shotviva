@@ -17,8 +17,8 @@ const brand = site.brand.name
 
 // 本页的案例（public/cases，Owner 2026-11-11）：一张猫咪照片做成三种画风，再加四个精确改图。
 // 图里的品牌都是虚构的。
-const catPhone = caseImage('pet-phone', '示例手机照：一只白肚皮的虎斑猫趴在灰色沙发扶手上，晚上的台灯光，旁边有毯子和电视遥控器')
-const catAnime = caseImage('pet-anime', 'AI 示例：同一只猫、同样的姿势和房间，画成粗线条、平涂阴影的日式动漫插画')
+const catPhone = caseImage('pet-phone', '真实手机照：一只白肚皮的虎斑猫趴在灰色沙发扶手上，晚上的台灯光，旁边有毯子和电视遥控器')
+const catAnime = caseImage('pet-anime', '真实案例：同一只猫、同样的姿势和房间，画成粗线条、平涂阴影的日式动漫插画')
 
 const catStyles: ShootDemo = {
   heading: { lead: '一张猫咪照片 → ', emphasis: '三种画风' },
@@ -27,8 +27,8 @@ const catStyles: ShootDemo = {
   arrow: '三种画风，同一只猫',
   results: [
     { image: catAnime, title: '动漫风', template: '粗线条，平涂阴影' },
-    { image: caseImage('pet-3d', 'AI 示例：同一只猫变成三维动画电影里的角色，趴在沙发上，暖色电影光'), title: '三维动画', template: '圆润造型，电影光' },
-    { image: caseImage('pet-watercolor', 'AI 示例：同一只猫画成手绘水彩绘本插画，纸面纹理和柔和的晕染'), title: '水彩绘本', template: '纸面纹理，柔和晕染' },
+    { image: caseImage('pet-3d', '真实案例：同一只猫变成三维动画电影里的角色，趴在沙发上，暖色电影光'), title: '三维动画', template: '圆润造型，电影光' },
+    { image: caseImage('pet-watercolor', '真实案例：同一只猫画成手绘水彩绘本插画，纸面纹理和柔和的晕染'), title: '水彩绘本', template: '纸面纹理，柔和晕染' },
   ],
 }
 
@@ -40,27 +40,27 @@ const edits: EditCases = {
     {
       title: '房间照，变成挂牌用的样片',
       change: '收掉杂物，换成傍晚的金色光线。墙、窗、沙发和挂画的位置一点没变。',
-      before: caseImage('room-phone', '示例手机照：傍晚的大平层客厅，布艺沙发、洞石茶几和整面城市落地窗，地上有购物袋、快递箱和扫地机器人'),
-      after: caseImage('room-staged', 'AI 示例：同一个大平层客厅、同一个角度，杂物都收掉了，傍晚的金色光线，茶几上一瓶白色枝条'),
+      before: caseImage('room-phone', '真实手机照：傍晚的大平层客厅，布艺沙发、洞石茶几和整面城市落地窗，地上有购物袋、快递箱和扫地机器人'),
+      after: caseImage('room-staged', '真实案例：同一个大平层客厅、同一个角度，杂物都收掉了，傍晚的金色光线，茶几上一瓶白色枝条'),
     },
     {
       title: '海报上改五处文字',
       change: '改了主题、一款饮品、它的价格、日期和优惠。手写字的风格、照片和其他文字都没动。',
-      before: caseImage('poster-zh-before', 'AI 示例：森系风格的「小蕨咖啡」海报，手写大字「你好，秋天！」「抹茶和枫糖的季节」，下面是三款饮品的菜单和价格'),
-      after: caseImage('poster-zh-after', 'AI 示例：同一张海报改了五处：抹茶和栗子的季节、栗子燕麦拿铁和它的新价格、每天都有、买二送一'),
+      before: caseImage('poster-zh-before', '真实案例：森系风格的「小蕨咖啡」海报，手写大字「你好，秋天！」「抹茶和枫糖的季节」，下面是三款饮品的菜单和价格'),
+      after: caseImage('poster-zh-after', '真实案例：同一张海报改了五处：抹茶和栗子的季节、栗子燕麦拿铁和它的新价格、每天都有、买二送一'),
     },
     {
       title: '换外壳颜色，一个字都不变',
       change: '酒红色的外壳和包装盒换成宝蓝色。品牌名、色号名、标语和口红膏体本身都保持原样。',
-      before: caseImage('lipstick-before', 'AI 示例：一个虚构品牌的高端口红广告，酒红色多面切割外壳和包装盒放在洞石台上，配象牙色缎面，上方印着品牌名、色号和标语'),
-      after: caseImage('lipstick-after', 'AI 示例：同一张口红广告，外壳和包装盒换成宝蓝色，广告上的文字一个都没变'),
+      before: caseImage('lipstick-before', '真实案例：一个虚构品牌的高端口红广告，酒红色多面切割外壳和包装盒放在洞石台上，配象牙色缎面，上方印着品牌名、色号和标语'),
+      after: caseImage('lipstick-after', '真实案例：同一张口红广告，外壳和包装盒换成宝蓝色，广告上的文字一个都没变'),
     },
     {
       title: '把自家饮品换进成品图',
       change: '用一张手机随手拍的草莓抹茶拿铁，换掉原图里的黑糖珍珠奶茶。台面、背景、光线和角度不变，道具跟着换成草莓和抹茶粉。',
-      before: caseImage('drink-before', 'AI 示例：黑糖珍珠奶茶的影棚广告图，水磨石台面，蜜桃色背景'),
-      after: caseImage('drink-after', 'AI 示例：同样的影棚布景，黑糖珍珠奶茶换成了手机照里的草莓抹茶拿铁，旁边是草莓和抹茶粉'),
-      reference: caseImage('drink-ref', '示例手机照：店里手拿着的一杯分层草莓抹茶拿铁，塑料杯'),
+      before: caseImage('drink-before', '真实案例：黑糖珍珠奶茶的影棚广告图，水磨石台面，蜜桃色背景'),
+      after: caseImage('drink-after', '真实案例：同样的影棚布景，黑糖珍珠奶茶换成了手机照里的草莓抹茶拿铁，旁边是草莓和抹茶粉'),
+      reference: caseImage('drink-ref', '真实手机照：店里手拿着的一杯分层草莓抹茶拿铁，塑料杯'),
     },
   ],
 }
@@ -123,7 +123,7 @@ export const makeZhImageToImageGenerator = (offers: OfferFacts) => defineContent
     },
     {
       question: '图生图会把我的商品、菜品或房间改掉吗？',
-      answer: '模板专门保留你拍的主体：形状、颜色、标签、摆盘或房间布局，只改光线、背景、场景或画风。',
+      answer: '模板专门保留你拍的主体：形状、颜色、标签、菜品本身或房间布局，改的是光线、背景、场景或画风；餐饮模板还可能换盘子或碗。',
     },
   ],
   related: [

@@ -566,7 +566,7 @@
       "seeAll": "See all",
       "seeAllWhich": "in {name}",
       "seeAllCount": "{count} in all",
-      "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are illustrative examples."
+      "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are real results made with these templates."
     },
     "series": {
       "count": "{count, plural, one {# template} other {# templates}}",
@@ -577,10 +577,10 @@
     },
     "template": {
       "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
-      "cardAlt": "{name} template example: phone photo on the left, AI result on the right",
+      "cardAlt": "{name} template, real example: phone photo on the left, AI result on the right",
       "phone": "Phone",
       "ai": "AI",
-      "example": "Illustrative example",
+      "example": "Real example",
       "featureAria": "{name}, video template, {category}. Make one",
       "featureMeta": "{category} · video",
       "compareAria": "Compare phone photo and AI result",
@@ -674,7 +674,7 @@
       "doneState": {
         "hud": "Done",
         "saved": "Saved to Photos",
-        "line": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono> px}} · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
+        "line": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono> px}} · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} freePrivate { Made with free credits, so it has a watermark; poster photos stay private.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
         "caption": "Phone photo → {name}.",
         "edit": "Edit this photo"
       },
@@ -690,6 +690,7 @@
       "generateCta": "Generate <cost>· {count, plural, one {# credit} other {# credits}}</cost>",
       "getCreditsCta": "Get credits <cost>· <mono>{count, number}</mono> needed</cost>",
       "freeNotice": "This photo uses free credits: it's shown publicly with a watermark. <b>Paid credits make it private and watermark-free.</b>",
+      "freeNoticePrivate": "This photo uses free credits, so it has a watermark. <b>Poster photos stay private: they never go in the public gallery.</b>",
       "needsCredits": "{tier} needs {count, plural, one {# credit} other {# credits}}. <b>Paid credits make photos private and watermark-free.</b>",
       "counter": "{count, number} / {max, number}",
       "developingSize": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono>}}",
@@ -798,7 +799,7 @@
       "done": "Done",
       "newest": "Newest first",
       "count": "{running, plural, =0 {} other {# in progress · }}{done} done",
-      "footnote": "Photos made with free credits are public with a watermark. Photos made with paid credits are private and watermark-free.",
+      "footnote": "Photos made with free credits are public with a watermark; poster photos stay private. Photos made with paid credits are private and watermark-free.",
       "photoAlt": "{name} photo",
       "empty": "Pick a template, upload one phone photo, and your first one lands here in about 60 seconds.",
       "emptyCta": "Create your first photo",
@@ -831,6 +832,7 @@
     },
     "work": {
       "freePublic": "Public · watermark",
+      "freePrivate": "Private · watermark",
       "private": "Private",
       "public": "Public"
     },
@@ -885,6 +887,7 @@
         "credits": "Credits",
         "visibility": "Visibility",
         "visibilityFree": "Public, with watermark",
+        "visibilityFreePrivate": "Private, with watermark",
         "visibilityPrivate": "Private",
         "visibilityPublic": "Public",
         "original": "Original",
@@ -1244,6 +1247,7 @@
       "noticeEmpty": "Write what to change, in any language. <b>The original is kept.</b>",
       "noticeReady": "Makes a new photo; the original stays in Photos.",
       "noticeFree": "Makes a new photo; the original stays in Photos. <b>Uses free credits: public with a watermark.</b>",
+      "noticeFreePrivate": "Makes a new photo; the original stays in Photos. <b>Uses free credits: watermarked, and private like the original poster.</b>",
       "failTitle": "The edit failed.",
       "failUntouched": "The original is untouched.",
       "changeRequest": "Change the request",
@@ -1561,8 +1565,8 @@
     "home": {
       "phone": "Phone",
       "ai": "AI",
-      "beforeAlt": "{name} template example: the phone photo before (illustrative example)",
-      "afterAlt": "{name} template example: the AI result, {use} (illustrative example)",
+      "beforeAlt": "{name} template, real example: the phone photo before",
+      "afterAlt": "{name} template, real example: the AI result, {use}",
       "pickAria": "{name}. {use} Pick this template",
       "compareLabel": "Compare the phone photo and the {name} result",
       "withDragHint": "{use} Drag the handle to compare.",
@@ -1573,8 +1577,8 @@
       "seriesOpen": "Open the series",
       "freeTag": "Free · public",
       "paidTag": "Paid · private",
-      "freeSampleAlt": "A free photo with the watermark (illustrative example)",
-      "paidSampleAlt": "The same photo made with paid credits, no watermark (illustrative example)"
+      "freeSampleAlt": "A free photo with the watermark (real example)",
+      "paidSampleAlt": "The same photo made with paid credits, no watermark (real example)"
     }
   },
   "pageError": {

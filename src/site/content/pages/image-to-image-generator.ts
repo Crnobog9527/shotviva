@@ -16,8 +16,8 @@ const { amazon, shopify } = PLATFORM_SPECS
 
 // The cases on this page (public/cases, Owner 2026-11-11): one cat photo in three art styles,
 // then four precise edits of finished pictures. Every brand in them is made up.
-const catPhone = caseImage('pet-phone', 'Example phone photo: a tabby-and-white cat lying on the arm of a grey sofa in evening lamp light, a blanket and a TV remote beside it')
-const catAnime = caseImage('pet-anime', 'AI example: the same cat, pose and room as a 2D anime illustration with bold outlines and flat cel shading')
+const catPhone = caseImage('pet-phone', 'Real phone photo: a tabby-and-white cat lying on the arm of a grey sofa in evening lamp light, a blanket and a TV remote beside it')
+const catAnime = caseImage('pet-anime', 'Real example: the same cat, pose and room as a 2D anime illustration with bold outlines and flat cel shading')
 
 const catStyles: ShootDemo = {
   heading: { lead: 'One cat photo → ', emphasis: 'three art styles' },
@@ -27,12 +27,12 @@ const catStyles: ShootDemo = {
   results: [
     { image: catAnime, title: 'Anime', template: 'Bold lines, flat cel shading' },
     {
-      image: caseImage('pet-3d', 'AI example: the same cat as a stylised 3D animated-film character on the sofa, warm cinematic light'),
+      image: caseImage('pet-3d', 'Real example: the same cat as a stylised 3D animated-film character on the sofa, warm cinematic light'),
       title: '3D animation',
       template: 'Rounded forms, cinematic light',
     },
     {
-      image: caseImage('pet-watercolor', 'AI example: the same cat as a hand-painted watercolour storybook illustration, soft washes on textured paper'),
+      image: caseImage('pet-watercolor', 'Real example: the same cat as a hand-painted watercolour storybook illustration, soft washes on textured paper'),
       title: 'Watercolour',
       template: 'Paper texture, soft washes',
     },
@@ -47,27 +47,27 @@ const edits: EditCases = {
     {
       title: 'A room, staged for the listing',
       change: 'Clutter cleared and golden-hour light added. The walls, windows, sofa and painting stay exactly where they were.',
-      before: caseImage('room-phone', 'Example phone photo: a penthouse living room at dusk with a bouclé sofa, a travertine table and tall city windows, shopping bags, a delivery box and a robot vacuum on the floor'),
-      after: caseImage('room-staged', 'AI example: the same penthouse living room from the same angle, clutter cleared, warm golden-hour light, a vase of white branches on the table'),
+      before: caseImage('room-phone', 'Real phone photo: a penthouse living room at dusk with a bouclé sofa, a travertine table and tall city windows, shopping bags, a delivery box and a robot vacuum on the floor'),
+      after: caseImage('room-staged', 'Real example: the same penthouse living room from the same angle, clutter cleared, warm golden-hour light, a vase of white branches on the table'),
     },
     {
       title: 'Five edits on one poster',
       change: 'The special, a drink, its price, the days and the offer. The hand lettering, the photo and every other line are untouched.',
-      before: caseImage('poster-en-before', 'AI example: a forest-style café poster for Little Fern Café, hand-lettered Hello, Autumn! over an iced oat latte, with a three-drink menu and prices'),
-      after: caseImage('poster-en-after', 'AI example: the same poster with five edits: Matcha & chestnut specials, Chestnut Oat Latte at a new price, Every day, Buy 2, get 1 free'),
+      before: caseImage('poster-en-before', 'Real example: a forest-style café poster for Little Fern Café, hand-lettered Hello, Autumn! over an iced oat latte, with a three-drink menu and prices'),
+      after: caseImage('poster-en-after', 'Real example: the same poster with five edits: Matcha & chestnut specials, Chestnut Oat Latte at a new price, Every day, Buy 2, get 1 free'),
     },
     {
       title: 'A new case colour, every word kept',
       change: 'The oxblood case and box turn sapphire blue. The brand, the shade name, the tagline and the lipstick itself stay as they were.',
-      before: caseImage('lipstick-before', 'AI example: a luxury lipstick ad for a made-up brand, an oxblood faceted case and box on travertine with ivory satin, shade No. 214 · Rouge Nocturne'),
-      after: caseImage('lipstick-after', 'AI example: the same lipstick ad with the case and box in sapphire blue, every word of the ad unchanged'),
+      before: caseImage('lipstick-before', 'Real example: a luxury lipstick ad for a made-up brand, an oxblood faceted case and box on travertine with ivory satin, shade No. 214 · Rouge Nocturne'),
+      after: caseImage('lipstick-after', 'Real example: the same lipstick ad with the case and box in sapphire blue, every word of the ad unchanged'),
     },
     {
       title: 'Your own drink in a finished shot',
       change: 'A phone photo of a strawberry matcha latte replaces the boba tea. The counter, backdrop, light and angle stay; the props follow the new drink.',
-      before: caseImage('drink-before', 'AI example: a studio ad photo of brown-sugar boba milk tea on a terrazzo counter against a peach backdrop'),
-      after: caseImage('drink-after', 'AI example: the same studio set with the strawberry matcha latte from the phone photo in place of the boba tea, strawberries and matcha powder beside it'),
-      reference: caseImage('drink-ref', 'Example phone photo: a layered strawberry matcha latte in a plastic cup, held up in a busy shop'),
+      before: caseImage('drink-before', 'Real example: a studio ad photo of brown-sugar boba milk tea on a terrazzo counter against a peach backdrop'),
+      after: caseImage('drink-after', 'Real example: the same studio set with the strawberry matcha latte from the phone photo in place of the boba tea, strawberries and matcha powder beside it'),
+      reference: caseImage('drink-ref', 'Real phone photo: a layered strawberry matcha latte in a plastic cup, held up in a busy shop'),
     },
   ],
 }
@@ -132,7 +132,7 @@ export const makeImageToImageGenerator = (offers: OfferFacts) => defineContentPa
     {
       question: 'Will the generator change my product, dish or room?',
       answer:
-        'Templates are built to keep the subject as shot: the shape, the colors, the label, the plating or the room layout. They change the light, the background, the scene or the art style.',
+        'Templates are built to keep the subject as shot: the shape, the colors, the label, the food or the room layout. They change the light, the background, the scene or the art style; food templates may also swap the plate or bowl.',
     },
     {
       question: 'What photos work best?',
