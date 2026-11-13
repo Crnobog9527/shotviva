@@ -86,7 +86,9 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
       ) : null}
       <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
       <div ref={bar} data-stuck={stuck || undefined} className="sticky top-0 z-40 py-2 data-[stuck]:nav-material data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
-        <SearchBox value={search.query} onChange={search.setQuery} label={t('search')} clear={t('searchClear')} className="mb-2 px-(--gutter) md:max-w-[420px]" />
+        <div className="mb-2 px-(--gutter)">
+          <SearchBox value={search.query} onChange={search.setQuery} label={t('search')} clear={t('searchClear')} className="md:max-w-[420px]" />
+        </div>
         <CategoryChips hidden={search.results !== null} filters={view.filters} saved={saved.length > 0} value={active} onChange={query.select} labels={chipLabels(t)} />
       </div>
       <h2 className="sr-only">{t('templates')}</h2>
