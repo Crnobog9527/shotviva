@@ -11,7 +11,9 @@ import { png } from '../fakes/images'
 
 // A published web template with a wrapped prompt, the way an admin would set one up. Priced
 // as a medium template (1 / 2 / 3), so Standard costs 1.
-export async function seedTemplate(db: Client, options: { visibleIn?: string[]; images?: object; copy?: object[]; body?: string } = {}) {
+// credits: a slot template must cover the single-image floor × its slots (migration 1310), so
+// its fixtures pass a higher price than the default 1 / 2 / 3.
+export async function seedTemplate(db: Client, options: { visibleIn?: string[]; images?: object; copy?: object[]; body?: string; credits?: Record<'1k' | '2k' | '3k', number> } = {}) {
   const id = `t4-${randomUUID().slice(0, 8)}`
   const fields = {
     images: options.images ?? { min: 1, max: 1 },
@@ -20,8 +22,8 @@ export async function seedTemplate(db: Client, options: { visibleIn?: string[]; 
   }
   await db.query(
     `insert into public.templates (id, name, category, fields, quality, credits_cost, is_active, visible_in)
-     values ($1, 'T4 test', 'pets', $2, 'medium', '{"1k": 1, "2k": 2, "3k": 3}', false, $3)`,
-    [id, JSON.stringify(fields), options.visibleIn ?? ['web']],
+     values ($1, 'T4 test', 'pets', $2, 'medium', $4, false, $3)`,
+    [id, JSON.stringify(fields), options.visibleIn ?? ['web'], JSON.stringify(options.credits ?? { '1k': 1, '2k': 2, '3k': 3 })],
   )
   await db.query('insert into public.template_prompts (template_id, body) values ($1, $2)', [
     id,
