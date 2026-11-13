@@ -9,6 +9,7 @@ import { indexingOpen, parseIndexingEnv, xRobotsTagRules } from './src/core/seo/
 import { legacyUserRedirects } from './src/core/admin/users/legacy-redirects'
 import { legacyHelpRedirects } from './src/core/support/legacy-redirects'
 import { assetsHeaders, assetsRemotePatterns, assetsRewrites, readAssetsEnv } from './src/core/storage/assets-env'
+import { HTML_LIMITED_BOTS } from './src/core/seo/html-limited-bots'
 import { SITE_DOMAIN } from './src/site/domain'
 
 const withNextIntl = createNextIntlPlugin('./src/site/i18n/request.ts')
@@ -52,6 +53,9 @@ const nextConfig: NextConfig = {
   // slow cross-border link to mainland China), WebP for browsers without it. Each format is
   // encoded once per width and then cached: the stored covers are immutable, content-hashed.
   images: { formats: ['image/avif', 'image/webp'], remotePatterns: assetsRemotePatterns(assets.NEXT_PUBLIC_ASSETS_BASE_URL) },
+  // Next's bot list minus Lighthouse (core/seo/html-limited-bots.ts): Lighthouse and PageSpeed
+  // Insights time the cached shell visitors get, not a request-time render.
+  htmlLimitedBots: HTML_LIMITED_BOTS,
   poweredByHeader: false,
   // PostHog's API paths end in a slash (/i/v0/e/); a trailing-slash redirect would break them.
   skipTrailingSlashRedirect: true,
