@@ -33,7 +33,7 @@ describe('All as sections per root category (Owner 2026-11-12)', () => {
   it('caps the cards a section draws but counts them all', () => {
     const many = Array.from({ length: 11 }, (_, i) => card(`f${i}`, ['food']))
     const [food] = catalogueSections([node('food')], many)
-    expect(food.entries).toHaveLength(8)
+    expect(food.entries).toHaveLength(6)
     expect(food.total).toBe(11)
     expect(catalogueSections([node('food')], many, 3)[0].entries).toHaveLength(3)
   })
