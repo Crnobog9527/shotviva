@@ -57,11 +57,25 @@ async function readCatalogueGaps(client: SupabaseClient): Promise<Map<string, Sa
   }
 }
 
+// Provider profiles (1440): which profile is live, for the editor's note. Read on its own so the
+// list still loads on a database without the column (the test site before the merge): all ChatGPT.
+async function readActiveProfiles(client: SupabaseClient): Promise<Map<string, 'openai' | 'seedream'>> {
+  const { data, error } = await client.from('template_prompts').select('template_id, active_profile').eq('active_profile', 'seedream')
+  if (error) {
+    logger.warn('admin templates: active profiles not read', { code: error.code })
+    return new Map()
+  }
+  return new Map((data as { template_id: string }[]).map((row) => [row.template_id, 'seedream' as const]))
+}
+
 export async function listAdminTemplates(client: SupabaseClient): Promise<AdminTemplate[]> {
-  const [rows, gaps] = await Promise.all([readAllAdminRows(client), readCatalogueGaps(client)])
+  const [rows, gaps, profiles] = await Promise.all([readAllAdminRows(client), readCatalogueGaps(client), readActiveProfiles(client)])
   // Stable sort preserves the database id order within each rank.
   const data = rows.sort((a, b) => a.sort_order - b.sort_order)
-  return data.map((row) => toAdminTemplate(row, gaps.get(row.id)))
+  return data.map((row) => {
+    const template = toAdminTemplate(row, gaps.get(row.id))
+    return template.prompt ? { ...template, prompt: { ...template.prompt, activeProfile: profiles.get(row.id) ?? 'openai' } } : template
+  })
 }
 
 async function readAllAdminRows(client: SupabaseClient): Promise<AdminRow[]> {

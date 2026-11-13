@@ -40,6 +40,6 @@ export function state(templates: AdminTemplate[] = [], extra: Partial<DbState> =
     series: new Map(), seriesSlugs: new Map(), templates: new Map(templates.map(t => [t.id, t])),
     providers: [{ id: 'env', label: 'Default', model: 'env-model', isActive: true, openAI: true, capabilities: null, floor: floors },
       { id: SEEDREAM, label: 'Seedream', model: 'seedream-4', isActive: false, openAI: false, capabilities: null, floor: floors }],
-    floors, testRuns: new Map(), ...extra,
+    floors, testRuns: new Map(), profiles: new Map(), ...extra,
   }
 }

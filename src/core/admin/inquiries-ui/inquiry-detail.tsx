@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import type { AdminInquiry } from '@/core/inquiries'
@@ -12,15 +11,12 @@ import { StatusBadge } from './inquiries-view'
 
 type Props = { inquiry: AdminInquiry; actions: InquiryAdminActions }
 
-// /admin/inquiries/[id]: everything the visitor sent, grouped as the form asks it, then the
+// The inquiry dialog on /admin/inquiries (?inquiry=<id>): everything the visitor sent, grouped as the form asks it, then the
 // Owner's follow-up (status and a private note).
 export function InquiryDetailView({ inquiry, actions }: Props) {
   return (
     <div className="grid max-w-3xl gap-6">
       <div className="flex flex-wrap items-center gap-3">
-        <Link href="/admin/inquiries" className="text-sm text-primary hover:underline">
-          {COPY.back}
-        </Link>
         <StatusBadge status={inquiry.status} />
         <span className="font-mono text-xs text-muted-foreground">{formatBeijing(inquiry.created_at)}</span>
       </div>

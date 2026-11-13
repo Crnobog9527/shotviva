@@ -5,18 +5,22 @@ import { after } from 'next/server'
 import { getTranslations } from 'next-intl/server'
 import { z } from 'zod'
 
-import { runAdminAction, type ActionResult } from '@/core/admin'
+import { loadUser, runAdminAction, runAdminQuery, type ActionResult, type ActionValue } from '@/core/admin'
+import type { TicketDialogData } from '@/core/admin/tickets-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { serverEnv } from '@/core/env'
 import { AppError } from '@/core/errors'
+import { jobRefOrShort } from '@/core/jobs'
 import { appOrigin } from '@/core/site-url'
 import { r2Store } from '@/core/storage'
 import {
   decideRefund,
+  loadAdminTicket,
   loadRenewalReview,
   notifyTicketReply,
   resolveRenewal,
   replyTicket,
+  showMessages,
   ticketAuthor,
   withTicketImages,
 } from '@/core/support'
@@ -71,6 +75,25 @@ export async function replyTicketAction(input: unknown): Promise<ActionResult> {
     // A bare close (no text) is not a reply, so it sends nothing.
     if (parsed.data.body.trim()) emailAuthorAfterReply(ticketId)
     refresh()
+  })
+}
+
+// The ticket dialog's read (?ticket=<id> on /admin/tickets): the ticket by primary key with its
+// payment and refund checks, then its author, the images as short-lived signed URLs (T69), the
+// attached work's reference number (T78) and a billing ticket's renewal review. Null: no such ticket.
+export async function ticketDetailAction(id: string): Promise<ActionValue<TicketDialogData | null>> {
+  await requireAdmin()
+  return runAdminQuery(async () => {
+    const db = createAdminSupabase()
+    const ticket = await loadAdminTicket(db, id)
+    if (!ticket) return null
+    const [user, messages, jobRef, renewal] = await Promise.all([
+      loadUser(db, ticket.userId),
+      showMessages(r2Store(), ticket.messages),
+      ticket.jobId ? jobRefOrShort(db, ticket.jobId) : null,
+      ticket.type === 'billing' ? loadRenewalReview(db, ticket.id) : null,
+    ])
+    return { ticket: { ...ticket, messages }, renewal, user, jobRef }
   })
 }
 

@@ -73,7 +73,7 @@ async function setup(options: Options = {}) {
   const input = { photo: 'in.jpg', fields: { dish: 'salmon' }, aspectRatio: '4:5', ...(options.note ? { note: options.note } : {}) }
   const items = parseBatch({ templates: [{ id: templateId, trial: { inputs: [input], n: options.n ?? 2 } }] }).templates
   const templates = new Map((await listAdminTemplates(service)).map(t => [t.id, t]))
-  const model = () => ({ providerId: 'fake', model: 'gpt-image-2.6' })
+  const model = () => ({ providerId: 'fake-openai', model: 'gpt-image-2.6' })
   const { cells } = planCells(items, templates, new Map([['in.jpg', photo.hash]]), { model })
   const ctx: RunContext = { deps, actorId: admin, photoIds: new Map([[photo.hash, photoId]]), budgetUsd: options.budgetUsd ?? 5,
     spentUsd: 0, reservedUsd: 0, estimateOf: () => ESTIMATE, retryFailed: options.retryFailed, sleep: async () => {} }

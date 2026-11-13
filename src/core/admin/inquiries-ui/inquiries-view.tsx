@@ -8,17 +8,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 import type { Page } from '../cursor'
 import { EmptyState } from '../shell/admin-blocks'
+import { RecordLink } from '../shell/record-dialog'
+import { INQUIRY_PARAM } from '../shell/record-dialog-url'
 import { formatBeijing } from '../shell/format'
 import { INQUIRIES_COPY as COPY } from './copy'
 
 type Props = { filter: InquiryFilter; page: Page<AdminInquiryRow>; paged: boolean }
 
-// /admin/inquiries (ARCHITECTURE §10.c): every inquiry, newest first; filter by status.
+// /admin/inquiries (ARCHITECTURE §10.c): every inquiry, newest first; filter by status. A row opens
+// the inquiry in a dialog over the list (?inquiry=<id>, inquiry-dialog.tsx).
 export function InquiriesView({ filter, page, paged }: Props) {
   return (
     <div className="grid gap-4">
       <Filters filter={filter} />
-      {page.items.length === 0 ? <EmptyState title={COPY.empty} /> : <InquiriesTable rows={page.items} />}
+      {page.items.length === 0 ? <EmptyState title={COPY.empty} /> : <InquiriesTable rows={page.items} filter={filter} />}
       <div className="flex gap-4 text-sm">
         {paged ? (
           <Link href={inquiriesHref(filter)} className="text-primary hover:underline">
@@ -71,7 +74,7 @@ export function StatusBadge({ status }: { status: InquiryStatus }) {
 
 const COLUMNS = ['createdAt', 'company', 'name', 'email', 'volume', 'uses', 'status'] as const
 
-function InquiriesTable({ rows }: { rows: AdminInquiryRow[] }) {
+function InquiriesTable({ rows, filter }: { rows: AdminInquiryRow[]; filter: InquiryFilter }) {
   return (
     <Table>
       <TableHeader>
@@ -86,9 +89,9 @@ function InquiriesTable({ rows }: { rows: AdminInquiryRow[] }) {
           <TableRow key={row.id}>
             <TableCell className="font-mono text-xs whitespace-nowrap">{formatBeijing(row.created_at)}</TableCell>
             <TableCell className="min-w-40 whitespace-normal">
-              <Link href={`/admin/inquiries/${row.id}`} className="line-clamp-2 text-sm font-medium text-primary hover:underline">
+              <RecordLink param={INQUIRY_PARAM} base={inquiriesHref(filter)} id={row.id} className="line-clamp-2 text-sm font-medium">
                 {row.company}
-              </Link>
+              </RecordLink>
             </TableCell>
             <TableCell className="text-sm">
               <span className="block max-w-32 truncate" title={row.name}>

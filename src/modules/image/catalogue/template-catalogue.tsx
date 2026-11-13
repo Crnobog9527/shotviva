@@ -5,7 +5,6 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { trackCatalogueSeeAll } from '@/core/analytics/browser'
-import { useRouter } from '@/core/i18n/navigation'
 import { cn } from '@/core/ui/cn'
 import { Reveal } from '@/core/ui/reveal-item'
 
@@ -17,9 +16,10 @@ import { filterCatalogue, openableTemplates } from './catalogue-filter'
 import { buildSearchIndex, searchTemplates } from './catalogue-search'
 import { catalogueSections, isTall, sectionsFor, type CatalogueSection } from './catalogue-sections'
 import { CatalogueSections } from './catalogue-sections-view'
-import { batchableTemplates, isMotion, posterHref, type CatalogueTemplate } from './catalogue-template'
+import { batchableTemplates, isMotion, type CatalogueTemplate } from './catalogue-template'
 import { findSeries, type CatalogueView, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
+import { isPosterIn, PosterDialogSlot } from './poster-dialog-slot'
 import { SavedEmpty } from './saved-empty'
 import { SearchBox } from './search-box'
 import { FeatureCard } from './feature-card'
@@ -46,17 +46,12 @@ type Props = { view: CatalogueView; create: CreateContext; endCard?: ReactNode }
 export function TemplateCatalogue({ view, create, endCard }: Props) {
   const t = useTranslations('app.create')
   const query = useCatalogueQuery(view.filters)
-  const router = useRouter()
   const [openId, setOpenId] = useState<string | null>(null)
   const openable = useMemo(() => openableTemplates(view.entries), [view.entries])
   const batchable = useMemo(() => batchableTemplates(openable), [openable])
-  // A poster template's card goes to its editor (ARCHITECTURE §5.3); every other card opens the dialog.
-  const open = (id: string) => {
-    const found = openable.find((item) => item.id === id)
-    const href = found ? posterHref(found) : null
-    if (href) router.push(href)
-    else setOpenId(id)
-  }
+  // A poster template's card opens its editor dialog, kept in the address (?poster=<id>, where
+  // old /posters/<id> links land too); every other card opens the creation dialog.
+  const open = (id: string) => (isPosterIn(openable, id) ? query.openPoster(id) : setOpenId(id))
   const featured = featuredOf(view.entries)
   const favoriteIds = useFavorites()?.ids
   const saved = useMemo(() => (favoriteIds ? savedIn(favoriteIds, openable) : []), [favoriteIds, openable])
@@ -93,7 +88,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
         </Reveal>
       ) : null}
       <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
-      <div ref={bar} data-stuck={stuck || undefined} className="sticky top-0 z-40 py-2 data-[stuck]:nav-material data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
+      <div ref={bar} data-stuck={stuck || undefined} data-chrome="" className="sticky top-0 z-40 py-2 data-[stuck]:chrome-bleed data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
         <div className="mb-2 px-(--gutter)">
           <SearchBox value={search.query} onChange={search.setQuery} label={t('search')} clear={t('searchClear')} className="md:max-w-[420px]" />
         </div>
@@ -104,6 +99,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
+      <PosterDialogSlot id={query.posterId} templates={openable} onClose={query.closePoster} create={create} />
       <BatchDialogSlot templates={batchable} create={create} />
     </>
   )
@@ -192,7 +188,7 @@ function featuredOf(entries: readonly GridEntry[]) {
 const entryKey = (entry: GridEntry) => (entry.type === 'series' ? `series-${entry.series.id}` : entry.template.id)
 
 // True once the chip bar has stuck to the top: only then does it pad for the top safe area and
-// take its bar material, so at rest there is no band over the ground (or the living background,
+// take its bar material (chrome-bleed, globals-body.css), so at rest there is no band over the ground (or the living background,
 // T54) and a notched phone shows no empty strip above the chips.
 function useStuck() {
   const sentinel = useRef<HTMLDivElement>(null)

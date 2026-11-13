@@ -58,7 +58,7 @@ describe('poster templates in the catalogue', () => {
   const poster = { ...tpl('tournament-poster-emerald', 'posters'), photoInput: 'none' as const, poster: true }
 
   it('sends a poster card to its editor and every other card to the dialog', () => {
-    expect(posterHref(poster)).toBe('/posters/tournament-poster-emerald')
+    expect(posterHref(poster)).toBe('/generate?poster=tournament-poster-emerald')
     expect(posterHref(tpl('ramen', 'food'))).toBeNull()
   })
 

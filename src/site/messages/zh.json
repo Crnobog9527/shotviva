@@ -255,15 +255,82 @@
     },
     "account": {
       "title": "Graylum",
-      "description": "不懂运营也能做好自媒体。Graylum 像专业运营一样陪你定方向、出内容、看数据复盘，告诉你下一步做什么。连接后，配图直接用 Shotviva 积分生成。",
-      "connected": "<b>{date, date, medium}</b> 起已连接。Graylum 可以用你的积分出图。",
-      "notConnected": "未连接。要连接，请从 Graylum 发起，并允许它使用你的积分。",
-      "disconnect": "断开 Graylum"
+      "description": "Graylum 是每个人的专属 AI 自媒体陪跑教练，运营从此交给 AI 教练，你只管专心输出你擅长的内容。"
     },
     "integrations": {
       "title": "连接的应用",
-      "enabled": "已启用",
+      "enabled": "已连接",
       "notEnabled": "未启用"
+    },
+    "intro": {
+      "tagline": "Graylum 是每个人的专属 AI 自媒体陪跑教练，运营从此交给 AI 教练，你只管专心输出你擅长的内容。",
+      "idea": "每个人都有值得被看见的本事：一手好菜、一门手艺、一段别人没走过的路。很多人也想过把它做成自媒体，被更多人看见、被信任，甚至靠它多一份收入。可真动手才发现，难的不是内容，是运营：做什么定位、今天发什么、为什么没人看。我们做 Graylum，就是想把这些交给 AI 教练，让你不用先变成运营专家，也能把擅长的事做成被看见的事业。",
+      "iconAlt": "Graylum 图标",
+      "close": "关闭",
+      "connection": {
+        "label": "Graylum 和 Shotviva 的连接",
+        "connected": "<b>已连接</b>：在 Graylum 的对话里配图，会直接用你的 Shotviva 积分出图。",
+        "notConnected": "<b>未连接</b>：在 Graylum 的集成页连接后，就能在 Graylum 写内容时直接用 Shotviva 出图。",
+        "disconnect": "断开",
+        "confirm": "断开后，Graylum 就不能再用你的 Shotviva 积分出图了。",
+        "confirmDisconnect": "确认断开",
+        "cancel": "取消",
+        "disconnecting": "正在断开…",
+        "connect": "去 Graylum 连接"
+      },
+      "what": "能做什么",
+      "when": "什么时候适合用",
+      "after": {
+        "title": "连接以后",
+        "line1": "在 Graylum 写内容时可以直接配图，用你的 Shotviva 积分，Graylum 不另外收费；",
+        "line2": "Shotviva 只把你的 Shotviva 账号 ID 交给 Graylum，Graylum 拿不到你的 Shotviva 密码；",
+        "line3": "随时可以在这里或 Graylum 的集成页断开。"
+      },
+      "view": "去看看 Graylum",
+      "newTab": "（在新标签页打开）",
+      "zoom": "看大图：{name}",
+      "lightbox": {
+        "label": "Graylum 截图",
+        "prev": "上一张",
+        "next": "下一张",
+        "count": "{n} / {total}"
+      },
+      "shots": {
+        "roadmap": {
+          "name": "路线图首页",
+          "note": "从定位到 30 天行动计划，六步帮你找准方向。"
+        },
+        "script": {
+          "name": "口播建议稿",
+          "label": "写口播",
+          "note": "有想法但不知道怎么开口的时候"
+        },
+        "xhsPost": {
+          "name": "小红书图文成稿",
+          "label": "写图文",
+          "note": "想发笔记却写不出能直接发的稿子的时候"
+        },
+        "storyboard": {
+          "name": "视频分镜",
+          "label": "拍视频",
+          "note": "稿子定了，不知道每个镜头怎么拍的时候"
+        },
+        "storeVisit": {
+          "name": "探店笔记成稿",
+          "label": "一稿多用",
+          "note": "同一件事想发到不同平台的时候"
+        },
+        "shotvivaImage": {
+          "name": "对话里用 Shotviva 出图",
+          "label": "写完就配图",
+          "note": "内容写好了还缺一张像样配图的时候"
+        },
+        "tools": {
+          "name": "功能广场",
+          "label": "更多工具",
+          "note": "定位、复盘、剪辑建议等都在这里。"
+        }
+      }
     }
   },
   "app": {
@@ -632,9 +699,8 @@
       "notEnough": "（积分不够）"
     },
     "poster": {
-      "title": "赛事海报",
-      "back": "返回",
-      "noStyles": "还没有海报风格。",
+      "dialogHint": "粘贴活动通知，逐行核对后一次生成整套海报。",
+      "sampleAlt": "{name} 样图第 {page} 页",
       "paste": {
         "heading": "粘贴活动通知",
         "hint": "把标题、时间、奖品、规则和级别表整段粘贴进来。我们先帮你分好块，你核对无误后才生成海报。",
