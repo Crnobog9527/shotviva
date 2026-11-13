@@ -5,7 +5,7 @@ import { seriesCopy as copy } from './copy'
 export function CoverField({ url, change }: { url: string | null; change: (url: string | null) => void }) {
   return (
     <div className="grid gap-1.5 text-sm">
-      <label className="grid gap-1">{copy.cover}
+      <label className="grid gap-1">{copy.coverField}
         <Input type="url" placeholder={copy.automatic} maxLength={4096} value={url ?? ''} onChange={e => change(e.target.value || null)} />
       </label>
       <p className="text-muted-foreground text-xs">{copy.coverHint}</p>
