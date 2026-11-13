@@ -1,9 +1,13 @@
+import { publicEnv } from '../public-env'
+
 // The 56 regular (400) @font-face rules of the official aggregate stylesheet, copied verbatim
 // (T67: MiSans for headings only, ARCHITECTURE §17). Chinese headings have always rendered MiSans
 // 400 (the display role asks for 400), so they look exactly as before. About 82 KB raw instead
 // of 245 for all three weights. Content-addressed: a change means a new hash here, never new bytes at
 // this URL. The woff2 files are the official ones, untouched.
 export const MISANS_STYLESHEET = '/fonts/misans/misans-400-e8d416058231a4c2.css'
+// On the static-file CDN when it is on (its woff2 URLs are relative, so they follow the sheet).
+const MISANS_HREF = `${publicEnv.NEXT_PUBLIC_ASSET_CDN_URL ?? ''}${MISANS_STYLESHEET}`
 
 const LINK_ID = 'misans-font'
 
@@ -20,7 +24,7 @@ const LINK_ID = 'misans-font'
 // a full page load (a real <a href>), so this always runs on arriving at a Chinese page.
 const INSERT = [
   '(function(){var d=document,done=0;',
-  `function go(){if(done||d.getElementById('${LINK_ID}'))return;done=1;var l=d.createElement('link');l.id='${LINK_ID}';l.rel='stylesheet';l.href='${MISANS_STYLESHEET}';d.head.appendChild(l)}`,
+  `function go(){if(done||d.getElementById('${LINK_ID}'))return;done=1;var l=d.createElement('link');l.id='${LINK_ID}';l.rel='stylesheet';l.href='${MISANS_HREF}';d.head.appendChild(l)}`,
   "try{new PerformanceObserver(function(p){if(p.getEntriesByName('first-contentful-paint').length)go()}).observe({type:'paint',buffered:true})}catch(e){}",
   'setTimeout(go,1000)})()',
 ].join('')

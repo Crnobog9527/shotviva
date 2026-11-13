@@ -1,6 +1,6 @@
 'use client'
 
-import Image from 'next/image'
+import { SiteImage as Image } from '@/core/ui/site-image'
 import type { FocusEvent, ReactNode } from 'react'
 
 import { cn } from '../../ui/cn'
