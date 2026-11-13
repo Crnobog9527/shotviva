@@ -50,7 +50,10 @@ beforeAll(async () => {
   await template(plainTemplate, 'pets', null)
 })
 
+// The sub-category goes again: other suites reorder every non-system category as roots.
 afterAll(async () => {
+  await db.query('update public.templates set subcategory_key = null where subcategory_key = $1', [leaf])
+  await db.query('delete from public.template_categories where key = $1', [leaf])
   await db.end()
 })
 
