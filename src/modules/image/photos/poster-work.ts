@@ -12,7 +12,9 @@ import { OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Resolution } from 
 export type PosterWork = {
   status: 'pending' | 'match' | 'mismatch' | 'unchecked'
   diffs: PosterDiff[]
-  redo: { templateId: string; aspect: OutputAspect; resolution: Resolution; credits: number; setId: string; part: number }
+  redo: { templateId: string; aspect: OutputAspect; resolution: Resolution; credits: number; setId: string; part: number; jobId: string }
+  // The first redraw after a failed check is free (refunded once it succeeds, 1347), once per poster.
+  freeRedraw: boolean
 }
 
 const posterInputs = z.object({
@@ -26,12 +28,17 @@ const checkRow = z.object({ status: z.enum(['match', 'mismatch', 'unchecked']), 
 export async function loadPosterWork(admin: SupabaseClient, job: Job): Promise<PosterWork | null> {
   const inputs = posterInputs.safeParse(job.inputs)
   if (!inputs.success) return null
-  const { data } = await admin.from('poster_checks').select('status, diffs').eq('job_id', job.id).maybeSingle()
-  const check = checkRow.safeParse(data)
   const { poster, aspect_ratio: aspect, resolution } = inputs.data
+  const [checked, used] = await Promise.all([
+    admin.from('poster_checks').select('status, diffs').eq('job_id', job.id).maybeSingle(),
+    admin.from('poster_free_redraws').select('job_id').eq('set_id', poster.set_id).eq('part', poster.part).maybeSingle(),
+  ])
+  const check = checkRow.safeParse(checked.data)
+  const status = check.success ? check.data.status : 'pending'
   return {
-    status: check.success ? check.data.status : 'pending',
+    status,
     diffs: check.success ? check.data.diffs : [],
-    redo: { templateId: job.templateId, aspect, resolution, credits: job.creditsCost, setId: poster.set_id, part: poster.part },
+    redo: { templateId: job.templateId, aspect, resolution, credits: job.creditsCost, setId: poster.set_id, part: poster.part, jobId: job.id },
+    freeRedraw: status === 'mismatch' && !used.error && used.data === null,
   }
 }

@@ -700,6 +700,8 @@
         "seen": "海报上：",
         "notFound": "海报上没找到",
         "redraw": "重画这一张 · {credits} 积分",
+        "redrawFree": "免费重画这一张",
+        "freeNote": "核对没通过的海报，第一次重画免费：出图时先预扣 {credits} 积分，出图成功后全部退回。",
         "dismiss": "我看过了，没问题",
         "editText": "改文字"
       },

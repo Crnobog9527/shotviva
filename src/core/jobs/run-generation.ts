@@ -35,6 +35,9 @@ import { backgroundInput } from './job-background'
 import { recordJobClientIp } from './job-download'
 import type { TemplateProvider } from './provider'
 import { reserveJob } from './settlement'
+import { callRpc } from '../billing/rpc'
+import { logger } from '../logger'
+import { z } from 'zod'
 import { partText } from '../poster'
 import { loadPosterPart, POSTER_FEATURE } from '../poster/sets'
 import { requireFeature } from '../features'
@@ -70,9 +73,39 @@ async function posterPart(deps: GenerationDeps, req: GenerationRequest, template
   }
   if (!req.poster || req.source !== 'web') throw new AppError('INVALID_INPUT', 'Confirm the poster text first')
   await (deps.allowPoster ?? ((userId: string) => requireFeature(userId, POSTER_FEATURE)))(req.userId)
-  const { setId, part: index } = req.poster
+  const { setId, part: index, redrawOf } = req.poster
   const { content, part } = await loadPosterPart(deps.db, req.userId, { setId, part: index, templateId: template.id })
-  return { text: partText(content, part), record: { set_id: setId, part: index, kind: part.kind, page: part.page, pages: part.pages } }
+  if (redrawOf) await assertSamePoster(deps, req.userId, redrawOf, { setId, part: index, templateId: template.id })
+  const record = { set_id: setId, part: index, kind: part.kind, page: part.page, pages: part.pages, ...(redrawOf ? { redraw_of: redrawOf } : {}) }
+  return { text: partText(content, part), record }
+}
+
+// A redraw names a finished poster of the caller's: the same set, poster and template.
+async function assertSamePoster(deps: GenerationDeps, userId: string, jobId: string, same: { setId: string; part: number; templateId: string }) {
+  const source = await findOwnJob(deps.db, userId, jobId)
+  const poster = source?.inputs.poster as { set_id?: unknown; part?: unknown } | undefined
+  if (!source || source.status !== 'succeeded' || source.templateId !== same.templateId || poster?.set_id !== same.setId || poster.part !== same.part) {
+    throw new AppError('INVALID_INPUT', 'Unknown poster to redraw')
+  }
+}
+
+// The first redraw of a poster whose text check failed is free (Owner 2026-11-13): once it has
+// succeeded, grant_poster_free_redraw (1347) gives back what it reserved, at most once per poster.
+// A failed grant only means the redraw stays paid; it never fails the finished work.
+async function grantFreeRedraw(deps: GenerationDeps, job: Job): Promise<void> {
+  try {
+    await callRpc(deps.db, 'grant_poster_free_redraw', { p_job_id: job.id }, z.boolean())
+  } catch (error) {
+    logger.error('poster.free_redraw.failed', { jobId: job.id, error })
+  }
+}
+
+// After a poster job succeeds: a free redraw's refund (on this request, so the balance the user
+// sees next is right), then its text check, scheduled after the response.
+async function finishPoster(deps: GenerationDeps, poster: Prepared['poster'], job: Job) {
+  if (!poster || job.status !== 'succeeded') return
+  if (poster.redraw_of) await grantFreeRedraw(deps, job)
+  deps.afterPoster?.(job)
 }
 
 // Everything that can be rejected without touching credits: template, fields, key
@@ -219,6 +252,6 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     locale: req.locale,
   })
   await keepInputPreview(deps, settled, image)
-  if (prepared.poster && settled.status === 'succeeded') deps.afterPoster?.(settled)
+  await finishPoster(deps, prepared.poster, settled)
   return toJobView(settled)
 }

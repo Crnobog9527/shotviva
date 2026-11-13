@@ -11,7 +11,7 @@ import { runPosterCheck } from '@/modules/image/poster'
 
 import { createMemoryStore } from '../fakes/memory-store'
 import { fakeProvider } from './generation-fixtures'
-import { connectAdmin, createUser, publishFixture } from './helpers'
+import { connectAdmin, createUser, profileOf, publishFixture } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
 // Dense-text posters (ARCHITECTURE §5.3, 1344): a confirmed set is saved, each poster is an
@@ -61,8 +61,8 @@ async function invitedUser() {
   return userId
 }
 
-function generate(userId: string, overrides: Partial<GenerationRequest> = {}) {
-  const fake = fakeProvider('ok')
+function generate(userId: string, overrides: Partial<GenerationRequest> = {}, behaviour: 'ok' | 'fail' = 'ok') {
+  const fake = fakeProvider(behaviour)
   const memory = createMemoryStore()
   const checked: string[] = []
   const deps = { db: service, store: memory.store, provider: fake.provider, providerTimeoutMs: 500, allowPoster: allow, afterPoster: (job: { id: string }) => { checked.push(job.id) } }
@@ -127,5 +127,57 @@ describe('poster sets and generation', () => {
     expect(rows[0].diffs).toEqual([{ path: 'table.rows.2', expected: '2 200', seen: '2 280' }])
     await runPosterCheck({ ...check, ...reader([]) }, view.id)
     expect((await db.query('select status from public.poster_checks where job_id = $1', [view.id])).rows[0].status).toBe('mismatch')
+  })
+
+  describe('free redraw after a failed check (1347)', () => {
+    async function checkedPoster(status: 'mismatch' | 'match') {
+      const userId = await invitedUser()
+      const set = await savePosterSet(service, { userId, templateId, fields: { poster }, content, source: 'paste', allow })
+      const first = await generate(userId, { poster: { setId: set.id, part: 0 } }).run()
+      await db.query("insert into public.poster_checks (job_id, user_id, status) values ($1, $2, $3)", [first.id, userId, status])
+      const redraw = (redrawOf: string, behaviour: 'ok' | 'fail' = 'ok') => generate(userId, { poster: { setId: set.id, part: 0, redrawOf } }, behaviour).run()
+      return { userId, set, first, redraw }
+    }
+    const credits = async (userId: string) => (await profileOf(db, userId)).credits
+
+    it('gives the first redraw back once it succeeds, and charges the next one', async () => {
+      const { userId, first, redraw } = await checkedPoster('mismatch')
+      const before = await credits(userId)
+      const free = await redraw(first.id)
+      expect(free.status).toBe('succeeded')
+      expect(await credits(userId)).toBe(before)
+      await redraw(first.id)
+      expect(await credits(userId)).toBe(before - 1)
+      await redraw(free.id)
+      expect(await credits(userId)).toBe(before - 2)
+    })
+
+    it('cannot be replayed for the same job', async () => {
+      const { userId, first, redraw } = await checkedPoster('mismatch')
+      const free = await redraw(first.id)
+      const before = await credits(userId)
+      expect((await service.rpc('grant_poster_free_redraw', { p_job_id: free.id })).data).toBe(true)
+      expect(await credits(userId)).toBe(before)
+      const refunds = await db.query("select count(*)::int n from public.credit_ledger where job_id = $1 and kind = 'refund'", [free.id])
+      expect(refunds.rows[0].n).toBe(1)
+    })
+
+    it('is not free when the check found nothing wrong', async () => {
+      const { userId, first, redraw } = await checkedPoster('match')
+      const before = await credits(userId)
+      await redraw(first.id)
+      expect(await credits(userId)).toBe(before - 1)
+    })
+
+    it('keeps the free redraw when the redraw fails, and refuses a source from another poster', async () => {
+      const { userId, set, first, redraw } = await checkedPoster('mismatch')
+      const before = await credits(userId)
+      await expect(redraw(first.id, 'fail')).rejects.toBeDefined()
+      expect(await credits(userId)).toBe(before)
+      await redraw(first.id)
+      expect(await credits(userId)).toBe(before)
+      const wrongPart = generate(userId, { poster: { setId: set.id, part: 1, redrawOf: first.id } }).run()
+      await expect(wrongPart).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    })
   })
 })

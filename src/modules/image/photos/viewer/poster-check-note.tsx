@@ -20,7 +20,7 @@ export function PosterCheckNote({ poster, templateName, onRedraw }: { poster: Po
     const { redo } = poster
     startJob({
       templateId: redo.templateId, templateName, resolution: redo.resolution, aspect: redo.aspect, credits: redo.credits, inputKey: null, batchId: undefined,
-      body: { template_id: redo.templateId, input_key: null, expected_credits: redo.credits, inputs: { copy: {}, aspect_ratio: redo.aspect, resolution: redo.resolution }, poster: { set_id: redo.setId, part: redo.part } },
+      body: { template_id: redo.templateId, input_key: null, expected_credits: redo.credits, inputs: { copy: {}, aspect_ratio: redo.aspect, resolution: redo.resolution }, poster: { set_id: redo.setId, part: redo.part, redraw_of: redo.jobId } },
     }, 1)
     onRedraw()
   }
@@ -28,6 +28,7 @@ export function PosterCheckNote({ poster, templateName, onRedraw }: { poster: Po
   return (
     <section className="grid gap-3 rounded-control bg-wash-faint p-3 text-caption">
       <p className={cn('font-medium', showDiffs && 'text-primary')}>{t(showDiffs ? 'mismatch' : poster.status, { count: poster.diffs.length })}</p>
+      {poster.freeRedraw ? <p className="text-muted-foreground">{t('freeNote', { credits: poster.redo.credits })}</p> : null}
       {showDiffs ? (
         <ul className="grid gap-2">
           {poster.diffs.slice(0, 8).map((diff) => (
@@ -39,7 +40,9 @@ export function PosterCheckNote({ poster, templateName, onRedraw }: { poster: Po
         </ul>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={redraw} className={buttonVariants({ variant: 'glass', size: 'touch' })}>{t('redraw', { credits: poster.redo.credits })}</button>
+        <button type="button" onClick={redraw} className={buttonVariants({ variant: 'glass', size: 'touch' })}>
+          {poster.freeRedraw ? t('redrawFree') : t('redraw', { credits: poster.redo.credits })}
+        </button>
         {showDiffs ? <button type="button" onClick={() => setDismissed(true)} className={buttonVariants({ variant: 'ghost', size: 'touch' })}>{t('dismiss')}</button> : null}
         <Link href={`/posters/${poster.redo.templateId}`} className={buttonVariants({ variant: 'ghost', size: 'touch' })}>{t('editText')}</Link>
       </div>
