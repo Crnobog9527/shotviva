@@ -31,7 +31,7 @@ afterAll(async () => {
 })
 
 describe('template output options on the Data API', () => {
-  it('offers a tall poster ratio only to a template that lists it (1310)', async () => {
+  it('offers a tall poster ratio only to a template that lists it (1340)', async () => {
     const options = async () => (await anonSupabase().from('templates').select('template_image_options').eq('id', templateId).single()).data?.template_image_options
     await db.query(`update public.ai_providers set capabilities = jsonb_set(capabilities, '{aspectRatios}', '["1:1","1:2"]') where id = $1`, [provider])
     expect((await options()).aspectRatios).toEqual(['1:1'])
