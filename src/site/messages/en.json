@@ -717,6 +717,10 @@
         "footer": "Footer",
         "pending": "has lines to check"
       },
+      "pages": {
+        "shared": "Both pages",
+        "page": "Page {page} · {name}"
+      },
       "flagged": "Not found in your pasted text, or cut to fit. Check it.",
       "header": {
         "brand": "Organiser",
@@ -746,7 +750,11 @@
           "plain": "Plain"
         },
         "lines": "Lines (one per row)",
-        "add": "Add a section"
+        "add": "Add a section",
+        "heading": {
+          "title": "Column heading",
+          "titleEn": "Column heading (English)"
+        }
       },
       "table": {
         "none": "This style has no table.",
@@ -770,8 +778,14 @@
       "remove": "Remove",
       "split": {
         "count": "{count, plural, =0 {Nothing to make yet} one {Makes # poster} other {Makes # posters}}",
-        "part": "{name} {page}/{pages}",
-        "oversized": "A section is longer than one poster can hold. Shorten it or split it into two sections."
+        "part": "Page {page} · {name}",
+        "ready": "ready",
+        "empty": "Nothing on this page yet. Fill it in, or paste a notice that has it.",
+        "over": {
+          "prizeRows": "Too many prizes for one page: {count} rows, at most {max}. Shorten the list.",
+          "chars": "Too much text for one page: {count} characters in the sections, at most {max}. Shorten it.",
+          "tableRows": "Too many table rows for one page: {count}, at most {max}. Remove some rows."
+        }
       },
       "size": "Size",
       "resolution": "Resolution",
@@ -800,7 +814,8 @@
         "invalid": "Some text is too long or a table row is incomplete. Check the blocks.",
         "notEnough": "Not enough credits.",
         "error": "Something went wrong. Please try again."
-      }
+      },
+      "slotHint": "Optional. Leave it empty and the prizes are drawn from their text."
     },
     "sizes": {
       "closest": "Closest to original ({ratio})",

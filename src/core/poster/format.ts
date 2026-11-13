@@ -50,11 +50,16 @@ function footerLines(footer: PosterContent['footer']): string[] {
   ]
 }
 
+function infoLines(info: PosterContent['info']): string[] {
+  return [line('Heading over the sections', [info.title, info.titleEn].filter(Boolean).join(' / '))]
+}
+
 export function partText(content: PosterContent, part: PosterPart): string {
-  const pageNote = part.pages > 1 ? ` (poster ${part.page} of ${part.pages})` : ''
+  const pageNote = part.pages > 1 ? ` (page ${part.page} of ${part.pages})` : ''
   const blocks = [
     ['[Header]', ...headerLines(content.header)],
     part.prizes ? ['[Prizes]', ...prizeLines(part.prizes)] : [],
+    part.sections ? ['[Sections column]', ...infoLines(content.info)] : [],
     ...(part.sections ?? []).map((section) => ['[Section]', ...sectionLines(section)]),
     part.table ? ['[Table]', ...tableLines(part.table)] : [],
     ['[Footer]', ...footerLines(content.footer)],

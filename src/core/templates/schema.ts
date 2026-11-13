@@ -46,6 +46,10 @@ export const templateFieldsSchema = z
     message: 'copy field keys must be unique',
     path: ['copy'],
   })
+  .refine((fields) => (fields.poster?.kinds ?? []).every((kind) => kind.slots.every((key) => (fields.images.slots ?? []).some((slot) => slot.key === key))), {
+    message: 'a poster page can only send image slots the template defines',
+    path: ['poster'],
+  })
   .superRefine((fields, ctx) => {
     for (const message of slotShapeProblems(fields)) ctx.addIssue({ code: 'custom', message, path: ['images', 'slots'] })
   })
