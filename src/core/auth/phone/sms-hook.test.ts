@@ -14,8 +14,8 @@ const SECRET = `v1,whsec_${RAW.toString('base64')}`
 const NOW = 1_762_500_000_000
 const CODE = '402913'
 
-function hookRequest(phone: string | null, { secret = RAW, otp = CODE } = {}) {
-  const body = JSON.stringify({ user: { id: 'user-1', phone, email: '' }, sms: { otp } })
+function hookRequest(phone: string | null, { secret = RAW, otp = CODE, to }: { secret?: Buffer; otp?: string; to?: string } = {}) {
+  const body = JSON.stringify({ user: { id: 'user-1', phone, email: '' }, sms: to === undefined ? { otp } : { otp, phone: to } })
   const timestamp = String(NOW / 1000)
   return new Request('http://localhost/api/auth/sms-hook', {
     method: 'POST',
@@ -104,5 +104,17 @@ describe('handleSmsHook', () => {
       expect(line).not.toContain('14000000001')
     }
     expect(logs.join('\n')).toContain('140****0001')
+  })
+})
+
+describe('handleSmsHook, binding a number (1480)', () => {
+  it('1480: binding a number to an email account sends to sms.phone, the new number', async () => {
+    for (const to of ['8614000000002', '+8614000000002']) {
+      outbox = []
+      const response = await handleSmsHook(hookRequest(null, { to }), deps())
+      expect(response.status).toBe(200)
+      expect(authorize).toHaveBeenLastCalledWith(phoneKey(parseMainlandPhone('14000000002')!))
+      expect(outbox[0]?.to).toEqual({ e164: '+8614000000002', national: '14000000002' })
+    }
   })
 })

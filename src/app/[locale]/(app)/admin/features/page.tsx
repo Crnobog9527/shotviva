@@ -25,8 +25,8 @@ import {
   saveFeatureAccessAction,
   setFeatureInviteAction,
   saveGallerySwitchAction,
-  saveSignupGiftCapAction,
   saveSignupGiftPausedAction,
+  saveSignupGiftRulesAction,
   saveWishlistSwitchAction,
 } from './actions'
 
@@ -57,7 +57,7 @@ export default async function AdminFeaturesPage() {
     <AdminPage title={FEATURES_COPY.title}>
       <AffiliateSwitchCard enabled={affiliate} save={saveAffiliateSwitchAction} />
       <div className="my-6 grid gap-4">
-        <SignupGiftCard state={signupGift} savePaused={saveSignupGiftPausedAction} saveCap={saveSignupGiftCapAction} />
+        <SignupGiftCard state={signupGift} savePaused={saveSignupGiftPausedAction} saveRules={saveSignupGiftRulesAction} />
       </div>
       <FeaturesEditor
         settings={settings}

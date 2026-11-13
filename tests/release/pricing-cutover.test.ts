@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import type { Client } from 'pg'
-import { afterAll, beforeAll, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, expect, it, onTestFinished, vi } from 'vitest'
 import { createUser, ledgerOf, profileOf } from '../db/helpers'
 import { cloneLocalPricingDb } from './local-pricing-clone'
 
@@ -86,8 +86,17 @@ it('serializes both arrival orders and refuses preview rollback after a new paym
   expect((await profileOf(release, buyer)).credits).toBe(2545)
 })
 
+// 1480: a network may receive signup_gift_per_ip gifts (default 5); with 1 this is the old
+// one-per-network race. The second account is left pending instead of refused.
 it('grants exactly one new signup gift when two verified users on the same IP claim concurrently', async () => {
   await release.query(script('preview'))
+  const before = (await release.query("select value from system_settings where key = 'signup_gift_per_ip'")).rows[0]?.value
+  await release.query(`insert into system_settings (key, value) values ('signup_gift_per_ip', '1'::jsonb)
+    on conflict (key) do update set value = excluded.value`)
+  onTestFinished(async () => {
+    if (before === undefined) await release.query("delete from system_settings where key = 'signup_gift_per_ip'")
+    else await release.query("update system_settings set value = $1::jsonb where key = 'signup_gift_per_ip'", [JSON.stringify(before)])
+  })
   const ids = [await createUser(release), await createUser(callback)]
   await release.query("update profiles set signup_ip='192.0.2.7' where id=any($1::uuid[])", [ids])
   const gift = (db: Client, id: string) => db.query(
@@ -95,4 +104,6 @@ it('grants exactly one new signup gift when two verified users on the same IP cl
   const claims = await Promise.all([gift(release, ids[0]), gift(callback, ids[1])])
   expect(claims.map(r => r.rows[0].free_credits).sort((a, b) => a - b)).toEqual([0, 100])
   for (const id of ids) expect((await gift(callback, id)).rows[0].applied).toBe(false)
+  const pending = await release.query("select count(*)::int as n from profiles where id = any($1::uuid[]) and signup_gift_refusal = 'same_ip_pending'", [ids])
+  expect(pending.rows[0].n).toBe(1)
 })

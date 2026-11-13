@@ -54,7 +54,7 @@ function Dial({ kind, count, of, label, ringLabel }: DialProps) {
 type Props = { balance: Balance; giftRefused: SignupGiftRefusal | null; allowance: Allowance | null; freeGift: number }
 
 // The account page's note, by refusal reason (1350).
-const REFUSAL_COPY = { same_ip: 'signupGiftRefused', daily_cap: 'signupGiftRefusedCap', paused: 'signupGiftRefusedPaused' } as const
+const REFUSAL_COPY = { same_ip_pending: 'signupGiftRefused', daily_cap: 'signupGiftRefusedCap', paused: 'signupGiftRefusedPaused' } as const
 
 // What each ring is measured against: "of 50" only while it is true, since packs or a
 // carried-over balance can top what the period gave; "of 6" only when the signup gift was

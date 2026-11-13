@@ -197,6 +197,8 @@
       "AUTH_SMS_DAILY_LIMIT": "这个号码今天获取验证码的次数已用完，请明天再试，或改用邮箱。",
       "AUTH_SMS_FAILED": "短信没有发出去，请稍后再试，或改用邮箱。",
       "AUTH_OTP_INVALID": "验证码不对或已过期，请检查后重输，或重新获取。",
+      "AUTH_SIGNUP_LIMITED": "这个网络一小时内注册得太频繁了，请过一小时再试，或改用手机号注册。",
+      "AUTH_PHONE_TAKEN": "这个手机号已经绑定了别的账号，换一个号码试试。",
       "INTERNAL": "出了点问题，请再试一次。",
       "CONFLICT": "这个请求已经处理过了。"
     },
@@ -629,7 +631,7 @@
       "paid": "你有 {paid} 积分。",
       "getCredits": "获取积分",
       "panelTitle": "积分",
-      "signupGiftRefused": "这个账号没有注册赠分记录。同一网络在 24 小时内限领一次。",
+      "signupGiftRefused": "这个账号还没领到注册赠分：同一网络 24 小时内领取的账号已满，可以在下面验证手机号或 Google 账号领取。",
       "signupGiftRefusedCap": "这个账号没有领到注册赠分：当天的注册赠分名额已经发完。",
       "signupGiftRefusedPaused": "这个账号没有领到注册赠分：注册时赠分暂停发放。"
     },
@@ -1544,6 +1546,29 @@
       "copied": "链接已复制",
       "text": "用 Shotviva 的「{name}」模板，手机照片也能做成这样：",
       "copyByHand": "复制这个链接发给朋友："
+    },
+    "giftClaim": {
+      "title": "领取注册赠分",
+      "body": "同一网络 24 小时内领注册赠分的账号已经满 {perIp} 个，这个账号先记为待领取。验证一个手机号或 Google 账号就能领到 {credits} 积分；每个手机号、每个 Google 账号只能领一次。",
+      "phoneButton": "绑定手机号领取 {credits} 积分",
+      "googleButton": "用 Google 账号领取",
+      "phoneLabel": "手机号",
+      "phonePlaceholder": "11 位手机号",
+      "consent": "我已阅读并同意<terms>《服务条款》</terms><privacy>《隐私政策》</privacy><aup>《使用规范》</aup>。",
+      "send": "获取验证码",
+      "sent": "验证码已发到 {phone}，{minutes} 分钟内有效。",
+      "codeLabel": "验证码",
+      "verify": "验证并领取 {credits} 积分",
+      "bindNote": "绑定后，这个手机号也能用来登录这个账号。",
+      "granted": "已领取 {credits} 积分。",
+      "reasons": {
+        "already_used": "这个手机号或 Google 账号已经领过注册赠分了，每个只能领一次。",
+        "daily_cap": "今天的注册赠分名额已经发完，明天再来领。",
+        "paused": "注册赠分暂停发放中，恢复后再来领。",
+        "method_off": "这个领取方式暂时关闭了。",
+        "no_identity": "还没有验证过的手机号或 Google 账号，请先完成验证。",
+        "not_pending": "这个账号没有待领取的注册赠分。"
+      }
     }
   },
   "paywall": {

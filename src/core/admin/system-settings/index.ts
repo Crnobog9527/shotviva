@@ -6,5 +6,5 @@ export {
   saveWishlistSwitchSchema,
   type SystemSettingDeps,
 } from './commands'
-export { loadSignupGift, saveSignupGiftCap } from './signup-gift'
-export type { SignupGiftState, SwitchKey, WishlistSwitch, WishlistSwitchInput } from './types'
+export { loadSignupGift, saveSignupGiftRules } from './signup-gift'
+export type { SignupGiftRules, SignupGiftState, SwitchKey, WishlistSwitch, WishlistSwitchInput } from './types'

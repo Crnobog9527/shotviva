@@ -28,7 +28,7 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   const { email, password, captchaToken, next } = parsed.data
 
   // Our per-IP limit first; it also leaves the row the Before User Created hook needs (1350).
-  if ((await requestSignup(createAdminSupabase(), email, clientIp(await headers()))) !== 'ok') return failed('AUTH_RATE_LIMITED')
+  if ((await requestSignup(createAdminSupabase(), email, clientIp(await headers()))) !== 'ok') return failed('AUTH_SIGNUP_LIMITED')
 
   const supabase = await createSessionSupabase()
   const locale = await currentLocale()
