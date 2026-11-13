@@ -31,6 +31,14 @@ export const publicEnvSchema = z.object({
     .url()
     .transform((url) => url.replace(/\/+$/, ''))
     .optional(),
+  // The switch for serving covers through the image CDN (Tencent EdgeOne, img-eo): its origin,
+  // e.g. https://img-eo.shotviva.com, no trailing slash. Set: cover srcsets point at
+  // <this>/_next/image?… (the CDN forwards only /_next/image to this site and caches the result);
+  // unset: the site's own /_next/image, as before. Read at build, so a change needs a redeploy.
+  NEXT_PUBLIC_IMAGE_CDN_URL: z
+    .url({ protocol: /^https$/ })
+    .transform((url) => url.replace(/\/+$/, ''))
+    .optional(),
   // This build's version (T90): set by next.config.ts from the deployment id; `dev` locally.
   NEXT_PUBLIC_APP_VERSION: z.string().min(1).default('dev'),
 })

@@ -1,2 +1,2 @@
 export { labPageHtml } from './page-html'
-export { coverKey, labOrigins, LAB_IMAGE_COUNT, pickKeys, TRIAL_CDN_ORIGINS, type LabConfig, type LabOrigin } from './sources'
+export { coverKey, labOrigins, LAB_IMAGE_COUNT, pickKeys, SMALL_WIDTH, IMAGE_CDN_ORIGIN, type LabConfig, type LabOrigin } from './sources'

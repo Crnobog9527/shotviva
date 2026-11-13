@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { labPageHtml } from './page-html'
-import { coverKey, labOrigins, pickKeys, TRIAL_CDN_ORIGINS } from './sources'
+import { coverKey, IMAGE_CDN_ORIGIN, labOrigins, pickKeys } from './sources'
 
 const BASE = 'https://shotviva.com/assets'
 
@@ -26,18 +26,25 @@ describe('pickKeys', () => {
 })
 
 describe('labOrigins', () => {
-  it('compares the /assets rewrite, r2.dev and the two trial CDNs in production', () => {
+  it('compares the /assets rewrite and r2.dev originals, then the small files on Vercel and the CDN', () => {
     const origins = labOrigins({ assetsBase: BASE, r2Origin: 'https://pub-x.r2.dev/' })
     expect(origins.map((o) => [o.id, o.base])).toEqual([
       ['site', BASE],
       ['r2', 'https://pub-x.r2.dev'],
-      ...TRIAL_CDN_ORIGINS.map((o) => [o.id, o.base]),
+      ['site-s', ''],
+      ['eo-s', IMAGE_CDN_ORIGIN],
     ])
   })
 
   it('has no rewrite row when the base is r2.dev itself (preview)', () => {
     const ids = labOrigins({ assetsBase: 'https://pub-p.r2.dev' }).map((o) => o.id)
-    expect(ids).toEqual(['r2', 'eo', 'ali'])
+    expect(ids).toEqual(['r2', 'site-s', 'eo-s'])
+  })
+
+  it('points the small CDN row at the switch when it is set, and has no small rows without covers', () => {
+    const eo = labOrigins({ assetsBase: BASE, imageCdn: 'https://cdn.example/' }).find((o) => o.id === 'eo-s')
+    expect(eo).toMatchObject({ base: 'https://cdn.example', small: true })
+    expect(labOrigins({}).some((o) => o.small)).toBe(false)
   })
 })
 
