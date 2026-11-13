@@ -25,7 +25,7 @@ beforeAll(async () => {
   admin = await createUser(pg)
   member = await createUser(pg)
   await pg.query("update public.profiles set role='admin' where id=$1", [admin])
-  await pg.query('insert into public.template_categories(key,name_en,name_zh) values($1,$1,$1)', [category])
+  await pg.query("insert into public.template_categories(key,name_en,name_zh) values($1,'QA delete','删除测试')", [category])
   await pg.query(`insert into public.templates(id,name,category_key,fields,cover_after_url,is_active)
     select id,id,$2,'{"images":{"min":1,"max":1},"copy":[],"aspectRatios":["1:1"]}','https://example.test/m.webp',false
     from unnest($1::text[]) id`, [ids, category])
