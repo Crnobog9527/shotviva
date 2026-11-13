@@ -29,7 +29,7 @@ export default async function LabPage({ params }: { params: Promise<{ id: string
   const models = {
     image: providers.filter(p => p.module === 'image' && p.apiKeyLast4 && p.capabilities).map(p => ({
       id: p.id, label: p.label + ' · ' + p.model, resolutions: p.resolutions.filter(r => p.capabilities?.resolutions.includes(r)),
-      fixedQuality: p.adapter === 'openrouter_images',
+      fixedQuality: p.adapter !== 'openai_images',
     })).filter(p => p.resolutions.length > 0),
     vision: providers.filter(isPromptLabVisionProvider).map(p => ({ id: p.id, label: p.label + ' · ' + p.model })),
   }

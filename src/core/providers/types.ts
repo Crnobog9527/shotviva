@@ -11,11 +11,11 @@ export type ProviderModule = (typeof PROVIDER_MODULES)[number]
 
 // Code adapters a row can name. A vendor with a different API shape is a new adapter (code),
 // not an admin setting.
-export const PROVIDER_ADAPTERS = ['openai_images', 'openrouter_images', 'openai_responses'] as const
+export const PROVIDER_ADAPTERS = ['openai_images', 'openrouter_images', 'ark_images', 'openai_responses'] as const
 export type ProviderAdapterId = (typeof PROVIDER_ADAPTERS)[number]
 
 export const MODULE_ADAPTERS: Record<ProviderModule, readonly ProviderAdapterId[]> = {
-  image: ['openai_images', 'openrouter_images'],
+  image: ['openai_images', 'openrouter_images', 'ark_images'],
   decision: ['openai_responses'],
 }
 
@@ -27,6 +27,13 @@ export const MODULE_ADAPTER: Record<ProviderModule, ProviderAdapterId> = {
 
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
 export const DEFAULT_BASE_URL = 'https://api.openai.com/v1'
+// Volcano Engine Ark (火山方舟), mainland cn-beijing (Owner 2026-11-13). BytePlus ModelArk speaks
+// the same API at https://ark.ap-southeast.bytepluses.com/api/v3 with its own model ids.
+export const ARK_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3'
+
+// Adapters whose capabilities are fixed in code rather than read from a vendor catalogue: they
+// never go stale, so nothing schedules a refresh for them.
+export const staticCapabilities = (adapter: ProviderAdapterId) => adapter !== 'openrouter_images'
 
 // What an adapter needs to call its vendor. The key is plaintext, read from Vault per request:
 // never keep, log or return it.
