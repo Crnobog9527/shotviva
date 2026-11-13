@@ -52,7 +52,8 @@ async function generationRow(client: SupabaseClient, id: string, surface: Templa
   }
   return selectTemplates((columns) => {
     const all = client.from('templates').select(columns).eq('id', id)
-    const query = drafts ? all : all.eq('is_active', true)
+    // Admin trials may run drafts, never a deleted template (1401: it can never go live).
+    const query = drafts ? all.is('deleted_at', null) : all.eq('is_active', true)
     return (surface ? query.contains('visible_in', [surface]) : query).maybeSingle<Row>()
   }, extra + (surface === 'partner' ? ', partner_image_aspects' : ''))
 }

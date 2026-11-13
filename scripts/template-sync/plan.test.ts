@@ -8,12 +8,12 @@ const calls: string[] = []
 const steps = vi.hoisted(() => ({
   readSeries: vi.fn(), syncSeriesDefinition: vi.fn(), syncSeriesMembers: vi.fn(),
   syncCategories: vi.fn(), templateCategoryKeys: vi.fn(), syncTemplate: vi.fn(),
-  readStates: vi.fn(), syncTemplateState: vi.fn(), syncSeriesActive: vi.fn(),
+  readStates: vi.fn(), readDeletedIds: vi.fn(), syncTemplateState: vi.fn(), syncSeriesActive: vi.fn(),
 }))
 vi.mock('./series', () => ({ readSeries: steps.readSeries, syncSeriesDefinition: steps.syncSeriesDefinition, syncSeriesMembers: steps.syncSeriesMembers }))
 vi.mock('./categories', () => ({ syncCategories: steps.syncCategories, templateCategoryKeys: steps.templateCategoryKeys }))
 vi.mock('./sync', () => ({ syncTemplate: steps.syncTemplate }))
-vi.mock('./state', () => ({ readStates: steps.readStates, syncTemplateState: steps.syncTemplateState, syncSeriesActive: steps.syncSeriesActive }))
+vi.mock('./state', () => ({ readStates: steps.readStates, readDeletedIds: steps.readDeletedIds, syncTemplateState: steps.syncTemplateState, syncSeriesActive: steps.syncSeriesActive }))
 
 const { runSync } = await import('./plan')
 
@@ -49,7 +49,8 @@ beforeEach(() => {
     calls.push(`members ${item.series.slug}`)
     return { placed: item.members, skipped: [] }
   })
-  steps.readStates.mockReset().mockImplementation(async (ids: string[]) => new Map(ids.map((id) => [id, { active: true, sale: true }])))
+  steps.readStates.mockReset().mockImplementation(async (ids: string[]) => new Map(ids.map((id) => [id, { active: true, sale: true, deleted: false }])))
+  steps.readDeletedIds.mockReset().mockResolvedValue(new Set())
   steps.syncTemplateState.mockReset().mockImplementation(async (id: string) => {
     calls.push(`state ${id}`)
     return 'sale unchanged, unchanged'
@@ -119,5 +120,21 @@ describe('runSync', () => {
     const { lines, options } = run()
     expect(await runSync({ templateIds: [], seriesSlugs: ['set'] }, options)).toBe(false)
     expect(lines).toContain('series set members 1/2 SKIPPED set-2')
+  })
+
+  it('never syncs a delete: a template deleted on either side is skipped and kept out of the series', async () => {
+    steps.readStates.mockImplementation(async (ids: string[]) =>
+      new Map(ids.map((id) => [id, { active: false, sale: false, deleted: id === 'set-1' }])))
+    steps.readDeletedIds.mockResolvedValue(new Set(['set-2']))
+    const { lines, options } = run()
+    expect(await runSync({ templateIds: [], seriesSlugs: ['set'] }, options)).toBe(true)
+    expect(calls).not.toContain('template set-1')
+    expect(calls).not.toContain('template set-2')
+    expect(steps.syncSeriesMembers.mock.calls[0]?.[0].members).toEqual(['set-1'])
+    expect(lines).toEqual(expect.arrayContaining([
+      'set-1 SKIPPED deleted on the test site (deletes are not synced)',
+      'set-2 SKIPPED deleted on production (deletes are not synced)',
+      'series set members SKIPPED deleted on production: set-2',
+    ]))
   })
 })

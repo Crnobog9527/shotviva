@@ -19,7 +19,7 @@ import { duplicateTemplateAction, listVersionsAction, manageVersionAction, readV
 import {
   applyCoverAction, bulkEditTemplatesAction, deleteTemplateCategoryAction, saveTemplateCategoryAction,
   setFeaturedTemplatesAction, setTemplatesFeaturedAction, requestCoverUploadAction, saveTemplateAction, setTemplateActiveAction,
-  setTemplateOrderAction, setTemplatesActiveAction,
+  setTemplateOrderAction, setTemplatesActiveAction, deleteTemplateAction,
 } from './actions'
 
 // The cover tabs (ARCHITECTURE §8.3, T87): the common cover, the site's languages, then the ones
@@ -77,6 +77,7 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
           setFeaturedMany: setTemplatesFeaturedAction,
           requestCoverUpload: requestCoverUploadAction,
           applyCover: applyCoverAction,
+          remove: deleteTemplateAction,
         }}
       />
       </AdminTemplatePreview>

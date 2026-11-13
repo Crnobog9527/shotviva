@@ -56,9 +56,10 @@ type ActionsProps = {
   pending: boolean
   onDuplicate: (id: string) => void
   onEdit: (template: AdminTemplate) => void
+  onDelete: (template: AdminTemplate) => void
 }
 
-export function ActionsCell({ template, pending, onDuplicate, onEdit }: ActionsProps) {
+export function ActionsCell({ template, pending, onDuplicate, onEdit, onDelete }: ActionsProps) {
   return (
     <TableCell className={stickyActionsClass}>
       <div className="flex items-center justify-end gap-1">
@@ -68,9 +69,16 @@ export function ActionsCell({ template, pending, onDuplicate, onEdit }: ActionsP
             <CopyPlus aria-hidden />
           </Button>
         )}
-        <Button variant="outline" size="sm" disabled={pending} onClick={() => onEdit(template)}>
-          {rowCopy.edit}
-        </Button>
+        {!template.isActive && !template.deletedAt && !isBuiltIn(template) && (
+          <Button variant="ghost" size="sm" className="text-destructive" disabled={pending} onClick={() => onDelete(template)}>
+            {rowCopy.delete}
+          </Button>
+        )}
+        {template.deletedAt ? <span className="text-muted-foreground px-2 text-sm">{rowCopy.deleted}</span> : (
+          <Button variant="outline" size="sm" disabled={pending} onClick={() => onEdit(template)}>
+            {rowCopy.edit}
+          </Button>
+        )}
       </div>
     </TableCell>
   )

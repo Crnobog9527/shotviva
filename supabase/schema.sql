@@ -329,6 +329,7 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     "subcategory_key" "text",
     "series_id" "uuid",
     "series_sort_order" integer DEFAULT 0 NOT NULL,
+    "deleted_at" timestamp with time zone,
     CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
     CONSTRAINT "templates_cover_locales_object" CHECK (("jsonb_typeof"("cover_locales") = 'object'::"text")),
     CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
@@ -1286,6 +1287,24 @@ $$;
 ALTER FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."guard_deleted_template"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if old.deleted_at is not null and new.deleted_at is null then
+    raise exception 'TEMPLATE_DELETED' using detail = '已删除的模板不能恢复';
+  end if;
+  if new.deleted_at is not null and (new.is_active or new.series_id is not null or new.featured_rank is not null) then
+    raise exception 'TEMPLATE_DELETED' using detail = '已删除的模板不能上架、加入系列或设为首页精选';
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."guard_deleted_template"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."is_template_catalog_v2"() RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -2102,6 +2121,22 @@ $_$;
 
 
 ALTER FUNCTION "admin"."template_image_options"("public"."templates") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_leaves_series_on_unpublish"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if old.is_active and not new.is_active and new.series_id is not null then
+    new.series_id := null;
+    new.series_sort_order := 0;
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."template_leaves_series_on_unpublish"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_price_state"("t" "public"."templates") RETURNS "jsonb"
@@ -3825,9 +3860,9 @@ CREATE OR REPLACE FUNCTION "public"."admin_assigned_template_count"("public"."te
     SET "search_path" TO ''
     AS $_$
   select case when $1.parent_id is null then
-    (select count(*) from public.templates t where t.category_key=$1.key and t.subcategory_key is null)
+    (select count(*) from public.templates t where t.category_key=$1.key and t.subcategory_key is null and t.deleted_at is null)
   else
-    (select count(*) from public.templates t where t.subcategory_key=$1.key)
+    (select count(*) from public.templates t where t.subcategory_key=$1.key and t.deleted_at is null)
   end
 $_$;
 
@@ -5300,6 +5335,39 @@ end $$;
 
 
 ALTER FUNCTION "public"."admin_delete_reference_category"("p_actor" "uuid", "p_key" "text", "p_move_to" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_delete_template"("p_actor" "uuid", "p_id" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  t public.templates;
+  v_system boolean;
+begin
+  if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
+    raise exception 'FORBIDDEN';
+  end if;
+  if not exists(select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  select * into t from public.templates where id = p_id for update;
+  if not found then raise exception 'TEMPLATE_MISSING'; end if;
+  select c.is_system into v_system from public.template_categories c where c.key = t.category_key;
+  if coalesce(v_system, false) or t.id in ('freeform', 'edit') then raise exception 'TEMPLATE_BUILT_IN'; end if;
+  if t.deleted_at is not null then return false; end if;
+  if t.is_active then raise exception 'TEMPLATE_LIVE'; end if;
+  update public.templates set deleted_at = now(), series_id = null, series_sort_order = 0, featured_rank = null
+    where id = p_id;
+  insert into public.admin_audit_log(action, user_id, target_id, reason)
+    values ('template_delete', p_actor, p_id, '模板列表删除已下架模板');
+  return true;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_delete_template"("p_actor" "uuid", "p_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") RETURNS integer
@@ -7324,7 +7392,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_series_candidates"("p_search" "text",
          coalesce(t.cover_after_url,t.cover_locales #>> '{zh,after}',t.cover_locales #>> '{en,after}'),
          t.series_id,t.is_active
     from public.templates t join public.template_categories c on c.key=t.category_key
-   where not c.is_system and t.id not in ('freeform','edit') and (p_after is null or t.id>p_after)
+   where not c.is_system and t.id not in ('freeform','edit') and t.deleted_at is null and (p_after is null or t.id>p_after)
      and (p_search='' or strpos(lower(t.id),lower(p_search))>0 or strpos(lower(t.name),lower(p_search))>0
           or strpos(lower(t.translations #>> '{zh,name}'),lower(p_search))>0)
    order by t.id limit 31
@@ -7748,7 +7816,7 @@ begin
          array_agg(t.sort_order order by t.sort_order, t.id)
     into v_members, order_slots
   from public.templates t
-  where case p_group
+  where t.deleted_at is null and case p_group
     when 'catalogue' then t.id <> 'edit'
     when 'featured' then t.featured_rank is not null
     else t.id <> 'edit' and t.is_active = (p_group = 'active')
@@ -13294,7 +13362,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -15631,7 +15699,15 @@ CREATE OR REPLACE TRIGGER "template_categories_sync_name" AFTER UPDATE OF "name_
 
 
 
+CREATE OR REPLACE TRIGGER "template_deleted_guard" BEFORE UPDATE OF "deleted_at", "is_active", "series_id", "featured_rank" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "admin"."guard_deleted_template"();
+
+
+
 CREATE OR REPLACE TRIGGER "template_favorites_guard" BEFORE INSERT ON "public"."template_favorites" FOR EACH ROW EXECUTE FUNCTION "public"."template_favorites_guard"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_leaves_series_on_unpublish" BEFORE UPDATE OF "is_active" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "admin"."template_leaves_series_on_unpublish"();
 
 
 
@@ -16852,6 +16928,10 @@ GRANT ALL ON FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resoluti
 
 
 
+REVOKE ALL ON FUNCTION "admin"."guard_deleted_template"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."is_template_catalog_v2"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."is_template_catalog_v2"() TO "service_role";
 
@@ -17009,6 +17089,10 @@ REVOKE ALL ON FUNCTION "admin"."template_image_options"("public"."templates") FR
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "anon";
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "authenticated";
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_leaves_series_on_unpublish"() FROM PUBLIC;
 
 
 
@@ -17465,6 +17549,11 @@ GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "servic
 
 REVOKE ALL ON FUNCTION "public"."admin_delete_reference_category"("p_actor" "uuid", "p_key" "text", "p_move_to" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_delete_reference_category"("p_actor" "uuid", "p_key" "text", "p_move_to" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_delete_template"("p_actor" "uuid", "p_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_template"("p_actor" "uuid", "p_id" "text") TO "service_role";
 
 
 
