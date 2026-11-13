@@ -19,6 +19,7 @@ import { missingRequiredCopy } from './text-fields'
 import type { ReadyPhoto } from './photo-batch'
 import { usePhotoBatch, useSlotPhotos, type PhotoBatch, type SlotPhotos } from './use-photo-batch'
 import type { FormValues } from './workspace-form'
+import { noteShareGenerate } from '../share/share-attribution'
 
 export type DraftInput = {
   template: CatalogueTemplate
@@ -86,6 +87,8 @@ function useDraftStart(template: CatalogueTemplate, limit: number, again: AgainS
   const setError = (next: PreflightError | null) => setRefusal(next ? { error: next, photoKey } : null)
   const queue = (inputs: StartInput[]) => {
     setWorkspaceJobs(template.id, enqueueJobs(inputs, limit))
+    // The first photo from a template whose share link this browser opened (share-attribution.ts).
+    noteShareGenerate(template.id)
     // A reload now comes back to these jobs, not to Make again's form (and copies nothing again).
     if (again) window.history.replaceState(null, '', window.location.pathname)
   }

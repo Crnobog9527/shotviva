@@ -16,7 +16,7 @@ import { REDUCED_MOTION, useQuietLoop } from './use-motion'
 // poster in one 8:5 frame, playing while in view under the Quiet Loop rule (DESIGN §4.2).
 // `sizes` is the frame's rendered width, for the poster; a video's poster attribute takes one URL,
 // `posterWidth` px wide (1080 covers a card, the dialog and the stage at 2x).
-type Props = { template: CatalogueTemplate; alt: string; sizes: string; posterWidth?: number; className?: string }
+type Props = { template: Pick<CatalogueTemplate, 'cover'>; alt: string; sizes: string; posterWidth?: number; className?: string }
 
 export function LoopPlate({ template, alt, sizes, posterWidth = 1080, className }: Props) {
   const { type, motion, poster } = template.cover

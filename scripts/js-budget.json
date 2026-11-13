@@ -1,5 +1,5 @@
 {
-  "note": "First-load JS per route in KB gzip (scripts/js-budget.ts). Set 2026-11-07 after the performance pass (#232-#236) at about 8% over what each route measured then. Raise a number only with a reason in the PR. Lowered 2026-11-11 for the marketing pages and legal pages (zod and the pricing plans out of their first load, mobile Lighthouse), again about 8% over what they measured. Lowered again 2026-11-11 for the marketing, legal and sign-in pages (the root error boundary no longer pulls the marketing blocks into every route, 7.8 KB off each), about 5% over what they measure; the app routes keep their numbers. Raised 2026-11-13 for /generate and /photos (325 → 328): Create's template search (#594) measured 325.3.",
+  "note": "First-load JS per route in KB gzip (scripts/js-budget.ts). Set 2026-11-07 after the performance pass (#232-#236) at about 8% over what each route measured then. Raise a number only with a reason in the PR. Lowered 2026-11-11 for the marketing pages and legal pages (zod and the pricing plans out of their first load, mobile Lighthouse), again about 8% over what they measured. Lowered again 2026-11-11 for the marketing, legal and sign-in pages (the root error boundary no longer pulls the marketing blocks into every route, 7.8 KB off each), about 5% over what they measure; the app routes keep their numbers. Raised 2026-11-13 for /generate and /photos (325 → 328): Create's template search (#594) measured 325.3. Raised again 2026-11-13 (#592): /generate and /photos 328 → 330, /account 335 → 337 for the template dialog's 分享 button, the full-screen viewer entry (the viewer itself loads on first open) and Saved's empty state; measured 328.3 and 335.7.",
   "routes": {
     "en": 220,
     "zh": 220,
@@ -12,8 +12,8 @@
     "en/privacy": 200,
     "en/login": 272,
     "en/signup": 272,
-    "en/generate": 328,
-    "en/photos": 328,
-    "en/account": 335
+    "en/generate": 330,
+    "en/photos": 330,
+    "en/account": 337
   }
 }

@@ -66,10 +66,11 @@ export function chipRows(filters: readonly FilterNode[], path: readonly string[]
 }
 
 // What the grid shows. Saved lists the saved templates newest first, series members included;
-// with none left (the last one was just removed) the chip is gone, so the grid falls back to All.
+// with none (the last one was just removed, or 我的收藏 opened it with nothing saved) it stays
+// on Saved and the page shows its empty state (Owner 2026-11-13).
 // A path shows every card in that category and below it, in the catalogue's order.
 export function filterCatalogue(entries: readonly GridEntry[], saved: readonly CatalogueTemplate[], chosen: Selection) {
-  const active = chosen.saved && saved.length === 0 ? ALL : chosen
+  const active = chosen
   if (active.saved) return { active, shown: saved.map((template): GridEntry => ({ type: 'template', template, path: [] })) }
   return { active, shown: active.path.length ? entries.filter((entry) => pathStartsWith(entry.path, active.path)) : [...entries] }
 }

@@ -25,6 +25,8 @@ type Props = {
   // A series' members (member-picker.tsx): under the sample's text from 768px, between the title
   // and the sample strip on phones, so switching never scrolls past the form.
   picker?: ReactNode
+  // The template's share button (share-button.tsx), under its name and description.
+  share?: ReactNode
 }
 
 // The creation dialog's frame (DESIGN §6.9 item 2, B comp create.html .cd): from 768px a 1040px
@@ -57,9 +59,9 @@ export const DESKTOP_FRAME = 'grid grid-cols-[46fr_54fr] overflow-hidden rounded
 // The title and description elements: the dialog's or drawer's own (labelling it), or plain
 // ones where the panes are drawn outside a dialog (the admin's live preview).
 type Headings = { Title: ElementType; Description: ElementType }
-export type PaneProps = Pick<Props, 'title' | 'description' | 'hint' | 'sample' | 'tall' | 'folded' | 'form' | 'bar' | 'picker'> & Headings
+export type PaneProps = Pick<Props, 'title' | 'description' | 'hint' | 'sample' | 'tall' | 'folded' | 'form' | 'bar' | 'picker' | 'share'> & Headings
 
-export function DesktopPanes({ Title, Description, title, description, hint, sample, form, bar, picker }: PaneProps) {
+export function DesktopPanes({ Title, Description, title, description, hint, sample, form, bar, picker, share }: PaneProps) {
   return (
     <>
       <div className="no-scrollbar flex min-h-0 flex-col justify-center-safe overflow-y-auto bg-card p-6 shadow-[inset_-1px_0_0_var(--border)]">
@@ -67,6 +69,7 @@ export function DesktopPanes({ Title, Description, title, description, hint, sam
         <Title className="pt-5 font-display text-h1 leading-[1.05] tracking-[-0.02em]">{title}</Title>
         <Description className="mt-1.5 text-label text-pretty text-muted-foreground">{description}</Description>
         <p className="mt-2 text-caption text-muted-foreground">{hint}</p>
+        {share ? <div className="mt-3">{share}</div> : null}
         {picker ? <div className="mt-6">{picker}</div> : null}
       </div>
       <div className="flex min-h-0 flex-col">
@@ -89,7 +92,7 @@ function PhoneSheet(props: Props) {
   )
 }
 
-export function PhonePanes({ Title, Description, title, description, sample, tall, folded, form, bar, picker }: PaneProps) {
+export function PhonePanes({ Title, Description, title, description, sample, tall, folded, form, bar, picker, share }: PaneProps) {
   return (
     <>
       {/* One scroll surface, title to options, over the pinned primary: inside the drawer only a
@@ -98,6 +101,7 @@ export function PhonePanes({ Title, Description, title, description, sample, tal
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
         <Title className="mr-12">{title}</Title>
         <Description className="mt-1 mb-3 text-pretty">{description}</Description>
+        {share ? <div className="-mt-1 mb-3">{share}</div> : null}
         {picker ? <div className="mb-4">{picker}</div> : null}
         <div style={phoneStrip(tall, folded)} className={cn('relative mx-auto overflow-hidden rounded-control transition-[height] duration-350 ease-house', folded && '[&_[aria-hidden=true]]:opacity-0')}>
           {sample}
