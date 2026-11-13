@@ -8,6 +8,9 @@
 // - Loads run one at a time; for each image the origins are shuffled, so a slow minute on the
 //   line hits every origin alike. The first load of each origin carries its DNS + TCP + TLS and
 //   is reported apart ("首张"); medians and P90 use the rest.
+// - The small-image rows (o.small) load the card-sized AVIF/WebP from /_next/image. Vercel's
+//   optimiser ignores the extra lab parameter in its cache key (checked 2026-11-13), so its
+//   "冷" is still a Vercel hit and costs no new transformation; on the CDN it is a CDN miss.
 // - Time = the Resource Timing duration (fetch start → last byte; no Timing-Allow-Origin needed),
 //   falling back to onload time. TTFB only where the origin sends Timing-Allow-Origin.
 export const CLIENT_SCRIPT = String.raw`(function () {
@@ -17,7 +20,10 @@ export const CLIENT_SCRIPT = String.raw`(function () {
   var results = [];
   if (performance.setResourceTimingBufferSize) performance.setResourceTimingBufferSize(1000);
 
-  function url(o, key, tag) { return o.base + '/' + key + '?lab=' + tag; }
+  function url(o, key, tag) {
+    if (o.small) return o.base + '/_next/image?url=' + encodeURIComponent(C.assetsBase + '/' + key) + '&w=' + C.smallWidth + '&q=75&lab=' + tag;
+    return o.base + '/' + key + '?lab=' + tag;
+  }
   function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function q(sorted, p) { if (!sorted.length) return null; var i = Math.min(sorted.length - 1, Math.ceil(p * sorted.length) - 1); return Math.round(sorted[Math.max(0, i)]); }
 
