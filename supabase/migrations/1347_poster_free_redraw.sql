@@ -2,8 +2,8 @@
 -- on a poster that differs from what the user confirmed, the first redraw of that poster is free;
 -- later ones charge like any job. "Free" is a refund on success: the redraw reserves and runs like
 -- any job (so reserve_credits and its price checks are untouched), and once it has succeeded the
--- server calls grant_poster_free_redraw, which gives back exactly what that job reserved, to the
--- pool it came from. One per poster (set + part): the primary key below makes a second grant for
+-- server calls grant_poster_free_redraw, which gives back what that job reserved (never more than
+-- the source poster cost), to the pool it came from. One per poster (set + part): the primary key below makes a second grant for
 -- the same poster impossible, and the ledger key makes a replay of the same job a no-op. A redraw
 -- that fails is refunded as usual and leaves the free redraw unused.
 create table public.poster_free_redraws (
@@ -21,7 +21,7 @@ grant select, insert on public.poster_free_redraws to service_role;
 
 -- True when this call (or an earlier call for the same job) made the job free. The redraw names
 -- its source in inputs.poster.redraw_of; the source must be the same user's poster job for the
--- same set, part and template, whose check found a mismatch.
+-- same set, part and template, at the same resolution and size, whose check found a mismatch.
 create function public.grant_poster_free_redraw(p_job_id uuid)
 returns boolean
 language plpgsql security definer set search_path = '' as $$
@@ -40,7 +40,9 @@ begin
    where id = (v_job.inputs->'poster'->>'redraw_of')::uuid and user_id = v_job.user_id and status = 'succeeded';
   if not found or v_source.template_id <> v_job.template_id
      or v_source.inputs->'poster'->'set_id' is distinct from v_job.inputs->'poster'->'set_id'
-     or v_source.inputs->'poster'->'part' is distinct from v_job.inputs->'poster'->'part' then
+     or v_source.inputs->'poster'->'part' is distinct from v_job.inputs->'poster'->'part'
+     or v_source.inputs->>'resolution' is distinct from v_job.inputs->>'resolution'
+     or v_source.inputs->>'aspect_ratio' is distinct from v_job.inputs->>'aspect_ratio' then
     return false;
   end if;
   if not exists (select from public.poster_checks where job_id = v_source.id and status = 'mismatch') then
@@ -56,7 +58,7 @@ begin
     return exists (select from public.poster_free_redraws where set_id = v_set and part = v_part and job_id = v_job.id);
   end if;
   perform public._apply_credit_change(
-    v_job.user_id, v_job.credit_pool, 'refund', v_job.credits_cost, 'poster free redraw',
+    v_job.user_id, v_job.credit_pool, 'refund', least(v_job.credits_cost, v_source.credits_cost), 'poster free redraw',
     'job:' || v_job.id::text || ':poster_free_redraw', v_job.id
   );
   return true;

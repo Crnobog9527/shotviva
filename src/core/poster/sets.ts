@@ -16,6 +16,8 @@ export const POSTER_FEATURE = 'dense_poster'
 // Sets one account may save per day; each is a few KB, and saving costs nothing but storage.
 export const POSTER_SETS_PER_DAY = 60
 export const POSTER_SOURCES = ['paste', 'photo', 'reuse', 'manual'] as const
+// poster_sets.parts holds at most this many posters (1344).
+export const POSTER_PARTS_MAX = 12
 
 export type SavedPosterSet = { id: string; templateId: string; parts: PosterPart[] }
 
@@ -54,6 +56,7 @@ export async function savePosterSet(db: SupabaseClient, input: SavePosterSet): P
   if (!content.success) throw fail(content.error.issues[0]?.message ?? 'Invalid poster text')
   const parts = splitPoster(content.data, fields)
   if (parts.length === 0) throw fail('Add some text before making the posters')
+  if (parts.length > POSTER_PARTS_MAX) throw fail(`At most ${POSTER_PARTS_MAX} posters per set; shorten the text`)
   await assertUnderDailyLimit(db, input.userId, input.now ?? new Date())
   const { data, error } = await db.from('poster_sets')
     .insert({ user_id: input.userId, template_id: input.templateId, source: input.source, content: content.data, parts })

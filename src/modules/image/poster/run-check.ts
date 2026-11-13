@@ -85,32 +85,38 @@ async function save(db: SupabaseClient, jobId: string, userId: string, outcome: 
   if (error) logger.error('poster.check.save_failed', { jobId, message: error.message })
 }
 
-async function read(deps: CheckDeps, credentials: ProviderCredentials, instructions: string, outputKey: string): Promise<{ lines: string[]; usage: Usage }> {
+// The reading, and the call's usage even when its answer cannot be parsed (it was paid for).
+async function read(deps: CheckDeps, credentials: ProviderCredentials, instructions: string, outputKey: string, spent: { usage: Usage }) {
   const body = requestBody(credentials.config.model, instructions, await posterImage(deps.store, outputKey))
   const answer = readResponsesOutput(await postResponses({ ...credentials.config, fetch: deps.fetch }, body, AbortSignal.timeout(deps.timeoutMs ?? TIMEOUT_MS)))
-  return { lines: z.object({ lines: z.array(z.string()) }).parse(answer.json).lines, usage: answer.usage }
+  spent.usage = answer.usage
+  return z.object({ lines: z.array(z.string()) }).parse(answer.json).lines
 }
 
-export async function runPosterCheck(deps: CheckDeps, jobId: string): Promise<CheckStatus | null> {
-  const job = await readJob(deps.db, jobId)
-  if (!job) return null
+async function check(deps: CheckDeps, jobId: string, job: NonNullable<Awaited<ReturnType<typeof readJob>>>, spent: { usage: Usage; credentials: ProviderCredentials | null }): Promise<Outcome> {
   const { content, part } = await loadPosterPart(deps.db, job.user_id, { setId: job.inputs.poster.set_id, part: job.inputs.poster.part, templateId: job.template_id })
   const { prompt } = await loadGenerationTemplate(deps.db, job.template_id, 'web')
   const instructions = instructionsOf(prompt.modelParams)
-  const credentials = await deps.credentials().catch(() => null)
-  if (!instructions || credentials?.adapter !== 'openai_responses') {
-    await save(deps.db, jobId, job.user_id, { status: 'unchecked', diffs: [], usage: null }, credentials)
-    return 'unchecked'
-  }
+  spent.credentials = await deps.credentials().catch(() => null)
+  if (!instructions || spent.credentials?.adapter !== 'openai_responses') return { status: 'unchecked', diffs: [], usage: null }
+  const lines = await read(deps, spent.credentials, instructions, job.output_key, spent)
+  const diffs = compareReading(partStrings(content, part), lines)
+  return { status: diffs.length > 0 ? 'mismatch' : 'match', diffs, usage: spent.usage }
+}
+
+// Any failure, before or after the call, leaves an 'unchecked' row, so the work never shows
+// "checking" forever.
+export async function runPosterCheck(deps: CheckDeps, jobId: string): Promise<CheckStatus | null> {
+  const job = await readJob(deps.db, jobId)
+  if (!job) return null
+  const spent: { usage: Usage; credentials: ProviderCredentials | null } = { usage: null, credentials: null }
+  let outcome: Outcome
   try {
-    const { lines, usage } = await read(deps, credentials, instructions, job.output_key)
-    const diffs = compareReading(partStrings(content, part), lines)
-    const status = diffs.length > 0 ? 'mismatch' : 'match'
-    await save(deps.db, jobId, job.user_id, { status, diffs, usage }, credentials)
-    return status
+    outcome = await check(deps, jobId, job, spent)
   } catch (error) {
     logger.warn('poster.check.failed', { jobId, error: error instanceof Error ? error.message : 'unknown' })
-    await save(deps.db, jobId, job.user_id, { status: 'unchecked', diffs: [], usage: null }, credentials)
-    return 'unchecked'
+    outcome = { status: 'unchecked', diffs: [], usage: spent.usage }
   }
+  await save(deps.db, jobId, job.user_id, outcome, spent.credentials)
+  return outcome.status
 }

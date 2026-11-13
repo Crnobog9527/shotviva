@@ -66,7 +66,7 @@ function generate(userId: string, overrides: Partial<GenerationRequest> = {}, be
   const memory = createMemoryStore()
   const checked: string[] = []
   const deps = { db: service, store: memory.store, provider: fake.provider, providerTimeoutMs: 500, allowPoster: allow, afterPoster: (job: { id: string }) => { checked.push(job.id) } }
-  const request: GenerationRequest = { userId, source: 'web', templateId, aspectRatio: '1:2', ...overrides }
+  const request: GenerationRequest = { userId, source: 'web', templateId, aspectRatio: '1:2', resolution: '2k', ...overrides }
   return { fake, checked, store: memory.store, run: () => runGeneration(deps, request) }
 }
 
@@ -147,9 +147,9 @@ describe('poster sets and generation', () => {
       expect(free.status).toBe('succeeded')
       expect(await credits(userId)).toBe(before)
       await redraw(first.id)
-      expect(await credits(userId)).toBe(before - 1)
-      await redraw(free.id)
       expect(await credits(userId)).toBe(before - 2)
+      await redraw(free.id)
+      expect(await credits(userId)).toBe(before - 4)
     })
 
     it('cannot be replayed for the same job', async () => {
@@ -166,7 +166,7 @@ describe('poster sets and generation', () => {
       const { userId, first, redraw } = await checkedPoster('match')
       const before = await credits(userId)
       await redraw(first.id)
-      expect(await credits(userId)).toBe(before - 1)
+      expect(await credits(userId)).toBe(before - 2)
     })
 
     it('keeps the free redraw when the redraw fails, and refuses a source from another poster', async () => {
@@ -179,5 +179,31 @@ describe('poster sets and generation', () => {
       const wrongPart = generate(userId, { poster: { setId: set.id, part: 1, redrawOf: first.id } }).run()
       await expect(wrongPart).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     })
+
+    it('cannot be upgraded: a redraw at another resolution or size is refused, and the refund never exceeds the source', async () => {
+      const { userId, set, first } = await checkedPoster('mismatch')
+      const at = (overrides: Partial<GenerationRequest>) => generate(userId, { poster: { setId: set.id, part: 0, redrawOf: first.id }, ...overrides }).run()
+      await expect(at({ resolution: '3k' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+      await expect(at({ aspectRatio: '9:16' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+      // A redraw job made outside the request path at a higher price still gets at most the source's credits back.
+      await db.query("update public.generation_jobs set credits_cost = 1 where id = $1", [first.id])
+      const before = await credits(userId)
+      const free = await at({})
+      expect(await credits(userId)).toBe(before - 2 + 1)
+      expect((await service.rpc('grant_poster_free_redraw', { p_job_id: free.id })).data).toBe(true)
+      expect(await credits(userId)).toBe(before - 1)
+    })
+  })
+
+  it('refuses 1K for a poster, more than 12 posters in a set, and keeps every poster work private', async () => {
+    const userId = await invitedUser()
+    const set = await savePosterSet(service, { userId, templateId, fields: { poster }, content, source: 'paste', allow })
+    await expect(generate(userId, { poster: { setId: set.id, part: 0 }, resolution: '1k' }).run()).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    const view = await generate(userId, { poster: { setId: set.id, part: 0 }, visibility: 'public' }).run()
+    const { rows } = await db.query('select visibility, gallery_excluded from public.generation_jobs where id = $1', [view.id])
+    expect(rows[0]).toEqual({ visibility: 'private', gallery_excluded: true })
+    const many = { ...content, prizes: { headline: '', rows: Array.from({ length: 13 }, (_, i) => ({ rank: String(i + 1), prize: 'x' })) } }
+    const tight = { kinds: [{ ...poster.kinds[0], capacity: { prizeRows: 1 } }] }
+    await expect(savePosterSet(service, { userId, templateId, fields: { poster: tight }, content: many, source: 'paste', allow })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   })
 })

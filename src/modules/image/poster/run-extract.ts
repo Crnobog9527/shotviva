@@ -68,13 +68,21 @@ function costOf(usage: Usage, prices: ProviderCredentials['prices']): number | n
   return Math.round(usage.inputTokens * prices.inputTextPerM + usage.outputTokens * prices.outputPerM) / 1e6
 }
 
-async function record(deps: ExtractDeps, row: { userId: string; chars: number; ok: boolean; provider: string; usage: Usage; prices: ProviderCredentials['prices'] }) {
+// The call's row goes in before the model is asked, so concurrent calls all count against the
+// hourly limit; it is completed (status, tokens, cost) when the call ends.
+async function reserveRow(deps: ExtractDeps, userId: string, chars: number, provider: string): Promise<number> {
+  const { data, error } = await deps.db.from('poster_extractions')
+    .insert({ user_id: userId, source: 'paste', input_chars: chars, status: 'pending', provider }).select('id').single<{ id: number }>()
+  if (error) throw new AppError('INTERNAL', 'poster_extractions insert failed', { cause: new Error(error.message) })
+  return data.id
+}
+
+async function record(deps: ExtractDeps, id: number, row: { ok: boolean; usage: Usage; prices: ProviderCredentials['prices'] }) {
   const { usage } = row
-  const cost = costOf(usage, row.prices)
-  const { error } = await deps.db.from('poster_extractions').insert({
-    user_id: row.userId, source: 'paste', input_chars: row.chars, status: row.ok ? 'ok' : 'failed', provider: row.provider,
-    input_tokens: usage?.inputTokens ?? null, output_tokens: usage?.outputTokens ?? null, cost_usd: cost,
-  })
+  const { error } = await deps.db.from('poster_extractions').update({
+    status: row.ok ? 'ok' : 'failed', input_tokens: usage?.inputTokens ?? null, output_tokens: usage?.outputTokens ?? null,
+    cost_usd: costOf(usage, row.prices),
+  }).eq('id', id)
   if (error) logger.error('poster.extract.record_failed', { message: error.message })
 }
 
@@ -102,17 +110,17 @@ export async function runExtract(deps: ExtractDeps, input: { userId: string; tem
   const instructions = instructionsOf(prompt.modelParams)
   const credentials = await deps.credentials()
   if (!instructions || !credentials || credentials.adapter !== 'openai_responses') return { status: 'unavailable' }
-  const base = { userId: input.userId, chars: text.length, provider: credentials.tag, prices: credentials.prices }
+  const id = await reserveRow(deps, input.userId, text.length, credentials.tag)
   let usage: Usage = null
   try {
     const answer = await ask(deps, credentials, requestBody(credentials.config.model, instructions, text))
     usage = answer.usage
     const content = toContent(answer.json)
-    await record(deps, { ...base, ok: true, usage })
+    await record(deps, id, { ok: true, usage, prices: credentials.prices })
     return { status: 'ok', content, unverified: unverifiedPaths(content, text) }
   } catch (error) {
     logger.warn('poster.extract.failed', { error: error instanceof Error ? error.message : 'unknown' })
-    await record(deps, { ...base, ok: false, usage })
+    await record(deps, id, { ok: false, usage, prices: credentials.prices })
     return { status: 'failed' }
   }
 }

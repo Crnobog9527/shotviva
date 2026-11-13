@@ -7,7 +7,8 @@ create table public.poster_extractions (
   user_id uuid not null references public.profiles (id) on delete cascade,
   source text not null check (source in ('paste', 'photo')),
   input_chars integer not null check (input_chars >= 0),
-  status text not null check (status in ('ok', 'failed')),
+  -- 'pending' from before the call (so a burst of calls counts at once) until it ends.
+  status text not null check (status in ('pending', 'ok', 'failed')),
   provider text,
   input_tokens integer check (input_tokens >= 0),
   output_tokens integer check (output_tokens >= 0),
@@ -20,4 +21,4 @@ create index poster_extractions_user_created on public.poster_extractions (user_
 alter table public.poster_extractions enable row level security;
 
 revoke all on public.poster_extractions from anon, authenticated;
-grant select, insert on public.poster_extractions to service_role;
+grant select, insert, update on public.poster_extractions to service_role;
