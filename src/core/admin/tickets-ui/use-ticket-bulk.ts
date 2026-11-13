@@ -18,6 +18,9 @@ export type TicketBulkKind = 'reply' | 'close'
 
 type Target = { id: string; who: string }
 
+// One author often has several tickets, so the email alone cannot tell them apart in the dialog.
+const targetName = (row: AdminTicketRow) => (row.preview ? `${ticketWho(row)} · ${row.preview.slice(0, 24)}` : ticketWho(row))
+
 export type TicketBulkRun = {
   targets: Target[]
   pending: boolean
@@ -36,7 +39,7 @@ export function useTicketBulk(rows: AdminTicketRow[], selection: RowSelection, a
   const run = useBulkRun<BulkTicketSkip>(selection.keepOnly)
   const open = (next: TicketBulkKind) => {
     run.reset()
-    setTargets(rows.filter((row) => selection.ids.includes(row.id)).map((row) => ({ id: row.id, who: ticketWho(row) })))
+    setTargets(rows.filter((row) => selection.ids.includes(row.id)).map((row) => ({ id: row.id, who: targetName(row) })))
     setKind(next)
   }
   const names = new Map(targets.map((target) => [target.id, target.who]))
