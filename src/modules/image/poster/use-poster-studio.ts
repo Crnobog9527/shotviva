@@ -59,7 +59,7 @@ function useStoredDraft(template: StudioTemplate) {
   return [draft, setDraft] as const
 }
 
-export type StudioNotice = 'sortFailed' | 'rateLimited' | 'invalid' | 'notEnough' | 'error' | null
+export type StudioNotice = 'sortFailed' | 'clipped' | 'rateLimited' | 'invalid' | 'notEnough' | 'error' | null
 
 export function usePosterStudio(template: StudioTemplate, concurrency: number, onStarted: () => void) {
   const [draft, setDraft] = useStoredDraft(template)
@@ -83,6 +83,7 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
       // The template's table is offered even when the text had none, so it can be typed in.
       const content = reply.content.table ? reply.content : { ...reply.content, table: emptyContent(template.poster).table }
       setDraft((d) => ({ ...d, step: 'edit', content, unverified: reply.unverified, reviewed: false, sorted: true }))
+      if (reply.clipped?.length) setNotice('clipped')
       return
     }
     setNotice(reply.status === 'error' && reply.code === 'RATE_LIMITED' ? 'rateLimited' : 'sortFailed')

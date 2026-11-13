@@ -42,7 +42,7 @@ export function GeneratePanel({ studio, template, balance }: Props) {
         </label>
       ) : null}
       <p className="text-caption text-muted-foreground">{t('proofread')}</p>
-      {studio.notice && studio.notice !== 'sortFailed' ? <p className="text-caption text-destructive">{t(`notice.${studio.notice}`)}</p> : null}
+      {studio.notice && studio.notice !== 'sortFailed' && studio.notice !== 'clipped' ? <p className="text-caption text-destructive">{t(`notice.${studio.notice}`)}</p> : null}
       <Button className="min-h-12" disabled={!ready || studio.busy} onClick={() => void studio.generate()}>
         {studio.busy ? t('starting') : t('generate', { count: studio.parts.length, credits: format.number(total) })}
       </Button>
