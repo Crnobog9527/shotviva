@@ -33,18 +33,21 @@ describe('labOrigins', () => {
       ['r2', 'https://pub-x.r2.dev'],
       ['site-s', ''],
       ['eo-s', IMAGE_CDN_ORIGIN],
+      ['site-f', ''],
+      ['eo-f', IMAGE_CDN_ORIGIN],
     ])
   })
 
   it('has no rewrite row when the base is r2.dev itself (preview)', () => {
     const ids = labOrigins({ assetsBase: 'https://pub-p.r2.dev' }).map((o) => o.id)
-    expect(ids).toEqual(['r2', 'site-s', 'eo-s'])
+    expect(ids).toEqual(['r2', 'site-s', 'eo-s', 'site-f', 'eo-f'])
   })
 
   it('points the small CDN row at the switch when it is set, and has no small rows without covers', () => {
     const eo = labOrigins({ assetsBase: BASE, imageCdn: 'https://cdn.example/' }).find((o) => o.id === 'eo-s')
     expect(eo).toMatchObject({ base: 'https://cdn.example', small: true })
     expect(labOrigins({}).some((o) => o.small)).toBe(false)
+    expect(labOrigins({}).map((o) => o.id)).toEqual(['site-f', 'eo-f'])
   })
 })
 

@@ -42,7 +42,9 @@ describe('coverImage through the image CDN (NEXT_PUBLIC_IMAGE_CDN_URL)', () => {
   it('leaves non-covers alone and is off when unset', () => {
     expect(coverImage('/api/files/job-1', '100vw', BASE, CDN)).toEqual({ src: '/api/files/job-1' })
     expect(coverImage(COVER, '100vw', BASE).src).toMatch(/^\/_next\/image\?/)
-    expect(coverLoaderFor('/home/hero.webp', BASE, CDN)).toBeUndefined()
+    expect(coverLoaderFor('/home/hero.webp', BASE, CDN)?.({ src: '/home/hero.webp', width: 640 })).toBe(`${CDN}/_next/image?url=%2Fhome%2Fhero.webp&w=640&q=75`)
+    expect(coverLoaderFor('/api/files/job-1', BASE, CDN)).toBeUndefined()
+    expect(coverLoaderFor('/admin-media/references/x.webp', BASE, CDN)).toBeUndefined()
     expect(coverLoaderFor(COVER, BASE, undefined)).toBeUndefined()
     expect(coverLoaderFor(COVER, BASE, CDN)?.({ src: COVER, width: 384, quality: 75 })).toBe(`${CDN}/_next/image?url=${encodeURIComponent(COVER)}&w=384&q=75`)
     expect(coverSrc(COVER, 700, BASE, CDN)).toBe(`${CDN}/_next/image?url=${encodeURIComponent(COVER)}&w=750&q=75`)
