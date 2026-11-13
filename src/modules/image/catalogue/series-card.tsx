@@ -62,9 +62,14 @@ function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boole
   const alt = useTranslations('app.series')('coverAlt', { name: series.name })
   const loading = eager ? 'eager' : 'lazy'
   if (series.cover) {
+    // The whole artwork, never cropped to the 8:5 frame (Owner 2026-11-13: 画风迁移 lost heads and
+    // hands): it is contained, and the same picture, blurred and dimmed, fills the bands a cover
+    // of another shape leaves. One download: both use the same srcset.
+    const cover = coverImage(series.cover, COVER_SIZES.cardFrame)
     return (
       <span className="hairline relative isolate block aspect-[8/5] overflow-hidden rounded-control bg-muted">
-        <img {...coverImage(series.cover, COVER_SIZES.cardFrame)} alt={alt} loading={loading} decoding="async" className="absolute inset-0 size-full object-cover transition-transform duration-600 ease-house group-hover:scale-[1.02]" />
+        <img {...cover} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" />
+        <img {...cover} alt={alt} loading={loading} decoding="async" className="absolute inset-0 size-full object-contain transition-transform duration-600 ease-house group-hover:scale-[1.02]" />
       </span>
     )
   }
