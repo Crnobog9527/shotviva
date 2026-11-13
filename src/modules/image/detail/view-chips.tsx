@@ -11,8 +11,10 @@ export type PhotoViewId = 'result' | 'checker' | 'original'
 // T32): frosted 32px pills riding the photo's bottom-right corner, 44px hit area, the
 // selected one solid bone like any selected chip. On a cut-out 白底 / 透明 are also the download
 // choice (ARCHITECTURE §8): what you see is the file you save. 原图 only shows the upload.
-export function viewsFor(transparent: boolean): PhotoViewId[] {
-  return transparent ? ['result', 'checker', 'original'] : ['result', 'original']
+// A work with no upload has no 原图 chip; with neither a cut-out nor an upload there are no chips.
+export function viewsFor(transparent: boolean, original = true): PhotoViewId[] {
+  const views: PhotoViewId[] = transparent ? ['result', 'checker'] : ['result']
+  return original ? [...views, 'original'] : views
 }
 
 const LABEL_KEY = { result: 'result', checker: 'transparent', original: 'original' } as const
