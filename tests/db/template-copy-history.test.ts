@@ -15,7 +15,7 @@ const base = 'https://example.test/assets'
 const ref = { key: `style-refs/${source}/${randomUUID()}.webp`, width: 20, height: 20, uploadedAt: new Date().toISOString() }
 const assets = createMemoryStore(), privateAssets = createMemoryStore()
 const stores = { public: assets.store, private: privateAssets.store }
-const template = { id: source, name: 'Source', category_key: 'pets', credits_cost: { '1k': 5, '2k': 8, '3k': 10 },
+const template = { id: source, name: 'Source', category_key: 'pets', credits_cost: { '1k': 5, '2k': 8, '4k': 10 },
   fields: { images: { min: 0, max: 1 }, copy: [], aspectRatios: ['1:1'] }, visible_in: ['web'], is_active: false }
 const first = { body: 'Fixture A', provider_id: null, model_params: { fixture: 'A' } }
 const second = { body: 'Fixture B', provider_id: provider, model_params: { fixture: 'B' } }
@@ -121,10 +121,10 @@ it('copies the assigned subcategory and leaves series membership and order on th
 it('retains the source prices on a closed v2 style copy', async () => {
   await pg.query('begin')
   try {
-    await pg.query("update public.templates set category_key='art-styles',credits_cost=$2 where id=$1",[source,{'1k':26,'2k':55,'3k':85}])
+    await pg.query("update public.templates set category_key='art-styles',credits_cost=$2 where id=$1",[source,{'1k':26,'2k':55,'4k':85}])
     await pg.query(`insert into public.system_settings(key,value) values ('pricing_catalog_version','"v2"')
       on conflict(key) do update set value=excluded.value`)
-    await pg.query("select admin.set_template_unpriced_resolutions($1,'{3k}')",[source])
+    await pg.query("select admin.set_template_unpriced_resolutions($1,'{4k}')",[source])
     const req=randomUUID(), dest='qa-copy-'+randomUUID()
     const manifest=async ()=>(await pg.query('select public.admin_template_copy_source($1,$2,$3) m',[actor,source,req])).rows[0].m
     const {token,assets: old}=await manifest()
@@ -133,12 +133,12 @@ it('retains the source prices on a closed v2 style copy', async () => {
     expect(saved.rows[0].r).toEqual({id:dest,previousStandard:null})
     expect((await manifest()).existing).toEqual(saved.rows[0].r)
     const prices=async(id:string)=>(await pg.query('select credits_cost,is_active from public.templates where id=$1',[id])).rows[0]
-    expect(await prices(dest)).toEqual({credits_cost:{'1k':26,'2k':55,'3k':85},is_active:false})
+    expect(await prices(dest)).toEqual({credits_cost:{'1k':26,'2k':55,'4k':85},is_active:false})
     expect((await pg.query('select enabled,unpriced_resolutions from public.template_sale_approvals where template_id=$1',[dest])).rows[0])
-      .toEqual({enabled:false,unpriced_resolutions:['3k']})
-    await pg.query('update public.templates set credits_cost=$2 where id=$1',[dest,{'1k':250,'2k':300,'3k':400}])
+      .toEqual({enabled:false,unpriced_resolutions:['4k']})
+    await pg.query('update public.templates set credits_cost=$2 where id=$1',[dest,{'1k':250,'2k':300,'4k':400}])
     await pg.query('select public.admin_set_template_sale($1,$2,true)',[actor,dest])
     expect((await pg.query('select enabled from public.template_sale_approvals where template_id=$1',[dest])).rows[0].enabled).toBe(true)
-    expect(await prices(source)).toEqual({credits_cost:{'1k':26,'2k':55,'3k':85},is_active:true})
+    expect(await prices(source)).toEqual({credits_cost:{'1k':26,'2k':55,'4k':85},is_active:true})
   } finally { await pg.query('rollback') }
 })

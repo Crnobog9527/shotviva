@@ -2,13 +2,10 @@ import { z } from 'zod'
 
 import { LEGACY_RESOLUTIONS, RESOLUTIONS, normalizeResolution } from './output-options'
 
-// The site calls the top tier '4k'. Until the contract migration renames it in the database,
-// every table, constraint and SQL function still stores and expects '3k' (ARCHITECTURE §8.1).
-// Everything that writes tier ids or tier-keyed objects to the database goes through toDb*;
-// everything that reads them goes through the schemas below (or fromDbTiers), which also
-// accept '4k' so the same code keeps working once the database stores the new name.
-
-const DB_TOP_TIER = '3k'
+// The top tier is '4k' everywhere since migration 1451 renamed it in the database (ARCHITECTURE
+// §8.1). Writes send '4k' as they are; the database also turns a '3k' from older code into '4k'.
+// History keeps the old name: generation jobs made before the rename say '3k'. So everything that
+// reads tier ids goes through the schemas below (or fromDbTiers), which read '3k' as '4k'.
 
 // Fields whose values are tier ids. `declared_resolutions` is deliberately absent: it only words
 // the provider audit row, which names the tiers as the admin saw them (4K).
@@ -36,28 +33,16 @@ function mapTiers(value: unknown, rename: (tier: string) => string, underTierKey
 
 const topLevel = (value: unknown) => isTierId(value) || (Array.isArray(value) && value.length > 0 && value.every(isTierId))
 
-const toDbTier = (tier: string) => (tier === '4k' ? DB_TOP_TIER : tier)
 const fromDbTier = (tier: string) => normalizeResolution(tier) as string
-
-export function toDbTiers<T>(value: T): T {
-  return mapTiers(value, toDbTier, topLevel(value)) as T
-}
 
 export function fromDbTiers<T>(value: T): T {
   return mapTiers(value, fromDbTier, topLevel(value)) as T
 }
 
-// fetch for the Supabase clients: PostgREST request bodies (RPC arguments, inserts, updates) go
-// out with database tier names, and JSON responses come back with site names. One choke point,
-// so no query can miss the rename; removed by the contract migration's follow-up. Bodies are
-// only parsed when they contain a tier id, so ordinary traffic pays one substring search.
+// fetch for the Supabase clients: JSON responses come back with '3k' (old job history) read as
+// '4k', at one choke point so no query can miss it. Requests go out unchanged. Bodies are only
+// parsed when they contain '3k', so ordinary traffic pays one substring search.
 const requestUrl = (input: Parameters<typeof fetch>[0]) => (typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
-
-function outgoing(init: RequestInit | undefined): RequestInit | undefined {
-  const body = init?.body
-  if (typeof body !== 'string' || !body.includes('"4k"')) return init
-  return { ...init, body: JSON.stringify(toDbTiers(JSON.parse(body))) }
-}
 
 async function incoming(response: Response): Promise<Response> {
   if (!response.body || !(response.headers.get('content-type') ?? '').includes('json')) return response
@@ -71,7 +56,7 @@ async function incoming(response: Response): Promise<Response> {
 export function withDbTiers(base: typeof fetch = fetch): typeof fetch {
   return async (input, init) => {
     if (!requestUrl(input).includes('/rest/v1/')) return base(input, init)
-    return incoming(await base(input, outgoing(init)))
+    return incoming(await base(input, init))
   }
 }
 

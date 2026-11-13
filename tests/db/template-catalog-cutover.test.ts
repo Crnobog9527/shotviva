@@ -7,7 +7,7 @@ import { connectAdmin, createUser } from './helpers'
 const model = 'gpt-image-2.6-sunburst'
 const provider = randomUUID()
 const tag = provider + '/' + model
-const costs = { '1k': 45, '2k': 120, '3k': 190 }
+const costs = { '1k': 45, '2k': 120, '4k': 190 }
 let db: Client
 let user: string
 
@@ -60,7 +60,7 @@ beforeEach(async () => {
   await db.query('update public.templates set is_active=false,featured_rank=null where is_active')
   await db.query("update public.ai_providers set is_active=false where module='image' and is_active")
   await db.query(`insert into public.ai_providers(id,label,model,adapter,is_active,resolutions)
-    values ($1,'Catalog test',$2,'openai_images',true,'{1k,2k,3k}')`,[provider,model])
+    values ($1,'Catalog test',$2,'openai_images',true,'{1k,2k,4k}')`,[provider,model])
   await db.query("update public.templates set is_active=true where id in ('edit','freeform')")
   await sample('promo-poster')
   await sample('bright-listing')
@@ -89,7 +89,7 @@ describe('activated template prices', () => {
     expect(parent).toMatchObject({ id,credits_cost:120,credit_pool:'paid',version:'v2' })
     expect((await reserve('promo-poster',2,'2k','web',null,id)).rows[0].id).toBe(id)
     await db.query("select public.confirm_job($1,'output',null,null)",[id])
-    expect((await reserve('edit',58,'3k','web',id)).rows[0].credits_cost).toBe(58)
+    expect((await reserve('edit',58,'4k','web',id)).rows[0].credits_cost).toBe(58)
     const partner = (await reserve('freeform',45,'1k','graylum')).rows[0]
     expect(partner.credits_cost).toBe(45)
     await db.query("select public.refund_job($1,'test')",[partner.id])
@@ -102,7 +102,7 @@ describe('activated template prices', () => {
     await activate()
     await db.query('set constraints template_publish_floor, prompt_publish_floor immediate')
     await db.query(`insert into public.templates(id,name,category,credits_cost) values
-      ('t98-old-room','Old room','pets','{"1k":2,"2k":4,"3k":6}')`)
+      ('t98-old-room','Old room','pets','{"1k":2,"2k":4,"4k":6}')`)
     await refuses(() => db.query("update public.templates set is_active=true where id='t98-old-room'"),
       'TEMPLATE_PRICE_BELOW_FLOOR')
     expect((await db.query("select is_active from public.templates where id='t98-old-room'")).rows[0].is_active).toBe(false)
@@ -111,7 +111,7 @@ describe('activated template prices', () => {
   it('requires normal T96 pricing on a substitute provider', async () => {
     const other = randomUUID()
     await db.query(`insert into public.ai_providers(id,label,model,adapter,resolutions,estimated_image_costs)
-      values($1,'Alternate','alternate-model','openai_images','{1k,2k,3k}','{"1k":1.00}')`,[other])
+      values($1,'Alternate','alternate-model','openai_images','{1k,2k,4k}','{"1k":1.00}')`,[other])
     await activate()
     const request = () => reserve('promo-poster',45,'1k','web',null,randomUUID(),other+'/alternate-model')
     await refuses(request,'TEMPLATE_UNAVAILABLE')
@@ -127,7 +127,7 @@ describe('activated template prices', () => {
     await activate()
     const id='partner-priced', other=randomUUID()
     await sample(id)
-    await db.query('update public.templates set credits_cost=$2 where id=$1',[id,{'1k':200,'2k':300,'3k':400}])
+    await db.query('update public.templates set credits_cost=$2 where id=$1',[id,{'1k':200,'2k':300,'4k':400}])
     await db.query(`insert into public.ai_providers(id,label,model,adapter,resolutions,capabilities) values
       ($1,'Limited web model','web-only','openrouter_images','{2k}',
       '{"resolutions":["2k"],"catalogImageCosts":{"2k":0.02}}')`,[other])
@@ -137,9 +137,9 @@ describe('activated template prices', () => {
       .toMatchObject({opt:{resolutions:['2k']},ratios:['1:1']})
     await refuses(() => reserve(id,200,'1k','web',null,randomUUID(),other+'/web-only'),'TEMPLATE_UNAVAILABLE')
     expect((await reserve(id,200,'1k','graylum')).rows[0].credits_cost).toBe(200)
-    expect((await reserve(id,400,'3k','graylum')).rows[0].credits_cost).toBe(400)
+    expect((await reserve(id,400,'4k','graylum')).rows[0].credits_cost).toBe(400)
     // Reconfiguring Router tiers invalidates its last confirmed capabilities.
-    await db.query("update public.ai_providers set resolutions='{1k,2k,3k}' where id=$1",[other])
+    await db.query("update public.ai_providers set resolutions='{1k,2k,4k}' where id=$1",[other])
     await refuses(() => db.query('select admin.assert_template_sale_floor(t) from public.templates t where id=$1',[id]),'TEMPLATE_PRICE_BELOW_FLOOR')
   })
 
@@ -148,27 +148,27 @@ describe('activated template prices', () => {
     const id='protected-tiers', other=randomUUID()
     await db.query("update public.ai_providers set resolutions='{1k,2k}' where id=$1",[provider])
     await db.query(`insert into public.templates(id,name,category,credits_cost,visible_in)
-      values($1,$1,'pets','{"1k":200,"2k":300,"3k":1}','{web,partner}')`,[id])
+      values($1,$1,'pets','{"1k":200,"2k":300,"4k":1}','{web,partner}')`,[id])
     await db.query('select public.admin_set_template_sale($1,$2,true)',[user,id])
     await db.query('update public.templates set is_active=true where id=$1',[id])
-    await db.query("update public.ai_providers set resolutions='{1k,2k,3k}' where id=$1",[provider])
+    await db.query("update public.ai_providers set resolutions='{1k,2k,4k}' where id=$1",[provider])
     const snapshot = async () => (await db.query(`select credits,free_credits,
       (select count(*) from public.generation_jobs where user_id=$1) jobs,
       (select count(*) from public.credit_ledger where user_id=$1) entries from public.profiles where id=$1`,[user])).rows[0]
     const before=await snapshot()
-    await refuses(() => reserve(id,1,'3k'),'TEMPLATE_UNAVAILABLE')
+    await refuses(() => reserve(id,1,'4k'),'TEMPLATE_UNAVAILABLE')
     await db.query('update public.ai_providers set is_active=false where id=$1',[provider])
     await db.query(`insert into public.ai_providers(id,label,model,adapter,is_active,resolutions,estimated_image_costs)
-      values($1,'Replacement','new-default','openai_images',true,'{1k,2k,3k}','{"1k":1.0}')`,[other])
+      values($1,'Replacement','new-default','openai_images',true,'{1k,2k,4k}','{"1k":1.0}')`,[other])
     const request = (fee:number,tier:string) => reserve(id,fee,tier,'graylum',null,randomUUID(),other+'/new-default')
-    await refuses(() => request(1,'3k'),'TEMPLATE_UNAVAILABLE')
+    await refuses(() => request(1,'4k'),'TEMPLATE_UNAVAILABLE')
     await refuses(() => request(200,'1k'),'TEMPLATE_UNAVAILABLE')
     expect(await snapshot()).toEqual(before)
     expect((await db.query('select public.template_image_options(t) opt from public.templates t where id=$1',[id])).rows[0].opt.resolutions).toEqual(['1k','2k'])
     await refuses(() => db.query("select admin.set_template_unpriced_resolutions($1,'{}')",[id]),'TEMPLATE_PRICE_BELOW_FLOOR')
-    await db.query('update public.templates set credits_cost=$2 where id=$1',[id,{'1k':900,'2k':300,'3k':400}])
+    await db.query('update public.templates set credits_cost=$2 where id=$1',[id,{'1k':900,'2k':300,'4k':400}])
     await db.query("select admin.set_template_unpriced_resolutions($1,'{}')",[id])
-    expect((await request(400,'3k')).rows[0].credits_cost).toBe(400)
+    expect((await request(400,'4k')).rows[0].credits_cost).toBe(400)
   })
 
   it('counts private references toward the model minimum on new and legacy saves while enforcing v2 prices', async () => {
@@ -204,7 +204,7 @@ describe('activated template prices', () => {
     await db.query("update public.templates set is_active=false where id='pending-rule'")
     await db.query("update public.ai_providers set resolutions='{1k}' where id=$1",[provider])
     await refuses(activate,'TEMPLATE_MODEL_NOT_READY')
-    await db.query("update public.ai_providers set resolutions='{1k,2k,3k}' where id=$1",[provider])
+    await db.query("update public.ai_providers set resolutions='{1k,2k,4k}' where id=$1",[provider])
     await activate()
     expect((await db.query("select is_active from public.templates where id='bright-listing'")).rows[0].is_active).toBe(false)
     await db.query("update public.templates set credits_cost=jsonb_set(credits_cost,'{1k}','77') where id='promo-poster'")
@@ -216,7 +216,7 @@ describe('activated template prices', () => {
 
   it('enforces the sales minimum on ordinary writes, bulk changes and art drafts', async () => {
     await activate()
-    const cheap = { medium: { '1k': 1, '2k': 1, '3k': 1 }, high: { '1k': 1, '2k': 1, '3k': 1 } }
+    const cheap = { medium: { '1k': 1, '2k': 1, '4k': 1 }, high: { '1k': 1, '2k': 1, '4k': 1 } }
     const floors = { ...cheap, version: 'v2', providers: { [provider]: cheap } }
     const write = (id: string, category: string, fee: number, tier = '1k') =>
       db.query('select public.admin_upsert_template($1,null)', [{ id, name: 'Fixture', category, quality:'medium',
@@ -224,9 +224,9 @@ describe('activated template prices', () => {
     await refuses(() => write('promo-poster','pets',44),'MODEL_CREDIT_FLOOR')
     await refuses(() => write('promo-poster','pets',119,'2k'),'MODEL_CREDIT_FLOOR')
     const { rows } = await db.query("select public.admin_bulk_edit_templates('{promo-poster}',$1,$2,$3,'{en,zh}') as result",
-      [{credits_cost:{'3k':189}},floors,user])
-    expect(rows[0].result.failures).toMatchObject([{id:'promo-poster',reason:'below_floor',resolution:'3k',given:189,floor:190}])
-    expect((await db.query("select credits_cost->>'3k' as price from public.templates where id='promo-poster'")).rows[0].price).toBe('190')
+      [{credits_cost:{'4k':189}},floors,user])
+    expect(rows[0].result.failures).toMatchObject([{id:'promo-poster',reason:'below_floor',resolution:'4k',given:189,floor:190}])
+    expect((await db.query("select credits_cost->>'4k' as price from public.templates where id='promo-poster'")).rows[0].price).toBe('190')
     await write('draft-art','art-styles',19)
     await db.query('set constraints style_sale_binding immediate')
     await refuses(() => db.query('select public.admin_upsert_template($1,null)', [{id:'unapproved-live-art',
@@ -270,7 +270,7 @@ describe('activated template prices', () => {
     await refuses(publish,'TEMPLATE_RETIRED')
     await refuses(() => enable(randomUUID(),true),'FORBIDDEN')
     await refuses(() => enable(user,true),'TEMPLATE_PRICE_BELOW_FLOOR')
-    await db.query("update public.templates set credits_cost=$2 where id=$1",[id,{'1k':200,'2k':300,'3k':400}])
+    await db.query("update public.templates set credits_cost=$2 where id=$1",[id,{'1k':200,'2k':300,'4k':400}])
     await enable(user,true)
     await enable(user,true)
     await publish()
@@ -292,7 +292,7 @@ describe('activated template prices', () => {
     expect(rows[0].catalog.version).toBe('v2')
     expect(rows[0].catalog.providers.find((p: { provider_id: string }) => p.provider_id === provider).approved['promo-poster'].costs).toEqual(costs)
     await db.query('reset role')
-    const high = { high:{'1k':100,'2k':160,'3k':250},medium:{'1k':100,'2k':160,'3k':250} }
+    const high = { high:{'1k':100,'2k':160,'4k':250},medium:{'1k':100,'2k':160,'4k':250} }
     const floor = { ...high,providers:{[provider]:high},models:{[provider]:model},version:'v2' }
     const bulk = (cost: number) => db.query("select public.admin_bulk_edit_templates('{promo-poster}',$1,$2,$3,'{en,zh}') r",
       [{credits_cost:{'1k':cost}},floor,user])
