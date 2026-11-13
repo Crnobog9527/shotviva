@@ -4,7 +4,7 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { listFeatureSettings, setFeatureInvite } from '@/core/admin'
-import { featureAllowed } from '@/core/features'
+import { featureAllowed, isInvited } from '@/core/features'
 
 import { connectAdmin, createUser, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
@@ -30,7 +30,9 @@ afterAll(async () => {
 })
 
 const emailOf = async (id: string) => (await db.query('select email from auth.users where id = $1', [id])).rows[0].email as string
-const gate = (k: string) => ({ registry: [{ key: k, name: '内测', inviteOnly: true }], loadAccess: async () => [], now })
+const gate = (k: string) => ({
+  registry: [{ key: k, name: '内测', inviteOnly: true }], loadAccess: async () => [], now, invited: (id: string, key: string) => isInvited(service, id, key),
+})
 
 describe('invite-only features', () => {
   it('invites by email, lists the account, opens the gate, and removes by id', async () => {
