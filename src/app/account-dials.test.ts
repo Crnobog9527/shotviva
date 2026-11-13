@@ -19,7 +19,7 @@ async function render(element: ReactElement, locale: 'en' | 'zh' = 'en') {
   return { html, text: html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() }
 }
 
-const dials = (paid: number, free: number, allowance: { credits: number; interval: 'month' | 'year' } | null, giftRefused = false) =>
+const dials = (paid: number, free: number, allowance: { credits: number; interval: 'month' | 'year' } | null, giftRefused: 'same_ip' | 'daily_cap' | 'paused' | null = null) =>
   createElement(CreditDials, { balance: { paid, free }, giftRefused, allowance, freeGift: site.billing.freeCredits })
 
 const ring = (html: string, kind: string) => html.match(new RegExp(`data-dial="${kind}".*?--ring-v:(\\d+)`))?.[1]
@@ -55,13 +55,19 @@ describe('credit dials', () => {
   })
 
   it('drops "/ 6" when the signup gift was withheld (same-IP rule), in both languages', async () => {
-    const en = await render(dials(0, 0, null, true))
+    const en = await render(dials(0, 0, null, 'same_ip'))
     expect(en.text).toContain('0 free public, watermarked')
     expect(en.text).not.toContain('/ 6')
     expect(en.html).toContain('aria-label="0 free credits left"')
-    const zh = await render(dials(0, 0, null, true), 'zh')
+    const zh = await render(dials(0, 0, null, 'same_ip'), 'zh')
     expect(zh.text).toContain('0 免费 公开、带水印')
     expect(zh.text).not.toContain('/ 6')
+  })
+
+  it('says why: the daily cap and the pause have their own note (1350)', async () => {
+    expect((await render(dials(0, 0, null, 'daily_cap'), 'zh')).text).toContain('当天的注册赠分名额已经发完')
+    expect((await render(dials(0, 0, null, 'paused'), 'zh')).text).toContain('赠分暂停发放')
+    expect((await render(dials(0, 0, null, 'same_ip'), 'zh')).text).toContain('同一网络在 24 小时内限领一次')
   })
 
   it('dialFigures: what each ring is measured against', () => {

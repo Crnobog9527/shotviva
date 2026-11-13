@@ -174,6 +174,7 @@ export {
 export {
   FEATURES_COPY,
   FeaturesEditor,
+  SignupGiftCard,
   WISHLIST_SWITCH_COPY,
   type FeatureAdminActions,
   type GallerySwitchKey,
@@ -182,9 +183,12 @@ export {
 } from './features-editor'
 export {
   loadSettingSwitch,
+  loadSignupGift,
   loadWishlistSwitch,
   saveSettingSwitch,
+  saveSignupGiftCap,
   saveWishlistSwitch,
+  type SignupGiftState,
   type SystemSettingDeps,
   type WishlistSwitch,
   type WishlistSwitchInput,

@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { refresh, updateTag } from 'next/cache'
 
-import { runAdminAction, saveFeatureAccess, setFeatureInvite, saveSettingSwitch, saveWishlistSwitch, WISHLIST_SWITCH_COPY, type ActionResult } from '@/core/admin'
+import { runAdminAction, saveFeatureAccess, setFeatureInvite, saveSettingSwitch, saveSignupGiftCap, saveWishlistSwitch, WISHLIST_SWITCH_COPY, type ActionResult } from '@/core/admin'
 import { AppError } from '@/core/errors'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { FEATURES_CACHE_TAG } from '@/core/features'
@@ -55,6 +55,17 @@ export async function saveGallerySwitchAction(key: unknown, input: unknown): Pro
     }
     await saveSettingSwitch({ db: createAdminSupabase(), invalidate }, admin.id, parsedKey.data, input)
   })
+}
+
+// 1350: the signup gift's pause and daily cap. grant_credits reads the rows itself.
+export async function saveSignupGiftPausedAction(input: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(() => saveSettingSwitch({ db: createAdminSupabase(), invalidate: settingsChanged }, admin.id, 'signup_gift_paused', input))
+}
+
+export async function saveSignupGiftCapAction(input: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(() => saveSignupGiftCap({ db: createAdminSupabase(), invalidate: settingsChanged }, admin.id, input))
 }
 
 export async function saveAffiliateSwitchAction(value: boolean): Promise<boolean> {
