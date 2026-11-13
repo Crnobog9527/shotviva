@@ -13,5 +13,6 @@ export {
   type AdminInquiryRow,
   type InquiryFilter,
 } from './admin'
+export { exportInquiries, setInquiriesStatus } from './bulk'
 export type { SubmitOutcome } from './submit'
-export { INQUIRY_STATUSES, type InquiryStatus } from './rules'
+export { INQUIRY_STATUSES, type BulkInquirySkip, type InquiryStatus } from './rules'
