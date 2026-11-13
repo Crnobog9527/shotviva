@@ -8,7 +8,9 @@ import {
   FeaturesEditor,
   listFeatureSettings,
   loadSettingSwitch,
+  loadSignupGift,
   loadWishlistSwitch,
+  SignupGiftCard,
   type GallerySwitchState,
   type WishlistSwitchState,
 } from '@/core/admin'
@@ -18,7 +20,14 @@ import { siteHasGallery } from '@/core/gallery'
 import { previewOverride, siteHasWishlist } from '@/core/wishlist'
 import { site } from '@/site/site.config'
 
-import { saveAffiliateSwitchAction, saveFeatureAccessAction, saveGallerySwitchAction, saveWishlistSwitchAction } from './actions'
+import {
+  saveAffiliateSwitchAction,
+  saveFeatureAccessAction,
+  saveGallerySwitchAction,
+  saveSignupGiftCapAction,
+  saveSignupGiftPausedAction,
+  saveWishlistSwitchAction,
+} from './actions'
 
 // Admin-only, request-time page (ARCHITECTURE §6.2 新功能抢先用, §10). The admin layout gates it too.
 // The 需求墙 and gallery switches show only on a site that has the feature at all (§15.6, §9).
@@ -40,12 +49,15 @@ async function galleryState(db: ReturnType<typeof createAdminSupabase>): Promise
 export default async function AdminFeaturesPage() {
   await requireAdmin()
   const db = createAdminSupabase()
-  const [settings, wishlist, gallery, affiliate] = await Promise.all([
-    listFeatureSettings(db), wishlistState(db), galleryState(db), isAffiliateEnabled(),
+  const [settings, wishlist, gallery, affiliate, signupGift] = await Promise.all([
+    listFeatureSettings(db), wishlistState(db), galleryState(db), isAffiliateEnabled(), loadSignupGift(db),
   ])
   return (
     <AdminPage title={FEATURES_COPY.title}>
       <AffiliateSwitchCard enabled={affiliate} save={saveAffiliateSwitchAction} />
+      <div className="my-6 grid gap-4">
+        <SignupGiftCard state={signupGift} savePaused={saveSignupGiftPausedAction} saveCap={saveSignupGiftCapAction} />
+      </div>
       <FeaturesEditor
         settings={settings}
         wishlist={wishlist}

@@ -17,6 +17,7 @@ import type {
   RenewalReviewAlert,
   SaleFloorExample,
   SaleFloorHiddenAlert,
+  SignupGiftCapAlert,
   SiteErrorsAlert,
   TicketAlert,
 } from './alert-kinds'
@@ -269,6 +270,14 @@ function saleFloorHidden(alert: SaleFloorHiddenAlert): Rendered {
   }
 }
 
+// 1350: the gift's daily cap. What happens next, and where the switch is.
+function signupGiftCap(alert: SignupGiftCapAlert): Rendered {
+  const line = alert.level === 'full'
+    ? `【注册赠送已满】北京时间 ${alert.day} 的注册赠分已送满 ${alert.cap} 份。今天之后注册的新账号不再送分（仍可付费）。如果是正常增长，可到后台「功能开关」调高上限。`
+    : `【注册赠送过半】北京时间 ${alert.day} 已送出 ${alert.granted} 份注册赠分，今天上限 ${alert.cap} 份。如果不像正常增长，可到后台「功能开关」暂停发放。`
+  return { line, path: '/admin/features' }
+}
+
 const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }>, who: string) => Rendered } = {
   refund,
   dispute_opened: disputeOpened,
@@ -291,6 +300,7 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   site_errors: siteErrors,
   business_inquiry: businessInquiry,
   sale_floor_hidden: saleFloorHidden,
+  signup_gift_cap: signupGiftCap,
   work_reported: (a) => ({
     line: `【创作库作品被举报】原因：${REPORT_REASON_NAMES[a.reason] ?? a.reason}。作品仍在展示，请到「创作库审核」页决定是否下架。`,
     path: '/admin/gallery?tab=reported',

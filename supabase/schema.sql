@@ -7452,13 +7452,14 @@ begin
     raise exception 'INVALID_INPUT' using detail = 'actor is required';
   end if;
   if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin'
-      and (p_key not in ('code_gift_policy','code_inviter_window_days','gallery_enabled','gallery_auto_approve')
+      and (p_key not in ('code_gift_policy','code_inviter_window_days','gallery_enabled','gallery_auto_approve',
+                         'signup_gift_daily_cap','signup_gift_paused')
            or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
 
   case p_key
-    when 'wishlist_enabled', 'gallery_enabled', 'gallery_auto_approve' then
+    when 'wishlist_enabled', 'gallery_enabled', 'gallery_auto_approve', 'signup_gift_paused' then
       if p_value is null or jsonb_typeof(p_value) <> 'boolean' then
         raise exception 'INVALID_INPUT' using detail = p_key || ' must be a boolean';
       end if;
@@ -7466,6 +7467,11 @@ begin
       if p_value is null or jsonb_typeof(p_value) <> 'number'
          or (p_value #>> '{}')::numeric < 0 or (p_value #>> '{}')::numeric > 1000 then
         raise exception 'INVALID_INPUT' using detail = 'admin_test_daily_budget_usd must be a number from 0 to 1000';
+      end if;
+    when 'signup_gift_daily_cap' then
+      if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[0-9]+$'
+         or (p_value #>> '{}')::numeric > 100000 then
+        raise exception 'INVALID_INPUT' using detail = 'signup_gift_daily_cap must be an integer from 0 to 100000';
       end if;
     when 'code_inviter_window_days' then
       if jsonb_typeof(p_value) is distinct from 'number' or
@@ -9859,6 +9865,7 @@ CREATE OR REPLACE FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amoun
 declare
   v_profile public.profiles;
   cutoff timestamptz;
+  v_today jsonb;
 begin
   if p_amount is null or p_amount <= 0 then
     raise exception 'INVALID_INPUT' using detail = 'amount must be positive';
@@ -9880,17 +9887,37 @@ begin
     else
       p_amount := 6;
     end if;
-    if v_profile.signup_ip is not null then
-      perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
-      if not exists (select 1 from public.credit_ledger where idempotency_key = p_idempotency_key)
-         and exists (
-           select 1
-             from public.profiles other
-             join public.credit_ledger l on l.idempotency_key = 'signup:' || other.id::text
-            where other.signup_ip = v_profile.signup_ip
-              and other.id <> p_user_id
-              and l.created_at > v_profile.created_at - interval '24 hours'
-         ) then
+
+    -- Already paid: the ledger's idempotency key makes this a no-op; never refuse it now.
+    if not exists (select 1 from public.credit_ledger where idempotency_key = p_idempotency_key) then
+      if v_profile.signup_gift_refusal is not null then
+        return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
+      end if;
+
+      if v_profile.signup_ip is not null then
+        perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
+        if exists (
+             select 1
+               from public.profiles other
+               join public.credit_ledger l on l.idempotency_key = 'signup:' || other.id::text
+              where other.signup_ip = v_profile.signup_ip
+                and other.id <> p_user_id
+                and l.created_at > v_profile.created_at - interval '24 hours'
+           ) then
+          update public.profiles set signup_gift_refusal = 'same_ip' where id = p_user_id;
+          return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
+        end if;
+      end if;
+
+      -- One gift at a time site-wide, so concurrent sign-ups cannot all pass the count.
+      perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_gift_cap', 0));
+      v_today := public.signup_gift_today();
+      if (v_today->>'paused')::boolean then
+        update public.profiles set signup_gift_refusal = 'paused' where id = p_user_id;
+        return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
+      end if;
+      if (v_today->>'granted')::integer >= (v_today->>'cap')::integer then
+        update public.profiles set signup_gift_refusal = 'daily_cap' where id = p_user_id;
         return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
       end if;
     end if;
@@ -9916,6 +9943,41 @@ $$;
 
 
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hook_before_user_created"("event" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_user jsonb := event->'user';
+  v_provider text := v_user->'app_metadata'->>'provider';
+  v_email text := lower(trim(coalesce(v_user->>'email', '')));
+  v_phone text := regexp_replace(coalesce(v_user->>'phone', ''), '[^0-9]', '', 'g');
+  v_refused jsonb := jsonb_build_object('error', jsonb_build_object(
+    'http_code', 403, 'message', 'Please sign up on the website.'));
+begin
+  if v_provider = 'email' then
+    if v_email = '' or not exists (
+         select 1 from public.signup_requests r
+          where r.email_key = encode(sha256(convert_to(v_email, 'UTF8')), 'hex')
+            and r.requested_at > now() - interval '10 minutes') then
+      return v_refused;
+    end if;
+  elsif v_provider = 'phone' then
+    if v_phone = '' or not exists (
+         select 1 from public.sms_sends s
+          where s.phone_key = encode(sha256(convert_to(v_phone, 'UTF8')), 'hex')
+            and s.requested_at > now() - interval '10 minutes') then
+      return v_refused;
+    end if;
+  end if;
+  return '{}'::jsonb;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hook_before_user_created"("event" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."list_my_wish_notices"("p_user_id" "uuid") RETURNS TABLE("request_id" "uuid", "template_id" "text", "template_name_en" "text", "template_name_zh" "text", "description_excerpt" "text", "is_author" boolean)
@@ -11454,6 +11516,71 @@ $$;
 ALTER FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."signup_gift_day_start"() RETURNS timestamp with time zone
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select date_trunc('day', now() at time zone 'Asia/Shanghai') at time zone 'Asia/Shanghai'
+$$;
+
+
+ALTER FUNCTION "public"."signup_gift_day_start"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_gift_today"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+  select jsonb_build_object(
+    'granted', (select count(*) from public.credit_ledger l
+                 where l.kind = 'grant' and l.reason = 'signup' and l.idempotency_key like 'signup:%'
+                   and l.created_at >= public.signup_gift_day_start()),
+    'cap', coalesce((select case when jsonb_typeof(s.value) = 'number' and (s.value #>> '{}') ~ '^[0-9]+$'
+                                 then (s.value #>> '{}')::integer end
+                       from public.system_settings s where s.key = 'signup_gift_daily_cap'), 30),
+    'paused', coalesce((select case when jsonb_typeof(s.value) = 'boolean' then (s.value #>> '{}')::boolean end
+                          from public.system_settings s where s.key = 'signup_gift_paused'), false)
+  )
+$_$;
+
+
+ALTER FUNCTION "public"."signup_gift_today"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+begin
+  if p_email_key is null or p_email_key !~ '^[0-9a-f]{64}$' then
+    raise exception 'INVALID_INPUT' using detail = 'email_key must be a sha256 hex digest';
+  end if;
+  if p_ip is not null then
+    perform pg_advisory_xact_lock(hashtextextended('signup:ip:' || host(p_ip), 0));
+    if (select count(*) from public.signup_requests r
+         where r.ip = p_ip and r.requested_at > now() - interval '1 hour') >= 5 then
+      return 'ip_hourly';
+    end if;
+    if (select count(*) from public.signup_requests r
+         where r.ip = p_ip and r.requested_at > now() - interval '24 hours') >= 20 then
+      return 'ip_daily';
+    end if;
+  end if;
+
+  insert into public.signup_requests (email_key, ip) values (p_email_key, p_ip);
+  delete from public.signup_requests r
+   where r.id in (select o.id from public.signup_requests o
+                   where o.requested_at < now() - interval '2 days'
+                   order by o.requested_at
+                   limit 200);
+  return 'ok';
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") RETURNS "text"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -12898,10 +13025,12 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "referred_by" "uuid",
     "referred_at" timestamp with time zone,
     "referred_source" "text",
+    "signup_gift_refusal" "text",
     CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
     CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
     CONSTRAINT "profiles_referred_source_check" CHECK (("referred_source" = ANY (ARRAY['signup'::"text", 'first_checkout'::"text", 'admin'::"text"]))),
-    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"])))
+    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"]))),
+    CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'daily_cap'::"text", 'paused'::"text"])))
 );
 
 
@@ -13605,6 +13734,29 @@ CREATE TABLE IF NOT EXISTS "public"."reference_template_sources" (
 ALTER TABLE "public"."reference_template_sources" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."signup_requests" (
+    "id" bigint NOT NULL,
+    "email_key" "text" NOT NULL,
+    "ip" "inet",
+    "requested_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "signup_requests_email_key_check" CHECK (("email_key" ~ '^[0-9a-f]{64}$'::"text"))
+);
+
+
+ALTER TABLE "public"."signup_requests" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."signup_requests" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."signup_requests_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."site_announcements" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "message_en" "text" NOT NULL,
@@ -14259,6 +14411,11 @@ ALTER TABLE ONLY "public"."reference_template_sources"
 
 
 
+ALTER TABLE ONLY "public"."signup_requests"
+    ADD CONSTRAINT "signup_requests_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."site_announcements"
     ADD CONSTRAINT "site_announcements_active_no_overlap" EXCLUDE USING "gist" ("tstzrange"(COALESCE("starts_at", '-infinity'::timestamp with time zone), COALESCE("ends_at", 'infinity'::timestamp with time zone)) WITH &&) WHERE ("is_active");
 
@@ -14636,6 +14793,10 @@ CREATE INDEX "credit_ledger_purchases_created_at_id_idx" ON "public"."credit_led
 
 
 
+CREATE INDEX "credit_ledger_signup_created_at_idx" ON "public"."credit_ledger" USING "btree" ("created_at") WHERE (("kind" = 'grant'::"text") AND ("reason" = 'signup'::"text"));
+
+
+
 CREATE INDEX "credit_ledger_user_id_created_at_idx" ON "public"."credit_ledger" USING "btree" ("user_id", "created_at" DESC);
 
 
@@ -14853,6 +15014,18 @@ CREATE INDEX "reference_deletions_ready" ON "public"."reference_object_deletions
 
 
 CREATE INDEX "reference_template_sources_asset" ON "public"."reference_template_sources" USING "btree" ("asset_id");
+
+
+
+CREATE INDEX "signup_requests_email_key_requested_at_idx" ON "public"."signup_requests" USING "btree" ("email_key", "requested_at" DESC);
+
+
+
+CREATE INDEX "signup_requests_ip_requested_at_idx" ON "public"."signup_requests" USING "btree" ("ip", "requested_at" DESC) WHERE ("ip" IS NOT NULL);
+
+
+
+CREATE INDEX "signup_requests_requested_at_idx" ON "public"."signup_requests" USING "btree" ("requested_at");
 
 
 
@@ -15951,6 +16124,9 @@ CREATE POLICY "series_read" ON "public"."template_series" FOR SELECT TO "authent
      JOIN "public"."template_category_paths" "c" ON (("c"."key" = COALESCE("t"."subcategory_key", "t"."category_key"))))
   WHERE (("t"."series_id" = "template_series"."id") AND "t"."is_active" AND ('web'::"text" = ANY ("t"."visible_in")) AND "c"."web_visible")))));
 
+
+
+ALTER TABLE "public"."signup_requests" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."site_announcements" ENABLE ROW LEVEL SECURITY;
@@ -17562,6 +17738,11 @@ REVOKE ALL ON FUNCTION "public"."handle_new_user"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."hook_before_user_created"("event" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hook_before_user_created"("event" "jsonb") TO "supabase_auth_admin";
+
+
+
 REVOKE ALL ON FUNCTION "public"."list_my_wish_notices"("p_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."list_my_wish_notices"("p_user_id" "uuid") TO "service_role";
 
@@ -17811,6 +17992,21 @@ GRANT ALL ON FUNCTION "public"."settle_waffo_order_v2"("p_user_id" "uuid", "p_pr
 
 REVOKE ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_day_start"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_day_start"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_today"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_today"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") TO "service_role";
 
 
 
@@ -18145,6 +18341,16 @@ GRANT ALL ON TABLE "public"."reference_object_deletions" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."reference_template_sources" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."signup_requests" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."signup_requests_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."signup_requests_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."signup_requests_id_seq" TO "service_role";
 
 
 

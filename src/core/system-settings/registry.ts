@@ -10,6 +10,10 @@ type SettingTypes = {
   gallery_enabled: boolean
   // Whether a work the automatic screen did not flag is approved without a person (§9 第 5 条).
   gallery_auto_approve: boolean
+  // 1350 (ARCHITECTURE §7): no signup gift at all while on. grant_credits reads the row itself.
+  signup_gift_paused: boolean
+  // 1350: signup gifts per Beijing day (0 = none). grant_credits reads the row itself.
+  signup_gift_daily_cap: number
 }
 
 export type SystemSettingKey = keyof SettingTypes
@@ -20,6 +24,8 @@ export const SYSTEM_SETTINGS: { [K in SystemSettingKey]: SettingDefinition<Setti
   wishlist_enabled: { schema: z.boolean(), fallback: false },
   gallery_enabled: { schema: z.boolean(), fallback: false },
   gallery_auto_approve: { schema: z.boolean(), fallback: false },
+  signup_gift_paused: { schema: z.boolean(), fallback: false },
+  signup_gift_daily_cap: { schema: z.number().int().min(0).max(100_000), fallback: 30 },
 }
 
 export function isSystemSettingKey(key: string): key is SystemSettingKey {

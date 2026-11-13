@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 
 import type { Balance } from '../../billing'
 import { PaywallButton } from '../../billing/paywall'
+import type { SignupGiftRefusal } from '../../auth/signup-gift'
 import type { Allowance } from '../../billing/subscription'
 import { cn } from '../../ui/cn'
 import { Chevron } from './rows'
@@ -50,7 +51,10 @@ function Dial({ kind, count, of, label, ringLabel }: DialProps) {
   )
 }
 
-type Props = { balance: Balance; giftRefused: boolean; allowance: Allowance | null; freeGift: number }
+type Props = { balance: Balance; giftRefused: SignupGiftRefusal | null; allowance: Allowance | null; freeGift: number }
+
+// The account page's note, by refusal reason (1350).
+const REFUSAL_COPY = { same_ip: 'signupGiftRefused', daily_cap: 'signupGiftRefusedCap', paused: 'signupGiftRefusedPaused' } as const
 
 // What each ring is measured against: "of 50" only while it is true, since packs or a
 // carried-over balance can top what the period gave; "of 6" only when the signup gift was
@@ -73,14 +77,14 @@ function useDialCopy(balance: Balance, figures: DialFigures) {
 export function CreditDials({ balance, giftRefused, allowance, freeGift }: Props) {
   const t = useTranslations('app.account.credits')
   const balanceT = useTranslations('app.balance')
-  const copy = useDialCopy(balance, dialFigures(balance, allowance, freeGift, giftRefused))
+  const copy = useDialCopy(balance, dialFigures(balance, allowance, freeGift, giftRefused !== null))
   return (
     <>
       <div className="grid gap-2">
         <Dial kind="paid" count={balance.paid} {...copy.paid} />
         <Dial kind="free" count={balance.free} {...copy.free} />
       </div>
-      {giftRefused ? <p className="mt-2 text-caption text-muted-foreground">{balanceT('signupGiftRefused')}</p> : null}
+      {giftRefused ? <p className="mt-2 text-caption text-muted-foreground">{balanceT(REFUSAL_COPY[giftRefused])}</p> : null}
       <PaywallButton trigger="account" options={{ step: 'packs' }} className="press mt-2 inline-flex min-h-11 items-center gap-1 text-caption font-medium text-foreground">
         {t('buy')}
         <Chevron className="size-4" />

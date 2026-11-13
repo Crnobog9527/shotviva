@@ -552,7 +552,9 @@
       "paid": "You have {paid, plural, one {# credit} other {# credits}}.",
       "getCredits": "Get credits",
       "panelTitle": "Credits",
-      "signupGiftRefused": "No sign-up credits were recorded for this account. Sign-up gifts are limited to one per network in 24 hours."
+      "signupGiftRefused": "No sign-up credits were recorded for this account. Sign-up gifts are limited to one per network in 24 hours.",
+      "signupGiftRefusedCap": "No sign-up credits for this account: that day's sign-up gifts had all been given out.",
+      "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up."
     },
     "create": {
       "title": "Create",
