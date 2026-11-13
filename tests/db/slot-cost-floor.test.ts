@@ -80,3 +80,14 @@ it('a slot template is held to the single-image floor times its slots', async ()
   // The template without slots next to it is held to the single floor as before.
   expect(await visible(medium)).toBe(true)
 })
+
+it('the save check (assert_template_sale_floor) holds a slot template to floor × slots, not just the catalogue', async () => {
+  const single = (await floor('high')).credits as number
+  await slotted(high, 2, single)
+  const assertFloor = () => db.query('select admin.assert_template_sale_floor(t) from public.templates t where id=$1', [high])
+  await db.query('savepoint before_check')
+  await expect(assertFloor()).rejects.toThrow(/TEMPLATE_PRICE_BELOW_FLOOR/)
+  await db.query('rollback to savepoint before_check')
+  await slotted(high, 2, single * 2)
+  await expect(assertFloor()).resolves.toBeTruthy()
+})
