@@ -1,4 +1,4 @@
-import Image from 'next/image'
+import { SiteImage as Image } from '@/core/ui/site-image'
 import type { CSSProperties } from 'react'
 
 import type { CardVisual as Visual, ImageRef } from '../page-content'

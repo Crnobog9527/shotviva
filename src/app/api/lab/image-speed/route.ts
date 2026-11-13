@@ -1,6 +1,7 @@
 import { connection } from 'next/server'
 
 import { serverEnv } from '@/core/env'
+import { publicEnv } from '@/core/public-env'
 import { labOrigins, labPageHtml, pickKeys } from '@/core/lab/image-speed'
 import { NOINDEX_HEADER } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
@@ -15,8 +16,8 @@ export async function GET() {
   const base = env.NEXT_PUBLIC_ASSETS_BASE_URL
   const templates = base ? await cachedWebCatalogue('zh') : []
   const keys = base ? pickKeys(templates.map((t) => t.coverAfterUrl ?? t.coverBeforeUrl), base) : []
-  const origins = labOrigins({ assetsBase: base, r2Origin: env.R2_PUBLIC_ORIGIN })
-  return new Response(labPageHtml({ origins, keys }), {
+  const origins = labOrigins({ assetsBase: base, r2Origin: env.R2_PUBLIC_ORIGIN, imageCdn: publicEnv.NEXT_PUBLIC_IMAGE_CDN_URL })
+  return new Response(labPageHtml({ origins, keys, assetsBase: base }), {
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',
