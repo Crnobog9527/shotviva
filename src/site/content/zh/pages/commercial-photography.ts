@@ -18,8 +18,8 @@ const { amazon, etsy, shopify } = PLATFORM_SPECS
 
 // 运动鞋这一套（public/cases，Owner 2026-11-11）：玄关地板上的一张手机照和用它做的三张成品，
 // 不再和首页的托特包重复。
-const sneakerPhone = caseImage('sneaker-phone', '示例手机照：玄关木地板上的一只米白色皮面运动鞋，后跟是灰绿色麂皮，早晨阳光很硬，钥匙和打开的鞋盒都入镜了')
-const sneakerLifestyle = caseImage('sneaker-lifestyle', 'AI 示例：同一只鞋放在阳光下咖啡馆门口的水泥台阶上，身后是虚化的亚麻外套')
+const sneakerPhone = caseImage('sneaker-phone', '真实手机照：玄关木地板上的一只米白色皮面运动鞋，后跟是灰绿色麂皮，早晨阳光很硬，钥匙和打开的鞋盒都入镜了')
+const sneakerLifestyle = caseImage('sneaker-lifestyle', '真实案例：同一只鞋放在阳光下咖啡馆门口的水泥台阶上，身后是虚化的亚麻外套')
 
 const shoot: ShootDemo = {
   heading: { lead: '一张手机照片 → ', emphasis: '一整套图' },
@@ -27,9 +27,9 @@ const shoot: ShootDemo = {
   phone: { image: sneakerPhone, file: 'IMG_3184.jpg', caption: '手机原图：早晨阳光很硬，门垫、钥匙和鞋盒都入镜了。' },
   arrow: '三种用途，同一只鞋',
   results: [
-    { image: caseImage('sneaker-listing', 'AI 示例：同一只鞋的纯白底商品主图，柔和影棚光'), title: '电商主图', template: '万物皆可变主图' },
+    { image: caseImage('sneaker-listing', '真实案例：同一只鞋的纯白底商品主图，柔和影棚光'), title: '电商主图', template: '万物皆可变主图' },
     { image: sneakerLifestyle, title: '生活场景图', template: '生活场景图' },
-    { image: caseImage('sneaker-promo-zh', 'AI 示例：同一只鞋悬浮在灰绿色背景上，做成写着「新品上市 百搭小白鞋」的促销海报'), title: '促销海报', template: '促销海报' },
+    { image: caseImage('sneaker-promo-zh', '真实案例：同一只鞋悬浮在灰绿色背景上，做成写着「新品上市 百搭小白鞋」的促销海报'), title: '促销海报', template: '促销海报' },
   ],
   bill: {
     photographer: { who: '摄影师', amount: '一整场拍摄', note: '预约、影棚、造型和精修' },
@@ -48,21 +48,21 @@ const whiteCases: EditCases = {
     {
       title: '桌上的音箱',
       change: '线、桌垫和房间都去掉了，音箱的网罩、高音单元和外壳质感都没变。出图是透明底的 PNG，放到哪个平台的背景上都行。',
-      before: caseImage('white-speaker-before', '示例手机照：深灰色监听音箱放在绿色桌垫上，后面是线和椅子'),
-      after: caseImage('white-speaker-after', 'AI 示例：同一只音箱抠成透明底，底下带一点柔和阴影'),
+      before: caseImage('white-speaker-before', '真实手机照：深灰色监听音箱放在绿色桌垫上，后面是线和椅子'),
+      after: caseImage('white-speaker-after', '真实案例：同一只音箱抠成透明底，底下带一点柔和阴影'),
       transparent: true,
     },
     {
       title: '挂在门上的连衣裙',
       change: '去掉衣架和门，放到纯白底上：还是这条裙子，熨得平整，每一朵绣花、流苏和钩花蕾丝都在原来的位置。',
-      before: caseImage('white-dress-before', '示例手机照：一条象牙白民族风绣花分层长裙挂在卧室门上，旁边是床和脏衣篮'),
-      after: caseImage('white-dress-after', 'AI 示例：同一条绣花长裙，纯白背景'),
+      before: caseImage('white-dress-before', '真实手机照：一条象牙白民族风绣花分层长裙挂在卧室门上，旁边是床和脏衣篮'),
+      after: caseImage('white-dress-after', '真实案例：同一条绣花长裙，纯白背景'),
     },
     {
       title: '街头逆光飞发',
       change: '最难抠的一类：逆光下在街头被风吹起的头发。街景、灯架和行人都去掉了，细碎发丝一根根保留，在透明底 PNG 上是柔和的半透明边缘。',
-      before: caseImage('white-hair-before', '示例手机照：穿驼色大衣的模特站在黄昏的街头，逆光下头发被风吹起，身后有灯架和摩托车'),
-      after: caseImage('white-hair-after', 'AI 示例：同一位模特抠成透明底，每一缕飞起的发丝都保留'),
+      before: caseImage('white-hair-before', '真实手机照：穿驼色大衣的模特站在黄昏的街头，逆光下头发被风吹起，身后有灯架和摩托车'),
+      after: caseImage('white-hair-after', '真实案例：同一位模特抠成透明底，每一缕飞起的发丝都保留'),
       transparent: true,
     },
   ],

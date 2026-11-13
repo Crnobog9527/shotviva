@@ -43,32 +43,32 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
   }
 }
 
-const fishPhone = caseImage('menu-fish-phone', '示例手机照：白色搪瓷大碗装的酸菜鱼放在后厨不锈钢出菜口，顶灯偏绿')
-const fishDark = caseImage('menu-fish-dark', 'AI 示例：同一份酸菜鱼重新装进白瓷碗，放在深色原木上，暖色侧光，热气升起')
+const fishPhone = caseImage('menu-fish-phone', '真实手机照：白色搪瓷大碗装的酸菜鱼放在后厨不锈钢出菜口，顶灯偏绿')
+const fishDark = caseImage('menu-fish-dark', '真实案例：同一份酸菜鱼重新装进白瓷碗，放在深色原木上，暖色侧光，热气升起')
 
 // 一道菜做成三种成图：菜不变，换碗、换场景、换光。
 const shoot: ShootDemo = {
   heading: { lead: '一张菜品手机照 → ', emphasis: '一整套菜单大片' },
   intro: '鲜椒牛蛙，在后厨出菜口用不锈钢盆随手一拍。做成三张成图，每张都是同一道菜：牛蛙、青红鲜椒、青花椒都没变。',
   phone: {
-    image: caseImage('menu-frog-phone', '示例手机照：不锈钢盆装的鲜椒牛蛙放在后厨台面上，日光灯，后面是单据和碗'),
+    image: caseImage('menu-frog-phone', '真实手机照：不锈钢盆装的鲜椒牛蛙放在后厨台面上，日光灯，后面是单据和碗'),
     file: 'IMG_2706.jpg',
     caption: '手机原图。日光灯、不锈钢盆，后面还挂着单据。',
   },
   arrow: '三种出图，同一道菜',
   results: [
     {
-      image: caseImage('menu-frog-dark', 'AI 示例：同一道牛蛙装进炭灰石碗，放在石板上，暗色手绘背景，暖色侧光'),
+      image: caseImage('menu-frog-dark', '真实案例：同一道牛蛙装进炭灰石碗，放在石板上，暗色手绘背景，暖色侧光'),
       title: '菜单主图',
       template: '暗调布景，侧逆光',
     },
     {
-      image: caseImage('menu-frog-pour', 'AI 示例：白瓷壶往白碗里的同一道菜浇热油，下面垫原木，热气定格在空中'),
+      image: caseImage('menu-frog-pour', '真实案例：白瓷壶往白碗里的同一道菜浇热油，下面垫原木，热气定格在空中'),
       title: '热油泼椒',
       template: '热油现浇，热气定格',
     },
     {
-      image: caseImage('menu-frog-poster-zh', 'AI 示例：同一道菜做成菜单海报，暖棕背景，标题是主厨招牌、鲜椒牛蛙'),
+      image: caseImage('menu-frog-poster-zh', '真实案例：同一道菜做成菜单海报，暖棕背景，标题是主厨招牌、鲜椒牛蛙'),
       title: '菜单海报',
       template: '菜名、一句介绍和价格',
     },

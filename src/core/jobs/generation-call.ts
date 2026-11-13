@@ -70,6 +70,8 @@ export function screenCost(judge: IdentityJudge | null | undefined, screen: Scre
   }
 }
 
-// Every word the user typed that reaches the image model: the template's text fields and the note.
+// Every word the user typed that reaches the image model: the template's text fields, a poster's
+// confirmed text and the note.
 // Toggles are not typed words (T89): their fragments are the template's own text.
-export const typedWords = (inputs: GenerationInputs): string[] => [...Object.values(inputs.copy), inputs.note]
+export const typedWords = (inputs: GenerationInputs): string[] =>
+  [...Object.values(inputs.copy), ...(inputs.posterText ? [inputs.posterText] : []), inputs.note]

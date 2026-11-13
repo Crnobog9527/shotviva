@@ -37,6 +37,9 @@ import { backgroundInput } from './job-background'
 import { recordJobClientIp } from './job-download'
 import type { TemplateProvider } from './provider'
 import { reserveJob } from './settlement'
+import { partText } from '../poster'
+import { loadPosterPart, POSTER_FEATURE } from '../poster/sets'
+import { requireFeature } from '../features'
 
 // `track` is injectable so tests can assert the `generate` event without PostHog.
 // `identityJudge`: the text-only decision call of ARCHITECTURE §5.1a; null or absent means the
@@ -47,6 +50,8 @@ export type GenerationDeps = Omit<SettleDeps, 'provider'> & {
   track?: ServerTrack
   identityJudge?: IdentityJudge | null
   identityJudgeTimeoutMs?: number
+  // The invite-only gate of poster templates (ARCHITECTURE §5.3); tests pass their own reads.
+  allowPoster?: (userId: string) => Promise<void>
 }
 
 const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'partner' }
@@ -75,6 +80,22 @@ function assertSingleRun(req: GenerationRequest, template: Template) {
 const uploadKeys = (req: GenerationRequest, inputs: GenerationInputs): string[] =>
   inputs.slots ? inputs.slots.map((slot) => slot.upload) : req.inputKey ? [req.inputKey] : []
 
+// A poster template writes its text from the caller's own saved set (ARCHITECTURE §5.3), never
+// from text the browser sends; every other template refuses a poster reference.
+async function posterPart(deps: GenerationDeps, req: GenerationRequest, template: Template) {
+  if (!template.fields.poster) {
+    if (req.poster) throw new AppError('INVALID_INPUT', 'This template does not make posters')
+    return null
+  }
+  if (!req.poster || req.source !== 'web') throw new AppError('INVALID_INPUT', 'Confirm the poster text first')
+  // Dense small text needs at least HD (ARCHITECTURE §5.3), whatever the template's prices say.
+  if ((req.resolution ?? DEFAULT_RESOLUTION) === '1k') throw new AppError('INVALID_INPUT', 'Posters are made in HD or Max')
+  await (deps.allowPoster ?? ((userId: string) => requireFeature(userId, POSTER_FEATURE)))(req.userId)
+  const { setId, part: index } = req.poster
+  const { content, part } = await loadPosterPart(deps.db, req.userId, { setId, part: index, templateId: template.id })
+  return { text: partText(content, part), record: { set_id: setId, part: index, kind: part.kind, page: part.page, pages: part.pages } }
+}
+
 // Everything that can be rejected without touching credits: template, fields, key
 // ownership, tier limits (batch size, rate limit), then the user's words (ARCHITECTURE §5.1a:
 // no face swap) alongside the stored upload itself (HEAD + bytes; bad ones are deleted).
@@ -87,7 +108,7 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   assertPricedTier(template.unpricedResolutions, tier)
   assertTemplateQuote(req.expectedCredits, template.creditsCost[tier])
   assertSingleRun(req, template)
-  const inputs = validateGenerationInputs(template.fields, {
+  const validated = validateGenerationInputs(template.fields, {
     copy: req.copy,
     aspectRatio: req.aspectRatio,
     note: req.note,
@@ -97,6 +118,7 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
     ...(req.inputSlots ? { slots: req.inputSlots } : {}),
     aspects: requestAspects(req, template),
   })
+  const { inputs, poster } = withPoster(validated, await posterPart(deps, req, template))
   const keys = uploadKeys(req, inputs)
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
   if (keys.some((key) => !isOwnInputKey(req.userId, key))) throw new AppError('INVALID_INPUT', 'Unknown upload')
@@ -106,7 +128,11 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   })
   // In parallel: the decision call usually finishes while the upload is still being read.
   const [screen, images] = await Promise.all([screenWords(deps, req, inputs), Promise.all(keys.map((key) => loadInputImage(deps.store, key)))])
-  return { template, prompt, inputs, images, keys, screen }
+  return { template, prompt, inputs, images, keys, screen, poster }
+}
+
+function withPoster(inputs: GenerationInputs, poster: Awaited<ReturnType<typeof posterPart>>) {
+  return poster ? { inputs: { ...inputs, posterText: poster.text }, poster: poster.record } : { inputs, poster: null }
 }
 
 // Every word the user typed that reaches the image model: the template's text fields and the
@@ -134,7 +160,8 @@ export function toggleInputs(inputs: GenerationInputs, now: Date) {
 
 // User content only; the wrapped prompt stays in template_prompts (ARCHITECTURE §4).
 // reserve_credits charges templates.credits_cost[resolution] from this very object.
-function jobInputs(req: GenerationRequest, { inputs, prompt, template }: Prepared, resolution: Resolution, attemptId: string, now: Date) {
+function jobInputs(req: GenerationRequest, prepared: Prepared, resolution: Resolution, attemptId: string, now: Date) {
+  const { inputs, prompt, template } = prepared
   const shown = publicCopyKeys(template.fields.copy)
   return {
     copy: inputs.copy,
@@ -151,6 +178,7 @@ function jobInputs(req: GenerationRequest, { inputs, prompt, template }: Prepare
     prompt_version: prompt.version,
     attempt_id: attemptId,
     ...batchInputs(req),
+    ...(prepared.poster ? { poster: prepared.poster } : {}),
   }
 }
 

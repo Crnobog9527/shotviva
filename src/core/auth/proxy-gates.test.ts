@@ -17,6 +17,8 @@ describe('gateFor', () => {
     ['/generate', 'signed_in'],
     ['/generate/pure-white', 'signed_in'],
     ['/photos', 'signed_in'],
+    ['/posters', 'signed_in'],
+    ['/posters/some-style', 'signed_in'],
     ['/photos/9b1c', 'signed_in'],
     ['/wishlist', 'signed_in'],
     ['/generated', null],

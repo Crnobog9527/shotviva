@@ -5,7 +5,8 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { createAdminSupabase } from '../auth/supabase-admin'
 import { serverEnv } from '../env'
 import { AppError } from '../errors'
-import { effectivePrices, providerTag, type GenerationProvider, type ProviderPrices } from '../jobs'
+import { effectivePrices, providerTag, type GenerationProvider, type ImageRequestOptions, type ProviderPrices } from '../jobs'
+import { ARK_RESOLUTIONS } from './ark'
 import { openRouterImageParameters } from './openrouter-catalog'
 import { PROVIDERS_CACHE_TAG } from './cache-tag'
 import { readProviderKey } from './keys'
@@ -39,11 +40,16 @@ export async function activeProvider(
 
 // Freeze the default model’s live range before a template job reserves credits or trial budget.
 // A trial can explicitly omit all references, so zero-input requests also need this check.
+// `request`: the job being routed (undefined when only resolving for an estimate).
 // `loadRow` is injectable for callers outside Next's cache (the templates:trial script).
-export async function defaultTemplateProvider(adapters: ProviderAdapters, checkReferences: boolean,
+export async function defaultTemplateProvider(adapters: ProviderAdapters, request: ImageRequestOptions | undefined,
   loadRow: (module: ProviderModule) => Promise<ActiveProviderRow | null> = cachedActiveRow): Promise<GenerationProvider> {
   const row = await loadRow('image')
-  const parameters = checkReferences && row?.adapter === 'openrouter_images'
+  // Ark has no Max tier: refuse it here, before any credits are held, rather than in the adapter.
+  if (request && row?.adapter === 'ark_images' && !ARK_RESOLUTIONS.includes(request.resolution)) {
+    throw new AppError('INVALID_INPUT', 'This model does not support the selected output size')
+  }
+  const parameters = request && row?.adapter === 'openrouter_images'
     ? await openRouterImageParameters(row.baseUrl, row.model) : undefined
   return resolveProvider('image', row, serverEnv(), adapters, (id) => readProviderKey(createAdminSupabase(), id), parameters)
 }

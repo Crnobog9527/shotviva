@@ -53,6 +53,8 @@ export {
   NOTE_MAX_LENGTH,
   OUTPUT_ASPECTS,
   RESOLUTIONS,
+  TALL_ASPECTS,
+  isTallAspect,
   type OutputAspect,
   type Resolution,
 } from './output-options'

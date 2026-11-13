@@ -2,16 +2,18 @@
 
 import type { ActionResult } from '../templates/types'
 import { EmptyState } from '../shell/admin-blocks'
-import type { FeatureAccessInput, FeatureSetting } from '../features/types'
+import type { FeatureAccessInput, FeatureInviteInput, FeatureSetting } from '../features/types'
 import type { WishlistSwitch, WishlistSwitchInput } from '../system-settings/types'
 import { FEATURES_COPY as COPY } from './copy'
 import { FeatureCard } from './feature-card'
+import { InviteCard } from './invite-card'
 import { GallerySwitches, type GallerySwitchKey, type GallerySwitchState } from './gallery-switches'
 import { SettingSwitchCard } from './setting-switch-card'
 import { WISHLIST_SWITCH_COPY } from './wishlist-copy'
 
 export type FeatureAdminActions = {
   save: (input: FeatureAccessInput) => Promise<ActionResult>
+  invite: (input: FeatureInviteInput) => Promise<ActionResult>
   saveWishlist: (input: WishlistSwitchInput) => Promise<ActionResult>
   saveGallery: (key: GallerySwitchKey, input: WishlistSwitchInput) => Promise<ActionResult>
 }
@@ -49,7 +51,9 @@ export function FeaturesEditor({ settings, wishlist, gallery, actions }: Props) 
         {settings.length === 0 ? (
           <EmptyState title={COPY.empty} body={COPY.emptyBody} />
         ) : (
-          settings.map((setting) => <FeatureCard key={setting.key} setting={setting} save={actions.save} />)
+          settings.map((setting) => setting.inviteOnly
+            ? <InviteCard key={setting.key} setting={setting} invite={actions.invite} />
+            : <FeatureCard key={setting.key} setting={setting} save={actions.save} />)
         )}
       </div>
     </div>

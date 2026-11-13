@@ -47,7 +47,7 @@ describe('admin_set_feature_access', () => {
     expect((await db.query('select count(*)::int as n from public.feature_access where key = $1', [k])).rows[0].n).toBe(1)
 
     const [listed] = await listFeatureSettings(service, registry)
-    expect(listed).toEqual({ key: k, name: '测试功能', minTier: null, openToAllAt: null })
+    expect(listed).toEqual({ key: k, name: '测试功能', minTier: null, openToAllAt: null, inviteOnly: false, invites: [] })
   })
 
   it('refuses a tier outside pro / max and a missing actor', async () => {

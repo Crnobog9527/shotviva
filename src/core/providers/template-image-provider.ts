@@ -76,7 +76,7 @@ export async function templateImageProvider(
   adapters: ProviderAdapters,
   id?: string | null,
   request?: ImageRequestOptions,
-  { lookup = cachedRow, fallback = () => defaultTemplateProvider(adapters, request !== undefined),
+  { lookup = cachedRow, fallback = () => defaultTemplateProvider(adapters, request),
     readKey = (keyId) => readProviderKey(createAdminSupabase(), keyId),
     parameters: loadParameters = openRouterImageParameters }: RoutingDeps = {},
 ) {

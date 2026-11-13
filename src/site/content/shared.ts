@@ -27,7 +27,7 @@ export function sharedFacts(offers: OfferFacts): readonly [Fact, Fact, Fact, ...
     // who and where, then the numbers every page shares.
     {
       label: 'Your photo stays your photo',
-      value: 'The product, label, plating and room look exactly like what you shot. Only the light, background or scene changes.',
+      value: 'The product, its label, the food and the room stay as you shot them. The light, background or scene changes; food templates may also swap the plate or bowl.',
     },
     {
       label: 'Edit like Photoshop, in plain words',
