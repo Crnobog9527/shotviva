@@ -1,24 +1,16 @@
 'use client'
 
-import { useState } from 'react'
-
 import type { Balance } from '@/core/billing/pools'
 import type { MembershipTier } from '@/core/config'
 import { useReveal } from '@/core/ui/reveal'
 
-import { useBatchRefusal } from '../batch/use-batch-refusal'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { batchCaps, type BatchCaps } from '../gated/feature-access'
-import { retryJob, setWorkspaceJobs } from '../generation/job-store'
-import { useWorkspaceJobs } from '../generation/use-jobs'
-import { createSubmitLatch } from '../workspace/submit-latch'
 import { MatrixAction } from './matrix-action'
 import { MatrixForm, MatrixHead, MatrixStage } from './matrix-form'
 import { MatrixLocked } from './matrix-locked'
 import { MatrixResults } from './matrix-results'
-import { onlyTemplate } from './matrix-state'
-import { submitBatch } from './submit-batch'
-import { MATRIX_VIEW, useMatrixDraft } from './use-matrix-draft'
+import { useBatchSession } from './use-batch-session'
 
 export type MatrixWorkspaceProps = {
   templates: CatalogueTemplate[]
@@ -40,41 +32,18 @@ export function MatrixWorkspace(props: MatrixWorkspaceProps) {
 }
 
 function BatchForm({ templates, initial, balance, tier, limit, caps }: MatrixWorkspaceProps & { caps: BatchCaps }) {
-  const draft = useMatrixDraft({ templates, initial, balance, limit, caps })
-  const ids = useWorkspaceJobs(MATRIX_VIEW)
-  const refusal = useBatchRefusal()
+  const session = useBatchSession({ templates, initial, balance, limit, caps, onStarted: () => window.scrollTo({ top: 0 }) })
+  const { draft, refusal } = session
   const reveal = useReveal<HTMLDivElement>()
-  const [latch] = useState(createSubmitLatch)
-  const generate = () => {
-    submitBatch(latch, draft.start, { refused: refusal.handle, started: () => window.scrollTo({ top: 0 }) })
-  }
-  const back = () => {
-    latch.reset()
-    setWorkspaceJobs(MATRIX_VIEW, [])
-  }
-  if (ids.length > 0) {
-    return (
-      <MatrixResults
-        ids={ids}
-        onRetry={(id) => void retryJob(id, limit)}
-        onNew={() => {
-          draft.photos.clear()
-          back()
-        }}
-        onApply={(templateId) => {
-          draft.photos.clear()
-          draft.setValues((current) => onlyTemplate(current, templateId))
-          back()
-        }}
-      />
-    )
+  if (session.ids.length > 0) {
+    return <MatrixResults ids={session.ids} onRetry={session.retry} onNew={session.newBatch} onApply={session.applyMore} />
   }
   return (
     <div className="lg:grid lg:grid-cols-[minmax(380px,440px)_minmax(0,1fr)] lg:items-start lg:gap-x-12 lg:px-(--gutter)">
       <div ref={reveal} className="min-w-0 px-(--gutter) lg:px-0">
         <MatrixHead caps={caps} />
         <MatrixForm draft={draft} templates={templates} balancePaid={balance.paid} tier={tier} />
-        <MatrixAction cta={draft.cta} max={caps.cells} error={refusal.message(draft.error)} onGenerate={generate} />
+        <MatrixAction cta={draft.cta} max={caps.cells} error={refusal.message(draft.error)} onGenerate={session.generate} />
       </div>
       <MatrixStage draft={draft} />
     </div>

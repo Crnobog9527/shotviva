@@ -10,6 +10,7 @@ import { Reveal } from '@/core/ui/reveal-item'
 
 import { useFavorites } from '../favorites/favorites-provider'
 import { savedIn } from '../favorites/favorites-store'
+import { BatchDialogSlot } from '../matrix/batch-dialog-slot'
 import { CreateDialog, type CreateContext } from '../workspace/create-dialog'
 import { filterCatalogue, openableTemplates } from './catalogue-filter'
 import { catalogueSections, isTall, sectionsFor, type CatalogueSection } from './catalogue-sections'
@@ -34,7 +35,8 @@ type Props = { view: CatalogueView; create: CreateContext; endCard?: ReactNode }
 // category levels (T102), the grid of side-by-side pair cards and series cards (one column on
 // phones, two from md, three from lg; the Art Styles compare is the tall card), the series panel
 // a series card opens (its members and the chosen one's form in one step, Owner 2026-11-12), and
-// the creation dialog every template opens (DESIGN §6.9 item 2). The
+// the creation dialog every template opens (DESIGN §6.9 item 2), and Batch create's dialog
+// (?batch=1, opened by the card above the catalogue or a template's batch link). The
 // chosen category and an open series live in the address (?category=, ?series=). With saved
 // templates the bar leads with Saved (T83), read from the page's FavoritesProvider.
 export function TemplateCatalogue({ view, create, endCard }: Props) {
@@ -42,6 +44,8 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
   const query = useCatalogueQuery(view.filters)
   const [openId, setOpenId] = useState<string | null>(null)
   const openable = useMemo(() => openableTemplates(view.entries), [view.entries])
+  // Batch create takes every template that uses a photo, series members included.
+  const batchable = useMemo(() => openable.filter((template) => template.photoInput !== 'none'), [openable])
   const featured = featuredOf(view.entries)
   const favoriteIds = useFavorites()?.ids
   const saved = useMemo(() => (favoriteIds ? savedIn(favoriteIds, openable) : []), [favoriteIds, openable])
@@ -61,7 +65,13 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
   }
 
   if (view.entries.length === 0) {
-    return <p className="px-(--gutter) pt-6 text-body text-muted-foreground">{t('empty')}</p>
+    // Batch create stays mounted even then: a batch already running keeps its dialog and results.
+    return (
+      <>
+        <p className="px-(--gutter) pt-6 text-body text-muted-foreground">{t('empty')}</p>
+        <BatchDialogSlot templates={batchable} create={create} />
+      </>
+    )
   }
   return (
     <>
@@ -79,6 +89,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
+      <BatchDialogSlot templates={batchable} create={create} />
     </>
   )
 }

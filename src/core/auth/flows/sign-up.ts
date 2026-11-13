@@ -4,7 +4,7 @@ import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { currentOrigin } from '../../request-origin'
 import { nextIn } from '../redirect-target'
-import { createServerSupabase } from '../supabase-server'
+import { createSessionSupabase } from '../supabase-server'
 import { classifyAuthError } from './classify-auth-error'
 import { confirmUrl } from './callback-url'
 import { failed, type FormState } from './form-state'
@@ -22,7 +22,7 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   if (!parsed.success) return failed('INVALID_INPUT')
   const { email, password, captchaToken, next } = parsed.data
 
-  const supabase = await createServerSupabase()
+  const supabase = await createSessionSupabase()
   const locale = await currentLocale()
   // user_metadata.locale picks the language of every auth email this account gets
   // (ARCHITECTURE §7: `{{ if eq .Data.locale "zh" }}` in supabase/templates/*.html).
@@ -46,7 +46,7 @@ export async function resendSignupEmail(form: FormData): Promise<FormState> {
   if (!parsed.success) return failed('INVALID_INPUT')
   const { email, captchaToken, next } = parsed.data
 
-  const supabase = await createServerSupabase()
+  const supabase = await createSessionSupabase()
   const { error } = await supabase.auth.resend({
     type: 'signup',
     email,
@@ -60,7 +60,7 @@ export async function requestPasswordReset(form: FormData): Promise<FormState> {
   if (!parsed.success) return failed('INVALID_INPUT')
   const { email, captchaToken } = parsed.data
 
-  const supabase = await createServerSupabase()
+  const supabase = await createSessionSupabase()
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     captchaToken,
     redirectTo: confirmUrl(await localized('/reset/update'), await currentOrigin()),
@@ -80,7 +80,7 @@ export async function updatePassword(form: FormData): Promise<FormState> {
   const parsed = newPasswordSchema.safeParse(formFields(form))
   if (!parsed.success) return failed('INVALID_INPUT')
 
-  const supabase = await createServerSupabase()
+  const supabase = await createSessionSupabase()
   const { data } = await supabase.auth.getUser()
   if (!data.user) return failed('UNAUTHORIZED')
   // Supabase signs this account out everywhere else when the password changes.
