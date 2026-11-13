@@ -62,9 +62,9 @@ function SeriesLinks({ template, label, shareId }: { template: SharedTemplate; l
 // A link whose template is not on the site (unpublished, hidden, removed, never public).
 export function SharedTemplateMissing({ title, text, browse }: { title: string; text: string; browse: string }) {
   return (
-    <article className="mk-w grid justify-items-center gap-4 px-(--gutter) py-20 text-center md:py-28">
+    <article className="mk-w grid justify-items-center gap-4 px-(--gutter) py-24 text-center">
       <h1 className="font-display text-h1 leading-[1.05] tracking-[-0.02em]">{title}</h1>
-      <p className="max-w-[44ch] text-label text-pretty text-muted-foreground">{text}</p>
+      <p className="text-label text-pretty text-muted-foreground">{text}</p>
       <Link href="/" prefetch={false} className="mk-cta mt-2">
         {browse}
       </Link>

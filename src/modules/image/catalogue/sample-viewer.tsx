@@ -20,6 +20,14 @@ type Props = {
   onSide(side: ViewerSide): void
 }
 
+// One-off values as inline styles, so the public pages' sheet stays small (scripts/public-css-check.ts).
+// Above the creation sheets (z-index 100).
+const LAYER = { zIndex: 110 } as const
+const FRAME = { ...LAYER, paddingTop: 'var(--sat)', paddingBottom: 'max(var(--sab), 12px)' } as const
+const PAN = { touchAction: 'pan-x pan-y pinch-zoom' } as const
+const FIT = { cursor: 'zoom-in' } as const
+const ZOOMED = { cursor: 'zoom-out', width: '200%' } as const
+
 // A sideways swipe this long (px) switches between the phone photo and the AI result.
 const SWIPE = 48
 
@@ -34,15 +42,16 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => (setZoomed(false), onOpenChange(next))}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-110 bg-black" />
+        <DialogPrimitive.Overlay className="fixed inset-0 bg-black" style={LAYER} />
         <DialogPrimitive.Content
           aria-describedby={undefined}
-          className="fixed inset-0 z-110 flex flex-col bg-black pt-(--sat) pb-[max(var(--sab),12px)] text-white outline-none"
+          style={FRAME}
+          className="fixed inset-0 flex flex-col bg-black text-white outline-none"
         >
           <DialogPrimitive.Title className="sr-only">{t('viewerTitle', { name })}</DialogPrimitive.Title>
           <div className="flex items-center justify-between gap-3 px-4 py-2">
             <SideToggle side={side} onSide={(next) => (setZoomed(false), onSide(next))} />
-            <DialogPrimitive.Close aria-label={t('viewerClose')} className="press grid size-11 place-items-center rounded-full bg-white/12 hover:bg-white/20">
+            <DialogPrimitive.Close aria-label={t('viewerClose')} className="press grid size-11 place-items-center rounded-full bg-wash-strong">
               <svg viewBox="0 0 24 24" aria-hidden="true" className="size-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
@@ -50,7 +59,8 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
           </div>
           <div
             {...swipe.handlers}
-            className={cn('relative min-h-0 flex-1 overflow-auto overscroll-contain [touch-action:pan-x_pan-y_pinch-zoom]', !zoomed && 'grid place-items-center')}
+            style={PAN}
+            className={cn('relative min-h-0 flex-1 overflow-auto overscroll-contain', !zoomed && 'grid place-items-center')}
           >
             <img
               key={url}
@@ -58,11 +68,12 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
               alt={side === 'phone' ? t('phonePhotoAlt') : t('resultAlt', { name })}
               decoding="async"
               onClick={() => !swipe.consumed() && setZoomed((value) => !value)}
-              className={cn('select-none', zoomed ? 'w-[200%] max-w-none cursor-zoom-out' : 'max-h-full max-w-full cursor-zoom-in object-contain')}
+              style={zoomed ? ZOOMED : FIT}
+              className={cn('select-none', zoomed ? 'max-w-none' : 'max-h-full max-w-full object-contain')}
               draggable={false}
             />
           </div>
-          <p className="px-4 pt-2 text-center text-caption text-white/70">{t(zoomed ? 'viewerHintZoomed' : 'viewerHint')}</p>
+          <p className="px-4 pt-2 text-center text-caption text-bone-dim">{t(zoomed ? 'viewerHintZoomed' : 'viewerHint')}</p>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
@@ -72,14 +83,14 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
 function SideToggle({ side, onSide }: { side: ViewerSide; onSide(side: ViewerSide): void }) {
   const t = useTranslations('app.template')
   return (
-    <div role="group" aria-label={t('viewerSwitch')} className="inline-flex rounded-full bg-white/12 p-1">
+    <div role="group" aria-label={t('viewerSwitch')} className="inline-flex rounded-full bg-wash-strong p-1">
       {(['phone', 'ai'] as const).map((key) => (
         <button
           key={key}
           type="button"
           aria-pressed={side === key}
           onClick={() => onSide(key)}
-          className={cn('min-h-9 min-w-16 rounded-full px-4 text-caption font-semibold', side === key ? (key === 'ai' ? 'bg-primary text-primary-foreground' : 'bg-white text-black') : 'text-white/80')}
+          className={cn('min-h-9 rounded-full px-5 text-caption font-semibold', side === key ? (key === 'ai' ? 'bg-primary text-primary-foreground' : 'bg-foreground text-background') : 'text-bone-dim')}
         >
           {t(key)}
         </button>

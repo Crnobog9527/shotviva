@@ -31,14 +31,14 @@ export function ZoomableSample({ template, className }: Props) {
   return (
     <>
       {sample}
-      {compare ? null : <button type="button" aria-label={t('viewerOpen', { name: template.name })} onClick={openAt} className="absolute inset-0 z-4 cursor-zoom-in rounded-media" />}
+      {compare ? null : <button type="button" aria-label={t('viewerOpen', { name: template.name })} onClick={openAt} className="absolute inset-0 z-4 rounded-media" />}
       <button
         type="button"
         aria-label={t('viewerOpen', { name: template.name })}
         onClick={() => setSide('ai')}
         className={cn('frost press absolute z-5 grid size-9 place-items-center rounded-full text-white', compare ? 'bottom-3 left-3' : 'top-3 left-3')}
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
         </svg>
       </button>
