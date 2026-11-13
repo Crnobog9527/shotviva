@@ -252,13 +252,13 @@ begin
         else array(select t.id from public.templates t where t.series_id = v_row.id order by t.series_sort_order, t.id) end,
       p_actor, p_step->>'reason');
   when 'save_profile' then
-    -- The profile that is not live (1391); the file is the source of truth, so the expected version
+    -- The profile that is not live (1441); the file is the source of truth, so the expected version
     -- is the row's own, read under the template lock the function takes.
     perform public.admin_save_template_profile(p_actor, v_id, p_step->>'profile', p_step->'prompt', p_step->>'quality',
       p_step->'credits_cost', array(select jsonb_array_elements_text(coalesce(p_step->'unpriced_resolutions','[]'::jsonb))),
       (select p.prompt_version from public.template_profiles p where p.template_id = v_id and p.profile = p_step->>'profile'));
   when 'switch_profile' then
-    -- The admin's switch (1391), audited with the batch's reason.
+    -- The admin's switch (1441), audited with the batch's reason.
     perform admin.switch_template_profile(p_actor, v_id, p_step->>'profile', 'templates:apply');
   else
     raise exception 'INVALID_INPUT';
@@ -12967,7 +12967,7 @@ declare
   v_refs boolean := p_prompt ? 'style_refs';
   v_prompt jsonb;
   v_matches integer;
-  -- Provider profiles (1393): carried only when the source sends them.
+  -- Provider profiles (1443): carried only when the source sends them.
   v_active_profile text := p_profiles->>'active';
   v_entry jsonb;
 begin

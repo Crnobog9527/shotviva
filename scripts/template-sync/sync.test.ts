@@ -117,7 +117,7 @@ describe('syncTemplate', () => {
   })
 })
 
-describe('syncTemplate with provider profiles (1393)', () => {
+describe('syncTemplate with provider profiles (1443)', () => {
   it('sends which profile is live and the other one, and copies the other one’s references too', async () => {
     const other = { key: 'style-refs/demo/6b2d3c4e-5f60-4b7c-9d8e-0f1a2b3c4d5e.webp', width: 32, height: 32, uploadedAt: '2026-11-13T00:00:00.000Z' }
     const entry = { profile: 'seedream', body: 's', model_params: {}, style_refs: [other], provider: { adapter: 'ark_images', model: 'm', base_url: 'u' },
@@ -150,7 +150,7 @@ describe('syncTemplate with provider profiles (1393)', () => {
   })
 })
 
-describe('syncTemplate before migration 1393 on the test site', () => {
+describe('syncTemplate before migration 1443 on the test site', () => {
   it('syncs as before, without profiles, when the source has no profile reader', async () => {
     const source = side()
     source.rpc.mockImplementation(async (name: string) => {

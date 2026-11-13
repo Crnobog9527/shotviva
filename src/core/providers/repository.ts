@@ -21,7 +21,7 @@ const capsColumns = {
 }
 
 const BASE_LIST_COLUMNS = `id, module, adapter, label, base_url, resolutions, capabilities, estimated_image_costs, model, api_key_last4, is_active, notes, updated_at, ${PRICE_COLUMNS}`
-// extra_input_image_usd arrives with migration 1390; a database without it (the test site before
+// extra_input_image_usd arrives with migration 1440; a database without it (the test site before
 // the merge) is read without the column.
 const LIST_COLUMNS = `${BASE_LIST_COLUMNS}, extra_input_image_usd`
 const missingColumn = (error: { code?: string } | null) => error?.code === '42703'
@@ -48,7 +48,7 @@ const listRowSchema = z.object({
   is_active: z.boolean(),
   notes: z.string().nullable(),
   updated_at: z.string(),
-  // 1390: cost of each extra input image of a slot job (USD); null when not set.
+  // 1440: cost of each extra input image of a slot job (USD); null when not set.
   extra_input_image_usd: z.coerce.number().nonnegative().nullable().optional(),
   ...priceColumns,
   ...capsColumns,

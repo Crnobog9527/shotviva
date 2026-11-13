@@ -3,7 +3,7 @@
 -- and the template's quality, for a template with n slots (n >= 2), the first that applies:
 --   1. at least ten succeeded slot jobs in 30 days that filled all n slots: their cost p95
 --      (never below the single-image floor);
---   2. the route's extra_input_image_usd (1390, set by the admin per model): the single-image floor
+--   2. the route's extra_input_image_usd (1440, set by the admin per model): the single-image floor
 --      + ceil((n-1) × extra × 1.10 / credit budget);
 --   3. neither (or a route with no model row, such as the environment model): single floor × n, as
 --      before, so missing data never makes a template cheaper.

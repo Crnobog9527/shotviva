@@ -1,4 +1,4 @@
--- T93 sync carries both provider profiles (1390) and which one is live (总控 2026-11-13).
+-- T93 sync carries both provider profiles (1440) and which one is live (总控 2026-11-13).
 --
 -- * read_template_sync_profiles(id, version), on the test site: the live profile's name and every
 --   other profile (prompt snapshot, model as adapter / model / endpoint, quality, prices, unpriced
@@ -130,7 +130,7 @@ declare
   v_refs boolean := p_prompt ? 'style_refs';
   v_prompt jsonb;
   v_matches integer;
-  -- Provider profiles (1393): carried only when the source sends them.
+  -- Provider profiles (1443): carried only when the source sends them.
   v_active_profile text := p_profiles->>'active';
   v_entry jsonb;
 begin

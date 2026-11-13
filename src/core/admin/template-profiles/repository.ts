@@ -38,7 +38,7 @@ const toSummary = (row: z.infer<typeof summaryRow>) => ({
 const zhName = (translations: unknown) => z.object({ zh: z.object({ name: z.string() }) }).safeParse(translations).data?.zh.name ?? null
 const slotCount = (fields: unknown) => z.object({ images: z.object({ slots: z.array(z.unknown()) }) }).safeParse(fields).data?.images.slots.length ?? 0
 
-// Whether this database has provider profiles (migrations 1390–1394). The test site's database
+// Whether this database has provider profiles (migrations 1440–1444). The test site's database
 // gets migrations only from a merge to main, so a branch deployed there before can lack them.
 export async function profilesInstalled(db: SupabaseClient): Promise<boolean> {
   const { error } = await db.from('template_profiles').select('template_id').limit(1)
@@ -108,7 +108,7 @@ const saveSchema = z.object({
   unpricedResolutions: z.array(resolutionSchema).max(2),
 })
 
-// Saves the profile that is not live (1391); the live one is edited in the template editor.
+// Saves the profile that is not live (1441); the live one is edited in the template editor.
 export async function saveTemplateProfile(db: SupabaseClient, actor: string, input: SaveProfileInput): Promise<number> {
   const parsed = saveSchema.safeParse(input)
   if (!parsed.success) throw new AppError('INVALID_INPUT', copy.invalid)
@@ -154,7 +154,7 @@ const switchSchema = z.object({
   target: profileKey, reason: z.string().trim().min(1).max(200), validateOnly: z.boolean(),
 })
 
-// Preview (validateOnly) or switch every template of the scope (1391). Never unpublishes: a
+// Preview (validateOnly) or switch every template of the scope (1441). Never unpublishes: a
 // template that cannot switch stays on its profile and is reported with its reason.
 export async function switchTemplateProfiles(db: SupabaseClient, actor: string, input: SwitchInput): Promise<SwitchRow[]> {
   const parsed = switchSchema.safeParse(input)

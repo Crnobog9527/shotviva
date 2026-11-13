@@ -52,7 +52,7 @@ type ModelCosts = {
   p95: Costs
   p95ByQuality?: Partial<Record<(typeof TEMPLATE_QUALITIES)[number], Costs>>
   estimates: Costs
-  // 1392: the model's cost per extra input image, and the p95 of full-slot jobs by number of slots.
+  // 1442: the model's cost per extra input image, and the p95 of full-slot jobs by number of slots.
   slotCosts?: { extraInputUsd?: number | null; p95Full?: Partial<Record<(typeof TEMPLATE_QUALITIES)[number], Partial<Record<Resolution, Record<string, number>>>>> }
 }
 
