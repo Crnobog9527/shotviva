@@ -8,7 +8,7 @@ import { Suspense } from 'react'
 import { AnnouncementBanner } from '@/core/announcements'
 import { SiteFooter } from '@/core/content'
 import { currentLocale } from '@/core/i18n/server'
-import { FooterLocales, FooterLocalesFallback, Link, LocaleMenu } from '@/core/i18n/ui'
+import { FooterLocales, FooterLocalesFallback, Link, LocaleMenu, NoLinkPrefetch } from '@/core/i18n/ui'
 import { footerLinksIn } from '@/site/content'
 import { site } from '@/site/site.config'
 
@@ -24,8 +24,9 @@ const zhPaths = site.locales.zhPaths
 export default async function AuthLayout({ children }: LayoutProps<'/[locale]'>) {
   const locale = await currentLocale()
   const t = await getTranslations('marketing.nav')
+  // Public pages load a link on the click only (core/i18n/ui/link-prefetch.tsx: mainland China).
   return (
-    <>
+    <NoLinkPrefetch>
       <AnnouncementBanner />
       <header className="mk-appbar">
         <div className="mk-w mk-appbar-row">
@@ -58,6 +59,6 @@ export default async function AuthLayout({ children }: LayoutProps<'/[locale]'>)
           </Suspense>
         }
       />
-    </>
+    </NoLinkPrefetch>
   )
 }

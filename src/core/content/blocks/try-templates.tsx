@@ -5,6 +5,7 @@ import { useSyncExternalStore } from 'react'
 
 import { Link } from '../../i18n/ui'
 import { PhotoPair } from './photo-pair'
+import { phoneSlot } from './phone-sizes'
 
 // No price on the cards, like the home grid (DESIGN, Owner 2026-11-08).
 // `href`: a series opens itself in Create; a template opens the home page's picker (?open=).
@@ -51,7 +52,7 @@ export function TryTemplates({ templates }: { templates: readonly TryTemplate[] 
             <PhotoPair
               before={{ src: card.before, alt: home('beforeAlt', { name: card.name }), ...SIZE }}
               after={{ src: card.after, alt: home('afterAlt', { name: card.name, use: card.use }), ...SIZE }}
-              sizes="(min-width: 768px) 17vw, 50vw"
+              sizes={`(min-width: 768px) 17vw, ${phoneSlot(50)}`}
             />
             <span className="mk-tpl-meta">
               <b>{card.name}</b>
