@@ -32,7 +32,7 @@ export function ModelSyncStatus({ provider }: { provider: ImageProviderOption })
   const action = useContext(Context)
   const [attempt, retry] = useState(0)
   const [state, setState] = useState<'pending' | 'missing' | 'failed' | null>(null)
-  const due = nextCapabilitySync(provider.openAI, provider.capabilities)
+  const due = nextCapabilitySync(provider.openAI || Boolean(provider.fixedCapabilities), provider.capabilities)
   const id = provider.id
   const key = JSON.stringify([id, provider.model, provider.capabilities?.fetchedAt])
   useEffect(() => {

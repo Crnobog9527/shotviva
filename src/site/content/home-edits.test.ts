@@ -18,7 +18,7 @@ describe('home text-edit cases', () => {
     for (const item of items) {
       for (const image of [item.before, item.after]) {
         expect(image.src).toMatch(/^\/cases\/text-[a-z0-9-]+\.webp$/)
-        expect(image.alt).toMatch(/^(AI example: |AI 示例：|Example phone photo: |示例手机照：)/)
+        expect(image.alt).toMatch(/^(Real example: |真实案例：|Real phone photo: |真实手机照：)/)
         const file = join(process.cwd(), 'public', image.src)
         expect(existsSync(file)).toBe(true)
         expect(statSync(file).size).toBeLessThanOrEqual(150_000)

@@ -46,18 +46,18 @@ const photo = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.we
 const phoneShot = tote.phone
 
 // The hero's AI side: three scenes made from that one phone photo, taking turns (Owner
-// 2026-11-11). Captions stay short and say only what changed; the alt text says it is an AI example.
+// 2026-11-11). Captions stay short and say only what changed; the alt text says it is a real example (Owner 2026-11-13).
 const heroScenes = [
   {
-    image: photo('hero-ai-street', 'AI example: the same woven leather tote on a woman’s shoulder on a sunny Paris street, café tables behind her'),
+    image: photo('hero-ai-street', 'Real example: the same woven leather tote on a woman’s shoulder on a sunny Paris street, café tables behind her'),
     caption: 'Same bag, now on a Paris street',
   },
   {
-    image: photo('hero-ai-terrace', 'AI example: the same tote on a marble café table on a seaside terrace, a woman with a coffee beside it'),
+    image: photo('hero-ai-terrace', 'Real example: the same tote on a marble café table on a seaside terrace, a woman with a coffee beside it'),
     caption: 'Same bag, on a seaside café table',
   },
   {
-    image: photo('hero-ai-villa', 'AI example: the same tote on a travertine bench in a sunlit villa arcade, leaf shadows on the wall'),
+    image: photo('hero-ai-villa', 'Real example: the same tote on a travertine bench in a sunlit villa arcade, leaf shadows on the wall'),
     caption: 'Same bag, new light and setting',
   },
 ] as const
@@ -145,7 +145,7 @@ const copy = {
   templateGrid: {
     heading: 'Img to Img Templates: No Prompts to Write',
     intro: `Every template starts from your phone photo and ends with a finished picture. Pick one and ${brand} does the rest.`,
-    note: 'All template images are illustrative examples.',
+    note: 'All template images are real results made with Shotviva templates.',
   },
   topics: useCases,
   wishlist: homeWishlist,
@@ -191,7 +191,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: "Does image to image AI keep my photo's subject the same?",
-    answer: `${brand} templates are built to keep the subject as you shot it: the product label, the plating, the room layout or the pet. Only the light, the background, the scene or the style changes. Many other image to image AI tools redraw the whole picture, subject included, so check the result before you use it.`,
+    answer: `${brand} templates are built to keep the subject as you shot it: the product and its label, the food, the room layout or the pet. The light, the background, the scene or the style changes, and food templates may also swap the plate or bowl. Many other image to image AI tools redraw the whole picture, subject included, so check the result before you use it.`,
   },
   {
     question: 'How is image to image AI different from an AI image generator?',

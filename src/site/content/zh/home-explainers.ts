@@ -9,15 +9,15 @@ import { ZH_TIERS, zhTierList, zhUploadLimits } from './offer'
 // The same illustrative tote set as the English home (public/home/hero-set-*.webp), shared with
 // the hero and the shoot demo.
 export const zhTote = {
-  phone: homeImage('hero-set-phone', '手机随手拍：厨房台面上的一只编织皮托特包，窗边自然光（示意图）'),
-  listing: homeImage('hero-set-listing', '同一只编织皮托特包的白底商品图，柔和影棚光（示意图）'),
-  lifestyle: homeImage('hero-set-lifestyle', '同一只包放在窗边的咖啡馆椅子上，早晨暖光（示意图）'),
-  promo: homeImage('hero-set-promo', '同一只包做成新品促销海报，明亮影棚光（示意图）'),
+  phone: homeImage('hero-set-phone', '手机随手拍：厨房台面上的一只编织皮托特包，窗边自然光（真实案例）'),
+  listing: homeImage('hero-set-listing', '同一只编织皮托特包的白底商品图，柔和影棚光（真实案例）'),
+  lifestyle: homeImage('hero-set-lifestyle', '同一只包放在窗边的咖啡馆椅子上，早晨暖光（真实案例）'),
+  promo: homeImage('hero-set-promo', '同一只包做成新品促销海报，明亮影棚光（真实案例）'),
 } as const satisfies Record<string, ImageRef>
 
 const [standard, hd, max] = ZH_TIERS
 const tiers = [standard, hd, max] as const
-const sizesAlt = (subject: string) => `${subject}，${tiers.map((tier) => `${tier.name} ${tier.px}`).join('、')} px 三档尺寸示意`
+const sizesAlt = (subject: string) => `${subject}，${tiers.map((tier) => `${tier.name} ${tier.px}`).join('、')} px 三档尺寸对比`
 const picked = (name: string) => `在模板列表里选中了「${name}」`
 
 export const zhSteps = {
@@ -52,10 +52,10 @@ export const zhSteps = {
 
 // The /zh/commercial-photography sneaker, with that page's own alt text.
 const sneaker = {
-  phone: caseImage('sneaker-phone', '示例手机照：玄关木地板上的一只米白色皮面运动鞋，后跟是灰绿色麂皮，早晨阳光很硬，钥匙和打开的鞋盒都入镜了'),
-  listing: caseImage('sneaker-listing', 'AI 示例：同一只鞋的纯白底商品主图，柔和影棚光'),
-  lifestyle: caseImage('sneaker-lifestyle', 'AI 示例：同一只鞋放在阳光下咖啡馆门口的水泥台阶上，身后是虚化的亚麻外套'),
-  promo: caseImage('sneaker-promo-zh', 'AI 示例：同一只鞋悬浮在灰绿色背景上，做成写着「新品上市 百搭小白鞋」的促销海报'),
+  phone: caseImage('sneaker-phone', '真实手机照：玄关木地板上的一只米白色皮面运动鞋，后跟是灰绿色麂皮，早晨阳光很硬，钥匙和打开的鞋盒都入镜了'),
+  listing: caseImage('sneaker-listing', '真实案例：同一只鞋的纯白底商品主图，柔和影棚光'),
+  lifestyle: caseImage('sneaker-lifestyle', '真实案例：同一只鞋放在阳光下咖啡馆门口的水泥台阶上，身后是虚化的亚麻外套'),
+  promo: caseImage('sneaker-promo-zh', '真实案例：同一只鞋悬浮在灰绿色背景上，做成写着「新品上市 百搭小白鞋」的促销海报'),
 } as const satisfies Record<string, ImageRef>
 
 // 「白底图、电商主图怎么做」 (SEO launch handbook G9): the white-background template, the
