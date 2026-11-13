@@ -18,8 +18,9 @@ function Nav({ aside }: { aside?: ReactNode }) {
   return <FlowNav back={{ href: '/generate', label: t('workspace.back') }} title={t('matrix.title')} aside={aside} />
 }
 
-// Batch create (T107, Owner 2026-11-12): one template on many photos (Pro, Max) or several
-// templates × photos (Max), a flow page like the workspace, with the tutorial always in its bar.
+// Batch create as a page (T107): the fallback deep link of the dialog Create opens (Owner
+// 2026-11-12: nothing in the app links here any more). One template on many photos (Pro, Max)
+// or several templates × photos (Max), with "See how it works" in its bar.
 // ?t=a,b opens with those templates chosen (from a template's dialog or workspace); the form
 // keeps as many as the plan holds.
 async function Matrix({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
