@@ -24,7 +24,8 @@ export function PosterStudio({ template, balance, concurrency }: Props) {
   if (studio.draft.step === 'paste') return <div className="px-(--gutter) pt-2"><PasteStep studio={studio} /></div>
   return (
     <div className="grid gap-6 px-(--gutter) pt-2">
-      {studio.notice === 'sortFailed' ? <p className="rounded-control bg-wash-faint p-3 text-caption">{t('notice.sortFailed')}</p> : null}
+      {studio.notice === 'sortFailed' || studio.notice === 'clipped'
+        ? <p className="rounded-control bg-wash-faint p-3 text-caption">{t(`notice.${studio.notice}`)}</p> : null}
       {studio.draft.source ? (
         <details className="rounded-control bg-wash-faint p-3 text-caption">
           <summary className="min-h-11 cursor-pointer content-center font-medium">{t('sourceText')}</summary>
