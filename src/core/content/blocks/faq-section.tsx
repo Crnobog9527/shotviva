@@ -14,7 +14,7 @@ type Props = {
 
 // A comparison right after an answer (建站规格 G6 D), as a real table so AI answers can lift it
 // (G5). The first cell of each row names the row.
-function FaqTableView({ table }: { table: FaqTable }) {
+export function FaqTableView({ table }: { table: FaqTable }) {
   const [corner, ...columns] = table.headers
   return (
     <table>
