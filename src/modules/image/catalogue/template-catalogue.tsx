@@ -20,6 +20,7 @@ import { CatalogueSections } from './catalogue-sections-view'
 import { batchableTemplates, isMotion, posterHref, type CatalogueTemplate } from './catalogue-template'
 import { findSeries, type CatalogueView, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
+import { SavedEmpty } from './saved-empty'
 import { SearchBox } from './search-box'
 import { FeatureCard } from './feature-card'
 import { SeriesCard } from './series-card'
@@ -92,14 +93,14 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
         </Reveal>
       ) : null}
       <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
-      <div ref={bar} data-stuck={stuck || undefined} className="sticky top-0 z-40 py-2 data-[stuck]:nav-material data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
+      <div ref={bar} data-stuck={stuck || undefined} data-chrome="" className="sticky top-0 z-40 py-2 data-[stuck]:chrome-bleed data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
         <div className="mb-2 px-(--gutter)">
           <SearchBox value={search.query} onChange={search.setQuery} label={t('search')} clear={t('searchClear')} className="md:max-w-[420px]" />
         </div>
-        <CategoryChips hidden={search.results !== null} filters={view.filters} saved={saved.length > 0} value={active} onChange={query.select} labels={chipLabels(t)} />
+        <CategoryChips hidden={search.results !== null} filters={view.filters} saved={showSaved(saved.length, active.saved)} value={active} onChange={query.select} labels={chipLabels(t)} />
       </div>
       <h2 className="sr-only">{t('templates')}</h2>
-      <CatalogueBody search={search} sections={sectionsFor(active, sections)} shown={shown} endCard={endCard} onOpen={open} onOpenSeries={query.openSeries} onSeeAll={seeAll} />
+      <CatalogueBody search={search} sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={query.openSeries} onSeeAll={seeAll} />
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
@@ -139,12 +140,20 @@ type BodyProps = Omit<GridProps, 'entries' | 'className'> & {
   search: ReturnType<typeof useCatalogueSearch>
   sections: CatalogueSection[] | null
   shown: readonly GridEntry[]
+  // Saved is chosen: when it holds nothing, its empty state with the way back to All.
+  saved: boolean
+  onBrowse(): void
   onSeeAll(section: CatalogueSection): void
 }
 
-// A search replaces the sections and the chosen category's grid with its matches.
-function CatalogueBody({ search, sections, shown, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
+// The Saved chip shows while something is saved, and stays while Saved is chosen (我的收藏).
+const showSaved = (count: number, chosen: boolean) => count > 0 || chosen
+
+// A search replaces the sections and the chosen category's grid with its matches; Saved with
+// nothing saved shows its empty state.
+function CatalogueBody({ search, sections, shown, saved, onBrowse, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
   if (search.results) return <SearchResults query={search.query.trim()} results={search.results} endCard={endCard} onOpen={onOpen} />
+  if (saved && shown.length === 0) return <SavedEmpty onBrowse={onBrowse} />
   if (!sections) return <CatalogueGrid entries={shown} endCard={endCard} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
   return (
     <>
@@ -183,7 +192,7 @@ function featuredOf(entries: readonly GridEntry[]) {
 const entryKey = (entry: GridEntry) => (entry.type === 'series' ? `series-${entry.series.id}` : entry.template.id)
 
 // True once the chip bar has stuck to the top: only then does it pad for the top safe area and
-// take its bar material, so at rest there is no band over the ground (or the living background,
+// take its bar material (chrome-bleed, globals-body.css), so at rest there is no band over the ground (or the living background,
 // T54) and a notched phone shows no empty strip above the chips.
 function useStuck() {
   const sentinel = useRef<HTMLDivElement>(null)

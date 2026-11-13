@@ -9,7 +9,7 @@ import type { SiteProduct } from '../../config'
 import { TabRootHeader } from '../../app-shell'
 import { thumbUrlFor, type MonthWorks } from '../../jobs'
 import type { LinkStatus } from '../../partner'
-import { IntegrationsPanel } from '../../partner/ui'
+import { IntegrationsPanel, type GraylumLinks } from '../../partner/ui'
 import { CreditDials } from './credit-dials'
 import { FilmStrip } from './film-strip'
 import { Group } from './rows'
@@ -37,6 +37,8 @@ export type AccountData = {
   morePurchases: boolean
   helpUnread: boolean
   graylum: LinkStatus
+  // Graylum's site for this deployment (production or staging), with tracking.
+  graylumLinks: GraylumLinks
   // profiles.role = 'admin': the "Admin" row (spec #186).
   affiliate: boolean
   admin: boolean
@@ -94,7 +96,7 @@ export function AccountView({ data, actions, site, children }: Props) {
       <Group title={t('settings.title')}>
         <SettingsRows email={data.email} phone={data.phone} purchases={data.purchases} morePurchases={data.morePurchases} helpUnread={data.helpUnread} admin={data.admin} affiliate={data.affiliate} />
       </Group>
-      <IntegrationsPanel graylum={data.graylum} disconnect={actions.disconnectGraylum} />
+      <IntegrationsPanel graylum={data.graylum} links={data.graylumLinks} disconnect={actions.disconnectGraylum} />
       <Group title={t('session.title')} hideTitle>
         <SessionRows signOut={actions.signOut} />
       </Group>

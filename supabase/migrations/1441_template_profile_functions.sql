@@ -1,4 +1,4 @@
--- Provider profiles (1390): saving the profile that is not live, and switching which one is live.
+-- Provider profiles (1440): saving the profile that is not live, and switching which one is live.
 --
 -- * admin_save_template_profile: writes only the inactive profile (a new tagged prompt version and
 --   its row). The live columns, the catalogue and every job are untouched. The live profile is
@@ -189,8 +189,7 @@ grant execute on function public.admin_switch_template_profiles(uuid,text[],text
 
 -- p_scope: 'category' (p_key: any level's key; its sub-categories too), 'series' (p_key: id or slug) or
 -- 'site'. Never art-style, edit or freeform templates.
--- plpgsql, not sql: the body names templates.deleted_at (1401), which a fresh database adds after
--- this migration; plpgsql resolves columns when it runs.
+-- Reads templates.deleted_at (1401, numbered before this migration).
 create function public.admin_template_profile_scope(p_scope text, p_key text) returns text[]
 language plpgsql stable set search_path='' as $$
 declare ids text[];

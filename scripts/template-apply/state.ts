@@ -37,7 +37,7 @@ export type DbState = {
   providers: ImageProviderOption[]
   floors: ProviderFloors
   testRuns: Map<string, TestRunInfo>
-  // Provider profiles (1390) of the batch's templates that name profiles: which is live, and each
+  // Provider profiles (1440) of the batch's templates that name profiles: which is live, and each
   // saved profile's version and content (for a re-run that changes nothing).
   profiles: Map<string, TemplateProfiles>
 }

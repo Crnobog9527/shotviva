@@ -19,6 +19,8 @@ import {
   type ConnectionResult,
   type HostResolver,
 } from '@/core/providers'
+import { UNKNOWN_MODEL_TIERS } from '@/core/providers/tier-support'
+import type { ImageCapabilities } from '@/core/templates/image-capabilities'
 
 import { lookupModelSchema, providerIdSchema, saveProviderSchema } from './schema'
 
@@ -46,12 +48,17 @@ export async function lookupProviderModel(input: unknown) {
   return fetchImageCapabilities('openrouter_images', await assertPublicBaseUrl(baseUrl), model, retry ? fetch : undefined)
 }
 
-// The slot floor's cost per extra input image (1392); undefined (an older editor) keeps it.
+// Tiers turned on beyond what the model's table says (unknown OpenAI models only): the save
+// records an audit entry for them in the same transaction (admin_save_provider).
+const declaredTiers = (caps: ImageCapabilities | null) =>
+  caps?.resolutionSource === 'declared' ? caps.resolutions.filter((tier) => !UNKNOWN_MODEL_TIERS.includes(tier)) : []
+
+// The slot floor's cost per extra input image (1440); undefined (an older editor) keeps it.
 async function saveExtraInputCost(deps: ProviderCommandDeps, adminId: string, id: string,
   { module, extraInputImageUsd: usd }: { module: string; extraInputImageUsd?: number | null }) {
   if (module !== 'image' || usd === undefined) return
   const { error } = await deps.db.rpc('admin_set_provider_extra_input_cost', { p_actor: adminId, p_id: id, p_usd: usd })
-  // A database without migration 1390 has no such field; an empty one has nothing to save.
+  // A database without migration 1440 has no such field; an empty one has nothing to save.
   if (error?.code === 'PGRST202' && usd === null) return
   if (error) throw new ProviderSettingError('internal', 'Saving the extra input image cost failed')
 }
@@ -61,11 +68,14 @@ export async function saveProvider(deps: ProviderCommandDeps, adminId: string, i
   const parsed = parseOrThrow(saveProviderSchema, input)
   if (!parsed.id && !parsed.apiKey) throw new ProviderSettingError('api_key_required', 'A new provider needs an API key')
   const baseUrl = await assertPublicBaseUrl(parsed.baseUrl, deps.resolveHost)
-  const caps = await fetchImageCapabilities(parsed.adapter, baseUrl, parsed.model, deps.fetch ?? fetch)
+  const caps = await fetchImageCapabilities(parsed.adapter, baseUrl, parsed.model, deps.fetch ?? fetch, parsed.resolutions)
+  const declared = declaredTiers(caps)
   const settings = {
     module: parsed.module, adapter: parsed.adapter, label: parsed.label, base_url: baseUrl, model: parsed.model,
     notes: parsed.notes, estimated_image_costs: parsed.estimatedImageCosts, price_input_text_per_m: parsed.priceInputTextPerM,
     price_input_image_per_m: parsed.priceInputImagePerM, price_output_per_m: parsed.priceOutputPerM,
+    // Empty unless an unknown OpenAI model got tiers declared; the save audits a non-empty list.
+    declared_resolutions: declared,
   }
   const { data, error } = await deps.db.rpc('admin_save_provider', {
     p_actor: adminId, p_id: parsed.id ?? null, p_settings: settings, p_capabilities: caps ?? {}, p_key: parsed.apiKey ?? null,
@@ -75,7 +85,7 @@ export async function saveProvider(deps: ProviderCommandDeps, adminId: string, i
   if (error) throw new ProviderSettingError('internal', 'Saving provider failed')
   const id = providerIdSchema.parse({ id: data }).id
   await saveExtraInputCost(deps, adminId, id, parsed)
-  logger.info('admin.provider.saved', { adminId, providerId: id, isNew: !parsed.id, keyChanged: Boolean(parsed.apiKey) })
+  logger.info('admin.provider.saved', { adminId, providerId: id, isNew: !parsed.id, keyChanged: Boolean(parsed.apiKey), declared })
   return id
 }
 

@@ -3,7 +3,7 @@
 // which a normal user's page must not carry at all (ARCHITECTURE §10, spec #186), not even as
 // an unused string in the serialized messages. Affiliate pages translate on the server too, and so
 // does the public gallery (T108), so its text adds nothing to any other page.
-export const SERVER_ONLY_NAMESPACES = ['adminEntry', 'affiliate', 'affiliateAgreement', 'gallery'] as const
+export const SERVER_ONLY_NAMESPACES = ['adminEntry', 'affiliate', 'affiliateAgreement', 'gallery', 'share'] as const
 
 // What no client component on a public page (marketing, sign-in, the root error and not-found
 // pages) reads: whole namespaces, and subtrees of `app` that only the logged-in app uses. The
@@ -27,6 +27,7 @@ export const APP_ONLY_APP_KEYS = [
   'create',
   'series',
   'work',
+  'share',
 ] as const
 
 type Messages = Record<string, unknown>

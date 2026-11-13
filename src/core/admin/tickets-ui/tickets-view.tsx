@@ -8,12 +8,15 @@ import { cn } from '@/core/ui/cn'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
 import { EmptyState } from '../shell/admin-blocks'
+import { RecordLink } from '../shell/record-dialog'
+import { TICKET_PARAM } from '../shell/record-dialog-url'
 import { formatBeijing } from '../shell/format'
 import { TICKETS_COPY as COPY } from './copy'
 
 type Props = { filter: AdminListFilter; page: Page<AdminTicketRow>; paged: boolean }
 
 // /admin/tickets: open tickets by default, most recently active first; filter by status and type.
+// A row opens the ticket in a dialog over the list (?ticket=<id>, ticket-dialog.tsx).
 export function TicketsView({ filter, page, paged }: Props) {
   return (
     <div className="grid gap-4">
@@ -24,7 +27,7 @@ export function TicketsView({ filter, page, paged }: Props) {
             max: TIER_LIMITS.max.supportHours,
             base: BASE_SUPPORT_REPLY_HOURS,
           })}</p> : null}
-      {page.items.length === 0 ? <EmptyState title={COPY.empty} /> : <TicketsTable rows={page.items} />}
+      {page.items.length === 0 ? <EmptyState title={COPY.empty} /> : <TicketsTable rows={page.items} filter={filter} />}
       <div className="flex gap-4 text-sm">
         {paged ? (
           <Link href={ticketsHref(filter)} className="text-primary hover:underline">
@@ -100,7 +103,7 @@ function DueAt({ row }: { row: AdminTicketRow }) {
 
 const COLUMNS = ['dueAt', 'lastMessageAt', 'email', 'tier', 'type', 'status', 'preview'] as const
 
-function TicketsTable({ rows }: { rows: AdminTicketRow[] }) {
+function TicketsTable({ rows, filter }: { rows: AdminTicketRow[]; filter: AdminListFilter }) {
   return (
     <Table>
       <TableHeader>
@@ -129,9 +132,9 @@ function TicketsTable({ rows }: { rows: AdminTicketRow[] }) {
               {row.refundDecision ? <span className="ml-2 text-xs text-muted-foreground">{COPY.decisions[row.refundDecision]}</span> : null}
             </TableCell>
             <TableCell className="min-w-64 whitespace-normal">
-              <Link href={`/admin/tickets/${row.id}`} className="line-clamp-2 text-sm text-primary hover:underline">
+              <RecordLink param={TICKET_PARAM} base={ticketsHref(filter)} id={row.id} className="line-clamp-2 text-sm">
                 {row.preview ?? '—'}
-              </Link>
+              </RecordLink>
             </TableCell>
           </TableRow>
         ))}

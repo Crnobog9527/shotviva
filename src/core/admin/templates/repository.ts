@@ -57,7 +57,7 @@ async function readCatalogueGaps(client: SupabaseClient): Promise<Map<string, Sa
   }
 }
 
-// Provider profiles (1390): which profile is live, for the editor's note. Read on its own so the
+// Provider profiles (1440): which profile is live, for the editor's note. Read on its own so the
 // list still loads on a database without the column (the test site before the merge): all ChatGPT.
 async function readActiveProfiles(client: SupabaseClient): Promise<Map<string, 'openai' | 'seedream'>> {
   const { data, error } = await client.from('template_prompts').select('template_id, active_profile').eq('active_profile', 'seedream')

@@ -68,7 +68,7 @@ const templateFields = templateInputSchema.partial().omit({ id: true, isActive: 
   module: z.enum(TEMPLATE_MODULES).optional(), quality: z.enum(TEMPLATE_QUALITIES).optional(),
 })
 
-// A provider profile that is not live (1390–1394): saved without touching the live template. The
+// A provider profile that is not live (1440–1444): saved without touching the live template. The
 // live profile is written with the template's own prompt / model fields.
 export const profileFileSchema = z.strictObject({
   // An image provider id, label or model name; Seedream takes an Ark model, ChatGPT any other.

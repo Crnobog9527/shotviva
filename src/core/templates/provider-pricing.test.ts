@@ -29,7 +29,7 @@ describe('model price floors', () => {
   })
 })
 
-describe('slot template floors (1392)', () => {
+describe('slot template floors (1442)', () => {
   const budget = 0.01
   const base = { openAI: false, resolutions: ['1k', '2k'] as const, p95: {}, estimates: { '1k': 0.05, '2k': 0.05 } }
   const single = minimumCredits(0.05, budget)

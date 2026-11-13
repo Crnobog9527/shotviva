@@ -73,6 +73,8 @@ export const site = defineSite({
       // The public gallery (T108), noindex in Chinese like the other inner pages.
       '/gallery',
       '/g/[jobId]',
+      // A template's share page (Owner 2026-11-13), noindex in both languages.
+      '/t/[templateId]',
     ],
     // Languages whose pages are not live yet but whose template covers can be prepared in the
     // admin ahead of launch (ARCHITECTURE §8.3, T87). Never shown on the site until launched.

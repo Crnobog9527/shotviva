@@ -115,7 +115,7 @@ function FormSections({ existing, providers, floor, categories, series, coverLan
   )
 }
 
-// Provider profiles (1390): the prompt and model here are the live profile; the other one is edited
+// Provider profiles (1440): the prompt and model here are the live profile; the other one is edited
 // and switched on 供应商配置 (the switch runs the same checks and never unpublishes).
 function ProfileNote({ id, active }: { id: string; active: 'openai' | 'seedream' }) {
   return (

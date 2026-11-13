@@ -2,7 +2,7 @@ import type { CreditsCost, TemplateQuality } from '@/core/templates/pricing'
 import type { Resolution } from '@/core/templates/output-options'
 import type { StyleRef } from '@/core/templates/style-refs'
 
-// Provider profiles (Owner 2026-11-13, migrations 1390–1394): every template keeps its ChatGPT
+// Provider profiles (Owner 2026-11-13, migrations 1440–1444): every template keeps its ChatGPT
 // setup and can carry a Seedream setup; one of them is live.
 export const PROFILES = ['openai', 'seedream'] as const
 export type ProfileKey = (typeof PROFILES)[number]

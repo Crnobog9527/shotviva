@@ -15,6 +15,7 @@ import { BlockSkeleton, LinkTabs } from './parts'
 import { PaymentBlock } from './payment-block'
 import { ProblemsBlock } from './problems-block'
 import { TrafficBlock } from './traffic-block'
+import { SharesBlock } from './shares-block'
 import { TemplatesBlock } from './templates-block'
 
 export function ViewTabs({ query }: { query: AnalyticsQuery }) {
@@ -68,6 +69,7 @@ export function AnalyticsView({ query, projectId, giftCredits }: Props) {
     { key: 'payment', title: COPY.payment.title, node: <PaymentBlock query={query} projectId={projectId} /> },
     { key: 'activation', title: COPY.activation.title, node: <ActivationBlock range={query.range} giftCredits={giftCredits} projectId={projectId} /> },
     { key: 'templates', title: COPY.templates.title, node: <TemplatesBlock range={query.range} projectId={projectId} /> },
+    { key: 'shares', title: COPY.shares.title, node: <SharesBlock range={query.range} projectId={projectId} /> },
     { key: 'problems', title: COPY.problems.title, node: <ProblemsBlock range={query.range} projectId={projectId} /> },
   ]
   return (

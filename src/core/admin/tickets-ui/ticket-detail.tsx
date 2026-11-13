@@ -20,15 +20,12 @@ import { UserLink } from '../users-ui/user-link'
 // jobRef: the attached work's reference number (T78), null when the ticket has none.
 type Props = { renewal?: RenewalReview | null; ticket: AdminTicket; user: UserDetail | null; jobRef: string | null; stripeLive: boolean; actions: TicketAdminActions }
 
-// /admin/tickets/[id]: the thread, who wrote it (A2's user summary), what it points at, and for
-// refund requests the review panel. Replying is the last block.
+// The ticket dialog on /admin/tickets (?ticket=<id>): the thread, who wrote it (A2's user summary),
+// what it points at, and for refund requests the review panel. Replying is the last block.
 export function TicketDetailView({ renewal, ticket, user, jobRef, stripeLive, actions }: Props) {
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-center gap-3">
-        <Link href="/admin/tickets" className="text-sm text-primary hover:underline">
-          {COPY.back}
-        </Link>
         <Badge variant={ticket.status === 'open' ? 'default' : 'secondary'}>{COPY.statuses[ticket.status]}</Badge>
         <span className="text-sm text-muted-foreground">{COPY.types[ticket.type]}</span>
         <span className="font-mono text-xs text-muted-foreground">{formatBeijing(ticket.createdAt)}</span>

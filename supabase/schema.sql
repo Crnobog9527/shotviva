@@ -252,13 +252,13 @@ begin
         else array(select t.id from public.templates t where t.series_id = v_row.id order by t.series_sort_order, t.id) end,
       p_actor, p_step->>'reason');
   when 'save_profile' then
-    -- The profile that is not live (1391); the file is the source of truth, so the expected version
+    -- The profile that is not live (1441); the file is the source of truth, so the expected version
     -- is the row's own, read under the template lock the function takes.
     perform public.admin_save_template_profile(p_actor, v_id, p_step->>'profile', p_step->'prompt', p_step->>'quality',
       p_step->'credits_cost', array(select jsonb_array_elements_text(coalesce(p_step->'unpriced_resolutions','[]'::jsonb))),
       (select p.prompt_version from public.template_profiles p where p.template_id = v_id and p.profile = p_step->>'profile'));
   when 'switch_profile' then
-    -- The admin's switch (1391), audited with the batch's reason.
+    -- The admin's switch (1441), audited with the batch's reason.
     perform admin.switch_template_profile(p_actor, v_id, p_step->>'profile', 'templates:apply');
   else
     raise exception 'INVALID_INPUT';
@@ -1798,6 +1798,41 @@ $$;
 
 
 ALTER FUNCTION "admin"."reference_tags_valid"("p_tags" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."remove_unpublished_series_members"() RETURNS integer
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  r record;
+  v_series uuid[] := '{}';
+  v_removed integer := 0;
+begin
+  -- Same lock order as the series save and the T93 sync: category tree shared, series, rows.
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  for r in
+    select t.id, t.series_id, s.slug from public.templates t join public.template_series s on s.id = t.series_id
+    where not t.is_active or t.deleted_at is not null
+    order by s.slug, t.series_sort_order, t.id
+    for update of t
+  loop
+    raise notice 'auto: unpublished: template % left series %', r.id, r.slug;
+    update public.templates set series_id = null, series_sort_order = 0 where id = r.id;
+    if not r.series_id = any(v_series) then v_series := v_series || r.series_id; end if;
+    v_removed := v_removed + 1;
+  end loop;
+  -- Only the series a member just left: their remaining members become 1, 2, 3… in current order.
+  update public.templates t set series_sort_order = n.ord
+    from (select id, row_number() over (partition by series_id order by series_sort_order, id)::integer as ord
+          from public.templates where series_id = any(v_series)) n
+    where t.id = n.id and t.series_sort_order <> n.ord;
+  return v_removed;
+end $$;
+
+
+ALTER FUNCTION "admin"."remove_unpublished_series_members"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text" DEFAULT NULL::"text") RETURNS "public"."credit_change"
@@ -7374,6 +7409,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_i
 declare
   v_id uuid;
   v_tiers text[] := array(select jsonb_array_elements_text(p_capabilities->'resolutions'));
+  v_declared text;
 begin
   if not exists (select 1 from public.profiles where id=p_actor and role='admin' and banned_at is null) then
     raise exception 'ADMIN_REQUIRED' using errcode='42501';
@@ -7403,6 +7439,12 @@ begin
     if not found then raise exception 'PROVIDER_NOT_FOUND'; end if;
   end if;
   if p_key is not null then perform public.admin_set_provider_key(v_id,p_key); end if;
+  -- An admin's declaration of tiers beyond the model table: one audit row per save that carries it.
+  if jsonb_typeof(p_settings->'declared_resolutions')='array' and jsonb_array_length(p_settings->'declared_resolutions')>0 then
+    select string_agg(upper(t),' / ' order by t) into v_declared from jsonb_array_elements_text(p_settings->'declared_resolutions') t;
+    insert into public.admin_audit_log(action,user_id,reason,target_id)
+    values ('provider_declare_tiers',p_actor,format('%s: declared %s beyond the model table',p_settings->>'model',v_declared),v_id::text);
+  end if;
   return v_id;
 end;
 $$;
@@ -12925,7 +12967,7 @@ declare
   v_refs boolean := p_prompt ? 'style_refs';
   v_prompt jsonb;
   v_matches integer;
-  -- Provider profiles (1393): carried only when the source sends them.
+  -- Provider profiles (1443): carried only when the source sends them.
   v_active_profile text := p_profiles->>'active';
   v_entry jsonb;
 begin
@@ -14056,7 +14098,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -17803,6 +17845,10 @@ REVOKE ALL ON FUNCTION "admin"."queue_test_asset_removal"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "admin"."reference_tags_valid"("p_tags" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."reference_tags_valid"("p_tags" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."remove_unpublished_series_members"() FROM PUBLIC;
 
 
 

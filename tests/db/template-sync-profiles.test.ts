@@ -7,7 +7,7 @@ import { readTemplateQuote } from '../../src/site/template-pricing'
 import { connectAdmin, createUser, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
-// 1393: T93 carries both provider profiles and which one is live. Calls go through PostgREST with
+// 1443: T93 carries both provider profiles and which one is live. Calls go through PostgREST with
 // the service role key, as the sync workflow does.
 
 const gptId = randomUUID()

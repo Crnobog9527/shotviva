@@ -54,7 +54,7 @@ export type AdminProvider = {
   resolutions: Resolution[]
   capabilities?: ImageCapabilities | null
   estimatedImageCosts?: EstimatedImageCosts
-  // Slot floor (1392): each extra input image a slot job sends, in USD; null = not set.
+  // Slot floor (1442): each extra input image a slot job sends, in USD; null = not set.
   extraInputImageUsd?: number | null
   model: string
   apiKeyLast4: string | null

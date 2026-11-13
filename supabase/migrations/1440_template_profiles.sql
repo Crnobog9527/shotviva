@@ -19,7 +19,7 @@
 --   T93 sync, version restore) writes the active profile's row too. No writer changes.
 -- * A deferred check keeps the active profile and the bound model's family in step: binding an Ark
 --   model to the ChatGPT profile (or the reverse) in the editor or bulk edit is refused; that is
---   what the profile switch (1391) is for.
+--   what the profile switch (1441) is for.
 -- * admin_template_profile_drift(): read-only consistency check for the admin page.
 -- Backfill: one profile per template from its live columns ('seedream' for templates already bound
 -- to an Ark model, 'openai' otherwise). No behaviour change.
@@ -191,7 +191,7 @@ revoke all on function public.admin_template_profile_drift() from public,anon,au
 grant execute on function public.admin_template_profile_drift() to service_role;
 
 -- Each extra input image a slot job sends costs this much (USD) on this model; read by the slot
--- floor (1392). Null keeps the conservative floor × slots.
+-- floor (1442). Null keeps the conservative floor × slots.
 alter table public.ai_providers add column extra_input_image_usd numeric
   check (extra_input_image_usd is null or (extra_input_image_usd >= 0 and extra_input_image_usd < 10));
 

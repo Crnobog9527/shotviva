@@ -4,6 +4,7 @@ import { findTestRun } from '../../src/modules/image/test-run/test-run-store'
 import { runTestGenerate } from '../../src/modules/image/test-run/run-test-generate'
 import { batchIdOf, MAX_ATTEMPTS, runIdOf, type Cell } from './cells'
 import { isDeterministic, watchedProvider, type Failure } from './provider-failure'
+import { BoundProviderUnavailable, ranOnCellProvider } from './bound-provider'
 
 // Runs cells through the admin's own 「首次出图」 (runTestGenerate: the same prompt assembly, provider,
 // face-swap screen, daily budget and admin_test_runs / admin_test_spend ledger), a few at a time.
@@ -77,6 +78,11 @@ async function call(cell: Cell, ctx: RunContext, attempt: number): Promise<CellR
     ctx.spentUsd += cost(run)
     return run.status === 'succeeded' ? { cell, run, outcome: 'succeeded' } : { cell, run, outcome: 'failed', code: run.errorCode ?? 'FAILED', failure: slot.failure }
   } catch (error) {
+    if (error instanceof BoundProviderUnavailable) {
+      if (!ctx.stopped) process.stderr.write(`${error.message}\n`)
+      ctx.stopped = 'BOUND_PROVIDER_UNAVAILABLE'
+      return { cell, outcome: 'failed', code: `BOUND_PROVIDER_UNAVAILABLE（${error.reason}）` }
+    }
     const code = error instanceof AppError ? error.code : 'FAILED'
     if (code === 'TEST_BUDGET_EXCEEDED') ctx.stopped = code
     return { cell, outcome: code === 'TEST_BUDGET_EXCEEDED' ? 'skipped' : 'failed', code }
@@ -90,10 +96,11 @@ const retryable = (result: CellResult) => result.outcome === 'failed' && Boolean
 
 // Where an earlier run left the cell: done, still running, failed (and whether to carry on), or new.
 function resume(cell: Cell, runs: TestRun[], ctx: RunContext): CellResult | number {
-  const done = runs.find(run => run.status === 'succeeded')
+  const done = runs.find(run => run.status === 'succeeded' && ranOnCellProvider(run, cell))
   if (done) return { cell, run: done, reused: true, outcome: 'succeeded' }
   const last = runs.at(-1)
   if (!last) return 0
+  if (last.status === 'succeeded') return runs.length
   if (last.status === 'running' && Date.now() - Date.parse(last.createdAt) < STALE_MS) return { cell, run: last, outcome: 'running' }
   const code = last.status === 'running' ? 'TIMEOUT' : last.errorCode ?? 'FAILED'
   if (!ctx.retryFailed || NEVER_RETRY.has(code)) return { cell, run: last, reused: true, outcome: 'failed', code }
@@ -114,7 +121,7 @@ export async function runCell(cell: Cell, ctx: RunContext): Promise<CellResult> 
 
 // Read only, for --dry-run: whether a cell already has a result (on any attempt) or would run.
 export async function peekCell(cell: Cell, db: RunContext['deps']['db']): Promise<'done' | 'pending'> {
-  return (await history(cell, db)).some(run => run.status === 'succeeded') ? 'done' : 'pending'
+  return (await history(cell, db)).some(run => run.status === 'succeeded' && ranOnCellProvider(run, cell)) ? 'done' : 'pending'
 }
 
 // At most `concurrency` cells at once, in order; results in the cells' order. Once stopped (budget,
