@@ -99,7 +99,7 @@ describe('generateEventProps', () => {
 
 describe('generateEventProps with image slots', () => {
   it('names the filled image slots in send order, never their uploads (§5.1e)', () => {
-    const slotted = { ...job, inputs: { ...job.inputs, input_slots: { logo: 'inputs/u/a.png', prize_2: 'inputs/u/b.jpg' } } }
+    const slotted = { ...job, inputs: { ...job.inputs, input_slots: [{ key: 'logo', upload: 'inputs/u/a.png' }, { key: 'prize_2', upload: 'inputs/u/b.jpg' }] } }
     const props = generateEventProps(slotted, 'food', { status: 'succeeded' }, 0)
     expect(props.slots_filled).toEqual(['logo', 'prize_2'])
     expect(validateEvent('generate', props).ok).toBe(true)

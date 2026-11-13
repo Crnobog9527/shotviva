@@ -94,9 +94,14 @@ export function keptSlotIndex(keptKey: string): number | null {
   return match ? Number(match[1]) - 1 : null
 }
 
-// A job's filled slots as stored (inputs.input_slots, keys in send order); anything malformed
-// is none.
+// A job's filled slots as stored: inputs.input_slots is an ordered array [{ key, upload }] in send
+// order. An array, never an object: jsonb re-sorts object keys (shorter first), which would lose
+// the order Make again maps kept copies back by. Anything malformed is none.
+export type StoredSlot = { key: string; upload: string }
+
+export const toStoredSlots = (slots: readonly { key: string; upload: string }[]): StoredSlot[] => slots.map(({ key, upload }) => ({ key, upload }))
+
 export function storedSlotOrder(raw: unknown): string[] {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return []
-  return Object.entries(raw).filter(([, value]) => typeof value === 'string').map(([key]) => key)
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((entry) => (typeof entry === 'object' && entry !== null && typeof entry.key === 'string' && typeof entry.upload === 'string' ? [entry.key] : []))
 }

@@ -16,6 +16,7 @@ import {
   assertTemplateQuote,
   hasSlots,
   publicCopyKeys,
+  toStoredSlots,
   validateGenerationInputs,
   type GenerationInputs,
   type Resolution,
@@ -144,8 +145,9 @@ function jobInputs(req: GenerationRequest, { inputs, prompt, template }: Prepare
     ...(inputs.note ? { note: inputs.note } : {}),
     ...toggleInputs(inputs, now),
     input_key: inputs.slots ? null : req.inputKey ?? null,
-    // Slot key → upload, in send order: Make again puts kept copy n back in the n-th (§5.1e).
-    ...(inputs.slots ? { input_slots: Object.fromEntries(inputs.slots.map((slot) => [slot.key, slot.upload])) } : {}),
+    // [{ key, upload }] in send order (an array: jsonb would re-sort object keys); Make again puts
+    // kept copy n back in the n-th slot (§5.1e).
+    ...(inputs.slots ? { input_slots: toStoredSlots(inputs.slots) } : {}),
     prompt_version: prompt.version,
     attempt_id: attemptId,
     ...batchInputs(req),

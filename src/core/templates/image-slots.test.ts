@@ -109,7 +109,8 @@ describe('slot helpers', () => {
     expect(keptSlotIndex('outputs/u/job.png')).toBeNull()
   })
   it('reads the stored send order', () => {
-    expect(storedSlotOrder({ logo: 'a', prize_2: 'b', bad: 1 })).toEqual(['logo', 'prize_2'])
+    expect(storedSlotOrder([{ key: 'venue_logo', upload: 'a' }, { key: 'prize_1', upload: 'b' }, { key: 'bad' }])).toEqual(['venue_logo', 'prize_1'])
+    expect(storedSlotOrder({ logo: 'a' })).toEqual([])
     expect(storedSlotOrder(null)).toEqual([])
   })
 })
