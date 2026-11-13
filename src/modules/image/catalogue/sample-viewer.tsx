@@ -34,10 +34,10 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => (setZoomed(false), onOpenChange(next))}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-110 bg-black/92 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-110 bg-black" />
         <DialogPrimitive.Content
           aria-describedby={undefined}
-          className="fixed inset-0 z-110 flex flex-col pt-(--sat) pb-[max(var(--sab),12px)] text-white outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0"
+          className="fixed inset-0 z-110 flex flex-col bg-black pt-(--sat) pb-[max(var(--sab),12px)] text-white outline-none"
         >
           <DialogPrimitive.Title className="sr-only">{t('viewerTitle', { name })}</DialogPrimitive.Title>
           <div className="flex items-center justify-between gap-3 px-4 py-2">
