@@ -96,3 +96,16 @@ export function FavoritesProvider({ initialIds, signedIn, returnTo, children }: 
     </FavoritesContext>
   )
 }
+
+// The admin 实时预览's heart (Owner 2026-11-14): drawn and pressable as for a signed-in user, but
+// the saved state lives in this frame only; nothing is written or tracked.
+export function PreviewFavorites({ children }: { children: ReactNode }) {
+  const [ids, setIds] = useState<readonly string[]>([])
+  const value = useMemo<Favorites>(() => ({
+    ids,
+    isSaved: (id) => ids.includes(id),
+    toggle: ({ id }) => setIds((current) => current.includes(id) ? current.filter((other) => other !== id) : [id, ...current]),
+    save: ({ id }) => setIds((current) => current.includes(id) ? current : [id, ...current]),
+  }), [ids])
+  return <FavoritesContext value={value}>{children}</FavoritesContext>
+}

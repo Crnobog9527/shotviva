@@ -2,6 +2,8 @@ export { FEATURED_MAX, saveTemplate, setFeaturedTemplates, setTemplateActive, se
 export { listVersions, manageVersion, readVersion } from './history'
 export { listAdminTemplates } from './repository'
 export { deleteTemplate } from './delete'
+export { deleteTemplates, setTemplatesSale } from './bulk-tasks'
+export type { BulkTaskOutcome } from './bulk-task-rules'
 export { listImageProviderOptions, pricingFromOptions, readImageProviderQuote } from './provider-pricing'
 export { bulkEditTemplates } from './bulk-edit'
 export { setTemplatesFeatured } from './bulk-featured'

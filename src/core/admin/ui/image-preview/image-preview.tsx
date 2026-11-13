@@ -12,13 +12,13 @@ export type PreviewImage = { url: string; label?: string }
 
 // A thumbnail that opens the large picture (Owner 2026-11-13): 原图 and AI 出图 side by side when the
 // cover has both. Esc, the overlay, the close button or a click on a picture closes it.
-export function PreviewThumb({ images, title, children }: { images: PreviewImage[]; title: string; children: ReactNode }) {
+export function PreviewThumb({ images, title, className, children }: { images: PreviewImage[]; title: string; className?: string; children: ReactNode }) {
   const [open, setOpen] = useState(false)
   if (!images.length) return <>{children}</>
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} aria-label={copy.open(title)} title={copy.hint}
-        className="focus-visible:ring-ring shrink-0 cursor-zoom-in rounded-md outline-none focus-visible:ring-2">
+        className={cn('focus-visible:ring-ring shrink-0 cursor-zoom-in rounded-md outline-none focus-visible:ring-2', className)}>
         {children}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>

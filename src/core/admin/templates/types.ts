@@ -6,6 +6,7 @@ import type { CoverPurpose } from '../covers/cover-rules'
 import type { BulkEditOutcome, BulkEditPatch } from './bulk-edit-rules'
 import type { FeaturedPlan } from './bulk-featured-rules'
 import type { ActiveChangeOutcome } from './publish-rules'
+import type { BulkTaskOutcome } from './bulk-task-rules'
 
 export type AdminTemplate = Template & {
   subcategoryKey?: string | null
@@ -77,4 +78,9 @@ export type TemplateAdminActions = {
   applyCover: (input: ApplyCoverRequest) => Promise<ActionResult>
   // 删除 an unpublished template (Owner 2026-11-13); a soft delete, works and history stay.
   remove: (input: { id: string }) => Promise<ActionResult>
+  // The bulk bar's further actions (Owner 2026-11-14): each template through its single path.
+  removeMany: (input: { ids: string[] }) => Promise<ActionValue<BulkTaskOutcome>>
+  setSaleMany: (input: { ids: string[]; enabled: boolean }) => Promise<ActionValue<BulkTaskOutcome>>
+  // seriesId null takes them out of whatever series they are in.
+  setSeriesMany: (input: { ids: string[]; seriesId: string | null }) => Promise<ActionValue<BulkTaskOutcome>>
 }

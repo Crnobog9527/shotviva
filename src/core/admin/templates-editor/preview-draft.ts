@@ -9,7 +9,8 @@ import { toTranslations, type TemplateFormValues } from './form-state'
 import { toImages } from './slot-form-state'
 import { toToggleFields, withoutToggles } from './toggle-form-state'
 
-export type PreviewSeries = { name: string; members: Template[] }
+// nameEn: the series' English name, for the English preview (older option lists may lack it).
+export type PreviewSeries = { name: string; nameEn?: string; members: Template[] }
 // stale: the field cards or the fields JSON do not parse yet, so the saved fields are shown.
 export type PreviewDraft = { template: Template; series: PreviewSeries | null; stale: boolean }
 
@@ -81,9 +82,10 @@ export function draftTemplate(values: TemplateFormValues, base: AdminTemplate, c
 
 // The series panel's members as users see them (published ones, in series order) with this
 // template's draft in its place, or at the end when the form just moved it into the series.
-export function draftSeries(draft: Template, seriesId: string | null, all: readonly AdminTemplate[], names: readonly { id: string; nameZh: string }[]): PreviewSeries | null {
+export function draftSeries(draft: Template, seriesId: string | null, all: readonly AdminTemplate[], names: readonly { id: string; nameZh: string; nameEn?: string }[]): PreviewSeries | null {
   if (!seriesId) return null
-  const name = names.find(option => option.id === seriesId)?.nameZh ?? ''
+  const option = names.find(item => item.id === seriesId)
+  const name = option?.nameZh ?? ''
   const order = (template: AdminTemplate) => template.seriesSortOrder ?? 0
   const others = all
     .filter(other => other.seriesId === seriesId && other.isActive && other.id !== draft.id)
@@ -92,11 +94,11 @@ export function draftSeries(draft: Template, seriesId: string | null, all: reado
   const at = own?.seriesId === seriesId ? others.filter(other => order(other) < order(own)).length : others.length
   const members: Template[] = [...others]
   members.splice(at, 0, draft)
-  return { name, members }
+  return { name, ...(option?.nameEn ? { nameEn: option.nameEn } : {}), members }
 }
 
 export function previewDraft(values: TemplateFormValues, base: AdminTemplate, context: {
-  categories: readonly CategoryOption[]; templates: readonly AdminTemplate[]; series: readonly { id: string; nameZh: string }[]
+  categories: readonly CategoryOption[]; templates: readonly AdminTemplate[]; series: readonly { id: string; nameZh: string; nameEn?: string }[]
 }): PreviewDraft {
   const { template, stale } = draftTemplate(values, base, context.categories)
   return { template, stale, series: draftSeries(template, values.seriesId, context.templates, context.series) }
