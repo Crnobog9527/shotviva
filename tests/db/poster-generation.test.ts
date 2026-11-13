@@ -195,10 +195,13 @@ describe('poster sets and generation', () => {
     })
   })
 
-  it('refuses 1K for a poster, more than 12 posters in a set, and keeps every poster work private', async () => {
+  it('makes a poster at 1K for the 1K price, refuses more than 12 posters in a set, and keeps every poster work private', async () => {
     const userId = await invitedUser()
     const set = await savePosterSet(service, { userId, templateId, fields: { poster }, content, source: 'paste', allow })
-    await expect(generate(userId, { poster: { setId: set.id, part: 0 }, resolution: '1k' }).run()).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    const before = (await profileOf(db, userId)).credits
+    const small = await generate(userId, { poster: { setId: set.id, part: 0 }, resolution: '1k' }).run()
+    expect(small.status).toBe('succeeded')
+    expect((await profileOf(db, userId)).credits).toBe(before - 1)
     const view = await generate(userId, { poster: { setId: set.id, part: 0 }, visibility: 'public' }).run()
     const { rows } = await db.query('select visibility, gallery_excluded from public.generation_jobs where id = $1', [view.id])
     expect(rows[0]).toEqual({ visibility: 'private', gallery_excluded: true })

@@ -101,13 +101,11 @@ async function posterPart(deps: GenerationDeps, req: GenerationRequest, template
   return { text: partText(content, part), record }
 }
 
-// A poster job comes from the website with its set, at HD or Max: dense small text needs at least
-// HD (ARCHITECTURE §5.3), whatever the template's prices say.
+// A poster job comes from the website with its set, at any tier the template sells (ARCHITECTURE
+// §5.3; 1K is sold too, the price check refuses a tier the template does not price).
 function posterResolution(req: GenerationRequest): Resolution {
   if (!req.poster || req.source !== 'web') throw new AppError('INVALID_INPUT', 'Confirm the poster text first')
-  const resolution = req.resolution ?? DEFAULT_RESOLUTION
-  if (resolution === '1k') throw new AppError('INVALID_INPUT', 'Posters are made in HD or Max')
-  return resolution
+  return req.resolution ?? DEFAULT_RESOLUTION
 }
 
 type SamePoster = { setId: string; part: number; templateId: string; resolution: string; aspectRatio: string }
