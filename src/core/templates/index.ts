@@ -61,6 +61,7 @@ export {
   assertPricedTier,
   assertTemplateQuote,
   creditsBelowFloor,
+  slotFloorFactor,
   creditsCostSchema,
   type ApprovedTariff,
   type CreditsCost,

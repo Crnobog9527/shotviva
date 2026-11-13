@@ -31,6 +31,9 @@ export function approvedCredit(floor: CreditsFloor, quality: TemplateQuality, re
   return floor.approved?.quality === quality ? floor.approved.costs[resolution] : undefined
 }
 
+// The single-image floor multiplier of a template: its number of image slots, at least 1.
+export const slotFloorFactor = (fields: { images: { slots?: readonly unknown[] } } | undefined) => Math.max(1, fields?.images.slots?.length ?? 0)
+
 export function creditMinimum(floor: CreditsFloor, quality: TemplateQuality, resolution: Resolution) {
   const tariff = floor.tariff?.quality === quality ? floor.tariff.costs[resolution] : 0
   return Math.max(tariff, floor[quality][resolution])
@@ -48,10 +51,12 @@ export function assertTemplateQuote(expected: number | undefined, current: numbe
 
 export type FloorViolation = { resolution: Resolution; floor: number; given: number }
 
-export function creditsBelowFloor(quality: TemplateQuality, cost: CreditsCost, floor: CreditsFloor, unpriced: readonly Resolution[] = []): FloorViolation[] {
+// slots: a template with named image slots (§5.1e) is held to the single-image floor × its slots,
+// like the database (admin.slot_floor_factor, 1310). An approved price still stands as it is.
+export function creditsBelowFloor(quality: TemplateQuality, cost: CreditsCost, floor: CreditsFloor, unpriced: readonly Resolution[] = [], slots = 1): FloorViolation[] {
   return RESOLUTIONS.flatMap((resolution) => {
     if (unpriced.includes(resolution)) return []
-    const min = creditMinimum(floor, quality, resolution)
+    const min = creditMinimum(floor, quality, resolution) * Math.max(1, slots)
     return cost[resolution] < min && cost[resolution] !== approvedCredit(floor, quality, resolution) ? [{ resolution, floor: min, given: cost[resolution] }] : []
   })
 }
