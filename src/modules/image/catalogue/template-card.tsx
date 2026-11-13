@@ -18,16 +18,13 @@ type Props = { template: CatalogueTemplate; onOpen(id: string): void; eager?: bo
 
 // A template card (DESIGN §4.2 and §6.9 items 1–3, B comp create.html). A 'compare' category
 // (画风) keeps the drag compare; every other template is the side-by-side pair that plays its change on hover.
-// A tap opens the creation dialog straight away: there is no preview step any more. The save
+// A tap opens the creation dialog (a poster template: its editor dialog) straight away: there is no preview step any more. The save
 // heart (T83) sits over the photo's top-right corner, beside the card's button, not inside it.
 export function TemplateCard(props: Props) {
   const { template } = props
   if (isCompareCategory(template) && hasStills(template)) return <ArtCard {...props} />
   return <PairCard {...props} />
 }
-
-// A poster card goes to its editor (a new page), every other card opens the creation dialog.
-const popupOf = (template: CatalogueTemplate) => (template.poster ? undefined : ('dialog' as const))
 
 function PairCard({ template, onOpen, eager, sizes }: Props) {
   const ref = useRef<HTMLButtonElement>(null)
@@ -39,7 +36,7 @@ function PairCard({ template, onOpen, eager, sizes }: Props) {
       <button
         ref={ref}
         type="button"
-        aria-haspopup={popupOf(template)}
+        aria-haspopup="dialog"
         onClick={() => onOpen(template.id)}
         className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house active:scale-[.97]"
       >

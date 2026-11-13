@@ -18,6 +18,10 @@ const rowSchema = z.object({
   estimated_image_costs: estimatedImageCostsSchema,
   p95: z.partialRecord(z.enum(RESOLUTIONS), z.number().nonnegative()),
   p95_by_quality: z.partialRecord(z.enum(TEMPLATE_QUALITIES), z.partialRecord(z.enum(RESOLUTIONS), z.number().nonnegative())).optional(),
+  slot_costs: z.object({
+    extra_input_usd: z.number().nonnegative().nullable(),
+    p95_full: z.partialRecord(z.enum(TEMPLATE_QUALITIES), z.partialRecord(z.enum(RESOLUTIONS), z.record(z.string(), z.number().nonnegative()))),
+  }).optional(),
 })
 
 const receiptSchema = z.object({
@@ -27,6 +31,9 @@ const quoteSchema = z.object({ input: z.unknown(), receipt: receiptSchema })
 const catalogSchema = z.object({
   version: z.enum(['v1', 'v2']), tariffs: tariffs.optional(), unit_price: z.coerce.number().positive(), providers: z.array(rowSchema.required({ approved: true })),
 })
+
+const slotCostsOf = (row: z.infer<typeof rowSchema>) =>
+  row.slot_costs && { extraInputUsd: row.slot_costs.extra_input_usd, p95Full: row.slot_costs.p95_full }
 
 function optionsFromInput(input: unknown, legacyBudget?: number): ImageProviderOption[] {
   const catalog = Array.isArray(input) ? null : catalogSchema.parse(input)
@@ -38,7 +45,7 @@ function optionsFromInput(input: unknown, legacyBudget?: number): ImageProviderO
     const openAI = row.adapter === 'openai_images'
     const estimates = { ...caps.data?.catalogImageCosts, ...row.estimated_image_costs }
     const resolutions = openAI ? row.resolutions : row.resolutions.filter(tier => caps.data?.resolutions.includes(tier))
-    const floor = modelCreditFloor({ openAI, resolutions, estimates, p95: row.p95, p95ByQuality: row.p95_by_quality }, budget)
+    const floor = modelCreditFloor({ openAI, resolutions, estimates, p95: row.p95, p95ByQuality: row.p95_by_quality, slotCosts: slotCostsOf(row) }, budget)
     return {
       fallbackFloors: row.fallback_floors, approved: row.approved, version: catalog?.version, tariffs: row.is_active ? catalog?.tariffs : undefined,
       id: row.provider_id ?? 'env', label: row.label, model: row.model, isActive: row.is_active, fixedCapabilities: row.adapter !== 'openrouter_images',

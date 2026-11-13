@@ -53,6 +53,16 @@ export async function lookupProviderModel(input: unknown) {
 const declaredTiers = (caps: ImageCapabilities | null) =>
   caps?.resolutionSource === 'declared' ? caps.resolutions.filter((tier) => !UNKNOWN_MODEL_TIERS.includes(tier)) : []
 
+// The slot floor's cost per extra input image (1440); undefined (an older editor) keeps it.
+async function saveExtraInputCost(deps: ProviderCommandDeps, adminId: string, id: string,
+  { module, extraInputImageUsd: usd }: { module: string; extraInputImageUsd?: number | null }) {
+  if (module !== 'image' || usd === undefined) return
+  const { error } = await deps.db.rpc('admin_set_provider_extra_input_cost', { p_actor: adminId, p_id: id, p_usd: usd })
+  // A database without migration 1440 has no such field; an empty one has nothing to save.
+  if (error?.code === 'PGRST202' && usd === null) return
+  if (error) throw new ProviderSettingError('internal', 'Saving the extra input image cost failed')
+}
+
 // Save the confirmed catalogue snapshot and the optional Vault key in the same transaction.
 export async function saveProvider(deps: ProviderCommandDeps, adminId: string, input: unknown): Promise<string> {
   const parsed = parseOrThrow(saveProviderSchema, input)
@@ -74,6 +84,7 @@ export async function saveProvider(deps: ProviderCommandDeps, adminId: string, i
   // Vendor keys are write-only; never attach the RPC input or database error detail to logs.
   if (error) throw new ProviderSettingError('internal', 'Saving provider failed')
   const id = providerIdSchema.parse({ id: data }).id
+  await saveExtraInputCost(deps, adminId, id, parsed)
   logger.info('admin.provider.saved', { adminId, providerId: id, isNew: !parsed.id, keyChanged: Boolean(parsed.apiKey), declared })
   return id
 }

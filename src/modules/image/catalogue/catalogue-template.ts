@@ -105,10 +105,11 @@ function toCatalogueCopy({ key, label, type, placeholder, help, required, maxLen
 export const slotsOfTemplate = (template: Pick<CatalogueTemplate, 'imageSlots'> | null): CatalogueImageSlot[] => template?.imageSlots ?? []
 export const isSlotTemplate = (template: Pick<CatalogueTemplate, 'imageSlots'> | null) => slotsOfTemplate(template).length > 0
 
-// Where a poster template's card leads (its editor); null for every other template, whose card
-// opens the creation dialog.
+// Where a poster template's editor opens: a dialog over Create (ARCHITECTURE §5.3), the same
+// address the old /posters/<id> pages and Photos' 改文字 lead to; null for every other template.
 export const posterHref = (template: Pick<CatalogueTemplate, 'id' | 'poster'>): string | null =>
-  template.poster ? `/posters/${encodeURIComponent(template.id)}` : null
+  template.poster ? posterDialogPath(template.id) : null
+export const posterDialogPath = (id: string) => `/generate?poster=${encodeURIComponent(id)}`
 
 // Batch create takes every template that uses a photo, series members included. Slot templates
 // are single-run only (§5.1e) and poster templates make posters from text: never in the batch.

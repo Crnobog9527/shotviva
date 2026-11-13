@@ -67,6 +67,8 @@ export const PROVIDERS_COPY = {
     imageCostsHint: (adapter: ProviderAdapterId) => adapter === 'ark_images'
       ? '有实测成本时优先用实测。火山方舟必须填写每档的预估单张总成本（含输入图），不能留空；实测样本不足时用它定积分下限。'
       : '有实测成本时优先用实测。留空使用可核算的目录估价（已含本站充值费用分摊）；也可填写含费估价覆盖。',
+    extraInputCost: '每张额外输入图成本（美元）',
+    extraInputCostHint: '格子模板（一单多张输入图、只出一张图）的成本下限用它：单图下限 + 多出的输入图 × 这个成本。留空时按单图下限 × 格子数保守计算。',
     catalogPrices: '供应商目录报价（美元）',
     titleNew: '新增供应商',
     titleEdit: (label: string) => `编辑「${label}」`,

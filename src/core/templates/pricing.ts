@@ -26,6 +26,9 @@ export type CreditsFloor = Record<TemplateQuality, CreditsCost> & {
   version?: 'v1' | 'v2'
   tariff?: ApprovedTariff
   unknownCapabilities?: boolean
+  // The route's floor for a template with n image slots (n = "2".."4"), when its data allows one
+  // below single × n (1442); absent means single × n.
+  slots?: Partial<Record<TemplateQuality, Partial<Record<Resolution, Record<string, number>>>>>
 }
 
 export function approvedCredit(floor: CreditsFloor, quality: TemplateQuality, resolution: Resolution) {
@@ -39,13 +42,15 @@ export const slotFloorFactor = (fields: { images: { slots?: readonly unknown[] }
 // slot multiplier below can leave it alone. provider-pricing re-exports it.
 export const MISSING_COST = 2147483647
 
-// slots: a template with named image slots (§5.1e) must cover the route's single-image floor ×
-// its slots, like the database (admin.slot_floor_factor, migration 1310), which multiplies the
-// route floor only: the template's own tariff and the missing-cost sentinel stay as they are.
+// slots: a template with named image slots (§5.1e) must cover the route's slot floor, like the
+// database (admin.slot_route_floor, migration 1442): the full-slot p95, else the single-image floor
+// plus the extra input images, else (no data) the single-image floor × its slots. Only the route
+// floor changes: the template's own tariff and the missing-cost sentinel stay as they are.
 export function creditMinimum(floor: CreditsFloor, quality: TemplateQuality, resolution: Resolution, slots = 1) {
   const tariff = floor.tariff?.quality === quality ? floor.tariff.costs[resolution] : 0
   const route = floor[quality][resolution]
-  return Math.max(tariff, route === MISSING_COST ? route : route * Math.max(1, slots))
+  if (route === MISSING_COST || slots <= 1) return Math.max(tariff, route)
+  return Math.max(tariff, floor.slots?.[quality]?.[resolution]?.[String(slots)] ?? route * slots)
 }
 
 export function assertPricedTier(unpriced: readonly Resolution[] | undefined, tier: Resolution) {
@@ -60,8 +65,8 @@ export function assertTemplateQuote(expected: number | undefined, current: numbe
 
 export type FloorViolation = { resolution: Resolution; floor: number; given: number }
 
-// slots: a template with named image slots (§5.1e) is held to the single-image floor × its slots,
-// like the database (admin.slot_floor_factor, 1310). An approved price still stands as it is.
+// slots: a template with named image slots (§5.1e) is held to its route's slot floor (creditMinimum,
+// 1442). An approved price still stands as it is.
 export function creditsBelowFloor(quality: TemplateQuality, cost: CreditsCost, floor: CreditsFloor, unpriced: readonly Resolution[] = [], slots = 1): FloorViolation[] {
   return RESOLUTIONS.flatMap((resolution) => {
     if (unpriced.includes(resolution)) return []
