@@ -11,24 +11,51 @@ import { SIGNUP_GIFT_COPY } from '../features-editor/signup-gift-copy'
 import { loadSettingSwitch, type SystemSettingDeps } from './commands'
 import type { SignupGiftState } from './types'
 
-// The signup gift's daily cap and pause (1350, ARCHITECTURE §7) on /admin/features. grant_credits
-// reads both rows itself, so a save applies to the next sign-up without any cache.
+// The signup gift's rules (1350, 1410, ARCHITECTURE §7) on /admin/features: the daily cap, how
+// many gifts one network may receive in 24 hours, which ways a pending account may claim, and
+// the pause. grant_credits and claim_signup_gift read the rows themselves, so a save applies to
+// the next sign-up without any cache.
 
-const todaySchema = z.object({ granted: z.number().int(), cap: z.number().int(), paused: z.boolean() })
+const todaySchema = z.object({
+  granted: z.number().int(),
+  cap: z.number().int(),
+  per_ip: z.number().int(),
+  claim_phone: z.boolean(),
+  claim_google: z.boolean(),
+})
 
 export async function loadSignupGift(db: SupabaseClient): Promise<SignupGiftState> {
   const [today, paused] = await Promise.all([db.rpc('signup_gift_today'), loadSettingSwitch(db, 'signup_gift_paused')])
   if (today.error) throw new AppError('INTERNAL', 'signup_gift_today failed', { cause: new Error(today.error.message) })
-  const { granted, cap } = todaySchema.parse(today.data)
-  return { granted, cap, paused }
+  const row = todaySchema.parse(today.data)
+  return {
+    granted: row.granted,
+    rules: { cap: row.cap, perIp: row.per_ip, claimPhone: row.claim_phone, claimGoogle: row.claim_google },
+    paused,
+  }
 }
 
-export const signupGiftCapSchema = z.object({ cap: z.number().int().min(0).max(100_000) })
+export const signupGiftRulesSchema = z.object({
+  cap: z.number().int().min(0).max(100_000),
+  perIp: z.number().int().min(0).max(1000),
+  claimPhone: z.boolean(),
+  claimGoogle: z.boolean(),
+})
 
-export async function saveSignupGiftCap(deps: SystemSettingDeps, adminId: string, input: unknown): Promise<void> {
-  const parsed = signupGiftCapSchema.safeParse(input)
-  if (!parsed.success) throw new AppError('INVALID_INPUT', SIGNUP_GIFT_COPY.cap.invalid)
-  await callRpc(deps.db, 'admin_set_system_setting', { p_key: 'signup_gift_daily_cap', p_value: parsed.data.cap, p_actor: adminId }, z.unknown())
+// One row per rule; the database checks the admin, the key and the range again.
+export async function saveSignupGiftRules(deps: SystemSettingDeps, adminId: string, input: unknown): Promise<void> {
+  const parsed = signupGiftRulesSchema.safeParse(input)
+  if (!parsed.success) throw new AppError('INVALID_INPUT', SIGNUP_GIFT_COPY.rules.invalid)
+  const rules = parsed.data
+  const rows = [
+    ['signup_gift_daily_cap', rules.cap],
+    ['signup_gift_per_ip', rules.perIp],
+    ['signup_gift_claim_phone', rules.claimPhone],
+    ['signup_gift_claim_google', rules.claimGoogle],
+  ] as const
+  for (const [key, value] of rows) {
+    await callRpc(deps.db, 'admin_set_system_setting', { p_key: key, p_value: value, p_actor: adminId }, z.unknown())
+  }
   deps.invalidate()
-  logger.info('admin.system_settings.saved', { adminId, key: 'signup_gift_daily_cap', cap: parsed.data.cap })
+  logger.info('admin.system_settings.saved', { adminId, key: 'signup_gift_rules', ...rules })
 }

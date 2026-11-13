@@ -14,6 +14,11 @@ type SettingTypes = {
   signup_gift_paused: boolean
   // 1350: signup gifts per Beijing day (0 = none). grant_credits reads the row itself.
   signup_gift_daily_cap: number
+  // 1410: signup gifts one signup IP may receive in 24 hours (0 = no limit); over it, pending.
+  signup_gift_per_ip: number
+  // 1410: whether a pending account may claim with a verified phone / a Google account.
+  signup_gift_claim_phone: boolean
+  signup_gift_claim_google: boolean
 }
 
 export type SystemSettingKey = keyof SettingTypes
@@ -26,6 +31,9 @@ export const SYSTEM_SETTINGS: { [K in SystemSettingKey]: SettingDefinition<Setti
   gallery_auto_approve: { schema: z.boolean(), fallback: false },
   signup_gift_paused: { schema: z.boolean(), fallback: false },
   signup_gift_daily_cap: { schema: z.number().int().min(0).max(100_000), fallback: 30 },
+  signup_gift_per_ip: { schema: z.number().int().min(0).max(1000), fallback: 5 },
+  signup_gift_claim_phone: { schema: z.boolean(), fallback: true },
+  signup_gift_claim_google: { schema: z.boolean(), fallback: true },
 }
 
 export function isSystemSettingKey(key: string): key is SystemSettingKey {

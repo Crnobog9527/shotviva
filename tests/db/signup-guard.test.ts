@@ -110,13 +110,13 @@ describe('signup gift pause', () => {
     expect(await grant(await newAccount())).toBe(true)
   })
 
-  it('records the same-IP refusal too', async () => {
+  it('records the per-network refusal too (pending since 1410)', async () => {
     const shared = ip()
     const [first, second] = [await createUser(db), await createUser(db)]
     await recordSignupIp(service, first, shared)
     await recordSignupIp(service, second, shared)
     expect([await grant(first), await grant(second)]).toEqual([true, false])
-    expect(await refusalOf(second)).toBe('same_ip')
+    expect(await refusalOf(second)).toBe('same_ip_pending')
   })
 })
 

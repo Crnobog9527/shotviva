@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { refresh, updateTag } from 'next/cache'
 
-import { runAdminAction, saveFeatureAccess, setFeatureInvite, saveSettingSwitch, saveSignupGiftCap, saveWishlistSwitch, WISHLIST_SWITCH_COPY, type ActionResult } from '@/core/admin'
+import { runAdminAction, saveFeatureAccess, setFeatureInvite, saveSettingSwitch, saveSignupGiftRules, saveWishlistSwitch, WISHLIST_SWITCH_COPY, type ActionResult } from '@/core/admin'
 import { AppError } from '@/core/errors'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { FEATURES_CACHE_TAG } from '@/core/features'
@@ -57,15 +57,18 @@ export async function saveGallerySwitchAction(key: unknown, input: unknown): Pro
   })
 }
 
-// 1350: the signup gift's pause and daily cap. grant_credits reads the rows itself.
+// 1350 + 1410: the signup gift's pause and rules. grant_credits and claim_signup_gift read the
+// rows themselves; the page reads again so today's count shows the new cap.
 export async function saveSignupGiftPausedAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()
   return runAdminAction(() => saveSettingSwitch({ db: createAdminSupabase(), invalidate: settingsChanged }, admin.id, 'signup_gift_paused', input))
 }
 
-export async function saveSignupGiftCapAction(input: unknown): Promise<ActionResult> {
+export async function saveSignupGiftRulesAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()
-  return runAdminAction(() => saveSignupGiftCap({ db: createAdminSupabase(), invalidate: settingsChanged }, admin.id, input))
+  const result = await runAdminAction(() => saveSignupGiftRules({ db: createAdminSupabase(), invalidate: settingsChanged }, admin.id, input))
+  if (result.ok) refresh()
+  return result
 }
 
 export async function saveAffiliateSwitchAction(value: boolean): Promise<boolean> {
