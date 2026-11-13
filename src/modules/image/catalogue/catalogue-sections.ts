@@ -2,11 +2,12 @@ import type { Selection } from './catalogue-filter'
 import { hasStills, isCompareCategory } from './catalogue-template'
 import type { FilterNode, GridEntry } from './catalogue-view'
 
-// Cards a section holds in All: a phone's rail scrolls through these, then ends on 「查看全部」.
-// From md up a section shows one row (two or three cards; three or four drag compares, which are
-// also a grid of four on phones), set by the section's CSS; the rest is one tap away on the
-// category itself.
-export const SECTION_LIMIT = 8
+// Cards a section holds in All (Owner 2026-11-13, was 8 on phones and one row from md): a phone's
+// rail scrolls through these, then ends on 「查看全部」; from md up they are all shown, two rows of
+// three on desktop and three rows of two on tablets. A section of drag compares shows four of them
+// on phones (two rows of two) and all six from md (two rows of three). The rest is one tap away on
+// the category itself.
+export const SECTION_LIMIT = 6
 
 export type CatalogueSection = {
   slug: string
