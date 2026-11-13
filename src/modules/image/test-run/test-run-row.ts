@@ -2,7 +2,8 @@ import { z } from 'zod'
 
 import { receiptDetail } from '@/core/admin/jobs/receipt-detail'
 import type { TestBudget } from '@/core/admin/test-runs'
-import { RESOLUTIONS, type Resolution } from '@/core/templates'
+import type { Resolution } from '@/core/templates'
+import { resolutionSchema } from '@/core/templates/db-resolution'
 
 // Mirrors public.admin_test_runs and admin_test_photos (supabase/migrations/0780, 0781;
 // ARCHITECTURE §10.b, T85). Client-safe: the panel's types come from here too.
@@ -47,7 +48,7 @@ export const testRunRowSchema = z
     photo_id: z.string().nullable(),
     batch_id: z.string(),
     status: z.enum(TEST_RUN_STATUSES),
-    resolution: z.enum(RESOLUTIONS),
+    resolution: resolutionSchema,
     inputs: z.record(z.string(), z.unknown()),
     prompt_version: z.number().int().nullable(),
     provider: z.string().nullable(),

@@ -48,9 +48,9 @@ function Result({ fileUrl }: { fileUrl: string }) {
 }
 
 const RESOLUTION_OPTIONS = [
-  { id: '1k', label: 'Standard' },
-  { id: '2k', label: 'HD' },
-  { id: '3k', label: 'Max' },
+  { id: '1k', label: '1K' },
+  { id: '2k', label: '2K' },
+  { id: '4k', label: '4K' },
 ]
 
 const NO_TEMPLATE: TestTemplate = { id: '', name: '', aspectRatios: ['1:1'], copyKeys: [] }

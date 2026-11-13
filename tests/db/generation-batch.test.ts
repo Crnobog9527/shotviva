@@ -87,7 +87,7 @@ describe('T107 preflight and independent jobs', () => {
     const id = await seedTemplate(sql)
     await sql.query("select admin.set_template_unpriced_resolutions($1,'{3k}')", [id])
     const chosen = cells.map((cell, i) => ({ ...cell, template_id: i ? id : cell.template_id,
-      inputs: { ...cell.inputs, resolution: '3k' as const } }))
+      inputs: { ...cell.inputs, resolution: '4k' as const } }))
     await expect(preflightBatch(db, userId, chosen, deps.provider)).rejects.toMatchObject({ code: 'TEMPLATE_UNAVAILABLE', templateId: id })
   })
 

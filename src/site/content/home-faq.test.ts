@@ -30,7 +30,7 @@ const G6_QUESTIONS = [
 ]
 
 const A_FIRST_SENTENCE =
-  'Shotviva is an image to image AI tool that gives a photo you already have a new look while the subject stays as shot — in 3 steps: upload one phone photo, pick a template, choose Standard, HD or Max.'
+  'Shotviva is an image to image AI tool that gives a photo you already have a new look while the subject stays as shot — in 3 steps: upload one phone photo, pick a template, choose 1K, 2K or 4K.'
 
 const firstSentence = (text: string) => text.split(/(?<=[.。])\s*/)[0] ?? text
 // G6 letters by position: English asks A–I in order; /zh moves the brand question I to the front

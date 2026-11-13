@@ -1,15 +1,16 @@
 import { z } from 'zod'
 
 import { creditsCostSchema } from '@/core/templates/pricing'
-import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
+import type { Resolution } from '@/core/templates/output-options'
 import { editParamsSchema } from '@/core/templates/edit-params'
+import { resolutionSchema } from '@/core/templates/db-resolution'
 
 // What /admin/templates/edit saves (ARCHITECTURE §5.2). Name, category, fields and surfaces of
 // the built-in `edit` template are fixed in code; the Owner sets only these.
 export const saveEditTemplateSchema = z.object({
   isActive: z.boolean(),
   creditsCost: creditsCostSchema,
-  unpricedResolutions: z.array(z.enum(RESOLUTIONS)).max(3).optional(),
+  unpricedResolutions: z.array(resolutionSchema).max(3).optional(),
   // The wrapper that goes before the range paragraph and the user's words.
   wrapper: z.string().trim().min(1).max(20000),
   params: editParamsSchema,
@@ -24,7 +25,7 @@ export type EditTemplateSettings = {
   saleEnabled: boolean
   providerId?: string | null
   isActive: boolean
-  creditsCost: { '1k': number; '2k': number; '3k': number }
+  creditsCost: { '1k': number; '2k': number; '4k': number }
   quality: 'high' | 'medium'
   wrapper: string
   version: number

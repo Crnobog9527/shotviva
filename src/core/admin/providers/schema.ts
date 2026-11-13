@@ -5,6 +5,7 @@ import { apiKeySchema } from '@/core/providers/keys'
 import { estimatedImageCostsSchema } from '@/core/templates/image-capabilities'
 import { RESOLUTIONS } from '@/core/templates/output-options'
 import { MODULE_ADAPTERS, PROVIDER_ADAPTERS, PROVIDER_MODULES } from '@/core/providers/types'
+import { resolutionSchema } from '@/core/templates/db-resolution'
 
 // Admin input for /admin/providers. Validated again on the server before anything is stored.
 
@@ -34,7 +35,7 @@ export const saveProviderSchema = z.object({
   module: z.enum(PROVIDER_MODULES).default('image'),
   adapter: z.enum(PROVIDER_ADAPTERS).default('openai_images'),
   // Older editors omit tiers. Inserts use the database default; edits keep the saved set.
-  resolutions: z.array(z.enum(RESOLUTIONS)).min(1).max(RESOLUTIONS.length)
+  resolutions: z.array(resolutionSchema).min(1).max(RESOLUTIONS.length)
     .refine((values) => new Set(values).size === values.length).optional(),
   estimatedImageCosts: estimatedImageCostsSchema.optional(),
   label: z.string().trim().min(1).max(80),

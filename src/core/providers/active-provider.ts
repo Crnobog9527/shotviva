@@ -45,7 +45,7 @@ export async function activeProvider(
 export async function defaultTemplateProvider(adapters: ProviderAdapters, request: ImageRequestOptions | undefined,
   loadRow: (module: ProviderModule) => Promise<ActiveProviderRow | null> = cachedActiveRow): Promise<GenerationProvider> {
   const row = await loadRow('image')
-  // Ark has no Max tier: refuse it here, before any credits are held, rather than in the adapter.
+  // Ark has no 4K tier: refuse it here, before any credits are held, rather than in the adapter.
   if (request && row?.adapter === 'ark_images' && !ARK_RESOLUTIONS.includes(request.resolution)) {
     throw new AppError('INVALID_INPUT', 'This model does not support the selected output size')
   }

@@ -43,7 +43,7 @@ export function EditForm({ source, balance, creditsCost, options, photoRatio, ou
         </p> : null}
       </Section>
       {options.resolutions.length > 1 ? <Section id="res-h" title={t('workspace.resolution')} aside={tierName(draft.resolution, t)}>
-        <ResolutionPicker options={options} value={draft.resolution} costs={creditsCost} balance={balance} onChange={(resolution) => onChange({ resolution })} />
+        <ResolutionPicker options={options} aspect={draft.aspect} photoRatio={photoRatio} value={draft.resolution} costs={creditsCost} balance={balance} onChange={(resolution) => onChange({ resolution })} />
       </Section> : null}
       <p className="flex items-center gap-2 text-caption text-muted-foreground">
         <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 flex-none text-primary" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round">

@@ -13,7 +13,7 @@ const catalogue = { data: [{ id: model, supported_parameters: { resolution: { ty
 
 function fakeDb() {
   const row = {
-    id, adapter: input.adapter, model, base_url: baseUrl, resolutions: ['2k', '3k'],
+    id, adapter: input.adapter, model, base_url: baseUrl, resolutions: ['2k', '4k'],
     price_input_text_per_m: null, price_input_image_per_m: null, price_output_per_m: null,
   }
   const select = () => ({ eq: () => ({ maybeSingle: async () => ({ data: row }) }) })
@@ -36,7 +36,7 @@ describe('OpenRouter provider administration', () => {
     const { db, rpc } = fakeDb()
     await saveProvider({ db, fetch: async () => Response.json(catalogue), resolveHost }, id, { ...input, resolutions: ['1k'] })
     expect(rpc).toHaveBeenCalledExactlyOnceWith('admin_save_provider', expect.objectContaining({
-      p_capabilities: expect.objectContaining({ resolutions: ['2k', '3k'] }), p_key: input.apiKey,
+      p_capabilities: expect.objectContaining({ resolutions: ['2k', '4k'] }), p_key: input.apiKey,
     }))
   })
 

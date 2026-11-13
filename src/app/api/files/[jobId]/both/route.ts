@@ -5,7 +5,7 @@ import { clientIp, createAdminSupabase, requireApiUser } from '@/core/auth'
 import { recordJobDownload, resolveJobPair } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
 
-// Flattening a 3K cut-out and packing two files the first time; later requests reuse the ZIP.
+// Flattening a 4K cut-out and packing two files the first time; later requests reuse the ZIP.
 export const maxDuration = 60
 
 // GET → a cut-out's 白底 + 透明 pair as one ZIP for its owner (ARCHITECTURE §8 「下载白底 / 透明底」):

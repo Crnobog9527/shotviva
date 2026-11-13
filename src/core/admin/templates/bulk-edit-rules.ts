@@ -40,7 +40,7 @@ export const BULK_EDIT_SYSTEM_IDS: ReadonlySet<string> = new Set([EDIT_TEMPLATE_
 export const isBulkEditable = (template: { id: string; categoryInfo?: { isSystem: boolean }; prompt?: { providerId: string | null } | null }) =>
   !BULK_EDIT_SYSTEM_IDS.has(template.id) && template.categoryInfo?.isSystem !== true
 
-const RESOLUTION_LABEL: Record<Resolution, string> = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' }
+const RESOLUTION_LABEL: Record<Resolution, string> = { '1k': '1K', '2k': '2K', '4k': '4K' }
 
 export const isEmptyPatch = (patch: BulkEditPatch) =>
   Object.keys(patch.creditsCost ?? {}).length === 0 && !patch.visibleIn && !patch.quality && !patch.categoryKey && patch.providerId === undefined

@@ -40,7 +40,7 @@ function BatchTray({ jobs, tally }: { jobs: TrackedJob[]; tally: BatchTally }) {
   const hud = tally.settled
     ? t('workspace.batch.hudDone', { done: tally.done, count: tally.count })
     : t(tally.current ? 'workspace.batch.hudDeveloping' : 'workspace.waiting', { index: tally.current ?? 0, count: tally.count })
-  const size = first ? t.rich('workspace.developingSize', { tier: tierName(first.resolution, t), px: tierPx(first.resolution), mono: (chunks) => <span className="font-mono">{chunks}</span> }) : null
+  const size = first ? t.rich('workspace.developingSize', { tier: tierName(first.resolution, t), px: tierPx(first.resolution, first.aspect), mono: (chunks) => <span className="font-mono">{chunks}</span> }) : null
   return <DevelopTray src={trayPhoto(jobs, tally)} developing={tally.current !== null} hud={[<span key="hud" className="tabular-nums">{hud}</span>, size]} className={TRAY_SIZE} />
 }
 

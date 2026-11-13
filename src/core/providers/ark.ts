@@ -5,7 +5,7 @@ import type { Resolution } from '../templates/output-options'
 // https://docs.volcengine.com/docs/82379/1541523:
 //   - `size` as WxH: 1280x720 (921,600) ≤ pixels ≤ 2048x2048x1.1025 (4,624,220), ratio 1/16–16
 //   - at most 10 reference images (`image`)
-// The site's Max tier (2880² ≈ 8.3 M pixels) is above the model's cap, so only 1k and 2k.
+// The site's 4K tier (2880² ≈ 8.3 M pixels at 1:1) is above the model's cap, so only 1k and 2k.
 export const ARK_RESOLUTIONS: readonly Resolution[] = ['1k', '2k']
 export const ARK_MAX_REFERENCES = 10
 export const ARK_MIN_PIXELS = 921_600

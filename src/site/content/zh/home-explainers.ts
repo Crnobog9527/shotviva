@@ -43,7 +43,7 @@ export const zhSteps = {
       },
     },
     {
-      heading: `下载${zhTierList}`,
+      heading: `下载 ${zhTierList}`,
       text: `${standard.name}适合${standard.use}，${hd.name}适合${hd.use}，${max.name}适合${max.use}。`,
       visual: { kind: 'sizes', image: { ...zhTote.lifestyle, alt: sizesAlt('同一只包的生活场景图') }, tiers },
     },

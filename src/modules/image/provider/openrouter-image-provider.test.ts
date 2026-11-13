@@ -106,7 +106,7 @@ describe('OpenRouter model limits', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
-  it.each([['1k', '1K'], ['2k', '2K'], ['3k', '4K']] as const)('maps FLUX %s to %s without a reference', async (resolution, size) => {
+  it.each([['1k', '1K'], ['2k', '2K'], ['4k', '4K']] as const)('maps FLUX %s to %s without a reference', async (resolution, size) => {
     const fetch = fake(reply(await imageData('png')))
     const provider = createOpenRouterImageProvider({ ...config, model: flux, baseUrl: 'https://relay.example/v1', fetch })
     await provider.generate(input({ resolution, aspectRatio: 'original', images: [] }))
@@ -118,7 +118,7 @@ describe('OpenRouter model limits', () => {
 
   it('shrinks real 4K pixels to the existing square 3K tier', async () => {
     const fetch = fake(reply(await imageData('png', 4096)))
-    const image = await createOpenRouterImageProvider({ ...config, model: flux, fetch }).generate(input({ resolution: '3k', aspectRatio: '1:1' }))
+    const image = await createOpenRouterImageProvider({ ...config, model: flux, fetch }).generate(input({ resolution: '4k', aspectRatio: '1:1' }))
     expect(await sharp(image.bytes).metadata()).toMatchObject({ width: 2880, height: 2880 })
   })
 })

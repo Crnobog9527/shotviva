@@ -6,7 +6,7 @@ import { templateItemSchema } from './schema'
 
 const ctx = (db = state()) => ({ state: db, seriesTarget: new Map<string, string | null>(), knownSeries: new Set(['set-a']) })
 const item = (input: unknown) => templateItemSchema.parse(input)
-const fresh = { id: 'new-one', name: 'New one', category: 'western', fields, creditsCost: { '1k': 40, '2k': 80, '3k': 120 }, prompt: { body: 'Body {{x}}' } }
+const fresh = { id: 'new-one', name: 'New one', category: 'western', fields, creditsCost: { '1k': 40, '2k': 80, '4k': 120 }, prompt: { body: 'Body {{x}}' } }
 
 describe('planTemplate', () => {
   it('creates a new template unpublished under a level-2 category, with the model saved explicitly', () => {
@@ -14,7 +14,7 @@ describe('planTemplate', () => {
     expect(plan.problems).toEqual([])
     const [save] = plan.ops
     expect(save).toMatchObject({ op: 'save_template', is_new: true, assignment: { series_id: null } })
-    expect(save.template).toMatchObject({ id: 'new-one', category_key: 'western', is_active: false, unpriced_resolutions: ['3k'] })
+    expect(save.template).toMatchObject({ id: 'new-one', category_key: 'western', is_active: false, unpriced_resolutions: ['4k'] })
     expect(save.prompt).toMatchObject({ provider_id: SEEDREAM })
     expect(save).not.toHaveProperty('expected')
   })
@@ -46,7 +46,7 @@ describe('planTemplate', () => {
   })
 
   it('reports validation problems by message and never sends them', () => {
-    const plan = planTemplate(item({ ...fresh, creditsCost: { '1k': 1, '2k': 1, '3k': 1 } }), ctx(), {})
+    const plan = planTemplate(item({ ...fresh, creditsCost: { '1k': 1, '2k': 1, '4k': 1 } }), ctx(), {})
     expect(plan.problems[0]).toContain('积分低于下限')
     expect(planTemplate(item({ id: 'missing-body', name: 'x' }), ctx(), {}).problems[0]).toContain('prompt.body')
     expect(planTemplate(item({ ...fresh, isActive: true }), ctx(), {}).notes[0]).toContain('isActive')

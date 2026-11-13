@@ -5,16 +5,16 @@ import { z } from 'zod'
 import { AppError } from '@/core/errors'
 import { GenerationFailure, settleProviderCall, templateCall, type JobCost } from '@/core/jobs'
 import { loadInputImage, type ObjectStore } from '@/core/storage'
-import { RESOLUTIONS } from '@/core/templates/output-options'
 import { TEMPLATE_QUALITIES } from '@/core/templates/pricing'
 import { input, runInput } from './contracts'
 import { labImageRoute } from './image-route'
 import { labRpc } from '@/core/admin/prompt-lab/commands'
 import { storeLabOutput } from './output'
 import { styleImage } from './style-image'
+import { resolutionSchema } from '@/core/templates/db-resolution'
 
 const cellSchema = z.object({
-  model: z.string(), resolution: z.enum(RESOLUTIONS), quality: z.enum(TEMPLATE_QUALITIES), use_style_reference: z.boolean(),
+  model: z.string(), resolution: resolutionSchema, quality: z.enum(TEMPLATE_QUALITIES), use_style_reference: z.boolean(),
   estimate_usd: z.number(), status: z.string(),
   admin_test_photos: z.object({ object_key: z.string() }),
   prompt_lab_versions: z.object({ version_no: z.number(), prompt: z.string() }),

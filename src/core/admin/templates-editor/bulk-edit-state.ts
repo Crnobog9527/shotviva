@@ -15,7 +15,7 @@ export type BulkEditValues = {
   category: string
 }
 
-export const emptyBulkEdit = (): BulkEditValues => ({ credits: { '1k': '', '2k': '', '3k': '' }, provider: 'keep', surfaces: '', quality: '', category: '' })
+export const emptyBulkEdit = (): BulkEditValues => ({ credits: { '1k': '', '2k': '', '4k': '' }, provider: 'keep', surfaces: '', quality: '', category: '' })
 
 const SURFACES: Record<Exclude<SurfaceChoice, ''>, BulkEditPatch['visibleIn']> = {
   web: ['web'],

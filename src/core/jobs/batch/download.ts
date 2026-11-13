@@ -18,7 +18,7 @@ export async function downloadBatchZip(db: SupabaseClient, userId: string, batch
 
   try {
     const archive = await batchArchive(db, userId, batchId, background)
-    // One at a time: a 3K cut-out decodes to ~33MB, and the copies outlive this ZIP for reuse.
+    // One at a time: a 4K cut-out decodes to ~33MB, and the copies outlive this ZIP for reuse.
     const store = r2Store()
     for (const copy of archive.white) {
       await stageVariant(store, { sourceKey: copy.source, key: copy.key, contentType: 'image/jpeg', make: flattenOnWhite })

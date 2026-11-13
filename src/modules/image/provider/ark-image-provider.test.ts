@@ -69,7 +69,7 @@ describe('Ark image requests', () => {
 
   it('refuses the Max tier before calling Ark', async () => {
     const fetch = fake(await ok())
-    await expect(createArkImageProvider({ ...config, fetch }).generate(input({ resolution: '3k' }))).rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
+    await expect(createArkImageProvider({ ...config, fetch }).generate(input({ resolution: '4k' }))).rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
     expect(fetch).not.toHaveBeenCalled()
   })
 })

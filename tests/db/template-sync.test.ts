@@ -6,6 +6,7 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { readTemplateQuote } from '../../src/site/template-pricing'
 import { anonClient, connectAdmin, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
+import { toDbTiers } from '../../src/core/templates/db-resolution'
 
 const providerId = randomUUID()
 const binding = { adapter: 'openai_images', model: providerId, base_url: 'https://model.example.test' }
@@ -36,7 +37,7 @@ async function prepare(template: ReturnType<typeof fixture>, run: string) {
   const { token } = await target(template.id, run)
   const { floors, receipt, envModel } = await readTemplateQuote(serviceSupabase())
   return { p_template: template, p_prompt: prompt, p_provider: binding,
-    p_floors: { ...floors, quote_receipt: receipt, env_model: envModel }, p_run_id: run,
+    p_floors: toDbTiers({ ...floors, quote_receipt: receipt, env_model: envModel }), p_run_id: run,
     p_locales: ['en', 'zh'], p_target_token: token, p_catalog_version: 'v1' }
 }
 const write = (args: Record<string, unknown>) => serviceClient().rpc('sync_preview_template', args)

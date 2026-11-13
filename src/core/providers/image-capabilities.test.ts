@@ -9,7 +9,7 @@ const models = Object.keys(samples)
 describe('public /images/models parameters captured 2026-11-09', () => {
   it.each([
     [models[0], ['1k'], false, 3, 10],
-    [models[1], ['1k', '2k', '3k'], true, 10, 15],
+    [models[1], ['1k', '2k', '4k'], true, 10, 15],
     [models[2], ['1k', '2k'], true, 14, 17],
   ] as const)('maps the advertised tiers, raw ratios and reference range for %s', async (model, resolutions, auto, max, count) => {
     const caps = await fetchImageCapabilities('openrouter_images', 'https://openrouter.ai/api/v1', model, catalog)

@@ -6,11 +6,11 @@ import { fetchImageCapabilities } from './image-capabilities'
 import { templateImageProvider } from './template-image-provider'
 import type { ActiveProviderRow, ProviderAdapters } from './types'
 
-// Ark has no Max tier. A 3k request must be refused while routing, before credits are reserved,
+// Ark has no 4K tier. A 4k request must be refused while routing, before credits are reserved,
 // whether the template names the Ark row or follows an Ark default.
 const generate = vi.fn()
 const adapters: ProviderAdapters = { ark_images: () => ({ id: 'ark', generate }) }
-const max: ImageRequestOptions = { resolution: '3k', aspectRatio: '4:3', referenceCount: 1 }
+const max: ImageRequestOptions = { resolution: '4k', aspectRatio: '4:3', referenceCount: 1 }
 
 async function arkRow(): Promise<ActiveProviderRow> {
   const capabilities = await fetchImageCapabilities('ark_images', 'https://ark.cn-beijing.volces.com/api/v3', 'doubao-seedream-5-5-261028')

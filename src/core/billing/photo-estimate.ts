@@ -2,7 +2,7 @@
 // the live Standard prices of the published web templates, so the range moves with the catalogue
 // and is never typed. No server-only import: the tier cards render it in the browser.
 
-type Resolution = '1k' | '2k' | '3k'
+type Resolution = '1k' | '2k' | '4k'
 export type PricedTemplate = { imageOptions?: { resolutions: readonly string[] }; creditsCost: Record<Resolution, number> }
 
 // Credits per photo at Standard: the cheapest, and the price most templates charge.

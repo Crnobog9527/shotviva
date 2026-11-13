@@ -27,6 +27,7 @@ import { listImageProviderOptions, pricingFromOptions } from '../src/core/admin/
 import { templateWithPromptSchema } from '../src/core/templates/schema'
 import { activeImportHint, importFailure, importOptions } from './import-prompts-options'
 import { toggleSetupProblems } from '../src/core/templates/toggles'
+import { withDbTiers } from '../src/core/templates/db-resolution'
 
 const fileSchema = z.object({ templates: z.array(templateWithPromptSchema).min(1) })
 
@@ -63,6 +64,7 @@ async function main() {
   const env = envSchema.parse(process.env)
   const client = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: withDbTiers() },
   })
   const pricing = await listImageProviderOptions(client, env.OPENAI_IMAGE_MODEL)
   const floors = pricingFromOptions(pricing)
