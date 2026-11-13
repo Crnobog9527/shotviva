@@ -61,10 +61,15 @@ function useStoredDraft(template: StudioTemplate) {
 
 export type StudioNotice = 'sortFailed' | 'clipped' | 'rateLimited' | 'invalid' | 'notEnough' | 'error' | null
 
+// The editor starts on 2K when the template sells it, so a first click is never a tier the
+// template has no price for; 1K and Max stay one tap away.
+export const defaultResolution = (resolutions: readonly Resolution[]): Resolution =>
+  resolutions.includes('2k') ? '2k' : resolutions[0] ?? '2k'
+
 export function usePosterStudio(template: StudioTemplate, concurrency: number, onStarted: () => void) {
   const [draft, setDraft] = useStoredDraft(template)
   const [aspect, setAspect] = useState<OutputAspect>(template.aspects[0] ?? '9:16')
-  const [resolution, setResolution] = useState<Resolution>(template.resolutions[0] ?? '2k')
+  const [resolution, setResolution] = useState<Resolution>(() => defaultResolution(template.resolutions))
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<StudioNotice>(null)
 
