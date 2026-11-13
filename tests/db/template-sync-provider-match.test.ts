@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 
+import { toDbTiers } from '../../src/core/templates/db-resolution'
 import { readTemplateQuote } from '../../src/site/template-pricing'
 import { connectAdmin, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
@@ -49,7 +50,7 @@ async function sync(binding: ReturnType<typeof triple>) {
   const { floors, receipt, envModel } = await readTemplateQuote(serviceSupabase())
   const result = await serviceClient().rpc('sync_preview_template', {
     p_template: template, p_prompt: prompt, p_provider: binding,
-    p_floors: { ...floors, quote_receipt: receipt, env_model: envModel }, p_run_id: '1',
+    p_floors: toDbTiers({ ...floors, quote_receipt: receipt, env_model: envModel }), p_run_id: '1',
     p_locales: ['en', 'zh'], p_target_token: (target.data as { token: string }).token, p_catalog_version: 'v1',
   })
   const bound = (await db.query('select provider_id from public.template_prompts where template_id=$1', [template.id])).rows[0]

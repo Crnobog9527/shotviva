@@ -7,7 +7,7 @@ const base = {
   prompt: { providerId: null, styleRefs: [], body: 'fixture', modelParams: {}, version: 1 },
   fields: { images: { min: 1, max: 1 }, aspectRatios: ['1:1'], copy: [], toggles: [] },
 }
-const prices = { '1k': 10, '2k': 15, '3k': 1 }
+const prices = { '1k': 10, '2k': 15, '4k': 1 }
 const provider: ImageProviderOption = {
   id: 'model', label: 'Model', model: 'model', isActive: true, openAI: false,
   capabilities: { resolutions: ['1k','2k'], aspectRatios: ['1:1'], minReferences: 1, maxReferences: 2, originalRatio: false, fetchedAt: '2026-11-01T00:00:00Z' },
@@ -22,6 +22,6 @@ it('names every incompatible row and permits its valid sibling before the confir
 })
 
 it('rejects changing an unoffered price without changing the model', () => {
-  expect(bulkModelFailures([base], { creditsCost: { '3k': 80 } }, [provider])).toMatchObject([{ id: 'first', reason: 'model' }])
+  expect(bulkModelFailures([base], { creditsCost: { '4k': 80 } }, [provider])).toMatchObject([{ id: 'first', reason: 'model' }])
   expect(bulkModelFailures([base], { creditsCost: { '2k': 80 } }, [provider])).toEqual([])
 })

@@ -55,7 +55,7 @@ describe('openai image provider', () => {
 
   it('sends the template quality, not model_params, and sizes by tier × ratio', async () => {
     const fetchImpl = vi.fn(async () => json({ data: [{ b64_json: PNG_B64 }] }))
-    await provider(fetchImpl).generate(input({ quality: 'medium', resolution: '3k', aspectRatio: '16:9', params: { quality: 'low' } }))
+    await provider(fetchImpl).generate(input({ quality: 'medium', resolution: '4k', aspectRatio: '16:9', params: { quality: 'low' } }))
     const form = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData
     expect(form.get('quality')).toBe('medium')
     expect(form.get('size')).toBe('3840x2160')

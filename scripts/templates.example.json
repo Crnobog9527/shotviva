@@ -31,7 +31,7 @@
         "aspectRatios": ["1:1", "4:5"]
       },
       "quality": "medium",
-      "creditsCost": { "1k": 1, "2k": 2, "3k": 3 },
+      "creditsCost": { "1k": 1, "2k": 2, "4k": 3 },
       "visibleIn": ["web"],
       "translations": { "zh": { "name": "示例汉堡", "description": "假的说明。" } },
       "prompt": { "body": "FAKE PROMPT. Never commit real prompts.", "modelParams": {} },

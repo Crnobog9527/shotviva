@@ -5,7 +5,7 @@ import { contentPagesIn, freeImagesIn, homePageIn, pricingFaqIn, pricingPageIn }
 import { FreeImagesLabel, FreeImagesShort, FreeImagesTitle, FromCredits, freeImagesLabel, fromCredits } from './offer'
 import { zhFreeImages, zhFromCredits } from './zh/offer'
 
-const priced = (credits: number) => ({ creditsCost: { '1k': credits, '2k': credits * 2, '3k': credits * 3 } })
+const priced = (credits: number) => ({ creditsCost: { '1k': credits, '2k': credits * 2, '4k': credits * 3 } })
 const MIXED = { from: 1, same: false }
 
 // 建站规格 G3, G4 (gap audit A1, T91): "from N credits" and every count of images are the

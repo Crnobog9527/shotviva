@@ -29,7 +29,14 @@ describe('app messages (en)', () => {
     expect(rich('app.workspace.freeNotice', plain)).toBe(
       "This photo uses free credits: it's shown publicly with a watermark. Paid credits make it private and watermark-free.",
     )
-    expect(['1k', '2k', '3k'].map((id) => t(`app.tiers.${id}.name`))).toEqual(['Standard', 'HD', 'Max'])
+    expect(['1k', '2k', '4k'].map((id) => t(`app.tiers.${id}.name`))).toEqual(['1K', '2K', '4K'])
+    // A work that followed the photo's ratio has no recorded size: the tier alone, never a guess.
+    const mono = { mono: (chunks: string) => chunks }
+    expect(rich('app.workspace.developingSize', { tier: '4K', px: 3840, ...mono })).toBe('4K · 3840')
+    expect(rich('app.workspace.developingSize', { tier: '4K', px: 0, ...mono })).toBe('4K')
+    expect(t('app.result.tierPx', { tier: '4K', px: 0 })).toBe('4K')
+    expect(t('app.units.size', { width: 3840, height: 2160 })).toBe('3840×2160')
+    expect(t('app.units.sizeApprox', { width: 1360, height: 768 })).toBe('≈ 1360×768')
     expect(t('app.credits', { count: 1 })).toBe('1 credit')
     expect(t('app.template.fromCredits', { count: 2 })).toBe('from 2 credits')
     expect(t('app.result.longPress')).toBe('Long-press to save')

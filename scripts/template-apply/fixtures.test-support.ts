@@ -5,10 +5,10 @@ import type { DbState } from './state'
 // A small in-memory target for the planner's unit tests (the database tests use a real stack).
 
 export const SEEDREAM = '11111111-1111-4111-8111-111111111111'
-const tiers = { '1k': 10, '2k': 20, '3k': 30 }
+const tiers = { '1k': 10, '2k': 20, '4k': 30 }
 export const floors: ProviderFloors = {
-  high: tiers, medium: tiers, resolutions: ['1k', '2k', '3k'], activeProvider: 'env',
-  providers: { env: { high: tiers, medium: tiers, resolutions: ['1k', '2k', '3k'] },
+  high: tiers, medium: tiers, resolutions: ['1k', '2k', '4k'], activeProvider: 'env',
+  providers: { env: { high: tiers, medium: tiers, resolutions: ['1k', '2k', '4k'] },
     [SEEDREAM]: { high: tiers, medium: tiers, resolutions: ['1k', '2k'] } },
   models: { env: 'env-model', [SEEDREAM]: 'seedream-4' },
 }
@@ -21,7 +21,7 @@ export function stored(id: string, extra: Partial<AdminTemplate> = {}): AdminTem
     categoryInfo: { key: 'food-drink', nameEn: 'Food', nameZh: '餐饮', introEn: null, introZh: null, cardStyle: 'pair', sortOrder: 0, isSystem: false },
     coverBeforeUrl: 'https://assets.test/covers/x/before.webp', coverAfterUrl: 'https://assets.test/covers/x/after.webp',
     coverMediaType: 'image', coverVideoUrl: null, coverPosterUrl: null, coverLocales: {},
-    fields, quality: 'high', creditsCost: { '1k': 40, '2k': 80, '3k': 120 }, sortOrder: 10, isActive: false,
+    fields, quality: 'high', creditsCost: { '1k': 40, '2k': 80, '4k': 120 }, sortOrder: 10, isActive: false,
     visibleIn: ['web'], translations: {}, featuredRank: null, createdAt: '', updatedAt: '',
     subcategoryKey: null, seriesId: null, seriesSortOrder: 0, saleEnabled: false, unpricedResolutions: [],
     prompt: { styleRefs: [], providerId: null, body: 'Prompt body', version: 3, modelParams: {} },

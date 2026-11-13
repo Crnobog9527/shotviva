@@ -84,7 +84,7 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
       <Toolbar query={query} onQuery={setQuery} onNew={() => openEditor({ mode: 'new' })} />
       {floor.version === 'v2' && <details className="text-muted-foreground text-sm">
         <summary className="cursor-pointer">尚未上架的规划价格</summary>
-        <p>精细文字海报（high）：Standard 120、HD 240、Max 360 积分。目前没有绑定此价目的模板。</p>
+        <p>精细文字海报（high）：1K 120、2K 240、4K 360 积分。目前没有绑定此价目的模板。</p>
       </details>}
       {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
       {error && !target ? (

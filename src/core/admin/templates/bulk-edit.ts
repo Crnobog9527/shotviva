@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { AppError } from '@/core/errors'
 import { LOCALES } from '@/core/i18n/locales'
 import { logger } from '@/core/logger'
+import { withTierKeys } from '@/core/templates/db-resolution'
 import { TEMPLATE_QUALITIES } from '@/core/templates/pricing'
 import { TEMPLATE_SURFACES } from '@/core/templates/schema'
 
@@ -27,7 +28,8 @@ const inputSchema = z.object({
   patch: z
     .strictObject({
       providerId: z.uuid().nullable().optional(),
-      creditsCost: z.strictObject({ '1k': tier.optional(), '2k': tier.optional(), '3k': tier.optional() }).optional(),
+      // A tab opened before the 4K rename still sends '3k': read it as '4k', like the template save.
+      creditsCost: withTierKeys(z.strictObject({ '1k': tier.optional(), '2k': tier.optional(), '4k': tier.optional() })).optional(),
       visibleIn: z
         .array(z.enum(TEMPLATE_SURFACES))
         .min(1)
@@ -48,7 +50,7 @@ const resultSchema = z.object({
         id: z.string(),
         name: z.string(),
         reason: z.literal('below_floor'),
-        resolution: z.enum(['1k', '2k', '3k']),
+        resolution: z.enum(['1k', '2k', '4k']),
         floor: z.number(),
         given: z.number(),
       }),

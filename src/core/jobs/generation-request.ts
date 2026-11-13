@@ -5,8 +5,9 @@ import { MAX_BATCH_TEMPLATES } from './batch/limits'
 import { MAX_BATCH_SIZE } from '../billing/tier-limits'
 import type { Locale } from '../i18n/locales'
 import { IMAGE_SLOTS_MAX } from '../templates/image-slots'
-import { NOTE_MAX_LENGTH, OUTPUT_ASPECTS, RESOLUTIONS, type Resolution } from '../templates/output-options'
+import { NOTE_MAX_LENGTH, OUTPUT_ASPECTS, type Resolution } from '../templates/output-options'
 import { JOB_VISIBILITIES, type JobSource, type JobVisibility } from './job-schema'
+import { resolutionSchema } from '@/core/templates/db-resolution'
 
 // Body of POST /api/generate. job_id is optional and client-made so a retried or
 // backgrounded request resolves to the same job instead of charging twice.
@@ -27,7 +28,7 @@ export const generateBodySchema = z.object({
       // One of the eight output sizes (DESIGN §4.3); omitted means 'original'.
       aspect_ratio: z.enum(OUTPUT_ASPECTS).optional(),
       // Standard / HD / Max; omitted means '1k'. Anything else is a 422.
-      resolution: z.enum(RESOLUTIONS).optional(),
+      resolution: resolutionSchema.optional(),
       // "Anything to change? (optional)"; blank is the same as absent.
       note: z
         .string()

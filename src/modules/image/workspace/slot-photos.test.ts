@@ -25,7 +25,7 @@ describe('slot photos (§5.1e)', () => {
 
   it('makes one job with input_slots, no single photo and a fixed size', () => {
     const template = {
-      id: 'poster', name: 'Poster', creditsCost: { '1k': 2, '2k': 4, '3k': 6 }, toggles: [], copyFields: [],
+      id: 'poster', name: 'Poster', creditsCost: { '1k': 2, '2k': 4, '4k': 6 }, toggles: [], copyFields: [],
       imageOptions: { originalRatio: true, aspectRatios: ['2:3', '1:1'], resolutions: ['1k'] }, imageSlots: slots,
     } as unknown as CatalogueTemplate
     const input = slotStartInput(template, { aspect: 'original', resolution: '1k', note: '', copy: {}, toggles: {} }, { logo: 'inputs/u/a.png' })

@@ -13,6 +13,7 @@ import { sanitizeNext } from '../redirect-target'
 import { isVerified, metadataLocale } from '../session-user'
 import type { CallbackFlow } from './callback-url'
 import { callbackTarget, type CallbackOutcome } from './callback-target'
+import { withDbTiers } from '../../templates/db-resolution'
 
 // Shared by /auth/callback (OAuth code exchange) and /auth/confirm (email token hash), so both
 // landings run the same post-verification path: signup IP, free-credit grant, `signup` event.
@@ -23,6 +24,7 @@ export type CookieToSet = { name: string; value: string; options: Parameters<Nex
 // browser actually receives.
 export function requestClient(request: NextRequest, jar: CookieToSet[]) {
   return createServerClient(publicEnv.NEXT_PUBLIC_SUPABASE_URL, publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+    global: { fetch: withDbTiers() },
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (cookies) => void jar.push(...cookies),

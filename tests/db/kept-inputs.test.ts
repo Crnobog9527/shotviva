@@ -56,7 +56,7 @@ async function setup(behaviour: FakeBehaviour = 'ok') {
 const keptKeyOf = async (userId: string, jobId: string) => keptInputsOf((await findOwnJob(service, userId, jobId))!)
 
 const template = (): CatalogueTemplate =>
-  ({ id: templateId, name: 'T4 test', creditsCost: { '1k': 1, '2k': 2, '3k': 3 }, copyFields: [{ key: 'dish', label: 'Dish', required: false, maxLength: 60 }] }) as CatalogueTemplate
+  ({ id: templateId, name: 'T4 test', creditsCost: { '1k': 1, '2k': 2, '4k': 3 }, copyFields: [{ key: 'dish', label: 'Dish', required: false, maxLength: 60 }] }) as CatalogueTemplate
 
 describe('inputs kept at settle', () => {
   it('copies the upload next to the result and records it on the job', async () => {

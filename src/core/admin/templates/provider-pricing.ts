@@ -7,12 +7,13 @@ import {
   RESOLUTIONS, TEMPLATE_QUALITIES, UNPRICED, type ProviderFloors,
 } from '@/core/templates'
 import type { ImageProviderOption } from '../image-provider-field'
+import { resolutionSchema } from '@/core/templates/db-resolution'
 
 const tariffs = z.record(z.string(), z.object({ quality: z.enum(TEMPLATE_QUALITIES), costs: creditsCostSchema, style_sale_approved: z.boolean().optional() }))
 const fallbackTiers = z.record(z.enum(RESOLUTIONS), z.number().int().positive().nullable())
 const rowSchema = z.object({
   provider_id: z.uuid().nullable(), label: z.string(), model: z.string(), adapter: z.enum(['openai_images', 'openrouter_images', 'ark_images']),
-  is_active: z.boolean(), capabilities: z.unknown(), resolutions: z.array(z.enum(RESOLUTIONS)),
+  is_active: z.boolean(), capabilities: z.unknown(), resolutions: z.array(resolutionSchema),
   approved: tariffs.optional(), fallback_floors: z.record(z.enum(TEMPLATE_QUALITIES), fallbackTiers).optional(),
   estimated_image_costs: estimatedImageCostsSchema,
   p95: z.partialRecord(z.enum(RESOLUTIONS), z.number().nonnegative()),

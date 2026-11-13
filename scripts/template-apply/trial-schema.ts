@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
-import { NOTE_MAX_LENGTH, OUTPUT_ASPECTS, RESOLUTIONS } from '../../src/core/templates/output-options'
+import { NOTE_MAX_LENGTH, OUTPUT_ASPECTS } from '../../src/core/templates/output-options'
+import { resolutionSchema } from '../../src/core/templates/db-resolution'
 
 // What `pnpm templates:trial` runs for a template (templates:apply ignores it). Each input set is one
 // trial of the admin's 「首次出图」: at most one test photo (a path relative to the batch file) or, for
@@ -25,7 +26,7 @@ export const trialSchema = z.strictObject({
   references: z.array(localImage).max(12).optional(),
   // Results per input set.
   n: z.int().min(1).max(5).optional(),
-  resolution: z.enum(RESOLUTIONS).optional(),
+  resolution: resolutionSchema.optional(),
 })
 
 export type Trial = z.infer<typeof trialSchema>

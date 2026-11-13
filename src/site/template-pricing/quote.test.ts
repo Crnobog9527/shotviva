@@ -3,9 +3,9 @@ import { expect, it, vi } from 'vitest'
 
 import { readPricingOptions, readTemplateQuote } from '.'
 
-const approved = { edit: { quality: 'medium', costs: { '1k': 20, '2k': 37, '3k': 58 } } }
+const approved = { edit: { quality: 'medium', costs: { '1k': 20, '2k': 37, '4k': 58 } } }
 const t96 = [{ provider_id: null, label: 'env', model: 'test-image-model', adapter: 'openai_images',
-  is_active: true, capabilities: {}, resolutions: ['1k', '2k', '3k'], estimated_image_costs: {}, p95: { '1k': 7 } }]
+  is_active: true, capabilities: {}, resolutions: ['1k', '2k', '4k'], estimated_image_costs: {}, p95: { '1k': 7 } }]
 const v2 = { version: 'v2', unit_price: 0.011, providers: [{ ...t96[0], approved }] }
 const receipt = { terms: 'terms-digest', active: 'env', routes: { env: 'provider-digest' } }
 
@@ -44,9 +44,9 @@ it('keeps the editor usable on older databases but requires the receipt for sync
 })
 
 it('offers only configured tiers confirmed by Router capabilities, including when a hidden tier has an estimate', async () => {
-  const router = { ...v2.providers[0], adapter: 'openrouter_images', resolutions: ['1k', '2k', '3k'],
+  const router = { ...v2.providers[0], adapter: 'openrouter_images', resolutions: ['1k', '2k', '4k'],
     capabilities: { resolutions: ['1k','2k'], aspectRatios: ['1:1'], originalRatio: false,
-      minReferences: 0, maxReferences: 4, fetchedAt: '2026-11-01T00:00:00Z' }, estimated_image_costs: { '3k': 0.03 } }
+      minReferences: 0, maxReferences: 4, fetchedAt: '2026-11-01T00:00:00Z' }, estimated_image_costs: { '4k': 0.03 } }
   const { db } = pricingClient(() => Response.json({ input: { ...v2, providers: [router] }, receipt }))
   expect((await readTemplateQuote(db)).floors.resolutions).toEqual(['1k','2k'])
 })

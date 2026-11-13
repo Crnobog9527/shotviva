@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
+import { toDbTiers } from '../../src/core/templates/db-resolution'
 import { readTemplateQuote } from '../../src/site/template-pricing'
 import { anonClient, connectAdmin, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
@@ -36,7 +37,7 @@ async function prepare(template: ReturnType<typeof fixture>, run: string, styleR
   expect(target.error).toBeNull()
   const { floors, receipt, envModel } = await readTemplateQuote(serviceSupabase())
   return { p_template: template, p_prompt: styleRefs === undefined ? prompt : { ...prompt, style_refs: styleRefs },
-    p_provider: binding, p_floors: { ...floors, quote_receipt: receipt, env_model: envModel }, p_run_id: run,
+    p_provider: binding, p_floors: toDbTiers({ ...floors, quote_receipt: receipt, env_model: envModel }), p_run_id: run,
     p_locales: ['en', 'zh'], p_target_token: (target.data as { token: string }).token, p_catalog_version: 'v1' }
 }
 const write = (args: Record<string, unknown>) => serviceClient().rpc('sync_preview_template', args)

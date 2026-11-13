@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { photoPrices, photoRange, tierCreditPrices, type PricedTemplate } from './photo-estimate'
 
 const tpl = (standard: number, resolutions?: string[]): PricedTemplate => ({
-  creditsCost: { '1k': standard, '2k': standard * 2, '3k': standard * 3 },
+  creditsCost: { '1k': standard, '2k': standard * 2, '4k': standard * 3 },
   ...(resolutions ? { imageOptions: { resolutions } } : {}),
 })
 
@@ -16,7 +16,7 @@ describe('photo estimate from live Standard prices', () => {
     expect(photoPrices([tpl(20), tpl(20), tpl(15), tpl(30)])).toEqual({ cheapest: 15, common: 20 })
     expect(photoPrices([tpl(15), tpl(20)])).toEqual({ cheapest: 15, common: 20 })
     expect(photoPrices([])).toBeNull()
-    expect(photoPrices([tpl(10, ['3k'])])).toBeNull()
+    expect(photoPrices([tpl(10, ['4k'])])).toBeNull()
   })
 
   it('divides the monthly credits, rounding down', () => {

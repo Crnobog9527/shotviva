@@ -46,7 +46,7 @@ describe('selectTemplates', () => {
       cover_poster_url: null,
       fields: { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'] },
       quality: 'high',
-      credits_cost: { '1k': 2, '2k': 4, '3k': 6 },
+      credits_cost: { '1k': 2, '2k': 4, '4k': 6 },
       sort_order: 10,
       is_active: true,
       visible_in: ['web'],

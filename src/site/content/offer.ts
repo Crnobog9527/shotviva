@@ -8,18 +8,21 @@ import { site } from '../site.config'
 // Live pages pass published offers; offline copy uses the phase-one baseline.
 
 // Per-template capabilities and charges come from the live catalogue.
+// `px` is each tier's square size, the number the site has always published (2880 for 4K; a
+// 16:9 4K photo is 3840×2160, which the workspace shows next to the tier). Which tiers a
+// template offers depends on its model.
 export const OUTPUT_TIERS = [
-  { name: 'Standard', px: 1024, use: 'social posts and delivery apps' },
-  { name: 'HD', px: 2048, use: 'websites and online stores' },
-  { name: 'Max', px: 2880, use: 'print and zoom' },
+  { name: '1K', px: 1024, use: 'social posts and delivery apps' },
+  { name: '2K', px: 2048, use: 'websites and online stores' },
+  { name: '4K', px: 2880, use: 'print and zoom' },
 ] as const
 
 export const tierNames = OUTPUT_TIERS.map((tier) => tier.name)
 
-// "Standard, HD or Max"
+// "1K, 2K or 4K"
 export const tierList = `${tierNames.slice(0, -1).join(', ')} or ${tierNames.at(-1)}`
 
-// "Standard 1024 px, HD 2048 px, Max 2880 px"
+// "1K 1024 px, 2K 2048 px, 4K 2880 px" (square sizes)
 export const tierPixels = OUTPUT_TIERS.map((tier) => `${tier.name} ${tier.px} px`).join(', ')
 
 // "from N credits" / "From N credits": N is the cheapest Standard price among the published web
