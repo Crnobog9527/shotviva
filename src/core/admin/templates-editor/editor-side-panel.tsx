@@ -29,7 +29,7 @@ export function EditorSidePanel({ testRun, draft, isActive }: { testRun: ReactNo
       {mode === 'preview' ? (
         <div className="grid min-w-0 gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-muted-foreground min-w-0 flex-1 text-xs">{COPY.hint}</p>
+            <p className="text-muted-foreground w-full min-w-0 text-xs sm:w-auto sm:flex-1">{COPY.hint}</p>
             <Segmented label={COPY.widthLabel} value={width} onChange={setWidth} options={[['desktop', COPY.desktop], ['phone', COPY.phone]]} />
             <Segmented label={COPY.localeLabel} value={locale} onChange={setLocale} options={[['zh', COPY.zh], ['en', COPY.en]]} />
           </div>
