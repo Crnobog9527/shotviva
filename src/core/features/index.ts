@@ -10,4 +10,5 @@ export {
 } from './access'
 export { cachedFeatureAccess, featureAccessFor, FEATURES_CACHE_TAG, loadFeatureAccess } from './read'
 export { FEATURES, findFeature, type FeatureDefinition } from './registry'
+export { isInvited } from './invited'
 export { featureAllowed, requireFeature, type RequireFeatureDeps } from './require-feature'
