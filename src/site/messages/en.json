@@ -24,6 +24,15 @@
       "pickerTitle": "Pick a template",
       "pickerText": "Each one keeps your subject as shot and changes the light, the scene or the style.",
       "pickTemplate": "Pick {name}",
+      "pickerSearch": "Search by name, use or category",
+      "pickerClear": "Clear search",
+      "pickerAll": "All",
+      "pickerFilter": "Filter templates",
+      "pickerFilterWithin": "Filter within {name}",
+      "pickerNoMatch": "No template matches “{query}”. Try another word.",
+      "pickerResults": "{count, plural, one {# template} other {# templates}}",
+      "pickerSeries": "Series · {count, plural, one {# template} other {# templates}}",
+      "pickerBack": "Back",
       "signup": {
         "title": "Make a free account to develop it",
         "text": "Your photo and template stay as you set them.",
@@ -565,6 +574,10 @@
       "templates": "Templates",
       "filter": "Filter templates",
       "filterWithin": "Filter within {name}",
+      "search": "Search by name, use or category",
+      "searchClear": "Clear search",
+      "searchResults": "“{query}”: {count, plural, one {# template} other {# templates}}",
+      "searchEmpty": "No template matches “{query}”. Try another word.",
       "all": "All",
       "seeAll": "See all",
       "seeAllWhich": "in {name}",
@@ -593,7 +606,13 @@
       "hintCompare": "Drag across the photo to compare.",
       "makeOne": "Make one",
       "animatedMeta": "{category} · animated",
-      "hintPair": "Phone photo on the left, the AI result on the right."
+      "hintPair": "Phone photo on the left, the AI result on the right.",
+      "viewerOpen": "View {name} full screen",
+      "viewerTitle": "{name}, full screen",
+      "viewerClose": "Close full screen",
+      "viewerSwitch": "Switch between the phone photo and the AI result",
+      "viewerHint": "Tap the image to zoom. Swipe to switch between Phone and AI.",
+      "viewerHintZoomed": "Drag to look around. Tap again to zoom out."
     },
     "tiers": {
       "1k": {
@@ -1039,9 +1058,18 @@
         "stepsLabel": "How it works",
         "stepLabel": "Step {n} of {total}",
         "steps": {
-          "say": { "title": "Say what you want", "text": "Describe the look in a sentence and add one reference photo. That's all we need." },
-          "vote": { "title": "Everyone votes", "text": "Other sellers vote for the wishes they want too. The most-wanted get built first." },
-          "ship": { "title": "Shipped and pinned", "text": "A finished template is pinned to the top of the wall. One tap to use it." }
+          "say": {
+            "title": "Say what you want",
+            "text": "Describe the look in a sentence and add one reference photo. That's all we need."
+          },
+          "vote": {
+            "title": "Everyone votes",
+            "text": "Other sellers vote for the wishes they want too. The most-wanted get built first."
+          },
+          "ship": {
+            "title": "Shipped and pinned",
+            "text": "A finished template is pinned to the top of the wall. One tap to use it."
+          }
         },
         "example": "We do 2nd cup half price every Wednesday. I want a fresh promo poster I can reuse every week",
         "exampleAuthor": "M***",
@@ -1439,7 +1467,17 @@
       "unavailable": "That template isn’t available right now, so it wasn’t saved.",
       "failed": "Couldn’t save that change. Check your connection and try again.",
       "close": "Close",
-      "pickerGroup": "Saved"
+      "pickerGroup": "Saved",
+      "emptyTitle": "No saved templates yet",
+      "emptyText": "Tap the heart on a template card or in its dialog to save it here.",
+      "emptyBrowse": "Browse templates",
+      "mine": "Saved templates"
+    },
+    "share": {
+      "button": "Share",
+      "copied": "Link copied",
+      "text": "A phone photo made into this with the {name} template on Shotviva:",
+      "copyByHand": "Copy this link to share it:"
     }
   },
   "paywall": {
@@ -2049,5 +2087,29 @@
       "failed": "The report did not go through. Please try again."
     },
     "footerLink": "Gallery"
+  },
+  "share": {
+    "metaTitle": "{name} · Shotviva template",
+    "metaDescription": "Turn a phone photo into a polished image with the {name} template on Shotviva.",
+    "ogAlt": "An AI result made with the {name} template",
+    "kicker": "Shotviva template · {category}",
+    "hint": "Left: the phone photo. Right: the AI result. Tap the image to zoom.",
+    "series": "Series · {name} · {count, plural, one {# template} other {# templates}}",
+    "make": "Make one with this template",
+    "browse": "Browse all templates",
+    "signUp": "Sign up free to use this template",
+    "signUpNote": "You come straight back to this template after signing up. Add a photo and go.",
+    "look": "Look at other templates first",
+    "missingTitle": "This template isn’t available",
+    "missingText": "It may have been taken down or changed. Have a look at the other templates.",
+    "missingBrowse": "See other templates"
+  },
+  "supportEmail": {
+    "subject": "You have a reply from Shotviva support",
+    "title": "Your ticket has a new reply",
+    "body": "We've replied to your support ticket. Open it to read the reply and continue the conversation.",
+    "button": "View the reply",
+    "fallback": "If the button doesn't work, copy and paste this link into your browser:",
+    "footer": "This is an automated email, please don't reply to it. Reply in your ticket on Shotviva instead."
   }
 }

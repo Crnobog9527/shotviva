@@ -719,12 +719,24 @@
   .mk-pk-t small { display: block; margin-top: 2px; font-size: 14px; color: var(--muted-foreground); }
   .mk-pk-row[aria-checked="true"] { background: var(--wash); box-shadow: inset 0 0 0 1.5px var(--foreground); }
   .mk-pk-go { position: sticky; bottom: 0; margin-top: 4px; padding-top: 12px; background: linear-gradient(transparent, var(--popover) 40%); }
-  @media (hover: hover) { .mk-pk-row[aria-checked="false"]:hover { background: var(--wash-faint); box-shadow: inset 0 0 0 1px var(--border); } }
+  /* search and chips over the list (Owner 2026-11-13); a series row opens its members in place */
+  .mk-pk-tools { display: grid; gap: 10px; margin-top: 16px; }
+  .mk-pk-none { padding: 24px 4px; font-size: 14px; color: var(--muted-foreground); }
+  .mk-pk-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px 0 4px; border-radius: var(--radius-button); font: 500 14px/1 var(--font-sans); color: var(--bone-dim); justify-self: start; }
+  .mk-pk-stack { position: relative; flex: none; border-radius: 12px; box-shadow: 3px -3px 0 -1px var(--accent), 6px -6px 0 -2px var(--secondary); margin: 6px 6px 0 0; }
+  .mk-pk-stack .mk-pk-th { display: block; }
+  @media (max-width: 767.98px) { .mk-pk-body[data-searching] .mk-pk-sample { display: none; } }
+  @media (hover: hover) {
+    .mk-pk-row[aria-checked="false"]:hover, .mk-pk-row:not([aria-checked]):hover { background: var(--wash-faint); box-shadow: inset 0 0 0 1px var(--border); }
+    .mk-pk-back:hover { color: var(--foreground); }
+  }
   @media (min-width: 768px) {
     .mk-picker { max-height: calc(100dvh - 64px); overflow: hidden; }
+    .mk-pk-tools { margin-top: 12px; }
     .mk-pk-body { display: grid; grid-template-columns: 46% minmax(0, 1fr); column-gap: 32px; align-items: start; padding: 24px; }
     .mk-pk-sample { margin-top: 0; }
-    .mk-pk-side { max-height: calc(100dvh - 112px); }
+    /* a fixed height, so the dialog does not jump as chips and searches change the list */
+    .mk-pk-side { height: min(640px, calc(100dvh - 112px)); }
     .mk-pk-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
   }
 

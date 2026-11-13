@@ -27,4 +27,9 @@ describe('admin catalogue filters and groups', () => {
     expect(catalogSections(rows, 'all', false, options).map(g => [g.orderGroup, g.rows]))
       .toEqual([['active', [single, earlier]], ['inactive', [member]]])
   })
+
+  it('shows 已删除 as one plain section, never reorderable', () => {
+    expect(catalogSections([member], 'deleted', false, options)).toEqual([{ id: 'deleted', title: null, orderGroup: null, rows: [member] }])
+    expect(catalogSections([member], 'deleted', true, options)[0]?.orderGroup).toBeNull()
+  })
 })

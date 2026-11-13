@@ -23,6 +23,7 @@ export { addTicketMessage, createTicket, markTicketSeen, type NewTicketImages } 
 export { showMessages, withTicketImages, type ImageTarget, type TicketImageRow } from './images'
 export { PICKER_LIMIT, hasUnreadReply, listMyTickets, listPaymentOptions, listWorkOptions, loadMyThread } from './reads'
 export { decideRefund, listAdminTickets, loadAdminTicket, openTicketCount, replyTicket, ticketAuthor } from './admin'
+export { notifyTicketReply, renderReplyEmail, ticketLink, type ReplyEmailOutcome } from './reply-email'
 export { ReplyTime } from './reply-time'
 export { SupportTabBadge } from './tab-badge'
 export { formError, type Choice, type FormState } from './ui/form-state'

@@ -1,26 +1,14 @@
-import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
+import { redirect } from 'next/navigation'
 
-import { AdminPage } from '@/core/admin'
-import { INQUIRIES_COPY, InquiryDetailView } from '@/core/admin/inquiries-ui'
-import { createAdminSupabase, requireAdmin } from '@/core/auth'
-import { loadAdminInquiry } from '@/core/inquiries'
-
-import { saveInquiryAction } from '../actions'
+import { requireAdmin } from '@/core/auth'
+import { INQUIRY_PARAM, withRecord } from '@/core/admin/shell/record-dialog-url'
 
 export const instant = false
 
-export const metadata: Metadata = { title: INQUIRIES_COPY.detailTitle }
-
-// One inquiry by primary key, every field, and the follow-up form.
+// Old inquiry address (alerts, bookmarks): an inquiry now opens as a dialog over the list, so this
+// lands there with the dialog open. The id is checked by the dialog's read.
 export default async function AdminInquiryPage({ params }: PageProps<'/[locale]/admin/inquiries/[id]'>) {
   await requireAdmin()
   const { id } = await params
-  const inquiry = await loadAdminInquiry(createAdminSupabase(), id)
-  if (!inquiry) notFound()
-  return (
-    <AdminPage title={INQUIRIES_COPY.detailTitle}>
-      <InquiryDetailView inquiry={inquiry} actions={{ save: saveInquiryAction }} />
-    </AdminPage>
-  )
+  redirect(withRecord('/admin/inquiries', INQUIRY_PARAM, id))
 }

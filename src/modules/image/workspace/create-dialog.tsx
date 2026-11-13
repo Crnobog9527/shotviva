@@ -10,7 +10,9 @@ import { navTypesFor } from '@/core/ui/nav-motion'
 import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { preloadBatchDialog } from '../matrix/batch-dialog-slot'
 import { openBatch } from '../matrix/batch-query'
-import { isCompareSample, TemplateSample } from '../catalogue/template-sample'
+import { isCompareSample } from '../catalogue/template-sample'
+import { ZoomableSample } from '../catalogue/zoomable-sample'
+import { ShareButton } from '../share/share-button'
 import { FavoriteButton } from '../favorites/favorite-button'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
@@ -64,10 +66,11 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
       description={[template.categoryName, template.description].filter(Boolean).join(' · ')}
       hint={t(tall ? 'hintCompare' : 'hintPair')}
       tall={tall}
+      share={<ShareButton template={template} />}
       folded={draft.photos.photos.length > 0}
       sample={
         <div className="relative max-md:h-full">
-          <TemplateSample template={template} className="max-md:h-full max-md:aspect-auto" />
+          <ZoomableSample template={template} className="max-md:h-full max-md:aspect-auto" />
           {/* The save heart (T83) takes the right corner the Phone / AI tags leave free. */}
           <FavoriteButton template={template} surface="create_dialog" className={tall ? 'right-1 bottom-1' : 'top-1 right-1'} />
         </div>

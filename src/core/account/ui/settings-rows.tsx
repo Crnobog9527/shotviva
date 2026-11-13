@@ -20,6 +20,7 @@ export function SettingsRows({ email, phone, purchases, morePurchases, helpUnrea
   const t = useTranslations('app.account.settings')
   const affiliateT = useTranslations('affiliate')
   const adminT = useTranslations('adminEntry')
+  const favoritesT = useTranslations('app.favorites')
   return (
     <RowsPanel>
       {admin ? (
@@ -34,6 +35,11 @@ export function SettingsRows({ email, phone, purchases, morePurchases, helpUnrea
           <RowValue />
         </Link>
       )}
+      {/* 我的收藏 (Owner 2026-11-13): Create opened on its Saved filter. */}
+      <Link href="/generate?saved=1" className={rowClass}>
+        {favoritesT('mine')}
+        <RowValue />
+      </Link>
       {phone ? <FactRow label={t('phone')} value={phone} /> : null}
       {email || !phone ? <FactRow label={t('email')} value={email} /> : null}
       <LanguageRow />

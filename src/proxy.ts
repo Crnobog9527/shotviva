@@ -10,6 +10,7 @@ import { captureCodeLink } from '@/core/codes/link'
 import { isBadGalleryPage } from '@/core/gallery/page-number'
 import { galleryWorkIdOf, liveGalleryGate } from '@/core/gallery/proxy-gate'
 import { serverEnv } from '@/core/env'
+import { viaImageCdn } from '@/core/storage/image-cdn-guard'
 import { routing } from '@/core/i18n/routing'
 import { canonicalRedirectResponse, withHostNoindex } from '@/core/seo'
 import { site } from '@/site/site.config'
@@ -28,9 +29,15 @@ const localeRouter = createMiddleware(routing)
 // answer with real statuses before rendering; pages still call requireUser()/requireAdmin().
 // Every response gets X-Robots-Tag while indexing is closed or off-domain, and the analytics
 // region cookie (T70).
+// Pages and APIs never answer through the image CDN (core/storage/image-cdn-guard.ts); then the
+// canonical-host redirect.
+function earlyResponse(request: NextRequest) {
+  return viaImageCdn(request.headers) ? notFoundResponse() : canonicalRedirectResponse(request, hosts)
+}
+
 export async function proxy(request: NextRequest) {
-  const redirect = canonicalRedirectResponse(request, hosts)
-  if (redirect) return redirect
+  const early = earlyResponse(request)
+  if (early) return early
   if (/^\/admin-media\/(references|prompt-lab)\//.test(request.nextUrl.pathname)) {
     const { referenceMedia } = await import('@/core/admin/reference-library/media-proxy')
     return referenceMedia(request)

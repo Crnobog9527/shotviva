@@ -62,7 +62,6 @@ const STATUSES: Record<InquiryStatus, string> = { new: '新咨询', contacted: '
 export const INQUIRIES_COPY = {
   title: '企业咨询',
   detailTitle: '企业咨询详情',
-  back: '← 返回企业咨询列表',
   empty: '还没有符合条件的企业咨询。',
   nextPage: '下一页 →',
   firstPage: '← 回到第一页',

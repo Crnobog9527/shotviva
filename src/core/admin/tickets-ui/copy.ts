@@ -2,7 +2,6 @@
 export const TICKETS_COPY = {
   title: '工单',
   detailTitle: '工单详情',
-  back: '← 返回工单列表',
   empty: '没有符合条件的工单。',
   nextPage: '下一页 →',
   firstPage: '← 回到第一页',

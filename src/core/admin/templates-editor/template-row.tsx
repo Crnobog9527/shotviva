@@ -8,7 +8,7 @@ import { TableCell, TableRow } from '@/core/ui/table'
 
 import type { AdminTemplate } from '../templates/types'
 import { DragHandle, MoveButtons, sortableRowClass, useSortableItem } from '../ui/sortable'
-import { bulkCopy, featuredCopy } from './copy'
+import { bulkCopy, featuredCopy, rowCopy } from './copy'
 import { summaryPrice } from './tier-price'
 import { canFeature } from './featured-state'
 import { ActionsCell, NameCell } from './row-cells'
@@ -20,6 +20,8 @@ export type RowHandlers = {
   pending: boolean
   onDuplicate: (id: string) => void
   onEdit: (template: AdminTemplate) => void
+  // 删除 (Owner 2026-11-13): shown on unpublished, non-built-in rows; opens the confirmation.
+  onDelete: (template: AdminTemplate) => void
   onToggle: (template: AdminTemplate, active: boolean) => void
   // 首页精选 (T53): whether the list is full or held by an unsaved arrangement, and the switch handler.
   featuredState: { full: boolean; locked: boolean }
@@ -45,6 +47,7 @@ export function TemplateRow(props: Props) {
         <Checkbox
           aria-label={bulkCopy.selectRow(template.name)}
           checked={checked}
+          disabled={!!template.deletedAt}
           onCheckedChange={(on) => onSelect(template.id, on === true)}
         />
       </TableCell>
@@ -53,6 +56,7 @@ export function TemplateRow(props: Props) {
           <DragHandle handle={item.handle} />
           <MoveButtons item={item} />
         </div>
+        <span className="text-muted-foreground block text-xs tabular-nums" title={rowCopy.orderNumberHint}>{rowCopy.orderNumber(template.sortOrder)}</span>
       </TableCell>
       <NameCell template={template} />
       <TableCell>
@@ -83,7 +87,7 @@ export function TemplateRow(props: Props) {
       <TableCell>
         <Switch
           checked={template.isActive}
-          disabled={pending}
+          disabled={pending || !!template.deletedAt}
           aria-label={`${template.isActive ? '下架' : '上架'} ${template.name}`}
           onCheckedChange={(checked) => onToggle(template, checked)}
         />
@@ -91,7 +95,7 @@ export function TemplateRow(props: Props) {
       <TableCell>
         <FeaturedSwitch template={template} state={featuredState} pending={pending} onFeature={onFeature} />
       </TableCell>
-      <ActionsCell template={template} pending={pending} onDuplicate={props.onDuplicate} onEdit={onEdit} />
+      <ActionsCell template={template} pending={pending} onDuplicate={props.onDuplicate} onEdit={onEdit} onDelete={props.onDelete} />
     </TableRow>
   )
 }

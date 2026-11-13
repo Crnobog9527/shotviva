@@ -197,6 +197,21 @@ export const ANALYTICS_COPY = {
       buyers: { label: '用后付款', help: '用过这个模板、之后在这段时间内付了款的人数；一个人用过几个模板，每个模板都算一次。' },
     } satisfies Record<string, Metric>,
   },
+  shares: {
+    title: '模板分享',
+    desc: '模板弹窗里点「分享」发出的链接：有多少人分享、多少人打开、打开后注册和出第一张图的人数。都按人数算，同一个人只算一次。',
+    step: '环节',
+    people: '人数',
+    events: '次数',
+    metrics: {
+      shares: { label: '分享', help: '在模板弹窗里点了「分享」（复制链接或用手机分享面板发出）的人数。' },
+      opens: { label: '打开分享链接', help: '打开过模板分享页的人数，登录和未登录都算。' },
+      signedOutOpens: { label: '其中未登录', help: '打开分享页时还没登录的人数，也就是可能被拉来注册的人。' },
+      signupStarts: { label: '点了注册', help: '在分享页上点「免费注册，用这个模板」的人数。' },
+      signups: { label: '注册成功', help: '注册前打开过分享链接（30 天内）的新用户人数。' },
+      firstPhotos: { label: '用分享的模板出图', help: '打开分享链接后，第一次用这个模板开始出图的人数。' },
+    } satisfies Record<string, Metric>,
+  },
   problems: {
     title: '体验问题',
     desc: '上传和出图失败了多少、最常见的原因，以及各页面在用户手机和电脑上真实打开有多快。',

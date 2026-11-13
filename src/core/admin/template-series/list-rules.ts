@@ -4,24 +4,30 @@ export type SeriesRow = {
   id: string; name_zh: string; slug: string; is_active: boolean; show_members: boolean; sort_order: number
   cover_url: string | null
 }
-export type SeriesListItem = SeriesRow & { thumb: { url: string; kind: 'custom' | 'auto' } | null }
+// `before`: the member's 原图 when the thumbnail is that member's cover, for the large preview.
+export type SeriesThumb = { url: string; kind: 'custom' | 'auto'; before?: string }
+export type SeriesListItem = SeriesRow & { thumb: SeriesThumb | null }
 type Member = {
   series_id: string; is_active: boolean; visible_in: string[]
-  cover_after_url: string | null; cover_locales: Record<string, unknown> | null
+  cover_after_url: string | null; cover_before_url?: string | null; cover_locales: Record<string, unknown> | null
 }
 
 function memberCover(member: Member) {
-  const localized = (locale: string) => {
-    const value = member.cover_locales?.[locale]
-    return value && typeof value === 'object' && 'after' in value && typeof value.after === 'string' ? value.after : null
+  const localized = (locale: string, slot: 'after' | 'before') => {
+    const value: unknown = member.cover_locales?.[locale]
+    if (!value || typeof value !== 'object' || !(slot in value)) return null
+    const url: unknown = (value as Record<string, unknown>)[slot]
+    return typeof url === 'string' ? url : null
   }
-  return member.cover_after_url ?? localized('zh') ?? localized('en')
+  const after = member.cover_after_url ?? localized('zh', 'after') ?? localized('en', 'after')
+  const before = member.cover_before_url ?? localized('zh', 'before') ?? localized('en', 'before')
+  return after ? { url: after, ...(before ? { before } : {}) } : null
 }
 
 // `members` come ordered by series_sort_order, as the public card reads them.
 export function autoCovers(rows: readonly SeriesRow[], members: readonly Member[]): SeriesListItem[] {
   // As web_catalogue_entries: the first member shown on the site, whether or not it has a cover.
-  const first = new Map<string, string | null>()
+  const first = new Map<string, ReturnType<typeof memberCover>>()
   for (const member of members) {
     if (member.is_active && member.visible_in.includes('web') && !first.has(member.series_id)) {
       first.set(member.series_id, memberCover(member))
@@ -29,7 +35,7 @@ export function autoCovers(rows: readonly SeriesRow[], members: readonly Member[
   }
   return rows.map(row => {
     const auto = first.get(row.id)
-    const thumb = row.cover_url ? { url: row.cover_url, kind: 'custom' as const } : auto ? { url: auto, kind: 'auto' as const } : null
+    const thumb: SeriesThumb | null = row.cover_url ? { url: row.cover_url, kind: 'custom' } : auto ? { ...auto, kind: 'auto' } : null
     return { ...row, thumb }
   })
 }

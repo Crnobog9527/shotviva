@@ -1,5 +1,5 @@
 // /admin/inquiries UI (T86, Chinese only, copy in copy.ts). Data and writes come from '@/core/inquiries'.
 export { INQUIRIES_COPY } from './copy'
 export { InquiriesView } from './inquiries-view'
-export { InquiryDetailView } from './inquiry-detail'
+export { InquiryDialogHost } from './inquiry-dialog'
 export type { InquiryAdminActions } from './follow-up-form'

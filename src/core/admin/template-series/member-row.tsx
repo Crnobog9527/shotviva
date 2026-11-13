@@ -1,4 +1,5 @@
 import { Button } from '@/core/ui/button'
+import { PreviewThumb } from '../ui/image-preview'
 import { DragHandle, MoveButtons, sortableRowClass, useSortableItem } from '../ui/sortable'
 import { seriesCopy as copy } from './copy'
 import type { SeriesCandidate } from './types'
@@ -12,9 +13,11 @@ export function MemberRow({ member, remove, currentCover, chooseCover }: {
     <li {...item.row} className={`${sortableRowClass} flex flex-wrap items-center gap-2 border-b py-1.5`}>
       <DragHandle handle={item.handle} /><MoveButtons item={item} />
       {member.cover_url && (
-        // The member preview uses the same public still URL that can be picked as the cover.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={member.cover_url} alt="" width={40} height={50} loading="lazy" className="h-12 w-10 rounded object-contain" />
+        <PreviewThumb title={member.name} images={[{ url: member.cover_url }]}>
+          {/* The member preview uses the same public still URL that can be picked as the cover. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={member.cover_url} alt="" width={40} height={50} loading="lazy" className="h-12 w-10 rounded object-contain" />
+        </PreviewThumb>
       )}
       <div className="mr-auto min-w-0">
         <p className="break-words text-sm">{member.name}</p>

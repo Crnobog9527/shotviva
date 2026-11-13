@@ -12,6 +12,7 @@ import { PostHogQueryError, queryRunner, type RunQuery } from './posthog-query'
 import { loadProblems, type Problems } from './problems'
 import { windowFor, type Range, type Window } from './range'
 import { loadTraffic, type Traffic } from './traffic'
+import { loadShares, type ShareFunnel } from './shares'
 import { loadTemplates, type TemplateRow } from './templates'
 
 // One cached read per block (ARCHITECTURE §16.2a: 10 minutes, keyed by the range and, for the
@@ -73,6 +74,13 @@ async function cachedTemplates(range: Range) {
   return { window, data: await loadTemplates(runner(), window) }
 }
 
+async function cachedShares(range: Range) {
+  'use cache'
+  profile()
+  const window = windowFor(range, new Date())
+  return { window, data: await loadShares(runner(), window) }
+}
+
 async function cachedProblems(range: Range) {
   'use cache'
   profile()
@@ -100,4 +108,5 @@ export const readPayment = (range: Range): Promise<Block<Payment>> => readBlock(
 export const readActivation = (range: Range, giftCredits: number): Promise<Block<Activation>> =>
   readBlock('activation', () => cachedActivation(range, giftCredits))
 export const readTemplates = (range: Range): Promise<Block<TemplateRow[]>> => readBlock('templates', () => cachedTemplates(range))
+export const readShares = (range: Range): Promise<Block<ShareFunnel>> => readBlock('shares', () => cachedShares(range))
 export const readProblems = (range: Range): Promise<Block<Problems>> => readBlock('problems', () => cachedProblems(range))
