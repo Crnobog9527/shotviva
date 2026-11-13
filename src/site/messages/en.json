@@ -650,6 +650,10 @@
         "footer": "Footer",
         "pending": "has lines to check"
       },
+      "pages": {
+        "shared": "Both pages",
+        "page": "Page {page} · {name}"
+      },
       "flagged": "Not found in your pasted text, or cut to fit. Check it.",
       "header": {
         "brand": "Organiser",

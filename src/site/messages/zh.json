@@ -650,6 +650,10 @@
         "footer": "页脚",
         "pending": "有待核对的行"
       },
+      "pages": {
+        "shared": "两页共用",
+        "page": "第{page}页 · {name}"
+      },
       "flagged": "原文里找不到这一项，或太长被截短了，请核对。",
       "header": {
         "brand": "主办方",

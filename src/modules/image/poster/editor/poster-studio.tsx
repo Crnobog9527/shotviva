@@ -3,7 +3,6 @@
 import { useTranslations } from 'next-intl'
 
 import type { Balance } from '@/core/billing/pools'
-import type { PosterBlock } from '@/core/poster'
 import { Button } from '@/core/ui/button'
 
 import type { PosterStudioState, StudioTemplate } from '../use-poster-studio'
@@ -28,7 +27,7 @@ export function StudioForm({ studio, template, balance }: Props) {
           <p className="whitespace-pre-wrap text-muted-foreground">{studio.draft.source}</p>
         </details>
       ) : null}
-      <BlockTabs blocks={blocksOf(template)} unverified={studio.draft.unverified} content={studio.draft.content}
+      <BlockTabs poster={template.poster} unverified={studio.draft.unverified} content={studio.draft.content}
         flagged={(path) => studio.draft.unverified.includes(path)} onChange={studio.edit} />
       <GeneratePanel studio={studio} template={template} balance={balance} />
       <Button variant="ghost" className="min-h-11" onClick={studio.toPaste}>{t('backToPaste')}</Button>
@@ -41,8 +40,3 @@ export function StudioBar({ studio, template, balance }: Props) {
   return studio.draft.step === 'paste' ? <SortButton studio={studio} /> : <GenerateButton studio={studio} template={template} balance={balance} />
 }
 
-// The template's blocks in a fixed reading order, each once.
-function blocksOf(template: StudioTemplate): PosterBlock[] {
-  const used = new Set(template.poster.kinds.flatMap((kind) => kind.blocks))
-  return (['header', 'prizes', 'sections', 'table', 'footer'] as const).filter((block) => used.has(block))
-}
