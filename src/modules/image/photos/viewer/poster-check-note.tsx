@@ -44,7 +44,7 @@ export function PosterCheckNote({ poster, templateName, onRedraw }: { poster: Po
           {poster.freeRedraw ? t('redrawFree') : t('redraw', { credits: poster.redo.credits })}
         </button>
         {showDiffs ? <button type="button" onClick={() => setDismissed(true)} className={buttonVariants({ variant: 'ghost', size: 'touch' })}>{t('dismiss')}</button> : null}
-        <Link href={`/posters/${poster.redo.templateId}`} className={buttonVariants({ variant: 'ghost', size: 'touch' })}>{t('editText')}</Link>
+        <Link href={`/generate?poster=${encodeURIComponent(poster.redo.templateId)}`} className={buttonVariants({ variant: 'ghost', size: 'touch' })}>{t('editText')}</Link>
       </div>
     </section>
   )
