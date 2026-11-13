@@ -1420,6 +1420,18 @@ end $$;
 ALTER FUNCTION "admin"."guard_deleted_template"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."is_seedream_route"("p_provider" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select exists(select from public.ai_providers p where p.id=p_provider and p.module='image'
+    and (p.adapter='ark_images' or (p.adapter='openrouter_images' and p.model ilike '%seedream%')))
+$$;
+
+
+ALTER FUNCTION "admin"."is_seedream_route"("p_provider" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."is_template_catalog_v2"() RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -1867,6 +1879,29 @@ $$;
 
 
 ALTER FUNCTION "admin"."reference_tags_valid"("p_tags" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."relabel_seedream_rebind"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if new.provider_id is distinct from old.provider_id
+     and old.active_profile='openai' and new.active_profile='openai'
+     and admin.provider_profile(new.provider_id)='seedream'
+     and admin.is_seedream_route(old.provider_id)
+     and not exists(select from public.template_profiles where template_id=new.template_id and profile='seedream') then
+    update public.template_profiles set profile='seedream', updated_at=now()
+      where template_id=new.template_id and profile='openai';
+    update public.template_prompt_versions v set profile='seedream'
+      where v.template_id=new.template_id and v.profile='openai' and admin.is_seedream_route(v.provider_id);
+    new.active_profile := 'seedream';
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."relabel_seedream_rebind"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."remove_unpublished_series_members"() RETURNS integer
@@ -16861,6 +16896,10 @@ CREATE OR REPLACE TRIGGER "template_prompts_default_profile" BEFORE INSERT ON "p
 
 
 
+CREATE OR REPLACE TRIGGER "template_prompts_seedream_rebind" BEFORE UPDATE OF "provider_id" ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "admin"."relabel_seedream_rebind"();
+
+
+
 CREATE OR REPLACE TRIGGER "template_prompts_style_refs" BEFORE INSERT OR UPDATE ON "public"."template_prompts" FOR EACH ROW EXECUTE FUNCTION "admin"."apply_style_refs"();
 
 
@@ -18157,6 +18196,11 @@ REVOKE ALL ON FUNCTION "admin"."guard_deleted_template"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "admin"."is_seedream_route"("p_provider" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."is_seedream_route"("p_provider" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."is_template_catalog_v2"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."is_template_catalog_v2"() TO "service_role";
 
@@ -18237,6 +18281,10 @@ REVOKE ALL ON FUNCTION "admin"."queue_test_asset_removal"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "admin"."reference_tags_valid"("p_tags" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."reference_tags_valid"("p_tags" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."relabel_seedream_rebind"() FROM PUBLIC;
 
 
 
