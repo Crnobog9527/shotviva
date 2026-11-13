@@ -7,7 +7,7 @@ export const seriesCopy = {
   members: '系列成员', emptyMembers: '尚未选择成员', remove: '移出', add: '加入', included: '已加入',
   other: '已属其他系列', search: '按模板名称或标识搜索', searchButton: '搜索', more: '加载更多',
   candidates: '选择模板', noMatch: '没有匹配的模板', memberCover: '设为系列封面', usingCover: '当前封面',
-  cover: '系列封面', coverHint: '可选成员封面，或填写图片的 HTTPS 地址。留空会使用首个前台可见成员的封面。',
+  coverField: '系列封面', coverHint: '可选成员封面，或填写图片的 HTTPS 地址。留空会使用首个前台可见成员的封面。',
   autoCover: '恢复自动封面', automatic: '自动选择', save: '保存系列', busy: '保存中…', status: '状态',
   invalid: '请填写中英文名称、分类、合法的网址标识和排序，并检查封面地址。',
   slugHint: '仅限小写字母、数字和短横线', next: '下一页', first: '第一页', noCategory: '请选择分类',
@@ -19,4 +19,13 @@ export const seriesCopy = {
   invalidCategory: '请选择有效的模板分类。', slugTaken: '这个系列网址标识已被使用。',
   forbidden: '只有管理员可以修改系列。', transient: '操作失败，请重试。',
   seriesSearch: '按系列中文名搜索', noSeriesMatch: '没有匹配的系列', saved: '系列已保存', selectStatus: '展示方式', separate: '系列及独立成员', onlySeries: '仅系列',
+  // 系列管理 list tools (Owner 2026-11-12).
+  cover: '封面', coverCustom: '自定义', coverAuto: '自动', noCover: '无封面', drag: '排序',
+  dragFiltered: '搜索时不能拖动排序，请先清空搜索。', orderSaved: '顺序已保存', orderFailed: '顺序没保存，已退回原来的顺序。',
+  listChanged: '系列列表已被修改，请刷新页面后重试。', batchInvalid: '批量操作的参数不对，请重新选择。',
+  selectAll: '全选', selectRow: (name: string) => `选择 ${name}`, selected: (n: number) => `已选 ${n} 个系列`, clear: '取消选择',
+  batchPublish: '上架', batchUnpublish: '下架', batchShowOn: '开启成员单独展示', batchShowOff: '关闭成员单独展示',
+  batchTitle: (label: string, n: number) => `${label} ${n} 个系列？`, batchConfirm: '确认', batchReason: '下架原因（必填）',
+  batchDone: (label: string, changed: number, total: number) => `已${label}：${changed} 个有变化，${total - changed} 个本来就是这样。`,
+  productionNote: '正式站的系列会被测试站同步覆盖，请在测试站修改。',
 } as const

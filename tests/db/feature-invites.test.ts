@@ -9,7 +9,7 @@ import { featureAllowed, isInvited } from '@/core/features'
 import { connectAdmin, createUser, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
-// Invite-only features (1312 / 1313): admin_set_feature_grant through the admin command, the list
+// Invite-only features (1342 / 1343): admin_set_feature_grant through the admin command, the list
 // the admin page shows, and the gate requireFeature applies. Keys are unique per run.
 
 let db: Client

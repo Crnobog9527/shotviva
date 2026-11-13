@@ -20,6 +20,8 @@ export type PhotoItem = {
   createdAt: string
   creditPool: CreditPool
   visibility: JobVisibility
+  // A poster work (gallery-excluded, §9 第 7 条): private even when free; its edits are too.
+  privateOnly?: boolean
   fileUrl: string | null
   // The small copy lists show (ARCHITECTURE §8.3「作品小图」): the thumbnail route, or for Photos'
   // first screen a signed URL of the copy itself. Null like fileUrl while the job runs.
@@ -52,6 +54,7 @@ export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string
     createdAt: job.createdAt.toISOString(),
     creditPool: job.creditPool,
     visibility: job.visibility,
+    privateOnly: job.galleryExcluded ?? false,
     fileUrl,
     thumbUrl: fileUrl ? (signedThumb ?? thumbUrlFor(job.id)) : null,
     transparent: isCutOut(job),

@@ -16,7 +16,7 @@ import { EXTRACT_JSON_SCHEMA, toContent } from './extract-schema'
 // 整理内容 (ARCHITECTURE §5.3): pasted notice text → the five blocks, by the active 'decision'
 // provider with strict structured output. The instructions are the template's own, private
 // (template_prompts.model_params.poster_extract.instructions). Every call is recorded with its
-// tokens and cost (poster_extractions, 1315); the text itself never is. A failure is not an
+// tokens and cost (poster_extractions, 1345); the text itself never is. A failure is not an
 // error for the user: the editor then starts empty with the pasted text beside it.
 
 export const EXTRACT_PER_HOUR = 30

@@ -14,7 +14,7 @@ import { fakeProvider } from './generation-fixtures'
 import { connectAdmin, createUser, publishFixture } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
-// Dense-text posters (ARCHITECTURE §5.3, 1314): a confirmed set is saved, each poster is an
+// Dense-text posters (ARCHITECTURE §5.3, 1344): a confirmed set is saved, each poster is an
 // ordinary generation job whose prompt carries that poster's text, read back from the set.
 
 let db: Client

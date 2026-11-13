@@ -111,6 +111,7 @@ CREATE OR REPLACE FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_re
     where g.provider=p_tag and g.inputs->>'resolution'=p_resolution
       and g.inputs ? 'quality' and g.inputs->>'quality'=p_quality
       and g.created_at>=now()-interval '30 days' and g.status='succeeded' and g.cost_usd is not null
+      and not (g.inputs ? 'input_slots')
   ), sources as (
     select r.adapter, m.n,
       -- Through jsonb as admin_image_provider_pricing returns it, so the rounding is unchanged.
@@ -441,7 +442,7 @@ begin
           percentile_cont(0.95) within group (order by cost_usd) p95
         from public.generation_jobs where provider like 'env/%' and status='succeeded'
           and cost_usd is not null and created_at >= now()-interval '30 days'
-          and inputs ? 'quality' and inputs->>'quality'=t.quality
+          and inputs ? 'quality' and inputs->>'quality'=t.quality and not (inputs ? 'input_slots')
         group by 1,2 having count(*)>=10
       ) per_model group by r
     ) per_tier;
@@ -457,11 +458,11 @@ begin
     -- T96 never sells unsupported resolutions on this model. Those fields keep
     -- their existing positive placeholder; fallback reservations have their own check.
     if bound is not null then
-      if not (tier=any(supported)) or admin.alternate_route_meets_floor(route_tag,tier,t.quality,(t.credits_cost->>tier)::int)
+      if not (tier=any(supported)) or admin.alternate_route_meets_floor(route_tag,tier,t.quality,(t.credits_cost->>tier)::int/admin.slot_floor_factor(t))
           then continue; end if;
     else
       usd := coalesce((env_p95->>tier)::numeric,(openai_usd->>tier)::numeric);
-      if budget>0 and (t.credits_cost->>tier)::int >= greatest(ceil(usd*1.10/budget),(openai_min->>tier)::int)
+      if budget>0 and (t.credits_cost->>tier)::int >= greatest(ceil(usd*1.10/budget),(openai_min->>tier)::int)*admin.slot_floor_factor(t)
           then continue; end if;
     end if;
     raise exception 'TEMPLATE_PRICE_BELOW_FLOOR' using detail=format('模板 %s 的 %s 售价低于模型成本下限或缺少报价，请刷新报价后再保存。',t.id,tier);
@@ -1228,6 +1229,21 @@ $$;
 ALTER FUNCTION "admin"."copy_template_price_marks"("p_source" "text", "p_target" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."default_category_gallery_excluded"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if new.key = 'posters' and new.parent_id is null then
+    new.gallery_excluded := true;
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."default_category_gallery_excluded"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") RETURNS numeric
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -1246,7 +1262,7 @@ CREATE OR REPLACE FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_res
       where g.provider=p_tag and g.inputs->>'resolution'=p_resolution
         and g.inputs ? 'quality' and g.inputs->>'quality'=p_quality
         and g.status='succeeded' and g.cost_usd is not null
-        and g.created_at>=now()-interval '30 days'
+        and g.created_at>=now()-interval '30 days' and not (g.inputs ? 'input_slots')
       having count(*)>=10
   ), priced as (
     select adapter, greatest(
@@ -1292,18 +1308,46 @@ begin
   if not v2 then return true; end if;
   if not coalesce(sale.enabled,false) then return false; end if;
   if route like 'env/_%' then
-    return coalesce(price>=admin.fallback_route_floor(route,tier,t.quality),false);
+    return coalesce(price>=admin.fallback_route_floor(route,tier,t.quality)*admin.slot_floor_factor(t),false);
   end if;
   select * into p from public.ai_providers
     where module='image' and id::text=split_part(route,'/',1) and id::text||'/'||model=route;
   if not found or not (tier=any(admin.sale_route_resolutions(p))) then return false; end if;
   approved:=admin.template_approved_price(p.id,t.id);
   if approved->>'quality'=t.quality and (approved->'costs'->>tier)::int=price then return true; end if;
-  return admin.alternate_route_meets_floor(route,tier,t.quality,price);
+  return admin.alternate_route_meets_floor(route,tier,t.quality,price/admin.slot_floor_factor(t));
 end $$;
 
 
 ALTER FUNCTION "admin"."job_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "v2" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."keep_gallery_excluded_private"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if tg_op = 'INSERT' then
+    new.gallery_excluded := new.gallery_excluded
+      or exists (
+        select 1 from public.templates t
+          join public.template_category_paths p on p.key = coalesce(t.subcategory_key, t.category_key)
+          join public.template_categories r on r.key = p.root_key
+         where t.id = new.template_id and r.gallery_excluded)
+      or exists (
+        select 1 from public.generation_jobs parent
+         where parent.id = new.parent_job_id and parent.gallery_excluded);
+  elsif old.gallery_excluded and not new.gallery_excluded then
+    raise exception 'GALLERY_EXCLUDED_IMMUTABLE';
+  end if;
+  if new.gallery_excluded then
+    new.visibility := 'private';
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."keep_gallery_excluded_private"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."lock_prompt_lab"("p_session_id" "uuid") RETURNS "void"
@@ -1763,7 +1807,7 @@ begin
     select from public.template_prompts tp join public.ai_providers p on p.id=tp.provider_id
     where tp.template_id=t.id and route is distinct from p.id::text||'/'||p.model
   ) then
-    if not coalesce(price>=admin.fallback_route_floor(route,tier,t.quality),false) then return false; end if;
+    if not coalesce(price>=admin.fallback_route_floor(route,tier,t.quality)*admin.slot_floor_factor(t),false) then return false; end if;
   end if;
   if v2 and exists (
     select from admin.template_price_snapshots s join admin.template_price_batches b on b.id=s.batch_id
@@ -1771,8 +1815,8 @@ begin
     where b.reverted_at is null and s.template_id=t.id and c.quality=t.quality
       and c.costs->tier=t.credits_cost->tier and
       (route is distinct from s.provider_id::text||'/gpt-image-2.6-sunburst'
-        or admin.template_approved_price(s.provider_id,t.id) is null)
-  ) then return admin.alternate_route_meets_floor(route,tier,t.quality,price); end if;
+        or not (admin.template_approved_prices(s.provider_id) ? t.id))
+  ) then return admin.alternate_route_meets_floor(route,tier,t.quality,price/admin.slot_floor_factor(t)); end if;
   return true;
 end $$;
 
@@ -1868,6 +1912,7 @@ CREATE OR REPLACE FUNCTION "admin"."route_p95_by_quality"("p_tag" "text") RETURN
       where g.provider=p_tag and g.inputs ? 'quality' and g.inputs->>'quality' in ('medium','high')
         and g.inputs->>'resolution' in ('1k','2k','3k')
         and g.created_at>=now()-interval '30 days' and g.status='succeeded' and g.cost_usd is not null
+        and not (g.inputs ? 'input_slots')
       group by 1,2 having count(*)>=10
     ) per_tier group by quality
   ) per_quality
@@ -1900,6 +1945,10 @@ begin
       select * into p from public.ai_providers a where a.module='image' and a.id::text||'/'||a.model=route;
       if not ('1k'=any(admin.sale_route_resolutions(p))) then reason:='route_unsupported';
       else reason:='below_floor'; floor:=admin.alternate_route_floor(route,'1k',t.quality);
+        -- A slot template's floor is per slot (above); report the floor its price is held to.
+        if admin.slot_floor_factor(t)>1 then
+          floor:=floor||jsonb_build_object('slots',admin.slot_floor_factor(t),'credits',(floor->>'credits')::int*admin.slot_floor_factor(t));
+        end if;
       end if;
     end if;
     result:=result||jsonb_build_array(jsonb_build_object('template_id',t.id,'quality',t.quality,
@@ -1949,6 +1998,18 @@ $$;
 
 
 ALTER FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."slot_floor_factor"("t" "public"."templates") RETURNS integer
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select greatest(1, case when jsonb_typeof(t.fields->'images'->'slots')='array'
+    then jsonb_array_length(t.fields->'images'->'slots') else 0 end)
+$$;
+
+
+ALTER FUNCTION "admin"."slot_floor_factor"("t" "public"."templates") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_apply_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") RETURNS "void"
@@ -2281,7 +2342,8 @@ begin
   return not exists (
     select j.provider from public.generation_jobs j where j.provider like 'env/_%'
       and j.status='succeeded' and j.cost_usd is not null and j.created_at>=now()-interval '30 days'
-      and j.inputs->>'resolution'='1k' and j.inputs->>'quality'=t.quality group by j.provider
+      and j.inputs->>'resolution'='1k' and j.inputs->>'quality'=t.quality and not (j.inputs ? 'input_slots')
+      group by j.provider
     having count(*)>=10 and not admin.template_route_allowed(t,j.provider,'1k',price,false)
   );
 end $$;
@@ -3740,6 +3802,7 @@ CREATE TABLE IF NOT EXISTS "public"."template_categories" (
     "seo_description_zh" "text",
     "name_en_lookup" "text" GENERATED ALWAYS AS ((("kind" || ':'::"text") || "lower"("name_en"))) STORED,
     "name_zh_lookup" "text" GENERATED ALWAYS AS ((("kind" || ':'::"text") || "name_zh")) STORED,
+    "gallery_excluded" boolean DEFAULT false NOT NULL,
     CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
     CONSTRAINT "template_categories_intro_en_check" CHECK ((("intro_en" IS NULL) OR (("char_length"("intro_en") >= 1) AND ("char_length"("intro_en") <= 200)))),
     CONSTRAINT "template_categories_intro_zh_check" CHECK ((("intro_zh" IS NULL) OR (("char_length"("intro_zh") >= 1) AND ("char_length"("intro_zh") <= 200)))),
@@ -5600,6 +5663,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_image_provider_pricing"("p_env_model"
      where g.created_at >= now() - interval '30 days'
        and coalesce(g.inputs->>'resolution', '1k') in ('1k','2k','3k')
        and g.status = 'succeeded' and g.cost_usd is not null
+       and not (g.inputs ? 'input_slots')
      group by 1, 2 having count(*) >= 10
   ), costs as (
     select provider, jsonb_object_agg(resolution, cost) as p95 from samples group by provider
@@ -6426,6 +6490,33 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_reorder_template_categories"("p_keys" "text"[], "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_reorder_template_series"("p_actor" "uuid", "p_ids" "uuid"[]) RETURNS integer
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare v_moved integer;
+begin
+  if not exists(select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  perform 1 from public.template_series order by id for update;
+  if p_ids is null or cardinality(p_ids) <> (select count(distinct i) from unnest(p_ids) i)
+     or cardinality(p_ids) <> (select count(*) from public.template_series)
+     or exists(select 1 from unnest(p_ids) i where not exists(select 1 from public.template_series s where s.id = i)) then
+    raise exception 'SERIES_CHANGED';
+  end if;
+  update public.template_series s set sort_order = m.ord::integer * 10
+    from unnest(p_ids) with ordinality as m(id, ord) where s.id = m.id and s.sort_order <> m.ord * 10;
+  get diagnostics v_moved = row_count;
+  return v_moved;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_reorder_template_series"("p_actor" "uuid", "p_ids" "uuid"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) RETURNS "void"
@@ -7673,6 +7764,53 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_set_template_sale"("p_actor" "uuid", "p_template_id" "text", "p_enabled" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_template_series_flag"("p_actor" "uuid", "p_ids" "uuid"[], "p_field" "text", "p_value" boolean, "p_reason" "text") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_ids uuid[];
+  v_reason text := nullif(btrim(p_reason), '');
+begin
+  if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
+    raise exception 'FORBIDDEN';
+  end if;
+  if not exists(select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_field not in ('is_active', 'show_members') or p_value is null or p_ids is null
+     or cardinality(p_ids) not between 1 and 200
+     or cardinality(p_ids) <> (select count(distinct i) from unnest(p_ids) i) then
+    raise exception 'INVALID_INPUT';
+  end if;
+  if p_field = 'is_active' and not p_value and v_reason is null then raise exception 'SERIES_REASON_REQUIRED'; end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  perform 1 from public.template_series where id = any(p_ids) order by id for update;
+  if (select count(*) from public.template_series where id = any(p_ids)) <> cardinality(p_ids) then
+    raise exception 'SERIES_CHANGED';
+  end if;
+  if p_field = 'is_active' then
+    with changed as (update public.template_series set is_active = p_value
+      where id = any(p_ids) and is_active <> p_value returning id) select array_agg(id) into v_ids from changed;
+  else
+    with changed as (update public.template_series set show_members = p_value
+      where id = any(p_ids) and show_members <> p_value returning id) select array_agg(id) into v_ids from changed;
+  end if;
+  insert into public.admin_audit_log(action, user_id, target_id, reason)
+    select case p_field when 'is_active' then 'series_set_active' else 'series_set_show_members' end,
+      p_actor, i::text, format('系列管理批量%s：%s', case when p_field = 'is_active' then
+        case when p_value then '上架' else '下架' end else
+        case when p_value then '开启成员单独展示' else '关闭成员单独展示' end end,
+        coalesce(v_reason, '无备注'))
+    from unnest(coalesce(v_ids, '{}')) i;
+  return coalesce(cardinality(v_ids), 0);
+end $$;
+
+
+ALTER FUNCTION "public"."admin_set_template_series_flag"("p_actor" "uuid", "p_ids" "uuid"[], "p_field" "text", "p_value" boolean, "p_reason" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_test_run_cover"("p_actor" "uuid", "p_run_id" "uuid", "p_before_url" "text", "p_after_url" "text", "p_locale" "text" DEFAULT NULL::"text") RETURNS "text"
@@ -9292,13 +9430,14 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "moderated_by" "uuid",
     "screen_attempts" integer DEFAULT 0 NOT NULL,
     "last_screen_at" timestamp with time zone,
+    "gallery_excluded" boolean DEFAULT false NOT NULL,
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
     CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
     CONSTRAINT "generation_jobs_credit_pool_check" CHECK (("credit_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
     CONSTRAINT "generation_jobs_credits_cost_check" CHECK (("credits_cost" > 0)),
     CONSTRAINT "generation_jobs_download_count_check" CHECK (("download_count" >= 0)),
-    CONSTRAINT "generation_jobs_free_work_public" CHECK ((("credit_pool" = 'paid'::"text") OR ("visibility" = 'public'::"text"))),
+    CONSTRAINT "generation_jobs_free_work_public" CHECK ((("credit_pool" = 'paid'::"text") OR ("visibility" = 'public'::"text") OR "gallery_excluded")),
     CONSTRAINT "generation_jobs_moderation_reason_check" CHECK (("moderation_reason" = ANY (ARRAY['auto'::"text", 'sexual'::"text", 'violence'::"text", 'hate'::"text", 'minor'::"text", 'privacy'::"text", 'ip'::"text", 'spam'::"text", 'quality'::"text", 'other'::"text"]))),
     CONSTRAINT "generation_jobs_moderation_status_check" CHECK (("moderation_status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text"]))),
     CONSTRAINT "generation_jobs_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
@@ -11203,6 +11342,27 @@ $$;
 ALTER FUNCTION "public"."resume_catalog_checkout"("p_user" "uuid", "p_token" "uuid", "p_hash" "text", "p_channel" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."session_identity"() RETURNS TABLE("id" "uuid", "email" "text", "phone" "text", "email_confirmed_at" timestamp with time zone, "phone_confirmed_at" timestamp with time zone, "app_metadata" "jsonb", "user_metadata" "jsonb", "role" "text", "banned_at" timestamp with time zone)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select u.id, u.email::text, u.phone::text, u.email_confirmed_at, u.phone_confirmed_at,
+    coalesce(u.raw_app_meta_data, '{}'::jsonb), coalesce(u.raw_user_meta_data, '{}'::jsonb),
+    p.role, p.banned_at
+  from auth.users u
+  -- Primary keys on both sides. A JWT without session_id (never one Auth issues to a user) matches nothing.
+  join auth.sessions s on s.id = (auth.jwt() ->> 'session_id')::uuid and s.user_id = u.id
+  left join public.profiles p on p.id = u.id
+  where u.id = auth.uid()
+    and u.deleted_at is null
+    and (u.banned_until is null or u.banned_until <= now())
+    and (s.not_after is null or s.not_after > now())
+$$;
+
+
+ALTER FUNCTION "public"."session_identity"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."set_job_visibility"("p_job_id" "uuid", "p_user_id" "uuid", "p_visibility" "text") RETURNS "public"."generation_jobs"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -11219,6 +11379,13 @@ begin
      for update;
   if not found then
     raise exception 'JOB_NOT_FOUND';
+  end if;
+
+  if v_job.gallery_excluded then
+    if p_visibility = 'public' then
+      raise exception 'WORK_PRIVATE_ONLY';
+    end if;
+    return v_job;
   end if;
 
   if v_job.credit_pool = 'free' and p_visibility = 'private' then
@@ -12862,7 +13029,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -14672,7 +14839,7 @@ CREATE INDEX "generation_jobs_route_p95_idx" ON "public"."generation_jobs" USING
 
 
 
-CREATE INDEX "generation_jobs_route_quality_p95_idx" ON "public"."generation_jobs" USING "btree" ("provider", (("inputs" ->> 'resolution'::"text")), (("inputs" ->> 'quality'::"text")), "created_at") INCLUDE ("cost_usd") WHERE (("status" = 'succeeded'::"text") AND ("cost_usd" IS NOT NULL) AND ("inputs" ? 'quality'::"text"));
+CREATE INDEX "generation_jobs_route_quality_p95_idx" ON "public"."generation_jobs" USING "btree" ("provider", (("inputs" ->> 'resolution'::"text")), (("inputs" ->> 'quality'::"text")), "created_at") INCLUDE ("cost_usd") WHERE (("status" = 'succeeded'::"text") AND ("cost_usd" IS NOT NULL) AND ("inputs" ? 'quality'::"text") AND (NOT ("inputs" ? 'input_slots'::"text")));
 
 
 
@@ -15040,6 +15207,10 @@ CREATE OR REPLACE TRIGGER "catalog_validate_discount" BEFORE INSERT OR UPDATE ON
 
 
 
+CREATE OR REPLACE TRIGGER "category_gallery_excluded_default" BEFORE INSERT ON "public"."template_categories" FOR EACH ROW EXECUTE FUNCTION "admin"."default_category_gallery_excluded"();
+
+
+
 CREATE OR REPLACE TRIGGER "category_move" AFTER UPDATE OF "parent_id", "level" ON "public"."template_categories" FOR EACH ROW EXECUTE FUNCTION "admin"."move_category_subtree"();
 
 
@@ -15053,6 +15224,10 @@ CREATE OR REPLACE TRIGGER "codes_enforce_gift_policy" BEFORE INSERT OR UPDATE OF
 
 
 CREATE CONSTRAINT TRIGGER "draft_sale_floor" AFTER UPDATE OF "credits_cost", "quality" ON "public"."templates" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN ((NOT "new"."is_active")) EXECUTE FUNCTION "admin"."check_template_publish_floor"();
+
+
+
+CREATE OR REPLACE TRIGGER "generation_jobs_gallery_excluded" BEFORE INSERT OR UPDATE OF "gallery_excluded", "visibility" ON "public"."generation_jobs" FOR EACH ROW EXECUTE FUNCTION "admin"."keep_gallery_excluded_private"();
 
 
 
@@ -16315,6 +16490,10 @@ GRANT ALL ON FUNCTION "admin"."copy_template_price_marks"("p_source" "text", "p_
 
 
 
+REVOKE ALL ON FUNCTION "admin"."default_category_gallery_excluded"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") TO "service_role";
 
@@ -16326,6 +16505,10 @@ GRANT ALL ON FUNCTION "admin"."is_template_catalog_v2"() TO "service_role";
 
 
 REVOKE ALL ON FUNCTION "admin"."job_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "v2" boolean) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."keep_gallery_excluded_private"() FROM PUBLIC;
 
 
 
@@ -16441,6 +16624,11 @@ GRANT ALL ON FUNCTION "admin"."sale_route_resolutions"("p" "public"."ai_provider
 
 REVOKE ALL ON FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."slot_floor_factor"("t" "public"."templates") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."slot_floor_factor"("t" "public"."templates") TO "service_role";
 
 
 
@@ -17097,6 +17285,11 @@ GRANT ALL ON FUNCTION "public"."admin_reorder_template_categories"("p_keys" "tex
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_reorder_template_series"("p_actor" "uuid", "p_ids" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_reorder_template_series"("p_actor" "uuid", "p_ids" "uuid"[]) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_reorder_templates"("p_ids" "text"[]) TO "service_role";
 
@@ -17254,6 +17447,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_template_order"("p_group" "text", "p_i
 
 REVOKE ALL ON FUNCTION "public"."admin_set_template_sale"("p_actor" "uuid", "p_template_id" "text", "p_enabled" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_template_sale"("p_actor" "uuid", "p_template_id" "text", "p_enabled" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_template_series_flag"("p_actor" "uuid", "p_ids" "uuid"[], "p_field" "text", "p_value" boolean, "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_template_series_flag"("p_actor" "uuid", "p_ids" "uuid"[], "p_field" "text", "p_value" boolean, "p_reason" "text") TO "service_role";
 
 
 
@@ -17818,6 +18016,11 @@ GRANT ALL ON FUNCTION "public"."reserve_credits"("p_job_id" "uuid", "p_user_id" 
 
 REVOKE ALL ON FUNCTION "public"."resume_catalog_checkout"("p_user" "uuid", "p_token" "uuid", "p_hash" "text", "p_channel" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."resume_catalog_checkout"("p_user" "uuid", "p_token" "uuid", "p_hash" "text", "p_channel" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."session_identity"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."session_identity"() TO "authenticated";
 
 
 

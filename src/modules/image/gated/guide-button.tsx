@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useSyncExternalStore } from 'react'
 
 import type { MembershipTier } from '@/core/config'
+import { cn } from '@/core/ui/cn'
 
 import { IntroTrigger } from './intro-trigger'
 
@@ -34,37 +35,40 @@ const subscribe = (listener: () => void) => {
   return () => listeners.delete(listener)
 }
 
-// The tutorial in Batch create's top bar (Owner 2026-11-12): always there while the page is
-// open, a "?" on phones and "Tutorial" beside it from md. It never opens by itself; until it
-// has been opened once in this browser it carries a small dot.
-export function GuideButton({ tier }: { tier: MembershipTier | null }) {
+// "See how it works" (Owner 2026-11-12: the small "?" was easy to miss): always a play mark and
+// the words, never an icon alone. `pill` is the big guided entry in Batch create's head; `chip`
+// the compact one (the Create card, the /generate/batch page's bar). It never opens by itself;
+// until it has been opened once in this browser the pill carries a small dot.
+export function GuideButton({ tier, variant = 'chip', className }: { tier: MembershipTier | null; variant?: 'pill' | 'chip'; className?: string }) {
   const t = useTranslations('app.gated.guide')
   // The server and the first client render agree on "seen" (no dot), then the browser's answer.
   const seen = useSyncExternalStore(subscribe, readSeen, () => true)
+  const pill = variant === 'pill'
   return (
     <IntroTrigger
       tab="batch"
       tier={tier}
-      label={t('open')}
       onOpen={markSeen}
-      className="press relative inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full text-label font-semibold text-bone-dim hover:text-foreground md:px-2"
+      className={cn(
+        'press relative inline-flex flex-none items-center rounded-full font-semibold text-foreground',
+        pill ? 'min-h-12 gap-2.5 bg-wash-strong pr-5 pl-1.5 text-label' : 'min-h-11 gap-2 bg-wash pr-3.5 pl-1 text-caption',
+        className,
+      )}
     >
-      <GuideIcon />
-      <span aria-hidden="true" className="hidden md:inline">
-        {t('title')}
-      </span>
-      {seen ? null : <span aria-hidden="true" className="absolute top-2 right-2 size-2 rounded-full bg-primary md:right-1" />}
+      <PlayMark large={pill} />
+      {t('demo')}
+      {pill && !seen ? <span aria-hidden="true" className="absolute top-1 right-1 size-2.5 rounded-full bg-primary shadow-[0_0_0_2px_var(--popover)]" /> : null}
     </IntroTrigger>
   )
 }
 
-// A question mark in a circle, in the house stroke.
-export function GuideIcon() {
+// A play triangle on the safelight disc.
+function PlayMark({ large }: { large: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-[22px]" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6" />
-      <path d="M12 17h.01" />
-    </svg>
+    <span aria-hidden="true" className={cn('grid flex-none place-items-center rounded-full bg-primary text-primary-foreground', large ? 'size-9' : 'size-8')}>
+      <svg viewBox="0 0 24 24" className={large ? 'size-4' : 'size-3.5'} fill="currentColor">
+        <path d="M8 5.5v13l10.5-6.5z" />
+      </svg>
+    </span>
   )
 }

@@ -8,6 +8,8 @@ export type EditSource = {
   name: string
   aspect: OutputAspect
   resolution: Resolution
+  // The work is a poster work (gallery-excluded): its edit stays private too, even on free credits.
+  privateOnly?: boolean
 }
 
 // aspect: the size of the new photo, the work's own unless another is picked (T47).

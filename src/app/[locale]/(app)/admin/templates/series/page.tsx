@@ -3,22 +3,18 @@ import { z } from 'zod'
 
 import { listAdminCategoryTree } from '@/core/admin/template-categories'
 import { categoryChoices } from '@/core/admin/templates-editor'
-import { getAdminSeries, listAdminSeriesPage, searchSeriesCandidates, seriesCopy, SeriesEditor, SeriesList } from '@/core/admin/template-series'
+import { getAdminSeries, listAdminSeries, searchSeriesCandidates, seriesCopy, SeriesCatalogue, SeriesDialog, SeriesEditor } from '@/core/admin/template-series'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
-import { saveSeriesAction, searchMembersAction } from './actions'
+import { serverEnv } from '@/core/env'
+import { reorderSeriesAction, saveSeriesAction, searchMembersAction, setSeriesFlagAction } from './actions'
 
 export const instant = false
 export const metadata = { title: seriesCopy.title }
 
-const paramsSchema = z.object({
-  q: z.string().trim().max(160).default(''), id: z.uuid().optional(), new: z.literal('1').optional(), saved: z.literal('1').optional(),
-  after: z.uuid().optional(), order: z.coerce.number().int().gte(-2147483648).lte(2147483647).optional(),
-}).refine(p => Boolean(p.after) === (p.order !== undefined))
+const paramsSchema = z.object({ id: z.uuid().optional(), new: z.literal('1').optional(), saved: z.literal('1').optional() })
+  .loose()
 
-function listCursor(p: z.infer<typeof paramsSchema>) {
-  return p.after && p.order !== undefined ? { id: p.after, order: p.order } : null
-}
-
+// The whole list, with the editor in a dialog over it for ?id= / ?new=1 (Owner 2026-11-12).
 export default async function AdminSeriesPage({ searchParams }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
@@ -27,14 +23,27 @@ export default async function AdminSeriesPage({ searchParams }: {
   if (!parsed.success) notFound()
   const p = parsed.data
   const db = createAdminSupabase()
-  if (!p.id && !p.new) {
-    const cursor = listCursor(p)
-    return <SeriesList page={await listAdminSeriesPage(db, cursor, p.q)} search={p.q} first={!cursor} saved={!!p.saved} />
-  }
+  const [items, editor] = await Promise.all([listAdminSeries(db), p.id || p.new ? editorDialog(db, p.id) : null])
+  // Production's series follow the test site (T93): edits there are overwritten by the next sync.
+  const production = serverEnv().VERCEL_ENV === 'production'
+  return (
+    <>
+      <SeriesCatalogue items={items} saved={!!p.saved} production={production}
+        actions={{ reorder: reorderSeriesAction, setFlag: setSeriesFlagAction }} />
+      {editor}
+    </>
+  )
+}
+
+async function editorDialog(db: ReturnType<typeof createAdminSupabase>, id: string | undefined) {
   const [detail, categories, initial] = await Promise.all([
-    p.id ? getAdminSeries(db, p.id) : null, listAdminCategoryTree(db), searchSeriesCandidates(db, '', null),
+    id ? getAdminSeries(db, id) : null, listAdminCategoryTree(db), searchSeriesCandidates(db, '', null),
   ])
-  if (p.id && !detail) notFound()
-  return <SeriesEditor key={detail?.revision ?? 'new'} detail={detail} initial={initial}
-    choices={categoryChoices(categories)} actions={{ save: saveSeriesAction, search: searchMembersAction }} />
+  if (id && !detail) notFound()
+  return (
+    <SeriesDialog title={detail ? seriesCopy.edit : seriesCopy.create}>
+      <SeriesEditor embedded key={detail?.revision ?? 'new'} detail={detail} initial={initial}
+        choices={categoryChoices(categories)} actions={{ save: saveSeriesAction, search: searchMembersAction }} />
+    </SeriesDialog>
+  )
 }

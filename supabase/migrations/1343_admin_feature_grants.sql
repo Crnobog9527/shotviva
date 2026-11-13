@@ -1,4 +1,4 @@
--- /admin/features: add an invited account (1312) by its email or phone number, remove one by its
+-- /admin/features: add an invited account (1342) by its email or phone number, remove one by its
 -- account id, and list the invited accounts. Only an unbanned admin may change the list; who did it is kept on the row.
 -- Accounts that sign in with a phone (mainland China) have no email, so both are accepted.
 create function public.admin_set_feature_grant(p_actor uuid, p_key text, p_account text, p_granted boolean)

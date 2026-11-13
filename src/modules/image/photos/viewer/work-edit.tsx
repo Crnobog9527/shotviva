@@ -25,7 +25,7 @@ type Props = { view: WorkView & { edit: Edit }; onBack(): void; onDone(id: strin
 // A failure offers Retry and Change the request, with the words kept.
 export function WorkEdit({ view, onBack, onDone }: Props) {
   const t = useTranslations('app.edit')
-  const source: EditSource = { id: view.item.id, fileUrl: view.item.fileUrl as string, name: view.item.templateName, aspect: view.item.aspect, resolution: view.item.resolution }
+  const source: EditSource = { id: view.item.id, fileUrl: view.item.fileUrl as string, name: view.item.templateName, aspect: view.item.aspect, resolution: view.item.resolution, privateOnly: view.item.privateOnly }
   const [draft, setDraft] = useState<EditDraft>({ text: '', resolution: source.resolution, aspect: source.aspect })
   const [jobId, setJobId] = useState<string | null>(null)
   const job = useJob(jobId)
