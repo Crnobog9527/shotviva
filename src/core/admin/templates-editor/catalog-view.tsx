@@ -6,10 +6,13 @@ import { categoryChoices, type CategoryOption } from './category-options'
 import { catalogSections, filterCatalog, SINGLE_TEMPLATES, type CatalogStatus, type SeriesOption } from './catalog-groups'
 import { catalogCopy as copy, orderCopy } from './copy'
 import type { AdminTemplate } from '../templates/types'
+import { searchCatalog } from './catalog-search'
+import { Input } from '@/core/ui/input'
 import { TemplatesTable, type TableSelection } from './templates-table'
 
 type Props = Omit<ComponentProps<typeof TemplatesTable>, 'selection' | 'order' | 'categoryLabels'> & {
   query: string
+  onQuery: (query: string) => void
   // Soft-deleted templates (1401), shown only under 已删除.
   deleted: AdminTemplate[]
   categories: readonly CategoryOption[]
@@ -20,7 +23,7 @@ type Props = Omit<ComponentProps<typeof TemplatesTable>, 'selection' | 'order' |
 
 const selectClass = 'border-input h-9 max-w-full rounded-md border px-3 text-sm'
 
-export function CatalogView({ templates, deleted, query, categories, series, selection, onOrder, ...row }: Props) {
+export function CatalogView({ templates: all, deleted: allDeleted, query, onQuery, categories, series, selection, onOrder, ...row }: Props) {
   const [status, setStatus] = useState<CatalogStatus>('active')
   const [category, setCategory] = useState('')
   const [seriesId, setSeriesId] = useState('')
@@ -28,6 +31,9 @@ export function CatalogView({ templates, deleted, query, categories, series, sel
   const options = categoryChoices(categories).concat(categories.filter(c => c.isSystem)
     .map(c => ({ key: c.key, label: c.nameZh, nameEn: c.nameEn, path: [c.key] })))
   const paths = new Map(options.map(c => [c.key, c]))
+  const labels = { paths, series: new Map(series.map(s => [s.id, s.nameZh])) }
+  const templates = searchCatalog(all, query, labels)
+  const deleted = searchCatalog(allDeleted, query, labels)
   const matching = filterCatalog(status === 'deleted' ? deleted : templates, paths, category, seriesId)
   const live = filterCatalog(templates, paths, category, seriesId)
   const active = live.filter(t => t.isActive).length
@@ -37,6 +43,8 @@ export function CatalogView({ templates, deleted, query, categories, series, sel
   const canReorder = !query.trim() && !category && !seriesId && !grouped && status !== 'deleted'
   return <div className="grid min-w-0 grid-cols-1 gap-3">
     <div className="flex flex-wrap items-center gap-2">
+      <Input type="search" className="w-full sm:w-72" aria-label={copy.search} placeholder={copy.search} maxLength={120}
+        value={query} onChange={e => onQuery(e.target.value)} />
       <div role="group" aria-label={copy.status} className="flex gap-1">
         {(Object.keys(tabs) as CatalogStatus[]).map(key => <Button key={key} variant={status === key ? 'secondary' : 'ghost'}
           size="sm" aria-pressed={status === key} onClick={() => setStatus(key)}>{tabs[key]}</Button>)}
@@ -53,7 +61,7 @@ export function CatalogView({ templates, deleted, query, categories, series, sel
       <Button size="sm" variant={grouped ? 'secondary' : 'outline'} aria-pressed={grouped}
         onClick={() => setGrouped(!grouped)}>{copy.groupSeries}</Button>
     </div>
-    {status === 'deleted' && <p className="text-muted-foreground text-sm">{copy.deletedHint}</p>}
+    <ListHint status={status} searching={!!query.trim()} />
     {sections.length === 0 && <p className="text-muted-foreground py-8 text-center text-sm">{copy.empty}</p>}
     {sections.map(({ id, title, rows, orderGroup }) => (
       <section key={id} className="min-w-0">
@@ -65,4 +73,10 @@ export function CatalogView({ templates, deleted, query, categories, series, sel
       </section>
     ))}
   </div>
+}
+
+// Under 已删除 what those rows are; while searching, why dragging is off.
+function ListHint({ status, searching }: { status: CatalogStatus; searching: boolean }) {
+  if (status === 'deleted') return <p className="text-muted-foreground text-sm">{copy.deletedHint}</p>
+  return searching ? <p className="text-muted-foreground text-xs">{orderCopy.filtered}</p> : null
 }
