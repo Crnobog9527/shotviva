@@ -46,6 +46,7 @@ function footerLines(footer: PosterContent['footer']): string[] {
   return [
     line(footer.phonesLabel || 'Phones', footer.phones.join('   ')),
     line(footer.addressLabel || 'Address', footer.address),
+    line('Caption under the QR code', footer.qrLabel),
   ]
 }
 
