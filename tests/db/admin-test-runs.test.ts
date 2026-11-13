@@ -160,6 +160,7 @@ describe('first runs of a slot template (§5.1e)', () => {
   it('sends each slot\'s test photo in slot order, records which was where, and refuses a missing required slot', async () => {
     const { r2, p, deps, photoId } = await setup()
     const templateId = await seedTemplate(db, {
+      credits: { '1k': 40, '2k': 80, '3k': 120 },
       images: { min: 1, max: 2, slots: [{ key: 'logo', label: 'Venue logo', required: false }, { key: 'prize_1', label: '1st prize photo', required: true }] },
       body: 'WRAPPED poster {{image_slots}}',
     })
