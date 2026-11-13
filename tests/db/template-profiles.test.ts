@@ -204,13 +204,20 @@ describe('slot floor (1442)', () => {
     expect(await floor(2)).toBe(10 + Math.ceil(0.01 * 1.10 / budget))
   })
 
-  it('ignores a job whose input_slots is not an array instead of failing the pricing read (1445)', async () => {
+  it('ignores jobs whose input_slots is an object, a string or null instead of failing (1445)', async () => {
     const user = await createUser(db)
     await db.query('set local session_replication_role = replica')
-    await db.query(`insert into public.generation_jobs (id,user_id,module,template_id,inputs,provider,source,status,visibility,credits_cost,credit_pool,cost_usd,output_key,finished_at)
-      values (gen_random_uuid(),$1,'image',$2,$3,$4,'web','succeeded','private',1,'paid',0.5,'t1445/x',now())`,
-    [user, id, JSON.stringify({ resolution: '1k', quality: 'medium', input_slots: { logo: 'inputs/u/a.png' } }), tag()])
-    await expect(one("select public.admin_image_pricing_catalog('env-model') c")).resolves.toBeTruthy()
+    for (const slots of [{ logo: 'inputs/u/a.png' }, 'inputs/u/a.png', null]) {
+      await db.query(`insert into public.generation_jobs (id,user_id,module,template_id,inputs,provider,source,status,visibility,credits_cost,credit_pool,cost_usd,output_key,finished_at)
+        select gen_random_uuid(),$1,'image',$2,$3,$4,'web','succeeded','private',1,'paid',0.5,'t1445/x',now() from generate_series(1,10)`,
+      [user, id, JSON.stringify({ resolution: '1k', quality: 'medium', input_slots: slots }), tag()])
+    }
+    // Every reader of the slot count: the editor's pricing read, the slot floor and the reports that use it.
+    await expect(one("select public.template_sync_pricing_input('env-model') r")).resolves.toBeTruthy()
+    expect((await one<{ c: Record<string, unknown> }>('select admin.route_slot_costs($1) c', [tag()])).c).toMatchObject({ p95_full: {} })
     expect(await floor(3)).toBe(30)
+    await expect(one('select admin.slot_floor_credits(t,$2,$3,10) f from public.templates t where t.id=$1', [id, tag(), '1k'])).resolves.toEqual({ f: 10 })
+    await expect(one('select admin.sale_floor_hidden() h')).resolves.toBeTruthy()
+    expect((await one<{ n: number | null }>("select admin.slot_count('{\"input_slots\":\"x\"}'::jsonb) n")).n).toBeNull()
   })
 })
