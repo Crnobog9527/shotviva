@@ -102,8 +102,9 @@ export const site = defineSite({
   },
   partners: {
     graylum: {
-      // Graylum production and staging (the domain bound to Graylum's staging Vercel project).
-      returnToHosts: ['graylum.com', 'auth-staging.graylum.com'],
+      // Graylum production (apex and www) and staging (the domain bound to Graylum's staging
+      // Vercel project). The first entry is the "back to Graylum" link on the connect page.
+      returnToHosts: ['graylum.com', 'www.graylum.com', 'auth-staging.graylum.com'],
       connectCallbackPath: '/api/connectors/shotviva/callback',
       // Not confirmed yet: must be the host(s) Graylum serves reference images from.
       imageHosts: ['graylum.com', 'staging.graylum.com'],
