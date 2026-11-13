@@ -6,7 +6,7 @@ import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
-import { loadStudioTemplate, posterAllowed, PosterStudio } from '@/modules/image'
+import { loadStudioTemplate, posterAllowed, PosterStudio } from '@/modules/image/posters'
 
 type RouteProps = { params: Promise<{ templateId: string }> }
 

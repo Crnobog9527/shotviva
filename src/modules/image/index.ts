@@ -5,7 +5,8 @@ export { CREDITS_FLOOR } from './credits-floor'
 // Photo editing (T30), server only like the provider.
 export { editBodySchema, editScopeClassifier, identityJudge, runEdit, toEditRequest, type ClassifierAnswer, type EditDeps, type ScopeClassifier } from './edit'
 export { GENERATION_COST_USD } from './generation-cost'
-export { EXTRACT_TEXT_MAX, schedulePosterCheck, listPosterTemplates, loadStudioTemplate, posterAllowed, PosterStudio, runExtract } from './poster'
+// The poster text check (ARCHITECTURE §5.3), server only; the poster pages use posters.ts.
+export { schedulePosterCheck } from './poster/schedule-check'
 export { useUpload, type UploadState } from './workspace/use-upload'
 export { checkPickedFile, uploadPhoto, UploadError, type UploadDeps, type UploadErrorCode } from '@/core/storage/upload'
 export { targetSize } from '@/core/storage/upload'
