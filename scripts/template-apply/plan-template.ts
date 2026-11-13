@@ -7,6 +7,7 @@ import type { PlanItem } from './plan-types'
 import type { TemplateItem } from './schema'
 import type { DbState } from './state'
 import { buildSave, givesTemplateFields, savesNothing, type SavePlan } from './template-payload'
+import { planProfiles } from './plan-profiles'
 
 // One template item → the steps the admin would click, in the order that works: 下架 first (a
 // sale can only close on an unpublished template), then 保存 (fields, category, series, model and
@@ -95,10 +96,13 @@ function laterSteps(item: TemplateItem, current: AdminTemplate | undefined, ctx:
 
 function describe(ops: Record<string, unknown>[], current: AdminTemplate | undefined, seriesChanged: string | null | undefined) {
   const names: Record<string, string> = { set_cover: '封面', test_run_cover: '试跑封面', set_sale: '销售' }
+  const profile = (key: unknown) => key === 'seedream' ? 'Seedream' : 'ChatGPT'
   return ops.map(op => {
     if (op.op === 'save_template') return (current ? '更新' : '新建') + (seriesChanged !== undefined ? `（系列→${seriesChanged ?? '无'}）` : '')
     if (op.op === 'set_active') return op.active ? '上架' : '下架'
     if (op.op === 'set_sale') return op.enabled ? '开放销售' : '关闭销售'
+    if (op.op === 'save_profile') return `保存${profile(op.profile)}配置`
+    if (op.op === 'switch_profile') return `切到${profile(op.profile)}配置`
     return names[String(op.op)] ?? String(op.op)
   })
 }
@@ -108,14 +112,15 @@ export function planTemplate(item: TemplateItem, ctx: Ctx, assets: TemplateAsset
   const problems: string[] = []
   const base = { ref: `template:${item.id}`, kind: 'template' as const, label: item.id }
   if (item.id === EDIT_TEMPLATE_ID) return { ...base, actions: [], ops: [], problems: ['作品编辑模板在「作品编辑」页单独管理'], notes: [] }
-  const notes = item.isActive === undefined ? [] : ['isActive 已忽略：上下架只看 publish']
+  const notes: string[] = item.isActive === undefined ? [] : ['isActive 已忽略：上下架只看 publish']
   let save: ReturnType<typeof saveStep> = null
   try {
     save = saveStep(item, current, ctx, assets)
   } catch (error) {
     problems.push(error instanceof Error ? error.message : String(error))
   }
-  const ops = [...unpublishStep(item, current, problems), ...(save ? [save.step] : []), ...laterSteps(item, current, ctx, save, assets, problems)]
+  const ops = [...unpublishStep(item, current, problems), ...(save ? [save.step] : []), ...planProfiles(item, ctx.state, problems, notes),
+    ...laterSteps(item, current, ctx, save, assets, problems)]
   const idle = problems.length ? ['—'] : ['无变化']
   return { ...base, actions: ops.length ? describe(ops, current, save?.seriesChanged) : idle, ops, problems, notes }
 }

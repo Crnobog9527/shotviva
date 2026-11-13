@@ -1,7 +1,8 @@
 import { z } from 'zod'
 
 import { CARD_STYLES, CATEGORY_KEY_PATTERN, CATEGORY_LIMITS } from '../../src/core/templates/categories'
-import { TEMPLATE_QUALITIES } from '../../src/core/templates/pricing'
+import { creditsCostSchema, TEMPLATE_QUALITIES } from '../../src/core/templates/pricing'
+import { RESOLUTIONS } from '../../src/core/templates/output-options'
 import { promptInputSchema, TEMPLATE_MODULES, templateInputSchema } from '../../src/core/templates/schema'
 import { MAX_STYLE_REFS } from '../../src/core/templates/style-refs'
 import { trialSchema } from './trial-schema'
@@ -67,6 +68,20 @@ const templateFields = templateInputSchema.partial().omit({ id: true, isActive: 
   module: z.enum(TEMPLATE_MODULES).optional(), quality: z.enum(TEMPLATE_QUALITIES).optional(),
 })
 
+// A provider profile that is not live (1390–1394): saved without touching the live template. The
+// live profile is written with the template's own prompt / model fields.
+export const profileFileSchema = z.strictObject({
+  // An image provider id, label or model name; Seedream takes an Ark model, ChatGPT any other.
+  model: z.string().trim().min(1).max(120),
+  prompt: z.strictObject({ body: promptInputSchema.shape.body, modelParams: z.record(z.string(), z.unknown()).optional() }),
+  quality: z.enum(TEMPLATE_QUALITIES).optional(),
+  creditsCost: creditsCostSchema,
+  unpricedResolutions: z.array(z.enum(RESOLUTIONS)).optional(),
+  // 'live': the live profile's style references; omitted: the profile keeps its own (none when new).
+  styleRefs: z.literal('live').optional(),
+})
+export const PROFILE_KEYS = ['openai', 'seedream'] as const
+
 export const templateItemSchema = templateFields.extend({
   id: templateInputSchema.shape.id,
   // Kept for old batch files and ignored: publishing is `publish`, never a side effect of a save.
@@ -89,6 +104,9 @@ export const templateItemSchema = templateFields.extend({
   openSale: z.boolean().optional(),
   publish: z.boolean().optional(),
   unpublishReason: reason.optional(),
+  profiles: z.strictObject({ openai: profileFileSchema.optional(), seedream: profileFileSchema.optional() }).optional(),
+  // Switch which profile is live (the admin's 切换配置: never unpublishes; refused for art styles).
+  activeProfile: z.enum(PROFILE_KEYS).optional(),
 }).strict()
 
 // Items one admin_apply_template_batch call takes (the same 300 in migration 1260): every category,

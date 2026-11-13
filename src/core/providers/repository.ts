@@ -20,7 +20,7 @@ const capsColumns = {
   estimated_image_costs: estimatedImageCostsSchema.optional(),
 }
 
-const LIST_COLUMNS = `id, module, adapter, label, base_url, resolutions, capabilities, estimated_image_costs, model, api_key_last4, is_active, notes, updated_at, ${PRICE_COLUMNS}`
+const LIST_COLUMNS = `id, module, adapter, label, base_url, resolutions, capabilities, estimated_image_costs, extra_input_image_usd, model, api_key_last4, is_active, notes, updated_at, ${PRICE_COLUMNS}`
 
 // numeric comes back from PostgREST as a JSON number; null when not filled in.
 const price = z.coerce.number().nonnegative().nullable()
@@ -44,6 +44,8 @@ const listRowSchema = z.object({
   is_active: z.boolean(),
   notes: z.string().nullable(),
   updated_at: z.string(),
+  // 1390: cost of each extra input image of a slot job (USD); null when not set.
+  extra_input_image_usd: z.coerce.number().nonnegative().nullable().optional(),
   ...priceColumns,
   ...capsColumns,
 })
@@ -77,6 +79,7 @@ function toAdminProvider(row: z.infer<typeof listRowSchema>): AdminProvider {
     resolutions: row.resolutions,
     capabilities: row.capabilities,
     estimatedImageCosts: row.estimated_image_costs,
+    extraInputImageUsd: row.extra_input_image_usd ?? null,
     model: row.model,
     apiKeyLast4: row.api_key_last4,
     isActive: row.is_active,

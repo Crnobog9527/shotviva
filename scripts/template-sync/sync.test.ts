@@ -21,6 +21,7 @@ function side(writes: Answer[] = [], styleRefs: Answer = { data: refs, error: nu
     if (name === 'read_template_sync_target') return { data: { token: 'missing', version: null }, error: null }
     if (name === 'read_template_sync_source') return { data: snapshot, error: null }
     if (name === 'read_template_sync_style_refs') return styleRefs
+    if (name === 'read_template_sync_profiles') return { data: { active: 'openai', inactive: [] }, error: null }
     return writes.shift() ?? { data: 1, error: null }
   })
   return { db: { rpc } as unknown as SupabaseClient, assets: { base: 'https://a.test', store: {} as never }, private: {} as never, rpc }
@@ -113,5 +114,38 @@ describe('syncTemplate', () => {
     covers.copyStyleRefs.mockRejectedValue(new Error('network'))
     await expect(syncTemplate('demo', '1', side(), target)).rejects.toMatchObject({ message: 'STYLE_REF_COPY_FAILED' })
     expect(writesOf(target)).toHaveLength(1)
+  })
+})
+
+describe('syncTemplate with provider profiles (1393)', () => {
+  it('sends which profile is live and the other one, and copies the other one’s references too', async () => {
+    const other = { key: 'style-refs/demo/6b2d3c4e-5f60-4b7c-9d8e-0f1a2b3c4d5e.webp', width: 32, height: 32, uploadedAt: '2026-11-13T00:00:00.000Z' }
+    const entry = { profile: 'seedream', body: 's', model_params: {}, style_refs: [other], provider: { adapter: 'ark_images', model: 'm', base_url: 'u' },
+      provider_missing: false, quality: 'medium', credits_cost: { '1k': 1, '2k': 1, '3k': 1 }, unpriced_resolutions: ['3k'] }
+    const source = side()
+    source.rpc.mockImplementation(async (name: string) => {
+      if (name === 'read_template_sync_source') return { data: snapshot, error: null }
+      if (name === 'read_template_sync_style_refs') return { data: refs, error: null }
+      if (name === 'read_template_sync_profiles') return { data: { active: 'openai', inactive: [entry] }, error: null }
+      return { data: { token: 'missing', version: null }, error: null }
+    })
+    const target = side()
+    await syncTemplate('demo', '1', source, target)
+    const { provider_missing: _, ...sent } = entry
+    void _
+    expect(writesOf(target).map(([, args]) => args?.p_profiles)).toEqual([{ active: 'openai', inactive: [sent] }, { active: 'openai', inactive: [sent] }])
+    expect(covers.copyStyleRefs).toHaveBeenCalledWith('demo', [...refs, other], expect.anything(), expect.anything())
+  })
+
+  it('stops when the test site’s inactive model row is gone', async () => {
+    const source = side()
+    source.rpc.mockImplementation(async (name: string) => {
+      if (name === 'read_template_sync_source') return { data: snapshot, error: null }
+      if (name === 'read_template_sync_style_refs') return { data: [], error: null }
+      if (name === 'read_template_sync_profiles') return { data: { active: 'openai', inactive: [{ profile: 'seedream', body: 's', model_params: {}, style_refs: [],
+        provider: null, provider_missing: true, quality: 'medium', credits_cost: {}, unpriced_resolutions: [] }] }, error: null }
+      return { data: { token: 'missing', version: null }, error: null }
+    })
+    await expect(syncTemplate('demo', '1', source, side())).rejects.toMatchObject({ message: 'SOURCE_PROVIDER_MISSING' })
   })
 })

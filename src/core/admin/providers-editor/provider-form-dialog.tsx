@@ -136,6 +136,10 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
               <p className="text-sm">{COPY.resolutions} · {form.resolutions.join(' / ').toUpperCase()}</p>
               <ImageCostFields adapter={form.adapter} tiers={form.resolutions} values={form.imageCosts} estimates={estimates}
                 onChange={(tier, value) => setForm((prev) => ({ ...prev, imageCosts: { ...prev.imageCosts, [tier]: value } }))} />
+              <Field id="extraInputCost" label={COPY.extraInputCost} hint={COPY.extraInputCostHint}>
+                <Input id="provider-extraInputCost" inputMode="decimal" value={form.extraInputCost}
+                  onChange={(e) => setForm((prev) => ({ ...prev, extraInputCost: e.target.value }))} />
+              </Field>
             </>
           )}
           <Field
