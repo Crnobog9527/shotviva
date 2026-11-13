@@ -28,6 +28,7 @@
         "title": "注册一个免费账号来出图",
         "text": "你选好的照片和模板都会保留。",
         "giftNote": "公开展示，带水印",
+        "phone": "手机号登录/注册",
         "email": "用邮箱继续",
         "login": "已有账号，去登录",
         "fine": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>。"
@@ -552,7 +553,9 @@
       "paid": "你有 {paid} 积分。",
       "getCredits": "获取积分",
       "panelTitle": "积分",
-      "signupGiftRefused": "这个账号没有注册赠分记录。同一网络在 24 小时内限领一次。"
+      "signupGiftRefused": "这个账号没有注册赠分记录。同一网络在 24 小时内限领一次。",
+      "signupGiftRefusedCap": "这个账号没有领到注册赠分：当天的注册赠分名额已经发完。",
+      "signupGiftRefusedPaused": "这个账号没有领到注册赠分：注册时赠分暂停发放。"
     },
     "create": {
       "title": "创作",

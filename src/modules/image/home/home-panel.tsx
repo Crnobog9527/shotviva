@@ -6,7 +6,7 @@ import { forwardRef, useId } from 'react'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { HomeCtaButton } from './home-cta-button'
 import { GiftIcon } from './home-icons'
-import { PanelNote, PanelRail, PanelUpload } from './panel-parts'
+import { PanelFormats, PanelNote, PanelRail, PanelUpload } from './panel-parts'
 import { PanelStage } from './panel-stage'
 import { MobileSizeMenu, SizeMenu } from './size-menu'
 import type { StageCover } from './use-stage-cover'
@@ -86,6 +86,7 @@ export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ sta
       </div>
       <div className="mk-panel-cta">
         <HomeCtaButton cta={state.cta} templateId={templateId} onPickPhoto={onPickPhoto} onSignUp={onSignUp} onGenerate={state.generate} />
+        <PanelFormats state={state} />
         <p className="mk-panel-gift">
           <GiftIcon className="mk-gift-i" />
           {gift}

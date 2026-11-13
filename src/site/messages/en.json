@@ -28,6 +28,7 @@
         "title": "Make a free account to develop it",
         "text": "Your photo and template stay as you set them.",
         "giftNote": "Shown publicly with a watermark",
+        "phone": "Continue with phone",
         "email": "Continue with email",
         "login": "I have an account · Log in",
         "fine": "By continuing you agree to the <terms>Terms</terms> and the <privacy>Privacy Policy</privacy>."
@@ -552,7 +553,9 @@
       "paid": "You have {paid, plural, one {# credit} other {# credits}}.",
       "getCredits": "Get credits",
       "panelTitle": "Credits",
-      "signupGiftRefused": "No sign-up credits were recorded for this account. Sign-up gifts are limited to one per network in 24 hours."
+      "signupGiftRefused": "No sign-up credits were recorded for this account. Sign-up gifts are limited to one per network in 24 hours.",
+      "signupGiftRefusedCap": "No sign-up credits for this account: that day's sign-up gifts had all been given out.",
+      "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up."
     },
     "create": {
       "title": "Create",

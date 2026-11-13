@@ -28,7 +28,7 @@ export default defineConfig({
       {
         // Runs against a real local Supabase (`supabase start`), never a mock (AGENTS §7).
         extends: true,
-        test: { name: 'db', include: ['tests/db/**/*.test.ts'], environment: 'node' },
+        test: { name: 'db', include: ['tests/db/**/*.test.ts'], environment: 'node', globalSetup: ['tests/db/global-setup.ts'] },
       },
     ],
   },

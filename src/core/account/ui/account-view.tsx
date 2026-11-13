@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 
+import type { SignupGiftRefusal } from '../../auth/signup-gift'
 import type { Balance } from '../../billing'
 import type { PurchaseLine } from '../../billing/documents/lines'
 import { PlanCard, planAllowance, type LastMembership, type SubscriptionSummary } from '../../billing/subscription'
@@ -24,8 +25,8 @@ export type AccountData = {
   // A phone sign-up's number, masked (140****5678); null for email and Google accounts (T63).
   phone: string | null
   balance: Balance
-  // Same-IP rule (ARCHITECTURE §7): this account got no signup gift.
-  giftRefused: boolean
+  // Why this account got no signup gift (ARCHITECTURE §7: same-IP rule, daily cap, pause); null: not refused.
+  giftRefused: SignupGiftRefusal | null
   subscription: SubscriptionSummary
   // When the account was made, and the newest membership purchase (from the payments list).
   since: Date | null
