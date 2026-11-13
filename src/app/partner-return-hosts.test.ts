@@ -23,3 +23,22 @@ describe('site.partners.graylum.returnToHosts', () => {
     expect(hosts[0]).toBe('graylum.com')
   })
 })
+
+// Reference images for /api/partner generate come only from these hosts (fetch-image.ts).
+describe('site.partners.graylum.imageHosts', () => {
+  const hosts = site.partners.graylum.imageHosts
+
+  it.each([
+    'https://www.graylum.com/uploads/a.jpg',
+    'https://auth-staging.graylum.com/uploads/a.jpg',
+    'https://graylum.com/uploads/a.jpg',
+    'https://staging.graylum.com/uploads/a.jpg',
+  ])('accepts %s', (url) => {
+    expect(allowlistedUrl(url, hosts)).not.toBeNull()
+  })
+
+  it('still rejects other hosts and lookalikes', () => {
+    expect(allowlistedUrl('https://evil.graylum.com/a.jpg', hosts)).toBeNull()
+    expect(allowlistedUrl('https://www.graylum.com.evil.example/a.jpg', hosts)).toBeNull()
+  })
+})

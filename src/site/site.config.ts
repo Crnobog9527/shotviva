@@ -106,8 +106,9 @@ export const site = defineSite({
       // Vercel project). The first entry is the "back to Graylum" link on the connect page.
       returnToHosts: ['graylum.com', 'www.graylum.com', 'auth-staging.graylum.com'],
       connectCallbackPath: '/api/connectors/shotviva/callback',
-      // Not confirmed yet: must be the host(s) Graylum serves reference images from.
-      imageHosts: ['graylum.com', 'staging.graylum.com'],
+      // Hosts Graylum serves reference images from, matched exactly: www.graylum.com (production)
+      // and auth-staging.graylum.com (staging), confirmed 2026-11-13; the first two are kept.
+      imageHosts: ['graylum.com', 'staging.graylum.com', 'www.graylum.com', 'auth-staging.graylum.com'],
     },
   },
   // Shotviva has a public gallery; it stays closed until the Owner opens it in the admin (§9).
