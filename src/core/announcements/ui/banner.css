@@ -57,27 +57,33 @@
   @keyframes sv-ann-wiggle { 0%, 70%, 100% { transform: rotate(0); } 74% { transform: rotate(-14deg); } 78% { transform: rotate(12deg); } 82% { transform: rotate(-9deg); } 86% { transform: rotate(6deg); } 90% { transform: rotate(0); } }
 
   /* Stacked: the icon, the message and the ✕ share the first row, top-aligned to the first line;
-     the link gets a row of its own, right-aligned to the message column. Phones always stack, in
-     every language; wider screens stack only a long message with a link (.sv-ann-stack), which
-     beside the pill would be squeezed into a narrow column. Grid placement is ignored by the
-     one-row flex layout, so it is set once here. A short message is balanced on phones, and
-     breaks only at spaces and punctuation, so no word or 「40%。」 sits alone on a line. */
+     the link gets a row of its own. Phones always stack, in every language; wider screens stack
+     only a long message with a link (.sv-ann-stack), which beside the pill would be squeezed into a
+     narrow column. Grid placement is ignored by the one-row flex layout, so it is set once here.
+     A short message is balanced on phones, and breaks only at spaces and punctuation, so no word or
+     「40%。」 sits alone on a line. */
   .sv-ann > svg { grid-area: icon; }
   .sv-ann p { grid-area: text; }
   .sv-ann-pill { grid-area: link; justify-self: end; }
   .sv-ann-x { grid-area: close; }
+  /* Phones (Owner 2026-11-13: the old full-size pill under the text looked out of place on iOS and
+     Android): one compact band. The link is a small pill under the message, left-aligned to it,
+     the ✕ centred on the first line; 14px text in both tones, no extra height for the promo. */
   @media (max-width: 639.98px) {
-    .sv-ann {
-      display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "icon text close" "link link .";
-      align-items: start; row-gap: 10px; padding-top: calc(var(--sat) + 10px); padding-bottom: 10px;
+    .sv-ann, .sv-ann.sv-promo {
+      display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "icon text close" ". link .";
+      align-items: start; gap: 6px 10px; min-height: 0; padding-top: calc(var(--sat) + 8px); padding-bottom: 8px; font-size: 14px;
     }
     .sv-ann > svg { margin-top: 1px; }
-    .sv-ann.sv-promo > svg { margin-top: 0; }
-    .sv-ann .sv-ann-pill {
-      max-width: 100%; min-height: 36px; padding-block: 7px; white-space: normal; text-align: center; text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere;
+    .sv-ann.sv-promo > svg { width: 20px; height: 20px; margin-top: 0; }
+    .sv-ann .sv-ann-pill, .sv-ann.sv-promo .sv-ann-pill {
+      justify-self: start; max-width: 100%; min-height: 26px; padding: 3px 8px 3px 10px; font-size: 13px; line-height: 1.25;
+      white-space: normal; word-break: keep-all; overflow-wrap: anywhere; box-shadow: none;
     }
-    .sv-ann .sv-ann-pill::before { inset: -4px -6px; }
-    .sv-ann .sv-ann-x { margin-bottom: 0; }
+    .sv-ann .sv-ann-pill svg { width: 12px; height: 12px; }
+    /* 26px tall, answers over 44px */
+    .sv-ann .sv-ann-pill::before { inset: -9px -6px; }
+    .sv-ann .sv-ann-x { width: 32px; height: 32px; margin: -6px -8px -6px 0; }
     .sv-ann p { max-width: none; }
     .sv-ann-short p { text-wrap: balance; word-break: keep-all; }
   }
