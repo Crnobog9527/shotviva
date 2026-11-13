@@ -606,6 +606,98 @@
       },
       "notEnough": "(not enough credits)"
     },
+    "poster": {
+      "title": "Event posters",
+      "back": "Back",
+      "noStyles": "No poster styles yet.",
+      "paste": {
+        "heading": "Paste your event notice",
+        "hint": "Paste everything: title, time, prizes, rules and the level table. We sort it into blocks for you to check before any poster is made.",
+        "placeholder": "Thursday Elite · starts 15:00\nChampion  …\nRules …",
+        "sort": "Sort into blocks",
+        "sorting": "Sorting…",
+        "manual": "Type it in myself"
+      },
+      "sourceText": "Your pasted text",
+      "backToPaste": "Paste again",
+      "tabs": {
+        "header": "Header",
+        "prizes": "Prizes",
+        "sections": "Rules",
+        "table": "Table",
+        "footer": "Footer",
+        "pending": "has lines to check"
+      },
+      "flagged": "Not found in your pasted text. Check it.",
+      "header": {
+        "brand": "Organiser",
+        "brandEn": "Organiser in English",
+        "cup": "Cup name",
+        "cupEn": "Cup name in English",
+        "city": "City",
+        "title": "Event title",
+        "subtitle": "Subtitle",
+        "datetimeLabel": "Time label",
+        "datetime": "Time"
+      },
+      "prizes": {
+        "headline": "Prize headline",
+        "note": "Prize note",
+        "rank": "Rank",
+        "rankEn": "Rank in English",
+        "prize": "Prize",
+        "add": "Add a rank"
+      },
+      "sections": {
+        "title": "Section title",
+        "style": "Line style",
+        "styles": {
+          "kv": "Label: value",
+          "numbered": "Numbered",
+          "plain": "Plain"
+        },
+        "lines": "Lines (one per row)",
+        "add": "Add a section"
+      },
+      "table": {
+        "none": "This style has no table.",
+        "title": "Table title",
+        "columns": "Columns",
+        "column": "Column",
+        "row": "Row",
+        "break": "Break row",
+        "insert": "+ Insert here",
+        "insertRow": "Level row",
+        "insertBreak": "Break row",
+        "footnote": "Note under the table"
+      },
+      "footer": {
+        "phones": "Phone numbers (one per line)",
+        "phonesLabel": "Phone label",
+        "addressLabel": "Address label",
+        "address": "Address",
+        "qrLabel": "QR code label"
+      },
+      "remove": "Remove",
+      "split": {
+        "count": "{count, plural, =0 {Nothing to make yet} one {Makes # poster} other {Makes # posters}}",
+        "part": "{name} {page}/{pages}",
+        "oversized": "A section is longer than one poster can hold. Shorten it or split it into two sections."
+      },
+      "size": "Size",
+      "resolution": "Resolution",
+      "reviewed": "{count, plural, one {I've checked the highlighted line} other {I've checked the # highlighted lines}}",
+      "proofread": "The posters are drawn by AI. Check every word on them before you print or share.",
+      "generate": "{count, plural, one {Make # poster} other {Make # posters}} · {credits} credits",
+      "starting": "Starting…",
+      "notice": {
+        "sortFailed": "We couldn't sort this automatically. Fill in the blocks below; your text is above.",
+        "rateLimited": "Too many tries in an hour. Please wait a little.",
+        "invalid": "Some text is too long or a table row is incomplete. Check the blocks.",
+        "notEnough": "Not enough credits.",
+        "error": "Something went wrong. Please try again."
+      }
+    },
     "sizes": {
       "closest": "Closest to original ({ratio})",
       "original": "Original",
