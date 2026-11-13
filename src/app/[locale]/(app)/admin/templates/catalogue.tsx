@@ -11,6 +11,7 @@ import { listAdminSeriesOptions, OrderHelp, seriesCopy } from '@/core/admin/temp
 import { moveTemplateCategoryAction } from './category-actions'
 import { AdminTemplatePreview } from './preview-provider'
 import { setTemplateSaleAction } from './sale-action'
+import { deleteTemplatesAction, setTemplatesSaleAction, setTemplatesSeriesAction } from './bulk-actions'
 import { syncTemplateModel } from './sync-model-action'
 import { loadMessages } from '@/site/i18n/messages'
 import { site } from '@/site/site.config'
@@ -78,6 +79,9 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
           requestCoverUpload: requestCoverUploadAction,
           applyCover: applyCoverAction,
           remove: deleteTemplateAction,
+          removeMany: deleteTemplatesAction,
+          setSaleMany: setTemplatesSaleAction,
+          setSeriesMany: setTemplatesSeriesAction,
         }}
       />
       </AdminTemplatePreview>

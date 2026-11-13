@@ -11,6 +11,8 @@ export {
   setTemplateActive,
   setTemplateOrder,
   deleteTemplate,
+  deleteTemplates,
+  setTemplatesSale,
   setTemplatesActive,
 } from './templates'
 export type {
@@ -20,6 +22,7 @@ export type {
   AdminTemplate,
   ApplyCoverRequest,
   BulkEditOutcome,
+  BulkTaskOutcome,
   CoverTicket,
   CoverUploadRequest,
   FeaturedPlan,
