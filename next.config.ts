@@ -11,7 +11,14 @@ import { legacyHelpRedirects } from './src/core/support/legacy-redirects'
 import { assetsHeaders, assetsRemotePatterns, assetsRewrites, readAssetsEnv } from './src/core/storage/assets-env'
 import { SITE_DOMAIN } from './src/site/domain'
 
-const withNextIntl = createNextIntlPlugin('./src/site/i18n/request.ts')
+// Messages are compiled to next-intl's compact form at build time (precompile), so pages ship and
+// run its small formatter instead of the ICU parser (~9 KB gz on every page) and no message is
+// parsed in the browser. Only the catalogs under src/site/messages are compiled; plain strings stay
+// strings, so code that reads one as text (the zh manifest) is unaffected.
+const withNextIntl = createNextIntlPlugin({
+  requestConfig: './src/site/i18n/request.ts',
+  experimental: { messages: { path: './src/site/messages', format: 'json', locales: ['en', 'zh'], precompile: true } },
+})
 
 // PostHog US cloud behind our own origin (ARCHITECTURE §16.1), so ad blockers that block
 // *.posthog.com do not drop events. Static assets (lazy-loaded extensions) have their own host.
