@@ -31,6 +31,8 @@ export type Cell = {
   photoHash: string | null
   // A slot template's test images by slot (§5.1e): slot key → sha256 of its bytes.
   slotHashes: Record<string, string> | null
+  // The provider the trial must run on (EffectiveModel): a result from any other is not this cell's.
+  providerId: string
 }
 
 const sorted = (value: unknown): unknown => Array.isArray(value) ? value.map(sorted)
@@ -88,7 +90,7 @@ function templateCells(item: TemplateItem, template: AdminTemplate, photoHashes:
     const hash = digest({ ...base, input: { ...input, photo: photoHash, ...(slotHashes ? { slots: slotHashes } : {}) } })
     const occurrence = seen.get(hash) ?? 0
     seen.set(hash, occurrence + 1)
-    for (let k = 0; k < n; k++) cells.push({ templateId: item.id, version: prompt.version, inputIndex, occurrence, k, hash, resolution, input, photoHash, slotHashes })
+    for (let k = 0; k < n; k++) cells.push({ templateId: item.id, version: prompt.version, inputIndex, occurrence, k, hash, resolution, input, photoHash, slotHashes, providerId: base.model.providerId })
   })
   return cells
 }
