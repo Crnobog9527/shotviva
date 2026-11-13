@@ -253,15 +253,82 @@
     },
     "account": {
       "title": "Graylum",
-      "description": "Your AI social media coach. Find your angle, create posts, and learn from your numbers, with a clear next step every time. Connect to create images with your Shotviva credits.",
-      "connected": "Connected since <b>{date, date, medium}</b>. Graylum can make photos with your credits.",
-      "notConnected": "Not connected. To connect, start from Graylum and allow it to use your credits.",
-      "disconnect": "Disconnect Graylum"
+      "description": "Graylum is a personal AI social media coach for everyone. Hand the running of your account to an AI coach and put your time into the content you're good at."
     },
     "integrations": {
       "title": "Integrations",
-      "enabled": "Enabled",
+      "enabled": "Connected",
       "notEnabled": "Not enabled"
+    },
+    "intro": {
+      "tagline": "Graylum is a personal AI social media coach for everyone. Hand the running of your account to an AI coach and put your time into the content you're good at.",
+      "idea": "Everyone has something worth being seen for: a great dish, a craft, a road nobody else has walked. Many people have thought about turning it into a social media account, to be seen by more people, to be trusted, maybe even to earn a little more from it. But once they start, they find the hard part isn't the content, it's running the account: what angle to take, what to post today, why nobody is watching. We built Graylum to hand all of that to an AI coach, so you don't have to become a social media expert first to turn what you're good at into work people see.",
+      "iconAlt": "Graylum icon",
+      "close": "Close",
+      "connection": {
+        "label": "Connection between Graylum and Shotviva",
+        "connected": "<b>Connected</b>: images you add in a Graylum chat are made with your Shotviva credits.",
+        "notConnected": "<b>Not connected</b>: connect on Graylum's Integrations page, and you can make images with Shotviva while you write in Graylum.",
+        "disconnect": "Disconnect",
+        "confirm": "Once disconnected, Graylum can no longer make images with your Shotviva credits.",
+        "confirmDisconnect": "Yes, disconnect",
+        "cancel": "Cancel",
+        "disconnecting": "Disconnecting…",
+        "connect": "Connect in Graylum"
+      },
+      "what": "What it does",
+      "when": "When it helps",
+      "after": {
+        "title": "Once connected",
+        "line1": "Add images while you write in Graylum, using your Shotviva credits. Graylum charges nothing extra.",
+        "line2": "Shotviva only gives Graylum your Shotviva account ID. Graylum never gets your Shotviva password.",
+        "line3": "Disconnect any time, here or on Graylum's Integrations page."
+      },
+      "view": "Visit Graylum",
+      "newTab": "(opens in a new tab)",
+      "zoom": "View larger: {name}",
+      "lightbox": {
+        "label": "Graylum screenshot",
+        "prev": "Previous",
+        "next": "Next",
+        "count": "{n} / {total}"
+      },
+      "shots": {
+        "roadmap": {
+          "name": "Roadmap home",
+          "note": "From positioning to a 30-day action plan, six steps to find your direction."
+        },
+        "script": {
+          "name": "Voiceover draft",
+          "label": "Voiceovers",
+          "note": "When you have an idea but don't know how to start talking"
+        },
+        "xhsPost": {
+          "name": "Xiaohongshu post draft",
+          "label": "Image posts",
+          "note": "When you want to post but can't write a draft that's ready to go"
+        },
+        "storyboard": {
+          "name": "Video storyboard",
+          "label": "Video",
+          "note": "When the script is set but you're not sure how to shoot each shot"
+        },
+        "storeVisit": {
+          "name": "Store visit post draft",
+          "label": "One draft, many platforms",
+          "note": "When you want to post the same story on different platforms"
+        },
+        "shotvivaImage": {
+          "name": "Shotviva images in the chat",
+          "label": "Images right after writing",
+          "note": "When the post is written but still needs a decent image"
+        },
+        "tools": {
+          "name": "Tools",
+          "label": "More tools",
+          "note": "Positioning, reviews, editing tips and more, all here."
+        }
+      }
     }
   },
   "app": {

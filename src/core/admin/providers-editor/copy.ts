@@ -67,6 +67,8 @@ export const PROVIDERS_COPY = {
     imageCostsHint: (adapter: ProviderAdapterId) => adapter === 'ark_images'
       ? '有实测成本时优先用实测。火山方舟必须填写每档的预估单张总成本（含输入图），不能留空；实测样本不足时用它定积分下限。'
       : '有实测成本时优先用实测。留空使用可核算的目录估价（已含本站充值费用分摊）；也可填写含费估价覆盖。',
+    extraInputCost: '每张额外输入图成本（美元）',
+    extraInputCostHint: '格子模板（一单多张输入图、只出一张图）的成本下限用它：单图下限 + 多出的输入图 × 这个成本。留空时按单图下限 × 格子数保守计算。',
     catalogPrices: '供应商目录报价（美元）',
     titleNew: '新增供应商',
     titleEdit: (label: string) => `编辑「${label}」`,
@@ -81,6 +83,9 @@ export const PROVIDERS_COPY = {
       openai_responses: 'OpenAI Responses API（结构化 JSON 输出，推理用最低档）。地址请填 https://api.openai.com/v1。',
     } satisfies Record<ProviderAdapterId, string>,
     resolutions: '支持的清晰度',
+    tiersHint: '只能在模型支持的档位里取消勾选；取消后，绑定这个供应商的模板不再提供该档。',
+    tiersUnknown: '代码里没有这个模型的规格，默认只开 1K。勾选 2K 或 4K 就是人工声明：保存时会写入审计记录，请先确认模型真的能出这个尺寸。',
+    tiersDeclared: (tiers: string) => `人工声明：${tiers}（保存时写入审计）`,
     baseUrl: '接口根地址',
     baseUrlHint: '请填写供应商的 HTTPS API 根地址。',
     arkModelHint: '例如 doubao-seedream-5-5-261028（须先在火山方舟控制台开通）。按张的官方价写在代码价目表里，目前只收录 5.5。',

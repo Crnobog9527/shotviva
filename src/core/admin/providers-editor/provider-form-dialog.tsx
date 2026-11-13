@@ -9,11 +9,12 @@ import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
 
 import { MODULE_ADAPTERS, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
+import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 
 import type { AdminProvider, ProviderAdminActions } from '../providers/types'
 
 import { PROVIDERS_COPY } from './copy'
-import { canSave, formFor, tiersFor, usesTokenPrices, withBaseUrl, withAdapter, withModel, type ProviderForm } from './form-state'
+import { canSave, formFor, tierOptions, usesTokenPrices, withBaseUrl, withAdapter, withModel, withTier, type ProviderForm, type TierOptions } from './form-state'
 import { CatalogPrices } from './catalog-prices'
 import { ImageCostFields } from './image-cost-fields'
 import { PriceFields } from './price-fields'
@@ -49,10 +50,31 @@ const COPY = PROVIDERS_COPY.form
 function useFormState(provider: AdminProvider | null, module: ProviderModule, lookupModel: Props['lookupModel']) {
   const [draft, setForm] = useState(() => formFor(provider, module))
   const catalog = useModelResolutions(draft.adapter === 'openrouter_images', draft.baseUrl.trim(), draft.model.trim(), lookupModel)
-  const tiers = catalog.snapshot?.resolutions ?? draft.resolutions
-  const form = { ...draft, resolutions: draft.adapter === 'openrouter_images' ? tiers : [...tiersFor(draft.adapter)] }
+  const tiers = tierOptions(draft, catalog.snapshot?.resolutions ?? null, provider)
+  const form = { ...draft, resolutions: tiers.selected }
   const canSubmit = !catalog.pending && catalog.result?.ok !== false && canSave(form, !provider?.apiKeyLast4)
-  return { form, setForm, catalog, canSubmit, estimates: catalog.snapshot?.catalogImageCosts }
+  return { form, setForm, catalog, canSubmit, tiers, estimates: catalog.snapshot?.catalogImageCosts }
+}
+
+// One checkbox per site tier (PR-1b): a tier the model lacks is disabled; an OpenAI model the
+// code does not know starts at 1K, and ticking more is a declaration the save audits.
+function TierChoice({ tiers, onToggle }: { tiers: TierOptions; onToggle(tier: Resolution, on: boolean): void }) {
+  return (
+    <fieldset className="grid gap-1.5">
+      <legend className="text-sm">{COPY.resolutions}</legend>
+      <div className="flex flex-wrap gap-4">
+        {RESOLUTIONS.map((tier) => (
+          <label key={tier} className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="provider-tier" value={tier} checked={tiers.selected.includes(tier)} disabled={!tiers.allowed.includes(tier)}
+              onChange={(event) => onToggle(tier, event.target.checked)} />
+            {tier.toUpperCase()}
+          </label>
+        ))}
+      </div>
+      <p className="text-muted-foreground text-xs">{tiers.unknownModel ? COPY.tiersUnknown : COPY.tiersHint}</p>
+      {tiers.declared.length ? <p role="status" className="text-sm text-amber-600">{COPY.tiersDeclared(tiers.declared.join(' / ').toUpperCase())}</p> : null}
+    </fieldset>
+  )
 }
 
 function LookupStatus({ catalog }: { catalog: ReturnType<typeof useModelResolutions> }) {
@@ -96,7 +118,7 @@ function Prices({ form, catalog, setForm }: PricesProps) {
 }
 
 export function ProviderFormDialog({ provider, module, pending, error, lookupModel, onCancel, onSubmit }: Props) {
-  const { form, setForm, catalog, canSubmit, estimates } = useFormState(provider, module, lookupModel)
+  const { form, setForm, catalog, canSubmit, tiers, estimates } = useFormState(provider, module, lookupModel)
   const set = (key: keyof ProviderForm) => (event: { target: { value: string } }) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }))
   // The model drives the official-price pre-fill (§10.0).
@@ -133,9 +155,13 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
           <CatalogPreview catalog={catalog} />
           {form.module === 'image' && (
             <>
-              <p className="text-sm">{COPY.resolutions} · {form.resolutions.join(' / ').toUpperCase()}</p>
+              <TierChoice tiers={tiers} onToggle={(tier, on) => setForm((prev) => withTier(prev, tiers.selected, tier, on))} />
               <ImageCostFields adapter={form.adapter} tiers={form.resolutions} values={form.imageCosts} estimates={estimates}
                 onChange={(tier, value) => setForm((prev) => ({ ...prev, imageCosts: { ...prev.imageCosts, [tier]: value } }))} />
+              <Field id="extraInputCost" label={COPY.extraInputCost} hint={COPY.extraInputCostHint}>
+                <Input id="provider-extraInputCost" inputMode="decimal" value={form.extraInputCost}
+                  onChange={(e) => setForm((prev) => ({ ...prev, extraInputCost: e.target.value }))} />
+              </Field>
             </>
           )}
           <Field

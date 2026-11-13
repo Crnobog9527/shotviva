@@ -10,7 +10,9 @@ import { LEGACY_RESOLUTIONS, RESOLUTIONS, normalizeResolution } from './output-o
 
 const DB_TOP_TIER = '3k'
 
-const TIER_LIST_KEYS = new Set(['resolution', 'resolutions', 'unpriced_resolutions', 'unpricedResolutions', 'p_resolution', 'p_unpriced'])
+// Fields whose values are tier ids. `declared_resolutions` is deliberately absent: it only words
+// the provider audit row, which names the tiers as the admin saw them (4K).
+const TIER_LIST_KEYS = new Set(['resolution', 'resolutions', 'unpriced_resolutions', 'unpricedResolutions', 'p_resolution', 'p_unpriced', 'resolutionLimit'])
 
 function isTierId(value: unknown): value is string {
   return typeof value === 'string' && ((RESOLUTIONS as readonly string[]).includes(value) || Object.hasOwn(LEGACY_RESOLUTIONS, value))

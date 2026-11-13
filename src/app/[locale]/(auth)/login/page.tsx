@@ -5,12 +5,11 @@ import { Suspense } from 'react'
 import { nextIn } from '@/core/auth'
 import { LoginForm } from '@/core/auth/ui'
 import { currentLocale } from '@/core/i18n/server'
+import { CONNECT_PAGE_PATH } from '@/core/partner'
 
 import { googleAction, loginAction, phoneSendAction, phoneVerifyAction, resendSignupAction } from '@/app/auth/actions'
 
-import { Arrived } from '../arrived'
-import { googleMainlandNote } from '../google-note'
-import { redirectIfSignedIn } from '../signed-in-redirect'
+import { LoginScreen } from '../auth-screens'
 import { sender } from '../sender'
 
 // Mainland phone sign-in is offered on the Chinese pages only (ARCHITECTURE §7, T63).
@@ -22,34 +21,21 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('auth.login'))('title') }
 }
 
-const NOTICES = new Set(['unverified', 'link_expired', 'callback_failed', 'oauth_failed'])
-
-async function Login({ searchParams }: PageProps<'/[locale]/login'>) {
-  const params = await searchParams
-  const error = typeof params.error === 'string' && NOTICES.has(params.error) ? params.error : null
-  const rawNext = typeof params.next === 'string' ? params.next : null
+// Static (auth-screens.tsx): the cached HTML carries the form with the defaults (no notice, the
+// account page as `next`); the browser then fills in ?next= and ?error=. A signed-in visitor is
+// redirected by the proxy (core/auth/guest-gate.ts).
+export default async function LoginPage() {
   const locale = await currentLocale()
-  // An unverified account is sent here with ?error=unverified; showing the form is the point.
-  if (!error) await redirectIfSignedIn(rawNext, locale)
-  const next = nextIn(rawNext, locale)
+  const form = {
+    action: loginAction,
+    google: { action: googleAction, mainlandNote: locale === 'zh' },
+    resendAction: resendSignupAction,
+    sender,
+    phone: locale === 'zh' ? phone : undefined,
+  }
   return (
-    <LoginForm
-      action={loginAction}
-      google={{ action: googleAction, mainlandNote: await googleMainlandNote(locale) }}
-      resendAction={resendSignupAction}
-      next={next}
-      notice={error}
-      arrived={<Arrived next={next} page="login" />}
-      sender={sender}
-      phone={locale === 'zh' ? phone : undefined}
-    />
-  )
-}
-
-export default function LoginPage(props: PageProps<'/[locale]/login'>) {
-  return (
-    <Suspense>
-      <Login {...props} />
+    <Suspense fallback={<LoginForm {...form} next={nextIn(null, locale)} notice={null} />}>
+      <LoginScreen {...form} locale={locale} connectPath={CONNECT_PAGE_PATH} />
     </Suspense>
   )
 }
