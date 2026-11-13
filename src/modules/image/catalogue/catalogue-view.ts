@@ -8,7 +8,8 @@ import { categoriesOf, type CatalogueTemplate } from './catalogue-template'
 // browser without another read.
 // `key` (the stable category key analytics uses) and, on roots, `intro` (分类管理's 首页说明,
 // shown under the section heading in All) come from the category tree; the flat fallback has neither.
-export type FilterNode = { slug: string; name: string; children: FilterNode[]; key?: string; intro?: string | null }
+// `alias`: the name in the other language, so search finds 「餐饮」 by "food" and the reverse.
+export type FilterNode = { slug: string; name: string; children: FilterNode[]; key?: string; intro?: string | null; alias?: string }
 
 export type CatalogueSeries = {
   id: string
@@ -46,7 +47,7 @@ function trim(tree: readonly CategoryNode[], entries: readonly GridEntry[], zh: 
   return tree
     .filter((node) => entries.some((entry) => startsWith(entry.path, node.path)))
     .map((node) => ({
-      slug: node.slug, key: node.key, name: zh ? node.nameZh : node.nameEn,
+      slug: node.slug, key: node.key, name: zh ? node.nameZh : node.nameEn, alias: zh ? node.nameEn : node.nameZh,
       // Only a root's intro is drawn (the section heading in All); deeper levels do not carry it.
       ...(node.path.length === 1 ? { intro: (zh ? node.introZh : node.introEn) ?? null } : {}),
       children: trim(node.children, entries, zh),

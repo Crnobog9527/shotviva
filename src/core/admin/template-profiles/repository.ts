@@ -44,7 +44,7 @@ export async function listProfileTemplates(db: SupabaseClient): Promise<ProfileT
   for (let after = ''; ;) {
     const { data, error } = await db.from('templates')
       .select('id, name, category_key, series_id, is_active, translations, fields, template_prompts(active_profile, provider_id), template_profiles(profile, prompt_version, quality, credits_cost, unpriced_resolutions, provider_unmatched, updated_at, template_prompt_versions(provider_id))')
-      .not('id', 'in', '(edit,freeform)').gt('id', after).order('id').limit(PAGE)
+      .not('id', 'in', '(edit,freeform)').is('deleted_at', null).gt('id', after).order('id').limit(PAGE)
     if (error) throw new AppError('INTERNAL', 'listProfileTemplates failed', { cause: error })
     const page = z.array(templateRow).parse(data)
     rows.push(...page)

@@ -122,7 +122,7 @@ describe('switching', () => {
     expect(back).toMatchObject({ ok: true, from: 'seedream', to: 'openai' })
     expect(await live()).toEqual(gpt)
     expect(await versions()).toBe(count)
-    expect(Number((await one<{ n: string }>("select count(*) n from public.admin_audit_log where action='template_profile_switch' and target_id=$1", [id])).n)).toBe(2)
+    expect(Number((await one<{ n: string }>('select count(*) n from admin.template_profile_switches where template_id=$1', [id])).n)).toBe(2)
     expect((await switchTo('openai'))[0]).toMatchObject({ ok: true, unchanged: true })
   })
 
@@ -143,6 +143,16 @@ describe('switching', () => {
     expect((await switchTo('seedream'))[0]).toMatchObject({ ok: false, code: 'PROVIDER_MISSING' })
     expect(await one('select public.admin_template_profile_scope($1,$2) s', ['category', 'art-styles'])).toEqual({ s: [] })
     expect((await one<{ s: string[] }>("select public.admin_template_profile_scope('site',null) s")).s).toContain(id)
+  })
+
+  it('leaves deleted templates (1401) out of the scope, the switch and the profile save', async () => {
+    await saveSeedream()
+    await db.query('update public.templates set is_active=false where id=$1', [id])
+    await db.query('select public.admin_delete_template($1,$2)', [actor, id])
+    expect((await one<{ s: string[] }>("select public.admin_template_profile_scope('site',null) s")).s).not.toContain(id)
+    expect((await switchTo('seedream'))[0]).toMatchObject({ ok: false, code: 'TEMPLATE_DELETED' })
+    const version = (await profile('seedream')).prompt_version
+    await expect(savepoint(() => saveSeedream('After delete', undefined, version))).rejects.toThrow(/TEMPLATE_NOT_FOUND/)
   })
 })
 

@@ -9,35 +9,28 @@
 --   same rows and the same deferred checks as an editor save (floor, sale, references, catalogue
 --   minimums, model family), forced at the end of each template. A template that fails is left on
 --   its current profile and reported; publication, sale, featured rank, order and covers never
---   change. Each switch is audited ('template_profile_switch'). p_validate_only rolls everything
+--   change. Each switch is logged in admin.template_profile_switches. p_validate_only rolls everything
 --   back and returns the same report (the admin's preview).
 -- * admin_template_profile_scope: a category (with its sub-categories), a series or the whole site
---   as template ids. Art-style templates and the built-in edit / freeform templates are never in it.
+--   as template ids. Art-style, deleted (1401) and the built-in edit / freeform templates are never in
+--   it; switching or saving a deleted template is refused.
 -- * admin_manage_prompt_version: a version a profile points at cannot be deleted (ACTIVE_VERSION).
--- The audit action list is 1296's plus 'template_profile_switch' (widen only).
 
-alter table public.admin_audit_log drop constraint admin_audit_log_action_check,
-  add constraint admin_audit_log_action_check check (action in (
-  'ban_user','unban_user','view_work','replay_checkout','decide_refund','submit_dispute',
-  'clawback_payment','save_code','set_code_active','affiliate_create','affiliate_decide',
-  'affiliate_set','affiliate_rebind','affiliate_adjust','affiliate_commission_release',
-  'affiliate_payout_decide','affiliate_settings','affiliate_recompute','waffo_renewal_settled',
-  'waffo_renewal_refunded','catalog_save','catalog_prepare','catalog_publish','catalog_retry',
-  'catalog_archive','catalog_waffo','gallery_setting','moderate_work','template_sync_active',
-  'template_sync_sale','series_sync_active','template_apply_active','template_apply_cover',
-  'series_set_active','series_set_show_members','template_profile_switch'));
+-- Each switch, in its own private log (not admin_audit_log: its action list is rewritten by other
+-- migrations, e.g. 1401, and a list without this action would refuse the switch).
+create table admin.template_profile_switches (
+  id bigint generated always as identity primary key,
+  template_id text not null references public.templates(id) on delete cascade,
+  actor_id uuid not null references public.profiles(id) on delete cascade,
+  from_profile text not null, to_profile text not null,
+  reason text not null check (length(reason) between 1 and 300),
+  created_at timestamptz not null default now()
+);
+alter table admin.template_profile_switches enable row level security;
+revoke all on admin.template_profile_switches from public,anon,authenticated,service_role;
+create index template_profile_switches_template_idx on admin.template_profile_switches(template_id, created_at);
 
--- service_role may read admin_audit_log but not write it (as template_apply_audit, 1260).
-create function admin.template_profile_audit(p_actor uuid, p_target text, p_reason text) returns void
-language plpgsql security definer set search_path='' as $$
-begin
-  if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
-    raise exception 'FORBIDDEN';
-  end if;
-  insert into public.admin_audit_log(action, user_id, target_id, reason) values('template_profile_switch', p_actor, p_target, p_reason);
-end $$;
-revoke all on function admin.template_profile_audit(uuid, text, text) from public, anon, authenticated;
-grant execute on function admin.template_profile_audit(uuid, text, text) to service_role;
+
 
 create function admin.valid_profile_prices(p_cost jsonb, p_unpriced text[]) returns boolean
 language sql immutable set search_path='' as $$
@@ -61,7 +54,7 @@ begin
   if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then raise exception 'NOT_ADMIN'; end if;
   if p_profile not in ('openai','seedream') or p_quality not in ('high','medium') or jsonb_typeof(p_prompt) is distinct from 'object'
     or not admin.valid_profile_prices(p_credits_cost, p_unpriced) then raise exception 'INVALID_INPUT'; end if;
-  perform 1 from public.templates where id=p_id for update;
+  perform 1 from public.templates where id=p_id and deleted_at is null for update;
   if not found then raise exception 'TEMPLATE_NOT_FOUND'; end if;
   if p_id in ('edit','freeform') then raise exception 'INVALID_INPUT'; end if;
   select * into tp from public.template_prompts where template_id=p_id for update;
@@ -121,6 +114,7 @@ begin
   select * into t from public.templates where id=p_id for update;
   if not found then raise exception 'TEMPLATE_NOT_FOUND'; end if;
   if p_id in ('edit','freeform') or t.category_key='art-styles' then raise exception 'PROFILE_NOT_ALLOWED'; end if;
+  if t.deleted_at is not null then raise exception 'TEMPLATE_DELETED' using detail='已删除的模板不参与切换'; end if;
   select * into tp from public.template_prompts where template_id=p_id for update;
   if not found then raise exception 'TEMPLATE_NOT_FOUND'; end if;
   v_from := tp.active_profile;
@@ -150,7 +144,8 @@ begin
     and (quality,credits_cost) is distinct from (p.quality,p.credits_cost);
   select * into t from public.templates where id=p_id;
   v_after := jsonb_build_object('resolutions',admin.template_image_options(t)->'resolutions','credits',t.credits_cost);
-  perform admin.template_profile_audit(p_actor, p_id, format('profile %s → %s: %s', v_from, p_target, p_reason));
+  insert into admin.template_profile_switches(template_id,actor_id,from_profile,to_profile,reason)
+    values (p_id,p_actor,v_from,p_target,p_reason);
   return jsonb_build_object('from',v_from,'to',p_target,'before',v_before,'after',v_after);
 end $$;
 revoke all on function admin.switch_template_profile(uuid,text,text,text) from public,anon,authenticated;
@@ -194,10 +189,14 @@ grant execute on function public.admin_switch_template_profiles(uuid,text[],text
 
 -- p_scope: 'category' (p_key: any level's key; its sub-categories too), 'series' (p_key: id or slug) or
 -- 'site'. Never art-style, edit or freeform templates.
+-- plpgsql, not sql: the body names templates.deleted_at (1401), which a fresh database adds after
+-- this migration; plpgsql resolves columns when it runs.
 create function public.admin_template_profile_scope(p_scope text, p_key text) returns text[]
-language sql stable set search_path='' as $$
-  select coalesce(array_agg(t.id order by t.id),'{}') from public.templates t
-  where t.id not in ('edit','freeform') and t.category_key<>'art-styles'
+language plpgsql stable set search_path='' as $$
+declare ids text[];
+begin
+  select coalesce(array_agg(t.id order by t.id),'{}') into ids from public.templates t
+  where t.id not in ('edit','freeform') and t.category_key<>'art-styles' and t.deleted_at is null
     and exists(select from public.template_prompts tp where tp.template_id=t.id)
     and case p_scope
       when 'site' then true
@@ -205,8 +204,9 @@ language sql stable set search_path='' as $$
       when 'category' then coalesce(t.subcategory_key,t.category_key) in (
         select c.key from public.template_categories c left join public.template_categories pc on pc.key=c.parent_id
         where c.kind='template' and (c.key=p_key or c.parent_id=p_key or pc.parent_id=p_key))
-      else false end
-$$;
+      else false end;
+  return ids;
+end $$;
 revoke all on function public.admin_template_profile_scope(text,text) from public,anon,authenticated;
 grant execute on function public.admin_template_profile_scope(text,text) to service_role;
 

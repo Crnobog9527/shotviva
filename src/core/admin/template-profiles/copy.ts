@@ -76,6 +76,7 @@ const SWITCH_ERRORS: Record<string, string> = {
   INVALID_STYLE_REFS: '画风参考图无效',
   VERSION_OTHER_PROFILE: '提示词版本不属于这套配置',
   TEMPLATE_NOT_FOUND: '模板已不存在',
+  TEMPLATE_DELETED: '模板已删除',
 }
 
 export function switchErrorText(code: string, detail: string | null): string {

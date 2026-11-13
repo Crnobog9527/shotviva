@@ -10,6 +10,7 @@ export {
   setTemplatesFeatured,
   setTemplateActive,
   setTemplateOrder,
+  deleteTemplate,
   setTemplatesActive,
 } from './templates'
 export type {

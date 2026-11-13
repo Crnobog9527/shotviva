@@ -49,3 +49,4 @@ describe('syncTemplateState', () => {
       .rejects.toThrow('SALE_ROUTE_NOT_ALLOWED')
   })
 })
+

@@ -11,6 +11,8 @@ export type AdminTemplate = Template & {
   subcategoryKey?: string | null
   seriesId?: string | null
   seriesSortOrder?: number
+  // 删除 (1401): set on soft-deleted templates, shown only under 已删除 and never published again.
+  deletedAt?: string | null
   saleEnabled?: boolean
   // Published but missing from the catalogue, and why (1295); absent when it is listed.
   catalogueGap?: SaleFloorExample
@@ -73,4 +75,6 @@ export type TemplateAdminActions = {
   setFeaturedMany: (input: { ids: string[]; featured: boolean; expectedIds: string[] }) => Promise<ActionValue<FeaturedPlan>>
   requestCoverUpload: (input: CoverUploadRequest) => Promise<ActionValue<CoverTicket>>
   applyCover: (input: ApplyCoverRequest) => Promise<ActionResult>
+  // 删除 an unpublished template (Owner 2026-11-13); a soft delete, works and history stay.
+  remove: (input: { id: string }) => Promise<ActionResult>
 }
