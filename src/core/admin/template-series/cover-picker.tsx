@@ -45,8 +45,9 @@ export function CoverPicker({ detail, save }: { detail: SeriesDetail; save: Seri
               return (
                 <li key={member.id}>
                   <button type="button" aria-pressed={chosen} onClick={() => setCover(member.cover_url)}
-                    className={cn('grid w-full gap-1 rounded-md p-1 text-left outline-none ring-offset-2 focus-visible:ring-2',
-                      chosen ? 'ring-primary ring-2' : 'hover:bg-muted')}>
+                    // Focus only tints (the dialog focuses the first tile on open); the orange ring means chosen.
+                    className={cn('hover:bg-muted focus-visible:bg-muted grid w-full gap-1 rounded-md p-1 text-left outline-none',
+                      chosen && 'ring-primary ring-2')}>
                     {/* eslint-disable-next-line @next/next/no-img-element -- admin-only, the same still the editor shows */}
                     <img src={member.cover_url ?? ''} alt="" loading="lazy" className="bg-muted aspect-[4/5] w-full rounded object-cover" />
                     <span className="truncate text-xs">{member.name}</span>
