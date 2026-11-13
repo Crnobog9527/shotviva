@@ -24,7 +24,9 @@ describe('toPhotoDetail', () => {
   })
 
   it('has no note when none was written, and a deleted original without a preview', () => {
-    expect(toPhotoDetail({ inputs: { note: '   ' } }, null)).toEqual({ note: null, original: { kind: 'deleted' }, keptWithWork: false })
+    expect(toPhotoDetail({ inputs: { note: '   ', input_key: 'inputs/u/a.jpg' } }, null)).toEqual({ note: null, original: { kind: 'deleted' }, keptWithWork: false })
+    // Nothing was uploaded (a dense-text poster): no original at all, not a deleted one.
+    expect(toPhotoDetail({ inputs: { input_key: null } }, null).original).toEqual({ kind: 'none' })
     expect(toPhotoDetail({ inputs: {} }, '/api/files/j/original', true).keptWithWork).toBe(true)
     expect(noteOf({})).toBeNull()
     expect(noteOf({ note: 42 })).toBeNull()
@@ -47,5 +49,7 @@ describe('viewsFor', () => {
   it('offers Result | Original, or three views for a cut-out', () => {
     expect(viewsFor(false)).toEqual(['result', 'original'])
     expect(viewsFor(true)).toEqual(['result', 'checker', 'original'])
+    expect(viewsFor(false, false)).toEqual(['result'])
+    expect(viewsFor(true, false)).toEqual(['result', 'checker'])
   })
 })

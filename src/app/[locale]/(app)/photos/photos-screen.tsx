@@ -8,7 +8,7 @@ import { createAdminSupabase, requireUser } from '@/core/auth'
 import { fileUrlFor, firstThumbUrls, listOwnJobs } from '@/core/jobs'
 import { currentLocale } from '@/core/i18n/server'
 import { r2Origin, r2Store } from '@/core/storage'
-import { cachedWebTemplates, EDIT_TEMPLATE_ID } from '@/core/templates'
+import { cachedPosterTemplates, cachedWebTemplates, EDIT_TEMPLATE_ID } from '@/core/templates'
 import { DoneGrid, PhotosCount, RunningList, toPhotoItem, type TemplateLookup } from '@/modules/image'
 
 function Header({ aside }: { aside?: ReactNode }) {
@@ -22,10 +22,12 @@ async function Photos({ back }: { back: string | Promise<string> }) {
   const now = new Date()
   // The first screen's small copies are signed while the templates are still being read.
   const works = listOwnJobs(createAdminSupabase(), user.id, now).then(async (own) => ({ own, signed: await firstThumbUrls(r2Store, own.done) }))
-  const [{ own, signed }, templates] = await Promise.all([works, cachedWebTemplates(await currentLocale(), true)])
+  const locale = await currentLocale()
+  const [{ own, signed }, templates, posters] = await Promise.all([works, cachedWebTemplates(locale, true), cachedPosterTemplates(locale)])
   const tp = await getTranslations('app.photos')
   const fallback = tp('fallbackName')
-  const lookup: TemplateLookup = new Map(templates.map((t) => [t.id, { name: t.name, cover: t.coverAfterUrl ?? t.coverPosterUrl }]))
+  // Poster templates are outside the catalogue (ARCHITECTURE §5.3) but name their works too.
+  const lookup: TemplateLookup = new Map([...templates, ...posters].map((t) => [t.id, { name: t.name, cover: t.coverAfterUrl ?? t.coverPosterUrl }]))
   // Edits run on the built-in `edit` template, which is in no catalogue (ARCHITECTURE §5.2).
   lookup.set(EDIT_TEMPLATE_ID, { name: tp('editedName'), cover: null })
   const running = own.running.map((job) => toPhotoItem(job, lookup, null, fallback))
