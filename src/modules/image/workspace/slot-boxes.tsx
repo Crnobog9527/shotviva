@@ -62,7 +62,7 @@ function MissingSlotPhotos({ reason }: { reason: 'old' | 'failed' }) {
   )
 }
 
-function SlotBox({ slot, photos }: { slot: CatalogueImageSlot; photos: SlotPhotos }) {
+export function SlotBox({ slot, photos }: { slot: CatalogueImageSlot; photos: SlotPhotos }) {
   const t = useTranslations('app')
   const input = useRef<HTMLInputElement>(null)
   const photo = photos.byKey[slot.key]
