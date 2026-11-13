@@ -40,6 +40,9 @@ function routerCharge(usage: ProviderUsage): number | null {
 }
 
 function imageCost(usage: ProviderUsage, prices: ProviderPrices | null | undefined): number | null {
+  // Billed per image at a list price the adapter already converted (Ark). Only counts are
+  // reported, so there is nothing to multiply here.
+  if (usage.list_cost_usd !== undefined) return usage.list_cost_usd
   if ('cost' in usage || usage.prompt_tokens !== undefined || usage.completion_tokens !== undefined) return routerCharge(usage)
   if (!prices) return null
   let total = 0

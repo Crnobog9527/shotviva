@@ -38,7 +38,7 @@ function estimateFor(row: AdminProvider, provider: GenerationProvider, selection
 export async function labImageRoute(db: SupabaseClient, selection: RouteFields) {
   const row = await findProvider(db, selection.providerId)
   if (!row) throw unavailable()
-  if (row.adapter === 'openrouter_images' && selection.quality !== 'medium') throw unavailable()
+  if (row.adapter !== 'openai_images' && selection.quality !== 'medium') throw unavailable()
   const options = routeOptions(row, selection)
   const provider = await imageProvider(row.id, options)
   if (provider.fallbackReason || provider.id !== providerTag(row.id, row.model)) throw unavailable()

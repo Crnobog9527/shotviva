@@ -1,13 +1,11 @@
 import 'server-only'
 
-import sharp from 'sharp'
 import { z } from 'zod'
 
 import { ProviderError, type ProviderInput, type ProviderOutput, type ProviderUsage } from '@/core/jobs'
 import { reportedUsage } from './openrouter-receipt'
-import { sniffImageType } from '@/core/storage'
 
-import { outputSize, sourcePhoto } from './output-size'
+import { pngFromBase64 } from './image-output'
 
 const errorSchema = z.object({
   code: z.union([z.number(), z.string()]).optional(),
@@ -39,19 +37,6 @@ function providerFailure(status: number, error: UpstreamError | null | undefined
   return new ProviderError(timeout ? 'timeout' : 'failed', `openrouter image request failed (HTTP ${httpCode})`, { usage })
 }
 
-async function normalizeOutput({ b64_json, media_type }: z.infer<typeof imageSchema>, input: ProviderInput) {
-  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64_json)) throw new Error('invalid base64 image')
-  const bytes = Buffer.from(b64_json, 'base64')
-  const type = sniffImageType(bytes)
-  if (!type || type === 'image/heic' || (media_type && type !== media_type)) throw new Error('invalid image format')
-  // All downstream outputs are PNG. Limit decode memory and preserve framing on the 4K → 3K conversion.
-  const image = sharp(bytes, { limitInputPixels: 32_000_000 }).rotate()
-  if (input.resolution === '3k') {
-    image.resize({ ...outputSize('3k', input.aspectRatio, sourcePhoto(input)), fit: 'inside', withoutEnlargement: true })
-  }
-  return image.png().toBuffer()
-}
-
 export async function readOpenRouterOutput(response: Response, input: ProviderInput): Promise<ProviderOutput> {
   input.noteUsage?.(reportedUsage({}, response.headers))
   const body: unknown = await response.json().catch(() => null)
@@ -63,7 +48,7 @@ export async function readOpenRouterOutput(response: Response, input: ProviderIn
   const image = parsed.data?.[0]
   if (!image) throw new ProviderError('failed', 'openrouter returned no image', { usage })
   try {
-    return { bytes: await normalizeOutput(image, input), contentType: 'image/png', usage }
+    return { bytes: await pngFromBase64(image.b64_json, image.media_type, input), contentType: 'image/png', usage }
   } catch {
     throw new ProviderError('failed', 'openrouter returned an unusable image', { usage })
   }

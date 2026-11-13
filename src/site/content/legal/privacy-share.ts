@@ -9,6 +9,7 @@ const providers = [
   'Supabase: database and sign-in (accounts, credit records, works and orders).',
   'Cloudflare R2: storage for uploaded photos, created images and Wishlist reference images.',
   'OpenAI: creates images. We send it your photo, the template instructions and the text you entered. OpenAI processes this data under its API terms.',
+  'Volcano Engine (Beijing Volcano Engine Technology Co., Ltd., mainland China): creates images for some templates. For those templates we send it your photo, any reference images, the template instructions and the text you entered, and it processes them on its servers in mainland China under its own terms.',
   'Stripe and Link: payments, subscriptions and billing portals. For card purchases where Link is the merchant of record, Link also receives your purchase details as the seller.',
   'Waffo: backup payment provider for one-time payments.',
   'PostHog (United States): product analytics, described in "Analytics and cookies" below.',

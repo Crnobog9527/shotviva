@@ -42,6 +42,10 @@ const serverEnvSchema = z.object({
   // OpenAI image provider (modules/image/provider); the key is required on first use.
   OPENAI_API_KEY: optionalSecret,
   OPENAI_IMAGE_MODEL: z.preprocess(blankAsUnset, z.string().min(1).default('gpt-image-2.5-sunburst')),
+  // Yuan per US dollar for providers that bill in CNY (Volcano Engine Ark, ARCHITECTURE §10.0):
+  // their per-image list price is converted with this rate into cost_usd. Default: the PBOC
+  // USD/CNY central parity of 2026-11-09 (6.7188), rounded. The Owner sets it per environment.
+  CNY_PER_USD: z.preprocess(blankAsUnset, z.coerce.number().finite().min(1).max(20).default(6.72)),
   // OpenAI Moderation API for public works (ARCHITECTURE §9 第 5 条, T108). Unset → OPENAI_API_KEY;
   // neither set → no automatic screen, so every public work waits for a person.
   OPENAI_MODERATION_API_KEY: optionalSecret,
