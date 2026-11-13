@@ -4,7 +4,6 @@ import { useSearchParams } from 'next/navigation'
 import type { ComponentProps } from 'react'
 
 import { loginNotice } from '@/core/auth/guest-gate'
-import { inMainlandZone } from '@/core/auth/mainland-zone'
 import { nextIn } from '@/core/auth/redirect-target'
 import { LoginForm, ResetRequestForm, SignupForm } from '@/core/auth/ui'
 import type { Locale } from '@/core/i18n'
@@ -31,7 +30,7 @@ export function LoginScreen({ locale, connectPath, google, ...form }: LoginProps
     <LoginForm
       key={notice ?? ''}
       {...form}
-      google={{ ...google, mainlandNote: google.mainlandNote || inMainlandZone() }}
+      google={google}
       next={next}
       notice={notice}
       arrived={<Arrived next={next} page="login" connectPath={connectPath} />}
@@ -47,7 +46,7 @@ export function SignupScreen({ locale, connectPath, google, ...form }: SignupPro
     <SignupForm
       key={tab}
       {...form}
-      google={{ ...google, mainlandNote: google.mainlandNote || inMainlandZone() }}
+      google={google}
       next={next}
       arrived={<Arrived next={next} page="signup" connectPath={connectPath} />}
       initialTab={tab}
