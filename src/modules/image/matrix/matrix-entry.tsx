@@ -7,14 +7,13 @@ import { Link } from '@/core/i18n/ui'
 import { cn } from '@/core/ui/cn'
 
 import { IntroTrigger } from '../gated/intro-trigger'
+import { batchHref } from './batch-query'
 import { MaxBadge } from './max-badge'
-
-const matrixHref = (templateIds: readonly string[] = []) => (templateIds.length ? `/generate/batch?t=${templateIds.join(',')}` : '/generate/batch')
 
 type Props = { tier: MembershipTier | null; templateId?: string; className?: string }
 
-// A template's way into several templates at once (T107), under its form. Max opens the
-// multi-template batch with this template already in it; below Max the same link carries a
+// A template's way into several templates at once (T107), under its form. Max opens Batch
+// create's dialog on Create with this template already in it (Owner 2026-11-12); below Max the same link carries a
 // locked Max badge and opens the feature's intro first (Owner 2026-11-12), which then offers
 // the paywall on Max. The Create page lists the feature among its gated ways (gated-features).
 export function MatrixEntry({ tier, templateId, className }: Props) {
@@ -35,7 +34,7 @@ export function MatrixEntry({ tier, templateId, className }: Props) {
     )
   }
   return (
-    <Link href={matrixHref(templateId ? [templateId] : [])} className={style}>
+    <Link href={batchHref(templateId ? [templateId] : [])} className={style}>
       {body}
     </Link>
   )

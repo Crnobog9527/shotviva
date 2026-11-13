@@ -24,6 +24,9 @@ export type Category = {
   // A built-in template's category (photo edit, partner freeform): never on Create or the home
   // page, not editable or deletable in admin.
   isSystem: boolean
+  // A root whose works are never public (migration 1320, ARCHITECTURE §9 第 7 条): the posters
+  // root. Read from the template's root (templates.category_key); a sub-category follows it.
+  galleryExcluded?: boolean
 }
 
 export type CategoryRow = {
@@ -35,9 +38,11 @@ export type CategoryRow = {
   card_style: CardStyle
   sort_order: number
   is_system: boolean
+  // Absent on a database before migration 1320.
+  gallery_excluded?: boolean
 }
 
-export const CATEGORY_COLUMNS = 'key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order, is_system'
+export const CATEGORY_COLUMNS = 'key, name_en, name_zh, intro_en, intro_zh, card_style, sort_order, is_system, gallery_excluded'
 
 export function toCategory(row: CategoryRow): Category {
   return {
@@ -49,6 +54,7 @@ export function toCategory(row: CategoryRow): Category {
     cardStyle: row.card_style,
     sortOrder: row.sort_order,
     isSystem: row.is_system,
+    galleryExcluded: row.gallery_excluded ?? false,
   }
 }
 
@@ -67,6 +73,7 @@ export function preT75Category(name: string): Category {
     cardStyle: name === 'Art Styles' ? 'compare' : 'pair',
     sortOrder: 0,
     isSystem: PRE_T75_SYSTEM.has(name),
+    galleryExcluded: false,
   }
 }
 

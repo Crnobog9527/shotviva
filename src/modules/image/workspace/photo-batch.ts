@@ -47,3 +47,9 @@ export function summarize(photos: readonly BatchPhoto[]): BatchSummary {
   const uploading = photos.some((photo) => photo.upload.phase !== 'done' && photo.upload.phase !== 'error')
   return { photo: uploading ? 'uploading' : ready.length > 0 ? 'ready' : 'none', ready, planned }
 }
+
+// The local previews (object URLs of picked files) to free: kept photos (no file) are R2 URLs,
+// and a preview a job still shows stays.
+export function previewsToRevoke(photos: readonly { url: string; file: unknown }[], inUse: ReadonlySet<string>): string[] {
+  return photos.flatMap((photo) => (photo.file && !inUse.has(photo.url) ? [photo.url] : []))
+}

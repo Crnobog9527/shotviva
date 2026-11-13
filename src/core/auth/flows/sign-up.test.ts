@@ -13,7 +13,7 @@ vi.mock('../../env', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../env')>()
   return { ...actual, serverEnv: () => ({ ...actual.serverEnv(), ...request.env }) }
 })
-vi.mock('../supabase-server', () => ({ createServerSupabase: async () => ({ auth: mocks }) }))
+vi.mock('../supabase-server', () => ({ createSessionSupabase: async () => ({ auth: mocks }) }))
 
 const { resendSignupEmail, signUpWithPassword, updatePassword } = await import('./sign-up')
 

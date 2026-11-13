@@ -75,3 +75,27 @@ describe('reference media gateway', () => {
     expect(sign).toHaveBeenCalledTimes(1)
   })
 })
+
+// Review of #542: the session check may have rotated the session; a failure while streaming
+// must still hand the rotated cookies to the browser.
+describe('reference media gateway after a session rotation', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchObject)
+    lookup.mockResolvedValue({ data: { id } })
+  })
+  afterEach(() => { vi.unstubAllGlobals(); vi.resetAllMocks() })
+
+  it.each([
+    ['signing fails', () => sign.mockRejectedValue(new Error('r2 not configured'))],
+    ['the upstream fetch throws', () => { sign.mockResolvedValue('https://private.invalid/x'); fetchObject.mockRejectedValue(new TypeError('fetch failed')) }],
+  ])('keeps the rotated session cookies on the 503 when %s', async (_, fail) => {
+    const rotated = NextResponse.next()
+    rotated.cookies.set('sb-test-auth-token', 'rotated-session', { path: '/' })
+    user.mockResolvedValue({ user: { role: 'admin', verified: true, banned: false }, response: () => rotated })
+    fail()
+    const res = await referenceMedia(request())
+    expect(res.status).toBe(503)
+    expect(res.cookies.get('sb-test-auth-token')?.value).toBe('rotated-session')
+    expect(res.headers.get('set-cookie') ?? '').not.toContain('private.invalid')
+  })
+})

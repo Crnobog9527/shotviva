@@ -1,4 +1,4 @@
--- Tall poster ratios (1310): a newly saved OpenAI provider lists 1:2 and 1:3 among the sizes it
+-- Tall poster ratios (1340): a newly saved OpenAI provider lists 1:2 and 1:3 among the sizes it
 -- can make. Rows already saved keep their list; the web reads OpenAI's sizes from
 -- admin.template_image_options, not from this snapshot, and the admin test run treats OpenAI as
 -- offering every ratio. Same trigger body as 0920 otherwise.

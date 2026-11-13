@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { setFeatureInvite } from './invites'
 
-// /admin/features invites (1313): invite-only features only; the database resolves the account.
+// /admin/features invites (1343): invite-only features only; the database resolves the account.
 
 const registry = [{ key: 'beta_posters', name: '内测', inviteOnly: true }, { key: 'studio_video', name: '视频' }]
 const USER = '0b4b8a8e-9a7e-4a6f-9d5e-7b1c2d3e4f50'
