@@ -135,6 +135,10 @@ export type SaleFloorHiddenAlert = {
   examples: SaleFloorExample[]
 }
 
+// 1350 (ARCHITECTURE §7): the signup gift's daily cap is half used ('half') or used up ('full').
+// day is the Beijing date the cap counts; one message per day and level.
+export type SignupGiftCapAlert = { kind: 'signup_gift_cap'; day: string; level: 'half' | 'full'; granted: number; cap: number }
+
 export type OwnerAlert =
   | { kind: 'template_fallback'; templateId: string; reason: string; rejected: boolean }
   | { kind: 'checkout_catalog_failed'; code: string }
@@ -151,6 +155,7 @@ export type OwnerAlert =
   | SiteErrorsAlert
   | BusinessInquiryAlert
   | SaleFloorHiddenAlert
+  | SignupGiftCapAlert
   // T108 (ARCHITECTURE §9 第 8 条): a visitor reported a work shown in the public gallery.
   | { kind: 'work_reported'; jobId: string; reason: string }
 
@@ -192,6 +197,7 @@ const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }
   // Once per hidden set; a set that lasts is reported again a day later.
   sale_floor_hidden: (a) => ({ key: `sale_floor_hidden:${a.fingerprint}`, cooldownMs: 24 * 60 * MINUTE, requireShared: true, money: false }),
   work_reported: (a) => ({ key: `work_reported:${a.jobId}`, cooldownMs: 60 * MINUTE, budget: 'reports', money: false }),
+  signup_gift_cap: (a) => ({ key: `signup_gift_cap:${a.day}:${a.level}`, money: false }),
 }
 
 // A redelivered webhook, a retried handler or a second instance builds the same key.

@@ -183,7 +183,7 @@ describe('poster sets and generation', () => {
     it('cannot be upgraded: a redraw at another resolution or size is refused, and the refund never exceeds the source', async () => {
       const { userId, set, first } = await checkedPoster('mismatch')
       const at = (overrides: Partial<GenerationRequest>) => generate(userId, { poster: { setId: set.id, part: 0, redrawOf: first.id }, ...overrides }).run()
-      await expect(at({ resolution: '3k' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+      await expect(at({ resolution: '4k' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
       await expect(at({ aspectRatio: '9:16' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
       // A redraw job made outside the request path at a higher price still gets at most the source's credits back.
       await db.query("update public.generation_jobs set credits_cost = 1 where id = $1", [first.id])

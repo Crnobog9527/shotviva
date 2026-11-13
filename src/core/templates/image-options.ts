@@ -1,6 +1,9 @@
 import { isTallAspect, OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Resolution } from './output-options'
 
-export type ImageOptions = { resolutions: Resolution[]; aspectRatios: OutputAspect[]; originalRatio: boolean }
+// exactPixels: the route delivers the site's size table exactly (OpenAI). OpenRouter models answer
+// with their own native sizes at 1K and 2K, so the picker marks those sizes as approximate.
+// Absent (rows read before migration 1340, which added it) counts as exact, as before.
+export type ImageOptions = { resolutions: Resolution[]; aspectRatios: OutputAspect[]; originalRatio: boolean; exactPixels?: boolean }
 
 // Every fixed ratio a provider can be asked for, tall poster ratios included.
 export const PROVIDER_ASPECTS: OutputAspect[] = OUTPUT_ASPECTS.filter((aspect) => aspect !== 'original')
@@ -10,11 +13,11 @@ export const FULL_IMAGE_OPTIONS: ImageOptions = { resolutions: [...RESOLUTIONS],
 
 // A tall ratio survives only when the list given explicitly names it (ARCHITECTURE §8.1).
 export function availableImageOptions(capabilities: ImageOptions, templateRatios?: readonly string[]): ImageOptions {
-  const { resolutions, originalRatio } = capabilities
+  const { resolutions, originalRatio, exactPixels } = capabilities
   const aspectRatios = PROVIDER_ASPECTS.filter((ratio) =>
     capabilities.aspectRatios.includes(ratio)
       && (templateRatios ? templateRatios.includes(ratio) : !isTallAspect(ratio)))
-  return { resolutions, aspectRatios, originalRatio }
+  return { resolutions, aspectRatios, originalRatio, ...(exactPixels === false && { exactPixels }) }
 }
 
 // The provider's sizes for one template: the usual ones as they are, a tall poster ratio only if

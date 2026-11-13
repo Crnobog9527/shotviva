@@ -10,7 +10,7 @@ const template = templateInputSchema.parse({
   category: 'food-drink',
   visibleIn: ['web'],
   quality: 'medium',
-  creditsCost: { '1k': 1, '2k': 2, '3k': 3 },
+  creditsCost: { '1k': 1, '2k': 2, '4k': 3 },
   fields: { images: { min: 1, max: 1 }, aspectRatios: ['1:1'] },
 })
 
@@ -23,7 +23,7 @@ describe('toUpsertArgs', () => {
 
   it('sends quality and the three prices, and leaves covers out unless given', () => {
     const args = toUpsertArgs(template, { body: 'x', modelParams: {} })
-    expect(args.p_template).toMatchObject({ quality: 'medium', credits_cost: { '1k': 1, '2k': 2, '3k': 3 } })
+    expect(args.p_template).toMatchObject({ quality: 'medium', credits_cost: { '1k': 1, '2k': 2, '4k': 3 } })
     expect(args.p_template).not.toHaveProperty('cover_before_url')
     const withCover = toUpsertArgs({ ...template, coverAfterUrl: 'https://a.test/x.webp' }, { body: 'x', modelParams: {} })
     expect(withCover.p_template).toMatchObject({ cover_after_url: 'https://a.test/x.webp' })

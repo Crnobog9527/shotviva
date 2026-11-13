@@ -19,6 +19,7 @@ import { isSpike, readFailureStats, spikeAlert } from './failure-spike'
 import { schedule } from './schedule'
 import { areaOf, createErrorWindow, sentryIssuesUrl, siteErrorsAlert, type ErrorBreach, type ErrorWindow } from './site-errors'
 import { readSaleFloorHidden, SALE_FLOOR_CHECK_EVERY_MS, saleFloorAlert } from './sale-floor'
+import { readSignupGiftToday, signupGiftAlert } from './signup-gift'
 import { renderAlert } from './templates'
 
 // notifyOwner (ARCHITECTURE §16.4, T72): the Owner's plain-Chinese business alert, posted to the
@@ -140,6 +141,17 @@ export async function checkSaleFloorWith(deps: NotifyDeps, opts: { force?: boole
   }
 }
 
+// 1350: after a new account's first sign-in, whether the day's signup gifts are half or all gone.
+export async function noteSignupGiftWith(deps: NotifyDeps): Promise<void> {
+  if (!deps.config || deps.backoff.paused(deps.now())) return
+  try {
+    const alert = signupGiftAlert(await readSignupGiftToday(deps.db()), deps.now())
+    if (alert) await notifyOwnerWith(deps, alert)
+  } catch (error) {
+    logger.warn('signup gift check failed', { error })
+  }
+}
+
 // Every server error passes here synchronously (core/analytics signalServerError): counted in the
 // window; a breach is returned only when an alert could go out now.
 export function recordServerError(deps: NotifyDeps, window: ErrorWindow, signal: ServerErrorSignal): ErrorBreach | null {
@@ -202,6 +214,11 @@ export function noteGenerationFailure(): void {
 export function noteSaleFloorCheck(): void {
   const deps = defaultDeps()
   if (deps?.config) schedule(() => checkSaleFloorWith(deps).then(() => undefined))
+}
+
+export function noteSignupGift(): void {
+  const deps = defaultDeps()
+  if (deps?.config) schedule(() => noteSignupGiftWith(deps))
 }
 
 // The cron's run: awaited, so the function stays up until the alert is sent.

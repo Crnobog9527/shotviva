@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { withDbTiers } from '../../src/core/templates/db-resolution'
 
 import { templateSyncDryRunEnv, templateSyncEnv } from '../../src/core/env'
 import { createR2Client, createR2Store } from '../../src/core/storage'
@@ -13,7 +14,7 @@ function endpoint(preview: boolean, settings: ReturnType<typeof templateSyncEnv>
   const bucket = preview ? 'shotviva-assets-preview' : 'shotviva-assets'
   const client = createR2Client(settings)
   return {
-    db: createClient(`https://${project}.supabase.co`, settings.serviceKey, { auth: { persistSession: false, autoRefreshToken: false } }),
+    db: createClient(`https://${project}.supabase.co`, settings.serviceKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: withDbTiers() } }),
     assets: { base: settings.base, store: createR2Store(client, bucket) },
     private: privateBucket ? createR2Store(client, privateBucket) : undefined,
   }

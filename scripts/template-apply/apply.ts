@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { withDbTiers } from '../../src/core/templates/db-resolution'
 
 import { RunError, targetStores } from './batch-file'
 import { buildPlan } from './plan'
@@ -43,7 +44,7 @@ async function revalidate(target: Target, env: Env) {
 // passed, then write. A dry run stops after the first step.
 export async function applyBatch(batch: Batch, baseDir: string, env: Env, dryRun: boolean) {
   const target = targetOf(env)
-  const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+  const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: withDbTiers() } })
   const state = await readState(db, batch)
   const ctx = { baseDir, db, assetsBase: target.assetsBase, ...(await targetStores(target)) }
   let plan = await buildPlan(batch, state, { ...ctx, write: false })

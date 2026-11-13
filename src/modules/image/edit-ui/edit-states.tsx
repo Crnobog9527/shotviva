@@ -44,7 +44,7 @@ function EditHead({ id, name, meta }: { id: string; name: string; meta: ReactNod
 
 const useSize = (job: TrackedJob) => {
   const t = useTranslations('app')
-  return t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px: tierPx(job.resolution), mono: monoTag })
+  return t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px: tierPx(job.resolution, job.aspect), mono: monoTag })
 }
 
 // Developing (photo.html?state=generating): nothing uploads for an edit, so the steps are

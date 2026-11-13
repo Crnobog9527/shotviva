@@ -26,7 +26,7 @@ const tpl = (category: string): CatalogueTemplate => ({
   categoryOrder: 10,
   compare: category === 'art-styles',
   description: null,
-  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 2, '2k': 4, '4k': 6 },
   copyFields: [],
   toggles: [],
   cover: { type: 'image', before: 'https://assets.test/b.webp', after: 'https://assets.test/a.webp', motion: null, poster: null },

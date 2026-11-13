@@ -19,11 +19,15 @@ function sorted(values: Record<string, unknown> = {}) {
   return Object.keys(values).sort().map(key => [key, values[key]])
 }
 
+// Cells keep the pre-rename id for the top tier, so a preflight signed by the code before the 4K
+// rename (which said '3k') still verifies after the deploy, and the v1 format stays as it is.
+const signedTier = (tier: GenerationRequest['resolution']) => (tier === '4k' ? '3k' : (tier ?? '1k'))
+
 export function signCell(req: GenerationRequest, cell: Cell) {
   const secret = serverEnv().SUPABASE_SERVICE_ROLE_KEY
   if (!secret) throw new AppError('INTERNAL', 'Batch signing unavailable')
   const payload = [req.userId, req.batchId, req.batchSize, req.batchTemplates, cell.position, cell.photo_name,
-    cell.template_name, req.templateId, req.inputKey, req.expectedCredits, req.resolution ?? '1k', req.aspectRatio,
+    cell.template_name, req.templateId, req.inputKey, req.expectedCredits, signedTier(req.resolution), req.aspectRatio,
     sorted(req.toggles), [...(req.togglesConfirmed ?? [])].sort(), sorted(req.copy), req.note]
   return createHmac('sha256', secret).update('shotviva.batch.cell.v1\0').update(JSON.stringify(payload)).digest('hex')
 }

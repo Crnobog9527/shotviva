@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Locale } from '@/core/i18n/locales'
 import { featureAllowed } from '@/core/features'
+import { templateAspectFilter } from '@/core/providers'
 import { POSTER_FEATURE } from '@/core/poster/sets'
 import { listTemplatesIn, type LocalizedTemplate } from '@/core/templates'
 import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
@@ -31,7 +32,15 @@ export function toStudioTemplate(template: LocalizedTemplate): StudioTemplate | 
   return { id: template.id, name: template.name, poster, aspects, resolutions: options.resolutions, creditsCost: template.creditsCost }
 }
 
+// Only the sizes /api/generate will take for this template's model: the offered list comes from
+// the template and the adapter, but a bound model's saved capabilities may be narrower.
+export function narrowToRoute(template: StudioTemplate, accepts: (aspect: string) => boolean): StudioTemplate {
+  return { ...template, aspects: template.aspects.filter(accepts) }
+}
+
+// `db`: the admin client (the template's model is private).
 export async function loadStudioTemplate(db: SupabaseClient, locale: Locale, id: string): Promise<StudioTemplate | null> {
   const [found] = await listTemplatesIn(db, locale, { id })
-  return found ? toStudioTemplate(found) : null
+  const template = found ? toStudioTemplate(found) : null
+  return template ? narrowToRoute(template, await templateAspectFilter(db, id)) : null
 }

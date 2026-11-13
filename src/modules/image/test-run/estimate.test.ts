@@ -6,7 +6,7 @@ describe('estimateRunUsd (what a running test run holds against the budget)', ()
   it('prices the tier’s square at the output rate, plus the input allowance', () => {
     // 1024² high on GPT Image 2.6 is 1,756 output tokens at $30 / M.
     expect(estimateRunUsd('1k', 'high', null)).toBeCloseTo((1756 * 30) / 1e6 + INPUT_ALLOWANCE_USD, 6)
-    expect(estimateRunUsd('3k', 'high', null)).toBeGreaterThan(estimateRunUsd('2k', 'high', null))
+    expect(estimateRunUsd('4k', 'high', null)).toBeGreaterThan(estimateRunUsd('2k', 'high', null))
     expect(estimateRunUsd('2k', 'high', null)).toBeGreaterThan(estimateRunUsd('1k', 'high', null))
   })
 

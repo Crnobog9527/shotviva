@@ -27,7 +27,7 @@ const text = (max: number) => z.string().transform(cleanPosterLine).pipe(z.strin
 
 export const headerSchema = z.object({
   brand: text(24), brandEn: text(48), cup: text(16), cupEn: text(32), city: text(16),
-  title: text(16), subtitle: text(32), datetimeLabel: text(12), datetime: text(24),
+  title: text(16), subtitle: text(32), datetimeLabel: text(12), datetime: text(40),
 })
 
 export const prizeRowSchema = z.object({ rank: text(8), rankEn: text(16), prize: text(40) })

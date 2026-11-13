@@ -34,7 +34,7 @@ export function GeneratePanel({ studio, template, balance }: Props) {
       <h3 id="size-h" className="text-caption font-medium">{t('size')}</h3>
       <SizePicker options={options} value={studio.aspect} onChange={studio.setAspect} />
       <h3 id="res-h" className="text-caption font-medium">{t('resolution')}</h3>
-      <ResolutionPicker options={options} value={studio.resolution} costs={template.creditsCost} balance={balance} onChange={studio.setResolution} />
+      <ResolutionPicker options={options} aspect={studio.aspect} value={studio.resolution} costs={template.creditsCost} balance={balance} onChange={studio.setResolution} />
       {studio.draft.unverified.length > 0 ? (
         <label className="flex min-h-11 items-center gap-3 text-caption">
           <Checkbox checked={studio.draft.reviewed} onCheckedChange={(checked) => studio.setReviewed(checked === true)} />
@@ -42,7 +42,7 @@ export function GeneratePanel({ studio, template, balance }: Props) {
         </label>
       ) : null}
       <p className="text-caption text-muted-foreground">{t('proofread')}</p>
-      {studio.notice && studio.notice !== 'sortFailed' ? <p className="text-caption text-destructive">{t(`notice.${studio.notice}`)}</p> : null}
+      {studio.notice && studio.notice !== 'sortFailed' && studio.notice !== 'clipped' ? <p className="text-caption text-destructive">{t(`notice.${studio.notice}`)}</p> : null}
       <Button className="min-h-12" disabled={!ready || studio.busy} onClick={() => void studio.generate()}>
         {studio.busy ? t('starting') : t('generate', { count: studio.parts.length, credits: format.number(total) })}
       </Button>

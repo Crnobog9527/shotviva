@@ -7,6 +7,7 @@ import { INQUIRY_USES, MONTHLY_VOLUMES } from '../inquiries/summary-choices'
 import { EDIT_SCOPES } from '../templates/edit-params'
 import { UPLOAD_SIZE_BUCKETS } from './event-values'
 import { findPii } from './pii'
+import { resolutionSchema } from '@/core/templates/db-resolution'
 
 // The event dictionary of ARCHITECTURE §16.2. Names and properties are fixed; changing one
 // is a [spec] PR first. Every schema is strict and only takes enums, numbers, booleans and
@@ -19,7 +20,7 @@ const errorCode = z.string().regex(/^[A-Z][A-Z0-9_]*$/).max(64)
 const toggleKey = z.string().regex(/^[a-z][a-z0-9_]*$/).max(64)
 
 export { categorySlug, UPLOAD_SIZE_BUCKETS, uploadSizeBucket } from './event-values'
-export const RESOLUTIONS = ['1k', '2k', '3k'] as const
+export const RESOLUTIONS = ['1k', '2k', '4k'] as const
 // watermark_download (T107): a free, watermarked photo was just downloaded or saved.
 export const PAYWALL_TRIGGERS = ['insufficient_credits', 'pricing_page', 'account', 'graylum', 'tier_required', 'watermark_download'] as const
 export const PRODUCT_TIERS = ['starter', 'pro', 'max', 'pack'] as const
@@ -78,7 +79,7 @@ export const eventSchemas = {
   generate: z.strictObject({
     template_id: slug,
     category: slug,
-    resolution: z.enum(RESOLUTIONS),
+    resolution: resolutionSchema,
     credits_cost: z.number().int().positive(),
     credit_pool: z.enum(CREDIT_POOLS),
     status: z.enum(['succeeded', 'failed']),

@@ -28,6 +28,7 @@
         "title": "Make a free account to develop it",
         "text": "Your photo and template stay as you set them.",
         "giftNote": "Shown publicly with a watermark",
+        "phone": "Continue with phone",
         "email": "Continue with email",
         "login": "I have an account · Log in",
         "fine": "By continuing you agree to the <terms>Terms</terms> and the <privacy>Privacy Policy</privacy>."
@@ -552,7 +553,9 @@
       "paid": "You have {paid, plural, one {# credit} other {# credits}}.",
       "getCredits": "Get credits",
       "panelTitle": "Credits",
-      "signupGiftRefused": "No sign-up credits were recorded for this account. Sign-up gifts are limited to one per network in 24 hours."
+      "signupGiftRefused": "No sign-up credits were recorded for this account. Sign-up gifts are limited to one per network in 24 hours.",
+      "signupGiftRefusedCap": "No sign-up credits for this account: that day's sign-up gifts had all been given out.",
+      "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up."
     },
     "create": {
       "title": "Create",
@@ -594,15 +597,15 @@
     },
     "tiers": {
       "1k": {
-        "name": "Standard",
+        "name": "1K",
         "use": "Social & delivery apps"
       },
       "2k": {
-        "name": "HD",
+        "name": "2K",
         "use": "Websites & online stores"
       },
-      "3k": {
-        "name": "Max",
+      "4k": {
+        "name": "4K",
         "use": "Print & zoom"
       },
       "notEnough": "(not enough credits)"
@@ -629,7 +632,7 @@
         "footer": "Footer",
         "pending": "has lines to check"
       },
-      "flagged": "Not found in your pasted text. Check it.",
+      "flagged": "Not found in your pasted text, or cut to fit. Check it.",
       "header": {
         "brand": "Organiser",
         "brandEn": "Organiser in English",
@@ -707,6 +710,7 @@
       },
       "notice": {
         "sortFailed": "We couldn't sort this automatically. Fill in the blocks below; your text is above.",
+        "clipped": "Some items were over their length limit, so they were cut to fit and marked in yellow. Check them against your text above, and shorten them if you need to.",
         "rateLimited": "Too many tries in an hour. Please wait a little.",
         "invalid": "Some text is too long or a table row is incomplete. Check the blocks.",
         "notEnough": "Not enough credits.",
@@ -782,7 +786,7 @@
       "doneState": {
         "hud": "Done",
         "saved": "Saved to Photos",
-        "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} freePrivate { Made with free credits, so it has a watermark; poster photos stay private.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
+        "line": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono> px}} · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} freePrivate { Made with free credits, so it has a watermark; poster photos stay private.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
         "caption": "Phone photo → {name}.",
         "edit": "Edit this photo"
       },
@@ -801,7 +805,7 @@
       "freeNoticePrivate": "This photo uses free credits, so it has a watermark. <b>Poster photos stay private: they never go in the public gallery.</b>",
       "needsCredits": "{tier} needs {count, plural, one {# credit} other {# credits}}. <b>Paid credits make photos private and watermark-free.</b>",
       "counter": "{count, number} / {max, number}",
-      "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>",
+      "developingSize": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono>}}",
       "yourPhotos": "Your photos",
       "addPhotos": "Add the photos you shot",
       "chooseGalleryMany": "Choose photos from gallery",
@@ -969,7 +973,7 @@
       "makeAnotherWith": "Make another with {name}",
       "shareText": "Made with {brand} {url}",
       "makeAgain": "Make again",
-      "tierPx": "{tier} · {px}",
+      "tierPx": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off}}}",
       "when": {
         "today": "Today",
         "yesterday": "Yesterday",
@@ -994,7 +998,7 @@
         "template": "Template",
         "size": "Size",
         "resolution": "Resolution",
-        "resolutionValue": "{tier} · {px} px",
+        "resolutionValue": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off} px}}",
         "format": "Format",
         "formatPng": "PNG, transparent background",
         "formatJpgWhite": "JPG, white background",
@@ -1225,6 +1229,8 @@
     "creditsUnit": "{count, plural, one {credit} other {credits}}",
     "units": {
       "px": "{px, number, ::group-off} px",
+      "size": "{width, number, ::group-off}×{height, number, ::group-off}",
+      "sizeApprox": "≈ {width, number, ::group-off}×{height, number, ::group-off}",
       "megabytes": "{size} MB",
       "percent": "{value, number, ::percent}"
     },

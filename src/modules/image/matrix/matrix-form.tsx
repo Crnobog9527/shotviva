@@ -108,7 +108,7 @@ function OutputSections({ draft, balancePaid, firstRatio }: { draft: MatrixDraft
       </Section>
       {options.resolutions.length > 1 ? (
         <Section id="res-h" title={t('workspace.resolution')} aside={<span className="text-caption text-muted-foreground">{t('matrix.resolutionAside')}</span>}>
-          <ResolutionPicker options={options} value={values.resolution} costs={totalsByResolution(cells)} balance={{ paid: balancePaid, free: 0 }} onChange={(next) => change((v) => ({ ...v, resolution: next }))} />
+          <ResolutionPicker options={options} aspect={values.aspect} photoRatio={firstRatio} value={values.resolution} costs={totalsByResolution(cells)} balance={{ paid: balancePaid, free: 0 }} onChange={(next) => change((v) => ({ ...v, resolution: next }))} />
         </Section>
       ) : null}
     </>

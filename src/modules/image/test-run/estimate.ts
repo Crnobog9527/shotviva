@@ -9,7 +9,7 @@ import { outputTokens } from '../provider'
 // is never below 2.5's, at the provider's output price (else the official one), plus an allowance
 // for the input photo, the prompt and the decision call. Replaced by the real cost when it ends.
 
-const SQUARE_EDGE: Record<Resolution, number> = { '1k': 1024, '2k': 2048, '3k': 2880 }
+const SQUARE_EDGE: Record<Resolution, number> = { '1k': 1024, '2k': 2048, '4k': 2880 }
 const OFFICIAL_OUTPUT_PER_M = 30
 export const INPUT_ALLOWANCE_USD = 0.02
 

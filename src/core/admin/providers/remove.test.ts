@@ -16,7 +16,7 @@ const row = (isActive: boolean) => ({
   id: ID,
   module: 'image',
   adapter: 'openai_images',
-  resolutions: ['1k', '2k', '3k'],
+  resolutions: ['1k', '2k', '4k'],
   label: 'Old relay',
   base_url: 'https://relay.example.com/v1',
   model: 'gpt-image-2.6',

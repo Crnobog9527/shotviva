@@ -11,7 +11,7 @@ const template = (cover: Partial<CatalogueTemplate['cover']>): CatalogueTemplate
   categoryOrder: 30,
   compare: false,
   description: null,
-  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 2, '2k': 4, '4k': 6 },
   copyFields: [],
   toggles: [],
   cover: { type: 'image', before: null, after: null, motion: null, poster: null, ...cover },

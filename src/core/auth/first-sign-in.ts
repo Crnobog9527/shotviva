@@ -2,6 +2,7 @@ import 'server-only'
 import { cookies, headers } from 'next/headers'
 
 import { bindReferral } from '../affiliate/referral'
+import { noteSignupGift } from '../alerts'
 import { track } from '../analytics'
 import type { Locale } from '../i18n/locales'
 import { billingGrant, grantSignupCredits } from './free-credits'
@@ -31,6 +32,8 @@ export async function onVerifiedSignIn(
   const first = address ? ipStored : granted
   const kind = await consumeSignupCode(admin, userId, first, benefits.invite, locale)
   if (first) {
+    // 1350: tell the Owner when half, then all, of today's signup gifts are gone (after()).
+    noteSignupGift()
     track('signup', { method, code_kind: kind }, { distinctId: userId, locale })
     await bindReferral(userId, (await cookies()).get('sv_ref')?.value, 'signup')
   }

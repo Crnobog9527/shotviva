@@ -22,7 +22,7 @@ describe('public OpenRouter endpoint quotes', () => {
     const estimates = catalogImageEstimates(pricing, caps)
     expect(estimates['1k']).toBeCloseTo(0.01899, 8)
     expect(estimates['2k']).toBe(estimates['1k'])
-    expect(estimates['3k']).toBeUndefined()
+    expect(estimates['4k']).toBeUndefined()
   })
 
   it('keeps token, paid or unquoted reference input from becoming a flat per-image total', () => {
