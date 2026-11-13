@@ -167,6 +167,11 @@ const copy = {
       note: 'For anyone who wants to see what the generator does with food, product, room and pet photos.',
     },
     {
+      href: '/transparent-background',
+      anchor: 'Transparent PNG maker',
+      note: 'For sellers who need a product cut out on a transparent or pure white background.',
+    },
+    {
       href: '/pricing',
       anchor: 'Pricing',
       note: 'For shops, sellers and hosts comparing monthly plans, yearly plans and one-time credit packs.',

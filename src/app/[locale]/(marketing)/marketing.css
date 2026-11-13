@@ -613,6 +613,7 @@
     .mk-steps::before { display: none; }
     .mk-steps li { padding-bottom: 0; }
     .mk-free { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .mk-free:has(> :nth-child(4)) { grid-template-columns: repeat(2, 1fr); }
     .mk-links { grid-template-columns: 1fr 1fr; }
     .mk-tgrid { grid-template-columns: 1fr 1fr; gap: 24px 16px; }
     .mk-solo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }

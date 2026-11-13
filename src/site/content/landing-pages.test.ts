@@ -31,15 +31,20 @@ function expectCaseFile(image: ImageRef) {
 
 // The three SEO landing pages (T44, design/comps-v3-b/landing.html, ARCHITECTURE §12, §17).
 describe('landing pages', () => {
-  it('exist in both languages with the same slugs; each indexable in Chinese too (SEO patch v5)', () => {
+  // The three launch verticals exist in both languages, indexable in Chinese too (SEO patch v5);
+  // /transparent-background (04-P1) is English only: no Chinese keyword-map row, no /zh path.
+  it('exist in both languages, except the English-only /transparent-background', () => {
     const slugs = (locale: 'en' | 'zh') => contentPagesIn(locale).map((page) => page.slug)
-    expect(slugs('en')).toEqual(['image-to-image-generator', 'commercial-photography', 'ai-restaurant-menu'])
-    expect(slugs('zh')).toEqual(slugs('en'))
-    for (const slug of slugs('en')) {
-      expect(site.indexing.indexablePaths).toContain(`/${slug}`)
+    const bilingual = ['image-to-image-generator', 'commercial-photography', 'ai-restaurant-menu']
+    expect(slugs('en')).toEqual([...bilingual, 'transparent-background'])
+    expect(slugs('zh')).toEqual(bilingual)
+    for (const slug of slugs('en')) expect(site.indexing.indexablePaths).toContain(`/${slug}`)
+    for (const slug of bilingual) {
       expect(site.locales.zhPaths).toContain(`/${slug}`)
+      expect(site.indexing.zhIndexablePaths).toContain(`/${slug}`)
     }
-    for (const slug of slugs('en')) expect(site.indexing.zhIndexablePaths).toContain(`/${slug}`)
+    expect(site.locales.zhPaths).not.toContain('/transparent-background')
+    expect(site.indexing.zhIndexablePaths).not.toContain('/transparent-background')
   })
 
   // Owner 2026-11-11: the inner pages show their own cases (public/cases), never the home tote,

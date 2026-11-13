@@ -1651,6 +1651,7 @@
       "useCaseMenu": "AI restaurant menu photos",
       "useCaseCommercial": "Commercial photography",
       "useCaseGenerator": "Image to image generator",
+      "useCaseTransparent": "Transparent PNG maker",
       "templates": "Templates",
       "login": "Log in",
       "startFree": "Start free",
