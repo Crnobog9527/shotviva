@@ -3,12 +3,16 @@
 /* eslint-disable @next/next/no-img-element -- a small static brand mark */
 import { ChevronRight } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import dynamic from 'next/dynamic'
 import { useState } from 'react'
 
 import { cn } from '../../../ui/cn'
-import { IntroDialog } from './intro-dialog'
 import type { GraylumLinks } from './intro-links'
 import { GRAYLUM_ICON } from './intro-shots'
+
+// The introduction (dialog, screenshots, lightbox) loads on the first open, so the account page's
+// first-load JS carries only this card.
+const IntroDialog = dynamic(() => import('./intro-dialog').then(m => m.IntroDialog), { ssr: false })
 
 type Props = { connected: boolean; links: GraylumLinks; disconnect: () => Promise<void> }
 
@@ -18,12 +22,16 @@ type Props = { connected: boolean; links: GraylumLinks; disconnect: () => Promis
 export function GraylumCard({ connected, links, disconnect }: Props) {
   const t = useTranslations('partner')
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   return (
     <>
       <button
         type="button"
         aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setMounted(true)
+          setOpen(true)
+        }}
         className="press grid min-h-16 w-full cursor-pointer grid-cols-[40px_1fr_auto_auto] items-center gap-x-3 py-3 text-left focus-visible:rounded-[10px] focus-visible:outline-offset-[-2px]"
       >
         <img src={GRAYLUM_ICON.src} alt="" width={40} height={40} className="size-10 rounded-[11px]" />
@@ -42,7 +50,7 @@ export function GraylumCard({ connected, links, disconnect }: Props) {
         </span>
         <ChevronRight aria-hidden strokeWidth={1.75} className="size-[18px] text-primary" />
       </button>
-      <IntroDialog open={open} onOpenChange={setOpen} connected={connected} links={links} disconnect={disconnect} />
+      {mounted && <IntroDialog open={open} onOpenChange={setOpen} connected={connected} links={links} disconnect={disconnect} />}
     </>
   )
 }
