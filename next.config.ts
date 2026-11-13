@@ -45,7 +45,13 @@ const nextConfig: NextConfig = {
   env: { NEXT_PUBLIC_APP_VERSION: appVersion(process.env) },
   // Pages live under app/[locale]; an address matching no route at all has no root layout,
   // so app/global-not-found.tsx renders it (ARCHITECTURE §17).
-  experimental: { globalNotFound: true },
+  // inlineCss: every page's stylesheets arrive inside the HTML as <style>, so the first screen paints
+  // as soon as the parser reaches it instead of waiting for 7 CSS files that share a slow link with
+  // the scripts, fonts and pictures. Mobile LCP with throttling applied: / 2.76 -> 1.04 s, /zh
+  // 2.68 -> 1.10 s, /login 2.96 -> 1.20 s (local A/B, PR #622). Global in Next 16.4 (no per-route
+  // switch): a signed-in page's first full load carries the app's sheet in its HTML (~28 KB br)
+  // instead of a cached file; moves inside the app are unchanged (Next uses <link> for those).
+  experimental: { globalNotFound: true, inlineCss: true },
   // Off for the site as a whole: with it on, every page's HTML also embeds a runtime prefetch
   // of itself (a second copy of the page tree and of the client messages, about 40% of the
   // marketing pages' HTML) and the server renders the page twice to produce it. The signed-in
