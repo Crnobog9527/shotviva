@@ -4,12 +4,12 @@ import { useSearchParams } from 'next/navigation'
 import type { ComponentProps } from 'react'
 
 import { loginNotice } from '@/core/auth/guest-gate'
+import { inMainlandZone } from '@/core/auth/mainland-zone'
 import { nextIn } from '@/core/auth/redirect-target'
 import { LoginForm, ResetRequestForm, SignupForm } from '@/core/auth/ui'
 import type { Locale } from '@/core/i18n'
 
 import { Arrived } from './arrived'
-import { inMainlandZone } from './mainland-zone'
 
 // The parts of the sign-in pages that depend on the address (?next=, ?error=, ?via=), read in the
 // browser so the pages themselves stay static: the form is in the cached HTML (the page's
