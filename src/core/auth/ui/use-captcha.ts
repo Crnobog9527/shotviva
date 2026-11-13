@@ -5,8 +5,12 @@ import { useCallback } from 'react'
 
 import { isLocale } from '../../i18n/locales'
 import { publicEnv } from '../../public-env'
-import { CaptchaNetworkError, hcaptchaLanguage } from './hcaptcha-script'
-import { invisibleToken, prepareHCaptcha, retainHCaptcha } from './hcaptcha-widget'
+import { hcaptchaLanguage, isCaptchaNetworkError, retainCaptcha } from './captcha-light'
+import { loadedWidget, loadWidget } from './widget-loader'
+
+// The loader and the widget come on demand (the warm-up or the first submit), never in a page's
+// first JavaScript; widget-loader.ts gives the download a clock, and a chunk that cannot load or
+// stalls is a network problem like any other.
 
 // `off`: no site key. `failed`: the challenge was closed, expired or failed. `network`: the script
 // or the check could not get through in time (slow or blocked network).
@@ -23,9 +27,10 @@ export function useCaptcha(siteKey: string = publicEnv.NEXT_PUBLIC_HCAPTCHA_SITE
   const tryToken = useCallback(async (onChallenge?: () => void): Promise<CaptchaOutcome> => {
     if (!siteKey) return { status: 'off' }
     try {
+      const { invisibleToken } = await loadWidget()
       return { status: 'token', token: await invisibleToken(siteKey, language, onChallenge) }
     } catch (error) {
-      return { status: error instanceof CaptchaNetworkError ? 'network' : 'failed' }
+      return { status: isCaptchaNetworkError(error) ? 'network' : 'failed' }
     }
   }, [siteKey, language])
 
@@ -37,11 +42,15 @@ export function useCaptcha(siteKey: string = publicEnv.NEXT_PUBLIC_HCAPTCHA_SITE
   }, [tryToken])
 
   const prepare = useCallback(() => {
-    if (siteKey) prepareHCaptcha(siteKey, language).catch(() => undefined)
+    if (siteKey) loadWidget().then((m) => m.prepareHCaptcha(siteKey, language)).catch(() => undefined)
   }, [siteKey, language])
 
   // A form that may submit holds the prepared widget while it is mounted (release on unmount).
-  const retain = useCallback(() => (siteKey ? retainHCaptcha() : () => undefined), [siteKey])
+  const retain = useCallback(
+    // Nothing to remove if the code never arrived: leaving early does not download it to release it.
+    () => (siteKey ? retainCaptcha(() => loadedWidget()?.releaseWarm()) : () => undefined),
+    [siteKey],
+  )
 
   return { enabled: Boolean(siteKey), getToken, tryToken, prepare, retain }
 }

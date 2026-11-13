@@ -15,6 +15,8 @@ import type {
   PaymentFailedAlert,
   RefundAlert,
   RenewalReviewAlert,
+  SaleFloorExample,
+  SaleFloorHiddenAlert,
   SiteErrorsAlert,
   TicketAlert,
 } from './alert-kinds'
@@ -244,6 +246,29 @@ function businessInquiry(alert: BusinessInquiryAlert): Rendered {
   }
 }
 
+const FLOOR_BASIS: Record<string, string> = { p95: '近 30 天实测 p95', estimate: '后台估价', catalog: '供应商目录价', list: 'OpenAI 保守价' }
+const HIDDEN_REASONS: Record<string, string> = {
+  sale_closed: '未开放销售', unpriced: '1K 未定价', no_route: '没有可用模型', route_unsupported: '模型不支持 1K',
+}
+
+function saleFloorExample(e: SaleFloorExample): string {
+  if (e.reason !== 'below_floor') return `${e.templateId}（${HIDDEN_REASONS[e.reason] ?? e.reason}）`
+  if (e.floor === null) return `${e.templateId}（模型无法定价）`
+  const basis = FLOOR_BASIS[e.basis ?? ''] ?? '成本'
+  const sample = e.basis === 'p95' && e.samples !== null ? ` ${e.samples} 张` : ''
+  return `${e.templateId}（${e.quality}，售价 ${e.price ?? '?'} 积分，底价 ${e.floor} 积分，按${basis}${sample}）`
+}
+
+// 1295: never a silent catalogue gap. Counts first, then a few examples, then what to do.
+function saleFloorHidden(alert: SaleFloorHiddenAlert): Rendered {
+  const more = alert.total > alert.examples.length ? ` 等 ${alert.total} 个` : ''
+  const floor = alert.belowFloor > 0 ? `，其中 ${alert.belowFloor} 个是 1K 售价低于成本下限` : ''
+  return {
+    line: `【模板不在创作页】已上架的 ${alert.total} 个模板现在没有显示${floor}。例如：${alert.examples.map(saleFloorExample).join('；')}${more}。用户看不到也买不了这些模板，请到后台模板页处理（改价，或走价格批准）。`,
+    path: '/admin/templates',
+  }
+}
+
 const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }>, who: string) => Rendered } = {
   refund,
   dispute_opened: disputeOpened,
@@ -265,6 +290,7 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   subscription_cancel_failed: cancelFailed,
   site_errors: siteErrors,
   business_inquiry: businessInquiry,
+  sale_floor_hidden: saleFloorHidden,
   work_reported: (a) => ({
     line: `【创作库作品被举报】原因：${REPORT_REASON_NAMES[a.reason] ?? a.reason}。作品仍在展示，请到「创作库审核」页决定是否下架。`,
     path: '/admin/gallery?tab=reported',

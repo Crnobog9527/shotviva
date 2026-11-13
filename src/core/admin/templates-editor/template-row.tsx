@@ -12,6 +12,7 @@ import { bulkCopy, featuredCopy } from './copy'
 import { summaryPrice } from './tier-price'
 import { canFeature } from './featured-state'
 import { ActionsCell, NameCell } from './row-cells'
+import { CATALOGUE_GAP_LABEL, catalogueGapText } from './catalogue-gap'
 
 const SURFACE_LABEL = { web: '站内', partner: '伙伴' } as const
 
@@ -69,6 +70,14 @@ export function TemplateRow(props: Props) {
       <TableCell>
         {summaryPrice(template.creditsCost, price, template.unpricedResolutions)}
         <span className="text-muted-foreground block text-xs">{template.quality}</span>
+        {template.catalogueGap && (
+          <Badge variant="destructive" className="mt-1" title={catalogueGapText(template.catalogueGap)}>
+            {CATALOGUE_GAP_LABEL}
+          </Badge>
+        )}
+        {template.catalogueGap && (
+          <span className="text-destructive block max-w-40 text-xs">{catalogueGapText(template.catalogueGap)}</span>
+        )}
       </TableCell>
       <TableCell>{template.prompt ? `v${template.prompt.version}` : '缺失'}</TableCell>
       <TableCell>

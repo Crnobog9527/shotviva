@@ -85,7 +85,8 @@ describe('seo:weekly checks', () => {
 
   it('derives the Chinese noindex pages from site.indexing', () => {
     for (const path of site.indexing.zhIndexablePaths) expect(ZH_NOINDEX_PATHS).not.toContain(path === '/' ? '/zh' : `/zh${path}`)
-    expect(ZH_NOINDEX_PATHS).toContain('/zh/commercial-photography')
+    expect(ZH_NOINDEX_PATHS).toContain('/zh/partners')
+    expect(ZH_NOINDEX_PATHS).not.toContain('/zh/commercial-photography')
     expect(ZH_NOINDEX_PATHS.some((path) => path.includes('['))).toBe(false)
   })
 

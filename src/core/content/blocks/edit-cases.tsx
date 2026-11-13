@@ -1,11 +1,12 @@
 import Image from 'next/image'
 
 import type { EditCases } from '../page-content'
+import { phoneSlot } from './phone-sizes'
 
 // One plate of a case pair: half of the full-width pair on a phone, a quarter of the row from
 // 768 (two cases side by side), 276 px from 1024 (the 1120 px content row, two cases with a
 // 16 px gap; three cases make it about 181 px, so the same files serve). The reference inset is about a third of a plate.
-const PLATE_SIZES = '(min-width: 1024px) 276px, (min-width: 768px) 25vw, 50vw'
+const PLATE_SIZES = `(min-width: 1024px) 276px, (min-width: 768px) 25vw, ${phoneSlot(50)}`
 const REFERENCE_SIZES = '(min-width: 1024px) 96px, (min-width: 768px) 9vw, 17vw'
 
 // "Change one thing, keep the rest" (landing pages): finished pictures edited precisely, each
