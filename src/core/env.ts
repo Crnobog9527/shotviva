@@ -102,6 +102,10 @@ const serverEnvSchema = z.object({
   // its invisible token on our server when NEXT_PUBLIC_HCAPTCHA_SITEKEY is set too. Production with
   // the site key but no secret refuses every inquiry (core/inquiries/captcha captchaMode).
   HCAPTCHA_SECRET: optionalSecret,
+  // Resend API key (D13): the email telling a ticket's author the Owner has replied
+  // (core/support/reply-email). A sending-only key for shotviva.com; unset → no email, the reply
+  // still goes through.
+  RESEND_API_KEY: optionalSecret,
 })
   .extend(sentryBuildEnvSchema.shape)
   // SITE_INDEXING: the pre-launch indexing switch (ARCHITECTURE §12.0), default off.
