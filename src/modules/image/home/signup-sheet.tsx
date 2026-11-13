@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 
 import { GoogleButton, SignupCodeField, SignupCodeProvider, useSignupCodeDraft, saveSignupCode, type FormAction } from '@/core/auth/ui'
 import { useRouter } from '@/core/i18n/navigation'
@@ -50,11 +50,13 @@ function SheetActions({ googleAction, next }: Pick<Props, 'googleAction' | 'next
   const t = useTranslations('home.generator.signup')
   const draft = useSignupCodeDraft()
   const router = useRouter()
-  const query = new URLSearchParams({ next })
+  // Mainland phone sign-in on the Chinese pages only, as on /signup and /login (ARCHITECTURE §7,
+  // T63). /signup opens on its 手机号 tab there, so 用邮箱继续 asks for the 邮箱 tab.
+  const phone = useLocale() === 'zh'
   // Keep invite codes out of link hrefs (autocapture and replay can see those). An edited
   // field, including a cleared one, reaches the next form before its request reads cookies.
-  function link(path: string) {
-    const href = `${path}?${query}`
+  function link(path: string, extra?: Record<string, string>) {
+    const href = `${path}?${new URLSearchParams({ next, ...extra })}`
     return { href, onNavigate(event: { preventDefault(): void }) {
       if (!draft?.edited) return
       event.preventDefault()
@@ -66,7 +68,8 @@ function SheetActions({ googleAction, next }: Pick<Props, 'googleAction' | 'next
       <SignupCodeField />
       <GoogleButton action={googleAction} next={next} className="mk-cta h-auto rounded-tile border-0" />
       <div className="mk-alt">
-        <Link className="mk-ghost-btn" prefetch={false} {...link('/signup')}>{t('email')}</Link>
+        {phone ? <Link className="mk-ghost-btn" prefetch={false} {...link('/signup')}>{t('phone')}</Link> : null}
+        <Link className="mk-ghost-btn" prefetch={false} {...link('/signup', phone ? { via: 'email' } : undefined)}>{t('email')}</Link>
         <Link className="mk-ghost-btn" prefetch={false} {...link('/login')}>{t('login')}</Link>
       </div>
     </>

@@ -279,6 +279,7 @@
     text-align: left; cursor: pointer; color: var(--foreground); background: color-mix(in srgb, var(--primary) 7%, var(--card));
     box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--primary) 55%, transparent);
   }
+  .mk-up-empty { display: none; }
   .mk-up-has { background: var(--wash); box-shadow: inset 0 0 0 1px var(--border); }
   .mk-up-plus { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: var(--primary); color: var(--primary-foreground); }
   .mk-up-thumb { flex: none; width: 48px; height: 48px; border-radius: 12px; object-fit: cover; }
@@ -314,6 +315,7 @@
   .mk-panel-note::placeholder { color: var(--muted-foreground); }
   .mk-panel-note:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--primary), 0 0 0 4px var(--safelight-halo); }
   .mk-panel-cta { grid-area: cta; padding-top: 12px; }
+  .mk-panel-fmt { padding-top: 8px; text-align: center; font-size: 13px; line-height: 1.35; color: var(--muted-foreground); }
   .mk-panel-gift { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0 2px; font-size: 14px; color: var(--bone-dim); }
   .mk-gift-i { width: 16px; height: 16px; color: var(--primary); }
   .mk-field { display: block; padding: 12px 4px 0; }
@@ -341,6 +343,8 @@
     .mk-panel-noup { grid-template-rows: auto auto auto auto 1fr; grid-template-areas: "head err" "stage rail" "stage row" "stage cta" "stage ."; }
     .mk-stage { --h: clamp(200px, calc(100cqw / var(--r, .8)), 260px); }
     .mk-up { margin-top: 0; padding: 16px 18px; }
+    .mk-up-empty { display: flex; }
+    .mk-panel-fmt { display: none; }
     .mk-rail { margin: 12px 0 0; padding: 2px; }
     .mk-panel-size-d { display: block; }
     .mk-panel-size-m { display: none; }
