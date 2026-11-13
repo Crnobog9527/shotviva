@@ -105,7 +105,7 @@ export async function testProvider(deps: ProviderCommandDeps, input: unknown): P
   if (!apiKey) throw new ProviderSettingError('api_key_missing', `provider ${id} has no API key`)
   const baseUrl = await assertPublicBaseUrl(row.baseUrl, deps.resolveHost)
   if (row.adapter === 'openrouter_images') await openRouterModelTiers(baseUrl, row.model, deps.fetch)
-  const result = await testConnection({ baseUrl, apiKey, adapter: row.adapter }, deps.fetch)
-  logger.info('admin.provider.tested', { providerId: id, ok: result.ok, status: result.status ?? null })
+  const result = await testConnection({ baseUrl, apiKey, adapter: row.adapter, model: row.model }, deps.fetch)
+  logger.info('admin.provider.tested', { providerId: id, adapter: row.adapter, ok: result.ok, status: result.status ?? null, ms: result.ms ?? null })
   return result
 }

@@ -10,6 +10,8 @@ import { copy } from './copy'
 
 export type ImageProviderOption = {
   id: string; label: string; model: string; isActive: boolean; openAI: boolean
+  // Capabilities set in code (OpenAI, Ark): nothing to sync from a catalogue.
+  fixedCapabilities?: boolean
   capabilities: ImageCapabilities | null; floor: CreditsFloor
   fallbackFloors?: Record<TemplateQuality, Record<Resolution, number | null>>
   tariffs?: Record<string, ApprovedTariff>

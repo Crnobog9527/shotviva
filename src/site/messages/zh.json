@@ -566,7 +566,7 @@
       "seeAll": "查看全部",
       "seeAllWhich": "「{name}」",
       "seeAllCount": "共 {count} 个",
-      "illustrative": "每张卡片左边是手机原图，右边是 AI 出图。模板图片仅为效果示例。"
+      "illustrative": "每张卡片左边是手机原图，右边是 AI 出图。模板图片都是用这些模板真实生成的。"
     },
     "series": {
       "count": "{count} 个模板",
@@ -577,10 +577,10 @@
     },
     "template": {
       "fromCredits": "{count} 积分起",
-      "cardAlt": "{name} 模板示例：左边是手机原图，右边是 AI 出图",
+      "cardAlt": "{name} 模板真实案例：左边是手机原图，右边是 AI 出图",
       "phone": "原图",
       "ai": "AI",
-      "example": "效果示例",
+      "example": "真实案例",
       "featureAria": "{name}，视频模板，{category}。做一张",
       "featureMeta": "{category} · 视频",
       "compareAria": "对比手机原图和 AI 出图",
@@ -768,7 +768,7 @@
     },
     "errors": {
       "NETWORK": "连不上 Shotviva，请检查网络后再试。",
-      "CONTENT_REJECTED": "照片或补充说明没有通过安全审核。请换一张照片，或改一下说明。",
+      "CONTENT_REJECTED": "出图模型这次没能使用这张照片或这段说明，有的模型不接受清晰的真人照片。可以换一张照片、改一下说明，或换个模板再试。",
       "IDENTITY_SWAP_REFUSED": "为保护每个人的肖像权，Shotviva 不能把人换成另一个人或换脸。可以改表情、妆容、光线和背景。",
       "REFERENCE_IMAGE_LIMIT": "参考图超过模型上限，请减少照片或换个模板。",
       "TEMPLATE_UNAVAILABLE": "这个模板暂时不可用，请稍后再试。",
@@ -1569,8 +1569,8 @@
     "home": {
       "phone": "原图",
       "ai": "AI",
-      "beforeAlt": "{name}模板示例：手机原图（示意图）",
-      "afterAlt": "{name}模板示例：AI 成图，{use}（示意图）",
+      "beforeAlt": "{name}模板真实案例：手机原图",
+      "afterAlt": "{name}模板真实案例：AI 成图，{use}",
       "pickAria": "{name}。{use}选用这个模板",
       "compareLabel": "对比手机原图和{name}效果",
       "withDragHint": "{use}拖动中间的把手对比。",
@@ -1581,8 +1581,8 @@
       "seriesOpen": "打开系列",
       "freeTag": "免费 · 公开",
       "paidTag": "付费 · 私密",
-      "freeSampleAlt": "带水印的免费图（示意图）",
-      "paidSampleAlt": "同一张图用付费积分生成，没有水印（示意图）"
+      "freeSampleAlt": "带水印的免费图（真实案例）",
+      "paidSampleAlt": "同一张图用付费积分生成，没有水印（真实案例）"
     }
   },
   "pageError": {

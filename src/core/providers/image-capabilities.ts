@@ -4,6 +4,7 @@ import { RESOLUTIONS } from '../templates/output-options'
 import { catalogImageEstimates } from './openrouter-pricing'
 import { openRouterCatalogPricing, openRouterImageParameters, type OpenRouterImageParameters } from './openrouter-catalog'
 import { OPENROUTER_IMAGE_SIZE } from './openrouter-input'
+import { ARK_MAX_REFERENCES, ARK_RESOLUTIONS } from './ark'
 import { ProviderSettingError } from './setting-error'
 import type { ProviderAdapterId } from './types'
 
@@ -29,6 +30,11 @@ export async function fetchImageCapabilities(adapter: ProviderAdapterId, baseUrl
   const fetchedAt = new Date().toISOString()
   if (adapter === 'openai_images') return {
     ...FULL_IMAGE_OPTIONS, providerAspectRatios: FULL_IMAGE_OPTIONS.aspectRatios, minReferences: 0, maxReferences: OPENAI_MAX_REFERENCES, fetchedAt,
+  }
+  // Ark takes any WxH within its pixel range, so every site ratio and 'original' fit; no catalogue.
+  if (adapter === 'ark_images') return {
+    ...FULL_IMAGE_OPTIONS, resolutions: [...ARK_RESOLUTIONS], providerAspectRatios: FULL_IMAGE_OPTIONS.aspectRatios,
+    minReferences: 0, maxReferences: ARK_MAX_REFERENCES, fetchedAt,
   }
   const parameters = await openRouterImageParameters(baseUrl, model, fetchImpl)
   const caps = catalogCapabilities(parameters, fetchedAt)

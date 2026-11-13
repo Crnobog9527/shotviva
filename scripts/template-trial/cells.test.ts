@@ -99,6 +99,10 @@ describe('provider failures', () => {
     }
     expect(isDeterministic(failure('timeout', 'openai request aborted at deadline'))).toBe(false)
     expect(isDeterministic(failure('content_rejected', 'openai 400 code=moderation_blocked type=-'))).toBe(true)
+    expect(failure('failed', 'ark image request failed (HTTP 429 code=AccountQuotaExceeded)')).toEqual({ kind: 'failed', status: 429, code: 'AccountQuotaExceeded' })
+    expect(isDeterministic(failure('failed', 'ark image request failed (HTTP 429 code=AccountQuotaExceeded)'))).toBe(true)
+    expect(isDeterministic(failure('failed', 'ark image request failed (HTTP 429 code=ModelAccountIpmRateLimitExceeded)'))).toBe(false)
+    expect(failure('failed', 'ark image request failed (HTTP 500 code=-)')).toMatchObject({ status: 500, code: null })
     expect(readFailure(new Error('x'))).toBeNull()
   })
 })

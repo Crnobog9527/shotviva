@@ -8,13 +8,12 @@ import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
 
-import { RESOLUTIONS } from '@/core/templates/output-options'
 import { MODULE_ADAPTERS, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
 
 import type { AdminProvider, ProviderAdminActions } from '../providers/types'
 
 import { PROVIDERS_COPY } from './copy'
-import { canSave, formFor, withBaseUrl, withAdapter, withModel, type ProviderForm } from './form-state'
+import { canSave, formFor, tiersFor, usesTokenPrices, withBaseUrl, withAdapter, withModel, type ProviderForm } from './form-state'
 import { CatalogPrices } from './catalog-prices'
 import { ImageCostFields } from './image-cost-fields'
 import { PriceFields } from './price-fields'
@@ -51,7 +50,7 @@ function useFormState(provider: AdminProvider | null, module: ProviderModule, lo
   const [draft, setForm] = useState(() => formFor(provider, module))
   const catalog = useModelResolutions(draft.adapter === 'openrouter_images', draft.baseUrl.trim(), draft.model.trim(), lookupModel)
   const tiers = catalog.snapshot?.resolutions ?? draft.resolutions
-  const form = { ...draft, resolutions: draft.adapter === 'openai_images' ? [...RESOLUTIONS] : tiers }
+  const form = { ...draft, resolutions: draft.adapter === 'openrouter_images' ? tiers : [...tiersFor(draft.adapter)] }
   const canSubmit = !catalog.pending && catalog.result?.ok !== false && canSave(form, !provider?.apiKeyLast4)
   return { form, setForm, catalog, canSubmit, estimates: catalog.snapshot?.catalogImageCosts }
 }
@@ -76,6 +75,24 @@ function CatalogPreview({ catalog }: { catalog: ReturnType<typeof useModelResolu
     <CatalogPrices pricing={snapshot.catalogPricing} />
     {snapshot.catalogPricing?.status === 'unavailable' && <Button variant="link" onClick={catalog.retry}>{COPY.retryLookup}</Button>}
   </div>
+}
+
+function modelHint(form: ProviderForm) {
+  if (form.adapter === 'openrouter_images') return COPY.routerModelHint
+  if (form.adapter === 'ark_images') return COPY.arkModelHint
+  return PROVIDERS_COPY.modules[form.module].modelHint
+}
+
+type PricesProps = {
+  form: ProviderForm
+  catalog: ReturnType<typeof useModelResolutions>
+  setForm: React.Dispatch<React.SetStateAction<ProviderForm>>
+}
+
+// Token prices, or for Ark (billed per image from the code table) a note instead.
+function Prices({ form, catalog, setForm }: PricesProps) {
+  if (!usesTokenPrices(form)) return <p className="text-muted-foreground text-xs">{COPY.arkPrices}</p>
+  return <PriceFields form={form} catalogPricing={catalog.snapshot?.catalogPricing} onChange={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))} />
 }
 
 export function ProviderFormDialog({ provider, module, pending, error, lookupModel, onCancel, onSubmit }: Props) {
@@ -109,7 +126,7 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
           <Field id="baseUrl" label={COPY.baseUrl} hint={COPY.baseUrlHint}>
             {input('baseUrl', true)}
           </Field>
-          <Field id="model" label={COPY.model} hint={form.adapter === 'openrouter_images' ? COPY.routerModelHint : PROVIDERS_COPY.modules[form.module].modelHint}>
+          <Field id="model" label={COPY.model} hint={modelHint(form)}>
             {input('model', true)}
           </Field>
           <LookupStatus catalog={catalog} />
@@ -119,6 +136,7 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
               <p className="text-sm">{COPY.resolutions} · {form.resolutions.join(' / ').toUpperCase()}</p>
               <ImageCostFields tiers={form.resolutions} values={form.imageCosts} estimates={estimates}
                 onChange={(tier, value) => setForm((prev) => ({ ...prev, imageCosts: { ...prev.imageCosts, [tier]: value } }))} />
+              {form.adapter === 'ark_images' && <p className="text-muted-foreground text-xs">{COPY.arkCostsRequired}</p>}
             </>
           )}
           <Field
@@ -128,7 +146,7 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
           >
             <Input id="provider-apiKey" type="password" autoComplete="new-password" className="font-mono" value={form.apiKey} onChange={set('apiKey')} />
           </Field>
-          <PriceFields form={form} catalogPricing={catalog.snapshot?.catalogPricing} onChange={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))} />
+          <Prices form={form} catalog={catalog} setForm={setForm} />
           <Field id="notes" label={COPY.notes}>
             <Textarea id="provider-notes" maxLength={500} value={form.notes} onChange={set('notes')} />
           </Field>

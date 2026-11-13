@@ -54,32 +54,32 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
   }
 }
 
-const fishPhone = caseImage('menu-fish-phone', 'Example phone photo: pickled mustard fish in a white enamel bowl on a steel kitchen pass, harsh green-tinted overhead light')
-const fishDark = caseImage('menu-fish-dark', 'AI example: the same pickled mustard fish re-plated in a white porcelain bowl on dark rough timber, warm side light and rising steam')
+const fishPhone = caseImage('menu-fish-phone', 'Real phone photo: pickled mustard fish in a white enamel bowl on a steel kitchen pass, harsh green-tinted overhead light')
+const fishDark = caseImage('menu-fish-dark', 'Real example: the same pickled mustard fish re-plated in a white porcelain bowl on dark rough timber, warm side light and rising steam')
 
 // One dish through three looks. The food stays the same; the bowl, the set and the light change.
 const shoot: ShootDemo = {
   heading: { lead: 'One phone photo of a dish → ', emphasis: 'a full menu shoot' },
   intro: 'Fresh chili bullfrog, shot on the kitchen pass in a steel basin. Three finished pictures, the same dish in every one: the bullfrog, the green and red chilies, the green peppercorns.',
   phone: {
-    image: caseImage('menu-frog-phone', 'Example phone photo: fresh chili bullfrog in a steel basin on a kitchen counter, fluorescent light, tickets and bowls behind'),
+    image: caseImage('menu-frog-phone', 'Real phone photo: fresh chili bullfrog in a steel basin on a kitchen counter, fluorescent light, tickets and bowls behind'),
     file: 'IMG_2706.jpg',
     caption: 'As shot on a phone. Fluorescent light, a steel basin, order tickets behind.',
   },
   arrow: 'Three looks, same dish',
   results: [
     {
-      image: caseImage('menu-frog-dark', 'AI example: the same bullfrog dish in a charcoal stone bowl on slate, dark painted backdrop, warm side light'),
+      image: caseImage('menu-frog-dark', 'Real example: the same bullfrog dish in a charcoal stone bowl on slate, dark painted backdrop, warm side light'),
       title: 'Menu hero',
       template: 'Dark set, sculpted side light',
     },
     {
-      image: caseImage('menu-frog-pour', 'AI example: hot oil poured from a white jug onto the same dish in a white bowl on raw timber, steam caught mid-air'),
+      image: caseImage('menu-frog-pour', 'Real example: hot oil poured from a white jug onto the same dish in a white bowl on raw timber, steam caught mid-air'),
       title: 'Sizzle shot',
       template: 'Hot oil poured, steam caught mid-air',
     },
     {
-      image: caseImage('menu-frog-poster-en', 'AI example: a menu poster of the same dish on a warm brown backdrop, headed Chef\'s Signature, Fresh Chili Bullfrog'),
+      image: caseImage('menu-frog-poster-en', 'Real example: a menu poster of the same dish on a warm brown backdrop, headed Chef\'s Signature, Fresh Chili Bullfrog'),
       title: 'Menu poster',
       template: 'Dish name, one line and the price',
     },
