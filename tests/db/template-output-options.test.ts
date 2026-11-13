@@ -31,11 +31,21 @@ afterAll(async () => {
 })
 
 describe('template output options on the Data API', () => {
+  it('offers a tall poster ratio only to a template that lists it (1310)', async () => {
+    const options = async () => (await anonSupabase().from('templates').select('template_image_options').eq('id', templateId).single()).data?.template_image_options
+    await db.query(`update public.ai_providers set capabilities = jsonb_set(capabilities, '{aspectRatios}', '["1:1","1:2"]') where id = $1`, [provider])
+    expect((await options()).aspectRatios).toEqual(['1:1'])
+    await db.query(`update public.templates set fields = jsonb_set(fields, '{aspectRatios}', '["1:2","1:1"]') where id = $1`, [templateId])
+    expect((await options()).aspectRatios).toEqual(['1:1', '1:2'])
+    await db.query(`update public.ai_providers set capabilities = $2 where id = $1`, [provider, caps])
+    await db.query(`update public.templates set fields = jsonb_set(fields, '{aspectRatios}', '["4:5","1:1"]') where id = $1`, [templateId])
+  })
+
   it('uses the bound provider for web and the actual default provider for partners', async () => {
     const { data, error } = await anonSupabase().from('templates').select('template_image_options,partner_image_aspects').eq('id',templateId).single()
     expect(error).toBeNull()
     expect(data).toEqual({
-      template_image_options: { resolutions: ['1k'], aspectRatios: ['1:1'], originalRatio: false },
+      template_image_options: { resolutions: ['1k'], aspectRatios: ['1:1'], originalRatio: false, exactPixels: false },
       partner_image_aspects: ['4:5','1:1'],
     })
   })
