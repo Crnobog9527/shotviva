@@ -111,6 +111,7 @@ CREATE OR REPLACE FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_re
     where g.provider=p_tag and g.inputs->>'resolution'=p_resolution
       and g.inputs ? 'quality' and g.inputs->>'quality'=p_quality
       and g.created_at>=now()-interval '30 days' and g.status='succeeded' and g.cost_usd is not null
+      and not (g.inputs ? 'input_slots')
   ), sources as (
     select r.adapter, m.n,
       -- Through jsonb as admin_image_provider_pricing returns it, so the rounding is unchanged.
@@ -441,7 +442,7 @@ begin
           percentile_cont(0.95) within group (order by cost_usd) p95
         from public.generation_jobs where provider like 'env/%' and status='succeeded'
           and cost_usd is not null and created_at >= now()-interval '30 days'
-          and inputs ? 'quality' and inputs->>'quality'=t.quality
+          and inputs ? 'quality' and inputs->>'quality'=t.quality and not (inputs ? 'input_slots')
         group by 1,2 having count(*)>=10
       ) per_model group by r
     ) per_tier;
@@ -457,11 +458,11 @@ begin
     -- T96 never sells unsupported resolutions on this model. Those fields keep
     -- their existing positive placeholder; fallback reservations have their own check.
     if bound is not null then
-      if not (tier=any(supported)) or admin.alternate_route_meets_floor(route_tag,tier,t.quality,(t.credits_cost->>tier)::int)
+      if not (tier=any(supported)) or admin.alternate_route_meets_floor(route_tag,tier,t.quality,(t.credits_cost->>tier)::int/admin.slot_floor_factor(t))
           then continue; end if;
     else
       usd := coalesce((env_p95->>tier)::numeric,(openai_usd->>tier)::numeric);
-      if budget>0 and (t.credits_cost->>tier)::int >= greatest(ceil(usd*1.10/budget),(openai_min->>tier)::int)
+      if budget>0 and (t.credits_cost->>tier)::int >= greatest(ceil(usd*1.10/budget),(openai_min->>tier)::int)*admin.slot_floor_factor(t)
           then continue; end if;
     end if;
     raise exception 'TEMPLATE_PRICE_BELOW_FLOOR' using detail=format('模板 %s 的 %s 售价低于模型成本下限或缺少报价，请刷新报价后再保存。',t.id,tier);
@@ -1246,7 +1247,7 @@ CREATE OR REPLACE FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_res
       where g.provider=p_tag and g.inputs->>'resolution'=p_resolution
         and g.inputs ? 'quality' and g.inputs->>'quality'=p_quality
         and g.status='succeeded' and g.cost_usd is not null
-        and g.created_at>=now()-interval '30 days'
+        and g.created_at>=now()-interval '30 days' and not (g.inputs ? 'input_slots')
       having count(*)>=10
   ), priced as (
     select adapter, greatest(
@@ -1292,14 +1293,14 @@ begin
   if not v2 then return true; end if;
   if not coalesce(sale.enabled,false) then return false; end if;
   if route like 'env/_%' then
-    return coalesce(price>=admin.fallback_route_floor(route,tier,t.quality),false);
+    return coalesce(price>=admin.fallback_route_floor(route,tier,t.quality)*admin.slot_floor_factor(t),false);
   end if;
   select * into p from public.ai_providers
     where module='image' and id::text=split_part(route,'/',1) and id::text||'/'||model=route;
   if not found or not (tier=any(admin.sale_route_resolutions(p))) then return false; end if;
   approved:=admin.template_approved_price(p.id,t.id);
   if approved->>'quality'=t.quality and (approved->'costs'->>tier)::int=price then return true; end if;
-  return admin.alternate_route_meets_floor(route,tier,t.quality,price);
+  return admin.alternate_route_meets_floor(route,tier,t.quality,price/admin.slot_floor_factor(t));
 end $$;
 
 
@@ -1763,7 +1764,7 @@ begin
     select from public.template_prompts tp join public.ai_providers p on p.id=tp.provider_id
     where tp.template_id=t.id and route is distinct from p.id::text||'/'||p.model
   ) then
-    if not coalesce(price>=admin.fallback_route_floor(route,tier,t.quality),false) then return false; end if;
+    if not coalesce(price>=admin.fallback_route_floor(route,tier,t.quality)*admin.slot_floor_factor(t),false) then return false; end if;
   end if;
   if v2 and exists (
     select from admin.template_price_snapshots s join admin.template_price_batches b on b.id=s.batch_id
@@ -1771,8 +1772,8 @@ begin
     where b.reverted_at is null and s.template_id=t.id and c.quality=t.quality
       and c.costs->tier=t.credits_cost->tier and
       (route is distinct from s.provider_id::text||'/gpt-image-2.6-sunburst'
-        or admin.template_approved_price(s.provider_id,t.id) is null)
-  ) then return admin.alternate_route_meets_floor(route,tier,t.quality,price); end if;
+        or not (admin.template_approved_prices(s.provider_id) ? t.id))
+  ) then return admin.alternate_route_meets_floor(route,tier,t.quality,price/admin.slot_floor_factor(t)); end if;
   return true;
 end $$;
 
@@ -1868,6 +1869,7 @@ CREATE OR REPLACE FUNCTION "admin"."route_p95_by_quality"("p_tag" "text") RETURN
       where g.provider=p_tag and g.inputs ? 'quality' and g.inputs->>'quality' in ('medium','high')
         and g.inputs->>'resolution' in ('1k','2k','3k')
         and g.created_at>=now()-interval '30 days' and g.status='succeeded' and g.cost_usd is not null
+        and not (g.inputs ? 'input_slots')
       group by 1,2 having count(*)>=10
     ) per_tier group by quality
   ) per_quality
@@ -1900,6 +1902,10 @@ begin
       select * into p from public.ai_providers a where a.module='image' and a.id::text||'/'||a.model=route;
       if not ('1k'=any(admin.sale_route_resolutions(p))) then reason:='route_unsupported';
       else reason:='below_floor'; floor:=admin.alternate_route_floor(route,'1k',t.quality);
+        -- A slot template's floor is per slot (above); report the floor its price is held to.
+        if admin.slot_floor_factor(t)>1 then
+          floor:=floor||jsonb_build_object('slots',admin.slot_floor_factor(t),'credits',(floor->>'credits')::int*admin.slot_floor_factor(t));
+        end if;
       end if;
     end if;
     result:=result||jsonb_build_array(jsonb_build_object('template_id',t.id,'quality',t.quality,
@@ -1949,6 +1955,18 @@ $$;
 
 
 ALTER FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."slot_floor_factor"("t" "public"."templates") RETURNS integer
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select greatest(1, case when jsonb_typeof(t.fields->'images'->'slots')='array'
+    then jsonb_array_length(t.fields->'images'->'slots') else 0 end)
+$$;
+
+
+ALTER FUNCTION "admin"."slot_floor_factor"("t" "public"."templates") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_apply_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") RETURNS "void"
@@ -2278,7 +2296,8 @@ begin
   return not exists (
     select j.provider from public.generation_jobs j where j.provider like 'env/_%'
       and j.status='succeeded' and j.cost_usd is not null and j.created_at>=now()-interval '30 days'
-      and j.inputs->>'resolution'='1k' and j.inputs->>'quality'=t.quality group by j.provider
+      and j.inputs->>'resolution'='1k' and j.inputs->>'quality'=t.quality and not (j.inputs ? 'input_slots')
+      group by j.provider
     having count(*)>=10 and not admin.template_route_allowed(t,j.provider,'1k',price,false)
   );
 end $$;
@@ -5597,6 +5616,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_image_provider_pricing"("p_env_model"
      where g.created_at >= now() - interval '30 days'
        and coalesce(g.inputs->>'resolution', '1k') in ('1k','2k','3k')
        and g.status = 'succeeded' and g.cost_usd is not null
+       and not (g.inputs ? 'input_slots')
      group by 1, 2 having count(*) >= 10
   ), costs as (
     select provider, jsonb_object_agg(resolution, cost) as p95 from samples group by provider
@@ -14530,7 +14550,7 @@ CREATE INDEX "generation_jobs_route_p95_idx" ON "public"."generation_jobs" USING
 
 
 
-CREATE INDEX "generation_jobs_route_quality_p95_idx" ON "public"."generation_jobs" USING "btree" ("provider", (("inputs" ->> 'resolution'::"text")), (("inputs" ->> 'quality'::"text")), "created_at") INCLUDE ("cost_usd") WHERE (("status" = 'succeeded'::"text") AND ("cost_usd" IS NOT NULL) AND ("inputs" ? 'quality'::"text"));
+CREATE INDEX "generation_jobs_route_quality_p95_idx" ON "public"."generation_jobs" USING "btree" ("provider", (("inputs" ->> 'resolution'::"text")), (("inputs" ->> 'quality'::"text")), "created_at") INCLUDE ("cost_usd") WHERE (("status" = 'succeeded'::"text") AND ("cost_usd" IS NOT NULL) AND ("inputs" ? 'quality'::"text") AND (NOT ("inputs" ? 'input_slots'::"text")));
 
 
 
@@ -16232,6 +16252,11 @@ GRANT ALL ON FUNCTION "admin"."sale_route_resolutions"("p" "public"."ai_provider
 
 REVOKE ALL ON FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."set_template_unpriced_resolutions"("p_id" "text", "p_unpriced" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."slot_floor_factor"("t" "public"."templates") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."slot_floor_factor"("t" "public"."templates") TO "service_role";
 
 
 
