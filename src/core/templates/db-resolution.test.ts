@@ -21,7 +21,7 @@ describe('tier ids between the site (4k) and the database (3k until the contract
       credits_cost: { '1k': 2, '2k': 4, '4k': 6 },
       inputs: { resolution: '4k', copy: { headline: '4k', note: 'make it 4k' } },
       resolutions: ['1k', '4k'],
-      capabilities: { resolutions: ['4k'], catalogImageCosts: { '4k': 0.2 }, aspectRatios: ['1:1'] },
+      capabilities: { resolutions: ['4k'], resolutionLimit: ['1k', '4k'], catalogImageCosts: { '4k': 0.2 }, aspectRatios: ['1:1'] },
       unpriced_resolutions: ['4k'],
       tags: ['4k'],
     }
@@ -30,7 +30,7 @@ describe('tier ids between the site (4k) and the database (3k until the contract
       credits_cost: { '1k': 2, '2k': 4, '3k': 6 },
       inputs: { resolution: '3k', copy: { headline: '4k', note: 'make it 4k' } },
       resolutions: ['1k', '3k'],
-      capabilities: { resolutions: ['3k'], catalogImageCosts: { '3k': 0.2 }, aspectRatios: ['1:1'] },
+      capabilities: { resolutions: ['3k'], resolutionLimit: ['1k', '3k'], catalogImageCosts: { '3k': 0.2 }, aspectRatios: ['1:1'] },
       unpriced_resolutions: ['3k'],
       tags: ['4k'],
     })
