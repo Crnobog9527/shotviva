@@ -10,7 +10,12 @@
 // base/key. An empty base is this page's own origin.
 // `font`: a static file instead of a picture (one of the MiSans woff2 subsets in public/fonts,
 // ~45 KB, the kind of file the static-file CDN serves), fetched from base + /fonts/misans/….
-export type LabOrigin = { id: string; label: string; base: string; small?: boolean; font?: boolean }
+// `hero`: the home page's first-screen pictures (public/home, the mobile LCP image) at w=640 from
+// base + /_next/image, the size a phone's srcset picks.
+export type LabOrigin = { id: string; label: string; base: string; small?: boolean; font?: boolean; hero?: boolean }
+
+export const LAB_HERO_FILES = ['hero-set-phone.webp', 'hero-ai-street.webp', 'hero-ai-terrace.webp', 'hero-ai-villa.webp', 'hero-set-listing.webp', 'hero-set-promo.webp']
+export const HERO_WIDTH = 640
 export type LabConfig = { origins: LabOrigin[]; keys: string[]; assetsBase?: string }
 
 // Six of the largest MiSans subsets the Chinese pages load (public/fonts/misans, content-hashed).
@@ -77,9 +82,13 @@ function cdnRows(hasCovers: boolean, cdn: string): LabOrigin[] {
     { id: 'site-s', label: '小图：本站 /_next/image（Vercel，现在）', base: '', small: true },
     { id: 'eo-s', label: '小图：img-eo /_next/image（EdgeOne 转 Vercel）', base: cdn, small: true },
   ]
+  const heroes: LabOrigin[] = [
+    { id: 'site-h', label: '首屏大图：本站 /_next/image（Vercel，现在）', base: '', hero: true },
+    { id: 'eo-h', label: '首屏大图：img-eo /_next/image（EdgeOne 转 Vercel）', base: cdn, hero: true },
+  ]
   const fonts: LabOrigin[] = [
     { id: 'site-f', label: '静态文件：本站（Vercel）', base: '', font: true },
     { id: 'eo-f', label: '静态文件：img-eo（EdgeOne 转 Vercel）', base: cdn, font: true },
   ]
-  return [...(hasCovers ? small : []), ...fonts]
+  return [...(hasCovers ? small : []), ...heroes, ...fonts]
 }

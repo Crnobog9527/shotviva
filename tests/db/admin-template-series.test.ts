@@ -60,7 +60,7 @@ describe('admin series management', () => {
     await expect(saveAdminSeries(service, actor, disable)).rejects.toThrow('下架原因')
     await saveAdminSeries(service, actor, { ...disable, reason: '测试下架' })
     expect((await readCategoryEntries(anon, [category], 'zh')).items).toEqual([])
-    expect(await listAdminSeriesOptions(service)).toContainEqual({ id, nameZh: fields.name_zh })
+    expect(await listAdminSeriesOptions(service)).toContainEqual({ id, nameZh: fields.name_zh, nameEn: fields.name_en })
     record = (await getAdminSeries(service, id))!
     await saveAdminSeries(service, actor, { ...disable, revision: record.revision, members: [] })
     expect((await readCategoryEntries(anon, [category], 'zh')).items).toHaveLength(2)
