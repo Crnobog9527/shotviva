@@ -49,7 +49,7 @@ export function useEditForm({ source, balance, creditsCost, imageOptions, draft:
     form: <EditForm options={imageOptions} photoRatio={photoRatio} outputAspect={aspect} source={source} balance={balance} creditsCost={creditsCost} draft={draft} showRequired={showRequired} onChange={change} />,
     bar:
       resolution && aspect ? (
-        <EditAction cta={cta} tier={tierName(draft.resolution, t)} onEmpty={pointAtField} onGenerate={() => onGenerate({ ...draft, aspect, resolution, text: draft.text.trim() })} />
+        <EditAction cta={cta} privateOnly={source.privateOnly ?? false} tier={tierName(draft.resolution, t)} onEmpty={pointAtField} onGenerate={() => onGenerate({ ...draft, aspect, resolution, text: draft.text.trim() })} />
       ) : (
         <button type="button" disabled className="h-12 w-full text-muted-foreground">
           {t(!resolution || !imageOptions.aspectRatios.length ? 'workspace.noOptions' : 'workspace.pickSize')}

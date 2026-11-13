@@ -2,10 +2,19 @@ import { NextRequest } from 'next/server'
 import { beforeEach, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ profile: { role: 'admin', banned_at: null as string | null }, read: vi.fn(), db: vi.fn() }))
-vi.mock('@/core/auth/supabase-server', () => ({ createServerSupabase: async () => ({
-  auth: { getUser: async () => ({ data: { user: { id: 'actor', email_confirmed_at: '2026-01-01', app_metadata: {} } } }) },
-  from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: mocks.profile }) }) }) }),
-}) }))
+// The session check (core/auth/identity.ts): the cookie's verified JWT, then session_identity()'s row.
+vi.mock('@/core/auth/identity', async (original) => {
+  const real = await original<typeof import('@/core/auth/identity')>()
+  return {
+    ...real,
+    verifyCookieIdentity: async () => ({
+      status: 'signed_in',
+      user: real.rowToSessionUser({ id: 'actor', email: null, phone: null, email_confirmed_at: '2026-01-01', phone_confirmed_at: null, app_metadata: {}, user_metadata: {}, ...mocks.profile }),
+    }),
+  }
+})
+vi.mock('next/headers', () => ({ headers: async () => new Headers(), cookies: async () => ({ getAll: () => [] }) }))
+vi.mock('next/server', async (original) => ({ ...(await original<typeof import('next/server')>()), connection: async () => {} }))
 vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: mocks.db }))
 vi.mock('@/core/i18n/server', () => ({ localized: async (path: string) => path }))
 vi.mock('@/core/admin/prompt-lab/store', () => ({

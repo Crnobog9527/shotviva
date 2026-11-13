@@ -270,9 +270,9 @@
         "max": "{count, number} photos · {templates, number} templates"
       },
       "guide": {
-        "title": "Tutorial",
-        "lede": "How Batch create works, with example results. Open it again any time from the ? button.",
-        "open": "Batch create tutorial",
+        "title": "See how it works",
+        "lede": "How Batch create works, with example results. Open it again any time from See how it works.",
+        "demo": "See how it works",
         "tabsLabel": "Ways to use Batch create",
         "tabs": {
           "batch": "1 template × photos",
@@ -410,6 +410,7 @@
       "newBatch": "New batch",
       "openPhotos": "Open Photos",
       "backToCreate": "Back to Create",
+      "closeWhileRunning": "Close (it keeps generating)",
       "lockedTitle": "Batch create comes with Pro and Max",
       "lockedPro": "One template on up to {count, number} photos at once.",
       "lockedMax": "Up to {templates, number} templates on your photos, {count, number} photos a batch.",
@@ -675,7 +676,7 @@
       "doneState": {
         "hud": "Done",
         "saved": "Saved to Photos",
-        "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
+        "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} freePrivate { Made with free credits, so it has a watermark; poster photos stay private.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
         "caption": "Phone photo → {name}.",
         "edit": "Edit this photo"
       },
@@ -691,6 +692,7 @@
       "generateCta": "Generate <cost>· {count, plural, one {# credit} other {# credits}}</cost>",
       "getCreditsCta": "Get credits <cost>· <mono>{count, number}</mono> needed</cost>",
       "freeNotice": "This photo uses free credits: it's shown publicly with a watermark. <b>Paid credits make it private and watermark-free.</b>",
+      "freeNoticePrivate": "This photo uses free credits, so it has a watermark. <b>Poster photos stay private: they never go in the public gallery.</b>",
       "needsCredits": "{tier} needs {count, plural, one {# credit} other {# credits}}. <b>Paid credits make photos private and watermark-free.</b>",
       "counter": "{count, number} / {max, number}",
       "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>",
@@ -799,7 +801,7 @@
       "done": "Done",
       "newest": "Newest first",
       "count": "{running, plural, =0 {} other {# in progress · }}{done} done",
-      "footnote": "Photos made with free credits are public with a watermark. Photos made with paid credits are private and watermark-free.",
+      "footnote": "Photos made with free credits are public with a watermark; poster photos stay private. Photos made with paid credits are private and watermark-free.",
       "photoAlt": "{name} photo",
       "empty": "Pick a template, upload one phone photo, and your first one lands here in about 60 seconds.",
       "emptyCta": "Create your first photo",
@@ -832,6 +834,7 @@
     },
     "work": {
       "freePublic": "Public · watermark",
+      "freePrivate": "Private · watermark",
       "private": "Private",
       "public": "Public"
     },
@@ -886,6 +889,7 @@
         "credits": "Credits",
         "visibility": "Visibility",
         "visibilityFree": "Public, with watermark",
+        "visibilityFreePrivate": "Private, with watermark",
         "visibilityPrivate": "Private",
         "visibilityPublic": "Public",
         "original": "Original",
@@ -1243,6 +1247,7 @@
       "noticeEmpty": "Write what to change, in any language. <b>The original is kept.</b>",
       "noticeReady": "Makes a new photo; the original stays in Photos.",
       "noticeFree": "Makes a new photo; the original stays in Photos. <b>Uses free credits: public with a watermark.</b>",
+      "noticeFreePrivate": "Makes a new photo; the original stays in Photos. <b>Uses free credits: watermarked, and private like the original poster.</b>",
       "failTitle": "The edit failed.",
       "failUntouched": "The original is untouched.",
       "changeRequest": "Change the request",

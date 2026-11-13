@@ -47,12 +47,14 @@ type Props = {
   limit?: number
   // Why the batch preflight said no (T107), when it was not a paywall moment.
   error?: string | null
+  // A poster template (gallery-excluded root): free credits still watermark, but never publish.
+  privateOnly?: boolean
 }
 
 // The creation form's bottom bar: one notice line at most, then the one primary (DESIGN §4.3
 // steps 4–5). The free-credit notice shows only when this photo would use free credits; a
 // batch (T28) says how many photos and that it is paid credits only.
-export function FormAction({ state, resolution, batch, onGenerate, placement = 'page', addFirst = null, limit = 1, error = null }: Props) {
+export function FormAction({ state, resolution, batch, onGenerate, placement = 'page', addFirst = null, limit = 1, error = null, privateOnly = false }: Props) {
   const t = useTranslations('app.workspace')
   return (
     <ActionBar inline={placement === 'sheet'} className={placement === 'page' ? PAGE : undefined}>
@@ -63,7 +65,7 @@ export function FormAction({ state, resolution, batch, onGenerate, placement = '
       ) : state.kind === 'need-photo' && addFirst !== null ? (
         <ActionNotice>{t.rich('again.addFirst', { ...rich, count: addFirst })}</ActionNotice>
       ) : (
-        <Notice state={state} resolution={resolution} limit={limit} />
+        <Notice state={state} resolution={resolution} limit={limit} privateOnly={privateOnly} />
       )}
       <Primary state={state} batch={batch} onGenerate={onGenerate} />
     </ActionBar>
@@ -101,13 +103,15 @@ function Primary({ state, batch, onGenerate }: { state: CtaState; batch: boolean
 
 const BATCH_LABELS: typeof LABELS = { ...LABELS, 'need-photo': 'needPhotos', uploading: 'uploadingManyCta' }
 
-function Notice({ state, resolution, limit }: { state: CtaState; resolution: Resolution; limit: number }) {
+function Notice({ state, resolution, limit, privateOnly }: { state: CtaState; resolution: Resolution; limit: number; privateOnly: boolean }) {
   const t = useTranslations('app')
   // A batch is paid credits only (ARCHITECTURE §6.2), so it never gets the free-credit notice.
   if (state.kind === 'generate' && state.count > 1) {
     return <ActionNotice>{t.rich('workspace.batch.notice', { ...rich, count: state.count, each: state.cost / state.count, limit })}</ActionNotice>
   }
-  if (state.kind === 'generate' && state.pool === 'free') return <ActionNotice>{t.rich('workspace.freeNotice', rich)}</ActionNotice>
+  if (state.kind === 'generate' && state.pool === 'free') {
+    return <ActionNotice>{t.rich(privateOnly ? 'workspace.freeNoticePrivate' : 'workspace.freeNotice', rich)}</ActionNotice>
+  }
   if (state.kind === 'get-credits' && state.count > 1) {
     return <ActionNotice>{t.rich('workspace.batchNeedsPaid', { ...rich, count: state.count, total: state.cost })}</ActionNotice>
   }

@@ -11,7 +11,7 @@ import { logger } from '@/core/logger'
 import { FEATURES_COPY } from '../features-editor/copy'
 import type { FeatureInvite } from './types'
 
-// Invited accounts of an invite-only feature (1312 / 1313). Service role only; the database
+// Invited accounts of an invite-only feature (1342 / 1343). Service role only; the database
 // re-checks the admin and resolves the email or phone to an account.
 
 const inviteRowSchema = z.object({
