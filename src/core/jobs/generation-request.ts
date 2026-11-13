@@ -4,6 +4,7 @@ import { cellSchema } from './batch/proof'
 import { MAX_BATCH_TEMPLATES } from './batch/limits'
 import { MAX_BATCH_SIZE } from '../billing/tier-limits'
 import type { Locale } from '../i18n/locales'
+import { IMAGE_SLOTS_MAX } from '../templates/image-slots'
 import { NOTE_MAX_LENGTH, OUTPUT_ASPECTS, RESOLUTIONS, type Resolution } from '../templates/output-options'
 import { JOB_VISIBILITIES, type JobSource, type JobVisibility } from './job-schema'
 
@@ -14,6 +15,12 @@ export const generateBodySchema = z.object({
   expected_credits: z.int().positive().optional(),
   template_id: z.string().min(1).max(64),
   input_key: z.string().min(1).max(200).nullable().optional(),
+  // A template with image slots (§5.1e): slot key → the caller's upload, filled slots only. Such
+  // a template takes no input_key.
+  input_slots: z
+    .record(z.string().regex(/^[a-z][a-z0-9_]*$/).max(64), z.string().min(1).max(200))
+    .refine((slots) => Object.keys(slots).length <= IMAGE_SLOTS_MAX, { message: 'Too many image slots' })
+    .optional(),
   inputs: z
     .object({
       copy: z.record(z.string(), z.unknown()).optional(),
@@ -52,6 +59,8 @@ export type GenerationRequest = {
   expectedCredits?: number
   templateId: string
   inputKey?: string | null
+  // Web only (§5.1e): a slot template's uploads by slot; the partner route has none.
+  inputSlots?: Record<string, string>
   copy?: Record<string, unknown>
   aspectRatio?: string
   // Web only: the partner route is fixed at '1k' with no note (ARCHITECTURE §14.6).
@@ -85,6 +94,7 @@ export function toGenerationRequest(userId: string, body: z.infer<typeof generat
     expectedCredits: body.expected_credits,
     templateId: body.template_id,
     inputKey: body.input_key ?? null,
+    ...(body.input_slots ? { inputSlots: body.input_slots } : {}),
     copy: body.inputs.copy,
     aspectRatio: body.inputs.aspect_ratio,
     resolution: body.inputs.resolution,

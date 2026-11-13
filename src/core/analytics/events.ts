@@ -95,6 +95,8 @@ export const eventSchemas = {
     batch_size: z.number().int().min(1).max(MAX_BATCH_SIZE),
     // The template's toggles as chosen (T89), key → on; {} for a template without any.
     toggles: z.record(toggleKey, z.boolean()).optional(),
+    // A slot template's filled image slots (§5.1e), keys only, in send order; [] otherwise.
+    slots_filled: z.array(toggleKey).max(4).optional(),
   }),
   // A request refused before charging (ARCHITECTURE §5.1a, T81): which entry, never the words.
   generate_refused: z.strictObject({ reason: z.enum(['identity_swap']), source: z.enum(IDENTITY_SOURCES) }),

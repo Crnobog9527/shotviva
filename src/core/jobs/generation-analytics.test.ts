@@ -84,6 +84,7 @@ describe('generateEventProps', () => {
       batch_size: 1,
       batch_templates: 1,
       toggles: {},
+      slots_filled: [],
     })
   })
 
@@ -93,6 +94,15 @@ describe('generateEventProps', () => {
     expect(props.toggles).toEqual({ replate: true })
     expect(validateEvent('generate', props).ok).toBe(true)
     expect(generateEventProps({ ...job, inputs: { toggles: 'on' } }, 'food', { status: 'succeeded' }, 0).toggles).toEqual({})
+  })
+})
+
+describe('generateEventProps with image slots', () => {
+  it('names the filled image slots in send order, never their uploads (§5.1e)', () => {
+    const slotted = { ...job, inputs: { ...job.inputs, input_slots: [{ key: 'logo', upload: 'inputs/u/a.png' }, { key: 'prize_2', upload: 'inputs/u/b.jpg' }] } }
+    const props = generateEventProps(slotted, 'food', { status: 'succeeded' }, 0)
+    expect(props.slots_filled).toEqual(['logo', 'prize_2'])
+    expect(validateEvent('generate', props).ok).toBe(true)
   })
 
   it('carries the batch size, 1 when there is no batch', () => {

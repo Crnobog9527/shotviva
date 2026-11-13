@@ -4,7 +4,7 @@ import type { IdentityJudge, ScreenResult } from '../identity-guard'
 import { AppError } from '../errors'
 import { logger } from '../logger'
 import type { InputImage, ObjectStore } from '../storage'
-import { providerParams, renderPrompt, toggleFragments, type GenerationInputs, type GenerationTemplate, type Resolution } from '../templates'
+import { PROMPT_MAX_LENGTH, providerParams, renderPrompt, toggleFragments, type GenerationInputs, type GenerationTemplate, type Resolution } from '../templates'
 import { resolveTemplateProvider, type GenerationProvider, type ProviderInput, type TemplateProvider } from './provider'
 import { readStyleImages } from './style-reference-images'
 import type { DecisionCost } from './settle-generation'
@@ -31,10 +31,9 @@ export async function selectTemplateRoute(provider: TemplateProvider, providerId
 
 export async function templateCall(
   deps: { store: ObjectStore; provider: TemplateProvider },
-  { template, prompt }: CallTemplate, inputs: GenerationInputs, image: InputImage | null,
+  { template, prompt }: CallTemplate, inputs: GenerationInputs, photos: readonly InputImage[],
   options: { resolution: Resolution; providerId: string | null; omitStyleRefs?: boolean; onRoute?: (provider: GenerationProvider) => void },
 ) {
-  const photos = image ? [image] : []
   const requested = options.omitStyleRefs ? [] : prompt.styleRefs
   const { provider, dropRefs } = await selectTemplateRoute(deps.provider, options.providerId,
     options.resolution, inputs.aspectRatio, photos.length, requested.length, options.onRoute)
@@ -45,10 +44,13 @@ export async function templateCall(
     })
   }
   const refs = dropRefs ? [] : requested
-  const refImages = await readStyleImages(deps.store, prompt.version, refs)
   const counts = { photo_count: photos.length, style_ref_count: refs.length }
+  const text = renderPrompt(prompt.body, inputs, toggleFragments(prompt.modelParams), counts)
+  // Before any credit is reserved: the caller reserves only after this returns (§5.1d).
+  if (text.length > PROMPT_MAX_LENGTH) throw new AppError('INVALID_INPUT', 'Text is too long for this template')
+  const refImages = await readStyleImages(deps.store, prompt.version, refs)
   const call: Omit<ProviderInput, 'signal'> = {
-    prompt: renderPrompt(prompt.body, inputs, toggleFragments(prompt.modelParams), counts),
+    prompt: text,
     images: [...photos, ...refImages],
     photoCount: photos.length,
     aspectRatio: inputs.aspectRatio,

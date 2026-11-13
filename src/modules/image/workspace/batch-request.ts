@@ -36,3 +36,18 @@ export function startInputs(template: CatalogueTemplate, values: FormValues, pho
     }
   })
 }
+
+// A slot template's one job (§5.1e): its filled slots as input_slots, no single photo, no batch.
+// Its sizes never include "as shot" (templateOptions), so the size needs no photo.
+export function slotStartInput(template: CatalogueTemplate, values: FormValues, uploads: Record<string, string>): StartInput | null {
+  const note = values.note.trim()
+  const options = templateOptions(template)
+  const resolution = closestResolution(values.resolution, options)
+  const aspect = chosenAspect(values.aspect, options, 1)
+  if (!resolution || !aspect) return null
+  const inputs = { copy: values.copy, resolution, ...(note ? { note } : {}), ...toggleRequest(template.toggles, values.toggles), aspect_ratio: aspect }
+  return {
+    templateId: template.id, templateName: template.name, resolution, aspect, credits: template.creditsCost[resolution], inputKey: null,
+    body: { expected_credits: template.creditsCost[resolution], template_id: template.id, input_key: null, input_slots: uploads, inputs },
+  }
+}

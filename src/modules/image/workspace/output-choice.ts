@@ -34,8 +34,11 @@ export function closestResolution(wanted: Resolution, options: ImageOptions): Re
   )
 }
 
-export function templateOptions(template: { imageOptions?: ImageOptions } | null) {
-  return template?.imageOptions ?? FULL_IMAGE_OPTIONS
+// A slot template offers no "as shot" size (§5.1e): its images are a logo and the like, not a
+// photo whose shape the result should follow. The server refuses it too.
+export function templateOptions(template: { imageOptions?: ImageOptions; imageSlots?: readonly unknown[] } | null) {
+  const options = template?.imageOptions ?? FULL_IMAGE_OPTIONS
+  return template?.imageSlots?.length ? { ...options, originalRatio: false } : options
 }
 
 export function hasOutputOptions(options: ImageOptions) {

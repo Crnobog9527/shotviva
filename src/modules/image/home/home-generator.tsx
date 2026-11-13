@@ -8,7 +8,7 @@ import { trackTemplateView } from '@/core/analytics/browser'
 import type { FormAction } from '@/core/auth/ui'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
-import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
+import { allowsNoPhoto, isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { FavoritesProvider } from '../favorites/favorites-provider'
 import { FavoriteReturn } from '../favorites/favorite-return-effect'
 import type { HomeViewer } from './home-cta'
@@ -59,7 +59,10 @@ const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matc
 // stacked on phones and two columns from 1024px (home-panel.tsx). Signed in it starts the photo through the workspace's own
 // pipeline and moves to that template's workspace; signed out it keeps the setup in this
 // browser and asks for an account.
-export function HomeGenerator({ templates, defaultId, viewer, googleAction, homePath, freeImages, initialCovers }: HomeGeneratorProps) {
+export function HomeGenerator({ templates: all, defaultId, viewer, googleAction, homePath, freeImages, initialCovers }: HomeGeneratorProps) {
+  // The panel has one upload card: a template with named image slots (§5.1e) opens in its own
+  // workspace instead, never here.
+  const templates = useMemo(() => all.filter((template) => !isSlotTemplate(template)), [all])
   const t = useTranslations('home.generator')
   const state = useHomeGenerator({ templates, defaultId, viewer })
   const [pickerOn, setPickerOn] = useState<CatalogueTemplate | null>(null)
