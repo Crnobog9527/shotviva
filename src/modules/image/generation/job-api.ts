@@ -13,6 +13,8 @@ export type GenerateBody = {
   batch_templates?: number
   batch_cell?: { position: number; photo_name: string; template_name: string; signature: string }
   inputs: { copy: Record<string, string>; aspect_ratio: string; resolution: string; note?: string; toggles?: Record<string, boolean>; toggles_confirmed?: string[] }
+  // A dense-text poster (ARCHITECTURE §5.3): which poster of the saved set this job makes.
+  poster?: { set_id: string; part: number }
 }
 
 // A photo edit (ARCHITECTURE §5.2): goes to /api/edit, settles and polls like any job.
