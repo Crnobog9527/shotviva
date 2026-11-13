@@ -23,7 +23,7 @@ type Props = {
   target: EditTarget
   floor: ProviderFloors
   categories: readonly CategoryOption[]
-  series: readonly { id: string; nameZh: string }[]
+  series: readonly { id: string; nameZh: string; nameEn?: string }[]
   // Every template, for the live preview's series panel.
   templates: readonly AdminTemplate[]
   coverLanguages: readonly CoverLanguage[]

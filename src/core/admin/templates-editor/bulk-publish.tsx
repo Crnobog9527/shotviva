@@ -16,13 +16,21 @@ import type { CategoryOption } from './category-field'
 import { useBulkActive } from './use-bulk-active'
 import { useBulkEdit } from './use-bulk-edit'
 import { useBulkFeatured } from './use-bulk-featured'
+import { BulkMoreBar } from './bulk-more-bar'
+import { BulkTaskDialog } from './bulk-task-dialog'
+import { BulkTaskResult } from './bulk-task-result'
+import type { SeriesOption } from './catalog-groups'
+import { useBulkTasks, type TaskActions } from './use-bulk-tasks'
 
 type Props = {
   selected: AdminTemplate[]
+  // Every live template in list order (移到最前 / 最后 reorders whole lists) and the series options.
+  all: readonly AdminTemplate[]
+  series: readonly SeriesOption[]
   // Another action (switch, save, reorder) is running.
   busy: boolean
   // Bulk 上架 / 下架 (T60), batch edit (T79) and batch 首页精选.
-  actions: Pick<TemplateAdminActions, 'setActiveMany' | 'editMany' | 'setFeaturedMany'>
+  actions: Pick<TemplateAdminActions, 'setActiveMany' | 'editMany' | 'setFeaturedMany'> & TaskActions
   // The featured list as shown (for the 首页精选 confirm step and the server's stale check), and
   // whether 首页精选 holds an unsaved arrangement that a batch would drop.
   featured: { ids: string[]; locked: boolean }
@@ -36,12 +44,13 @@ type Props = {
 // Bulk 上架 / 下架 (T60): bar → confirm dialog naming the templates → one server call → result list.
 // Batch edit (T79) shares the bar: dialog → review → one all-or-nothing call. So does batch
 // 首页精选: confirm step with a per-template verdict → one all-or-nothing call.
-export function BulkPublish({ selected, busy, actions, featured: shown, floor, providers, categories, onClear }: Props) {
+export function BulkPublish({ selected, all, series, busy, actions, featured: shown, floor, providers, categories, onClear }: Props) {
   const [asking, setAsking] = useState<boolean | null>(null)
   const { pending, outcome, error, run, dismiss } = useBulkActive(actions.setActiveMany)
   const edit = useBulkEdit(actions.editMany, onClear)
   const featured = useBulkFeatured(actions.setFeaturedMany, onClear)
-  const disabled = busy || pending || edit.pending || featured.pending
+  const tasks = useBulkTasks(actions, selected, all, onClear)
+  const disabled = busy || pending || edit.pending || featured.pending || tasks.pending
 
   const confirm = (reason: string | undefined) => {
     const active = asking
@@ -61,7 +70,9 @@ export function BulkPublish({ selected, busy, actions, featured: shown, floor, p
         onFeature={featured.start}
         featureLocked={shown.locked}
         onClear={onClear}
+        more={<BulkMoreBar tasks={tasks} disabled={disabled} />}
       />
+      <BulkTaskResult tasks={tasks} />
       {[error, featured.error].map((message) => message ? (
         <p key={message} role="alert" className="text-destructive text-sm">
           {message}
@@ -80,6 +91,7 @@ export function BulkPublish({ selected, busy, actions, featured: shown, floor, p
         floor={floor}
         categories={categories}
       />
+      <BulkTaskDialog task={tasks.asking} selected={selected} series={series} pending={disabled} onCancel={tasks.cancel} onConfirm={tasks.confirm} />
       <BulkFeaturedDialog bulk={featured} selected={selected} featuredIds={shown.ids} />
       <BulkConfirmDialog
         active={asking}

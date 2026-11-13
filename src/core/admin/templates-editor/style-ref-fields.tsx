@@ -10,6 +10,8 @@ import { styleRefCopy as copy } from './copy'
 import type { referenceBudget } from './style-ref-state'
 import { isRefFromAfterCover, type AfterCover } from '../covers/client'
 import { reuseAfterCover, uploadStyleRef } from './style-ref-upload'
+import { PreviewThumb } from '../ui/image-preview'
+import { styleRefUrl } from './style-ref-url'
 
 type Props = {
   cover: AfterCover | null
@@ -87,14 +89,15 @@ export function StyleRefFields({ cover, templateId, refs, budget, busy, onBusy, 
 
 function RefRow({ refKey, label, pick, remove }: { refKey: string; label: string; pick: (key: string) => void; remove: () => void }) {
   const item = useSortableItem(refKey)
-  const [, templateId, filename] = refKey.split('/')
-  const query = new URLSearchParams({ templateId, imageId: filename.slice(0, -5) })
+  const url = styleRefUrl(refKey)
   return (
     <li {...item.row} className={cn('flex items-center gap-2 rounded-md border p-1', sortableRowClass)}>
       <DragHandle handle={item.handle} />
-      {/* A same-origin admin gate signs the private image only when the dialog opens. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="size-12 rounded object-contain" alt={label} src={`/api/admin/style-refs?${query}`} referrerPolicy="no-referrer" />
+      {/* A same-origin admin gate signs the private image only when it is drawn; the large view reads the same gate. */}
+      <PreviewThumb title={label} images={url ? [{ url, label }] : []}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="size-12 rounded object-contain" alt={label} src={url ?? undefined} referrerPolicy="no-referrer" />
+      </PreviewThumb>
       <MoveButtons item={item} />
       <Button type="button" variant="outline" size="sm" onClick={() => pick(refKey)}>{copy.replace}</Button>
       <Button type="button" variant="ghost" size="sm" onClick={remove}>{copy.remove}</Button>

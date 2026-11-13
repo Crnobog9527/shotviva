@@ -5,6 +5,8 @@ import type { AdminTemplate, VersionSummary } from '../templates/types'
 import { VersionList } from './version-list'
 import { usePromptHistory, type HistoryOptions } from './use-prompt-history'
 import { versionCopy as copy } from './version-copy'
+import { PreviewThumb } from '../ui/image-preview'
+import { styleRefUrl } from './style-ref-url'
 
 export type { VersionActions } from './use-prompt-history'
 type Props = HistoryOptions & { active: number; disabled: boolean }
@@ -35,11 +37,15 @@ function PromptHistory({ active, disabled, ...options }: Props) {
         <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all">{preview.body}</pre>
         <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(preview.modelParams, null, 2)}</pre>
         <p>{copy.refs(preview.styleRefs.length)}</p>
-        <div className="flex gap-1">{preview.styleRefs.map((ref, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={ref.key} className="size-12 rounded object-contain" alt={`#${i+1}`} referrerPolicy="no-referrer"
-            src={`/api/admin/style-refs?${new URLSearchParams({ templateId: values.id, imageId: ref.key.split('/')[2]!.slice(0,-5) })}`} />
-        ))}</div>
+        <div className="flex gap-1">{preview.styleRefs.map((ref, i) => {
+          const url = styleRefUrl(ref.key)
+          return (
+            <PreviewThumb key={ref.key} title={`#${i + 1}`} images={url ? [{ url, label: `#${i + 1}` }] : []}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="size-12 rounded object-contain" alt={`#${i + 1}`} referrerPolicy="no-referrer" src={url ?? undefined} />
+            </PreviewThumb>
+          )
+        })}</div>
         <Button type="button" variant="outline" onClick={choose}>{copy.choose} v{preview.version}</Button>
       </div>}
       {values.selectedVersion && <p role="status">{copy.staged(values.selectedVersion)}</p>}
