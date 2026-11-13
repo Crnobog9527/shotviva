@@ -1229,6 +1229,21 @@ $$;
 ALTER FUNCTION "admin"."copy_template_price_marks"("p_source" "text", "p_target" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."default_category_gallery_excluded"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if new.key = 'posters' and new.parent_id is null then
+    new.gallery_excluded := true;
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."default_category_gallery_excluded"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") RETURNS numeric
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -1305,6 +1320,34 @@ end $$;
 
 
 ALTER FUNCTION "admin"."job_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "v2" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."keep_gallery_excluded_private"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if tg_op = 'INSERT' then
+    new.gallery_excluded := new.gallery_excluded
+      or exists (
+        select 1 from public.templates t
+          join public.template_category_paths p on p.key = coalesce(t.subcategory_key, t.category_key)
+          join public.template_categories r on r.key = p.root_key
+         where t.id = new.template_id and r.gallery_excluded)
+      or exists (
+        select 1 from public.generation_jobs parent
+         where parent.id = new.parent_job_id and parent.gallery_excluded);
+  elsif old.gallery_excluded and not new.gallery_excluded then
+    raise exception 'GALLERY_EXCLUDED_IMMUTABLE';
+  end if;
+  if new.gallery_excluded then
+    new.visibility := 'private';
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."keep_gallery_excluded_private"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."lock_prompt_lab"("p_session_id" "uuid") RETURNS "void"
@@ -3756,6 +3799,7 @@ CREATE TABLE IF NOT EXISTS "public"."template_categories" (
     "seo_description_zh" "text",
     "name_en_lookup" "text" GENERATED ALWAYS AS ((("kind" || ':'::"text") || "lower"("name_en"))) STORED,
     "name_zh_lookup" "text" GENERATED ALWAYS AS ((("kind" || ':'::"text") || "name_zh")) STORED,
+    "gallery_excluded" boolean DEFAULT false NOT NULL,
     CONSTRAINT "template_categories_card_style_check" CHECK (("card_style" = ANY (ARRAY['pair'::"text", 'compare'::"text"]))),
     CONSTRAINT "template_categories_intro_en_check" CHECK ((("intro_en" IS NULL) OR (("char_length"("intro_en") >= 1) AND ("char_length"("intro_en") <= 200)))),
     CONSTRAINT "template_categories_intro_zh_check" CHECK ((("intro_zh" IS NULL) OR (("char_length"("intro_zh") >= 1) AND ("char_length"("intro_zh") <= 200)))),
@@ -9253,13 +9297,14 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "moderated_by" "uuid",
     "screen_attempts" integer DEFAULT 0 NOT NULL,
     "last_screen_at" timestamp with time zone,
+    "gallery_excluded" boolean DEFAULT false NOT NULL,
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
     CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
     CONSTRAINT "generation_jobs_credit_pool_check" CHECK (("credit_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
     CONSTRAINT "generation_jobs_credits_cost_check" CHECK (("credits_cost" > 0)),
     CONSTRAINT "generation_jobs_download_count_check" CHECK (("download_count" >= 0)),
-    CONSTRAINT "generation_jobs_free_work_public" CHECK ((("credit_pool" = 'paid'::"text") OR ("visibility" = 'public'::"text"))),
+    CONSTRAINT "generation_jobs_free_work_public" CHECK ((("credit_pool" = 'paid'::"text") OR ("visibility" = 'public'::"text") OR "gallery_excluded")),
     CONSTRAINT "generation_jobs_moderation_reason_check" CHECK (("moderation_reason" = ANY (ARRAY['auto'::"text", 'sexual'::"text", 'violence'::"text", 'hate'::"text", 'minor'::"text", 'privacy'::"text", 'ip'::"text", 'spam'::"text", 'quality'::"text", 'other'::"text"]))),
     CONSTRAINT "generation_jobs_moderation_status_check" CHECK (("moderation_status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text"]))),
     CONSTRAINT "generation_jobs_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
@@ -11201,6 +11246,13 @@ begin
      for update;
   if not found then
     raise exception 'JOB_NOT_FOUND';
+  end if;
+
+  if v_job.gallery_excluded then
+    if p_visibility = 'public' then
+      raise exception 'WORK_PRIVATE_ONLY';
+    end if;
+    return v_job;
   end if;
 
   if v_job.credit_pool = 'free' and p_visibility = 'private' then
@@ -14906,6 +14958,10 @@ CREATE OR REPLACE TRIGGER "catalog_validate_discount" BEFORE INSERT OR UPDATE ON
 
 
 
+CREATE OR REPLACE TRIGGER "category_gallery_excluded_default" BEFORE INSERT ON "public"."template_categories" FOR EACH ROW EXECUTE FUNCTION "admin"."default_category_gallery_excluded"();
+
+
+
 CREATE OR REPLACE TRIGGER "category_move" AFTER UPDATE OF "parent_id", "level" ON "public"."template_categories" FOR EACH ROW EXECUTE FUNCTION "admin"."move_category_subtree"();
 
 
@@ -14919,6 +14975,10 @@ CREATE OR REPLACE TRIGGER "codes_enforce_gift_policy" BEFORE INSERT OR UPDATE OF
 
 
 CREATE CONSTRAINT TRIGGER "draft_sale_floor" AFTER UPDATE OF "credits_cost", "quality" ON "public"."templates" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN ((NOT "new"."is_active")) EXECUTE FUNCTION "admin"."check_template_publish_floor"();
+
+
+
+CREATE OR REPLACE TRIGGER "generation_jobs_gallery_excluded" BEFORE INSERT OR UPDATE OF "gallery_excluded", "visibility" ON "public"."generation_jobs" FOR EACH ROW EXECUTE FUNCTION "admin"."keep_gallery_excluded_private"();
 
 
 
@@ -16126,6 +16186,10 @@ GRANT ALL ON FUNCTION "admin"."copy_template_price_marks"("p_source" "text", "p_
 
 
 
+REVOKE ALL ON FUNCTION "admin"."default_category_gallery_excluded"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") TO "service_role";
 
@@ -16137,6 +16201,10 @@ GRANT ALL ON FUNCTION "admin"."is_template_catalog_v2"() TO "service_role";
 
 
 REVOKE ALL ON FUNCTION "admin"."job_route_allowed"("t" "public"."templates", "route" "text", "tier" "text", "price" integer, "v2" boolean) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."keep_gallery_excluded_private"() FROM PUBLIC;
 
 
 

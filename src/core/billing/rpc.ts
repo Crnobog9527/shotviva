@@ -39,6 +39,8 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   NOT_ADMIN: 'FORBIDDEN',
   // A free work cannot be made private (ARCHITECTURE §6.2).
   FREE_WORK_PUBLIC: 'FORBIDDEN',
+  // A work from a gallery-excluded category (the posters root) is never public (§9 第 7 条).
+  WORK_PRIVATE_ONLY: 'FORBIDDEN',
   // Dispute evidence (T82): an unknown dispute, a Managed Payments one (Stripe answers it), and a
   // second submit of the one submission Stripe allows.
   DISPUTE_NOT_FOUND: 'NOT_FOUND',
