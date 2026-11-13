@@ -17,6 +17,8 @@ export type GenerationInputs = {
   toggles: Record<string, boolean>
   // Toggles that are on and whose confirm dialog the user accepted (the job records when).
   confirmed: string[]
+  // A poster template's confirmed text for this one poster (ARCHITECTURE §5.3), from the saved set.
+  posterText?: string
 }
 
 export type RawGenerationInputs = {
@@ -103,7 +105,8 @@ export function validateGenerationInputs(fields: TemplateFields, raw: RawGenerat
 // template edit can never leak a raw placeholder to the model. A copy field the body has no
 // placeholder for follows the template text as a "Label: value" line (ARCHITECTURE §5), so an
 // admin-defined field always reaches the model. The user's note goes last, never inside the
-// template text, so it cannot reorder it (ARCHITECTURE §4 inputs.note).
+// template text, so it cannot reorder it (ARCHITECTURE §4 inputs.note). A poster's confirmed text
+// (§5.3) sits between the two: after the template's own layout words, before the note.
 export function renderPrompt(
   body: string, inputs: GenerationInputs, fragments: ToggleFragments = {},
   counts = { photo_count: 0, style_ref_count: 0 },
@@ -115,5 +118,5 @@ export function renderPrompt(
   }
   const rendered = body.replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (_, key: string) => values[key] ?? '').trim()
   const lines = inputs.labels ? copyLines(body, inputs.copy, inputs.labels) : ''
-  return [rendered, lines, inputs.note].filter(Boolean).join('\n\n')
+  return [rendered, lines, inputs.posterText, inputs.note].filter(Boolean).join('\n\n')
 }

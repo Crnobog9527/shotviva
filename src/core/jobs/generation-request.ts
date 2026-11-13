@@ -40,6 +40,8 @@ export const generateBodySchema = z.object({
   batch_id: z.uuid().optional(),
   batch_cell: cellSchema.optional(),
   batch_size: z.number().int().min(1).max(MAX_BATCH_SIZE).optional(),
+  // Dense-text posters (ARCHITECTURE §5.3): which poster of a saved set this job makes.
+  poster: z.object({ set_id: z.uuid(), part: z.int().min(0).max(11) }).optional(),
 })
 
 export type GenerationRequest = {
@@ -70,6 +72,8 @@ export type GenerationRequest = {
   locale?: Locale
   // The website request's IP, stored on the job for dispute evidence (T82). Web only.
   clientIp?: string | null
+  // A poster template's job: the set and the poster in it; its text is read from the set.
+  poster?: { setId: string; part: number }
 }
 
 export function toGenerationRequest(userId: string, body: z.infer<typeof generateBodySchema>): GenerationRequest {
@@ -91,5 +95,6 @@ export function toGenerationRequest(userId: string, body: z.infer<typeof generat
     batchTemplates: body.batch_templates,
     batchId: body.batch_id,
     batchCell: body.batch_cell,
+    ...(body.poster ? { poster: { setId: body.poster.set_id, part: body.poster.part } } : {}),
   }
 }
