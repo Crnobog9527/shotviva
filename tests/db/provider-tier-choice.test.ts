@@ -9,7 +9,7 @@ import { connectAdmin, createUser } from './helpers'
 import { publicHost } from './provider-fixtures'
 import { serviceSupabase } from './supabase-env'
 
-// PR-1b, migration 1370: OpenAI tiers come from the model table; an admin narrows them or, for a
+// PR-1b, migration 1420: OpenAI tiers come from the model table; an admin narrows them or, for a
 // model the table does not know, declares more, and the declaration is audited with the save.
 
 const PREFIX = 'PR1b tiers'
@@ -72,6 +72,11 @@ describe('OpenAI tiers by model (PR-1b)', () => {
     const id = await save({ model: 'gpt-image-9-test', resolutions: ['1k', '4k'] })
     expect(await row(id)).toEqual({ resolutions: ['1k', '3k'], source: 'declared', lim: ['1k', '3k'] })
     expect(await audits(id)).toEqual([{ reason: 'gpt-image-9-test: declared 4K beyond the model table', user_id: adminId }])
+  })
+
+  it('keeps every audit action main had when 1420 rebuilt the constraint', async () => {
+    const def = (await pg.query("select pg_get_constraintdef(oid) as d from pg_constraint where conname = 'admin_audit_log_action_check'")).rows[0].d as string
+    for (const action of ['provider_declare_tiers', 'template_delete', 'series_set_show_members', 'ban_user']) expect(def).toContain(`'${action}'`)
   })
 
   it('refuses a declaration from a non-admin without saving or auditing anything', async () => {

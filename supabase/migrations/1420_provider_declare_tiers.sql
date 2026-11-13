@@ -1,8 +1,9 @@
 -- PR-1b (1K / 2K / 4K by model): an OpenAI model the code's table does not know opens 1K only;
 -- an admin may declare more tiers for it, and that declaration is audited in the same transaction
--- as the save. Widens the audit actions with provider_declare_tiers (the list is 1296's, plus the
--- new value), and admin_save_provider is 0921's body unchanged except the audit insert before it
--- returns. Deployed code sends no declared_resolutions, so nothing changes for it.
+-- as the save. Widens the audit actions with provider_declare_tiers: the list is every action on main
+-- when this lands (1401's, with template_delete) plus the new value; a later migration that rebuilds
+-- this constraint must keep all of them. admin_save_provider is 0921's body unchanged except the
+-- audit insert before it returns. Deployed code sends no declared_resolutions, so nothing changes for it.
 alter table public.admin_audit_log drop constraint admin_audit_log_action_check,
   add constraint admin_audit_log_action_check check (action in (
   'ban_user','unban_user','view_work','replay_checkout','decide_refund','submit_dispute',
@@ -12,7 +13,7 @@ alter table public.admin_audit_log drop constraint admin_audit_log_action_check,
   'waffo_renewal_refunded','catalog_save','catalog_prepare','catalog_publish','catalog_retry',
   'catalog_archive','catalog_waffo','gallery_setting','moderate_work','template_sync_active',
   'template_sync_sale','series_sync_active','template_apply_active','template_apply_cover',
-  'series_set_active','series_set_show_members','provider_declare_tiers'));
+  'series_set_active','series_set_show_members','template_delete','provider_declare_tiers'));
 
 create or replace function public.admin_save_provider(p_actor uuid,p_id uuid,p_settings jsonb,p_capabilities jsonb,p_key text default null)
 returns uuid language plpgsql security definer set search_path='' as $$
