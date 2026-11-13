@@ -39,6 +39,10 @@ const nextConfig: NextConfig = {
   // answers them with Access-Control-Allow-Origin: *, which the cross-origin font files need.
   assetPrefix: publicEnvAtBuild.NEXT_PUBLIC_ASSET_CDN_URL,
   cacheComponents: true,
+  // Vercel builds skip next build's type-check step: only main and validation/preview deploy, and
+  // both receive code only through PRs whose required CI check ("lint · typecheck · test · build")
+  // already ran `pnpm typecheck` on it. Local and CI builds (no VERCEL=1) still type-check.
+  typescript: { ignoreBuildErrors: process.env.VERCEL === '1' },
   // Development action arguments can contain admin-only prompt bodies and private asset keys.
   logging: { serverFunctions: false },
   // The build's version, read by the new-version banner and /api/version (T90, core/app-update).
