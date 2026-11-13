@@ -20,6 +20,8 @@ export type RowHandlers = {
   pending: boolean
   onDuplicate: (id: string) => void
   onEdit: (template: AdminTemplate) => void
+  // 删除 (Owner 2026-11-13): shown on unpublished, non-built-in rows; opens the confirmation.
+  onDelete: (template: AdminTemplate) => void
   onToggle: (template: AdminTemplate, active: boolean) => void
   // 首页精选 (T53): whether the list is full or held by an unsaved arrangement, and the switch handler.
   featuredState: { full: boolean; locked: boolean }
@@ -92,7 +94,7 @@ export function TemplateRow(props: Props) {
       <TableCell>
         <FeaturedSwitch template={template} state={featuredState} pending={pending} onFeature={onFeature} />
       </TableCell>
-      <ActionsCell template={template} pending={pending} onDuplicate={props.onDuplicate} onEdit={onEdit} />
+      <ActionsCell template={template} pending={pending} onDuplicate={props.onDuplicate} onEdit={onEdit} onDelete={props.onDelete} />
     </TableRow>
   )
 }

@@ -1,7 +1,7 @@
 import { syncCategories, templateCategoryKeys } from './categories'
 import { SyncError } from './covers'
 import { readSeries, syncSeriesDefinition, syncSeriesMembers, type SeriesSnapshot } from './series'
-import { readStates, syncSeriesActive, syncTemplateState } from './state'
+import { readStates, syncSeriesActive, syncTemplateDelete, syncTemplateState } from './state'
 import { syncTemplate, type SyncTarget } from './sync'
 
 // One dispatch (2026-11-12): templates by id and whole series by slug, the test site being the only
@@ -90,6 +90,15 @@ async function seriesActive(series: readonly SeriesSnapshot[], active: boolean, 
   }
 }
 
+// Deleted on the test site (1381): no content write, production unpublishes and deletes it.
+async function deleteOne(id: string, sale: boolean, run: Run, fail: (line: string) => void) {
+  try {
+    run.report(`${id} ${await syncTemplateDelete(id, sale, { id: run.actorId, runId: run.runId }, run.target, run.validateOnly)}`)
+  } catch (error) {
+    fail(`${id} delete ${reason(error)}`)
+  }
+}
+
 // Each template's content, then its sale and publication as on the test site.
 async function templates(ids: readonly string[], run: Run, fail: (line: string) => void) {
   const actor = { id: run.actorId, runId: run.runId }
@@ -98,6 +107,11 @@ async function templates(ids: readonly string[], run: Run, fail: (line: string) 
     return null
   })
   for (const id of ids) {
+    const state = states?.get(id)
+    if (state?.deleted) {
+      await deleteOne(id, state.sale, run, fail)
+      continue
+    }
     try {
       const version = await syncTemplate(id, run.runId, run.source, run.target, run.validateOnly)
       run.report(`${id} ${run.validateOnly ? 'DRY-RUN OK (rolled back), would write' : 'OK'} v${version}`)
@@ -105,7 +119,6 @@ async function templates(ids: readonly string[], run: Run, fail: (line: string) 
       fail(`${id} ${reason(error)}`)
       continue
     }
-    const state = states?.get(id)
     if (!state) continue
     try {
       run.report(`${id} state ${await syncTemplateState(id, state, actor, run.target, run.validateOnly)}`)

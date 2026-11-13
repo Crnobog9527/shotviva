@@ -72,4 +72,6 @@ export type TemplateAdminActions = {
   setFeaturedMany: (input: { ids: string[]; featured: boolean; expectedIds: string[] }) => Promise<ActionValue<FeaturedPlan>>
   requestCoverUpload: (input: CoverUploadRequest) => Promise<ActionValue<CoverTicket>>
   applyCover: (input: ApplyCoverRequest) => Promise<ActionResult>
+  // 删除 an unpublished template (Owner 2026-11-13); a soft delete, works and history stay.
+  remove: (input: { id: string }) => Promise<ActionResult>
 }

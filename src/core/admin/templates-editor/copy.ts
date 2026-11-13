@@ -265,6 +265,7 @@ export const rowCopy = {
   edit: '编辑',
   // The number 创作页 compares with the series' (Owner 2026-11-13).
   orderNumber: (n: number) => `序号 ${n}`,
+  delete: '删除',
   orderNumberHint: '创作页里单独模板卡和系列卡按这个数字从小到大混排（同一大类内）；不单独展示的系列成员以系列的序号为准。',
 } as const
 
@@ -309,4 +310,12 @@ export const featuredCopy = {
   dropped: '首页精选在别处变了（上下架或另一个页面保存过），未保存的排列已丢弃，下面是现在的样子。',
   dismiss: '知道了',
   locked: '先保存或放弃上面「首页精选」的改动',
+} as const
+
+// 删除 an unpublished template (Owner 2026-11-13).
+export const deleteCopy = {
+  title: (name: string) => `删除「${name}」？`,
+  body: '删除后无法恢复：模板从后台列表消失，也不能再上架或加入系列。',
+  kept: '已经生成的作品、出图记录和收藏都会保留。',
+  cancel: '取消', confirm: '确认删除', done: (name: string) => `已删除「${name}」`,
 } as const

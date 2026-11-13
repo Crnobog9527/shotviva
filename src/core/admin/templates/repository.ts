@@ -37,7 +37,8 @@ async function readAdminPage(client: SupabaseClient, after: string | null) {
   const { data, error } = await selectTemplates((columns) => {
     // The stable primary-key cursor keeps an in-flight reorder from skipping a template.
     const taxonomy = columns.startsWith(PRE_T75_TEMPLATE_COLUMNS + ',') ? '' : ', subcategory_key, series_id, series_sort_order'
-    const page = client.from('templates').select(columns + taxonomy).neq('id', EDIT_TEMPLATE_ID)
+    // Deleted templates (1381) stay in the table for the works that point at them, not in the list.
+    const page = client.from('templates').select(columns + taxonomy).neq('id', EDIT_TEMPLATE_ID).is('deleted_at', null)
       .order('id').limit(CATALOGUE_PAGE_SIZE)
     if (after) page.gt('id', after)
     return page.returns<AdminRow[]>()
