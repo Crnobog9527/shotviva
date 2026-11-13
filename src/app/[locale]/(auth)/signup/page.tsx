@@ -3,16 +3,14 @@ import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 
 import { nextIn } from '@/core/auth'
-import { readSignupCode } from '@/core/auth/signup-code-actions'
 import { SignupCodeProvider, SignupForm } from '@/core/auth/ui'
 import { currentLocale } from '@/core/i18n/server'
+import { CONNECT_PAGE_PATH } from '@/core/partner'
 import { site } from '@/site/site.config'
 
 import { googleAction, phoneSendAction, phoneVerifyAction, resendSignupAction, signupAction } from '@/app/auth/actions'
 
-import { Arrived } from '../arrived'
-import { googleMainlandNote } from '../google-note'
-import { redirectIfSignedIn } from '../signed-in-redirect'
+import { SignupScreen } from '../auth-screens'
 import { sender } from '../sender'
 
 // Mainland phone sign-in is offered on the Chinese pages only (ARCHITECTURE §7, T63).
@@ -24,33 +22,24 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('auth.signup'))('title') }
 }
 
-async function Signup({ searchParams }: PageProps<'/[locale]/signup'>) {
-  const params = await searchParams
-  const rawNext = typeof params.next === 'string' ? params.next : null
+// Static, like the login page (auth-screens.tsx): the browser fills in ?next= and ?via=, and the
+// invite-code cookie is read after the form shows (SignupCodeProvider without `initial`). A
+// signed-in visitor is redirected by the proxy (core/auth/guest-gate.ts).
+export default async function SignupPage() {
   const locale = await currentLocale()
-  await redirectIfSignedIn(rawNext, locale)
-  const next = nextIn(rawNext, locale)
+  const form = {
+    action: signupAction,
+    google: { action: googleAction, mainlandNote: locale === 'zh' },
+    resendAction: resendSignupAction,
+    giftCredits: site.billing.freeCredits,
+    sender,
+    phone: locale === 'zh' ? phone : undefined,
+  }
   return (
-    <SignupCodeProvider initial={await readSignupCode()}>
-      <SignupForm
-        action={signupAction}
-        google={{ action: googleAction, mainlandNote: await googleMainlandNote(locale) }}
-        resendAction={resendSignupAction}
-        next={next}
-        giftCredits={site.billing.freeCredits}
-        arrived={<Arrived next={next} page="signup" />}
-        sender={sender}
-        phone={locale === 'zh' ? phone : undefined}
-        initialTab={params.via === 'email' ? 'email' : 'phone'}
-      />
+    <SignupCodeProvider>
+      <Suspense fallback={<SignupForm {...form} next={nextIn(null, locale)} initialTab="phone" />}>
+        <SignupScreen {...form} locale={locale} connectPath={CONNECT_PAGE_PATH} />
+      </Suspense>
     </SignupCodeProvider>
-  )
-}
-
-export default function SignupPage(props: PageProps<'/[locale]/signup'>) {
-  return (
-    <Suspense>
-      <Signup {...props} />
-    </Suspense>
   )
 }
