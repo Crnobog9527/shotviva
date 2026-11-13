@@ -2,6 +2,7 @@ import type { ProviderPrices } from '@/core/jobs'
 import { effectivePrices, officialPrice } from '@/core/jobs/model-prices'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 import { ARK_RESOLUTIONS } from '@/core/providers/ark'
+import { openAIImageTiers, UNKNOWN_MODEL_TIERS } from '@/core/providers/tier-support'
 import { ARK_BASE_URL, DEFAULT_BASE_URL, MODULE_ADAPTER, OPENROUTER_BASE_URL, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
 
 import type { AdminProvider, SaveProviderInput } from '../providers/types'
@@ -12,7 +13,11 @@ export type ProviderForm = {
   // Fixed per row: a new one takes the section it was added from.
   module: ProviderModule
   adapter: ProviderAdapterId
+  // The tiers the admin keeps on (PR-1b): within what the model offers, or, for an OpenAI model
+  // the table does not know, a declaration. `tiersTouchedFor` is the model the admin last ticked
+  // tiers for, so changing the model never carries a choice over to another one.
   resolutions: Resolution[]
+  tiersTouchedFor?: string | null
   imageCosts: Partial<Record<Resolution, string>>
   label: string
   baseUrl: string
@@ -197,4 +202,40 @@ export function canSave(form: ProviderForm, needsKey: boolean): boolean {
     return !cost || (PRICE_PATTERN.test(cost) && Number(cost) > 0 && Number.isFinite(Number(cost)))
   })
   return filled && estimatesOk && form.resolutions.length > 0 && pricesOk && (!needsKey || form.apiKey.trim() !== '')
+}
+
+// The tier checkboxes (PR-1b). `catalog`: OpenRouter's detected tiers (null while its lookup is
+// pending). `saved`: the stored row, whose choice is kept while the model is the same.
+export type TierOptions = { detected: readonly Resolution[]; allowed: readonly Resolution[]; selected: Resolution[]; declared: Resolution[]; unknownModel: boolean }
+
+type Saved = Pick<AdminProvider, 'model' | 'resolutions'> | null | undefined
+
+function detectedTiers(form: ProviderForm, catalog: readonly Resolution[] | null, saved: Saved) {
+  const model = form.model.trim()
+  if (form.adapter === 'openai_images') return openAIImageTiers(model)
+  if (form.adapter === 'ark_images') return { tiers: ARK_RESOLUTIONS, known: true }
+  return { tiers: catalog ?? (saved?.model === model ? saved.resolutions : []), known: true }
+}
+
+// The admin's own ticks for this model, else the saved row's choice for the same model, else the
+// default: everything detected, or 1K for an unknown model.
+function startingChoice(form: ProviderForm, saved: Saved, fallback: readonly Resolution[]) {
+  const model = form.model.trim()
+  if (form.tiersTouchedFor === model) return form.resolutions
+  return saved && saved.model === model ? saved.resolutions : fallback
+}
+
+export function tierOptions(form: ProviderForm, catalog: readonly Resolution[] | null, saved?: Saved): TierOptions {
+  const { tiers: detected, known } = detectedTiers(form, catalog, saved)
+  const unknownModel = !known
+  const fallback = unknownModel ? UNKNOWN_MODEL_TIERS : detected
+  const allowed = unknownModel ? RESOLUTIONS : detected
+  const picked = allowed.filter((tier) => startingChoice(form, saved, fallback).includes(tier))
+  const selected = picked.length ? picked : [...fallback]
+  return { detected, allowed, selected, declared: unknownModel ? selected.filter((tier) => !UNKNOWN_MODEL_TIERS.includes(tier)) : [], unknownModel }
+}
+
+export function withTier(form: ProviderForm, current: readonly Resolution[], tier: Resolution, on: boolean): ProviderForm {
+  const next = on ? [...current, tier] : current.filter((value) => value !== tier)
+  return { ...form, resolutions: RESOLUTIONS.filter((value) => next.includes(value)), tiersTouchedFor: form.model.trim() }
 }

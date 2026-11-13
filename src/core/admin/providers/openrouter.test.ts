@@ -32,13 +32,14 @@ describe('OpenRouter provider administration', () => {
     expect(rpc).not.toHaveBeenCalled()
   })
 
-  it('saves verified capabilities and the write-only key in one call, even with stale editor tiers', async () => {
+  it('saves verified capabilities and the write-only key in one call, narrowed to the ticked tiers the catalogue has', async () => {
     const { db, rpc } = fakeDb()
-    await saveProvider({ db, fetch: async () => Response.json(catalogue), resolveHost }, id, { ...input, resolutions: ['1k'] })
+    await saveProvider({ db, fetch: async () => Response.json(catalogue), resolveHost }, id, { ...input, resolutions: ['1k', '2k'] })
     expect(rpc).toHaveBeenCalledExactlyOnceWith('admin_save_provider', expect.objectContaining({
-      p_capabilities: expect.objectContaining({ resolutions: ['2k', '4k'] }), p_key: input.apiKey,
+      p_capabilities: expect.objectContaining({ resolutions: ['2k'], resolutionSource: 'catalog', resolutionLimit: ['2k'] }), p_key: input.apiKey,
     }))
   })
+
 
   it('saves real-unit public quotes on an existing model while reusing its Vault key and preserving overrides', async () => {
     const { db, rpc } = fakeDb()
@@ -82,5 +83,14 @@ describe('OpenRouter provider administration', () => {
     expect(fetch.mock.calls[0][1]).toMatchObject({ redirect: 'error' })
     expect(fetch.mock.calls[0][1]?.headers).toBeUndefined()
     expect(fetch.mock.calls[1][1]?.headers).toEqual({ Authorization: 'Bearer ' + input.apiKey })
+  })
+})
+
+describe('OpenRouter tier choice (PR-1b)', () => {
+  it('refuses ticked tiers the catalogue no longer has, instead of opening ones the admin left off', async () => {
+    const { db, rpc } = fakeDb()
+    await expect(saveProvider({ db, fetch: async () => Response.json(catalogue), resolveHost }, id, { ...input, resolutions: ['1k'] }))
+      .rejects.toMatchObject({ reason: 'invalid_input' })
+    expect(rpc).not.toHaveBeenCalled()
   })
 })
