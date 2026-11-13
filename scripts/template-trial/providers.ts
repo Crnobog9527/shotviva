@@ -18,12 +18,12 @@ export function scriptProviders(db: SupabaseClient) {
   const readKey = (id: string) => readProviderKey(db, id)
   const provider: TemplateProvider = (id, request) => templateImageProvider(IMAGE_ADAPTERS, id, request, {
     lookup: providerId => findProviderRow(db, providerId),
-    fallback: () => defaultTemplateProvider(IMAGE_ADAPTERS, request !== undefined, loadRow),
+    fallback: () => defaultTemplateProvider(IMAGE_ADAPTERS, request, loadRow),
     readKey,
   })
   // For estimates: the bound provider as configured, and the default it can fall back to.
   const bound = async (id: string | null): Promise<GenerationProvider[]> => {
-    const fallback = await defaultTemplateProvider(IMAGE_ADAPTERS, false, loadRow)
+    const fallback = await defaultTemplateProvider(IMAGE_ADAPTERS, undefined, loadRow)
     if (!id) return [fallback]
     return [await resolveProvider('image', await findProviderRow(db, id), serverEnv(), IMAGE_ADAPTERS, readKey), fallback]
   }

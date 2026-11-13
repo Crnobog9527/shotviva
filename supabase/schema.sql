@@ -524,7 +524,7 @@ CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     "resolutions" "text"[] DEFAULT '{1k,2k,3k}'::"text"[] NOT NULL,
     "capabilities" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     "estimated_image_costs" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text", 'openai_responses'::"text"]))),
+    CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text", 'ark_images'::"text", 'openai_responses'::"text"]))),
     CONSTRAINT "ai_providers_api_key_last4_check" CHECK ((("char_length"("api_key_last4") >= 1) AND ("char_length"("api_key_last4") <= 4))),
     CONSTRAINT "ai_providers_base_url_check" CHECK ((("base_url" ~ '^https://[^\s/?#@]+(/[^\s?#]*)?$'::"text") AND ("char_length"("base_url") <= 300))),
     CONSTRAINT "ai_providers_capabilities_check" CHECK (("jsonb_typeof"("capabilities") = 'object'::"text")),
@@ -532,7 +532,7 @@ CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     CONSTRAINT "ai_providers_key_pair" CHECK ((("vault_secret_id" IS NULL) = ("api_key_last4" IS NULL))),
     CONSTRAINT "ai_providers_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 80))),
     CONSTRAINT "ai_providers_model_check" CHECK ((("char_length"("model") >= 1) AND ("char_length"("model") <= 120))),
-    CONSTRAINT "ai_providers_module_adapter" CHECK (((("module" = 'image'::"text") AND ("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text"]))) OR (("module" = 'decision'::"text") AND ("adapter" = 'openai_responses'::"text")))),
+    CONSTRAINT "ai_providers_module_adapter" CHECK (((("module" = 'image'::"text") AND ("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text", 'ark_images'::"text"]))) OR (("module" = 'decision'::"text") AND ("adapter" = 'openai_responses'::"text")))),
     CONSTRAINT "ai_providers_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'decision'::"text"]))),
     CONSTRAINT "ai_providers_notes_check" CHECK ((("notes" IS NULL) OR ("char_length"("notes") <= 500))),
     CONSTRAINT "ai_providers_prices_nonnegative" CHECK (((COALESCE("price_input_text_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_input_image_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_output_per_m", (0)::numeric) >= (0)::numeric))),
@@ -1336,7 +1336,9 @@ begin
          where t.id = new.template_id and r.gallery_excluded)
       or exists (
         select 1 from public.generation_jobs parent
-         where parent.id = new.parent_job_id and parent.gallery_excluded);
+         where parent.id = new.parent_job_id and parent.gallery_excluded)
+      -- A dense-text poster template (fields.poster), wherever it is filed (1348).
+      or exists (select 1 from public.templates t where t.id = new.template_id and t.fields ? 'poster');
   elsif old.gallery_excluded and not new.gallery_excluded then
     raise exception 'GALLERY_EXCLUDED_IMMUTABLE';
   end if;
@@ -2085,9 +2087,12 @@ CREATE OR REPLACE FUNCTION "admin"."template_image_options"("public"."templates"
     AS $_$
   select jsonb_build_object(
     'resolutions', array(select r from unnest(admin.sale_route_resolutions(p)) r where not(r=any(coalesce(s.unpriced_resolutions,'{}')))),
-    'aspectRatios',case when p.adapter='openrouter_images' then coalesce(p.capabilities->'aspectRatios','[]'::jsonb)
-      else '["16:9","4:5","1:1","9:16","3:2","4:3","2:3"]'::jsonb end,
-    'originalRatio',case when p.adapter='openrouter_images' then coalesce(p.capabilities->'originalRatio','false'::jsonb) else 'true'::jsonb end)
+    'aspectRatios',(select coalesce(jsonb_agg(a.r order by a.n),'[]'::jsonb)
+      from jsonb_array_elements_text(case when p.adapter='openrouter_images' then coalesce(p.capabilities->'aspectRatios','[]'::jsonb)
+        else '["16:9","4:5","1:1","9:16","3:2","4:3","2:3","1:2","1:3"]'::jsonb end) with ordinality a(r,n)
+      where a.r not in ('1:2','1:3') or coalesce(t.fields->'aspectRatios','[]'::jsonb) ? a.r),
+    'originalRatio',case when p.adapter='openrouter_images' then coalesce(p.capabilities->'originalRatio','false'::jsonb) else 'true'::jsonb end,
+    'exactPixels',p.adapter is distinct from 'openrouter_images')
   from public.templates t left join public.template_sale_approvals s on s.template_id=t.id
   left join public.template_prompts tp on tp.template_id=t.id
   left join public.ai_providers p on p.id=coalesce(case when t.id<>'edit' then tp.provider_id end,
@@ -5781,6 +5786,21 @@ $$;
 ALTER FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_list_feature_grants"("p_key" "text") RETURNS TABLE("user_id" "uuid", "email" "text", "phone" "text", "created_at" timestamp with time zone)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select g.user_id, u.email::text, u.phone::text, g.created_at
+  from public.feature_user_grants g join auth.users u on u.id = g.user_id
+  where g.feature_key = p_key
+  order by g.created_at desc
+  limit 200
+$$;
+
+
+ALTER FUNCTION "public"."admin_list_feature_grants"("p_key" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -7292,6 +7312,47 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_key" "text", "p_account" "text", "p_granted" boolean) RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_account text := lower(btrim(coalesce(p_account, '')));
+  v_digits text := regexp_replace(v_account, '\D', '', 'g');
+  v_user uuid;
+begin
+  if not exists(select from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN' using errcode = '42501';
+  end if;
+  if p_key is null or p_key !~ '^[a-z][a-z0-9_]{0,39}$' or v_account = '' or p_granted is null then
+    raise exception 'INVALID_INPUT' using errcode = '22023';
+  end if;
+  -- The admin page removes an invite by the account id it listed.
+  if v_account ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    v_user := v_account::uuid;
+  elsif position('@' in v_account) > 0 then
+    select id into v_user from auth.users where lower(email) = v_account;
+  elsif length(v_digits) >= 6 then
+    select id into v_user from auth.users
+      where phone in (v_digits, '86' || v_digits) order by created_at limit 1;
+  end if;
+  if v_user is null or not exists(select from public.profiles where id = v_user) then
+    raise exception 'PROFILE_NOT_FOUND' using errcode = 'P0002';
+  end if;
+  if p_granted then
+    insert into public.feature_user_grants (feature_key, user_id, granted_by)
+    values (p_key, v_user, p_actor) on conflict do nothing;
+  else
+    delete from public.feature_user_grants where feature_key = p_key and user_id = v_user;
+  end if;
+  return v_user;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_key" "text", "p_account" "text", "p_granted" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) RETURNS "void"
@@ -11671,7 +11732,7 @@ begin
   end if;
   if new.adapter = 'openai_images' and new.capabilities = '{}' then
     new.capabilities := jsonb_build_object(
-      'resolutions',to_jsonb(new.resolutions),'aspectRatios','["16:9","4:5","1:1","9:16","3:2","4:3","2:3"]'::jsonb,
+      'resolutions',to_jsonb(new.resolutions),'aspectRatios','["16:9","4:5","1:1","9:16","3:2","4:3","2:3","1:2","1:3"]'::jsonb,
       'originalRatio',true,'minReferences',0,'maxReferences',4,'fetchedAt',now()
     );
   end if;
@@ -13361,6 +13422,18 @@ CREATE TABLE IF NOT EXISTS "public"."feature_access" (
 ALTER TABLE "public"."feature_access" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."feature_user_grants" (
+    "feature_key" "text" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "granted_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "feature_user_grants_feature_key_check" CHECK (("feature_key" ~ '^[a-z][a-z0-9_]{0,39}$'::"text"))
+);
+
+
+ALTER TABLE "public"."feature_user_grants" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."identity_judge_calls" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -13467,6 +13540,57 @@ ALTER TABLE "public"."payments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTI
     CACHE 1
 );
 
+
+
+CREATE TABLE IF NOT EXISTS "public"."poster_extractions" (
+    "id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "source" "text" NOT NULL,
+    "input_chars" integer NOT NULL,
+    "status" "text" NOT NULL,
+    "provider" "text",
+    "input_tokens" integer,
+    "output_tokens" integer,
+    "cost_usd" numeric(10,6),
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "poster_extractions_cost_usd_check" CHECK (("cost_usd" >= (0)::numeric)),
+    CONSTRAINT "poster_extractions_input_chars_check" CHECK (("input_chars" >= 0)),
+    CONSTRAINT "poster_extractions_input_tokens_check" CHECK (("input_tokens" >= 0)),
+    CONSTRAINT "poster_extractions_output_tokens_check" CHECK (("output_tokens" >= 0)),
+    CONSTRAINT "poster_extractions_source_check" CHECK (("source" = ANY (ARRAY['paste'::"text", 'photo'::"text"]))),
+    CONSTRAINT "poster_extractions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'ok'::"text", 'failed'::"text"])))
+);
+
+
+ALTER TABLE "public"."poster_extractions" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."poster_extractions" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."poster_extractions_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."poster_sets" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "template_id" "text" NOT NULL,
+    "source" "text" DEFAULT 'paste'::"text" NOT NULL,
+    "content" "jsonb" NOT NULL,
+    "parts" "jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "poster_sets_content_check" CHECK ((("jsonb_typeof"("content") = 'object'::"text") AND ("pg_column_size"("content") <= 65536))),
+    CONSTRAINT "poster_sets_parts_check" CHECK ((("jsonb_typeof"("parts") = 'array'::"text") AND (("jsonb_array_length"("parts") >= 1) AND ("jsonb_array_length"("parts") <= 12)))),
+    CONSTRAINT "poster_sets_source_check" CHECK (("source" = ANY (ARRAY['paste'::"text", 'photo'::"text", 'reuse'::"text", 'manual'::"text"])))
+);
+
+
+ALTER TABLE "public"."poster_sets" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."prompt_lab_reverse_requests" (
@@ -14109,6 +14233,11 @@ ALTER TABLE ONLY "public"."feature_access"
 
 
 
+ALTER TABLE ONLY "public"."feature_user_grants"
+    ADD CONSTRAINT "feature_user_grants_pkey" PRIMARY KEY ("feature_key", "user_id");
+
+
+
 ALTER TABLE ONLY "public"."generation_jobs"
     ADD CONSTRAINT "generation_jobs_pkey" PRIMARY KEY ("id");
 
@@ -14171,6 +14300,16 @@ ALTER TABLE ONLY "public"."payments"
 
 ALTER TABLE "public"."payments"
     ADD CONSTRAINT "payments_waffo_payment_ids_check" CHECK ((("channel" <> 'waffo'::"text") OR ("waffo_payment_id" IS NOT NULL))) NOT VALID;
+
+
+
+ALTER TABLE ONLY "public"."poster_extractions"
+    ADD CONSTRAINT "poster_extractions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."poster_sets"
+    ADD CONSTRAINT "poster_sets_pkey" PRIMARY KEY ("id");
 
 
 
@@ -14757,6 +14896,14 @@ CREATE INDEX "payments_user_id_idx" ON "public"."payments" USING "btree" ("user_
 
 
 CREATE INDEX "payments_waffo_order_id_idx" ON "public"."payments" USING "btree" ("waffo_order_id") WHERE ("waffo_order_id" IS NOT NULL);
+
+
+
+CREATE INDEX "poster_extractions_user_created" ON "public"."poster_extractions" USING "btree" ("user_id", "created_at" DESC);
+
+
+
+CREATE INDEX "poster_sets_user_created" ON "public"."poster_sets" USING "btree" ("user_id", "created_at" DESC);
 
 
 
@@ -15437,6 +15584,16 @@ ALTER TABLE ONLY "public"."feature_access"
 
 
 
+ALTER TABLE ONLY "public"."feature_user_grants"
+    ADD CONSTRAINT "feature_user_grants_granted_by_fkey" FOREIGN KEY ("granted_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."feature_user_grants"
+    ADD CONSTRAINT "feature_user_grants_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."generation_jobs"
     ADD CONSTRAINT "generation_jobs_moderated_by_fkey" FOREIGN KEY ("moderated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -15509,6 +15666,21 @@ ALTER TABLE ONLY "public"."payments"
 
 ALTER TABLE ONLY "public"."payments"
     ADD CONSTRAINT "payments_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_extractions"
+    ADD CONSTRAINT "poster_extractions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_sets"
+    ADD CONSTRAINT "poster_sets_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_sets"
+    ADD CONSTRAINT "poster_sets_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -15877,6 +16049,9 @@ ALTER TABLE "public"."credit_ledger" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."feature_access" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."feature_user_grants" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."generation_jobs" ENABLE ROW LEVEL SECURITY;
 
 
@@ -15911,6 +16086,16 @@ ALTER TABLE "public"."payment_refunds" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."payments" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."poster_extractions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."poster_sets" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "poster_sets_read_own" ON "public"."poster_sets" FOR SELECT TO "authenticated" USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
+
 
 
 ALTER TABLE "public"."products" ENABLE ROW LEVEL SECURITY;
@@ -16960,6 +17145,11 @@ GRANT ALL ON FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp wit
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_list_feature_grants"("p_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_list_feature_grants"("p_key" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_list_template_requests"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role";
 
@@ -17157,6 +17347,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_code_active"("p_actor" "uuid", "p_code
 
 REVOKE ALL ON FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_key" "text", "p_account" "text", "p_granted" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_key" "text", "p_account" "text", "p_granted" boolean) TO "service_role";
 
 
 
@@ -18066,6 +18261,10 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 
 
 
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."feature_user_grants" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."identity_judge_calls" TO "service_role";
 
 
@@ -18117,6 +18316,21 @@ GRANT SELECT ON TABLE "public"."payment_dispute_link_errors" TO "service_role";
 GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."poster_extractions" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."poster_extractions_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."poster_extractions_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."poster_extractions_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."poster_sets" TO "service_role";
+GRANT SELECT ON TABLE "public"."poster_sets" TO "authenticated";
 
 
 

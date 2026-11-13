@@ -5,10 +5,10 @@ import type { FeatureAccess } from './access'
 import { requireFeature, type RequireFeatureDeps } from './require-feature'
 
 const NOW = Date.parse('2026-11-06T12:00:00Z')
-const registry = [{ key: 'studio_video', name: '视频工作室' }]
+const registry = [{ key: 'studio_video', name: '视频工作室' }, { key: 'beta_posters', name: '内测', inviteOnly: true }]
 
-function deps(rows: FeatureAccess[], tier: 'starter' | 'pro' | 'max' | null): RequireFeatureDeps & { tierOf: ReturnType<typeof vi.fn> } {
-  return { registry, loadAccess: async () => rows, tierOf: vi.fn(async () => tier), now: () => NOW }
+function deps(rows: FeatureAccess[], tier: 'starter' | 'pro' | 'max' | null, invited = false): RequireFeatureDeps & { tierOf: ReturnType<typeof vi.fn> } {
+  return { registry, loadAccess: async () => rows, tierOf: vi.fn(async () => tier), invited: async () => invited, now: () => NOW }
 }
 
 const gated = (minTier: 'pro' | 'max', openToAllAt: string | null = null): FeatureAccess[] => [
@@ -43,5 +43,25 @@ describe('requireFeature', () => {
     const error = await requireFeature('user-1', 'studio_vidoe', deps([], 'max')).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(AppError)
     expect((error as AppError).code).toBe('INTERNAL')
+  })
+
+  describe('invite-only', () => {
+    const row = (openToAllAt: string | null): FeatureAccess[] => [{ key: 'beta_posters', minTier: null, openToAllAt }]
+
+    it('is closed to a Max account that was not invited, even with no row at all', async () => {
+      for (const rows of [[], row(null)]) {
+        const error = await requireFeature('user-1', 'beta_posters', deps(rows, 'max')).catch((e: unknown) => e)
+        expect((error as AppError).code).toBe('FORBIDDEN')
+      }
+    })
+
+    it('opens to an invited account whatever its tier', async () => {
+      await expect(requireFeature('user-1', 'beta_posters', deps([], null, true))).resolves.toBeUndefined()
+    })
+
+    it('opens to everyone once open_to_all_at has passed, and not before', async () => {
+      await expect(requireFeature('user-1', 'beta_posters', deps(row('2026-11-01T00:00:00Z'), null))).resolves.toBeUndefined()
+      await expect(requireFeature('user-1', 'beta_posters', deps(row('2026-12-01T00:00:00Z'), 'max'))).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    })
   })
 })

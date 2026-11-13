@@ -20,7 +20,7 @@ function paidValue({ planFrom, packFrom }: OfferFacts): string {
 export function zhSharedFacts(offers: OfferFacts): readonly [Fact, Fact, Fact, ...Fact[]] {
   return [
     // 为什么选 Shotviva（Owner 2026-11-08）：两条核心卖点在前，然后是对比、适合谁、用在哪，最后是各页共用的数字。
-    { label: '你拍的是什么，出来还是什么', value: '商品、标签、摆盘、房间布局都和你拍的一样，只换光线、背景或场景。' },
+    { label: '你拍的是什么，出来还是什么', value: '商品、标签、菜品本身、房间布局都保持你拍的样子，换的是光线、背景或场景；餐饮模板还可能换盘子或碗。' },
     { label: '像 PS 一样改，说一句话就行', value: '说「去掉桌上的杂物」或「换成晴天」，只改这一处；连改好几轮，原图也不走样。' },
     { label: '别的 AI 工具常见的问题', value: '整张图重画：标签上的字写错，菜不像你做的菜，房间里多出没见过的家具；每多改一次，离实物就更远一点。' },
     { label: '为什么这里能保住原图', value: '自主研发的编辑引擎，跑在全球顶级的图片大模型上。每次修改前先弄清你要改的到底是哪一处，其余部分全部锁住。' },

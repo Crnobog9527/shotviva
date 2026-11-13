@@ -566,7 +566,7 @@
       "seeAll": "See all",
       "seeAllWhich": "in {name}",
       "seeAllCount": "{count} in all",
-      "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are illustrative examples."
+      "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are real results made with these templates."
     },
     "series": {
       "count": "{count, plural, one {# template} other {# templates}}",
@@ -577,10 +577,10 @@
     },
     "template": {
       "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
-      "cardAlt": "{name} template example: phone photo on the left, AI result on the right",
+      "cardAlt": "{name} template, real example: phone photo on the left, AI result on the right",
       "phone": "Phone",
       "ai": "AI",
-      "example": "Illustrative example",
+      "example": "Real example",
       "featureAria": "{name}, video template, {category}. Make one",
       "featureMeta": "{category} · video",
       "compareAria": "Compare phone photo and AI result",
@@ -607,6 +607,98 @@
       },
       "notEnough": "(not enough credits)"
     },
+    "poster": {
+      "title": "Event posters",
+      "back": "Back",
+      "noStyles": "No poster styles yet.",
+      "paste": {
+        "heading": "Paste your event notice",
+        "hint": "Paste everything: title, time, prizes, rules and the level table. We sort it into blocks for you to check before any poster is made.",
+        "placeholder": "Thursday Elite · starts 15:00\nChampion  …\nRules …",
+        "sort": "Sort into blocks",
+        "sorting": "Sorting…",
+        "manual": "Type it in myself"
+      },
+      "sourceText": "Your pasted text",
+      "backToPaste": "Paste again",
+      "tabs": {
+        "header": "Header",
+        "prizes": "Prizes",
+        "sections": "Rules",
+        "table": "Table",
+        "footer": "Footer",
+        "pending": "has lines to check"
+      },
+      "flagged": "Not found in your pasted text. Check it.",
+      "header": {
+        "brand": "Organiser",
+        "brandEn": "Organiser in English",
+        "cup": "Cup name",
+        "cupEn": "Cup name in English",
+        "city": "City",
+        "title": "Event title",
+        "subtitle": "Subtitle",
+        "datetimeLabel": "Time label",
+        "datetime": "Time"
+      },
+      "prizes": {
+        "headline": "Prize headline",
+        "note": "Prize note",
+        "rank": "Rank",
+        "rankEn": "Rank in English",
+        "prize": "Prize",
+        "add": "Add a rank"
+      },
+      "sections": {
+        "title": "Section title",
+        "style": "Line style",
+        "styles": {
+          "kv": "Label: value",
+          "numbered": "Numbered",
+          "plain": "Plain"
+        },
+        "lines": "Lines (one per row)",
+        "add": "Add a section"
+      },
+      "table": {
+        "none": "This style has no table.",
+        "title": "Table title",
+        "columns": "Columns",
+        "column": "Column",
+        "row": "Row",
+        "break": "Break row",
+        "insert": "+ Insert here",
+        "insertRow": "Level row",
+        "insertBreak": "Break row",
+        "footnote": "Note under the table"
+      },
+      "footer": {
+        "phones": "Phone numbers (one per line)",
+        "phonesLabel": "Phone label",
+        "addressLabel": "Address label",
+        "address": "Address",
+        "qrLabel": "QR code label"
+      },
+      "remove": "Remove",
+      "split": {
+        "count": "{count, plural, =0 {Nothing to make yet} one {Makes # poster} other {Makes # posters}}",
+        "part": "{name} {page}/{pages}",
+        "oversized": "A section is longer than one poster can hold. Shorten it or split it into two sections."
+      },
+      "size": "Size",
+      "resolution": "Resolution",
+      "reviewed": "{count, plural, one {I've checked the highlighted line} other {I've checked the # highlighted lines}}",
+      "proofread": "The posters are drawn by AI. Check every word on them before you print or share.",
+      "generate": "{count, plural, one {Make # poster} other {Make # posters}} · {credits} credits",
+      "starting": "Starting…",
+      "notice": {
+        "sortFailed": "We couldn't sort this automatically. Fill in the blocks below; your text is above.",
+        "rateLimited": "Too many tries in an hour. Please wait a little.",
+        "invalid": "Some text is too long or a table row is incomplete. Check the blocks.",
+        "notEnough": "Not enough credits.",
+        "error": "Something went wrong. Please try again."
+      }
+    },
     "sizes": {
       "closest": "Closest to original ({ratio})",
       "original": "Original",
@@ -617,6 +709,8 @@
       "3:2": "Rental",
       "4:3": "Website",
       "2:3": "Pin",
+      "1:2": "Long poster",
+      "1:3": "Extra-long poster",
       "asShot": "as shot",
       "withRatio": "{name} {ratio}"
     },
@@ -768,7 +862,7 @@
     },
     "errors": {
       "NETWORK": "Couldn't reach Shotviva. Check your connection and try again.",
-      "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
+      "CONTENT_REJECTED": "The image model couldn't use this photo or note. Some models don't accept clear photos of real people. Try another photo, change the note, or pick another template.",
       "IDENTITY_SWAP_REFUSED": "Shotviva can't swap faces or turn a person into someone else, to protect everyone's likeness. You can change the expression, makeup, lighting and background.",
       "REFERENCE_IMAGE_LIMIT": "This model accepts fewer reference images. Remove some photos or choose another template.",
       "TEMPLATE_UNAVAILABLE": "This template is temporarily unavailable. Please try again later.",
@@ -1569,8 +1663,8 @@
     "home": {
       "phone": "Phone",
       "ai": "AI",
-      "beforeAlt": "{name} template example: the phone photo before (illustrative example)",
-      "afterAlt": "{name} template example: the AI result, {use} (illustrative example)",
+      "beforeAlt": "{name} template, real example: the phone photo before",
+      "afterAlt": "{name} template, real example: the AI result, {use}",
       "pickAria": "{name}. {use} Pick this template",
       "compareLabel": "Compare the phone photo and the {name} result",
       "withDragHint": "{use} Drag the handle to compare.",
@@ -1581,8 +1675,8 @@
       "seriesOpen": "Open the series",
       "freeTag": "Free · public",
       "paidTag": "Paid · private",
-      "freeSampleAlt": "A free photo with the watermark (illustrative example)",
-      "paidSampleAlt": "The same photo made with paid credits, no watermark (illustrative example)"
+      "freeSampleAlt": "A free photo with the watermark (real example)",
+      "paidSampleAlt": "The same photo made with paid credits, no watermark (real example)"
     }
   },
   "pageError": {

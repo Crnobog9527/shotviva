@@ -18,7 +18,7 @@ import { siteHasGallery } from '@/core/gallery'
 import { previewOverride, siteHasWishlist } from '@/core/wishlist'
 import { site } from '@/site/site.config'
 
-import { saveAffiliateSwitchAction, saveFeatureAccessAction, saveGallerySwitchAction, saveWishlistSwitchAction } from './actions'
+import { saveAffiliateSwitchAction, saveFeatureAccessAction, setFeatureInviteAction, saveGallerySwitchAction, saveWishlistSwitchAction } from './actions'
 
 // Admin-only, request-time page (ARCHITECTURE §6.2 新功能抢先用, §10). The admin layout gates it too.
 // The 需求墙 and gallery switches show only on a site that has the feature at all (§15.6, §9).
@@ -50,7 +50,7 @@ export default async function AdminFeaturesPage() {
         settings={settings}
         wishlist={wishlist}
         gallery={gallery}
-        actions={{ save: saveFeatureAccessAction, saveWishlist: saveWishlistSwitchAction, saveGallery: saveGallerySwitchAction }}
+        actions={{ save: saveFeatureAccessAction, invite: setFeatureInviteAction, saveWishlist: saveWishlistSwitchAction, saveGallery: saveGallerySwitchAction }}
       />
     </AdminPage>
   )

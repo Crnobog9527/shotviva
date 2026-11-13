@@ -57,6 +57,9 @@ export const site = defineSite({
       '/generate/[templateId]',
       '/photos',
       '/photos/[jobId]',
+      // Dense-text posters (ARCHITECTURE §5.3), invite-only and noindex like every app page.
+      '/posters',
+      '/posters/[templateId]',
       '/account',
       // The Purchases list's receipt / invoice redirect (T80), so /zh links reach it.
       '/account/purchases/[paymentId]/[document]',
