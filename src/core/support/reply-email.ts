@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { metadataLocale } from '../auth/session-user'
+import { QA_PERSONA_EMAILS } from '../billing/stripe/qa-test-clock'
 import { DEFAULT_LOCALE, type Locale } from '../i18n/locales'
 import { localizePath } from '../i18n/paths'
 import { logger } from '../logger'
@@ -137,6 +138,12 @@ export async function notifyTicketReply(deps: ReplyEmailDeps, ticketId: string):
     const authorId = await ticketAuthor(deps.db, ticketId)
     const recipient = authorId ? await recipientOf(deps.db, authorId) : null
     if (!recipient) return 'skipped'
+    // The QA personas (scripts/qa) have no mailbox: a send would bounce and hurt the sender's
+    // reputation with Resend.
+    if (QA_PERSONA_EMAILS.has(recipient.email.trim().toLowerCase())) {
+      logger.info('ticket reply email skipped: test account', { ticketId })
+      return 'skipped'
+    }
     const t = await deps.translate(recipient.locale)
     const email = renderReplyEmail(t, ticketLink(deps.origin, ticketId, recipient.locale), recipient.locale)
     const response = await (deps.fetch ?? fetch)(RESEND_ENDPOINT, {

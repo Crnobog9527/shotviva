@@ -160,6 +160,14 @@ describe('notifyTicketReply', () => {
 })
 
 describe('notifyTicketReply when it cannot or must not send', () => {
+  it('skips a QA persona, whose address has no mailbox', async () => {
+    const { client } = db({ email: 'QA-Creator@shotviva.com', email_confirmed_at: '2026-11-01T00:00:00Z' })
+    const fetchImpl = ok()
+    await expect(notifyTicketReply(deps(client, fetchImpl), TICKET)).resolves.toBe('skipped')
+    expect(fetchImpl).not.toHaveBeenCalled()
+    expect(mocks.info).toHaveBeenCalledWith('ticket reply email skipped: test account', { ticketId: TICKET })
+  })
+
   it('sends nothing and reads nothing when RESEND_API_KEY is unset', async () => {
     const { client, getUserById } = db({
       email: 'buyer@example.com',
