@@ -697,9 +697,8 @@
       "notEnough": "(not enough credits)"
     },
     "poster": {
-      "title": "Event posters",
-      "back": "Back",
-      "noStyles": "No poster styles yet.",
+      "dialogHint": "Paste your event notice, check every line, then make the whole set.",
+      "sampleAlt": "{name}, sample page {page}",
       "paste": {
         "heading": "Paste your event notice",
         "hint": "Paste everything: title, time, prizes, rules and the level table. We sort it into blocks for you to check before any poster is made.",

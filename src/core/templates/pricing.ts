@@ -27,7 +27,7 @@ export type CreditsFloor = Record<TemplateQuality, CreditsCost> & {
   tariff?: ApprovedTariff
   unknownCapabilities?: boolean
   // The route's floor for a template with n image slots (n = "2".."4"), when its data allows one
-  // below single × n (1392); absent means single × n.
+  // below single × n (1442); absent means single × n.
   slots?: Partial<Record<TemplateQuality, Partial<Record<Resolution, Record<string, number>>>>>
 }
 
@@ -43,7 +43,7 @@ export const slotFloorFactor = (fields: { images: { slots?: readonly unknown[] }
 export const MISSING_COST = 2147483647
 
 // slots: a template with named image slots (§5.1e) must cover the route's slot floor, like the
-// database (admin.slot_route_floor, migration 1392): the full-slot p95, else the single-image floor
+// database (admin.slot_route_floor, migration 1442): the full-slot p95, else the single-image floor
 // plus the extra input images, else (no data) the single-image floor × its slots. Only the route
 // floor changes: the template's own tariff and the missing-cost sentinel stay as they are.
 export function creditMinimum(floor: CreditsFloor, quality: TemplateQuality, resolution: Resolution, slots = 1) {
@@ -66,7 +66,7 @@ export function assertTemplateQuote(expected: number | undefined, current: numbe
 export type FloorViolation = { resolution: Resolution; floor: number; given: number }
 
 // slots: a template with named image slots (§5.1e) is held to its route's slot floor (creditMinimum,
-// 1392). An approved price still stands as it is.
+// 1442). An approved price still stands as it is.
 export function creditsBelowFloor(quality: TemplateQuality, cost: CreditsCost, floor: CreditsFloor, unpriced: readonly Resolution[] = [], slots = 1): FloorViolation[] {
   return RESOLUTIONS.flatMap((resolution) => {
     if (unpriced.includes(resolution)) return []

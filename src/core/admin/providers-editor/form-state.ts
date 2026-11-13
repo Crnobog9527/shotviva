@@ -19,7 +19,7 @@ export type ProviderForm = {
   resolutions: Resolution[]
   tiersTouchedFor?: string | null
   imageCosts: Partial<Record<Resolution, string>>
-  // USD per extra input image of a slot job (1392), as typed; blank means not set.
+  // USD per extra input image of a slot job (1442), as typed; blank means not set.
   extraInputCost: string
   label: string
   baseUrl: string

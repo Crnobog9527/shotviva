@@ -32,7 +32,7 @@ async function readStyleRefs(id: string, version: number, source: SyncTarget) {
   return refs.data
 }
 
-// Both provider profiles (1393): which one is live on the test site, and the other one as it is
+// Both provider profiles (1443): which one is live on the test site, and the other one as it is
 // saved there, for exactly the prompt version the sync read.
 const profileKey = z.enum(['openai', 'seedream'])
 const inactiveProfile = z.object({
@@ -45,7 +45,7 @@ const profilesSchema = z.object({ active: profileKey, inactive: z.array(inactive
 
 async function readProfiles(id: string, version: number, source: SyncTarget) {
   const result = await source.db.rpc('read_template_sync_profiles', { p_id: id, p_version: version })
-  // A test site without migration 1393: sync as before (no profiles; the 9-argument function).
+  // A test site without migration 1443: sync as before (no profiles; the 9-argument function).
   if (result.error?.code === 'PGRST202') return null
   if (result.error) throw new SyncError(result.error.message === 'SOURCE_CHANGED' ? 'SOURCE_CHANGED' : 'SOURCE_READ_FAILED')
   const parsed = profilesSchema.safeParse(result.data)

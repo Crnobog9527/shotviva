@@ -38,7 +38,7 @@ export const saveProviderSchema = z.object({
   resolutions: z.array(resolutionSchema).min(1).max(RESOLUTIONS.length)
     .refine((values) => new Set(values).size === values.length).optional(),
   estimatedImageCosts: estimatedImageCostsSchema.optional(),
-  // Slot template floor (1392). Blank clears it; absent (older editors) keeps it.
+  // Slot template floor (1442). Blank clears it; absent (older editors) keeps it.
   extraInputImageUsd: z.preprocess(v => (v === '' ? null : v), z.coerce.number().min(0).max(9.99).nullable().optional()),
   label: z.string().trim().min(1).max(80),
   ...modelFields,

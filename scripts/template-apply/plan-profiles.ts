@@ -5,7 +5,7 @@ import type { TemplateItem } from './schema'
 import type { DbState } from './state'
 import { resolveModel } from './template-payload'
 
-// Provider profiles in a batch file (1390–1394): `profiles.<key>` saves a profile that is not live
+// Provider profiles in a batch file (1440–1444): `profiles.<key>` saves a profile that is not live
 // (save_profile: the live template is untouched), `activeProfile` switches through the admin's own
 // switch (switch_profile), after the profile is saved. The live profile is written with the
 // template's own prompt / model fields, so naming it under `profiles` is refused.

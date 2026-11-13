@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { connectAdmin, createUser } from './helpers'
 
-// Provider profiles (1390–1394): the live profile is projected onto the existing columns, every
+// Provider profiles (1440–1444): the live profile is projected onto the existing columns, every
 // write path keeps its row, the inactive profile is saved without touching the site, and the
 // switch restores the saved version with the editor's own checks and never unpublishes.
 const openai = randomUUID()
@@ -181,7 +181,7 @@ describe('T93 sync carries both profiles', () => {
   })
 })
 
-describe('slot floor (1392)', () => {
+describe('slot floor (1442)', () => {
   const tag = () => `${openai}/gpt-fixture`
   const floor = async (slots: number, single = 10) =>
     (await one<{ f: number }>("select admin.slot_route_floor($1,'1k','medium',$2,$3) f", [tag(), slots, single])).f
@@ -198,7 +198,7 @@ describe('slot floor (1392)', () => {
     const user = await createUser(db)
     await db.query('set local session_replication_role = replica')
     await db.query(`insert into public.generation_jobs (id,user_id,module,template_id,inputs,provider,source,status,visibility,credits_cost,credit_pool,cost_usd,output_key,finished_at)
-      select gen_random_uuid(),$1,'image',$2,$3,$4,'web','succeeded','private',1,'paid',0,'t1392/x',now() from generate_series(1,10)`,
+      select gen_random_uuid(),$1,'image',$2,$3,$4,'web','succeeded','private',1,'paid',0,'t1442/x',now() from generate_series(1,10)`,
     [user, id, JSON.stringify({ resolution: '1k', quality: 'medium', input_slots: [{ key: 'a' }, { key: 'b' }, { key: 'c' }] }), tag()])
     expect(await floor(3)).toBe(10)
     expect(await floor(2)).toBe(10 + Math.ceil(0.01 * 1.10 / budget))
