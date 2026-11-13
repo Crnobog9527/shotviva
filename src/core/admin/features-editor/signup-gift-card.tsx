@@ -20,7 +20,7 @@ type Props = {
 const COPY = SIGNUP_GIFT_COPY.rules
 const whole = (value: string, max: number) => /^\d+$/.test(value) && Number(value) <= max
 
-// 1350 + 1410 (ARCHITECTURE §7): today's count against the daily cap, then every signup gift
+// 1350 + 1480 (ARCHITECTURE §7): today's count against the daily cap, then every signup gift
 // rule in one form with its plain-language explanation, and the pause on its own card.
 export function SignupGiftCard({ state, savePaused, saveRules }: Props) {
   const [cap, setCap] = useState(String(state.rules.cap))

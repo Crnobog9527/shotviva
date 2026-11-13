@@ -7,7 +7,7 @@ import { AppError } from '../errors'
 
 // Whether this account was refused the signup gift, and why, for the note on the account page
 // (ARCHITECTURE §7). grant_credits stores the reason on the profile: 'same_ip_pending' (over the
-// per-network allowance; the account can still claim with a phone or Google, 1410),
+// per-network allowance; the account can still claim with a phone or Google, 1480),
 // 'daily_cap' and 'paused' (final). Older same-IP refusals are pending too, as claim_signup_gift
 // reads them: 'same_ip' (1350) and, before that (0184), no reason but a recorded IP. The same
 // reading would also cover a grant that failed and has not been retried yet; the next verified

@@ -31,7 +31,7 @@ export async function onVerifiedSignIn(
   const address = clientIp(await headers())
   const ipStored = await recordSignupIp(admin, userId, address)
   const granted = await grantSignupCredits(billingGrant(admin), userId, benefits.freeCredits)
-  // 1410: an account over the per-network allowance is pending; a confirmed phone or a linked
+  // 1480: an account over the per-network allowance is pending; a confirmed phone or a linked
   // Google account pays it now (a phone or Google sign-up, or a Google account just linked).
   const claimed = !granted && benefits.freeCredits > 0 && (await claimQuietly(admin, userId))
   const first = address ? ipStored : granted

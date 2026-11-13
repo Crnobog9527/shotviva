@@ -242,7 +242,7 @@ begin
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog', 0));
   perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_gift_cap', 0));
   select * into v_profile from public.profiles where id = p_user_id for update;
-  -- Pending: over the allowance since 1410, a 1350 'same_ip', or an older same-IP refusal that
+  -- Pending: over the allowance since 1480, a 1350 'same_ip', or an older same-IP refusal that
   -- stored nothing (an IP, no reason). Never paid already.
   if not found
      or not (coalesce(v_profile.signup_gift_refusal in ('same_ip_pending', 'same_ip'), false)

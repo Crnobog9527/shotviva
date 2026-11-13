@@ -107,8 +107,8 @@ describe('handleSmsHook', () => {
   })
 })
 
-describe('handleSmsHook, binding a number (1410)', () => {
-  it('1410: binding a number to an email account sends to sms.phone, the new number', async () => {
+describe('handleSmsHook, binding a number (1480)', () => {
+  it('1480: binding a number to an email account sends to sms.phone, the new number', async () => {
     for (const to of ['8614000000002', '+8614000000002']) {
       outbox = []
       const response = await handleSmsHook(hookRequest(null, { to }), deps())

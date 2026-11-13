@@ -86,7 +86,7 @@ it('serializes both arrival orders and refuses preview rollback after a new paym
   expect((await profileOf(release, buyer)).credits).toBe(2545)
 })
 
-// 1410: a network may receive signup_gift_per_ip gifts (default 5); with 1 this is the old
+// 1480: a network may receive signup_gift_per_ip gifts (default 5); with 1 this is the old
 // one-per-network race. The second account is left pending instead of refused.
 it('grants exactly one new signup gift when two verified users on the same IP claim concurrently', async () => {
   await release.query(script('preview'))

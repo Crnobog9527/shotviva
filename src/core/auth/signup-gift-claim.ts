@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { AppError } from '../errors'
 import { logger } from '../logger'
 
-// Claiming a signup gift the per-network allowance left pending (1410, ARCHITECTURE §7): the
+// Claiming a signup gift the per-network allowance left pending (1480, ARCHITECTURE §7): the
 // account proves a verified phone number or a linked Google account, each of which pays one
 // signup gift ever. claim_signup_gift reads the phone and the Google identity from Supabase Auth
 // itself, so nothing the browser sends decides who is paid.

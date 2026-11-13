@@ -5,7 +5,7 @@ import { AppError } from '@/core/errors'
 import type { SystemSettingDeps } from './commands'
 import { saveSignupGiftRules } from './signup-gift'
 
-// 1350 + 1410: the signup gift's rules on /admin/features. One RPC per rule (the database checks
+// 1350 + 1480: the signup gift's rules on /admin/features. One RPC per rule (the database checks
 // the admin, the key and the range again), then the settings cache.
 
 function deps() {

@@ -16,7 +16,7 @@ import { TEST_SIGNUP_GIFT_CAP, TEST_SIGNUP_GIFT_PER_IP } from './global-setup'
 import { connectAdmin, createUser, profileOf } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
-// 1410 (ARCHITECTURE §7): a network may receive signup_gift_per_ip signup gifts in 24 hours;
+// 1480 (ARCHITECTURE §7): a network may receive signup_gift_per_ip signup gifts in 24 hours;
 // accounts over it are pending and claim later with a verified phone or a Google account, each
 // of which pays one signup gift ever. The daily cap and the pause still apply at claim time.
 
@@ -296,7 +296,7 @@ describe('claim_signup_gift under concurrency', () => {
   })
 })
 
-describe('admin_set_system_setting (1410 keys) and access', () => {
+describe('admin_set_system_setting (1480 keys) and access', () => {
   let adminId: string
   beforeAll(async () => {
     adminId = await createUser(db)

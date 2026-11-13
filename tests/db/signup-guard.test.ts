@@ -110,7 +110,7 @@ describe('signup gift pause', () => {
     expect(await grant(await newAccount())).toBe(true)
   })
 
-  it('records the per-network refusal too (pending since 1410)', async () => {
+  it('records the per-network refusal too (pending since 1480)', async () => {
     const shared = ip()
     const [first, second] = [await createUser(db), await createUser(db)]
     await recordSignupIp(service, first, shared)

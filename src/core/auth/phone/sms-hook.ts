@@ -19,7 +19,7 @@ import { verifyWebhookSignature } from './webhook-signature'
 const payloadSchema = z.object({
   user: z.object({ id: z.string(), phone: z.string().nullable().optional() }),
   // `phone` is where the code goes: the new number when an account binds one (phone_change,
-  // 1410), else the account's own. Older Auth versions only sent user.phone.
+  // 1480), else the account's own. Older Auth versions only sent user.phone.
   sms: z.object({ otp: z.string().regex(/^\d{6}$/), phone: z.string().optional() }),
 })
 

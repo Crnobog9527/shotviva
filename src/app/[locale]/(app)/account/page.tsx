@@ -53,7 +53,7 @@ async function Account() {
     displayProducts(),
     history,
   ])
-  // 1410: an account over the per-network allowance can still claim its signup gift.
+  // 1480: an account over the per-network allowance can still claim its signup gift.
   const claimOptions = signupGift.reason === 'same_ip_pending' ? await readClaimOptions(admin) : null
   const purchases = paymentChoices(payments, identities, t as unknown as Translate, { money: formatMoney(locale) })
   const last = lastMembership(payments, identities)

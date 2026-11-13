@@ -4,7 +4,7 @@ import { refresh } from 'next/cache'
 
 import { claimWithGoogle, sendClaimPhoneCode, verifyClaimPhoneCode, type ClaimState } from '@/core/auth'
 
-// 1410: the account page's 「领取注册赠分」. A claim changes the balance, so the page reads again.
+// 1480: the account page's 「领取注册赠分」. A claim changes the balance, so the page reads again.
 function refreshOnClaim(state: ClaimState): ClaimState {
   if (state.status === 'claimed') refresh()
   return state

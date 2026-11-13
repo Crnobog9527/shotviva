@@ -57,7 +57,7 @@ export async function saveGallerySwitchAction(key: unknown, input: unknown): Pro
   })
 }
 
-// 1350 + 1410: the signup gift's pause and rules. grant_credits and claim_signup_gift read the
+// 1350 + 1480: the signup gift's pause and rules. grant_credits and claim_signup_gift read the
 // rows themselves; the page reads again so today's count shows the new cap.
 export async function saveSignupGiftPausedAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()

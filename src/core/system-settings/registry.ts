@@ -14,9 +14,9 @@ type SettingTypes = {
   signup_gift_paused: boolean
   // 1350: signup gifts per Beijing day (0 = none). grant_credits reads the row itself.
   signup_gift_daily_cap: number
-  // 1410: signup gifts one signup IP may receive in 24 hours (0 = no limit); over it, pending.
+  // 1480: signup gifts one signup IP may receive in 24 hours (0 = no limit); over it, pending.
   signup_gift_per_ip: number
-  // 1410: whether a pending account may claim with a verified phone / a Google account.
+  // 1480: whether a pending account may claim with a verified phone / a Google account.
   signup_gift_claim_phone: boolean
   signup_gift_claim_google: boolean
 }

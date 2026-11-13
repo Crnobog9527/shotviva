@@ -11,7 +11,7 @@ import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { Group } from './rows'
 
-// 「领取注册赠分」 (1410, ARCHITECTURE §7): shown only to an account the per-network allowance left
+// 「领取注册赠分」 (1480, ARCHITECTURE §7): shown only to an account the per-network allowance left
 // pending. Bind a phone number (code by SMS) or use a Google account; each pays one signup gift
 // ever. The admin decides which of the two are offered.
 

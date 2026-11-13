@@ -62,7 +62,7 @@ describe('onVerifiedSignIn', () => {
     expect(mocks.track).toHaveBeenCalledWith('signup', { method: 'google', code_kind: 'invite' }, { distinctId: 'u1', locale: 'en' })
   })
 
-  it('1410: a gift the grant left pending is claimed after the sign-in, and the Owner alert checks', async () => {
+  it('1480: a gift the grant left pending is claimed after the sign-in, and the Owner alert checks', async () => {
     mocks.recordSignupIp.mockResolvedValue(false)
     mocks.grantSignupCredits.mockResolvedValue(false)
     mocks.claimQuietly.mockResolvedValueOnce(true)
@@ -72,7 +72,7 @@ describe('onVerifiedSignIn', () => {
     expect(mocks.track).not.toHaveBeenCalled()
   })
 
-  it('1410: no claim when the grant paid', async () => {
+  it('1480: no claim when the grant paid', async () => {
     mocks.recordSignupIp.mockResolvedValue(true)
     mocks.grantSignupCredits.mockResolvedValue(true)
     await onVerifiedSignIn('u1', benefits, 'email', 'zh')

@@ -20,7 +20,7 @@ import { classifyPhoneError, limitError } from './classify-phone-error'
 import { failed, type FormState } from './form-state'
 import { formFields } from './schemas'
 
-// The account page's 「领取注册赠分」 (1410, ARCHITECTURE §7). A pending account binds a phone
+// The account page's 「领取注册赠分」 (1480, ARCHITECTURE §7). A pending account binds a phone
 // number (Supabase phone change: our SMS limits, the Send SMS hook, a six-digit code) or links a
 // Google account, then claim_signup_gift pays it if that phone or Google account never paid a
 // signup gift before. The session decides whose account it is; the database reads the phone and

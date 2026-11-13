@@ -11,7 +11,7 @@ import { SIGNUP_GIFT_COPY } from '../features-editor/signup-gift-copy'
 import { loadSettingSwitch, type SystemSettingDeps } from './commands'
 import type { SignupGiftState } from './types'
 
-// The signup gift's rules (1350, 1410, ARCHITECTURE §7) on /admin/features: the daily cap, how
+// The signup gift's rules (1350, 1480, ARCHITECTURE §7) on /admin/features: the daily cap, how
 // many gifts one network may receive in 24 hours, which ways a pending account may claim, and
 // the pause. grant_credits and claim_signup_gift read the rows themselves, so a save applies to
 // the next sign-up without any cache.
