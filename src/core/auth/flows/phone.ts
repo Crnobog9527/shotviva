@@ -15,7 +15,7 @@ import { sanitizeNext } from '../redirect-target'
 import { metadataLocale } from '../session-user'
 import { clientIp } from '../signup-ip'
 import { createAdminSupabase } from '../supabase-admin'
-import { createServerSupabase } from '../supabase-server'
+import { createSessionSupabase } from '../supabase-server'
 import { classifyPhoneError, limitError } from './classify-phone-error'
 import { failed, type FormState } from './form-state'
 import { formFields } from './schemas'
@@ -42,7 +42,7 @@ export async function sendPhoneCode(form: FormData): Promise<FormState> {
   if (status !== 'ok') return failed(limitError(status))
 
   const locale = await currentLocale()
-  const supabase = await createServerSupabase()
+  const supabase = await createSessionSupabase()
   const { error } = await supabase.auth.signInWithOtp({
     phone: phone.e164,
     options: {
@@ -69,7 +69,7 @@ export async function verifyPhoneCode(form: FormData, options: PhoneSignInOption
   const phone = parseMainlandPhone(parsed.data.phone)
   if (!phone) return failed('AUTH_PHONE_INVALID')
 
-  const supabase = await createServerSupabase()
+  const supabase = await createSessionSupabase()
   const { data, error } = await supabase.auth.verifyOtp({ phone: phone.e164, token: parsed.data.code, type: 'sms' })
   if (error || !data.user) return failed(verifyError(error))
   await onVerifiedSignIn(data.user.id, options, 'phone', metadataLocale(data.user) ?? (await currentLocale()))

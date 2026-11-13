@@ -160,7 +160,8 @@
   .mk-spair .mk-hl { z-index: 3; }
   .mk-spair .mk-tag { z-index: 4; }
   .mk-sl { position: absolute; inset: 0; z-index: 1; display: none; grid-template-columns: 1fr 1fr; opacity: 0; transition: opacity .7s var(--ease); }
-  .mk-armed .mk-sl { display: grid; }
+  /* only the layer whose turn is next (series-motion.ts LOADING_CLASS), so its lazy images load just in time */
+  .mk-armed .mk-sl.mk-ld { display: grid; }
   .mk-sl.mk-was { opacity: 1; transition: none; }
   .mk-sl.mk-on { z-index: 2; opacity: 1; }
   a.mk-series { text-decoration: none; transition: transform .3s var(--ease); }

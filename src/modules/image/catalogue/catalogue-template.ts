@@ -12,6 +12,8 @@ export type CatalogueTemplate = {
   categoryName: string
   categoryOrder: number
   compare: boolean
+  // Its root category keeps every work private, free ones too (the posters root, §9 第 7 条).
+  privateOnly?: boolean
   // The translated one-liner (templates.translations), when the page's language has one.
   description: string | null
   photoInput?: 'required' | 'optional' | 'none'
@@ -59,6 +61,7 @@ export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTempl
     categoryName: template.categoryView.name,
     categoryOrder: template.categoryView.sortOrder,
     compare: template.categoryView.compare,
+    privateOnly: template.categoryInfo.galleryExcluded ?? false,
     description: template.description ?? null,
     photoInput: template.fields.images.max === 0 ? 'none' : template.fields.images.min === 0 ? 'optional' : 'required',
     imageOptions: template.imageOptions ?? FULL_IMAGE_OPTIONS,

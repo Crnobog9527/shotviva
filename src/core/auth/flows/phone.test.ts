@@ -18,7 +18,7 @@ vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' }) }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
 vi.mock('../../i18n/server', () => ({ currentLocale: async () => 'zh' }))
-vi.mock('../supabase-server', () => ({ createServerSupabase: async () => ({ auth: { signInWithOtp: mocks.signInWithOtp, verifyOtp: mocks.verifyOtp } }) }))
+vi.mock('../supabase-server', () => ({ createSessionSupabase: async () => ({ auth: { signInWithOtp: mocks.signInWithOtp, verifyOtp: mocks.verifyOtp } }) }))
 vi.mock('../supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc }) }))
 vi.mock('../first-sign-in', () => ({ onVerifiedSignIn: mocks.onVerifiedSignIn }))
 

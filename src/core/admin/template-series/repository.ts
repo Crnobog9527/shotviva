@@ -52,18 +52,6 @@ export async function searchSeriesCandidates(db: SupabaseClient, search: unknown
   return { items, next: rows.length > PAGE ? items[PAGE - 1].id : null }
 }
 
-export async function listAdminSeriesPage(db: SupabaseClient, cursor: { order: number; id: string } | null, search: string) {
-  const query = db.from('template_series').select('id,name_zh,slug,is_active,show_members,sort_order')
-    .order('sort_order').order('id').limit(PAGE + 1)
-  if (search) query.ilike('name_zh', '%' + search.replace(/[\\%_]/g, char => '\\' + char) + '%')
-  if (cursor) query.or(`sort_order.gt.${cursor.order},and(sort_order.eq.${cursor.order},id.gt.${cursor.id})`)
-  const { data, error } = await query.returns<Array<{
-    id: string; name_zh: string; slug: string; is_active: boolean; show_members: boolean; sort_order: number
-  }>>()
-  if (error) throw new AppError('INTERNAL', 'list series failed', { cause: error })
-  return { items: data.slice(0, PAGE), hasNext: data.length > PAGE }
-}
-
 export async function listAdminSeriesOptions(db: SupabaseClient): Promise<{ id: string; nameZh: string }[]> {
   const options: { id: string; nameZh: string }[] = []
   for (;;) {

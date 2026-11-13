@@ -14,9 +14,6 @@ export type PaidTier = Exclude<MembershipTier, 'starter'>
 // The lowest tier that unlocks each part: its badge, and the plan the paywall opens on.
 export const FEATURE_TIER: Record<GatedFeature, PaidTier> = { batch: 'pro', templates: 'max' }
 
-// The one page both parts live on.
-export const BATCH_WORKSPACE = '/generate/batch'
-
 // What one batch may hold on this plan, the same rule the server enforces (assertBatchAllowed):
 // up to `cells` photos in all (limitsFor().batchMax), and more than one template on Max only.
 // Null below Pro, where a batch is one photo and the page shows the plan that unlocks it.
