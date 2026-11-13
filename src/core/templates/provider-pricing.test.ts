@@ -23,7 +23,7 @@ describe('model price floors', () => {
       openAI: false, resolutions: ['1k', '2k'], estimates: { '1k': 0.019, '2k': 0.019 },
       p95: { '1k': 0.0715, '2k': 0.0715 }, p95ByQuality: { high: { '1k': 0.0715 }, medium: { '1k': 0.0095 } },
     }, centBudget)
-    expect(floor.medium).toEqual({ '1k': 6, '2k': 12, '3k': 1 })
-    expect(floor.high).toEqual({ '1k': 44, '2k': 12, '3k': 1 })
+    expect(floor.medium).toEqual({ '1k': 6, '2k': 12, '4k': 1 })
+    expect(floor.high).toEqual({ '1k': 44, '2k': 12, '4k': 1 })
   })
 })
