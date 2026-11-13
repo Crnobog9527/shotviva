@@ -9,8 +9,9 @@
 export type FeatureDefinition = { readonly key: string; readonly name: string; readonly inviteOnly?: boolean }
 
 export const FEATURES: readonly FeatureDefinition[] = [
-  // Dense-text tournament posters, phase 1: the Owner's test accounts only (Owner 2026-11-13).
-  { key: 'dense_poster', name: '赛事海报（内测）', inviteOnly: true },
+  // Dense-text tournament posters: open to every signed-in account (Owner 2026-11-13: 「不需要加任何
+  // 权限限制，直接开放就行了」). The key stays so a tier or a date can gate it again from the admin.
+  { key: 'dense_poster', name: '赛事海报' },
 ]
 
 export function findFeature(registry: readonly FeatureDefinition[], key: string): FeatureDefinition | undefined {

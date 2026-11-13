@@ -8,7 +8,7 @@ import { Link } from '@/core/i18n/navigation'
 import { currentLocale } from '@/core/i18n/server'
 import { listPosterTemplates, posterAllowed } from '@/modules/image/posters'
 
-// Dense-text posters (ARCHITECTURE §5.3), invite-only in phase 1: anyone not invited gets a 404.
+// Dense-text posters (ARCHITECTURE §5.3), open to every signed-in account (feature dense_poster).
 // One style goes straight to its editor; several are listed.
 async function Posters() {
   const user = await requireUser('/posters')
