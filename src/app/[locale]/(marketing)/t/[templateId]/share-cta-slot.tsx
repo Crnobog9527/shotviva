@@ -6,7 +6,7 @@ import { getSessionUser } from '@/core/auth'
 import { logger } from '@/core/logger'
 import type { Locale } from '@/core/i18n/locales'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
-import { ShareCta } from '@/modules/image/marketing'
+import { ShareCta } from '@/modules/image/share-page'
 import { creditFacts, fillCredits, freeImagesIn } from '@/site/content'
 
 type Props = { templateId: string; shareId: string | null; locale: Locale; text: Awaited<ReturnType<typeof shareCtaText>> }

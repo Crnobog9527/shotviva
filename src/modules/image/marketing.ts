@@ -6,7 +6,3 @@ export { toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalog
 export { HomeGenerator, type HomeGeneratorProps } from './home/home-generator'
 export { HomeDraftNote } from './home/home-draft-note'
 export type { HomeViewer } from './home/home-cta'
-// A template's share page (/t/<id>, Owner 2026-11-13).
-export { loadSharedTemplate, type SharedTemplate } from './share/load-shared-template'
-export { SharedTemplateMissing, SharedTemplatePage } from './share/shared-template-page'
-export { ShareCta } from './share/share-cta'

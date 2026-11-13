@@ -6,7 +6,7 @@ import { Suspense } from 'react'
 import { isShareId, SHARE_PARAM } from '@/core/analytics/share-link'
 import { currentLocale } from '@/core/i18n/server'
 import { absoluteUrl, notIndexedRobots, pageMetadata } from '@/core/seo'
-import { loadSharedTemplate, SharedTemplateMissing, SharedTemplatePage } from '@/modules/image/marketing'
+import { loadSharedTemplate, SharedTemplateMissing, SharedTemplatePage } from '@/modules/image/share-page'
 import { site } from '@/site/site.config'
 
 import { ShareCtaFallback, ShareCtaSlot, shareCtaText } from './share-cta-slot'

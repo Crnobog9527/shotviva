@@ -1,13 +1,17 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import dynamic from 'next/dynamic'
 import { useState, type MouseEvent } from 'react'
 
 import { cn } from '@/core/ui/cn'
 
 import { hasStills, type CatalogueTemplate } from './catalogue-template'
-import { SampleViewer, type ViewerSide } from './sample-viewer'
+import type { ViewerSide } from './sample-viewer'
 import { isCompareSample, TemplateSample, type SampleTemplate } from './template-sample'
+
+// Fetched on the first open only (scripts/js-budget.json).
+const SampleViewer = dynamic(() => import('./sample-viewer').then((m) => m.SampleViewer), { ssr: false })
 
 type Props = { template: SampleTemplate & Pick<CatalogueTemplate, 'name'>; className?: string }
 
@@ -38,15 +42,15 @@ export function ZoomableSample({ template, className }: Props) {
           <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
         </svg>
       </button>
-      <SampleViewer
-        open={side !== null}
+      {side === null ? null : <SampleViewer
+        open
         onOpenChange={(open) => !open && setSide(null)}
         before={template.cover.before as string}
         after={template.cover.after as string}
         name={template.name}
-        side={side ?? 'ai'}
+        side={side}
         onSide={setSide}
-      />
+      />}
     </>
   )
 }
