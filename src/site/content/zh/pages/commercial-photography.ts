@@ -4,7 +4,7 @@ import { defineContentPage, type EditCases, type ShootDemo } from '@/core/conten
 import { site } from '../../../site.config'
 import { caseImage, CATEGORY, withFirstFrame } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
-import { dayRateUsd, packshotUsd, SET_PHOTOS, styledShotUsd, usdRange } from '../../offer'
+import { dayRateUsd, packshotUsd, photoSeconds, SET_PHOTOS, styledShotUsd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
 import { productBills } from '../home'
 import { ZH_TIERS, zhFreeImages, zhPlansSentence, zhTierList } from '../offer'
@@ -125,7 +125,7 @@ export const makeZhCommercialPhotography = (offers: OfferFacts) => defineContent
   faq: [
     {
       question: '产品拍照一般多少钱？',
-      answer: `按美国 2026 年的公开报价，白底产品图每张 ${usdRange(packshotUsd)}，造型图每张 ${usdRange(styledShotUsd)}，影棚一天 ${usdRange(dayRateUsd)}。${brand} 用你自己的手机照片做一张造型、精修好的商品图。${zhPlansSentence(offers)}`,
+      answer: `按美国 2026 年的公开报价，白底产品图每张 ${usdRange(packshotUsd)}，造型图每张 ${usdRange(styledShotUsd)}，影棚一天 ${usdRange(dayRateUsd)}。${brand} 用你自己的手机照片，大约 ${photoSeconds} 秒做好一张造型、精修好的商品图。${zhPlansSentence(offers)}`,
     },
     {
       question: 'AI 能代替产品摄影师吗？',

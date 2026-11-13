@@ -6,7 +6,7 @@ import { caseImage, CATEGORY, SIZE_COUNT, withFirstFrame } from '../../landing-s
 import { zhPricingRelated } from '../shared'
 import { foodHalfDayUsd, MENU_DISHES, photoSeconds, usd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
-import { planLabel, ZH_TIERS, zhFreeImages, zhTierList } from '../offer'
+import { planLabel, ZH_TIERS, zhFreeImages, zhPlansSentence, zhTierList } from '../offer'
 
 // /zh/ai-restaurant-menu (T44, ARCHITECTURE §17): noindex (中文口径主词表: 「暂不建」, keyword
 // ai菜单). For restaurant owners who put dishes on delivery apps; the US apps' figures are kept
@@ -105,29 +105,6 @@ const copy = {
       value: `外卖平台要的是你实际卖的菜。${brand} 从你自己的手机照片出发，换碗、换光线和背景，不改菜本身。`,
     },
   ],
-  faq: [
-    {
-      question: '外卖平台的菜单能用 AI 图吗？',
-      answer: `外卖平台要求图片展示你实际出餐的菜。${brand} 从你自己的手机照片出发，菜保持原样，只换碗、光线和背景，所以图里还是你的菜。上传前请查看平台当下的图片规定。`,
-    },
-    {
-      question: '菜单图片要多大尺寸？',
-      answer: `DoorDash 要横版 ${doordash.ratio}、至少 ${px(doordash.minW)} × ${px(doordash.minH)} px，Uber Eats 是 ${uberEats.ratio}，Grubhub 用方图。印刷菜单和社交媒体常用 4:5 或 1:1。${brand} 导出 PNG，分${zhTierList}三档，${SIZE_COUNT} 种尺寸。`,
-    },
-    {
-      question: '请美食摄影师要多少钱？',
-      answer: `按美国的公开报价，拍半天大约 ${usdRange(foodHalfDayUsd)}，食物造型师通常另外收费。${brand} 用你的手机照片做一张菜单图。`,
-    },
-    {
-      question: '要自己写提示词吗？',
-      answer: `${brand} 不用写提示词。选「外卖菜单」「暗调氛围」或「促销海报」，光线和造型由模板决定。只有一行选填的「有什么想改的？」，比如写「辣椒油要看得见」。`,
-      link: { href: '/', anchor: '看看 AI改图 的全部模板。' },
-    },
-    {
-      question: '能直接做整张菜单吗？',
-      answer: `${brand} 做的是照片：一次一道菜，另外可以做一张促销海报。整张多道菜的菜单或价目表排版，${brand} 不做。`,
-    },
-  ],
   headings: {
     facts: '菜单和外卖平台的图片尺寸',
     faq: 'AI菜单配图常见问题',
@@ -147,6 +124,29 @@ const copy = {
 export const makeZhAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
   ...copy,
   costBills: menuBills(offers),
+  faq: [
+    {
+      question: '外卖平台的菜单能用 AI 图吗？',
+      answer: `外卖平台要求图片展示你实际出餐的菜。${brand} 从你自己的手机照片出发，菜保持原样，只换碗、光线和背景，所以图里还是你的菜。上传前请查看平台当下的图片规定。`,
+    },
+    {
+      question: '菜单图片要多大尺寸？',
+      answer: `DoorDash 要横版 ${doordash.ratio}、至少 ${px(doordash.minW)} × ${px(doordash.minH)} px，Uber Eats 是 ${uberEats.ratio}，Grubhub 用方图。印刷菜单和社交媒体常用 4:5 或 1:1。${brand} 导出 PNG，分${zhTierList}三档，${SIZE_COUNT} 种尺寸。`,
+    },
+    {
+      question: '请美食摄影师要多少钱？',
+      answer: `按美国的公开报价，拍半天大约 ${usdRange(foodHalfDayUsd)}，食物造型师通常另外收费。${brand} 用你的手机照片，大约 ${photoSeconds} 秒做好一张菜单图。${zhPlansSentence(offers)}`,
+    },
+    {
+      question: '要自己写提示词吗？',
+      answer: `${brand} 不用写提示词。选「外卖菜单」「暗调氛围」或「促销海报」，光线和造型由模板决定。只有一行选填的「有什么想改的？」，比如写「辣椒油要看得见」。`,
+      link: { href: '/', anchor: '看看 AI改图 的全部模板。' },
+    },
+    {
+      question: '能直接做整张菜单吗？',
+      answer: `${brand} 做的是照片：一次一道菜，另外可以做一张促销海报。整张多道菜的菜单或价目表排版，${brand} 不做。`,
+    },
+  ],
   related: [
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
     { href: '/commercial-photography', anchor: '商业摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
