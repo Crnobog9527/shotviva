@@ -47,6 +47,7 @@ function StyleChoice({ value, onChange }: { value: CategoryFormValues['cardStyle
   return (
     <fieldset className="grid gap-2">
       <legend className="mb-1 text-sm font-medium">{COPY.style}</legend>
+      <p className="-mt-1 text-xs text-muted-foreground">{COPY.styleWhere}</p>
       {CARD_STYLES.map((style) => (
         <label key={style} className="flex items-start gap-2 text-sm">
           <input type="radio" name="category-style" className="mt-1 accent-primary" checked={value === style} onChange={() => onChange(style)} />

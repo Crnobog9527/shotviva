@@ -13,7 +13,13 @@ type Props = {
   saved: boolean
   value: Selection
   onChange(next: Selection): void
+  // The words, passed in: the home picker (a public page) has no app.create messages.
+  labels: ChipLabels
+  // Hidden while a search is typed (the search covers every category).
+  hidden?: boolean
 }
+
+export type ChipLabels = { all: string; filter: string; filterWithin(name: string): string }
 
 type Chip = { key: string; name: string; pressed: boolean; select: Selection; heart?: boolean }
 
@@ -23,27 +29,27 @@ type Chip = { key: string; name: string; pressed: boolean; select: Selection; he
 // leads with its own All (the level above, unnarrowed) and marks its choice with a bone rim, not
 // a fill, so the eye reads one solid chip as the place and the rims as narrowing within it.
 // Each row is its own horizontal rail on phones (§8.3) and wraps from md up (B comp create.html).
-export function CategoryChips({ filters, saved, value, onChange }: Props) {
-  const t = useTranslations('app.create')
+export function CategoryChips({ filters, saved, value, onChange, labels, hidden }: Props) {
   const savedName = useTranslations('app.favorites')('saved')
   const rows = chipRows(filters, value.path)
   const root: Chip[] = [
     ...(saved ? [{ key: '~saved', name: savedName, pressed: value.saved, select: { saved: true, path: [] }, heart: true }] : []),
-    { key: '~all', name: t('all'), pressed: !value.saved && value.path.length === 0, select: { saved: false, path: [] } },
+    { key: '~all', name: labels.all, pressed: !value.saved && value.path.length === 0, select: { saved: false, path: [] } },
     ...(rows[0] ?? []).map((node) => ({ key: node.slug, name: node.name, pressed: value.path[0] === node.slug, select: { saved: false, path: [node.slug] } })),
   ]
+  if (hidden) return null
   return (
     <div className="grid gap-2">
-      <ChipRow chips={root} label={t('filter')} depth={0} onChange={onChange} />
+      <ChipRow chips={root} label={labels.filter} depth={0} onChange={onChange} />
       {rows.slice(1).map((nodes, index) => {
         const parent = value.path.slice(0, index + 1)
         const chosen = value.path[index + 1]
         const chips: Chip[] = [
-          { key: '~all', name: t('all'), pressed: chosen === undefined, select: { saved: false, path: parent } },
+          { key: '~all', name: labels.all, pressed: chosen === undefined, select: { saved: false, path: parent } },
           ...nodes.map((node) => ({ key: node.slug, name: node.name, pressed: chosen === node.slug, select: { saved: false, path: [...parent, node.slug] } })),
         ]
         const parentName = rows[index]?.find((node) => node.slug === parent.at(-1))?.name ?? ''
-        return <ChipRow key={parent.join('/')} chips={chips} label={t('filterWithin', { name: parentName })} depth={index + 1} onChange={onChange} />
+        return <ChipRow key={parent.join('/')} chips={chips} label={labels.filterWithin(parentName)} depth={index + 1} onChange={onChange} />
       })}
     </div>
   )

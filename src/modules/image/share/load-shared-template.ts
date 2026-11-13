@@ -16,7 +16,9 @@ export type SharedTemplate = Shown & { series: { name: string; members: Shown[] 
 const shown = ({ id, name, description, category, categoryName, compare, cover }: CatalogueTemplate): Shown => ({ id, name, description, category, categoryName, compare, cover })
 
 // The template as Create would open it today, from the cached catalogue; null when it is not
-// live on the web (unpublished, partner-only, deleted, a dense-text poster) or the id is no id.
+// live on the web (unpublished or soft-deleted, which the database keeps unpublished; partner-only)
+// or the id is no id. Dense-text poster templates (fields.poster, §5.3) are never shared: their
+// card leads to the poster editor, not to a template anyone can open.
 export async function loadSharedTemplate(locale: Locale, templateId: string): Promise<SharedTemplate | null> {
   if (!isShareTemplateId(templateId)) return null
   const view = await loadCatalogueView(locale)
@@ -25,9 +27,10 @@ export async function loadSharedTemplate(locale: Locale, templateId: string): Pr
 
 export function findShared(entries: readonly GridEntry[], templateId: string): SharedTemplate | null {
   for (const entry of entries) {
-    if (entry.type === 'template' && entry.template.id === templateId) return { ...shown(entry.template), series: null }
+    if (entry.type === 'template' && entry.template.id === templateId) return entry.template.poster ? null : { ...shown(entry.template), series: null }
     if (entry.type !== 'series') continue
     const member = entry.series.members.find((item) => item.id === templateId)
+    if (member?.poster) return null
     if (member) return { ...shown(member), series: { name: entry.series.name, members: entry.series.members.map(shown) } }
   }
   return null

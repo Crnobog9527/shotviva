@@ -28,7 +28,14 @@ describe('share page template (Owner 2026-11-13)', () => {
     expect(JSON.stringify(shown)).not.toMatch(/creditsCost|copyFields|toggles/)
   })
 
+  // Unpublished and soft-deleted templates (#591 keeps a deleted one unpublished) are not in the
+  // cached web catalogue at all, so they read as not live.
   it('is null for a template that is not live', () => {
     expect(findShared(entries, 'gone')).toBeNull()
+  })
+
+  it('is null for a dense-text poster template', () => {
+    const poster = { ...(template('menu-poster') as object), poster: true } as never
+    expect(findShared([{ type: 'template', template: poster, path: ['posters'] }] as never, 'menu-poster')).toBeNull()
   })
 })
