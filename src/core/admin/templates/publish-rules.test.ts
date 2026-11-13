@@ -27,6 +27,12 @@ describe('publishBlockers', () => {
     expect(publishBlockers(ready('a'), CREDITS_FLOOR)).toEqual([])
   })
 
+  it('holds a slot template to the floor × its slots (§5.1e)', () => {
+    const slots = { images: { slots: [{ key: 'a' }, { key: 'b' }] } }
+    expect(publishBlockers(ready('s', { fields: slots }), CREDITS_FLOOR)).toEqual(['below_floor'])
+    expect(publishBlockers(ready('s', { fields: slots, creditsCost: { '1k': 4, '2k': 8, '3k': 12 } }), CREDITS_FLOOR)).toEqual([])
+  })
+
   it('names every missing piece of a web template', () => {
     const draft = ready('a', {
       hasPrompt: false,

@@ -34,9 +34,17 @@ export function approvedCredit(floor: CreditsFloor, quality: TemplateQuality, re
 // The single-image floor multiplier of a template: its number of image slots, at least 1.
 export const slotFloorFactor = (fields: { images: { slots?: readonly unknown[] } } | undefined) => Math.max(1, fields?.images.slots?.length ?? 0)
 
-export function creditMinimum(floor: CreditsFloor, quality: TemplateQuality, resolution: Resolution) {
+// The floor of a model without a usable cost (sold nowhere until it has one); defined here so the
+// slot multiplier below can leave it alone. provider-pricing re-exports it.
+export const MISSING_COST = 2147483647
+
+// slots: a template with named image slots (§5.1e) must cover the route's single-image floor ×
+// its slots, like the database (admin.slot_floor_factor, migration 1310), which multiplies the
+// route floor only: the template's own tariff and the missing-cost sentinel stay as they are.
+export function creditMinimum(floor: CreditsFloor, quality: TemplateQuality, resolution: Resolution, slots = 1) {
   const tariff = floor.tariff?.quality === quality ? floor.tariff.costs[resolution] : 0
-  return Math.max(tariff, floor[quality][resolution])
+  const route = floor[quality][resolution]
+  return Math.max(tariff, route === MISSING_COST ? route : route * Math.max(1, slots))
 }
 
 export function assertPricedTier(unpriced: readonly Resolution[] | undefined, tier: Resolution) {
@@ -56,7 +64,7 @@ export type FloorViolation = { resolution: Resolution; floor: number; given: num
 export function creditsBelowFloor(quality: TemplateQuality, cost: CreditsCost, floor: CreditsFloor, unpriced: readonly Resolution[] = [], slots = 1): FloorViolation[] {
   return RESOLUTIONS.flatMap((resolution) => {
     if (unpriced.includes(resolution)) return []
-    const min = creditMinimum(floor, quality, resolution) * Math.max(1, slots)
+    const min = creditMinimum(floor, quality, resolution, slots)
     return cost[resolution] < min && cost[resolution] !== approvedCredit(floor, quality, resolution) ? [{ resolution, floor: min, given: cost[resolution] }] : []
   })
 }
