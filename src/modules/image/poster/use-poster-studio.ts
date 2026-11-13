@@ -6,7 +6,7 @@ import { posterContentSchema, splitPoster, type PosterContent, type PosterFields
 import type { OutputAspect, Resolution } from '@/core/templates/output-options'
 
 import { startJob } from '../generation/job-store'
-import { emptyContent, tidyContent } from './content-edit'
+import { emptyContent, tidyContent, withDefaults } from './content-edit'
 import { extractPoster, savePosterSet } from './poster-api'
 
 // The poster editor's state (ARCHITECTURE §5.3): paste → sorted blocks the user checks → one job
@@ -85,8 +85,8 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     const reply = await extractPoster(template.id, draft.source)
     setBusy(false)
     if (reply.status === 'ok') {
-      // The template's table is offered even when the text had none, so it can be typed in.
-      const content = reply.content.table ? reply.content : { ...reply.content, table: emptyContent(template.poster).table }
+      // The template's table and sections heading are offered even when the text had none.
+      const content = withDefaults(posterContentSchema.parse(reply.content), template.poster)
       setDraft((d) => ({ ...d, step: 'edit', content, unverified: reply.unverified, reviewed: false, sorted: true }))
       if (reply.clipped?.length) setNotice('clipped')
       return

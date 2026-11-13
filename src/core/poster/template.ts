@@ -26,6 +26,8 @@ export const posterFieldsSchema = z.object({
   // The level table's header the editor starts from; the user may rename the columns.
   tableColumns: z.array(z.string().min(1).max(POSTER_LIMITS.cell)).min(POSTER_LIMITS.tableColumns.min)
     .max(POSTER_LIMITS.tableColumns.max).optional(),
+  // The sections column's heading the editor starts from (「赛事信息」 / 「INFORMATION」); editable.
+  infoHeading: z.object({ title: z.string().max(12), titleEn: z.string().max(24) }).optional(),
 }).refine((poster) => new Set(poster.kinds.map((kind) => kind.key)).size === poster.kinds.length, {
   message: 'poster kind keys must be unique', path: ['kinds'],
 })

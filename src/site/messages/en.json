@@ -683,7 +683,11 @@
           "plain": "Plain"
         },
         "lines": "Lines (one per row)",
-        "add": "Add a section"
+        "add": "Add a section",
+        "heading": {
+          "title": "Column heading",
+          "titleEn": "Column heading (English)"
+        }
       },
       "table": {
         "none": "This style has no table.",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { partText, posterContentSchema, posterFieldsSchema, splitPoster, tablePages, unverifiedPaths, type TableRow } from '.'
+import { partStrings, partText, posterContentSchema, posterFieldsSchema, splitPoster, tablePages, unverifiedPaths, type TableRow } from '.'
 
 // Fictional content shaped like a weekly tournament set: 10 prizes, 5 rule sections and a
 // 26-level table with three break rows.
@@ -86,6 +86,22 @@ describe('partText', () => {
   it('writes break rows as full-width rows', () => {
     const parts = splitPoster(posterContentSchema.parse(raw), fields)
     expect(partText(posterContentSchema.parse(raw), parts[2]!)).toContain('Full-width row: 休息　用餐40分钟')
+  })
+})
+
+describe('the sections column heading', () => {
+  it('goes on the poster that carries the sections only, and is checked there', () => {
+    const content = posterContentSchema.parse({ ...raw, info: { title: '赛事信息', titleEn: 'INFORMATION' } })
+    const wide = posterFieldsSchema.parse({ ...fields, kinds: fields.kinds.map((kind) => ({ ...kind, capacity: {} })) })
+    const [prizes, rules] = splitPoster(content, wide)
+    expect(partText(content, prizes!)).not.toContain('INFORMATION')
+    expect(partText(content, rules!)).toContain('Heading over the sections: 赛事信息 / INFORMATION')
+    expect(partStrings(content, rules!).map((item) => item.path)).toEqual(expect.arrayContaining(['info.title', 'info.titleEn']))
+    expect(partStrings(content, prizes!).some((item) => item.path.startsWith('info'))).toBe(false)
+  })
+
+  it('defaults to blank, so an old saved set still parses', () => {
+    expect(posterContentSchema.parse({}).info).toEqual({ title: '', titleEn: '' })
   })
 })
 

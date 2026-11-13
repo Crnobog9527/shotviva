@@ -15,8 +15,21 @@ export function emptyContent(fields: PosterFields): PosterContent {
   const table: PosterTable | null = fields.tableColumns
     ? { title: '', titleEn: '', columns: [...fields.tableColumns], rows: [], footnote: '' }
     : null
-  return { header: { ...EMPTY_HEADER }, prizes: null, sections: [], table, footer: { ...EMPTY_FOOTER } }
+  return { header: { ...EMPTY_HEADER }, prizes: null, info: emptyInfo(fields), sections: [], table, footer: { ...EMPTY_FOOTER } }
 }
+
+// The sections column's heading as the template starts it, or blank.
+export const emptyInfo = (fields: PosterFields): PosterContent['info'] => ({ title: fields.infoHeading?.title ?? '', titleEn: fields.infoHeading?.titleEn ?? '' })
+
+// The sorted text keeps what the model found; an empty heading takes the template's.
+export const withDefaults = (content: PosterContent, fields: PosterFields): PosterContent => ({
+  ...content,
+  info: content.info.title || content.info.titleEn ? content.info : emptyInfo(fields),
+  table: content.table ?? emptyContent(fields).table,
+})
+
+export const setInfo = (content: PosterContent, key: keyof PosterContent['info'], value: string): PosterContent =>
+  ({ ...content, info: { ...content.info, [key]: value } })
 
 export const setHeader = (content: PosterContent, key: keyof Header, value: string): PosterContent =>
   ({ ...content, header: { ...content.header, [key]: value } })
