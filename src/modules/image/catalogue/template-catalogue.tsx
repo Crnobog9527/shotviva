@@ -5,7 +5,6 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { trackCatalogueSeeAll } from '@/core/analytics/browser'
-import { useRouter } from '@/core/i18n/navigation'
 import { cn } from '@/core/ui/cn'
 import { Reveal } from '@/core/ui/reveal-item'
 
@@ -17,9 +16,10 @@ import { filterCatalogue, openableTemplates } from './catalogue-filter'
 import { buildSearchIndex, searchTemplates } from './catalogue-search'
 import { catalogueSections, isTall, sectionsFor, type CatalogueSection } from './catalogue-sections'
 import { CatalogueSections } from './catalogue-sections-view'
-import { batchableTemplates, isMotion, posterHref, type CatalogueTemplate } from './catalogue-template'
+import { batchableTemplates, isMotion, type CatalogueTemplate } from './catalogue-template'
 import { findSeries, type CatalogueView, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
+import { isPosterIn, PosterDialogSlot } from './poster-dialog-slot'
 import { SavedEmpty } from './saved-empty'
 import { SearchBox } from './search-box'
 import { FeatureCard } from './feature-card'
@@ -46,17 +46,12 @@ type Props = { view: CatalogueView; create: CreateContext; endCard?: ReactNode }
 export function TemplateCatalogue({ view, create, endCard }: Props) {
   const t = useTranslations('app.create')
   const query = useCatalogueQuery(view.filters)
-  const router = useRouter()
   const [openId, setOpenId] = useState<string | null>(null)
   const openable = useMemo(() => openableTemplates(view.entries), [view.entries])
   const batchable = useMemo(() => batchableTemplates(openable), [openable])
-  // A poster template's card goes to its editor (ARCHITECTURE §5.3); every other card opens the dialog.
-  const open = (id: string) => {
-    const found = openable.find((item) => item.id === id)
-    const href = found ? posterHref(found) : null
-    if (href) router.push(href)
-    else setOpenId(id)
-  }
+  // A poster template's card opens its editor dialog, kept in the address (?poster=<id>, where
+  // old /posters/<id> links land too); every other card opens the creation dialog.
+  const open = (id: string) => (isPosterIn(openable, id) ? query.openPoster(id) : setOpenId(id))
   const featured = featuredOf(view.entries)
   const favoriteIds = useFavorites()?.ids
   const saved = useMemo(() => (favoriteIds ? savedIn(favoriteIds, openable) : []), [favoriteIds, openable])
@@ -104,6 +99,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
+      <PosterDialogSlot id={query.posterId} templates={openable} onClose={query.closePoster} create={create} />
       <BatchDialogSlot templates={batchable} create={create} />
     </>
   )

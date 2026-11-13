@@ -1,7 +1,7 @@
 import { NextIntlClientProvider } from 'next-intl'
 import { createElement, type FunctionComponent, type ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { IDLE } from '@/core/auth/flows/form-state'
 import { LoginForm, SignupForm } from '@/core/auth/ui'
@@ -45,17 +45,9 @@ describe('Google on mainland networks', () => {
     expect(await render(signup, 'zh')).toContain('中国大陆网络下，Google 登录通常打不开')
   })
 
-  it('is always on /zh and on English pages for mainland IPs only', async () => {
-    const country = { value: null as string | null }
-    vi.doMock('next/headers', () => ({ headers: async () => new Headers(country.value ? { 'x-vercel-ip-country': country.value } : {}) }))
-    const { googleMainlandNote } = await import('./[locale]/(auth)/google-note')
-    expect(await googleMainlandNote('zh')).toBe(true)
-    country.value = 'CN'
-    expect(await googleMainlandNote('en')).toBe(true)
-    for (const other of ['HK', 'MO', 'TW', 'US', null]) {
-      country.value = other
-      expect(await googleMainlandNote('en')).toBe(false)
-    }
-    vi.doUnmock('next/headers')
+  it('shows on English pages for mainland time zones only (the page is static)', async () => {
+    const { inMainlandZone } = await import('./[locale]/(auth)/mainland-zone')
+    for (const zone of ['Asia/Shanghai', 'Asia/Urumqi']) expect(inMainlandZone(zone)).toBe(true)
+    for (const zone of ['Asia/Hong_Kong', 'Asia/Macau', 'Asia/Taipei', 'America/New_York', 'UTC']) expect(inMainlandZone(zone)).toBe(false)
   })
 })

@@ -11,7 +11,8 @@ import { providerIdSchema } from './schema'
 
 async function refresh(deps: ProviderCommandDeps, row: AdminProvider, force = true) {
   const url = row.adapter === 'openrouter_images' ? await assertPublicBaseUrl(row.baseUrl, deps.resolveHost) : row.baseUrl
-  const capabilities = await fetchImageCapabilities(row.adapter, url, row.model, deps.fetch ?? (force ? fetch : undefined))
+  // The admin's narrower choice or an unknown model's declaration is applied again, not dropped.
+  const capabilities = await fetchImageCapabilities(row.adapter, url, row.model, deps.fetch ?? (force ? fetch : undefined), row.capabilities?.resolutionLimit)
   if (!capabilities) throw new ProviderSettingError('invalid_input', 'An image provider is required')
   await persistRefreshedCapabilities(deps.db, row, capabilities)
 }

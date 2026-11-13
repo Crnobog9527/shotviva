@@ -133,7 +133,7 @@ export async function approveFixtures(db: Client, ...ids: string[]) {
 // charge (reserve_credits reads the price from the template, never from the caller).
 export async function createPricedTemplate(
   db: Client,
-  // Raw SQL fixture: 3k (the name before migration 1431) is stored as 4k by the table's trigger.
+  // Raw SQL fixture: 3k (the name before migration 1451) is stored as 4k by the table's trigger.
   cost: Record<string, number> = { '1k': 1, '2k': 2, '4k': 3 },
   quality: 'high' | 'medium' = 'medium',
 ) {

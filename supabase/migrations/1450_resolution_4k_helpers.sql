@@ -1,6 +1,6 @@
--- PR-2 of 1K / 2K / 4K (contract): the site's top tier has been called 4k since #534, while the
--- database kept storing 3k behind the app's fetch shim. 1431 renames the stored id. These helpers
--- only add functions: nothing calls them until 1431, so this file changes no behaviour.
+-- PR-2 of 1K / 2K / 4K (contract), migration 1450: the site's top tier has been called 4k since #534, while the
+-- database kept storing 3k behind the app's fetch shim. 1451 renames the stored id. These helpers
+-- only add functions: nothing calls them until 1451, so this file changes no behaviour.
 --
 -- canonical_resolution: '3k' (the old name) and '4k' are the same tier; everything else is as given.
 create function public.canonical_resolution(p text) returns text

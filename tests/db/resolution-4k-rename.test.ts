@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { connectAdmin, createPricedTemplate, createUser, ledgerOf } from './helpers'
 
-// Migration 1431 (PR-2): the stored top tier is 4k. The code deployed before it still sends 3k
+// Migration 1451 (PR-2): the stored top tier is 4k. The code deployed before it still sends 3k
 // through its fetch shim, so every write path and every function that takes a tier must read 3k
 // as 4k, and history (generation_jobs.inputs) that says 3k is the same tier. Raw SQL here, no shim.
 

@@ -48,6 +48,7 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-xl font-semibold">模板与提示词</h1>
         <Link href="/admin/templates/series" className="text-sm underline underline-offset-4">{seriesCopy.title}</Link>
+        <Link href="/admin/templates/profiles" className="text-sm underline underline-offset-4">供应商配置</Link>
         <Link href="/admin/templates/edit" className="text-sm underline underline-offset-4">
           作品编辑的判断题和约束段落 →
         </Link>

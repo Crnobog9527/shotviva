@@ -52,21 +52,53 @@ type ModelCosts = {
   p95: Costs
   p95ByQuality?: Partial<Record<(typeof TEMPLATE_QUALITIES)[number], Costs>>
   estimates: Costs
+  // 1442: the model's cost per extra input image, and the p95 of full-slot jobs by number of slots.
+  slotCosts?: { extraInputUsd?: number | null; p95Full?: Partial<Record<(typeof TEMPLATE_QUALITIES)[number], Partial<Record<Resolution, Record<string, number>>>>> }
+}
+
+const SLOT_COUNTS = [2, 3, 4] as const
+
+// The same three steps as admin.slot_route_floor: full-slot p95 (never below the single floor),
+// else single + the extra inputs, else nothing here (creditMinimum falls back to single × n).
+function slotFloor(model: ModelCosts, quality: (typeof TEMPLATE_QUALITIES)[number], resolution: Resolution, single: number, n: number, budget: number) {
+  const p95 = model.slotCosts?.p95Full?.[quality]?.[resolution]?.[String(n)]
+  if (p95 !== undefined) return Math.max(single, Math.ceil(p95 * 1.10 / budget))
+  const extra = model.slotCosts?.extraInputUsd
+  if (extra !== undefined && extra !== null) return single + Math.ceil((n - 1) * extra * 1.10 / budget)
+  return undefined
 }
 
 function measuredCost(model: ModelCosts, quality: (typeof TEMPLATE_QUALITIES)[number], resolution: Resolution) {
   return model.p95ByQuality ? model.p95ByQuality[quality]?.[resolution] : model.p95[resolution]
 }
 
+type Quality = (typeof TEMPLATE_QUALITIES)[number]
+
+function routeMinimum(model: ModelCosts, quality: Quality, resolution: Resolution, budget: number) {
+  const fallback = model.openAI ? OPENAI_ESTIMATES[quality][resolution] : undefined
+  const cost = measuredCost(model, quality, resolution) ?? model.estimates[resolution] ?? fallback
+  const min = cost === undefined ? MISSING_COST : minimumCredits(cost, budget)
+  return model.openAI ? Math.max(min, OPENAI_MINIMUM[quality][resolution]) : min
+}
+
+// The slot floors this route's data allows (n = 2..4); none means single × n.
+function slotFloors(model: ModelCosts, quality: Quality, resolution: Resolution, single: number, budget: number) {
+  const entries = SLOT_COUNTS.flatMap(n => {
+    const slot = slotFloor(model, quality, resolution, single, n, budget)
+    return slot === undefined ? [] : [[String(n), slot] as const]
+  })
+  return entries.length ? Object.fromEntries(entries) : undefined
+}
+
 export function modelCreditFloor(model: ModelCosts, budget: number): CreditsFloor {
   const floor: CreditsFloor = { high: {} as CreditsCost, medium: {} as CreditsCost, resolutions: model.resolutions }
   for (const quality of TEMPLATE_QUALITIES) {
     for (const resolution of RESOLUTIONS) {
-      const fallback = model.openAI ? OPENAI_ESTIMATES[quality][resolution] : undefined
-      const cost = measuredCost(model, quality, resolution) ?? model.estimates[resolution] ?? fallback
-      let min = cost === undefined ? MISSING_COST : minimumCredits(cost, budget)
-      if (model.openAI) min = Math.max(min, OPENAI_MINIMUM[quality][resolution])
-      floor[quality][resolution] = model.resolutions.includes(resolution) ? min : 1
+      const supported = model.resolutions.includes(resolution)
+      const min = routeMinimum(model, quality, resolution, budget)
+      floor[quality][resolution] = supported ? min : 1
+      const slots = supported && min !== MISSING_COST ? slotFloors(model, quality, resolution, min, budget) : undefined
+      if (slots) ((floor.slots ??= {})[quality] ??= {})[resolution] = slots
     }
   }
   return floor

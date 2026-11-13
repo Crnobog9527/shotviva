@@ -2,12 +2,14 @@ import { z } from 'zod'
 
 import { LEGACY_RESOLUTIONS, RESOLUTIONS, normalizeResolution } from './output-options'
 
-// The top tier is '4k' everywhere since migration 1431 renamed it in the database (ARCHITECTURE
+// The top tier is '4k' everywhere since migration 1451 renamed it in the database (ARCHITECTURE
 // §8.1). Writes send '4k' as they are; the database also turns a '3k' from older code into '4k'.
 // History keeps the old name: generation jobs made before the rename say '3k'. So everything that
 // reads tier ids goes through the schemas below (or fromDbTiers), which read '3k' as '4k'.
 
-const TIER_LIST_KEYS = new Set(['resolution', 'resolutions', 'unpriced_resolutions', 'unpricedResolutions', 'p_resolution', 'p_unpriced'])
+// Fields whose values are tier ids. `declared_resolutions` is deliberately absent: it only words
+// the provider audit row, which names the tiers as the admin saw them (4K).
+const TIER_LIST_KEYS = new Set(['resolution', 'resolutions', 'unpriced_resolutions', 'unpricedResolutions', 'p_resolution', 'p_unpriced', 'resolutionLimit'])
 
 function isTierId(value: unknown): value is string {
   return typeof value === 'string' && ((RESOLUTIONS as readonly string[]).includes(value) || Object.hasOwn(LEGACY_RESOLUTIONS, value))
