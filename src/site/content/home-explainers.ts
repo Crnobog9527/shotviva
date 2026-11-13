@@ -9,10 +9,10 @@ import { OUTPUT_TIERS, tierList, uploadLimits } from './offer'
 // The illustrative tote set (design/assets/img/hero-set-*.webp, ARCHITECTURE §13 item 2): one
 // phone snapshot and three results from it, shared with the hero and the shoot demo.
 export const tote = {
-  phone: homeImage('hero-set-phone', 'Phone snapshot of a woven leather tote on a busy kitchen counter, window light (illustrative example)'),
-  listing: homeImage('hero-set-listing', 'The same woven leather tote as a white-background listing photo, soft studio light (illustrative example)'),
-  lifestyle: homeImage('hero-set-lifestyle', 'The same tote on a café chair by a window, warm morning light (illustrative example)'),
-  promo: homeImage('hero-set-promo', 'The same tote on a promo poster headed New Season Tote, bright studio light (illustrative example)'),
+  phone: homeImage('hero-set-phone', 'Phone snapshot of a woven leather tote on a busy kitchen counter, window light (real example)'),
+  listing: homeImage('hero-set-listing', 'The same woven leather tote as a white-background listing photo, soft studio light (real example)'),
+  lifestyle: homeImage('hero-set-lifestyle', 'The same tote on a café chair by a window, warm morning light (real example)'),
+  promo: homeImage('hero-set-promo', 'The same tote on a promo poster headed New Season Tote, bright studio light (real example)'),
 } as const satisfies Record<string, ImageRef>
 
 const [standard, hd, max] = OUTPUT_TIERS
@@ -61,13 +61,13 @@ export const useCases = {
   cards: [
     {
       heading: 'AI Restaurant Menu Photos',
-      text: 'Shoot a dish on the pass with a phone. The plate stays as served; only the light and the background change. Start with',
+      text: 'Shoot a dish on the pass with a phone. The food stays as served; the plate, the light and the background can change. Start with',
       link: { href: '/ai-restaurant-menu', anchor: 'AI restaurant menu photos' },
       after: '.',
       visual: {
         kind: 'pair',
-        before: caseImage('menu-fish-phone', 'Example phone photo: pickled mustard fish in a white enamel bowl on a steel kitchen pass, harsh green-tinted overhead light'),
-        after: caseImage('menu-fish-dark', 'AI example: the same pickled mustard fish re-plated in a white porcelain bowl on dark rough timber, warm side light and rising steam'),
+        before: caseImage('menu-fish-phone', 'Real phone photo: pickled mustard fish in a white enamel bowl on a steel kitchen pass, harsh green-tinted overhead light'),
+        after: caseImage('menu-fish-dark', 'Real example: the same pickled mustard fish re-plated in a white porcelain bowl on dark rough timber, warm side light and rising steam'),
         tags: { before: phoneTag, after: 'Menu photo' },
       },
     },
@@ -78,8 +78,8 @@ export const useCases = {
       after: '.',
       visual: {
         kind: 'pair',
-        before: caseImage('sneaker-phone', 'Example phone photo: an off-white leather sneaker with a sage-green heel tab on a hallway floor, hard morning sun, keys and an open shoe box in frame'),
-        after: caseImage('sneaker-listing', 'AI example: the same sneaker on a pure white background, soft studio light, a marketplace main image'),
+        before: caseImage('sneaker-phone', 'Real phone photo: an off-white leather sneaker with a sage-green heel tab on a hallway floor, hard morning sun, keys and an open shoe box in frame'),
+        after: caseImage('sneaker-listing', 'Real example: the same sneaker on a pure white background, soft studio light, a marketplace main image'),
         tags: { before: phoneTag, after: 'Listing' },
       },
     },
@@ -90,8 +90,8 @@ export const useCases = {
       after: '.',
       visual: {
         kind: 'pair',
-        before: caseImage('pet-phone', 'Example phone photo: a tabby-and-white cat lying on the arm of a grey sofa in evening lamp light, a blanket and a TV remote beside it'),
-        after: caseImage('pet-watercolor', 'AI example: the same cat as a hand-painted watercolour storybook illustration, soft washes on textured paper'),
+        before: caseImage('pet-phone', 'Real phone photo: a tabby-and-white cat lying on the arm of a grey sofa in evening lamp light, a blanket and a TV remote beside it'),
+        after: caseImage('pet-watercolor', 'Real example: the same cat as a hand-painted watercolour storybook illustration, soft washes on textured paper'),
         tags: { before: phoneTag, after: 'Watercolor' },
       },
     },
