@@ -5717,6 +5717,21 @@ $$;
 ALTER FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp with time zone, "p_cursor_id" "text", "p_limit" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_list_feature_grants"("p_key" "text") RETURNS TABLE("user_id" "uuid", "email" "text", "phone" "text", "created_at" timestamp with time zone)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select g.user_id, u.email::text, u.phone::text, g.created_at
+  from public.feature_user_grants g join auth.users u on u.id = g.user_id
+  where g.feature_key = p_key
+  order by g.created_at desc
+  limit 200
+$$;
+
+
+ALTER FUNCTION "public"."admin_list_feature_grants"("p_key" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_list_template_requests"() RETURNS TABLE("id" "uuid", "email" "text", "description" "text", "image_keys" "text"[], "status" "text", "template_id" "text", "votes_count" integer, "created_at" timestamp with time zone)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -7201,6 +7216,47 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_key" "text", "p_account" "text", "p_granted" boolean) RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_account text := lower(btrim(coalesce(p_account, '')));
+  v_digits text := regexp_replace(v_account, '\D', '', 'g');
+  v_user uuid;
+begin
+  if not exists(select from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN' using errcode = '42501';
+  end if;
+  if p_key is null or p_key !~ '^[a-z][a-z0-9_]{0,39}$' or v_account = '' or p_granted is null then
+    raise exception 'INVALID_INPUT' using errcode = '22023';
+  end if;
+  -- The admin page removes an invite by the account id it listed.
+  if v_account ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    v_user := v_account::uuid;
+  elsif position('@' in v_account) > 0 then
+    select id into v_user from auth.users where lower(email) = v_account;
+  elsif length(v_digits) >= 6 then
+    select id into v_user from auth.users
+      where phone in (v_digits, '86' || v_digits) order by created_at limit 1;
+  end if;
+  if v_user is null or not exists(select from public.profiles where id = v_user) then
+    raise exception 'PROFILE_NOT_FOUND' using errcode = 'P0002';
+  end if;
+  if p_granted then
+    insert into public.feature_user_grants (feature_key, user_id, granted_by)
+    values (p_key, v_user, p_actor) on conflict do nothing;
+  else
+    delete from public.feature_user_grants where feature_key = p_key and user_id = v_user;
+  end if;
+  return v_user;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_key" "text", "p_account" "text", "p_granted" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) RETURNS "void"
@@ -13194,6 +13250,18 @@ CREATE TABLE IF NOT EXISTS "public"."feature_access" (
 ALTER TABLE "public"."feature_access" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."feature_user_grants" (
+    "feature_key" "text" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "granted_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "feature_user_grants_feature_key_check" CHECK (("feature_key" ~ '^[a-z][a-z0-9_]{0,39}$'::"text"))
+);
+
+
+ALTER TABLE "public"."feature_user_grants" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."identity_judge_calls" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -13939,6 +14007,11 @@ ALTER TABLE ONLY "public"."credit_ledger"
 
 ALTER TABLE ONLY "public"."feature_access"
     ADD CONSTRAINT "feature_access_pkey" PRIMARY KEY ("key");
+
+
+
+ALTER TABLE ONLY "public"."feature_user_grants"
+    ADD CONSTRAINT "feature_user_grants_pkey" PRIMARY KEY ("feature_key", "user_id");
 
 
 
@@ -15262,6 +15335,16 @@ ALTER TABLE ONLY "public"."feature_access"
 
 
 
+ALTER TABLE ONLY "public"."feature_user_grants"
+    ADD CONSTRAINT "feature_user_grants_granted_by_fkey" FOREIGN KEY ("granted_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."feature_user_grants"
+    ADD CONSTRAINT "feature_user_grants_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."generation_jobs"
     ADD CONSTRAINT "generation_jobs_moderated_by_fkey" FOREIGN KEY ("moderated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -15700,6 +15783,9 @@ ALTER TABLE "public"."credit_ledger" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."feature_access" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."feature_user_grants" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."generation_jobs" ENABLE ROW LEVEL SECURITY;
@@ -16772,6 +16858,11 @@ GRANT ALL ON FUNCTION "public"."admin_list_disputes"("p_cursor_at" timestamp wit
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_list_feature_grants"("p_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_list_feature_grants"("p_key" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_list_template_requests"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_list_template_requests"() TO "service_role";
 
@@ -16964,6 +17055,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_code_active"("p_actor" "uuid", "p_code
 
 REVOKE ALL ON FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min_tier" "text", "p_open_to_all_at" timestamp with time zone, "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_key" "text", "p_account" "text", "p_granted" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_key" "text", "p_account" "text", "p_granted" boolean) TO "service_role";
 
 
 
@@ -17860,6 +17956,10 @@ GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."feature_access" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."feature_user_grants" TO "service_role";
 
 
 
