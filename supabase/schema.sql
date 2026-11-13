@@ -1336,7 +1336,9 @@ begin
          where t.id = new.template_id and r.gallery_excluded)
       or exists (
         select 1 from public.generation_jobs parent
-         where parent.id = new.parent_job_id and parent.gallery_excluded);
+         where parent.id = new.parent_job_id and parent.gallery_excluded)
+      -- A dense-text poster template (fields.poster), wherever it is filed (1348).
+      or exists (select 1 from public.templates t where t.id = new.template_id and t.fields ? 'poster');
   elsif old.gallery_excluded and not new.gallery_excluded then
     raise exception 'GALLERY_EXCLUDED_IMMUTABLE';
   end if;
@@ -13556,7 +13558,7 @@ CREATE TABLE IF NOT EXISTS "public"."poster_extractions" (
     CONSTRAINT "poster_extractions_input_tokens_check" CHECK (("input_tokens" >= 0)),
     CONSTRAINT "poster_extractions_output_tokens_check" CHECK (("output_tokens" >= 0)),
     CONSTRAINT "poster_extractions_source_check" CHECK (("source" = ANY (ARRAY['paste'::"text", 'photo'::"text"]))),
-    CONSTRAINT "poster_extractions_status_check" CHECK (("status" = ANY (ARRAY['ok'::"text", 'failed'::"text"])))
+    CONSTRAINT "poster_extractions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'ok'::"text", 'failed'::"text"])))
 );
 
 
@@ -18317,7 +18319,7 @@ GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "service_role";
 
 
 
-GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."poster_extractions" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."poster_extractions" TO "service_role";
 
 
 
