@@ -21,6 +21,8 @@ export const CLIENT_SCRIPT = String.raw`(function () {
   if (performance.setResourceTimingBufferSize) performance.setResourceTimingBufferSize(1000);
 
   function url(o, key, tag) {
+    if (o.hero) return o.base + '/_next/image?url=' + encodeURIComponent('/home/' + C.heroFiles[C.keys.indexOf(key) % C.heroFiles.length]) + '&w=' + C.heroWidth + '&q=75&lab=' + tag;
+    if (o.font) return o.base + '/fonts/misans/' + C.fontFiles[C.keys.indexOf(key) % C.fontFiles.length] + '?lab=' + tag;
     if (o.small) return o.base + '/_next/image?url=' + encodeURIComponent(C.assetsBase + '/' + key) + '&w=' + C.smallWidth + '&q=75&lab=' + tag;
     return o.base + '/' + key + '?lab=' + tag;
   }
@@ -34,7 +36,24 @@ export const CLIENT_SCRIPT = String.raw`(function () {
       .then(function (r) { return r.blob ? r.blob() : null; }).catch(function () {}).then(function () { clearTimeout(timer); });
   }
 
-  function load(u) {
+  // A static file (font row): fetched, not decoded as an image; timed the same way.
+  function fetchTimed(u) {
+    var t0 = performance.now();
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, TIMEOUT);
+    return fetch(u, { mode: 'no-cors', cache: 'no-store', signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { return r.blob(); }).then(function () { return true; }, function () { return false; })
+      .then(function (ok) {
+        clearTimeout(timer);
+        var e = performance.getEntriesByName(u).pop();
+        var ms = e && e.duration > 0 ? e.duration : performance.now() - t0;
+        var ttfb = e && e.responseStart > 0 ? e.responseStart - e.startTime : null;
+        return { ok: ok, ms: Math.round(ms), ttfb: ttfb === null ? null : Math.round(ttfb), kb: null };
+      });
+  }
+
+  function load(u, o) {
+    if (o && o.font) return fetchTimed(u);
     return new Promise(function (resolve) {
       var img = new Image(); var t0 = performance.now(); var done = false;
       function finish(ok) {
@@ -107,7 +126,7 @@ export const CLIENT_SCRIPT = String.raw`(function () {
         var modes = Math.random() < 0.5 ? ['w', 'c'] : ['c', 'w'];
         for (var m = 0; m < 2; m++) {
           n++; $('status').textContent = '测速中 ' + n + ' / ' + total + '（请保持页面在前台）';
-          var r = await load(url(o, C.keys[k], modes[m] + token));
+          var r = await load(url(o, C.keys[k], modes[m] + token), o);
           r.o = o.id; r.k = k; r.m = modes[m]; r.first = !seen[o.id]; seen[o.id] = true;
           results.push(r); render();
         }
