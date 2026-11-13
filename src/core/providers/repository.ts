@@ -20,7 +20,11 @@ const capsColumns = {
   estimated_image_costs: estimatedImageCostsSchema.optional(),
 }
 
-const LIST_COLUMNS = `id, module, adapter, label, base_url, resolutions, capabilities, estimated_image_costs, model, api_key_last4, is_active, notes, updated_at, ${PRICE_COLUMNS}`
+const BASE_LIST_COLUMNS = `id, module, adapter, label, base_url, resolutions, capabilities, estimated_image_costs, model, api_key_last4, is_active, notes, updated_at, ${PRICE_COLUMNS}`
+// extra_input_image_usd arrives with migration 1390; a database without it (the test site before
+// the merge) is read without the column.
+const LIST_COLUMNS = `${BASE_LIST_COLUMNS}, extra_input_image_usd`
+const missingColumn = (error: { code?: string } | null) => error?.code === '42703'
 
 // numeric comes back from PostgREST as a JSON number; null when not filled in.
 const price = z.coerce.number().nonnegative().nullable()
@@ -44,6 +48,8 @@ const listRowSchema = z.object({
   is_active: z.boolean(),
   notes: z.string().nullable(),
   updated_at: z.string(),
+  // 1390: cost of each extra input image of a slot job (USD); null when not set.
+  extra_input_image_usd: z.coerce.number().nonnegative().nullable().optional(),
   ...priceColumns,
   ...capsColumns,
 })
@@ -77,6 +83,7 @@ function toAdminProvider(row: z.infer<typeof listRowSchema>): AdminProvider {
     resolutions: row.resolutions,
     capabilities: row.capabilities,
     estimatedImageCosts: row.estimated_image_costs,
+    extraInputImageUsd: row.extra_input_image_usd ?? null,
     model: row.model,
     apiKeyLast4: row.api_key_last4,
     isActive: row.is_active,
@@ -92,13 +99,17 @@ function toActiveRow(row: z.infer<typeof rowSchema>): ActiveProviderRow {
 }
 
 export async function listProviders(db: SupabaseClient): Promise<AdminProvider[]> {
-  const { data, error } = await db.from('ai_providers').select(LIST_COLUMNS).order('created_at')
+  const list = (columns: string) => db.from('ai_providers').select(columns).order('created_at')
+  let { data, error } = await list(LIST_COLUMNS)
+  if (missingColumn(error)) ({ data, error } = await list(BASE_LIST_COLUMNS))
   if (error) fail('list', error)
   return z.array(listRowSchema).parse(data).map(toAdminProvider)
 }
 
 export async function findProvider(db: SupabaseClient, id: string): Promise<AdminProvider | null> {
-  const { data, error } = await db.from('ai_providers').select(LIST_COLUMNS).eq('id', id).maybeSingle()
+  const one = (columns: string) => db.from('ai_providers').select(columns).eq('id', id).maybeSingle()
+  let { data, error } = await one(LIST_COLUMNS)
+  if (missingColumn(error)) ({ data, error } = await one(BASE_LIST_COLUMNS))
   if (error) fail('read', error)
   return data ? toAdminProvider(listRowSchema.parse(data)) : null
 }

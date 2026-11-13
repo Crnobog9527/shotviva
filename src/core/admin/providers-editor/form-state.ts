@@ -19,6 +19,8 @@ export type ProviderForm = {
   resolutions: Resolution[]
   tiersTouchedFor?: string | null
   imageCosts: Partial<Record<Resolution, string>>
+  // USD per extra input image of a slot job (1392), as typed; blank means not set.
+  extraInputCost: string
   label: string
   baseUrl: string
   model: string
@@ -40,6 +42,7 @@ export const DEFAULT_FORM: ProviderForm = {
   adapter: 'openai_images',
   resolutions: [...RESOLUTIONS],
   imageCosts: {},
+  extraInputCost: '',
   model: '',
   apiKey: '',
   notes: '',
@@ -57,6 +60,7 @@ export function formFor(provider: AdminProvider | null, module: ProviderModule =
     adapter: provider.adapter,
     resolutions: provider.resolutions,
     imageCosts: Object.fromEntries(Object.entries(provider.estimatedImageCosts ?? {}).map(([tier, cost]) => [tier, String(cost)])),
+    extraInputCost: provider.extraInputImageUsd == null ? '' : String(provider.extraInputImageUsd),
     label: provider.label,
     baseUrl: provider.baseUrl,
     model: provider.model,
@@ -179,6 +183,7 @@ export function toSaveInput(form: ProviderForm, provider: AdminProvider | null):
     adapter: form.adapter,
     resolutions: form.resolutions,
     estimatedImageCosts: Object.fromEntries(form.resolutions.filter((tier) => form.imageCosts[tier]?.trim()).map((tier) => [tier, Number(form.imageCosts[tier])])),
+    ...(form.module === 'image' ? { extraInputImageUsd: form.extraInputCost.trim() } : {}),
     label: form.label,
     baseUrl: form.baseUrl,
     model: form.model,

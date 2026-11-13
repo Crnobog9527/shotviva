@@ -17,7 +17,8 @@ export type AdminTemplate = Template & {
   // Published but missing from the catalogue, and why (1295); absent when it is listed.
   catalogueGap?: SaleFloorExample
   // null only if a template was created outside the admin flow without a prompt.
-  prompt: { styleRefs: StyleRef[]; providerId: string | null; body: string; version: number; modelParams: Record<string, unknown> } | null
+  // activeProfile (1390): which provider profile the prompt fields are; the other is edited on 供应商配置.
+  prompt: { styleRefs: StyleRef[]; providerId: string | null; body: string; version: number; modelParams: Record<string, unknown>; activeProfile?: 'openai' | 'seedream' } | null
 }
 
 // What the editor sends back; validated again on the server before it reaches the database.

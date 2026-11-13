@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import type { CreditsFloor } from '@/core/templates/pricing'
 
@@ -94,6 +95,7 @@ function FormSections({ existing, providers, floor, categories, series, coverLan
         <StyleSection cover={cover} values={values} budget={budget} uploading={uploading} setUploading={setUploading} onChange={onChange} />
       </EditorSection>
       <EditorSection id="prompt" sections={sections}>
+        {existing?.prompt ? <ProfileNote id={existing.id} active={existing.prompt.activeProfile ?? 'openai'} /> : null}
         <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
         <TemplateHistory template={existing} values={values} disabled={footer.pending || uploading} actions={coverActions} providers={providers} onChange={onChange} />
       </EditorSection>
@@ -110,6 +112,18 @@ function FormSections({ existing, providers, floor, categories, series, coverLan
         <TemplateAdvancedFields values={values} onChange={onChange} />
       </EditorSection>
     </>
+  )
+}
+
+// Provider profiles (1390): the prompt and model here are the live profile; the other one is edited
+// and switched on 供应商配置 (the switch runs the same checks and never unpublishes).
+function ProfileNote({ id, active }: { id: string; active: 'openai' | 'seedream' }) {
+  return (
+    <p className="text-muted-foreground text-xs">
+      这里改的是在用的{active === 'seedream' ? ' Seedream ' : ' ChatGPT '}配置。另一套在
+      <Link className="underline underline-offset-4" href={`/admin/templates/profiles?q=${encodeURIComponent(id)}`}>供应商配置</Link>
+      里编辑和切换。
+    </p>
   )
 }
 
