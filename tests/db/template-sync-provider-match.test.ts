@@ -49,6 +49,7 @@ async function sync(binding: ReturnType<typeof triple>) {
   const { floors, receipt, envModel } = await readTemplateQuote(serviceSupabase())
   const result = await serviceClient().rpc('sync_preview_template', {
     p_template: template, p_prompt: prompt, p_provider: binding,
+    // Floors go out in site names (4k): since migration 1451 the database stores 4k too.
     p_floors: { ...floors, quote_receipt: receipt, env_model: envModel }, p_run_id: '1',
     p_locales: ['en', 'zh'], p_target_token: (target.data as { token: string }).token, p_catalog_version: 'v1',
   })

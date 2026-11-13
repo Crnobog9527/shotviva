@@ -36,6 +36,7 @@ async function prepare(template: ReturnType<typeof fixture>, run: string, styleR
   expect(target.error).toBeNull()
   const { floors, receipt, envModel } = await readTemplateQuote(serviceSupabase())
   return { p_template: template, p_prompt: styleRefs === undefined ? prompt : { ...prompt, style_refs: styleRefs },
+    // Floors go out in site names (4k): since migration 1451 the database stores 4k too.
     p_provider: binding, p_floors: { ...floors, quote_receipt: receipt, env_model: envModel }, p_run_id: run,
     p_locales: ['en', 'zh'], p_target_token: (target.data as { token: string }).token, p_catalog_version: 'v1' }
 }
