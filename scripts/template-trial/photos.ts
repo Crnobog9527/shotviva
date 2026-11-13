@@ -5,11 +5,12 @@ import { resolve } from 'node:path'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
 
-import { INPUT_JPEG_QUALITY, INPUT_LONG_EDGE, MAX_UPLOAD_BYTES } from '../../src/core/storage/rules'
+import { INPUT_JPEG_QUALITY, INPUT_LONG_EDGE, MAX_UPLOAD_BYTES, type Matte } from '../../src/core/storage/rules'
+import { matteOf } from '../../src/core/storage/see-through'
 import { sniffImageType, type ObjectStore } from '../../src/core/storage'
 import { confirmTestPhoto } from '../../src/modules/image/test-run/test-photos'
 import { findTestPhoto } from '../../src/modules/image/test-run/test-run-store'
-import { uuidFrom } from './cells'
+import { digest, uuidFrom } from './cells'
 
 // Test photos from local files, as the admin panel's upload makes them: the browser's compression
 // (JPEG, long edge INPUT_LONG_EDGE, INPUT_JPEG_QUALITY), the object under admin-tests/photos/, then
@@ -25,17 +26,22 @@ export async function readPhoto(baseDir: string, path: string) {
   return { bytes, hash: createHash('sha256').update(bytes).digest('hex') }
 }
 
-async function compress(bytes: Uint8Array) {
-  return sharp(bytes, { limitInputPixels: 120_000_000 }).rotate()
+// A see-through file is laid on the same ground as the browser's compression does
+// (rules/alpha-matte.ts); before 2026-11-14 its transparent area became black here too.
+async function compress(bytes: Uint8Array, matte: Matte | null) {
+  const resized = sharp(bytes, { limitInputPixels: 120_000_000 }).rotate()
     .resize({ width: INPUT_LONG_EDGE, height: INPUT_LONG_EDGE, fit: 'inside', withoutEnlargement: true })
+  return (matte ? resized.flatten({ background: matte }) : resized)
     .jpeg({ quality: Math.round(INPUT_JPEG_QUALITY * 100) }).toBuffer()
 }
 
 export async function ensureTestPhoto(deps: { db: SupabaseClient; store: ObjectStore }, actorId: string, photo: { bytes: Uint8Array; hash: string }) {
-  const id = uuidFrom(photo.hash)
+  const matte = await matteOf(photo.bytes)
+  // A see-through file gets a new id, so the black copy uploaded before the fix is not reused.
+  const id = uuidFrom(matte ? digest(['matte', photo.hash]) : photo.hash)
   if (await findTestPhoto(deps.db, id)) return id
   const key = `admin-tests/photos/${id}.jpg`
-  await deps.store.put(key, await compress(photo.bytes), 'image/jpeg')
+  await deps.store.put(key, await compress(photo.bytes, matte), 'image/jpeg')
   await confirmTestPhoto(deps, actorId, id, key)
   return id
 }
