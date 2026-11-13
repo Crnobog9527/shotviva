@@ -1,12 +1,14 @@
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
+import type { ProviderAdapterId } from '../providers/types'
 import type { Resolution } from '@/core/templates/output-options'
 
 import { PROVIDERS_COPY } from './copy'
 
 const COPY = PROVIDERS_COPY.form
 
-export function ImageCostFields({ tiers, values, estimates, onChange }: {
+export function ImageCostFields({ adapter, tiers, values, estimates, onChange }: {
+  adapter: ProviderAdapterId
   tiers: Resolution[]
   values: Partial<Record<Resolution, string>>
   estimates?: Partial<Record<Resolution, number>>
@@ -14,7 +16,7 @@ export function ImageCostFields({ tiers, values, estimates, onChange }: {
 }) {
   return <fieldset className="grid gap-2">
     <legend className="text-sm font-medium">{COPY.imageCosts}</legend>
-    <p className="text-muted-foreground text-xs">{COPY.imageCostsHint}</p>
+    <p className="text-muted-foreground text-xs">{COPY.imageCostsHint(adapter)}</p>
     <div className="grid grid-cols-3 gap-2">
       {tiers.map((tier) => <div key={tier} className="grid gap-1">
         <Label htmlFor={`cost-${tier}`}>{tier.toUpperCase()}</Label>
