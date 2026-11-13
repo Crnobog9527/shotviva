@@ -58,6 +58,10 @@ const serverEnvSchema = z.object({
   // here must never take every server route down, only Ark's cost record is affected.
   CNY_PER_USD: z.preprocess(blankAsUnset, z.coerce.number().finite().min(1).max(20).default(DEFAULT_CNY_PER_USD))
     .catch(() => { warnRejectedRate(); return DEFAULT_CNY_PER_USD }),
+  // OpenRouter management (provisioning) key, read-only use: /admin/costs reads OpenRouter's daily
+  // billed usage with it (GET /api/v1/activity). Not the inference key in /admin/providers.
+  // Unset → that section shows only our own recorded cost.
+  OPENROUTER_MANAGEMENT_KEY: optionalSecret,
   // OpenAI Moderation API for public works (ARCHITECTURE §9 第 5 条, T108). Unset → OPENAI_API_KEY;
   // neither set → no automatic screen, so every public work waits for a person.
   OPENAI_MODERATION_API_KEY: optionalSecret,

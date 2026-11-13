@@ -22,19 +22,46 @@ const pageSchema = z.object({
   next_page: z.string().nullish(),
 })
 
-export type CostsFailure = 'unauthorized' | 'http_error' | 'network' | 'timeout' | 'bad_response'
+export type CostsFailure = 'unauthorized' | 'rate_limited' | 'http_error' | 'network' | 'timeout' | 'bad_response'
 
-// Thrown so a 'use cache' caller never caches a failure. The message carries no key.
+// Thrown by the fetchers; billed.ts turns it into a plain result inside the cache, because a
+// 'use cache' boundary does not keep an error's class (a 429 used to show as 连不上). The message
+// carries no key; `code` is the provider's error code ('insufficient_quota'…), never its message.
 export class OpenAICostsError extends Error {
   readonly failure: CostsFailure
   readonly status: number | null
+  readonly code: string | null
 
-  constructor(failure: CostsFailure, status: number | null = null) {
-    super(`openai costs ${failure}${status === null ? '' : ` (HTTP ${status})`}`)
+  constructor(failure: CostsFailure, status: number | null = null, code: string | null = null) {
+    super(`costs ${failure}${status === null ? '' : ` (HTTP ${status})`}${code ? ` ${code}` : ''}`)
     this.name = 'OpenAICostsError'
     this.failure = failure
     this.status = status
+    this.code = code
   }
+}
+
+const errorBody = z.object({ error: z.object({ code: z.string().nullish(), type: z.string().nullish() }) })
+const SAFE_CODE = /^[A-Za-z0-9_.-]{1,64}$/
+
+// A provider's error code from a failed response, when it is a short identifier.
+export async function errorCode(response: Response): Promise<string | null> {
+  const parsed = errorBody.safeParse(await response.json().catch(() => null))
+  const code = parsed.success ? (parsed.data.error.code ?? parsed.data.error.type ?? null) : null
+  return code && SAFE_CODE.test(code) ? code : null
+}
+
+// Shared by the OpenAI and OpenRouter fetchers.
+export async function failOnStatus(response: Response): Promise<void> {
+  if (response.ok) return
+  const code = await errorCode(response)
+  if (response.status === 401 || response.status === 403) throw new OpenAICostsError('unauthorized', response.status, code)
+  if (response.status === 429) throw new OpenAICostsError('rate_limited', response.status, code)
+  throw new OpenAICostsError('http_error', response.status, code)
+}
+
+export function fetchFailure(error: unknown): OpenAICostsError {
+  return new OpenAICostsError(error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'network')
 }
 
 export type CostsQuery = { apiKey: string; projectId: string | null; startDay: string; days: number }
@@ -63,10 +90,9 @@ async function getPage(query: CostsQuery, page: string | null, fetchImpl: typeof
       redirect: 'error',
     })
   } catch (error) {
-    throw new OpenAICostsError(error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'network')
+    throw fetchFailure(error)
   }
-  if (response.status === 401 || response.status === 403) throw new OpenAICostsError('unauthorized', response.status)
-  if (!response.ok) throw new OpenAICostsError('http_error', response.status)
+  await failOnStatus(response)
   const parsed = pageSchema.safeParse(await response.json().catch(() => null))
   if (!parsed.success) throw new OpenAICostsError('bad_response', response.status)
   return parsed.data

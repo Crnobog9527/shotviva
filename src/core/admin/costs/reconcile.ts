@@ -1,7 +1,10 @@
-// UTC-day reconciliation against OpenAI's invoice. Our totals include every provider.
+// UTC-day reconciliation of one provider's bill against our recorded cost for that provider.
 export type OurDay = {
   day: string
   cost_usd: number
+  // Ark's list price in yuan, as recorded per job (Ark bills in CNY); 0 for other providers.
+  cost_cny?: number
+  test_cost_cny?: number
   costed: number
   uncosted: number
   no_usage: number
@@ -12,9 +15,9 @@ export type OurDay = {
 }
 
 export type ReconcileRow = OurDay & {
-  // null: no Admin key, or OpenAI could not be read.
+  // null: no key, the bill could not be read, or the provider has not billed this day yet.
   billed: number | null
-  // billed − ours; positive means OpenAI charged more than we recorded.
+  // billed − ours; positive means the provider charged more than we recorded.
   difference: number | null
 }
 
@@ -24,7 +27,10 @@ export type PriceDrift = { days: number; from: string; to: string }
 
 export type Reconciliation = {
   rows: ReconcileRow[]
-  totals: { ours: number; tests: number; billed: number | null; difference: number | null; uncosted: number; noUsage: number }
+  totals: {
+    ours: number; oursCny: number; tests: number; jobs: number
+    billed: number | null; difference: number | null; uncosted: number; noUsage: number
+  }
   drift: PriceDrift | null
 }
 
@@ -61,22 +67,27 @@ export function priceDrift(rows: readonly ReconcileRow[]): PriceDrift | null {
   return best !== null && best.days >= STALE_DAYS ? best : null
 }
 
-export function reconcile(ours: readonly OurDay[], billed: Readonly<Record<string, number>> | null): Reconciliation {
+// pendingToday: the provider's bill has no entry for the current day yet (OpenRouter's Activity
+// API only lists completed days), so today shows no billed amount and stays out of the totals.
+export function reconcile(ours: readonly OurDay[], billed: Readonly<Record<string, number>> | null, options: { pendingToday?: boolean } = {}): Reconciliation {
   // Newest day first, like every admin list.
-  const rows = [...ours].reverse().map((day): ReconcileRow => {
-    const value = billed === null ? null : (billed[day.day] ?? 0)
+  const rows = [...ours].reverse().map((day, index): ReconcileRow => {
+    const value = billed === null || (options.pendingToday && index === 0) ? null : (billed[day.day] ?? 0)
     return { ...day, billed: value, difference: value === null || day.has_openrouter ? null : value - day.cost_usd }
   })
-  const sum = (pick: (row: ReconcileRow) => number) => rows.reduce((total, row) => total + pick(row), 0)
-  const oursTotal = sum((row) => row.cost_usd)
+  const sum = (pick: (row: ReconcileRow) => number, from = rows) => from.reduce((total, row) => total + pick(row), 0)
+  const comparable = rows.filter((row) => row.billed !== null)
   const billedTotal = billed === null ? null : sum((row) => row.billed ?? 0)
   return {
     rows,
     totals: {
-      ours: oursTotal,
+      ours: sum((row) => row.cost_usd),
+      oursCny: sum((row) => row.cost_cny ?? 0),
       tests: sum((row) => row.test_cost_usd ?? 0),
+      jobs: sum((row) => row.costed + row.uncosted + row.no_usage),
       billed: billedTotal,
-      difference: billedTotal === null || rows.some((row) => row.has_openrouter) ? null : billedTotal - oursTotal,
+      // Only over the days both sides cover.
+      difference: billedTotal === null || rows.some((row) => row.has_openrouter) ? null : billedTotal - sum((row) => row.cost_usd, comparable),
       uncosted: sum((row) => row.uncosted),
       noUsage: sum((row) => row.no_usage),
     },
