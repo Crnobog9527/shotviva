@@ -53,6 +53,10 @@ const valid: { [E in EventName]: unknown } = {
   checkout_cancel: { product_id: 'pack_m', method: 'alipay' },
   upload_error: { reason: 'transfer_failed' },
   app_update_prompt: { action: 'shown', reason: 'version' },
+  template_share: { template_id: 'ramen-studio', category: 'food-drink', method: 'native', share_id: 'k3x9m2pa' },
+  template_share_open: { template_id: 'ramen-studio', share_id: 'k3x9m2pa', signed_in: false, referrer_host: 'mp.weixin.qq.com' },
+  template_share_signup_start: { template_id: 'ramen-studio', share_id: null },
+  template_share_generate: { template_id: 'ramen-studio', share_id: 'k3x9m2pa' },
 }
 
 const EVENT_NAMES = [
@@ -75,6 +79,10 @@ const EVENT_NAMES = [
       'purchase',
       'signup',
       'template_favorite',
+      'template_share',
+      'template_share_generate',
+      'template_share_open',
+      'template_share_signup_start',
       'template_toggle',
       'template_view',
       'upload',
@@ -131,6 +139,15 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     expect(validateEvent('purchase', checkout).ok).toBe(false)
     expect(validateEvent('contact_sales_click', { page: '/pricing' }).ok).toBe(true)
     expect(validateEvent('contact_sales_click', { page: '/account' }).ok).toBe(false)
+  })
+
+  // Template share links (Owner 2026-11-13): a host, never an address; slugs only on signup.
+  it('keeps the share funnel to hosts and slugs', () => {
+    expect(validateEvent('template_share_open', { ...(valid.template_share_open as object), referrer_host: 'https://mp.weixin.qq.com/s/abc' }).ok).toBe(false)
+    expect(validateEvent('template_share_open', { ...(valid.template_share_open as object), referrer_host: 'www.google.com' }).ok).toBe(false)
+    expect(validateEvent('template_share', { ...(valid.template_share as object), method: 'email' }).ok).toBe(false)
+    expect(validateEvent('signup', { method: 'email', share_template_id: 'ramen-studio', share_id: 'k3x9m2pa' }).ok).toBe(true)
+    expect(validateEvent('signup', { method: 'email', share_template_id: 'Ramen Studio' }).ok).toBe(false)
   })
 
   // 中国银行卡 (T64, ARCHITECTURE §6.3): checkout_start.method = 'cn_card'.

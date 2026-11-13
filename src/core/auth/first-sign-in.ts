@@ -4,6 +4,7 @@ import { cookies, headers } from 'next/headers'
 import { bindReferral } from '../affiliate/referral'
 import { noteSignupGift } from '../alerts'
 import { track } from '../analytics'
+import { parseShareMark, SHARE_COOKIE } from '../analytics/share-link'
 import type { Locale } from '../i18n/locales'
 import { billingGrant, grantSignupCredits } from './free-credits'
 import { consumeSignupCode, type SignupBenefits } from './signup-code'
@@ -34,7 +35,11 @@ export async function onVerifiedSignIn(
   if (first) {
     // 1350: tell the Owner when half, then all, of today's signup gifts are gone (after()).
     noteSignupGift()
-    track('signup', { method, code_kind: kind }, { distinctId: userId, locale })
-    await bindReferral(userId, (await cookies()).get('sv_ref')?.value, 'signup')
+    const jar = await cookies()
+    // A template share link opened before signing up (core/analytics/share-link.ts).
+    const share = parseShareMark(jar.get(SHARE_COOKIE)?.value)
+    const shared = share ? { share_template_id: share.templateId, share_id: share.shareId } : {}
+    track('signup', { method, code_kind: kind, ...shared }, { distinctId: userId, locale })
+    await bindReferral(userId, jar.get('sv_ref')?.value, 'signup')
   }
 }

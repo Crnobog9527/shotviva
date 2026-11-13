@@ -593,7 +593,13 @@
       "hintCompare": "在图片上左右拖动，对比前后效果。",
       "makeOne": "做一张",
       "animatedMeta": "{category} · 动图",
-      "hintPair": "左边是手机原图，右边是 AI 出图。"
+      "hintPair": "左边是手机原图，右边是 AI 出图。",
+      "viewerOpen": "放大查看 {name}",
+      "viewerTitle": "{name} 大图",
+      "viewerClose": "关闭大图",
+      "viewerSwitch": "切换原图和 AI 出图",
+      "viewerHint": "点图片放大，左右滑动切换原图和 AI。",
+      "viewerHintZoomed": "拖动查看细节，再点一下缩回。"
     },
     "tiers": {
       "1k": {
@@ -1039,9 +1045,18 @@
         "stepsLabel": "使用步骤",
         "stepLabel": "第 {n} 步，共 {total} 步",
         "steps": {
-          "say": { "title": "说出你要的效果", "text": "用一句话描述想要的样子，再配一张参考图就行。" },
-          "vote": { "title": "大家投票，票多先做", "text": "其他卖家也会给想要的愿望投票，票多的先做。" },
-          "ship": { "title": "做好置顶，一键使用", "text": "做好的模板会置顶在许愿墙上，点一下就能用。" }
+          "say": {
+            "title": "说出你要的效果",
+            "text": "用一句话描述想要的样子，再配一张参考图就行。"
+          },
+          "vote": {
+            "title": "大家投票，票多先做",
+            "text": "其他卖家也会给想要的愿望投票，票多的先做。"
+          },
+          "ship": {
+            "title": "做好置顶，一键使用",
+            "text": "做好的模板会置顶在许愿墙上，点一下就能用。"
+          }
         },
         "example": "我们每周三第二杯半价，想要一个清爽好看的促销海报，每周能直接套",
         "exampleAuthor": "林***",
@@ -1439,7 +1454,17 @@
       "unavailable": "这个模板暂时不可用，没有收藏上。",
       "failed": "没能保存这次修改，请检查网络后重试。",
       "close": "关闭",
-      "pickerGroup": "收藏"
+      "pickerGroup": "收藏",
+      "emptyTitle": "还没有收藏的模板",
+      "emptyText": "在模板卡片或创作弹窗上点心形，就会收藏到这里。",
+      "emptyBrowse": "去看看模板",
+      "mine": "我的收藏"
+    },
+    "share": {
+      "button": "分享",
+      "copied": "链接已复制",
+      "text": "用 Shotviva 的「{name}」模板，手机照片也能做成这样：",
+      "copyByHand": "复制这个链接发给朋友："
     }
   },
   "paywall": {
@@ -2049,5 +2074,21 @@
       "failed": "举报没有提交成功，请再试一次。"
     },
     "footerLink": "创作库"
+  },
+  "share": {
+    "metaTitle": "{name} · Shotviva 模板",
+    "metaDescription": "用 Shotviva 的「{name}」模板，把手机照片做成好看的商用图。",
+    "ogAlt": "{name} 模板的 AI 出图效果",
+    "kicker": "Shotviva 模板 · {category}",
+    "hint": "左边是手机原图，右边是 AI 出图。点图片可以放大看。",
+    "series": "系列 · {name} · {count} 个模板",
+    "make": "用这个模板做一张",
+    "browse": "浏览全部模板",
+    "signUp": "免费注册，用这个模板",
+    "signUpNote": "注册后直接回到这个模板，上传照片就能做。",
+    "look": "先看看其他模板",
+    "missingTitle": "这个模板暂时看不到了",
+    "missingText": "它可能已经下架或改动过。去首页看看其他模板吧。",
+    "missingBrowse": "去看看其他模板"
   }
 }

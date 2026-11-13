@@ -47,8 +47,8 @@ describe('catalogue helpers', () => {
     expect(isCompareSample(tpl('white', 'products-resale', stills))).toBe(false)
     expect(isCompareCategory(tpl('x', 'art-styles'))).toBe(true)
     // Renamed, the same category keeps it; a pair category named "Art Styles" does not get it.
-    expect(isCompareSample({ ...tpl('manhwa', 'art-styles', stills), categoryName: '漫画风' })).toBe(true)
-    expect(isCompareSample({ ...tpl('x', 'pets', stills), categoryName: 'Art Styles' })).toBe(false)
+    expect(isCompareSample({ ...tpl('manhwa', 'art-styles', stills), name: '漫画风' })).toBe(true)
+    expect(isCompareSample({ ...tpl('x', 'pets', stills), name: 'Art Styles' })).toBe(false)
     expect(hasStills(tpl('x', 'pets', stills))).toBe(true)
     expect(hasStills(tpl('x', 'pets', { after: 'https://a/a.webp' }))).toBe(false)
   })

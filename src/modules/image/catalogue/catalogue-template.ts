@@ -121,15 +121,15 @@ export function cardPrice(template: CatalogueTemplate) {
 }
 
 // A motion card plays only with both its file and its poster (the table check guarantees it).
-export function isMotion(template: CatalogueTemplate): boolean {
+export function isMotion(template: Pick<CatalogueTemplate, 'cover'>): boolean {
   return template.cover.type !== 'image' && template.cover.motion !== null && template.cover.poster !== null
 }
 
 // The drag compare (DESIGN §6.9 item 1) belongs to categories whose card style is 'compare'
 // (today 画风 / Art Styles), set in 分类管理, never matched by name (T75).
-export const isCompareCategory = (template: CatalogueTemplate) => template.compare
+export const isCompareCategory = (template: Pick<CatalogueTemplate, 'compare'>) => template.compare
 
 // Both stills present: the card can show the side-by-side pair (or the compare).
-export function hasStills(template: CatalogueTemplate): boolean {
+export function hasStills(template: Pick<CatalogueTemplate, 'cover'>): boolean {
   return template.cover.before !== null && template.cover.after !== null
 }

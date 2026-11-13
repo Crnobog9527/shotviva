@@ -18,6 +18,7 @@ import { CatalogueSections } from './catalogue-sections-view'
 import { isMotion, isSlotTemplate } from './catalogue-template'
 import { findSeries, type CatalogueView, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
+import { SavedEmpty } from './saved-empty'
 import { FeatureCard } from './feature-card'
 import { SeriesCard } from './series-card'
 import { TemplateCard } from './template-card'
@@ -83,10 +84,10 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
       ) : null}
       <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
       <div ref={bar} data-stuck={stuck || undefined} className="sticky top-0 z-40 py-2 data-[stuck]:nav-material data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
-        <CategoryChips filters={view.filters} saved={saved.length > 0} value={active} onChange={query.select} />
+        <CategoryChips filters={view.filters} saved={showSaved(saved.length, active.saved)} value={active} onChange={query.select} />
       </div>
       <h2 className="sr-only">{t('templates')}</h2>
-      <CatalogueBody sections={sectionsFor(active, sections)} shown={shown} endCard={endCard} onOpen={setOpenId} onOpenSeries={query.openSeries} onSeeAll={seeAll} />
+      <CatalogueBody sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={setOpenId} onOpenSeries={query.openSeries} onSeeAll={seeAll} />
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
@@ -98,10 +99,17 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
 type BodyProps = Omit<GridProps, 'entries' | 'className'> & {
   sections: CatalogueSection[] | null
   shown: readonly GridEntry[]
+  // Saved is chosen: when it holds nothing, its empty state with the way back to All.
+  saved: boolean
+  onBrowse(): void
   onSeeAll(section: CatalogueSection): void
 }
 
-function CatalogueBody({ sections, shown, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
+// The Saved chip shows while something is saved, and stays while Saved is chosen (我的收藏).
+const showSaved = (count: number, chosen: boolean) => count > 0 || chosen
+
+function CatalogueBody({ sections, shown, saved, onBrowse, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
+  if (saved && shown.length === 0) return <SavedEmpty onBrowse={onBrowse} />
   if (!sections) return <CatalogueGrid entries={shown} endCard={endCard} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
   return (
     <>
