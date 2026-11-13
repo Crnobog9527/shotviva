@@ -53,9 +53,10 @@ export async function signInWithGoogle(form: FormData): Promise<FormState> {
 }
 
 // `then`: where to land afterwards, a same-site path (sanitised; the home page otherwise), e.g.
-// the login page on the way back to /connect/graylum ("Not you?").
+// the login page on the way back to /connect/graylum ("Not you?"). Only this browser signs out:
+// Supabase's default scope is global, which also ended the account's sessions on every device.
 export async function signOut(then?: string): Promise<never> {
   const supabase = await createSessionSupabase()
-  await supabase.auth.signOut()
+  await supabase.auth.signOut({ scope: 'local' })
   redirect(await localized(then ? sanitizeNext(then) : '/'))
 }
