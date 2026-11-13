@@ -50,6 +50,8 @@ export type GenerationDeps = Omit<SettleDeps, 'provider'> & {
   identityJudgeTimeoutMs?: number
   // The invite-only gate of poster templates (ARCHITECTURE §5.3); tests pass their own reads.
   allowPoster?: (userId: string) => Promise<void>
+  // A finished poster's text check (§5.3 自动核对), scheduled after the response by the route.
+  afterPoster?: (job: Job) => void
 }
 
 const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'partner' }
@@ -217,5 +219,6 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     locale: req.locale,
   })
   await keepInputPreview(deps, settled, image)
+  if (prepared.poster && settled.status === 'succeeded') deps.afterPoster?.(settled)
   return toJobView(settled)
 }

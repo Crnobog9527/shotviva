@@ -7,6 +7,8 @@ import { isInvited, loadFeatureAccess, requireFeature } from '@/core/features'
 import { runGeneration, type GenerationRequest } from '@/core/jobs'
 import { POSTER_FEATURE, savePosterSet } from '@/core/poster/sets'
 
+import { runPosterCheck } from '@/modules/image/poster'
+
 import { createMemoryStore } from '../fakes/memory-store'
 import { fakeProvider } from './generation-fixtures'
 import { connectAdmin, createUser, publishFixture } from './helpers'
@@ -37,7 +39,8 @@ beforeAll(async () => {
      values ($1, 'Poster test', 'pets', $2, 'medium', '{"1k": 1, "2k": 2, "3k": 3}', false, '{web}')`,
     [templateId, JSON.stringify(fields)],
   )
-  await db.query('insert into public.template_prompts (template_id, body) values ($1, $2)', [templateId, 'LAYOUT poster in {{aspect_ratio}}'])
+  await db.query('insert into public.template_prompts (template_id, body, model_params) values ($1, $2, $3)',
+    [templateId, 'LAYOUT poster in {{aspect_ratio}}', JSON.stringify({ poster_check: { instructions: 'READ IT' } })])
   await publishFixture(db, templateId)
 })
 
@@ -60,10 +63,18 @@ async function invitedUser() {
 
 function generate(userId: string, overrides: Partial<GenerationRequest> = {}) {
   const fake = fakeProvider('ok')
-  const deps = { db: service, store: createMemoryStore().store, provider: fake.provider, providerTimeoutMs: 500, allowPoster: allow }
+  const memory = createMemoryStore()
+  const checked: string[] = []
+  const deps = { db: service, store: memory.store, provider: fake.provider, providerTimeoutMs: 500, allowPoster: allow, afterPoster: (job: { id: string }) => { checked.push(job.id) } }
   const request: GenerationRequest = { userId, source: 'web', templateId, aspectRatio: '1:2', ...overrides }
-  return { fake, run: () => runGeneration(deps, request) }
+  return { fake, checked, store: memory.store, run: () => runGeneration(deps, request) }
 }
+
+const reader = (lines: string[]) => ({
+  credentials: async () => ({ tag: 'decision/fake', adapter: 'openai_responses' as const, config: { baseUrl: 'https://api.example.test/v1', model: 'fake', apiKey: 'k' },
+    prices: { inputTextPerM: 0.2, outputPerM: 1.6 } as never }),
+  fetch: async () => Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify({ lines }) }] }], usage: { input_tokens: 3000, output_tokens: 200 } }),
+})
 
 describe('poster sets and generation', () => {
   it('splits the set, makes each poster from its own text and records which poster it is', async () => {
@@ -101,5 +112,20 @@ describe('poster sets and generation', () => {
     expect(privileges.rows[0]).toEqual({ ins: false, sel: true, ext: false })
     const policy = await db.query("select qual from pg_policies where tablename = 'poster_sets'")
     expect(policy.rows[0].qual).toContain('auth.uid()')
+  })
+
+  it('checks a finished poster: schedules it, records the lines that differ, and does it once', async () => {
+    const userId = await invitedUser()
+    const set = await savePosterSet(service, { userId, templateId, fields: { poster }, content, source: 'paste', allow })
+    const job = generate(userId, { poster: { setId: set.id, part: 2 } })
+    const view = await job.run()
+    expect(job.checked).toEqual([view.id])
+    const check = { db: service, store: job.store, ...reader(['周6大师赛 开赛时间 14:00', '级别 基础分', '1 100', '休息10分钟', '2 280', '188 0000 1234 云川市滨江区']) }
+    expect(await runPosterCheck(check, view.id)).toBe('mismatch')
+    const { rows } = await db.query('select status, diffs, input_tokens, cost_usd from public.poster_checks where job_id = $1', [view.id])
+    expect(rows[0]).toMatchObject({ status: 'mismatch', input_tokens: 3000, cost_usd: '0.000920' })
+    expect(rows[0].diffs).toEqual([{ path: 'table.rows.2', expected: '2 200', seen: '2 280' }])
+    await runPosterCheck({ ...check, ...reader([]) }, view.id)
+    expect((await db.query('select status from public.poster_checks where job_id = $1', [view.id])).rows[0].status).toBe('mismatch')
   })
 })

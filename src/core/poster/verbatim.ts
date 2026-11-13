@@ -5,7 +5,8 @@ import { posterStrings } from './content'
 // all whitespace removed, so a reflowed line still matches but a changed character does not.
 // The paths that fail are shown in yellow until the user confirms them.
 
-export const normalizeForMatch = (text: string): string => text.normalize('NFKC').replace(/\s+/g, '').toLowerCase()
+// Column bars a reader may put between table cells are ignored like spaces.
+export const normalizeForMatch = (text: string): string => text.normalize('NFKC').replace(/[\s|｜]+/g, '').toLowerCase()
 
 export function unverifiedPaths(content: unknown, source: string): string[] {
   const haystack = normalizeForMatch(source)

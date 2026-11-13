@@ -5,7 +5,7 @@ export { CREDITS_FLOOR } from './credits-floor'
 // Photo editing (T30), server only like the provider.
 export { editBodySchema, editScopeClassifier, identityJudge, runEdit, toEditRequest, type ClassifierAnswer, type EditDeps, type ScopeClassifier } from './edit'
 export { GENERATION_COST_USD } from './generation-cost'
-export { EXTRACT_TEXT_MAX, listPosterTemplates, loadStudioTemplate, posterAllowed, PosterStudio, runExtract } from './poster'
+export { EXTRACT_TEXT_MAX, schedulePosterCheck, listPosterTemplates, loadStudioTemplate, posterAllowed, PosterStudio, runExtract } from './poster'
 export { useUpload, type UploadState } from './workspace/use-upload'
 export { checkPickedFile, uploadPhoto, UploadError, type UploadDeps, type UploadErrorCode } from '@/core/storage/upload'
 export { targetSize } from '@/core/storage/upload'

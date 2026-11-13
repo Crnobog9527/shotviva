@@ -690,6 +690,18 @@
       "proofread": "海报由 AI 绘制，打印或转发前请逐字核对。",
       "generate": "生成 {count} 张海报 · {credits} 积分",
       "starting": "正在开始…",
+      "check": {
+        "pending": "正在核对这张海报上的文字…",
+        "match": "文字已核对：每一行都和你确认的一致。",
+        "mismatch": "有 {count} 行和你确认的不一样",
+        "unchecked": "没能自动核对文字，请自己逐字看一遍。",
+        "expected": "确认稿：",
+        "seen": "海报上：",
+        "notFound": "海报上没找到",
+        "redraw": "重画这一张 · {credits} 积分",
+        "dismiss": "我看过了，没问题",
+        "editText": "改文字"
+      },
       "notice": {
         "sortFailed": "没能自动整理，请在下面各块里填写，原文在上方。",
         "rateLimited": "一小时内整理次数太多，请稍后再试。",

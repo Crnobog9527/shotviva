@@ -13373,6 +13373,27 @@ ALTER TABLE "public"."payments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTI
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."poster_checks" (
+    "job_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "status" "text" NOT NULL,
+    "diffs" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "provider" "text",
+    "input_tokens" integer,
+    "output_tokens" integer,
+    "cost_usd" numeric(10,6),
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "poster_checks_cost_usd_check" CHECK (("cost_usd" >= (0)::numeric)),
+    CONSTRAINT "poster_checks_diffs_check" CHECK ((("jsonb_typeof"("diffs") = 'array'::"text") AND ("pg_column_size"("diffs") <= 32768))),
+    CONSTRAINT "poster_checks_input_tokens_check" CHECK (("input_tokens" >= 0)),
+    CONSTRAINT "poster_checks_output_tokens_check" CHECK (("output_tokens" >= 0)),
+    CONSTRAINT "poster_checks_status_check" CHECK (("status" = ANY (ARRAY['match'::"text", 'mismatch'::"text", 'unchecked'::"text"])))
+);
+
+
+ALTER TABLE "public"."poster_checks" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."poster_extractions" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -14134,6 +14155,11 @@ ALTER TABLE "public"."payments"
 
 
 
+ALTER TABLE ONLY "public"."poster_checks"
+    ADD CONSTRAINT "poster_checks_pkey" PRIMARY KEY ("job_id");
+
+
+
 ALTER TABLE ONLY "public"."poster_extractions"
     ADD CONSTRAINT "poster_extractions_pkey" PRIMARY KEY ("id");
 
@@ -14727,6 +14753,10 @@ CREATE INDEX "payments_user_id_idx" ON "public"."payments" USING "btree" ("user_
 
 
 CREATE INDEX "payments_waffo_order_id_idx" ON "public"."payments" USING "btree" ("waffo_order_id") WHERE ("waffo_order_id" IS NOT NULL);
+
+
+
+CREATE INDEX "poster_checks_user" ON "public"."poster_checks" USING "btree" ("user_id", "created_at" DESC);
 
 
 
@@ -15492,6 +15522,16 @@ ALTER TABLE ONLY "public"."payments"
 
 
 
+ALTER TABLE ONLY "public"."poster_checks"
+    ADD CONSTRAINT "poster_checks_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "public"."generation_jobs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_checks"
+    ADD CONSTRAINT "poster_checks_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."poster_extractions"
     ADD CONSTRAINT "poster_extractions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
@@ -15909,6 +15949,13 @@ ALTER TABLE "public"."payment_refunds" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."payments" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."poster_checks" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "poster_checks_read_own" ON "public"."poster_checks" FOR SELECT TO "authenticated" USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
+
 
 
 ALTER TABLE "public"."poster_extractions" ENABLE ROW LEVEL SECURITY;
@@ -18111,6 +18158,11 @@ GRANT SELECT ON TABLE "public"."payment_dispute_link_errors" TO "service_role";
 GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."poster_checks" TO "service_role";
+GRANT SELECT ON TABLE "public"."poster_checks" TO "authenticated";
 
 
 
