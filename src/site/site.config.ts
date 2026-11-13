@@ -122,6 +122,8 @@ export const site = defineSite({
       '/image-to-image-generator',
       '/commercial-photography',
       '/ai-restaurant-menu',
+      // SEO launch handbook 04-P1 (Owner 2026-11-13), English only.
+      '/transparent-background',
       '/pricing',
       '/terms',
       '/privacy',
