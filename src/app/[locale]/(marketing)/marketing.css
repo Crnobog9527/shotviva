@@ -343,8 +343,6 @@
     .mk-panel-noup { grid-template-rows: auto auto auto auto 1fr; grid-template-areas: "head err" "stage rail" "stage row" "stage cta" "stage ."; }
     .mk-stage { --h: clamp(200px, calc(100cqw / var(--r, .8)), 260px); }
     .mk-up { margin-top: 0; padding: 16px 18px; }
-    .mk-up-empty { display: flex; }
-    .mk-panel-fmt { display: none; }
     .mk-rail { margin: 12px 0 0; padding: 2px; }
     .mk-panel-size-d { display: block; }
     .mk-panel-size-m { display: none; }

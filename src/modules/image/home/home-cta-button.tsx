@@ -13,7 +13,9 @@ import { CameraIcon } from './home-icons'
 type Props = {
   cta: HomeCta
   templateId: string | null
-  onPickPhoto(): void
+  // The page's hidden file input: "Upload photo" is a <label> for it, so the phone's picker opens
+  // natively from the tap, with no script in between (Owner 2026-11-13: the button did nothing).
+  fileInputId: string
   onSignUp(): void
   onGenerate(): void
 }
@@ -26,18 +28,28 @@ const PRIMARY = 'mk-cta'
 // The generator's one primary (DESIGN §6.9 item 9), with the workspace's own labels:
 // "Generate · 2 credits", "Get credits · N needed" (neutral, opens the paywall), or a disabled
 // state while the photo uploads or a slot is busy.
-export function HomeCtaButton({ cta, templateId, onPickPhoto, onSignUp, onGenerate }: Props) {
+export function HomeCtaButton({ cta, templateId, fileInputId, onSignUp, onGenerate }: Props) {
   const t = useTranslations('app.workspace')
   const home = useTranslations('home.generator')
   const generate = (count: number) => t.rich('generateCta', { cost: costTag, count })
   switch (cta.kind) {
     case 'pick-photo':
       return (
-        <button type="button" className={PRIMARY} onClick={onPickPhoto}>
+        <label
+          htmlFor={fileInputId}
+          className={PRIMARY}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return
+            event.preventDefault()
+            document.getElementById(fileInputId)?.click()
+          }}
+        >
           <CameraIcon />
           {/* Says what the click does: it opens the photo picker (review of #523, F6). */}
           <span>{home('uploadPhoto')}</span>
-        </button>
+        </label>
       )
     case 'sign-up':
       return (

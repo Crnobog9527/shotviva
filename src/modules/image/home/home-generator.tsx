@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import dynamic from 'next/dynamic'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import { trackTemplateView } from '@/core/analytics/browser'
 import type { FormAction } from '@/core/auth/ui'
@@ -68,6 +68,7 @@ export function HomeGenerator({ templates: all, defaultId, viewer, googleAction,
   const [pickerOn, setPickerOn] = useState<CatalogueTemplate | null>(null)
   const [signUp, setSignUp] = useState(false)
   const file = useRef<HTMLInputElement>(null)
+  const fileId = useId()
   const panel = useRef<HTMLElement>(null)
   const watch = useMemo(() => [panel], [])
   const bring = useCallback(() => panel.current?.scrollIntoView({ behavior: smooth(), block: 'center' }), [])
@@ -102,7 +103,7 @@ export function HomeGenerator({ templates: all, defaultId, viewer, googleAction,
     void state.keepDraft()
     setSignUp(true)
   }
-  const shared = { state, gift: t('gift', { images: freeImages }), onPickPhoto: pickPhoto, onOpenPicker: () => setPickerOn(state.template), onSignUp: askToSignUp }
+  const shared = { state, gift: t('gift', { images: freeImages }), onPickPhoto: pickPhoto, fileInputId: fileId, onOpenPicker: () => setPickerOn(state.template), onSignUp: askToSignUp }
   // Signed in, the picker's hearts save on the visitor's account; signed out a heart goes to
   // sign-in and comes back here to save it (T83).
   return (
@@ -110,11 +111,16 @@ export function HomeGenerator({ templates: all, defaultId, viewer, googleAction,
     <div className="mk-generator">
       <FavoriteReturn signedIn={viewer !== null} templates={templates} onSaved={onPreview} />
       <HomePanel ref={panel} initialCovers={initialCovers} thumbOf={thumbFor} {...shared} />
+      {/* Visually hidden, not display:none: the primary is a <label for> it, which some phone
+          browsers (Huawei, older iOS) ignore when the input is display:none or clicked from JS. */}
       <input
         ref={file}
+        id={fileId}
         type="file"
         accept={UPLOAD_ACCEPT}
-        hidden
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
         onChange={(event) => {
           const picked = event.currentTarget.files?.[0]
           if (picked) state.photo.pick(picked)
@@ -135,7 +141,7 @@ export function HomeGenerator({ templates: all, defaultId, viewer, googleAction,
         thumbOf={thumbFor}
       />
       {viewer ? null : <SignupSheet open={signUp} onOpenChange={setSignUp} googleAction={googleAction} next={homePath} gift={freeImages} />}
-      <HomeDock show={away && !footer} canStartWithoutPicking={canStartWithoutPicking} cost={state.cost} onClick={bring} />
+      <HomeDock show={away && !footer} canStartWithoutPicking={canStartWithoutPicking} onClick={bring} />
     </div>
     </FavoritesProvider>
   )
