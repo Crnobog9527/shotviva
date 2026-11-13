@@ -7,6 +7,7 @@ import { ResetRequestForm } from '@/core/auth/ui'
 
 import { resetRequestAction } from '@/app/auth/actions'
 
+import { ResetScreen } from '../auth-screens'
 import { sender } from '../sender'
 
 // Sign-in pages are noindex like the rest of the app (建站规格 R6), in both languages, and carry
@@ -15,17 +16,12 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('auth.reset'))('title') }
 }
 
-async function Reset({ searchParams }: PageProps<'/[locale]/reset'>) {
-  const { error } = await searchParams
+// Static (auth-screens.tsx): the cached HTML carries the form; the browser reads ?error=.
+export default function ResetPage() {
+  const form = { action: resetRequestAction, linkHours: EMAIL_LINK_HOURS, sender }
   return (
-    <ResetRequestForm action={resetRequestAction} linkExpired={error === 'link_expired'} linkHours={EMAIL_LINK_HOURS} sender={sender} />
-  )
-}
-
-export default function ResetPage(props: PageProps<'/[locale]/reset'>) {
-  return (
-    <Suspense>
-      <Reset {...props} />
+    <Suspense fallback={<ResetRequestForm {...form} linkExpired={false} />}>
+      <ResetScreen {...form} />
     </Suspense>
   )
 }
