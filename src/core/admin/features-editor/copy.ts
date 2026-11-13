@@ -15,8 +15,19 @@ export const FEATURES_COPY = {
   save: '保存',
   saving: '保存中…',
   saved: (name: string) => `已保存「${name}」`,
+  invites: {
+    intro: '内测功能：只有下面这些账号（和管理员）能用。按登录用的邮箱或手机号添加。',
+    none: '还没有邀请任何账号',
+    account: '邮箱或手机号',
+    placeholder: 'name@example.com 或 13800000000',
+    add: '邀请',
+    remove: '移除',
+    added: '已邀请',
+    removed: '已移除',
+  },
   errors: {
     invalid: '填写的内容不对，请检查后再保存',
     unknownFeature: '没有这个功能，请刷新页面',
+    noAccount: '找不到这个邮箱或手机号对应的账号，请确认对方已注册',
   },
 } as const

@@ -4,4 +4,5 @@ export {
   saveFeatureAccessSchema,
   type FeatureAccessDeps,
 } from './commands'
-export type { FeatureAccessInput, FeatureSetting } from './types'
+export { setFeatureInvite } from './invites'
+export type { FeatureAccessInput, FeatureInvite, FeatureInviteInput, FeatureSetting } from './types'
