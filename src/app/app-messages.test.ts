@@ -40,9 +40,9 @@ describe('app messages (en)', () => {
     expect(t('app.workspace.counter', { count: 12, max: 300 })).toBe('12 / 300')
   })
 
-  it('names the eight sizes', () => {
-    const sizes = ['original', '16:9', '4:5', '1:1', '9:16', '3:2', '4:3', '2:3'].map((id) => t(`app.sizes.${id}`))
-    expect(sizes).toEqual(['Original', 'Banner', 'Post', 'Listing', 'Story', 'Rental', 'Website', 'Pin'])
+  it('names the eight sizes and the two tall poster sizes', () => {
+    const sizes = ['original', '16:9', '4:5', '1:1', '9:16', '3:2', '4:3', '2:3', '1:2', '1:3'].map((id) => t(`app.sizes.${id}`))
+    expect(sizes).toEqual(['Original', 'Banner', 'Post', 'Listing', 'Story', 'Rental', 'Website', 'Pin', 'Long poster', 'Extra-long poster'])
   })
 
   it('never says prompt in product copy (DESIGN §1)', () => {

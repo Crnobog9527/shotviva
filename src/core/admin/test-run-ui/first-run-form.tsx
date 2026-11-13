@@ -6,7 +6,7 @@ import { ImageProviderField, type ImageProviderOption } from '@/core/admin/image
 import { Button } from '@/core/ui/button'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
-import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
+import { FULL_IMAGE_OPTIONS, templateSizes } from '@/core/templates/image-options'
 import { DEFAULT_RESOLUTION, NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
 import type { AdminTemplate } from '../templates/types'
@@ -32,11 +32,12 @@ type Props = {
 
 const noSizes = { aspects: [], resolutions: [], minReferences: 0 }
 
-function trialSizes(providers: readonly ImageProviderOption[], id: string | null) {
+function trialSizes(providers: readonly ImageProviderOption[], id: string | null, templateRatios: readonly string[]) {
   const selected = providers.find(p => id ? p.id === id : p.isActive)
   if (!selected) return noSizes
-  const options = selected.capabilities ?? (selected.openAI ? FULL_IMAGE_OPTIONS : null)
-  if (!options) return noSizes
+  const stored = selected.capabilities ?? (selected.openAI ? FULL_IMAGE_OPTIONS : null)
+  if (!stored) return noSizes
+  const options = templateSizes(stored, selected.openAI, templateRatios)
   const aspects = options.originalRatio ? ['original' as const, ...options.aspectRatios] : options.aspectRatios
   return { aspects, resolutions: options.resolutions, minReferences: selected.capabilities?.minReferences ?? 0 }
 }
@@ -63,7 +64,7 @@ export function FirstRunForm({ template, providers, photos, onLaunch, onPhotoUpl
   const [note, setNote] = useState('')
   const [toggles, setToggles] = useState<Record<string, boolean>>({})
   const [wanted, setOptions] = useState<RunOptionValues>({ resolution: DEFAULT_RESOLUTION, aspect: 'original', triple: false })
-  const sizes = trialSizes(providers, providerId)
+  const sizes = trialSizes(providers, providerId, template.fields.aspectRatios)
   const options: RunOptionValues = {
     triple: wanted.triple,
     resolution: availableValue(wanted.resolution, sizes.resolutions),
