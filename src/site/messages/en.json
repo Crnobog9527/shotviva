@@ -566,7 +566,7 @@
       "seeAll": "See all",
       "seeAllWhich": "in {name}",
       "seeAllCount": "{count} in all",
-      "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are illustrative examples."
+      "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are real results made with these templates."
     },
     "series": {
       "count": "{count, plural, one {# template} other {# templates}}",
@@ -577,10 +577,10 @@
     },
     "template": {
       "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
-      "cardAlt": "{name} template example: phone photo on the left, AI result on the right",
+      "cardAlt": "{name} template, real example: phone photo on the left, AI result on the right",
       "phone": "Phone",
       "ai": "AI",
-      "example": "Illustrative example",
+      "example": "Real example",
       "featureAria": "{name}, video template, {category}. Make one",
       "featureMeta": "{category} · video",
       "compareAria": "Compare phone photo and AI result",
@@ -1563,8 +1563,8 @@
     "home": {
       "phone": "Phone",
       "ai": "AI",
-      "beforeAlt": "{name} template example: the phone photo before (illustrative example)",
-      "afterAlt": "{name} template example: the AI result, {use} (illustrative example)",
+      "beforeAlt": "{name} template, real example: the phone photo before",
+      "afterAlt": "{name} template, real example: the AI result, {use}",
       "pickAria": "{name}. {use} Pick this template",
       "compareLabel": "Compare the phone photo and the {name} result",
       "withDragHint": "{use} Drag the handle to compare.",
@@ -1575,8 +1575,8 @@
       "seriesOpen": "Open the series",
       "freeTag": "Free · public",
       "paidTag": "Paid · private",
-      "freeSampleAlt": "A free photo with the watermark (illustrative example)",
-      "paidSampleAlt": "The same photo made with paid credits, no watermark (illustrative example)"
+      "freeSampleAlt": "A free photo with the watermark (real example)",
+      "paidSampleAlt": "The same photo made with paid credits, no watermark (real example)"
     }
   },
   "pageError": {
