@@ -1,6 +1,7 @@
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
+import { CompareSection } from './blocks/compare-section'
 import { CostBillsSection } from './blocks/cost-bills'
 import { EditCasesSection } from './blocks/edit-cases'
 import { FaqSection } from './blocks/faq-section'
@@ -23,7 +24,8 @@ type Props = {
 
 // One skeleton for every SEO landing page (design/comps-v3-b/landing.html, ARCHITECTURE §12,
 // 建站规格 R10): hero + direct answer + generator → the optional "full shoot" demo → the optional
-// edit cases → the page's template categories → facts → the two bills → FAQ → related pages.
+// edit cases → the page's template categories → facts → the two bills → the optional comparison
+// table → FAQ → related pages.
 // No visible breadcrumbs (DESIGN §8); the BreadcrumbList JSON-LD stays.
 export function ContentPageView({ page, isLinkEnabled, templates, generator }: Props) {
   const t = useTranslations('marketing')
@@ -37,6 +39,7 @@ export function ContentPageView({ page, isLinkEnabled, templates, generator }: P
       {landing.templates ? <TemplateGrid grid={landing.templates} sections={templates} isLinkEnabled={isLinkEnabled} /> : null}
       <FactCards facts={page.facts} heading={headings.facts ?? t('facts')} note={landing.factsNote} />
       <CostBillsSection bills={page.costBills} />
+      {landing.compare ? <CompareSection compare={landing.compare} /> : null}
       <FaqSection faq={page.faq} heading={headings.faq} isLinkEnabled={isLinkEnabled} variant="accordion" />
       <RelatedLinks heading={headings.related ?? t('related')} links={page.related.filter((link) => isLinkEnabled(link.href))} variant="cards" />
     </article>

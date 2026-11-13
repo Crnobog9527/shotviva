@@ -29,7 +29,8 @@ function resultCard(record: TrialRecord, pick?: string) {
 function inputsBlock(item: TemplateItem, root: string, baseDir: string) {
   const sets = item.trial?.inputs ?? []
   return sets.map((input, i) => {
-    const photo = input.photo ? img(relative(root, resolve(baseDir, input.photo)), `输入 ${i + 1}`) : '<div class="miss">无照片</div>'
+    const slots = Object.entries(input.slots ?? {}).map(([slot, path]) => img(relative(root, resolve(baseDir, path)), `输入 ${i + 1} · ${slot}`)).join('')
+    const photo = input.photo ? img(relative(root, resolve(baseDir, input.photo)), `输入 ${i + 1}`) : slots || '<div class="miss">无照片</div>'
     const text = Object.entries(input.fields ?? {}).map(([k, v]) => `${k}: ${v}`).concat(input.note ? [`说明: ${input.note}`] : [])
     return `<figure>${photo}<figcaption>输入 #${i + 1}${input.aspectRatio ? ' · ' + escape(input.aspectRatio) : ''}<br>${text.map(escape).join('<br>')}</figcaption></figure>`
   }).join('')

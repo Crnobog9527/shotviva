@@ -45,6 +45,7 @@ describe('model_params.toggles (T89)', () => {
     expect(toggleFragments(params)).toEqual({ replate: { on: 'FAKE-ON', off: 'FAKE-OFF' } })
     expect(toggleFragments({})).toEqual({})
     expect(providerParams(params)).toEqual({ input_fidelity: 'high' })
+    expect(providerParams({ ...params, poster_extract: { instructions: 'x' } })).toEqual({ input_fidelity: 'high' })
   })
 
   it('refuses a save whose toggle has no placeholder or misses a fragment', () => {

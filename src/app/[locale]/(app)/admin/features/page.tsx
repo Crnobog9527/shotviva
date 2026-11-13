@@ -23,6 +23,7 @@ import { site } from '@/site/site.config'
 import {
   saveAffiliateSwitchAction,
   saveFeatureAccessAction,
+  setFeatureInviteAction,
   saveGallerySwitchAction,
   saveSignupGiftCapAction,
   saveSignupGiftPausedAction,
@@ -62,7 +63,7 @@ export default async function AdminFeaturesPage() {
         settings={settings}
         wishlist={wishlist}
         gallery={gallery}
-        actions={{ save: saveFeatureAccessAction, saveWishlist: saveWishlistSwitchAction, saveGallery: saveGallerySwitchAction }}
+        actions={{ save: saveFeatureAccessAction, invite: setFeatureInviteAction, saveWishlist: saveWishlistSwitchAction, saveGallery: saveGallerySwitchAction }}
       />
     </AdminPage>
   )

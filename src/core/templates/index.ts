@@ -7,6 +7,7 @@ export {
   COPY_MAX_LENGTH,
   COPY_OPTION_MAX_LENGTH,
   COPY_OPTIONS_MAX,
+  COPY_FIELDS_MAX,
   copyFieldSchema,
   publicCopyKeys,
   storedPublicKeys,
@@ -52,6 +53,8 @@ export {
   NOTE_MAX_LENGTH,
   OUTPUT_ASPECTS,
   RESOLUTIONS,
+  TALL_ASPECTS,
+  isTallAspect,
   type OutputAspect,
   type Resolution,
 } from './output-options'
@@ -60,6 +63,7 @@ export {
   assertPricedTier,
   assertTemplateQuote,
   creditsBelowFloor,
+  slotFloorFactor,
   creditsCostSchema,
   type ApprovedTariff,
   type CreditsCost,
@@ -86,6 +90,23 @@ export {
   type EditScope,
 } from './edit-params'
 export {
+  checkSlotUploads,
+  hasSlots,
+  IMAGE_SLOTS_MAX,
+  IMAGE_SLOTS_PLACEHOLDER,
+  imageSlotSchema,
+  keptSlotIndex,
+  slotMapping,
+  slotsOf,
+  slotSurfaceProblems,
+  storedSlotOrder,
+  toStoredSlots,
+  type StoredSlot,
+  type ImageSlot,
+  type SlotUploads,
+} from './image-slots'
+export {
+  PROMPT_MAX_LENGTH,
   renderPrompt,
   validateGenerationInputs,
   type GenerationInputs,
@@ -107,7 +128,7 @@ export {
 export { allowedWebAspects } from './allowed-web-aspects'
 export { estimatedImageCostsSchema, imageCapabilitiesSchema } from './image-capabilities'
 export { imageCostBudget, maxCostPerCredit, modelCreditFloor, UNPRICED, type ProviderFloors } from './provider-pricing'
-export { cachedWebTemplates, findWebTemplate } from './cached-catalogue'
+export { cachedPosterTemplates, cachedWebTemplates, findWebTemplate } from './cached-catalogue'
 export { cachedCatalogueIndex, cachedCategoryEntries, cachedCategoryTree, cachedSeriesMembers } from './cached-taxonomy'
 export type { CatalogueIndex, IndexEntry, IndexSeries } from './catalogue-index'
 export type { CatalogueCursor, CataloguePage, CategoryNode } from './taxonomy'

@@ -1,7 +1,10 @@
 import 'server-only'
 
 import type { GenerationProvider, ImageRequestOptions } from '@/core/jobs'
+import { serverEnv } from '@/core/env'
 import { templateImageProvider, type ProviderAdapters } from '@/core/providers'
+
+import { createArkImageProvider } from './ark-image-provider'
 
 import { createOpenAIImageProvider } from './openai-image-provider'
 import { createOpenRouterImageProvider } from './openrouter-image-provider'
@@ -14,6 +17,7 @@ export { outputTokens } from './output-tokens'
 export const IMAGE_ADAPTERS: ProviderAdapters = {
   openrouter_images: createOpenRouterImageProvider,
   openai_images: (config) => createOpenAIImageProvider(config),
+  ark_images: (config) => createArkImageProvider({ ...config, cnyPerUsd: serverEnv().CNY_PER_USD }),
 }
 
 // A template override applies only to callers supplying its id and the image request.

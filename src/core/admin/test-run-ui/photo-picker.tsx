@@ -16,6 +16,8 @@ import { failureMessage } from './messages'
 export const MAX_PICKED = 3
 
 type Props = {
+  // One image slot's picker (§5.1e): its own title, one photo at most, no asset manager.
+  slot?: { label: string }
   photos: readonly TestPhotoView[]
   picked: readonly string[]
   onPick: (ids: string[]) => void
@@ -26,21 +28,22 @@ type Props = {
 
 const ACCEPT = 'image/jpeg,image/png,image/webp'
 
-function toggle(picked: readonly string[], id: string): string[] {
+function toggle(picked: readonly string[], id: string, max = MAX_PICKED): string[] {
   if (picked.includes(id)) return picked.filter((other) => other !== id)
-  return picked.length >= MAX_PICKED ? [...picked.slice(1), id] : [...picked, id]
+  return picked.length >= max ? [...picked.slice(picked.length - max + 1), id] : [...picked, id]
 }
 
 // 测试照片 (ARCHITECTURE §10.b): upload a new one (picked at once) or tick up to three of the
 // recently used ones. The order ticked is the order the runs start in.
-export function PhotoPicker({ photos, picked, onPick, onUploaded, onError, onNotice }: Props) {
+export function PhotoPicker({ slot, photos, picked, onPick, onUploaded, onError, onNotice }: Props) {
+  const max = slot ? 1 : MAX_PICKED
   const [progress, setProgress] = useState<number | null>(null)
   const upload = async (file: File) => {
     setProgress(0)
     try {
       const photo = await uploadTestPhoto(file, setProgress)
       onUploaded()
-      onPick(toggle(picked, photo.id))
+      onPick(toggle(picked, photo.id, max))
     } catch (error) {
       onError(failureMessage(error))
     } finally {
@@ -49,20 +52,20 @@ export function PhotoPicker({ photos, picked, onPick, onUploaded, onError, onNot
   }
   return (
     <fieldset className="grid min-w-0 gap-2">
-      <legend className="text-sm font-medium">{COPY.first.photos}</legend>
-      <p className="text-muted-foreground text-xs">{COPY.first.photosHint}</p>
+      <legend className="text-sm font-medium">{slot ? slot.label : COPY.first.photos}</legend>
+      <p className="text-muted-foreground text-xs">{slot ? COPY.first.slotHint : COPY.first.photosHint}</p>
       <ul className="grid grid-cols-4 gap-2 sm:grid-cols-6" aria-label={COPY.first.recent}>
         <li>
           <UploadTile progress={progress} onFile={upload} />
         </li>
         {photos.map((photo) => (
           <li key={photo.id}>
-            <PhotoTile photo={photo} order={picked.indexOf(photo.id)} onToggle={() => onPick(toggle(picked, photo.id))} />
+            <PhotoTile photo={photo} order={picked.indexOf(photo.id)} onToggle={() => onPick(toggle(picked, photo.id, max))} />
           </li>
         ))}
       </ul>
       {photos.length === 0 ? <p className="text-muted-foreground text-xs">{COPY.first.noRecent}</p> : null}
-      <AssetManager kind="photo" onRemoved={ids => { onPick(picked.filter(id => !ids.includes(id))); onUploaded() }} onError={onError} onNotice={onNotice} />
+      {slot ? null : <AssetManager kind="photo" onRemoved={ids => { onPick(picked.filter(id => !ids.includes(id))); onUploaded() }} onError={onError} onNotice={onNotice} />}
     </fieldset>
   )
 }

@@ -32,7 +32,7 @@ export const PROVIDERS_COPY = {
     updatedAt: '更新时间（UTC）',
     actions: '操作',
   },
-  adapters: { openai_images: 'OpenAI Images 接口', openrouter_images: 'OpenRouter Images 接口', openai_responses: 'OpenAI Responses 接口' } satisfies Record<ProviderAdapterId, string>,
+  adapters: { openai_images: 'OpenAI Images 接口', openrouter_images: 'OpenRouter Images 接口', ark_images: '火山方舟 Images 接口', openai_responses: 'OpenAI Responses 接口' } satisfies Record<ProviderAdapterId, string>,
   active: '当前使用',
   inactive: '未使用',
   keyMasked: (last4: string | null) => (last4 ? `••••${last4}` : '未设置'),
@@ -47,6 +47,9 @@ export const PROVIDERS_COPY = {
   priceUnset: '未填',
   fallbackPricesMissing: '缺少估算单价；供应商未返回账单时无法估算成本。',
   pricesMissing: '单价没填全，价目表里也没有这个模型，这个供应商的任务算不出成本',
+  arkPriceLine: (bands: string, input: number) => `每张输出 ${bands} · 每张输入图 ¥${input}（人民币，按 CNY_PER_USD 折美元）`,
+  arkPriceAsOf: (asOf: string, source: string) => `官方价 · 取于 ${asOf} · ${source}`,
+  arkPriceMissing: '代码价目表里没有这个火山方舟模型，它的任务算不出成本',
   pricesFromTable: (asOf: string) => `空着的项按官方价 · 取于 ${asOf}`,
   edit: '编辑',
   test: '测试连接',
@@ -60,7 +63,10 @@ export const PROVIDERS_COPY = {
   neverFetched: '尚未刷新',
   form: {
     imageCosts: '预估单张总成本（美元）',
-    imageCostsHint: '有实测成本时优先用实测。留空使用可核算的目录估价（已含本站充值费用分摊）；也可填写含费估价覆盖。',
+    // Ark has no catalogue estimate to fall back on, so blank is not offered there (schema refine).
+    imageCostsHint: (adapter: ProviderAdapterId) => adapter === 'ark_images'
+      ? '有实测成本时优先用实测。火山方舟必须填写每档的预估单张总成本（含输入图），不能留空；实测样本不足时用它定积分下限。'
+      : '有实测成本时优先用实测。留空使用可核算的目录估价（已含本站充值费用分摊）；也可填写含费估价覆盖。',
     catalogPrices: '供应商目录报价（美元）',
     titleNew: '新增供应商',
     titleEdit: (label: string) => `编辑「${label}」`,
@@ -71,11 +77,14 @@ export const PROVIDERS_COPY = {
     adapterHint: {
       openai_images: 'OpenAI Images 接口（官方地址或兼容服务）。',
       openrouter_images: '通过 OpenRouter 图片接口出图。测试连接只检查模型和密钥，免费。',
+      ark_images: '火山方舟（大陆北京）Seedream 出图，按张计费。只有标准和高清两档。测试连接发一个不出图的请求，免费，并显示往返耗时。',
       openai_responses: 'OpenAI Responses API（结构化 JSON 输出，推理用最低档）。地址请填 https://api.openai.com/v1。',
     } satisfies Record<ProviderAdapterId, string>,
     resolutions: '支持的清晰度',
     baseUrl: '接口根地址',
     baseUrlHint: '请填写供应商的 HTTPS API 根地址。',
+    arkModelHint: '例如 doubao-seedream-5-5-261028（须先在火山方舟控制台开通）。按张的官方价写在代码价目表里，目前只收录 5.5。',
+    arkPrices: '按张计费：用代码里的火山方舟官方价目（人民币），按环境变量 CNY_PER_USD 的汇率折成美元记成本，不用填 token 单价。',
     routerModelHint: '例如 google/gemini-3.1-flash-image。保存时自动读取该模型支持的清晰度、比例和参考图数量。',
     lookupPending: '正在查询模型能力与报价…',
     retryLookup: '重新查询',
@@ -137,11 +146,18 @@ export const PROVIDERS_COPY = {
 
 // One line per connection test, shown next to the row that was tested.
 export function connectionText(result: ConnectionResult): string {
+  const took = result.ms === undefined ? '' : ` · 往返 ${result.ms} ms`
+  return connectionStatus(result) + took
+}
+
+function connectionStatus(result: ConnectionResult): string {
   if (result.ok) return `连接成功（HTTP ${result.status}）`
   const status = result.status ?? '-'
   switch (result.failure) {
     case 'unauthorized':
       return `鉴权失败（HTTP ${status}），请检查密钥`
+    case 'model_unavailable':
+      return `模型不可用（HTTP ${status}）：请在火山方舟控制台开通该模型，并确认账户没有欠费`
     case 'http_error':
       return `接口返回 HTTP ${status}，请检查地址`
     case 'redirect':

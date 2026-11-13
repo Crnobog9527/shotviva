@@ -7,7 +7,7 @@ import { limitsFor } from '@/core/billing/tier-limits'
 import { useRouter } from '@/core/i18n'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
-import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { preloadBatchDialog } from '../matrix/batch-dialog-slot'
 import { openBatch } from '../matrix/batch-query'
 import { isCompareSample, TemplateSample } from '../catalogue/template-sample'
@@ -45,7 +45,8 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   const workspace = `/generate/${template.id}`
   // Generate moves to the template's workspace page, kept prefetched while the dialog is open.
   useWarmRoute(workspace, open)
-  const batch = limitsFor(context.tier).batchMax > 1 && template.photoInput !== 'none' && draft.photos.photos.length === 0
+  // A slot template is single-run only (§5.1e): no way to a batch.
+  const batch = limitsFor(context.tier).batchMax > 1 && template.photoInput !== 'none' && !isSlotTemplate(template) && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
   const submitOnce = useSubmitOnce(open)
   const generate = () => {
@@ -77,6 +78,7 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
           balance={context.balance}
           tier={context.tier}
           photos={draft.photos}
+          slots={draft.slots}
           values={draft.values}
           onChange={draft.change}
           surface="create_dialog"

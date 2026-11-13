@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { refresh, updateTag } from 'next/cache'
 
-import { runAdminAction, saveFeatureAccess, saveSettingSwitch, saveSignupGiftCap, saveWishlistSwitch, WISHLIST_SWITCH_COPY, type ActionResult } from '@/core/admin'
+import { runAdminAction, saveFeatureAccess, setFeatureInvite, saveSettingSwitch, saveSignupGiftCap, saveWishlistSwitch, WISHLIST_SWITCH_COPY, type ActionResult } from '@/core/admin'
 import { AppError } from '@/core/errors'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { FEATURES_CACHE_TAG } from '@/core/features'
@@ -26,6 +26,15 @@ function settingsChanged() {
 export async function saveFeatureAccessAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()
   return runAdminAction(() => saveFeatureAccess({ db: createAdminSupabase(), invalidate: featuresChanged }, admin.id, input))
+}
+
+// An invite changes who passes requireFeature on the very next request (it is never cached).
+export async function setFeatureInviteAction(input: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(async () => {
+    await setFeatureInvite({ db: createAdminSupabase() }, admin.id, input)
+    refresh()
+  })
 }
 
 export async function saveWishlistSwitchAction(input: unknown): Promise<ActionResult> {

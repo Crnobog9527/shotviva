@@ -13,6 +13,8 @@ export const testGenerateBodySchema = z.object({
   // Absent follows the saved template; explicit null uses the global default.
   provider_id: z.uuid().nullable().optional(),
   photo_id: z.uuid().nullable().optional(),
+  // A template with image slots (§5.1e): slot key → test photo, filled slots only.
+  slot_photos: z.record(z.string().regex(/^[a-z][a-z0-9_]*$/).max(64), z.uuid()).optional(),
   omit_style_refs: z.boolean().optional(),
   inputs: z
     .object({

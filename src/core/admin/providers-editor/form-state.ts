@@ -1,7 +1,8 @@
 import type { ProviderPrices } from '@/core/jobs'
 import { effectivePrices, officialPrice } from '@/core/jobs/model-prices'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
-import { DEFAULT_BASE_URL, MODULE_ADAPTER, OPENROUTER_BASE_URL, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
+import { ARK_RESOLUTIONS } from '@/core/providers/ark'
+import { ARK_BASE_URL, DEFAULT_BASE_URL, MODULE_ADAPTER, OPENROUTER_BASE_URL, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
 
 import type { AdminProvider, SaveProviderInput } from '../providers/types'
 
@@ -95,7 +96,7 @@ function officialText(module: ProviderModule, model: string): Partial<Record<Pri
 
 // Opening a row whose prices are blank: pre-fill them from the price table (§10.0).
 function fillOfficial(form: ProviderForm): ProviderForm {
-  if (form.adapter === 'openrouter_images') return form
+  if (form.adapter !== 'openai_images' && form.module === 'image') return form
   const official = officialText(form.module, form.model)
   const filled = { ...form }
   for (const field of MODULE_PRICE_FIELDS[form.module]) {
@@ -108,6 +109,7 @@ function fillOfficial(form: ProviderForm): ProviderForm {
 // price follows the new model's (blank when the table has none). One the Owner typed stays.
 export function withModel(form: ProviderForm, model: string): ProviderForm {
   if (form.adapter === 'openrouter_images' && model !== form.model) return { ...clearPrices(form), model }
+  if (form.adapter === 'ark_images') return { ...form, model }
   const before = officialText(form.module, form.model)
   const after = officialText(form.module, model)
   const next = { ...form, model, imageCosts: model === form.model ? form.imageCosts : {} }
@@ -152,9 +154,18 @@ export function withBaseUrl(form: ProviderForm, baseUrl: string): ProviderForm {
 
 // New rows offer the standard endpoint for the selected protocol. Stored rows cannot switch.
 export function withAdapter(form: ProviderForm, adapter: ProviderAdapterId): ProviderForm {
-  const baseUrl = adapter === 'openrouter_images' ? OPENROUTER_BASE_URL : DEFAULT_BASE_URL
-  return { ...clearPrices(form), adapter, baseUrl, resolutions: [...RESOLUTIONS] }
+  const baseUrl = adapter === 'openrouter_images' ? OPENROUTER_BASE_URL : adapter === 'ark_images' ? ARK_BASE_URL : DEFAULT_BASE_URL
+  return { ...clearPrices(form), adapter, baseUrl, resolutions: [...tiersFor(adapter)] }
 }
+
+// Tiers fixed in code for adapters without a catalogue. OpenRouter's come from its catalogue.
+export function tiersFor(adapter: ProviderAdapterId): readonly Resolution[] {
+  return adapter === 'ark_images' ? ARK_RESOLUTIONS : RESOLUTIONS
+}
+
+// Ark bills per image in yuan from the code price table (ark-prices.ts); its token price fields are
+// not used, and the floor needs a hand-entered per-image estimate for every tier until it has samples.
+export const usesTokenPrices = (form: Pick<ProviderForm, 'adapter'>) => form.adapter !== 'ark_images'
 
 export function toSaveInput(form: ProviderForm, provider: AdminProvider | null): SaveProviderInput {
   return {
@@ -168,9 +179,10 @@ export function toSaveInput(form: ProviderForm, provider: AdminProvider | null):
     model: form.model,
     apiKey: form.apiKey,
     notes: form.notes,
-    priceInputTextPerM: form.priceInputTextPerM,
-    priceInputImagePerM: form.priceInputImagePerM,
-    priceOutputPerM: form.priceOutputPerM,
+    // Ark rows keep no token prices (fields hidden); blank is stored as null.
+    priceInputTextPerM: usesTokenPrices(form) ? form.priceInputTextPerM : '',
+    priceInputImagePerM: usesTokenPrices(form) ? form.priceInputImagePerM : '',
+    priceOutputPerM: usesTokenPrices(form) ? form.priceOutputPerM : '',
   }
 }
 
@@ -181,6 +193,7 @@ export function canSave(form: ProviderForm, needsKey: boolean): boolean {
   const pricesOk = PRICE_FIELDS.every((field) => PRICE_PATTERN.test(form[field]))
   const estimatesOk = form.resolutions.every((tier) => {
     const cost = form.imageCosts[tier]?.trim()
+    if (!cost && form.adapter === 'ark_images') return false
     return !cost || (PRICE_PATTERN.test(cost) && Number(cost) > 0 && Number.isFinite(Number(cost)))
   })
   return filled && estimatesOk && form.resolutions.length > 0 && pricesOk && (!needsKey || form.apiKey.trim() !== '')

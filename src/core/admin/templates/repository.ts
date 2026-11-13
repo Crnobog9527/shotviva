@@ -162,14 +162,14 @@ export async function saveAssignedTemplate(client: SupabaseClient, template: Tem
 
 type CandidateRow = SaleRow & Pick<
   TemplateRow,
-  'id' | 'name' | 'category_key' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'cover_locales' | 'quality' | 'credits_cost' | 'is_active'
+  'id' | 'name' | 'category_key' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'cover_locales' | 'quality' | 'credits_cost' | 'is_active' | 'fields'
 > & { template_prompts: { version: number; provider_id: string | null } | null }
 
 // Only what the publish rules read (T60); one query for the whole batch, by primary key.
 export async function loadPublishCandidates(client: SupabaseClient, ids: readonly string[]): Promise<PublishCandidate[]> {
   const { data, error } = await client
     .from('templates')
-    .select('id, name, category_key, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, template_sale_approvals(enabled,unpriced_resolutions), template_prompts(version, provider_id)')
+    .select('id, name, category_key, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, fields, template_sale_approvals(enabled,unpriced_resolutions), template_prompts(version, provider_id)')
     .in('id', ids)
     .returns<CandidateRow[]>()
   if (error) throw new AppError('INTERNAL', `loadPublishCandidates failed: ${error.message}`)
@@ -183,6 +183,8 @@ export async function loadPublishCandidates(client: SupabaseClient, ids: readonl
     // A launched language's own complete set also counts (T87).
     coverLocales: coverLocalesSchema.parse(row.cover_locales ?? {}),
     quality: row.quality,
+    // Only the slots matter here: a slot template's floor is per slot (§5.1e).
+    fields: { images: { slots: row.fields?.images?.slots } },
     creditsCost: row.credits_cost,
     isActive: row.is_active,
     saleEnabled: row.template_sale_approvals?.enabled === true,

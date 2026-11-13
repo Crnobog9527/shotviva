@@ -14,6 +14,7 @@ import { toPhotoDetail } from '../detail/photo-detail'
 import { editDisplay, editOriginal } from './edit-display'
 import type { TemplateLookup } from './photo-item'
 import type { WorkView } from './work-view'
+import { loadPosterWork } from './poster-work'
 
 // shareText: the Share sheet's line, from the site config (which modules do not read).
 type Deps = { db: SupabaseClient; admin: SupabaseClient; store: () => ObjectStore; locale: Locale; shareText: string }
@@ -31,7 +32,7 @@ export async function loadWorkView(deps: Deps, req: Req): Promise<WorkView | nul
   const [job, around] = await Promise.all([findOwnJob(deps.admin, req.userId, req.jobId), readAround(deps, req)])
   if (!job || job.status !== 'succeeded') return null
   const { offer, balance, tier, reference, t } = around
-  const { kept, parent, lookup } = await readFromJob(deps, req.userId, job)
+  const [{ kept, parent, lookup }, poster] = await Promise.all([readFromJob(deps, req.userId, job), loadPosterWork(deps.admin, job)])
   const names = { fallback: t('photos.fallbackName'), edited: t('photos.editedName'), titleEdited: (name: string) => t('edit.titleEdited', { name }) }
   const { item, source, change } = editDisplay(job, parent, lookup, names, fileUrlFor)
   const detail = { ...toPhotoDetail(job, kept ? originalUrlFor(job.id) : null, keptInputsOf(job).length > 0), reference }
@@ -43,10 +44,19 @@ export async function loadWorkView(deps: Deps, req: Req): Promise<WorkView | nul
     // findOwnJob leaves out a deleted work (T41), so a parent id with no parent row means deleted.
     parentDeleted: job.parentJobId !== null && parent === null,
     change,
-    // Make again needs the template in today's catalogue; an edit has none (T40).
-    againable: job.templateId !== EDIT_TEMPLATE_ID && lookup.has(job.templateId),
-    edit: offer && { ...offer, balance, concurrency: limitsFor(tier).concurrency },
+    ...actionsFor(job, lookup, poster, offer && { ...offer, balance, concurrency: limitsFor(tier).concurrency }),
     shareText: deps.shareText,
+  }
+}
+
+// Make again needs the template in today's catalogue; an edit has none (T40). A poster has
+// neither Make again nor an AI edit (which would redraw its text unchecked): it shows its text
+// check and Redraw, and changes its text in the poster editor (ARCHITECTURE §5.3).
+function actionsFor(job: Job, lookup: TemplateLookup, poster: WorkView['poster'], edit: WorkView['edit']) {
+  return {
+    againable: !poster && job.templateId !== EDIT_TEMPLATE_ID && lookup.has(job.templateId),
+    edit: poster ? null : edit,
+    poster,
   }
 }
 

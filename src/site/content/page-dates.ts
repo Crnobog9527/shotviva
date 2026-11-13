@@ -10,6 +10,7 @@ export const PAGE_LASTMOD: Readonly<Record<string, string>> = {
   '/image-to-image-generator': '2026-11-13',
   '/commercial-photography': '2026-11-13',
   '/ai-restaurant-menu': '2026-11-13',
+  '/transparent-background': '2026-11-13',
   '/pricing': '2026-11-12',
   '/terms': LAST_UPDATED,
   '/privacy': LAST_UPDATED,

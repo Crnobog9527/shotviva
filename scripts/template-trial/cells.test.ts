@@ -17,6 +17,20 @@ const defaultModel: EffectiveModel = () => ({ providerId: 'env', model: 'gpt-ima
 const ids = (trial: object, t = templates(), model = defaultModel) =>
   planCells(batch(trial).templates, t, photos, { model }).cells.map(c => runIdOf(c, 0))
 
+describe('trial cells with image slots (§5.1e)', () => {
+  it('hashes each slot\'s image bytes, so a changed or moved slot image re-runs the cell', () => {
+    const { cells } = planCells(batch({ inputs: [{ slots: { logo: 'in/a.jpg', prize_1: 'in/b.jpg' } }] }).templates, templates(), photos, { model: defaultModel })
+    expect(cells[0]?.slotHashes).toEqual({ logo: 'a'.repeat(64), prize_1: 'b'.repeat(64) })
+    const base = ids({ inputs: [{ slots: { logo: 'in/a.jpg' } }] })[0]
+    expect(ids({ inputs: [{ slots: { logo: 'in/c.jpg' } }] })[0]).not.toBe(base)
+    expect(ids({ inputs: [{ slots: { prize_1: 'in/a.jpg' } }] })[0]).not.toBe(base)
+  })
+
+  it('refuses a photo and slots in one input set', () => {
+    expect(() => batch({ inputs: [{ photo: 'in/a.jpg', slots: { logo: 'in/b.jpg' } }] })).toThrow()
+  })
+})
+
 describe('trial cells', () => {
   it('makes n cells per input set with stable, distinct UUID run ids', () => {
     const trial = { inputs: [{ photo: 'in/a.jpg' }, { photo: 'in/b.jpg', fields: { dish: 'soup' } }], n: 2 }
@@ -85,6 +99,10 @@ describe('provider failures', () => {
     }
     expect(isDeterministic(failure('timeout', 'openai request aborted at deadline'))).toBe(false)
     expect(isDeterministic(failure('content_rejected', 'openai 400 code=moderation_blocked type=-'))).toBe(true)
+    expect(failure('failed', 'ark image request failed (HTTP 429 code=AccountQuotaExceeded)')).toEqual({ kind: 'failed', status: 429, code: 'AccountQuotaExceeded' })
+    expect(isDeterministic(failure('failed', 'ark image request failed (HTTP 429 code=AccountQuotaExceeded)'))).toBe(true)
+    expect(isDeterministic(failure('failed', 'ark image request failed (HTTP 429 code=ModelAccountIpmRateLimitExceeded)'))).toBe(false)
+    expect(failure('failed', 'ark image request failed (HTTP 500 code=-)')).toMatchObject({ status: 500, code: null })
     expect(readFailure(new Error('x'))).toBeNull()
   })
 })

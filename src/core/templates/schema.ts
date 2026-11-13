@@ -4,7 +4,9 @@ import { RESOLUTIONS } from './output-options'
 import { styleRefsSchema } from './style-refs'
 import { creditsCostSchema, TEMPLATE_QUALITIES } from './pricing'
 import { RESERVED_KEYS, toggleFieldSchema, TOGGLES_MAX } from './toggles'
-import { copyFieldSchema } from './copy-fields'
+import { COPY_FIELDS_MAX, copyFieldSchema } from './copy-fields'
+import { imageSlotsSchema, slotShapeProblems } from './image-slots'
+import { posterFieldsSchema } from '../poster/template'
 
 // Template shapes shared by the admin page, the import script and (later) generation.
 // No `server-only` here: scripts/import-prompts.ts validates with the same schema.
@@ -22,11 +24,19 @@ const slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'lowercase letters, di
 
 export const templateFieldsSchema = z
   .object({
-    images: z.object({ min: z.number().int().min(0).max(4), max: z.number().int().min(0).max(4) }),
-    copy: z.array(copyFieldSchema).max(10).default([]),
+    // slots (§5.1e): named upload boxes; with them max = slots and min = required slots.
+    images: z.object({ min: z.number().int().min(0).max(4), max: z.number().int().min(0).max(4), slots: imageSlotsSchema.optional() }),
+    copy: z.array(copyFieldSchema).max(COPY_FIELDS_MAX).default([]),
     aspectRatios: z.array(z.string().regex(/^\d{1,2}:\d{1,2}$/)).min(1),
     // Optional on/off choices (T89), off by default; their prompt text is private.
     toggles: z.array(toggleFieldSchema).max(TOGGLES_MAX).default([]),
+    // A dense-text poster template (ARCHITECTURE §5.3): its text comes from the confirmed content
+    // blocks, never from copy fields, and it makes one or more posters per set.
+    poster: posterFieldsSchema.optional(),
+  })
+  .refine((fields) => !fields.poster || fields.copy.length === 0, {
+    message: 'a poster template takes its text from the content blocks, not from copy fields',
+    path: ['poster'],
   })
   .refine((fields) => fields.images.min <= fields.images.max, {
     message: 'images.min must not exceed images.max',
@@ -36,13 +46,17 @@ export const templateFieldsSchema = z
     message: 'copy field keys must be unique',
     path: ['copy'],
   })
-  // One placeholder namespace: {{key}} is either a copy field or a toggle, never both.
+  .superRefine((fields, ctx) => {
+    for (const message of slotShapeProblems(fields)) ctx.addIssue({ code: 'custom', message, path: ['images', 'slots'] })
+  })
+  // One key namespace: a copy field, a toggle or an image slot (whose zh text also sits in
+  // translations.zh.fields.<key>), never two of them, and never a reserved placeholder.
   .refine((fields) => {
-    const keys = [...fields.copy.map((field) => field.key), ...fields.toggles.map((toggle) => toggle.key)]
+    const keys = [...fields.copy.map((field) => field.key), ...fields.toggles.map((toggle) => toggle.key), ...(fields.images.slots ?? []).map((slot) => slot.key)]
     const reserved = keys.some((key) => (RESERVED_KEYS as readonly string[]).includes(key))
     return new Set(keys).size === keys.length && !reserved
   }, {
-    message: 'copy and toggle keys must be unique and differ from reserved placeholders',
+    message: 'copy field, toggle and image slot keys must be unique and differ from reserved placeholders',
     path: ['toggles'],
   })
 
