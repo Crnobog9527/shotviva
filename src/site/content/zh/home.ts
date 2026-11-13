@@ -49,9 +49,9 @@ const phoneShot = zhTote.phone
 
 // 首屏 AI 那一半：同一张手机照片做出的三个场景轮流展示（Owner 2026-11-11），和英文首页一致。
 const heroScenes = [
-  { image: photo('hero-ai-street', 'AI 示例：同一只编织皮托特包挎在女生肩上，阳光下的巴黎街头，身后是咖啡馆座位'), caption: '同一只包，换了街景和模特' },
-  { image: photo('hero-ai-terrace', 'AI 示例：同一只包放在海边露台的大理石咖啡桌上，旁边的女生端着咖啡'), caption: '同一只包，放上海边露台的咖啡桌' },
-  { image: photo('hero-ai-villa', 'AI 示例：同一只包放在阳光下别墅廊下的石凳上，墙上有树叶的影子'), caption: '同一只包，换了光线和场景' },
+  { image: photo('hero-ai-street', '真实案例：同一只编织皮托特包挎在女生肩上，阳光下的巴黎街头，身后是咖啡馆座位'), caption: '同一只包，换了街景和模特' },
+  { image: photo('hero-ai-terrace', '真实案例：同一只包放在海边露台的大理石咖啡桌上，旁边的女生端着咖啡'), caption: '同一只包，放上海边露台的咖啡桌' },
+  { image: photo('hero-ai-villa', '真实案例：同一只包放在阳光下别墅廊下的石凳上，墙上有树叶的影子'), caption: '同一只包，换了光线和场景' },
 ] as const
 
 // Also the /zh/commercial-photography demo (T44).
@@ -129,7 +129,7 @@ const copy = {
   templateGrid: {
     heading: 'AI改图模板：不用写提示词',
     intro: `每个模板都从你的手机照片开始，到一张成品图结束。选一个，剩下的交给 ${brand}。`,
-    note: '模板图片均为示意图。',
+    note: '模板图片都是用 Shotviva 模板真实生成的。',
   },
   topics: whiteBackgroundGuide,
   wishlist: zhHomeWishlist,
@@ -166,7 +166,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: 'AI改图会不会把我照片里的东西改掉？',
-    answer: `${brand} 的模板专门保留你拍的主体：商品标签、摆盘、房间布局或宠物都按原样留着，只改光线、背景、场景或画风。不少 AI改图工具会连主体一起重画，用之前最好先看一眼效果。${brand} 不做人像美颜修图。`,
+    answer: `${brand} 的模板专门保留你拍的主体：商品和标签、菜品本身、房间布局或宠物都按原样留着，改的是光线、背景、场景或画风；餐饮模板还可能换盘子或碗。不少 AI改图工具会连主体一起重画，用之前最好先看一眼效果。${brand} 不做人像美颜修图。`,
   },
   {
     question: 'AI改图和 AI 生图有什么区别？',
