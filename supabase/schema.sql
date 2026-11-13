@@ -1336,7 +1336,9 @@ begin
          where t.id = new.template_id and r.gallery_excluded)
       or exists (
         select 1 from public.generation_jobs parent
-         where parent.id = new.parent_job_id and parent.gallery_excluded);
+         where parent.id = new.parent_job_id and parent.gallery_excluded)
+      -- A dense-text poster template (fields.poster), wherever it is filed (1348).
+      or exists (select 1 from public.templates t where t.id = new.template_id and t.fields ? 'poster');
   elsif old.gallery_excluded and not new.gallery_excluded then
     raise exception 'GALLERY_EXCLUDED_IMMUTABLE';
   end if;
@@ -2085,9 +2087,12 @@ CREATE OR REPLACE FUNCTION "admin"."template_image_options"("public"."templates"
     AS $_$
   select jsonb_build_object(
     'resolutions', array(select r from unnest(admin.sale_route_resolutions(p)) r where not(r=any(coalesce(s.unpriced_resolutions,'{}')))),
-    'aspectRatios',case when p.adapter='openrouter_images' then coalesce(p.capabilities->'aspectRatios','[]'::jsonb)
-      else '["16:9","4:5","1:1","9:16","3:2","4:3","2:3"]'::jsonb end,
-    'originalRatio',case when p.adapter='openrouter_images' then coalesce(p.capabilities->'originalRatio','false'::jsonb) else 'true'::jsonb end)
+    'aspectRatios',(select coalesce(jsonb_agg(a.r order by a.n),'[]'::jsonb)
+      from jsonb_array_elements_text(case when p.adapter='openrouter_images' then coalesce(p.capabilities->'aspectRatios','[]'::jsonb)
+        else '["16:9","4:5","1:1","9:16","3:2","4:3","2:3","1:2","1:3"]'::jsonb end) with ordinality a(r,n)
+      where a.r not in ('1:2','1:3') or coalesce(t.fields->'aspectRatios','[]'::jsonb) ? a.r),
+    'originalRatio',case when p.adapter='openrouter_images' then coalesce(p.capabilities->'originalRatio','false'::jsonb) else 'true'::jsonb end,
+    'exactPixels',p.adapter is distinct from 'openrouter_images')
   from public.templates t left join public.template_sale_approvals s on s.template_id=t.id
   left join public.template_prompts tp on tp.template_id=t.id
   left join public.ai_providers p on p.id=coalesce(case when t.id<>'edit' then tp.provider_id end,
@@ -11727,7 +11732,7 @@ begin
   end if;
   if new.adapter = 'openai_images' and new.capabilities = '{}' then
     new.capabilities := jsonb_build_object(
-      'resolutions',to_jsonb(new.resolutions),'aspectRatios','["16:9","4:5","1:1","9:16","3:2","4:3","2:3"]'::jsonb,
+      'resolutions',to_jsonb(new.resolutions),'aspectRatios','["16:9","4:5","1:1","9:16","3:2","4:3","2:3","1:2","1:3"]'::jsonb,
       'originalRatio',true,'minReferences',0,'maxReferences',4,'fetchedAt',now()
     );
   end if;
@@ -13537,6 +13542,57 @@ ALTER TABLE "public"."payments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTI
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."poster_extractions" (
+    "id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "source" "text" NOT NULL,
+    "input_chars" integer NOT NULL,
+    "status" "text" NOT NULL,
+    "provider" "text",
+    "input_tokens" integer,
+    "output_tokens" integer,
+    "cost_usd" numeric(10,6),
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "poster_extractions_cost_usd_check" CHECK (("cost_usd" >= (0)::numeric)),
+    CONSTRAINT "poster_extractions_input_chars_check" CHECK (("input_chars" >= 0)),
+    CONSTRAINT "poster_extractions_input_tokens_check" CHECK (("input_tokens" >= 0)),
+    CONSTRAINT "poster_extractions_output_tokens_check" CHECK (("output_tokens" >= 0)),
+    CONSTRAINT "poster_extractions_source_check" CHECK (("source" = ANY (ARRAY['paste'::"text", 'photo'::"text"]))),
+    CONSTRAINT "poster_extractions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'ok'::"text", 'failed'::"text"])))
+);
+
+
+ALTER TABLE "public"."poster_extractions" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."poster_extractions" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."poster_extractions_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."poster_sets" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "template_id" "text" NOT NULL,
+    "source" "text" DEFAULT 'paste'::"text" NOT NULL,
+    "content" "jsonb" NOT NULL,
+    "parts" "jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "poster_sets_content_check" CHECK ((("jsonb_typeof"("content") = 'object'::"text") AND ("pg_column_size"("content") <= 65536))),
+    CONSTRAINT "poster_sets_parts_check" CHECK ((("jsonb_typeof"("parts") = 'array'::"text") AND (("jsonb_array_length"("parts") >= 1) AND ("jsonb_array_length"("parts") <= 12)))),
+    CONSTRAINT "poster_sets_source_check" CHECK (("source" = ANY (ARRAY['paste'::"text", 'photo'::"text", 'reuse'::"text", 'manual'::"text"])))
+);
+
+
+ALTER TABLE "public"."poster_sets" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."prompt_lab_reverse_requests" (
     "id" "uuid" NOT NULL,
     "session_id" "uuid" NOT NULL,
@@ -14247,6 +14303,16 @@ ALTER TABLE "public"."payments"
 
 
 
+ALTER TABLE ONLY "public"."poster_extractions"
+    ADD CONSTRAINT "poster_extractions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."poster_sets"
+    ADD CONSTRAINT "poster_sets_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."products"
     ADD CONSTRAINT "products_pkey" PRIMARY KEY ("id");
 
@@ -14830,6 +14896,14 @@ CREATE INDEX "payments_user_id_idx" ON "public"."payments" USING "btree" ("user_
 
 
 CREATE INDEX "payments_waffo_order_id_idx" ON "public"."payments" USING "btree" ("waffo_order_id") WHERE ("waffo_order_id" IS NOT NULL);
+
+
+
+CREATE INDEX "poster_extractions_user_created" ON "public"."poster_extractions" USING "btree" ("user_id", "created_at" DESC);
+
+
+
+CREATE INDEX "poster_sets_user_created" ON "public"."poster_sets" USING "btree" ("user_id", "created_at" DESC);
 
 
 
@@ -15595,6 +15669,21 @@ ALTER TABLE ONLY "public"."payments"
 
 
 
+ALTER TABLE ONLY "public"."poster_extractions"
+    ADD CONSTRAINT "poster_extractions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_sets"
+    ADD CONSTRAINT "poster_sets_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_sets"
+    ADD CONSTRAINT "poster_sets_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."profiles"
     ADD CONSTRAINT "profiles_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
@@ -15997,6 +16086,16 @@ ALTER TABLE "public"."payment_refunds" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."payments" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."poster_extractions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."poster_sets" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "poster_sets_read_own" ON "public"."poster_sets" FOR SELECT TO "authenticated" USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
+
 
 
 ALTER TABLE "public"."products" ENABLE ROW LEVEL SECURITY;
@@ -18217,6 +18316,21 @@ GRANT SELECT ON TABLE "public"."payment_dispute_link_errors" TO "service_role";
 GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."poster_extractions" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."poster_extractions_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."poster_extractions_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."poster_extractions_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."poster_sets" TO "service_role";
+GRANT SELECT ON TABLE "public"."poster_sets" TO "authenticated";
 
 
 
