@@ -9,6 +9,7 @@ import type { FormAction } from '@/core/auth/ui'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
 import { allowsNoPhoto, isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
+import type { PickerBrowse } from '../catalogue/picker-browse'
 import { FavoritesProvider } from '../favorites/favorites-provider'
 import { FavoriteReturn } from '../favorites/favorite-return-effect'
 import type { HomeViewer } from './home-cta'
@@ -23,6 +24,8 @@ import { useOpenFromQuery, usePickEvents } from './use-pick-events'
 export type HomeGeneratorProps = {
   // The live web catalogue (cached).
   templates: CatalogueTemplate[]
+  // The picker's categories, series and card order (Create's cached index); null: flat list.
+  browse: PickerBrowse | null
   defaultId: string | null
   // null: signed out (or not known yet while the page streams).
   viewer: HomeViewer | null
@@ -59,7 +62,7 @@ const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matc
 // stacked on phones and two columns from 1024px (home-panel.tsx). Signed in it starts the photo through the workspace's own
 // pipeline and moves to that template's workspace; signed out it keeps the setup in this
 // browser and asks for an account.
-export function HomeGenerator({ templates: all, defaultId, viewer, googleAction, homePath, freeImages, initialCovers }: HomeGeneratorProps) {
+export function HomeGenerator({ templates: all, browse, defaultId, viewer, googleAction, homePath, freeImages, initialCovers }: HomeGeneratorProps) {
   // The panel has one upload card: a template with named image slots (§5.1e) opens in its own
   // workspace instead, never here.
   const templates = useMemo(() => all.filter((template) => !isSlotTemplate(template)), [all])
@@ -130,6 +133,7 @@ export function HomeGenerator({ templates: all, defaultId, viewer, googleAction,
       <TemplatePicker
         openOn={pickerOn}
         templates={templates}
+        browse={browse}
         onClose={() => setPickerOn(null)}
         onPick={(id) => {
           setPickerOn(null)
