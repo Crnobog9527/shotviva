@@ -172,7 +172,7 @@ describe('first runs of a slot template (§5.1e)', () => {
     const run = await runTestGenerate(deps, { actorId: admin, body: body({ prize_1: photoId, logo: second }) })
     expect(run.status).toBe('succeeded')
     expect(p.calls[0]!.images.map((image) => image.width)).toEqual([900, 1600])
-    expect(p.calls[0]!.prompt).toContain('Image 1: Venue logo; Image 2: 1st prize photo')
+    expect(p.calls[0]!.prompt).toContain('Image 1 is the Venue logo; Image 2 is the 1st prize photo. These names only say which attached image is which')
     const stored = (await db.query('select inputs from public.admin_test_runs where id = $1', [run.id])).rows[0].inputs
     expect(stored.slot_photos).toEqual({ prize_1: photoId, logo: second })
     await expect(runTestGenerate(deps, { actorId: admin, body: body({ logo: second }) })).rejects.toMatchObject({ code: 'INVALID_INPUT' })

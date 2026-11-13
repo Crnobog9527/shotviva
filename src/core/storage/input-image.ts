@@ -5,6 +5,7 @@ import sharp from 'sharp'
 import { AppError } from '../errors'
 import { logger } from '../logger'
 import type { ObjectStore } from './object-store'
+import { matteOf } from './see-through'
 import { INPUT_JPEG_QUALITY, INPUT_LONG_EDGE, isUploadContentType, MAX_UPLOAD_BYTES } from './rules'
 import { sniffImageType } from './sniff'
 
@@ -24,11 +25,15 @@ async function reject(store: ObjectStore, key: string, code: 'IMAGE_TOO_LARGE' |
 
 // Normal uploads are already ≤2048 JPEGs; this also covers the browser-compression fallback,
 // where the original (≤20MB) was uploaded as-is. rotate() bakes in EXIF orientation and the
-// re-encode drops all metadata, GPS included.
+// re-encode drops all metadata, GPS included. A see-through PNG/WebP (a logo, a cut-out work being
+// edited) is laid on a neutral ground first: JPEG has no alpha and sharp would otherwise turn the
+// transparent area black (see-through.ts).
 export async function normalizeInputImage(bytes: Uint8Array): Promise<Uint8Array> {
-  const output = await sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS })
+  const matte = await matteOf(bytes)
+  const resized = sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS })
     .rotate()
     .resize({ width: INPUT_LONG_EDGE, height: INPUT_LONG_EDGE, fit: 'inside', withoutEnlargement: true })
+  const output = await (matte ? resized.flatten({ background: matte }) : resized)
     .jpeg({ quality: Math.round(INPUT_JPEG_QUALITY * 100) })
     .toBuffer()
   return new Uint8Array(output)

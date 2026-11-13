@@ -80,11 +80,16 @@ export function checkSlotUploads(slots: readonly ImageSlot[], given: Readonly<Re
   return filled
 }
 
+// Said after the list: Seedream once printed a slot's label ("Venue logo") on the poster, reading
+// the list as copy to set (2026-11-14).
+export const SLOT_LABELS_NOT_TEXT = 'These names only say which attached image is which; never write them on the image.'
+
 // {{image_slots}}: which attached image is which, in the order they are sent, e.g.
-// "Image 1: Venue logo; Image 2: 2nd prize photo". Empty slots take no number.
+// "Image 1 is the Venue logo; Image 2 is the 2nd prize photo. These names only say …". Labels go
+// unquoted: a quoted phrase reads to image models like text to set. Empty slots take no number.
 export function slotMapping(labels: readonly string[]): string {
   if (labels.length === 0) return 'No images are attached.'
-  return labels.map((label, index) => `Image ${index + 1}: ${label}`).join('; ')
+  return `${labels.map((label, index) => `Image ${index + 1} is the ${label}`).join('; ')}. ${SLOT_LABELS_NOT_TEXT}`
 }
 
 // The kept copy of the n-th sent image is `…-in-<n>.<ext>` (T40); a copy that failed is left out

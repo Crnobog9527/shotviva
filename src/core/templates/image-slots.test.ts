@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { renderPrompt, validateGenerationInputs } from './generation-inputs'
-import { keptSlotIndex, slotMapping, slotSurfaceProblems, storedSlotOrder } from './image-slots'
+import { keptSlotIndex, SLOT_LABELS_NOT_TEXT, slotMapping, slotSurfaceProblems, storedSlotOrder } from './image-slots'
 import { templateFieldsSchema } from './schema'
 
 const slotted = {
@@ -84,7 +84,7 @@ describe('renderPrompt image list', () => {
 
   it('fills {{image_slots}} with the sent images only, numbered from 1', () => {
     expect(renderPrompt('Map: {{image_slots}}', inputsWith({ logo: 'inputs/u/l.png', prize_2: 'inputs/u/b.jpg' }))).toBe(
-      'Map: Image 1: Venue logo; Image 2: 2nd prize photo\n\nVenue name: Night Flight',
+      'Map: Image 1 is the Venue logo; Image 2 is the 2nd prize photo. These names only say which attached image is which; never write them on the image.\n\nVenue name: Night Flight',
     )
   })
 
@@ -93,7 +93,7 @@ describe('renderPrompt image list', () => {
   })
 
   it('appends the list when the body has no placeholder', () => {
-    expect(renderPrompt('Poster.', inputsWith({ prize_1: 'inputs/u/a.jpg' }))).toBe('Poster.\n\nImages: Image 1: 1st prize photo\n\nVenue name: Night Flight')
+    expect(renderPrompt('Poster.', inputsWith({ prize_1: 'inputs/u/a.jpg' }))).toBe('Poster.\n\nImages: Image 1 is the 1st prize photo. These names only say which attached image is which; never write them on the image.\n\nVenue name: Night Flight')
   })
 
   it('leaves a template without slots as it was', () => {
@@ -103,7 +103,7 @@ describe('renderPrompt image list', () => {
 })
 
 describe('slot helpers', () => {
-  it('maps labels', () => expect(slotMapping(['A'])).toBe('Image 1: A'))
+  it('maps labels', () => expect(slotMapping(['A'])).toBe(`Image 1 is the A. ${SLOT_LABELS_NOT_TEXT}`))
   it('reads the slot index from a kept copy key', () => {
     expect(keptSlotIndex('outputs/u/job-in-2.png')).toBe(1)
     expect(keptSlotIndex('outputs/u/job.png')).toBeNull()
