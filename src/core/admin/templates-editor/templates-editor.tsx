@@ -131,6 +131,7 @@ export function TemplatesEditor({ providers, templates: all, categories, series,
           floor={floor}
           categories={categories}
           series={series}
+          templates={templates}
           coverLanguages={coverLanguages}
           coverActions={actions}
           pending={pending}
