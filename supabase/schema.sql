@@ -1336,7 +1336,9 @@ begin
          where t.id = new.template_id and r.gallery_excluded)
       or exists (
         select 1 from public.generation_jobs parent
-         where parent.id = new.parent_job_id and parent.gallery_excluded);
+         where parent.id = new.parent_job_id and parent.gallery_excluded)
+      -- A dense-text poster template (fields.poster), wherever it is filed (1348).
+      or exists (select 1 from public.templates t where t.id = new.template_id and t.fields ? 'poster');
   elsif old.gallery_excluded and not new.gallery_excluded then
     raise exception 'GALLERY_EXCLUDED_IMMUTABLE';
   end if;
@@ -9982,7 +9984,9 @@ begin
    where id = (v_job.inputs->'poster'->>'redraw_of')::uuid and user_id = v_job.user_id and status = 'succeeded';
   if not found or v_source.template_id <> v_job.template_id
      or v_source.inputs->'poster'->'set_id' is distinct from v_job.inputs->'poster'->'set_id'
-     or v_source.inputs->'poster'->'part' is distinct from v_job.inputs->'poster'->'part' then
+     or v_source.inputs->'poster'->'part' is distinct from v_job.inputs->'poster'->'part'
+     or v_source.inputs->>'resolution' is distinct from v_job.inputs->>'resolution'
+     or v_source.inputs->>'aspect_ratio' is distinct from v_job.inputs->>'aspect_ratio' then
     return false;
   end if;
   if not exists (select from public.poster_checks where job_id = v_source.id and status = 'mismatch') then
@@ -9998,7 +10002,7 @@ begin
     return exists (select from public.poster_free_redraws where set_id = v_set and part = v_part and job_id = v_job.id);
   end if;
   perform public._apply_credit_change(
-    v_job.user_id, v_job.credit_pool, 'refund', v_job.credits_cost, 'poster free redraw',
+    v_job.user_id, v_job.credit_pool, 'refund', least(v_job.credits_cost, v_source.credits_cost), 'poster free redraw',
     'job:' || v_job.id::text || ':poster_free_redraw', v_job.id
   );
   return true;
@@ -13623,7 +13627,7 @@ CREATE TABLE IF NOT EXISTS "public"."poster_extractions" (
     CONSTRAINT "poster_extractions_input_tokens_check" CHECK (("input_tokens" >= 0)),
     CONSTRAINT "poster_extractions_output_tokens_check" CHECK (("output_tokens" >= 0)),
     CONSTRAINT "poster_extractions_source_check" CHECK (("source" = ANY (ARRAY['paste'::"text", 'photo'::"text"]))),
-    CONSTRAINT "poster_extractions_status_check" CHECK (("status" = ANY (ARRAY['ok'::"text", 'failed'::"text"])))
+    CONSTRAINT "poster_extractions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'ok'::"text", 'failed'::"text"])))
 );
 
 
@@ -18461,7 +18465,7 @@ GRANT SELECT ON TABLE "public"."poster_checks" TO "authenticated";
 
 
 
-GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."poster_extractions" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."poster_extractions" TO "service_role";
 
 
 
