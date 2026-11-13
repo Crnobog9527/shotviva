@@ -6,6 +6,8 @@ export type GenerateBody = {
   expected_credits?: number
   template_id: string
   input_key: string | null
+  // A slot template's uploads by slot (§5.1e); such a job has no input_key.
+  input_slots?: Record<string, string>
   // Photos in the workspace batch (T28); 1 for a single photo.
   batch_size?: number
   // From the batch preflight (T107): the batch, its distinct templates and this cell's signed proof.
