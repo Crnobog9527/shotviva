@@ -16,6 +16,10 @@ export const imageCapabilitiesSchema = withTierKeys(z.object({
   originalRatio: z.boolean(),
   minReferences: z.number().int().nonnegative(),
   maxReferences: z.number().int().nonnegative(),
+  // Where `resolutions` came from and the admin's narrower choice or declaration (PR-1b,
+  // providers/tier-support.ts). Absent on snapshots written before: read as detected, no choice.
+  resolutionSource: z.enum(['spec', 'catalog', 'declared', 'unknown']).optional(),
+  resolutionLimit: z.array(resolutionSchema).min(1).optional(),
   catalogVersion: z.literal(1).optional(),
   catalogImageCosts: estimatedImageCostsSchema.optional(),
   catalogPricing: catalogPricingSchema.optional(),
