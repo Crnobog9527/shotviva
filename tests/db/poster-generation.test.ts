@@ -100,9 +100,9 @@ describe('poster sets and generation', () => {
     await expect(generate(userId, { poster: { setId: set.id, part: 0 } }).run()).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   })
 
-  it('is closed to an account that was not invited', async () => {
+  it('is open to any signed-in account, invited or not', async () => {
     const userId = await createUser(db, { credits: 10 })
-    await expect(savePosterSet(service, { userId, templateId, fields: { poster }, content, source: 'paste', allow })).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    await expect(savePosterSet(service, { userId, templateId, fields: { poster }, content, source: 'paste', allow })).resolves.toMatchObject({ id: expect.any(String) })
   })
 
   it('lets owners read their own sets and nobody else, and never write them', async () => {

@@ -10,8 +10,8 @@ import { loadStudioTemplate, posterAllowed, PosterStudio } from '@/modules/image
 
 type RouteProps = { params: Promise<{ templateId: string }> }
 
-// The poster editor (ARCHITECTURE §5.3), a flow page back to the poster list. Invite-only: 404
-// for anyone else, and for a template that makes no posters.
+// The poster editor (ARCHITECTURE §5.3), a flow page back to the poster list. 404 when the
+// dense_poster feature is gated off for this account, and for a template that makes no posters.
 async function Studio({ params }: RouteProps) {
   const { templateId } = await params
   const user = await requireUser(`/posters/${templateId}`)

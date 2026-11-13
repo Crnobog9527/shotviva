@@ -12,8 +12,8 @@ import type { OutputAspect } from '@/core/templates/output-options'
 
 import type { StudioTemplate } from './use-poster-studio'
 
-// Server side of the poster pages (ARCHITECTURE §5.3): invite-only, so a caller who may not use
-// the feature gets null and the page answers 404, as if it did not exist.
+// Server side of the poster pages (ARCHITECTURE §5.3): a caller the dense_poster feature does not
+// allow (open to everyone today; the admin can gate it again) gets null and the page answers 404.
 
 export const posterAllowed = (userId: string) => featureAllowed(userId, POSTER_FEATURE).catch(() => false)
 
