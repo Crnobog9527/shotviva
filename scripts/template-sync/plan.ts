@@ -1,7 +1,7 @@
 import { syncCategories, templateCategoryKeys } from './categories'
 import { SyncError } from './covers'
 import { readSeries, syncSeriesDefinition, syncSeriesMembers, type SeriesSnapshot } from './series'
-import { readStates, syncSeriesActive, syncTemplateDelete, syncTemplateState } from './state'
+import { readDeletedIds, readStates, syncSeriesActive, syncTemplateState } from './state'
 import { syncTemplate, type SyncTarget } from './sync'
 
 // One dispatch (2026-11-12): templates by id and whole series by slug, the test site being the only
@@ -64,11 +64,16 @@ async function definitions(series: readonly SeriesSnapshot[], run: Run, fail: (l
   return defined
 }
 
-async function members(series: readonly SeriesSnapshot[], run: Run, fail: (line: string) => void) {
+// A member deleted on production stays out of the series there (the guard trigger would refuse it).
+async function members(series: readonly SeriesSnapshot[], goneHere: ReadonlySet<string>, run: Run, fail: (line: string) => void) {
   for (const item of series) {
     const label = `series ${item.series.slug} members`
+    const kept = item.members.filter((id) => !goneHere.has(id))
+    if (kept.length < item.members.length) {
+      run.report(`${label} SKIPPED deleted on production: ${item.members.filter((id) => goneHere.has(id)).join(' ')}`)
+    }
     try {
-      const { placed, skipped } = await syncSeriesMembers(item, run.target, run.validateOnly)
+      const { placed, skipped } = await syncSeriesMembers({ ...item, members: kept }, run.target, run.validateOnly)
       const line = `${label} ${placed.length}/${item.members.length}`
       if (skipped.length > 0) fail(`${line} SKIPPED ${skipped.join(' ')}`)
       else run.report(line)
@@ -90,17 +95,8 @@ async function seriesActive(series: readonly SeriesSnapshot[], active: boolean, 
   }
 }
 
-// Deleted on the test site (1381): no content write, production unpublishes and deletes it.
-async function deleteOne(id: string, sale: boolean, run: Run, fail: (line: string) => void) {
-  try {
-    run.report(`${id} ${await syncTemplateDelete(id, sale, { id: run.actorId, runId: run.runId }, run.target, run.validateOnly)}`)
-  } catch (error) {
-    fail(`${id} delete ${reason(error)}`)
-  }
-}
-
 // Each template's content, then its sale and publication as on the test site.
-async function templates(ids: readonly string[], run: Run, fail: (line: string) => void) {
+async function templates(ids: readonly string[], goneHere: ReadonlySet<string>, run: Run, fail: (line: string) => void) {
   const actor = { id: run.actorId, runId: run.runId }
   const states = await readStates(ids, run.source).catch((error: unknown) => {
     fail(`states ${reason(error)}`)
@@ -108,8 +104,8 @@ async function templates(ids: readonly string[], run: Run, fail: (line: string) 
   })
   for (const id of ids) {
     const state = states?.get(id)
-    if (state?.deleted) {
-      await deleteOne(id, state.sale, run, fail)
+    if (state?.deleted || goneHere.has(id)) {
+      run.report(`${id} SKIPPED deleted on ${state?.deleted ? 'the test site' : 'production'} (deletes are not synced)`)
       continue
     }
     try {
@@ -140,8 +136,12 @@ export async function runSync(request: SyncRequest, run: Run): Promise<boolean> 
   await categories(series, ids, run, fail)
   const defined = await definitions(series, run, fail)
   await seriesActive(defined, false, run, fail)
-  await templates(ids, run, fail)
-  await members(defined, run, fail)
+  const goneHere = await readDeletedIds(ids, run.target).catch((error: unknown) => {
+    fail(`deleted ${reason(error)}`)
+    return new Set<string>()
+  })
+  await templates(ids, goneHere, run, fail)
+  await members(defined, goneHere, run, fail)
   await seriesActive(defined, true, run, fail)
   return ok
 }

@@ -7,7 +7,7 @@ import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 
 // 删除 in the template list (Owner 2026-11-13): unpublished, non-built-in templates only. A soft
-// delete (admin_delete_template, 1381): works, jobs and requests keep pointing at the row, so
+// delete (admin_delete_template, 1401): works, jobs and requests keep pointing at the row, so
 // nothing a user made disappears; the template just leaves the admin and can never go live again.
 const MESSAGES: Record<string, string> = {
   TEMPLATE_LIVE: '已上架的模板不能删除，请先下架。',

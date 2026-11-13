@@ -69,14 +69,16 @@ export function ActionsCell({ template, pending, onDuplicate, onEdit, onDelete }
             <CopyPlus aria-hidden />
           </Button>
         )}
-        {!template.isActive && !isBuiltIn(template) && (
+        {!template.isActive && !template.deletedAt && !isBuiltIn(template) && (
           <Button variant="ghost" size="sm" className="text-destructive" disabled={pending} onClick={() => onDelete(template)}>
             {rowCopy.delete}
           </Button>
         )}
-        <Button variant="outline" size="sm" disabled={pending} onClick={() => onEdit(template)}>
-          {rowCopy.edit}
-        </Button>
+        {template.deletedAt ? <span className="text-muted-foreground px-2 text-sm">{rowCopy.deleted}</span> : (
+          <Button variant="outline" size="sm" disabled={pending} onClick={() => onEdit(template)}>
+            {rowCopy.edit}
+          </Button>
+        )}
       </div>
     </TableCell>
   )

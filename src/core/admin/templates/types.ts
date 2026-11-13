@@ -11,6 +11,8 @@ export type AdminTemplate = Template & {
   subcategoryKey?: string | null
   seriesId?: string | null
   seriesSortOrder?: number
+  // 删除 (1401): set on soft-deleted templates, shown only under 已删除 and never published again.
+  deletedAt?: string | null
   saleEnabled?: boolean
   // Published but missing from the catalogue, and why (1295); absent when it is listed.
   catalogueGap?: SaleFloorExample

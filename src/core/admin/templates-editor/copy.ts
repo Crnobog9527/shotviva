@@ -248,7 +248,8 @@ export const saleCopy = {
 }
 
 export const catalogCopy = {
-  priceGroup: '出图与价格', active: '已上架', inactive: '已下架', all: '全部',
+  priceGroup: '出图与价格', active: '已上架', inactive: '已下架', all: '全部', deleted: '已删除',
+  deletedHint: '已删除的模板不能上架、加入系列或排序；作品和出图记录都保留。',
   seriesFilter: '筛选系列', allSeries: '全部系列', single: '单个模板', groupSeries: '按系列分组',
   empty: '没有匹配的模板',
   status: '上架状态', category: '筛选分类', categories: '全部分类', search: '搜索中文名、英文名或 ID',
@@ -266,6 +267,7 @@ export const rowCopy = {
   // The number 创作页 compares with the series' (Owner 2026-11-13).
   orderNumber: (n: number) => `序号 ${n}`,
   delete: '删除',
+  deleted: '已删除',
   orderNumberHint: '创作页里单独模板卡和系列卡按这个数字从小到大混排（同一大类内）；不单独展示的系列成员以系列的序号为准。',
 } as const
 

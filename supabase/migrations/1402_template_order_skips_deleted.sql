@@ -1,4 +1,4 @@
--- 删除已下架模板 (1381): the template list no longer shows deleted templates, so dragging the
+-- 删除已下架模板 (1401): the template list no longer shows deleted templates, so dragging the
 -- 全部 / 已下架 list must not count them as members of the group (ORDER_MISMATCH otherwise). As
 -- 1106, with `t.deleted_at is null` in the group filter; same signature, create or replace.
 create or replace function public.admin_set_template_order(p_group text, p_ids text[], p_actor uuid, p_expected_ids text[])

@@ -5,7 +5,7 @@ const deps = vi.hoisted(() => ({ loadPublishCandidates: vi.fn(), readTemplateFlo
 vi.mock('../../src/core/admin/templates/repository', () => ({ loadPublishCandidates: deps.loadPublishCandidates }))
 vi.mock('../../src/site/template-pricing', () => ({ readTemplateFloors: deps.readTemplateFloors }))
 
-const { syncTemplateDelete, syncTemplateState } = await import('./state')
+const { syncTemplateState } = await import('./state')
 
 const candidate = {
   id: 'demo', name: 'Demo', description: 'One line.', visibleIn: ['web'], coverBeforeUrl: 'https://a.test/b.webp',
@@ -50,28 +50,3 @@ describe('syncTemplateState', () => {
   })
 })
 
-describe('syncTemplateDelete', () => {
-  // A production side that has (or lacks) the row and answers the two RPCs in order.
-  function side(exists: boolean, answers: { data?: unknown; error?: { message: string } }[]) {
-    const rpc = vi.fn(async () => answers.shift() ?? { data: null })
-    const maybeSingle = vi.fn(async () => ({ data: exists ? { id: 'demo' } : null, error: null }))
-    const from = vi.fn(() => ({ select: () => ({ eq: () => ({ maybeSingle }) }) }))
-    return { db: { rpc, from } as unknown as SupabaseClient, assets: { base: 'https://a.test', store: {} as never }, rpc }
-  }
-
-  it('unpublishes, then deletes with production\'s own admin function as the sync actor', async () => {
-    const prod = side(true, [{ data: { sale: 'unchanged', active: 'unpublished' } }, { data: true }])
-    expect(await syncTemplateDelete('demo', false, actor, prod, false)).toBe('sale unchanged, unpublished, deleted')
-    expect(prod.rpc).toHaveBeenNthCalledWith(1, 'sync_preview_template_state', expect.objectContaining({ p_id: 'demo', p_active: false }))
-    expect(prod.rpc).toHaveBeenNthCalledWith(2, 'admin_delete_template', { p_actor: actor.id, p_id: 'demo' })
-  })
-
-  it('does nothing where production never had it, and only rolls back the unpublish on a dry run', async () => {
-    const absent = side(false, [])
-    expect(await syncTemplateDelete('demo', false, actor, absent, false)).toBe('deleted on the test site, absent here')
-    expect(absent.rpc).not.toHaveBeenCalled()
-    const dry = side(true, [{ data: { sale: 'unchanged', active: 'unpublished' } }])
-    expect(await syncTemplateDelete('demo', false, actor, dry, true)).toBe('sale unchanged, unpublished, would delete')
-    expect(dry.rpc).toHaveBeenCalledTimes(1)
-  })
-})

@@ -56,8 +56,11 @@ function afterSave(payload: SaveTemplatePayload): Editing {
   return { mode: 'saved', id: typeof id === 'string' ? id : '' }
 }
 
-export function TemplatesEditor({ providers, templates, categories, series, floor, coverLanguages, actions, initialEdit }: Props) {
+export function TemplatesEditor({ providers, templates: all, categories, series, floor, coverLanguages, actions, initialEdit }: Props) {
+  // Deleted templates (1401) only appear under 已删除; everything else works on the live ones.
   const [query, setQuery] = useState('')
+  const templates = all.filter((template) => !template.deletedAt)
+  const deleted = all.filter((template) => template.deletedAt && matchesSearch(template, query))
   const [editing, setEditing] = useState<Editing | null>(initialEdit ? { mode: 'saved', id: initialEdit } : null)
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
   const [deleting, setDeleting] = useState<AdminTemplate | null>(null)
@@ -107,6 +110,7 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
       <CatalogView query={query} series={series} categories={categories}
         floor={floor}
         templates={visible}
+        deleted={deleted}
         selection={{
           selected,
           onSelect: (id, on) => setSelected((current) => toggleId(current, id, on)),

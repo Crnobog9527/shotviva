@@ -47,6 +47,7 @@ export function TemplateRow(props: Props) {
         <Checkbox
           aria-label={bulkCopy.selectRow(template.name)}
           checked={checked}
+          disabled={!!template.deletedAt}
           onCheckedChange={(on) => onSelect(template.id, on === true)}
         />
       </TableCell>
@@ -86,7 +87,7 @@ export function TemplateRow(props: Props) {
       <TableCell>
         <Switch
           checked={template.isActive}
-          disabled={pending}
+          disabled={pending || !!template.deletedAt}
           aria-label={`${template.isActive ? '下架' : '上架'} ${template.name}`}
           onCheckedChange={(checked) => onToggle(template, checked)}
         />

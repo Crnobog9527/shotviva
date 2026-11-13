@@ -4,9 +4,9 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { connectAdmin, createUser, publishFixture } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
-// 1380: a member that goes from 上架 to 下架 leaves its series. 1381: 删除 is a soft delete of an
+// 1400: a member that goes from 上架 to 下架 leaves its series. 1401: 删除 is a soft delete of an
 // unpublished template that keeps the row (and so every job pointing at it) and can never go live
-// again. 1382: the template order groups ignore deleted rows.
+// again. 1402: the template order groups ignore deleted rows.
 
 const category = 'qa-delete-unpublish'
 const ids = ['qa-del-a', 'qa-del-b', 'qa-del-c']
