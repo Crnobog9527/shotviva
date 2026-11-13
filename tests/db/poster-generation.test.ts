@@ -25,7 +25,7 @@ const allow = (userId: string) =>
 
 const poster = {
   kinds: [
-    { key: 'prizes', name: { en: 'Prizes', zh: '奖品' }, blocks: ['header', 'prizes', 'footer'], capacity: { prizeRows: 3 } },
+    { key: 'prizes', name: { en: 'Prizes', zh: '奖品' }, blocks: ['header', 'prizes', 'footer'], capacity: { prizeRows: 4 } },
     { key: 'rules', name: { en: 'Rules', zh: '规则' }, blocks: ['header', 'table', 'footer'] },
   ],
 }
@@ -77,19 +77,20 @@ const reader = (lines: string[]) => ({
 })
 
 describe('poster sets and generation', () => {
-  it('splits the set, makes each poster from its own text and records which poster it is', async () => {
+  it('saves the template\'s two pages, makes each from its own text and records which page it is', async () => {
     const userId = await invitedUser()
     const set = await savePosterSet(service, { userId, templateId, fields: { poster }, content, source: 'paste', allow })
-    expect(set.parts.map((part) => `${part.kind} ${part.page}/${part.pages}`)).toEqual(['prizes 1/2', 'prizes 2/2', 'rules 1/1'])
+    expect(set.parts.map((part) => `${part.kind} ${part.page}/${part.pages}`)).toEqual(['prizes 1/2', 'rules 2/2'])
 
-    const { fake, run } = generate(userId, { poster: { setId: set.id, part: 1 } })
+    const { fake, run } = generate(userId, { poster: { setId: set.id, part: 0 } })
     const view = await run()
     expect(view.status).toBe('succeeded')
     expect(fake.calls[0]?.prompt).toContain('LAYOUT poster in 1:2')
-    expect(fake.calls[0]?.prompt).toContain('Row 1: 第四名 | 奖品4')
-    expect(fake.calls[0]?.prompt).not.toContain('冠军')
+    expect(fake.calls[0]?.prompt).toContain('Row 1: 冠军 | 奖品1')
+    expect(fake.calls[0]?.prompt).toContain('Row 4: 第四名 | 奖品4')
+    expect(fake.calls[0]?.prompt).not.toContain('休息10分钟')
     const { rows } = await db.query('select inputs from public.generation_jobs where id = $1', [view.id])
-    expect(rows[0].inputs.poster).toEqual({ set_id: set.id, part: 1, kind: 'prizes', page: 2, pages: 2 })
+    expect(rows[0].inputs.poster).toEqual({ set_id: set.id, part: 0, kind: 'prizes', page: 1, pages: 2 })
   })
 
   it('refuses a poster template job without a set, and a set of someone else', async () => {
@@ -117,7 +118,7 @@ describe('poster sets and generation', () => {
   it('checks a finished poster: schedules it, records the lines that differ, and does it once', async () => {
     const userId = await invitedUser()
     const set = await savePosterSet(service, { userId, templateId, fields: { poster }, content, source: 'paste', allow })
-    const job = generate(userId, { poster: { setId: set.id, part: 2 } })
+    const job = generate(userId, { poster: { setId: set.id, part: 1 } })
     const view = await job.run()
     expect(job.checked).toEqual([view.id])
     const check = { db: service, store: job.store, ...reader(['周6大师赛 开赛时间 14:00', '级别 基础分', '1 100', '休息10分钟', '2 280', '188 0000 1234 云川市滨江区']) }
@@ -195,7 +196,7 @@ describe('poster sets and generation', () => {
     })
   })
 
-  it('makes a poster at 1K for the 1K price, refuses more than 12 posters in a set, and keeps every poster work private', async () => {
+  it('makes a poster at 1K for the 1K price, refuses a page over its capacity or left empty, and keeps every poster work private', async () => {
     const userId = await invitedUser()
     const set = await savePosterSet(service, { userId, templateId, fields: { poster }, content, source: 'paste', allow })
     const before = (await profileOf(db, userId)).credits
@@ -208,5 +209,6 @@ describe('poster sets and generation', () => {
     const many = { ...content, prizes: { headline: '', rows: Array.from({ length: 13 }, (_, i) => ({ rank: String(i + 1), prize: 'x' })) } }
     const tight = { kinds: [{ ...poster.kinds[0], capacity: { prizeRows: 1 } }] }
     await expect(savePosterSet(service, { userId, templateId, fields: { poster: tight }, content: many, source: 'paste', allow })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(savePosterSet(service, { userId, templateId, fields: { poster }, content: { ...content, table: null }, source: 'paste', allow })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   })
 })

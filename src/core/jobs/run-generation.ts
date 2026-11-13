@@ -40,9 +40,7 @@ import { reserveJob } from './settlement'
 import { callRpc } from '../billing/rpc'
 import { logger } from '../logger'
 import { z } from 'zod'
-import { partText } from '../poster'
-import { loadPosterPart, POSTER_FEATURE } from '../poster/sets'
-import { requireFeature } from '../features'
+import { posterPart, redrawSlots } from './poster-generation'
 
 // `track` is injectable so tests can assert the `generate` event without PostHog.
 // `identityJudge`: the text-only decision call of ARCHITECTURE §5.1a; null or absent means the
@@ -85,41 +83,6 @@ function assertSingleRun(req: GenerationRequest, template: Template) {
 const uploadKeys = (req: GenerationRequest, inputs: GenerationInputs): string[] =>
   inputs.slots ? inputs.slots.map((slot) => slot.upload) : req.inputKey ? [req.inputKey] : []
 
-// A poster template writes its text from the caller's own saved set (ARCHITECTURE §5.3), never
-// from text the browser sends; every other template refuses a poster reference.
-async function posterPart(deps: GenerationDeps, req: GenerationRequest, template: Template, aspectRatio: string) {
-  if (!template.fields.poster) {
-    if (req.poster) throw new AppError('INVALID_INPUT', 'This template does not make posters')
-    return null
-  }
-  const resolution = posterResolution(req)
-  await (deps.allowPoster ?? ((userId: string) => requireFeature(userId, POSTER_FEATURE)))(req.userId)
-  const { setId, part: index, redrawOf } = req.poster as NonNullable<GenerationRequest['poster']>
-  const { content, part } = await loadPosterPart(deps.db, req.userId, { setId, part: index, templateId: template.id })
-  if (redrawOf) await assertSamePoster(deps, req.userId, redrawOf, { setId, part: index, templateId: template.id, resolution, aspectRatio })
-  const record = { set_id: setId, part: index, kind: part.kind, page: part.page, pages: part.pages, ...(redrawOf ? { redraw_of: redrawOf } : {}) }
-  return { text: partText(content, part), record }
-}
-
-// A poster job comes from the website with its set, at any tier the template sells (ARCHITECTURE
-// §5.3; 1K is sold too, the price check refuses a tier the template does not price).
-function posterResolution(req: GenerationRequest): Resolution {
-  if (!req.poster || req.source !== 'web') throw new AppError('INVALID_INPUT', 'Confirm the poster text first')
-  return req.resolution ?? DEFAULT_RESOLUTION
-}
-
-type SamePoster = { setId: string; part: number; templateId: string; resolution: string; aspectRatio: string }
-
-// A redraw names a finished poster of the caller's: the same set, poster and template, at the
-// same resolution and size (a free redraw can never be an upgrade).
-async function assertSamePoster(deps: GenerationDeps, userId: string, jobId: string, same: SamePoster) {
-  const source = await findOwnJob(deps.db, userId, jobId)
-  const poster = source?.inputs.poster as { set_id?: unknown; part?: unknown } | undefined
-  const matches = source?.status === 'succeeded' && source.templateId === same.templateId && poster?.set_id === same.setId
-    && poster.part === same.part && source.inputs.resolution === same.resolution && source.inputs.aspect_ratio === same.aspectRatio
-  if (!matches) throw new AppError('INVALID_INPUT', 'Unknown poster to redraw')
-}
-
 // The first redraw of a poster whose text check failed is free (Owner 2026-11-13): once it has
 // succeeded, grant_poster_free_redraw (1347) gives back what it reserved, at most once per poster.
 // A failed grant only means the redraw stays paid; it never fails the finished work.
@@ -151,6 +114,8 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   assertPricedTier(template.unpricedResolutions, tier)
   assertTemplateQuote(req.expectedCredits, template.creditsCost[tier])
   assertSingleRun(req, template)
+  // A poster redraw brings back the source poster's kept prize photo (ARCHITECTURE §5.3).
+  const inputSlots = req.inputSlots ?? (await redrawSlots(deps, req, template))
   const validated = validateGenerationInputs(template.fields, {
     copy: req.copy,
     aspectRatio: req.aspectRatio,
@@ -158,10 +123,10 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
     // Partner v1 takes no toggles: every one stays at its default, off (T89).
     ...(req.source === 'web' ? { toggles: req.toggles, togglesConfirmed: req.togglesConfirmed } : {}),
     imageCount: req.inputKey ? 1 : 0,
-    ...(req.inputSlots ? { slots: req.inputSlots } : {}),
+    ...(inputSlots ? { slots: inputSlots } : {}),
     aspects: requestAspects(req, template),
   })
-  const { inputs, poster } = withPoster(validated, await posterPart(deps, req, template, validated.aspectRatio))
+  const { inputs, poster } = withPoster(validated, await posterPart(deps, req, template, validated))
   const keys = uploadKeys(req, inputs)
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
   if (keys.some((key) => !isOwnInputKey(req.userId, key))) throw new AppError('INVALID_INPUT', 'Unknown upload')

@@ -15,6 +15,7 @@ const object = (properties: Record<string, unknown>) =>
 export const EXTRACT_JSON_SCHEMA = object({
   header: object({ brand: str, brandEn: str, cup: str, cupEn: str, city: str, title: str, subtitle: str, datetimeLabel: str, datetime: str }),
   prizes: object({ headline: str, note: str, rows: { type: 'array', items: object({ rank: str, rankEn: str, prize: str }) } }),
+  info: object({ title: str, titleEn: str }),
   sections: { type: 'array', items: object({ title: str, style: { type: 'string', enum: ['kv', 'numbered', 'plain'] }, lines: strings }) },
   table: object({ title: str, titleEn: str, columns: strings, rows: { type: 'array', items: object({ cells: strings, break: str }) }, footnote: str }),
   footer: object({ phones: strings, phonesLabel: str, addressLabel: str, address: str, qrLabel: str }),
@@ -23,6 +24,7 @@ export const EXTRACT_JSON_SCHEMA = object({
 const answerSchema = z.object({
   header: z.record(z.string(), z.string()),
   prizes: z.object({ headline: z.string(), note: z.string(), rows: z.array(z.object({ rank: z.string(), rankEn: z.string(), prize: z.string() })) }),
+  info: z.object({ title: z.string(), titleEn: z.string() }).optional(),
   sections: z.array(z.object({ title: z.string(), style: z.string(), lines: z.array(z.string()) })),
   table: z.object({
     title: z.string(), titleEn: z.string(), columns: z.array(z.string()),
@@ -75,6 +77,7 @@ export function toContent(json: unknown): { content: PosterContent; clipped: str
   const draft: Record<string, unknown> = {
     header: answer.header,
     prizes: answer.prizes.rows.length > 0 || answer.prizes.headline ? answer.prizes : null,
+    ...(answer.info ? { info: answer.info } : {}),
     sections: answer.sections.filter((section) => section.title || section.lines.length > 0),
     table: tableOf(answer.table),
     footer: answer.footer,

@@ -719,6 +719,10 @@
         "footer": "页脚",
         "pending": "有待核对的行"
       },
+      "pages": {
+        "shared": "两页共用",
+        "page": "第{page}页 · {name}"
+      },
       "flagged": "原文里找不到这一项，或太长被截短了，请核对。",
       "header": {
         "brand": "主办方",
@@ -748,7 +752,11 @@
           "plain": "普通"
         },
         "lines": "内容（一行一条）",
-        "add": "加一个栏目"
+        "add": "加一个栏目",
+        "heading": {
+          "title": "栏目总标题",
+          "titleEn": "栏目总标题英文"
+        }
       },
       "table": {
         "none": "这个风格没有表格。",
@@ -772,8 +780,14 @@
       "remove": "删除",
       "split": {
         "count": "{count, plural, =0 {还没有可生成的内容} other {将生成 # 张海报}}",
-        "part": "{name} {page}/{pages}",
-        "oversized": "有一个栏目比一整张海报还长，请精简，或拆成两个栏目。"
+        "part": "第{page}页 · {name}",
+        "ready": "已填好",
+        "empty": "这一页还没有内容，请填写，或粘贴含这部分的通知。",
+        "over": {
+          "prizeRows": "奖品太多，一页放不下：现在 {count} 行，最多 {max} 行，请删减。",
+          "chars": "说明文字太多，一页放不下：现在 {count} 字，最多 {max} 字，请精简。",
+          "tableRows": "表格太长，一页放不下：现在 {count} 行，最多 {max} 行，请删减。"
+        }
       },
       "size": "尺寸",
       "resolution": "清晰度",
@@ -802,7 +816,8 @@
         "invalid": "有内容超长或表格行没填完整，请检查各块。",
         "notEnough": "积分不够。",
         "error": "出了点问题，请重试。"
-      }
+      },
+      "slotHint": "可不传。不传的话，按奖品文字画出奖品。"
     },
     "sizes": {
       "closest": "接近原图（{ratio}）",

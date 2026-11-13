@@ -30,6 +30,10 @@ export const headerSchema = z.object({
   title: text(16), subtitle: text(32), datetimeLabel: text(12), datetime: text(40),
 })
 
+// The heading over the rule sections' column (「赛事信息　INFORMATION」 on the second page), next to
+// the table's own title (「级别结构　STRUCTURE」).
+export const infoSchema = z.object({ title: text(12), titleEn: text(24) })
+
 export const prizeRowSchema = z.object({ rank: text(8), rankEn: text(16), prize: text(40) })
 
 export const prizesSchema = z.object({
@@ -65,6 +69,7 @@ export const footerSchema = z.object({
 export const posterContentSchema = z.object({
   header: headerSchema.default(headerSchema.parse({})),
   prizes: prizesSchema.nullable().default(null),
+  info: infoSchema.default(infoSchema.parse({})),
   sections: z.array(sectionSchema).max(POSTER_LIMITS.sections).default([]),
   table: tableSchema.nullable().default(null),
   footer: footerSchema.default(footerSchema.parse({})),

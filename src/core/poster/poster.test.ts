@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { partText, posterContentSchema, posterFieldsSchema, splitPoster, tablePages, unverifiedPaths, type TableRow } from '.'
+import { partStrings, partText, posterContentSchema, posterFieldsSchema, pagesReady, splitPoster, unverifiedPaths, type TableRow } from '.'
 
 // Fictional content shaped like a weekly tournament set: 10 prizes, 5 rule sections and a
 // 26-level table with three break rows.
@@ -41,34 +41,33 @@ describe('poster content', () => {
   })
 })
 
-describe('splitPoster', () => {
-  it('fits the prizes on one poster and splits the rules into sections and table pages', () => {
-    const parts = splitPoster(posterContentSchema.parse(raw), fields)
-    expect(parts.map((p) => `${p.kind} ${p.page}/${p.pages}`)).toEqual(['prizes 1/1', 'rules 1/3', 'rules 2/3', 'rules 3/3'])
+describe('splitPoster: always one page per kind (Owner 2026-11-14)', () => {
+  // The Owner's sample fits: 10 prizes on page 1; on page 2 the sections and the 23-row table.
+  const roomy = posterFieldsSchema.parse({ kinds: fields.kinds.map((kind) => ({ ...kind, capacity: { prizeRows: 12, chars: 1200, tableRows: 30 } })) })
+
+  it('makes page 1 and page 2, never a third, with every block on its own page', () => {
+    const parts = splitPoster(posterContentSchema.parse(raw), roomy)
+    expect(parts.map((p) => `${p.kind} ${p.page}/${p.pages}`)).toEqual(['prizes 1/2', 'rules 2/2'])
     expect(parts[0]?.prizes?.rows).toHaveLength(10)
+    expect(parts[1]).toMatchObject({ table: { continued: false } })
     expect(parts[1]?.sections).toHaveLength(5)
-    expect(parts[2]?.table?.rows.length).toBeLessThanOrEqual(24)
-    expect(parts[3]?.table?.continued).toBe(true)
+    expect(parts[1]?.table?.rows).toHaveLength(29)
+    expect(pagesReady(parts)).toBe(true)
   })
 
-  it('keeps sections and table on one poster when both fit, and makes nothing for empty blocks', () => {
-    const small = posterContentSchema.parse({ ...raw, prizes: null, sections: raw.sections.slice(0, 1), table: { ...raw.table, rows: rows.slice(0, 10) } })
-    const parts = splitPoster(small, fields)
-    expect(parts).toHaveLength(1)
-    expect(parts[0]).toMatchObject({ kind: 'rules', page: 1, pages: 1, table: { continued: false } })
-    expect(parts[0]?.sections).toHaveLength(1)
+  it('marks a page over its capacity instead of adding a page', () => {
+    const parts = splitPoster(posterContentSchema.parse(raw), fields)
+    expect(parts).toHaveLength(2)
+    expect(parts[1]?.over).toEqual(['tableRows'])
+    const tight = posterFieldsSchema.parse({ ...fields, kinds: [{ ...fields.kinds[0], capacity: { prizeRows: 5 } }, fields.kinds[1]] })
+    expect(splitPoster(posterContentSchema.parse(raw), tight)[0]?.over).toEqual(['prizeRows'])
+    expect(pagesReady(parts)).toBe(false)
   })
 
-  it('cuts a long table after a break row in the second half of a page', () => {
-    const pages = tablePages(rows, 24)
-    expect(pages.map((page) => page.length)).toEqual([15, 14])
-    expect(pages[0]?.at(-1)).toEqual({ break: '休息10分钟/截止报名' })
-  })
-
-  it('marks a section too long for a whole poster', () => {
-    const tight = posterFieldsSchema.parse({ kinds: [{ ...fields.kinds[1], capacity: { chars: 100 } }] })
-    const parts = splitPoster(posterContentSchema.parse({ sections: raw.sections.slice(0, 1) }), tight)
-    expect(parts[0]?.oversized).toBe(true)
+  it('keeps an empty page in the set, marked, so the editor asks for it', () => {
+    const parts = splitPoster(posterContentSchema.parse({ ...raw, prizes: null }), roomy)
+    expect(parts.map((part) => part.empty ?? false)).toEqual([true, false])
+    expect(pagesReady(parts)).toBe(false)
   })
 })
 
@@ -80,12 +79,28 @@ describe('partText', () => {
     expect(text).toContain('Row 10: 第10名 | 奖品10（256G）')
     expect(text).toContain('赛事热线: 188 0000 1234   188 0000 5678')
     expect(text).not.toContain('[Table]')
-    expect(partText(posterContentSchema.parse(raw), rules!)).toContain('(poster 1 of 3)')
+    expect(partText(posterContentSchema.parse(raw), rules!)).toContain('(page 2 of 2)')
   })
 
   it('writes break rows as full-width rows', () => {
     const parts = splitPoster(posterContentSchema.parse(raw), fields)
-    expect(partText(posterContentSchema.parse(raw), parts[2]!)).toContain('Full-width row: 休息　用餐40分钟')
+    expect(partText(posterContentSchema.parse(raw), parts[1]!)).toContain('Full-width row: 休息　用餐40分钟')
+  })
+})
+
+describe('the sections column heading', () => {
+  it('goes on the poster that carries the sections only, and is checked there', () => {
+    const content = posterContentSchema.parse({ ...raw, info: { title: '赛事信息', titleEn: 'INFORMATION' } })
+    const wide = posterFieldsSchema.parse({ ...fields, kinds: fields.kinds.map((kind) => ({ ...kind, capacity: {} })) })
+    const [prizes, rules] = splitPoster(content, wide)
+    expect(partText(content, prizes!)).not.toContain('INFORMATION')
+    expect(partText(content, rules!)).toContain('Heading over the sections: 赛事信息 / INFORMATION')
+    expect(partStrings(content, rules!).map((item) => item.path)).toEqual(expect.arrayContaining(['info.title', 'info.titleEn']))
+    expect(partStrings(content, prizes!).some((item) => item.path.startsWith('info'))).toBe(false)
+  })
+
+  it('defaults to blank, so an old saved set still parses', () => {
+    expect(posterContentSchema.parse({}).info).toEqual({ title: '', titleEn: '' })
   })
 })
 

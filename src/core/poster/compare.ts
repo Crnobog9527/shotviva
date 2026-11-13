@@ -16,7 +16,8 @@ export function partStrings(content: PosterContent, part: PosterPart): { path: s
     title: part.table.title, titleEn: part.table.titleEn, columns: part.table.columns, footnote: part.table.footnote,
     rows: part.table.rows.map((row) => (Array.isArray(row) ? row.join(' ') : row.break)),
   }
-  return posterStrings({ header: content.header, prizes: part.prizes, sections: part.sections, table, footer: content.footer })
+  const info = part.sections ? content.info : undefined
+  return posterStrings({ header: content.header, prizes: part.prizes, info, sections: part.sections, table, footer: content.footer })
 }
 
 // 1 − edit distance / longer length: one wrong digit in "2 200" still finds "2 280" first.
