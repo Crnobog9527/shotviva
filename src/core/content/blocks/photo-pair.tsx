@@ -2,6 +2,8 @@ import Image from 'next/image'
 import { useTranslations } from 'next-intl'
 
 import { cn } from '../../ui/cn'
+import { FirstFrame } from '../../ui/first-frame'
+import { registerFirstFrame } from '../../ui/first-frame-store'
 import { WhiteGroundImage } from '../../ui/white-ground-image'
 import type { ImageRef } from '../page-content'
 
@@ -35,11 +37,13 @@ const afterLoading = (preload: boolean) => (preload ? ({ loading: 'eager', fetch
 // later, and the full picture covers it as soon as it has loaded (same crop, same filter). A
 // plain <img> with `decoding="sync"`, so the frame is decoded for the very first paint; as a CSS
 // background it was decoded off-thread and appeared a few frames late, behind hydration.
+// The frame's bytes go to the markup only, through the server-side store (first-frame-store.ts):
+// as a prop they were in the HTML twice.
 export function BeforePane({ image, preload, sizes }: { image: ImageRef; preload: boolean; sizes: string }) {
+  const framed = preload && registerFirstFrame(image.src, image.firstFrame)
   return (
     <span className="mk-pane">
-      {/* eslint-disable-next-line @next/next/no-img-element -- a data: URI, nothing for next/image to resize */}
-      {preload && image.firstFrame ? <img className="mk-ff" src={image.firstFrame} width={image.width} height={image.height} alt="" aria-hidden decoding="sync" /> : null}
+      {framed ? <FirstFrame frameKey={image.src} className="mk-ff" width={image.width} height={image.height} /> : null}
       <Image className="mk-b" src={image.src} alt={image.alt} width={image.width} height={image.height} sizes={sizes} preload={preload} loading={preload ? undefined : 'lazy'} />
     </span>
   )

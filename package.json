@@ -29,6 +29,7 @@
     "seo:check": "tsx scripts/seo-check.ts",
     "seo:weekly": "tsx scripts/seo-weekly.ts",
     "check:app-shell": "tsx scripts/app-shell-check.ts",
+    "check:first-frame": "tsx scripts/first-frame-check.ts",
     "seo:ssr": "tsx --require ./scripts/ci/ignore-css.cjs scripts/ssr-seo-audit.ts",
     "js:budget": "tsx scripts/js-budget.ts",
     "css:sources": "tsx scripts/public-css-sources.ts",

@@ -75,6 +75,25 @@ export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTempl
   }
 }
 
+// A list of templates for a page. Templates of one family carry the same on/off options (label,
+// hint and the whole confirmation text) and the same size options; converted one by one, each
+// template got its own copy, and the page data repeated them (production home page, 2026-11-12:
+// 2 distinct options on 20 of 35 templates, 29 KB of a 57 KB list). Here equal values become one
+// object that every template points to: React sends an object it has already sent as a
+// reference, so each travels once. What a template holds, and what renders, is unchanged.
+export function toCatalogueTemplates(templates: readonly LocalizedTemplate[]): CatalogueTemplate[] {
+  const known = new Map<string, unknown>()
+  const shared = <T,>(value: T): T => {
+    const key = JSON.stringify(value)
+    if (!known.has(key)) known.set(key, value)
+    return known.get(key) as T
+  }
+  return templates.map((template) => {
+    const card = toCatalogueTemplate(template)
+    return { ...card, imageOptions: shared(card.imageOptions), creditsCost: shared(card.creditsCost), toggles: shared(card.toggles.map(shared)) }
+  })
+}
+
 type LocalizedCopy = LocalizedTemplate['fields']['copy'][number]
 
 function toCatalogueCopy({ key, label, type, placeholder, help, required, maxLength, options, optionLabels, min, max, public: shown }: LocalizedCopy): CatalogueCopyField {

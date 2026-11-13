@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useState, type CSSProperties } from 'react'
 
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
+import { FirstFrame } from '@/core/ui/first-frame'
 
 import { thumbImage } from './thumb-image'
 import { stageImage, useStageCover, type StageCover } from './use-stage-cover'
@@ -39,7 +40,7 @@ export function PanelStage({ name, after, initial, inset }: Props) {
                 every other cover; the blurred fill shows only outside it. */}
             <span className="mk-stage-pic">
               {/* The opening cover's first frame, painted with the document, under the full picture. */}
-              {cover.firstFrame ? <img className="mk-stage-ff" src={cover.firstFrame} width={STAGE_PX} height={Math.round(STAGE_PX / cover.ratio)} alt="" aria-hidden decoding="sync" /> : null}
+              {cover.firstFrame ? <FirstFrame frameKey={cover.url} className="mk-stage-ff" width={STAGE_PX} height={Math.round(STAGE_PX / cover.ratio)} /> : null}
               <img key={cover.url} className="mk-stage-img" {...stageImage(cover.url)} alt={t('stageAlt', { name })} loading="lazy" decoding="async" />
             </span>
           </>

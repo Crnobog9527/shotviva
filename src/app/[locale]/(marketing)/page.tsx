@@ -7,7 +7,7 @@ import { JsonLdScript, faqPageLd, organizationLd, pageMetadata, softwareApplicat
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
-import { toCatalogueTemplate } from '@/modules/image/marketing'
+import { toCatalogueTemplates } from '@/modules/image/marketing'
 import { creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
 import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
@@ -41,7 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function HomePage() {
   const { locale, live, series, products, page, wishlistOpen, free, meta } = await load()
   const ldMeta = { ...meta, path: localizePath(meta.path, locale) }
-  const catalogue = live.map(toCatalogueTemplate)
+  const catalogue = toCatalogueTemplates(live)
   // Series show as one card each, in the admin's order (T102, Owner 2026-11-12).
   const { defaultId, ...sections } = featuredSections(live, undefined, series)
   const initialCovers = await openingCovers(live.find((template) => template.id === defaultId))

@@ -15,7 +15,7 @@ import {
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
-import { toCatalogueTemplate } from '@/modules/image/marketing'
+import { toCatalogueTemplates } from '@/modules/image/marketing'
 import { contentPagesIn, creditFacts, featuredSections, fillCredits, findContentPageIn, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
 import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
@@ -70,7 +70,7 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   const ld = [breadcrumbListLd(site, ldCrumbs), faqPageLd(page.faq)]
   // Offers: only the plans and packs this page's copy shows, price and credits (03-S2).
   if (page.module) ld.push(softwareApplicationLd(site, meta, offersShownIn(page, products), free))
-  const catalogue = live.map(toCatalogueTemplate)
+  const catalogue = toCatalogueTemplates(live)
   // The page's own categories' featured templates; the generator opens on the first of them.
   const { defaultId, ...sections } = featuredSections(live, page.landing.templates?.categoryKeys, series)
   const initialCovers = await openingCovers(live.find((template) => template.id === defaultId))

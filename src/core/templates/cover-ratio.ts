@@ -4,6 +4,7 @@ import { cacheLife } from 'next/cache'
 
 import { logger } from '../logger'
 import { isCoverUrl } from '../ui/cover-image'
+import { registerFirstFrame } from '../ui/first-frame-store'
 import { CATALOGUE_LIFE } from './cached-catalogue'
 
 // The home generator's preview reads the opening template's covers on the server (Owner
@@ -82,5 +83,8 @@ export async function openingCovers(template: Covers | undefined) {
   if (!template) return null
   const url = template.coverAfterUrl ?? template.coverPosterUrl
   const [after, before] = await Promise.all([coverPreview(url, true), coverPreview(template.coverBeforeUrl, false)])
-  return { templateId: template.id, after: url && after.ratio ? { url, ratio: after.ratio, firstFrame: after.firstFrame } : null, beforeRatio: before.ratio }
+  // The frame itself stays on the server (ui/first-frame-store.ts); the page is told only that
+  // there is one, so its bytes are in the HTML once (the <img>) and not again in the page data.
+  const framed = url ? registerFirstFrame(url, after.firstFrame) : false
+  return { templateId: template.id, after: url && after.ratio ? { url, ratio: after.ratio, firstFrame: framed } : null, beforeRatio: before.ratio }
 }

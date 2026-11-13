@@ -19,7 +19,7 @@ export { createReturnPath } from './catalogue/catalogue-filter'
 export type { CatalogueSeries, CatalogueView, FilterNode, GridEntry } from './catalogue/catalogue-view'
 // Saved templates (T83): the provider every page with hearts wraps its catalogue in.
 export { FavoritesProvider } from './favorites'
-export { toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalogue-template'
+export { toCatalogueTemplate, toCatalogueTemplates, type CatalogueTemplate } from './catalogue/catalogue-template'
 export { ImageWorkspace, type WorkspaceProps } from './workspace/image-workspace'
 export { MatrixWorkspaceLazy as MatrixWorkspace } from './matrix/matrix-lazy'
 export type { MatrixWorkspaceProps } from './matrix/matrix-workspace'

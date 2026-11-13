@@ -48,6 +48,9 @@ jobs:
       # The app top bar must be in every app page's prerendered shell (scripts/app-shell-check-lib.ts).
       - if: steps.changes.outputs.code == 'true'
         run: pnpm check:app-shell
+      # The hero's first frame is in each prerendered marketing page, once (scripts/first-frame-check.ts).
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm check:first-frame
       # First-load JS per route against scripts/js-budget.json (performance pass, B8).
       - if: steps.changes.outputs.code == 'true'
         run: pnpm js:budget
