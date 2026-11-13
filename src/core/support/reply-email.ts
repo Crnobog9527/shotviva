@@ -161,6 +161,9 @@ export async function notifyTicketReply(deps: ReplyEmailDeps, ticketId: string):
       })
       return 'failed'
     }
+    // Resend's email id, so a send can be found in its dashboard (Emails log) without the address.
+    const sent = (await response.json().catch(() => null)) as { id?: unknown } | null
+    logger.info('ticket reply email sent', { ticketId, emailId: typeof sent?.id === 'string' ? sent.id : null })
     return 'sent'
   } catch (error) {
     logger.error('ticket reply email failed', { ticketId, error })

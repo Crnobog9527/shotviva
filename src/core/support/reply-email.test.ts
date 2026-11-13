@@ -133,6 +133,7 @@ describe('notifyTicketReply', () => {
       subject: zh.supportEmail.subject,
     })
     expect(body.html).toContain(`${ORIGIN}/zh/account?help=${TICKET}`)
+    expect(mocks.info).toHaveBeenCalledWith('ticket reply email sent', { ticketId: TICKET, emailId: 'x' })
   })
 
   it('falls back to English when the account has no saved language', async () => {
