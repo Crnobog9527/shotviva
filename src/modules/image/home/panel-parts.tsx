@@ -16,9 +16,9 @@ function useFormats(): string {
   return useTranslations('app.workspace')('formats', { formats: useFormatter().list(UPLOAD_FORMAT_NAMES, { type: 'disjunction' }), mb: UPLOAD_MAX_MB })
 }
 
-// The first step, the obvious one: a card that asks for the phone photo, then shows it. On phones
-// the empty card is hidden (marketing.css): the big primary under it says the same thing, and
-// PanelFormats carries the format hint there instead (Owner 2026-11-13, one upload action).
+// The first step, the obvious one: a card that asks for the phone photo, then shows it. While
+// empty it is hidden at every width (marketing.css): the big primary says the same thing, and
+// PanelFormats carries the format hint under it (Owner 2026-11-13, one upload action).
 export function PanelUpload({ url, onPick }: { url: string | null; onPick(): void }) {
   const t = useTranslations('home.generator')
   const formats = useFormats()
@@ -45,7 +45,7 @@ export function PanelUpload({ url, onPick }: { url: string | null; onPick(): voi
   )
 }
 
-// The format and size hint under the primary, phones only, while no photo is chosen.
+// The format and size hint under the primary while no photo is chosen.
 export function PanelFormats({ state }: { state: HomeGeneratorState }) {
   const formats = useFormats()
   return state.template?.photoInput !== 'none' && !state.photo.url ? <p className="mk-panel-fmt">{formats}</p> : null

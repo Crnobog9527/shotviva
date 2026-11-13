@@ -21,6 +21,7 @@ type Props = {
   thumbOf(template: CatalogueTemplate): string | null
   gift: string
   onPickPhoto(): void
+  fileInputId: string
   onOpenPicker(): void
   onSignUp(): void
 }
@@ -59,7 +60,7 @@ function PanelHead({ template, onOpenPicker }: { template: CatalogueTemplate | n
 // template's result, whole, with the photo it came from; the upload; the template rail; size and
 // note; Generate. Phones stack it (preview → upload → template → size and note → Generate);
 // from 1024 it is two columns, the preview kept small so the hero pair stays the largest picture.
-export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ state, initialCovers, thumbOf, gift, onPickPhoto, onOpenPicker, onSignUp }, ref) {
+export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ state, initialCovers, thumbOf, gift, onPickPhoto, fileInputId, onOpenPicker, onSignUp }, ref) {
   const t = useTranslations('home.generator')
   const app = useTranslations('app')
   const tags = useTranslations('marketing.home')
@@ -85,7 +86,7 @@ export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ sta
         <PanelNote state={state} />
       </div>
       <div className="mk-panel-cta">
-        <HomeCtaButton cta={state.cta} templateId={templateId} onPickPhoto={onPickPhoto} onSignUp={onSignUp} onGenerate={state.generate} />
+        <HomeCtaButton cta={state.cta} templateId={templateId} fileInputId={fileInputId} onSignUp={onSignUp} onGenerate={state.generate} />
         <PanelFormats state={state} />
         <p className="mk-panel-gift">
           <GiftIcon className="mk-gift-i" />

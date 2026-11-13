@@ -51,7 +51,7 @@ function ConnectDone({ graylumHome }: { graylumHome: string }) {
         {t('title')}
       </h1>
       <p className="mt-2 text-body leading-normal text-pretty text-bone-dim">
-        {t.rich('line', { link: (chunks) => <a href={graylumHome} className="text-foreground underline underline-offset-3">{chunks}</a> })}
+        {t.rich('line', { link: (chunks) => <a href={graylumHome} className="whitespace-nowrap text-foreground underline underline-offset-3">{chunks}</a> })}
       </p>
       <div className="mt-6 grid size-14 place-items-center rounded-[18px] bg-wash text-primary shadow-[inset_0_0_0_1px_var(--border)]">
         <svg viewBox="0 0 24 24" aria-hidden="true" className="size-[26px] motion-safe:animate-spin motion-safe:[animation-duration:1.6s]" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round">
