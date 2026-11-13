@@ -10,7 +10,7 @@ import { screenCost, templateCall, typedWords, type SettleDeps, type TemplatePro
 import { loadInputImage } from '@/core/storage'
 import { DEFAULT_RESOLUTION, loadTestTemplate, OUTPUT_ASPECTS, validateGenerationInputs } from '@/core/templates'
 
-import { estimateRunUsd } from './estimate'
+import { testRunEstimateUsd } from './provider-estimate'
 import { continueTestRun } from './test-ledger'
 import type { testGenerateBodySchema } from './test-run-request'
 import type { TestRun } from './test-run-row'
@@ -74,6 +74,7 @@ export async function runTestGenerate(deps: FirstRunDeps, req: TestGenerateReque
   })
   // Marks the request that created the row; a concurrent repeat gets the row and calls nothing.
   const attemptId = randomUUID()
+  const estimateUsd = await testRunEstimateUsd(deps.db, provider, resolution, loaded.template.quality, images.length)
   const run = await beginTestRun(deps.db, {
     actorId: req.actorId,
     runId: req.body.run_id,
@@ -94,7 +95,7 @@ export async function runTestGenerate(deps: FirstRunDeps, req: TestGenerateReque
     },
     promptVersion: loaded.prompt.version,
     provider: provider.id,
-    estimateUsd: estimateRunUsd(resolution, loaded.template.quality, provider.prices),
+    estimateUsd,
   })
   if (run.status !== 'running' || run.inputs.attempt_id !== attemptId) return run
   // The face-swap judge (§5.1a) only now, with the budget held: a click over the budget calls nothing.
