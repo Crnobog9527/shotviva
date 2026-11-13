@@ -54,6 +54,21 @@ function infoLines(info: PosterContent['info']): string[] {
   return [line('Heading over the sections', [info.title, info.titleEn].filter(Boolean).join(' / '))]
 }
 
+// Long numbers are the commonest misdrawn text (a zero dropped from "50000cc", test site
+// 2026-11-14), so every run of five or more digits on this poster is spelled out once more, digit
+// by digit, in a block the prompt marks as a check, never as text to draw.
+export const DIGIT_CHECK_MIN = 5
+const DIGIT_CHECK_MAX = 24
+
+export function digitCheck(lines: readonly string[]): string[] {
+  const numbers = [...new Set(lines.flatMap((line) => line.match(new RegExp(`\\d{${DIGIT_CHECK_MIN},}`, 'g')) ?? []))].slice(0, DIGIT_CHECK_MAX)
+  if (numbers.length === 0) return []
+  return [
+    '[Digit check: not poster text, never draw this block]',
+    ...numbers.map((number) => `${number} has ${number.length} digits: ${[...number].join('-')}`),
+  ]
+}
+
 export function partText(content: PosterContent, part: PosterPart): string {
   const pageNote = part.pages > 1 ? ` (page ${part.page} of ${part.pages})` : ''
   const blocks = [
@@ -65,5 +80,6 @@ export function partText(content: PosterContent, part: PosterPart): string {
     ['[Footer]', ...footerLines(content.footer)],
   ]
   const listed = blocks.map((block) => block.filter(Boolean)).filter((block) => block.length > 1)
-  return [`Poster text${pageNote}:`, ...listed.map((block) => block.join('\n'))].join('\n\n')
+  const check = digitCheck(listed.flat())
+  return [`Poster text${pageNote}:`, ...listed.map((block) => block.join('\n')), ...(check.length ? [check.join('\n')] : [])].join('\n\n')
 }
