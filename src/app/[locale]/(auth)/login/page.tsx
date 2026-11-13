@@ -28,13 +28,13 @@ export default async function LoginPage() {
   const locale = await currentLocale()
   const form = {
     action: loginAction,
-    google: { action: googleAction, mainlandNote: locale === 'zh' },
+    google: { action: googleAction, mainlandNote: locale === 'zh' || ('zone' as const) },
     resendAction: resendSignupAction,
     sender,
     phone: locale === 'zh' ? phone : undefined,
   }
   return (
-    <Suspense fallback={<LoginForm {...form} google={{ ...form.google, mainlandNote: form.google.mainlandNote || 'zone' }} next={nextIn(null, locale)} notice={null} />}>
+    <Suspense fallback={<LoginForm {...form} next={nextIn(null, locale)} notice={null} />}>
       <LoginScreen {...form} locale={locale} connectPath={CONNECT_PAGE_PATH} />
     </Suspense>
   )
