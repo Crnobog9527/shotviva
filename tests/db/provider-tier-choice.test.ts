@@ -30,7 +30,7 @@ const save = (input: Record<string, unknown>) =>
     ...input,
   })
 
-// Raw database names: the top tier is still stored as 3k until the contract migration.
+// Raw database names: the top tier is stored as 4k since migration 1451.
 const row = async (id: string) =>
   (await pg.query("select resolutions, capabilities->>'resolutionSource' as source, capabilities->'resolutionLimit' as lim from public.ai_providers where id = $1", [id])).rows[0]
 const audits = async (id: string) =>
@@ -52,7 +52,7 @@ afterAll(async () => {
 describe('OpenAI tiers by model (PR-1b)', () => {
   it('opens all three tiers for a known model, with no audit', async () => {
     const id = await save({ model: 'gpt-image-2.6', resolutions: ['1k', '2k', '4k'] })
-    expect(await row(id)).toEqual({ resolutions: ['1k', '2k', '3k'], source: 'spec', lim: null })
+    expect(await row(id)).toEqual({ resolutions: ['1k', '2k', '4k'], source: 'spec', lim: null })
     expect(await audits(id)).toEqual([])
   })
 
@@ -70,7 +70,7 @@ describe('OpenAI tiers by model (PR-1b)', () => {
 
   it('audits a declaration for an unknown model in the same save', async () => {
     const id = await save({ model: 'gpt-image-9-test', resolutions: ['1k', '4k'] })
-    expect(await row(id)).toEqual({ resolutions: ['1k', '3k'], source: 'declared', lim: ['1k', '3k'] })
+    expect(await row(id)).toEqual({ resolutions: ['1k', '4k'], source: 'declared', lim: ['1k', '4k'] })
     expect(await audits(id)).toEqual([{ reason: 'gpt-image-9-test: declared 4K beyond the model table', user_id: adminId }])
   })
 

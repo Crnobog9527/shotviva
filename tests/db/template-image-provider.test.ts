@@ -10,7 +10,7 @@ const image = randomUUID()
 const decision = randomUUID()
 const template = {
   id: `t92-${randomUUID().slice(0, 8)}`, name: 'T92', category: 'pets',
-  credits_cost: { '1k': 2, '2k': 4, '3k': 6 },
+  credits_cost: { '1k': 2, '2k': 4, '4k': 6 },
 }
 
 function save(prompt: Record<string, unknown>) {
@@ -37,8 +37,8 @@ afterAll(async () => {
 describe('per-template image provider', () => {
   it('rejects invalid tiers and decision adapters for OpenRouter rows', async () => {
     const defaults = await db.query('select resolutions from public.ai_providers where id = $1', [decision])
-    expect(defaults.rows[0]?.resolutions).toEqual(['1k', '2k', '3k'])
-    for (const tiers of [[], ['4k'], [null]]) {
+    expect(defaults.rows[0]?.resolutions).toEqual(['1k', '2k', '4k'])
+    for (const tiers of [[], ['8k'], [null]]) {
       await expect(db.query('update public.ai_providers set resolutions = $2 where id = $1', [image, tiers])).rejects.toThrow(/check constraint/)
     }
     await expect(db.query("update public.ai_providers set module = 'decision' where id = $1", [image])).rejects.toThrow(/check constraint/)

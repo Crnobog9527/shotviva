@@ -7,7 +7,7 @@ import { connectAdmin, createUser } from './helpers'
 const provider = randomUUID()
 const id = 't96-price-fixture'
 const model = 'vendor/image-v1'
-const costs = { '1k': 2, '2k': 4, '3k': 6 }
+const costs = { '1k': 2, '2k': 4, '4k': 6 }
 const template = { id, name: 'T96 fixture', category: 'pets', credits_cost: costs }
 const prompt = { body: 'fixture', provider_id: provider }
 let db: Client
