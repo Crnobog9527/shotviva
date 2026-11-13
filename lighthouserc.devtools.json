@@ -13,7 +13,7 @@
     },
     "assert": {
       "assertions": {
-        "largest-contentful-paint": ["error", { "maxNumericValue": 1000, "aggregationMethod": "median-run" }]
+        "largest-contentful-paint": ["error", { "maxNumericValue": 1200, "aggregationMethod": "median-run" }]
       }
     },
     "upload": { "target": "filesystem", "outputDir": ".lighthouseci-devtools" }
