@@ -814,6 +814,8 @@
    pains on hairline rows, then the Wishlist tab's own prints (tape, lean, stamp) as eight
    examples, two to a row on phones and four from 768px. Static: no JS, the images lazy. */
 @layer components {
+  /* The tilted prints and the stamp swing a few px past the gutter; clip at the section (full viewport width) so they never widen the page. */
+  .mk-wish { overflow-x: clip; }
   .mk-wish h2 em { font-style: italic; }
   .mk-wish h2:lang(zh) em { font-style: normal; }
   .mk-wish-points { list-style: none; margin: 20px 0 0; padding: 0; }
