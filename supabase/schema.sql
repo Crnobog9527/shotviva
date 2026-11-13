@@ -4974,6 +4974,72 @@ $$;
 ALTER FUNCTION "public"."admin_daily_costs"("p_days" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_daily_costs_by_provider"("p_days" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_today timestamptz;
+  v_start timestamptz;
+begin
+  if p_days is null or p_days < 1 or p_days > 90 then
+    raise exception 'INVALID_INPUT' using detail = 'p_days must be between 1 and 90';
+  end if;
+
+  v_today := date_trunc('day', now() at time zone 'UTC') at time zone 'UTC';
+  v_start := v_today - make_interval(days => p_days - 1);
+
+  return (
+    with jobs as (
+      select date_trunc('day', g.created_at at time zone 'UTC') as day,
+             public.cost_provider_family(g.provider, g.provider_usage) as provider,
+             g.status, g.provider_usage, g.cost_usd
+        from public.generation_jobs g
+       where g.created_at >= v_start
+    ),
+    job_days as (
+      select j.day, j.provider,
+             coalesce(sum(j.cost_usd), 0) as cost_usd,
+             coalesce(sum((j.provider_usage ->> 'list_cost_cny')::numeric) filter (where j.cost_usd is not null), 0) as cost_cny,
+             count(*) filter (where j.cost_usd is not null) as costed,
+             count(*) filter (where j.cost_usd is null and j.provider_usage is not null) as uncosted,
+             count(*) filter (where j.cost_usd is null and j.provider_usage is null and j.status <> 'running') as no_usage
+        from jobs j
+       group by 1, 2
+    ),
+    test_days as (
+      select date_trunc('day', x.started_at at time zone 'UTC') as day,
+             public.cost_provider_family(x.provider, r.provider_usage) as provider,
+             coalesce(sum(x.cost_usd), 0) as cost_usd,
+             coalesce(sum((r.provider_usage ->> 'list_cost_cny')::numeric) filter (where x.cost_usd is not null), 0) as cost_cny,
+             count(*) as runs
+        from public.admin_test_spend x
+        left join public.admin_test_runs r on r.id = x.run_id
+       where x.started_at >= v_start
+       group by 1, 2
+    )
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'day', to_char(coalesce(j.day, t.day), 'YYYY-MM-DD'),
+             'provider', coalesce(j.provider, t.provider),
+             'cost_usd', coalesce(j.cost_usd, 0),
+             'cost_cny', coalesce(j.cost_cny, 0),
+             'costed', coalesce(j.costed, 0),
+             'uncosted', coalesce(j.uncosted, 0),
+             'no_usage', coalesce(j.no_usage, 0),
+             'test_cost_usd', coalesce(t.cost_usd, 0),
+             'test_cost_cny', coalesce(t.cost_cny, 0),
+             'test_runs', coalesce(t.runs, 0)
+           ) order by coalesce(j.day, t.day), coalesce(j.provider, t.provider)), '[]'::jsonb)
+      from job_days j
+      full join test_days t on t.day = j.day and t.provider = j.provider
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_daily_costs_by_provider"("p_days" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_dashboard_stats"("p_days" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -9505,6 +9571,26 @@ $$;
 
 
 ALTER FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_kept_inputs" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."cost_provider_family"("p_tag" "text", "p_usage" "jsonb") RETURNS "text"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select case
+    when a.adapter = 'ark_images' then 'ark'
+    when a.adapter = 'openrouter_images' then 'openrouter'
+    when a.adapter is not null then 'openai'
+    when p_usage ? 'list_cost_cny' then 'ark'
+    when coalesce(p_usage ?| array['cost', 'prompt_tokens', 'completion_tokens'], false) then 'openrouter'
+    else 'openai'
+  end
+  from (select (select p.adapter from public.ai_providers p
+                 where p.id::text = split_part(coalesce(p_tag, ''), '/', 1)) as adapter) a;
+$$;
+
+
+ALTER FUNCTION "public"."cost_provider_family"("p_tag" "text", "p_usage" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid", "p_ticket_id" "uuid" DEFAULT NULL::"uuid", "p_images" "jsonb" DEFAULT '[]'::"jsonb") RETURNS "public"."support_tickets"
@@ -17352,6 +17438,11 @@ GRANT ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) TO "service
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_daily_costs_by_provider"("p_days" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_daily_costs_by_provider"("p_days" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_dashboard_stats"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_dashboard_stats"("p_days" integer) TO "service_role";
 
@@ -17982,6 +18073,11 @@ GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
 
 REVOKE ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_kept_inputs" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_kept_inputs" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."cost_provider_family"("p_tag" "text", "p_usage" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."cost_provider_family"("p_tag" "text", "p_usage" "jsonb") TO "service_role";
 
 
 
