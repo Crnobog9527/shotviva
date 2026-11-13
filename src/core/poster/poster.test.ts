@@ -88,6 +88,20 @@ describe('partText', () => {
   })
 })
 
+describe('the digit check', () => {
+  it('spells out every run of five or more digits once, after the poster text, on the page that has them', () => {
+    const content = posterContentSchema.parse({ ...raw, sections: [{ title: '报名说明', style: 'kv', lines: ['第3级别　3000赛事分获取50000cc', '第9级别　5000赛事分获取120000cc', '再次获取50000cc'] }] })
+    const wide = posterFieldsSchema.parse({ ...fields, kinds: fields.kinds.map((kind) => ({ ...kind, capacity: {} })) })
+    const [prizes, rules] = splitPoster(content, wide)
+    const text = partText(content, rules!)
+    expect(text).toMatch(/\[Digit check: not poster text, never draw this block\]\n50000 has 5 digits: 5-0-0-0-0\n120000 has 6 digits: 1-2-0-0-0-0/)
+    expect(text.indexOf('[Digit check')).toBeGreaterThan(text.indexOf('[Footer]'))
+    expect(text.match(/50000 has/g)).toHaveLength(1)
+    // Phone numbers are written in groups of four, so a page with only those gets no check.
+    expect(partText(content, prizes!)).not.toContain('Digit check')
+  })
+})
+
 describe('the sections column heading', () => {
   it('goes on the poster that carries the sections only, and is checked there', () => {
     const content = posterContentSchema.parse({ ...raw, info: { title: '赛事信息', titleEn: 'INFORMATION' } })
