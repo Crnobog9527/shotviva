@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useUpdateHold } from '@/core/app-update'
 
-import { summarize, takeBatch, uploadsToStart, type BatchPhoto } from './photo-batch'
+import { getJobs } from '../generation/job-store'
+import { previewsToRevoke, summarize, takeBatch, uploadsToStart, type BatchPhoto } from './photo-batch'
 import { naturalSize, nearestRatio } from './photo-ratio'
 import { isAbort, UploadError, uploadPhoto } from '@/core/storage/upload'
 import { uploadDeps, type UploadState } from './use-upload'
@@ -21,6 +22,16 @@ function failed(error: unknown): UploadState {
 // cancel for one photo. The controller map also guards against starting a photo twice.
 function useBatchUploads(entries: Entry[], patch: (id: string, change: Partial<Entry>) => void) {
   const controllers = useRef(new Map<string, AbortController>())
+
+  // Leaving the page (or Batch create's dialog, which lives for the whole /generate visit) stops
+  // the uploads still running: nothing is left to use them.
+  useEffect(() => {
+    const running = controllers.current
+    return () => {
+      for (const controller of running.values()) controller.abort()
+      running.clear()
+    }
+  }, [])
 
   useEffect(() => {
     const running = controllers.current
@@ -58,6 +69,7 @@ export function usePhotoBatch(batchMax: number, kept?: KeptStart) {
     setEntries((list) => list.map((entry) => (entry.id === id ? { ...entry, ...change } : entry)))
   }, [])
   const cancel = useBatchUploads(entries, patch)
+  useRevokeOnLeave(entries)
   useBatchHolds(entries)
   useKeptRatios(entries, patch)
 
@@ -89,6 +101,22 @@ export function usePhotoBatch(batchMax: number, kept?: KeptStart) {
 }
 
 export type PhotoBatch = ReturnType<typeof usePhotoBatch>
+
+// On leaving: the local previews nothing shows any more go (a job still developing or settled
+// in this tab keeps its preview, which the workspace, Photos and the batch results draw).
+function useRevokeOnLeave(entries: Entry[]) {
+  const latest = useRef(entries)
+  useEffect(() => {
+    latest.current = entries
+  }, [entries])
+  useEffect(() => {
+    const current = latest
+    return () => {
+      const inUse = new Set(getJobs().flatMap((job) => (job.previewUrl ? [job.previewUrl] : [])))
+      for (const url of previewsToRevoke(current.current, inUse)) URL.revokeObjectURL(url)
+    }
+  }, [])
+}
 
 export type KeptStart = { photos: readonly { inputKey: string; bytes: number; url: string }[]; madeAt: string }
 
@@ -148,7 +176,7 @@ export function useSlotPhotos(slots: readonly { key: string; required: boolean }
   }, [])
   const cancel = useBatchUploads(entries, patch)
   useBatchHolds(entries)
-  useRevokeSlotPreviews(entries)
+  useRevokeOnLeave(entries)
 
   const drop = (slot: string) => {
     cancel(slot)
@@ -171,21 +199,6 @@ export function useSlotPhotos(slots: readonly { key: string; required: boolean }
 
 export type SlotPhotos = ReturnType<typeof useSlotPhotos>
 
-// On leaving the form: the slot photos' local previews go. A slot job never shows its uploads
-// (no input preview, §5.1e), so none is still in use. (#543's useRevokeOnLeave does the same for
-// the photo list; the two can share one helper once both are on main.)
-function useRevokeSlotPreviews(entries: Entry[]) {
-  const latest = useRef(entries)
-  useEffect(() => {
-    latest.current = entries
-  }, [entries])
-  useEffect(() => {
-    const current = latest
-    return () => {
-      for (const entry of current.current) if (entry.file) URL.revokeObjectURL(entry.url)
-    }
-  }, [])
-}
 
 function keptSlotEntries(kept: SlotKept | undefined): Entry[] {
   return (kept?.photos ?? []).flatMap((photo) => (photo.slot

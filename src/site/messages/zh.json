@@ -270,9 +270,9 @@
         "max": "{count, number} 张 · {templates, number} 个模板"
       },
       "guide": {
-        "title": "新手教程",
-        "lede": "批量创作怎么用，附示例成品。随时可以点 ? 再看。",
-        "open": "批量创作新手教程",
+        "title": "效果演示",
+        "lede": "批量创作怎么用，附示例成品。随时可以点「效果演示」再看。",
+        "demo": "效果演示",
         "tabsLabel": "批量创作的两种用法",
         "tabs": {
           "batch": "1 个模板 × 多张",
@@ -410,6 +410,7 @@
       "newBatch": "新的一批",
       "openPhotos": "打开作品",
       "backToCreate": "返回创作",
+      "closeWhileRunning": "关闭（继续在后台出图）",
       "lockedTitle": "批量创作是 Pro 和 Max 的功能",
       "lockedPro": "一个模板一次最多 {count, number} 张照片。",
       "lockedMax": "最多 {templates, number} 个模板一起套，一批最多 {count, number} 张。",

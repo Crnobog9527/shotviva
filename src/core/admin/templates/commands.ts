@@ -7,7 +7,7 @@ import { AppError } from '@/core/errors'
 import { isStyleRefKey } from '@/core/templates/style-refs'
 import { logger } from '@/core/logger'
 import { MISSING_COST, providerFloor, floorGuidance, type ProviderFloors } from '@/core/templates/provider-pricing'
-import { creditsBelowFloor, promptInputSchema, slotSurfaceProblems, templateInputSchema, toggleSetupProblems, type PromptInput } from '@/core/templates'
+import { creditsBelowFloor, promptInputSchema, slotFloorFactor, slotSurfaceProblems, templateInputSchema, toggleSetupProblems, type PromptInput } from '@/core/templates'
 
 import { describeBlockers, planActiveChange, type ActiveChangeOutcome } from './publish-rules'
 import * as repo from './repository'
@@ -31,7 +31,7 @@ const TIER_LABEL = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' } as const
 
 // ARCHITECTURE §6.1: prices may go up, never below the floor for the template's quality tier.
 function assertAboveFloor(template: z.infer<typeof templateInputSchema>, floor: ProviderFloors): void {
-  const low = creditsBelowFloor(template.quality, template.creditsCost, floor, template.unpricedResolutions)
+  const low = creditsBelowFloor(template.quality, template.creditsCost, floor, template.unpricedResolutions, slotFloorFactor(template.fields))
   if (low.length === 0) return
   const detail = low.map((v) => v.floor === MISSING_COST ? floorGuidance(v.floor, floor.unknownCapabilities) : `${TIER_LABEL[v.resolution]} 不能低于 ${v.floor}（填了 ${v.given}）`).join('；')
   throw new AppError('INVALID_INPUT', `积分低于下限：${detail}`)

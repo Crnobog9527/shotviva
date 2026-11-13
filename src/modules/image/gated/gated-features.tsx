@@ -1,63 +1,60 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import type { ReactNode } from 'react'
 
 import type { MembershipTier } from '@/core/config'
-import { Link } from '@/core/i18n/ui'
 
-import { BATCH_WORKSPACE, batchCaps, batchCounts, isLocked, MATRIX_TEMPLATES } from './feature-access'
-import { GuideIcon } from './guide-button'
+import { preloadBatchDialog } from '../matrix/batch-dialog-slot'
+import { openBatch } from '../matrix/batch-query'
+import { batchCaps, batchCounts, isLocked, MATRIX_TEMPLATES } from './feature-access'
+import { GuideButton } from './guide-button'
 import { IntroTrigger } from './intro-trigger'
 import { TierBadge } from './tier-badge'
-
-const CARD = 'press hairline flex w-full items-start gap-3 rounded-tile bg-card p-3 pr-14 text-left md:items-center md:p-3.5 md:pr-16'
 
 // Kept for the Create page's catalogue wrapper (scroll target of in-page links).
 export const TEMPLATES_ANCHOR = 'templates'
 
-// Create's one way into Batch create (Owner 2026-11-12: batch photos and several templates are
-// one creation screen, not two cards). The card names both plans with what each brings, lit or
-// locked for this account. With Pro or Max it opens the page; below Pro it opens the guide as an
-// intro first, then the paywall on Pro. The "?" in its corner is the tutorial, for everyone.
+// The card's whole face is its button (an ::after over the card), with "See how it works" above
+// it as a button of its own.
+const ENTRY = "text-left after:absolute after:inset-0 after:rounded-tile after:content-[''] focus-visible:outline-none focus-visible:after:shadow-[inset_0_0_0_2px_var(--ring)]"
+
+// Create's one way into Batch create (Owner 2026-11-12): batch photos and several templates in
+// one creation screen, which opens as a dialog right here (never another page). The card names
+// both plans with what each brings, lit or locked for this account. With Pro or Max it opens the
+// dialog; below Pro it opens the intro first, then the paywall on Pro. "See how it works" is a
+// labelled button on the card, for everyone, and only plays the demo.
 export function GatedFeatures({ tier }: { tier: MembershipTier | null }) {
   const t = useTranslations('app.gated')
-  const open = batchCaps(tier) !== null
   return (
-    <section aria-label={t('heading')} className="relative pt-2">
-      <Entry open={open} tier={tier}>
+    <section aria-label={t('heading')} className="pt-2">
+      <div className="press hairline relative flex w-full items-start gap-3 rounded-tile bg-card p-3 md:items-center md:p-3.5">
         <CardIcon />
-        <span className="min-w-0 flex-1 md:flex md:items-center md:gap-4">
-          <span className="block min-w-0 md:flex-1">
-            <b className="block text-body leading-[1.25] font-semibold">{t('create.title')}</b>
+        <div className="min-w-0 flex-1 md:flex md:items-center md:gap-4">
+          <div className="min-w-0 md:flex-1">
+            <Entry tier={tier} />
             <span className="mt-1 block text-caption leading-[1.35] text-pretty text-muted-foreground">{t('create.line')}</span>
-          </span>
+          </div>
           <PlanMarks tier={tier} />
-        </span>
-      </Entry>
-      <IntroTrigger
-        tab="batch"
-        tier={tier}
-        label={t('guide.open')}
-        className="press absolute top-2 right-0 grid size-12 place-items-center rounded-full text-bone-dim hover:text-foreground md:top-[calc(50%+4px)] md:right-1.5 md:-translate-y-1/2"
-      >
-        <GuideIcon />
-      </IntroTrigger>
+          <GuideButton tier={tier} className="relative z-10 mt-3 md:mt-0" />
+        </div>
+      </div>
     </section>
   )
 }
 
-function Entry({ open, tier, children }: { open: boolean; tier: MembershipTier | null; children: ReactNode }) {
-  if (open) {
+function Entry({ tier }: { tier: MembershipTier | null }) {
+  const t = useTranslations('app.gated.create')
+  const title = <b className="block text-body leading-[1.25] font-semibold">{t('title')}</b>
+  if (batchCaps(tier)) {
     return (
-      <Link href={BATCH_WORKSPACE} className={CARD}>
-        {children}
-      </Link>
+      <button type="button" data-batch-entry onClick={() => openBatch()} onPointerEnter={preloadBatchDialog} onFocus={preloadBatchDialog} className={ENTRY}>
+        {title}
+      </button>
     )
   }
   return (
-    <IntroTrigger tab="batch" tier={tier} upgrade="pro" className={CARD}>
-      {children}
+    <IntroTrigger tab="batch" tier={tier} upgrade="pro" className={ENTRY}>
+      {title}
     </IntroTrigger>
   )
 }

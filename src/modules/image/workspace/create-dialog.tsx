@@ -5,10 +5,11 @@ import { useState } from 'react'
 
 import { limitsFor } from '@/core/billing/tier-limits'
 import { useRouter } from '@/core/i18n'
-import { Link } from '@/core/i18n/ui'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
 import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
+import { preloadBatchDialog } from '../matrix/batch-dialog-slot'
+import { openBatch } from '../matrix/batch-query'
 import { isCompareSample, TemplateSample } from '../catalogue/template-sample'
 import { FavoriteButton } from '../favorites/favorite-button'
 import { CreateSheet } from './create-sheet'
@@ -89,16 +90,21 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   )
 }
 
-// Pro and Max can run this template on several photos: in Batch create, with it already chosen
-// (Owner 2026-11-12: one creation screen for batches), not in this dialog.
+// Pro and Max can run this template on several photos: in Batch create, which opens over Create
+// with it already chosen once this dialog has closed (Owner 2026-11-12: one creation screen for
+// batches, a dialog, never another page).
 export function BatchLink({ templateId, onGo }: { templateId: string; onGo(): void }) {
   const t = useTranslations('app.workspace.batch')
+  const go = () => {
+    onGo()
+    openBatch([templateId])
+  }
   return (
-    <Link href={`/generate/batch?t=${templateId}`} onClick={onGo} className="press mt-2 inline-flex min-h-11 items-center gap-0.5 text-caption font-medium text-foreground hover:underline hover:underline-offset-3">
+    <button type="button" onClick={go} onPointerEnter={preloadBatchDialog} className="press mt-2 inline-flex min-h-11 items-center gap-0.5 text-caption font-medium text-foreground hover:underline hover:underline-offset-3">
       {t('onPage')}
       <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 text-primary" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 6l6 6-6 6" />
       </svg>
-    </Link>
+    </button>
   )
 }

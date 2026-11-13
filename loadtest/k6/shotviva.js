@@ -39,10 +39,15 @@ const MARKETING = (__ENV.MARKETING_PATHS || '/,/zh,/pricing,/zh/pricing').split(
 const think = () => sleep(2 + Math.random() * 3)
 const user = (data) => ({ Cookie: cookieHeader(data.sessions[(__VU - 1) % data.sessions.length]) })
 const ok = (res, name) => check(res, { [`${name} 2xx`]: (r) => r.status >= 200 && r.status < 400 })
-// Signed-in pages must not have been redirected to sign-in (k6 follows redirects).
+// Signed-in pages must not have been redirected to sign-in (k6 follows redirects), nor sent there
+// from inside the streamed page (a redirect() after the shell is a 200 whose body carries
+// NEXT_REDIRECT), nor have rendered an error boundary instead of content (a server error's digest
+// on an errored Suspense boundary; client-only boundaries carry an empty one): "signed in" counts
+// the first two, "rendered" the third.
 const okSignedIn = (res, name) => check(res, {
   [`${name} 2xx`]: (r) => r.status >= 200 && r.status < 400,
-  [`${name} signed in`]: (r) => !/\/(login|sign-?in)\b/.test(r.url),
+  [`${name} signed in`]: (r) => !/\/(login|sign-?in)\b/.test(r.url) && !String(r.body).includes('NEXT_REDIRECT'),
+  [`${name} rendered`]: (r) => !/data-dgst="(?!NEXT_)[^"]+"/.test(String(r.body)),
 })
 
 export function marketing() {
