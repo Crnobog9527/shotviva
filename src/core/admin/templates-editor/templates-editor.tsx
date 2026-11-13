@@ -9,7 +9,8 @@ import type { AdminTemplate, CoverLanguage, SaveTemplatePayload, TemplateAdminAc
 
 import { BulkPublish } from './bulk-publish'
 import type { CategoryOption } from './category-field'
-import { orderCopy } from './copy'
+import { deleteCopy, orderCopy } from './copy'
+import { DeleteDialog } from './delete-dialog'
 import { FeaturedPanel } from './featured-panel'
 import { FEATURED_LIMIT } from './featured-state'
 import { selectedInOrder, toggleId, toggleVisible } from './selection-state'
@@ -54,10 +55,14 @@ function afterSave(payload: SaveTemplatePayload): Editing {
   return { mode: 'saved', id: typeof id === 'string' ? id : '' }
 }
 
-export function TemplatesEditor({ providers, templates, categories, series, floor, coverLanguages, actions, initialEdit }: Props) {
+export function TemplatesEditor({ providers, templates: all, categories, series, floor, coverLanguages, actions, initialEdit }: Props) {
+  // Deleted templates (1401) only appear under 已删除; everything else works on the live ones.
   const [query, setQuery] = useState('')
+  const templates = all.filter((template) => !template.deletedAt)
+  const deleted = all.filter((template) => template.deletedAt)
   const [editing, setEditing] = useState<Editing | null>(initialEdit ? { mode: 'saved', id: initialEdit } : null)
   const [unpublishing, setUnpublishing] = useState<AdminTemplate | null>(null)
+  const [deleting, setDeleting] = useState<AdminTemplate | null>(null)
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const { pending, error, notice, run, clearError } = useTemplateActions()
   const duplicate = useDuplicateTemplate(actions.duplicate, run, receipt => setEditing({ mode: 'saved', ...receipt }))
@@ -103,6 +108,7 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
       <CatalogView query={query} onQuery={setQuery} series={series} categories={categories}
         floor={floor}
         templates={templates}
+        deleted={deleted}
         selection={{
           selected,
           onSelect: (id, on) => setSelected((current) => toggleId(current, id, on)),
@@ -115,6 +121,7 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
         onDuplicate={duplicate}
         onEdit={(template) => openEditor({ mode: 'edit', template })}
         onToggle={toggle}
+        onDelete={setDeleting}
       />
       {target ? (
         <TemplateFormDialog
@@ -124,6 +131,7 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
           floor={floor}
           categories={categories}
           series={series}
+          templates={templates}
           coverLanguages={coverLanguages}
           coverActions={actions}
           pending={pending}
@@ -133,6 +141,12 @@ export function TemplatesEditor({ providers, templates, categories, series, floo
           onSubmit={(payload, saved) => run(() => actions.save(payload), '已保存', result => { saved(result.version); setEditing(afterSave(payload)) })}
         />
       ) : null}
+      <DeleteDialog template={deleting} pending={pending} onCancel={() => setDeleting(null)} onConfirm={() => {
+        if (!deleting) return
+        const { id, name } = deleting
+        setDeleting(null)
+        run(() => actions.remove({ id }), deleteCopy.done(name))
+      }} />
       <UnpublishDialog
         template={unpublishing}
         pending={pending}

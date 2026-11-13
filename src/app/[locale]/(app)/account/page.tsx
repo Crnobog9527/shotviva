@@ -12,7 +12,9 @@ import { readBalance } from '@/core/billing'
 import { purchaseLines } from '@/core/billing/documents'
 import { lastMembership, readMemberSince, readSubscriptionSummary } from '@/core/billing/subscription'
 import { listMonthWorks } from '@/core/jobs'
+import { serverEnv } from '@/core/env'
 import { readLinkStatus } from '@/core/partner'
+import { graylumIntroLinks } from '@/core/partner/ui'
 import { formatMoney, hasUnreadReply, listPaymentOptions, paymentChoices, PICKER_LIMIT, ReplyTime } from '@/core/support'
 import { AccountHelp } from '@/core/support/ui/account'
 import { currentLocale } from '@/core/i18n/server'
@@ -55,7 +57,7 @@ async function Account() {
   const more = payments.length >= PICKER_LIMIT
   // Each line with its receipt / invoice links (T80); the support picker keeps the plain labels.
   const lines = purchaseLines(payments, purchases, locale)
-  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.reason, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, affiliate, admin: user.role === 'admin' }
+  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.reason, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, graylumLinks: graylumIntroLinks(serverEnv().VERCEL_ENV), affiliate, admin: user.role === 'admin' }
   // Help & feedback opens over the page (?help=…, T68); its payments picker is the Purchases list.
   return (
     <>

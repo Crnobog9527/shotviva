@@ -9,7 +9,9 @@ import { navTypesFor } from '@/core/ui/nav-motion'
 
 import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { CatalogueSeries } from '../catalogue/catalogue-view'
-import { isCompareSample, TemplateSample } from '../catalogue/template-sample'
+import { isCompareSample } from '../catalogue/template-sample'
+import { ZoomableSample } from '../catalogue/zoomable-sample'
+import { ShareButton } from '../share/share-button'
 import { FavoriteButton } from '../favorites/favorite-button'
 import { BatchLink, type CreateContext } from './create-dialog'
 import { CreateSheet } from './create-sheet'
@@ -72,6 +74,7 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
       description={[template.categoryName, template.description].filter(Boolean).join(' · ')}
       hint={t(tall ? 'template.hintCompare' : 'template.hintPair')}
       tall={tall}
+      share={<ShareButton template={template} />}
       folded={draft.photos.photos.length > 0}
       picker={<MemberPicker label={t('series.members', { name: series.name, count: series.members.length })} members={series.members} value={template.id} onChange={choose} />}
       sample={<Sample template={template} tall={tall} />}
@@ -97,7 +100,7 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
 function Sample({ template, tall }: { template: CatalogueTemplate; tall: boolean }) {
   return (
     <div key={template.id} className="sample-swap relative max-md:h-full">
-      <TemplateSample template={template} className="max-md:h-full max-md:aspect-auto" />
+      <ZoomableSample template={template} className="max-md:h-full max-md:aspect-auto" />
       {/* The save heart (T83) takes the right corner the Phone / AI tags leave free. */}
       <FavoriteButton template={template} surface="create_dialog" className={tall ? 'right-1 bottom-1' : 'top-1 right-1'} />
     </div>

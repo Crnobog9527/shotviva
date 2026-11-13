@@ -35,7 +35,10 @@ export function UnpublishDialog({ template, pending, onCancel, onConfirm }: Prop
       <DialogContent>
         <DialogHeader>
           <DialogTitle>下架「{template?.name}」？</DialogTitle>
-          <DialogDescription>下架后用户和伙伴入口都看不到这个模板，可以随时重新上架。</DialogDescription>
+          <DialogDescription>
+            下架后用户和伙伴入口都看不到这个模板，可以随时重新上架。
+            {template?.seriesId ? '它会同时移出所在的系列，重新上架后要在系列管理里重新加入。' : null}
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-2">
           <Label htmlFor="unpublish-reason">下架原因（必填）</Label>

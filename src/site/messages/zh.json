@@ -57,7 +57,7 @@
       "field": "手机号",
       "placeholder": "11 位手机号",
       "hint": "仅支持中国大陆（+86）手机号，新号码会自动注册。",
-      "consent": "我已阅读并同意<terms>《服务条款》</terms><privacy>《隐私政策》</privacy><aup>《使用规范》</aup>，并同意将我的手机号等个人信息传输到中国大陆以外处理（数据存放在美国，短信由短信服务商发送）。",
+      "consent": "我已阅读并同意<terms>《服务条款》</terms><privacy>《隐私政策》</privacy><aup>《使用规范》</aup>。",
       "send": "获取验证码"
     },
     "code": {
@@ -253,15 +253,82 @@
     },
     "account": {
       "title": "Graylum",
-      "description": "不懂运营也能做好自媒体。Graylum 像专业运营一样陪你定方向、出内容、看数据复盘，告诉你下一步做什么。连接后，配图直接用 Shotviva 积分生成。",
-      "connected": "<b>{date, date, medium}</b> 起已连接。Graylum 可以用你的积分出图。",
-      "notConnected": "未连接。要连接，请从 Graylum 发起，并允许它使用你的积分。",
-      "disconnect": "断开 Graylum"
+      "description": "Graylum 是每个人的专属 AI 自媒体陪跑教练，运营从此交给 AI 教练，你只管专心输出你擅长的内容。"
     },
     "integrations": {
       "title": "连接的应用",
-      "enabled": "已启用",
+      "enabled": "已连接",
       "notEnabled": "未启用"
+    },
+    "intro": {
+      "tagline": "Graylum 是每个人的专属 AI 自媒体陪跑教练，运营从此交给 AI 教练，你只管专心输出你擅长的内容。",
+      "idea": "每个人都有值得被看见的本事：一手好菜、一门手艺、一段别人没走过的路。很多人也想过把它做成自媒体，被更多人看见、被信任，甚至靠它多一份收入。可真动手才发现，难的不是内容，是运营：做什么定位、今天发什么、为什么没人看。我们做 Graylum，就是想把这些交给 AI 教练，让你不用先变成运营专家，也能把擅长的事做成被看见的事业。",
+      "iconAlt": "Graylum 图标",
+      "close": "关闭",
+      "connection": {
+        "label": "Graylum 和 Shotviva 的连接",
+        "connected": "<b>已连接</b>：在 Graylum 的对话里配图，会直接用你的 Shotviva 积分出图。",
+        "notConnected": "<b>未连接</b>：在 Graylum 的集成页连接后，就能在 Graylum 写内容时直接用 Shotviva 出图。",
+        "disconnect": "断开",
+        "confirm": "断开后，Graylum 就不能再用你的 Shotviva 积分出图了。",
+        "confirmDisconnect": "确认断开",
+        "cancel": "取消",
+        "disconnecting": "正在断开…",
+        "connect": "去 Graylum 连接"
+      },
+      "what": "能做什么",
+      "when": "什么时候适合用",
+      "after": {
+        "title": "连接以后",
+        "line1": "在 Graylum 写内容时可以直接配图，用你的 Shotviva 积分，Graylum 不另外收费；",
+        "line2": "Shotviva 只把你的 Shotviva 账号 ID 交给 Graylum，Graylum 拿不到你的 Shotviva 密码；",
+        "line3": "随时可以在这里或 Graylum 的集成页断开。"
+      },
+      "view": "去看看 Graylum",
+      "newTab": "（在新标签页打开）",
+      "zoom": "看大图：{name}",
+      "lightbox": {
+        "label": "Graylum 截图",
+        "prev": "上一张",
+        "next": "下一张",
+        "count": "{n} / {total}"
+      },
+      "shots": {
+        "roadmap": {
+          "name": "路线图首页",
+          "note": "从定位到 30 天行动计划，六步帮你找准方向。"
+        },
+        "script": {
+          "name": "口播建议稿",
+          "label": "写口播",
+          "note": "有想法但不知道怎么开口的时候"
+        },
+        "xhsPost": {
+          "name": "小红书图文成稿",
+          "label": "写图文",
+          "note": "想发笔记却写不出能直接发的稿子的时候"
+        },
+        "storyboard": {
+          "name": "视频分镜",
+          "label": "拍视频",
+          "note": "稿子定了，不知道每个镜头怎么拍的时候"
+        },
+        "storeVisit": {
+          "name": "探店笔记成稿",
+          "label": "一稿多用",
+          "note": "同一件事想发到不同平台的时候"
+        },
+        "shotvivaImage": {
+          "name": "对话里用 Shotviva 出图",
+          "label": "写完就配图",
+          "note": "内容写好了还缺一张像样配图的时候"
+        },
+        "tools": {
+          "name": "功能广场",
+          "label": "更多工具",
+          "note": "定位、复盘、剪辑建议等都在这里。"
+        }
+      }
     }
   },
   "app": {
@@ -606,7 +673,13 @@
       "hintCompare": "在图片上左右拖动，对比前后效果。",
       "makeOne": "做一张",
       "animatedMeta": "{category} · 动图",
-      "hintPair": "左边是手机原图，右边是 AI 出图。"
+      "hintPair": "左边是手机原图，右边是 AI 出图。",
+      "viewerOpen": "放大查看 {name}",
+      "viewerTitle": "{name} 大图",
+      "viewerClose": "关闭大图",
+      "viewerSwitch": "切换原图和 AI 出图",
+      "viewerHint": "点图片放大，左右滑动切换原图和 AI。",
+      "viewerHintZoomed": "拖动查看细节，再点一下缩回。"
     },
     "tiers": {
       "1k": {
@@ -1052,9 +1125,18 @@
         "stepsLabel": "使用步骤",
         "stepLabel": "第 {n} 步，共 {total} 步",
         "steps": {
-          "say": { "title": "说出你要的效果", "text": "用一句话描述想要的样子，再配一张参考图就行。" },
-          "vote": { "title": "大家投票，票多先做", "text": "其他卖家也会给想要的愿望投票，票多的先做。" },
-          "ship": { "title": "做好置顶，一键使用", "text": "做好的模板会置顶在许愿墙上，点一下就能用。" }
+          "say": {
+            "title": "说出你要的效果",
+            "text": "用一句话描述想要的样子，再配一张参考图就行。"
+          },
+          "vote": {
+            "title": "大家投票，票多先做",
+            "text": "其他卖家也会给想要的愿望投票，票多的先做。"
+          },
+          "ship": {
+            "title": "做好置顶，一键使用",
+            "text": "做好的模板会置顶在许愿墙上，点一下就能用。"
+          }
         },
         "example": "我们每周三第二杯半价，想要一个清爽好看的促销海报，每周能直接套",
         "exampleAuthor": "林***",
@@ -1452,7 +1534,17 @@
       "unavailable": "这个模板暂时不可用，没有收藏上。",
       "failed": "没能保存这次修改，请检查网络后重试。",
       "close": "关闭",
-      "pickerGroup": "收藏"
+      "pickerGroup": "收藏",
+      "emptyTitle": "还没有收藏的模板",
+      "emptyText": "在模板卡片或创作弹窗上点心形，就会收藏到这里。",
+      "emptyBrowse": "去看看模板",
+      "mine": "我的收藏"
+    },
+    "share": {
+      "button": "分享",
+      "copied": "链接已复制",
+      "text": "用 Shotviva 的「{name}」模板，手机照片也能做成这样：",
+      "copyByHand": "复制这个链接发给朋友："
     }
   },
   "paywall": {
@@ -2062,5 +2154,29 @@
       "failed": "举报没有提交成功，请再试一次。"
     },
     "footerLink": "创作库"
+  },
+  "share": {
+    "metaTitle": "{name} · Shotviva 模板",
+    "metaDescription": "用 Shotviva 的「{name}」模板，把手机照片做成好看的商用图。",
+    "ogAlt": "{name} 模板的 AI 出图效果",
+    "kicker": "Shotviva 模板 · {category}",
+    "hint": "左边是手机原图，右边是 AI 出图。点图片可以放大看。",
+    "series": "系列 · {name} · {count} 个模板",
+    "make": "用这个模板做一张",
+    "browse": "浏览全部模板",
+    "signUp": "免费注册，用这个模板",
+    "signUpNote": "注册后直接回到这个模板，上传照片就能做。",
+    "look": "先看看其他模板",
+    "missingTitle": "这个模板暂时看不到了",
+    "missingText": "它可能已经下架或改动过。去首页看看其他模板吧。",
+    "missingBrowse": "去看看其他模板"
+  },
+  "supportEmail": {
+    "subject": "Shotviva 客服回复了你的工单",
+    "title": "你的工单有新回复",
+    "body": "我们已经回复了你的工单。点下面的按钮查看回复，也可以在工单里继续沟通。",
+    "button": "查看回复",
+    "fallback": "如果按钮点不开，请把下面的链接复制到浏览器打开：",
+    "footer": "这是系统自动发送的邮件，请勿直接回复。如需继续沟通，请在 Shotviva 的工单里回复。"
   }
 }

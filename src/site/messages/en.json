@@ -253,15 +253,82 @@
     },
     "account": {
       "title": "Graylum",
-      "description": "Your AI social media coach. Find your angle, create posts, and learn from your numbers, with a clear next step every time. Connect to create images with your Shotviva credits.",
-      "connected": "Connected since <b>{date, date, medium}</b>. Graylum can make photos with your credits.",
-      "notConnected": "Not connected. To connect, start from Graylum and allow it to use your credits.",
-      "disconnect": "Disconnect Graylum"
+      "description": "Graylum is a personal AI social media coach for everyone. Hand the running of your account to an AI coach and put your time into the content you're good at."
     },
     "integrations": {
       "title": "Integrations",
-      "enabled": "Enabled",
+      "enabled": "Connected",
       "notEnabled": "Not enabled"
+    },
+    "intro": {
+      "tagline": "Graylum is a personal AI social media coach for everyone. Hand the running of your account to an AI coach and put your time into the content you're good at.",
+      "idea": "Everyone has something worth being seen for: a great dish, a craft, a road nobody else has walked. Many people have thought about turning it into a social media account, to be seen by more people, to be trusted, maybe even to earn a little more from it. But once they start, they find the hard part isn't the content, it's running the account: what angle to take, what to post today, why nobody is watching. We built Graylum to hand all of that to an AI coach, so you don't have to become a social media expert first to turn what you're good at into work people see.",
+      "iconAlt": "Graylum icon",
+      "close": "Close",
+      "connection": {
+        "label": "Connection between Graylum and Shotviva",
+        "connected": "<b>Connected</b>: images you add in a Graylum chat are made with your Shotviva credits.",
+        "notConnected": "<b>Not connected</b>: connect on Graylum's Integrations page, and you can make images with Shotviva while you write in Graylum.",
+        "disconnect": "Disconnect",
+        "confirm": "Once disconnected, Graylum can no longer make images with your Shotviva credits.",
+        "confirmDisconnect": "Yes, disconnect",
+        "cancel": "Cancel",
+        "disconnecting": "Disconnecting…",
+        "connect": "Connect in Graylum"
+      },
+      "what": "What it does",
+      "when": "When it helps",
+      "after": {
+        "title": "Once connected",
+        "line1": "Add images while you write in Graylum, using your Shotviva credits. Graylum charges nothing extra.",
+        "line2": "Shotviva only gives Graylum your Shotviva account ID. Graylum never gets your Shotviva password.",
+        "line3": "Disconnect any time, here or on Graylum's Integrations page."
+      },
+      "view": "Visit Graylum",
+      "newTab": "(opens in a new tab)",
+      "zoom": "View larger: {name}",
+      "lightbox": {
+        "label": "Graylum screenshot",
+        "prev": "Previous",
+        "next": "Next",
+        "count": "{n} / {total}"
+      },
+      "shots": {
+        "roadmap": {
+          "name": "Roadmap home",
+          "note": "From positioning to a 30-day action plan, six steps to find your direction."
+        },
+        "script": {
+          "name": "Voiceover draft",
+          "label": "Voiceovers",
+          "note": "When you have an idea but don't know how to start talking"
+        },
+        "xhsPost": {
+          "name": "Xiaohongshu post draft",
+          "label": "Image posts",
+          "note": "When you want to post but can't write a draft that's ready to go"
+        },
+        "storyboard": {
+          "name": "Video storyboard",
+          "label": "Video",
+          "note": "When the script is set but you're not sure how to shoot each shot"
+        },
+        "storeVisit": {
+          "name": "Store visit post draft",
+          "label": "One draft, many platforms",
+          "note": "When you want to post the same story on different platforms"
+        },
+        "shotvivaImage": {
+          "name": "Shotviva images in the chat",
+          "label": "Images right after writing",
+          "note": "When the post is written but still needs a decent image"
+        },
+        "tools": {
+          "name": "Tools",
+          "label": "More tools",
+          "note": "Positioning, reviews, editing tips and more, all here."
+        }
+      }
     }
   },
   "app": {
@@ -606,7 +673,13 @@
       "hintCompare": "Drag across the photo to compare.",
       "makeOne": "Make one",
       "animatedMeta": "{category} · animated",
-      "hintPair": "Phone photo on the left, the AI result on the right."
+      "hintPair": "Phone photo on the left, the AI result on the right.",
+      "viewerOpen": "View {name} full screen",
+      "viewerTitle": "{name}, full screen",
+      "viewerClose": "Close full screen",
+      "viewerSwitch": "Switch between the phone photo and the AI result",
+      "viewerHint": "Tap the image to zoom. Swipe to switch between Phone and AI.",
+      "viewerHintZoomed": "Drag to look around. Tap again to zoom out."
     },
     "tiers": {
       "1k": {
@@ -1052,9 +1125,18 @@
         "stepsLabel": "How it works",
         "stepLabel": "Step {n} of {total}",
         "steps": {
-          "say": { "title": "Say what you want", "text": "Describe the look in a sentence and add one reference photo. That's all we need." },
-          "vote": { "title": "Everyone votes", "text": "Other sellers vote for the wishes they want too. The most-wanted get built first." },
-          "ship": { "title": "Shipped and pinned", "text": "A finished template is pinned to the top of the wall. One tap to use it." }
+          "say": {
+            "title": "Say what you want",
+            "text": "Describe the look in a sentence and add one reference photo. That's all we need."
+          },
+          "vote": {
+            "title": "Everyone votes",
+            "text": "Other sellers vote for the wishes they want too. The most-wanted get built first."
+          },
+          "ship": {
+            "title": "Shipped and pinned",
+            "text": "A finished template is pinned to the top of the wall. One tap to use it."
+          }
         },
         "example": "We do 2nd cup half price every Wednesday. I want a fresh promo poster I can reuse every week",
         "exampleAuthor": "M***",
@@ -1452,7 +1534,17 @@
       "unavailable": "That template isn’t available right now, so it wasn’t saved.",
       "failed": "Couldn’t save that change. Check your connection and try again.",
       "close": "Close",
-      "pickerGroup": "Saved"
+      "pickerGroup": "Saved",
+      "emptyTitle": "No saved templates yet",
+      "emptyText": "Tap the heart on a template card or in its dialog to save it here.",
+      "emptyBrowse": "Browse templates",
+      "mine": "Saved templates"
+    },
+    "share": {
+      "button": "Share",
+      "copied": "Link copied",
+      "text": "A phone photo made into this with the {name} template on Shotviva:",
+      "copyByHand": "Copy this link to share it:"
     }
   },
   "paywall": {
@@ -2062,5 +2154,29 @@
       "failed": "The report did not go through. Please try again."
     },
     "footerLink": "Gallery"
+  },
+  "share": {
+    "metaTitle": "{name} · Shotviva template",
+    "metaDescription": "Turn a phone photo into a polished image with the {name} template on Shotviva.",
+    "ogAlt": "An AI result made with the {name} template",
+    "kicker": "Shotviva template · {category}",
+    "hint": "Left: the phone photo. Right: the AI result. Tap the image to zoom.",
+    "series": "Series · {name} · {count, plural, one {# template} other {# templates}}",
+    "make": "Make one with this template",
+    "browse": "Browse all templates",
+    "signUp": "Sign up free to use this template",
+    "signUpNote": "You come straight back to this template after signing up. Add a photo and go.",
+    "look": "Look at other templates first",
+    "missingTitle": "This template isn’t available",
+    "missingText": "It may have been taken down or changed. Have a look at the other templates.",
+    "missingBrowse": "See other templates"
+  },
+  "supportEmail": {
+    "subject": "You have a reply from Shotviva support",
+    "title": "Your ticket has a new reply",
+    "body": "We've replied to your support ticket. Open it to read the reply and continue the conversation.",
+    "button": "View the reply",
+    "fallback": "If the button doesn't work, copy and paste this link into your browser:",
+    "footer": "This is an automated email, please don't reply to it. Reply in your ticket on Shotviva instead."
   }
 }

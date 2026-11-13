@@ -14,7 +14,10 @@ import { PairMedia } from './pair-media'
 // .cd-media / .dev): the side-by-side pair, the drag compare for a 'compare' category (画风), or the loop when a
 // motion template has no stills. `fill` stretches it over the workspace stage, which is only drawn
 // from lg up: its covers load lazily, so a phone (where it is display:none) never fetches them.
-export function TemplateSample({ template, fill = false, className }: { template: CatalogueTemplate; fill?: boolean; className?: string }) {
+// Only what the sample draws, so a public page (the share page) can pass no more than that.
+export type SampleTemplate = Pick<CatalogueTemplate, 'name' | 'compare' | 'cover'>
+
+export function TemplateSample({ template, fill = false, className }: { template: SampleTemplate; fill?: boolean; className?: string }) {
   const t = useTranslations('app.template')
   const { before, after } = template.cover
   const sizes = fill ? { plate: COVER_SIZES.stagePlate, frame: COVER_SIZES.stageFrame } : { plate: COVER_SIZES.dialogPlate, frame: COVER_SIZES.dialogFrame }
@@ -28,4 +31,4 @@ export function TemplateSample({ template, fill = false, className }: { template
 }
 
 // Whether the sample is the tall drag compare (the dialog sizes its strip by it).
-export const isCompareSample = (template: CatalogueTemplate) => isCompareCategory(template) && hasStills(template)
+export const isCompareSample = (template: SampleTemplate) => isCompareCategory(template) && hasStills(template)

@@ -3,23 +3,16 @@
 import { Checkbox } from '@/core/ui/checkbox'
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
-import { Textarea } from '@/core/ui/textarea'
-import type { CreditsFloor } from '@/core/templates/pricing'
 import { TEMPLATE_DESCRIPTION_MAX } from '@/core/templates/schema'
 
-import { CategoryField, type CategoryOption } from './category-field'
 import { publicCopy, styleRefCopy } from './copy'
 import type { TemplateFormValues } from './form-state'
 import { ChinesePublicFields } from './template-translation-fields'
-import { TemplatePriceFields } from './template-price-fields'
 
 type Props = {
   values: TemplateFormValues
   isNew: boolean
   uploading: boolean
-  modelField: React.ReactNode
-  floor: CreditsFloor
-  categories: readonly CategoryOption[]
   onChange: (patch: Partial<TemplateFormValues>) => void
 }
 
@@ -59,11 +52,10 @@ function DescriptionField({ value, onChange }: { value: string; onChange: (value
   )
 }
 
-export function TemplatePublicFields({ values, isNew, uploading, modelField, floor, categories, onChange }: Props) {
+export function TemplatePublicFields({ values, isNew, uploading, onChange }: Props) {
   const lockNewId = uploading || values.styleRefs.length > 0
   return (
     <fieldset className="grid gap-3">
-      <legend className="mb-1 text-sm font-semibold">公开信息</legend>
       <div className="grid gap-3">
         <TextField id="id" label="ID（小写字母、数字、短横线，创建后不可改）" value={values.id}
           disabled={!isNew || lockNewId} onChange={(id) => onChange({ id })} />
@@ -72,8 +64,6 @@ export function TemplatePublicFields({ values, isNew, uploading, modelField, flo
       {isNew && lockNewId && <p className="text-muted-foreground text-xs">{styleRefCopy.idLocked}</p>}
       <DescriptionField value={values.description} onChange={(description) => onChange({ description })} />
       <ChinesePublicFields values={values} onChange={onChange} />
-      <CategoryField value={values.category} categories={categories} onChange={(category) => onChange({ category })} />
-      <TemplatePriceFields modelField={modelField} values={values} floor={floor} onChange={onChange} />
       <div className="flex items-center gap-6 text-sm">
         <span>展示入口</span>
         <label className="flex items-center gap-2">
@@ -86,11 +76,6 @@ export function TemplatePublicFields({ values, isNew, uploading, modelField, flo
             onCheckedChange={(checked) => onChange({ visiblePartner: checked === true })} />
           伙伴（partner）
         </label>
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="tpl-fieldsJson">字段定义（JSON：images / aspectRatios；aspectRatios 只对伙伴接口生效，站内按出图模型支持的比例显示。用户填写的字段在下面单独编辑）</Label>
-        <Textarea id="tpl-fieldsJson" className="min-h-32 font-mono text-xs" value={values.fieldsJson}
-          onChange={(event) => onChange({ fieldsJson: event.target.value })} />
       </div>
     </fieldset>
   )
