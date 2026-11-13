@@ -9,7 +9,7 @@ import { posterContentSchema, type PosterContent } from './content'
 import { splitPoster, type PosterPart } from './split'
 import { posterFieldsSchema, type PosterFields } from './template'
 
-// Saving a confirmed set and reading one poster of it back (ARCHITECTURE §5.3, table 1314).
+// Saving a confirmed set and reading one poster of it back (ARCHITECTURE §5.3, table 1344).
 // Service-role client: poster_sets takes no client writes.
 
 export const POSTER_FEATURE = 'dense_poster'
