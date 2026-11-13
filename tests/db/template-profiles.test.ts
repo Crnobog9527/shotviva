@@ -203,4 +203,14 @@ describe('slot floor (1442)', () => {
     expect(await floor(3)).toBe(10)
     expect(await floor(2)).toBe(10 + Math.ceil(0.01 * 1.10 / budget))
   })
+
+  it('ignores a job whose input_slots is not an array instead of failing the pricing read (1445)', async () => {
+    const user = await createUser(db)
+    await db.query('set local session_replication_role = replica')
+    await db.query(`insert into public.generation_jobs (id,user_id,module,template_id,inputs,provider,source,status,visibility,credits_cost,credit_pool,cost_usd,output_key,finished_at)
+      values (gen_random_uuid(),$1,'image',$2,$3,$4,'web','succeeded','private',1,'paid',0.5,'t1445/x',now())`,
+    [user, id, JSON.stringify({ resolution: '1k', quality: 'medium', input_slots: { logo: 'inputs/u/a.png' } }), tag()])
+    await expect(one("select public.admin_image_pricing_catalog('env-model') c")).resolves.toBeTruthy()
+    expect(await floor(3)).toBe(30)
+  })
 })
