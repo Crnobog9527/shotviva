@@ -6,7 +6,6 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { readTemplateQuote } from '../../src/site/template-pricing'
 import { anonClient, connectAdmin, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
-import { toDbTiers } from '../../src/core/templates/db-resolution'
 
 const providerId = randomUUID()
 const binding = { adapter: 'openai_images', model: providerId, base_url: 'https://model.example.test' }
@@ -20,7 +19,7 @@ function fixture() {
   templateIds.push(id)
   return { id, module: 'image', name: 'QA', description: 'QA', category_key: categoryKey,
     fields: { images: { min: 0, max: 1 }, copy: [], aspectRatios: ['1:1'] },
-    translations: { zh: { name: '测试' } }, quality: 'medium', credits_cost: { '1k': 1, '2k': 2, '3k': 3 },
+    translations: { zh: { name: '测试' } }, quality: 'medium', credits_cost: { '1k': 1, '2k': 2, '4k': 3 },
     visible_in: ['web'], cover_media_type: 'image', cover_before_url: 'https://example.test/b',
     cover_after_url: 'https://example.test/a', cover_locales: { zh: { after: 'https://example.test/zh' } },
     is_active: true, sort_order: 123, featured_rank: 1,
@@ -37,7 +36,7 @@ async function prepare(template: ReturnType<typeof fixture>, run: string) {
   const { token } = await target(template.id, run)
   const { floors, receipt, envModel } = await readTemplateQuote(serviceSupabase())
   return { p_template: template, p_prompt: prompt, p_provider: binding,
-    p_floors: toDbTiers({ ...floors, quote_receipt: receipt, env_model: envModel }), p_run_id: run,
+    p_floors: { ...floors, quote_receipt: receipt, env_model: envModel }, p_run_id: run,
     p_locales: ['en', 'zh'], p_target_token: token, p_catalog_version: 'v1' }
 }
 const write = (args: Record<string, unknown>) => serviceClient().rpc('sync_preview_template', args)
@@ -169,7 +168,7 @@ it('reads the source catalogue, private prompt and binding together; rejects bot
   })
   const args = await prepare(template, 'A')
   expect((await write({ ...args, p_catalog_version: 'v2',
-    p_template: { ...template, credits_cost: { '1k': 74, '2k': 150, '3k': 225 } } })).error?.message).toBe('CATALOG_MISMATCH')
+    p_template: { ...template, credits_cost: { '1k': 74, '2k': 150, '4k': 225 } } })).error?.message).toBe('CATALOG_MISMATCH')
   expect(await write({ ...args, p_validate_only: true })).toEqual(ok(2))
   // The changed marker stays in this transaction; parallel CI suites continue to see v1.
   await db.query('begin')
@@ -177,9 +176,9 @@ it('reads the source catalogue, private prompt and binding together; rejects bot
     await db.query("select pg_advisory_xact_lock(hashtextextended('shotviva.template_catalog',0))")
     await db.query(`insert into public.system_settings(key,value) values ('pricing_catalog_version','"v2"')
       on conflict(key) do update set value=excluded.value`)
-    await db.query('update public.templates set credits_cost=$2 where id=$1', [template.id, { '1k': 74, '2k': 150, '3k': 225 }])
+    await db.query('update public.templates set credits_cost=$2 where id=$1', [template.id, { '1k': 74, '2k': 150, '4k': 225 }])
     const read = await db.query('select public.read_template_sync_source($1) as snapshot', [template.id])
-    expect(read.rows[0].snapshot).toMatchObject({ catalog: 'v2', template: { credits_cost: { '1k': 74, '2k': 150, '3k': 225 } } })
+    expect(read.rows[0].snapshot).toMatchObject({ catalog: 'v2', template: { credits_cost: { '1k': 74, '2k': 150, '4k': 225 } } })
     await expect(writeSql(db, args)).rejects.toThrow('CATALOG_MISMATCH')
   } finally {
     await db.query('rollback')
