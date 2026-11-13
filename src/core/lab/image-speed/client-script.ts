@@ -21,6 +21,7 @@ export const CLIENT_SCRIPT = String.raw`(function () {
   if (performance.setResourceTimingBufferSize) performance.setResourceTimingBufferSize(1000);
 
   function url(o, key, tag) {
+    if (o.hero) return o.base + '/_next/image?url=' + encodeURIComponent('/home/' + C.heroFiles[C.keys.indexOf(key) % C.heroFiles.length]) + '&w=' + C.heroWidth + '&q=75&lab=' + tag;
     if (o.font) return o.base + '/fonts/misans/' + C.fontFiles[C.keys.indexOf(key) % C.fontFiles.length] + '?lab=' + tag;
     if (o.small) return o.base + '/_next/image?url=' + encodeURIComponent(C.assetsBase + '/' + key) + '&w=' + C.smallWidth + '&q=75&lab=' + tag;
     return o.base + '/' + key + '?lab=' + tag;
