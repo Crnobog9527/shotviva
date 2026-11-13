@@ -61,7 +61,7 @@ async function invitedUser() {
 function generate(userId: string, overrides: Partial<GenerationRequest> = {}) {
   const fake = fakeProvider('ok')
   const deps = { db: service, store: createMemoryStore().store, provider: fake.provider, providerTimeoutMs: 500, allowPoster: allow }
-  const request: GenerationRequest = { userId, source: 'web', templateId, aspectRatio: '1:2', ...overrides }
+  const request: GenerationRequest = { userId, source: 'web', templateId, aspectRatio: '1:2', resolution: '2k', ...overrides }
   return { fake, run: () => runGeneration(deps, request) }
 }
 
@@ -101,5 +101,17 @@ describe('poster sets and generation', () => {
     expect(privileges.rows[0]).toEqual({ ins: false, sel: true, ext: false })
     const policy = await db.query("select qual from pg_policies where tablename = 'poster_sets'")
     expect(policy.rows[0].qual).toContain('auth.uid()')
+  })
+
+  it('refuses 1K for a poster, more than 12 posters in a set, and keeps every poster work private', async () => {
+    const userId = await invitedUser()
+    const set = await savePosterSet(service, { userId, templateId, fields: { poster }, content, source: 'paste', allow })
+    await expect(generate(userId, { poster: { setId: set.id, part: 0 }, resolution: '1k' }).run()).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    const view = await generate(userId, { poster: { setId: set.id, part: 0 }, visibility: 'public' }).run()
+    const { rows } = await db.query('select visibility, gallery_excluded from public.generation_jobs where id = $1', [view.id])
+    expect(rows[0]).toEqual({ visibility: 'private', gallery_excluded: true })
+    const many = { ...content, prizes: { headline: '', rows: Array.from({ length: 13 }, (_, i) => ({ rank: String(i + 1), prize: 'x' })) } }
+    const tight = { kinds: [{ ...poster.kinds[0], capacity: { prizeRows: 1 } }] }
+    await expect(savePosterSet(service, { userId, templateId, fields: { poster: tight }, content: many, source: 'paste', allow })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   })
 })

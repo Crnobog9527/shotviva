@@ -67,6 +67,8 @@ async function posterPart(deps: GenerationDeps, req: GenerationRequest, template
     return null
   }
   if (!req.poster || req.source !== 'web') throw new AppError('INVALID_INPUT', 'Confirm the poster text first')
+  // Dense small text needs at least HD (ARCHITECTURE §5.3), whatever the template's prices say.
+  if ((req.resolution ?? DEFAULT_RESOLUTION) === '1k') throw new AppError('INVALID_INPUT', 'Posters are made in HD or Max')
   await (deps.allowPoster ?? ((userId: string) => requireFeature(userId, POSTER_FEATURE)))(req.userId)
   const { setId, part: index } = req.poster
   const { content, part } = await loadPosterPart(deps.db, req.userId, { setId, part: index, templateId: template.id })

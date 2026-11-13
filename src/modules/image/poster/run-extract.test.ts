@@ -31,10 +31,16 @@ describe('toContent', () => {
 
 const fields = { poster: { kinds: [{ key: 'prizes', name: { en: 'P', zh: 'P' }, blocks: ['header', 'prizes', 'footer'] }] } }
 
+// poster_extractions: the call's row is inserted as pending first, then completed.
 function fakeDb(recentCalls = 0) {
-  const inserted: unknown[] = []
+  const inserted: Record<string, unknown>[] = []
   const query = { select: () => query, eq: () => query, gte: () => query, limit: async () => ({ data: Array.from({ length: recentCalls }, (_, id) => ({ id })), error: null }) }
-  const db = { from: () => ({ ...query, insert: async (row: unknown) => { inserted.push(row); return { error: null } } }) }
+  const insert = (row: Record<string, unknown>) => {
+    inserted.push({ ...row })
+    return { select: () => ({ single: async () => ({ data: { id: inserted.length }, error: null }) }) }
+  }
+  const update = (change: Record<string, unknown>) => ({ eq: async (_: string, id: number) => { Object.assign(inserted[id - 1]!, change); return { error: null } } })
+  const db = { from: () => ({ ...query, insert, update }) }
   return { db: db as never, inserted }
 }
 
