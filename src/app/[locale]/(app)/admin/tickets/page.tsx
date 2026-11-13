@@ -8,7 +8,7 @@ import { serverEnv } from '@/core/env'
 import { adminListFilterSchema, listAdminTickets } from '@/core/support'
 
 import { applyClawbackAction, previewClawbackAction } from '../orders/actions'
-import { decideRefundAction, replyTicketAction, resolveRenewalAction, ticketDetailAction } from './actions'
+import { bulkReplyTicketsAction, decideRefundAction, replyTicketAction, resolveRenewalAction, ticketDetailAction } from './actions'
 
 // Admin-only, request-time page (ARCHITECTURE §10 「站内工单」): open tickets by default. The
 // proxy answers non-admins with a 404; requireAdmin() stays the authoritative check. A ticket opens
@@ -24,6 +24,8 @@ const ticketActions = {
   clawback: { preview: previewClawbackAction, apply: applyClawbackAction },
 }
 
+const bulkActions = { reply: bulkReplyTicketsAction }
+
 export default async function AdminTicketsPage({ searchParams }: PageProps<'/[locale]/admin/tickets'>) {
   await requireAdmin()
   const params = await searchParams
@@ -32,7 +34,7 @@ export default async function AdminTicketsPage({ searchParams }: PageProps<'/[lo
   const page = await listAdminTickets(createAdminSupabase(), filter, cursor)
   return (
     <AdminPage title={TICKETS_COPY.title}>
-      <TicketsView filter={filter} page={page} paged={cursor !== null} />
+      <TicketsView filter={filter} page={page} paged={cursor !== null} bulk={bulkActions} />
       <Suspense>
         <TicketDialogHost load={ticketDetailAction} actions={ticketActions} stripeLive={serverEnv().VERCEL_ENV === 'production'} />
       </Suspense>
