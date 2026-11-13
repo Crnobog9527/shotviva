@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { ARK_RESOLUTIONS } from '@/core/providers/ark'
 import { apiKeySchema } from '@/core/providers/keys'
 import { estimatedImageCostsSchema } from '@/core/templates/image-capabilities'
 import { RESOLUTIONS } from '@/core/templates/output-options'
@@ -47,6 +48,10 @@ export const saveProviderSchema = z.object({
   priceOutputPerM: pricePerM,
 })
   .refine((input) => MODULE_ADAPTERS[input.module].some((adapter) => adapter === input.adapter), { path: ['adapter'] })
+  // Ark's sale floor has no list price to fall back on: until it has measured samples it uses these
+  // per-image estimates, so every tier it offers needs one (the form enforces the same).
+  .refine((input) => input.adapter !== 'ark_images' || ARK_RESOLUTIONS.every((tier) => (input.estimatedImageCosts?.[tier] ?? 0) > 0),
+    { path: ['estimatedImageCosts'] })
 
 export type SaveProviderInput = z.input<typeof saveProviderSchema>
 

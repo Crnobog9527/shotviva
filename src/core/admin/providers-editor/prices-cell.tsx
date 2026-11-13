@@ -1,4 +1,5 @@
 import type { ProviderPrices } from '@/core/jobs'
+import { arkPrice } from '@/core/jobs/ark-prices'
 import { effectivePrices } from '@/core/jobs/model-prices'
 import type { ProviderAdapterId, ProviderModule } from '@/core/providers/types'
 
@@ -25,6 +26,19 @@ export function PricesCell({ prices, module, model, adapter }: Props) {
       <div className="font-mono">{text} · {COPY.tokenUnit}</div>
       {fromTable ? <div className="text-muted-foreground">{COPY.pricesFromTable(fromTable)}</div> : null}
       {missing ? <div role="note">{adapter === 'openrouter_images' ? COPY.fallbackPricesMissing : COPY.pricesMissing}</div> : null}
+    </div>
+  )
+}
+
+// Ark rows bill per image from the code price table (yuan), converted at CNY_PER_USD.
+export function ArkPricesCell({ model }: { model: string }) {
+  const entry = arkPrice(model)
+  if (!entry) return <div role="note" className="text-destructive w-52 text-xs whitespace-normal">{COPY.arkPriceMissing}</div>
+  const bands = entry.outputBands.map((band) => `≤${(band.maxPixels / 1e6).toFixed(2)}M 像素 ¥${band.cny}`).join(' · ')
+  return (
+    <div className="w-52 text-xs whitespace-normal">
+      <div className="font-mono">{COPY.arkPriceLine(bands, entry.inputImageCny)}</div>
+      <div className="text-muted-foreground">{COPY.arkPriceAsOf(entry.asOf, entry.source)}</div>
     </div>
   )
 }

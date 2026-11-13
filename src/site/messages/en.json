@@ -762,7 +762,7 @@
     },
     "errors": {
       "NETWORK": "Couldn't reach Shotviva. Check your connection and try again.",
-      "CONTENT_REJECTED": "The photo or your note didn't pass the safety check. Try another photo or change the note.",
+      "CONTENT_REJECTED": "The image model couldn't use this photo or note. Some models don't accept clear photos of real people. Try another photo, change the note, or pick another template.",
       "IDENTITY_SWAP_REFUSED": "Shotviva can't swap faces or turn a person into someone else, to protect everyone's likeness. You can change the expression, makeup, lighting and background.",
       "REFERENCE_IMAGE_LIMIT": "This model accepts fewer reference images. Remove some photos or choose another template.",
       "TEMPLATE_UNAVAILABLE": "This template is temporarily unavailable. Please try again later.",

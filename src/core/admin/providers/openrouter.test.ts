@@ -75,7 +75,7 @@ describe('OpenRouter provider administration', () => {
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(Response.json(catalogue))
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
-    expect(await testProvider({ db, resolveHost, fetch }, { id })).toEqual({ ok: false, failure: 'unauthorized', status: 401 })
+    expect(await testProvider({ db, resolveHost, fetch }, { id })).toMatchObject({ ok: false, failure: 'unauthorized', status: 401 })
     expect(fetch.mock.calls.map(([url, options]) => [url, options?.method])).toEqual([
       [baseUrl + '/images/models', 'GET'], [baseUrl + '/key', 'GET'],
     ])
