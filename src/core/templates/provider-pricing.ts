@@ -1,5 +1,5 @@
 import { RESOLUTIONS, type Resolution } from './output-options'
-import { TEMPLATE_QUALITIES, type ApprovedTariff, type CreditsCost, type CreditsFloor } from './pricing'
+import { MISSING_COST, TEMPLATE_QUALITIES, type ApprovedTariff, type CreditsCost, type CreditsFloor } from './pricing'
 
 type Costs = Partial<Record<Resolution, number>>
 export type ProviderFloors = CreditsFloor & {
@@ -9,7 +9,7 @@ export type ProviderFloors = CreditsFloor & {
   tariffs?: Record<string, ApprovedTariff>
   approvals?: Record<string, Record<string, ApprovedTariff>>
 }
-export const MISSING_COST = 2147483647
+export { MISSING_COST }
 const unknownTiers = { '1k': MISSING_COST, '2k': MISSING_COST, '4k': MISSING_COST }
 export const UNPRICED: CreditsFloor = { high: unknownTiers, medium: unknownTiers, unknownCapabilities: true }
 

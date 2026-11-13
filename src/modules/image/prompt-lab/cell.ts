@@ -39,7 +39,7 @@ async function prepareCell(deps: CellDeps, row: z.infer<typeof cellSchema>) {
   const args = await templateCall({ ...deps, provider }, {
     template: { id: asset.id, quality: row.quality },
     prompt: { providerId, modelParams: {}, styleRefs, body: row.prompt_lab_versions.prompt, version: row.prompt_lab_versions.version_no },
-  }, { copy: {}, note: '', aspectRatio, toggles: {}, confirmed: [] }, photo, { providerId, resolution: row.resolution })
+  }, { copy: {}, note: '', aspectRatio, toggles: {}, confirmed: [] }, [photo], { providerId, resolution: row.resolution })
   if (args.styleRefKeys.length !== styleRefs.length) throw new AppError('MODEL_INPUT_UNSUPPORTED', '模型无法接收画风参考图')
   if (args.call.images[1]) args.call.images[1] = await styleImage(args.call.images[1])
   return args

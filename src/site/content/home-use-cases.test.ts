@@ -20,14 +20,15 @@ async function render(element: ReactElement) {
 
 // SEO launch handbook G5: the use-case H2 links each landing page from <main> with its keyword.
 describe('home use cases', () => {
-  it('has the G5 heading and three cards linking the landing pages by keyword', async () => {
+  it('has the G5 heading and four cards linking the landing pages by keyword', async () => {
     const topics = homePage.topics!
     expect(topics.heading).toBe('What People Use Image to Image AI For')
     const html = await render(createElement(TopicCards, { topic: topics, isLinkEnabled: () => true }))
-    expect(html.match(/<h3>/g)).toHaveLength(3)
+    expect(html.match(/<h3>/g)).toHaveLength(4)
     expect(html).toContain('<a href="/ai-restaurant-menu">AI restaurant menu photos</a>.')
     expect(html).toContain('<a href="/commercial-photography">commercial photography</a>.')
     expect(html).toContain('<a href="/image-to-image-generator">image to image generator</a>.')
+    expect(html).toContain('<a href="/transparent-background">transparent PNG maker</a>.')
   })
 })
 

@@ -38,6 +38,8 @@ export async function MarketingHeader({ locale }: { locale: Locale }) {
               { href: '/ai-restaurant-menu', label: t('useCaseMenu') },
               { href: '/commercial-photography', label: t('useCaseCommercial') },
               { href: '/image-to-image-generator', label: t('useCaseGenerator') },
+              // English only (04-P1): there is no /zh version of this page.
+              ...(locale === 'en' ? [{ href: '/transparent-background' as const, label: t('useCaseTransparent') }] : []),
             ]}
           />
           <Link href="/#templates" className="mk-nl">

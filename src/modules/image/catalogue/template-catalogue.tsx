@@ -15,7 +15,7 @@ import { CreateDialog, type CreateContext } from '../workspace/create-dialog'
 import { filterCatalogue, openableTemplates } from './catalogue-filter'
 import { catalogueSections, isTall, sectionsFor, type CatalogueSection } from './catalogue-sections'
 import { CatalogueSections } from './catalogue-sections-view'
-import { isMotion } from './catalogue-template'
+import { isMotion, isSlotTemplate } from './catalogue-template'
 import { findSeries, type CatalogueView, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
 import { FeatureCard } from './feature-card'
@@ -45,7 +45,8 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
   const [openId, setOpenId] = useState<string | null>(null)
   const openable = useMemo(() => openableTemplates(view.entries), [view.entries])
   // Batch create takes every template that uses a photo, series members included.
-  const batchable = useMemo(() => openable.filter((template) => template.photoInput !== 'none'), [openable])
+  // Slot templates are single-run only (§5.1e): never in the batch dialog.
+  const batchable = useMemo(() => openable.filter((template) => template.photoInput !== 'none' && !isSlotTemplate(template)), [openable])
   const featured = featuredOf(view.entries)
   const favoriteIds = useFavorites()?.ids
   const saved = useMemo(() => (favoriteIds ? savedIn(favoriteIds, openable) : []), [favoriteIds, openable])

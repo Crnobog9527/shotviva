@@ -24,6 +24,7 @@ import { TemplatePromptFields } from './template-prompt-fields'
 import { TemplatePublicFields } from './template-public-fields'
 import { TemplateToggleFields } from './template-toggle-fields'
 import { TemplateCopyFields } from './template-copy-fields'
+import { TemplateSlotFields } from './template-slot-fields'
 
 export type EditTarget = { mode: 'new' } | { mode: 'edit'; template: AdminTemplate; previousStandard?: number | null }
 
@@ -134,6 +135,7 @@ function FormColumn({ target, providers, values, isNew, floor, categories, serie
       <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
       <TemplateHistory template={existing} values={values} disabled={pending || uploading}
         actions={coverActions} providers={providers} onChange={onChange} />
+      <TemplateSlotFields values={values} onChange={onChange} />
       <TemplateCopyFields values={values} onChange={onChange} />
       <TemplateToggleFields values={values} onChange={onChange} />
       {isNew ? <p className="text-muted-foreground text-xs">新模板保存后默认是下架状态，保存后留在这里，右侧就能试跑。</p> : null}

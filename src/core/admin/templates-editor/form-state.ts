@@ -9,6 +9,7 @@ import { toggleFragments, toggleSetupProblems } from '@/core/templates/toggles'
 import type { AdminTemplate, SaveTemplatePayload } from '../templates/types'
 import { toFragments, toToggleFields, toToggleValues, toZhToggleText, withoutToggles, type ToggleFormValue } from './toggle-form-state'
 import { copySetupProblems, toCopyFields, toCopyValues, toZhCopyText, withoutCopy, type CopyFormValue } from './copy-form-state'
+import { slotSetupProblems, toImages, toSlotValues, toZhSlotText, withoutSlots, type SlotFormValue } from './slot-form-state'
 
 export type TemplateFormValues = {
   expectedVersion?: number
@@ -42,6 +43,8 @@ export type TemplateFormValues = {
   toggles: ToggleFormValue[]
   // The 用户填写的字段 cards (fields.copy and their Chinese text); fieldsJson leaves them out.
   copyFields: CopyFormValue[]
+  // The 图片格子 cards (fields.images.slots, §5.1e); fieldsJson leaves the slots out.
+  imageSlots: SlotFormValue[]
 }
 
 // The template's own Chinese name and one-liner; field text lives on the field cards.
@@ -77,6 +80,7 @@ export function emptyFormValues(): TemplateFormValues {
     zh: emptyZh(),
     toggles: [],
     copyFields: [],
+    imageSlots: [],
   }
 }
 
@@ -87,8 +91,8 @@ function toZhValues(template: AdminTemplate): ZhFormValues {
 
 // Only filled-in text; {} when nothing is translated. The field cards (copy and toggles) add
 // their own text under `fields`.
-export function toTranslations(zh: ZhFormValues, copyFields: readonly CopyFormValue[] = [], toggles: readonly ToggleFormValue[] = []) {
-  const fields = { ...toZhCopyText(copyFields), ...toZhToggleText(toggles) }
+export function toTranslations(zh: ZhFormValues, copyFields: readonly CopyFormValue[] = [], toggles: readonly ToggleFormValue[] = [], slots: readonly SlotFormValue[] = []) {
+  const fields = { ...toZhCopyText(copyFields), ...toZhToggleText(toggles), ...toZhSlotText(slots) }
   const entry = {
     ...(zh.name.trim() ? { name: zh.name.trim() } : {}),
     ...(zh.description.trim() ? { description: zh.description.trim() } : {}),
@@ -119,7 +123,7 @@ export function toFormValues(template: AdminTemplate): TemplateFormValues {
 
     visibleWeb: template.visibleIn.includes('web'),
     visiblePartner: template.visibleIn.includes('partner'),
-    fieldsJson: pretty(withoutCopy(withoutToggles(template.fields))),
+    fieldsJson: pretty(withoutSlots(withoutCopy(withoutToggles(template.fields)))),
     providerId: template.prompt?.providerId ?? null,
     styleRefs: template.prompt?.styleRefs ?? [],
     styleRefsEdited: false,
@@ -128,6 +132,7 @@ export function toFormValues(template: AdminTemplate): TemplateFormValues {
     zh: toZhValues(template),
     toggles: toToggleValues(template),
     copyFields: toCopyValues(template),
+    imageSlots: toSlotValues(template),
   }
 }
 
@@ -151,7 +156,8 @@ export function creditProblems(values: TemplateFormValues, floor: CreditsFloor):
     const text = values.credits[resolution].trim()
     if (!text || unsupportedTier(floor, resolution)) continue
     const value = Number(text)
-    const min = creditMinimum(floor, values.quality, resolution)
+    // A slot template is held to the single-image floor × its slots (§5.1e, migration 1310).
+    const min = creditMinimum(floor, values.quality, resolution, values.imageSlots.length)
     if (!/^\d+$/.test(text)) problems[resolution] = '请填正整数'
     else if (value === approvedCredit(floor, values.quality, resolution)) continue
     else if (min === MISSING_COST) problems[resolution] = floorGuidance(min, floor.unknownCapabilities)
@@ -184,9 +190,14 @@ function withToggles(values: TemplateFormValues, fields: unknown, params: unknow
   if (!isObject(params)) return { ok: false as const, message: '模型参数要是一个 JSON 对象' }
   const toggles = toToggleFields(values.toggles)
   const modelParams = { ...withoutToggles(params), ...privateFragments(values) }
-  const problems = [...copySetupProblems(values.copyFields), ...toggleSetupProblems(toggles, values.promptBody, modelParams)]
+  const copyKeys = values.copyFields.map((field) => field.key.trim())
+  const problems = [
+    ...copySetupProblems(values.copyFields), ...toggleSetupProblems(toggles, values.promptBody, modelParams),
+    ...slotSetupProblems(values.imageSlots, copyKeys, values.visiblePartner),
+  ]
   if (problems.length > 0) return { ok: false as const, message: problems.join('；') }
-  return { ok: true as const, fields: { ...withoutCopy(withoutToggles(fields)), copy: toCopyFields(values.copyFields), toggles }, modelParams }
+  const rest = withoutCopy(withoutToggles(fields))
+  return { ok: true as const, fields: { ...rest, images: toImages(values.imageSlots, rest.images), copy: toCopyFields(values.copyFields), toggles }, modelParams }
 }
 
 function revision(values: TemplateFormValues) {
@@ -226,7 +237,7 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
         ...storedPrices(values.credits, values.storedCredits, floor.resolutions, isNew),
         visibleIn,
         fields: wired.fields,
-        translations: toTranslations(values.zh, values.copyFields, values.toggles),
+        translations: toTranslations(values.zh, values.copyFields, values.toggles, values.imageSlots),
       },
       prompt: { ...(values.styleRefsEdited ? { styleRefs: values.styleRefs } : {}), providerId: values.providerId, body: values.promptBody, modelParams: wired.modelParams },
     },

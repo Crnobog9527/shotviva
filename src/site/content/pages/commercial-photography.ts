@@ -144,6 +144,8 @@ export const makeCommercialPhotography = (offers: OfferFacts) => defineContentPa
     {
       question: 'Are AI product photos allowed on Amazon and Etsy?',
       answer: `Both require images that show the real product accurately, and Etsy now asks for at least one unedited photo of the actual item in each listing. ${brand} starts from your photo and changes only the background, light and scene. Rules change, so check each platform's current image policy before you list.`,
+      // 04-P1: the cut-out page, linked from this page's copy with the anchor "transparent PNG".
+      link: { href: '/transparent-background', anchor: 'Make a main image as a transparent PNG.' },
     },
     {
       question: 'Do I own the photos?',

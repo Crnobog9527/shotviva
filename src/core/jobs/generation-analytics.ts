@@ -6,6 +6,7 @@ import { track as defaultTrack, type EventProps, type ServerTrack } from '../ana
 import { categorySlug } from '../analytics/events'
 import { DEFAULT_LOCALE, type Locale } from '../i18n/locales'
 import { EDIT_SCOPES } from '../templates/edit-params'
+import { storedSlotOrder } from '../templates/image-slots'
 import { GenerationFailure } from './generation-failure'
 import type { Job } from './job-schema'
 import { modelFromTag } from './provider-tag'
@@ -41,6 +42,7 @@ export function generateEventProps(job: Job, category: string, outcome: Outcome,
     edit_scope: editScope.parse(job.inputs.edit_scope ?? null),
     // As stored on the job (T89); a template without toggles stores none.
     toggles: jobToggles.parse(job.inputs.toggles ?? {}),
+    slots_filled: storedSlotOrder(job.inputs.input_slots),
   }
 }
 

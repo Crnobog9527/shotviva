@@ -27,7 +27,9 @@ export function toStudioTemplate(template: LocalizedTemplate): StudioTemplate | 
   const options = template.imageOptions ?? FULL_IMAGE_OPTIONS
   // Only the sizes the template lists (tall posters first), and only those its model can make.
   const aspects = template.fields.aspectRatios.filter((ratio): ratio is OutputAspect => (options.aspectRatios as string[]).includes(ratio))
-  return { id: template.id, name: template.name, poster, aspects, resolutions: options.resolutions, creditsCost: template.creditsCost }
+  // HD or Max only: the server refuses a poster at 1K (dense small text), so it is never offered.
+  const resolutions = options.resolutions.filter((tier) => tier !== '1k')
+  return { id: template.id, name: template.name, poster, aspects, resolutions, creditsCost: template.creditsCost }
 }
 
 export async function loadStudioTemplate(db: SupabaseClient, locale: Locale, id: string): Promise<StudioTemplate | null> {

@@ -72,7 +72,10 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   if (page.module) ld.push(softwareApplicationLd(site, meta, offersShownIn(page, products), free))
   const catalogue = live.map(toCatalogueTemplate)
   // The page's own categories' featured templates; the generator opens on the first of them.
-  const { defaultId, ...sections } = featuredSections(live, page.landing.templates?.categoryKeys, series)
+  const { defaultId: firstFeatured, ...sections } = featuredSections(live, page.landing.templates?.categoryKeys, series)
+  // A page may name the template to open on (e.g. the cut-out one); only while it is live.
+  const wanted = page.landing.templates?.defaultId
+  const defaultId = wanted && live.some((template) => template.id === wanted) ? wanted : firstFeatured
   const initialCovers = await openingCovers(live.find((template) => template.id === defaultId))
   const generator = (
     <HomeGeneratorSlot templates={catalogue} defaultId={defaultId} homePath={localizePath(path, locale)} freeImages={free} initialCovers={initialCovers} />

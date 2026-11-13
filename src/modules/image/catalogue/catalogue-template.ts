@@ -23,6 +23,9 @@ export type CatalogueTemplate = {
   copyFields: CatalogueCopyField[]
   // On/off options (T89), off by default, in the page's language; [] for most templates.
   toggles: CatalogueToggle[]
+  // Named upload boxes in send order (§5.1e), in the page's language; absent or [] for a
+  // template that takes the single photo.
+  imageSlots?: CatalogueImageSlot[]
   cover: {
     type: CoverMediaType
     before: string | null
@@ -50,6 +53,9 @@ export type CatalogueCopyField = {
   public: boolean
 }
 
+// note: the text field (copyFields key) drawn right under the box.
+export type CatalogueImageSlot = { key: string; label: string; help?: string; required: boolean; note?: string }
+
 export type CatalogueToggle = { key: string; label: string; hint?: string; confirm?: ToggleConfirm }
 
 // Pass a template already through localizeTemplate (core/templates) for the page's language.
@@ -67,6 +73,7 @@ export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTempl
     imageOptions: template.imageOptions ?? FULL_IMAGE_OPTIONS,
     creditsCost: template.creditsCost,
     copyFields: template.fields.copy.map(toCatalogueCopy),
+    imageSlots: (template.fields.images.slots ?? []).map(({ key, label, help, required, note }) => ({ key, label, required, ...(help ? { help } : {}), ...(note ? { note } : {}) })),
     toggles: (template.fields.toggles ?? []).map(({ key, label, hint, confirm }) => ({ key, label, ...(hint ? { hint } : {}), ...(confirm ? { confirm } : {}) })),
     cover: {
       type: template.coverMediaType,
@@ -90,6 +97,9 @@ function toCatalogueCopy({ key, label, type, placeholder, help, required, maxLen
     ...(max !== undefined ? { max } : {}),
   }
 }
+
+export const slotsOfTemplate = (template: Pick<CatalogueTemplate, 'imageSlots'> | null): CatalogueImageSlot[] => template?.imageSlots ?? []
+export const isSlotTemplate = (template: Pick<CatalogueTemplate, 'imageSlots'> | null) => slotsOfTemplate(template).length > 0
 
 export const allowsNoPhoto = (template: CatalogueTemplate | null) => template?.photoInput === 'optional' || template?.photoInput === 'none'
 

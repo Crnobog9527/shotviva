@@ -54,8 +54,9 @@ export type SectionHeadings = { facts?: string; faq?: string; related?: string }
 type AtLeast3<T> = readonly [T, T, T, ...T[]]
 type Between3And5<T> = readonly [T, T, T] | readonly [T, T, T, T] | readonly [T, T, T, T, T]
 type Between2And3<T> = readonly [T, T] | readonly [T, T, T]
-// 2–3 inner pages, then optionally /pricing (gap audit B10, landing.html "more").
-type RelatedBlock<T> = Between2And3<T> | readonly [T, T, T, T]
+// 2–3 inner pages, then optionally /pricing (gap audit B10, landing.html "more"); the home page
+// links every landing page (R8), four since /transparent-background, plus /pricing.
+type RelatedBlock<T> = Between2And3<T> | readonly [T, T, T, T] | readonly [T, T, T, T, T]
 
 // Everything a page has besides its FAQ, which differs in length between the home page and
 // the inner pages.
@@ -84,9 +85,13 @@ export type PageBasics = {
 // template section shows the featured templates of the page's categories (`categories`: the
 // stored category values, T53), and the generator opens on the first of them; the "full shoot"
 // demo is optional; `factsNote` says where the fact numbers come from (G4: verifiable).
+// `templates.defaultId`: the template the generator opens on when it is live, instead of the first
+// featured one (e.g. /transparent-background opens on the cut-out template). `compare`: an
+// optional H2 with one comparison table, right before the FAQ (SEO launch handbook 04-P1 H2-5).
 export type LandingParts = {
   factsNote: string
-  templates?: { heading: string; intro: string; categoryKeys: readonly [string, ...string[]] }
+  templates?: { heading: string; intro: string; categoryKeys: readonly [string, ...string[]]; defaultId?: string }
+  compare?: { heading: string; intro: string; table: FaqTable }
   shoot?: ShootDemo
   edits?: EditCases
 }
@@ -139,7 +144,8 @@ export type ExplainedText = HeadedText & { visual: CardVisual }
 // white-background guide, G9; the English use cases, G5). `link` closes a card's text as a plain
 // in-body link, `after` is the punctuation that follows it.
 export type TopicCard = ExplainedText & { link?: RelatedLink; after?: string }
-export type TopicSection = { id: string; heading: string; cards: readonly [TopicCard, TopicCard, TopicCard] }
+// Three cards, or four (two by two on wide screens) once a fourth landing page joins (04-P1).
+export type TopicSection = { id: string; heading: string; cards: readonly [TopicCard, TopicCard, TopicCard] | readonly [TopicCard, TopicCard, TopicCard, TopicCard] }
 
 // Home: "One phone photo → a full shoot" (ARCHITECTURE §13 item 2, DESIGN §6.9): the phone
 // snapshot, the three results from three templates, and a two-line bill under them.

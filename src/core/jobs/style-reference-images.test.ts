@@ -40,7 +40,7 @@ afterEach(() => vi.restoreAllMocks())
 
 it('falls back for a saved count limit, retaining photo-first order, placeholders and receipt', async () => {
   const { deps, fallback } = setup()
-  const { call, provider, styleRefKeys } = await templateCall(deps, { template, prompt }, inputs, photo, request)
+  const { call, provider, styleRefKeys } = await templateCall(deps, { template, prompt }, inputs, [photo], request)
   expect(fallback).toHaveBeenCalledOnce()
   expect(provider.id).toBe('default')
   expect(call.images.map((im) => im.bytes[0])).toEqual([11, 21, 31])
@@ -53,7 +53,7 @@ it('quotes the same fallback that submission uses, without reading private refer
   const saved = { template: { ...template, creditsCost: { '1k': 36, '2k': 92, '4k': 141 } }, prompt }
   const quoted = await quoteBatchRoute(deps.provider, saved, '1k', inputs.aspectRatio)
   expect(get).not.toHaveBeenCalled()
-  const submitted = await templateCall(deps, saved, inputs, photo, request)
+  const submitted = await templateCall(deps, saved, inputs, [photo], request)
   expect(quoted).toEqual({ template_id: template.id, expected_credits: 36, resolution: '1k', fallback_route: true,
     provider: submitted.provider.id })
 })
@@ -61,7 +61,7 @@ it('quotes the same fallback that submission uses, without reading private refer
 it('drops all styles before reading bytes when the default is also over its limit', async () => {
   const { deps, get } = setup(1)
   const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined)
-  const { call, styleRefKeys } = await templateCall(deps, { template, prompt }, inputs, photo, request)
+  const { call, styleRefKeys } = await templateCall(deps, { template, prompt }, inputs, [photo], request)
   expect(call.images).toEqual([photo])
   expect(call.prompt).toBe('1|0')
   expect(styleRefKeys).toEqual([])
@@ -72,7 +72,7 @@ it('drops all styles before reading bytes when the default is also over its limi
 
 it('loads once per version including concurrent requests and retries failed storage reads privately', async () => {
   const { deps, get } = setup()
-  const invoke = (version: number) => templateCall(deps, { template, prompt: { ...prompt, version } }, inputs, photo, request)
+  const invoke = (version: number) => templateCall(deps, { template, prompt: { ...prompt, version } }, inputs, [photo], request)
   expect(get).not.toHaveBeenCalled()
   await Promise.all([invoke(1), invoke(1)])
   expect(get).toHaveBeenCalledTimes(2)
@@ -86,13 +86,13 @@ it('uses one saved style for a zero-photo request to the selected min-one model,
   const { deps, fallback, get } = setup(2, 1)
   const saved = { template, prompt: { ...prompt, styleRefs: refs.slice(0, 1) } }
   const omitted = { ...request, omitStyleRefs: true }
-  await expect(templateCall(deps, saved, inputs, null, omitted)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  await expect(templateCall(deps, saved, inputs, [], omitted)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   expect(get).not.toHaveBeenCalled()
-  const run = await templateCall(deps, saved, inputs, null, request)
+  const run = await templateCall(deps, saved, inputs, [], request)
   expect(run.provider.id).toBe('router/fixture')
   expect(run.call).toMatchObject({ prompt: '0|1', photoCount: 0, images: [{ bytes: Uint8Array.of(21) }] })
   expect(run.styleRefKeys).toEqual([refs[0]!.key])
-  const photoOnly = await templateCall(deps, saved, inputs, photo, omitted)
+  const photoOnly = await templateCall(deps, saved, inputs, [photo], omitted)
   expect(photoOnly.call).toMatchObject({ prompt: '1|0', photoCount: 1, images: [photo] })
   expect(photoOnly.styleRefKeys).toEqual([])
   expect(fallback).not.toHaveBeenCalled()
@@ -103,7 +103,7 @@ it('rejects an empty effective input after opt-out or reference overflow on a mi
   const { deps, get } = setup(1, 1)
   const followDefault = { ...request, providerId: null }
   for (const omitStyleRefs of [true, false]) {
-    await expect(templateCall(deps, { template, prompt }, inputs, null, { ...followDefault, omitStyleRefs }))
+    await expect(templateCall(deps, { template, prompt }, inputs, [], { ...followDefault, omitStyleRefs }))
       .rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
   }
   expect(get).not.toHaveBeenCalled()
