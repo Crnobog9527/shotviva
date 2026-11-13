@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { trackCatalogueSeeAll } from '@/core/analytics/browser'
+import { useRouter } from '@/core/i18n/navigation'
 import { cn } from '@/core/ui/cn'
 import { Reveal } from '@/core/ui/reveal-item'
 
@@ -13,11 +14,13 @@ import { savedIn } from '../favorites/favorites-store'
 import { BatchDialogSlot } from '../matrix/batch-dialog-slot'
 import { CreateDialog, type CreateContext } from '../workspace/create-dialog'
 import { filterCatalogue, openableTemplates } from './catalogue-filter'
+import { buildSearchIndex, searchTemplates } from './catalogue-search'
 import { catalogueSections, isTall, sectionsFor, type CatalogueSection } from './catalogue-sections'
 import { CatalogueSections } from './catalogue-sections-view'
-import { isMotion, isSlotTemplate } from './catalogue-template'
+import { batchableTemplates, isMotion, posterHref, type CatalogueTemplate } from './catalogue-template'
 import { findSeries, type CatalogueView, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
+import { SearchBox } from './search-box'
 import { FeatureCard } from './feature-card'
 import { SeriesCard } from './series-card'
 import { TemplateCard } from './template-card'
@@ -42,11 +45,17 @@ type Props = { view: CatalogueView; create: CreateContext; endCard?: ReactNode }
 export function TemplateCatalogue({ view, create, endCard }: Props) {
   const t = useTranslations('app.create')
   const query = useCatalogueQuery(view.filters)
+  const router = useRouter()
   const [openId, setOpenId] = useState<string | null>(null)
   const openable = useMemo(() => openableTemplates(view.entries), [view.entries])
-  // Batch create takes every template that uses a photo, series members included.
-  // Slot templates are single-run only (§5.1e): never in the batch dialog.
-  const batchable = useMemo(() => openable.filter((template) => template.photoInput !== 'none' && !isSlotTemplate(template)), [openable])
+  const batchable = useMemo(() => batchableTemplates(openable), [openable])
+  // A poster template's card goes to its editor (ARCHITECTURE §5.3); every other card opens the dialog.
+  const open = (id: string) => {
+    const found = openable.find((item) => item.id === id)
+    const href = found ? posterHref(found) : null
+    if (href) router.push(href)
+    else setOpenId(id)
+  }
   const featured = featuredOf(view.entries)
   const favoriteIds = useFavorites()?.ids
   const saved = useMemo(() => (favoriteIds ? savedIn(favoriteIds, openable) : []), [favoriteIds, openable])
@@ -55,6 +64,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
   // Once loaded the panel stays mounted, so closing it can play its motion.
   const [sheetLoaded, setSheetLoaded] = useState(false)
   if (series && !sheetLoaded) setSheetLoaded(true)
+  const search = useCatalogueSearch(view)
   const { sentinel, stuck } = useStuck()
   const sections = useMemo(() => catalogueSections(view.filters, view.entries), [view.filters, view.entries])
   const bar = useRef<HTMLDivElement>(null)
@@ -78,15 +88,18 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
     <>
       {featured ? (
         <Reveal className="px-(--gutter)">
-          <FeatureCard template={featured} onOpen={setOpenId} />
+          <FeatureCard template={featured} onOpen={open} />
         </Reveal>
       ) : null}
       <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
       <div ref={bar} data-stuck={stuck || undefined} className="sticky top-0 z-40 py-2 data-[stuck]:nav-material data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
-        <CategoryChips filters={view.filters} saved={saved.length > 0} value={active} onChange={query.select} />
+        <div className="mb-2 px-(--gutter)">
+          <SearchBox value={search.query} onChange={search.setQuery} label={t('search')} clear={t('searchClear')} className="md:max-w-[420px]" />
+        </div>
+        <CategoryChips hidden={search.results !== null} filters={view.filters} saved={saved.length > 0} value={active} onChange={query.select} labels={chipLabels(t)} />
       </div>
       <h2 className="sr-only">{t('templates')}</h2>
-      <CatalogueBody sections={sectionsFor(active, sections)} shown={shown} endCard={endCard} onOpen={setOpenId} onOpenSeries={query.openSeries} onSeeAll={seeAll} />
+      <CatalogueBody search={search} sections={sectionsFor(active, sections)} shown={shown} endCard={endCard} onOpen={open} onOpenSeries={query.openSeries} onSeeAll={seeAll} />
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
@@ -95,13 +108,43 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
   )
 }
 
+type Translate = ReturnType<typeof useTranslations<'app.create'>>
+const chipLabels = (t: Translate) => ({ all: t('all'), filter: t('filter'), filterWithin: (name: string) => t('filterWithin', { name }) })
+
+// Search over every template the page holds, series members included (catalogue-search.ts).
+function useCatalogueSearch(view: CatalogueView) {
+  const [query, setQuery] = useState('')
+  const index = useMemo(() => buildSearchIndex(view.entries, view.filters), [view])
+  const results = useMemo(() => (query.trim() ? searchTemplates(index, query) : null), [index, query])
+  return { query, setQuery, results }
+}
+
+type ResultsProps = { query: string; results: readonly CatalogueTemplate[]; endCard?: ReactNode; onOpen(id: string): void }
+
+// Matches as plain template cards; none: a line, and the Wishlist's card when it is open.
+function SearchResults({ query, results, endCard, onOpen }: ResultsProps) {
+  const t = useTranslations('app.create')
+  const entries = results.map((template): GridEntry => ({ type: 'template', template, path: [] }))
+  return (
+    <>
+      <p aria-live="polite" className="px-(--gutter) pt-2 text-caption text-muted-foreground">
+        {results.length ? t('searchResults', { query, count: results.length }) : t('searchEmpty', { query })}
+      </p>
+      <CatalogueGrid entries={entries} endCard={endCard} className="mt-3" onOpen={onOpen} onOpenSeries={() => undefined} />
+    </>
+  )
+}
+
 type BodyProps = Omit<GridProps, 'entries' | 'className'> & {
+  search: ReturnType<typeof useCatalogueSearch>
   sections: CatalogueSection[] | null
   shown: readonly GridEntry[]
   onSeeAll(section: CatalogueSection): void
 }
 
-function CatalogueBody({ sections, shown, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
+// A search replaces the sections and the chosen category's grid with its matches.
+function CatalogueBody({ search, sections, shown, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
+  if (search.results) return <SearchResults query={search.query.trim()} results={search.results} endCard={endCard} onOpen={onOpen} />
   if (!sections) return <CatalogueGrid entries={shown} endCard={endCard} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
   return (
     <>

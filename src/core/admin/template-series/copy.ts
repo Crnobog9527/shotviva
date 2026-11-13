@@ -27,5 +27,10 @@ export const seriesCopy = {
   batchPublish: '上架', batchUnpublish: '下架', batchShowOn: '开启成员单独展示', batchShowOff: '关闭成员单独展示',
   batchTitle: (label: string, n: number) => `${label} ${n} 个系列？`, batchConfirm: '确认', batchReason: '下架原因（必填）',
   batchDone: (label: string, changed: number, total: number) => `已${label}：${changed} 个有变化，${total - changed} 个本来就是这样。`,
+  // 换封面 from the list (Owner 2026-11-13).
+  changeCover: '换封面', changeCoverTitle: (name: string) => `更换封面：${name}`, pickFromMembers: '从成员封面中选',
+  noMemberCovers: '成员都还没有封面，可以填写图片地址。', saveCover: '保存封面',
+  orderNumber: (n: number) => `序号 ${n}`,
+  orderNumberHint: '创作页里系列卡和单独模板卡按这个数字从小到大混排（同一大类内）。',
   productionNote: '正式站的系列会被测试站同步覆盖，请在测试站修改。',
 } as const

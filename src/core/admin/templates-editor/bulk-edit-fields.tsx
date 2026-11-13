@@ -6,7 +6,8 @@ import { RESOLUTIONS } from '@/core/templates/output-options'
 
 import type { BulkEditValues, SurfaceChoice } from './bulk-edit-state'
 import { ImageProviderField, type ImageProviderOption } from '../image-provider-field'
-import { categoryChoices, type CategoryOption } from './category-options'
+import type { CategoryOption } from './category-options'
+import { CategoryPicker } from './category-picker'
 import { bulkEditCopy as COPY } from './copy'
 import { TIER_LABEL } from './form-state'
 
@@ -89,14 +90,7 @@ function CategoryChoice({ value, categories, onChange }: { value: string; catego
   return (
     <div className="grid gap-1.5">
       <Label htmlFor="bulk-category">{COPY.category}</Label>
-      <select id="bulk-category" className={SELECT} value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">{COPY.categoryKeep}</option>
-        {categoryChoices(categories).map((category) => (
-            <option key={category.key} value={category.key}>
-              {category.label} · {category.nameEn}
-            </option>
-          ))}
-      </select>
+      <CategoryPicker id="bulk-category" value={value} categories={categories} placeholder={COPY.categoryKeep} emptyChoice={COPY.categoryKeep} onChange={onChange} />
     </div>
   )
 }
