@@ -33,7 +33,7 @@ async function Workspace({ params, searchParams }: RouteProps) {
   const found = await findWebTemplate(supabase, locale, templateId)
   if (!found) notFound()
   const template = toCatalogueTemplate(found)
-  // A poster template is made in its own editor (ARCHITECTURE §5.3), never in this workspace.
+  // A poster template is made in its editor dialog on Create (ARCHITECTURE §5.3), never here.
   const posterPath = posterHref(template)
   if (posterPath) redirect(localizePath(posterPath, locale))
   const againId = typeof query.again === 'string' ? query.again : undefined

@@ -1,43 +1,24 @@
-import { notFound } from 'next/navigation'
-import { getTranslations } from 'next-intl/server'
+import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 
-import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
-import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
+import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
-import { loadStudioTemplate, posterAllowed, PosterStudio } from '@/modules/image/posters'
+import { posterDialogPath } from '@/modules/image'
 
 type RouteProps = { params: Promise<{ templateId: string }> }
 
-// The poster editor (ARCHITECTURE §5.3), a flow page back to the poster list. 404 when the
-// dense_poster feature is gated off for this account, and for a template that makes no posters.
-async function Studio({ params }: RouteProps) {
-  const { templateId } = await params
-  const user = await requireUser(`/posters/${templateId}`)
-  if (!(await posterAllowed(user.id))) notFound()
-  const admin = createAdminSupabase()
-  const supabase = await createServerSupabase()
-  const [template, balance, tier, t] = await Promise.all([
-    loadStudioTemplate(admin, await currentLocale(), templateId), readBalance(supabase, user.id),
-    effectiveTier(admin, user.id), getTranslations('app.poster'),
-  ])
-  if (!template) notFound()
-  return (
-    <>
-      <FlowNav back={{ href: '/posters', label: t('back') }} title={t('title')} aside={<BalanceChip balance={balance} />} />
-      <h1 className="px-(--gutter) pt-2 text-caption text-muted-foreground">{template.name}</h1>
-      <PosterStudio template={template} balance={balance} concurrency={limitsFor(tier).concurrency} />
-    </>
-  )
+// The old poster editor page (ARCHITECTURE §5.3; Owner 2026-11-14: the editor is a dialog on
+// Create, not a page). Its links (shared, bookmarked, Photos before this change) open Create
+// with that template's editor dialog; Create signs a visitor in first and comes back to it.
+async function ToDialog({ params }: RouteProps): Promise<null> {
+  const [{ templateId }, locale] = await Promise.all([params, currentLocale()])
+  redirect(localizePath(posterDialogPath(templateId), locale))
 }
 
 export default function PosterStudioPage({ params }: PageProps<'/[locale]/posters/[templateId]'>) {
   return (
-    <AppPage>
-      <Suspense fallback={null}>
-        <Studio params={params} />
-      </Suspense>
-    </AppPage>
+    <Suspense fallback={null}>
+      <ToDialog params={params} />
+    </Suspense>
   )
 }

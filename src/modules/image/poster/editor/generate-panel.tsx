@@ -12,16 +12,13 @@ import type { PosterStudioState, StudioTemplate } from '../use-poster-studio'
 
 type Props = { studio: PosterStudioState; template: StudioTemplate; balance: Balance }
 
-// What will be made and what it costs (ARCHITECTURE §5.3 拆张): one ordinary job per poster, so
-// the total is the template's price at this resolution times the number of posters.
+// What will be made and in which size (ARCHITECTURE §5.3 拆张); the price and the button sit in
+// the dialog's pinned bar (GenerateBar).
 export function GeneratePanel({ studio, template, balance }: Props) {
   const t = useTranslations('app.poster')
-  const format = useFormatter()
   const locale = useLocale()
   const options = { resolutions: template.resolutions, aspectRatios: template.aspects, originalRatio: false }
-  const total = template.creditsCost[studio.resolution] * studio.parts.length
   const oversized = studio.parts.some((part) => part.oversized)
-  const ready = canStart(studio, balance, total)
   return (
     <section className="grid gap-4 rounded-card bg-card p-4 hairline">
       <h2 className="text-body font-semibold">{t('split.count', { count: studio.parts.length })}</h2>
@@ -43,10 +40,20 @@ export function GeneratePanel({ studio, template, balance }: Props) {
       ) : null}
       <p className="text-caption text-muted-foreground">{t('proofread')}</p>
       {studio.notice && studio.notice !== 'sortFailed' && studio.notice !== 'clipped' ? <p className="text-caption text-destructive">{t(`notice.${studio.notice}`)}</p> : null}
-      <Button className="min-h-12" disabled={!ready || studio.busy} onClick={() => void studio.generate()}>
-        {studio.busy ? t('starting') : t('generate', { count: studio.parts.length, credits: format.number(total) })}
-      </Button>
     </section>
+  )
+}
+
+// One ordinary job per poster, so the total is the template's price at this resolution times
+// the number of posters.
+export function GenerateButton({ studio, template, balance }: Props) {
+  const t = useTranslations('app.poster')
+  const format = useFormatter()
+  const total = template.creditsCost[studio.resolution] * studio.parts.length
+  return (
+    <Button className="min-h-12 w-full" disabled={!canStart(studio, balance, total) || studio.busy} onClick={() => void studio.generate()}>
+      {studio.busy ? t('starting') : t('generate', { count: studio.parts.length, credits: format.number(total) })}
+    </Button>
   )
 }
 

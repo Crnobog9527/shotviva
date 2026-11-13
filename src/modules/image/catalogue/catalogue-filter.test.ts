@@ -90,6 +90,19 @@ describe('Create return path after sign-in', () => {
   it('drops anything else, so no other text rides into next', () => {
     for (const bad of [undefined, '', ['a', 'b'], 'Dark Menu', 'a&next=//evil.example', '../admin', 'x'.repeat(81)]) {
       expect(createReturnPath(bad as string | string[] | undefined)).toBe('/generate')
+      expect(createReturnPath(undefined, bad as string | string[] | undefined)).toBe('/generate')
     }
+  })
+
+  // Old /posters/<id> links land on /generate?poster=<id>; signing in must not lose the editor.
+  it('keeps an open poster editor', () => {
+    expect(createReturnPath(undefined, 'tournament-poster-emerald')).toBe('/generate?poster=tournament-poster-emerald')
+  })
+})
+
+describe('the poster editor in the address', () => {
+  it('adds ?poster= after the filter and drops it on the next write', () => {
+    expect(selectionSearch(new URLSearchParams('category=posters'), { saved: false, path: ['posters'] }, null, 'tp-red')).toBe('?category=posters&poster=tp-red')
+    expect(selectionSearch(new URLSearchParams('category=posters&poster=tp-red'), { saved: false, path: ['posters'] }, null)).toBe('?category=posters')
   })
 })
