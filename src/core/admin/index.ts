@@ -166,6 +166,7 @@ export { REPLAY_COPY, ReplayPanel, type ReplayActions } from './replay-ui'
 export {
   listFeatureSettings,
   saveFeatureAccess,
+  setFeatureInvite,
   type FeatureAccessDeps,
   type FeatureAccessInput,
   type FeatureSetting,

@@ -1,5 +1,5 @@
 import { OPENAI_MAX_REFERENCES, imageCapabilitiesSchema, type ImageCapabilities } from '../templates/image-capabilities'
-import { availableImageOptions, FULL_IMAGE_OPTIONS } from '../templates/image-options'
+import { availableImageOptions, FULL_IMAGE_OPTIONS, PROVIDER_ASPECTS } from '../templates/image-options'
 import { RESOLUTIONS } from '../templates/output-options'
 import { catalogImageEstimates } from './openrouter-pricing'
 import { openRouterCatalogPricing, openRouterImageParameters, type OpenRouterImageParameters } from './openrouter-catalog'
@@ -18,7 +18,7 @@ export function catalogCapabilities(parameters: OpenRouterImageParameters, fetch
   const providerAspectRatios = ratios.filter((ratio) => /^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/.test(ratio))
   const parsed = imageCapabilitiesSchema.safeParse({
     resolutions, originalRatio: ratios.includes('auto'), providerAspectRatios,
-    aspectRatios: availableImageOptions(FULL_IMAGE_OPTIONS, providerAspectRatios).aspectRatios,
+    aspectRatios: availableImageOptions({ ...FULL_IMAGE_OPTIONS, aspectRatios: PROVIDER_ASPECTS }, providerAspectRatios).aspectRatios,
     minReferences: parameters.input_references?.min ?? 0, maxReferences: parameters.input_references?.max ?? 0, fetchedAt,
   })
   if (!parsed.success) throw new ProviderSettingError('invalid_input', 'No supported site tier or invalid reference range')
@@ -29,7 +29,7 @@ export async function fetchImageCapabilities(adapter: ProviderAdapterId, baseUrl
   if (adapter === 'openai_responses') return null
   const fetchedAt = new Date().toISOString()
   if (adapter === 'openai_images') return {
-    ...FULL_IMAGE_OPTIONS, providerAspectRatios: FULL_IMAGE_OPTIONS.aspectRatios, minReferences: 0, maxReferences: OPENAI_MAX_REFERENCES, fetchedAt,
+    ...FULL_IMAGE_OPTIONS, aspectRatios: PROVIDER_ASPECTS, providerAspectRatios: PROVIDER_ASPECTS, minReferences: 0, maxReferences: OPENAI_MAX_REFERENCES, fetchedAt,
   }
   // Ark takes any WxH within its pixel range, so every site ratio and 'original' fit; no catalogue.
   if (adapter === 'ark_images') return {

@@ -4,6 +4,7 @@ import { styleRefsSchema } from './style-refs'
 import { creditsCostSchema, TEMPLATE_QUALITIES } from './pricing'
 import { RESERVED_KEYS, toggleFieldSchema, TOGGLES_MAX } from './toggles'
 import { copyFieldSchema } from './copy-fields'
+import { posterFieldsSchema } from '../poster/template'
 import { resolutionSchema } from './db-resolution'
 
 // Template shapes shared by the admin page, the import script and (later) generation.
@@ -27,6 +28,13 @@ export const templateFieldsSchema = z
     aspectRatios: z.array(z.string().regex(/^\d{1,2}:\d{1,2}$/)).min(1),
     // Optional on/off choices (T89), off by default; their prompt text is private.
     toggles: z.array(toggleFieldSchema).max(TOGGLES_MAX).default([]),
+    // A dense-text poster template (ARCHITECTURE §5.3): its text comes from the confirmed content
+    // blocks, never from copy fields, and it makes one or more posters per set.
+    poster: posterFieldsSchema.optional(),
+  })
+  .refine((fields) => !fields.poster || fields.copy.length === 0, {
+    message: 'a poster template takes its text from the content blocks, not from copy fields',
+    path: ['poster'],
   })
   .refine((fields) => fields.images.min <= fields.images.max, {
     message: 'images.min must not exceed images.max',

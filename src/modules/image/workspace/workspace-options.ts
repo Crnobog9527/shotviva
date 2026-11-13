@@ -5,13 +5,14 @@ import { normalizeResolution, type OutputAspect, type Resolution } from '@/core/
 
 import { outputSize, type OutputSize } from '../provider/output-size'
 
-// The eight sizes and three resolutions as the workspace shows them (DESIGN §4.3). Tiers are
-// labelled 1K / 2K / 4K next to the pixel size the photo will actually have; names and use lines
-// live in site/messages (app.sizes, app.tiers); this file holds ids, order and geometry.
+// The sizes (eight, plus the tall poster ratios a template opts into) and three resolutions as the
+// workspace shows them (DESIGN §4.3). Tiers are labelled 1K / 2K / 4K next to the pixel size the
+// photo will actually have; names and use lines live in site/messages (app.sizes, app.tiers);
+// this file holds ids, order and geometry.
 
 export type SizeOption = { id: OutputAspect; ratio: string | null; glyph: { w: number; h: number; dashed: boolean } }
 
-const SIZE_ORDER: readonly OutputAspect[] = ['original', '16:9', '4:5', '1:1', '9:16', '3:2', '4:3', '2:3']
+const SIZE_ORDER: readonly OutputAspect[] = ['original', '16:9', '4:5', '1:1', '9:16', '3:2', '4:3', '2:3', '1:2', '1:3']
 
 // Ratio glyph inside a 34×30 box; Original is a dashed 22×28 frame ("as shot").
 function glyphFor(id: OutputAspect): SizeOption['glyph'] {

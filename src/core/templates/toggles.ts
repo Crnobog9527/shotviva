@@ -50,10 +50,12 @@ export function toggleFragments(modelParams: Record<string, unknown>): ToggleFra
 }
 
 // What the image provider gets of model_params: everything but the fragments, which only feed
-// renderPrompt.
+// renderPrompt, and a poster template's private extraction instructions (ARCHITECTURE §5.3),
+// which only the text model reads.
 export function providerParams(modelParams: Record<string, unknown>): Record<string, unknown> {
   const rest = { ...modelParams }
   delete rest.toggles
+  delete rest.poster_extract
   return rest
 }
 
