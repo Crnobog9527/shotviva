@@ -7117,6 +7117,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_save_provider"("p_actor" "uuid", "p_i
 declare
   v_id uuid;
   v_tiers text[] := array(select jsonb_array_elements_text(p_capabilities->'resolutions'));
+  v_declared text;
 begin
   if not exists (select 1 from public.profiles where id=p_actor and role='admin' and banned_at is null) then
     raise exception 'ADMIN_REQUIRED' using errcode='42501';
@@ -7146,6 +7147,12 @@ begin
     if not found then raise exception 'PROVIDER_NOT_FOUND'; end if;
   end if;
   if p_key is not null then perform public.admin_set_provider_key(v_id,p_key); end if;
+  -- An admin's declaration of tiers beyond the model table: one audit row per save that carries it.
+  if jsonb_typeof(p_settings->'declared_resolutions')='array' and jsonb_array_length(p_settings->'declared_resolutions')>0 then
+    select string_agg(upper(t),' / ' order by t) into v_declared from jsonb_array_elements_text(p_settings->'declared_resolutions') t;
+    insert into public.admin_audit_log(action,user_id,reason,target_id)
+    values ('provider_declare_tiers',p_actor,format('%s: declared %s beyond the model table',p_settings->>'model',v_declared),v_id::text);
+  end if;
   return v_id;
 end;
 $$;
@@ -13397,7 +13404,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );

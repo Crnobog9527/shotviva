@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { saveProviderSchema } from '../providers/schema'
 import type { AdminProvider } from '../providers/types'
 
-import { canSave, DEFAULT_FORM, formFor, missingPrices, priceOrigin, pricesFromTable, toSaveInput, withAdapter, withModel } from './form-state'
+import { canSave, DEFAULT_FORM, formFor, missingPrices, priceOrigin, pricesFromTable, toSaveInput, withAdapter, withModel, tierOptions, withTier, type ProviderForm } from './form-state'
+import type { Resolution } from '@/core/templates/output-options'
 
 const provider: AdminProvider = {
   id: '6f1c2f9e-6a52-4c39-9a51-0a9f6b0c1d2e',
@@ -119,5 +120,41 @@ describe('official price pre-fill (§10.0)', () => {
     expect(pricesFromTable(empty, 'image', 'gpt-image-2.6-sunburst')).toBe('2026-11-06')
     expect(pricesFromTable(provider.prices, 'image', 'gpt-image-2.6-sunburst')).toBeNull()
     expect(pricesFromTable(empty, 'image', 'gpt-image-2.6')).toBeNull()
+  })
+})
+
+describe('tier checkboxes (PR-1b)', () => {
+  const openAI = (model: string): ProviderForm => ({ ...DEFAULT_FORM, adapter: 'openai_images', model })
+
+  it('offers a known OpenAI model all three and lets the admin narrow them', () => {
+    const form = openAI('gpt-image-2.6')
+    expect(tierOptions(form, null)).toMatchObject({ allowed: ['1k', '2k', '4k'], selected: ['1k', '2k', '4k'], declared: [], unknownModel: false })
+    const narrowed = withTier(form, ['1k', '2k', '4k'], '4k', false)
+    expect(tierOptions(narrowed, null)).toMatchObject({ selected: ['1k', '2k'], declared: [] })
+  })
+
+  it('starts an unknown model at 1K and counts ticked tiers as declared', () => {
+    const form = openAI('gpt-image-3')
+    expect(tierOptions(form, null)).toMatchObject({ allowed: ['1k', '2k', '4k'], selected: ['1k'], declared: [], unknownModel: true })
+    const ticked = withTier(form, ['1k'], '4k', true)
+    expect(tierOptions(ticked, null)).toMatchObject({ selected: ['1k', '4k'], declared: ['4k'] })
+  })
+
+  it('never carries ticks over to another model', () => {
+    const ticked = withTier(openAI('gpt-image-3'), ['1k'], '2k', true)
+    expect(tierOptions({ ...ticked, model: 'gpt-image-4' }, null)).toMatchObject({ selected: ['1k'], declared: [] })
+    // A known model's full default does not become a declaration on an unknown one either.
+    expect(tierOptions({ ...openAI('gpt-image-2.6'), model: 'gpt-image-3' }, null)).toMatchObject({ selected: ['1k'], declared: [] })
+  })
+
+  it('keeps the saved choice while the model is the same', () => {
+    const saved = { model: 'gpt-image-2.6', resolutions: ['1k', '2k'] as Resolution[] }
+    expect(tierOptions(openAI('gpt-image-2.6'), null, saved)).toMatchObject({ selected: ['1k', '2k'] })
+    expect(tierOptions(openAI('gpt-image-2.5'), null, saved)).toMatchObject({ selected: ['1k', '2k', '4k'] })
+  })
+
+  it('takes OpenRouter tiers from the catalogue and Ark from code', () => {
+    expect(tierOptions({ ...DEFAULT_FORM, adapter: 'openrouter_images', model: 'x/y' }, ['1k', '2k'])).toMatchObject({ allowed: ['1k', '2k'], selected: ['1k', '2k'] })
+    expect(tierOptions({ ...DEFAULT_FORM, adapter: 'ark_images', model: 'doubao' }, null)).toMatchObject({ allowed: ['1k', '2k'] })
   })
 })
