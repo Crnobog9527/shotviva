@@ -52,6 +52,8 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   AUTH_SMS_DAILY_LIMIT: 'internal',
   AUTH_SMS_FAILED: 'internal',
   AUTH_OTP_INVALID: 'internal',
+  AUTH_SIGNUP_LIMITED: 'internal',
+  AUTH_PHONE_TAKEN: 'internal',
   CONFLICT: 'invalid_input',
   TEMPLATE_UNAVAILABLE: 'invalid_input',
   TEMPLATE_QUOTE_CHANGED: 'invalid_input',

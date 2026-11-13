@@ -18,7 +18,9 @@ import { verifyWebhookSignature } from './webhook-signature'
 
 const payloadSchema = z.object({
   user: z.object({ id: z.string(), phone: z.string().nullable().optional() }),
-  sms: z.object({ otp: z.string().regex(/^\d{6}$/) }),
+  // `phone` is where the code goes: the new number when an account binds one (phone_change,
+  // 1480), else the account's own. Older Auth versions only sent user.phone.
+  sms: z.object({ otp: z.string().regex(/^\d{6}$/), phone: z.string().optional() }),
 })
 
 export type SmsHookDeps = {
@@ -52,7 +54,7 @@ export async function handleSmsHook(request: Request, deps: SmsHookDeps): Promis
   }
   const payload = payloadSchema.safeParse(safeJson(body))
   if (!payload.success) return hookError(400, 'Unexpected payload')
-  const phone = parseStoredPhone(payload.data.user.phone)
+  const phone = parseStoredPhone((payload.data.sms.phone || payload.data.user.phone)?.replace(/^\+/, ''))
   if (!phone) return hookError(400, 'Only mainland China (+86) mobile numbers are supported')
   if ('problem' in deps.sender) {
     logger.error('sms hook: no SMS provider', { problem: deps.sender.problem })

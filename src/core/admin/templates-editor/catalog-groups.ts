@@ -2,7 +2,7 @@ import type { AdminTemplate } from '../templates/types'
 import { catalogCopy } from './copy'
 
 export type CatalogStatus = 'active' | 'inactive' | 'all' | 'deleted'
-export type SeriesOption = { id: string; nameZh: string }
+export type SeriesOption = { id: string; nameZh: string; nameEn?: string }
 export const SINGLE_TEMPLATES = 'single'
 
 type CatalogRow = Pick<AdminTemplate, 'id' | 'category' | 'subcategoryKey' | 'seriesId' | 'seriesSortOrder' | 'isActive'>

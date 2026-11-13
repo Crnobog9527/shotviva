@@ -23,7 +23,7 @@ type Props = {
   target: EditTarget
   floor: ProviderFloors
   categories: readonly CategoryOption[]
-  series: readonly { id: string; nameZh: string }[]
+  series: readonly { id: string; nameZh: string; nameEn?: string }[]
   // Every template, for the live preview's series panel.
   templates: readonly AdminTemplate[]
   coverLanguages: readonly CoverLanguage[]
@@ -69,7 +69,7 @@ export function TemplateFormDialog({ target, providers, floor: allFloors, catego
       {/* Two columns from lg (ARCHITECTURE §10.b: 「试跑」 on the right), each scrolling on its own;
           one scrolling column below that. */}
       <DialogContent className="max-h-[92vh] gap-0 overflow-y-auto p-0 sm:max-w-[min(1400px,96vw)] lg:h-[92vh] lg:overflow-clip">
-        <div className="grid min-h-0 lg:h-full lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+        <div className="grid min-h-0 grid-cols-1 lg:h-full lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
           <FormColumn existing={target.mode === 'edit' ? target.template : null} {...{ providers, values, floor, categories, series, coverLanguages, coverActions, onChange }}
             footer={{ pending, error: shownError, saved: submitted ? (notice ?? null) : null, onCancel, onSave: submit }} />
           <aside className="bg-muted/20 min-h-0 border-t p-6 lg:overflow-y-auto lg:border-t-0 lg:border-l">

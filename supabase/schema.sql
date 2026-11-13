@@ -8146,13 +8146,15 @@ begin
   end if;
   if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin'
       and (p_key not in ('code_gift_policy','code_inviter_window_days','gallery_enabled','gallery_auto_approve',
-                         'signup_gift_daily_cap','signup_gift_paused')
+                         'signup_gift_daily_cap','signup_gift_paused','signup_gift_per_ip',
+                         'signup_gift_claim_phone','signup_gift_claim_google')
            or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
 
   case p_key
-    when 'wishlist_enabled', 'gallery_enabled', 'gallery_auto_approve', 'signup_gift_paused' then
+    when 'wishlist_enabled', 'gallery_enabled', 'gallery_auto_approve', 'signup_gift_paused',
+         'signup_gift_claim_phone', 'signup_gift_claim_google' then
       if p_value is null or jsonb_typeof(p_value) <> 'boolean' then
         raise exception 'INVALID_INPUT' using detail = p_key || ' must be a boolean';
       end if;
@@ -8165,6 +8167,11 @@ begin
       if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[0-9]+$'
          or (p_value #>> '{}')::numeric > 100000 then
         raise exception 'INVALID_INPUT' using detail = 'signup_gift_daily_cap must be an integer from 0 to 100000';
+      end if;
+    when 'signup_gift_per_ip' then
+      if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[0-9]+$'
+         or (p_value #>> '{}')::numeric > 1000 then
+        raise exception 'INVALID_INPUT' using detail = 'signup_gift_per_ip must be an integer from 0 to 1000';
       end if;
     when 'code_inviter_window_days' then
       if jsonb_typeof(p_value) is distinct from 'number' or
@@ -9926,6 +9933,87 @@ $$;
 ALTER FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."claim_signup_gift"("p_user_id" "uuid", "p_method" "text" DEFAULT NULL::"text") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_profile public.profiles;
+  v_amount integer;
+  v_today jsonb;
+  v_key record;
+  v_enabled boolean := false;
+  v_change public.credit_change;
+begin
+  if p_user_id is null or (p_method is not null and p_method not in ('phone', 'google')) then
+    raise exception 'INVALID_INPUT' using detail = 'unknown claim method';
+  end if;
+
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_gift_cap', 0));
+  select * into v_profile from public.profiles where id = p_user_id for update;
+  -- Pending: over the allowance since 1480, a 1350 'same_ip', or an older same-IP refusal that
+  -- stored nothing (an IP, no reason). Never paid already.
+  if not found
+     or not (coalesce(v_profile.signup_gift_refusal in ('same_ip_pending', 'same_ip'), false)
+             or (v_profile.signup_gift_refusal is null and v_profile.signup_ip is not null))
+     or exists (select 1 from public.credit_ledger where idempotency_key = 'signup:' || p_user_id::text) then
+    return 'not_pending';
+  end if;
+  v_amount := public.signup_gift_amount(v_profile.created_at);
+  if v_amount = 0 then
+    return 'not_pending';
+  end if;
+
+  v_today := public.signup_gift_today();
+  for v_key in
+    select k.method, k.key_hash
+      from public.signup_gift_identity_keys(p_user_id) k
+     where p_method is null or k.method = p_method
+     order by k.method desc  -- phone first
+  loop
+    if not (v_today->>('claim_' || v_key.method))::boolean then
+      continue;
+    end if;
+    v_enabled := true;
+    if exists (select 1 from public.signup_gift_claims c where c.key_hash = v_key.key_hash) then
+      continue;
+    end if;
+    if (v_today->>'paused')::boolean then
+      return 'paused';
+    end if;
+    if (v_today->>'granted')::integer >= (v_today->>'cap')::integer then
+      return 'daily_cap';
+    end if;
+
+    insert into public.signup_gift_claims (key_hash, method, user_id) values (v_key.key_hash, v_key.method, p_user_id);
+    update public.profiles set signup_gift_refusal = null where id = p_user_id;
+    v_change := public._apply_credit_change(p_user_id, 'free', 'grant', v_amount, 'signup', 'signup:' || p_user_id::text);
+    -- The account's other keys are spent too: one account, one gift, whatever it later links.
+    insert into public.signup_gift_claims (key_hash, method, user_id)
+    select k.key_hash, k.method, p_user_id from public.signup_gift_identity_keys(p_user_id) k
+    on conflict (key_hash) do nothing;
+    return 'granted';
+  end loop;
+
+  if not v_enabled then
+    -- No enabled method with a key: say which is missing, the switch or the identity.
+    if p_method is not null and not (v_today->>('claim_' || p_method))::boolean then
+      return 'method_off';
+    end if;
+    if p_method is null and not (v_today->>'claim_phone')::boolean and not (v_today->>'claim_google')::boolean then
+      return 'method_off';
+    end if;
+    return 'no_identity';
+  end if;
+  return 'already_used';
+end;
+$$;
+
+
+ALTER FUNCTION "public"."claim_signup_gift"("p_user_id" "uuid", "p_method" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."claim_waffo_catalog_session"("p_user" "uuid", "p_token" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -10718,8 +10806,9 @@ CREATE OR REPLACE FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amoun
     AS $$
 declare
   v_profile public.profiles;
-  cutoff timestamptz;
   v_today jsonb;
+  v_per_ip integer;
+  v_change public.credit_change;
 begin
   if p_amount is null or p_amount <= 0 then
     raise exception 'INVALID_INPUT' using detail = 'amount must be positive';
@@ -10729,36 +10818,28 @@ begin
     perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
     lock table public.profiles in row exclusive mode;
     select * into v_profile from public.profiles where id = p_user_id;
-    -- Read the committed version, not the app bundle: a stale tab must not award six
-    -- old credits after cutover, nor may an old account claim a second registration gift.
-    select updated_at into cutoff from public.system_settings
-     where key='pricing_catalog_version' and value='"v2"'::jsonb;
-    if cutoff is not null then
-      if v_profile.created_at < cutoff then
-        return row(false,v_profile.credits,v_profile.free_credits,v_profile.paid_until)::public.credit_change;
-      end if;
-      p_amount := 100;
-    else
-      p_amount := 6;
+    p_amount := public.signup_gift_amount(v_profile.created_at);
+    if p_amount = 0 then
+      return row(false,v_profile.credits,v_profile.free_credits,v_profile.paid_until)::public.credit_change;
     end if;
 
     -- Already paid: the ledger's idempotency key makes this a no-op; never refuse it now.
     if not exists (select 1 from public.credit_ledger where idempotency_key = p_idempotency_key) then
+      -- A stored refusal stands; a pending account is paid only through claim_signup_gift.
       if v_profile.signup_gift_refusal is not null then
         return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
       end if;
 
-      if v_profile.signup_ip is not null then
+      v_per_ip := public.signup_gift_setting_int('signup_gift_per_ip', 5);
+      if v_profile.signup_ip is not null and v_per_ip > 0 then
         perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
-        if exists (
-             select 1
-               from public.profiles other
-               join public.credit_ledger l on l.idempotency_key = 'signup:' || other.id::text
-              where other.signup_ip = v_profile.signup_ip
-                and other.id <> p_user_id
-                and l.created_at > v_profile.created_at - interval '24 hours'
-           ) then
-          update public.profiles set signup_gift_refusal = 'same_ip' where id = p_user_id;
+        if (select count(*)
+              from public.profiles other
+              join public.credit_ledger l on l.idempotency_key = 'signup:' || other.id::text
+             where other.signup_ip = v_profile.signup_ip
+               and other.id <> p_user_id
+               and l.created_at > v_profile.created_at - interval '24 hours') >= v_per_ip then
+          update public.profiles set signup_gift_refusal = 'same_ip_pending' where id = p_user_id;
           return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
         end if;
       end if;
@@ -10774,6 +10855,14 @@ begin
         update public.profiles set signup_gift_refusal = 'daily_cap' where id = p_user_id;
         return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
       end if;
+
+      v_change := public._apply_credit_change(p_user_id, p_pool, 'grant', p_amount, p_reason, p_idempotency_key);
+      if v_change.applied then
+        insert into public.signup_gift_claims (key_hash, method, user_id)
+        select k.key_hash, k.method, p_user_id from public.signup_gift_identity_keys(p_user_id) k
+        on conflict (key_hash) do nothing;
+      end if;
+      return v_change;
     end if;
   end if;
 
@@ -12456,6 +12545,23 @@ $$;
 ALTER FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) RETURNS integer
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select case
+           when cutoff is null then 6
+           when p_created_at < cutoff then 0
+           else 100
+         end
+    from (select (select s.updated_at from public.system_settings s
+                   where s.key = 'pricing_catalog_version' and s.value = '"v2"'::jsonb) as cutoff) c
+$$;
+
+
+ALTER FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."signup_gift_day_start"() RETURNS timestamp with time zone
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -12467,21 +12573,63 @@ $$;
 ALTER FUNCTION "public"."signup_gift_day_start"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."signup_gift_today"() RETURNS "jsonb"
+CREATE OR REPLACE FUNCTION "public"."signup_gift_identity_keys"("p_user_id" "uuid") RETURNS TABLE("method" "text", "key_hash" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select 'phone', encode(sha256(convert_to(u.phone, 'UTF8')), 'hex')
+    from auth.users u
+   where u.id = p_user_id and coalesce(u.phone, '') <> '' and u.phone_confirmed_at is not null
+  union all
+  select 'google', encode(sha256(convert_to('google:' || i.provider_id, 'UTF8')), 'hex')
+    from auth.identities i
+   where i.user_id = p_user_id and i.provider = 'google'
+$$;
+
+
+ALTER FUNCTION "public"."signup_gift_identity_keys"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_gift_setting_bool"("p_key" "text", "p_default" boolean) RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select coalesce((select case when jsonb_typeof(s.value) = 'boolean' then (s.value #>> '{}')::boolean end
+                     from public.system_settings s where s.key = p_key), p_default)
+$$;
+
+
+ALTER FUNCTION "public"."signup_gift_setting_bool"("p_key" "text", "p_default" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_gift_setting_int"("p_key" "text", "p_default" integer) RETURNS integer
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $_$
+  select coalesce((select case when jsonb_typeof(s.value) = 'number' and (s.value #>> '{}') ~ '^[0-9]+$'
+                               then (s.value #>> '{}')::integer end
+                     from public.system_settings s where s.key = p_key), p_default)
+$_$;
+
+
+ALTER FUNCTION "public"."signup_gift_setting_int"("p_key" "text", "p_default" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_gift_today"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
   select jsonb_build_object(
     'granted', (select count(*) from public.credit_ledger l
                  where l.kind = 'grant' and l.reason = 'signup' and l.idempotency_key like 'signup:%'
                    and l.created_at >= public.signup_gift_day_start()),
-    'cap', coalesce((select case when jsonb_typeof(s.value) = 'number' and (s.value #>> '{}') ~ '^[0-9]+$'
-                                 then (s.value #>> '{}')::integer end
-                       from public.system_settings s where s.key = 'signup_gift_daily_cap'), 30),
-    'paused', coalesce((select case when jsonb_typeof(s.value) = 'boolean' then (s.value #>> '{}')::boolean end
-                          from public.system_settings s where s.key = 'signup_gift_paused'), false)
+    'cap', public.signup_gift_setting_int('signup_gift_daily_cap', 30),
+    'paused', public.signup_gift_setting_bool('signup_gift_paused', false),
+    'per_ip', public.signup_gift_setting_int('signup_gift_per_ip', 5),
+    'claim_phone', public.signup_gift_setting_bool('signup_gift_claim_phone', true),
+    'claim_google', public.signup_gift_setting_bool('signup_gift_claim_google', true)
   )
-$_$;
+$$;
 
 
 ALTER FUNCTION "public"."signup_gift_today"() OWNER TO "postgres";
@@ -14195,7 +14343,7 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
     CONSTRAINT "profiles_referred_source_check" CHECK (("referred_source" = ANY (ARRAY['signup'::"text", 'first_checkout'::"text", 'admin'::"text"]))),
     CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"]))),
-    CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'daily_cap'::"text", 'paused'::"text"])))
+    CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'same_ip_pending'::"text", 'daily_cap'::"text", 'paused'::"text"])))
 );
 
 
@@ -14996,6 +15144,19 @@ CREATE TABLE IF NOT EXISTS "public"."reference_template_sources" (
 ALTER TABLE "public"."reference_template_sources" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."signup_gift_claims" (
+    "key_hash" "text" NOT NULL,
+    "method" "text" NOT NULL,
+    "user_id" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "signup_gift_claims_key_hash_check" CHECK (("key_hash" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "signup_gift_claims_method_check" CHECK (("method" = ANY (ARRAY['phone'::"text", 'google'::"text"])))
+);
+
+
+ALTER TABLE "public"."signup_gift_claims" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."signup_requests" (
     "id" bigint NOT NULL,
     "email_key" "text" NOT NULL,
@@ -15729,6 +15890,11 @@ ALTER TABLE ONLY "public"."reference_template_sources"
 
 ALTER TABLE ONLY "public"."reference_template_sources"
     ADD CONSTRAINT "reference_template_sources_run_id_key" UNIQUE ("run_id");
+
+
+
+ALTER TABLE ONLY "public"."signup_gift_claims"
+    ADD CONSTRAINT "signup_gift_claims_pkey" PRIMARY KEY ("key_hash");
 
 
 
@@ -17228,6 +17394,11 @@ ALTER TABLE ONLY "public"."reference_template_sources"
 
 
 
+ALTER TABLE ONLY "public"."signup_gift_claims"
+    ADD CONSTRAINT "signup_gift_claims_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
+
+
+
 ALTER TABLE ONLY "public"."site_announcements"
     ADD CONSTRAINT "site_announcements_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -17623,6 +17794,9 @@ CREATE POLICY "series_read" ON "public"."template_series" FOR SELECT TO "authent
      JOIN "public"."template_category_paths" "c" ON (("c"."key" = COALESCE("t"."subcategory_key", "t"."category_key"))))
   WHERE (("t"."series_id" = "template_series"."id") AND "t"."is_active" AND ('web'::"text" = ANY ("t"."visible_in")) AND "c"."web_visible")))));
 
+
+
+ALTER TABLE "public"."signup_gift_claims" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."signup_requests" ENABLE ROW LEVEL SECURITY;
@@ -19277,6 +19451,11 @@ GRANT ALL ON FUNCTION "public"."claim_dispute_reminders"("p_dispute_ids" "text"[
 
 
 
+REVOKE ALL ON FUNCTION "public"."claim_signup_gift"("p_user_id" "uuid", "p_method" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."claim_signup_gift"("p_user_id" "uuid", "p_method" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."claim_waffo_catalog_session"("p_user" "uuid", "p_token" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."claim_waffo_catalog_session"("p_user" "uuid", "p_token" "uuid") TO "service_role";
 
@@ -19673,8 +19852,28 @@ GRANT ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."signup_gift_day_start"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."signup_gift_day_start"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_identity_keys"("p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_identity_keys"("p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_setting_bool"("p_key" "text", "p_default" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_setting_bool"("p_key" "text", "p_default" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_setting_int"("p_key" "text", "p_default" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_setting_int"("p_key" "text", "p_default" integer) TO "service_role";
 
 
 
@@ -20052,6 +20251,10 @@ GRANT ALL ON TABLE "public"."reference_object_deletions" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."reference_template_sources" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."signup_gift_claims" TO "service_role";
 
 
 

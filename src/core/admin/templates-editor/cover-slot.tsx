@@ -7,6 +7,7 @@ import { cn } from '@/core/ui/cn'
 
 import { coverCopy as COPY } from './copy'
 import { coverFileName, formatBytes, useFileSize } from './cover-file'
+import { PreviewThumb } from '../ui/image-preview'
 
 type CoverMedia = {
   // Current public file. A video shows with its poster and plays on demand; an animated WebP
@@ -38,9 +39,11 @@ function Preview({ label, preview }: { label: string; preview: CoverMedia['previ
       {preview?.video ? (
         <video src={preview.url} poster={preview.poster ?? undefined} className="h-full w-full object-contain" controls muted loop playsInline preload="metadata" />
       ) : preview ? (
-        // Admin-only preview of an already-converted public file; next/image adds nothing here.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={preview.url} alt={label} className="h-full w-full object-contain" />
+        <PreviewThumb title={label} images={[{ url: preview.url, label }]} className="size-full">
+          {/* Admin-only preview of an already-converted public file; next/image adds nothing here. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={preview.url} alt={label} className="h-full w-full object-contain" />
+        </PreviewThumb>
       ) : (
         <span className="text-muted-foreground text-xs">未上传</span>
       )}

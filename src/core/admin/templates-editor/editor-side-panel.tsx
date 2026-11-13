@@ -6,6 +6,7 @@ import { cn } from '@/core/ui/cn'
 
 import { sidePanelCopy as COPY } from './layout-copy'
 import type { PreviewDraft } from './preview-draft'
+import { PreviewGuard } from './preview-guard'
 import { useTemplatePreview, type PreviewLocale, type PreviewWidth } from './preview-slot'
 
 type Mode = 'test' | 'preview'
@@ -28,7 +29,7 @@ export function EditorSidePanel({ testRun, draft, isActive }: { testRun: ReactNo
       {mode === 'preview' ? (
         <div className="grid min-w-0 gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-muted-foreground min-w-0 flex-1 text-xs">{COPY.hint}</p>
+            <p className="text-muted-foreground w-full min-w-0 text-xs sm:w-auto sm:flex-1">{COPY.hint}</p>
             <Segmented label={COPY.widthLabel} value={width} onChange={setWidth} options={[['desktop', COPY.desktop], ['phone', COPY.phone]]} />
             <Segmented label={COPY.localeLabel} value={locale} onChange={setLocale} options={[['zh', COPY.zh], ['en', COPY.en]]} />
           </div>
@@ -37,7 +38,7 @@ export function EditorSidePanel({ testRun, draft, isActive }: { testRun: ReactNo
               {draft.stale ? <p className="text-sm text-amber-600 dark:text-amber-400">{COPY.staleFields}</p> : null}
               {!isActive ? <p className="text-muted-foreground text-xs">{COPY.inactive}</p> : null}
               <ScaledFrame width={width}>
-                {preview({ template: draft.template, series: draft.series, width, locale })}
+                {preview({ template: draft.template, series: seriesIn(draft.series, locale), width, locale })}
               </ScaledFrame>
             </>
           )}
@@ -48,7 +49,11 @@ export function EditorSidePanel({ testRun, draft, isActive }: { testRun: ReactNo
 }
 
 // Draws the frame at its real size and zooms it to the panel's width, so the dialog lays out as
-// it does for users. inert: nothing in it can be pressed or focused (no upload, no generate).
+// it does for users. Not inert (Owner 2026-11-14: an inert frame could not be scrolled, so the
+// dialog's own scroll pane never moved and the preview felt like a picture): wheel, trackpad,
+// scrollbar and touch reach it, and its switches, choices and series strip work as they do for
+// users. PreviewGuard stops only what would leave the preview: picking or dropping a photo,
+// pasting one, following a link, submitting.
 function ScaledFrame({ width, children }: { width: PreviewWidth; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null)
   const [room, setRoom] = useState<number | null>(null)
@@ -63,12 +68,18 @@ function ScaledFrame({ width, children }: { width: PreviewWidth; children: React
   const zoom = room ? Math.min(1, room / frame.width) : 1
   return (
     <div ref={box} className="w-full min-w-0 overflow-hidden">
-      <div inert className="bg-popover mx-auto overflow-hidden rounded-2xl border shadow-lg"
+      <PreviewGuard className="bg-popover mx-auto overflow-hidden rounded-2xl border shadow-lg"
         style={{ width: frame.width, height: frame.height, zoom }}>
         {children}
-      </div>
+      </PreviewGuard>
     </div>
   )
+}
+
+// The series strip's title in the preview's language, as the user's dialog names it.
+function seriesIn(series: PreviewDraft['series'], locale: PreviewLocale) {
+  if (!series) return null
+  return { name: locale === 'en' ? series.nameEn || series.name : series.name, members: series.members }
 }
 
 function Segmented<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (value: T) => void; options: [T, string][] }) {

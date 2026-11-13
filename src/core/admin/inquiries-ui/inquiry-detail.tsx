@@ -7,7 +7,7 @@ import { formatBeijing } from '../shell/format'
 import { UserLink } from '../users-ui/user-link'
 import { INQUIRIES_COPY as COPY } from './copy'
 import { FollowUpForm, type InquiryAdminActions } from './follow-up-form'
-import { StatusBadge } from './inquiries-view'
+import { StatusBadge } from './status-badge'
 
 type Props = { inquiry: AdminInquiry; actions: InquiryAdminActions }
 

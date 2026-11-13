@@ -36,7 +36,7 @@ export type FormColumnProps = {
   providers: readonly ImageProviderOption[]
   floor: CreditsFloor
   categories: readonly CategoryOption[]
-  series: readonly { id: string; nameZh: string }[]
+  series: readonly { id: string; nameZh: string; nameEn?: string }[]
   coverLanguages: readonly CoverLanguage[]
   coverActions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover' | 'setSale'> & VersionActions
   values: TemplateFormValues

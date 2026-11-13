@@ -41,7 +41,7 @@ describe('signUpWithPassword', () => {
     expect(fn).toBe('signup_request')
     expect(args).toEqual({ p_email_key: expect.stringMatching(/^[0-9a-f]{64}$/), p_ip: '203.0.113.7' })
     mocks.rpc.mockResolvedValueOnce({ data: 'ip_hourly', error: null })
-    expect(await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))).toEqual({ status: 'error', code: 'AUTH_RATE_LIMITED' })
+    expect(await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))).toEqual({ status: 'error', code: 'AUTH_SIGNUP_LIMITED' })
     expect(mocks.signUp).toHaveBeenCalledTimes(1)
   })
 

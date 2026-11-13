@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   headers: vi.fn(),
   bind: vi.fn(),
   claim: vi.fn().mockResolvedValue(null),
+  claimQuietly: vi.fn().mockResolvedValue(false),
   track: vi.fn(),
   recordSignupIp: vi.fn(),
   grantSignupCredits: vi.fn(),
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../affiliate/referral', () => ({ bindReferral: mocks.bind }))
 vi.mock('./signup-code', () => ({ consumeSignupCode: mocks.claim }))
+vi.mock('./signup-gift-claim', () => ({ claimQuietly: mocks.claimQuietly }))
 vi.mock('next/headers', () => ({ headers: mocks.headers, cookies: async () => new Map([['sv_ref', { value: 'partner' }]]) }))
 vi.mock('../analytics', () => ({ track: mocks.track }))
 vi.mock('../alerts', () => ({ noteSignupGift: mocks.noteSignupGift }))
@@ -58,6 +60,23 @@ describe('onVerifiedSignIn', () => {
     await onVerifiedSignIn('u1', benefits, 'google', 'en')
     expect(mocks.bind).toHaveBeenCalledWith('u1', 'partner', 'signup')
     expect(mocks.track).toHaveBeenCalledWith('signup', { method: 'google', code_kind: 'invite' }, { distinctId: 'u1', locale: 'en' })
+  })
+
+  it('1480: a gift the grant left pending is claimed after the sign-in, and the Owner alert checks', async () => {
+    mocks.recordSignupIp.mockResolvedValue(false)
+    mocks.grantSignupCredits.mockResolvedValue(false)
+    mocks.claimQuietly.mockResolvedValueOnce(true)
+    await onVerifiedSignIn('u1', benefits, 'google', 'zh')
+    expect(mocks.claimQuietly).toHaveBeenCalledExactlyOnceWith({}, 'u1')
+    expect(mocks.noteSignupGift).toHaveBeenCalledOnce()
+    expect(mocks.track).not.toHaveBeenCalled()
+  })
+
+  it('1480: no claim when the grant paid', async () => {
+    mocks.recordSignupIp.mockResolvedValue(true)
+    mocks.grantSignupCredits.mockResolvedValue(true)
+    await onVerifiedSignIn('u1', benefits, 'email', 'zh')
+    expect(mocks.claimQuietly).not.toHaveBeenCalled()
   })
 
   it('falls back to the grant when there is no client IP', async () => {

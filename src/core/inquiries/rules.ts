@@ -46,3 +46,6 @@ export const LIMITS = {
 
 export const INQUIRY_PAGES = ['/pricing', '/zh/pricing'] as const
 export type InquiryPage = (typeof INQUIRY_PAGES)[number]
+
+// Why a batch on /admin/inquiries left an inquiry as it was.
+export type BulkInquirySkip = 'missing' | 'same'
