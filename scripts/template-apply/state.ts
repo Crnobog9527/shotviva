@@ -7,6 +7,8 @@ import { getAdminSeries } from '../../src/core/admin/template-series/repository'
 import type { SeriesDetail } from '../../src/core/admin/template-series/types'
 import type { ImageProviderOption } from '../../src/core/admin/image-provider-field'
 import type { ProviderFloors } from '../../src/core/templates/provider-pricing'
+import type { StyleRef } from '../../src/core/templates/style-refs'
+import { getProfileDetail } from '../../src/core/admin/template-profiles/repository'
 import { findTestRun } from '../../src/modules/image/test-run/test-run-store'
 import { pricingFromOptions } from '../../src/core/admin/templates/provider-pricing'
 import { readPricingOptions } from '../../src/site/template-pricing'
@@ -35,7 +37,14 @@ export type DbState = {
   providers: ImageProviderOption[]
   floors: ProviderFloors
   testRuns: Map<string, TestRunInfo>
+  // Provider profiles (1440) of the batch's templates that name profiles: which is live, and each
+  // saved profile's version and content (for a re-run that changes nothing).
+  profiles: Map<string, TemplateProfiles>
 }
+
+export type StoredProfile = { version: number; body: string; modelParams: Record<string, unknown>; providerId: string | null
+  styleRefs: StyleRef[]; quality: string; creditsCost: Record<string, number>; unpricedResolutions: string[] }
+export type TemplateProfiles = { active: 'openai' | 'seedream'; stored: Partial<Record<'openai' | 'seedream', StoredProfile>> }
 
 async function readCategories(db: SupabaseClient) {
   const { data, error } = await db.from('template_categories').select(Object.keys(categoryRow.shape).join(','))
@@ -83,14 +92,32 @@ async function seriesSlugById(db: SupabaseClient) {
   return new Map(z.array(z.object({ id: z.string(), slug: z.string() })).parse(data).map(r => [r.id, r.slug]))
 }
 
+async function readProfiles(db: SupabaseClient, batch: Batch) {
+  const ids = batch.templates.filter(t => t.profiles || t.activeProfile).map(t => t.id)
+  const result = new Map<string, TemplateProfiles>()
+  if (ids.length === 0) return result
+  const { data, error } = await db.from('template_prompts').select('template_id, active_profile').in('template_id', ids)
+  if (error) throw new Error('读取供应商配置失败')
+  for (const row of z.array(z.object({ template_id: z.string(), active_profile: z.enum(['openai', 'seedream']) })).parse(data)) {
+    const stored: TemplateProfiles['stored'] = {}
+    for (const key of ['openai', 'seedream'] as const) {
+      const detail = await getProfileDetail(db, row.template_id, key)
+      if (detail) stored[key] = { version: detail.version, body: detail.body, modelParams: detail.modelParams, providerId: detail.providerId,
+        styleRefs: detail.styleRefs, quality: detail.quality, creditsCost: detail.creditsCost, unpricedResolutions: detail.unpricedResolutions }
+    }
+    result.set(row.template_id, { active: row.active_profile, stored })
+  }
+  return result
+}
+
 export async function readState(db: SupabaseClient, batch: Batch): Promise<DbState> {
   const [categories, all, providers, idToSlug] = await Promise.all([
     readCategories(db), listAdminTemplates(db), readPricingOptions(db), seriesSlugById(db),
   ])
   const templates = new Map(all.map(t => [t.id, t]))
   const runIds = batch.templates.flatMap(t => t.cover && 'testRun' in t.cover ? [t.cover.testRun] : [])
-  const [series, testRuns] = await Promise.all([
-    readSeries(db, seriesSlugs(batch, templates, idToSlug)), readTestRuns(db, runIds),
+  const [series, testRuns, profiles] = await Promise.all([
+    readSeries(db, seriesSlugs(batch, templates, idToSlug)), readTestRuns(db, runIds), readProfiles(db, batch),
   ])
-  return { categories, series, seriesSlugs: idToSlug, templates, providers, floors: pricingFromOptions(providers), testRuns }
+  return { categories, series, seriesSlugs: idToSlug, templates, providers, floors: pricingFromOptions(providers), testRuns, profiles }
 }
