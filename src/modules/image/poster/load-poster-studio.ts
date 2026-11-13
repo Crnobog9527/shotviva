@@ -17,11 +17,6 @@ import type { StudioTemplate } from './use-poster-studio'
 
 export const posterAllowed = (userId: string) => featureAllowed(userId, POSTER_FEATURE).catch(() => false)
 
-export async function listPosterTemplates(db: SupabaseClient, locale: Locale): Promise<{ id: string; name: string; description: string | null }[]> {
-  const templates = await listTemplatesIn(db, locale, { posters: true })
-  return templates.map((template) => ({ id: template.id, name: template.name, description: template.description }))
-}
-
 export function toStudioTemplate(template: LocalizedTemplate): StudioTemplate | null {
   const poster = template.fields.poster
   if (!poster) return null

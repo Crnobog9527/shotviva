@@ -32,9 +32,10 @@ function Header({ aside }: { aside?: ReactNode }) {
 type Search = Promise<Record<string, string | string[] | undefined>>
 
 // The proxy already sends a signed-out visitor to sign-in with the full address; this is the
-// page's own fallback, and it keeps an open series (?series=) too.
+// page's own fallback, and it keeps an open series (?series=) or poster editor (?poster=) too.
 async function Create({ searchParams }: { searchParams: Search }) {
-  const user = await requireUser(createReturnPath((await searchParams).series))
+  const query = await searchParams
+  const user = await requireUser(createReturnPath(query.series, query.poster))
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
   const [view, balance, tier, runningIds, favoriteIds, wishlistLive] = await Promise.all([

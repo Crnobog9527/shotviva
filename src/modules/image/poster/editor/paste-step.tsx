@@ -21,10 +21,17 @@ export function PasteStep({ studio }: { studio: PosterStudioState }) {
         placeholder={t('paste.placeholder')} onChange={(event) => studio.setSource(event.target.value)} className={`${fieldClass} min-h-[260px]`} />
       <p className="text-right text-caption text-muted-foreground">{draft.source.length} / {TEXT_MAX}</p>
       {studio.notice === 'rateLimited' ? <p className="text-caption text-destructive">{t('notice.rateLimited')}</p> : null}
-      <Button className="min-h-12" disabled={busy || !draft.source.trim()} onClick={() => void studio.sort()}>
-        {busy ? t('paste.sorting') : t('paste.sort')}
-      </Button>
       <Button variant="ghost" className="min-h-11" disabled={busy} onClick={studio.toManual}>{t('paste.manual')}</Button>
     </section>
+  )
+}
+
+// The paste step's primary, in the dialog's pinned bar: the model sorts the text into blocks.
+export function SortButton({ studio }: { studio: PosterStudioState }) {
+  const t = useTranslations('app.poster')
+  return (
+    <Button className="min-h-12 w-full" disabled={studio.busy || !studio.draft.source.trim()} onClick={() => void studio.sort()}>
+      {studio.busy ? t('paste.sorting') : t('paste.sort')}
+    </Button>
   )
 }

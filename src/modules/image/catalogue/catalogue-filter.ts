@@ -7,14 +7,19 @@ import { pathStartsWith, type FilterNode, type GridEntry } from './catalogue-vie
 export const CATEGORY_PARAM = 'category'
 export const SAVED_PARAM = 'saved'
 export const SERIES_PARAM = 'series'
+// A poster template's editor, open as a dialog over Create (ARCHITECTURE §5.3).
+export const POSTER_PARAM = 'poster'
 
 // Where sign-in comes back to for Create (requireUser): the series a link opened (the public
-// series cards link to /generate?series=<slug>) survives the trip; anything else is plain
-// /generate. Only a slug or id shape is kept, so nothing but this one parameter rides along
-// (sanitizeNext still keeps `next` on this site).
+// series cards link to /generate?series=<slug>), or the poster editor (old /posters/<id> links
+// land on /generate?poster=<id>), survives the trip; anything else is plain /generate. Only a
+// slug or id shape is kept, so nothing but that one parameter rides along (sanitizeNext still
+// keeps `next` on this site).
 const SERIES_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
-export function createReturnPath(series: string | string[] | undefined): string {
-  return typeof series === 'string' && series.length <= 80 && SERIES_KEY.test(series) ? `/generate?${SERIES_PARAM}=${series}` : '/generate'
+export const isOpenKey = (value: unknown): value is string => typeof value === 'string' && value.length <= 80 && SERIES_KEY.test(value)
+export function createReturnPath(series: string | string[] | undefined, poster?: string | string[]): string {
+  if (isOpenKey(series)) return `/generate?${SERIES_PARAM}=${series}`
+  return isOpenKey(poster) ? `/generate?${POSTER_PARAM}=${poster}` : '/generate'
 }
 
 export type Selection = { saved: boolean; path: string[] }
@@ -42,13 +47,14 @@ export function readSelection(search: URLSearchParams, filters: readonly FilterN
 
 // The query for a selection (and an open series), keeping every other parameter. Slugs are
 // plain [a-z0-9-], so the slashes are left readable.
-export function selectionSearch(current: URLSearchParams, selection: Selection, series: string | null = current.get(SERIES_PARAM)): string {
+export function selectionSearch(current: URLSearchParams, selection: Selection, series: string | null = current.get(SERIES_PARAM), poster: string | null = null): string {
   const next = new URLSearchParams(current)
-  for (const key of [CATEGORY_PARAM, SAVED_PARAM, SERIES_PARAM]) next.delete(key)
+  for (const key of [CATEGORY_PARAM, SAVED_PARAM, SERIES_PARAM, POSTER_PARAM]) next.delete(key)
   const parts = [...next].map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
   if (selection.saved) parts.push(`${SAVED_PARAM}=1`)
   else if (selection.path.length) parts.push(`${CATEGORY_PARAM}=${selection.path.map(encodeURIComponent).join('/')}`)
   if (series) parts.push(`${SERIES_PARAM}=${encodeURIComponent(series)}`)
+  if (poster) parts.push(`${POSTER_PARAM}=${encodeURIComponent(poster)}`)
   return parts.length ? `?${parts.join('&')}` : ''
 }
 
