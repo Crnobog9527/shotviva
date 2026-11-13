@@ -14,7 +14,9 @@ import {
   allowedWebAspects,
   assertPricedTier,
   assertTemplateQuote,
+  hasSlots,
   publicCopyKeys,
+  toStoredSlots,
   validateGenerationInputs,
   type GenerationInputs,
   type Resolution,
@@ -35,6 +37,9 @@ import { backgroundInput } from './job-background'
 import { recordJobClientIp } from './job-download'
 import type { TemplateProvider } from './provider'
 import { reserveJob } from './settlement'
+import { callRpc } from '../billing/rpc'
+import { logger } from '../logger'
+import { z } from 'zod'
 import { partText } from '../poster'
 import { loadPosterPart, POSTER_FEATURE } from '../poster/sets'
 import { requireFeature } from '../features'
@@ -50,29 +55,88 @@ export type GenerationDeps = Omit<SettleDeps, 'provider'> & {
   identityJudgeTimeoutMs?: number
   // The invite-only gate of poster templates (ARCHITECTURE §5.3); tests pass their own reads.
   allowPoster?: (userId: string) => Promise<void>
+  // A finished poster's text check (§5.3 自动核对), scheduled after the response by the route.
+  afterPoster?: (job: Job) => void
 }
 
 const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'partner' }
 
 
-function requestAspects(req: GenerationRequest, template: Template) {
-  return req.source === 'web' ? allowedWebAspects(template.imageOptions, req.resolution ?? DEFAULT_RESOLUTION) : undefined
+// A slot template offers no "as shot" size: its images are a logo and the like, not a photo to
+// follow (§5.1e).
+export function requestAspects(req: Pick<GenerationRequest, 'source' | 'resolution'>, template: Pick<Template, 'imageOptions' | 'fields'>) {
+  if (req.source !== 'web') return undefined
+  const aspects = allowedWebAspects(template.imageOptions, req.resolution ?? DEFAULT_RESOLUTION)
+  return hasSlots(template.fields) ? aspects.filter((aspect) => aspect !== 'original') : aspects
 }
+
+// A slot template is one job at a time (总控 2026-11-12): its images each have their own role,
+// so there is no "same settings × several photos" to batch.
+function assertSingleRun(req: GenerationRequest, template: Template) {
+  if (!hasSlots(template.fields)) return
+  // Web only (§14.6): the save refuses a partner-visible slot template; this is the backstop.
+  if (req.source !== 'web') throw new AppError('TEMPLATE_UNAVAILABLE', 'Template not available')
+  if (req.batchId || req.batchCell || (req.batchSize ?? 1) > 1 || (req.batchTemplates ?? 1) > 1) {
+    throw new AppError('INVALID_INPUT', 'This template makes one image at a time')
+  }
+}
+
+// The job's uploads in the order the model gets them: the one photo, or the filled slots.
+const uploadKeys = (req: GenerationRequest, inputs: GenerationInputs): string[] =>
+  inputs.slots ? inputs.slots.map((slot) => slot.upload) : req.inputKey ? [req.inputKey] : []
 
 // A poster template writes its text from the caller's own saved set (ARCHITECTURE §5.3), never
 // from text the browser sends; every other template refuses a poster reference.
-async function posterPart(deps: GenerationDeps, req: GenerationRequest, template: Template) {
+async function posterPart(deps: GenerationDeps, req: GenerationRequest, template: Template, aspectRatio: string) {
   if (!template.fields.poster) {
     if (req.poster) throw new AppError('INVALID_INPUT', 'This template does not make posters')
     return null
   }
-  if (!req.poster || req.source !== 'web') throw new AppError('INVALID_INPUT', 'Confirm the poster text first')
-  // Dense small text needs at least HD (ARCHITECTURE §5.3), whatever the template's prices say.
-  if ((req.resolution ?? DEFAULT_RESOLUTION) === '1k') throw new AppError('INVALID_INPUT', 'Posters are made in HD or Max')
+  const resolution = posterResolution(req)
   await (deps.allowPoster ?? ((userId: string) => requireFeature(userId, POSTER_FEATURE)))(req.userId)
-  const { setId, part: index } = req.poster
+  const { setId, part: index, redrawOf } = req.poster as NonNullable<GenerationRequest['poster']>
   const { content, part } = await loadPosterPart(deps.db, req.userId, { setId, part: index, templateId: template.id })
-  return { text: partText(content, part), record: { set_id: setId, part: index, kind: part.kind, page: part.page, pages: part.pages } }
+  if (redrawOf) await assertSamePoster(deps, req.userId, redrawOf, { setId, part: index, templateId: template.id, resolution, aspectRatio })
+  const record = { set_id: setId, part: index, kind: part.kind, page: part.page, pages: part.pages, ...(redrawOf ? { redraw_of: redrawOf } : {}) }
+  return { text: partText(content, part), record }
+}
+
+// A poster job comes from the website with its set, at any tier the template sells (ARCHITECTURE
+// §5.3; 1K is sold too, the price check refuses a tier the template does not price).
+function posterResolution(req: GenerationRequest): Resolution {
+  if (!req.poster || req.source !== 'web') throw new AppError('INVALID_INPUT', 'Confirm the poster text first')
+  return req.resolution ?? DEFAULT_RESOLUTION
+}
+
+type SamePoster = { setId: string; part: number; templateId: string; resolution: string; aspectRatio: string }
+
+// A redraw names a finished poster of the caller's: the same set, poster and template, at the
+// same resolution and size (a free redraw can never be an upgrade).
+async function assertSamePoster(deps: GenerationDeps, userId: string, jobId: string, same: SamePoster) {
+  const source = await findOwnJob(deps.db, userId, jobId)
+  const poster = source?.inputs.poster as { set_id?: unknown; part?: unknown } | undefined
+  const matches = source?.status === 'succeeded' && source.templateId === same.templateId && poster?.set_id === same.setId
+    && poster.part === same.part && source.inputs.resolution === same.resolution && source.inputs.aspect_ratio === same.aspectRatio
+  if (!matches) throw new AppError('INVALID_INPUT', 'Unknown poster to redraw')
+}
+
+// The first redraw of a poster whose text check failed is free (Owner 2026-11-13): once it has
+// succeeded, grant_poster_free_redraw (1347) gives back what it reserved, at most once per poster.
+// A failed grant only means the redraw stays paid; it never fails the finished work.
+async function grantFreeRedraw(deps: GenerationDeps, job: Job): Promise<void> {
+  try {
+    await callRpc(deps.db, 'grant_poster_free_redraw', { p_job_id: job.id }, z.boolean())
+  } catch (error) {
+    logger.error('poster.free_redraw.failed', { jobId: job.id, error })
+  }
+}
+
+// After a poster job succeeds: a free redraw's refund (on this request, so the balance the user
+// sees next is right), then its text check, scheduled after the response.
+async function finishPoster(deps: GenerationDeps, poster: Prepared['poster'], job: Job) {
+  if (!poster || job.status !== 'succeeded') return
+  if (poster.redraw_of) await grantFreeRedraw(deps, job)
+  deps.afterPoster?.(job)
 }
 
 // Everything that can be rejected without touching credits: template, fields, key
@@ -86,6 +150,7 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
   const tier = req.resolution ?? DEFAULT_RESOLUTION
   assertPricedTier(template.unpricedResolutions, tier)
   assertTemplateQuote(req.expectedCredits, template.creditsCost[tier])
+  assertSingleRun(req, template)
   const validated = validateGenerationInputs(template.fields, {
     copy: req.copy,
     aspectRatio: req.aspectRatio,
@@ -93,18 +158,20 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
     // Partner v1 takes no toggles: every one stays at its default, off (T89).
     ...(req.source === 'web' ? { toggles: req.toggles, togglesConfirmed: req.togglesConfirmed } : {}),
     imageCount: req.inputKey ? 1 : 0,
+    ...(req.inputSlots ? { slots: req.inputSlots } : {}),
     aspects: requestAspects(req, template),
   })
-  const { inputs, poster } = withPoster(validated, await posterPart(deps, req, template))
+  const { inputs, poster } = withPoster(validated, await posterPart(deps, req, template, validated.aspectRatio))
+  const keys = uploadKeys(req, inputs)
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
-  if (req.inputKey && !isOwnInputKey(req.userId, req.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')
+  if (keys.some((key) => !isOwnInputKey(req.userId, key))) throw new AppError('INVALID_INPUT', 'Unknown upload')
   await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limitsFor(membership), {
     jobId: req.jobId,
     idempotencyKey: req.idempotencyKey,
   })
   // In parallel: the decision call usually finishes while the upload is still being read.
-  const [screen, image] = await Promise.all([screenWords(deps, req, inputs), req.inputKey ? loadInputImage(deps.store, req.inputKey) : null])
-  return { template, prompt, inputs, image, screen, poster }
+  const [screen, images] = await Promise.all([screenWords(deps, req, inputs), Promise.all(keys.map((key) => loadInputImage(deps.store, key)))])
+  return { template, prompt, inputs, images, keys, screen, poster }
 }
 
 function withPoster(inputs: GenerationInputs, poster: Awaited<ReturnType<typeof posterPart>>) {
@@ -147,7 +214,10 @@ function jobInputs(req: GenerationRequest, prepared: Prepared, resolution: Resol
     resolution,
     ...(inputs.note ? { note: inputs.note } : {}),
     ...toggleInputs(inputs, now),
-    input_key: req.inputKey ?? null,
+    input_key: inputs.slots ? null : req.inputKey ?? null,
+    // [{ key, upload }] in send order (an array: jsonb would re-sort object keys); Make again puts
+    // kept copy n back in the n-th slot (§5.1e).
+    ...(inputs.slots ? { input_slots: toStoredSlots(inputs.slots) } : {}),
     prompt_version: prompt.version,
     attempt_id: attemptId,
     ...batchInputs(req),
@@ -166,10 +236,12 @@ function reserveFields(req: GenerationRequest) {
 }
 
 // ARCHITECTURE §8 「原图小图」 (T32), only once the result is confirmed: a failed job has no photo
-// page. Edits (T30) settle elsewhere and get none; their source is the work they edited. (The
-// upload itself is copied next to the result during settle, T40.)
-async function keepInputPreview(deps: GenerationDeps, job: Job, image: Prepared['image']) {
-  if (image) await writeInputPreview(deps.store, { userId: job.userId, jobId: job.id, bytes: image.bytes })
+// page. Edits (T30) settle elsewhere and get none; their source is the work they edited. A slot
+// template's work has none either: a logo and prize photos are no "before" (§5.1e). (The
+// uploads themselves are copied next to the result during settle, T40.)
+async function keepInputPreview(deps: GenerationDeps, job: Job, { images, inputs }: Pick<Prepared, 'images' | 'inputs'>) {
+  const [image] = images
+  if (image && !inputs.slots) await writeInputPreview(deps.store, { userId: job.userId, jobId: job.id, bytes: image.bytes })
 }
 
 // Synchronous generation (ARCHITECTURE §4) shared by the web route and, later, the partner
@@ -185,13 +257,13 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     if (existing) return toJobView(existing)
   }
   const prepared = await prepare(deps, req)
-  const { template, prompt, inputs, image } = prepared
+  const { template, prompt, inputs, images } = prepared
 
   const jobId = req.jobId ?? randomUUID()
   const resolution = req.resolution ?? DEFAULT_RESOLUTION
   const attemptId = randomUUID()
   const { job, call, provider } = await withFallbackNotice(template.id, async (selected) => {
-    const route = await templateCall(deps, { template, prompt }, inputs, image, {
+    const route = await templateCall(deps, { template, prompt }, inputs, images, {
       resolution, providerId: req.source === 'web' ? prompt.providerId : null,
       onRoute: actual => selected(routeFallbackReason(actual, prompt.providerId, req.source)),
     })
@@ -210,7 +282,7 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
 
   const settle = () =>
     settleGeneration({ ...deps, provider }, job, call, outputKeyFor(req.userId, job.id), {
-      inputKeys: req.inputKey ? [req.inputKey] : [],
+      inputKeys: prepared.keys,
       decision: screenCost(deps.identityJudge, prepared.screen),
     })
   const settled = await settleTracked(job, template.category, settle, {
@@ -218,6 +290,7 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     batchSize: req.batchSize ?? 1,
     locale: req.locale,
   })
-  await keepInputPreview(deps, settled, image)
+  await keepInputPreview(deps, settled, prepared)
+  await finishPoster(deps, prepared.poster, settled)
   return toJobView(settled)
 }

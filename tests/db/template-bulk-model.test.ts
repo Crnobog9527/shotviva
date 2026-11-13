@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest'
 
 import { CREDITS_FLOOR } from '@/modules/image/credits-floor'
 import { connectAdmin, createUser } from './helpers'
+import { toDbTiers } from '@/core/templates/db-resolution'
 
 let db: Client
 let admin: string
@@ -36,7 +37,7 @@ async function draft(max = 1, ratio = '1:1', standard = costs['1k']) {
 
 const apply = async (ids: string[], patch: Record<string, unknown>, floor = CREDITS_FLOOR) =>
   (await db.query('select public.admin_bulk_edit_templates($1,$2,$3,$4,$5) as result',
-    [ids, patch, { ...floor, version: 'v2' }, admin, ['en', 'zh']])).rows[0].result
+    [ids, patch, toDbTiers({ ...floor, version: 'v2' }), admin, ['en', 'zh']])).rows[0].result
 
 const bindings = async (ids: string[]) =>
   (await db.query('select distinct provider_id from public.template_prompts where template_id=any($1)', [ids])).rows
@@ -72,7 +73,7 @@ it('changes supported prices and bindings together, protects hidden tiers, and c
 it('reports the replacement floor for the cheap template before changing either binding', async () => {
   const cheap = await draft(1, '1:1', 19)
   const ids = [await draft(), cheap]
-  const floor = { high: { '1k': 20, '2k': 20, '3k': 1 }, medium: { '1k': 20, '2k': 20, '3k': 1 } }
+  const floor = { high: { '1k': 20, '2k': 20, '4k': 1 }, medium: { '1k': 20, '2k': 20, '4k': 1 } }
   const outcome = await apply(ids, { provider_id: target }, floor)
   expect(outcome.failures).toEqual([{ id: cheap, name: cheap, reason: 'below_floor', resolution: '1k', floor: 20, given: 19 }])
   expect(await bindings(ids)).toEqual([{ provider_id: null }])

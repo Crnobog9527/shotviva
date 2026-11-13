@@ -29,7 +29,7 @@ import type { AdminTemplate, SaveTemplatePayload, TemplateOrderGroup } from './t
 
 type PromptRow = { style_refs: StyleRef[]; provider_id: string | null; body: string; version: number; model_params: Record<string, unknown> }
 type SaleRow = { template_sale_approvals: { enabled: boolean; unpriced_resolutions: Resolution[] } | null }
-type AdminRow = SaleRow & { subcategory_key: string | null; series_id: string | null; series_sort_order: number } & (TemplateRow | PreT75TemplateRow) & { template_prompts: PromptRow | null }
+type AdminRow = SaleRow & { subcategory_key: string | null; series_id: string | null; series_sort_order: number; deleted_at?: string | null } & (TemplateRow | PreT75TemplateRow) & { template_prompts: PromptRow | null }
 
 const CATALOGUE_PAGE_SIZE = 250
 
@@ -37,7 +37,8 @@ async function readAdminPage(client: SupabaseClient, after: string | null) {
   const { data, error } = await selectTemplates((columns) => {
     // The stable primary-key cursor keeps an in-flight reorder from skipping a template.
     const taxonomy = columns.startsWith(PRE_T75_TEMPLATE_COLUMNS + ',') ? '' : ', subcategory_key, series_id, series_sort_order'
-    const page = client.from('templates').select(columns + taxonomy).neq('id', EDIT_TEMPLATE_ID)
+    // Deleted templates (1401) come too, marked: the list hides them unless 已删除 is chosen.
+    const page = client.from('templates').select(columns + taxonomy + (taxonomy ? ', deleted_at' : '')).neq('id', EDIT_TEMPLATE_ID)
       .order('id').limit(CATALOGUE_PAGE_SIZE)
     if (after) page.gt('id', after)
     return page.returns<AdminRow[]>()
@@ -82,6 +83,7 @@ function toAdminTemplate(row: AdminRow, gap: SaleFloorExample | undefined): Admi
     subcategoryKey: row.subcategory_key,
     seriesId: row.series_id,
     seriesSortOrder: row.series_sort_order,
+    deletedAt: row.deleted_at ?? null,
     saleEnabled: row.template_sale_approvals?.enabled === true,
     unpricedResolutions: row.template_sale_approvals?.unpriced_resolutions,
     prompt: row.template_prompts
@@ -162,14 +164,14 @@ export async function saveAssignedTemplate(client: SupabaseClient, template: Tem
 
 type CandidateRow = SaleRow & Pick<
   TemplateRow,
-  'id' | 'name' | 'category_key' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'cover_locales' | 'quality' | 'credits_cost' | 'is_active'
+  'id' | 'name' | 'category_key' | 'description' | 'visible_in' | 'cover_before_url' | 'cover_after_url' | 'cover_locales' | 'quality' | 'credits_cost' | 'is_active' | 'fields'
 > & { template_prompts: { version: number; provider_id: string | null } | null }
 
 // Only what the publish rules read (T60); one query for the whole batch, by primary key.
 export async function loadPublishCandidates(client: SupabaseClient, ids: readonly string[]): Promise<PublishCandidate[]> {
   const { data, error } = await client
     .from('templates')
-    .select('id, name, category_key, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, template_sale_approvals(enabled,unpriced_resolutions), template_prompts(version, provider_id)')
+    .select('id, name, category_key, description, visible_in, cover_before_url, cover_after_url, cover_locales, quality, credits_cost, is_active, fields, template_sale_approvals(enabled,unpriced_resolutions), template_prompts(version, provider_id)')
     .in('id', ids)
     .returns<CandidateRow[]>()
   if (error) throw new AppError('INTERNAL', `loadPublishCandidates failed: ${error.message}`)
@@ -183,6 +185,8 @@ export async function loadPublishCandidates(client: SupabaseClient, ids: readonl
     // A launched language's own complete set also counts (T87).
     coverLocales: coverLocalesSchema.parse(row.cover_locales ?? {}),
     quality: row.quality,
+    // Only the slots matter here: a slot template's floor is per slot (§5.1e).
+    fields: { images: { slots: row.fields?.images?.slots } },
     creditsCost: row.credits_cost,
     isActive: row.is_active,
     saleEnabled: row.template_sale_approvals?.enabled === true,

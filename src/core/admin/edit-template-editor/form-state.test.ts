@@ -7,7 +7,7 @@ import { canSave, formFor, toSaveInput } from './form-state'
 const settings = {
   saleEnabled: true,
   isActive: false,
-  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 2, '2k': 4, '4k': 6 },
   quality: 'high' as const,
   wrapper: 'W',
   version: 3,
@@ -22,7 +22,7 @@ describe('edit template form', () => {
     expect(canSave(form)).toBe(false)
 
     const input = toSaveInput({ ...form, classifier: 'classify it' })
-    expect(input).toMatchObject({ creditsCost: { '1k': 2, '2k': 4, '3k': 6 }, params: { input_fidelity: 'high', classifier: 'classify it' } })
+    expect(input).toMatchObject({ creditsCost: { '1k': 2, '2k': 4, '4k': 6 }, params: { input_fidelity: 'high', classifier: 'classify it' } })
     expect(saveEditTemplateSchema.safeParse(input).success).toBe(true)
   })
 

@@ -33,7 +33,7 @@ type SuccessProps = { job: TrackedJob; shareText: string; editable: boolean; onA
 export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps) {
   const t = useTranslations('app')
   const fileUrl = job.fileUrl as string
-  const px = tierPx(job.resolution)
+  const px = tierPx(job.resolution, job.aspect)
   const size = t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px, mono: monoTag })
   const tray = (
     <>
@@ -75,9 +75,9 @@ type FailureProps = { job: TrackedJob; onRetry(): void; onNewPhoto(): void; onEd
 export function FailureView({ job, onRetry, onNewPhoto, onEditWords }: FailureProps) {
   const t = useTranslations('app')
   const errors = useTranslations('app.errors')
-  const { failure, retry } = readFailure(job.failure, job.inputKey !== null)
+  const { failure, retry } = readFailure(job.failure, job.inputKey !== null || hasSlotInputs(job))
   const words = failure.code === 'IDENTITY_SWAP_REFUSED'
-  const size = t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px: tierPx(job.resolution), mono: monoTag })
+  const size = t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px: tierPx(job.resolution, job.aspect), mono: monoTag })
   const tray = (
     <>
       <DevelopTray src={job.previewUrl ?? null} developing={false} negative hud={[t('workspace.failState.hud'), size]} className={TRAY_SIZE} />
@@ -152,3 +152,6 @@ function Chevron() {
     </svg>
   )
 }
+
+// A slot template's job (§5.1e) has no single photo but its uploads in the body: Retry resends them.
+const hasSlotInputs = (job: TrackedJob) => Object.keys(job.body && 'input_slots' in job.body ? job.body.input_slots ?? {} : {}).length > 0

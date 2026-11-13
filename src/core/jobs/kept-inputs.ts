@@ -7,6 +7,7 @@ import { galleryVariantKeys } from '../gallery/variants'
 import { logger } from '../logger'
 import { copyBackKeptInputs, DOWNLOAD_VARIANTS, downloadVariantKeyFor, inputPreviewKeyFor, workThumbKeyFor, type ObjectStore } from '../storage'
 import { EDIT_TEMPLATE_ID } from '../templates/edit-params'
+import { keptSlotIndex, storedSlotOrder } from '../templates/image-slots'
 import type { Job } from './job-schema'
 
 // ARCHITECTURE §8.3「输入图随作品保留」(T40). The copies' keys sit in the job's own inputs, under
@@ -23,7 +24,17 @@ export function keptInputsOf(job: Pick<Job, 'inputs'>): string[] {
 // Long enough for the workspace thumbnail and the developing view that reuses it.
 const PREVIEW_SECONDS = 3600
 
-export type AgainPhoto = { inputKey: string; bytes: number; url: string }
+// slot: for a slot template's work (§5.1e), which box the photo goes back to.
+export type AgainPhoto = { inputKey: string; bytes: number; url: string; slot?: string }
+
+// The slot a kept copy came from: kept copy n is the n-th image sent, and inputs.input_slots (an
+// ordered array) lists the filled slots in send order. A failed copy is missing from
+// kept_inputs, so the number in the key decides, never the position in the list.
+function slotOfKept(job: Job, kept: string): string | undefined {
+  const order = storedSlotOrder(job.inputs.input_slots)
+  const index = keptSlotIndex(kept)
+  return index === null ? undefined : order[index]
+}
 
 // Make again (T40): the work's kept photos as fresh uploads, ready for /api/generate. The caller
 // has already read the job as its owner. Only a finished template work qualifies; one with
@@ -33,7 +44,10 @@ export async function photosForAgain(store: ObjectStore, job: Job): Promise<Agai
   if (kept.length === 0) throw new AppError('NOT_FOUND', 'Nothing kept for this work')
   const restored = await copyBackKeptInputs(store, { userId: job.userId, jobId: job.id }, kept)
   return Promise.all(
-    restored.map(async (photo) => ({ ...photo, url: await store.presignGet(photo.inputKey, { expiresInSeconds: PREVIEW_SECONDS }) })),
+    restored.map(async (photo, index) => {
+      const slot = slotOfKept(job, kept[index]!)
+      return { ...photo, url: await store.presignGet(photo.inputKey, { expiresInSeconds: PREVIEW_SECONDS }), ...(slot ? { slot } : {}) }
+    }),
   )
 }
 

@@ -102,13 +102,13 @@ describe('runGeneration by resolution', () => {
   it('charges 1 / 2 / 3 for Standard / HD / Max and passes tier, quality and the photo size on', async () => {
     const { userId, fake, deps, request } = await setup()
     const views = []
-    for (const resolution of ['1k', '2k', '3k'] as const) views.push(await runGeneration(deps, request({ resolution })))
+    for (const resolution of ['1k', '2k', '4k'] as const) views.push(await runGeneration(deps, request({ resolution })))
     expect(views.map((view) => view.credits_cost)).toEqual([1, 2, 3])
     expect((await profileOf(db, userId)).credits).toBe(14)
     expect(fake.calls.map((call) => [call.resolution, call.quality, call.aspectRatio])).toEqual([
       ['1k', 'medium', 'original'],
       ['2k', 'medium', 'original'],
-      ['3k', 'medium', 'original'],
+      ['4k', 'medium', 'original'],
     ])
     expect(fake.calls[0]?.images[0]).toMatchObject({ width: 2048, height: 1536 })
   })
@@ -141,20 +141,20 @@ describe('admin save checks the floor', () => {
   const client = serviceSupabase()
 
   it('refuses a high template at 1 credit for Standard, naming the floor 2; 3 saves', async () => {
-    await saveTemplate(client, 'admin', payload({ '1k': 2, '2k': 4, '3k': 6 }, 'high', true), CREDITS_FLOOR)
-    await expect(saveTemplate(client, 'admin', payload({ '1k': 1, '2k': 4, '3k': 6 }), CREDITS_FLOOR)).rejects.toMatchObject({
+    await saveTemplate(client, 'admin', payload({ '1k': 2, '2k': 4, '4k': 6 }, 'high', true), CREDITS_FLOOR)
+    await expect(saveTemplate(client, 'admin', payload({ '1k': 1, '2k': 4, '4k': 6 }), CREDITS_FLOOR)).rejects.toMatchObject({
       code: 'INVALID_INPUT',
-      message: expect.stringContaining('Standard 不能低于 2'),
+      message: expect.stringContaining('1K 不能低于 2'),
     })
-    await saveTemplate(client, 'admin', payload({ '1k': 3, '2k': 4, '3k': 6 }), CREDITS_FLOOR)
+    await saveTemplate(client, 'admin', payload({ '1k': 3, '2k': 4, '4k': 6 }), CREDITS_FLOOR)
     expect((await listAdminTemplates(client)).find((t) => t.id === id)).toMatchObject({
       quality: 'high',
-      creditsCost: { '1k': 3, '2k': 4, '3k': 6 },
+      creditsCost: { '1k': 3, '2k': 4, '4k': 6 },
     })
   })
 
   it('lets a medium template go down to 1 / 2 / 3', async () => {
-    await saveTemplate(client, 'admin', payload({ '1k': 1, '2k': 2, '3k': 3 }, 'medium'), CREDITS_FLOOR)
+    await saveTemplate(client, 'admin', payload({ '1k': 1, '2k': 2, '4k': 3 }, 'medium'), CREDITS_FLOOR)
     expect((await listAdminTemplates(client)).find((t) => t.id === id)?.quality).toBe('medium')
   })
 })

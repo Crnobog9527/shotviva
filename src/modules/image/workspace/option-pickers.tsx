@@ -9,7 +9,7 @@ import type { OutputAspect, Resolution } from '@/core/templates/output-options'
 import { cn } from '@/core/ui/cn'
 
 import { canAfford } from './cta-state'
-import { sizeChoices, TIER_OPTIONS } from './workspace-options'
+import { sizeChoices, TIER_OPTIONS, tierSize } from './workspace-options'
 
 const radioInput = 'peer sr-only'
 const focusRing = 'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring'
@@ -42,11 +42,16 @@ export function SizePicker({ value, onChange, options, photoRatio, name = 'size'
   )
 }
 
-type ResolutionProps = { options: ImageOptions; value: Resolution; costs: CreditsCost; balance: Balance; onChange(next: Resolution): void }
+type ResolutionProps = {
+  options: ImageOptions; value: Resolution; costs: CreditsCost; balance: Balance; onChange(next: Resolution): void
+  // The chosen size and the first photo's ratio, so each card shows the real output pixels.
+  aspect?: OutputAspect; photoRatio?: number | null
+}
 
-// Resolution (DESIGN §4.3 step 3b): Standard / HD / Max as stacked cards with this template's
-// credits on the right; a tier neither pool covers shows its credits greyed.
-export function ResolutionPicker({ value, costs, balance, onChange, options }: ResolutionProps) {
+// Resolution (DESIGN §4.3 step 3b): 1K / 2K / 4K as stacked cards with the output size and this
+// template's credits on the right; a tier neither pool covers shows its credits greyed. Only the
+// tiers the template's model supports are offered.
+export function ResolutionPicker({ value, costs, balance, onChange, options, aspect = 'original', photoRatio }: ResolutionProps) {
   const t = useTranslations('app')
   const format = useFormatter()
   return (
@@ -54,13 +59,14 @@ export function ResolutionPicker({ value, costs, balance, onChange, options }: R
       {TIER_OPTIONS.filter(({ id }) => options.resolutions.includes(id)).map((tier) => {
         const cost = costs[tier.id]
         const affordable = canAfford(balance, cost)
+        const size = tierSize(tier.id, aspect, photoRatio)
         return (
           <label key={tier.id} className="relative cursor-pointer">
             <input type="radio" name="resolution" value={tier.id} checked={value === tier.id} onChange={() => onChange(tier.id)} className={radioInput} />
             <span className={cn('grid min-h-16 grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 rounded-control py-4 pr-4 pl-4 transition-[box-shadow,background]', focusRing, value === tier.id ? 'chosen' : 'hairline bg-card')}>
               <span className="flex items-baseline gap-2 text-body leading-[1.2] font-semibold">
                 {t(`tiers.${tier.id}.name`)}
-                <span className="font-mono text-caption leading-none font-normal text-muted-foreground">{t('units.px', { px: tier.px })}</span>
+                <span className="font-mono text-caption leading-none font-normal text-muted-foreground">{size ? t(options.exactPixels === false ? 'units.sizeApprox' : 'units.size', size) : t('units.px', { px: tier.px })}</span>
               </span>
               <span className={cn('col-start-2 row-span-2 row-start-1 text-right font-display text-[24px] leading-none', !affordable && 'text-muted-foreground')}>
                 {format.number(cost)}

@@ -15,7 +15,7 @@ import {
   toTranslations,
 } from './form-state'
 
-const FLOOR = { high: { '1k': 2, '2k': 4, '3k': 6 }, medium: { '1k': 1, '2k': 2, '3k': 3 } }
+const FLOOR = { high: { '1k': 2, '2k': 4, '4k': 6 }, medium: { '1k': 1, '2k': 2, '4k': 3 } }
 
 const template: AdminTemplate = {
   id: 'burger-hero',
@@ -32,7 +32,7 @@ const template: AdminTemplate = {
   coverLocales: {},
   fields: { images: { min: 1, max: 1 }, copy: [], aspectRatios: ['1:1'], toggles: [] },
   quality: 'high',
-  creditsCost: { '1k': 3, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 3, '2k': 4, '4k': 6 },
   sortOrder: 10,
   isActive: true,
   visibleIn: ['web', 'partner'],
@@ -62,12 +62,12 @@ describe('prompt version selection', () => {
 })
 
 it('keeps historical prices distinct from unpriced tiers and opens a tier only on explicit input', () => {
-    const values = toFormValues({ ...template, unpricedResolutions: ['3k'] })
-    expect(values.credits['3k']).toBe('')
-    const persisted = { creditsCost: template.creditsCost, unpricedResolutions: ['3k'] }
+    const values = toFormValues({ ...template, unpricedResolutions: ['4k'] })
+    expect(values.credits['4k']).toBe('')
+    const persisted = { creditsCost: template.creditsCost, unpricedResolutions: ['4k'] }
     expect(buildPayload(values, false, FLOOR)).toMatchObject({ payload: { template: persisted } })
-    const edited = { ...values, credits: { ...values.credits, '3k': '7' } }
-    expect(buildPayload(edited, false, FLOOR)).toMatchObject({ payload: { template: { unpricedResolutions: [], creditsCost: { '3k': 7 } } } })
+    const edited = { ...values, credits: { ...values.credits, '4k': '7' } }
+    expect(buildPayload(edited, false, FLOOR)).toMatchObject({ payload: { template: { unpricedResolutions: [], creditsCost: { '4k': 7 } } } })
     const limited = { ...FLOOR, resolutions: ['1k','2k'] as const }
     expect(buildPayload(toFormValues(template), false, { ...limited, resolutions: [...limited.resolutions] })).toMatchObject({
       payload: { template: { unpricedResolutions: [], creditsCost: template.creditsCost } },
@@ -97,7 +97,7 @@ describe('template form state', () => {
           description: 'Stacked burger, studio light',
           visibleIn: ['web', 'partner'],
           quality: 'high',
-          creditsCost: { '1k': 3, '2k': 4, '3k': 6 },
+          creditsCost: { '1k': 3, '2k': 4, '4k': 6 },
         }),
         prompt: { providerId: template.prompt?.providerId, body: 'FAKE BODY', modelParams: { quality: 'high' } },
       },
@@ -125,9 +125,9 @@ describe('template form state', () => {
   })
 
   it('flags credit numbers under the floor of the chosen quality', () => {
-    const low = { ...toFormValues(template), credits: { '1k': '1', '2k': '4', '3k': '6' } }
+    const low = { ...toFormValues(template), credits: { '1k': '1', '2k': '4', '4k': '6' } }
     expect(creditProblems(low, FLOOR)).toEqual({ '1k': '不能低于下限 2' })
-    expect(buildPayload(low, false, FLOOR)).toMatchObject({ ok: false, message: expect.stringContaining('Standard') })
+    expect(buildPayload(low, false, FLOOR)).toMatchObject({ ok: false, message: expect.stringContaining('1K') })
     expect(creditProblems({ ...low, quality: 'medium' }, FLOOR)).toEqual({})
     expect(creditProblems({ ...low, credits: { ...low.credits, '2k': '2.5' } }, FLOOR)).toMatchObject({ '2k': '请填正整数' })
   })
@@ -256,5 +256,59 @@ describe('the 开关 cards (T89)', () => {
     expect(buildPayload({ ...values, promptBody: 'FAKE BODY' }, false, FLOOR).ok).toBe(false)
     const noOff = values.toggles.map((toggle) => ({ ...toggle, off: ' ' }))
     expect(buildPayload({ ...values, toggles: noOff }, false, FLOOR).ok).toBe(false)
+  })
+})
+
+describe('图片格子 cards (§5.1e)', () => {
+  const slotted: AdminTemplate = {
+    ...template,
+    // Two slots: the floor is the single-image floor × 2 (migration 1310).
+    creditsCost: { '1k': 6, '2k': 12, '4k': 18 },
+    visibleIn: ['web'],
+    fields: {
+      images: { min: 1, max: 2, slots: [
+        { key: 'logo', label: 'Venue logo', required: false },
+        { key: 'prize_1', label: '1st prize photo', help: 'A clear photo', required: true, note: 'prize_1_note' },
+      ] },
+      copy: [{ key: 'prize_1_note', label: '1st prize details', type: 'short', required: false, maxLength: 60, public: false }],
+      aspectRatios: ['1:1'], toggles: [],
+    },
+    translations: { zh: { fields: { logo: { label: 'Logo 上传' }, prize_1: { label: '一等奖照片上传', help: '清楚的照片' } } } },
+  }
+
+  it('round-trips slots and their Chinese text, with counts that follow the cards', () => {
+    const values = toFormValues(slotted)
+    expect(values.fieldsJson).not.toContain('slots')
+    expect(values.imageSlots.map((slot) => [slot.key, slot.labelZh, slot.note])).toEqual([['logo', 'Logo 上传', ''], ['prize_1', '一等奖照片上传', 'prize_1_note']])
+    const result = buildPayload(values, false, FLOOR)
+    expect(result).toMatchObject({ ok: true, payload: { template: {
+      fields: { images: { min: 1, max: 2, slots: slotted.fields.images.slots } },
+      translations: { zh: { fields: { logo: { label: 'Logo 上传' }, prize_1: { label: '一等奖照片上传', help: '清楚的照片' } } } },
+    } } })
+    if (!result.ok) throw new Error(result.message)
+    expect(templateFieldsSchema.safeParse((result.payload.template as { fields: unknown }).fields).success).toBe(true)
+  })
+
+  it('recounts min / max when a slot is made required or removed', () => {
+    const values = toFormValues(slotted)
+    const edited = { ...values, imageSlots: [{ ...values.imageSlots[0]!, required: true }] }
+    expect(buildPayload(edited, false, FLOOR)).toMatchObject({ ok: true, payload: { template: { fields: { images: { min: 1, max: 1 } } } } })
+    expect(buildPayload({ ...values, imageSlots: [] }, false, FLOOR)).toMatchObject({ ok: true, payload: { template: { fields: { images: { min: 1, max: 2 } } } } })
+  })
+
+  it.each([
+    ['a partner-visible slot template', { visiblePartner: true }, 'partner'],
+    ['a note that names no text field', { copyFields: [] }, 'prize_1_note'],
+  ])('refuses %s before the round trip', (_, patch, message) => {
+    expect(buildPayload({ ...toFormValues(slotted), ...patch }, false, FLOOR)).toMatchObject({ ok: false, message: expect.stringContaining(message) })
+  })
+})
+
+describe('cost floor of a slot template (§5.1e, migration 1310)', () => {
+  it('holds each tier to the single-image floor × its slots before the round trip', () => {
+    const slots = [{ key: 'a', label: 'A', labelZh: '', help: '', helpZh: '', required: false, note: '' }, { key: 'b', label: 'B', labelZh: '', help: '', helpZh: '', required: false, note: '' }]
+    const values = { ...toFormValues(template), credits: { '1k': '3', '2k': '8', '4k': '12' }, imageSlots: slots }
+    expect(creditProblems(values, FLOOR)['1k']).toContain('4')
+    expect(creditProblems({ ...values, credits: { '1k': '4', '2k': '8', '4k': '12' } }, FLOOR)).toEqual({})
   })
 })

@@ -17,7 +17,7 @@ describe('againValues', () => {
   })
 
   it('falls back to the defaults for what the template no longer offers or was never set', () => {
-    expect(againValues({ aspect_ratio: '7:3', resolution: '3k', note: 4, copy: 'no' }, template)).toEqual({
+    expect(againValues({ aspect_ratio: '7:3', resolution: '4k', note: 4, copy: 'no' }, template)).toEqual({
       aspect: 'original',
       resolution: '1k',
       note: '',

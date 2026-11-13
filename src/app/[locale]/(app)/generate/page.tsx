@@ -6,8 +6,10 @@ import { Suspense, type ReactNode } from 'react'
 import { AppPage, BalanceChip, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
+import { featureAllowed } from '@/core/features'
 import { listFavoriteIdsOrEmpty } from '@/core/favorites'
 import { currentLocale } from '@/core/i18n/server'
+import { POSTER_FEATURE } from '@/core/poster/sets'
 import { listRunningJobIds } from '@/core/jobs'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
@@ -36,8 +38,10 @@ async function Create({ searchParams }: { searchParams: Search }) {
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
   const [view, balance, tier, runningIds, favoriteIds, wishlistLive] = await Promise.all([
-    // Templates and series cards placed under up to three category levels (T102).
-    loadCatalogueView(await currentLocale()),
+    // Templates and series cards placed under up to three category levels (T102); the poster
+    // templates too while this account may use the poster editor (ARCHITECTURE §5.3). Checked
+    // through core, not modules/image/posters, which would ship the poster editor's JS here.
+    loadCatalogueView(await currentLocale(), featureAllowed(user.id, POSTER_FEATURE).catch(() => false)),
     readBalance(supabase, user.id),
     // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
     effectiveTier(admin, user.id),

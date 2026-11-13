@@ -41,6 +41,7 @@ async function Signup({ searchParams }: PageProps<'/[locale]/signup'>) {
         arrived={<Arrived next={next} page="signup" />}
         sender={sender}
         phone={locale === 'zh' ? phone : undefined}
+        initialTab={params.via === 'email' ? 'email' : 'phone'}
       />
     </SignupCodeProvider>
   )

@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { connection } from 'next/server'
 
 import { publicEnv } from '../public-env'
+import { withDbTiers } from '../templates/db-resolution'
 import { bearerClient } from './bearer-client'
 import { cookieToken } from './cookie-token'
 
@@ -28,6 +29,7 @@ export async function createSessionSupabase() {
   await connection()
   const cookieStore = await cookies()
   return createServerClient(env().url, env().anonKey, {
+    global: { fetch: withDbTiers() },
     cookies: {
       getAll: () => cookieStore.getAll(),
       setAll(cookiesToSet) {

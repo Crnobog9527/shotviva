@@ -276,7 +276,7 @@ describe('deleting', () => {
 describe('/admin/templates/edit', () => {
   const input = (overrides: Record<string, unknown> = {}) => ({
     isActive: true,
-    creditsCost: { '1k': 3, '2k': 5, '3k': 7 },
+    creditsCost: { '1k': 3, '2k': 5, '4k': 7 },
     wrapper: TEST_WRAPPER,
     params: TEST_EDIT_PARAMS,
     ...overrides,
@@ -286,19 +286,19 @@ describe('/admin/templates/edit', () => {
     const adminId = await createUser(db)
     await saveEditTemplate(serviceSupabase(), adminId, input(), CREDITS_FLOOR)
     const settings = await loadEditTemplateSettings(serviceSupabase())
-    expect(settings).toMatchObject({ saleEnabled: true, isActive: true, creditsCost: { '1k': 3, '2k': 5, '3k': 7 }, wrapper: TEST_WRAPPER, params: TEST_EDIT_PARAMS })
+    expect(settings).toMatchObject({ saleEnabled: true, isActive: true, creditsCost: { '1k': 3, '2k': 5, '4k': 7 }, wrapper: TEST_WRAPPER, params: TEST_EDIT_PARAMS })
     const { rows } = await db.query<{ visible_in: string[] }>("select visible_in from public.templates where id = 'edit'")
     expect(rows[0]?.visible_in).toEqual([])
     // Published, yet in no catalogue and not in the ordinary template editor.
     expect((await listTemplates(anonSupabase(), 'web')).map((t) => t.id)).not.toContain('edit')
     expect((await listTemplates(anonSupabase(), 'partner')).map((t) => t.id)).not.toContain('edit')
     expect((await listAdminTemplates(serviceSupabase())).map((t) => t.id)).not.toContain('edit')
-    await saveEditTemplate(serviceSupabase(), adminId, input({ creditsCost: { '1k': 2, '2k': 4, '3k': 6 } }), CREDITS_FLOOR)
+    await saveEditTemplate(serviceSupabase(), adminId, input({ creditsCost: { '1k': 2, '2k': 4, '4k': 6 } }), CREDITS_FLOOR)
   })
 
   it('refuses a price under the floor and missing classifier instructions', async () => {
     const adminId = await createUser(db)
-    await expect(saveEditTemplate(serviceSupabase(), adminId, input({ creditsCost: { '1k': 1, '2k': 1, '3k': 1 } }), CREDITS_FLOOR)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(saveEditTemplate(serviceSupabase(), adminId, input({ creditsCost: { '1k': 1, '2k': 1, '4k': 1 } }), CREDITS_FLOOR)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     const params = { ...TEST_EDIT_PARAMS, classifier: '' }
     await expect(saveEditTemplate(serviceSupabase(), adminId, input({ params }), CREDITS_FLOOR)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   })

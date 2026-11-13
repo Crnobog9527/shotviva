@@ -40,6 +40,8 @@ export const TEST_RUN_COPY = {
     run: (count: number) => (count > 1 ? `试跑 ${count} 张` : '试跑'),
     needInputs: (minimum: number) => `当前模型每次至少需要 ${minimum} 张输入图（测试照片和画风参考图合计）。请调整本次输入或切换模型。`,
     needPhoto: '先选一张测试照片',
+    slotHint: '这个格子最多 1 张，不选就是空格子（不送给模型）。',
+    needSlot: (label: string) => `「${label}」是必填格子，先选一张测试照片`,
     toggles: '开关（管理员试跑不弹确认框）',
     toggleOn: '开',
     toggleOff: '关',
@@ -142,7 +144,7 @@ export const TEST_RUN_COPY = {
   } as Record<string, string>,
 } as const
 
-export const RESOLUTION_LABEL: Record<Resolution, string> = { '1k': '标准 1K', '2k': '高清 2K', '3k': '超清 3K' }
+export const RESOLUTION_LABEL: Record<Resolution, string> = { '1k': '1K', '2k': '2K', '4k': '4K' }
 
 export const ASPECT_LABEL: Record<string, string> = { original: '跟随照片' }
 

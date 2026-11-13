@@ -1,7 +1,7 @@
 import { hasCompleteCoverSet } from '@/core/templates/cover-locales'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
 import { providerFloor, type ProviderFloors } from '@/core/templates/provider-pricing'
-import { creditsBelowFloor } from '@/core/templates/pricing'
+import { creditsBelowFloor, slotFloorFactor } from '@/core/templates/pricing'
 import type { Template } from '@/core/templates/types'
 
 // When a template may go live (T60). The single 上架 switch and the bulk bar both run these
@@ -34,7 +34,7 @@ export const PUBLISH_BLOCKER_LABEL: Record<PublishBlocker, string> = {
 export type PublishCandidate = Pick<
   Template,
   'unpricedResolutions' | 'id' | 'name' | 'description' | 'visibleIn' | 'coverBeforeUrl' | 'coverAfterUrl' | 'coverLocales' | 'quality' | 'creditsCost' | 'isActive'
-> & { saleEnabled?: boolean; hasPrompt: boolean; category?: string; providerId?: string | null }
+> & { saleEnabled?: boolean; hasPrompt: boolean; category?: string; providerId?: string | null; fields?: { images: { slots?: readonly unknown[] } } }
 
 // The built-in photo-edit template (ARCHITECTURE §5.2) is switched on its own page; the editor
 // list never shows it. Deep imports keep this file free of the server-side templates barrel.
@@ -57,7 +57,7 @@ export function publishBlockers(template: PublishCandidate, floor: ProviderFloor
     ['no_description', onWeb && blank(template.description)],
     // A before and an after every launched page can show under the cover fallback (T87).
     ['no_cover', onWeb && !hasCompleteCoverSet(template)],
-    ['below_floor', creditsBelowFloor(template.quality, template.creditsCost, prices, template.unpricedResolutions).length > 0],
+    ['below_floor', creditsBelowFloor(template.quality, template.creditsCost, prices, template.unpricedResolutions, slotFloorFactor(template.fields)).length > 0],
   ]
   return checks.filter(([, failed]) => failed).map(([blocker]) => blocker)
 }

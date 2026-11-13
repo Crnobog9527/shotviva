@@ -15,10 +15,11 @@ export async function pngFromBase64(b64: string, mediaType: string | null | unde
   const bytes = Buffer.from(b64, 'base64')
   const type = sniffImageType(bytes)
   if (!type || type === 'image/heic' || (mediaType && type !== mediaType)) throw new Error('invalid image format')
-  // All downstream outputs are PNG. Limit decode memory and preserve framing on the 4K → 3K conversion.
+  // All downstream outputs are PNG. Limit decode memory and preserve framing when a native 4K output is
+  // scaled to the site's 4K size table (2880² at 1:1).
   const image = sharp(bytes, { limitInputPixels: 32_000_000 }).rotate()
-  if (input.resolution === '3k') {
-    image.resize({ ...outputSize('3k', input.aspectRatio, sourcePhoto(input)), fit: 'inside', withoutEnlargement: true })
+  if (input.resolution === '4k') {
+    image.resize({ ...outputSize('4k', input.aspectRatio, sourcePhoto(input)), fit: 'inside', withoutEnlargement: true })
   }
   return image.png().toBuffer()
 }

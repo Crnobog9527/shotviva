@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { callRpc } from '@/core/billing'
 import { AppError } from '@/core/errors'
 import type { ObjectStore } from '@/core/storage'
+import { storedSlotOrder } from '@/core/templates/image-slots'
 
 // Admin "查看作品" (ARCHITECTURE §10, T25). admin_view_work writes the view_work audit row and
 // returns the job's keys in the same call, so no view goes unrecorded. The output is the clean
@@ -18,7 +19,9 @@ export const VIEW_LINK_SECONDS = 300
 export const INPUT_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000
 
 // deleted: the user deleted the work (T41); its files are gone, so nothing is signed.
-export type WorkLinks = { output: string | null; input: string | null; inputExpired: boolean; deleted: boolean }
+// slotCount: images a slot template's work was made from (§5.1e); v1 shows only the first
+// (admin_view_work returns one key), and the dialog says so. 0 for every other work.
+export type WorkLinks = { output: string | null; input: string | null; inputExpired: boolean; deleted: boolean; slotCount: number }
 
 // A set-returning function: PostgREST answers with its one row in an array.
 const viewSchema = z
@@ -50,15 +53,23 @@ async function inputLink(store: ObjectStore, key: string | null, createdAt: stri
   return { input: await store.presignGet(key, { expiresInSeconds: VIEW_LINK_SECONDS }), inputExpired: false }
 }
 
+// After the audited read: only the filled slots' names leave the row, never their keys.
+async function countSlots(db: SupabaseClient, jobId: string): Promise<number> {
+  const { data, error } = await db.from('generation_jobs').select('slots:inputs->input_slots').eq('id', jobId).maybeSingle()
+  if (error || !data) return 0
+  return storedSlotOrder((data as { slots: unknown }).slots).length
+}
+
 export async function viewWork({ db, store, now = new Date() }: Deps, jobId: unknown): Promise<WorkLinks> {
   const id = z.uuid().safeParse(jobId)
   if (!id.success) throw new AppError('INVALID_INPUT', '任务 id 不对。')
   const job = await callRpc(db, 'admin_view_work', { p_job_id: id.data }, viewSchema)
   // The view is still logged by admin_view_work; a deleted work only says so.
-  if (job.deleted_at) return { output: null, input: null, inputExpired: false, deleted: true }
-  const [output, input] = await Promise.all([
+  if (job.deleted_at) return { output: null, input: null, inputExpired: false, deleted: true, slotCount: 0 }
+  const [output, input, slotCount] = await Promise.all([
     job.status === 'succeeded' && job.output_key ? store.presignGet(job.output_key, { expiresInSeconds: VIEW_LINK_SECONDS }) : null,
     inputLink(store, job.input_key, job.created_at, now),
+    countSlots(db, id.data),
   ])
-  return { output, ...input, deleted: false }
+  return { output, ...input, deleted: false, slotCount }
 }

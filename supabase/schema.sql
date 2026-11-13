@@ -329,6 +329,7 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     "subcategory_key" "text",
     "series_id" "uuid",
     "series_sort_order" integer DEFAULT 0 NOT NULL,
+    "deleted_at" timestamp with time zone,
     CONSTRAINT "templates_category_check" CHECK ((("char_length"("category") >= 1) AND ("char_length"("category") <= 60))),
     CONSTRAINT "templates_cover_locales_object" CHECK (("jsonb_typeof"("cover_locales") = 'object'::"text")),
     CONSTRAINT "templates_cover_media_type_check" CHECK (("cover_media_type" = ANY (ARRAY['image'::"text", 'animated'::"text", 'video'::"text"]))),
@@ -1286,6 +1287,24 @@ $$;
 ALTER FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."guard_deleted_template"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if old.deleted_at is not null and new.deleted_at is null then
+    raise exception 'TEMPLATE_DELETED' using detail = '已删除的模板不能恢复';
+  end if;
+  if new.deleted_at is not null and (new.is_active or new.series_id is not null or new.featured_rank is not null) then
+    raise exception 'TEMPLATE_DELETED' using detail = '已删除的模板不能上架、加入系列或设为首页精选';
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."guard_deleted_template"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."is_template_catalog_v2"() RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -2102,6 +2121,22 @@ $_$;
 
 
 ALTER FUNCTION "admin"."template_image_options"("public"."templates") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_leaves_series_on_unpublish"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if old.is_active and not new.is_active and new.series_id is not null then
+    new.series_id := null;
+    new.series_sort_order := 0;
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."template_leaves_series_on_unpublish"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_price_state"("t" "public"."templates") RETURNS "jsonb"
@@ -3825,9 +3860,9 @@ CREATE OR REPLACE FUNCTION "public"."admin_assigned_template_count"("public"."te
     SET "search_path" TO ''
     AS $_$
   select case when $1.parent_id is null then
-    (select count(*) from public.templates t where t.category_key=$1.key and t.subcategory_key is null)
+    (select count(*) from public.templates t where t.category_key=$1.key and t.subcategory_key is null and t.deleted_at is null)
   else
-    (select count(*) from public.templates t where t.subcategory_key=$1.key)
+    (select count(*) from public.templates t where t.subcategory_key=$1.key and t.deleted_at is null)
   end
 $_$;
 
@@ -4974,6 +5009,72 @@ $$;
 ALTER FUNCTION "public"."admin_daily_costs"("p_days" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_daily_costs_by_provider"("p_days" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_today timestamptz;
+  v_start timestamptz;
+begin
+  if p_days is null or p_days < 1 or p_days > 90 then
+    raise exception 'INVALID_INPUT' using detail = 'p_days must be between 1 and 90';
+  end if;
+
+  v_today := date_trunc('day', now() at time zone 'UTC') at time zone 'UTC';
+  v_start := v_today - make_interval(days => p_days - 1);
+
+  return (
+    with jobs as (
+      select date_trunc('day', g.created_at at time zone 'UTC') as day,
+             public.cost_provider_family(g.provider, g.provider_usage) as provider,
+             g.status, g.provider_usage, g.cost_usd
+        from public.generation_jobs g
+       where g.created_at >= v_start
+    ),
+    job_days as (
+      select j.day, j.provider,
+             coalesce(sum(j.cost_usd), 0) as cost_usd,
+             coalesce(sum((j.provider_usage ->> 'list_cost_cny')::numeric) filter (where j.cost_usd is not null), 0) as cost_cny,
+             count(*) filter (where j.cost_usd is not null) as costed,
+             count(*) filter (where j.cost_usd is null and j.provider_usage is not null) as uncosted,
+             count(*) filter (where j.cost_usd is null and j.provider_usage is null and j.status <> 'running') as no_usage
+        from jobs j
+       group by 1, 2
+    ),
+    test_days as (
+      select date_trunc('day', x.started_at at time zone 'UTC') as day,
+             public.cost_provider_family(x.provider, r.provider_usage) as provider,
+             coalesce(sum(x.cost_usd), 0) as cost_usd,
+             coalesce(sum((r.provider_usage ->> 'list_cost_cny')::numeric) filter (where x.cost_usd is not null), 0) as cost_cny,
+             count(*) as runs
+        from public.admin_test_spend x
+        left join public.admin_test_runs r on r.id = x.run_id
+       where x.started_at >= v_start
+       group by 1, 2
+    )
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'day', to_char(coalesce(j.day, t.day), 'YYYY-MM-DD'),
+             'provider', coalesce(j.provider, t.provider),
+             'cost_usd', coalesce(j.cost_usd, 0),
+             'cost_cny', coalesce(j.cost_cny, 0),
+             'costed', coalesce(j.costed, 0),
+             'uncosted', coalesce(j.uncosted, 0),
+             'no_usage', coalesce(j.no_usage, 0),
+             'test_cost_usd', coalesce(t.cost_usd, 0),
+             'test_cost_cny', coalesce(t.cost_cny, 0),
+             'test_runs', coalesce(t.runs, 0)
+           ) order by coalesce(j.day, t.day), coalesce(j.provider, t.provider)), '[]'::jsonb)
+      from job_days j
+      full join test_days t on t.day = j.day and t.provider = j.provider
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_daily_costs_by_provider"("p_days" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_dashboard_stats"("p_days" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -5234,6 +5335,39 @@ end $$;
 
 
 ALTER FUNCTION "public"."admin_delete_reference_category"("p_actor" "uuid", "p_key" "text", "p_move_to" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_delete_template"("p_actor" "uuid", "p_id" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  t public.templates;
+  v_system boolean;
+begin
+  if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
+    raise exception 'FORBIDDEN';
+  end if;
+  if not exists(select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  select * into t from public.templates where id = p_id for update;
+  if not found then raise exception 'TEMPLATE_MISSING'; end if;
+  select c.is_system into v_system from public.template_categories c where c.key = t.category_key;
+  if coalesce(v_system, false) or t.id in ('freeform', 'edit') then raise exception 'TEMPLATE_BUILT_IN'; end if;
+  if t.deleted_at is not null then return false; end if;
+  if t.is_active then raise exception 'TEMPLATE_LIVE'; end if;
+  update public.templates set deleted_at = now(), series_id = null, series_sort_order = 0, featured_rank = null
+    where id = p_id;
+  insert into public.admin_audit_log(action, user_id, target_id, reason)
+    values ('template_delete', p_actor, p_id, '模板列表删除已下架模板');
+  return true;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_delete_template"("p_actor" "uuid", "p_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") RETURNS integer
@@ -7258,7 +7392,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_series_candidates"("p_search" "text",
          coalesce(t.cover_after_url,t.cover_locales #>> '{zh,after}',t.cover_locales #>> '{en,after}'),
          t.series_id,t.is_active
     from public.templates t join public.template_categories c on c.key=t.category_key
-   where not c.is_system and t.id not in ('freeform','edit') and (p_after is null or t.id>p_after)
+   where not c.is_system and t.id not in ('freeform','edit') and t.deleted_at is null and (p_after is null or t.id>p_after)
      and (p_search='' or strpos(lower(t.id),lower(p_search))>0 or strpos(lower(t.name),lower(p_search))>0
           or strpos(lower(t.translations #>> '{zh,name}'),lower(p_search))>0)
    order by t.id limit 31
@@ -7513,13 +7647,14 @@ begin
     raise exception 'INVALID_INPUT' using detail = 'actor is required';
   end if;
   if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin'
-      and (p_key not in ('code_gift_policy','code_inviter_window_days','gallery_enabled','gallery_auto_approve')
+      and (p_key not in ('code_gift_policy','code_inviter_window_days','gallery_enabled','gallery_auto_approve',
+                         'signup_gift_daily_cap','signup_gift_paused')
            or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
 
   case p_key
-    when 'wishlist_enabled', 'gallery_enabled', 'gallery_auto_approve' then
+    when 'wishlist_enabled', 'gallery_enabled', 'gallery_auto_approve', 'signup_gift_paused' then
       if p_value is null or jsonb_typeof(p_value) <> 'boolean' then
         raise exception 'INVALID_INPUT' using detail = p_key || ' must be a boolean';
       end if;
@@ -7527,6 +7662,11 @@ begin
       if p_value is null or jsonb_typeof(p_value) <> 'number'
          or (p_value #>> '{}')::numeric < 0 or (p_value #>> '{}')::numeric > 1000 then
         raise exception 'INVALID_INPUT' using detail = 'admin_test_daily_budget_usd must be a number from 0 to 1000';
+      end if;
+    when 'signup_gift_daily_cap' then
+      if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[0-9]+$'
+         or (p_value #>> '{}')::numeric > 100000 then
+        raise exception 'INVALID_INPUT' using detail = 'signup_gift_daily_cap must be an integer from 0 to 100000';
       end if;
     when 'code_inviter_window_days' then
       if jsonb_typeof(p_value) is distinct from 'number' or
@@ -7676,7 +7816,7 @@ begin
          array_agg(t.sort_order order by t.sort_order, t.id)
     into v_members, order_slots
   from public.templates t
-  where case p_group
+  where t.deleted_at is null and case p_group
     when 'catalogue' then t.id <> 'edit'
     when 'featured' then t.featured_rank is not null
     else t.id <> 'edit' and t.is_active = (p_group = 'active')
@@ -9501,6 +9641,26 @@ $$;
 ALTER FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_kept_inputs" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."cost_provider_family"("p_tag" "text", "p_usage" "jsonb") RETURNS "text"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select case
+    when a.adapter = 'ark_images' then 'ark'
+    when a.adapter = 'openrouter_images' then 'openrouter'
+    when a.adapter is not null then 'openai'
+    when p_usage ? 'list_cost_cny' then 'ark'
+    when coalesce(p_usage ?| array['cost', 'prompt_tokens', 'completion_tokens'], false) then 'openrouter'
+    else 'openai'
+  end
+  from (select (select p.adapter from public.ai_providers p
+                 where p.id::text = split_part(coalesce(p_tag, ''), '/', 1)) as adapter) a;
+$$;
+
+
+ALTER FUNCTION "public"."cost_provider_family"("p_tag" "text", "p_usage" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid", "p_ticket_id" "uuid" DEFAULT NULL::"uuid", "p_images" "jsonb" DEFAULT '[]'::"jsonb") RETURNS "public"."support_tickets"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -9920,6 +10080,7 @@ CREATE OR REPLACE FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amoun
 declare
   v_profile public.profiles;
   cutoff timestamptz;
+  v_today jsonb;
 begin
   if p_amount is null or p_amount <= 0 then
     raise exception 'INVALID_INPUT' using detail = 'amount must be positive';
@@ -9941,17 +10102,37 @@ begin
     else
       p_amount := 6;
     end if;
-    if v_profile.signup_ip is not null then
-      perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
-      if not exists (select 1 from public.credit_ledger where idempotency_key = p_idempotency_key)
-         and exists (
-           select 1
-             from public.profiles other
-             join public.credit_ledger l on l.idempotency_key = 'signup:' || other.id::text
-            where other.signup_ip = v_profile.signup_ip
-              and other.id <> p_user_id
-              and l.created_at > v_profile.created_at - interval '24 hours'
-         ) then
+
+    -- Already paid: the ledger's idempotency key makes this a no-op; never refuse it now.
+    if not exists (select 1 from public.credit_ledger where idempotency_key = p_idempotency_key) then
+      if v_profile.signup_gift_refusal is not null then
+        return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
+      end if;
+
+      if v_profile.signup_ip is not null then
+        perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
+        if exists (
+             select 1
+               from public.profiles other
+               join public.credit_ledger l on l.idempotency_key = 'signup:' || other.id::text
+              where other.signup_ip = v_profile.signup_ip
+                and other.id <> p_user_id
+                and l.created_at > v_profile.created_at - interval '24 hours'
+           ) then
+          update public.profiles set signup_gift_refusal = 'same_ip' where id = p_user_id;
+          return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
+        end if;
+      end if;
+
+      -- One gift at a time site-wide, so concurrent sign-ups cannot all pass the count.
+      perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_gift_cap', 0));
+      v_today := public.signup_gift_today();
+      if (v_today->>'paused')::boolean then
+        update public.profiles set signup_gift_refusal = 'paused' where id = p_user_id;
+        return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
+      end if;
+      if (v_today->>'granted')::integer >= (v_today->>'cap')::integer then
+        update public.profiles set signup_gift_refusal = 'daily_cap' where id = p_user_id;
         return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
       end if;
     end if;
@@ -9963,6 +10144,54 @@ $$;
 
 
 ALTER FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."grant_poster_free_redraw"("p_job_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_job public.generation_jobs;
+  v_source public.generation_jobs;
+  v_set uuid;
+  v_part integer;
+  v_claimed uuid;
+begin
+  select * into v_job from public.generation_jobs where id = p_job_id;
+  if not found or v_job.status <> 'succeeded' or v_job.inputs->'poster'->>'redraw_of' is null then
+    return false;
+  end if;
+  select * into v_source from public.generation_jobs
+   where id = (v_job.inputs->'poster'->>'redraw_of')::uuid and user_id = v_job.user_id and status = 'succeeded';
+  if not found or v_source.template_id <> v_job.template_id
+     or v_source.inputs->'poster'->'set_id' is distinct from v_job.inputs->'poster'->'set_id'
+     or v_source.inputs->'poster'->'part' is distinct from v_job.inputs->'poster'->'part'
+     or v_source.inputs->>'resolution' is distinct from v_job.inputs->>'resolution'
+     or v_source.inputs->>'aspect_ratio' is distinct from v_job.inputs->>'aspect_ratio' then
+    return false;
+  end if;
+  if not exists (select from public.poster_checks where job_id = v_source.id and status = 'mismatch') then
+    return false;
+  end if;
+  v_set := (v_job.inputs->'poster'->>'set_id')::uuid;
+  v_part := (v_job.inputs->'poster'->>'part')::integer;
+  insert into public.poster_free_redraws (set_id, part, job_id, source_job_id)
+  values (v_set, v_part, v_job.id, v_source.id)
+  on conflict (set_id, part) do nothing
+  returning job_id into v_claimed;
+  if v_claimed is null then
+    return exists (select from public.poster_free_redraws where set_id = v_set and part = v_part and job_id = v_job.id);
+  end if;
+  perform public._apply_credit_change(
+    v_job.user_id, v_job.credit_pool, 'refund', least(v_job.credits_cost, v_source.credits_cost), 'poster free redraw',
+    'job:' || v_job.id::text || ':poster_free_redraw', v_job.id
+  );
+  return true;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."grant_poster_free_redraw"("p_job_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
@@ -9977,6 +10206,41 @@ $$;
 
 
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hook_before_user_created"("event" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_user jsonb := event->'user';
+  v_provider text := v_user->'app_metadata'->>'provider';
+  v_email text := lower(trim(coalesce(v_user->>'email', '')));
+  v_phone text := regexp_replace(coalesce(v_user->>'phone', ''), '[^0-9]', '', 'g');
+  v_refused jsonb := jsonb_build_object('error', jsonb_build_object(
+    'http_code', 403, 'message', 'Please sign up on the website.'));
+begin
+  if v_provider = 'email' then
+    if v_email = '' or not exists (
+         select 1 from public.signup_requests r
+          where r.email_key = encode(sha256(convert_to(v_email, 'UTF8')), 'hex')
+            and r.requested_at > now() - interval '10 minutes') then
+      return v_refused;
+    end if;
+  elsif v_provider = 'phone' then
+    if v_phone = '' or not exists (
+         select 1 from public.sms_sends s
+          where s.phone_key = encode(sha256(convert_to(v_phone, 'UTF8')), 'hex')
+            and s.requested_at > now() - interval '10 minutes') then
+      return v_refused;
+    end if;
+  end if;
+  return '{}'::jsonb;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hook_before_user_created"("event" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."list_my_wish_notices"("p_user_id" "uuid") RETURNS TABLE("request_id" "uuid", "template_id" "text", "template_name_en" "text", "template_name_zh" "text", "description_excerpt" "text", "is_author" boolean)
@@ -11515,6 +11779,71 @@ $$;
 ALTER FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."signup_gift_day_start"() RETURNS timestamp with time zone
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select date_trunc('day', now() at time zone 'Asia/Shanghai') at time zone 'Asia/Shanghai'
+$$;
+
+
+ALTER FUNCTION "public"."signup_gift_day_start"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_gift_today"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+  select jsonb_build_object(
+    'granted', (select count(*) from public.credit_ledger l
+                 where l.kind = 'grant' and l.reason = 'signup' and l.idempotency_key like 'signup:%'
+                   and l.created_at >= public.signup_gift_day_start()),
+    'cap', coalesce((select case when jsonb_typeof(s.value) = 'number' and (s.value #>> '{}') ~ '^[0-9]+$'
+                                 then (s.value #>> '{}')::integer end
+                       from public.system_settings s where s.key = 'signup_gift_daily_cap'), 30),
+    'paused', coalesce((select case when jsonb_typeof(s.value) = 'boolean' then (s.value #>> '{}')::boolean end
+                          from public.system_settings s where s.key = 'signup_gift_paused'), false)
+  )
+$_$;
+
+
+ALTER FUNCTION "public"."signup_gift_today"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+begin
+  if p_email_key is null or p_email_key !~ '^[0-9a-f]{64}$' then
+    raise exception 'INVALID_INPUT' using detail = 'email_key must be a sha256 hex digest';
+  end if;
+  if p_ip is not null then
+    perform pg_advisory_xact_lock(hashtextextended('signup:ip:' || host(p_ip), 0));
+    if (select count(*) from public.signup_requests r
+         where r.ip = p_ip and r.requested_at > now() - interval '1 hour') >= 5 then
+      return 'ip_hourly';
+    end if;
+    if (select count(*) from public.signup_requests r
+         where r.ip = p_ip and r.requested_at > now() - interval '24 hours') >= 20 then
+      return 'ip_daily';
+    end if;
+  end if;
+
+  insert into public.signup_requests (email_key, ip) values (p_email_key, p_ip);
+  delete from public.signup_requests r
+   where r.id in (select o.id from public.signup_requests o
+                   where o.requested_at < now() - interval '2 days'
+                   order by o.requested_at
+                   limit 200);
+  return 'ok';
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") RETURNS "text"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -12959,10 +13288,12 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "referred_by" "uuid",
     "referred_at" timestamp with time zone,
     "referred_source" "text",
+    "signup_gift_refusal" "text",
     CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
     CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
     CONSTRAINT "profiles_referred_source_check" CHECK (("referred_source" = ANY (ARRAY['signup'::"text", 'first_checkout'::"text", 'admin'::"text"]))),
-    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"])))
+    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"]))),
+    CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'daily_cap'::"text", 'paused'::"text"])))
 );
 
 
@@ -13031,7 +13362,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -13542,6 +13873,27 @@ ALTER TABLE "public"."payments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTI
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."poster_checks" (
+    "job_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "status" "text" NOT NULL,
+    "diffs" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "provider" "text",
+    "input_tokens" integer,
+    "output_tokens" integer,
+    "cost_usd" numeric(10,6),
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "poster_checks_cost_usd_check" CHECK (("cost_usd" >= (0)::numeric)),
+    CONSTRAINT "poster_checks_diffs_check" CHECK ((("jsonb_typeof"("diffs") = 'array'::"text") AND ("pg_column_size"("diffs") <= 32768))),
+    CONSTRAINT "poster_checks_input_tokens_check" CHECK (("input_tokens" >= 0)),
+    CONSTRAINT "poster_checks_output_tokens_check" CHECK (("output_tokens" >= 0)),
+    CONSTRAINT "poster_checks_status_check" CHECK (("status" = ANY (ARRAY['match'::"text", 'mismatch'::"text", 'unchecked'::"text"])))
+);
+
+
+ALTER TABLE "public"."poster_checks" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."poster_extractions" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -13574,6 +13926,19 @@ ALTER TABLE "public"."poster_extractions" ALTER COLUMN "id" ADD GENERATED ALWAYS
     CACHE 1
 );
 
+
+
+CREATE TABLE IF NOT EXISTS "public"."poster_free_redraws" (
+    "set_id" "uuid" NOT NULL,
+    "part" integer NOT NULL,
+    "job_id" "uuid" NOT NULL,
+    "source_job_id" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "poster_free_redraws_part_check" CHECK (("part" >= 0))
+);
+
+
+ALTER TABLE "public"."poster_free_redraws" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."poster_sets" (
@@ -13727,6 +14092,29 @@ CREATE TABLE IF NOT EXISTS "public"."reference_template_sources" (
 
 
 ALTER TABLE "public"."reference_template_sources" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."signup_requests" (
+    "id" bigint NOT NULL,
+    "email_key" "text" NOT NULL,
+    "ip" "inet",
+    "requested_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "signup_requests_email_key_check" CHECK (("email_key" ~ '^[0-9a-f]{64}$'::"text"))
+);
+
+
+ALTER TABLE "public"."signup_requests" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."signup_requests" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."signup_requests_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."site_announcements" (
@@ -14303,8 +14691,23 @@ ALTER TABLE "public"."payments"
 
 
 
+ALTER TABLE ONLY "public"."poster_checks"
+    ADD CONSTRAINT "poster_checks_pkey" PRIMARY KEY ("job_id");
+
+
+
 ALTER TABLE ONLY "public"."poster_extractions"
     ADD CONSTRAINT "poster_extractions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."poster_free_redraws"
+    ADD CONSTRAINT "poster_free_redraws_job_id_key" UNIQUE ("job_id");
+
+
+
+ALTER TABLE ONLY "public"."poster_free_redraws"
+    ADD CONSTRAINT "poster_free_redraws_pkey" PRIMARY KEY ("set_id", "part");
 
 
 
@@ -14395,6 +14798,11 @@ ALTER TABLE ONLY "public"."reference_template_sources"
 
 ALTER TABLE ONLY "public"."reference_template_sources"
     ADD CONSTRAINT "reference_template_sources_run_id_key" UNIQUE ("run_id");
+
+
+
+ALTER TABLE ONLY "public"."signup_requests"
+    ADD CONSTRAINT "signup_requests_pkey" PRIMARY KEY ("id");
 
 
 
@@ -14775,6 +15183,10 @@ CREATE INDEX "credit_ledger_purchases_created_at_id_idx" ON "public"."credit_led
 
 
 
+CREATE INDEX "credit_ledger_signup_created_at_idx" ON "public"."credit_ledger" USING "btree" ("created_at") WHERE (("kind" = 'grant'::"text") AND ("reason" = 'signup'::"text"));
+
+
+
 CREATE INDEX "credit_ledger_user_id_created_at_idx" ON "public"."credit_ledger" USING "btree" ("user_id", "created_at" DESC);
 
 
@@ -14899,6 +15311,10 @@ CREATE INDEX "payments_waffo_order_id_idx" ON "public"."payments" USING "btree" 
 
 
 
+CREATE INDEX "poster_checks_user" ON "public"."poster_checks" USING "btree" ("user_id", "created_at" DESC);
+
+
+
 CREATE INDEX "poster_extractions_user_created" ON "public"."poster_extractions" USING "btree" ("user_id", "created_at" DESC);
 
 
@@ -15000,6 +15416,18 @@ CREATE INDEX "reference_deletions_ready" ON "public"."reference_object_deletions
 
 
 CREATE INDEX "reference_template_sources_asset" ON "public"."reference_template_sources" USING "btree" ("asset_id");
+
+
+
+CREATE INDEX "signup_requests_email_key_requested_at_idx" ON "public"."signup_requests" USING "btree" ("email_key", "requested_at" DESC);
+
+
+
+CREATE INDEX "signup_requests_ip_requested_at_idx" ON "public"."signup_requests" USING "btree" ("ip", "requested_at" DESC) WHERE ("ip" IS NOT NULL);
+
+
+
+CREATE INDEX "signup_requests_requested_at_idx" ON "public"."signup_requests" USING "btree" ("requested_at");
 
 
 
@@ -15271,7 +15699,15 @@ CREATE OR REPLACE TRIGGER "template_categories_sync_name" AFTER UPDATE OF "name_
 
 
 
+CREATE OR REPLACE TRIGGER "template_deleted_guard" BEFORE UPDATE OF "deleted_at", "is_active", "series_id", "featured_rank" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "admin"."guard_deleted_template"();
+
+
+
 CREATE OR REPLACE TRIGGER "template_favorites_guard" BEFORE INSERT ON "public"."template_favorites" FOR EACH ROW EXECUTE FUNCTION "public"."template_favorites_guard"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_leaves_series_on_unpublish" BEFORE UPDATE OF "is_active" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "admin"."template_leaves_series_on_unpublish"();
 
 
 
@@ -15669,8 +16105,33 @@ ALTER TABLE ONLY "public"."payments"
 
 
 
+ALTER TABLE ONLY "public"."poster_checks"
+    ADD CONSTRAINT "poster_checks_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "public"."generation_jobs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_checks"
+    ADD CONSTRAINT "poster_checks_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."poster_extractions"
     ADD CONSTRAINT "poster_extractions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_free_redraws"
+    ADD CONSTRAINT "poster_free_redraws_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "public"."generation_jobs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_free_redraws"
+    ADD CONSTRAINT "poster_free_redraws_set_id_fkey" FOREIGN KEY ("set_id") REFERENCES "public"."poster_sets"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_free_redraws"
+    ADD CONSTRAINT "poster_free_redraws_source_job_id_fkey" FOREIGN KEY ("source_job_id") REFERENCES "public"."generation_jobs"("id") ON DELETE CASCADE;
 
 
 
@@ -16088,7 +16549,17 @@ ALTER TABLE "public"."payment_refunds" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."payments" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."poster_checks" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "poster_checks_read_own" ON "public"."poster_checks" FOR SELECT TO "authenticated" USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
+
+
+
 ALTER TABLE "public"."poster_extractions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."poster_free_redraws" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."poster_sets" ENABLE ROW LEVEL SECURITY;
@@ -16136,6 +16607,9 @@ CREATE POLICY "series_read" ON "public"."template_series" FOR SELECT TO "authent
      JOIN "public"."template_category_paths" "c" ON (("c"."key" = COALESCE("t"."subcategory_key", "t"."category_key"))))
   WHERE (("t"."series_id" = "template_series"."id") AND "t"."is_active" AND ('web'::"text" = ANY ("t"."visible_in")) AND "c"."web_visible")))));
 
+
+
+ALTER TABLE "public"."signup_requests" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."site_announcements" ENABLE ROW LEVEL SECURITY;
@@ -16454,6 +16928,10 @@ GRANT ALL ON FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resoluti
 
 
 
+REVOKE ALL ON FUNCTION "admin"."guard_deleted_template"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."is_template_catalog_v2"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."is_template_catalog_v2"() TO "service_role";
 
@@ -16611,6 +17089,10 @@ REVOKE ALL ON FUNCTION "admin"."template_image_options"("public"."templates") FR
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "anon";
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "authenticated";
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_leaves_series_on_unpublish"() FROM PUBLIC;
 
 
 
@@ -17040,6 +17522,11 @@ GRANT ALL ON FUNCTION "public"."admin_daily_costs"("p_days" integer) TO "service
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_daily_costs_by_provider"("p_days" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_daily_costs_by_provider"("p_days" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_dashboard_stats"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_dashboard_stats"("p_days" integer) TO "service_role";
 
@@ -17062,6 +17549,11 @@ GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "servic
 
 REVOKE ALL ON FUNCTION "public"."admin_delete_reference_category"("p_actor" "uuid", "p_key" "text", "p_move_to" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_delete_reference_category"("p_actor" "uuid", "p_key" "text", "p_move_to" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_delete_template"("p_actor" "uuid", "p_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_template"("p_actor" "uuid", "p_id" "text") TO "service_role";
 
 
 
@@ -17673,6 +18165,11 @@ GRANT ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "
 
 
 
+REVOKE ALL ON FUNCTION "public"."cost_provider_family"("p_tag" "text", "p_usage" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."cost_provider_family"("p_tag" "text", "p_usage" "jsonb") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid", "p_ticket_id" "uuid", "p_images" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."create_support_ticket"("p_user_id" "uuid", "p_type" "text", "p_body" "text", "p_payment_id" bigint, "p_job_id" "uuid", "p_ticket_id" "uuid", "p_images" "jsonb") TO "service_role";
 
@@ -17753,7 +18250,17 @@ GRANT ALL ON FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" in
 
 
 
+REVOKE ALL ON FUNCTION "public"."grant_poster_free_redraw"("p_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."grant_poster_free_redraw"("p_job_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."handle_new_user"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."hook_before_user_created"("event" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hook_before_user_created"("event" "jsonb") TO "supabase_auth_admin";
 
 
 
@@ -18006,6 +18513,21 @@ GRANT ALL ON FUNCTION "public"."settle_waffo_order_v2"("p_user_id" "uuid", "p_pr
 
 REVOKE ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_day_start"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_day_start"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_today"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_today"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") TO "service_role";
 
 
 
@@ -18319,6 +18841,11 @@ GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "service_role";
 
 
 
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."poster_checks" TO "service_role";
+GRANT SELECT ON TABLE "public"."poster_checks" TO "authenticated";
+
+
+
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."poster_extractions" TO "service_role";
 
 
@@ -18326,6 +18853,10 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 GRANT UPDATE ON SEQUENCE "public"."poster_extractions_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."poster_extractions_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."poster_extractions_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."poster_free_redraws" TO "service_role";
 
 
 
@@ -18359,6 +18890,16 @@ GRANT ALL ON TABLE "public"."reference_object_deletions" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."reference_template_sources" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."signup_requests" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."signup_requests_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."signup_requests_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."signup_requests_id_seq" TO "service_role";
 
 
 

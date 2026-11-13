@@ -1,9 +1,14 @@
 import 'server-only'
 
+import { headers } from 'next/headers'
+
 import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { currentOrigin } from '../../request-origin'
 import { nextIn } from '../redirect-target'
+import { clientIp } from '../signup-ip'
+import { requestSignup } from '../signup-request'
+import { createAdminSupabase } from '../supabase-admin'
 import { createSessionSupabase } from '../supabase-server'
 import { classifyAuthError } from './classify-auth-error'
 import { confirmUrl } from './callback-url'
@@ -21,6 +26,9 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   const parsed = signUpSchema.safeParse(formFields(form))
   if (!parsed.success) return failed('INVALID_INPUT')
   const { email, password, captchaToken, next } = parsed.data
+
+  // Our per-IP limit first; it also leaves the row the Before User Created hook needs (1350).
+  if ((await requestSignup(createAdminSupabase(), email, clientIp(await headers()))) !== 'ok') return failed('AUTH_RATE_LIMITED')
 
   const supabase = await createSessionSupabase()
   const locale = await currentLocale()

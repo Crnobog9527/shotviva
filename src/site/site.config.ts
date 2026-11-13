@@ -57,6 +57,9 @@ export const site = defineSite({
       '/generate/[templateId]',
       '/photos',
       '/photos/[jobId]',
+      // Dense-text posters (ARCHITECTURE §5.3), invite-only and noindex like every app page.
+      '/posters',
+      '/posters/[templateId]',
       '/account',
       // The Purchases list's receipt / invoice redirect (T80), so /zh links reach it.
       '/account/purchases/[paymentId]/[document]',
@@ -99,11 +102,13 @@ export const site = defineSite({
   },
   partners: {
     graylum: {
-      // Graylum production and staging (the domain bound to Graylum's staging Vercel project).
-      returnToHosts: ['graylum.com', 'auth-staging.graylum.com'],
+      // Graylum production (apex and www) and staging (the domain bound to Graylum's staging
+      // Vercel project). The first entry is the "back to Graylum" link on the connect page.
+      returnToHosts: ['graylum.com', 'www.graylum.com', 'auth-staging.graylum.com'],
       connectCallbackPath: '/api/connectors/shotviva/callback',
-      // Not confirmed yet: must be the host(s) Graylum serves reference images from.
-      imageHosts: ['graylum.com', 'staging.graylum.com'],
+      // Hosts Graylum serves reference images from, matched exactly: www.graylum.com (production)
+      // and auth-staging.graylum.com (staging), confirmed 2026-11-13; the first two are kept.
+      imageHosts: ['graylum.com', 'staging.graylum.com', 'www.graylum.com', 'auth-staging.graylum.com'],
     },
   },
   // Shotviva has a public gallery; it stays closed until the Owner opens it in the admin (§9).
@@ -122,6 +127,8 @@ export const site = defineSite({
       '/image-to-image-generator',
       '/commercial-photography',
       '/ai-restaurant-menu',
+      // SEO launch handbook 04-P1 (Owner 2026-11-13), English only.
+      '/transparent-background',
       '/pricing',
       '/terms',
       '/privacy',

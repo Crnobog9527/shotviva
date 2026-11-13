@@ -23,7 +23,7 @@ const live = (id: string, category: Key, extra: { rank?: number; covers?: boolea
   coverAfterUrl: extra.covers === false ? null : `https://shotviva.com/assets/covers/${id}/a.webp`,
   featuredRank: extra.rank ?? null,
   createdAt: `2026-11-${String(++day).padStart(2, '0')}T00:00:00Z`,
-  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 2, '2k': 4, '4k': 6 },
 })
 
 // T53, ARCHITECTURE §12 home item 3.

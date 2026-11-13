@@ -57,6 +57,12 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
   prompt version; no prompt text). Needs `TEMPLATE_TOOLS_R2_ACCOUNT_ID`,
   `TEMPLATE_TOOLS_R2_ACCESS_KEY_ID` and `TEMPLATE_TOOLS_R2_SECRET_ACCESS_KEY` for the test site's
   buckets (the same keys let templates:apply upload covers and style references).
+  A template with image slots takes `"slots": { "<slot key>": "<image path>" }` in an input set
+  instead of `"photo"`; only the slots listed are sent.
+- Image slots: a template's `fields.images` may carry `"slots": [{ "key", "label", "help"?,
+  "required"?, "note"? }]` (1–4, the order the model gets them). With slots, `images.max` must be
+  the number of slots and `images.min` the number of required ones; `note` names a text field shown
+  under that box; such a template must be `visibleIn: ["web"]` only.
 - Review and finish: write each template's verdict into the file as
   `"review": { "status": "pass" | "fail", "version": <prompt version>, "pick": "<trial run id>", "notes": "…" }`
   (a pass needs `pick`, the result that becomes the cover; a review of an older prompt version no

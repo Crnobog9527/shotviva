@@ -95,5 +95,18 @@ export const useCases = {
         tags: { before: phoneTag, after: 'Watercolor' },
       },
     },
+    // The fourth landing page (SEO launch handbook 04-P1): two by two on wide screens.
+    {
+      heading: 'Transparent PNG and White Background',
+      text: 'Cut a product out of a phone photo and download it on a transparent background or on pure white, ready for any marketplace. Try the',
+      link: { href: '/transparent-background', anchor: 'transparent PNG maker' },
+      after: '.',
+      visual: {
+        kind: 'pair',
+        before: caseImage('white-dress-before', 'Real phone photo: an ivory tiered maxi dress with folk flower embroidery hanging on a bedroom door, a bed and a laundry basket in frame'),
+        after: caseImage('white-dress-after', 'Real example: the same embroidered dress on a pure white background'),
+        tags: { before: phoneTag, after: 'White' },
+      },
+    },
   ],
 } as const satisfies HomePage['topics']

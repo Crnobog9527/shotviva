@@ -24,10 +24,20 @@
       "pickerTitle": "选一个模板",
       "pickerText": "每个模板都保留你拍的主体，只换光线、场景或画风。",
       "pickTemplate": "选用{name}",
+      "pickerSearch": "搜索模板：名称、用途、分类",
+      "pickerClear": "清空搜索",
+      "pickerAll": "全部",
+      "pickerFilter": "按分类筛选",
+      "pickerFilterWithin": "在「{name}」里筛选",
+      "pickerNoMatch": "没有找到「{query}」相关的模板，换个词试试。",
+      "pickerResults": "{count, number} 个模板",
+      "pickerSeries": "系列 · {count, number} 个模板",
+      "pickerBack": "返回",
       "signup": {
         "title": "注册一个免费账号来出图",
         "text": "你选好的照片和模板都会保留。",
         "giftNote": "公开展示，带水印",
+        "phone": "手机号登录/注册",
         "email": "用邮箱继续",
         "login": "已有账号，去登录",
         "fine": "继续即表示你同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>。"
@@ -47,7 +57,7 @@
       "field": "手机号",
       "placeholder": "11 位手机号",
       "hint": "仅支持中国大陆（+86）手机号，新号码会自动注册。",
-      "consent": "我已阅读并同意<terms>《服务条款》</terms><privacy>《隐私政策》</privacy><aup>《使用规范》</aup>，并同意将我的手机号等个人信息传输到中国大陆以外处理（数据存放在美国，短信由短信服务商发送）。",
+      "consent": "我已阅读并同意<terms>《服务条款》</terms><privacy>《隐私政策》</privacy><aup>《使用规范》</aup>。",
       "send": "获取验证码"
     },
     "code": {
@@ -552,7 +562,9 @@
       "paid": "你有 {paid} 积分。",
       "getCredits": "获取积分",
       "panelTitle": "积分",
-      "signupGiftRefused": "这个账号没有注册赠分记录。同一网络在 24 小时内限领一次。"
+      "signupGiftRefused": "这个账号没有注册赠分记录。同一网络在 24 小时内限领一次。",
+      "signupGiftRefusedCap": "这个账号没有领到注册赠分：当天的注册赠分名额已经发完。",
+      "signupGiftRefusedPaused": "这个账号没有领到注册赠分：注册时赠分暂停发放。"
     },
     "create": {
       "title": "创作",
@@ -562,6 +574,10 @@
       "templates": "模板",
       "filter": "筛选模板",
       "filterWithin": "在「{name}」里筛选",
+      "search": "搜索模板：名称、用途、分类",
+      "searchClear": "清空搜索",
+      "searchResults": "「{query}」：{count, number} 个模板",
+      "searchEmpty": "没有找到「{query}」相关的模板，换个词试试。",
       "all": "全部",
       "seeAll": "查看全部",
       "seeAllWhich": "「{name}」",
@@ -594,18 +610,125 @@
     },
     "tiers": {
       "1k": {
-        "name": "标准",
+        "name": "1K",
         "use": "社交媒体、外卖平台"
       },
       "2k": {
-        "name": "高清",
+        "name": "2K",
         "use": "官网、网店"
       },
-      "3k": {
-        "name": "超清",
+      "4k": {
+        "name": "4K",
         "use": "印刷、放大查看"
       },
       "notEnough": "（积分不够）"
+    },
+    "poster": {
+      "title": "赛事海报",
+      "back": "返回",
+      "noStyles": "还没有海报风格。",
+      "paste": {
+        "heading": "粘贴活动通知",
+        "hint": "把标题、时间、奖品、规则和级别表整段粘贴进来。我们先帮你分好块，你核对无误后才生成海报。",
+        "placeholder": "周4精英赛 开赛时间15:00\n冠军 ……\n赛事规则 ……",
+        "sort": "整理内容",
+        "sorting": "正在整理…",
+        "manual": "我自己填"
+      },
+      "sourceText": "你粘贴的原文",
+      "backToPaste": "重新粘贴",
+      "tabs": {
+        "header": "页眉",
+        "prizes": "奖品",
+        "sections": "说明",
+        "table": "表格",
+        "footer": "页脚",
+        "pending": "有待核对的行"
+      },
+      "flagged": "原文里找不到这一项，或太长被截短了，请核对。",
+      "header": {
+        "brand": "主办方",
+        "brandEn": "主办方英文",
+        "cup": "杯赛名",
+        "cupEn": "杯赛英文名",
+        "city": "城市",
+        "title": "赛事标题",
+        "subtitle": "副标题",
+        "datetimeLabel": "时间标签",
+        "datetime": "时间"
+      },
+      "prizes": {
+        "headline": "奖品标题",
+        "note": "奖品说明",
+        "rank": "名次",
+        "rankEn": "名次英文",
+        "prize": "奖品",
+        "add": "加一个名次"
+      },
+      "sections": {
+        "title": "栏目标题",
+        "style": "行的样式",
+        "styles": {
+          "kv": "标签：内容",
+          "numbered": "编号",
+          "plain": "普通"
+        },
+        "lines": "内容（一行一条）",
+        "add": "加一个栏目"
+      },
+      "table": {
+        "none": "这个风格没有表格。",
+        "title": "表格标题",
+        "columns": "列名",
+        "column": "列",
+        "row": "行",
+        "break": "休息行",
+        "insert": "＋ 在这里插入",
+        "insertRow": "数据行",
+        "insertBreak": "休息行",
+        "footnote": "表格下方备注"
+      },
+      "footer": {
+        "phones": "电话（一行一个）",
+        "phonesLabel": "电话标签",
+        "addressLabel": "地址标签",
+        "address": "地址",
+        "qrLabel": "二维码说明"
+      },
+      "remove": "删除",
+      "split": {
+        "count": "{count, plural, =0 {还没有可生成的内容} other {将生成 # 张海报}}",
+        "part": "{name} {page}/{pages}",
+        "oversized": "有一个栏目比一整张海报还长，请精简，或拆成两个栏目。"
+      },
+      "size": "尺寸",
+      "resolution": "清晰度",
+      "reviewed": "我已核对标黄的 {count} 行",
+      "proofread": "海报由 AI 绘制，打印或转发前请逐字核对。",
+      "generate": "生成 {count} 张海报 · {credits} 积分",
+      "starting": "正在开始…",
+      "check": {
+        "pending": "正在核对这张海报上的文字…",
+        "match": "文字已核对：每一行都和你确认的一致。",
+        "mismatch": "有 {count} 行和你确认的不一样",
+        "unchecked": "没能自动核对文字，请自己逐字看一遍。",
+        "expected": "确认稿：",
+        "seen": "海报上：",
+        "notFound": "海报上没找到",
+        "redraw": "重画这一张 · {credits} 积分",
+        "redrawFree": "免费重画这一张",
+        "freeNote": "核对没通过的海报，第一次重画免费：出图时先预扣 {credits} 积分，出图成功后全部退回。",
+        "dismiss": "我看过了，没问题",
+        "editText": "改文字"
+      },
+      "notice": {
+        "sortFailed": "没能自动整理，请在下面各块里填写，原文在上方。",
+        "clipped": "有几项超过了字数上限，已截短并标黄。请对照上方原文核对，需要的话改写得短一些。",
+        "rateLimited": "一小时内整理次数太多，请稍后再试。",
+        "invalid": "有内容超长或表格行没填完整，请检查各块。",
+        "notEnough": "积分不够。",
+        "error": "出了点问题，请重试。"
+      }
     },
     "sizes": {
       "closest": "接近原图（{ratio}）",
@@ -676,7 +799,7 @@
       "doneState": {
         "hud": "已完成",
         "saved": "已存进「作品」",
-        "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · 用了 {count} 积分。{pool, select, free {用的是免费积分，所以会公开展示，并带水印。} freePrivate {用的是免费积分，所以带水印；海报类作品只自己可见。} paid {用的是付费积分，所以是私密的，没有水印。} other {}}",
+        "line": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono> px}} · 用了 {count} 积分。{pool, select, free {用的是免费积分，所以会公开展示，并带水印。} freePrivate {用的是免费积分，所以带水印；海报类作品只自己可见。} paid {用的是付费积分，所以是私密的，没有水印。} other {}}",
         "caption": "手机照片 → {name}。",
         "edit": "继续编辑"
       },
@@ -693,9 +816,9 @@
       "getCreditsCta": "获取积分 <cost>· 需要 <mono>{count, number}</mono></cost>",
       "freeNotice": "这张图用的是免费积分：会公开展示，并带水印。<b>用付费积分生成的图是私密的，没有水印。</b>",
       "freeNoticePrivate": "这张图用的是免费积分，会带水印。<b>海报类作品只自己可见，不会进入公开创作库。</b>",
-      "needsCredits": "{tier}需要 {count} 积分。<b>用付费积分生成的图是私密的，没有水印。</b>",
+      "needsCredits": "{tier} 需要 {count} 积分。<b>用付费积分生成的图是私密的，没有水印。</b>",
       "counter": "{count, number} / {max, number}",
-      "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>",
+      "developingSize": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono>}}",
       "yourPhotos": "你的照片",
       "addPhotos": "添加你拍的照片",
       "chooseGalleryMany": "从相册选多张",
@@ -760,6 +883,12 @@
       },
       "toggles": {
         "cancel": "取消"
+      },
+      "slots": {
+        "upload": "上传图片",
+        "oneAtATime": "这个模板一次做一张。",
+        "remove": "移除",
+        "replace": "换一张"
       }
     },
     "errors": {
@@ -857,7 +986,7 @@
       "makeAnotherWith": "用 {name} 再做一张",
       "shareText": "用 {brand} 制作 {url}",
       "makeAgain": "再做一张",
-      "tierPx": "{tier} · {px}",
+      "tierPx": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off}}}",
       "when": {
         "today": "今天",
         "yesterday": "昨天",
@@ -882,7 +1011,7 @@
         "template": "模板",
         "size": "尺寸",
         "resolution": "清晰度",
-        "resolutionValue": "{tier} · {px} px",
+        "resolutionValue": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off} px}}",
         "format": "格式",
         "formatPng": "PNG，透明背景",
         "formatJpgWhite": "JPG，白底",
@@ -1113,6 +1242,8 @@
     "creditsUnit": "{count, plural, other {积分}}",
     "units": {
       "px": "{px, number, ::group-off} px",
+      "size": "{width, number, ::group-off}×{height, number, ::group-off}",
+      "sizeApprox": "约 {width, number, ::group-off}×{height, number, ::group-off}",
       "megabytes": "{size} MB",
       "percent": "{value, number, ::percent}"
     },
@@ -1545,6 +1676,7 @@
       "useCaseMenu": "AI菜单配图",
       "useCaseCommercial": "商业产品摄影",
       "useCaseGenerator": "图生图在线工具",
+      "useCaseTransparent": "透明 PNG 制作",
       "templates": "模板",
       "login": "登录",
       "startFree": "免费开始",

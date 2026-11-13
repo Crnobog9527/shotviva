@@ -1,8 +1,9 @@
 'use client'
 
-import Image, { type ImageProps } from 'next/image'
+import { type ImageProps } from 'next/image'
 
 import { cn } from './cn'
+import { SiteImage as Image } from './site-image'
 import { useLoaded } from './use-loaded'
 
 // next/image with solid white painted behind its own pixels once it has loaded, so a template's

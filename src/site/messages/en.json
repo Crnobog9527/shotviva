@@ -24,10 +24,20 @@
       "pickerTitle": "Pick a template",
       "pickerText": "Each one keeps your subject as shot and changes the light, the scene or the style.",
       "pickTemplate": "Pick {name}",
+      "pickerSearch": "Search by name, use or category",
+      "pickerClear": "Clear search",
+      "pickerAll": "All",
+      "pickerFilter": "Filter templates",
+      "pickerFilterWithin": "Filter within {name}",
+      "pickerNoMatch": "No template matches “{query}”. Try another word.",
+      "pickerResults": "{count, plural, one {# template} other {# templates}}",
+      "pickerSeries": "Series · {count, plural, one {# template} other {# templates}}",
+      "pickerBack": "Back",
       "signup": {
         "title": "Make a free account to develop it",
         "text": "Your photo and template stay as you set them.",
         "giftNote": "Shown publicly with a watermark",
+        "phone": "Continue with phone",
         "email": "Continue with email",
         "login": "I have an account · Log in",
         "fine": "By continuing you agree to the <terms>Terms</terms> and the <privacy>Privacy Policy</privacy>."
@@ -552,7 +562,9 @@
       "paid": "You have {paid, plural, one {# credit} other {# credits}}.",
       "getCredits": "Get credits",
       "panelTitle": "Credits",
-      "signupGiftRefused": "No sign-up credits were recorded for this account. Sign-up gifts are limited to one per network in 24 hours."
+      "signupGiftRefused": "No sign-up credits were recorded for this account. Sign-up gifts are limited to one per network in 24 hours.",
+      "signupGiftRefusedCap": "No sign-up credits for this account: that day's sign-up gifts had all been given out.",
+      "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up."
     },
     "create": {
       "title": "Create",
@@ -562,6 +574,10 @@
       "templates": "Templates",
       "filter": "Filter templates",
       "filterWithin": "Filter within {name}",
+      "search": "Search by name, use or category",
+      "searchClear": "Clear search",
+      "searchResults": "“{query}”: {count, plural, one {# template} other {# templates}}",
+      "searchEmpty": "No template matches “{query}”. Try another word.",
       "all": "All",
       "seeAll": "See all",
       "seeAllWhich": "in {name}",
@@ -594,18 +610,125 @@
     },
     "tiers": {
       "1k": {
-        "name": "Standard",
+        "name": "1K",
         "use": "Social & delivery apps"
       },
       "2k": {
-        "name": "HD",
+        "name": "2K",
         "use": "Websites & online stores"
       },
-      "3k": {
-        "name": "Max",
+      "4k": {
+        "name": "4K",
         "use": "Print & zoom"
       },
       "notEnough": "(not enough credits)"
+    },
+    "poster": {
+      "title": "Event posters",
+      "back": "Back",
+      "noStyles": "No poster styles yet.",
+      "paste": {
+        "heading": "Paste your event notice",
+        "hint": "Paste everything: title, time, prizes, rules and the level table. We sort it into blocks for you to check before any poster is made.",
+        "placeholder": "Thursday Elite · starts 15:00\nChampion  …\nRules …",
+        "sort": "Sort into blocks",
+        "sorting": "Sorting…",
+        "manual": "Type it in myself"
+      },
+      "sourceText": "Your pasted text",
+      "backToPaste": "Paste again",
+      "tabs": {
+        "header": "Header",
+        "prizes": "Prizes",
+        "sections": "Rules",
+        "table": "Table",
+        "footer": "Footer",
+        "pending": "has lines to check"
+      },
+      "flagged": "Not found in your pasted text, or cut to fit. Check it.",
+      "header": {
+        "brand": "Organiser",
+        "brandEn": "Organiser in English",
+        "cup": "Cup name",
+        "cupEn": "Cup name in English",
+        "city": "City",
+        "title": "Event title",
+        "subtitle": "Subtitle",
+        "datetimeLabel": "Time label",
+        "datetime": "Time"
+      },
+      "prizes": {
+        "headline": "Prize headline",
+        "note": "Prize note",
+        "rank": "Rank",
+        "rankEn": "Rank in English",
+        "prize": "Prize",
+        "add": "Add a rank"
+      },
+      "sections": {
+        "title": "Section title",
+        "style": "Line style",
+        "styles": {
+          "kv": "Label: value",
+          "numbered": "Numbered",
+          "plain": "Plain"
+        },
+        "lines": "Lines (one per row)",
+        "add": "Add a section"
+      },
+      "table": {
+        "none": "This style has no table.",
+        "title": "Table title",
+        "columns": "Columns",
+        "column": "Column",
+        "row": "Row",
+        "break": "Break row",
+        "insert": "+ Insert here",
+        "insertRow": "Level row",
+        "insertBreak": "Break row",
+        "footnote": "Note under the table"
+      },
+      "footer": {
+        "phones": "Phone numbers (one per line)",
+        "phonesLabel": "Phone label",
+        "addressLabel": "Address label",
+        "address": "Address",
+        "qrLabel": "QR code label"
+      },
+      "remove": "Remove",
+      "split": {
+        "count": "{count, plural, =0 {Nothing to make yet} one {Makes # poster} other {Makes # posters}}",
+        "part": "{name} {page}/{pages}",
+        "oversized": "A section is longer than one poster can hold. Shorten it or split it into two sections."
+      },
+      "size": "Size",
+      "resolution": "Resolution",
+      "reviewed": "{count, plural, one {I've checked the highlighted line} other {I've checked the # highlighted lines}}",
+      "proofread": "The posters are drawn by AI. Check every word on them before you print or share.",
+      "generate": "{count, plural, one {Make # poster} other {Make # posters}} · {credits} credits",
+      "starting": "Starting…",
+      "check": {
+        "pending": "Checking the text on this poster…",
+        "match": "Text checked: every line matches what you confirmed.",
+        "mismatch": "{count, plural, one {# line differs from what you confirmed} other {# lines differ from what you confirmed}}",
+        "unchecked": "The text could not be checked automatically. Please read it through.",
+        "expected": "Confirmed: ",
+        "seen": "On the poster: ",
+        "notFound": "Not found on the poster",
+        "redraw": "Redraw this poster · {credits} credits",
+        "redrawFree": "Redraw this poster for free",
+        "freeNote": "Your first redraw of a poster that failed the check is free: {credits} credits are held while it draws and all given back once it is done.",
+        "dismiss": "I've checked it",
+        "editText": "Change the text"
+      },
+      "notice": {
+        "sortFailed": "We couldn't sort this automatically. Fill in the blocks below; your text is above.",
+        "clipped": "Some items were over their length limit, so they were cut to fit and marked in yellow. Check them against your text above, and shorten them if you need to.",
+        "rateLimited": "Too many tries in an hour. Please wait a little.",
+        "invalid": "Some text is too long or a table row is incomplete. Check the blocks.",
+        "notEnough": "Not enough credits.",
+        "error": "Something went wrong. Please try again."
+      }
     },
     "sizes": {
       "closest": "Closest to original ({ratio})",
@@ -676,7 +799,7 @@
       "doneState": {
         "hud": "Done",
         "saved": "Saved to Photos",
-        "line": "{tier} · <mono>{px, number, ::group-off}</mono> px · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} freePrivate { Made with free credits, so it has a watermark; poster photos stay private.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
+        "line": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono> px}} · {count, plural, one {# credit} other {# credits}} used.{pool, select, free { Made with free credits, so it's public with a watermark.} freePrivate { Made with free credits, so it has a watermark; poster photos stay private.} paid { Made with paid credits, so it's private and watermark-free.} other {}}",
         "caption": "Phone photo → {name}.",
         "edit": "Edit this photo"
       },
@@ -695,7 +818,7 @@
       "freeNoticePrivate": "This photo uses free credits, so it has a watermark. <b>Poster photos stay private: they never go in the public gallery.</b>",
       "needsCredits": "{tier} needs {count, plural, one {# credit} other {# credits}}. <b>Paid credits make photos private and watermark-free.</b>",
       "counter": "{count, number} / {max, number}",
-      "developingSize": "{tier} · <mono>{px, number, ::group-off}</mono>",
+      "developingSize": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono>}}",
       "yourPhotos": "Your photos",
       "addPhotos": "Add the photos you shot",
       "chooseGalleryMany": "Choose photos from gallery",
@@ -760,6 +883,12 @@
       },
       "toggles": {
         "cancel": "Cancel"
+      },
+      "slots": {
+        "upload": "Upload image",
+        "oneAtATime": "This template makes one image at a time.",
+        "remove": "Remove",
+        "replace": "Replace"
       }
     },
     "errors": {
@@ -857,7 +986,7 @@
       "makeAnotherWith": "Make another with {name}",
       "shareText": "Made with {brand} {url}",
       "makeAgain": "Make again",
-      "tierPx": "{tier} · {px}",
+      "tierPx": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off}}}",
       "when": {
         "today": "Today",
         "yesterday": "Yesterday",
@@ -882,7 +1011,7 @@
         "template": "Template",
         "size": "Size",
         "resolution": "Resolution",
-        "resolutionValue": "{tier} · {px} px",
+        "resolutionValue": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off} px}}",
         "format": "Format",
         "formatPng": "PNG, transparent background",
         "formatJpgWhite": "JPG, white background",
@@ -1113,6 +1242,8 @@
     "creditsUnit": "{count, plural, one {credit} other {credits}}",
     "units": {
       "px": "{px, number, ::group-off} px",
+      "size": "{width, number, ::group-off}×{height, number, ::group-off}",
+      "sizeApprox": "≈ {width, number, ::group-off}×{height, number, ::group-off}",
       "megabytes": "{size} MB",
       "percent": "{value, number, ::percent}"
     },
@@ -1545,6 +1676,7 @@
       "useCaseMenu": "AI restaurant menu photos",
       "useCaseCommercial": "Commercial photography",
       "useCaseGenerator": "Image to image generator",
+      "useCaseTransparent": "Transparent PNG maker",
       "templates": "Templates",
       "login": "Log in",
       "startFree": "Start free",

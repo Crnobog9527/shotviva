@@ -2,7 +2,7 @@ import { hasCompleteCoverSet } from '@/core/templates/cover-locales'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 import { MISSING_COST, floorGuidance, providerFloor, type ProviderFloors } from '@/core/templates/provider-pricing'
-import { creditsBelowFloor, type CreditsCost, type TemplateQuality } from '@/core/templates/pricing'
+import { creditsBelowFloor, slotFloorFactor, type CreditsCost, type TemplateQuality } from '@/core/templates/pricing'
 import type { TemplateSurface } from '@/core/templates/schema'
 import type { Template } from '@/core/templates/types'
 
@@ -30,7 +30,7 @@ export type BulkEditOutcome = { changed: number; failures: BulkEditFailure[] }
 export type BulkEditCandidate = Pick<
   Template,
   'id' | 'name' | 'quality' | 'creditsCost' | 'unpricedResolutions' | 'visibleIn' | 'isActive' | 'description' | 'coverBeforeUrl' | 'coverAfterUrl' | 'coverLocales'
-> & { category?: string; categoryInfo?: { isSystem: boolean }; prompt?: { providerId: string | null } | null }
+> & { category?: string; categoryInfo?: { isSystem: boolean }; prompt?: { providerId: string | null } | null; fields?: { images: { slots?: readonly unknown[] } } }
 
 // The built-in templates: photo edit has its own page, and the partner API's free-prompt
 // `freeform` must not pick up a web template's prices, entry points or category from a 「全选」.
@@ -40,7 +40,7 @@ export const BULK_EDIT_SYSTEM_IDS: ReadonlySet<string> = new Set([EDIT_TEMPLATE_
 export const isBulkEditable = (template: { id: string; categoryInfo?: { isSystem: boolean }; prompt?: { providerId: string | null } | null }) =>
   !BULK_EDIT_SYSTEM_IDS.has(template.id) && template.categoryInfo?.isSystem !== true
 
-const RESOLUTION_LABEL: Record<Resolution, string> = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' }
+const RESOLUTION_LABEL: Record<Resolution, string> = { '1k': '1K', '2k': '2K', '4k': '4K' }
 
 export const isEmptyPatch = (patch: BulkEditPatch) =>
   Object.keys(patch.creditsCost ?? {}).length === 0 && !patch.visibleIn && !patch.quality && !patch.categoryKey && patch.providerId === undefined
@@ -75,7 +75,7 @@ export function bulkEditFailures(
     const { quality, visibleIn, prices, unpriced } = candidatePricing(template, patch, floor)
     const cost = { ...template.creditsCost, ...patch.creditsCost }
     const { id, name } = template
-    const low = creditsBelowFloor(quality, cost, prices, unpriced)
+    const low = creditsBelowFloor(quality, cost, prices, unpriced, slotFloorFactor(template.fields))
       .map(v => ({ id, name, reason: 'below_floor' as const, ...v }))
     const web = webIncomplete(template, visibleIn)
     return web ? [...low, { id, name, reason: 'web_incomplete' }] : low

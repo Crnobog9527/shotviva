@@ -12,12 +12,18 @@ import { PlusIcon } from './home-icons'
 import { thumbImage } from './thumb-image'
 import type { HomeGeneratorState } from './use-home-generator'
 
-// The first step, the obvious one: a card that asks for the phone photo, then shows it.
+function useFormats(): string {
+  return useTranslations('app.workspace')('formats', { formats: useFormatter().list(UPLOAD_FORMAT_NAMES, { type: 'disjunction' }), mb: UPLOAD_MAX_MB })
+}
+
+// The first step, the obvious one: a card that asks for the phone photo, then shows it. While
+// empty it is hidden at every width (marketing.css): the big primary says the same thing, and
+// PanelFormats carries the format hint under it (Owner 2026-11-13, one upload action).
 export function PanelUpload({ url, onPick }: { url: string | null; onPick(): void }) {
   const t = useTranslations('home.generator')
-  const formats = useTranslations('app.workspace')('formats', { formats: useFormatter().list(UPLOAD_FORMAT_NAMES, { type: 'disjunction' }), mb: UPLOAD_MAX_MB })
+  const formats = useFormats()
   return (
-    <button type="button" className={url ? 'mk-up mk-up-has' : 'mk-up'} onClick={onPick} aria-label={url ? t('replaceAria') : undefined}>
+    <button type="button" className={url ? 'mk-up mk-up-has' : 'mk-up mk-up-empty'} onClick={onPick} aria-label={url ? t('replaceAria') : undefined}>
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element -- a local object URL
         <img className={`${REPLAY_BLOCK_CLASS} mk-up-thumb`} src={url} alt="" />
@@ -37,6 +43,12 @@ export function PanelUpload({ url, onPick }: { url: string | null; onPick(): voi
       ) : null}
     </button>
   )
+}
+
+// The format and size hint under the primary while no photo is chosen.
+export function PanelFormats({ state }: { state: HomeGeneratorState }) {
+  const formats = useFormats()
+  return state.template?.photoInput !== 'none' && !state.photo.url ? <p className="mk-panel-fmt">{formats}</p> : null
 }
 
 // The chosen template first, then the next few in catalogue order; the full picker one tap away.

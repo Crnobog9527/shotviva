@@ -37,6 +37,9 @@ it('runs the package entry point, rejects unflagged publication locally and uses
     expect(calls.map(call=>call.url)).toEqual(['/rest/v1/rpc/admin_image_pricing_catalog','/rest/v1/rpc/admin_import_template'])
     expect(calls[1]?.body).toMatchObject({p_open_sale:true,p_actor:actor,p_template:{id:'example-burger-hero',is_active:true}})
     expect(calls[1]?.body).not.toHaveProperty('p_style_refs')
+    // The database still names the top tier 3k (withDbTiers on the script's client).
+    const sent = calls[1]?.body.p_template as { credits_cost: Record<string, number> }
+    expect(Object.keys(sent.credits_cost).sort()).toEqual(['1k', '2k', '3k'])
   } finally {
     await new Promise<void>(resolve => http.close(() => resolve()))
     await rm(dir,{recursive:true})

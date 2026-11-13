@@ -60,6 +60,15 @@ export async function cachedWebTemplates(locale: Locale, includeSeriesMembers: b
   return listTemplatesIn(createAdminSupabase(), locale, { includeSeriesMembers })
 }
 
+// The dense-text poster templates (ARCHITECTURE §5.3), which the catalogue above leaves out:
+// Photos names and covers poster works with them. Never offered for Make again.
+export async function cachedPosterTemplates(locale: Locale): Promise<LocalizedTemplate[]> {
+  'use cache'
+  cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
+  cacheLife(CATALOGUE_LIFE)
+  return listTemplatesIn(createAdminSupabase(), locale, { posters: true })
+}
+
 type TemplateReads = {
   cached: (locale: Locale) => Promise<LocalizedTemplate[]>
   live: (db: SupabaseClient, locale: Locale, id: string) => Promise<LocalizedTemplate[]>

@@ -32,7 +32,7 @@ export type ExtractDeps = {
 }
 
 export type ExtractResult =
-  | { status: 'ok'; content: PosterContent; unverified: string[] }
+  | { status: 'ok'; content: PosterContent; unverified: string[]; clipped: string[] }
   | { status: 'unavailable' | 'failed' }
 
 async function assertUnderHourlyLimit(db: SupabaseClient, userId: string, now: Date) {
@@ -115,9 +115,11 @@ export async function runExtract(deps: ExtractDeps, input: { userId: string; tem
   try {
     const answer = await ask(deps, credentials, requestBody(credentials.config.model, instructions, text))
     usage = answer.usage
-    const content = toContent(answer.json)
+    const { content, clipped } = toContent(answer.json)
     await record(deps, id, { ok: true, usage, prices: credentials.prices })
-    return { status: 'ok', content, unverified: unverifiedPaths(content, text) }
+    // A cut value is still found in the paste, so it is flagged for review explicitly.
+    const unverified = [...new Set([...unverifiedPaths(content, text), ...clipped])]
+    return { status: 'ok', content, unverified, clipped }
   } catch (error) {
     logger.warn('poster.extract.failed', { error: error instanceof Error ? error.message : 'unknown' })
     await record(deps, id, { ok: false, usage, prices: credentials.prices })

@@ -7,7 +7,7 @@ const base = {
   name: 'Pizza top-down',
   category: 'pizza',
   visibleIn: ['web'],
-  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 2, '2k': 4, '4k': 6 },
   fields: { images: { min: 1, max: 1 }, aspectRatios: ['1:1'] },
 }
 
@@ -19,12 +19,14 @@ describe('template schema', () => {
 
   it('requires all three per-resolution prices as positive integers, nothing else', () => {
     const cost = (creditsCost: unknown) => templateInputSchema.safeParse({ ...base, creditsCost }).success
-    expect(cost({ '1k': 1, '2k': 2, '3k': 3 })).toBe(true)
+    expect(cost({ '1k': 1, '2k': 2, '4k': 3 })).toBe(true)
     expect(cost(2)).toBe(false)
     expect(cost({ '1k': 1, '2k': 2 })).toBe(false)
-    expect(cost({ '1k': 1, '2k': 2, '3k': 3, '4k': 4 })).toBe(false)
-    expect(cost({ '1k': 0, '2k': 2, '3k': 3 })).toBe(false)
-    expect(cost({ '1k': 1.5, '2k': 2, '3k': 3 })).toBe(false)
+    expect(cost({ '1k': 1, '2k': 2, '4k': 3, '8k': 4 })).toBe(false)
+    // A row stored before the 4K rename reads as 4k; it cannot carry both names.
+    expect(templateInputSchema.parse({ ...base, creditsCost: { '1k': 1, '2k': 2, '3k': 3 } }).creditsCost).toEqual({ '1k': 1, '2k': 2, '4k': 3 })
+    expect(cost({ '1k': 0, '2k': 2, '4k': 3 })).toBe(false)
+    expect(cost({ '1k': 1.5, '2k': 2, '4k': 3 })).toBe(false)
     expect(templateInputSchema.safeParse({ ...base, quality: 'low' }).success).toBe(false)
   })
 

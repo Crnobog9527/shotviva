@@ -3,12 +3,12 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { RESOLUTIONS } from '../templates/output-options'
 import { AppError } from '../errors'
 import { estimatedImageCostsSchema, imageCapabilitiesSchema, type ImageCapabilities } from '../templates/image-capabilities'
 import type { ProviderPrices } from '../jobs'
 import { ProviderSettingError } from './setting-error'
 import { PROVIDER_ADAPTERS, PROVIDER_MODULES, type ActiveProviderRow, type AdminProvider, type ProviderModule } from './types'
+import { resolutionSchema } from '@/core/templates/db-resolution'
 
 // Data access for public.ai_providers. Service-role client only: the table refuses every
 // client role (ARCHITECTURE §3.3). Keys are not here: they live in Vault (keys.ts).
@@ -38,7 +38,7 @@ const listRowSchema = z.object({
   adapter: z.enum(PROVIDER_ADAPTERS),
   label: z.string(),
   base_url: z.string(),
-  resolutions: z.array(z.enum(RESOLUTIONS)),
+  resolutions: z.array(resolutionSchema),
   model: z.string(),
   api_key_last4: z.string().nullable(),
   is_active: z.boolean(),
@@ -54,7 +54,7 @@ const rowSchema = z.object({
   id: z.uuid(),
   adapter: z.enum(PROVIDER_ADAPTERS),
   base_url: z.string(),
-  resolutions: z.array(z.enum(RESOLUTIONS)),
+  resolutions: z.array(resolutionSchema),
   model: z.string(),
   ...priceColumns,
   ...capsColumns,

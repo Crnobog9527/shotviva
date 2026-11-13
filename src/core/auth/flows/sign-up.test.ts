@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ signUp: vi.fn(), resend: vi.fn(), resetPasswordForEmail: vi.fn(), updateUser: vi.fn(), getUser: vi.fn() }))
+const mocks = vi.hoisted(() => ({ signUp: vi.fn(), resend: vi.fn(), resetPasswordForEmail: vi.fn(), updateUser: vi.fn(), getUser: vi.fn(), rpc: vi.fn() }))
 const request = vi.hoisted(() => ({ host: 'localhost:3000', env: {} as Record<string, unknown> }))
 
 vi.mock('server-only', () => ({}))
@@ -8,12 +8,13 @@ vi.mock('../../i18n/server', () => ({
   currentLocale: async () => 'zh',
   localized: async (path: string) => `/zh${path === '/' ? '' : path}`,
 }))
-vi.mock('next/headers', () => ({ headers: async () => new Headers({ host: request.host }) }))
+vi.mock('next/headers', () => ({ headers: async () => new Headers({ host: request.host, 'x-forwarded-for': '203.0.113.7' }) }))
 vi.mock('../../env', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../env')>()
   return { ...actual, serverEnv: () => ({ ...actual.serverEnv(), ...request.env }) }
 })
 vi.mock('../supabase-server', () => ({ createSessionSupabase: async () => ({ auth: mocks }) }))
+vi.mock('../supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc }) }))
 
 const { resendSignupEmail, signUpWithPassword, updatePassword } = await import('./sign-up')
 
@@ -29,9 +30,21 @@ beforeEach(() => {
   vi.clearAllMocks()
   request.host = 'localhost:3000'
   request.env = {}
+  mocks.rpc.mockResolvedValue({ data: 'ok', error: null })
 })
 
 describe('signUpWithPassword', () => {
+  it('registers the request with the visitor IP before Supabase, and stops at our IP limit (1350)', async () => {
+    mocks.signUp.mockResolvedValue({ data: { user: { identities: [{}] } }, error: null })
+    await signUpWithPassword(form({ email: 'Mei@Example.com', password: 'hunter2x' }))
+    const [fn, args] = mocks.rpc.mock.calls[0]!
+    expect(fn).toBe('signup_request')
+    expect(args).toEqual({ p_email_key: expect.stringMatching(/^[0-9a-f]{64}$/), p_ip: '203.0.113.7' })
+    mocks.rpc.mockResolvedValueOnce({ data: 'ip_hourly', error: null })
+    expect(await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))).toEqual({ status: 'error', code: 'AUTH_RATE_LIMITED' })
+    expect(mocks.signUp).toHaveBeenCalledTimes(1)
+  })
+
   it('links back to the allow-listed test-site alias the form was sent from (preview only)', async () => {
     mocks.signUp.mockResolvedValue({ data: { user: { identities: [{}] } }, error: null })
     request.host = 'shotviva-qa-user.vercel.app'

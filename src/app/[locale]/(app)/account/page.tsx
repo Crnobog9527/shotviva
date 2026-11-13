@@ -55,7 +55,7 @@ async function Account() {
   const more = payments.length >= PICKER_LIMIT
   // Each line with its receipt / invoice links (T80); the support picker keeps the plain labels.
   const lines = purchaseLines(payments, purchases, locale)
-  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.refused, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, affiliate, admin: user.role === 'admin' }
+  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.reason, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, affiliate, admin: user.role === 'admin' }
   // Help & feedback opens over the page (?help=…, T68); its payments picker is the Purchases list.
   return (
     <>

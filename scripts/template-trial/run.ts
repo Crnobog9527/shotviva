@@ -13,6 +13,7 @@ import { dirname, join, relative } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import { createClient } from '@supabase/supabase-js'
+import { withDbTiers } from '../../src/core/templates/db-resolution'
 import { z } from 'zod'
 
 import { listAdminTemplates } from '../../src/core/admin/templates/repository'
@@ -53,7 +54,9 @@ function readFlags(args: string[]) {
 async function photoHashes(items: ReturnType<typeof readBatchFile>['templates'], baseDir: string) {
   const photos = new Map<string, { bytes: Uint8Array; hash: string }>()
   for (const input of items.flatMap(item => item.trial?.inputs ?? [])) {
-    if (input.photo && !photos.has(input.photo)) photos.set(input.photo, await readPhoto(baseDir, input.photo))
+    for (const path of [input.photo, ...Object.values(input.slots ?? {})]) {
+      if (path && !photos.has(path)) photos.set(path, await readPhoto(baseDir, path))
+    }
   }
   return photos
 }
@@ -79,7 +82,7 @@ async function prepare() {
   const target = targetOf(env.data)
   const batch = readBatchFile(options.file)
   const baseDir = dirname(options.file)
-  const db = createClient(env.data.NEXT_PUBLIC_SUPABASE_URL, env.data.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+  const db = createClient(env.data.NEXT_PUBLIC_SUPABASE_URL, env.data.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: withDbTiers() } })
   const templates = new Map((await listAdminTemplates(db)).map(t => [t.id, t]))
   const photos = await photoHashes(batch.templates, baseDir)
   const model = await effectiveModels(db)
@@ -93,7 +96,7 @@ type PrivateStore = NonNullable<Awaited<ReturnType<typeof targetStores>>['privat
 async function uploadPhotos(p: Prepared, deps: { db: Prepared['db']; store: PrivateStore }) {
   const photoIds = new Map<string, string>()
   for (const photo of new Map([...p.photos.values()].map(x => [x.hash, x])).values()) {
-    if (p.cells.some(c => c.photoHash === photo.hash)) photoIds.set(photo.hash, await ensureTestPhoto(deps, p.env.SHOTVIVA_IMPORT_ADMIN_ID, photo))
+    if (p.cells.some(c => c.photoHash === photo.hash || Object.values(c.slotHashes ?? {}).includes(photo.hash))) photoIds.set(photo.hash, await ensureTestPhoto(deps, p.env.SHOTVIVA_IMPORT_ADMIN_ID, photo))
   }
   return photoIds
 }

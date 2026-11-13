@@ -58,6 +58,20 @@ function localizeCopy(field: CopyField, text: TemplateTranslation | undefined): 
   return { ...field, label: own.label || field.label, ...(placeholder ? { placeholder } : {}), ...(help ? { help } : {}), ...optionLabels(field, own) }
 }
 
+// An image slot's label and help (§5.1e), each falling back to English. Display only: the
+// prompt's image list always uses the English label (server side, from the stored fields).
+function localizeImages(images: TemplateFields['images'], text: TemplateTranslation | undefined): TemplateFields['images'] {
+  if (!images.slots || !text) return images
+  return {
+    ...images,
+    slots: images.slots.map((slot) => {
+      const own = text.fields?.[slot.key] ?? {}
+      const help = own.help || slot.help
+      return { ...slot, label: own.label || slot.label, ...(help ? { help } : {}) }
+    }),
+  }
+}
+
 export function localizeTemplate(template: Template, locale: Locale): LocalizedTemplate {
   const categoryView = localizeCategory(template.categoryInfo, locale)
   const shown = withLocaleCover(template, locale)
@@ -69,6 +83,9 @@ export function localizeTemplate(template: Template, locale: Locale): LocalizedT
     categoryView,
     name: text.name || template.name,
     description: text.description || template.description,
-    fields: { ...template.fields, copy, toggles: template.fields.toggles.map((toggle) => localizeToggle(toggle, text)) },
+    fields: {
+      ...template.fields, copy, images: localizeImages(template.fields.images, text),
+      toggles: template.fields.toggles.map((toggle) => localizeToggle(toggle, text)),
+    },
   }
 }

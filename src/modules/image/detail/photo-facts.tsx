@@ -44,11 +44,11 @@ export function PhotoFacts({ item, original, keptWithWork, reference }: Props) {
     <dl aria-label={f('label')} className="hairline mt-5 rounded-panel bg-card px-4 py-1">
       <Row label={f('template')}>{item.templateName}</Row>
       <Row label={f('size')}>{mono(sizeLabel(item.aspect, t))}</Row>
-      <Row label={f('resolution')}>{f('resolutionValue', { tier: tierName(item.resolution, t), px: tierPx(item.resolution) })}</Row>
+      <Row label={f('resolution')}>{f('resolutionValue', { tier: tierName(item.resolution, t), px: tierPx(item.resolution, item.aspect) })}</Row>
       {item.fileUrl ? <FormatRow fileUrl={item.fileUrl} work={{ pool: item.creditPool, transparent: item.transparent }} className={ROW} /> : null}
       <Row label={f('credits')}>{mono(t('credits', { count: item.credits }))}</Row>
       <Row label={f('visibility')}>{f(VISIBILITY[workTagKey(item.creditPool, item.visibility)])}</Row>
-      <Row label={f('original')}>{originalFact(original, keptWithWork, f)}</Row>
+      {original.kind === 'none' ? null : <Row label={f('original')}>{originalFact(original, keptWithWork, f)}</Row>}
       <Row label={f('made')}>
         <PhotoWhen iso={item.createdAt} variant="made" />
       </Row>

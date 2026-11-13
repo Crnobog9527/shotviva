@@ -9,10 +9,10 @@ const { syncTemplateState } = await import('./state')
 
 const candidate = {
   id: 'demo', name: 'Demo', description: 'One line.', visibleIn: ['web'], coverBeforeUrl: 'https://a.test/b.webp',
-  coverAfterUrl: 'https://a.test/a.webp', coverLocales: {}, quality: 'medium', creditsCost: { '1k': 5, '2k': 6, '3k': 7 },
+  coverAfterUrl: 'https://a.test/a.webp', coverLocales: {}, quality: 'medium', creditsCost: { '1k': 5, '2k': 6, '4k': 7 },
   isActive: false, saleEnabled: false, unpricedResolutions: [], hasPrompt: true, providerId: null,
 }
-const floors = { high: { '1k': 2, '2k': 4, '3k': 6 }, medium: { '1k': 1, '2k': 2, '3k': 3 } }
+const floors = { high: { '1k': 2, '2k': 4, '4k': 6 }, medium: { '1k': 1, '2k': 2, '4k': 3 } }
 
 function target(answer: { data?: unknown; error?: { message: string } }) {
   const rpc = vi.fn(async () => answer)
@@ -49,3 +49,4 @@ describe('syncTemplateState', () => {
       .rejects.toThrow('SALE_ROUTE_NOT_ALLOWED')
   })
 })
+

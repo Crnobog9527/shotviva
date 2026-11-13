@@ -6,7 +6,7 @@ export const zhCopy = {
 
 // 用户填写的字段 (ARCHITECTURE §5 fields.copy): what the user types or picks for this template.
 export const copyFieldCopy = {
-  legend: '用户填写的字段（选填，最多 10 个）',
+  legend: '用户填写的字段（选填，最多 12 个）',
   hint: '用户在创作区看到的输入项，比如海报标题、价格、尺寸。提示词正文里写 {{key}} 可以指定放在哪里；不写的话，系统会把「英文名称: 用户填的内容」自动加在提示词正文后面。用户填的内容只用于他自己的这次出图。',
   empty: '这个模板没有要用户填写的字段。',
   add: '添加字段',
@@ -32,6 +32,28 @@ export const copyFieldCopy = {
   addOption: '添加选项',
   removeOption: '删除',
   placement: (key: string, used: boolean) => (used ? `提示词里有 {{${key}}}，内容会放在那里。` : `提示词里没有 {{${key}}}，内容会以一行「英文名称: 内容」加在正文后面。`),
+  promptSize: (worst: number, max: number) => `提醒：提示词正文加上所有字段填满时最多约 ${worst} 字符，超过 ${max} 时用户出图会被拒绝（不扣积分）。可以调小字段的字数上限。`,
+} as const
+
+// The 图片格子 cards (ARCHITECTURE §5.1e).
+export const slotFieldCopy = {
+  legend: '图片格子（选填，最多 4 个）',
+  hint: '每个格子是创作区里一个单独的上传框（比如「Logo 上传」「一等奖照片上传」），用户只能把图传进对应的格子。出图时只把传了图的格子按这里的顺序送给模型；空格子不占位置。有格子的模板只能单张出（不进批量创作），只在站内用，也不提供「按原图比例」。没有格子时，用上面字段定义里的 images 按张数上传。',
+  empty: '没有图片格子：用户按张数上传（字段定义 JSON 里的 images）。',
+  add: '添加格子',
+  remove: '删除这个格子',
+  up: '上移',
+  key: 'key（小写字母、数字、下划线）',
+  label: '英文名称（也会写进提示词的图片清单）',
+  labelZh: '中文名称（创作区上传框的标题）',
+  help: '英文说明（选填，显示在上传框下面）',
+  helpZh: '中文说明（选填）',
+  required: '必填',
+  note: '挂在下面的文字字段（选填）',
+  noNote: '不挂',
+  placement: (used: boolean) => (used
+    ? '提示词里有 {{image_slots}}，会填成「Image 1: …; Image 2: …」这样的图片清单。'
+    : '提示词里没有 {{image_slots}}，图片清单会以一行「Images: Image 1: …」加在正文后面。'),
 } as const
 
 // The English text in 公开信息 (T52).
@@ -215,9 +237,9 @@ export const styleRefCopy = {
   needId: '先填写有效的模板 ID，再上传参考图。', idLocked: '移除已上传的参考图后可修改模板 ID。', invalidUpload: '上传失败，请重试。', decodeFailed: '无法读取图片，请换一个文件。',
 } as const
 
-export function fallbackPriceCopy(tiers?: Record<'1k' | '2k' | '3k', number | null>) {
-  const floor = (tier: '1k' | '2k' | '3k') => tiers?.[tier] ?? '不可用'
-  return `回退到默认模型时的最低积分：Standard ${floor('1k')}、HD ${floor('2k')}、Max ${floor('3k')}。当前售价低于对应下限或该档不可用时，回退会被拒绝。`
+export function fallbackPriceCopy(tiers?: Record<'1k' | '2k' | '4k', number | null>) {
+  const floor = (tier: '1k' | '2k' | '4k') => tiers?.[tier] ?? '不可用'
+  return `回退到默认模型时的最低积分：1K ${floor('1k')}、2K ${floor('2k')}、4K ${floor('4k')}。当前售价低于对应下限或该档不可用时，回退会被拒绝。`
 }
 
 export const saleCopy = {
@@ -226,10 +248,11 @@ export const saleCopy = {
 }
 
 export const catalogCopy = {
-  priceGroup: '出图与价格', active: '已上架', inactive: '已下架', all: '全部',
+  priceGroup: '出图与价格', active: '已上架', inactive: '已下架', all: '全部', deleted: '已删除',
+  deletedHint: '已删除的模板不能上架、加入系列或排序；作品和出图记录都保留。',
   seriesFilter: '筛选系列', allSeries: '全部系列', single: '单个模板', groupSeries: '按系列分组',
   empty: '没有匹配的模板',
-  status: '上架状态', category: '筛选分类', categories: '全部分类', search: '搜索中文名、英文名或 ID',
+  status: '上架状态', category: '筛选分类', categories: '全部分类', search: '搜索名称、ID、分类或系列',
 }
 
 // The catalogue row (2026-11-12): the cover thumbnail, the id that copies itself, the actions.
@@ -238,9 +261,14 @@ export const rowCopy = {
   copyId: '复制 ID',
   copied: '已复制',
   credits: '积分',
-  tiers: 'Standard / HD / Max',
+  tiers: '1K / 2K / 4K',
   version: '版本',
   edit: '编辑',
+  // The number 创作页 compares with the series' (Owner 2026-11-13).
+  orderNumber: (n: number) => `序号 ${n}`,
+  delete: '删除',
+  deleted: '已删除',
+  orderNumberHint: '创作页里单独模板卡和系列卡按这个数字从小到大混排（同一大类内）；不单独展示的系列成员以系列的序号为准。',
 } as const
 
 // Batch 首页精选 (2026-11-12): the bulk bar's two buttons and their confirm step.
@@ -284,4 +312,12 @@ export const featuredCopy = {
   dropped: '首页精选在别处变了（上下架或另一个页面保存过），未保存的排列已丢弃，下面是现在的样子。',
   dismiss: '知道了',
   locked: '先保存或放弃上面「首页精选」的改动',
+} as const
+
+// 删除 an unpublished template (Owner 2026-11-13).
+export const deleteCopy = {
+  title: (name: string) => `删除「${name}」？`,
+  body: '删除后无法恢复：模板从后台列表消失，也不能再上架或加入系列。',
+  kept: '已经生成的作品、出图记录和收藏都会保留。',
+  cancel: '取消', confirm: '确认删除', done: (name: string) => `已删除「${name}」`,
 } as const

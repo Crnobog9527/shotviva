@@ -3,27 +3,18 @@
 import { useState } from 'react'
 import { providerFloor, type ProviderFloors } from '@/core/templates/provider-pricing'
 
-import { Label } from '@/core/ui/label'
-import { Button } from '@/core/ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/core/ui/dialog'
+import { Dialog, DialogContent } from '@/core/ui/dialog'
 
-import { ImageProviderField, type ImageProviderOption } from '../image-provider-field'
+import type { ImageProviderOption } from '../image-provider-field'
 import type { AdminTemplate, CoverLanguage, SaveTemplatePayload, TemplateAdminActions } from '../templates/types'
 import { TEST_RUN_COPY, TestRunPanel } from '../test-run-ui'
 
 import type { CategoryOption } from './category-field'
-import { buildPayload, emptyFormValues, toFormValues, type TemplateFormValues } from './form-state'
-import { afterCoverSource, type AfterCover } from '../covers/client'
-import { referenceBudget, refUploadId } from './style-ref-state'
-import { StyleRefFields } from './style-ref-fields'
-import { TemplateCoverFields } from './template-cover-fields'
-import { categoryCopy, fallbackPriceCopy } from './copy'
-import { SaleSwitch } from './sale-switch'
-import { TemplateHistory, type VersionActions } from './prompt-history'
-import { TemplatePromptFields } from './template-prompt-fields'
-import { TemplatePublicFields } from './template-public-fields'
-import { TemplateToggleFields } from './template-toggle-fields'
-import { TemplateCopyFields } from './template-copy-fields'
+import { EditorSidePanel } from './editor-side-panel'
+import { buildPayload, emptyFormValues, toFormValues } from './form-state'
+import { previewDraft } from './preview-draft'
+import type { VersionActions } from './prompt-history'
+import { FormColumn } from './template-form-column'
 
 export type EditTarget = { mode: 'new' } | { mode: 'edit'; template: AdminTemplate; previousStandard?: number | null }
 
@@ -33,6 +24,8 @@ type Props = {
   floor: ProviderFloors
   categories: readonly CategoryOption[]
   series: readonly { id: string; nameZh: string }[]
+  // Every template, for the live preview's series panel.
+  templates: readonly AdminTemplate[]
   coverLanguages: readonly CoverLanguage[]
   coverActions: Pick<TemplateAdminActions, 'requestCoverUpload' | 'applyCover' | 'setSale'> & VersionActions
   pending: boolean
@@ -44,7 +37,7 @@ type Props = {
 }
 
 // Mounted fresh per target (keyed by the container), so initial state comes straight from props.
-export function TemplateFormDialog({ target, providers, floor: allFloors, categories, series, coverLanguages, coverActions, pending, error, notice, onCancel, onSubmit }: Props) {
+export function TemplateFormDialog({ target, providers, floor: allFloors, categories, series, templates, coverLanguages, coverActions, pending, error, notice, onCancel, onSubmit }: Props) {
   const isNew = target.mode === 'new'
   const [values, setValues] = useState(() =>
     target.mode === 'edit' ? toFormValues(target.template) : emptyFormValues(),
@@ -77,9 +70,12 @@ export function TemplateFormDialog({ target, providers, floor: allFloors, catego
           one scrolling column below that. */}
       <DialogContent className="max-h-[92vh] gap-0 overflow-y-auto p-0 sm:max-w-[min(1400px,96vw)] lg:h-[92vh] lg:overflow-clip">
         <div className="grid min-h-0 lg:h-full lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-          <FormColumn {...{ target, providers, values, isNew, floor, categories, series, coverLanguages, coverActions, onChange, pending, onCancel }} error={shownError} saved={submitted ? (notice ?? null) : null} onSave={submit} />
+          <FormColumn existing={target.mode === 'edit' ? target.template : null} {...{ providers, values, floor, categories, series, coverLanguages, coverActions, onChange }}
+            footer={{ pending, error: shownError, saved: submitted ? (notice ?? null) : null, onCancel, onSave: submit }} />
           <aside className="bg-muted/20 min-h-0 border-t p-6 lg:overflow-y-auto lg:border-t-0 lg:border-l">
-            {target.mode === 'edit' ? <TestRunPanel providers={providers} template={target.template} languages={coverLanguages} /> : <NewTemplateNote />}
+            <EditorSidePanel isActive={target.mode === 'edit' && target.template.isActive}
+              draft={target.mode === 'edit' ? previewDraft(values, target.template, { categories, templates, series }) : null}
+              testRun={target.mode === 'edit' ? <TestRunPanel providers={providers} template={target.template} languages={coverLanguages} /> : <NewTemplateNote />} />
           </aside>
         </div>
       </DialogContent>
@@ -96,103 +92,3 @@ function NewTemplateNote() {
   )
 }
 
-type FormColumnProps = Pick<Props, 'target' | 'providers' | 'floor' | 'categories' | 'series' | 'coverLanguages' | 'coverActions' | 'pending' | 'onCancel'> & {
-  values: TemplateFormValues
-  isNew: boolean
-  error: string | null
-  // This dialog's own last save, shown by the button (the dialog stays open after a save).
-  saved: string | null
-  onChange: (patch: Partial<TemplateFormValues>) => void
-  onSave: () => void
-}
-
-function FormColumn({ target, providers, values, isNew, floor, categories, series, coverLanguages, coverActions, pending, error, saved, onChange, onCancel, onSave }: FormColumnProps) {
-  const [activeCover, setActiveCover] = useState(0)
-  const [uploading, setUploading] = useState(false)
-  const budget = referenceBudget(providers, values.providerId, values.fieldsJson, values.styleRefs.length)
-  const existing = target.mode === 'edit' ? target.template : null
-  const cover = afterCoverSource(existing, coverLanguages[activeCover].code)
-  return (
-    <div className="grid min-h-0 content-start gap-4 p-6 lg:overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle>{existing ? `编辑「${existing.name}」` : '新建模板'}</DialogTitle>
-      </DialogHeader>
-      <SaleSwitch template={existing} action={coverActions.setSale} disabled={pending} />
-      <TemplatePublicFields modelField={values.module === 'image' && (
-        <>
-          <ImageProviderField id="tpl-provider" providers={providers} value={values.providerId} onChange={(providerId) => onChange({ providerId })} />
-          <FallbackPrice providers={providers} values={values} />
-        </>
-      )} values={values} isNew={isNew} uploading={uploading} floor={floor} categories={categories} onChange={onChange} />
-      <SeriesField template={existing} series={series} value={values.seriesId} onChange={seriesId => onChange({ seriesId })} />
-      {existing ? (
-        <TemplateCoverFields template={existing} languages={coverLanguages} actions={coverActions} active={activeCover} onSelect={setActiveCover} />
-      ) : (
-        <p className="text-muted-foreground text-xs">保存模板后再打开编辑，即可上传封面。</p>
-      )}
-      <StyleSection cover={cover} values={values} budget={budget} uploading={uploading} setUploading={setUploading} onChange={onChange} />
-      <TemplatePromptFields values={values} version={existing?.prompt?.version ?? null} onChange={onChange} />
-      <TemplateHistory template={existing} values={values} disabled={pending || uploading}
-        actions={coverActions} providers={providers} onChange={onChange} />
-      <TemplateCopyFields values={values} onChange={onChange} />
-      <TemplateToggleFields values={values} onChange={onChange} />
-      {isNew ? <p className="text-muted-foreground text-xs">新模板保存后默认是下架状态，保存后留在这里，右侧就能试跑。</p> : null}
-      <FormFooter saveDisabled={styleSaveBlocked(uploading, values.module, budget.problem)} pending={pending} error={error} saved={saved} onCancel={onCancel} onSave={onSave} />
-    </div>
-  )
-}
-
-function SeriesField({ template, series, value, onChange }: {
-  template: AdminTemplate | null; series: Props['series']; value: string | null; onChange: (id: string | null) => void
-}) {
-  if (template?.categoryInfo.isSystem) return null
-  return (
-    <div className="grid gap-1.5">
-      <Label htmlFor="tpl-series">{categoryCopy.series}</Label>
-      <select id="tpl-series" className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
-        value={value ?? ''} onChange={event => onChange(event.target.value || null)}>
-        <option value="">{categoryCopy.standalone}</option>
-        {series.map(item => <option key={item.id} value={item.id}>{item.nameZh}</option>)}
-      </select>
-    </div>
-  )
-}
-
-function FallbackPrice({ providers, values }: Pick<FormColumnProps, 'providers' | 'values'>) {
-  const active = providers.find(option => option.isActive)
-  if (!values.providerId || values.providerId === active?.id) return null
-  return <p className="text-muted-foreground text-xs">{fallbackPriceCopy(active?.fallbackFloors?.[values.quality])}</p>
-}
-
-function styleSaveBlocked(uploading: boolean, module: string, problem: string | null) {
-  return uploading || (module === 'image' && !!problem)
-}
-
-function StyleSection({ cover, values, budget, uploading, setUploading, onChange }: Pick<FormColumnProps, 'values' | 'onChange'> & {
-  cover: AfterCover | null; budget: ReturnType<typeof referenceBudget>; uploading: boolean; setUploading: (value: boolean) => void
-}) {
-  if (values.module !== 'image') return null
-  return <StyleRefFields cover={cover} templateId={refUploadId(values.id)} refs={values.styleRefs} budget={budget}
-    busy={uploading} onBusy={setUploading} onChange={styleRefs => onChange({ styleRefs, styleRefsEdited: true })} />
-}
-
-function FormFooter({ pending, error, saved, onCancel, onSave, saveDisabled }: Pick<FormColumnProps, 'pending' | 'error' | 'saved' | 'onCancel' | 'onSave'> & { saveDisabled: boolean }) {
-  return (
-    <>
-      {error ? (
-        <p role="alert" className="text-destructive text-sm">
-          {error}
-        </p>
-      ) : null}
-      <DialogFooter className="items-center">
-        {saved && !error && !pending ? <p className="text-sm text-emerald-700 sm:mr-auto dark:text-emerald-400">{saved}</p> : null}
-        <Button variant="outline" onClick={onCancel} disabled={pending}>
-          关闭
-        </Button>
-        <Button onClick={onSave} disabled={pending || saveDisabled}>
-          {pending ? '保存中…' : '保存'}
-        </Button>
-      </DialogFooter>
-    </>
-  )
-}

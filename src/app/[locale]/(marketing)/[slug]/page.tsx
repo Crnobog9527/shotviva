@@ -13,9 +13,10 @@ import {
   softwareApplicationLd,
 } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
+import { cachedCatalogueIndex } from '@/core/templates/cached-taxonomy'
 import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
-import { toCatalogueTemplate } from '@/modules/image/marketing'
+import { pickerBrowse, toCatalogueTemplate } from '@/modules/image/marketing'
 import { contentPagesIn, creditFacts, featuredSections, fillCredits, findContentPageIn, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
 import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
@@ -46,11 +47,11 @@ export function generateStaticParams({ params }: { params: { locale: string } })
 async function load(params: Promise<{ slug: string }>) {
   const locale = await currentLocale()
   const slug = (await params).slug
-  const [products, live, series] = await Promise.all([displayProducts(), cachedWebCatalogue(locale), cachedPublicSeries(locale)])
+  const [products, live, series, index] = await Promise.all([displayProducts(), cachedWebCatalogue(locale), cachedPublicSeries(locale), cachedCatalogueIndex(locale)])
   const found = findContentPageIn(slug, locale, products)
   if (!found || !isEnabled(found)) notFound()
   const facts = creditFacts(live)
-  return { locale, live, series, products, page: fillCredits(found, facts), free: fillCredits(freeImagesIn(locale), facts) }
+  return { locale, live, series, index, products, page: fillCredits(found, facts), free: fillCredits(freeImagesIn(locale), facts) }
 }
 
 export async function generateMetadata({ params }: PageProps<'/[locale]/[slug]'>): Promise<Metadata> {
@@ -59,7 +60,7 @@ export async function generateMetadata({ params }: PageProps<'/[locale]/[slug]'>
 }
 
 export default async function ContentRoute({ params }: PageProps<'/[locale]/[slug]'>) {
-  const { locale, live, series, products, page, free } = await load(params)
+  const { locale, live, series, index, products, page, free } = await load(params)
   const path = pagePath(page)
   const crumbs = [
     { name: homePageIn(locale).label, path: '/' },
@@ -72,10 +73,13 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   if (page.module) ld.push(softwareApplicationLd(site, meta, offersShownIn(page, products), free))
   const catalogue = live.map(toCatalogueTemplate)
   // The page's own categories' featured templates; the generator opens on the first of them.
-  const { defaultId, ...sections } = featuredSections(live, page.landing.templates?.categoryKeys, series)
+  const { defaultId: firstFeatured, ...sections } = featuredSections(live, page.landing.templates?.categoryKeys, series)
+  // A page may name the template to open on (e.g. the cut-out one); only while it is live.
+  const wanted = page.landing.templates?.defaultId
+  const defaultId = wanted && live.some((template) => template.id === wanted) ? wanted : firstFeatured
   const initialCovers = await openingCovers(live.find((template) => template.id === defaultId))
   const generator = (
-    <HomeGeneratorSlot templates={catalogue} defaultId={defaultId} homePath={localizePath(path, locale)} freeImages={free} initialCovers={initialCovers} />
+    <HomeGeneratorSlot templates={catalogue} browse={pickerBrowse(index, catalogue, locale === 'zh')} defaultId={defaultId} homePath={localizePath(path, locale)} freeImages={free} initialCovers={initialCovers} />
   )
   return (
     <>

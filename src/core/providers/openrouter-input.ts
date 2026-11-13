@@ -1,7 +1,7 @@
 import type { ImageRequestOptions } from '../jobs/provider'
 import type { OpenRouterImageParameters } from './openrouter-catalog'
 
-export const OPENROUTER_IMAGE_SIZE = { '1k': '1K', '2k': '2K', '3k': '4K' } as const
+export const OPENROUTER_IMAGE_SIZE = { '1k': '1K', '2k': '2K', '4k': '4K' } as const
 
 // Used both when choosing a template's provider and when calling OpenRouter directly.
 function referenceMismatch(count: number, range: OpenRouterImageParameters['input_references']) {

@@ -5,7 +5,7 @@ import type { CreditsFloor } from '@/core/templates/pricing'
 import { describeBlockers, planActiveChange, publishBlockers, type PublishCandidate } from './publish-rules'
 
 // core cannot import the image module's table; the same shape with the v1 numbers.
-const CREDITS_FLOOR: CreditsFloor = { high: { '1k': 2, '2k': 4, '3k': 6 }, medium: { '1k': 1, '2k': 2, '3k': 3 } }
+const CREDITS_FLOOR: CreditsFloor = { high: { '1k': 2, '2k': 4, '4k': 6 }, medium: { '1k': 1, '2k': 2, '4k': 3 } }
 
 const ready = (id: string, over: Partial<PublishCandidate> = {}): PublishCandidate => ({
   id,
@@ -16,7 +16,7 @@ const ready = (id: string, over: Partial<PublishCandidate> = {}): PublishCandida
   coverAfterUrl: `https://assets.test/covers/${id}/after.webp`,
   coverLocales: {},
   quality: 'high',
-  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 2, '2k': 4, '4k': 6 },
   isActive: false,
   hasPrompt: true,
   ...over,
@@ -27,13 +27,19 @@ describe('publishBlockers', () => {
     expect(publishBlockers(ready('a'), CREDITS_FLOOR)).toEqual([])
   })
 
+  it('holds a slot template to the floor × its slots (§5.1e)', () => {
+    const slots = { images: { slots: [{ key: 'a' }, { key: 'b' }] } }
+    expect(publishBlockers(ready('s', { fields: slots }), CREDITS_FLOOR)).toEqual(['below_floor'])
+    expect(publishBlockers(ready('s', { fields: slots, creditsCost: { '1k': 4, '2k': 8, '4k': 12 } }), CREDITS_FLOOR)).toEqual([])
+  })
+
   it('names every missing piece of a web template', () => {
     const draft = ready('a', {
       hasPrompt: false,
       name: '  ',
       description: null,
       coverAfterUrl: null,
-      creditsCost: { '1k': 1, '2k': 4, '3k': 6 },
+      creditsCost: { '1k': 1, '2k': 4, '4k': 6 },
     })
     expect(publishBlockers(draft, CREDITS_FLOOR)).toEqual(['no_prompt', 'no_name', 'no_description', 'no_cover', 'below_floor'])
   })

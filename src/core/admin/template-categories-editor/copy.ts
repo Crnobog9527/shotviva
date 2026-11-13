@@ -4,7 +4,7 @@ import { CATEGORY_LIMITS } from '@/core/templates/categories'
 // Chinese-only (DESIGN §7).
 export const CATEGORIES_COPY = {
   title: '分类管理',
-  body: '拖动可调整同级顺序或移到其他分类下，最多可建三级。点分类前的箭头展开或收起子分类，拖到收起的分类上也能放进去。创作页的分类条和首页的模板分组都按这里的顺序和名称显示。没有已上架模板的分类不会出现在页面上。改名只改显示，标识不变。',
+  body: '拖动或在序号框里输入数字（按回车）可调整同级顺序，「移动」可移到其他分类下，最多可建三级。点分类前的箭头展开或收起子分类。创作页的分类条和首页的模板分组都按这里的顺序和名称显示。没有已上架模板的分类不会出现在页面上。改名只改显示，标识不变。',
   add: '新增分类',
   addChild: '新增子分类',
   hidden: '隐藏',
@@ -41,10 +41,13 @@ export const CATEGORIES_COPY = {
     introEn: '英文首页说明（选填）',
     introHint: '显示在首页这个分类的标题下面。留空就不显示说明。',
     style: '模板卡片样式',
+    // Where it shows (Owner 2026-11-13 asked): single template cards only. A series card shows
+    // its series cover (or its first member's pair) whatever this says.
     styleHint: {
       pair: '手机原图和 AI 结果并排放（大多数分类）。',
       compare: '一张图左右拖动对比（现在只有「画风」用）。',
     },
+    styleWhere: '只影响单个模板的卡片：创作页的模板卡片，以及首页、落地页模板区里只放一个模板的分类。系列卡片不受影响，它显示系列封面（没有封面时显示第一个模板的并排图），所以分类里放的是系列时，改这里看不出变化。',
     cancel: '取消',
     save: '保存',
     saving: '保存中…',

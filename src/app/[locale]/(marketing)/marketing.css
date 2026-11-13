@@ -279,6 +279,7 @@
     text-align: left; cursor: pointer; color: var(--foreground); background: color-mix(in srgb, var(--primary) 7%, var(--card));
     box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--primary) 55%, transparent);
   }
+  .mk-up-empty { display: none; }
   .mk-up-has { background: var(--wash); box-shadow: inset 0 0 0 1px var(--border); }
   .mk-up-plus { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: var(--primary); color: var(--primary-foreground); }
   .mk-up-thumb { flex: none; width: 48px; height: 48px; border-radius: 12px; object-fit: cover; }
@@ -314,6 +315,7 @@
   .mk-panel-note::placeholder { color: var(--muted-foreground); }
   .mk-panel-note:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--primary), 0 0 0 4px var(--safelight-halo); }
   .mk-panel-cta { grid-area: cta; padding-top: 12px; }
+  .mk-panel-fmt { padding-top: 8px; text-align: center; font-size: 13px; line-height: 1.35; color: var(--muted-foreground); }
   .mk-panel-gift { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0 2px; font-size: 14px; color: var(--bone-dim); }
   .mk-gift-i { width: 16px; height: 16px; color: var(--primary); }
   .mk-field { display: block; padding: 12px 4px 0; }
@@ -613,6 +615,7 @@
     .mk-steps::before { display: none; }
     .mk-steps li { padding-bottom: 0; }
     .mk-free { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .mk-free:has(> :nth-child(4)) { grid-template-columns: repeat(2, 1fr); }
     .mk-links { grid-template-columns: 1fr 1fr; }
     .mk-tgrid { grid-template-columns: 1fr 1fr; gap: 24px 16px; }
     .mk-solo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
@@ -716,12 +719,24 @@
   .mk-pk-t small { display: block; margin-top: 2px; font-size: 14px; color: var(--muted-foreground); }
   .mk-pk-row[aria-checked="true"] { background: var(--wash); box-shadow: inset 0 0 0 1.5px var(--foreground); }
   .mk-pk-go { position: sticky; bottom: 0; margin-top: 4px; padding-top: 12px; background: linear-gradient(transparent, var(--popover) 40%); }
-  @media (hover: hover) { .mk-pk-row[aria-checked="false"]:hover { background: var(--wash-faint); box-shadow: inset 0 0 0 1px var(--border); } }
+  /* search and chips over the list (Owner 2026-11-13); a series row opens its members in place */
+  .mk-pk-tools { display: grid; gap: 10px; margin-top: 16px; }
+  .mk-pk-none { padding: 24px 4px; font-size: 14px; color: var(--muted-foreground); }
+  .mk-pk-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px 0 4px; border-radius: var(--radius-button); font: 500 14px/1 var(--font-sans); color: var(--bone-dim); justify-self: start; }
+  .mk-pk-stack { position: relative; flex: none; border-radius: 12px; box-shadow: 3px -3px 0 -1px var(--accent), 6px -6px 0 -2px var(--secondary); margin: 6px 6px 0 0; }
+  .mk-pk-stack .mk-pk-th { display: block; }
+  @media (max-width: 767.98px) { .mk-pk-body[data-searching] .mk-pk-sample { display: none; } }
+  @media (hover: hover) {
+    .mk-pk-row[aria-checked="false"]:hover, .mk-pk-row:not([aria-checked]):hover { background: var(--wash-faint); box-shadow: inset 0 0 0 1px var(--border); }
+    .mk-pk-back:hover { color: var(--foreground); }
+  }
   @media (min-width: 768px) {
     .mk-picker { max-height: calc(100dvh - 64px); overflow: hidden; }
+    .mk-pk-tools { margin-top: 12px; }
     .mk-pk-body { display: grid; grid-template-columns: 46% minmax(0, 1fr); column-gap: 32px; align-items: start; padding: 24px; }
     .mk-pk-sample { margin-top: 0; }
-    .mk-pk-side { max-height: calc(100dvh - 112px); }
+    /* a fixed height, so the dialog does not jump as chips and searches change the list */
+    .mk-pk-side { height: min(640px, calc(100dvh - 112px)); }
     .mk-pk-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
   }
 
@@ -813,6 +828,8 @@
    pains on hairline rows, then the Wishlist tab's own prints (tape, lean, stamp) as eight
    examples, two to a row on phones and four from 768px. Static: no JS, the images lazy. */
 @layer components {
+  /* The tilted prints and the stamp swing a few px past the gutter; clip at the section (full viewport width) so they never widen the page. */
+  .mk-wish { overflow-x: clip; }
   .mk-wish h2 em { font-style: italic; }
   .mk-wish h2:lang(zh) em { font-style: normal; }
   .mk-wish-points { list-style: none; margin: 20px 0 0; padding: 0; }

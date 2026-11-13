@@ -22,4 +22,14 @@ describe('switching series members', () => {
     expect(memberSwitch(members, 'a', 'a')).toBeNull()
     expect(memberSwitch(members, 'a', 'gone')).toBeNull()
   })
+
+  it('keeps text the next member asks for under the same key and type, and a choice still offered', () => {
+    const field = (key: string, type = 'short', options?: string[]) => ({ key, label: key, type, required: false, maxLength: 5, public: false, ...(options ? { options: options.map((value) => ({ value, label: value })) } : {}) })
+    const poster = (id: string, fields: object[]) => ({ id, photoInput: 'optional', copyFields: fields }) as unknown as CatalogueTemplate
+    const from = poster('neon', [field('venue'), field('prize_1'), field('size', 'select', ['S', 'M']), field('count', 'number')])
+    const to = poster('receipt', [field('venue'), field('prize_1', 'long'), field('size', 'select', ['M', 'L']), field('extra')])
+    const step = memberSwitch([from, to], 'neon', 'receipt', { venue: 'Night Flight Bar', prize_1: 'Whisky', size: 'S', count: '3' })
+    expect(step?.values.copy).toEqual({ venue: 'Night' })
+    expect(memberSwitch([from, to], 'neon', 'receipt', { size: 'M' })?.values.copy).toEqual({ size: 'M' })
+  })
 })

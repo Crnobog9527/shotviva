@@ -42,6 +42,7 @@ export function DetailPhoto({ src, alt, work, tierLabel, original }: DetailPhoto
     if (chosen) choose(chosen)
   }
   const shown = showing === 'original'
+  const views = viewsFor(background !== null, original.source.kind !== 'none')
   const image = showing === 'checker' ? shareSource(src, { pool: work.pool }, 'transparent') : src
   return (
     <figure className="hairline relative mx-auto w-full overflow-hidden rounded-panel bg-photo-ground lg:w-fit">
@@ -51,7 +52,7 @@ export function DetailPhoto({ src, alt, work, tierLabel, original }: DetailPhoto
         <WorkTag pool={work.pool} visibility={work.visibility} />
         <span className="frost inline-flex min-h-[26px] items-center rounded-full px-2 py-1 text-caption leading-none font-semibold text-foreground">{tierLabel}</span>
       </div>
-      <ViewChips views={viewsFor(background !== null)} value={showing} transparent={background !== null} onChange={pick} className="absolute right-3 bottom-3" />
+      {views.length > 1 ? <ViewChips views={views} value={showing} transparent={background !== null} onChange={pick} className="absolute right-3 bottom-3" /> : null}
     </figure>
   )
 }

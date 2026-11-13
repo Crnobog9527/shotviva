@@ -37,7 +37,7 @@ describe('partner template taxonomy', () => {
       cardStyle: 'pair', sortOrder: 1, isSystem: false },
     coverBeforeUrl: null, coverAfterUrl: null, coverVideoUrl: null, coverPosterUrl: null, coverMediaType: 'image', coverLocales: {},
     fields: { images: { min: 1, max: 1 }, copy: [], toggles: [], aspectRatios: ['1:1'] },
-    creditsCost: { '1k': 2, '2k': 4, '3k': 6 }, quality: 'high', sortOrder: 0, isActive: true, visibleIn: ['partner'],
+    creditsCost: { '1k': 2, '2k': 4, '4k': 6 }, quality: 'high', sortOrder: 0, isActive: true, visibleIn: ['partner'],
     translations: {}, featuredRank: null, createdAt: '', updatedAt: '',
   }
 

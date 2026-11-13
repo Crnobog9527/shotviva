@@ -30,7 +30,7 @@ describe('home page skeleton', () => {
       'The AI photo studio that starts from your real photo. What you shot stays; the template changes the light, the scene or the art style.',
     )
     expect(home.answerBlock).toBe(
-      'Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With Shotviva you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in Standard, HD or Max. No prompts. New users get 100 free credits.',
+      'Image to image AI takes a photo you already have and gives it a new look while the subject stays as shot. With Shotviva you upload one phone photo, pick a template for food, products, rooms, pets or an art style, and download it in 1K, 2K or 4K. No prompts. New users get 100 free credits.',
     )
   })
 
@@ -53,7 +53,7 @@ describe('home page skeleton', () => {
     expect(homePage.steps.items.map((step) => step.heading)).toEqual([
       'Upload One Photo',
       'Pick a Template',
-      'Download in Standard, HD or Max',
+      'Download in 1K, 2K or 4K',
     ])
     // SEO PATCH v4.1: no "100" in a home heading, no photo count, no "generous / unlimited".
     expect(home.freeOffer.points[0].heading).toBe('Try It Before You Pay')
@@ -72,8 +72,8 @@ describe('public numbers', () => {
     // Filled from the catalogue at render time (credits.test.ts).
     expect(fillCredits(freeImagesLabel, LIVE)).toBe('100 free credits')
     expect(fillCredits(fromCredits, LIVE)).toBe('from 1 credit')
-    expect(tierList).toBe('Standard, HD or Max')
-    expect(tierPixels).toBe('Standard 1024 px, HD 2048 px, Max 2880 px')
+    expect(tierList).toBe('1K, 2K or 4K')
+    expect(tierPixels).toBe('1K 1024 px, 2K 2048 px, 4K 2880 px')
     expect(uploadLimits).toBe('JPG, PNG or WebP, up to 20MB')
   })
 

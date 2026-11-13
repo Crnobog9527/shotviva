@@ -6,12 +6,13 @@ import { track as defaultTrack, type EventProps, type ServerTrack } from '../ana
 import { categorySlug } from '../analytics/events'
 import { DEFAULT_LOCALE, type Locale } from '../i18n/locales'
 import { EDIT_SCOPES } from '../templates/edit-params'
+import { storedSlotOrder } from '../templates/image-slots'
 import { GenerationFailure } from './generation-failure'
 import type { Job } from './job-schema'
 import { modelFromTag } from './provider-tag'
 
 // Pre-T16 jobs carry no resolution and every one of them is generated at 1K.
-const resolution = z.enum(['1k', '2k', '3k']).catch('1k')
+const resolution = z.enum(['1k', '2k', '4k']).catch('1k')
 // Only edits carry a scope (T30); a template generation has none.
 const editScope = z.enum(EDIT_SCOPES).nullable().catch(null)
 const jobToggles = z.record(z.string(), z.boolean()).catch({})
@@ -41,6 +42,7 @@ export function generateEventProps(job: Job, category: string, outcome: Outcome,
     edit_scope: editScope.parse(job.inputs.edit_scope ?? null),
     // As stored on the job (T89); a template without toggles stores none.
     toggles: jobToggles.parse(job.inputs.toggles ?? {}),
+    slots_filled: storedSlotOrder(job.inputs.input_slots),
   }
 }
 

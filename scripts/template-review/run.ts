@@ -14,6 +14,7 @@ import { dirname, join, relative } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import { createClient } from '@supabase/supabase-js'
+import { withDbTiers } from '../../src/core/templates/db-resolution'
 
 import { AppError } from '../../src/core/errors'
 import { applyBatch } from '../template-apply/apply'
@@ -44,7 +45,7 @@ async function load(file: string) {
   if (!env.success) throw new RunError(`环境变量缺失或不对：${env.error.issues.map(i => i.path.join('.')).join('、')}`)
   const target = targetOf(env.data)
   const batch = readBatchFile(file)
-  const db = createClient(env.data.NEXT_PUBLIC_SUPABASE_URL, env.data.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+  const db = createClient(env.data.NEXT_PUBLIC_SUPABASE_URL, env.data.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: withDbTiers() } })
   return { env: env.data, target, batch, progress: await readProgress(db, batch.templates.map(t => t.id)) }
 }
 

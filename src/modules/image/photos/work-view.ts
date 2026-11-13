@@ -5,6 +5,7 @@ import type { CreditsCost } from '@/core/templates/pricing'
 import type { PhotoDetail } from '../detail/photo-detail'
 import type { EditParent } from '../result/edited-from'
 import type { PhotoItem } from './photo-item'
+import type { PosterWork } from './poster-work'
 
 // One finished work in the Photos viewer (GET /api/photos/[jobId]): plain JSON, no image bytes
 // (AGENTS §6), only the addresses the browser loads them from.
@@ -20,4 +21,6 @@ export type WorkView = {
   // Editing (T30) when it is on: its price and options, and what the account can spend now.
   edit: { creditsCost: CreditsCost; imageOptions: ImageOptions; balance: Balance; concurrency: number } | null
   shareText: string
+  // A dense-text poster (§5.3): its text check and Redraw; such a work has no Make again or Edit.
+  poster: PosterWork | null
 }

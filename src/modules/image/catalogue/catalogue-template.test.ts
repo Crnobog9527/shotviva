@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { cardPrice, categoriesOf, hasStills, isCompareCategory, isMotion, type CatalogueTemplate } from './catalogue-template'
+import { batchableTemplates, cardPrice, categoriesOf, hasStills, isCompareCategory, isMotion, posterHref, toCatalogueTemplate, type CatalogueTemplate } from './catalogue-template'
 import { isCompareSample } from './template-sample'
 
 // Category order and card style as set in 分类管理 (T75); 'art-styles' is the compare one.
@@ -13,7 +13,7 @@ const tpl = (id: string, category: string, cover: Partial<CatalogueTemplate['cov
   categoryOrder: ORDER[category] ?? 100,
   compare: category === 'art-styles',
   description: null,
-  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 2, '2k': 4, '4k': 6 },
   copyFields: [],
   toggles: [],
   cover: { type: 'image', before: null, after: null, motion: null, poster: null, ...cover },
@@ -29,7 +29,7 @@ describe('catalogue helpers', () => {
 
   it('prices the card at the Standard tier', () => {
     expect(cardPrice(tpl('a', 'x'))).toBe(2)
-    expect(cardPrice({ ...tpl('a', 'x'), creditsCost: { '1k': 1, '2k': 2, '3k': 3 } })).toBe(1)
+    expect(cardPrice({ ...tpl('a', 'x'), creditsCost: { '1k': 1, '2k': 2, '4k': 3 } })).toBe(1)
   })
 
   it('treats a card as motion only with its file and poster', () => {
@@ -51,5 +51,32 @@ describe('catalogue helpers', () => {
     expect(isCompareSample({ ...tpl('x', 'pets', stills), categoryName: 'Art Styles' })).toBe(false)
     expect(hasStills(tpl('x', 'pets', stills))).toBe(true)
     expect(hasStills(tpl('x', 'pets', { after: 'https://a/a.webp' }))).toBe(false)
+  })
+})
+
+describe('poster templates in the catalogue', () => {
+  const poster = { ...tpl('tournament-poster-emerald', 'posters'), photoInput: 'none' as const, poster: true }
+
+  it('sends a poster card to its editor and every other card to the dialog', () => {
+    expect(posterHref(poster)).toBe('/posters/tournament-poster-emerald')
+    expect(posterHref(tpl('ramen', 'food'))).toBeNull()
+  })
+
+  it('never offers a poster template, a slot template or a no-photo template for batch create', () => {
+    const photo = { ...tpl('ramen', 'food'), photoInput: 'required' as const }
+    const slots = { ...photo, id: 'duo', imageSlots: [{ key: 'a', label: 'A', required: true }] }
+    const posterWithPhoto = { ...poster, photoInput: 'optional' as const }
+    expect(batchableTemplates([photo, slots, poster, posterWithPhoto]).map((t) => t.id)).toEqual(['ramen'])
+  })
+
+  it('marks a template with fields.poster, and only that one', () => {
+    const base = {
+      id: 'p', name: 'P', category: 'posters', categoryView: { name: '海报', sortOrder: 90, compare: false },
+      categoryInfo: { galleryExcluded: true }, description: null, creditsCost: { '1k': 1, '2k': 2, '4k': 3 },
+      coverMediaType: 'image', coverBeforeUrl: null, coverAfterUrl: null, coverVideoUrl: null, coverPosterUrl: null,
+    }
+    const fields = { images: { min: 0, max: 0 }, copy: [], aspectRatios: ['1:2'] }
+    expect(toCatalogueTemplate({ ...base, fields: { ...fields, poster: { kinds: [] } } } as never)).toMatchObject({ poster: true, photoInput: 'none', privateOnly: true })
+    expect(toCatalogueTemplate({ ...base, fields } as never)).not.toHaveProperty('poster')
   })
 })

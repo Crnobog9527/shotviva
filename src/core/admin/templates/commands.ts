@@ -7,7 +7,7 @@ import { AppError } from '@/core/errors'
 import { isStyleRefKey } from '@/core/templates/style-refs'
 import { logger } from '@/core/logger'
 import { MISSING_COST, providerFloor, floorGuidance, type ProviderFloors } from '@/core/templates/provider-pricing'
-import { creditsBelowFloor, promptInputSchema, templateInputSchema, toggleSetupProblems, type PromptInput } from '@/core/templates'
+import { creditsBelowFloor, promptInputSchema, slotFloorFactor, slotSurfaceProblems, templateInputSchema, toggleSetupProblems, type PromptInput } from '@/core/templates'
 
 import { describeBlockers, planActiveChange, type ActiveChangeOutcome } from './publish-rules'
 import * as repo from './repository'
@@ -27,11 +27,11 @@ function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown, what: string): T 
   return result.data
 }
 
-const TIER_LABEL = { '1k': 'Standard', '2k': 'HD', '3k': 'Max' } as const
+const TIER_LABEL = { '1k': '1K', '2k': '2K', '4k': '4K' } as const
 
 // ARCHITECTURE §6.1: prices may go up, never below the floor for the template's quality tier.
 function assertAboveFloor(template: z.infer<typeof templateInputSchema>, floor: ProviderFloors): void {
-  const low = creditsBelowFloor(template.quality, template.creditsCost, floor, template.unpricedResolutions)
+  const low = creditsBelowFloor(template.quality, template.creditsCost, floor, template.unpricedResolutions, slotFloorFactor(template.fields))
   if (low.length === 0) return
   const detail = low.map((v) => v.floor === MISSING_COST ? floorGuidance(v.floor, floor.unknownCapabilities) : `${TIER_LABEL[v.resolution]} 不能低于 ${v.floor}（填了 ${v.given}）`).join('；')
   throw new AppError('INVALID_INPUT', `积分低于下限：${detail}`)
@@ -51,6 +51,8 @@ export function validateTemplateSave(payload: Pick<SaveTemplatePayload, 'templat
   if (prompt.styleRefs?.some(ref => !isStyleRefKey(template.id, ref.key))) throw new AppError('INVALID_INPUT', '画风参考图不属于这个模板')
   assertAboveFloor(template, providerFloor(floor, prompt.providerId, template.id))
   assertTogglesWired(template, prompt)
+  const surface = slotSurfaceProblems(template.fields, template.visibleIn)
+  if (surface.length > 0) throw new AppError('INVALID_INPUT', surface.join('；'))
   // A brand-new template starts unpublished so it can be checked before anyone sees it.
   return { template: payload.isNew ? { ...template, isActive: false } : template, prompt }
 }

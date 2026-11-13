@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { coverImage, coverSrc, isCoverUrl } from './cover-image'
+import { coverImage, coverLoaderFor, coverSrc, isCoverUrl } from './cover-image'
 
 const BASE = 'https://shotviva.com/assets'
 const COVER = `${BASE}/covers/korean-manhwa/after-8c988390aa621eda.webp`
@@ -25,6 +25,27 @@ describe('coverImage (covers at the size they are shown)', () => {
   it('optimises nothing without an assets base', () => {
     expect(isCoverUrl(COVER, '')).toBe(false)
     expect(coverImage(COVER, '100vw', '')).toEqual({ src: COVER })
+  })
+})
+
+describe('coverImage through the image CDN (NEXT_PUBLIC_IMAGE_CDN_URL)', () => {
+  const CDN = 'https://img-eo.shotviva.com'
+
+  it('puts the very same optimiser URLs on the CDN host', () => {
+    const plain = coverImage(COVER, '50vw', BASE, '')
+    const viaCdn = coverImage(COVER, '50vw', BASE, CDN)
+    expect(viaCdn.sizes).toBe(plain.sizes)
+    expect(viaCdn.srcSet).toBe(plain.srcSet?.replaceAll('/_next/image?', `${CDN}/_next/image?`))
+    expect(viaCdn.src).toBe(`${CDN}${plain.src}`)
+  })
+
+  it('leaves non-covers alone and is off when unset', () => {
+    expect(coverImage('/api/files/job-1', '100vw', BASE, CDN)).toEqual({ src: '/api/files/job-1' })
+    expect(coverImage(COVER, '100vw', BASE).src).toMatch(/^\/_next\/image\?/)
+    expect(coverLoaderFor('/home/hero.webp', BASE, CDN)).toBeUndefined()
+    expect(coverLoaderFor(COVER, BASE, undefined)).toBeUndefined()
+    expect(coverLoaderFor(COVER, BASE, CDN)?.({ src: COVER, width: 384, quality: 75 })).toBe(`${CDN}/_next/image?url=${encodeURIComponent(COVER)}&w=384&q=75`)
+    expect(coverSrc(COVER, 700, BASE, CDN)).toBe(`${CDN}/_next/image?url=${encodeURIComponent(COVER)}&w=750&q=75`)
   })
 })
 

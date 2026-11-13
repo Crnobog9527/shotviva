@@ -5,7 +5,10 @@ export { CREDITS_FLOOR } from './credits-floor'
 // Photo editing (T30), server only like the provider.
 export { editBodySchema, editScopeClassifier, identityJudge, runEdit, toEditRequest, type ClassifierAnswer, type EditDeps, type ScopeClassifier } from './edit'
 export { GENERATION_COST_USD } from './generation-cost'
-export { EXTRACT_TEXT_MAX, runExtract } from './poster'
+// The dense-text poster pages and routes import posters.ts, not this barrel: exporting the poster
+// editor here put it in every page that imports index.ts (/generate and /photos have a JS budget).
+// Only the server-side text check is exported here, for /api/generate (ARCHITECTURE §5.3).
+export { schedulePosterCheck } from './poster/schedule-check'
 export { useUpload, type UploadState } from './workspace/use-upload'
 export { checkPickedFile, uploadPhoto, UploadError, type UploadDeps, type UploadErrorCode } from '@/core/storage/upload'
 export { targetSize } from '@/core/storage/upload'
@@ -20,7 +23,7 @@ export { createReturnPath } from './catalogue/catalogue-filter'
 export type { CatalogueSeries, CatalogueView, FilterNode, GridEntry } from './catalogue/catalogue-view'
 // Saved templates (T83): the provider every page with hearts wraps its catalogue in.
 export { FavoritesProvider } from './favorites'
-export { toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalogue-template'
+export { posterHref, toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalogue-template'
 export { ImageWorkspace, type WorkspaceProps } from './workspace/image-workspace'
 export { MatrixWorkspaceLazy as MatrixWorkspace } from './matrix/matrix-lazy'
 export type { MatrixWorkspaceProps } from './matrix/matrix-workspace'

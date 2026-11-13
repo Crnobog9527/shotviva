@@ -6,7 +6,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from '../../i18n/ui'
 import type { FormState } from '../flows/form-state'
 import { PASSWORD_MIN } from '../flows/schemas'
-import { AuthTabs } from './auth-tabs'
+import { AuthTabs, type AuthTab } from './auth-tabs'
 import { CheckEmail } from './check-email'
 import { CaptchaFailed, Divider, EmailField, FormStatus, hcaptchaLink, Notice, PasswordField, SubmitButton } from './form-parts'
 import { SignupCodeHiddenInput } from './signup-code-context'
@@ -30,13 +30,15 @@ type Props = {
   sender: string
   // Chinese pages only (T63): the 手机号 tab, shown first.
   phone?: PhoneActions
+  // Which of the two tabs opens first (the home sign-up sheet's 用邮箱继续 asks for 邮箱).
+  initialTab?: AuthTab
 }
 
 const addr = (chunks: ReactNode) => <span className="au-addr">{chunks}</span>
 
 // /signup (design/comps-v3-b/auth.html `?v=signup|verify`, `?err=weak`; a registered address gets the same
 // neutral "check your email" view, never `?err=exists`: control 2026-11-06).
-export function SignupForm({ action, google, resendAction, next, giftCredits, arrived, sender, phone }: Props) {
+export function SignupForm({ action, google, resendAction, next, giftCredits, arrived, sender, phone, initialTab = 'phone' }: Props) {
   const t = useTranslations('auth')
   const form = useAuthForm(action, { captcha: true, validate: validateSignup })
   // "Use a different email" puts this answer aside; the next submit brings a new one.
@@ -82,7 +84,7 @@ export function SignupForm({ action, google, resendAction, next, giftCredits, ar
       <SignupCodeField />
       {phone ? (
         <AuthTabs
-          initial="phone"
+          initial={initialTab}
           phone={<PhoneSignIn actions={phone} next={next} submitLabel={t('signup.submit')} />}
           email={<EmailSignup form={form} google={google} next={next} />}
         />

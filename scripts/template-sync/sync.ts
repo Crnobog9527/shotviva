@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { site } from '../../src/site/site.config'
-import { templateFieldsSchema, toggleSetupProblems } from '../../src/core/templates'
+import { slotSurfaceProblems, templateFieldsSchema, toggleSetupProblems } from '../../src/core/templates'
 import { readTemplateQuote } from '../../src/site/template-pricing'
 import { styleRefsSchema } from '../../src/core/templates/style-refs'
 import { copyCovers, SyncError, type Assets } from './covers'
@@ -68,7 +68,9 @@ export async function syncTemplate(id: string, runId: string, source: SyncTarget
   // The test site's own binding points at no image model row (deleted, or another module).
   if (provider_id && !provider) throw new SyncError('SOURCE_PROVIDER_MISSING')
   const fields = templateFieldsSchema.safeParse(row.fields)
-  if (!fields.success || toggleSetupProblems(fields.data.toggles, revision.body, revision.model_params).length) {
+  const surfaces = z.array(z.string()).catch([]).parse(row.visible_in)
+  if (!fields.success || toggleSetupProblems(fields.data.toggles, revision.body, revision.model_params).length
+    || slotSurfaceProblems(fields.data, surfaces).length) {
     throw new SyncError('INVALID_FIELDS_OR_TOGGLES')
   }
   const styleRefs = await readStyleRefs(id, revision.version, source)

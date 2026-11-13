@@ -6,7 +6,7 @@ import type { CreditsFloor } from '@/core/templates/pricing'
 import type { PublishCandidate } from './publish-rules'
 
 // core cannot import the image module's table; the same shape with the v1 numbers.
-const CREDITS_FLOOR: CreditsFloor = { high: { '1k': 2, '2k': 4, '3k': 6 }, medium: { '1k': 1, '2k': 2, '3k': 3 } }
+const CREDITS_FLOOR: CreditsFloor = { high: { '1k': 2, '2k': 4, '4k': 6 }, medium: { '1k': 1, '2k': 2, '4k': 3 } }
 
 const repo = vi.hoisted(() => ({ loadPublishCandidates: vi.fn(), setTemplatesActive: vi.fn() }))
 const logger = vi.hoisted(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() }))
@@ -27,7 +27,7 @@ const row = (id: string, over: Partial<PublishCandidate> = {}): PublishCandidate
   coverAfterUrl: 'https://assets.test/a.webp',
   coverLocales: {},
   quality: 'high',
-  creditsCost: { '1k': 2, '2k': 4, '3k': 6 },
+  creditsCost: { '1k': 2, '2k': 4, '4k': 6 },
   isActive: false,
   hasPrompt: true,
   ...over,

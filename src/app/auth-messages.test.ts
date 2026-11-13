@@ -90,7 +90,7 @@ describe('phone sign-in messages', () => {
     const addr = (chunks: string) => chunks
     const legal = { terms: addr, privacy: addr, aup: addr }
     expect(t.zh('phone.consent', legal)).toBe(
-      '我已阅读并同意《服务条款》《隐私政策》《使用规范》，并同意将我的手机号等个人信息传输到中国大陆以外处理（数据存放在美国，短信由短信服务商发送）。',
+      '我已阅读并同意《服务条款》《隐私政策》《使用规范》。',
     )
     expect(t.en('phone.consent', legal)).toMatch(
       /Terms of Service.*Privacy Policy.*Acceptable Use Policy.*outside mainland China.*United States.*SMS provider/,

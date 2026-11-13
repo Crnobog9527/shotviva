@@ -17,6 +17,7 @@ describe('Shotviva sitemap once indexing opens', () => {
       'https://shotviva.com/image-to-image-generator',
       'https://shotviva.com/commercial-photography',
       'https://shotviva.com/ai-restaurant-menu',
+      'https://shotviva.com/transparent-background',
       'https://shotviva.com/pricing',
       'https://shotviva.com/terms',
       'https://shotviva.com/privacy',
@@ -72,7 +73,7 @@ describe('sitemaps, robots meta, canonical and hreflang agree (SEO patch v5)', (
       expect(date! <= today, url).toBe(true)
     }
     const xml = urlsetXml(pageSitemapUrls(site), PAGE_LASTMOD)
-    expect(xml.match(/<lastmod>/g)).toHaveLength(9)
+    expect(xml.match(/<lastmod>/g)).toHaveLength(10)
     expect(xml).toContain('<url><loc>https://shotviva.com/</loc><lastmod>')
   })
 

@@ -14,7 +14,7 @@ import { outputTokens, TOKEN_BASE, TOKEN_MODELS } from './output-tokens'
 
 export type OutputSize = { width: number; height: number }
 
-export const TIER_EDGE: Record<Resolution, number> = { '1k': 1024, '2k': 2048, '3k': 2880 }
+export const TIER_EDGE: Record<Resolution, number> = { '1k': 1024, '2k': 2048, '4k': 2880 }
 
 const STEP = 16
 const MAX_EDGE = 3840
@@ -35,10 +35,10 @@ export const OUTPUT_SIZES: Record<Resolution, Record<string, string>> = {
     '3:2': '2496x1664', '2:3': '1664x2496', '4:3': '2352x1760', '3:4': '1760x2352',
     '1:2': '1440x2880', '1:3': '1168x3504',
   },
-  '3k': {
+  '4k': {
     '1:1': '2880x2880', '16:9': '3840x2160', '9:16': '2160x3840', '4:5': '2576x3216',
     '3:2': '3520x2352', '2:3': '2352x3520', '4:3': '3312x2480', '3:4': '2480x3312',
-    // Tall posters: the 3840 edge cap, not the pixel budget, limits Max here.
+    // Tall posters: the 3840 edge cap, not the pixel budget, limits 4K here.
     '1:2': '1920x3840', '1:3': '1280x3840',
   },
 }

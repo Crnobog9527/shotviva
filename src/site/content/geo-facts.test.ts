@@ -16,10 +16,8 @@ function indexablePages() {
     pages.push({ name: `${locale} pricing`, page: [pricing, pricingFaqIn(locale, 'stripe', false, pricing)], vertical: false })
     for (const { slug } of contentPagesIn(locale)) {
       if (locale === 'zh' && !zhIndexable.has(`/${slug}`)) continue
-      // The time-and-price sentences are required on the English verticals and /zh's generator.
-      // /zh/commercial-photography and /zh/ai-restaurant-menu became indexable with SEO patch v5,
-      // which freezes copy for the 4-week index watch; they get theirs after it (5+ facts already).
-      const vertical = locale === 'en' || slug === 'image-to-image-generator'
+      // Every indexable vertical, English and Chinese, states the time per photo and a starting price.
+      const vertical = true
       pages.push({ name: `${locale} /${slug}`, page: findContentPageIn(slug, locale, products), vertical })
     }
   }

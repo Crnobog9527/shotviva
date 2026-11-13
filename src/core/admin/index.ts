@@ -10,6 +10,7 @@ export {
   setTemplatesFeatured,
   setTemplateActive,
   setTemplateOrder,
+  deleteTemplate,
   setTemplatesActive,
 } from './templates'
 export type {
@@ -27,7 +28,7 @@ export type {
   TemplateOrderGroup,
 } from './templates'
 export { applyCover, createCoverUpload, publishStillCover, type ApplyCoverInput, type CoverDeps, type CoverUploadTicket } from './covers'
-export { TemplatesEditor } from './templates-editor'
+export { TemplatesEditor, type TemplatePreviewProps } from './templates-editor'
 export {
   deleteTemplateCategory,
   listAdminCategories,
@@ -174,6 +175,7 @@ export {
 export {
   FEATURES_COPY,
   FeaturesEditor,
+  SignupGiftCard,
   WISHLIST_SWITCH_COPY,
   type FeatureAdminActions,
   type GallerySwitchKey,
@@ -182,9 +184,12 @@ export {
 } from './features-editor'
 export {
   loadSettingSwitch,
+  loadSignupGift,
   loadWishlistSwitch,
   saveSettingSwitch,
+  saveSignupGiftCap,
   saveWishlistSwitch,
+  type SignupGiftState,
   type SystemSettingDeps,
   type WishlistSwitch,
   type WishlistSwitchInput,
@@ -196,7 +201,8 @@ export {
   COSTS_DAYS,
   CostsView,
   loadAdminKeyStatus,
-  loadBilled,
+  loadBills,
+  loadProviderDailyCosts,
   loadOurDailyCosts,
   saveCostSettings,
   type CostKeyActions,
