@@ -29,7 +29,7 @@ export default async function SignupPage() {
   const locale = await currentLocale()
   const form = {
     action: signupAction,
-    google: { action: googleAction, mainlandNote: locale === 'zh' },
+    google: { action: googleAction, mainlandNote: locale === 'zh' || ('zone' as const) },
     resendAction: resendSignupAction,
     giftCredits: site.billing.freeCredits,
     sender,

@@ -28,7 +28,7 @@ export default async function LoginPage() {
   const locale = await currentLocale()
   const form = {
     action: loginAction,
-    google: { action: googleAction, mainlandNote: locale === 'zh' },
+    google: { action: googleAction, mainlandNote: locale === 'zh' || ('zone' as const) },
     resendAction: resendSignupAction,
     sender,
     phone: locale === 'zh' ? phone : undefined,

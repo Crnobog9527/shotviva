@@ -9,7 +9,6 @@ import { LoginForm, ResetRequestForm, SignupForm } from '@/core/auth/ui'
 import type { Locale } from '@/core/i18n'
 
 import { Arrived } from './arrived'
-import { inMainlandZone } from './mainland-zone'
 
 // The parts of the sign-in pages that depend on the address (?next=, ?error=, ?via=), read in the
 // browser so the pages themselves stay static: the form is in the cached HTML (the page's
@@ -31,7 +30,7 @@ export function LoginScreen({ locale, connectPath, google, ...form }: LoginProps
     <LoginForm
       key={notice ?? ''}
       {...form}
-      google={{ ...google, mainlandNote: google.mainlandNote || inMainlandZone() }}
+      google={google}
       next={next}
       notice={notice}
       arrived={<Arrived next={next} page="login" connectPath={connectPath} />}
@@ -47,7 +46,7 @@ export function SignupScreen({ locale, connectPath, google, ...form }: SignupPro
     <SignupForm
       key={tab}
       {...form}
-      google={{ ...google, mainlandNote: google.mainlandNote || inMainlandZone() }}
+      google={google}
       next={next}
       arrived={<Arrived next={next} page="signup" connectPath={connectPath} />}
       initialTab={tab}
