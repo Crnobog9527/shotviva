@@ -5,7 +5,7 @@ import { isLocale } from '../../i18n/locales'
 import { logger } from '../../logger'
 import { assertSameOrigin } from '../api-guards'
 import { getSessionUser } from '../session'
-import { createServerSupabase } from '../supabase-server'
+import { createSessionSupabase } from '../supabase-server'
 
 export type AccountLocaleDeps = {
   sessionUser: typeof getSessionUser
@@ -13,7 +13,7 @@ export type AccountLocaleDeps = {
 }
 
 async function saveWithSession(locale: 'en' | 'zh'): Promise<void> {
-  const supabase = await createServerSupabase()
+  const supabase = await createSessionSupabase()
   const { error } = await supabase.auth.updateUser({ data: { locale } })
   // A failed save only means the emails and the next device keep the old language.
   if (error) logger.warn('could not store the account language', { code: error.code })

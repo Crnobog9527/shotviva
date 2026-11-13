@@ -11,7 +11,7 @@ import { deleteAccount, type AccountStorage, type CancelSubscriptions } from './
 import { assertSameOrigin } from './api-guards'
 import { getSessionUser } from './session'
 import { createAdminSupabase } from './supabase-admin'
-import { createServerSupabase } from './supabase-server'
+import { createSessionSupabase } from './supabase-server'
 
 const bodySchema = z.object({ confirm: z.literal('DELETE') })
 
@@ -39,7 +39,7 @@ async function run(request: NextRequest, deps: Required<RouteDeps>) {
     logger.warn('account deletion: gallery cache not expired', { error })
   }
   // Clears this browser's cookies; the refresh token died with the user.
-  const supabase = await createServerSupabase()
+  const supabase = await createSessionSupabase()
   await supabase.auth.signOut({ scope: 'local' })
 }
 
