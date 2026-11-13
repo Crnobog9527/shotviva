@@ -11,8 +11,8 @@ import { join } from 'node:path'
 
 import sharp from 'sharp'
 
-// One entry per hero `before` picture (home and the three landing pages, both languages).
-const SOURCES = ['/home/hero-set-phone.webp', '/cases/sneaker-phone.webp', '/cases/pet-phone.webp', '/cases/menu-fish-phone.webp']
+// One entry per hero `before` picture (home and the landing pages, both languages).
+const SOURCES = ['/home/hero-set-phone.webp', '/cases/sneaker-phone.webp', '/cases/pet-phone.webp', '/cases/menu-fish-phone.webp', '/cases/white-dress-before.webp']
 
 // 288 px: at least as many pixels as the plate has CSS pixels on a phone (about 190 wide) and on
 // a desktop (268 wide), so the browser counts the frame, not the later full picture, as the

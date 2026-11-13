@@ -32,7 +32,9 @@ function legacyList(db: SupabaseClient, surface: TemplateSurface, id?: string) {
   }, surface === 'partner' ? ',partner_image_aspects' : '')
 }
 
-type WebLookup = { id?: string; includeSeriesMembers?: boolean }
+// posters: the dense-text poster templates only (their own entry, ARCHITECTURE §5.3); without it
+// they stay out of the catalogue, the home page and batches. A lookup by id finds either kind.
+type WebLookup = { id?: string; includeSeriesMembers?: boolean; posters?: boolean }
 
 async function catalogueRows(db: SupabaseClient, surface: TemplateSurface, lookup: WebLookup) {
   if (surface === 'web') {
@@ -57,6 +59,6 @@ export async function listTemplates(db: SupabaseClient, surface: TemplateSurface
 // Passing an id opens a visible series member in the workspace even when its series hides individual cards.
 export async function listTemplatesIn(db: SupabaseClient, locale: Locale, lookup: WebLookup = {}): Promise<LocalizedTemplate[]> {
   return (await listTemplates(db, 'web', lookup))
-    .filter(template => !template.categoryInfo.isSystem)
+    .filter(template => !template.categoryInfo.isSystem && (lookup.id !== undefined || Boolean(template.fields.poster) === Boolean(lookup.posters)))
     .map(template => localizeTemplate(template, locale))
 }

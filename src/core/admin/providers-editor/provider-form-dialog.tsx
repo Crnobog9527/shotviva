@@ -134,9 +134,8 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
           {form.module === 'image' && (
             <>
               <p className="text-sm">{COPY.resolutions} · {form.resolutions.join(' / ').toUpperCase()}</p>
-              <ImageCostFields tiers={form.resolutions} values={form.imageCosts} estimates={estimates}
+              <ImageCostFields adapter={form.adapter} tiers={form.resolutions} values={form.imageCosts} estimates={estimates}
                 onChange={(tier, value) => setForm((prev) => ({ ...prev, imageCosts: { ...prev.imageCosts, [tier]: value } }))} />
-              {form.adapter === 'ark_images' && <p className="text-muted-foreground text-xs">{COPY.arkCostsRequired}</p>}
             </>
           )}
           <Field

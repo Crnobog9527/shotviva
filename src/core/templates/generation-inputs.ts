@@ -21,6 +21,8 @@ export type GenerationInputs = {
   // A template with image slots (§5.1e): the filled ones in definition order, each with its
   // English label and upload key; [] when none is filled. Absent for every other template.
   slots?: { key: string; label: string; upload: string }[]
+  // A poster template's confirmed text for this one poster (ARCHITECTURE §5.3), from the saved set.
+  posterText?: string
 }
 
 export type RawGenerationInputs = {
@@ -136,7 +138,8 @@ export const PROMPT_MAX_LENGTH = 32000
 // template edit can never leak a raw placeholder to the model. A copy field the body has no
 // placeholder for follows the template text as a "Label: value" line (ARCHITECTURE §5), so an
 // admin-defined field always reaches the model. The user's note goes last, never inside the
-// template text, so it cannot reorder it (ARCHITECTURE §4 inputs.note).
+// template text, so it cannot reorder it (ARCHITECTURE §4 inputs.note). A poster's confirmed text
+// (§5.3) sits between the two: after the template's own layout words, before the note.
 export function renderPrompt(
   body: string, inputs: GenerationInputs, fragments: ToggleFragments = {},
   counts = { photo_count: 0, style_ref_count: 0 },
@@ -149,5 +152,5 @@ export function renderPrompt(
   }
   const rendered = body.replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (_, key: string) => values[key] ?? '').trim()
   const lines = inputs.labels ? copyLines(body, inputs.copy, inputs.labels) : ''
-  return [rendered, slotLines(body, inputs), lines, inputs.note].filter(Boolean).join('\n\n')
+  return [rendered, slotLines(body, inputs), lines, inputs.posterText, inputs.note].filter(Boolean).join('\n\n')
 }

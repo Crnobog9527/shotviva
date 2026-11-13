@@ -6,6 +6,7 @@ import { creditsCostSchema, TEMPLATE_QUALITIES } from './pricing'
 import { RESERVED_KEYS, toggleFieldSchema, TOGGLES_MAX } from './toggles'
 import { COPY_FIELDS_MAX, copyFieldSchema } from './copy-fields'
 import { imageSlotsSchema, slotShapeProblems } from './image-slots'
+import { posterFieldsSchema } from '../poster/template'
 
 // Template shapes shared by the admin page, the import script and (later) generation.
 // No `server-only` here: scripts/import-prompts.ts validates with the same schema.
@@ -29,6 +30,13 @@ export const templateFieldsSchema = z
     aspectRatios: z.array(z.string().regex(/^\d{1,2}:\d{1,2}$/)).min(1),
     // Optional on/off choices (T89), off by default; their prompt text is private.
     toggles: z.array(toggleFieldSchema).max(TOGGLES_MAX).default([]),
+    // A dense-text poster template (ARCHITECTURE §5.3): its text comes from the confirmed content
+    // blocks, never from copy fields, and it makes one or more posters per set.
+    poster: posterFieldsSchema.optional(),
+  })
+  .refine((fields) => !fields.poster || fields.copy.length === 0, {
+    message: 'a poster template takes its text from the content blocks, not from copy fields',
+    path: ['poster'],
   })
   .refine((fields) => fields.images.min <= fields.images.max, {
     message: 'images.min must not exceed images.max',

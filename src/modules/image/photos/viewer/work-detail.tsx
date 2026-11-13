@@ -18,6 +18,7 @@ import type { PhotoItem } from '../photo-item'
 import type { WorkView } from '../work-view'
 import { useSwipe } from './use-swipe'
 import type { ViewState } from './use-work-view'
+import { PosterCheckNote } from './poster-check-note'
 import { BatchLine, TraySteps, ViewerMessage, type Steps } from './viewer-bits'
 import { useViewer, type Viewer } from './viewer-context'
 import { VIEWER_GRID, VIEWER_SIDE, VIEWER_TRAY } from './viewer-frame'
@@ -69,12 +70,18 @@ function ReadyDetail({ view, listed, steps, viewer }: { view: WorkView; listed: 
               <TraySteps steps={steps} />
             </>
           ),
-          again: view.againable ? <AgainButton onOpen={() => viewer.setMode('again')} /> : null,
+          again: againSlot(view, viewer),
           batch: <BatchLine item={view.item} items={viewer.items} />,
         }}
       />
     </div>
   )
+}
+
+// A poster shows its text check and Redraw in Make again's place (ARCHITECTURE §5.3).
+function againSlot(view: WorkView, viewer: Viewer) {
+  if (view.poster) return <PosterCheckNote poster={view.poster} templateName={view.item.templateName} onRedraw={viewer.close} />
+  return view.againable ? <AgainButton onOpen={() => viewer.setMode('again')} /> : null
 }
 
 function AgainButton({ onOpen }: { onOpen(): void }) {

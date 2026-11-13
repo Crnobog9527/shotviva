@@ -9,6 +9,7 @@ import { FEATURE_MIN_TIERS, FEATURES, findFeature, loadFeatureAccess, type Featu
 import { logger } from '@/core/logger'
 
 import { FEATURES_COPY } from '../features-editor/copy'
+import { listFeatureInvites } from './invites'
 import type { FeatureSetting } from './types'
 
 // /admin/features data (ARCHITECTURE §6.2). Service-role client only: feature_access refuses
@@ -24,10 +25,11 @@ export async function listFeatureSettings(
 ): Promise<FeatureSetting[]> {
   if (registry.length === 0) return []
   const rows = await loadFeatureAccess(db)
-  return registry.map(({ key, name }) => {
+  return Promise.all(registry.map(async ({ key, name, inviteOnly = false }) => {
     const row = rows.find((r) => r.key === key)
-    return { key, name, minTier: row?.minTier ?? null, openToAllAt: row?.openToAllAt ?? null }
-  })
+    const invites = inviteOnly ? await listFeatureInvites(db, key) : []
+    return { key, name, minTier: row?.minTier ?? null, openToAllAt: row?.openToAllAt ?? null, inviteOnly, invites }
+  }))
 }
 
 export const saveFeatureAccessSchema = z.object({

@@ -8,6 +8,7 @@ import { footerLinks } from './legal'
 import { aiRestaurantMenu, makeAiRestaurantMenu } from './pages/ai-restaurant-menu'
 import { commercialPhotography, makeCommercialPhotography } from './pages/commercial-photography'
 import { imageToImageGenerator, makeImageToImageGenerator } from './pages/image-to-image-generator'
+import { makeTransparentBackground, transparentBackground } from './pages/transparent-background'
 import { makePricingPage, pricingPage, type PricingContent } from './pricing'
 import { zhHomePage, makeZhHomePage } from './zh/home'
 import { zhAiRestaurantMenu, makeZhAiRestaurantMenu } from './zh/pages/ai-restaurant-menu'
@@ -24,6 +25,8 @@ const PRICING: Record<Locale, PricingContent> = { en: pricingPage, zh: zhPricing
 const INNER = {
   en: [
     [imageToImageGenerator, makeImageToImageGenerator], [commercialPhotography, makeCommercialPhotography], [aiRestaurantMenu, makeAiRestaurantMenu],
+    // English only (04-P1): no Chinese keyword-map row, so no /zh version.
+    [transparentBackground, makeTransparentBackground],
   ],
   zh: [
     [zhImageToImageGenerator, makeZhImageToImageGenerator], [zhCommercialPhotography, makeZhCommercialPhotography], [zhAiRestaurantMenu, makeZhAiRestaurantMenu],

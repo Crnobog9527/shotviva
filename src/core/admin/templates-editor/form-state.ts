@@ -157,7 +157,7 @@ export function creditProblems(values: TemplateFormValues, floor: CreditsFloor):
     if (!text || unsupportedTier(floor, resolution)) continue
     const value = Number(text)
     // A slot template is held to the single-image floor × its slots (§5.1e, migration 1310).
-    const min = creditMinimum(floor, values.quality, resolution) * Math.max(1, values.imageSlots.length)
+    const min = creditMinimum(floor, values.quality, resolution, values.imageSlots.length)
     if (!/^\d+$/.test(text)) problems[resolution] = '请填正整数'
     else if (value === approvedCredit(floor, values.quality, resolution)) continue
     else if (min === MISSING_COST) problems[resolution] = floorGuidance(min, floor.unknownCapabilities)

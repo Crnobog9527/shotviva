@@ -32,6 +32,7 @@ const SLOTS = [
 beforeAll(async () => {
   db = await connectAdmin()
   templateId = await seedTemplate(db, {
+    credits: { '1k': 40, '2k': 80, '3k': 120 }, 
     images: { min: 1, max: 3, slots: SLOTS },
     copy: [{ key: 'venue', label: 'Venue name', required: true, maxLength: 16 }, { key: 'prize_1_note', label: '1st prize details', maxLength: 60 }],
     body: 'WRAPPED prize poster. {{image_slots}}',
@@ -43,7 +44,7 @@ afterAll(async () => {
 })
 
 async function setup(slots: readonly string[] = ['logo', 'prize_1', 'prize_2']) {
-  const userId = await createUser(db, { credits: 5 })
+  const userId = await createUser(db, { credits: 100 })
   const r2 = createMemoryStore()
   const uploads: Record<string, string> = {}
   for (const [index, slot] of slots.entries()) {
@@ -59,7 +60,7 @@ async function setup(slots: readonly string[] = ['logo', 'prize_1', 'prize_2']) 
 }
 
 const template = (): CatalogueTemplate => ({
-  id: templateId, name: 'Slots', creditsCost: { '1k': 1, '2k': 2, '3k': 3 }, photoInput: 'required', toggles: [],
+  id: templateId, name: 'Slots', creditsCost: { '1k': 40, '2k': 80, '3k': 120 }, photoInput: 'required', toggles: [],
   copyFields: [{ key: 'venue', label: 'Venue name', type: 'short', required: true, maxLength: 16, public: false }],
   imageSlots: SLOTS.map(({ key, label, required }) => ({ key, label, required })),
 }) as unknown as CatalogueTemplate
@@ -77,7 +78,7 @@ describe('a slot template job', () => {
     expect((job.inputs.input_slots as { key: string }[]).map((slot) => slot.key)).toEqual(['prize_1', 'prize_2'])
     expect(keptInputsOf(job)).toEqual([`outputs/${userId}/${view.id}-in-1.jpg`, `outputs/${userId}/${view.id}-in-2.jpg`])
     expect(r2.objects.has(inputPreviewKeyFor(userId, view.id))).toBe(false)
-    expect((await profileOf(db, userId)).credits).toBe(4)
+    expect((await profileOf(db, userId)).credits).toBe(60)
   })
 
   it.each([
@@ -89,7 +90,7 @@ describe('a slot template job', () => {
     const fill = (value: unknown) => (value === 'x' ? uploads.logo : value)
     const changed = Object.fromEntries(Object.entries(patch).map(([key, value]) => [key, typeof value === 'object' && value ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fill(v)])) : fill(value)]))
     await expect(runGeneration(deps, { ...request, ...changed })).rejects.toMatchObject({ code: expect.stringMatching(/INVALID_INPUT|TEMPLATE_UNAVAILABLE|NOT_FOUND/) })
-    expect((await profileOf(db, userId)).credits).toBe(5)
+    expect((await profileOf(db, userId)).credits).toBe(100)
   })
 
   it('refuses a batch even for a Max account (single run only)', async () => {
@@ -135,10 +136,11 @@ describe('slot order survives jsonb (keys jsonb would re-sort)', () => {
     // jsonb orders object keys shorter-first: an object { venue_logo, prize_1 } reads back as
     // { prize_1, venue_logo }. The order is stored as an array, so Make again maps -in-1 to the logo.
     const id = await seedTemplate(db, {
+      credits: { '1k': 40, '2k': 80, '3k': 120 }, 
       images: { min: 0, max: 2, slots: [{ key: 'venue_logo', label: 'Venue logo', required: false }, { key: 'prize_1', label: '1st prize photo', required: false }] },
       copy: [], body: 'WRAPPED poster {{image_slots}}',
     })
-    const userId = await createUser(db, { credits: 5 })
+    const userId = await createUser(db, { credits: 100 })
     const r2 = createMemoryStore()
     const logo = newInputKey(userId, 'image/jpeg')
     const prize = newInputKey(userId, 'image/jpeg')
@@ -159,7 +161,7 @@ describe('slot order survives jsonb (keys jsonb would re-sort)', () => {
 describe('the database reference check counts slots (0943)', () => {
   it('refuses more slots than the model takes', async () => {
     const five = Array.from({ length: 4 }, (_, i) => ({ key: `s${i}`, label: `S${i}`, required: false }))
-    const id = await seedTemplate(db, { images: { min: 0, max: 4, slots: five } })
+    const id = await seedTemplate(db, { credits: { '1k': 40, '2k': 80, '3k': 120 }, images: { min: 0, max: 4, slots: five } })
     await expect(db.query(`update public.templates set fields = jsonb_set(fields, '{images,max}', '5') where id = $1`, [id])).rejects.toThrow(/MODEL_REFERENCE_LIMIT/)
   })
 })

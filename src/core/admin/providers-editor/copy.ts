@@ -63,7 +63,10 @@ export const PROVIDERS_COPY = {
   neverFetched: '尚未刷新',
   form: {
     imageCosts: '预估单张总成本（美元）',
-    imageCostsHint: '有实测成本时优先用实测。留空使用可核算的目录估价（已含本站充值费用分摊）；也可填写含费估价覆盖。',
+    // Ark has no catalogue estimate to fall back on, so blank is not offered there (schema refine).
+    imageCostsHint: (adapter: ProviderAdapterId) => adapter === 'ark_images'
+      ? '有实测成本时优先用实测。火山方舟必须填写每档的预估单张总成本（含输入图），不能留空；实测样本不足时用它定积分下限。'
+      : '有实测成本时优先用实测。留空使用可核算的目录估价（已含本站充值费用分摊）；也可填写含费估价覆盖。',
     catalogPrices: '供应商目录报价（美元）',
     titleNew: '新增供应商',
     titleEdit: (label: string) => `编辑「${label}」`,
@@ -82,7 +85,6 @@ export const PROVIDERS_COPY = {
     baseUrlHint: '请填写供应商的 HTTPS API 根地址。',
     arkModelHint: '例如 doubao-seedream-5-5-261028（须先在火山方舟控制台开通）。按张的官方价写在代码价目表里，目前只收录 5.5。',
     arkPrices: '按张计费：用代码里的火山方舟官方价目（人民币），按环境变量 CNY_PER_USD 的汇率折成美元记成本，不用填 token 单价。',
-    arkCostsRequired: '火山方舟模型必须填写每档的预估单张总成本（含输入图），实测样本不足时用它定积分下限。',
     routerModelHint: '例如 google/gemini-3.1-flash-image。保存时自动读取该模型支持的清晰度、比例和参考图数量。',
     lookupPending: '正在查询模型能力与报价…',
     retryLookup: '重新查询',

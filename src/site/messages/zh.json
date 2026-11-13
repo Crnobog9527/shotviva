@@ -607,6 +607,112 @@
       },
       "notEnough": "（积分不够）"
     },
+    "poster": {
+      "title": "赛事海报",
+      "back": "返回",
+      "noStyles": "还没有海报风格。",
+      "paste": {
+        "heading": "粘贴活动通知",
+        "hint": "把标题、时间、奖品、规则和级别表整段粘贴进来。我们先帮你分好块，你核对无误后才生成海报。",
+        "placeholder": "周4精英赛 开赛时间15:00\n冠军 ……\n赛事规则 ……",
+        "sort": "整理内容",
+        "sorting": "正在整理…",
+        "manual": "我自己填"
+      },
+      "sourceText": "你粘贴的原文",
+      "backToPaste": "重新粘贴",
+      "tabs": {
+        "header": "页眉",
+        "prizes": "奖品",
+        "sections": "说明",
+        "table": "表格",
+        "footer": "页脚",
+        "pending": "有待核对的行"
+      },
+      "flagged": "原文里找不到这一项，请核对。",
+      "header": {
+        "brand": "主办方",
+        "brandEn": "主办方英文",
+        "cup": "杯赛名",
+        "cupEn": "杯赛英文名",
+        "city": "城市",
+        "title": "赛事标题",
+        "subtitle": "副标题",
+        "datetimeLabel": "时间标签",
+        "datetime": "时间"
+      },
+      "prizes": {
+        "headline": "奖品标题",
+        "note": "奖品说明",
+        "rank": "名次",
+        "rankEn": "名次英文",
+        "prize": "奖品",
+        "add": "加一个名次"
+      },
+      "sections": {
+        "title": "栏目标题",
+        "style": "行的样式",
+        "styles": {
+          "kv": "标签：内容",
+          "numbered": "编号",
+          "plain": "普通"
+        },
+        "lines": "内容（一行一条）",
+        "add": "加一个栏目"
+      },
+      "table": {
+        "none": "这个风格没有表格。",
+        "title": "表格标题",
+        "columns": "列名",
+        "column": "列",
+        "row": "行",
+        "break": "休息行",
+        "insert": "＋ 在这里插入",
+        "insertRow": "数据行",
+        "insertBreak": "休息行",
+        "footnote": "表格下方备注"
+      },
+      "footer": {
+        "phones": "电话（一行一个）",
+        "phonesLabel": "电话标签",
+        "addressLabel": "地址标签",
+        "address": "地址",
+        "qrLabel": "二维码说明"
+      },
+      "remove": "删除",
+      "split": {
+        "count": "{count, plural, =0 {还没有可生成的内容} other {将生成 # 张海报}}",
+        "part": "{name} {page}/{pages}",
+        "oversized": "有一个栏目比一整张海报还长，请精简，或拆成两个栏目。"
+      },
+      "size": "尺寸",
+      "resolution": "清晰度",
+      "reviewed": "我已核对标黄的 {count} 行",
+      "proofread": "海报由 AI 绘制，打印或转发前请逐字核对。",
+      "generate": "生成 {count} 张海报 · {credits} 积分",
+      "starting": "正在开始…",
+      "check": {
+        "pending": "正在核对这张海报上的文字…",
+        "match": "文字已核对：每一行都和你确认的一致。",
+        "mismatch": "有 {count} 行和你确认的不一样",
+        "unchecked": "没能自动核对文字，请自己逐字看一遍。",
+        "expected": "确认稿：",
+        "seen": "海报上：",
+        "notFound": "海报上没找到",
+        "redraw": "重画这一张 · {credits} 积分",
+        "redrawFree": "免费重画这一张",
+        "freeNote": "核对没通过的海报，第一次重画免费：出图时先预扣 {credits} 积分，出图成功后全部退回。",
+        "dismiss": "我看过了，没问题",
+        "editText": "改文字"
+      },
+      "notice": {
+        "sortFailed": "没能自动整理，请在下面各块里填写，原文在上方。",
+        "rateLimited": "一小时内整理次数太多，请稍后再试。",
+        "invalid": "有内容超长或表格行没填完整，请检查各块。",
+        "notEnough": "积分不够。",
+        "error": "出了点问题，请重试。"
+      }
+    },
     "sizes": {
       "closest": "接近原图（{ratio}）",
       "original": "原图比例",
@@ -617,6 +723,8 @@
       "3:2": "房源",
       "4:3": "网站",
       "2:3": "长图",
+      "1:2": "长海报",
+      "1:3": "超长海报",
       "asShot": "同原图",
       "withRatio": "{name} {ratio}"
     },
@@ -1549,6 +1657,7 @@
       "useCaseMenu": "AI菜单配图",
       "useCaseCommercial": "商业产品摄影",
       "useCaseGenerator": "图生图在线工具",
+      "useCaseTransparent": "透明 PNG 制作",
       "templates": "模板",
       "login": "登录",
       "startFree": "免费开始",
