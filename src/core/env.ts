@@ -4,10 +4,19 @@ import { z } from 'zod'
 import { alertsEnvShape } from './alerts/alerts-env'
 import { sentryBuildEnvSchema } from './build-env'
 import { previewHostsShape } from './preview-hosts'
+import { logger } from './logger'
 import { indexingEnvSchema } from './seo/indexing-env'
 import { smsEnvShape } from './sms/sms-env'
 import { assetsEnvShape, checkAssetsEnv } from './storage/assets-env'
 import { checkWaffoEnv, waffoEnvShape } from './waffo-env'
+
+const DEFAULT_CNY_PER_USD = 6.72
+let rateWarned = false
+function warnRejectedRate() {
+  if (rateWarned) return
+  rateWarned = true
+  logger.warn('CNY_PER_USD is not a number between 1 and 20; using the default', { fallback: DEFAULT_CNY_PER_USD })
+}
 
 // `KEY=` lines in .env files arrive as '' — treat them as unset rather than invalid.
 const blankAsUnset = (value: unknown) => (value === '' ? undefined : value)
@@ -45,7 +54,10 @@ const serverEnvSchema = z.object({
   // Yuan per US dollar for providers that bill in CNY (Volcano Engine Ark, ARCHITECTURE §10.0):
   // their per-image list price is converted with this rate into cost_usd. Default: the PBOC
   // USD/CNY central parity of 2026-11-09 (6.7188), rounded. The Owner sets it per environment.
-  CNY_PER_USD: z.preprocess(blankAsUnset, z.coerce.number().finite().min(1).max(20).default(6.72)),
+  // An unusable value ('6,72', 'abc', '0', ' ') falls back to the default with one warning: a typo
+  // here must never take every server route down, only Ark's cost record is affected.
+  CNY_PER_USD: z.preprocess(blankAsUnset, z.coerce.number().finite().min(1).max(20).default(DEFAULT_CNY_PER_USD))
+    .catch(() => { warnRejectedRate(); return DEFAULT_CNY_PER_USD }),
   // OpenAI Moderation API for public works (ARCHITECTURE §9 第 5 条, T108). Unset → OPENAI_API_KEY;
   // neither set → no automatic screen, so every public work waits for a person.
   OPENAI_MODERATION_API_KEY: optionalSecret,

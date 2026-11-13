@@ -7,6 +7,12 @@ describe('parseServerEnv', () => {
     expect(parseServerEnv({}).NODE_ENV).toBe('development')
   })
 
+  it('reads CNY_PER_USD and falls back to the default for unusable values instead of failing', () => {
+    expect(parseServerEnv({}).CNY_PER_USD).toBe(6.72)
+    expect(parseServerEnv({ CNY_PER_USD: '7.1' }).CNY_PER_USD).toBe(7.1)
+    for (const bad of ['6,72', 'abc', '0', ' ', '-3', '100']) expect(parseServerEnv({ CNY_PER_USD: bad }).CNY_PER_USD).toBe(6.72)
+  })
+
   it('names the bad key without echoing its value', () => {
     expect(() => parseServerEnv({ NODE_ENV: 'staging-secret' })).toThrow(/NODE_ENV/)
     expect(() => parseServerEnv({ NODE_ENV: 'staging-secret' })).not.toThrow(/staging-secret/)
