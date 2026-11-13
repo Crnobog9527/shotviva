@@ -67,12 +67,12 @@ function SlotBox({ slot, photos }: { slot: CatalogueImageSlot; photos: SlotPhoto
   if (!photo) {
     return (
       <div onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
-        <button type="button" onClick={() => input.current?.click()}
+        <button type="button" onClick={() => input.current?.click()} aria-label={`${t('workspace.slots.upload')} · ${slot.label}`}
           className="press hairline-lit flex min-h-[72px] w-full items-center justify-center gap-2 rounded-panel bg-card px-4 text-body font-semibold text-foreground md:hover:bg-wash">
           <svg viewBox="0 0 24 24" aria-hidden="true" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
             {ICONS.gallery}
           </svg>
-          {t('workspace.slots.upload')} · {slot.label}
+          {t('workspace.slots.upload')}
         </button>
         {chooser}
       </div>

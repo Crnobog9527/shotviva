@@ -758,7 +758,7 @@
         "cancel": "取消"
       },
       "slots": {
-        "upload": "上传",
+        "upload": "上传图片",
         "oneAtATime": "这个模板一次做一张。",
         "remove": "移除",
         "replace": "换一张"
