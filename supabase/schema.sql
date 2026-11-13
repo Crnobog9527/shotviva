@@ -9965,6 +9965,54 @@ $$;
 ALTER FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" integer, "p_reason" "text", "p_idempotency_key" "text", "p_pool" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."grant_poster_free_redraw"("p_job_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_job public.generation_jobs;
+  v_source public.generation_jobs;
+  v_set uuid;
+  v_part integer;
+  v_claimed uuid;
+begin
+  select * into v_job from public.generation_jobs where id = p_job_id;
+  if not found or v_job.status <> 'succeeded' or v_job.inputs->'poster'->>'redraw_of' is null then
+    return false;
+  end if;
+  select * into v_source from public.generation_jobs
+   where id = (v_job.inputs->'poster'->>'redraw_of')::uuid and user_id = v_job.user_id and status = 'succeeded';
+  if not found or v_source.template_id <> v_job.template_id
+     or v_source.inputs->'poster'->'set_id' is distinct from v_job.inputs->'poster'->'set_id'
+     or v_source.inputs->'poster'->'part' is distinct from v_job.inputs->'poster'->'part'
+     or v_source.inputs->>'resolution' is distinct from v_job.inputs->>'resolution'
+     or v_source.inputs->>'aspect_ratio' is distinct from v_job.inputs->>'aspect_ratio' then
+    return false;
+  end if;
+  if not exists (select from public.poster_checks where job_id = v_source.id and status = 'mismatch') then
+    return false;
+  end if;
+  v_set := (v_job.inputs->'poster'->>'set_id')::uuid;
+  v_part := (v_job.inputs->'poster'->>'part')::integer;
+  insert into public.poster_free_redraws (set_id, part, job_id, source_job_id)
+  values (v_set, v_part, v_job.id, v_source.id)
+  on conflict (set_id, part) do nothing
+  returning job_id into v_claimed;
+  if v_claimed is null then
+    return exists (select from public.poster_free_redraws where set_id = v_set and part = v_part and job_id = v_job.id);
+  end if;
+  perform public._apply_credit_change(
+    v_job.user_id, v_job.credit_pool, 'refund', least(v_job.credits_cost, v_source.credits_cost), 'poster free redraw',
+    'job:' || v_job.id::text || ':poster_free_redraw', v_job.id
+  );
+  return true;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."grant_poster_free_redraw"("p_job_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -13542,6 +13590,27 @@ ALTER TABLE "public"."payments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTI
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."poster_checks" (
+    "job_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "status" "text" NOT NULL,
+    "diffs" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "provider" "text",
+    "input_tokens" integer,
+    "output_tokens" integer,
+    "cost_usd" numeric(10,6),
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "poster_checks_cost_usd_check" CHECK (("cost_usd" >= (0)::numeric)),
+    CONSTRAINT "poster_checks_diffs_check" CHECK ((("jsonb_typeof"("diffs") = 'array'::"text") AND ("pg_column_size"("diffs") <= 32768))),
+    CONSTRAINT "poster_checks_input_tokens_check" CHECK (("input_tokens" >= 0)),
+    CONSTRAINT "poster_checks_output_tokens_check" CHECK (("output_tokens" >= 0)),
+    CONSTRAINT "poster_checks_status_check" CHECK (("status" = ANY (ARRAY['match'::"text", 'mismatch'::"text", 'unchecked'::"text"])))
+);
+
+
+ALTER TABLE "public"."poster_checks" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."poster_extractions" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -13574,6 +13643,19 @@ ALTER TABLE "public"."poster_extractions" ALTER COLUMN "id" ADD GENERATED ALWAYS
     CACHE 1
 );
 
+
+
+CREATE TABLE IF NOT EXISTS "public"."poster_free_redraws" (
+    "set_id" "uuid" NOT NULL,
+    "part" integer NOT NULL,
+    "job_id" "uuid" NOT NULL,
+    "source_job_id" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "poster_free_redraws_part_check" CHECK (("part" >= 0))
+);
+
+
+ALTER TABLE "public"."poster_free_redraws" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."poster_sets" (
@@ -14303,8 +14385,23 @@ ALTER TABLE "public"."payments"
 
 
 
+ALTER TABLE ONLY "public"."poster_checks"
+    ADD CONSTRAINT "poster_checks_pkey" PRIMARY KEY ("job_id");
+
+
+
 ALTER TABLE ONLY "public"."poster_extractions"
     ADD CONSTRAINT "poster_extractions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."poster_free_redraws"
+    ADD CONSTRAINT "poster_free_redraws_job_id_key" UNIQUE ("job_id");
+
+
+
+ALTER TABLE ONLY "public"."poster_free_redraws"
+    ADD CONSTRAINT "poster_free_redraws_pkey" PRIMARY KEY ("set_id", "part");
 
 
 
@@ -14896,6 +14993,10 @@ CREATE INDEX "payments_user_id_idx" ON "public"."payments" USING "btree" ("user_
 
 
 CREATE INDEX "payments_waffo_order_id_idx" ON "public"."payments" USING "btree" ("waffo_order_id") WHERE ("waffo_order_id" IS NOT NULL);
+
+
+
+CREATE INDEX "poster_checks_user" ON "public"."poster_checks" USING "btree" ("user_id", "created_at" DESC);
 
 
 
@@ -15669,8 +15770,33 @@ ALTER TABLE ONLY "public"."payments"
 
 
 
+ALTER TABLE ONLY "public"."poster_checks"
+    ADD CONSTRAINT "poster_checks_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "public"."generation_jobs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_checks"
+    ADD CONSTRAINT "poster_checks_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."poster_extractions"
     ADD CONSTRAINT "poster_extractions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_free_redraws"
+    ADD CONSTRAINT "poster_free_redraws_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "public"."generation_jobs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_free_redraws"
+    ADD CONSTRAINT "poster_free_redraws_set_id_fkey" FOREIGN KEY ("set_id") REFERENCES "public"."poster_sets"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."poster_free_redraws"
+    ADD CONSTRAINT "poster_free_redraws_source_job_id_fkey" FOREIGN KEY ("source_job_id") REFERENCES "public"."generation_jobs"("id") ON DELETE CASCADE;
 
 
 
@@ -16088,7 +16214,17 @@ ALTER TABLE "public"."payment_refunds" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."payments" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."poster_checks" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "poster_checks_read_own" ON "public"."poster_checks" FOR SELECT TO "authenticated" USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
+
+
+
 ALTER TABLE "public"."poster_extractions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."poster_free_redraws" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."poster_sets" ENABLE ROW LEVEL SECURITY;
@@ -17753,6 +17889,11 @@ GRANT ALL ON FUNCTION "public"."grant_credits"("p_user_id" "uuid", "p_amount" in
 
 
 
+REVOKE ALL ON FUNCTION "public"."grant_poster_free_redraw"("p_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."grant_poster_free_redraw"("p_job_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."handle_new_user"() FROM PUBLIC;
 
 
@@ -18319,6 +18460,11 @@ GRANT UPDATE ON SEQUENCE "public"."payments_id_seq" TO "service_role";
 
 
 
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."poster_checks" TO "service_role";
+GRANT SELECT ON TABLE "public"."poster_checks" TO "authenticated";
+
+
+
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."poster_extractions" TO "service_role";
 
 
@@ -18326,6 +18472,10 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 GRANT UPDATE ON SEQUENCE "public"."poster_extractions_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."poster_extractions_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."poster_extractions_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."poster_free_redraws" TO "service_role";
 
 
 

@@ -16,6 +16,7 @@ export {
   type PosterTable,
   type TableRow,
 } from './content'
+export { compareReading, partStrings, type PosterDiff } from './compare'
 export { partText } from './format'
 export { splitPoster, tablePages, type PosterPart } from './split'
 export { kindFor, posterFieldsSchema, type PosterCapacity, type PosterFields, type PosterKind } from './template'
