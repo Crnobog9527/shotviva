@@ -5,7 +5,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { styleRefsSchema, type StyleRef } from '@/core/templates/style-refs'
 import type { Resolution } from '@/core/templates/output-options'
 import type { ProviderFloors } from '@/core/templates/provider-pricing'
+import { readSaleFloorHidden } from '@/core/alerts/sale-floor'
+import type { SaleFloorExample } from '@/core/alerts/alert-kinds'
 import { AppError, type ErrorCode } from '@/core/errors'
+import { logger } from '@/core/logger'
 import {
   coverLocalesSchema,
   EDIT_TEMPLATE_ID,
@@ -43,7 +46,24 @@ async function readAdminPage(client: SupabaseClient, after: string | null) {
   return data
 }
 
+// 1295: published templates the catalogue leaves out, by id. The list still loads without it.
+async function readCatalogueGaps(client: SupabaseClient): Promise<Map<string, SaleFloorExample>> {
+  try {
+    return new Map((await readSaleFloorHidden(client)).map((gap) => [gap.templateId, gap]))
+  } catch (error) {
+    logger.warn('admin templates: catalogue gaps not read', { error })
+    return new Map()
+  }
+}
+
 export async function listAdminTemplates(client: SupabaseClient): Promise<AdminTemplate[]> {
+  const [rows, gaps] = await Promise.all([readAllAdminRows(client), readCatalogueGaps(client)])
+  // Stable sort preserves the database id order within each rank.
+  const data = rows.sort((a, b) => a.sort_order - b.sort_order)
+  return data.map((row) => toAdminTemplate(row, gaps.get(row.id)))
+}
+
+async function readAllAdminRows(client: SupabaseClient): Promise<AdminRow[]> {
   const rows: AdminRow[] = []
   let after: string | null = null
   while (true) {
@@ -52,10 +72,13 @@ export async function listAdminTemplates(client: SupabaseClient): Promise<AdminT
     if (page.length < CATALOGUE_PAGE_SIZE) break
     after = page[page.length - 1].id
   }
-  // Stable sort preserves the database id order within each rank.
-  const data = rows.sort((a, b) => a.sort_order - b.sort_order)
-  return data.map((row) => ({
+  return rows
+}
+
+function toAdminTemplate(row: AdminRow, gap: SaleFloorExample | undefined): AdminTemplate {
+  return {
     ...toTemplate(row),
+    ...(gap ? { catalogueGap: gap } : {}),
     subcategoryKey: row.subcategory_key,
     seriesId: row.series_id,
     seriesSortOrder: row.series_sort_order,
@@ -70,7 +93,7 @@ export async function listAdminTemplates(client: SupabaseClient): Promise<AdminT
           modelParams: row.template_prompts.model_params,
         }
       : null,
-  }))
+  }
 }
 
 // A plain GET, not `head: true`: PostgREST answers HEAD without Content-Length and then

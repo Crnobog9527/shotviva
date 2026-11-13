@@ -82,6 +82,24 @@
     font: 500 14px/1 var(--font-sans); color: var(--bone-dim);
   }
   .au-hint { font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
+  /* The status line under a working form; empty, it stays a live region but takes no row. */
+  .au-status:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; }
+  .au-gnote { margin-top: 8px; text-align: center; text-wrap: balance; }
+  .au-retry { font-weight: 600; text-decoration: underline; text-underline-offset: 3px; color: inherit; }
+  /* Before hydration (form-parts SubmitButton): the button looks as usual for 1.5 s, then dims and
+     reads "still loading" in the same box. No script runs yet, so a CSS delay does the timing. */
+  .au-primary { position: relative; }
+  /* The button keeps its display (a change would count as a layout shift at hydration); the
+     waiting label lies over the usual one. */
+  .au-primary[data-wait] { opacity: 1; animation: au-dim 0s 1.5s forwards; }
+  .au-primary[data-wait] .au-wait {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    visibility: hidden; animation: au-show 0s 1.5s forwards;
+  }
+  .au-primary[data-wait] .au-lbl { animation: au-hide 0s 1.5s forwards; }
+  @keyframes au-dim { to { opacity: .55; } }
+  @keyframes au-show { to { visibility: visible; } }
+  @keyframes au-hide { to { visibility: hidden; } }
   .au-err { display: flex; align-items: flex-start; gap: 6px; font-size: 14px; line-height: 1.4; color: var(--destructive); }
   .au-err svg, .au-notice svg { flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
   .au-err svg { width: 16px; height: 16px; margin-top: 1px; }

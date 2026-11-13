@@ -36,6 +36,7 @@
   },
   "auth": {
     "google": "Continue with Google",
+    "googleMainland": "Google sign-in usually doesn't load on networks in mainland China. Use your email instead.",
     "or": "or with email",
     "tabs": {
       "label": "Sign-in method",
@@ -151,7 +152,17 @@
     },
     "captcha": {
       "line": "Protected by <hcaptcha>hCaptcha</hcaptcha>.",
-      "failed": "Verification didn't complete. Please try again."
+      "failed": "Verification didn't complete. Please try again.",
+      "network": "The security check couldn't load, probably because the connection is slow.",
+      "retry": "Try again"
+    },
+    "pending": {
+      "loading": "Still loading the page…",
+      "checking": "Getting the security check ready…",
+      "checkingSlow": "Slow connection. Still loading the security check…",
+      "challenge": "Finish the security check in the window that opened.",
+      "sending": "Sending…",
+      "sendingSlow": "Slow connection. Still waiting for the server…"
     },
     "notices": {
       "unverified": "Verify your email first. Open the link we sent you.",

@@ -6,6 +6,7 @@ import { CompareSlider } from './compare-slider'
 import { PhotoPair } from './photo-pair'
 import { SeriesCard } from './series-card'
 import { SeriesMotion } from './series-motion-mount'
+import { phoneSlot } from './phone-sizes'
 
 // Each featured template's covers as the admin set them (T53: no bundled samples); a template
 // without both shows an empty pair frame. `live` marks templates the home generator can pick.
@@ -21,7 +22,7 @@ type Grid = Pick<HomePage['templateGrid'], 'heading' | 'intro' | 'note'>
 type Props = { grid: Pick<Grid, 'heading' | 'intro'> & Partial<Pick<Grid, 'note'>>; sections: FeaturedSections; isLinkEnabled: (href: string) => boolean }
 
 // One plate of a card's pair: 172 px on a 375 px phone, 174 px at 800, 274 px at 1280.
-const CARD_SIZES = '(min-width: 1024px) 276px, (min-width: 768px) 25vw, 50vw'
+const CARD_SIZES = `(min-width: 1024px) 276px, (min-width: 768px) 25vw, ${phoneSlot(50)}`
 
 function images(card: TemplateCard, media: TemplateMedia, t: ReturnType<typeof useTranslations>): { before: ImageRef; after: ImageRef } | null {
   if (!media.before || !media.after) return null
@@ -81,7 +82,7 @@ function Solo({ card, media, art }: { card: TemplateCard; media: TemplateMedia; 
   return (
     <div className={art ? 'mk-solo mk-solo-art' : 'mk-solo'}>
       {art && pictures ? (
-        <CompareSlider {...pictures} label={t('compareLabel', { name: card.name })} sizes="(min-width: 1024px) 420px, 100vw" />
+        <CompareSlider {...pictures} label={t('compareLabel', { name: card.name })} sizes={`(min-width: 1024px) 420px, ${phoneSlot(100)}`} />
       ) : (
         <PairCard card={card} media={media} size="lg" />
       )}
@@ -103,7 +104,7 @@ function SoloSeries({ card, media }: { card: TemplateCard; media: TemplateLookup
   const t = useTranslations('marketing.home')
   return (
     <div className="mk-solo">
-      <SeriesCard card={card} media={media} sizes="(min-width: 1024px) 276px, 50vw" size="lg" />
+      <SeriesCard card={card} media={media} sizes={`(min-width: 1024px) 276px, ${phoneSlot(50)}`} size="lg" />
       <div className="mk-solo-meta">
         <b>{card.name}</b>
         <span className="mk-use">{card.use}</span>
