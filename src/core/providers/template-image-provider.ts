@@ -13,6 +13,7 @@ import { ProviderSettingError } from './setting-error'
 import { defaultTemplateProvider, PROVIDERS_CACHE_TAG } from './active-provider'
 import { readProviderKey } from './keys'
 import { findProviderRow } from './repository'
+import { storedAspectAccepted } from './stored-capabilities'
 import { effectiveReferenceRange, resolveProvider } from './resolve'
 import type { ActiveProviderRow, ProviderAdapters } from './types'
 
@@ -33,11 +34,7 @@ type RoutingDeps = {
 function validateStoredCapabilities(row: ActiveProviderRow, request: ImageRequestOptions) {
   const caps = row.capabilities
   if (!caps) return
-  const fixed: readonly string[] = caps.providerAspectRatios ?? caps.aspectRatios
-  const aspect = request.aspectRatio === 'original'
-    ? caps.originalRatio
-    : fixed.includes(request.aspectRatio)
-  if (!aspect || !caps.resolutions.includes(request.resolution)) {
+  if (!storedAspectAccepted(caps, request.aspectRatio) || !caps.resolutions.includes(request.resolution)) {
     throw new AppError('INVALID_INPUT', 'This model does not support the selected output size')
   }
   if (request.referenceCount < caps.minReferences) {

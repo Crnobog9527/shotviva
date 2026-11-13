@@ -60,6 +60,15 @@ describe('Ark image requests', () => {
     }
   })
 
+  // Evidence for offering the tall poster sizes on Ark: they fit its pixel range as they are.
+  it.each(['1k', '2k'] as const)('fits the tall %s poster sizes without raising them', (resolution) => {
+    for (const aspectRatio of ['1:2', '1:3']) {
+      const { width, height } = arkSize({ resolution, aspectRatio, photoCount: 0, images: [] })
+      expect(width * height).toBeGreaterThanOrEqual(ARK_MIN_PIXELS)
+      expect(width * height).toBeLessThanOrEqual(ARK_MAX_PIXELS)
+    }
+  })
+
   it('follows an extreme original photo ratio without going under the pixel floor', () => {
     const wide = { bytes: new Uint8Array([1]), contentType: 'image/png', width: 9000, height: 1000 }
     const size = arkSize({ resolution: '1k', aspectRatio: 'original', photoCount: 1, images: [wide] })
