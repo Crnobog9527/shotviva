@@ -30,9 +30,9 @@ export type CheckDeps = {
 export type CheckStatus = 'match' | 'mismatch' | 'unchecked'
 
 // Long enough to read a table row on a 1:3 poster, small enough for one request.
-const READ_EDGE = 2048
+export const READ_EDGE = 2048
 const TIMEOUT_MS = 60_000
-const LINES_SCHEMA = {
+export const LINES_SCHEMA = {
   type: 'object', properties: { lines: { type: 'array', items: { type: 'string' } } }, required: ['lines'], additionalProperties: false,
 } as const
 
@@ -47,7 +47,7 @@ async function readJob(db: SupabaseClient, jobId: string) {
   return parsed.success ? parsed.data : null
 }
 
-const instructionsOf = (modelParams: Record<string, unknown>): string | null => {
+export const checkInstructionsOf = (modelParams: Record<string, unknown>): string | null => {
   const block = modelParams.poster_check
   const text = block && typeof block === 'object' ? (block as { instructions?: unknown }).instructions : null
   return typeof text === 'string' && text.trim() ? text : null
@@ -59,7 +59,8 @@ async function posterImage(store: ObjectStore, key: string): Promise<string> {
   return `data:image/jpeg;base64,${jpeg.toString('base64')}`
 }
 
-function requestBody(model: string, instructions: string, imageUrl: string) {
+// Also 拍照识别's reading of an old poster (run-extract-photo.ts): the same line-by-line transcription.
+export function readingBody(model: string, instructions: string, imageUrl: string) {
   return {
     model, instructions,
     input: [{ role: 'user', content: [{ type: 'input_image', image_url: imageUrl, detail: 'high' }] }],
@@ -87,7 +88,7 @@ async function save(db: SupabaseClient, jobId: string, userId: string, outcome: 
 
 // The reading, and the call's usage even when its answer cannot be parsed (it was paid for).
 async function read(deps: CheckDeps, credentials: ProviderCredentials, instructions: string, outputKey: string, spent: { usage: Usage }) {
-  const body = requestBody(credentials.config.model, instructions, await posterImage(deps.store, outputKey))
+  const body = readingBody(credentials.config.model, instructions, await posterImage(deps.store, outputKey))
   const answer = readResponsesOutput(await postResponses({ ...credentials.config, fetch: deps.fetch }, body, AbortSignal.timeout(deps.timeoutMs ?? TIMEOUT_MS)))
   spent.usage = answer.usage
   return z.object({ lines: z.array(z.string()) }).parse(answer.json).lines
@@ -96,7 +97,7 @@ async function read(deps: CheckDeps, credentials: ProviderCredentials, instructi
 async function check(deps: CheckDeps, jobId: string, job: NonNullable<Awaited<ReturnType<typeof readJob>>>, spent: { usage: Usage; credentials: ProviderCredentials | null }): Promise<Outcome> {
   const { content, part } = await loadPosterPart(deps.db, job.user_id, { setId: job.inputs.poster.set_id, part: job.inputs.poster.part, templateId: job.template_id })
   const { prompt } = await loadGenerationTemplate(deps.db, job.template_id, 'web')
-  const instructions = instructionsOf(prompt.modelParams)
+  const instructions = checkInstructionsOf(prompt.modelParams)
   spent.credentials = await deps.credentials().catch(() => null)
   if (!instructions || spent.credentials?.adapter !== 'openai_responses') return { status: 'unchecked', diffs: [], usage: null }
   const lines = await read(deps, spent.credentials, instructions, job.output_key, spent)

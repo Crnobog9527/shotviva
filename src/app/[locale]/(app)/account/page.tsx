@@ -16,6 +16,7 @@ import { serverEnv } from '@/core/env'
 import { readLinkStatus } from '@/core/partner'
 import { graylumIntroLinks } from '@/core/partner/ui'
 import { formatMoney, hasUnreadReply, listPaymentOptions, paymentChoices, PICKER_LIMIT, ReplyTime } from '@/core/support'
+import { StoreCard } from '@/core/store-profile/ui'
 import { AccountHelp } from '@/core/support/ui/account'
 import { currentLocale } from '@/core/i18n/server'
 import type { Translate } from '@/core/translate'
@@ -25,6 +26,7 @@ import { site } from '@/site/site.config'
 import { actions, helpActions } from './account-actions'
 import { claimGoogleAction, claimPhoneSendAction, claimPhoneVerifyAction } from './claim-actions'
 import { loadMyInvites } from './invite-action'
+import { loadStoreProfile, saveStoreProfileAction } from './store-actions'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.account'))('metaTitle') }
@@ -66,6 +68,7 @@ async function Account() {
     <>
       <AccountView data={data} actions={actions} site={{ brand: site.brand.name, products: offers, freeCredits: signupGift.granted }}>
         {claimOptions ? <GiftClaimCard credits={site.billing.freeCredits} options={claimOptions} actions={claimActions} /> : null}
+        <StoreCard actions={storeActions} />
         <InviteCard load={loadMyInvites} />
         <RedeemCard pending={discount} />
       </AccountView>
@@ -74,6 +77,7 @@ async function Account() {
   )
 }
 
+const storeActions = { load: loadStoreProfile, save: saveStoreProfileAction }
 const claimActions = { sendCode: claimPhoneSendAction, verifyCode: claimPhoneVerifyAction, google: claimGoogleAction }
 
 export default function AccountPage() {

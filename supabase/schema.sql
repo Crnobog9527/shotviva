@@ -15380,6 +15380,28 @@ ALTER TABLE "public"."sms_sends" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENT
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."store_profiles" (
+    "user_id" "uuid" NOT NULL,
+    "name" "text" DEFAULT ''::"text" NOT NULL,
+    "name_en" "text" DEFAULT ''::"text" NOT NULL,
+    "phones" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "address" "text" DEFAULT ''::"text" NOT NULL,
+    "wechat" "text" DEFAULT ''::"text" NOT NULL,
+    "qr_key" "text",
+    "autofill" boolean DEFAULT true NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "store_profiles_address_check" CHECK (("char_length"("address") <= 60)),
+    CONSTRAINT "store_profiles_check" CHECK ((("qr_key" IS NULL) OR ("qr_key" ~ (('^outputs/'::"text" || ("user_id")::"text") || '/store-qr-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$'::"text")))),
+    CONSTRAINT "store_profiles_name_check" CHECK (("char_length"("name") <= 24)),
+    CONSTRAINT "store_profiles_name_en_check" CHECK (("char_length"("name_en") <= 48)),
+    CONSTRAINT "store_profiles_phones_check" CHECK ((("cardinality"("phones") <= 3) AND ("char_length"("array_to_string"("phones", ''::"text")) <= 60))),
+    CONSTRAINT "store_profiles_wechat_check" CHECK (("char_length"("wechat") <= 40))
+);
+
+
+ALTER TABLE "public"."store_profiles" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."subscriptions" (
     "stripe_subscription_id" "text",
     "user_id" "uuid" NOT NULL,
@@ -16061,6 +16083,11 @@ ALTER TABLE ONLY "public"."site_announcements"
 
 ALTER TABLE ONLY "public"."sms_sends"
     ADD CONSTRAINT "sms_sends_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."store_profiles"
+    ADD CONSTRAINT "store_profiles_pkey" PRIMARY KEY ("user_id");
 
 
 
@@ -17562,6 +17589,11 @@ ALTER TABLE ONLY "public"."site_announcements"
 
 
 
+ALTER TABLE ONLY "public"."store_profiles"
+    ADD CONSTRAINT "store_profiles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."subscriptions"
     ADD CONSTRAINT "subscriptions_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id");
 
@@ -17964,6 +17996,13 @@ ALTER TABLE "public"."site_announcements" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."sms_sends" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."store_profiles" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "store_profiles_select_own" ON "public"."store_profiles" FOR SELECT TO "authenticated" USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
+
 
 
 ALTER TABLE "public"."subscriptions" ENABLE ROW LEVEL SECURITY;
@@ -20464,6 +20503,11 @@ GRANT ALL ON TABLE "public"."sms_sends" TO "service_role";
 GRANT UPDATE ON SEQUENCE "public"."sms_sends_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."sms_sends_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."sms_sends_id_seq" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."store_profiles" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."store_profiles" TO "service_role";
 
 
 

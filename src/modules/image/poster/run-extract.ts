@@ -48,7 +48,7 @@ export type PreparedExtract =
   | { kind: 'done'; result: ExtractResult }
   | { kind: 'model'; run: (onStage: (stage: ExtractStage) => void) => Promise<ExtractResult> }
 
-async function assertUnderHourlyLimit(db: SupabaseClient, userId: string, now: Date) {
+export async function assertUnderHourlyLimit(db: SupabaseClient, userId: string, now: Date) {
   const since = new Date(now.getTime() - 3600 * 1000).toISOString()
   const { data, error } = await db.from('poster_extractions').select('id')
     .eq('user_id', userId).gte('created_at', since).limit(EXTRACT_PER_HOUR)
@@ -56,13 +56,13 @@ async function assertUnderHourlyLimit(db: SupabaseClient, userId: string, now: D
   if ((data?.length ?? 0) >= EXTRACT_PER_HOUR) throw new AppError('RATE_LIMITED', 'Too many requests, try again later')
 }
 
-function instructionsOf(modelParams: Record<string, unknown>): string | null {
+export function instructionsOf(modelParams: Record<string, unknown>): string | null {
   const block = modelParams.poster_extract
   const text = block && typeof block === 'object' ? (block as { instructions?: unknown }).instructions : null
   return typeof text === 'string' && text.trim() ? text : null
 }
 
-function requestBody(model: string, instructions: string, text: string) {
+export function requestBody(model: string, instructions: string, text: string) {
   return {
     model, instructions: `${instructions}\n\n${EXTRACT_FORMAT_NOTE}`,
     input: [{ role: 'user', content: [{ type: 'input_text', text }] }],
@@ -75,7 +75,7 @@ function requestBody(model: string, instructions: string, text: string) {
 }
 
 // Dollars to the micro-dollar, as generation_jobs.cost_usd; null when a price is missing.
-function costOf(usage: StreamUsage, prices: ProviderCredentials['prices']): number | null {
+export function costOf(usage: StreamUsage, prices: ProviderCredentials['prices']): number | null {
   if (!usage || prices?.inputTextPerM == null || prices.outputPerM == null) return null
   return Math.round(usage.inputTokens * prices.inputTextPerM + usage.outputTokens * prices.outputPerM) / 1e6
 }
@@ -113,7 +113,7 @@ export function stageWatcher(onStage: (stage: ExtractStage) => void) {
 }
 
 // One try plus one retry on a transport or shape failure, each under its own deadline.
-async function ask(deps: ExtractDeps, credentials: ProviderCredentials, body: unknown, onStage: (stage: ExtractStage) => void) {
+export async function ask(deps: ExtractDeps, credentials: ProviderCredentials, body: unknown, onStage: (stage: ExtractStage) => void) {
   let last: unknown
   const watch = stageWatcher(onStage)
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -128,7 +128,7 @@ async function ask(deps: ExtractDeps, credentials: ProviderCredentials, body: un
   throw last
 }
 
-function okResult(content: PosterContent, clipped: string[], text: string): ExtractResult {
+export function okResult(content: PosterContent, clipped: string[], text: string): ExtractResult {
   // A cut value is still found in the paste, so it is flagged for review explicitly.
   const unverified = [...new Set([...unverifiedPaths(content, text), ...clipped])]
   return { status: 'ok', content, unverified, clipped }
