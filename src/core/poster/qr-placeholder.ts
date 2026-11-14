@@ -24,6 +24,41 @@ export function isPlaceholderPixel(r: number, g: number, b: number): boolean {
   return r >= 170 && b >= 170 && g <= 100 && Math.abs(r - b) <= 80
 }
 
+// The square's soft, resampled edge: background blended with magenta. Painted white pixel by pixel
+// rather than covered by a bigger box, so a caption drawn right under the square stays whole.
+export function isFringePixel(r: number, g: number, b: number): boolean {
+  return r - g >= 45 && b - g >= 45 && Math.abs(r - b) <= 90
+}
+
+// The tight box of placeholder pixels in a full-resolution crop (offset to poster coordinates),
+// or null when the crop has none.
+export function tightBox(raster: Raster, offset: { left: number; top: number }): Box | null {
+  const { data, width, height, channels } = raster
+  let [minX, minY, maxX, maxY] = [width, height, -1, -1]
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * channels
+      if (!isPlaceholderPixel(data[o]!, data[o + 1]!, data[o + 2]!)) continue
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y)
+    }
+  }
+  return maxX < 0 ? null : { left: offset.left + minX, top: offset.top + minY, width: maxX - minX + 1, height: maxY - minY + 1 }
+}
+
+// An RGBA layer the size of the crop: opaque white on the fringe outside `box`, clear elsewhere.
+export function fringeLayer(raster: Raster, offset: { left: number; top: number }, box: Box): Uint8Array {
+  const { data, width, height, channels } = raster
+  const layer = new Uint8Array(width * height * 4)
+  for (let i = 0; i < width * height; i++) {
+    const x = offset.left + (i % width)
+    const y = offset.top + Math.floor(i / width)
+    const inside = x >= box.left && x < box.left + box.width && y >= box.top && y < box.top + box.height
+    const o = i * channels
+    if (!inside && isFringePixel(data[o]!, data[o + 1]!, data[o + 2]!)) layer.set([255, 255, 255, 255], i * 4)
+  }
+  return layer
+}
+
 // A square is a plausible QR spot when it is square, filled, at least 5% of the poster's width
 // and no more than a fifth of it (a poster drawn mostly in magenta has no placeholder to find).
 const SQUARE = { minAspect: 0.75, maxAspect: 1.33, minFill: 0.8, minSide: 0.05, maxSide: 0.4 }
