@@ -254,7 +254,7 @@
   --font-instrument-serif: "Instrument Serif", "Instrument Serif Fallback";
 }
 
-/* Geist and Geist Mono come from next/font (src/app/fonts.ts); Tailwind emits these on :root, so
+/* Geist and Geist Mono are declared by core/ui/geist-fonts.tsx (public/fonts/geist); Tailwind emits these on :root, so
    font-sans / font-mono / font-display and var(--font-*) all resolve to the self-hosted files. */
 @theme static {
   /* Latin glyphs stay Geist / Instrument Serif / Geist Mono. Chinese text uses the system CJK
