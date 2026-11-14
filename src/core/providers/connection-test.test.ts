@@ -22,6 +22,12 @@ describe('testConnection', () => {
     expect(fetchImpl).toHaveBeenCalledWith(`${config.baseUrl}/key`, expect.objectContaining({ method: 'GET', redirect: 'manual' }))
   })
 
+  it('checks the key, not the public catalogue, for a Responses row on OpenRouter', async () => {
+    const fetchImpl = vi.fn(async () => new Response('{}', { status: 200 }))
+    await testConnection({ baseUrl: 'https://openrouter.ai/api/v1', apiKey: 'sk-or-test-123456', adapter: 'openai_responses' }, fetchImpl)
+    expect(fetchImpl).toHaveBeenCalledWith('https://openrouter.ai/api/v1/key', expect.objectContaining({ method: 'GET' }))
+  })
+
   it('reports a wrong key as unauthorized and keeps only the status', async () => {
     const body = JSON.stringify({ error: { message: 'Incorrect API key provided: sk-test-key-123456' } })
     const result = await testConnection(config, async () => new Response(body, { status: 401 }))

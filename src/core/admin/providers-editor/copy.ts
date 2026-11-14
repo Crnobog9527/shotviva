@@ -80,7 +80,7 @@ export const PROVIDERS_COPY = {
       openai_images: 'OpenAI Images 接口（官方地址或兼容服务）。',
       openrouter_images: '通过 OpenRouter 图片接口出图。测试连接只检查模型和密钥，免费。',
       ark_images: '火山方舟（大陆北京）Seedream 出图，按张计费。只有标准和高清两档。测试连接发一个不出图的请求，免费，并显示往返耗时。',
-      openai_responses: 'OpenAI Responses API（结构化 JSON 输出，推理用最低档）。地址请填 https://api.openai.com/v1。',
+      openai_responses: 'OpenAI Responses API（结构化 JSON 输出，推理用最低档）。OpenAI 模型一律经 OpenRouter：地址填 https://openrouter.ai/api/v1，模型名带 openai/ 前缀（如 openai/gpt-6-luna）。',
     } satisfies Record<ProviderAdapterId, string>,
     resolutions: '支持的清晰度',
     tiersHint: '只能在模型支持的档位里取消勾选；取消后，绑定这个供应商的模板不再提供该档。',
