@@ -15,6 +15,7 @@
  *   CODEX_REVIEW_MODE=on-demand  Codex's automatic review is off. This also asks when a
  *                                high-risk PR is opened, reopened or marked ready.
  *
+ * After asking, it re-runs the head's "Codex findings" run so the check waits for the review.
  * Posts nothing (exit 3: run it again later) while a Codex review is running, and nothing when
  * a "@codex review" was posted in the last 10 minutes. Env: GH_TOKEN, REPO, PR, HEAD_SHA,
  * ACTION, CODEX_REVIEW_MODE.
@@ -78,3 +79,16 @@ if (recent) {
 
 execFileSync('gh', ['pr', 'comment', String(env.PR), '--repo', env.REPO, '--body', `@codex review\n\n<sub>${why}.</sub>`])
 console.log(`Asked Codex to review: ${why}.`)
+
+// A comment starts no check on the PR, so "Codex findings" would stay green while this review
+// runs. Re-running its latest pull_request run makes it wait for the review (up to 20 minutes).
+const runs = JSON.parse(
+  execFileSync('gh', ['run', 'list', '--repo', env.REPO, '--workflow', 'codex-review.yml', '--event', 'pull_request',
+    '--commit', env.HEAD_SHA, '--limit', '1', '--json', 'databaseId,status'], { encoding: 'utf8' }),
+)
+if (runs[0]?.status === 'completed') {
+  execFileSync('gh', ['run', 'rerun', String(runs[0].databaseId), '--repo', env.REPO])
+  console.log(`Re-ran "Codex findings" (run ${runs[0].databaseId}); it now waits for this review.`)
+} else if (!runs[0]) {
+  console.warn('No "Codex findings" run for the head yet; it will wait for the review when it starts.')
+}
