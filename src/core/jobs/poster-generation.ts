@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { AppError } from '../errors'
+import { logger } from '../logger'
 import { requireFeature } from '../features'
 import { partText } from '../poster'
 import { pasteUserQr, readUserQr } from '../poster/qr-paste'
@@ -54,7 +55,12 @@ export async function posterQrFinisher(deps: Pick<GenerationDeps, 'store'>, qr: 
   const image = await loadInputImage(deps.store, qr.upload)
   const code = await readUserQr(image.bytes)
   if (!code) throw new AppError('INVALID_INPUT', 'The QR code could not be read; please upload a clearer one')
-  return async (bytes: Uint8Array) => (await pasteUserQr(bytes, code, qr.fallback)).bytes
+  return async (bytes: Uint8Array) => {
+    const pasted = await pasteUserQr(bytes, code, qr.fallback)
+    // How often the model's placeholder is found, against the template's fixed spot.
+    logger.info('poster.qr.pasted', { placed: pasted.placed })
+    return pasted.bytes
+  }
 }
 
 // A poster job comes from the website with its set, at any tier the template sells (ARCHITECTURE
