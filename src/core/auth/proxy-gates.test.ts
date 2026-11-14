@@ -183,6 +183,15 @@ describe('development-only pages', () => {
     expect((await dev('/generate/upload-test')).status).toBe(307)
     expect((await dev('/zh/generate/upload-test')).status).toBe(404)
   })
+
+  it('404s the error test on production (no validationPages) and under /zh, and lets it through elsewhere', async () => {
+    expect((await gate('/error-test')).status).toBe(404)
+    expect((await gate('/zh/error-test')).status).toBe(404)
+    const validation = (url: string) =>
+      proxyGate(new NextRequest(`http://localhost:3000${url}`), { translatedPaths: zhPaths, forward, validationPages: true })
+    expect((await validation('/error-test')).status).not.toBe(404)
+    expect((await validation('/zh/error-test')).status).toBe(404)
+  })
 })
 
 // ARCHITECTURE §17 「怎么选语言」: the stored choice (NEXT_LOCALE) moves a visit to its twin.
