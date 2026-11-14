@@ -7,6 +7,7 @@ describe('admin nav', () => {
     expect(adminNavItems({ wishlist: true }).map((item) => item.key)).toEqual([
       'overview',
       'analytics',
+      'experiments',
       'users',
       'tickets',
       'inquiries',

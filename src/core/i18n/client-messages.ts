@@ -30,6 +30,8 @@ export const APP_ONLY_APP_KEYS = [
   'share',
   'wait',
   'notify',
+  // 每周复用 (§5.3): the poster editor, the creation dialogs and the account card only.
+  'weekly',
 ] as const
 
 type Messages = Record<string, unknown>

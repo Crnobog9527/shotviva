@@ -848,8 +848,11 @@
         "restore": "恢复示例内容",
         "contactsLeft": "店名、电话、地址还是示例内容，确认要用吗？",
         "clearAllQuestion": "会把你改过的内容也清掉，确定全部清空吗？",
-        "restoreQuestion": "会覆盖你改过的内容，确定恢复示例吗？"
-      }
+        "restoreQuestion": "会覆盖你改过的内容，确定恢复示例吗？",
+        "photoHint": "已按照片里的文字填好，请逐项核对。",
+        "reusedHint": "也可以全部清空，或换回示例内容。"
+      },
+      "photoText": "照片里读出的文字"
     },
     "sizes": {
       "closest": "接近原图（{ratio}）",
@@ -1664,6 +1667,66 @@
       "titleReady": "生成好了",
       "titleFailed": "没有成功",
       "leaveQueued": "还有照片没开始生成，关掉这个标签页就会取消它们（不扣积分）。"
+    },
+    "weekly": {
+      "useLast": "用上一期",
+      "lastLoading": "正在读上一期…",
+      "lastFrom": "上一期：<day></day> · {name}",
+      "reused": "已填入 <day></day> 那一期（{name}）的全部内容，改日期和奖品就行。",
+      "lastFailed": "没读到上一期，请再试一次。",
+      "replaceAsk": "会替换编辑器里你已经填的内容，确定吗？",
+      "replace": "替换",
+      "cancel": "取消",
+      "saveStore": "保存店铺信息，下次打开自动填好店名、电话和地址",
+      "storeFilled": "已自动填入你的店铺信息（店名、电话、地址等）。",
+      "undo": "撤销",
+      "autofillOff": "以后不自动填",
+      "fillStore": "填入我的店铺信息",
+      "storeReplaceAsk": "店铺信息会替换你已经填的店名、电话或地址，确定吗？",
+      "photo": {
+        "hint": "没有通知文字？拍上一期的海报或截图（两页就一起选两张），自动认出上面的字。",
+        "pick": "拍照识别旧海报",
+        "uploading": "正在上传照片…",
+        "reading": "正在读照片里的字",
+        "error": {
+          "upload": "照片没传上去，请再选一次，没有扣积分。",
+          "failed": "没认出照片里的字，{credits} 积分已退回。换一张更清楚、正对着拍的照片，或者直接粘贴文字。",
+          "rateLimited": "这一小时识别次数太多了，请稍后再试，没有扣积分。",
+          "credits": "积分不够：识别要 {credits} 积分。",
+          "unavailable": "拍照识别暂时用不了，没有扣积分。请直接粘贴文字。"
+        },
+        "replaceAsk": "照片里的字认出来了。要替换编辑器里你已经填的内容吗？",
+        "replace": "替换",
+        "keep": "保留现在的",
+        "cost": "识别会扣 {credits} 积分（不论选一张还是两张）",
+        "notEnough": "积分不够：识别要 {credits} 积分。",
+        "getCredits": "去充值"
+      },
+      "storeCard": {
+        "title": "店铺信息",
+        "open": "店名、电话、地址和二维码",
+        "hint": "填一次，以后打开海报模板时自动填进店名、电话、地址和二维码。只有你自己能看到。",
+        "loading": "正在读取…",
+        "loadFailed": "没读到，请刷新页面再试。",
+        "name": "店名",
+        "nameEn": "英文店名（选填）",
+        "phone": "电话 {n}",
+        "address": "地址",
+        "wechat": "微信号（选填）",
+        "qr": "二维码",
+        "qrHint": "微信或群二维码，会贴到海报的二维码位置。",
+        "qrFailed": "二维码没传上去，请再选一次。",
+        "qrUploading": "正在上传…",
+        "qrPick": "上传二维码",
+        "qrChange": "换一张",
+        "qrRemove": "删除二维码",
+        "autofill": "打开海报模板时自动填入",
+        "save": "保存",
+        "saving": "正在保存…",
+        "saved": "已保存。",
+        "failed": "没保存成功，请再试一次。"
+      },
+      "photosGone": "上一期的图片找不到了：{boxes}。请重新上传。"
     }
   },
   "paywall": {

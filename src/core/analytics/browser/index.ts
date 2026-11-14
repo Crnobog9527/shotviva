@@ -16,6 +16,8 @@ export {
   trackUploadError,
 } from './client'
 export { AnalyticsIdentify } from './analytics-identify'
+export { ExperimentBeacon } from './experiment-beacon'
+export { reportExperiments } from './experiments'
 export { ConsentSlot } from '../consent-ui/consent-slot'
 export { CookieSettingsButton } from '../consent-ui/cookie-settings-button'
 export { REPLAY_BLOCK_CLASS } from '../replay'

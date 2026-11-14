@@ -26,11 +26,16 @@ export type StudioTemplate = {
   // Upload boxes (fields.images.slots) in the page's language, e.g. the prize photo; each page
   // sends only the ones its kind lists (poster.kinds[].slots).
   slots: CatalogueImageSlot[]
+  // 拍照识别's price per run, from the server's setting (1521); 0: not offered.
+  photoCredits: number
 }
 
 // fromSample: the content started from the template's sample text (fields.poster.sample), whose
 // untouched values the editor shows greyer; a sorted paste replaces it.
-type Draft = { step: 'paste' | 'edit'; source: string; content: PosterContent; unverified: string[]; reviewed: boolean; sorted: boolean; fromSample: boolean }
+// origin: where the content came from when it was not typed or pasted (§5.3「每周复用」): the last
+// issue (with which work and when) or a photo of an old poster; saved as the set's source.
+export type DraftOrigin = { source: 'reuse'; madeAt: string; templateId: string } | { source: 'photo' }
+type Draft = { step: 'paste' | 'edit'; source: string; content: PosterContent; unverified: string[]; reviewed: boolean; sorted: boolean; fromSample: boolean; origin?: DraftOrigin }
 
 const storageKey = (id: string) => `poster-draft:${id}`
 
@@ -83,7 +88,7 @@ function useStoredDraft(template: StudioTemplate) {
     if (!ready) return
     try { sessionStorage.setItem(storageKey(id), JSON.stringify(draft)) } catch { /* private mode: no draft */ }
   }, [draft, ready, id])
-  return [draft, setDraft] as const
+  return [draft, setDraft, ready] as const
 }
 
 export type StudioNotice = 'sortFailed' | 'clipped' | 'rateLimited' | 'invalid' | 'notEnough' | 'error' | null
@@ -99,7 +104,7 @@ export const sortFailure = (reply: { status: string; code?: string }): 'rateLimi
   reply.status === 'error' && reply.code === 'RATE_LIMITED' ? 'rateLimited' : 'sortFailed'
 
 export function usePosterStudio(template: StudioTemplate, concurrency: number, onStarted: () => void) {
-  const [draft, setDraft] = useStoredDraft(template)
+  const [draft, setDraft, ready] = useStoredDraft(template)
   const [aspect, setAspect] = useState<OutputAspect>(template.aspects[0] ?? '9:16')
   const [resolution, setResolution] = useState<Resolution>(() => defaultResolution(template.resolutions))
   const [busy, setBusy] = useState(false)
@@ -127,7 +132,7 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     if (reply.status === 'ok') {
       // The template's table and sections heading are offered even when the text had none.
       const content = withDefaults(posterContentSchema.parse(reply.content), template.poster)
-      setDraft((d) => ({ ...d, step: 'edit', content, unverified: reply.unverified, reviewed: false, sorted: true, fromSample: false }))
+      setDraft((d) => ({ ...d, step: 'edit', content, unverified: reply.unverified, reviewed: false, sorted: true, fromSample: false, origin: undefined }))
       if (reply.clipped?.length) setNotice('clipped')
       return
     }
@@ -142,7 +147,7 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     if (!parsed.success) return setNotice('invalid')
     setBusy(true)
     setNotice(null)
-    const saved = await savePosterSet(template.id, parsed.data, draft.sorted ? 'paste' : 'manual')
+    const saved = await savePosterSet(template.id, parsed.data, draft.origin?.source ?? (draft.sorted ? 'paste' : 'manual'))
     setBusy(false)
     if (!saved.ok) return setNotice(saved.code === 'INVALID_INPUT' ? 'invalid' : 'error')
     const credits = template.creditsCost[resolution]
@@ -163,13 +168,23 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     setReviewed: (reviewed: boolean) => setDraft((d) => ({ ...d, reviewed })),
     // 全部清空 keeps the shape and drops every word; 恢复示例 puts the template's text back.
     clearAll: () => setDraft((d) => ({ ...d, content: clearAll(d.content), unverified: [], reviewed: false })),
-    restoreSample: () => setDraft((d) => ({ ...d, content: startContent(template.poster), unverified: [], reviewed: false, sorted: false, fromSample: true })),
-    edit, clearPart, sort, generate, parts, valid: parsed.success, busy, stage, notice, photos, qrCheck,
+    restoreSample: () => setDraft((d) => ({ ...d, content: startContent(template.poster), unverified: [], reviewed: false, sorted: false, fromSample: true, origin: undefined })),
+    ...reuseActions(setDraft, template), ready, edit, clearPart, sort, generate, parts, valid: parsed.success, busy, stage, notice, photos, qrCheck,
     aspect, setAspect, resolution, setResolution,
   }
 }
 
 export type PosterStudioState = ReturnType<typeof usePosterStudio>
+
+// 用上一期 / 拍照识别 (§5.3「每周复用」): the editor opens on that content, `source` being what the
+// photo read; update changes the content in place (the store details).
+function reuseActions(setDraft: (change: (draft: Draft) => Draft) => void, template: Pick<StudioTemplate, 'poster'>) {
+  return {
+    startFrom: (content: PosterContent, origin: DraftOrigin, extra: { unverified?: string[]; source?: string } = {}) =>
+      setDraft((d) => ({ ...d, step: 'edit', content: withDefaults(content, template.poster), unverified: extra.unverified ?? [], reviewed: false, sorted: false, fromSample: false, origin, source: extra.source ?? d.source })),
+    update: (change: (content: PosterContent) => PosterContent) => setDraft((d) => ({ ...d, content: change(d.content) })),
+  }
+}
 
 // The uploads one page sends: the filled slots its kind lists, and the QR code, which every page
 // carries (§5.3); or none.

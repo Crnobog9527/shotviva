@@ -8,6 +8,7 @@ export const SHELL_COPY = {
   nav: {
     overview: '概览',
     analytics: '流量与转化',
+    experiments: 'A/B 实验',
     users: '用户',
     tickets: '工单',
     inquiries: '企业咨询',

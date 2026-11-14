@@ -8,6 +8,8 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   { key: 'overview', href: '/admin' },
   // T74 (ARCHITECTURE §16.2a): traffic and conversion from PostHog, next to the business overview.
   { key: 'analytics', href: '/admin/analytics' },
+  // A/B experiments (ARCHITECTURE §16.5), next to the traffic they split.
+  { key: 'experiments', href: '/admin/experiments' },
   { key: 'users', href: '/admin/users' },
   { key: 'tickets', href: '/admin/tickets' },
   // T86 (ARCHITECTURE §10.c): business inquiries from the pricing page, next to the tickets.

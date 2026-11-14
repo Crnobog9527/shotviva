@@ -178,6 +178,7 @@ export {
 export {
   FEATURES_COPY,
   FeaturesEditor,
+  PosterPhotoCard,
   SignupGiftCard,
   WISHLIST_SWITCH_COPY,
   type FeatureAdminActions,
@@ -187,9 +188,11 @@ export {
 } from './features-editor'
 export {
   loadSettingSwitch,
+  loadPosterPhotoPrice,
   loadSignupGift,
   loadWishlistSwitch,
   saveSettingSwitch,
+  savePosterPhotoPrice,
   saveSignupGiftRules,
   saveWishlistSwitch,
   type SignupGiftRules,
@@ -230,3 +233,5 @@ export {
   type DisputeUploadTicket,
 } from './disputes'
 export { DisputeDetail, DisputesList, toCard, type DisputeActions, type DisputeCard } from './disputes-ui'
+export { actOnExperiment, loadExperimentViews, saveExperiment, type ExperimentView } from './experiments'
+export { EXPERIMENTS_COPY, ExperimentsEditor, type ExperimentAdminActions, type SurfaceChoices } from './experiments-ui'

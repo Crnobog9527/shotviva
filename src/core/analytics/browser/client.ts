@@ -35,6 +35,8 @@ export function initBrowserAnalytics(): void {
         ? async () => {
             const { default: posthog } = await import('posthog-js')
             posthog.init(key, posthogConfig(readConsent(), window.location.pathname))
+            // The page's A/B variants tag every event from here on (ARCHITECTURE §16.5).
+            void import('./experiments').then(({ reportExperiments }) => reportExperiments())
             return posthog
           }
         : null,
