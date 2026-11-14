@@ -15,6 +15,7 @@ import type { AdminProvider, ProviderAdminActions } from '../providers/types'
 
 import { PROVIDERS_COPY } from './copy'
 import { canSave, formFor, tierOptions, usesTokenPrices, withBaseUrl, withAdapter, withModel, withTier, type ProviderForm, type TierOptions } from './form-state'
+import { ByokField } from './byok-field'
 import { CatalogPrices } from './catalog-prices'
 import { DECISION_ROUTES, decisionRoute, withDecisionRoute, type DecisionRoute } from './decision-route'
 import { ImageCostFields } from './image-cost-fields'
@@ -176,6 +177,7 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
           <CatalogPreview catalog={catalog} />
           {form.module === 'image' && (
             <>
+              <ByokField form={form} onChange={(on) => setForm((prev) => ({ ...prev, byokListPrice: on }))} />
               <TierChoice tiers={tiers} onToggle={(tier, on) => setForm((prev) => withTier(prev, tiers.selected, tier, on))} />
               <ImageCostFields adapter={form.adapter} tiers={form.resolutions} values={form.imageCosts} estimates={estimates}
                 onChange={(tier, value) => setForm((prev) => ({ ...prev, imageCosts: { ...prev.imageCosts, [tier]: value } }))} />

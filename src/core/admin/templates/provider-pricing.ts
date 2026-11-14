@@ -8,6 +8,7 @@ import {
 } from '@/core/templates'
 import type { ImageProviderOption } from '../image-provider-field'
 import { resolutionSchema } from '@/core/templates/db-resolution'
+import type { ImageCapabilities } from '@/core/templates/image-capabilities'
 
 const tariffs = z.record(z.string(), z.object({ quality: z.enum(TEMPLATE_QUALITIES), costs: creditsCostSchema, style_sale_approved: z.boolean().optional() }))
 const fallbackTiers = z.record(z.enum(RESOLUTIONS), z.number().int().positive().nullable())
@@ -16,6 +17,9 @@ const rowSchema = z.object({
   is_active: z.boolean(), capabilities: z.unknown(), resolutions: z.array(resolutionSchema),
   approved: tariffs.optional(), fallback_floors: z.record(z.enum(TEMPLATE_QUALITIES), fallbackTiers).optional(),
   estimated_image_costs: estimatedImageCostsSchema,
+  // 1552: priced like the official OpenAI line (the line itself or a BYOK OpenRouter line on its
+  // model): OpenAI's list estimate by quality, no catalogue estimate. Absent before 1552.
+  list_priced: z.boolean().optional(),
   p95: z.partialRecord(z.enum(RESOLUTIONS), z.number().nonnegative()),
   p95_by_quality: z.partialRecord(z.enum(TEMPLATE_QUALITIES), z.partialRecord(z.enum(RESOLUTIONS), z.number().nonnegative())).optional(),
   slot_costs: z.object({
@@ -35,6 +39,10 @@ const catalogSchema = z.object({
 const slotCostsOf = (row: z.infer<typeof rowSchema>) =>
   row.slot_costs && { extraInputUsd: row.slot_costs.extra_input_usd, p95Full: row.slot_costs.p95_full }
 
+// A list-priced line falls back to OpenAI's list estimate, never to its catalogue one (1552).
+const estimatesOf = (row: z.infer<typeof rowSchema>, listed: boolean, caps?: ImageCapabilities) =>
+  listed ? { ...row.estimated_image_costs } : { ...caps?.catalogImageCosts, ...row.estimated_image_costs }
+
 function optionsFromInput(input: unknown, legacyBudget?: number): ImageProviderOption[] {
   const catalog = Array.isArray(input) ? null : catalogSchema.parse(input)
   const budget = catalog ? imageCostBudget(catalog.unit_price) : legacyBudget
@@ -43,9 +51,10 @@ function optionsFromInput(input: unknown, legacyBudget?: number): ImageProviderO
   return rows.map(row => {
     const caps = imageCapabilitiesSchema.safeParse(row.capabilities)
     const openAI = row.adapter === 'openai_images'
-    const estimates = { ...caps.data?.catalogImageCosts, ...row.estimated_image_costs }
+    const listed = row.list_priced ?? openAI
+    const estimates = estimatesOf(row, listed, caps.data)
     const resolutions = openAI ? row.resolutions : row.resolutions.filter(tier => caps.data?.resolutions.includes(tier))
-    const floor = modelCreditFloor({ openAI, resolutions, estimates, p95: row.p95, p95ByQuality: row.p95_by_quality, slotCosts: slotCostsOf(row) }, budget)
+    const floor = modelCreditFloor({ openAI: listed, resolutions, estimates, p95: row.p95, p95ByQuality: row.p95_by_quality, slotCosts: slotCostsOf(row) }, budget)
     return {
       fallbackFloors: row.fallback_floors, approved: row.approved, version: catalog?.version, tariffs: row.is_active ? catalog?.tariffs : undefined,
       id: row.provider_id ?? 'env', label: row.label, model: row.model, isActive: row.is_active, fixedCapabilities: row.adapter !== 'openrouter_images',
