@@ -26,6 +26,8 @@ import { SlotBoxes } from './slot-boxes'
 import type { PhotoBatch, SlotPhotos } from './use-photo-batch'
 import { chosenAspect, templateOptions } from './output-choice'
 import { notePlaceholder, sizeLabel } from './workspace-options'
+import { clearCopy, copyExamples, typedCopy } from './copy-examples'
+import { ExampleTools } from './example-tools'
 
 // toggles (T89): the template's on/off options, key → on; {} is every one off.
 export type FormValues = { aspect: OutputAspect; resolution: Resolution; note: string; copy: Record<string, string>; toggles: Record<string, boolean> }
@@ -45,13 +47,16 @@ type Props = {
   photoExtra?: ReactNode
   // Which frame renders the form, for the template_toggle event (T89).
   surface?: Exclude<ToggleSurface, 'home'>
+  // The form opened with the cover's text (useWorkspaceDraft.fromExamples): greyer until edited,
+  // with 全部清空 / 恢复示例 over the fields.
+  examples?: boolean
 }
 
 // One column, one scroll, no wizard (DESIGN §4.3): photo → text the template needs → its on/off
 // options (T89) → the optional note → size → resolution, then the balance line above the action bar. The one form
 // source (T38): the workspace page and the creation dialog both render it, and their frames
 // set the side padding.
-export function WorkspaceForm({ template, balance, tier, photos, slots, values, onChange, again, photoExtra, surface = 'workspace' }: Props) {
+export function WorkspaceForm({ template, balance, tier, photos, slots, values, onChange, again, photoExtra, surface = 'workspace', examples = false }: Props) {
   const t = useTranslations('app')
   const balanceT = useTranslations('app.balance')
   const noteT = useTranslations('app.workspace.notePlaceholder')
@@ -62,7 +67,7 @@ export function WorkspaceForm({ template, balance, tier, photos, slots, values, 
   return (
     <>
       {again ? <AgainNote again={again} template={template} photoRatio={ratioForSize} /> : null}
-      <AskedFor template={template} photos={photos} slots={slots} values={values} onChange={onChange} again={again} tier={tier} photoExtra={photoExtra} />
+      <AskedFor template={template} photos={photos} slots={slots} values={values} onChange={onChange} again={again} tier={tier} photoExtra={photoExtra} examples={examples} />
       <TemplateToggles className="pt-6" template={template} values={values.toggles} onChange={(toggles) => onChange({ toggles })} surface={surface} />
       <div className="pt-6">
         <NoteField value={values.note} placeholder={notePlaceholder(template.category, noteT)} onChange={(note) => onChange({ note })} />
@@ -92,22 +97,44 @@ export function WorkspaceForm({ template, balance, tier, photos, slots, values, 
   )
 }
 
-type AskedProps = Pick<Props, 'template' | 'photos' | 'slots' | 'values' | 'onChange' | 'again' | 'tier' | 'photoExtra'>
+type AskedProps = Pick<Props, 'template' | 'photos' | 'slots' | 'values' | 'onChange' | 'again' | 'tier' | 'photoExtra' | 'examples'>
 
 // What the template asks for: its titled groups when it has them (fields.groups, Owner
 // 2026-11-14), else the photo or slot boxes followed by the text fields.
 function AskedFor(props: AskedProps) {
-  const { template, slots, values, onChange, again } = props
+  const { template, slots, values, onChange, again, examples } = props
   const groups = template.groups ?? []
+  const tools = examples ? <Examples template={template} values={values} onChange={onChange} /> : null
   if (groups.length > 0 && (slots || !isSlotTemplate(template))) {
-    return <FieldGroups groups={groups} fields={template.copyFields} slots={slotsOfTemplate(template)} photos={slots}
-      copy={values.copy} onCopy={(copy) => onChange({ copy })} missing={again?.missing ?? null} />
+    return (
+      <>
+        {tools}
+        <FieldGroups groups={groups} fields={template.copyFields} slots={slotsOfTemplate(template)} photos={slots} examples={examples}
+          copy={values.copy} onCopy={(copy) => onChange({ copy })} missing={again?.missing ?? null} />
+      </>
+    )
   }
   return (
     <>
       <ImagesSection {...props} />
-      <TextFields template={template} values={values} onChange={onChange} />
+      {tools}
+      <TextFields template={template} values={values} onChange={onChange} examples={examples} />
     </>
+  )
+}
+
+// Only for a template whose fields carry the cover's text.
+function Examples({ template, values, onChange }: Pick<Props, 'template' | 'values' | 'onChange'>) {
+  const t = useTranslations('app.workspace.examples')
+  const examples = copyExamples(template.copyFields)
+  if (Object.keys(examples).length === 0) return null
+  const typed = typedCopy(template.copyFields, values.copy)
+  return (
+    <div className="pt-6">
+      <ExampleTools hint={t('hint')} typed={typed}
+        onClearAll={() => onChange({ copy: clearCopy(values.copy, template.copyFields.map((field) => field.key)) })}
+        onRestore={() => onChange({ copy: { ...values.copy, ...examples } })} />
+    </div>
   )
 }
 
@@ -118,13 +145,13 @@ function ImagesSection({ template, photos, slots, values, onChange, again, tier,
 }
 
 // The template's text fields, less the notes drawn under their image slots.
-function TextFields({ template, values, onChange }: Pick<Props, 'template' | 'values' | 'onChange'>) {
+function TextFields({ template, values, onChange, examples }: Pick<Props, 'template' | 'values' | 'onChange' | 'examples'>) {
   const notes = new Set(slotsOfTemplate(template).flatMap((slot) => (slot.note ? [slot.note] : [])))
   const fields = template.copyFields.filter((field) => !notes.has(field.key))
   if (fields.length === 0) return null
   return (
     <div className="pt-6">
-      <CopyFields fields={fields} values={values.copy} onChange={(copy) => onChange({ copy })} />
+      <CopyFields fields={fields} values={values.copy} onChange={(copy) => onChange({ copy })} examples={examples} />
     </div>
   )
 }

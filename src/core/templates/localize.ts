@@ -44,7 +44,7 @@ function localizeToggle(toggle: ToggleField, text: TemplateTranslation): ToggleF
   return { ...toggle, label: own.label || toggle.label, ...(hint ? { hint } : {}), ...confirm }
 }
 
-// Label, placeholder, help and option labels, each falling back to English.
+// Label, placeholder, help, example and option labels, each falling back to English.
 type OwnCopyText = NonNullable<TemplateTranslation['fields']>[string]
 
 function optionLabels(field: CopyField, own: OwnCopyText): Pick<LocalizedCopyField, 'optionLabels'> {
@@ -54,9 +54,11 @@ function optionLabels(field: CopyField, own: OwnCopyText): Pick<LocalizedCopyFie
 
 function localizeCopy(field: CopyField, text: TemplateTranslation | undefined): LocalizedCopyField {
   const own: OwnCopyText = text?.fields?.[field.key] ?? {}
-  const placeholder = own.placeholder || field.placeholder
-  const help = own.help || field.help
-  return { ...field, label: own.label || field.label, ...(placeholder ? { placeholder } : {}), ...(help ? { help } : {}), ...optionLabels(field, own) }
+  const texts = Object.fromEntries((['placeholder', 'help', 'example'] as const).flatMap((key) => {
+    const value = own[key] || field[key]
+    return value ? [[key, value]] : []
+  }))
+  return { ...field, label: own.label || field.label, ...texts, ...optionLabels(field, own) }
 }
 
 // An image slot's label and help (§5.1e), each falling back to English. Display only: the

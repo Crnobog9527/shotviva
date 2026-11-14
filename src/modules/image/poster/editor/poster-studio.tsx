@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl'
 import type { Balance } from '@/core/billing/pools'
 import { Button } from '@/core/ui/button'
 
-import { isSampleText, sampleContactsLeft } from '../content-edit'
+import { ConfirmAction } from '../../workspace/example-tools'
+import { isSampleText, sampleContactsLeft, typedPoster } from '../content-edit'
 import type { PosterStudioState, StudioTemplate } from '../use-poster-studio'
 import { BlockTabs } from './block-tabs'
 import { GenerateButton, GeneratePanel } from './generate-panel'
@@ -22,7 +23,7 @@ export function StudioForm({ studio, template, balance }: Props) {
   return (
     <section className="grid gap-6 pt-2">
       <StudioNotes studio={studio} />
-      {template.poster.sample ? <SampleTools studio={studio} /> : null}
+      {template.poster.sample ? <SampleTools studio={studio} sample={template.poster.sample} /> : null}
       <BlockTabs poster={template.poster} unverified={studio.draft.unverified} content={studio.draft.content}
         flagged={(path) => studio.draft.unverified.includes(path)} onChange={studio.edit} onClear={studio.clearPart}
         sample={(path) => studio.draft.fromSample && isSampleText(studio.draft.content, template.poster.sample, path)}
@@ -49,14 +50,16 @@ export function StudioBar({ studio, template, balance }: Props) {
 
 // The editor starts from the cover poster's text (fields.poster.sample): a line saying so, with
 // 全部清空 (every word gone, the rows and sections kept) and 恢复示例.
-function SampleTools({ studio }: { studio: PosterStudioState }) {
+function SampleTools({ studio, sample }: { studio: PosterStudioState; sample: StudioTemplate['poster']['sample'] }) {
   const t = useTranslations('app.poster.sample')
+  // Words the user typed (or a sorted notice) are asked about before they are wiped.
+  const typed = typedPoster(studio.draft.content, studio.draft.fromSample ? sample : undefined)
   return (
     <div className="grid gap-2 rounded-control bg-wash-faint p-3 text-caption">
       <p className="text-muted-foreground">{t(studio.draft.fromSample ? 'hint' : 'sortedHint')}</p>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" className="min-h-11" onClick={studio.clearAll}>{t('clearAll')}</Button>
-        <Button variant="ghost" size="sm" className="min-h-11" onClick={studio.restoreSample}>{t('restore')}</Button>
+        <ConfirmAction variant="outline" label={t('clearAll')} question={t('clearAllQuestion')} risky={typed} onConfirm={studio.clearAll} />
+        <ConfirmAction label={t('restore')} question={t('restoreQuestion')} risky={typed} onConfirm={studio.restoreSample} />
       </div>
     </div>
   )

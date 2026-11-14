@@ -50,6 +50,8 @@ export type CatalogueCopyField = {
   type: CopyFieldType
   placeholder?: string
   help?: string
+  // The cover's text the form starts with (fields.copy[].example), in this language.
+  example?: string
   required: boolean
   maxLength: number
   options?: { value: string; label: string }[]
@@ -106,11 +108,12 @@ const catalogueGroups = (groups: readonly LocalizedGroup[] | undefined) => (grou
 
 type LocalizedCopy = LocalizedTemplate['fields']['copy'][number]
 
-function toCatalogueCopy({ key, label, type, placeholder, help, required, maxLength, options, optionLabels, min, max, public: shown }: LocalizedCopy): CatalogueCopyField {
+function toCatalogueCopy({ key, label, type, placeholder, help, example, required, maxLength, options, optionLabels, min, max, public: shown }: LocalizedCopy): CatalogueCopyField {
   return {
     key, label, type: type ?? 'short', required, maxLength, public: shown ?? false,
     ...(placeholder ? { placeholder } : {}),
     ...(help ? { help } : {}),
+    ...(example ? { example } : {}),
     ...(type === 'select' && options ? { options: options.map((value) => ({ value, label: optionLabels?.[value] ?? value })) } : {}),
     ...(min !== undefined ? { min } : {}),
     ...(max !== undefined ? { max } : {}),

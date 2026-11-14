@@ -115,6 +115,8 @@ export const templateTranslationSchema = z.object({
       z.string().regex(/^[a-z][a-z0-9_]*$/),
       z.object({
         label: optionalText(60), placeholder: optionalText(200), help: optionalText(200), hint: optionalText(200),
+        // A copy field's example (fields.copy[].example) in this language.
+        example: optionalText(1000),
         confirm: confirmTranslationSchema.optional(),
         options: z.record(z.string().max(60), optionalText(60)).optional(),
       }),
@@ -126,7 +128,7 @@ export type ConfirmTranslation = { title?: string; body?: string; checkbox?: str
 export type TemplateTranslation = {
   name?: string
   description?: string
-  fields?: Record<string, { label?: string; placeholder?: string; help?: string; hint?: string; confirm?: ConfirmTranslation; options?: Record<string, string | undefined> }>
+  fields?: Record<string, { label?: string; placeholder?: string; help?: string; hint?: string; example?: string; confirm?: ConfirmTranslation; options?: Record<string, string | undefined> }>
 }
 
 export const templateTranslationsSchema = z.strictObject({ zh: templateTranslationSchema.optional() })

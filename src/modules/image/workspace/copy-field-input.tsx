@@ -18,16 +18,17 @@ export const fieldClass =
 // phone's own picker).
 const CHIPS_MAX = 6
 
-type Props = { field: CatalogueCopyField; id: string; value: string; describedBy?: string; onChange(next: string): void }
+// example: the value is still the cover's text (copy-examples.ts), drawn greyer until edited.
+type Props = { field: CatalogueCopyField; id: string; value: string; describedBy?: string; example?: boolean; onChange(next: string): void }
 
 // One admin-defined field (ARCHITECTURE §5 fields.copy) drawn for its type. The server checks
 // the same rules again; these attributes only spare the user a refused Generate.
-export function CopyFieldInput({ field, id, value, describedBy, onChange }: Props) {
+export function CopyFieldInput({ field, id, value, describedBy, example, onChange }: Props) {
   const common = { id, value, required: field.required, 'aria-describedby': describedBy, onFocus: reveal }
   if (field.type === 'long') {
     return (
       <textarea {...common} rows={4} maxLength={field.maxLength} placeholder={field.placeholder} autoCapitalize="sentences"
-        onChange={(event) => onChange(event.target.value)} className={`${fieldClass} min-h-[120px]`} />
+        onChange={(event) => onChange(event.target.value)} className={cn(fieldClass, 'min-h-[120px]', example && 'text-muted-foreground')} />
     )
   }
   if (field.type === 'select') return <ChoiceInput field={field} id={id} value={value} describedBy={describedBy} onChange={onChange} />
@@ -35,7 +36,7 @@ export function CopyFieldInput({ field, id, value, describedBy, onChange }: Prop
   return (
     <input {...common} maxLength={field.maxLength} placeholder={field.placeholder} enterKeyHint="done"
       inputMode={number ? 'decimal' : undefined} autoCapitalize={number ? 'off' : 'sentences'} autoComplete="off"
-      onChange={(event) => onChange(event.target.value)} className={`${fieldClass} h-13 py-0`} />
+      onChange={(event) => onChange(event.target.value)} className={cn(fieldClass, 'h-13 py-0', example && 'text-muted-foreground')} />
   )
 }
 

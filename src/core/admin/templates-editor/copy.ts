@@ -21,6 +21,8 @@ export const copyFieldCopy = {
   labelZh: '中文名称',
   placeholder: '英文占位提示（选填）',
   placeholderZh: '中文占位提示（选填）',
+  example: '英文示例值（选填，照封面上的字；用户打开时预填）',
+  exampleZh: '中文示例值（选填）',
   help: '英文说明（选填，显示在输入框下面）',
   helpZh: '中文说明（选填）',
   maxLength: '字数上限',

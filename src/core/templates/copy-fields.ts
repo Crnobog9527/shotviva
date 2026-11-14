@@ -42,12 +42,23 @@ export const copyFieldSchema = z
     // May the public work page (§9) show what the user typed here, and one-click reuse carry it
     // to someone else? Off unless the admin turns it on: a user's words stay theirs.
     public: z.boolean().default(false),
+    // The text on the template's own cover (Owner 2026-11-14): the form opens with it filled in,
+    // greyer until edited, so a user only types over what changes. zh: translations.zh.fields.
+    example: z.string().max(COPY_MAX_LENGTH).optional(),
   })
   .superRefine((field, ctx) => {
     for (const message of shapeProblems(field)) ctx.addIssue({ code: 'custom', message: `${field.key}: ${message}`, path: [field.key] })
   })
 
-type FieldShape = { type: CopyFieldType; options?: string[]; min?: number; max?: number }
+type FieldShape = { type: CopyFieldType; options?: string[]; min?: number; max?: number; maxLength?: number; example?: string }
+
+// An example the field itself would refuse could never be generated as is.
+function exampleProblems(field: FieldShape): string[] {
+  if (field.example === undefined) return []
+  if (field.maxLength !== undefined && [...field.example].length > field.maxLength) return ['example is longer than maxLength']
+  if (field.type === 'select' && !(field.options ?? []).includes(field.example)) return ['a choice field\'s example must be one of its options']
+  return []
+}
 
 // A user's choice goes through cleanCopy before it is matched, so an option it would change
 // ("Extra  large", a zero-width space) could never be chosen: refuse it (the admin editor cleans
@@ -66,7 +77,7 @@ function boundProblems(field: FieldShape): string[] {
   return field.min !== undefined && field.max !== undefined && field.min > field.max ? ['min must not exceed max'] : []
 }
 
-const shapeProblems = (field: FieldShape) => [...optionProblems(field), ...boundProblems(field)]
+const shapeProblems = (field: FieldShape) => [...optionProblems(field), ...boundProblems(field), ...exampleProblems(field)]
 
 export type CopyField = z.infer<typeof copyFieldSchema>
 

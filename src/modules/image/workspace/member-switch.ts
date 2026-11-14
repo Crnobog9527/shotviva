@@ -1,4 +1,4 @@
-import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import type { CatalogueCopyField, CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { FormValues } from './workspace-form'
 
 // What choosing another member of a series does to the one draft the series panel keeps
@@ -20,8 +20,15 @@ function keptCopy(current: CatalogueTemplate | undefined, next: CatalogueTemplat
   return Object.fromEntries((next.copyFields ?? []).flatMap((field) => {
     const was = current?.copyFields?.find((candidate) => candidate.key === field.key)
     const value = copy[field.key]
-    if (!was || was.type !== field.type || !value) return []
-    if (field.type === 'select' && !field.options?.some((option) => option.value === value)) return []
-    return [[field.key, value.slice(0, field.maxLength)]]
+    // Text left as the previous member's example becomes this member's (each copies its own cover).
+    if (field.example && (!value || !was || value === was.example)) return [[field.key, field.example]]
+    const kept = keptValue(field, was, value)
+    return kept === null ? [] : [[field.key, kept]]
   }))
+}
+
+function keptValue(field: CatalogueCopyField, was: CatalogueCopyField | undefined, value: string | undefined): string | null {
+  if (!was || was.type !== field.type || !value) return null
+  if (field.type === 'select' && !field.options?.some((option) => option.value === value)) return null
+  return value.slice(0, field.maxLength)
 }
