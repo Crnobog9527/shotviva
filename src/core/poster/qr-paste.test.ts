@@ -61,6 +61,18 @@ describe('pasteUserQr', () => {
     expect(magentaLeft(data, info.channels)).toBe(0)
   })
 
+  it('leaves a caption drawn right under the square whole', async () => {
+    const qr = (await readUserQr(FIXTURE))!
+    const square = { left: 60, top: 1230, side: 110 }
+    const caption = await sharp({ create: { width: 110, height: 24, channels: 3, background: { r: 30, g: 30, b: 30 } } }).png().toBuffer()
+    const base = await sharp(await poster(square)).composite([{ input: caption, left: 60, top: 1342 }]).png().toBuffer()
+    const result = await pasteUserQr(base, qr, spot)
+    const { data, info } = await sharp(result.bytes).extract({ left: 60, top: 1344, width: 110, height: 20 }).raw().toBuffer({ resolveWithObject: true })
+    let light = 0
+    for (let i = 0; i < data.length; i += info.channels) if (data[i]! > 128) light++
+    expect(light).toBe(0)
+  })
+
   it('falls back to the template spot when the model drew no square', async () => {
     const qr = (await readUserQr(FIXTURE))!
     const result = await pasteUserQr(await poster(), qr, spot)
