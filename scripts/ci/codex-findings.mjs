@@ -3,7 +3,8 @@
  * request visible before merge, instead of a comment nobody opened.
  *
  *   - Fails while a Codex review thread is unresolved and not outdated: a finding on code that is
- *     still there. Fix it and resolve the thread, or reply why not and resolve it.
+ *     still there. Fix it, or resolve the thread and reply why not (the reply re-runs this check;
+ *     resolving alone triggers no workflow).
  *   - Warns (passes) for unresolved outdated threads: the lines changed since; resolve them once
  *     the finding is handled.
  *   - For a high-risk change (scripts/ci/review-risk.mjs), fails until Codex has finished at least

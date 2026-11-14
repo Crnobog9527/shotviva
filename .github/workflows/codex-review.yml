@@ -10,14 +10,16 @@ name: Codex review
 #     when someone comments "@codex review".
 #   - "Codex findings": fails while a Codex review thread is unresolved on current code, and for
 #     high-risk PRs until a Codex review has finished (scripts/ci/codex-findings.mjs). Re-runs
-#     when a review is submitted or a thread is resolved.
+#     on every push, review and review comment.
 on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize]
   pull_request_review:
     types: [submitted, dismissed]
-  pull_request_review_thread:
-    types: [resolved, unresolved]
+  # Resolving a thread starts no workflow; a reply in the thread does (resolve, then reply with
+  # what was done), and so does the push that fixes it.
+  pull_request_review_comment:
+    types: [created, edited, deleted]
 
 concurrency:
   group: codex-review-${{ github.event.pull_request.number }}
