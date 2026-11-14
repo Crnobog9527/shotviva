@@ -83,7 +83,7 @@ function StudioNotes({ studio }: { studio: PosterStudioState }) {
       {notice ? <p className="rounded-control bg-wash-faint p-3 text-caption">{t(`notice.${notice}`)}</p> : null}
       {studio.draft.source ? (
         <details className="rounded-control bg-wash-faint p-3 text-caption">
-          <summary className="min-h-11 cursor-pointer content-center font-medium">{t('sourceText')}</summary>
+          <summary className="min-h-11 cursor-pointer content-center font-medium">{t(studio.draft.origin?.source === 'photo' ? 'photoText' : 'sourceText')}</summary>
           <p className="whitespace-pre-wrap text-muted-foreground">{studio.draft.source}</p>
         </details>
       ) : null}

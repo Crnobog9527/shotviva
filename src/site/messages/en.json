@@ -849,7 +849,8 @@
         "contactsLeft": "The organiser, phone or address is still the sample’s. Use it anyway?",
         "photoHint": "Filled in from the text on your photo. Check each part.",
         "reusedHint": "You can also clear everything, or go back to the sample."
-      }
+      },
+      "photoText": "Text read from your photos"
     },
     "sizes": {
       "closest": "Closest to original ({ratio})",
