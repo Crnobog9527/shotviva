@@ -13,9 +13,9 @@ const CREAM = { r: 250, g: 244, b: 232 }
 
 // A 720×1440 poster (1K at 1:2) with, optionally, the model's magenta square in the footer: a
 // slightly off colour and a blurred edge, as an image model draws it.
-async function poster(square?: { left: number; top: number; side: number }) {
+async function poster(square?: { left: number; top: number; side: number }, colour = { r: 246, g: 12, b: 238 }) {
   const layers = square ? [{
-    input: await sharp({ create: { width: square.side, height: square.side, channels: 3, background: { r: 246, g: 12, b: 238 } } }).png().toBuffer(),
+    input: await sharp({ create: { width: square.side, height: square.side, channels: 3, background: colour } }).png().toBuffer(),
     left: square.left, top: square.top,
   }] : []
   return sharp({ create: { width: 720, height: 1440, channels: 3, background: CREAM } }).composite(layers).blur(0.8).png().toBuffer()
@@ -58,6 +58,14 @@ describe('pasteUserQr', () => {
     const { code, data, info } = await readAll(result.bytes)
     expect(code?.data).toBe('SHOTVIVA-QR-FIXTURE')
     expect(code!.location.topLeftCorner.y).toBeGreaterThan(1200)
+    expect(magentaLeft(data, info.channels)).toBe(0)
+  })
+
+  it('finds the hot pink Seedream draws for the magenta', async () => {
+    const qr = (await readUserQr(FIXTURE))!
+    const result = await pasteUserQr(await poster({ left: 60, top: 1230, side: 110 }, { r: 250, g: 5, b: 165 }), qr, spot)
+    expect(result.placed).toBe('placeholder')
+    const { data, info } = await readAll(result.bytes)
     expect(magentaLeft(data, info.channels)).toBe(0)
   })
 

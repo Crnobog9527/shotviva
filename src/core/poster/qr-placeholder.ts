@@ -19,15 +19,16 @@ export type Box = { left: number; top: number; width: number; height: number }
 export type Raster = { data: Uint8Array | Uint8ClampedArray; width: number; height: number; channels: number }
 
 // Model colours drift and the output is resampled: anything strongly red and blue with little
-// green reads as the placeholder.
+// green reads as the placeholder. Seedream draws "#FF00FF" as a hot pink near (250, 5, 165)
+// (2026-11-14), so blue may trail red by a good deal; the shape checks below keep pink gradients out.
 export function isPlaceholderPixel(r: number, g: number, b: number): boolean {
-  return r >= 170 && b >= 170 && g <= 100 && Math.abs(r - b) <= 80
+  return r >= 170 && b >= 120 && g <= 90 && b - g >= 100 && r - b <= 130
 }
 
 // The square's soft, resampled edge: background blended with magenta. Painted white pixel by pixel
 // rather than covered by a bigger box, so a caption drawn right under the square stays whole.
 export function isFringePixel(r: number, g: number, b: number): boolean {
-  return r - g >= 45 && b - g >= 45 && Math.abs(r - b) <= 90
+  return r - g >= 45 && b - g >= 45 && r - b <= 140 && b - r <= 90
 }
 
 // The tight box of placeholder pixels in a full-resolution crop (offset to poster coordinates),
