@@ -6,8 +6,16 @@ import { SlotBox } from '../../workspace/slot-boxes'
 import type { SlotPhotos } from '../../workspace/use-photo-batch'
 import type { StudioTemplate } from '../use-poster-studio'
 import type { QrCheck } from '../use-qr-check'
+import type { PagePhotos } from './block-tabs'
 
 type Props = { template: StudioTemplate; kind: string | null; photos: SlotPhotos; qrCheck: QrCheck }
+
+// A tab's upload boxes: the page's own (kind) or, for what both pages share (kind null), the QR code.
+function slotsOf(template: StudioTemplate, kind: string | null) {
+  const qr = template.poster.qr?.slot
+  const listed = kind === null ? (qr ? [qr] : []) : template.poster.kinds.find((item) => item.key === kind)?.slots ?? []
+  return template.slots.filter((slot) => listed.includes(slot.key))
+}
 
 // A tab's upload boxes (ARCHITECTURE §5.3, the named slots of §5.1e): e.g. the prize photo on
 // the prize page, and under what both pages share (kind null) the QR code, which every page
@@ -15,26 +23,41 @@ type Props = { template: StudioTemplate; kind: string | null; photos: SlotPhotos
 // it always has.
 export function PageSlots({ template, kind, photos, qrCheck }: Props) {
   const qr = template.poster.qr?.slot
-  const listed = kind === null ? (qr ? [qr] : []) : template.poster.kinds.find((item) => item.key === kind)?.slots ?? []
-  const slots = template.slots.filter((slot) => listed.includes(slot.key))
+  const slots = slotsOf(template, kind)
   if (slots.length === 0) return null
-  return <>{slots.map((slot) => <SlotSection key={slot.key} slot={slot} photos={photos} qrCheck={slot.key === qr ? qrCheck : null} />)}</>
+  return <>{slots.map((slot) => <SlotSection key={slot.key} slot={slot} photos={photos} qrCheck={slot.key === qr ? qrCheck : null} titled={slots.length > 1} />)}</>
 }
 
-type SlotProps = { slot: StudioTemplate['slots'][number]; photos: SlotPhotos; qrCheck: QrCheck | null }
+type SlotProps = { slot: StudioTemplate['slots'][number]; photos: SlotPhotos; qrCheck: QrCheck | null; titled: boolean }
 
-function SlotSection({ slot, photos, qrCheck }: SlotProps) {
+// One box; its own title only when the part holds several (else the part is titled by it).
+function SlotSection({ slot, photos, qrCheck, titled }: SlotProps) {
   const t = useTranslations('app')
   return (
     <section className="grid gap-3">
-      <h3 className="flex items-baseline gap-2 text-label font-semibold">
-        {slot.label}
-        {slot.required ? null : <span className="font-normal text-muted-foreground">{t('workspace.optional')}</span>}
-      </h3>
+      {titled ? (
+        <h4 className="flex items-baseline gap-2 text-label font-semibold">
+          {slot.label}
+          {slot.required ? null : <span className="font-normal text-muted-foreground">{t('workspace.optional')}</span>}
+        </h4>
+      ) : null}
       <SlotBox slot={slot} photos={photos} />
       {qrCheck === 'unreadable' ? <p role="alert" className="text-caption text-destructive">{t('poster.qrUnreadable')}</p>
         : qrCheck === 'checking' ? <p className="text-caption text-muted-foreground">{t('poster.qrChecking')}</p>
           : <p className="text-caption text-muted-foreground">{slot.help ?? t(qrCheck ? 'poster.qrHint' : 'poster.slotHint')}</p>}
     </section>
   )
+}
+
+// The editor's part for a tab's uploads: titled by the slot when there is one, else 上传图片.
+export function pagePhotos(template: StudioTemplate, photos: SlotPhotos, qrCheck: QrCheck, fallback: string): PagePhotos {
+  return {
+    render: (kind) => <PageSlots template={template} kind={kind} photos={photos} qrCheck={qrCheck} />,
+    count: (kind) => {
+      const slots = slotsOf(template, kind)
+      if (slots.length === 0) return null
+      const label = slots.length === 1 ? slots[0]!.label : fallback
+      return { label, filled: slots.filter((slot) => photos.byKey[slot.key]).length, total: slots.length }
+    },
+  }
 }

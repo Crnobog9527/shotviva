@@ -822,7 +822,18 @@
       "slotHint": "可不传。不传的话，按奖品文字画出奖品。",
       "qrHint": "可不传。传了的话，两页都会把这张二维码原样贴上去，保证扫得出来。请传清晰的二维码图片（PNG / JPG）。",
       "qrChecking": "正在识别二维码…",
-      "qrUnreadable": "这张图里认不出二维码，请换一张清晰、完整的二维码图片。"
+      "qrUnreadable": "这张图里认不出二维码，请换一张清晰、完整的二维码图片。",
+      "folds": {
+        "masthead": "页眉",
+        "title": "标题与时间",
+        "info": "栏目总标题",
+        "section": "第 {n} 栏",
+        "prizes": "奖品表",
+        "table": "表格",
+        "footer": "页脚 · 电话与地址",
+        "photos": "上传图片",
+        "flagged": "{count} 处待核对"
+      }
     },
     "sizes": {
       "closest": "接近原图（{ratio}）",
@@ -983,6 +994,12 @@
         "oneAtATime": "这个模板一次做一张。",
         "remove": "移除",
         "replace": "换一张"
+      },
+      "groups": {
+        "filled": "已填 {filled}/{total}",
+        "required": "还有 {count} 项必填",
+        "done": "必填已填好",
+        "invalid": "有内容需要修改"
       }
     },
     "errors": {
