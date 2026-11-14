@@ -19,12 +19,21 @@ it('recovers the missing charge from the matching authenticated generation recei
     expect.objectContaining({ method: 'GET', redirect: 'error', headers: { Authorization: 'Bearer fixture' } }))
 })
 
-it('does not assign another request’s charge or interpret a BYOK fee as total cost', async () => {
+it('does not assign another request’s charge, and books BYOK as upstream plus the fee', async () => {
   const mismatch = await read({}, { id: 'gen-other', total_cost: 123, is_byok: false }).receipt
   expect(mismatch).toMatchObject({ cost: null, generation_id: gen })
   const byok = await read({ usage: { cost: 0 } }, { id: gen, total_cost: 0, is_byok: true, upstream_inference_cost: 0.02 }).receipt
   expect(byok).toMatchObject({ is_byok: true, upstream_inference_cost: 0.02 })
-  expect(jobCostUsd(byok, null)).toBeNull()
+  expect(jobCostUsd(byok, null)).toBe(0.02)
+})
+
+it('looks up the upstream bill a BYOK response left out, keeping the reported fee', async () => {
+  const { fetch, receipt } = read({ usage: { cost: 0, is_byok: true } }, { id: gen, total_cost: 0, is_byok: true, upstream_inference_cost: 0.0425 })
+  const usage = await receipt
+  expect(usage).toMatchObject({ cost: 0, is_byok: true, upstream_inference_cost: 0.0425 })
+  expect(usage.cost_source).toBeUndefined()
+  expect(jobCostUsd(usage, null)).toBe(0.0425)
+  expect(fetch).toHaveBeenCalledOnce()
 })
 
 it('uses the response without another call when it supplies the charge and billing mode', async () => {

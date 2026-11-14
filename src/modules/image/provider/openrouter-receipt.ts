@@ -55,7 +55,9 @@ function mergeReceipt(usage: ProviderUsage, receipt: z.infer<typeof metadata>['d
 }
 
 export async function completeReceipt(usage: ProviderUsage, source: ReceiptSource): Promise<ProviderUsage> {
-  if (usage.generation_id && (usage.cost === null || usage.is_byok === undefined)) {
+  // A BYOK response may carry the fee but not the upstream bill; the receipt has both.
+  const byokUpstreamMissing = usage.is_byok === true && usage.upstream_inference_cost === undefined
+  if (usage.generation_id && (usage.cost === null || usage.is_byok === undefined || byokUpstreamMissing)) {
     const receipt = await lookup(source, usage.generation_id)
     if (receipt) mergeReceipt(usage, receipt)
   }
