@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GenerationProvider, ImageRequestOptions } from '../jobs'
 import { logger } from '../logger'
 import type { OpenRouterImageParameters } from './openrouter-catalog'
+import { catalogCapabilities } from './image-capabilities'
 import { ProviderSettingError } from './setting-error'
 import { templateImageProvider } from './template-image-provider'
 import type { ActiveProviderRow, ProviderAdapters } from './types'
@@ -85,5 +86,29 @@ describe('template image provider', () => {
     const deps = dependencies()
     deps.lookup.mockResolvedValue({ ...row, adapter: 'openai_responses' })
     await expect(templateImageProvider(adapters, row.id, request, deps)).rejects.toThrow('image provider')
+  })
+})
+
+describe('OpenRouter GPT image line', () => {
+  // 跟随照片 is the default ratio: a GPT image line on OpenRouter sizes it from the photo.
+  it.each([
+    ['without auto', ['1:1', '3:4']],
+    ['with auto', ['1:1', '3:4', 'auto']],
+    ['without any ratio list', null],
+  ] as const)('keeps an original-ratio request on the OpenRouter GPT image line (catalogue %s)', async (_label, ratios) => {
+    const parameters: OpenRouterImageParameters = {
+      ...(ratios ? { aspect_ratio: { type: 'enum', values: [...ratios] } } : {}),
+      quality: { type: 'enum', values: ['medium', 'high'] }, input_references: { type: 'range', min: 0, max: 16 },
+    }
+    const model = 'openai/gpt-image-2.6-sunburst'
+    const gpt: ActiveProviderRow = { ...row, id: 'or-gpt', model, resolutions: ['1k', '2k', '4k'],
+      capabilities: catalogCapabilities(model, parameters, '2026-11-15T00:00:00.000Z') }
+    const deps = { ...dependencies(), lookup: vi.fn(async () => gpt), parameters: vi.fn(async () => parameters) }
+    for (const resolution of ['1k', '2k'] as const) {
+      const selected = await templateImageProvider(adapters, gpt.id, { resolution, aspectRatio: 'original', referenceCount: 2 }, deps)
+      expect(selected.id).toBe(`or-gpt/${model}`)
+      expect(selected.fallbackReason).toBeUndefined()
+    }
+    expect(deps.fallback).not.toHaveBeenCalled()
   })
 })
