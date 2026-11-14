@@ -1,4 +1,5 @@
-import { OPENROUTER_TOP_UP_FACTOR } from './openrouter-fee'
+import { logger } from '../logger'
+import { OPENROUTER_TOP_UP_FACTOR, openRouterChargeUsd } from './openrouter-fee'
 import type { ProviderPrices, ProviderUsage } from './provider'
 
 // A job's real cost (ARCHITECTURE §10.0, T33): reported tokens × the per-million price snapshot.
@@ -35,8 +36,10 @@ export function estimatedRouterCost(usage: ProviderUsage, prices: ProviderPrices
 }
 
 function routerCharge(usage: ProviderUsage): number | null {
-  if (usage.is_byok !== false || usage.cost == null) return null
-  return usage.cost * OPENROUTER_TOP_UP_FACTOR
+  const charge = openRouterChargeUsd(usage)
+  if (charge !== 'missing_upstream') return charge
+  logger.warn('openrouter byok receipt without upstream cost; cost left empty', { generationId: usage.generation_id ?? null })
+  return null
 }
 
 function imageCost(usage: ProviderUsage, prices: ProviderPrices | null | undefined): number | null {

@@ -4,7 +4,7 @@ import sharp from 'sharp'
 import { AppError } from '@/core/errors'
 import { effectivePrices } from '@/core/jobs'
 import { OPENROUTER_BASE_URL, type AdminProvider } from '@/core/providers'
-import { OPENROUTER_TOP_UP_FACTOR } from '@/core/jobs/openrouter-fee'
+import { OPENROUTER_TOP_UP_FACTOR, openRouterChargeUsd } from '@/core/jobs/openrouter-fee'
 
 const endpoint = (row: AdminProvider) => row.baseUrl.replace(/\/+$/, '')
 const maxOutput = 2048
@@ -13,7 +13,8 @@ const token = z.int().nonnegative()
 const reply = z.object({
   status: z.string().optional(), output: z.array(z.object({ content: z.array(z.object({ type: z.string(), text: z.string().optional() })).optional() })),
   usage: z.object({ input_tokens: token, output_tokens: token, cost: z.number().nonnegative().nullable().optional(),
-    is_byok: z.boolean().optional() }).nullish(),
+    is_byok: z.boolean().optional(),
+    cost_details: z.object({ upstream_inference_cost: z.number().nonnegative().nullish() }).nullish().catch(undefined) }).nullish(),
 })
 
 export function reverseEstimate(row: AdminProvider, instruction: string) {
@@ -31,11 +32,16 @@ export async function visionPreview(bytes: Uint8Array) {
   return `data:image/webp;base64,${image.toString('base64')}`
 }
 
-function actualCost(row: AdminProvider, usage: z.infer<typeof reply>['usage']) {
+type Usage = NonNullable<z.infer<typeof reply>['usage']>
+
+function routerCost(usage: Usage) {
+  const charge = openRouterChargeUsd({ ...usage, upstream_inference_cost: usage.cost_details?.upstream_inference_cost ?? undefined })
+  return typeof charge === 'number' ? round(charge) : null
+}
+
+function actualCost(row: AdminProvider, usage: Usage | null | undefined) {
   if (!usage) return null
-  if (endpoint(row) === OPENROUTER_BASE_URL) {
-    return usage.cost != null && usage.is_byok === false ? round(usage.cost * OPENROUTER_TOP_UP_FACTOR) : null
-  }
+  if (endpoint(row) === OPENROUTER_BASE_URL) return routerCost(usage)
   const rates = effectivePrices(row.model, row.prices)
   // Responses reports aggregate input tokens. Separate image pricing cannot be reconstructed.
   if (rates?.inputTextPerM == null || rates.outputPerM == null) return null
