@@ -4,13 +4,13 @@ import { setRequestLocale } from 'next-intl/server'
 
 import { AnnouncementBanner } from '@/core/announcements'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
+import { GeistFonts } from '@/core/ui/geist-fonts'
 import { InstrumentSerifPreload } from '@/core/ui/instrument-serif'
 import { loadMessages } from '@/site/i18n/messages'
 import { site } from '@/site/site.config'
 
 import { MarketingFooter, MarketingHeader } from './[locale]/marketing-chrome'
 import { NotFoundContent } from './[locale]/not-found-content'
-import { fontVariables } from './fonts'
 import './globals-public.css'
 
 // An address that matches no route at all has no [locale] root layout to render in, so Next
@@ -23,8 +23,9 @@ export default async function GlobalNotFound() {
   // touching request headers (which would stop the page from prerendering).
   setRequestLocale('en')
   return (
-    <html lang="en" className={`${fontVariables} h-full antialiased`}>
+    <html lang="en" className="h-full antialiased">
       <body className="flex min-h-full flex-col">
+        <GeistFonts />
         <InstrumentSerifPreload />
         <NextIntlClientProvider locale="en" messages={await loadMessages('en')}>
           <TranslatedPathsProvider paths={site.locales.zhPaths}>

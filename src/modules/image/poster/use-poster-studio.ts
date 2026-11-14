@@ -32,6 +32,15 @@ type Draft = { step: 'paste' | 'edit'; source: string; content: PosterContent; u
 
 const storageKey = (id: string) => `poster-draft:${id}`
 
+// Switching style within a series keeps what was pasted and checked: the next template starts
+// from this one's draft unless it already has its own.
+export function carryDraft(from: string, to: string) {
+  try {
+    const draft = sessionStorage.getItem(storageKey(from))
+    if (draft && sessionStorage.getItem(storageKey(to)) === null) sessionStorage.setItem(storageKey(to), draft)
+  } catch { /* private mode: nothing to carry */ }
+}
+
 const freshDraft = (template: StudioTemplate): Draft =>
   ({ step: 'paste', source: '', content: emptyContent(template.poster), unverified: [], reviewed: false, sorted: false })
 

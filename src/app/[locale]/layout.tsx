@@ -10,11 +10,11 @@ import { UpdateSlot } from '@/core/app-update'
 import { htmlLang, isLocale, publicClientMessages } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata, ShortcutTitleSync } from '@/core/seo'
+import { GeistFonts } from '@/core/ui/geist-fonts'
 import { InstrumentSerifPreload } from '@/core/ui/instrument-serif'
 import { MiSansStylesheet } from '@/core/ui/misans-stylesheet'
 import { site } from '@/site/site.config'
 
-import { fontVariables } from '../fonts'
 
 // Default robots is noindex; only paths in site.indexing opt in (core/seo/indexing.ts). The web
 // app manifest follows the language (T65).
@@ -46,8 +46,10 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
   const messages = publicClientMessages(await getMessages())
   const lang = isLocale(locale) ? locale : site.locales.default
   return (
-    <html lang={htmlLang(lang)} className={`${fontVariables} h-full antialiased`}>
+    <html lang={htmlLang(lang)} className="h-full antialiased">
       <body className="flex min-h-full flex-col">
+        {/* Geist faces and preload on one host (core/ui/geist-fonts.tsx). */}
+        <GeistFonts />
         {/* Each language fetches only its own display face: MiSans right after the first paint
             (misans-stylesheet.tsx), or Instrument Serif with the document. */}
         {lang === 'zh' ? <MiSansStylesheet /> : <InstrumentSerifPreload />}
