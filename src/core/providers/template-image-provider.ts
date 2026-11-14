@@ -8,7 +8,7 @@ import { serverEnv } from '../env'
 import { logger } from '../logger'
 import { providerTag, type GenerationProvider, type ImageRequestOptions } from '../jobs'
 import { openRouterImageParameters, type OpenRouterImageParameters } from './openrouter-catalog'
-import { openRouterInputMismatch } from './openrouter-input'
+import { openRouterInputMismatch, openRouterPixelSize } from './openrouter-input'
 import { ProviderSettingError } from './setting-error'
 import { defaultTemplateProvider, PROVIDERS_CACHE_TAG } from './active-provider'
 import { readProviderKey } from './keys'
@@ -42,7 +42,10 @@ function validateStoredCapabilities(row: ActiveProviderRow, request: ImageReques
   }
 }
 
+// A pixel-size model (GPT image on OpenRouter) sizes 'original' from the photo, so it never needs
+// the catalogue's 'auto'.
 function lostOriginalSupport(row: ActiveProviderRow, aspect: string, parameters: OpenRouterImageParameters) {
+  if (openRouterPixelSize(row.model, parameters)) return false
   return row.capabilities?.originalRatio && aspect === 'original' && !parameters.aspect_ratio?.values.includes('auto')
 }
 
