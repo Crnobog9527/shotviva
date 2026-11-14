@@ -8294,7 +8294,7 @@ begin
   if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin'
       and (p_key not in ('code_gift_policy','code_inviter_window_days','gallery_enabled','gallery_auto_approve',
                          'signup_gift_daily_cap','signup_gift_paused','signup_gift_per_ip',
-                         'signup_gift_claim_phone','signup_gift_claim_google')
+                         'signup_gift_claim_phone','signup_gift_claim_google','poster_photo_credits')
            or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
@@ -8319,6 +8319,12 @@ begin
       if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[0-9]+$'
          or (p_value #>> '{}')::numeric > 1000 then
         raise exception 'INVALID_INPUT' using detail = 'signup_gift_per_ip must be an integer from 0 to 1000';
+      end if;
+    -- 拍照识别's price per run (§5.3「每周复用」, Owner 2026-11-14). Unset: the feature is off.
+    when 'poster_photo_credits' then
+      if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[1-9][0-9]*$'
+         or (p_value #>> '{}')::numeric > 1000 then
+        raise exception 'INVALID_INPUT' using detail = 'poster_photo_credits must be an integer from 1 to 1000';
       end if;
     when 'code_inviter_window_days' then
       if jsonb_typeof(p_value) is distinct from 'number' or
@@ -12357,6 +12363,37 @@ $$;
 ALTER FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."refund_poster_photo"("p_extraction_id" bigint, "p_input_chars" integer, "p_input_tokens" integer, "p_output_tokens" integer, "p_cost_usd" numeric) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_user uuid;
+  v_row public.poster_extractions;
+begin
+  select e.user_id into v_user from public.poster_extractions e where e.id = p_extraction_id;
+  if not found then raise exception 'JOB_NOT_FOUND'; end if;
+  -- Same lock order as start_poster_photo (profile, then row).
+  perform 1 from public.profiles where id = v_user for update;
+  select * into v_row from public.poster_extractions where id = p_extraction_id for update;
+  if v_row.status = 'failed' then return; end if;
+  if v_row.status = 'ok' then raise exception 'JOB_ALREADY_SETTLED'; end if;
+
+  if v_row.credits > 0 then
+    perform public._apply_credit_change(v_user, v_row.credit_pool, 'refund', v_row.credits, 'poster photo refund',
+      'poster_photo:' || p_extraction_id::text || ':refund');
+  end if;
+  update public.poster_extractions
+     set status = 'failed', input_chars = coalesce(p_input_chars, input_chars), input_tokens = p_input_tokens,
+         output_tokens = p_output_tokens, cost_usd = p_cost_usd
+   where id = p_extraction_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."refund_poster_photo"("p_extraction_id" bigint, "p_input_chars" integer, "p_input_tokens" integer, "p_output_tokens" integer, "p_cost_usd" numeric) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") RETURNS "void"
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -13072,6 +13109,48 @@ $$;
 
 
 ALTER FUNCTION "public"."snapshot_test_spend_provider"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."start_poster_photo"("p_user_id" "uuid", "p_provider" "text", "p_per_hour" integer) RETURNS TABLE("extraction_id" bigint, "credits" integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_profile public.profiles;
+  v_price integer;
+  v_pool text;
+  v_id bigint;
+begin
+  select * into v_profile from public.profiles where id = p_user_id for update;
+  if not found then raise exception 'PROFILE_NOT_FOUND'; end if;
+  if v_profile.banned_at is not null then raise exception 'USER_BANNED'; end if;
+
+  select (s.value #>> '{}')::integer into v_price from public.system_settings s
+   where s.key = 'poster_photo_credits' and jsonb_typeof(s.value) = 'number' and (s.value #>> '{}') ~ '^[1-9][0-9]*$';
+  if v_price is null then raise exception 'PRICE_UNSET'; end if;
+
+  if (select count(*) from public.poster_extractions e
+       where e.user_id = p_user_id and e.created_at >= now() - interval '1 hour') >= p_per_hour then
+    raise exception 'RATE_LIMITED';
+  end if;
+
+  if v_profile.credits >= v_price then v_pool := 'paid';
+  elsif v_profile.free_credits >= v_price then v_pool := 'free';
+  else raise exception 'CREDITS_INSUFFICIENT';
+  end if;
+
+  insert into public.poster_extractions (user_id, source, input_chars, status, provider, credits, credit_pool)
+  values (p_user_id, 'photo', 0, 'pending', p_provider, v_price, v_pool)
+  returning id into v_id;
+
+  perform public._apply_credit_change(p_user_id, v_pool, 'reserve', -v_price, 'poster photo',
+    'poster_photo:' || v_id::text || ':reserve');
+  return query select v_id, v_price;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."start_poster_photo"("p_user_id" "uuid", "p_provider" "text", "p_per_hour" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."submit_business_inquiry"("p_inquiry" "jsonb", "p_ip_hash" "text") RETURNS "jsonb"
@@ -15273,7 +15352,12 @@ CREATE TABLE IF NOT EXISTS "public"."poster_extractions" (
     "output_tokens" integer,
     "cost_usd" numeric(10,6),
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "credits" integer DEFAULT 0 NOT NULL,
+    "credit_pool" "text",
+    CONSTRAINT "poster_extractions_charged_pool" CHECK ((("credits" = 0) = ("credit_pool" IS NULL))),
     CONSTRAINT "poster_extractions_cost_usd_check" CHECK (("cost_usd" >= (0)::numeric)),
+    CONSTRAINT "poster_extractions_credit_pool_check" CHECK (("credit_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
+    CONSTRAINT "poster_extractions_credits_check" CHECK (("credits" >= 0)),
     CONSTRAINT "poster_extractions_input_chars_check" CHECK (("input_chars" >= 0)),
     CONSTRAINT "poster_extractions_input_tokens_check" CHECK (("input_tokens" >= 0)),
     CONSTRAINT "poster_extractions_output_tokens_check" CHECK (("output_tokens" >= 0)),
@@ -20176,6 +20260,11 @@ GRANT ALL ON FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "t
 
 
 
+REVOKE ALL ON FUNCTION "public"."refund_poster_photo"("p_extraction_id" bigint, "p_input_chars" integer, "p_input_tokens" integer, "p_output_tokens" integer, "p_cost_usd" numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."refund_poster_photo"("p_extraction_id" bigint, "p_input_chars" integer, "p_input_tokens" integer, "p_output_tokens" integer, "p_cost_usd" numeric) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") TO "service_role";
 
@@ -20304,6 +20393,11 @@ GRANT ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "
 
 
 REVOKE ALL ON FUNCTION "public"."snapshot_test_spend_provider"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."start_poster_photo"("p_user_id" "uuid", "p_provider" "text", "p_per_hour" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."start_poster_photo"("p_user_id" "uuid", "p_provider" "text", "p_per_hour" integer) TO "service_role";
 
 
 

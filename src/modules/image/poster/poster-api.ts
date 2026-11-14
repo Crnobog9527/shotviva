@@ -57,7 +57,8 @@ export async function savePosterSet(templateId: string, content: PosterContent, 
 
 // 拍照识别: the uploaded photos of an old poster (one per page), read and sorted like a paste; `text` is what the
 // photo said, shown beside the blocks like a pasted notice.
-export type PhotoReply = ExtractReply & { text?: string }
+// credits: what an ok run took; refunded: what a failed run gave back.
+export type PhotoReply = (ExtractReply & { text?: string; credits?: number }) | { status: 'failed'; refunded: number }
 
 export async function extractPosterPhoto(templateId: string, inputKeys: readonly string[], onStage?: (stage: PosterBlock) => void): Promise<PhotoReply> {
   try {

@@ -14,15 +14,32 @@ const USER = '11111111-1111-4111-8111-111111111111'
 const KEY = `inputs/${USER}/22222222-2222-4222-8222-222222222222.jpg`
 const fields = { poster: { kinds: [{ key: 'prizes', name: { en: 'P', zh: 'P' }, blocks: ['header', 'prizes', 'footer'] }] } }
 
-function fakeDb(recentCalls = 0) {
+// poster_extractions through the charge functions (1523): start makes the pending row and takes
+// PRICE credits (an abstract price; the real one is a database setting), refund marks it failed.
+const PRICE = 7
+function fakeDb(options: { recentCalls?: number; price?: number | null; balance?: number } = {}) {
   const inserted: Record<string, unknown>[] = []
-  const query = { select: () => query, eq: () => query, gte: () => query, limit: async () => ({ data: Array.from({ length: recentCalls }, (_, id) => ({ id })), error: null }) }
-  const insert = (row: Record<string, unknown>) => {
-    inserted.push({ ...row })
-    return { select: () => ({ single: async () => ({ data: { id: inserted.length }, error: null }) }) }
+  const refunds: number[] = []
+  const query = { eq: () => query, update: () => query }
+  const update = (change: Record<string, unknown>) => {
+    const chain = { eq: (column: string, value: unknown) => { if (column === 'id') Object.assign(inserted[(value as number) - 1]!, change); return chain }, then: (ok: (v: unknown) => void) => ok({ error: null }) }
+    return chain
   }
-  const update = (change: Record<string, unknown>) => ({ eq: async (_: string, id: number) => { Object.assign(inserted[id - 1]!, change); return { error: null } } })
-  return { db: { from: () => ({ ...query, insert, update }) } as never, inserted }
+  const rpc = async (fn: string, args: Record<string, unknown>) => {
+    if (fn === 'refund_poster_photo') {
+      const row = inserted[(args.p_extraction_id as number) - 1]!
+      refunds.push(row.credits as number)
+      Object.assign(row, { status: 'failed', input_tokens: args.p_input_tokens, output_tokens: args.p_output_tokens })
+      return { data: null, error: null }
+    }
+    const price = options.price === undefined ? PRICE : options.price
+    if (price === null) return { data: null, error: { message: 'PRICE_UNSET' } }
+    if ((options.recentCalls ?? 0) >= 30) return { data: null, error: { message: 'RATE_LIMITED' } }
+    if ((options.balance ?? 100) < price) return { data: null, error: { message: 'CREDITS_INSUFFICIENT' } }
+    inserted.push({ source: 'photo', status: 'pending', provider: args.p_provider, credits: price })
+    return { data: [{ extraction_id: inserted.length, credits: price }], error: null }
+  }
+  return { db: { from: () => ({ ...query, update }), rpc } as never, inserted, refunds }
 }
 
 const credentials = async () => ({
@@ -56,7 +73,8 @@ describe('preparePhotoExtract', () => {
     expect(result).toMatchObject({ status: 'ok', content: { header: { cup: '星海杯' } }, text: notice.join('\n') })
     const body = JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body))
     expect(body).toMatchObject({ instructions: 'Read every line.', input: [{ content: [{ type: 'input_image', detail: 'high' }] }] })
-    expect(inserted[0]).toMatchObject({ source: 'photo', status: 'ok', provider: 'decision/gpt-6-luna', input_tokens: 1500, output_tokens: 400, cost_usd: 0.00094 })
+    expect(result).toMatchObject({ credits: PRICE })
+    expect(inserted[0]).toMatchObject({ source: 'photo', status: 'ok', provider: 'decision/gpt-6-luna', credits: PRICE, input_tokens: 1500, output_tokens: 400, cost_usd: 0.00094 })
   })
 
   it('reads one photo per page and sorts them as one notice', async () => {
@@ -72,18 +90,26 @@ describe('preparePhotoExtract', () => {
     expect(inserted[0]).toMatchObject({ input_tokens: 3000, output_tokens: 800 })
   })
 
-  it('records a failed reading and answers failed, so the editor keeps the paste step', async () => {
-    const { db, inserted } = fakeDb()
+  it('refunds a run that read nothing and says so, so the editor keeps the paste step', async () => {
+    const { db, inserted, refunds } = fakeDb()
     const prepared = await preparePhotoExtract(deps(db, vi.fn(async () => reading([]))), { userId: USER, templateId: 't', inputKeys: [KEY] })
     const result = prepared.kind === 'model' ? await prepared.run(() => undefined) : null
-    expect(result).toEqual({ status: 'failed' })
+    expect(result).toEqual({ status: 'failed', refunded: PRICE })
     expect(inserted[0]).toMatchObject({ source: 'photo', status: 'failed' })
+    expect(refunds).toEqual([PRICE])
   })
 
   it('refuses someone else\'s upload, and counts against the hourly limit', async () => {
     const other = KEY.replace(USER, '33333333-3333-4333-8333-333333333333')
     await expect(preparePhotoExtract(deps(fakeDb().db, vi.fn()), { userId: USER, templateId: 't', inputKeys: [other] })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
-    await expect(preparePhotoExtract(deps(fakeDb(30).db, vi.fn()), { userId: USER, templateId: 't', inputKeys: [KEY] })).rejects.toMatchObject({ code: 'RATE_LIMITED' })
+    await expect(preparePhotoExtract(deps(fakeDb({ recentCalls: 30 }).db, vi.fn()), { userId: USER, templateId: 't', inputKeys: [KEY] })).rejects.toMatchObject({ code: 'RATE_LIMITED' })
+  })
+
+  it('charges nothing when no price is set, and refuses a balance that cannot cover it', async () => {
+    const fetch = vi.fn()
+    await expect(preparePhotoExtract(deps(fakeDb({ price: null }).db, fetch), { userId: USER, templateId: 't', inputKeys: [KEY] })).resolves.toEqual({ kind: 'done', result: { status: 'unavailable' } })
+    await expect(preparePhotoExtract(deps(fakeDb({ balance: PRICE - 1 }).db, fetch), { userId: USER, templateId: 't', inputKeys: [KEY] })).rejects.toMatchObject({ code: 'CREDITS_INSUFFICIENT' })
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('is unavailable without reading instructions', async () => {

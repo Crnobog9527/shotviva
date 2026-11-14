@@ -1659,13 +1659,18 @@
         "uploading": "Uploading the photo…",
         "reading": "Reading the text in the photo",
         "error": {
-          "upload": "The photo didn't upload. Please choose it again.",
-          "failed": "Couldn't read the text in this photo. Try a sharper, straight-on photo, or paste the text instead.",
-          "rateLimited": "Too many reads this hour. Please try again later."
+          "upload": "The photo didn't upload, nothing was charged. Please choose it again.",
+          "failed": "Couldn't read the text in this photo; your {credits} credits are back. Try a sharper, straight-on photo, or paste the text instead.",
+          "rateLimited": "Too many reads this hour, nothing was charged. Please try again later.",
+          "credits": "Not enough credits: reading costs {credits}.",
+          "unavailable": "Reading photos isn't available right now, nothing was charged. Please paste the text instead."
         },
         "replaceAsk": "The text is read. Replace what you've already filled in?",
         "replace": "Replace",
-        "keep": "Keep mine"
+        "keep": "Keep mine",
+        "cost": "Costs {credits} credits per read (one photo or both pages)",
+        "notEnough": "Not enough credits: reading costs {credits}.",
+        "getCredits": "Get credits"
       },
       "storeCard": {
         "title": "Store details",

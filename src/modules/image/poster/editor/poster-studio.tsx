@@ -27,7 +27,7 @@ type FormProps = Props & { reuse: StudioReuse }
 export function StudioForm({ studio, template, balance, reuse }: FormProps) {
   const t = useTranslations('app.poster')
   const tools = <WeeklyTools studio={studio} weekly={reuse.weekly} names={reuse.names} />
-  if (studio.draft.step === 'paste') return <section className="grid gap-6 pt-2">{tools}<PasteStep studio={studio} photo={<PhotoPick photo={reuse.photo} />} /></section>
+  if (studio.draft.step === 'paste') return <section className="grid gap-6 pt-2">{tools}<PasteStep studio={studio} photo={template.photoCredits > 0 ? <PhotoPick photo={reuse.photo} credits={template.photoCredits} balance={balance} /> : null} /></section>
   return (
     <section className="grid gap-6 pt-2">
       <StudioNotes studio={studio} />
