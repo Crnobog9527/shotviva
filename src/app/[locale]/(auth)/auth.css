@@ -216,5 +216,10 @@
   }
   @media (prefers-reduced-motion: no-preference) { .au-plate { animation: au-rise .5s var(--ease) both; } }
   @media (prefers-reduced-motion: reduce) { .au-tabs::before, .au-check input::after { transition: none; } }
-  @keyframes au-rise { from { opacity: 0; transform: translateY(10px); } }
+  /* The rise moves the plate only; it does not fade it in. Chrome does not record a text paint
+     made at opacity 0, and an opacity animation runs on the compositor without repainting, so a
+     faded-in form reached the LCP record only when the text was next repainted: when Geist
+     arrived, ~1.2 s after the first paint on a slow phone. Unfaded, the form is drawn and
+     counted at the first paint. */
+  @keyframes au-rise { from { transform: translateY(10px); } }
 }
