@@ -66,6 +66,8 @@ const templateSchema = z.object({
 const templateStatsSchema = z.object({
   timezone: z.literal('Asia/Shanghai'),
   redraw_minutes: z.number().int().positive(),
+  // The first Make again ever recorded (1514); null until there is one, absent before 1514.
+  redraw_since: z.string().nullable().optional(),
   templates: z.array(templateSchema),
 })
 

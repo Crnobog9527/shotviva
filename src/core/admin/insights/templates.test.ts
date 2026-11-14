@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { TemplateStat } from './reads'
-import { cheapestCreditUsd, parseRedrawAlert, sortLines, templateLines } from './templates'
+import { cheapestCreditUsd, parseRedrawAlert, redrawCounted, sortLines, templateLines } from './templates'
 
 const stat = (id: string, extra: Partial<TemplateStat> = {}): TemplateStat => ({
   template_id: id, name: id, name_zh: null, category_key: 'food', category_name: '餐饮', subcategory_key: null,
@@ -18,7 +18,7 @@ const stats = [
   stat('d', { live: false }),
 ]
 // Abstract units only (one credit = 1): no real price, cost or credit rate in tests.
-const input = { stats, shares: { a: { shares: 2, opens: 7 } }, creditUsd: 1, redrawAlert: 0.3 }
+const input = { stats, shares: { a: { shares: 2, opens: 7 } }, creditUsd: 1, redrawAlert: 0.3, redrawCounted: true }
 
 describe('template lines', () => {
   it('works out rates and a run-time margin per template', () => {
@@ -50,6 +50,21 @@ describe('template lines', () => {
     expect(sortLines(lines, 'uses').map((l) => l.key)).toEqual(['a', 'b', 'c', 'd'])
     expect(sortLines(lines, 'success').map((l) => l.key)).toEqual(['a', 'b', 'c', 'd'])
     expect(sortLines(lines, 'favourites')[0]!.key).toBe('b')
+  })
+})
+
+describe('redraws before they were recorded', () => {
+  it('count from the Beijing day of the first Make again', () => {
+    // 2026-11-14 23:30 UTC is 2026-11-15 in Beijing.
+    expect(redrawCounted('2026-11-14T23:30:00Z', '2026-11-15')).toBe(true)
+    expect(redrawCounted('2026-11-14T23:30:00Z', '2026-11-14')).toBe(false)
+    expect(redrawCounted(null, '2026-11-20')).toBe(false)
+    expect(redrawCounted(undefined, '2026-11-20')).toBe(false)
+  })
+
+  it('show no rate and raise no redraw flag for an earlier period', () => {
+    const [a] = templateLines({ ...input, redrawCounted: false }, 'template')
+    expect([a!.redrawRate, a!.flags.redraw, a!.redraws]).toEqual([null, false, 4])
   })
 })
 
