@@ -28,13 +28,14 @@ export function FoldSection({ id, title, summary, open, onToggle, children, clas
       <Heading id={`${id}-h`} className="m-0">
         <button type="button" aria-expanded={open} aria-controls={`${id}-panel`} onClick={onToggle}
           className="press flex min-h-14 w-full items-center gap-3 rounded-panel px-4 py-3 text-left">
-          <span className="grid min-w-0 flex-1 gap-0.5">
+          <span className="grid min-w-0 flex-1 gap-1">
             <span className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{title}</span>
             {summary ? <span className="text-caption leading-[1.4] font-normal text-muted-foreground">{summary}</span> : null}
           </span>
+          {/* Up / down by its path, not a rotate class: this ships on public pages' CSS budget. */}
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"
-            className={cn('size-5 flex-none text-muted-foreground transition-transform motion-reduce:transition-none', open && 'rotate-180')}>
-            <path d="m6 9 6 6 6-6" />
+            className="size-5 flex-none text-muted-foreground">
+            <path d={open ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} />
           </svg>
         </button>
       </Heading>
