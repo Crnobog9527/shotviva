@@ -25,6 +25,7 @@ export type { CatalogueSeries, CatalogueView, FilterNode, GridEntry } from './ca
 export { FavoritesProvider } from './favorites'
 export { posterDialogPath, posterHref, toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalogue-template'
 export { ImageWorkspace, type WorkspaceProps } from './workspace/image-workspace'
+export { TemplateUnavailable } from './workspace/template-unavailable'
 export { MatrixWorkspaceLazy as MatrixWorkspace } from './matrix/matrix-lazy'
 export type { MatrixWorkspaceProps } from './matrix/matrix-workspace'
 export { loadBatchCatalogue } from './matrix/batch-catalogue'
