@@ -1678,8 +1678,8 @@
       "fillStore": "Fill in my store details",
       "storeReplaceAsk": "Your store details will replace the name, phone or address you typed. Continue?",
       "photo": {
-        "hint": "No notice text? Take a photo or screenshot of your last poster and we'll read the text on it.",
-        "pick": "Read an old poster from a photo",
+        "hint": "No notice text? Pick photos or screenshots of your last poster (both pages at once) and we'll read the text on them.",
+        "pick": "Read an old poster from photos",
         "uploading": "Uploading the photo…",
         "reading": "Reading the text in the photo",
         "error": {

@@ -28,7 +28,7 @@ export type LastRowProps = {
 export function LastRow({ last, reused, busy, failed, dirty, onTake, names }: LastRowProps) {
   const t = useTranslations('app.weekly')
   const [asking, setAsking] = useState(false)
-  if (reused) return <p role="status" className={box}>{t.rich('reused', { day: () => <ShortDay iso={reused.madeAt} />, name: names[reused.templateId] ?? '' })}</p>
+  if (reused) return <div role="status" className={box}><p>{t.rich('reused', { day: () => <ShortDay iso={reused.madeAt} />, name: names[reused.templateId] ?? '' })}</p></div>
   if (!last) return null
   const go = () => { setAsking(false); onTake() }
   return (
