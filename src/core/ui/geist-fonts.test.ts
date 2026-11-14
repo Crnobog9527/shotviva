@@ -32,4 +32,10 @@ describe('geistCss', () => {
     expect(css).toContain('--font-geist-mono:geistMono,"geistMono Fallback"')
     expect(geistCss('')).toContain(`url(${GEIST_FILE})`)
   })
+
+  it('gives each fallback face an Arial-metric font on systems without Arial', () => {
+    const faces = geistCss('').match(/@font-face\{font-family:"(geist|geistMono|Instrument Serif) Fallback";src:[^;]+/g) ?? []
+    expect(faces).toHaveLength(3)
+    for (const face of faces) expect(face).toContain('local(Arial),local(Arimo),local("Liberation Sans")')
+  })
 })

@@ -11,7 +11,6 @@ import { htmlLang, isLocale, publicClientMessages } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata, ShortcutTitleSync } from '@/core/seo'
 import { GeistFonts } from '@/core/ui/geist-fonts'
-import { InstrumentSerifPreload } from '@/core/ui/instrument-serif'
 import { MiSansStylesheet } from '@/core/ui/misans-stylesheet'
 import { site } from '@/site/site.config'
 
@@ -50,9 +49,9 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
       <body className="flex min-h-full flex-col">
         {/* Geist faces and preload on one host (core/ui/geist-fonts.tsx). */}
         <GeistFonts />
-        {/* Each language fetches only its own display face: MiSans right after the first paint
-            (misans-stylesheet.tsx), or Instrument Serif with the document. */}
-        {lang === 'zh' ? <MiSansStylesheet /> : <InstrumentSerifPreload />}
+        {/* Chinese pages fetch MiSans right after the first paint (misans-stylesheet.tsx); English
+            headings fetch Instrument Serif when they are laid out (globals-body.css). */}
+        {lang === 'zh' ? <MiSansStylesheet /> : null}
         <NextIntlClientProvider messages={messages}>
           <TranslatedPathsProvider paths={site.locales.zhPaths}>
             {children}
