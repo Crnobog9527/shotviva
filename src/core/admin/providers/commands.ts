@@ -63,6 +63,15 @@ async function saveExtraInputCost(deps: ProviderCommandDeps, adminId: string, id
   if (error) throw new ProviderSettingError('internal', 'Saving the extra input image cost failed')
 }
 
+// 「BYOK（按官方价）」 (1551); only an OpenRouter openai/gpt-image-* line reads it. Undefined (an
+// older editor, another line) keeps it.
+async function saveByokListPrice(deps: ProviderCommandDeps, adminId: string, id: string,
+  { module, byokListPrice: on }: { module: string; byokListPrice?: boolean }) {
+  if (module !== 'image' || on === undefined) return
+  const { error } = await deps.db.rpc('admin_set_provider_byok_list_price', { p_actor: adminId, p_id: id, p_on: on })
+  if (error) throw new ProviderSettingError('internal', 'Saving the BYOK setting failed')
+}
+
 // Save the confirmed catalogue snapshot and the optional Vault key in the same transaction.
 export async function saveProvider(deps: ProviderCommandDeps, adminId: string, input: unknown): Promise<string> {
   const parsed = parseOrThrow(saveProviderSchema, input)
@@ -85,6 +94,7 @@ export async function saveProvider(deps: ProviderCommandDeps, adminId: string, i
   if (error) throw new ProviderSettingError('internal', 'Saving provider failed')
   const id = providerIdSchema.parse({ id: data }).id
   await saveExtraInputCost(deps, adminId, id, parsed)
+  await saveByokListPrice(deps, adminId, id, parsed)
   logger.info('admin.provider.saved', { adminId, providerId: id, isNew: !parsed.id, keyChanged: Boolean(parsed.apiKey), declared })
   return id
 }

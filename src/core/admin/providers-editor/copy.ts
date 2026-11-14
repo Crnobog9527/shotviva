@@ -69,6 +69,8 @@ export const PROVIDERS_COPY = {
       : '有实测成本时优先用实测。留空使用可核算的目录估价（已含本站充值费用分摊）；也可填写含费估价覆盖。',
     extraInputCost: '每张额外输入图成本（美元）',
     extraInputCostHint: '格子模板（一单多张输入图、只出一张图）的成本下限用它：单图下限 + 多出的输入图 × 这个成本。留空时按单图下限 × 格子数保守计算。',
+    byokListPrice: 'BYOK（按官方价）',
+    byokListPriceHint: '用我们自己的 OpenAI 密钥经 OpenRouter 出图时打开：OpenAI 按官方价收费、OpenRouter 免手续费，积分下限按官方线路算（官方价估算、共用官方线路的实测成本和已批准价格），不加充值费用分摊。没配 BYOK、走 OpenRouter 余额时关掉。',
     catalogPrices: '供应商目录报价（美元）',
     titleNew: '新增供应商',
     titleEdit: (label: string) => `编辑「${label}」`,

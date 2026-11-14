@@ -100,7 +100,7 @@ CREATE OR REPLACE FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_re
     SET "search_path" TO ''
     AS $$
   with route as (
-    select p.adapter, p.capabilities, p.estimated_image_costs
+    select p.adapter, p.capabilities, p.estimated_image_costs, admin.provider_list_priced(p) as listed
     from public.ai_providers p
     where p.module='image' and p.id::text||'/'||p.model=p_tag
       and p.resolutions @> array[public.canonical_resolution(p_resolution)] and p.capabilities<>'{}'::jsonb
@@ -108,24 +108,25 @@ CREATE OR REPLACE FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_re
   ), measured as (
     select count(*) as n, percentile_cont(0.95) within group (order by g.cost_usd) as p95
     from public.generation_jobs g
-    where g.provider=p_tag and g.inputs->>'resolution' = any(public.resolution_aliases(p_resolution))
+    where g.provider=any((select admin.route_cost_tags(p_tag))::text[]) and g.inputs->>'resolution' = any(public.resolution_aliases(p_resolution))
       and g.inputs ? 'quality' and g.inputs->>'quality'=p_quality
       and g.created_at>=now()-interval '30 days' and g.status='succeeded' and g.cost_usd is not null
       and not (g.inputs ? 'input_slots')
   ), sources as (
-    select r.adapter, m.n,
+    select r.listed, m.n,
       -- Through jsonb as admin_image_provider_pricing returns it, so the rounding is unchanged.
       case when m.n>=10 then (to_jsonb(m.p95) #>> '{}')::numeric end as p95,
       (r.estimated_image_costs->>public.canonical_resolution(p_resolution))::numeric as estimate,
-      case when r.adapter='openrouter_images' and jsonb_typeof(r.capabilities->'catalogImageCosts'->public.canonical_resolution(p_resolution))='number'
+      case when r.adapter='openrouter_images' and not r.listed
+        and jsonb_typeof(r.capabilities->'catalogImageCosts'->public.canonical_resolution(p_resolution))='number'
         and (r.capabilities->'catalogImageCosts'->>public.canonical_resolution(p_resolution))::numeric > 0
         then (r.capabilities->'catalogImageCosts'->>public.canonical_resolution(p_resolution))::numeric end as catalog,
-      case when r.adapter='openai_images' then
+      case when r.listed then
         ((case when p_quality='medium' then '{"1k":0.055,"2k":0.095,"4k":0.135}'
                     else '{"1k":0.081,"2k":0.135,"4k":0.206}' end)::jsonb->>public.canonical_resolution(p_resolution))::numeric end as list
     from route r cross join measured m
   ), priced as (
-    select adapter, n, coalesce(p95,estimate,catalog,list) as usd,
+    select listed, n, coalesce(p95,estimate,catalog,list) as usd,
       case when p95 is not null then 'p95' when estimate is not null then 'estimate'
            when catalog is not null then 'catalog' when list is not null then 'list' end as basis
     from sources
@@ -135,7 +136,7 @@ CREATE OR REPLACE FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_re
   select jsonb_build_object('usd',priced.usd,'basis',priced.basis,'samples',priced.n,
     'credits',case when priced.usd is not null and budget.usd>0 then greatest(
       ceil(priced.usd*1.10/budget.usd)::int,
-      case when priced.adapter='openai_images' then (case when p_quality='medium' then
+      case when priced.listed then (case when p_quality='medium' then
         '{"1k":1,"2k":2,"4k":3}' else '{"1k":2,"2k":4,"4k":6}' end::jsonb->>public.canonical_resolution(p_resolution))::int else 0 end) end)
   from priced, budget
 $$;
@@ -533,6 +534,7 @@ CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     "capabilities" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     "estimated_image_costs" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     "extra_input_image_usd" numeric,
+    "byok_list_price" boolean DEFAULT true NOT NULL,
     CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text", 'ark_images'::"text", 'openai_responses'::"text"]))),
     CONSTRAINT "ai_providers_api_key_last4_check" CHECK ((("char_length"("api_key_last4") >= 1) AND ("char_length"("api_key_last4") <= 4))),
     CONSTRAINT "ai_providers_base_url_check" CHECK ((("base_url" ~ '^https://[^\s/?#@]+(/[^\s?#]*)?$'::"text") AND ("char_length"("base_url") <= 300))),
@@ -1363,33 +1365,33 @@ CREATE OR REPLACE FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_res
     SET "search_path" TO ''
     AS $$
   with route as (
-    select p.adapter, p.estimated_image_costs, p.capabilities
+    select admin.provider_list_priced(p) as listed, p.adapter, p.estimated_image_costs, p.capabilities
       from public.ai_providers p
       where p.module='image' and p.id::text=split_part(p_tag,'/',1)
         and p_tag=p.id::text||'/'||p.model and public.canonical_resolution(p_resolution)=any(p.resolutions)
         and (p.adapter='openai_images' or p.capabilities<>'{}'::jsonb)
     union all
-    select 'openai_images','{}'::jsonb,'{}'::jsonb where p_tag like 'env/_%'
+    select true,'openai_images','{}'::jsonb,'{}'::jsonb where p_tag like 'env/_%'
   ), measured as (
     select percentile_cont(0.95) within group (order by g.cost_usd)::numeric as usd
       from public.generation_jobs g
-      where g.provider=p_tag and g.inputs->>'resolution' = any(public.resolution_aliases(p_resolution))
+      where g.provider=any((select admin.route_cost_tags(p_tag))::text[]) and g.inputs->>'resolution' = any(public.resolution_aliases(p_resolution))
         and g.inputs ? 'quality' and g.inputs->>'quality'=p_quality
         and g.status='succeeded' and g.cost_usd is not null
         and g.created_at>=now()-interval '30 days' and not (g.inputs ? 'input_slots')
       having count(*)>=10
   ), priced as (
-    select adapter, greatest(
+    select listed, greatest(
       (select usd from measured), (estimated_image_costs->>public.canonical_resolution(p_resolution))::numeric,
-      case when jsonb_typeof(capabilities->'catalogImageCosts'->public.canonical_resolution(p_resolution))='number'
+      case when not listed and jsonb_typeof(capabilities->'catalogImageCosts'->public.canonical_resolution(p_resolution))='number'
         then nullif((capabilities->'catalogImageCosts'->>public.canonical_resolution(p_resolution))::numeric,0) end,
-      case when adapter='openai_images' then
+      case when listed then
         ((case when p_quality='medium' then '{"1k":0.055,"2k":0.095,"4k":0.135}'
           else '{"1k":0.081,"2k":0.135,"4k":0.206}' end)::jsonb->>public.canonical_resolution(p_resolution))::numeric end
     ) as usd from route
   ), budget as (select admin.lowest_credit_price()*0.761*0.4 as usd)
   select greatest(1,ceil(priced.usd*1.10/budget.usd),
-    case when adapter='openai_images' then
+    case when listed then
       ((case when p_quality='medium' then '{"1k":1,"2k":2,"4k":3}'
         else '{"1k":2,"2k":4,"4k":6}' end)::jsonb->>public.canonical_resolution(p_resolution))::int end)
     from priced,budget where priced.usd is not null and budget.usd>0
@@ -1778,6 +1780,30 @@ end $$;
 ALTER FUNCTION "admin"."protect_reverse_request"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."provider_cost_model"("p" "public"."ai_providers") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select case when p.module<>'image' or not admin.provider_list_priced(p) then null
+    when p.adapter='openai_images' then p.model else substr(p.model, length('openai/')+1) end
+$$;
+
+
+ALTER FUNCTION "admin"."provider_cost_model"("p" "public"."ai_providers") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."provider_list_priced"("p" "public"."ai_providers") RETURNS boolean
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select p.adapter='openai_images'
+    or (p.adapter='openrouter_images' and p.model like 'openai/gpt-image-%' and p.byok_list_price)
+$$;
+
+
+ALTER FUNCTION "admin"."provider_list_priced"("p" "public"."ai_providers") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."provider_profile"("p_provider" "uuid") RETURNS "text"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -2113,10 +2139,10 @@ begin
     select from admin.template_price_snapshots s join admin.template_price_batches b on b.id=s.batch_id
     join admin.template_tariffs_v2 c on c.id=s.template_id
     where b.reverted_at is null and s.template_id=t.id and c.quality=t.quality
-      and c.costs->tier=t.credits_cost->tier and
-      (route is distinct from s.provider_id::text||'/gpt-image-2.6-sunburst'
-        or not (admin.template_approved_prices(s.provider_id) ? t.id))
-  ) then return coalesce(price>=admin.slot_floor_credits(t,route,tier,(admin.alternate_route_floor(route,tier,t.quality)->>'credits')::int),false); end if;
+      and c.costs->tier=t.credits_cost->tier
+  ) and admin.template_approved_price((select p.id from public.ai_providers p where p.module='image'
+      and p.id::text=split_part(route,'/',1) and p.id::text||'/'||p.model=route), t.id) is null
+  then return coalesce(price>=admin.slot_floor_credits(t,route,tier,(admin.alternate_route_floor(route,tier,t.quality)->>'credits')::int),false); end if;
   return true;
 end $$;
 
@@ -2200,6 +2226,27 @@ $$;
 ALTER FUNCTION "admin"."rollback_template_price_catalog_v2"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."route_cost_tags"("p_tag" "text") RETURNS "text"[]
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  with me as (
+    select admin.provider_cost_model(p) as m from public.ai_providers p
+      where p.module='image' and p.id::text=split_part(p_tag,'/',1) and p.id::text||'/'||p.model=p_tag
+    union all select substr(p_tag, length('env/')+1) where p_tag like 'env/_%'
+  )
+  select array(select distinct tag from (
+    select p_tag as tag
+    union all select p.id::text||'/'||p.model from public.ai_providers p, me
+      where me.m is not null and p.module='image' and admin.provider_cost_model(p)=me.m
+    union all select 'env/'||me.m from me where me.m is not null
+  ) pool order by tag)
+$$;
+
+
+ALTER FUNCTION "admin"."route_cost_tags"("p_tag" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."route_p95_by_quality"("p_tag" "text") RETURNS "jsonb"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -2210,7 +2257,7 @@ CREATE OR REPLACE FUNCTION "admin"."route_p95_by_quality"("p_tag" "text") RETURN
       select g.inputs->>'quality' quality, public.canonical_resolution(g.inputs->>'resolution') res,
         percentile_cont(0.95) within group (order by g.cost_usd) cost
       from public.generation_jobs g
-      where g.provider=p_tag and g.inputs ? 'quality' and g.inputs->>'quality' in ('medium','high')
+      where g.provider=any((select admin.route_cost_tags(p_tag))::text[]) and g.inputs ? 'quality' and g.inputs->>'quality' in ('medium','high')
         and g.inputs->>'resolution' in ('1k','2k','3k','4k')
         and g.created_at>=now()-interval '30 days' and g.status='succeeded' and g.cost_usd is not null
         and not (g.inputs ? 'input_slots')
@@ -2237,7 +2284,7 @@ CREATE OR REPLACE FUNCTION "admin"."route_slot_costs"("p_tag" "text") RETURNS "j
           select g.inputs->>'quality' quality, public.canonical_resolution(g.inputs->>'resolution') res, admin.slot_count(g.inputs) n,
             percentile_cont(0.95) within group (order by g.cost_usd) cost
           from public.generation_jobs g
-          where g.provider=p_tag and g.inputs->>'quality' in ('medium','high') and g.inputs->>'resolution' in ('1k','2k','3k','4k')
+          where g.provider=any((select admin.route_cost_tags(p_tag))::text[]) and g.inputs->>'quality' in ('medium','high') and g.inputs->>'resolution' in ('1k','2k','3k','4k')
             and g.status='succeeded' and g.cost_usd is not null and g.created_at>=now()-interval '30 days'
             and admin.slot_count(g.inputs) between 2 and 4
           group by 1,2,3 having count(*)>=10
@@ -2374,7 +2421,7 @@ CREATE OR REPLACE FUNCTION "admin"."slot_route_floor"("p_tag" "text", "p_resolut
   full_slots as (
     select percentile_cont(0.95) within group (order by g.cost_usd)::numeric as usd
       from public.generation_jobs g
-      where g.provider=p_tag and g.inputs->>'resolution'=p_resolution
+      where g.provider=any((select admin.route_cost_tags(p_tag))::text[]) and g.inputs->>'resolution'=p_resolution
         and g.inputs ? 'quality' and g.inputs->>'quality'=p_quality
         and g.status='succeeded' and g.cost_usd is not null and g.created_at>=now()-interval '30 days'
         and admin.slot_count(g.inputs)=p_slots
@@ -2470,11 +2517,15 @@ CREATE OR REPLACE FUNCTION "admin"."template_approved_price"("p_provider" "uuid"
   select jsonb_build_object('quality',c.quality,'costs',c.costs)
   from admin.template_price_batches b join admin.template_price_snapshots s on s.batch_id=b.id
   join admin.template_tariffs_v2 c on c.id=s.template_id
-  join public.ai_providers p on p.id=s.provider_id
-  where b.reverted_at is null and admin.is_template_catalog_v2() and p.id=p_provider and s.template_id=p_template
-    and p.module='image' and p.adapter='openai_images' and p.model='gpt-image-2.6-sunburst'
-    and md5(p.base_url) is not distinct from s.provider_endpoint_hash
+  join public.ai_providers sp on sp.id=s.provider_id
+  join public.ai_providers p on p.id=p_provider
+  where b.reverted_at is null and admin.is_template_catalog_v2() and s.template_id=p_template
+    and sp.module='image' and sp.adapter='openai_images' and sp.model='gpt-image-2.6-sunburst'
+    and md5(sp.base_url) is not distinct from s.provider_endpoint_hash
+    and (sp.capabilities->'resolutions') ?& array['1k','2k','4k']
+    and p.module='image' and (p.id=sp.id or (p.adapter='openrouter_images' and admin.provider_cost_model(p)=sp.model))
     and (p.capabilities->'resolutions') ?& array['1k','2k','4k']
+  limit 1
 $$;
 
 
@@ -2488,10 +2539,13 @@ CREATE OR REPLACE FUNCTION "admin"."template_approved_prices"("p_provider" "uuid
   select coalesce(jsonb_object_agg(s.template_id,jsonb_build_object('quality',c.quality,'costs',c.costs)), '{}')
   from admin.template_price_batches b join admin.template_price_snapshots s on s.batch_id=b.id
   join admin.template_tariffs_v2 c on c.id=s.template_id
-  join public.ai_providers p on p.id=s.provider_id
-  where b.reverted_at is null and admin.is_template_catalog_v2() and p.id=p_provider
-    and p.module='image' and p.adapter='openai_images' and p.model='gpt-image-2.6-sunburst'
-    and md5(p.base_url) is not distinct from s.provider_endpoint_hash
+  join public.ai_providers sp on sp.id=s.provider_id
+  join public.ai_providers p on p.id=p_provider
+  where b.reverted_at is null and admin.is_template_catalog_v2()
+    and sp.module='image' and sp.adapter='openai_images' and sp.model='gpt-image-2.6-sunburst'
+    and md5(sp.base_url) is not distinct from s.provider_endpoint_hash
+    and (sp.capabilities->'resolutions') ?& array['1k','2k','4k']
+    and p.module='image' and (p.id=sp.id or (p.adapter='openrouter_images' and admin.provider_cost_model(p)=sp.model))
     and (p.capabilities->'resolutions') ?& array['1k','2k','4k']
 $$;
 
@@ -5807,6 +5861,10 @@ begin
   if exists (select 1 from public.template_prompts where provider_id = p_id) then
     raise exception 'PROVIDER_REFERENCED' using errcode = '23503';
   end if;
+  if exists (select 1 from admin.template_price_snapshots s join admin.template_price_batches b on b.id = s.batch_id
+             where s.provider_id = p_id and b.reverted_at is null) then
+    raise exception 'PROVIDER_REFERENCED' using errcode = '23503', detail = '这条线路记着已批准的价格，其他线路在沿用，不能删除';
+  end if;
 
   delete from public.ai_providers where id = p_id;
   delete from vault.secrets where name = 'shotviva.provider.' || p_id::text;
@@ -6481,6 +6539,8 @@ CREATE OR REPLACE FUNCTION "public"."admin_image_pricing_catalog"("p_env_model" 
   select jsonb_build_object('version',case when admin.is_template_catalog_v2() then 'v2' else 'v1' end,
     'unit_price',admin.lowest_credit_price(),'tariffs',admin.template_catalog_minimums(),
     'providers',coalesce((select jsonb_agg(to_jsonb(p)||jsonb_build_object('approved',admin.template_approved_prices(p.provider_id))
+      || jsonb_build_object('list_priced',coalesce((select admin.provider_list_priced(a) from public.ai_providers a where a.id=p.provider_id),
+           p.adapter='openai_images'))
       || jsonb_build_object('p95_by_quality',admin.route_p95_by_quality(coalesce(p.provider_id::text,'env')||'/'||p.model))
       || jsonb_build_object('slot_costs',admin.route_slot_costs(coalesce(p.provider_id::text,'env')||'/'||p.model))
       || case when p.is_active then jsonb_build_object('fallback_floors',(
@@ -6499,30 +6559,30 @@ CREATE OR REPLACE FUNCTION "public"."admin_image_provider_pricing"("p_env_model"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
-  with samples as (
-    -- Jobs before PR-2 say 3k for the same tier as 4k: one sample set.
-    select g.provider, public.canonical_resolution(coalesce(g.inputs->>'resolution', '1k')) as resolution,
-           percentile_cont(0.95) within group (order by g.cost_usd) as cost
-      from public.generation_jobs g
-     where g.created_at >= now() - interval '30 days'
-       and coalesce(g.inputs->>'resolution', '1k') in ('1k','2k','3k','4k')
-       and g.status = 'succeeded' and g.cost_usd is not null
-       and not (g.inputs ? 'input_slots')
-     group by 1, 2 having count(*) >= 10
-  ), costs as (
-    select provider, jsonb_object_agg(resolution, cost) as p95 from samples group by provider
-  )
-  select p.id, p.label, p.model, p.adapter, p.is_active, p.capabilities, p.resolutions,
-         p.estimated_image_costs, coalesce(c.p95, '{}'::jsonb)
-    from public.ai_providers p
-    left join costs c on c.provider = p.id::text || '/' || p.model
-   where p.module = 'image'
-  union all
-  select null::uuid, '环境默认'::text, p_env_model, 'openai_images'::text, true, '{}'::jsonb,
-         array['1k', '2k', '4k'], '{}'::jsonb, coalesce(c.p95, '{}'::jsonb)
-    from (values (1)) as fallback(dummy) left join costs c on c.provider = 'env/' || p_env_model
-   where not exists (select 1 from public.ai_providers where module = 'image' and is_active)
-   order by 2, 1
+  select r.id, r.label, r.model, r.adapter, r.is_active, r.capabilities, r.resolutions, r.estimated_image_costs,
+    coalesce((
+      -- Jobs before PR-2 say 3k for the same tier as 4k: one sample set.
+      select jsonb_object_agg(s.resolution, s.cost) from (
+        select public.canonical_resolution(coalesce(g.inputs->>'resolution', '1k')) as resolution,
+               percentile_cont(0.95) within group (order by g.cost_usd) as cost
+          from public.generation_jobs g
+         where g.provider = any((select admin.route_cost_tags(r.tag))::text[])
+           and g.created_at >= now() - interval '30 days'
+           and coalesce(g.inputs->>'resolution', '1k') in ('1k','2k','3k','4k')
+           and g.status = 'succeeded' and g.cost_usd is not null
+           and not (g.inputs ? 'input_slots')
+         group by 1 having count(*) >= 10
+      ) s), '{}'::jsonb)
+  from (
+    select p.id, p.label, p.model, p.adapter, p.is_active, p.capabilities, p.resolutions, p.estimated_image_costs,
+           p.id::text || '/' || p.model as tag
+      from public.ai_providers p where p.module = 'image'
+    union all
+    select null::uuid, '环境默认'::text, p_env_model, 'openai_images'::text, true, '{}'::jsonb,
+           array['1k', '2k', '4k'], '{}'::jsonb, 'env/' || p_env_model
+     where not exists (select 1 from public.ai_providers where module = 'image' and is_active)
+  ) r
+  order by 2, 1
 $$;
 
 
@@ -8372,6 +8432,21 @@ end $$;
 
 
 ALTER FUNCTION "public"."admin_set_prompt_lab_reverse"("p_actor" "uuid", "p_model" "text", "p_instruction" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_provider_byok_list_price"("p_actor" "uuid", "p_id" "uuid", "p_on" boolean) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then raise exception 'NOT_ADMIN'; end if;
+  if p_on is null then raise exception 'INVALID_INPUT'; end if;
+  update public.ai_providers set byok_list_price=p_on where id=p_id and module='image';
+  if not found then raise exception 'PROVIDER_NOT_FOUND'; end if;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_set_provider_byok_list_price"("p_actor" "uuid", "p_id" "uuid", "p_on" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_provider_extra_input_cost"("p_actor" "uuid", "p_id" "uuid", "p_usd" numeric) RETURNS "void"
@@ -19205,6 +19280,16 @@ GRANT ALL ON FUNCTION "admin"."protect_reverse_request"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "admin"."provider_cost_model"("p" "public"."ai_providers") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."provider_cost_model"("p" "public"."ai_providers") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."provider_list_priced"("p" "public"."ai_providers") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."provider_list_priced"("p" "public"."ai_providers") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."provider_profile"("p_provider" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."provider_profile"("p_provider" "uuid") TO "service_role";
 
@@ -19271,6 +19356,11 @@ REVOKE ALL ON FUNCTION "admin"."restore_approved_wallets_v2"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "admin"."rollback_template_price_catalog_v2"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."route_cost_tags"("p_tag" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."route_cost_tags"("p_tag" "text") TO "service_role";
 
 
 
@@ -20163,6 +20253,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_openai_costs_project"("p_project_id" "
 
 REVOKE ALL ON FUNCTION "public"."admin_set_prompt_lab_reverse"("p_actor" "uuid", "p_model" "text", "p_instruction" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_prompt_lab_reverse"("p_actor" "uuid", "p_model" "text", "p_instruction" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_provider_byok_list_price"("p_actor" "uuid", "p_id" "uuid", "p_on" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_provider_byok_list_price"("p_actor" "uuid", "p_id" "uuid", "p_on" boolean) TO "service_role";
 
 
 
