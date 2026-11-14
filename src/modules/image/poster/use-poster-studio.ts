@@ -82,6 +82,11 @@ export type StudioNotice = 'sortFailed' | 'clipped' | 'rateLimited' | 'invalid' 
 export const defaultResolution = (resolutions: readonly Resolution[]): Resolution =>
   resolutions.includes('2k') ? '2k' : resolutions[0] ?? '2k'
 
+// What a sort that did not work shows: too many this hour keeps the paste step and its text
+// (rateLimited); anything else opens the blocks to fill by hand under the pasted text (sortFailed).
+export const sortFailure = (reply: { status: string; code?: string }): 'rateLimited' | 'sortFailed' =>
+  reply.status === 'error' && reply.code === 'RATE_LIMITED' ? 'rateLimited' : 'sortFailed'
+
 export function usePosterStudio(template: StudioTemplate, concurrency: number, onStarted: () => void) {
   const [draft, setDraft] = useStoredDraft(template)
   const [aspect, setAspect] = useState<OutputAspect>(template.aspects[0] ?? '9:16')
@@ -112,8 +117,11 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
       if (reply.clipped?.length) setNotice('clipped')
       return
     }
-    setNotice(reply.status === 'error' && reply.code === 'RATE_LIMITED' ? 'rateLimited' : 'sortFailed')
-    setDraft((d) => ({ ...d, step: 'edit', sorted: false }))
+    // Too many sorts this hour: stay on the paste step with the text as it is and say so, rather
+    // than open an empty editor (2026-11-14, seen on the test site).
+    const failed = sortFailure(reply)
+    setNotice(failed)
+    if (failed === 'sortFailed') setDraft((d) => ({ ...d, step: 'edit', sorted: false }))
   }
 
   async function generate() {
