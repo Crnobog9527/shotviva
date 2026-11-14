@@ -1,11 +1,14 @@
 import 'server-only'
 
 import { AppError } from '@/core/errors'
-import { OPENROUTER_BASE_URL, OPENROUTER_IMAGE_SIZE, openRouterInputMismatch, openRouterImageParameters, type OpenRouterImageParameters } from '@/core/providers'
+import {
+  OPENROUTER_BASE_URL, OPENROUTER_IMAGE_SIZE, openRouterInputMismatch, openRouterImageParameters, openRouterPixelSize, type OpenRouterImageParameters,
+} from '@/core/providers'
 import { ProviderError, type GenerationProvider, type ProviderInput } from '@/core/jobs'
 
 import { completeReceipt } from './openrouter-receipt'
 import { readOpenRouterOutput } from './openrouter-response'
+import { formatSize, outputSize, sourcePhoto } from './output-size'
 
 type OpenRouterImageConfig = {
   apiKey: string
@@ -29,11 +32,25 @@ function requestedAspect(input: ProviderInput, supported: OpenRouterImageParamet
   return 'auto'
 }
 
+// OpenAI's GPT image models: the exact size and quality the official line sends (output-size.ts),
+// so the tier, ratio and the quality a template's price assumes all reach OpenAI.
+function pixelSizeRequest(model: string, input: ProviderInput, supported: OpenRouterImageParameters) {
+  return {
+    model,
+    prompt: input.prompt,
+    size: formatSize(outputSize(input.resolution, input.aspectRatio, sourcePhoto(input))),
+    quality: supported.quality?.values.includes(input.quality) ? input.quality : undefined,
+    output_format: supported.output_format?.values.includes('png') ? 'png' : undefined,
+    input_references: referenceImages(input.images),
+  }
+}
+
 function imageRequest(model: string, input: ProviderInput, supported: OpenRouterImageParameters) {
-  const mismatch = openRouterInputMismatch({ ...input, referenceCount: input.images.length }, supported)
+  const mismatch = openRouterInputMismatch({ ...input, referenceCount: input.images.length }, supported, model)
   if (mismatch) {
     throw new AppError(mismatch.reason === 'reference_image_limit' ? 'REFERENCE_IMAGE_LIMIT' : 'MODEL_INPUT_UNSUPPORTED', mismatch.message)
   }
+  if (openRouterPixelSize(model, supported)) return pixelSizeRequest(model, input, supported)
   const aspect = requestedAspect(input, supported)
   return {
     model,

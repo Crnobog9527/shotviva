@@ -23,6 +23,7 @@ const reply = (image: { b64_json: string; media_type?: string }) => ({ data: [im
 const gemini = config.model
 const flux = 'black-forest-labs/flux-3-image-klein'
 const seedream = 'bytedance-seed/seedream-5-0-lite'
+const sunburst = 'openai/gpt-image-2.6-sunburst'
 const enumOf = (...values: string[]) => ({ type: 'enum', values })
 const range = (max: number) => ({ type: 'range', min: 0, max })
 const catalogue = { data: [
@@ -35,6 +36,10 @@ const catalogue = { data: [
     resolution: enumOf('2K', '4K'), aspect_ratio: enumOf('auto', '4:3'), input_references: range(14),
   } },
   { id: 'openai/gpt-image', supported_parameters: { output_format: enumOf('png'), input_references: range(16) } },
+  { id: sunburst, supported_parameters: {
+    aspect_ratio: enumOf('1:1', '3:4', 'auto'), output_format: enumOf('png', 'jpeg'),
+    quality: enumOf('auto', 'low', 'medium', 'high'), input_references: range(16),
+  } },
 ] }
 
 const fake = (body: unknown, status = 200) => vi.fn<typeof fetch>(async (url) =>
@@ -114,6 +119,25 @@ describe('OpenRouter model limits', () => {
     expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).toEqual({
       model: flux, prompt: 'fixture', aspect_ratio: 'auto', resolution: size, output_format: 'png',
     })
+  })
+
+  // The catalogue lists no resolution for OpenAI's models; OpenRouter forwards an explicit size.
+  it.each([
+    ['1k', '1:1', '1024x1024'], ['2k', '3:4', '1760x2352'], ['4k', '4:5', '2576x3216'],
+  ] as const)('sends GPT Image 2.6 %s %s as the official pixel size %s with the template quality', async (resolution, aspectRatio, size) => {
+    const fetch = fake(reply(await imageData('png')))
+    await createOpenRouterImageProvider({ ...config, model: sunburst, fetch }).generate(input({ resolution, aspectRatio, images: [] }))
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).toEqual({
+      model: sunburst, prompt: 'fixture', size, quality: 'medium', output_format: 'png',
+    })
+  })
+
+  it('sizes an original-ratio GPT Image edit from the photo', async () => {
+    const fetch = fake(reply(await imageData('png')))
+    const photoBytes = { ...photo, width: 3000, height: 2000 }
+    await createOpenRouterImageProvider({ ...config, model: sunburst, fetch })
+      .generate(input({ resolution: '2k', aspectRatio: 'original', images: [photoBytes], photoCount: 1 }))
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).toMatchObject({ size: '2496x1664' })
   })
 
   it('shrinks real 4K pixels to the existing square 3K tier', async () => {

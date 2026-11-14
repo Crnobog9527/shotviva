@@ -4,7 +4,9 @@ import { OPENROUTER_TOP_UP_FACTOR } from '../jobs/openrouter-fee'
 import { catalogRateSchema, type CatalogPricing, type CatalogRate } from '../templates/catalog-pricing'
 import type { EstimatedImageCosts, ImageCapabilities } from '../templates/image-capabilities'
 import type { Resolution } from '../templates/output-options'
+import { OPENAI_ESTIMATES } from '../templates/provider-pricing'
 import { OPENROUTER_IMAGE_SIZE } from './openrouter-input'
+import { openAIFreeSizeModel } from './tier-support'
 
 const endpointList = z.object({
   id: z.string(),
@@ -37,9 +39,35 @@ function tierPrice(rates: CatalogRate[], tier: Resolution, usesReferences: boole
   return matches.length === 1 && matches[0].cost_usd > 0 ? matches[0].cost_usd : null
 }
 
-export function catalogImageEstimates(quote: CatalogPricing, caps: Pick<ImageCapabilities, 'resolutions' | 'maxReferences'>): EstimatedImageCosts {
+// OpenAI's list token rates behind OPENAI_ESTIMATES (gpt-image-2 family, USD per token).
+const OPENAI_LIST_RATES: Record<string, number> = { input_image: 8e-6, input_text: 5e-6, output_image: 30e-6 }
+
+// OpenRouter bills OpenAI's GPT image models per token, so no per-image rate exists. Their cost
+// per image is the official line's estimate (high quality, the dearer of the two the site sells,
+// prompt and input images included), scaled up when a route's token rates exceed OpenAI's list.
+function openAITokenScale(rates: CatalogRate[]) {
+  if (!rates.length) return null
+  let scale = 0
+  for (const rate of rates) {
+    const list = OPENAI_LIST_RATES[rate.billable]
+    if (rate.cost_usd === 0) continue
+    if (rate.unit !== 'token' || rate.variant !== undefined || list === undefined) return null
+    scale = Math.max(scale, rate.cost_usd / list)
+  }
+  return scale > 0 ? scale : null
+}
+
+function openAIEstimates(quote: CatalogPricing, resolutions: readonly Resolution[]): EstimatedImageCosts {
+  const scales = quote.endpoints.map(p => openAITokenScale(p.rates))
+  if (!scales.length || !scales.every((s): s is number => s !== null)) return {}
+  const scale = Math.max(1, ...scales)
+  return Object.fromEntries(resolutions.map(tier => [tier, OPENAI_ESTIMATES.high[tier] * scale * OPENROUTER_TOP_UP_FACTOR]))
+}
+
+export function catalogImageEstimates(quote: CatalogPricing, caps: Pick<ImageCapabilities, 'resolutions' | 'maxReferences'>, model = ''): EstimatedImageCosts {
   const costs: EstimatedImageCosts = {}
   if (quote.status !== 'quoted') return costs
+  if (model.startsWith('openai/') && openAIFreeSizeModel(model.slice('openai/'.length))) return openAIEstimates(quote, caps.resolutions)
   for (const tier of caps.resolutions) {
     const rates = quote.endpoints.map(p => tierPrice(p.rates, tier, caps.maxReferences > 0))
     if (rates.length && rates.every((rate): rate is number => rate !== null)) {

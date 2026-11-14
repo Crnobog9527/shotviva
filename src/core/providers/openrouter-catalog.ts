@@ -2,11 +2,11 @@ import 'server-only'
 
 import { z } from 'zod'
 
-import { RESOLUTIONS, type Resolution } from '../templates/output-options'
+import type { Resolution } from '../templates/output-options'
 import type { CatalogPricing } from '../templates/catalog-pricing'
 import { getCatalogJson } from './catalog-request'
 import { parseEndpointPrices } from './openrouter-pricing'
-import { OPENROUTER_IMAGE_SIZE } from './openrouter-input'
+import { openRouterTiers } from './openrouter-input'
 import { ProviderSettingError } from './setting-error'
 
 const enumParameter = z.object({ type: z.literal('enum'), values: z.array(z.string()) })
@@ -19,6 +19,7 @@ const imageParameters = z.object({
   resolution: enumParameter.optional(),
   aspect_ratio: enumParameter.optional(),
   output_format: enumParameter.optional(),
+  quality: enumParameter.optional(),
   input_references: referenceRange.optional(),
 }).refine(value => Object.keys(value).length > 0)
 export type OpenRouterImageParameters = z.infer<typeof imageParameters>
@@ -52,8 +53,7 @@ export async function openRouterImageParameters(baseUrl: string, model: string, 
 }
 
 export async function openRouterModelTiers(baseUrl: string, model: string, fetchImpl?: typeof fetch): Promise<Resolution[] | null> {
-  const { resolution } = await openRouterImageParameters(baseUrl, model, fetchImpl)
-  const tiers = RESOLUTIONS.filter((tier) => resolution?.values.includes(OPENROUTER_IMAGE_SIZE[tier]))
+  const tiers = openRouterTiers(model, await openRouterImageParameters(baseUrl, model, fetchImpl))
   return tiers.length ? tiers : null
 }
 

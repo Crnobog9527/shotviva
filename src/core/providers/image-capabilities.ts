@@ -1,24 +1,22 @@
 import { OPENAI_MAX_REFERENCES, imageCapabilitiesSchema, type ImageCapabilities } from '../templates/image-capabilities'
 import { availableImageOptions, FULL_IMAGE_OPTIONS, PROVIDER_ASPECTS } from '../templates/image-options'
-import { RESOLUTIONS, type Resolution } from '../templates/output-options'
+import type { Resolution } from '../templates/output-options'
 import { catalogImageEstimates } from './openrouter-pricing'
 import { openRouterCatalogPricing, openRouterImageParameters, type OpenRouterImageParameters } from './openrouter-catalog'
-import { OPENROUTER_IMAGE_SIZE } from './openrouter-input'
+import { openRouterPixelSize, openRouterTiers } from './openrouter-input'
 import { ARK_MAX_REFERENCES, ARK_RESOLUTIONS } from './ark'
 import { ProviderSettingError } from './setting-error'
 import { decideTiers, openAIImageTiers, type TierDecision } from './tier-support'
 import type { ProviderAdapterId } from './types'
 
-export function catalogCapabilities(parameters: OpenRouterImageParameters, fetchedAt: string): ImageCapabilities {
-  // Models with no resolution parameter produce a single native size (the site's standard tier).
-  const tiers = parameters.resolution?.values
-  const resolutions = tiers
-    ? RESOLUTIONS.filter((tier) => tiers.includes(OPENROUTER_IMAGE_SIZE[tier]))
-    : ['1k' as const]
+export function catalogCapabilities(model: string, parameters: OpenRouterImageParameters, fetchedAt: string): ImageCapabilities {
+  const resolutions = openRouterTiers(model, parameters)
+  const pixelSize = openRouterPixelSize(model, parameters)
   const ratios = parameters.aspect_ratio?.values ?? []
-  const providerAspectRatios = ratios.filter((ratio) => /^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/.test(ratio))
+  // A pixel size carries any site ratio, and 'original' follows the photo, as on the official line.
+  const providerAspectRatios = pixelSize ? PROVIDER_ASPECTS : ratios.filter((ratio) => /^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/.test(ratio))
   const parsed = imageCapabilitiesSchema.safeParse({
-    resolutions, originalRatio: ratios.includes('auto'), providerAspectRatios,
+    resolutions, originalRatio: pixelSize || ratios.includes('auto'), providerAspectRatios,
     aspectRatios: availableImageOptions({ ...FULL_IMAGE_OPTIONS, aspectRatios: PROVIDER_ASPECTS }, providerAspectRatios).aspectRatios,
     minReferences: parameters.input_references?.min ?? 0, maxReferences: parameters.input_references?.max ?? 0, fetchedAt,
   })
@@ -54,8 +52,8 @@ export async function fetchImageCapabilities(adapter: ProviderAdapterId, baseUrl
     return withTiers(caps, decideTiers(ARK_RESOLUTIONS, 'spec', choice))
   }
   const parameters = await openRouterImageParameters(baseUrl, model, fetchImpl)
-  const detected = catalogCapabilities(parameters, fetchedAt)
+  const detected = catalogCapabilities(model, parameters, fetchedAt)
   const caps = withTiers(detected, decideTiers(detected.resolutions, 'catalog', choice))
   const catalogPricing = await openRouterCatalogPricing(baseUrl, model, fetchImpl)
-  return { ...caps, catalogVersion: 1 as const, catalogPricing, catalogImageCosts: catalogImageEstimates(catalogPricing, caps) }
+  return { ...caps, catalogVersion: 1 as const, catalogPricing, catalogImageCosts: catalogImageEstimates(catalogPricing, caps, model) }
 }
