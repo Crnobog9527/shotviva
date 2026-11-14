@@ -1,0 +1,73 @@
+import type { Metadata, Viewport } from 'next'
+import { Suspense } from 'react'
+import { NextIntlClientProvider } from 'next-intl'
+import { getMessages } from 'next-intl/server'
+import { locale as rootLocale } from 'next/root-params'
+
+import { ConsentSlot } from '@/core/analytics/browser'
+import { SignupCodeResult } from '@/core/auth/signup-result'
+import { UpdateSlot } from '@/core/app-update'
+import { htmlLang, isLocale, publicClientMessages } from '@/core/i18n'
+import { TranslatedPathsProvider } from '@/core/i18n/ui'
+import { rootMetadata, ShortcutTitleSync } from '@/core/seo'
+import { GeistFonts } from '@/core/ui/geist-fonts'
+import { InstrumentSerifPreload } from '@/core/ui/instrument-serif'
+import { MiSansStylesheet } from '@/core/ui/misans-stylesheet'
+import { site } from '@/site/site.config'
+
+
+// Default robots is noindex; only paths in site.indexing opt in (core/seo/indexing.ts). The web
+// app manifest follows the language (T65).
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await rootLocale()
+  return rootMetadata(site, isLocale(locale) ? locale : site.locales.default)
+}
+
+// viewport-fit=cover so fixed bars can pad with env(safe-area-inset-*) (DESIGN §8.5).
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#0B0A09',
+  colorScheme: 'dark',
+}
+
+// One tree for both languages (ARCHITECTURE §17): `en` is served unprefixed by the proxy's
+// locale router, `zh` under /zh. The proxy never forwards any other first segment here.
+export function generateStaticParams() {
+  return site.locales.enabled.map((locale) => ({ locale }))
+}
+
+
+export default async function RootLayout({ children }: LayoutProps<'/[locale]'>) {
+  const locale = await rootLocale()
+  // What public pages' client components read: not the server-only namespaces (the admin entry's
+  // label, spec #186), nor what only the logged-in app reads, which the (app) layout adds.
+  const messages = publicClientMessages(await getMessages())
+  const lang = isLocale(locale) ? locale : site.locales.default
+  return (
+    <html lang={htmlLang(lang)} className="h-full antialiased">
+      <body className="flex min-h-full flex-col">
+        {/* Geist faces and preload on one host (core/ui/geist-fonts.tsx). */}
+        <GeistFonts />
+        {/* Each language fetches only its own display face: MiSans right after the first paint
+            (misans-stylesheet.tsx), or Instrument Serif with the document. */}
+        {lang === 'zh' ? <MiSansStylesheet /> : <InstrumentSerifPreload />}
+        <NextIntlClientProvider messages={messages}>
+          <TranslatedPathsProvider paths={site.locales.zhPaths}>
+            {children}
+            {/* The analytics cookie bar, for EU/EEA/UK/CH visitors who have not answered (T70). */}
+            <ConsentSlot />
+            {/* "Shotviva has been updated" with Refresh, on every page (T90). */}
+            <Suspense fallback={null}>
+              <SignupCodeResult />
+              <UpdateSlot />
+            </Suspense>
+            {/* Huawei Browser names a home-screen shortcut after the live page title (core/seo/shortcut-title.ts). */}
+            <ShortcutTitleSync name={site.brand.name} />
+          </TranslatedPathsProvider>
+        </NextIntlClientProvider>
+      </body>
+    </html>
+  )
+}

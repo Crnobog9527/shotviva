@@ -1,0 +1,763 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-05T23:40:00+08:00",
+  "title": "Design System: Shotviva",
+  "extensions": {
+    "colorMeta": {
+      "background": {
+        "role": "neutral",
+        "displayName": "Darkroom Black",
+        "canonical": "oklch(0.146 0.003 69)",
+        "hexApprox": "#0B0A09",
+        "tonalRamp": [
+          "oklch(0.150 0.001 69)",
+          "oklch(0.264 0.002 69)",
+          "oklch(0.379 0.002 69)",
+          "oklch(0.493 0.003 69)",
+          "oklch(0.607 0.003 69)",
+          "oklch(0.721 0.002 69)",
+          "oklch(0.836 0.002 69)",
+          "oklch(0.950 0.001 69)"
+        ]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Bone",
+        "canonical": "oklch(0.945 0.014 78)",
+        "hexApprox": "#F2ECE3",
+        "tonalRamp": [
+          "oklch(0.150 0.007 78)",
+          "oklch(0.264 0.009 78)",
+          "oklch(0.379 0.011 78)",
+          "oklch(0.493 0.013 78)",
+          "oklch(0.607 0.013 78)",
+          "oklch(0.721 0.011 78)",
+          "oklch(0.836 0.009 78)",
+          "oklch(0.950 0.007 78)"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Tray",
+        "canonical": "oklch(0.184 0.005 67)",
+        "hexApprox": "#141210",
+        "tonalRamp": [
+          "oklch(0.150 0.003 67)",
+          "oklch(0.264 0.003 67)",
+          "oklch(0.379 0.004 67)",
+          "oklch(0.493 0.005 67)",
+          "oklch(0.607 0.005 67)",
+          "oklch(0.721 0.004 67)",
+          "oklch(0.836 0.003 67)",
+          "oklch(0.950 0.003 67)"
+        ]
+      },
+      "popover": {
+        "role": "neutral",
+        "displayName": "Sheet",
+        "canonical": "oklch(0.199 0.006 56)",
+        "hexApprox": "#181513",
+        "tonalRamp": [
+          "oklch(0.150 0.003 56)",
+          "oklch(0.264 0.004 56)",
+          "oklch(0.379 0.005 56)",
+          "oklch(0.493 0.006 56)",
+          "oklch(0.607 0.006 56)",
+          "oklch(0.721 0.005 56)",
+          "oklch(0.836 0.004 56)",
+          "oklch(0.950 0.003 56)"
+        ]
+      },
+      "primary": {
+        "role": "primary",
+        "displayName": "Safelight",
+        "canonical": "oklch(0.684 0.208 36)",
+        "hexApprox": "#FF5B2E",
+        "tonalRamp": [
+          "oklch(0.150 0.109 36)",
+          "oklch(0.264 0.137 36)",
+          "oklch(0.379 0.165 36)",
+          "oklch(0.493 0.194 36)",
+          "oklch(0.607 0.194 36)",
+          "oklch(0.721 0.165 36)",
+          "oklch(0.836 0.137 36)",
+          "oklch(0.950 0.109 36)"
+        ]
+      },
+      "primary-foreground": {
+        "role": "neutral",
+        "displayName": "Fixer Black",
+        "canonical": "oklch(0.159 0.038 43)",
+        "hexApprox": "#1A0702",
+        "tonalRamp": [
+          "oklch(0.150 0.020 43)",
+          "oklch(0.264 0.025 43)",
+          "oklch(0.379 0.030 43)",
+          "oklch(0.493 0.035 43)",
+          "oklch(0.607 0.035 43)",
+          "oklch(0.721 0.030 43)",
+          "oklch(0.836 0.025 43)",
+          "oklch(0.950 0.020 43)"
+        ]
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Secondary (shadcn slot, unused in comps)",
+        "canonical": "oklch(0.234 0.008 59)",
+        "hexApprox": "#211D1A",
+        "tonalRamp": [
+          "oklch(0.150 0.004 59)",
+          "oklch(0.264 0.006 59)",
+          "oklch(0.379 0.007 59)",
+          "oklch(0.493 0.008 59)",
+          "oklch(0.607 0.008 59)",
+          "oklch(0.721 0.007 59)",
+          "oklch(0.836 0.006 59)",
+          "oklch(0.950 0.004 59)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Well",
+        "canonical": "oklch(0.216 0.007 67)",
+        "hexApprox": "#1C1916",
+        "tonalRamp": [
+          "oklch(0.150 0.004 67)",
+          "oklch(0.264 0.005 67)",
+          "oklch(0.379 0.006 67)",
+          "oklch(0.493 0.007 67)",
+          "oklch(0.607 0.007 67)",
+          "oklch(0.721 0.006 67)",
+          "oklch(0.836 0.005 67)",
+          "oklch(0.950 0.004 67)"
+        ]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Ash",
+        "canonical": "oklch(0.685 0.021 72)",
+        "hexApprox": "#A2988C",
+        "tonalRamp": [
+          "oklch(0.150 0.011 72)",
+          "oklch(0.264 0.014 72)",
+          "oklch(0.379 0.017 72)",
+          "oklch(0.493 0.019 72)",
+          "oklch(0.607 0.019 72)",
+          "oklch(0.721 0.017 72)",
+          "oklch(0.836 0.014 72)",
+          "oklch(0.950 0.011 72)"
+        ]
+      },
+      "accent": {
+        "role": "neutral",
+        "displayName": "Accent (shadcn slot, unused in comps)",
+        "canonical": "oklch(0.266 0.012 56)",
+        "hexApprox": "#2A2420",
+        "tonalRamp": [
+          "oklch(0.150 0.006 56)",
+          "oklch(0.264 0.008 56)",
+          "oklch(0.379 0.009 56)",
+          "oklch(0.493 0.011 56)",
+          "oklch(0.607 0.011 56)",
+          "oklch(0.721 0.009 56)",
+          "oklch(0.836 0.008 56)",
+          "oklch(0.950 0.006 56)"
+        ]
+      },
+      "destructive": {
+        "role": "error",
+        "displayName": "Destructive",
+        "canonical": "oklch(0.688 0.201 24)",
+        "hexApprox": "#FF5A5A",
+        "tonalRamp": [
+          "oklch(0.150 0.106 24)",
+          "oklch(0.264 0.133 24)",
+          "oklch(0.379 0.160 24)",
+          "oklch(0.493 0.187 24)",
+          "oklch(0.607 0.187 24)",
+          "oklch(0.721 0.160 24)",
+          "oklch(0.836 0.133 24)",
+          "oklch(0.950 0.106 24)"
+        ]
+      },
+      "success": {
+        "role": "success",
+        "displayName": "Success",
+        "canonical": "oklch(0.807 0.115 156)",
+        "hexApprox": "#7FD6A0",
+        "tonalRamp": [
+          "oklch(0.150 0.061 156)",
+          "oklch(0.264 0.076 156)",
+          "oklch(0.379 0.091 156)",
+          "oklch(0.493 0.107 156)",
+          "oklch(0.607 0.107 156)",
+          "oklch(0.721 0.091 156)",
+          "oklch(0.836 0.076 156)",
+          "oklch(0.950 0.061 156)"
+        ]
+      },
+      "graphite": {
+        "role": "tier",
+        "displayName": "Graphite (Starter, paywall rows)",
+        "canonical": "oklch(0.206 0.005 68)",
+        "hexApprox": "#191715",
+        "tonalRamp": [
+          "oklch(0.150 0.003 68)",
+          "oklch(0.264 0.003 68)",
+          "oklch(0.379 0.004 68)",
+          "oklch(0.493 0.005 68)",
+          "oklch(0.607 0.005 68)",
+          "oklch(0.721 0.004 68)",
+          "oklch(0.836 0.003 68)",
+          "oklch(0.950 0.003 68)"
+        ]
+      },
+      "sapphire-top": {
+        "role": "tier",
+        "displayName": "Sapphire Glass, top",
+        "canonical": "oklch(0.224 0.051 267)",
+        "hexApprox": "#111A33",
+        "tonalRamp": [
+          "oklch(0.150 0.027 267)",
+          "oklch(0.264 0.034 267)",
+          "oklch(0.379 0.040 267)",
+          "oklch(0.493 0.047 267)",
+          "oklch(0.607 0.047 267)",
+          "oklch(0.721 0.040 267)",
+          "oklch(0.836 0.034 267)",
+          "oklch(0.950 0.027 267)"
+        ]
+      },
+      "sapphire-deep": {
+        "role": "tier",
+        "displayName": "Sapphire Glass, deep",
+        "canonical": "oklch(0.177 0.034 270)",
+        "hexApprox": "#0B1020",
+        "tonalRamp": [
+          "oklch(0.150 0.018 270)",
+          "oklch(0.264 0.023 270)",
+          "oklch(0.379 0.027 270)",
+          "oklch(0.493 0.032 270)",
+          "oklch(0.607 0.032 270)",
+          "oklch(0.721 0.027 270)",
+          "oklch(0.836 0.023 270)",
+          "oklch(0.950 0.018 270)"
+        ]
+      },
+      "sapphire-ink": {
+        "role": "tier",
+        "displayName": "Sapphire Ink",
+        "canonical": "oklch(0.817 0.091 267)",
+        "hexApprox": "#A9C2FF",
+        "tonalRamp": [
+          "oklch(0.150 0.048 267)",
+          "oklch(0.264 0.060 267)",
+          "oklch(0.379 0.072 267)",
+          "oklch(0.493 0.085 267)",
+          "oklch(0.607 0.085 267)",
+          "oklch(0.721 0.072 267)",
+          "oklch(0.836 0.060 267)",
+          "oklch(0.950 0.048 267)"
+        ]
+      },
+      "sapphire-rim": {
+        "role": "tier",
+        "displayName": "Sapphire Rim",
+        "canonical": "oklch(0.721 0.144 268)",
+        "hexApprox": "#7EA0FF",
+        "tonalRamp": [
+          "oklch(0.150 0.076 268)",
+          "oklch(0.264 0.095 268)",
+          "oklch(0.379 0.115 268)",
+          "oklch(0.493 0.134 268)",
+          "oklch(0.607 0.134 268)",
+          "oklch(0.721 0.115 268)",
+          "oklch(0.836 0.095 268)",
+          "oklch(0.950 0.076 268)"
+        ]
+      },
+      "sapphire-flag": {
+        "role": "tier",
+        "displayName": "Sapphire",
+        "canonical": "oklch(0.650 0.186 267)",
+        "hexApprox": "#5B86FF",
+        "tonalRamp": [
+          "oklch(0.150 0.098 267)",
+          "oklch(0.264 0.123 267)",
+          "oklch(0.379 0.148 267)",
+          "oklch(0.493 0.173 267)",
+          "oklch(0.607 0.173 267)",
+          "oklch(0.721 0.148 267)",
+          "oklch(0.836 0.123 267)",
+          "oklch(0.950 0.098 267)"
+        ]
+      },
+      "max-black-top": {
+        "role": "tier",
+        "displayName": "Max Black, top",
+        "canonical": "oklch(0.204 0.021 80)",
+        "hexApprox": "#1C160C",
+        "tonalRamp": [
+          "oklch(0.150 0.011 80)",
+          "oklch(0.264 0.014 80)",
+          "oklch(0.379 0.017 80)",
+          "oklch(0.493 0.019 80)",
+          "oklch(0.607 0.019 80)",
+          "oklch(0.721 0.017 80)",
+          "oklch(0.836 0.014 80)",
+          "oklch(0.950 0.011 80)"
+        ]
+      },
+      "max-black-deep": {
+        "role": "tier",
+        "displayName": "Max Black, deep",
+        "canonical": "oklch(0.146 0.008 80)",
+        "hexApprox": "#0C0A07",
+        "tonalRamp": [
+          "oklch(0.150 0.004 80)",
+          "oklch(0.264 0.005 80)",
+          "oklch(0.379 0.006 80)",
+          "oklch(0.493 0.007 80)",
+          "oklch(0.607 0.007 80)",
+          "oklch(0.721 0.006 80)",
+          "oklch(0.836 0.005 80)",
+          "oklch(0.950 0.004 80)"
+        ]
+      },
+      "max-gold": {
+        "role": "tier",
+        "displayName": "Max Gold",
+        "canonical": "oklch(0.867 0.112 88)",
+        "hexApprox": "#F2CF7A",
+        "tonalRamp": [
+          "oklch(0.150 0.059 88)",
+          "oklch(0.264 0.074 88)",
+          "oklch(0.379 0.089 88)",
+          "oklch(0.493 0.104 88)",
+          "oklch(0.607 0.104 88)",
+          "oklch(0.721 0.089 88)",
+          "oklch(0.836 0.074 88)",
+          "oklch(0.950 0.059 88)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(0.945 0.014 78)",
+        "note": "bone at 9% alpha; drawn as inset 0 0 0 1px",
+        "tonalRamp": [
+          "oklch(0.150 0.007 78)",
+          "oklch(0.264 0.009 78)",
+          "oklch(0.379 0.011 78)",
+          "oklch(0.493 0.013 78)",
+          "oklch(0.607 0.013 78)",
+          "oklch(0.721 0.011 78)",
+          "oklch(0.836 0.009 78)",
+          "oklch(0.950 0.007 78)"
+        ]
+      },
+      "input": {
+        "role": "neutral",
+        "displayName": "Input Stroke",
+        "canonical": "oklch(0.945 0.014 78)",
+        "note": "bone at 16% alpha",
+        "tonalRamp": [
+          "oklch(0.150 0.007 78)",
+          "oklch(0.264 0.009 78)",
+          "oklch(0.379 0.011 78)",
+          "oklch(0.493 0.013 78)",
+          "oklch(0.607 0.013 78)",
+          "oklch(0.721 0.011 78)",
+          "oklch(0.836 0.009 78)",
+          "oklch(0.950 0.007 78)"
+        ]
+      },
+      "ring": {
+        "role": "neutral",
+        "displayName": "Focus Ring",
+        "canonical": "oklch(0.684 0.208 36)",
+        "note": "same as Safelight",
+        "tonalRamp": [
+          "oklch(0.150 0.109 36)",
+          "oklch(0.264 0.137 36)",
+          "oklch(0.379 0.165 36)",
+          "oklch(0.493 0.194 36)",
+          "oklch(0.607 0.194 36)",
+          "oklch(0.721 0.165 36)",
+          "oklch(0.836 0.137 36)",
+          "oklch(0.950 0.109 36)"
+        ]
+      },
+      "bone-dim": {
+        "role": "neutral",
+        "displayName": "Bone Dim",
+        "canonical": "oklch(0.945 0.014 78)",
+        "note": "bone at 62% alpha",
+        "tonalRamp": [
+          "oklch(0.150 0.007 78)",
+          "oklch(0.264 0.009 78)",
+          "oklch(0.379 0.011 78)",
+          "oklch(0.493 0.013 78)",
+          "oklch(0.607 0.013 78)",
+          "oklch(0.721 0.011 78)",
+          "oklch(0.836 0.009 78)",
+          "oklch(0.950 0.007 78)"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "oklch(0.945 0.014 78)",
+        "note": "bone at 6% alpha; row dividers",
+        "tonalRamp": [
+          "oklch(0.150 0.007 78)",
+          "oklch(0.264 0.009 78)",
+          "oklch(0.379 0.011 78)",
+          "oklch(0.493 0.013 78)",
+          "oklch(0.607 0.013 78)",
+          "oklch(0.721 0.011 78)",
+          "oklch(0.836 0.009 78)",
+          "oklch(0.950 0.007 78)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "large-title": {
+        "displayName": "Large Title",
+        "purpose": "Tab-root page titles (Create, Photos)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Marketing section heads; workspace template name."
+      },
+      "h1": {
+        "displayName": "H1",
+        "purpose": "Homepage H1 display line and bottom-sheet titles; one italic phrase allowed."
+      },
+      "price": {
+        "displayName": "Price",
+        "purpose": "Paywall tier prices."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Sub-section heads and step titles."
+      },
+      "item-title": {
+        "displayName": "Item Title",
+        "purpose": "Template names, FAQ questions, list-row titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Reading text and every input (16px floor)."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Ghost and quiet buttons."
+      },
+      "button-primary": {
+        "displayName": "Primary Button",
+        "purpose": "The one primary per screen."
+      },
+      "field-label": {
+        "displayName": "Field Label",
+        "purpose": "Form labels; (optional) in Ash at 400."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Metadata, tags, chips, notes; the 14px floor for visible text."
+      },
+      "measure": {
+        "displayName": "Measure",
+        "purpose": "Geist Mono for credits, px, ratios, percentages, per-credit prices only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "hairline-edge",
+        "value": "inset 0 0 0 1px var(--border)",
+        "purpose": "Every panel, tile, card, row and thumbnail edge."
+      },
+      {
+        "name": "panel-top-light",
+        "value": "inset 0 0 0 1px var(--border), inset 0 1px 0 rgba(255,255,255,.035)",
+        "purpose": "Panel edge with a faint top highlight."
+      },
+      {
+        "name": "raised",
+        "value": "inset 0 1px 0 rgba(255,255,255,.38), inset 0 -2px 0 rgba(0,0,0,.12), 0 16px 30px -16px rgba(0,0,0,.9)",
+        "purpose": "The primary button."
+      },
+      {
+        "name": "raised-card",
+        "value": "inset 0 0 0 1px var(--border), inset 0 1px 0 rgba(255,255,255,.05), 0 30px 60px -30px rgba(0,0,0,.8)",
+        "purpose": "The homepage generator card."
+      },
+      {
+        "name": "sheet",
+        "value": "inset 0 1px 0 rgba(255,255,255,.08), 0 -30px 60px -20px rgba(0,0,0,.7)",
+        "purpose": "Bottom sheets."
+      },
+      {
+        "name": "material-bar",
+        "value": "inset 0 1px 0 var(--border)",
+        "purpose": "Top hairline on tab bar, action bar, checkout (over blur 24px saturate 1.3-1.4)."
+      },
+      {
+        "name": "focus-field",
+        "value": "inset 0 0 0 1.5px var(--primary), 0 0 0 4px rgba(255,91,46,.14)",
+        "purpose": "Textarea focus."
+      },
+      {
+        "name": "chosen-safelight",
+        "value": "inset 0 0 0 1.5px var(--primary)",
+        "purpose": "Chosen size tile and resolution card (with a Safelight wash at 12-14%)."
+      },
+      {
+        "name": "tier-max-rim",
+        "value": "conic-gradient(from var(--a), #F7DF9A, #8A6420, #FFE9B0, #C8962E, #6E4E14, #F2CF7A, #F7DF9A) as a 1.5px masked ring",
+        "purpose": "Max tier gold-foil rim; turns once per 9s; still under reduced motion."
+      },
+      {
+        "name": "chrome",
+        "value": "var(--chrome)",
+        "purpose": "Gold-foil fill for the Max flag and Max checkout button only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(.2, .8, .2, 1)",
+        "purpose": "House ease for presses, sheets, docks and fades."
+      },
+      {
+        "name": "spring",
+        "value": "cubic-bezier(.32, 1.25, .4, 1)",
+        "purpose": "Monthly / Yearly segment thumb only."
+      },
+      {
+        "name": "press",
+        "value": "transform scale(.975) 180ms var(--ease); template cards scale(.97) 200ms",
+        "purpose": "Press feedback on every tappable surface."
+      },
+      {
+        "name": "sheet",
+        "value": "transform 420ms var(--ease)",
+        "purpose": "Bottom sheet in and out; drag dismiss past 120px or a fast flick."
+      },
+      {
+        "name": "dock",
+        "value": "transform 450ms var(--ease)",
+        "purpose": "Homepage floating primary in and out."
+      },
+      {
+        "name": "develop",
+        "value": "7s var(--ease) infinite alternate",
+        "purpose": "Negative-to-positive reveal with the Safelight scan line while generating."
+      },
+      {
+        "name": "max-rim-and-sheen",
+        "value": "rim 9s linear infinite; sheen 6s ease-in-out infinite",
+        "purpose": "Max tier material; still under reduced motion."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation and transition durations to .001ms",
+        "purpose": "prefers-reduced-motion: everything settles immediately; template video shows its poster only."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone",
+        "value": "375px",
+        "note": "Only width drawn in comps-v3-b; desktop follows 规范 §8.6 (content max-width 720px, two-column workspace from 1024px)."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "shadcn Button (default). The one filled, full-width primary per screen, with a mono cost.",
+      "html": "<button class=\"ds-btn-primary\">Generate <span class=\"ds-cost\">· 2 credits</span></button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:56px;padding:0 18px;border:0;border-radius:18px;font:600 16.5px/1 var(--font-sans);letter-spacing:-0.01em;background:var(--primary);color:var(--primary-foreground);box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -2px 0 rgba(0,0,0,.12),0 16px 30px -16px rgba(0,0,0,.9);transition:transform .18s var(--ease);cursor:pointer}.ds-btn-primary .ds-cost{font:500 14px/1 var(--font-mono);opacity:.72}.ds-btn-primary:active{transform:scale(.975)}.ds-btn-primary:focus-visible{outline:2px solid var(--ring);outline-offset:2px}"
+    },
+    {
+      "name": "Neutral Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary-neutral",
+      "description": "shadcn Button (default) with the Bone fill: buying Starter or a pack, or \"Get credits\".",
+      "html": "<button class=\"ds-btn-neutral\">Get credits <span class=\"ds-cost\">· 2 needed</span></button>",
+      "css": ".ds-btn-neutral{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:56px;border:0;border-radius:18px;font:600 16.5px/1 var(--font-sans);background:var(--foreground);color:var(--background);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 16px 30px -16px rgba(0,0,0,.9);transition:transform .18s var(--ease);cursor:pointer}.ds-btn-neutral .ds-cost{font:500 14px/1 var(--font-mono);opacity:.72}.ds-btn-neutral:active{transform:scale(.975)}.ds-btn-neutral:focus-visible{outline:2px solid var(--ring);outline-offset:2px}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "shadcn Button (secondary). Every non-primary action.",
+      "html": "<button class=\"ds-btn-ghost\">Replace photo</button>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border:0;border-radius:14px;font:600 15px/1 var(--font-sans);letter-spacing:-0.01em;color:var(--foreground);background:rgba(242,236,227,.06);box-shadow:inset 0 0 0 1px var(--border);transition:transform .18s var(--ease);cursor:pointer}.ds-btn-ghost:active{transform:scale(.975)}.ds-btn-ghost:focus-visible{outline:2px solid var(--ring);outline-offset:2px}"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "shadcn ToggleGroup item. Category filters on Create.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip\" aria-pressed=\"true\">All</button><button class=\"ds-chip\" aria-pressed=\"false\">Food &amp; Drink</button></div>",
+      "css": ".ds-chips{display:flex;gap:8px}.ds-chip{height:36px;min-width:44px;padding:0 14px;border:0;border-radius:999px;font:500 14px/1 var(--font-sans);background:rgba(242,236,227,.06);color:var(--bone-dim);box-shadow:inset 0 0 0 1px var(--border);transition:background .2s,color .2s;cursor:pointer}.ds-chip[aria-pressed=\"true\"]{background:var(--foreground);color:var(--background);box-shadow:none}.ds-chip:focus-visible{outline:2px solid var(--ring);outline-offset:2px}"
+    },
+    {
+      "name": "Optional Field",
+      "kind": "input",
+      "refersTo": "textarea",
+      "description": "shadcn Textarea + Label. 16px text, 300-character counter.",
+      "html": "<label class=\"ds-label\" for=\"ds-note\">Anything to change? <span>(optional)</span></label><textarea class=\"ds-textarea\" id=\"ds-note\" rows=\"2\" placeholder=\"e.g. keep the chain gold\"></textarea>",
+      "css": ".ds-label{display:block;font:500 15px/1.3 var(--font-sans);color:var(--foreground);margin-bottom:8px}.ds-label span{color:var(--muted-foreground);font-weight:400}.ds-textarea{width:100%;min-height:92px;resize:none;padding:14px;border:0;border-radius:16px;font:400 16px/1.45 var(--font-sans);color:var(--foreground);background:rgba(242,236,227,.04);box-shadow:inset 0 0 0 1px var(--input);transition:box-shadow .2s}.ds-textarea::placeholder{color:var(--muted-foreground)}.ds-textarea:focus{outline:none;box-shadow:inset 0 0 0 1.5px var(--primary),0 0 0 4px rgba(255,91,46,.14)}"
+    },
+    {
+      "name": "Template Card",
+      "kind": "card",
+      "refersTo": "template-card-media",
+      "description": "Self-built (§2). Split at rest: Phone left, AI right, mono cost.",
+      "html": "<button class=\"ds-tpl\"><span class=\"ds-tpl-media\"><span class=\"ds-b\"></span><span class=\"ds-a\"></span><span class=\"ds-seam\"></span><span class=\"ds-tag ds-l\">Phone</span><span class=\"ds-tag ds-r\">AI</span></span><span class=\"ds-tpl-name\">Pure White</span><span class=\"ds-tpl-use\">Marketplace</span><span class=\"ds-tpl-cost\">from 2 credits</span></button>",
+      "css": ".ds-tpl{display:block;width:160px;text-align:left;border:0;background:none;color:var(--foreground);padding:0;border-radius:18px;transition:transform .2s var(--ease);cursor:pointer}.ds-tpl:active{transform:scale(.97)}.ds-tpl:focus-visible{outline:2px solid var(--ring);outline-offset:2px}.ds-tpl-media{position:relative;display:block;aspect-ratio:4/5;border-radius:16px;overflow:hidden;background:var(--muted);box-shadow:inset 0 0 0 1px var(--border)}.ds-b{position:absolute;inset:0;background:linear-gradient(160deg,#8f8f93,#6c6c70)}.ds-a{position:absolute;inset:0;clip-path:inset(0 0 0 50%);background:linear-gradient(160deg,#f4f2ee,#d9d4cc)}.ds-seam{position:absolute;top:0;bottom:0;left:50%;width:1.5px;margin-left:-.75px;background:rgba(255,255,255,.95)}.ds-tag{position:absolute;bottom:7px;height:24px;padding:0 7px;border-radius:7px;display:inline-flex;align-items:center;font:600 14px/1 var(--font-sans);color:#fff;background:rgba(11,10,9,.62)}.ds-l{left:7px}.ds-r{right:7px;background:var(--primary);color:var(--primary-foreground)}.ds-tpl-name{display:block;padding:10px 2px 0;font:600 16px/1.25 var(--font-sans);letter-spacing:-0.015em}.ds-tpl-use{display:block;padding:2px 2px 0;font:400 14px/1.35 var(--font-sans);color:var(--muted-foreground)}.ds-tpl-cost{display:inline-block;margin:7px 2px 0;padding:4px 6px;border-radius:6px;font:500 14px/1 var(--font-mono);color:var(--bone-dim);background:rgba(242,236,227,.06)}"
+    },
+    {
+      "name": "Tab Bar",
+      "kind": "nav",
+      "refersTo": "tab-bar",
+      "description": "Self-built bottom tab bar (§2). Current tab: Bone label, Safelight icon. Labels at the 14px floor.",
+      "html": "<nav class=\"ds-tabbar\"><a aria-current=\"page\"><svg viewBox=\"0 0 24 24\"><rect x=\"3.5\" y=\"3.5\" width=\"17\" height=\"17\" rx=\"5\"/><path d=\"M12 8v8M8 12h8\"/></svg>Create</a><a><svg viewBox=\"0 0 24 24\"><path d=\"M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z\"/></svg>Wishlist</a><a><svg viewBox=\"0 0 24 24\"><rect x=\"3.5\" y=\"5.5\" width=\"14\" height=\"14\" rx=\"3\"/><path d=\"M3.5 16l4-4 4 4 2-2 4 4\"/></svg>Photos</a><a><svg viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"8.5\" r=\"3.8\"/><path d=\"M4.5 20c1.2-3.6 4-5.3 7.5-5.3s6.3 1.7 7.5 5.3\"/></svg>Account</a></nav>",
+      "css": ".ds-tabbar{display:grid;grid-template-columns:repeat(4,1fr);padding:6px 8px 4px;background:rgba(14,12,11,.78);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);box-shadow:inset 0 1px 0 var(--border)}.ds-tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:50px;font:500 14px/1 var(--font-sans);color:rgba(162,152,140,.85);text-decoration:none;cursor:pointer}.ds-tabbar svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}.ds-tabbar a[aria-current=\"page\"]{color:var(--foreground)}.ds-tabbar a[aria-current=\"page\"] svg{color:var(--primary)}.ds-tabbar a:focus-visible{outline:2px solid var(--ring);outline-offset:-2px;border-radius:8px}"
+    },
+    {
+      "name": "Resolution Choice Card",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "shadcn RadioGroup item as a card. Chosen: 1.5px Safelight rim plus a faint Safelight wash.",
+      "html": "<label class=\"ds-res\"><input type=\"radio\" name=\"ds-r\" checked><span class=\"ds-res-card\"><span class=\"ds-n\">Standard <span class=\"ds-px\">1024 px</span></span><span class=\"ds-u\">Social &amp; delivery apps</span><span class=\"ds-c\">2<small>credits</small></span></span></label>",
+      "css": ".ds-res{display:block;cursor:pointer}.ds-res input{position:absolute;opacity:0}.ds-res-card{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;min-height:64px;padding:14px 14px 14px 16px;border-radius:16px;background:var(--card);box-shadow:inset 0 0 0 1px var(--border);color:var(--foreground);transition:box-shadow .2s,background .2s}.ds-n{font:600 16px/1.2 var(--font-sans)}.ds-px{font:400 14px/1 var(--font-mono);color:var(--muted-foreground);margin-left:6px}.ds-u{grid-column:1;font:400 14px/1.35 var(--font-sans);color:var(--muted-foreground)}.ds-c{grid-row:1/span 2;grid-column:2;text-align:right;font:400 24px/1 var(--font-display)}.ds-c small{display:block;font:400 14px/1 var(--font-sans);color:var(--muted-foreground);margin-top:4px}.ds-res input:checked+.ds-res-card{background:linear-gradient(180deg,rgba(255,91,46,.12),rgba(255,91,46,.03));box-shadow:inset 0 0 0 1.5px var(--primary)}.ds-res input:focus-visible+.ds-res-card{outline:2px solid var(--ring);outline-offset:2px}"
+    },
+    {
+      "name": "Paywall Tiers",
+      "kind": "custom",
+      "refersTo": "tier-pro",
+      "description": "Self-built paywall drawer content (§2) on shadcn RadioGroup: graphite Starter, sapphire-glass Pro, black-and-gold Max; live perks, then a separate grey Coming soon group.",
+      "html": "<div class=\"ds-tiers\"><div class=\"ds-tier ds-starter\"><b class=\"ds-nm\">Starter</b><span class=\"ds-amt\">$11.58</span><span class=\"ds-ph\">Includes</span><span class=\"ds-perk\">No watermark, commercial use</span></div><div class=\"ds-tier ds-pro\"><b class=\"ds-nm\">Pro</b> <span class=\"ds-flag\">Recommended</span><span class=\"ds-amt\">$29.08</span><span class=\"ds-ph\">Everything in Starter, plus</span><span class=\"ds-perk\">3 photos generating at a time</span><span class=\"ds-ph\">Coming soon</span><span class=\"ds-soon\">Batch upload, up to 10 photos</span></div><div class=\"ds-tier ds-max\"><b class=\"ds-nm\">Max</b> <span class=\"ds-flag\">Best value per credit</span><span class=\"ds-amt\">$58.25</span><span class=\"ds-ph\">Everything in Pro, plus</span><span class=\"ds-perk\">6 photos generating at a time</span></div></div>",
+      "css": ".ds-tiers{display:grid;gap:10px;width:340px}.ds-tier{position:relative;display:block;padding:14px 16px 13px;border-radius:22px;color:var(--foreground)}.ds-nm{font:600 18px/1 var(--font-sans)}.ds-flag{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:999px;font:600 14px/1 var(--font-sans);margin-left:8px}.ds-amt{display:block;margin-top:10px;font:400 40px/.9 var(--font-display);letter-spacing:-0.02em}.ds-ph{display:block;margin-top:10px;font:600 14px/1.3 var(--font-sans);color:var(--muted-foreground)}.ds-perk{display:block;margin-top:4px;font:400 14px/1.35 var(--font-sans);color:#D8D0C4}.ds-perk::before{content:\"\\2713  \";color:var(--muted-foreground)}.ds-soon{display:block;margin-top:4px;padding-left:18px;font:400 14px/1.35 var(--font-sans);color:var(--muted-foreground)}.ds-starter{background:#191715;box-shadow:inset 0 0 0 1px var(--border)}.ds-pro{background:radial-gradient(120% 90% at 100% 0%,rgba(70,120,255,.32),transparent 60%),linear-gradient(180deg,#111A33,#0B1020);box-shadow:inset 0 0 0 1.5px #7EA0FF,inset 0 1px 0 rgba(190,210,255,.3)}.ds-pro .ds-nm{color:#A9C2FF}.ds-pro .ds-flag{background:#5B86FF;color:#071027}.ds-pro .ds-perk::before{color:#A9C2FF}.ds-max{background:radial-gradient(120% 90% at 100% 0%,rgba(230,180,80,.22),transparent 60%),linear-gradient(160deg,#1C160C,#0C0A07 60%);box-shadow:inset 0 0 0 1.5px #C8962E}.ds-max .ds-nm,.ds-max .ds-amt{color:#F2CF7A}.ds-max .ds-flag{background:var(--chrome);color:#111}.ds-max .ds-perk::before{color:#F2CF7A}"
+    },
+    {
+      "name": "Bottom Sheet",
+      "kind": "custom",
+      "refersTo": "sheet",
+      "description": "shadcn Drawer (vaul) on phone, Dialog from md up. Grab bar, 44px close, Sheet shadow.",
+      "html": "<section class=\"ds-sheet\"><div class=\"ds-grab\"></div><h2 class=\"ds-sheet-h\">Pure White</h2><p class=\"ds-sheet-p\">Products &amp; Resale · Marketplace</p></section>",
+      "css": ".ds-sheet{width:360px;padding:0 16px 20px;background:var(--popover);border-radius:30px 30px 0 0;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 -30px 60px -20px rgba(0,0,0,.7);color:var(--foreground)}.ds-grab{height:28px;display:grid;place-items:center}.ds-grab::before{content:\"\";width:38px;height:5px;border-radius:3px;background:rgba(242,236,227,.24)}.ds-sheet-h{margin:2px 0 4px;font:400 32px/1.05 var(--font-display)}.ds-sheet-p{margin:0;font:400 14px/1.35 var(--font-sans);color:var(--muted-foreground)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Darkroom",
+    "overview": "Shotviva is a darkroom for a phone photo. The room is warm black, never blue and never pure black; type is the colour of bone paper; and the one light in the room is the safelight, a hot red-orange that marks what to press, what the AI made, and what is developing right now. The user's photo is the print in the tray: the interface is dark and quiet so the image is the brightest, most colourful thing on screen. A single static film-grain layer sits over everything, the way a darkroom print carries grain; it never moves.\n\nThe language of the room runs through the product. Uploading is framed in a viewfinder with four corner brackets and a 4:5 readout; generating is \"Developing\", shown as a greyed negative turning positive under a safelight scan line; finished photos land in Photos. Display type is Instrument Serif, a narrow editorial serif with an italic used for one emphasised phrase per headline; everything you read or tap is Geist; and Geist Mono is kept for real measurements only (credits, px, ratios, percentages, per-credit prices). Edges are drawn as 1px inset hairlines in bone at 9%, not as borders or drop shadows.\n\nThe system behaves like a native iOS app on mobile web: a large serif title on tab roots, a bottom tab bar there, flow pages with a back link and one fixed bottom action, bottom sheets for every overlay, and press feedback (scale) on every tappable surface. The paywall is the one place colour widens: three tiers are told apart by material, matte graphite, sapphire glass, black and gold.",
+    "keyCharacteristics": [
+      "Warm black ground, bone type, one safelight accent; the photo carries all other colour.",
+      "One static film-grain overlay at 7% opacity, never animated.",
+      "Instrument Serif for display (sentence case, one italic phrase), Geist for UI, Geist Mono only for measurements.",
+      "Edges are inset 1px hairlines; depth comes from tone steps and two drop levels.",
+      "Every template card is a split at rest: phone photo left, AI result right.",
+      "One filled full-width primary per screen, in the thumb zone.",
+      "Paywall tiers are materials: graphite, sapphire glass, black and gold."
+    ],
+    "rules": [
+      {
+        "name": "The One Safelight Rule",
+        "body": "Safelight is the only chromatic UI colour outside the paywall tiers. It marks the primary action, the AI side, the current place and live progress; it is never a background wash behind body text and never decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The 13px→14px Contrast Rule",
+        "body": "Captions are at least 14px, and Ash or Bone Dim text holds at least 4.5:1 on every surface it sits on, including every point of each paywall tier. Check the lightest point of a gradient or overlay, not its base. Never dim muted text further with opacity.",
+        "section": "colors"
+      },
+      {
+        "name": "The 16px Input Rule",
+        "body": "Every input and textarea renders its text at 16px or larger, so iOS never zooms the page. Placeholders sit in the same 16px.",
+        "section": "typography"
+      },
+      {
+        "name": "The Measurement Mono Rule",
+        "body": "Geist Mono appears only on real measurements: a cost, a size, a ratio, a count, a percentage. Words never go in mono.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Italic Rule",
+        "body": "A serif headline may italicise one phrase. Display type is never bold and never all caps.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Primary Rule",
+        "body": "Each screen has exactly one filled, full-width primary, 56px tall, in the bottom thumb zone (or the generator card on the homepage). The homepage's floating dock repeats the generator's own primary and shows only while the generator is off-screen, so the two are never visible together. Every other action is ghost, quiet or a link.",
+        "section": "layout"
+      },
+      {
+        "name": "The Inset Hairline Rule",
+        "body": "Edges are inset 1px bone strokes, never CSS borders on cards and never coloured outlines at rest.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Static Grain Rule",
+        "body": "One film-grain layer over the whole page, fixed, non-interactive, never animated.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Always-Visible Split Rule",
+        "body": "A template card shows the phone photo and the AI result at the same time, at rest, labelled \"Phone\" and \"AI\". No toggle, no hover, nothing to tap first. The homepage generator and the preview sheet use the same two words.",
+        "section": "components"
+      },
+      {
+        "name": "The Quiet Loop Rule",
+        "body": "A template video is muted, loops, plays inline and shows no controls. It plays only while it is in view and pauses when it leaves. The poster frame (the split image) shows first and the video loads after. With reduced motion, only the poster is shown and it never plays.",
+        "section": "components"
+      },
+      {
+        "name": "The Tier Materials Rule",
+        "body": "Starter is matte graphite: flat, hairline, no light. Pro is sapphire glass: a deep blue gradient with a corner light, a cool rim and a top highlight, its name in Sapphire Ink, the only flag in solid Sapphire. Max is black and gold: a black gradient with a gold corner light, a gold-foil rim that turns slowly and a slow sheen, its name and price in solid Max Gold, gold check, gold-foil flag, gold-foil checkout. Under reduced motion the rim and sheen hold still.",
+        "section": "components"
+      },
+      {
+        "name": "The Live Perks Rule",
+        "body": "Each tier lists only perks that are live today, under \"Includes\" or \"Everything in X, plus\", with a check. Perks that are not live sit below in their own group headed \"Coming soon\", in Ash caption text without checks, never mixed into the live list. Tier copy never promises queue priority or faster generation.",
+        "section": "components"
+      },
+      {
+        "name": "The Credits Unit Rule",
+        "body": "Prices, charges and balances are always in credits: \"Generate · 2 credits\", \"from 2 credits\", \"$0.23/credit\", \"6 free\". The phrase \"3 free Standard images\" appears only on the marketing page, the sign-up prompt and the FAQ; inside the app the gift is \"6 free credits\".",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "**Do** keep one filled, full-width, 56px primary per screen in the thumb zone (The One Primary Rule).",
+      "**Do** set every input and textarea at 16px or larger (The 16px Input Rule).",
+      "**Do** keep every caption at 14px or larger and measure Ash and Bone Dim at 4.5:1 or better on the lightest point of every surface, including each paywall tier (The 13px→14px Contrast Rule).",
+      "**Do** show every template card as a split at rest with \"Phone\" and \"AI\" tags (The Always-Visible Split Rule).",
+      "**Do** play template videos muted, looped, inline, without controls, only while in view, poster first, poster only under reduced motion (The Quiet Loop Rule).",
+      "**Do** write prices, charges and balances in credits; keep \"3 free Standard images\" to the marketing page, sign-up prompt and FAQ (The Credits Unit Rule).",
+      "**Do** tell tiers apart by material: graphite, sapphire glass, black and gold with solid gold type and a gold rim (The Tier Materials Rule).",
+      "**Do** list only live perks with checks and put the rest in a separate grey \"Coming soon\" group (The Live Perks Rule).",
+      "**Do** draw edges as inset 1px bone hairlines and keep drop shadows to the Raised and Sheet levels.",
+      "**Do** keep stand-in images clean: no \"Illustrative example\" badge on any image; disclose in alt text and one section caption line instead (Owner 2026-11-07).",
+      "**Do** reserve Geist Mono for measurements.",
+      "**Do** map each component to shadcn/ui (new-york) or a 规范 §2 self-built component, using the `:root` variables, not literal colours."
+    ],
+    "donts": [
+      "**Don't** use Safelight as a wash behind body text or as decoration; it marks action, the AI side, the current place and live progress.",
+      "**Don't** put a second filled button on a screen that already has its primary.",
+      "**Don't** dim Ash text with opacity, and don't run a sheen or gradient light behind text where it drops below 4.5:1.",
+      "**Don't** add a before/after toggle, a hover reveal or a media-type badge to still template cards.",
+      "**Don't** autoplay video that is off-screen, or play it at all under reduced motion.",
+      "**Don't** mix \"Coming soon\" perks into the live list, and don't claim queue priority or faster generation on any tier.",
+      "**Don't** animate the film grain.",
+      "**Don't** write \"prompt\", \"seed\" or \"guidance\" in product UI.",
+      "**Don't** set display type bold or in capitals."
+    ]
+  }
+}

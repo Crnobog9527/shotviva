@@ -1,0 +1,127 @@
+{
+  "google/gemini-2.5-flash-image": {
+    "aspect_ratio": {
+      "type": "enum",
+      "values": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9"
+      ]
+    },
+    "n": {
+      "type": "range",
+      "min": 1,
+      "max": 1
+    },
+    "input_references": {
+      "type": "range",
+      "min": 0,
+      "max": 3
+    }
+  },
+  "black-forest-labs/flux-3-image-klein": {
+    "resolution": {
+      "type": "enum",
+      "values": [
+        "768",
+        "1K",
+        "1.5K",
+        "2K",
+        "4K"
+      ]
+    },
+    "aspect_ratio": {
+      "type": "enum",
+      "values": [
+        "21:9",
+        "2:1",
+        "16:9",
+        "3:2",
+        "7:5",
+        "4:3",
+        "5:4",
+        "1:1",
+        "4:5",
+        "3:4",
+        "5:7",
+        "2:3",
+        "9:16",
+        "1:2",
+        "9:21",
+        "auto"
+      ]
+    },
+    "output_format": {
+      "type": "enum",
+      "values": [
+        "jpeg",
+        "png"
+      ]
+    },
+    "n": {
+      "type": "range",
+      "min": 1,
+      "max": 1
+    },
+    "input_references": {
+      "type": "range",
+      "min": 0,
+      "max": 10
+    },
+    "seed": {
+      "type": "boolean"
+    }
+  },
+  "bytedance-seed/seedream-5-0-flash": {
+    "resolution": {
+      "type": "enum",
+      "values": [
+        "1K",
+        "2K"
+      ]
+    },
+    "aspect_ratio": {
+      "type": "enum",
+      "values": [
+        "1:1",
+        "1:2",
+        "2:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "9:19.5",
+        "19.5:9",
+        "9:20",
+        "20:9",
+        "9:21",
+        "21:9",
+        "auto"
+      ]
+    },
+    "n": {
+      "type": "range",
+      "min": 1,
+      "max": 1
+    },
+    "input_references": {
+      "type": "range",
+      "min": 0,
+      "max": 14
+    },
+    "seed": {
+      "type": "boolean"
+    }
+  }
+}

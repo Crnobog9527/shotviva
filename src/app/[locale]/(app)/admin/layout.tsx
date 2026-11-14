@@ -1,0 +1,77 @@
+import { Suspense } from 'react'
+
+import { isAffiliateEnabled } from '@/core/affiliate/feature'
+import { AdminShell, adminNavItems, UserDialogHost } from '@/core/admin'
+import { createAdminSupabase, requireAdmin } from '@/core/auth'
+import { pendingReviewCount } from '@/core/admin/gallery-review'
+import { serverEnv } from '@/core/env'
+import { siteHasGallery } from '@/core/gallery'
+import { newInquiryCount } from '@/core/inquiries'
+import { logger } from '@/core/logger'
+import { openTicketCount } from '@/core/support'
+import { isWishlistEnabled } from '@/core/wishlist'
+import { site } from '@/site/site.config'
+
+import { compensateJobAction, viewWorkAction } from './jobs/actions'
+import { adjustCreditsAction, banUserAction, unbanUserAction, userDetailAction } from './users/actions'
+
+// One admin gate for every /admin/* route (T23). The proxy already answers non-admins with a
+// 404 before rendering. A layout does not stop its pages from rendering and is not re-run on
+// client navigation (Next "Layouts and auth checks"), so pages and server actions still call
+// requireAdmin() too; it is cached per request, so that costs no extra round trip.
+export const instant = false
+
+// The open-ticket count beside 「工单」: one exact count on the open partial index. A failed read
+// only hides the number.
+async function ticketCount(): Promise<number> {
+  try {
+    return await openTicketCount(createAdminSupabase())
+  } catch (error) {
+    logger.warn('admin.tickets.count.failed', { error })
+    return 0
+  }
+}
+
+// The new-inquiry count beside 「企业咨询」 (T86), the same way.
+async function inquiryCount(): Promise<number> {
+  try {
+    return await newInquiryCount(createAdminSupabase())
+  } catch (error) {
+    logger.warn('admin.inquiries.count.failed', { error })
+    return 0
+  }
+}
+
+// Public works waiting for a person beside 「创作库审核」 (T108), the same way.
+async function galleryCount(): Promise<number> {
+  if (!siteHasGallery(site)) return 0
+  try {
+    return await pendingReviewCount(createAdminSupabase())
+  } catch (error) {
+    logger.warn('admin.gallery.count.failed', { error })
+    return 0
+  }
+}
+
+// The user detail dialog (T77) opens over whichever admin page has ?user=<id>.
+const userDialogActions = {
+  load: userDetailAction,
+  user: { adjust: adjustCreditsAction, ban: banUserAction, unban: unbanUserAction },
+  jobs: { view: viewWorkAction, compensate: compensateJobAction },
+}
+
+export default async function AdminLayout({ children }: LayoutProps<'/[locale]/admin'>) {
+  const admin = await requireAdmin()
+  const [tickets, inquiries, gallery, wishlist, affiliate] = await Promise.all([
+    ticketCount(), inquiryCount(), galleryCount(), isWishlistEnabled(site), isAffiliateEnabled(),
+  ])
+  const flags = { wishlist, affiliate, gallery: siteHasGallery(site) }
+  return (
+    <AdminShell items={adminNavItems(flags, { tickets, inquiries, gallery })} email={admin.email}>
+      {children}
+      <Suspense fallback={null}>
+        <UserDialogHost actions={userDialogActions} stripeLive={serverEnv().VERCEL_ENV === 'production'} />
+      </Suspense>
+    </AdminShell>
+  )
+}

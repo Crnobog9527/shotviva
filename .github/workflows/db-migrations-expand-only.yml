@@ -1,0 +1,67 @@
+# New migrations must be expand-only (AGENTS §5). Production migrates automatically on merge to
+# main ("DB push (production)", no approval step) and the Vercel deployment is promoted only after
+# that, so for a while the code live on production runs against the migrated database. This fails
+# a PR whose ADDED migrations contain SQL that can break that code or destroy data
+# (scripts/check-migrations-destructive.ts has the full list and what it lets through):
+#
+#   - drop table / view / type / schema / sequence, and any drop function or procedure
+#   - alter table … drop column / drop constraint / alter column … drop default
+#   - renames and `set schema`; alter column … type
+#   - tightening: set not null, a check / unique / primary or foreign key constraint or a unique
+#     index on an existing table (unless it only involves columns the same file adds), a not null
+#     column without a default
+#   - truncate, delete from, and update … set not targeted by literal keys, outside function
+#     bodies (`create or replace function` bodies are runtime code and are not scanned; `do`
+#     blocks run during the migration and are)
+#
+# Comments and string literals are ignored. Migrations already on main are never scanned, only
+# files the PR adds. Re-adding a constraint under the same name (widening a check, as 0460 and
+# 0560 do) passes with a warning for the reviewer.
+#
+# A contract PR, whose old structure the control session has confirmed production no longer uses,
+# passes with `[contract]` in the PR title (findings become warnings); `edited` reruns the check
+# when the title changes.
+name: DB migrations expand-only
+
+# Also exercise the trusted checkout and PR fetch when this check itself changes.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/workflows/db-migrations-expand-only.yml'
+      - 'scripts/check-migrations-destructive.ts'
+
+concurrency:
+  group: db-expand-only-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  expand-only:
+    name: new migrations keep the deployed code working
+    # `edited` matters only for the title ([contract]); a description edit skips the job.
+    if: github.event.action != 'edited' || github.event.changes.title != null
+    runs-on: ubuntu-latest
+    env:
+      PR_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      # Only main supplies executable files (including .nvmrc). Read the PR as Git objects.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: refs/heads/main
+          fetch-depth: 0
+      - name: Fetch the exact PR commit, including for forks
+        run: git fetch --no-tags origin "$PR_HEAD"
+      # Node runs the TypeScript scanner directly (type stripping); it imports only built-ins, so
+      # no install.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - name: Scan added migrations for destructive SQL
+        env:
+          # Through env, never interpolated into the script: titles are untrusted input.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-migrations-destructive.ts HEAD "$PR_HEAD"

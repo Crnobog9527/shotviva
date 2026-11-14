@@ -1,0 +1,98 @@
+import { NextRequest } from 'next/server'
+import type { Client } from 'pg'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+import type { SessionUser } from '@/core/auth'
+import { handleConnectAuthorize, handleLink } from '@/core/partner'
+
+import { connectAdmin } from './helpers'
+import { createUser, linkRow, partnerConfig, partnerRequest, routeDeps } from './partner-fixtures'
+import { serviceSupabase } from './supabase-env'
+
+// The "Allow" POST on /connect/graylum: same origin, signed in, allowlisted callback → 302
+// with a code that /api/partner/link accepts once.
+
+let db: Client
+
+beforeAll(async () => {
+  db = await connectAdmin()
+})
+
+afterAll(async () => {
+  await db.end()
+})
+
+// appOrigin with no Vercel env (tests) is the local dev origin.
+const APP = 'http://localhost:3000'
+const CALLBACK = 'https://auth-staging.graylum.com/api/connectors/shotviva/callback'
+
+function post(fields: Record<string, string>, origin = APP) {
+  const form = new FormData()
+  for (const [key, value] of Object.entries(fields)) form.set(key, value)
+  return new NextRequest(`${APP}/connect/graylum/authorize`, { method: 'POST', headers: { origin }, body: form })
+}
+
+const sessionOf = (id: string, verified = true): SessionUser => ({ id, email: null, phone: null, role: 'user', verified, banned: false, locale: null, onboarding: { wishlistSeen: false, wishlistHintSeen: false } })
+const deps = (user: SessionUser | null) => ({ db: serviceSupabase, user: async () => user, config: partnerConfig })
+
+describe('connect authorize', () => {
+  it('302s to the allowlisted callback with code + state, and the code links once', async () => {
+    const userId = await createUser(db, { credits: 3 })
+    const response = await handleConnectAuthorize(post({ state: 'graylum-state-1', return_to: CALLBACK }), deps(sessionOf(userId)))
+    expect(response.status).toBe(302)
+    const location = new URL(response.headers.get('location') ?? '')
+    expect(`${location.origin}${location.pathname}`).toBe(CALLBACK)
+    expect(location.searchParams.get('state')).toBe('graylum-state-1')
+
+    const code = location.searchParams.get('code') ?? ''
+    const link = () => handleLink(partnerRequest('/api/partner/link', { method: 'POST', body: { code } }), routeDeps())
+    expect((await link()).status).toBe(200)
+    expect((await link()).status).toBe(422)
+  })
+
+  it('refuses a non-allowlisted return_to without issuing a code', async () => {
+    const userId = await createUser(db)
+    const response = await handleConnectAuthorize(
+      post({ state: 'graylum-state-2', return_to: 'https://evil.example/api/connectors/shotviva/callback' }),
+      deps(sessionOf(userId)),
+    )
+    // Back to the connect page's "not valid" state (B comp connect.html ?v=error), nothing echoed.
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe(`${APP}/connect/graylum?error=invalid`)
+    expect(await linkRow(db, userId)).toBeNull()
+  })
+
+  it('keeps the language of the page that posted when sending back an invalid link', async () => {
+    const userId = await createUser(db)
+    const response = await handleConnectAuthorize(post({ state: 'short' }), { ...deps(sessionOf(userId)), locale: 'zh' })
+    expect(response.headers.get('location')).toBe(`${APP}/zh/connect/graylum?error=invalid`)
+  })
+
+  it('sends a failure to mint the code back to the page as "something went wrong"', async () => {
+    const userId = await createUser(db)
+    const broken = () => ({ from: () => { throw new Error('database down') } }) as unknown as ReturnType<typeof serviceSupabase>
+    const response = await handleConnectAuthorize(post({ state: 'graylum-state-5' }), { ...deps(sessionOf(userId)), db: broken })
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe(`${APP}/connect/graylum?error=failed`)
+    expect(await linkRow(db, userId)).toBeNull()
+  })
+
+  it('refuses another origin', async () => {
+    const userId = await createUser(db)
+    const response = await handleConnectAuthorize(post({ state: 'graylum-state-3' }, 'https://evil.example'), deps(sessionOf(userId)))
+    expect(response.status).toBe(403)
+    expect(await linkRow(db, userId)).toBeNull()
+  })
+
+  it('sends a signed-out or unverified user to sign in, back to the same connect page', async () => {
+    for (const user of [null, sessionOf(await createUser(db), false)]) {
+      const response = await handleConnectAuthorize(post({ state: 'graylum-state-4', return_to: CALLBACK }), deps(user))
+      expect(response.status).toBe(303)
+      const location = new URL(response.headers.get('location') ?? '')
+      expect(location.pathname).toBe('/login')
+      expect(location.searchParams.get('next')).toBe(
+        `/connect/graylum?state=graylum-state-4&return_to=${encodeURIComponent(CALLBACK)}`,
+      )
+    }
+  })
+})

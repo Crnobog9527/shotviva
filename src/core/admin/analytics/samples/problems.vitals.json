@@ -1,0 +1,80 @@
+{
+ "cache_key": "cache_problems_vitals",
+ "is_cached": false,
+ "last_refresh": "2026-11-08T08:00:00.000000Z",
+ "next_allowed_client_refresh": "2026-11-08T08:01:00.000000Z",
+ "timezone": "UTC",
+ "columns": [
+  "path",
+  "samples",
+  "lcp",
+  "inp",
+  "cls",
+  "fcp"
+ ],
+ "types": [
+  [
+   "path",
+   "String"
+  ],
+  [
+   "samples",
+   "UInt64"
+  ],
+  [
+   "lcp",
+   "Float64"
+  ],
+  [
+   "inp",
+   "Nullable(Float64)"
+  ],
+  [
+   "cls",
+   "Float64"
+  ],
+  [
+   "fcp",
+   "Float64"
+  ]
+ ],
+ "results": [
+  [
+   "/",
+   420,
+   2100.0,
+   120.0,
+   0.02,
+   1200.0
+  ],
+  [
+   "/pricing",
+   80,
+   4600.0,
+   310.0,
+   0.3,
+   2900.0
+  ],
+  [
+   "/zh",
+   150,
+   3100.0,
+   null,
+   0.08,
+   1700.0
+  ]
+ ],
+ "hasMore": false,
+ "limit": 100,
+ "offset": 0,
+ "modifiers": {
+  "personsOnEventsMode": "person_id_override_properties_joined"
+ },
+ "query_status": null,
+ "timings": [
+  {
+   "k": "./query",
+   "t": 0.21
+  }
+ ]
+}

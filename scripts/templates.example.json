@@ -1,0 +1,69 @@
+{
+  "$comment": "Format example for pnpm templates:apply. Copy to .local/templates/<batch>.json (gitignored) and replace everything; every value here is fake. Paths are relative to the batch file. Omitted fields keep what the database has.",
+  "categories": [
+    { "key": "example-western", "nameEn": "Example Western", "nameZh": "示例西餐", "parent": "food-drink" },
+    { "key": "example-western-dark", "nameEn": "Example Dark", "nameZh": "示例暗调", "parent": "example-western" }
+  ],
+  "referenceCategories": [
+    { "nameEn": "Example refs", "nameZh": "示例素材", "parent": null }
+  ],
+  "series": [
+    {
+      "slug": "example-set",
+      "nameEn": "Example set",
+      "nameZh": "示例系列",
+      "category": "example-western",
+      "isActive": false,
+      "showMembers": false,
+      "cover": { "template": "example-burger-hero" },
+      "members": ["example-burger-hero", "example-burger-side"]
+    }
+  ],
+  "templates": [
+    {
+      "id": "example-burger-hero",
+      "name": "Example burger hero",
+      "description": "Fake one-line description.",
+      "category": "example-western-dark",
+      "fields": {
+        "images": { "min": 1, "max": 1 },
+        "copy": [],
+        "aspectRatios": ["1:1", "4:5"]
+      },
+      "quality": "medium",
+      "creditsCost": { "1k": 1, "2k": 2, "4k": 3 },
+      "visibleIn": ["web"],
+      "translations": { "zh": { "name": "示例汉堡", "description": "假的说明。" } },
+      "prompt": { "body": "FAKE PROMPT. Never commit real prompts.", "modelParams": {} },
+      "model": "default",
+      "styleRefs": ["refs/example-burger-hero/1.webp"],
+      "profiles": {
+        "seedream": {
+          "model": "Seedream 5.5", "prompt": { "body": "FAKE SEEDREAM PROMPT. Never commit real prompts.", "modelParams": {} },
+          "creditsCost": { "1k": 1, "2k": 2, "4k": 2 }, "unpricedResolutions": ["4k"], "styleRefs": "live"
+        }
+      },
+      "activeProfile": "openai",
+      "cover": { "before": "covers/example-burger-hero/before.webp", "after": "covers/example-burger-hero/after.webp" },
+      "openSale": false,
+      "publish": false,
+      "trial": {
+        "inputs": [
+          { "photo": "before-photos/example-burger.jpg", "aspectRatio": "4:5" },
+          { "photo": "before-photos/example-burger-2.jpg", "fields": {}, "note": "Fake note." }
+        ],
+        "references": ["reference-images/example/benchmark-1.jpg"],
+        "n": 2,
+        "resolution": "1k"
+      },
+      "review": { "status": "pass", "version": 1, "pick": "00000000-0000-4000-8000-000000000001", "notes": "Fake verdict." }
+    },
+    {
+      "id": "example-burger-side",
+      "category": "example-western",
+      "cover": { "testRun": "00000000-0000-4000-8000-000000000000" },
+      "openSale": true,
+      "publish": true
+    }
+  ]
+}

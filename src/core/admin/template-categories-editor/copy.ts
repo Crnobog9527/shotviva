@@ -1,0 +1,67 @@
+import { CATEGORY_LIMITS } from '@/core/templates/categories'
+
+// 分类管理 on /admin/templates (ARCHITECTURE §5 「模板分类由后台管理」, T75). Admin is
+// Chinese-only (DESIGN §7).
+export const CATEGORIES_COPY = {
+  title: '分类管理',
+  body: '拖动或在序号框里输入数字（按回车）可调整同级顺序，「移动」可移到其他分类下，最多可建三级。点分类前的箭头展开或收起子分类。创作页的分类条和首页的模板分组都按这里的顺序和名称显示。没有已上架模板的分类不会出现在页面上。改名只改显示，标识不变。',
+  add: '新增分类',
+  addChild: '新增子分类',
+  hidden: '隐藏',
+  hasChildren: '请先移走子分类',
+  seriesCount: (n: number) => `${n} 个系列`,
+  childCount: (n: number) => `${n} 个子分类`,
+  empty: '还没有分类。',
+  moveUp: (name: string) => `上移 ${name}`,
+  moveDown: (name: string) => `下移 ${name}`,
+  edit: '编辑',
+  remove: '删除',
+  noIntro: '没有首页说明',
+  count: (n: number) => (n === 0 ? '没有模板' : `${n} 个模板`),
+  style: { pair: '并排对比', compare: '拖动对比' },
+  saved: (name: string) => `已保存「${name}」`,
+  reordered: '分类顺序已保存',
+  deleted: (name: string, moved: number, to: string | null) =>
+    moved > 0 && to ? `已删除「${name}」，${moved} 个模板移到了「${to}」` : `已删除「${name}」`,
+  form: {
+    newTitle: '新增分类',
+    childTitle: (parent: string) => `在「${parent}」下新增分类`,
+    slug: '网址标识（同级唯一）',
+    visible: '在前台显示此分类及其可见子分类',
+    seoTitleEn: '英文 SEO 标题', seoTitleZh: '中文 SEO 标题',
+    seoDescriptionEn: '英文 SEO 描述', seoDescriptionZh: '中文 SEO 描述',
+    seo: 'SEO 设置（选填）',
+    editTitle: (name: string) => `编辑「${name}」`,
+    nameZh: `中文名称（最多 ${CATEGORY_LIMITS.nameZh} 个字）`,
+    nameEn: `英文名称（最多 ${CATEGORY_LIMITS.nameEn} 个字符）`,
+    key: '标识（英文小写、数字和短横线，保存后不能改）',
+    keyHint: '数据统计使用此标识。默认按英文名称生成。',
+    keyFixed: '标识创建后不能改',
+    introZh: '中文首页说明（选填）',
+    introEn: '英文首页说明（选填）',
+    introHint: '显示在首页这个分类的标题下面。留空就不显示说明。',
+    style: '模板卡片样式',
+    // Where it shows (Owner 2026-11-13 asked): single template cards only. A series card shows
+    // its series cover (or its first member's pair) whatever this says.
+    styleHint: {
+      pair: '手机原图和 AI 结果并排放（大多数分类）。',
+      compare: '一张图左右拖动对比（现在只有「画风」用）。',
+    },
+    styleWhere: '只影响单个模板的卡片：创作页的模板卡片，以及首页、落地页模板区里只放一个模板的分类。系列卡片不受影响，它显示系列封面（没有封面时显示第一个模板的并排图），所以分类里放的是系列时，改这里看不出变化。',
+    cancel: '取消',
+    save: '保存',
+    saving: '保存中…',
+    invalid: '请检查中英文名称、固定标识和网址标识。标识只能使用小写字母、数字和短横线。',
+  },
+  removeDialog: {
+    title: (name: string) => `删除「${name}」？`,
+    unused: '没有模板用这个分类，删除后创作页和首页不再有它。',
+    used: (n: number, series: number) => `这个分类下有 ${n} 个模板、${series} 个系列（含未上架）。删除时会一起移到所选分类。`,
+    moveTo: '移入分类',
+    pick: '请选择分类',
+    last: '这是最后一个分类，至少要保留一个，不能删除。',
+    cancel: '取消',
+    confirm: '确认删除',
+    confirmMove: '移动并删除',
+  },
+} as const

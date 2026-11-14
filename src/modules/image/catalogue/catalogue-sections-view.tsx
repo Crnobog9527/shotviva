@@ -1,0 +1,104 @@
+'use client'
+
+import { ChevronRight } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+
+import { cn } from '@/core/ui/cn'
+import { Reveal } from '@/core/ui/reveal-item'
+
+import type { CatalogueSection } from './catalogue-sections'
+import type { GridEntry } from './catalogue-view'
+import { SeriesCard } from './series-card'
+import { COVER_SIZES } from './cover-sizes'
+import { TemplateCard, type CardSizes } from './template-card'
+
+type Props = {
+  sections: readonly CatalogueSection[]
+  onOpen(id: string): void
+  onOpenSeries(slug: string): void
+  onSeeAll(section: CatalogueSection): void
+}
+
+// Create's All (Owner 2026-11-12): a section per root category in 分类管理's order, its heading,
+// 首页说明 and 「查看全部 N」 (the same as tapping that category's chip). On phones each section is
+// a horizontal rail (CSS scroll-snap, no script) whose next card peeks in and which ends on a
+// 「查看全部」 card; from md up it is the grid, at most six cards (SECTION_LIMIT). Cards keep the
+// catalogue's own order. A section of drag compares (画风) is a two-column grid of four on phones
+// instead: the compare takes horizontal drags, so it cannot sit in a rail that scrolls sideways.
+export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: Props) {
+  const t = useTranslations('app.create')
+  return (
+    <div className="mt-2 grid gap-8 md:mt-3 md:gap-10">
+      {sections.map((section, sectionIndex) => {
+        const headingId = `create-section-${section.slug}`
+        // Read as 「查看全部 12「美食」」 / "See all 12 in Food": the visible words first, then the
+        // category, so the accessible name starts with what is on screen (WCAG 2.5.3).
+        const which = <span className="sr-only"> {t('seeAllWhich', { name: section.name })}</span>
+        return (
+          <section key={section.slug} aria-labelledby={headingId} className="min-w-0">
+            <Reveal className="flex items-baseline gap-2 px-(--gutter)">
+              <h3 id={headingId} className="shrink-0 text-body leading-[1.25] font-semibold tracking-[-0.015em]">{section.name}</h3>
+              {section.intro ? <p className="min-w-0 flex-1 truncate text-caption text-muted-foreground">{section.intro}</p> : <span className="flex-1" />}
+              <button type="button" onClick={() => onSeeAll(section)}
+                className="press -my-2 inline-flex min-h-11 shrink-0 items-center gap-1 rounded-inner ps-2 text-caption font-medium text-foreground">
+                {t('seeAll')}{' '}
+                <span className="font-mono text-muted-foreground">{section.total}</span>
+                {which}
+                <ChevronRight aria-hidden className="size-3.5 text-muted-foreground" />
+              </button>
+            </Reveal>
+            {section.compare ? (
+              <ul className="mt-2 grid grid-cols-2 gap-3 px-(--gutter) md:mt-3 md:grid-cols-3 md:gap-4">
+                {section.entries.map((entry, index) => (
+                  <li key={entryKey(entry)} className={cn(index >= COMPARE_PHONE && 'hidden md:block')}>
+                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} sizes={COMPARE_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ul className={cn(
+                // relative: the rail is the containing block for anything absolutely placed in its cards
+                // (the sr-only category name in the end card), so its scroll clips them; otherwise
+                // they sit at the rail's far end against the page and widen it on phones.
+                'no-scrollbar relative mt-2 flex snap-x snap-mandatory scroll-px-(--gutter) gap-3 overflow-x-auto px-(--gutter) pb-1',
+                'md:mt-3 md:grid md:snap-none md:grid-cols-2 md:gap-4 md:overflow-visible md:pb-0 lg:grid-cols-3',
+              )}>
+                {section.entries.map((entry, index) => (
+                  <li key={entryKey(entry)} className="w-[calc(100%-4rem)] max-w-96 flex-none snap-start md:w-auto md:max-w-none">
+                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} sizes={RAIL_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
+                  </li>
+                ))}
+                {section.total > section.entries.length ? (
+                  <li className="flex w-28 flex-none snap-start md:hidden">
+                    <button type="button" onClick={() => onSeeAll(section)}
+                      className="press hairline flex w-full flex-col items-center justify-center gap-1 rounded-tile bg-wash text-caption font-medium">
+                      <span>{t('seeAll')}</span>
+                      <span className="font-mono text-muted-foreground">{t('seeAllCount', { count: section.total })}{which}</span>
+                    </button>
+                  </li>
+                ) : null}
+              </ul>
+            )}
+          </section>
+        )
+      })}
+    </div>
+  )
+}
+
+const entryKey = (entry: GridEntry) => (entry.type === 'series' ? `series-${entry.series.id}` : entry.template.id)
+
+// Drag compares shown on phones: four (two rows of two); from md every one the section holds.
+const COMPARE_PHONE = 4
+
+// Cover widths for the section cards' srcset: a rail card is about 279 px on a 375 phone (the
+// row less 4rem, half of it a plate) and a grid cell from md; a compare is a quarter-to-half column.
+const RAIL_SIZES = { plate: COVER_SIZES.railPlate, frame: COVER_SIZES.railFrame }
+const COMPARE_SIZES = { art: COVER_SIZES.artSection }
+
+type CardProps = { entry: GridEntry; eager: boolean; sizes: CardSizes; onOpen(id: string): void; onOpenSeries(slug: string): void }
+
+function Card({ entry, eager, sizes, onOpen, onOpenSeries }: CardProps) {
+  if (entry.type === 'series') return <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={eager} />
+  return <TemplateCard template={entry.template} onOpen={onOpen} eager={eager} sizes={sizes} />
+}

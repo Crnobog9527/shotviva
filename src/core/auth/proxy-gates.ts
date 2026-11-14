@@ -1,0 +1,200 @@
+import { NextResponse, type NextRequest } from 'next/server'
+
+import { chosenLocale } from '../i18n/locale-cookie'
+import { localeRedirect } from '../i18n/locale-redirect'
+import { DEFAULT_LOCALE, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, type Locale } from '../i18n/locales'
+import { localizePath, matchesPaths, splitLocale } from '../i18n/paths'
+import { publicEnv } from '../public-env'
+import { cookieToken } from './cookie-token'
+import { GUEST_PAGE, guestRedirect } from './guest-gate'
+import { IDENTITY_HEADER, sealIdentity } from './forwarded-identity'
+import { SIGNED_OUT, verifyIdentity, type Identity } from './identity'
+import { loginPath } from './redirect-target'
+import type { SessionUser } from './session-user'
+import { NOT_FOUND_PAGE, NOT_FOUND_RENDER_HEADER, localizedNotFound, plainNotFound, type FetchPage } from './not-found-page'
+import { forwardRequest, hasSessionCookie, proxySupabase, updateSession, withCookies, type Forward } from './update-session'
+
+// With cacheComponents, notFound()/redirect() inside a page stream as a 200 after the
+// static shell has gone out. These gates answer with a real status before rendering;
+// requireUser()/requireAdmin() in pages and actions stay as the authoritative check.
+const ADMIN = /^\/admin(\/|$)/
+// The app shell (Create, Photos, Wishlist, Account, the checkout return) is signed-in only
+// (DESIGN §8.1).
+// /connect/graylum is gated as a page only: its form POST (…/authorize) handles a lost
+// session itself, since a 307 here would replay the POST against the login page.
+const SIGNED_IN = /^\/(account|checkout|generate|photos|posters|wishlist|reset\/update)(\/|$)|^\/connect\/graylum\/?$/
+// Development-only harnesses (the T4 upload test): a real 404 everywhere else, in any language.
+const DEV_ONLY = /^\/generate\/upload-test\/?$/
+// Validation-only pages (/error-test, which throws to show the error boundary): local builds and
+// the test site, a real 404 on production and under /zh. The page's own check runs after the 200
+// shell has streamed, so it cannot change the status.
+const VALIDATION_ONLY = /^\/error-test\/?$/
+// Route handlers and files outside the locale tree: session refresh only, no locale routing.
+const NOT_A_PAGE = /^\/(api|auth|ingest|monitoring)(\/|$)|^\/(sitemap[\w-]*\.xml|robots\.txt|llms\.txt)$/
+
+export type Gate = 'admin' | 'signed_in' | null
+
+// `translatedPaths`: pages with a /zh version (site.config); `forward` hands a page request to
+// the locale router (next-intl middleware), which rewrites /pricing to the [locale] tree.
+export type ProxyGateOptions = {
+  translatedPaths: readonly string[]
+  forward: Forward
+  devPages?: boolean
+  // Validation-only pages answer (everywhere but production).
+  validationPages?: boolean
+  // Tests pass their own; the proxy uses fetch.
+  fetchPage?: FetchPage
+  // Key material for the identity header handed to the page (forwarded-identity.ts): the
+  // service-role key. Without it the page checks the session itself.
+  identitySecret?: string
+}
+
+// `pathname` is the logical path, without the /zh prefix.
+export function gateFor(pathname: string): Gate {
+  if (ADMIN.test(pathname)) return 'admin'
+  if (SIGNED_IN.test(pathname)) return 'signed_in'
+  return null
+}
+
+export function notFoundResponse(): NextResponse {
+  return plainNotFound()
+}
+
+// One check for the request (identity.ts). `user` is null when signed out and when the check could
+// not run; `identity` tells the two apart.
+export async function currentProxyUser(request: NextRequest) {
+  const { supabase, response, discard } = proxySupabase(request)
+  const identity = await verifyIdentity(supabase)
+  // Could not tell: undo what a failed refresh deleted, never a refresh that went through
+  // (update-session.ts).
+  if (identity.status === 'unavailable') discard()
+  return { identity, user: identity.status === 'signed_in' ? identity.user : null, response }
+}
+
+// Pure decision so every branch is unit-tested without a network. `pathname` is the address
+// as requested (it becomes `next`), `locale` picks which login page to send a visitor to.
+export function decide(
+  gate: Exclude<Gate, null>,
+  user: SessionUser | null,
+  pathname: string,
+  search: string,
+  locale: Locale = DEFAULT_LOCALE,
+) {
+  if (gate === 'admin') return user?.verified && user.role === 'admin' && !user.banned ? 'pass' : 'not_found'
+  if (!user) return { redirect: localizePath(loginPath(`${pathname}${search}`), locale) }
+  if (!user.verified) return { redirect: localizePath('/login?error=unverified', locale) }
+  return 'pass'
+}
+
+// When Auth or the database could not answer: /admin stays a 404 (it never reveals itself), any
+// other gated page goes through without an identity, so the page checks again and shows its
+// retry state instead of the login page.
+export function decideIdentity(gate: Exclude<Gate, null>, identity: Identity, pathname: string, search: string, locale: Locale = DEFAULT_LOCALE) {
+  if (identity.status === 'unavailable') return gate === 'admin' ? 'not_found' : 'pass'
+  return decide(gate, identity.status === 'signed_in' ? identity.user : null, pathname, search, locale)
+}
+
+// Page addresses are lowercase by rule (建站规格 R4) and the gates below match lowercase only,
+// while the locale router matches case-insensitively: /Admin or /ACCOUNT must never slip past
+// them. Percent-escapes (%2F) are left as they are.
+export function lowercasePath(pathname: string): string | null {
+  const lower = pathname.replace(/%[0-9A-Fa-f]{2}|[^%]+/g, (part) => (part.startsWith('%') ? part : part.toLowerCase()))
+  return lower === pathname ? null : lower
+}
+
+// A development or validation harness outside the environments it is for, or under /zh.
+function closedHarness(path: string, locale: string, options: Pick<ProxyGateOptions, 'devPages' | 'validationPages'>): boolean {
+  if (DEV_ONLY.test(path)) return !options.devPages || locale !== DEFAULT_LOCALE
+  if (VALIDATION_ONLY.test(path)) return !options.validationPages || locale !== DEFAULT_LOCALE
+  return false
+}
+
+// Answers that need no session: wrong case, development-only pages, /zh addresses of
+// English-only pages (ARCHITECTURE §17). null means "go on to the gates".
+async function addressAnswer(request: NextRequest, options: ProxyGateOptions): Promise<NextResponse | null> {
+  const { pathname, search } = request.nextUrl
+  const lower = lowercasePath(pathname)
+  if (lower) return NextResponse.redirect(new URL(`${lower}${search}`, request.url), 308)
+  const { locale, path } = splitLocale(pathname)
+  if (path === NOT_FOUND_PAGE) {
+    return request.headers.get(NOT_FOUND_RENDER_HEADER) === '1' ? null : localizedNotFound(request, locale, options.fetchPage)
+  }
+  if (closedHarness(path, locale, options)) return notFoundResponse()
+  if (locale !== DEFAULT_LOCALE && !matchesPaths(path, options.translatedPaths)) {
+    return localizedNotFound(request, locale, options.fetchPage)
+  }
+  return null
+}
+
+// A 307 to the chosen language's twin (ARCHITECTURE §17); null when there is nothing to move.
+function toChosenLocale(request: NextRequest, chosen: Locale | null, translatedPaths: readonly string[]): NextResponse | null {
+  const { pathname, search } = request.nextUrl
+  const target = localeRedirect({ method: request.method, pathname, search, chosen }, translatedPaths)
+  return target ? NextResponse.redirect(new URL(target, request.url), 307) : null
+}
+
+// Signed in on another device, or before the cookie existed: the account's own language
+// (user_metadata.locale) stands in for the cookie on app pages, and is copied into it.
+export function toAccountLocale(request: NextRequest, user: SessionUser | null, translatedPaths: readonly string[]): NextResponse | null {
+  if (!user?.locale) return null
+  const moved = toChosenLocale(request, user.locale, translatedPaths)
+  moved?.cookies.set(LOCALE_COOKIE, user.locale, { path: '/', maxAge: LOCALE_COOKIE_MAX_AGE, sameSite: 'lax' })
+  return moved
+}
+
+export async function proxyGate(request: NextRequest, options: ProxyGateOptions): Promise<NextResponse> {
+  // Only this proxy may say who the visitor is (forwarded-identity.ts).
+  request.headers.delete(IDENTITY_HEADER)
+  const { pathname, search } = request.nextUrl
+  if (NOT_A_PAGE.test(pathname)) return updateSession(request, forwardRequest)
+  const early = await addressAnswer(request, options)
+  if (early) return early
+  const chosen = chosenLocale(request.headers.get('cookie') ?? '')
+  const moved = toChosenLocale(request, chosen, options.translatedPaths)
+  if (moved) return moved
+  const { locale, path } = splitLocale(pathname)
+  const gate = gateFor(path)
+  if (!gate) return ungatedAnswer(request, path, locale, options)
+  const configured = Boolean(publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  const { identity, response } = hasSessionCookie(request) && configured
+    ? await checkedRequest(request, options.identitySecret)
+    : { identity: SIGNED_OUT, response: () => NextResponse.next({ request }) }
+  const verdict = decideIdentity(gate, identity, pathname, search, locale)
+  const user = identity.status === 'signed_in' ? identity.user : null
+  return withCookies(gatedAnswer(request, verdict, chosen ? null : user, options), response())
+}
+
+// A page without a gate: the session refresh, except /login and /signup with a session cookie.
+function ungatedAnswer(request: NextRequest, path: string, locale: Locale, options: ProxyGateOptions) {
+  const configured = Boolean(publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  if (GUEST_PAGE.test(path) && configured && hasSessionCookie(request)) return guestAnswer(request, path, locale, options)
+  return updateSession(request, options.forward)
+}
+
+// /login or /signup with a session cookie (guest-gate.ts): a signed-in, verified visitor goes on
+// to their `next`; anyone else gets the static page, with the refreshed cookies.
+async function guestAnswer(request: NextRequest, path: string, locale: Locale, options: ProxyGateOptions) {
+  const { identity, response } = await currentProxyUser(request)
+  const target = guestRedirect(identity, path, request.nextUrl.searchParams, locale)
+  return withCookies(target ? NextResponse.redirect(new URL(target, request.url)) : options.forward(request), response())
+}
+
+// The proxy's check, and on success the sealed answer on the request it forwards. The token is
+// read from the request's cookies after the check, so it is the refreshed one, read the same way
+// the page reads it (cookie-token.ts).
+async function checkedRequest(request: NextRequest, secret: string | undefined) {
+  const { identity, response } = await currentProxyUser(request)
+  if (identity.status === 'signed_in' && secret) {
+    const found = await cookieToken(request.cookies.getAll(), publicEnv.NEXT_PUBLIC_SUPABASE_URL)
+    if (found) request.headers.set(IDENTITY_HEADER, sealIdentity(identity.user, found.token, secret))
+  }
+  return { identity, response }
+}
+
+// What a gated page answers once the session is known. `user` is passed only when no language
+// was chosen on this device, so the account's language can stand in (ARCHITECTURE §17).
+function gatedAnswer(request: NextRequest, verdict: ReturnType<typeof decide>, user: SessionUser | null, options: ProxyGateOptions) {
+  if (verdict === 'pass') return toAccountLocale(request, user, options.translatedPaths) ?? options.forward(request)
+  if (verdict === 'not_found') return notFoundResponse()
+  return NextResponse.redirect(new URL(verdict.redirect, request.url))
+}

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0A09">
+<meta name="robots" content="noindex">
+<title>Connect Graylum · Shotviva</title>
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/studio.css">
+<link rel="stylesheet" href="css/marketing.css">
+<script src="js/studio.js"></script>
+<script src="js/marketing.js"></script>
+<style>
+  /* /connect/graylum (ARCHITECTURE §14.2): Graylum sends the user here with ?state=…; logged out, they first go through
+     auth.html?next=graylum; logged in, one button: allow Graylum to make photos with this account's credits, then 302 back.
+       ?v=allow (default) | done (redirecting back) | error (state mismatch, expired code or a return address off the allow-list) | already (already connected)
+     The same trimmed shell as auth.html. */
+  h1 { text-wrap: balance; } p { text-wrap: pretty; }
+  .appbar { position: sticky; top: 0; z-index: 50; padding: var(--sat) var(--gutter) 0;
+    background: linear-gradient(color-mix(in srgb, var(--background) 92%, transparent), color-mix(in srgb, var(--background) 72%, transparent)); backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3); }
+  .appbar-row { height: 56px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; min-height: 44px; }
+  .brand .word { font: 400 24px/1 var(--font-display); letter-spacing: -0.02em; }
+  .brand .word i { color: var(--primary); font-style: normal; }
+  .brand .tag { font: 400 14px/1.15 var(--font-sans); color: var(--muted-foreground); padding-left: 8px; border-left: 1px solid var(--border); white-space: nowrap; }
+  .who { font: 400 14px/1 var(--font-sans); color: var(--muted-foreground); }
+
+  .cx { position: relative; padding: 24px var(--gutter) 0; }
+  .cx::before { content: ""; position: absolute; z-index: 0; left: 50%; top: 40%; width: min(900px, 140vw); height: 520px; transform: translate(-50%, -50%); pointer-events: none;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 18%, transparent), transparent 70%); }
+  .plate { position: relative; z-index: 1; }
+  .view { display: none; } .view.on { display: block; }
+  /* the two marks, joined */
+  .marks { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .mark { width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; background: var(--bone-6); box-shadow: inset 0 0 0 1px var(--border); font: 400 28px/1 var(--font-display); letter-spacing: -0.02em; }
+  .mark.sv i { color: var(--primary); font-style: normal; }
+  .mark.gl { display: block; object-fit: cover; background: #0B0A09; }                       /* the real Graylum icon (Owner-supplied) */
+  /* .mark.sv is a PLACEHOLDER: Shotviva's app icon isn't designed yet; swap it for the icon when it exists */
+  .marks .lnk { display: flex; gap: 4px; align-items: center; color: var(--muted-foreground); }
+  .marks .lnk i { display: block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .5; }
+  .marks .lnk i:nth-child(2) { opacity: .8; } .marks .lnk i:nth-child(3) { opacity: 1; color: var(--primary); }
+  .marks.ok .lnk i { color: var(--success); opacity: 1; }
+  .title { font: 400 32px/1.05 var(--font-display); letter-spacing: -0.02em; }
+  .sub { margin-top: 8px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
+  .sub b { color: var(--foreground); font-weight: 500; }
+  /* what Graylum gets: a short hairlined list, each with a drawn glyph */
+  .gets { list-style: none; margin: 20px 0 0; padding: 0; border-top: 1px solid var(--hairline); }
+  .gets li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--hairline); font-size: 15px; line-height: 1.45; }
+  .gets li .i { width: 20px; height: 20px; margin-top: 2px; color: var(--bone-dim); flex: none; }
+  .gets li b { display: block; font-weight: 500; }
+  .gets li span { color: var(--muted-foreground); font-size: 14px; }
+  .acts { display: grid; gap: 8px; margin-top: 24px; }
+  .acts .btn-quiet { min-height: 48px; }
+  .fine { margin-top: 16px; font-size: 14px; line-height: 1.5; color: var(--muted-foreground); }
+  .fine a { color: var(--bone-dim); text-decoration: none; }
+  .glyph { width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; margin-bottom: 20px; background: var(--bone-6); box-shadow: inset 0 0 0 1px var(--border); color: var(--foreground); }
+  .glyph .i { width: 26px; height: 26px; stroke-width: 1.6; }
+  .glyph.ok { background: color-mix(in srgb, var(--success) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 40%, transparent); color: var(--success); }
+  .glyph.spin .i { color: var(--primary); }
+  @media (prefers-reduced-motion: no-preference) { .glyph.spin .i { animation: turn 1.6s linear infinite; transform-origin: 12px 12px; } }
+  @keyframes turn { to { transform: rotate(360deg); } }
+  .bal { margin-top: 16px; }
+
+  footer { margin-top: 48px; }
+  @media (min-width: 768px) {
+    .appbar-row { height: 64px; }
+    .cx { min-height: calc(100dvh - 64px - 180px); display: grid; place-items: center; padding: 40px var(--gutter); }
+    .cx::before { top: 50%; width: 1100px; height: 640px; }
+    .plate { width: 480px; padding: 32px; border-radius: 22px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 rgba(255,255,255,.035), 0 40px 80px -40px rgba(0,0,0,.9); }
+    .title { font-size: 36px; }
+    footer { margin-top: 0; }
+  }
+  @media (hover: hover) { .fine a:hover { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; } }
+  @media (prefers-reduced-motion: no-preference) { .plate { animation: rise .5s var(--ease) both; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-row w">
+    <a class="brand" href="home.html" aria-label="Shotviva, AI photo studio">
+      <span class="word">Shotviva<i>.</i></span><span class="tag">AI photo studio</span>
+    </a>
+    <span class="who">mei@example.com</span>
+  </div>
+</header>
+
+<main class="cx">
+  <div class="plate">
+
+    <section class="view" data-v="allow" aria-labelledby="h-allow">
+      <div class="marks" aria-hidden="true"><img class="mark gl" src="../assets/img/graylum-mark.png" alt="Graylum" width="56" height="56"><span class="lnk"><i></i><i></i><i></i></span><span class="mark sv" title="Shotviva app icon: placeholder until the icon is designed">S<i>.</i></span></div>
+      <h1 class="title" id="h-allow">Let Graylum make photos with your Shotviva credits?</h1>
+      <p class="sub">You're logged in as <b>mei@example.com</b>. Graylum would like to use this account.</p>
+      <ul class="gets">
+        <li><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="3"/><path d="M8 12h8M12 8v8"/></svg><div><b>Make photos from inside Graylum</b><span>Each one is charged to this account, at the same credit price as here.</span></div></li>
+        <li><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v4.5M12 16h.01"/></svg><div><b>See your balance</b><span>Graylum gets your account id and how many credits are left. Nothing else, and no password.</span></div></li>
+        <li><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><div><b>Disconnect any time</b><span>From Account → Integrations. Photos already made stay in your Photos.</span></div></li>
+      </ul>
+      <span class="bal"><span class="coin" aria-hidden="true"></span>41 credits · 3 free</span>
+      <div class="acts">
+        <a class="btn btn-primary" href="connect.html?v=done">Allow Graylum</a>
+        <a class="btn btn-quiet" href="https://graylum.com">Cancel and go back to Graylum</a>
+      </div>
+      <p class="fine">Not you? <a href="auth.html?next=graylum">Log in with a different account</a>.</p>
+    </section>
+
+    <section class="view" data-v="done" aria-labelledby="h-done">
+      <div class="marks ok" aria-hidden="true"><img class="mark gl" src="../assets/img/graylum-mark.png" alt="Graylum" width="56" height="56"><span class="lnk"><i></i><i></i><i></i></span><span class="mark sv" title="Shotviva app icon: placeholder until the icon is designed">S<i>.</i></span></div>
+      <h1 class="title" id="h-done">Connected</h1>
+      <p class="sub">Taking you back to Graylum. If nothing happens in a few seconds, <a href="https://graylum.com" style="color:var(--foreground)">open Graylum</a>.</p>
+      <div class="glyph spin" style="margin:24px 0 0"><svg class="i" viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 1-8.5 8.5"/></svg></div>
+    </section>
+
+    <section class="view" data-v="already" aria-labelledby="h-already">
+      <div class="marks ok" aria-hidden="true"><img class="mark gl" src="../assets/img/graylum-mark.png" alt="Graylum" width="56" height="56"><span class="lnk"><i></i><i></i><i></i></span><span class="mark sv" title="Shotviva app icon: placeholder until the icon is designed">S<i>.</i></span></div>
+      <h1 class="title" id="h-already">Graylum is already connected</h1>
+      <p class="sub">This account has been connected since 2 Nov 2026. Going back to Graylum will reconnect it with no change.</p>
+      <div class="acts">
+        <a class="btn btn-primary" href="connect.html?v=done">Back to Graylum</a>
+        <a class="btn btn-quiet" href="account.html?integ=open">Manage in Account</a>
+      </div>
+    </section>
+
+    <section class="view" data-v="error" aria-labelledby="h-err">
+      <div class="glyph"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v5M12 16h.01"/></svg></div>
+      <h1 class="title" id="h-err">This connection link isn't valid</h1>
+      <p class="sub">It may have expired, been used already, or come from somewhere other than Graylum. Start again from Graylum's "Connect Shotviva" button.</p>
+      <div class="acts">
+        <a class="btn btn-ghost" href="https://graylum.com">Back to Graylum</a>
+        <a class="btn btn-quiet" href="create.html">Go to Shotviva</a>
+      </div>
+      <p class="fine">Nothing was connected and nothing was charged.</p>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="w">
+    <p class="word">Shotviva<i>.</i></p>
+    <div class="foot-main">
+      <a class="mail" href="mailto:support@shotviva.com">support@shotviva.com</a>
+      <span class="copy">© 2026 Shotviva</span>
+    </div>
+    <div class="foot-fine">
+      <nav aria-label="Legal"><a href="legal.html">Terms</a><span aria-hidden="true">·</span><a href="legal.html?page=privacy">Privacy</a><span aria-hidden="true">·</span><a href="legal.html?page=refunds">Refunds</a><span aria-hidden="true">·</span><a href="legal.html?page=acceptable-use">Acceptable use</a></nav>
+      <nav class="lang" aria-label="Language"><span aria-current="true">English</span><span aria-hidden="true">·</span><a href="/zh/connect/graylum" lang="zh-CN" hreflang="zh-CN">简体中文</a></nav>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  const v = ['done', 'error', 'already'].includes(window.SV.q.get('v')) ? window.SV.q.get('v') : 'allow';
+  document.querySelector(`.view[data-v="${v}"]`).classList.add('on');
+  if (v === 'error') document.querySelector('.who').remove();
+  document.title = ({ allow: 'Connect Graylum', done: 'Connected', already: 'Already connected', error: 'Link not valid' })[v] + ' · Shotviva';
+})();
+</script>
+</body>
+</html>

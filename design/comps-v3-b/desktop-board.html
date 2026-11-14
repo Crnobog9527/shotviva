@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Shotviva v3-b · 暗房 · 桌面稿对照板</title>
+<link rel="stylesheet" href="css/studio.css">
+<style>
+  body { background: #070605; padding: 48px 40px 80px; font-family: var(--font-sans), "PingFang SC", sans-serif; }
+  body::after { display: none; }
+  header { max-width: 980px; }
+  .eyebrow { font: 500 14px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 16px; }
+  header h1 { font: 400 64px/.95 var(--font-display); letter-spacing: -0.02em; }
+  header h1 em { color: var(--primary); }
+  header p { margin-top: 16px; font: 400 15px/1.75 "PingFang SC", var(--font-sans); color: var(--bone-dim); max-width: 860px; }
+  header ul { margin: 12px 0 0; padding-left: 20px; font: 400 15px/1.75 "PingFang SC", var(--font-sans); color: var(--bone-dim); max-width: 860px; }
+  header li b { color: var(--foreground); font-weight: 500; }
+
+  .row { margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--border); }
+  .row > h2 { display: flex; align-items: baseline; gap: 12px; font: 600 17px/1.3 "PingFang SC", var(--font-sans); }
+  .row > h2 span { font: 400 14px/1 var(--font-mono); color: var(--primary); }
+  .row > p { margin-top: 8px; font: 400 14px/1.7 "PingFang SC", var(--font-sans); color: var(--muted-foreground); max-width: 900px; }
+  .row nav { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .row nav a { font: 500 14px/1 "PingFang SC", var(--font-sans); padding: 8px 12px; border-radius: 8px; background: var(--bone-6); text-decoration: none; color: var(--bone-dim); }
+  .frames { display: flex; gap: 32px; align-items: flex-end; margin-top: 20px; overflow-x: auto; padding-bottom: 12px; }
+  figure { margin: 0; flex: none; }
+  figcaption { margin-top: 10px; font: 400 14px/1.6 "PingFang SC", var(--font-sans); color: var(--muted-foreground); }
+  figcaption b { display: block; font: 500 14px/1.4 var(--font-mono); color: var(--foreground); }
+  /* a frame renders the real comp at its true width, scaled down with a transform */
+  .frame { position: relative; overflow: hidden; border-radius: 12px; background: var(--background); box-shadow: inset 0 0 0 1px var(--border), 0 30px 60px -30px rgba(0,0,0,.9); }
+  .frame iframe { border: 0; position: absolute; left: 0; top: 0; transform-origin: 0 0; background: var(--background); }
+  .f-m { width: 169px; height: 365px; border-radius: 22px; }
+  .f-m iframe { width: 375px; height: 812px; transform: scale(.45); }
+  .f-1280 { width: 512px; height: 320px; }
+  .f-1280 iframe { width: 1280px; height: 800px; transform: scale(.4); }
+  .f-1440 { width: 576px; height: 360px; }
+  .f-1440 iframe { width: 1440px; height: 900px; transform: scale(.4); }
+</style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">Shotviva · desktop comps · v3-b · 2026-11-06</p>
+  <h1>Darkroom<em>.</em> 桌面稿</h1>
+  <p>桌面不是另一套设计，是手机「暗房」的放宽：同一套变量、字号、材质和组件，只改布局和密度。两个断点：768 起 tab bar 变顶栏链接、抽屉变居中弹窗、网格变多列；1024 起首页首屏两栏加一条生成栏、工作台左表单右预览。内容最宽 1120px 居中，1280 和 1440 只差两侧留白。每页仍然只有一个实心主按钮；没有侧栏、汉堡和 hover 才能用的功能；桌面没有手机没有的功能或入口。第三轮（Owner 11-06 十条）：对比一律「左手机实拍、右 AI 成品」两图并排，只有画风迁移保留拖动遮罩；点模板直接进创作弹窗；全站加了克制的氛围动效（减少动态时全停）。</p>
+  <ul>
+    <li><b>首页首屏（≥1024）</b>：左标题 + 直接回答，右「手机实拍 | AI 成品」并排对比；下面一条横向生成栏（照片格、模板芯片、尺寸芯片、可选备注、Generate），不随上传长高。手机上对比图在文字和生成卡之间。</li>
+    <li><b>Create / Photos</b>：底部 tab bar 变成顶栏四个链接（Create / Wishlist / Photos / Account），余额胶囊留在页标题右侧；模板卡是两图并排（画风迁移是竖版拖动对比），768 两列、1024 三列；悬停擦除播放；点卡直接进创作弹窗；分类 chips 换行不横滚。</li>
+    <li><b>工作台（≥1024）</b>：左列上传、补充说明、尺寸（8 项）、清晰度，主按钮吸底在左列末尾；右列是「显影盘」大预览，按空 / 已传 / 生成中 / 成功 / 失败五个状态换内容。失败状态新加："Generation failed. Your credits were refunded." 唯一主按钮 Retry。</li>
+    <li><b>定价页 + 付费墙</b>：pricing.html 新页，三档并排、Monthly / Yearly 切换（Yearly 标 Save up to 40%：Starter / Pro 年付 8 折、Max 6 折）、积分包三档分层，375 下退化成竖排；付费墙在桌面是 920px 居中弹窗，内容与手机抽屉完全一致，结账条固定在弹窗底部。</li>
+  </ul>
+</header>
+
+<section class="row">
+  <h2><span>01</span>营销首页 home.html</h2>
+  <p>桌面顶部有营销导航（Templates / Pricing / Log in / Start free）。首屏：左文字、右「手机实拍 | AI 成品」并排对比；下面一条 88px 的生成栏（照片格、模板芯片、尺寸芯片、可选备注、Generate），放了照片也不长高，栏后一盏安全灯呼吸光。往下「一张图变一套图」实拍图与三张成品等宽；模板按分类成行，两图并排的卡；「What 3 Product Photos Cost」是两张账单：摄影师报价（3 张造型图 + 精修 ≈ $297–$990、要等几天）对 Shotviva（from $19.90/月，这 3 张 6 credits ≈ $2.40、每张 20–40 秒）；末尾「Image to Image AI for Food, Products, Rooms and More」是四张相关链接卡，每张一句收益文案 + 箭头；<b>/ai-restaurant-menu 与 /commercial-photography 两页还没上线</b>，代码只渲染已存在的页面，上线初期这块只有两张卡（`?links=live`）。页脚是 support@ 与 © 行，下面一行法务链接。</p>
+  <nav><a href="home.html" target="_blank">打开桌面</a><a href="home.html?frame=1" target="_blank">打开 375</a><a href="home.html?photo=1&signup=1" target="_blank">已上传 + 注册弹窗</a><a href="home.html?preview=pure-white" target="_blank">模板预览弹窗</a><a href="home.html?lang=zh" target="_blank">中文提示条</a><a href="home.html?menu=lang" target="_blank">地球菜单</a><a href="home.html?faq=all" target="_blank">FAQ 九问全开</a><a href="home.html?links=live" target="_blank">相关链接：上线初期两卡</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="home.html?frame=1" title="home 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>手机基线</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="home.html" title="home 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>内容 1120 居中，两侧 80</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="home.html" title="home 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>同一布局，两侧 160</figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>02</span>登录后首页 create.html</h2>
+  <p>顶栏链接替代 tab bar；精选卡是宽幅「实拍 | AI」并排，悬停时右半播视频；模板卡静止时是两图并排，鼠标指上去右半从实拍擦到成品并循环，触屏进视口播一次；画风迁移卡是竖版拖动对比，没有播放角标。点卡片直接打开创作弹窗：左样图，右就是工作台表单和唯一主按钮，没有「Use this template」。</p>
+  <nav><a href="create.html" target="_blank">打开桌面</a><a href="create.html?frame=1" target="_blank">打开 375</a><a href="create.html?preview=korean-manhwa" target="_blank">预览弹窗（视频模板）</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="create.html?frame=1" title="create 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>底部 tab bar，两列</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="create.html" title="create 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>顶栏链接，四列</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="create.html?open=pure-white" title="create 1440 dialog" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>点模板直接进创作弹窗</figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>03</span>工作台 workspace.html</h2>
+  <p>工作台现在是创作弹窗的全页形态：直链、手机、Photos 里「Make again」打开它，表单和弹窗共用一份。左列表单，右列显影盘预览吸顶；主按钮在左列末尾，仍然只有一个。五个状态：empty / ready / generating / done / failed。</p>
+  <nav><a href="workspace.html" target="_blank">已传图</a><a href="workspace.html?state=empty" target="_blank">未传图</a><a href="workspace.html?state=generating" target="_blank">生成中</a><a href="workspace.html?state=done" target="_blank">成功</a><a href="workspace.html?state=failed" target="_blank">失败</a><a href="workspace.html?balance=0" target="_blank">余额不足</a><a href="workspace.html?frame=1&state=failed" target="_blank">375 失败</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="workspace.html?frame=1" title="workspace 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>单列，底部固定主按钮</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="workspace.html" title="workspace 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>两列，已传图</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="workspace.html?state=failed" title="workspace 1440 failed" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>失败状态：退回积分，Retry 是唯一主按钮</figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>04</span>定价页 pricing.html（新）</h2>
+  <p>营销页壳。积分包下面新增「For business」宽幅板（规范 §6.9 第 8 条）：不是第四档、没有价格；衬线标题 + 一句对象说明（brands / e-commerce sellers / restaurant groups / agencies），六条「we set it up for you」项目（量价与开票、品牌定制模板、更高吞吐与批量、API、隐私与数据条款、专属联系人）按细线列表排（手机单列、768 两列、1024 三列），一个幽灵按钮「Contact us」mailto 带主题与正文模板；比 Max 卡安静，和消费者三档区分。Yearly 按钮带「Save up to 40%」标（Starter / Pro 年付 8 折，Max 6 折）；三档并排，Pro 蓝宝石、Max 黑金（金箔字、金边慢转、悬停流光、背后金色微光）；积分包三档分层：20 石墨、55 蓝宝石「Most popular」、115 黑金「Best value」，各标每 credit 单价；卡片进视口依次浮现，切换月付 / 年付时价格淡入淡出。</p>
+  <nav><a href="pricing.html" target="_blank">年付</a><a href="pricing.html?billing=m" target="_blank">月付</a><a href="pricing.html#biz-h" target="_blank">For business</a><a href="pricing.html?lang=zh" target="_blank">中文提示条</a><a href="pricing.html?frame=1" target="_blank">打开 375</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="pricing.html?frame=1" title="pricing 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>竖排，和付费墙一致</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="pricing.html" title="pricing 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>三栏并排</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="pricing.html?billing=m" title="pricing 1440 monthly" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>月付：不显示任何节省字样</figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>05</span>付费墙 paywall.html</h2>
+  <p>手机是 iOS 页面抽屉；768 起变 920px 居中弹窗，背后工作台只变暗不缩放。三档并排、积分包、Card / Alipay、结账条和细则，内容与手机一字不差。Max 金边在弹出时转一圈即停，无流光。</p>
+  <nav><a href="paywall.html" target="_blank">年付</a><a href="paywall.html?billing=m" target="_blank">月付</a><a href="paywall.html?frame=1" target="_blank">打开 375</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="paywall.html?frame=1" title="paywall 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>底部抽屉</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="paywall.html" title="paywall 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>居中弹窗</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="paywall.html?billing=m" title="paywall 1440 monthly" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>月付</figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>06</span>作品 photos.html</h2>
+  <p>顶栏链接（Photos 角标 2）；进行中任务两列；完成作品 768 三列、1024 四列。扫描线只在 data-job="generating" 的任务上跑。</p>
+  <nav><a href="photos.html" target="_blank">打开桌面</a><a href="photos.html?frame=1" target="_blank">打开 375</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="photos.html?frame=1" title="photos 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b></figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="photos.html" title="photos 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b></figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="photos.html" title="photos 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b></figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>07</span>作品详情 + 编辑面板 photo.html（新，规范 §5.2 作品编辑 + T32 原图与说明）</h2>
+  <p>单张作品页，成品是主角：大图（HUD 标可见性与分辨率）、图右下角一组磨砂视图芯片「Result | Original」（透明 PNG 成品是「On white | Transparent | Original」，Transparent 显示棋盘格；原图已按隐私规则删除时 Original 视图显示空托盘「Original deleted」）、名称与元信息、「Your note」引文块（用户在「Anything to change?」写的字；没写就不显示；长文折成 4 行 + Show more）、Download 主按钮、Edit / Make again 两个幽灵按钮、事实表（Template / Size / Resolution / Format / Credits / Visibility / Original / Made）。<b>Edit</b> 打开编辑面板：手机是底部抽屉（照片折成 120px 条），桌面与创作弹窗同一组件（左照片、右表单）；一个必填字段「What would you like to change?」（1–500 字，任何语言，三个示例芯片可一键填入），尺寸固定为原图，分辨率默认原图档位，主按钮「Generate · 2 credits」在字段为空时变暗、按下只把光标放进字段；积分不够时变「Get credits · N needed」。提交进入正常生成流程（负片 + 扫描线显影新图，显示「Your change」）；失败态退回积分，可 Retry 或「Change the request」。编辑出的新作品页有「Edited from」链接回原图，并且自己也能再编辑。整页没有 "prompt" 一词。</p>
+  <nav><a href="photo.html" target="_blank">完成态</a><a href="photo.html?view=original" target="_blank">看原图</a><a href="photo.html?png=1&view=checker" target="_blank">透明 PNG · 棋盘格</a><a href="photo.html?orig=expired&view=original" target="_blank">原图已删</a><a href="photo.html?note=none" target="_blank">没写说明</a><a href="photo.html?note=long" target="_blank">长说明</a><a href="photo.html?edit=empty" target="_blank">编辑面板 · 空</a><a href="photo.html?edit=typing" target="_blank">已输入</a><a href="photo.html?edit=low" target="_blank">积分不够</a><a href="photo.html?state=generating" target="_blank">生成中</a><a href="photo.html?state=failed" target="_blank">失败</a><a href="photo.html?edited=1" target="_blank">编辑结果 · Edited from</a><a href="photo.html?frame=1&edit=empty" target="_blank">打开 375</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="photo.html?frame=1&edit=typing" title="photo 375 edit" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>编辑抽屉，已输入</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="photo.html?png=1&view=checker" title="photo 1280 png" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>透明 PNG 成品，棋盘格视图</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="photo.html?edited=1" title="photo 1440 edited" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>编辑结果页，Edited from 链接</figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>08</span>账号页 account.html（会员卡版）+ 语言切换 + Integrations</h2>
+  <p><b>Owner 11-06 夜：太单调，要活泼、艺术化。</b>Plan 改成一张会员卡：档位材质（Starter 石墨、Pro 蓝宝石、Max 黑金）、卡右下角一枚描边的「Shotviva.」字标压在卡上、每 7 秒一道斜向光泽扫过、顶行 mono 的「MEMBER / RENEWS …」、档位名衬线 44 / 52、底行「SINCE Nov 2026」+ 操作按钮；五个订阅状态都套这张卡。Credits 改成两只仪表：安全灯环是本月付费积分余量、骨白环是免费积分，数字衬线 32；下面一条带齿孔的胶卷条放本月的照片缩略图，末尾「+5」进 Photos。桌面 1024 起会员卡和积分两栏并排，Settings 等分组靠左对齐。</p>
+  <p>语言切换按总控要求「安静、一行、不放国旗」：顶部导航 Pricing 和 Log in 之间一枚 36px 地球图标按钮（`aria-label="Language / 语言"`，手机顶栏也在），点开两项菜单「English ✓ / 简体中文」（196px 弹出层、44px 行、当前项安全灯勾，Esc / 点外面关闭，方向键在两项间移动）；营销页页脚法务链接那一行的右端是「English · 简体中文」（当前语言骨白、另一种是链接，手机上折到法务链接下一行）；浏览器语言是中文时，导航上方出现一条可关闭的提示「Shotviva 有简体中文版。 切换到中文 ×」（从不自动跳转，关掉后记住）。应用内的切换放在账号页「Settings」里的「Language」行，点开是两项单选的底部抽屉 / 居中对话框（English / 简体中文），选中即生效并关闭。账号页本身是 P0 骨架稿：Plan 卡（档位、续费日、Manage subscription）、Credits 两格（付费 / 免费分开）+ Buy credits、Settings 行（Email / Language / Purchases / Support）、Sign out / Delete account；加「Integrations」（T34 已上线）：每个产品一行，Graylum 名称 + 一句说明 + 「Enabled / Not enabled」胶囊，展开显示 Connected since 与 Disconnect（第二行 Shopify <b>仅为示意</b>：没有这个集成，上线只有 Graylum，别实现）。</p>
+  <nav><a href="account.html?sub=cancelled" target="_blank">订阅：已取消</a><a href="account.html?sub=expired" target="_blank">订阅：已到期</a><a href="account.html?sub=past_due" target="_blank">订阅：续费失败</a><a href="account.html?sub=wallet" target="_blank">订阅：支付宝单期</a><a href="home.html?menu=lang" target="_blank">导航地球菜单</a><a href="account.html" target="_blank">账号页</a><a href="account.html?integ=open" target="_blank">Integrations 展开</a><a href="account.html?lang=open" target="_blank">语言抽屉</a><a href="home.html?lang=zh" target="_blank">首页中文提示条</a><a href="account.html?frame=1" target="_blank">打开 375</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="account.html?frame=1&lang=open" title="account 375 language" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>Language 抽屉</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="home.html?lang=zh&menu=lang" title="home 1280 language" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>首页：地球菜单打开 + 中文提示条</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="account.html?sub=wallet" title="account 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>账号页（Owner 11-06 夜：会员卡 + 两只仪表 + 本月胶卷条），Pro 支付宝单期态</figcaption></figure>
+  </div>
+</section>
+<section class="row">
+  <h2><span>09</span>登录 / 注册 / 重设密码 auth.html（P0，规范 ARCHITECTURE §7）</h2>
+  <p>一个文件按查询串切八个视图：`?v=login`（默认）/ `signup` / `verify`（注册后查邮件）/ `reset` / `reset-sent` / `update`（邮件链接进来设新密码）/ `updated` / `expired`。营销壳裁到只剩字标、Pricing 和地球菜单，不再出现和表单重复的 Log in / Start free。手机是整页一列；768 起是 440px 居中的卡，后面一盏安全灯。Google 是幽灵按钮在上，「or with email」细线分隔，邮箱 + 密码（Show / Hide、Forgot password? 在标签右端），主按钮只有一个。错误：`?err=creds`（邮箱密码不匹配，提示里直接给重设链接）、`unverified`（先验证邮箱，可重发）、`exists`（已有账号，转登录）、`weak` / `mismatch`（字段级红框 + 一句话）。hCaptcha 隐形：表单下一行 14px 归属文字；`?captcha=1` 显示备用复选框（第三方 iframe 的占位画法）。`?next=photo` 在标题下加一条「Your photo and template are kept.」带缩略图。注册页保留「3 free Standard images · Shown publicly with a watermark」礼物条，这是营销页之外唯一允许写免费张数的地方。重发邮件 60 秒冷却（`?resent=1`），邮件来自 Shotviva &lt;support@shotviva.com&gt;。</p>
+  <nav><a href="auth.html" target="_blank">登录</a><a href="auth.html?v=signup" target="_blank">注册</a><a href="auth.html?v=signup&captcha=1&err=weak" target="_blank">注册：复选框 + 密码太短</a><a href="auth.html?err=creds" target="_blank">登录：不匹配</a><a href="auth.html?v=verify" target="_blank">查邮件</a><a href="auth.html?v=reset" target="_blank">重设</a><a href="auth.html?v=reset-sent&resent=1" target="_blank">重设已发</a><a href="auth.html?v=update&err=mismatch" target="_blank">设新密码：不一致</a><a href="auth.html?v=updated" target="_blank">已保存</a><a href="auth.html?v=expired" target="_blank">链接过期</a><a href="auth.html?next=photo&frame=1" target="_blank">375：带着照片来登录</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="auth.html?v=signup&frame=1" title="signup 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>注册</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="auth.html?err=creds" title="login 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>登录，邮箱密码不匹配</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="auth.html?v=signup&captcha=1&err=weak" title="signup 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>注册，hCaptcha 备用复选框 + 密码太短</figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>10</span>结账返回页 checkout.html + 取消提示（P0，T9）</h2>
+  <p>Stripe 的 success_url 落到这页（应用壳，无页脚）：绿勾、「You're on Pro」/「55 credits added」、一张四行收据板（Added +135 credits、Balance 138 credits、Renews 6 Dec 2026 · $49.90、Paid $49.90 · Visa ···· 4242；积分包没有 Renews 行），主按钮「Start creating」，下面两条安静链接 Receipt（Stripe 收据）/ Manage in Account，末尾一句续费说明（订阅：Renews automatically. Cancel anytime from Account；年付：A year of credits, all in your account now；积分包：One-time payment. Nothing renews）。`?p=` 九个商品 id 同 site.config。`?r=pending` 是支付宝异步未到账：时钟图标慢转、「Confirming your payment」、订单两行、幽灵「Check again」+ Back to Create，10 分钟未到写 support。cancel_url 不落这页：回 `/pricing?checkout=cancel`，顶部出一条 toast「Checkout cancelled. Nothing was charged.」10 秒自动收。</p>
+  <nav><a href="checkout.html" target="_blank">Pro 月付成功</a><a href="checkout.html?p=max_yearly" target="_blank">Max 年付</a><a href="checkout.html?p=pack_m" target="_blank">积分包 55</a><a href="checkout.html?r=pending" target="_blank">支付宝确认中</a><a href="pricing.html?checkout=cancel" target="_blank">定价页：取消 toast</a><a href="checkout.html?frame=1" target="_blank">打开 375</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="checkout.html?p=pack_m&frame=1" title="checkout 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>积分包到账</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="checkout.html?r=pending" title="checkout 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>支付宝确认中</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="pricing.html?checkout=cancel" title="pricing cancel 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>定价页，取消结账的 toast</figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>11</span>404 与空状态 404.html / empty.html（P0，DESIGN §4.6、§4.7）</h2>
+  <p>站点 404（营销壳）：mono 的「404」、衬线大标题「Nothing developed <em>here.</em>」、一句说明、主按钮「Go to the home page」+ 幽灵「Browse templates」（链 `/#templates`），下面三张模板卡<b>每次打开随机三张</b>（从上架、对外可见、非画风迁移的模板里抽；Owner 11-06 夜问，原稿是写死的）；`?v=error` 是 500（Try again）。应用内空状态是一个组件 `.state`：一只空的取景框（四角括号，里面放该页的线图标）+ 一句粗体 + 一句说明 + 一个按钮，放在真实页面里判断：Photos 空（第一行卡片虚影透出来、主按钮 Create your first photo）、Wishlist 墙空（Tell us what template you need + Request a template）、My requests 空（You haven't requested anything yet + Go to the wall）、Purchases 空（See plans）、应用内 404（This photo isn't here + Back to Photos）、加载失败（红框、Try again、Still stuck? 写 support）、离线。</p>
+  <nav><a href="404.html" target="_blank">404</a><a href="404.html?v=error" target="_blank">500</a><a href="empty.html" target="_blank">Photos 空</a><a href="empty.html?v=wishlist" target="_blank">Wishlist 空</a><a href="empty.html?v=requests" target="_blank">My requests 空</a><a href="empty.html?v=purchases" target="_blank">Purchases 空</a><a href="empty.html?v=404" target="_blank">应用内 404</a><a href="empty.html?v=error" target="_blank">加载失败</a><a href="empty.html?v=offline" target="_blank">离线</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="empty.html?frame=1" title="empty 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>Photos 空</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="empty.html?v=wishlist" title="empty 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>Wishlist 墙空</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="404.html" title="404 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>站点 404</figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>12</span>法务阅读版式 legal.html（P0，T19；正文是样稿）</h2>
+  <p>四页一个版式：`?page=privacy | refunds | acceptable-use`，默认 Terms。标题下一行「Last updated · Applies to」，四页胶囊切换（当前页骨白实心）。正文 68ch、17px / 1.65，章节衬线 28 带编号（条款要被引用，编号承载信息），「In short」摘要段，条款里的表格与注释块各一例；目录手机上是可折叠的 Contents 卡，1024 起是左侧 240px 吸顶列，跟着阅读位置高亮。Terms 末尾「Third-party notices」：「This site uses the MiSans font, © Xiaomi.」+ 协议 PDF 链接，另列 Geist / Instrument Serif 的 OFL（规范 ARCHITECTURE §17：署名放这里，不放页脚）。<b>正文全部是样稿</b>，只为检验版式；文字归 T19，上线前 Owner 的律师审。</p>
+  <nav><a href="legal.html" target="_blank">Terms</a><a href="legal.html?page=privacy" target="_blank">Privacy</a><a href="legal.html?page=refunds" target="_blank">Refunds</a><a href="legal.html?page=acceptable-use" target="_blank">Acceptable use</a><a href="legal.html#third-party-notices" target="_blank">Third-party notices</a><a href="legal.html?frame=1" target="_blank">打开 375</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="legal.html?frame=1" title="legal 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>Terms</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="legal.html?page=refunds" title="legal 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>Refunds</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="legal.html" title="legal 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>Terms，目录吸顶</figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>13</span>站内公告条（P0，T23 用户侧）· 两种语气 info / promo</h2>
+  <p>按公告表 `site_announcements` 的字段画：`tone` = info（安静：骨白 6% 底、无动效、链接是灰胶囊）或 promo（促销带）、文字、可选 `link_url` + `link_label`；后台改字和链接，动效随语气自动套。<b>Owner 11-06 夜：促销要醒目活泼带动效。</b>promo = 促销带：暖安全灯渐变底（#2B1108 → #4A1C0B）、左侧一盏 3.2 秒呼吸的安全灯光晕、每 6 秒一道斜向的光扫过整条、左边价签图标每 5 秒抖一下、文字里的折扣数字用浅橙加粗、右边一枚 32px 实心胶囊（link_label）。减少动态时光扫和抖动都停，只剩静态渐变。`SV.announce(kind, text)`（`js/studio.js`，CSS 在 `css/studio.css` 末尾 `.ann`）：两个壳都放在最顶上，一行 14px（768 起 15px），左图标、中间文字（可带链接）、右 32px 圆形 ×（关闭状态按公告 id 存 localStorage）。info 是骨白 6% 底 + 底描边；warning 是安全灯 12% 底、图标安全灯。营销壳里它在 sticky 顶栏上方，滚过去就走；应用壳桌面的顶栏是固定的，所以公告条也固定，顶栏下移它的高度。375 下不挤压页头，自己占一行。后台、结账页、生成过程中不显示（规范 T23）。文字来自公告表，按当前语言。`?announce=info | warning` 演示。</p>
+  <nav><a href="home.html?announce=promo" target="_blank">首页 promo</a><a href="home.html?announce=info" target="_blank">首页 info</a><a href="create.html?announce=info" target="_blank">Create info</a><a href="create.html?announce=promo&frame=1" target="_blank">375：Create promo</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="home.html?announce=promo&frame=1" title="home announce 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>首页 promo</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="create.html?announce=info" title="create announce 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>Create，info</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="home.html?announce=promo" title="home announce 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>首页 promo</figcaption></figure>
+  </div>
+</section>
+<section class="row">
+  <h2><span>14</span>SEO 落地页 landing.html（P1；`/image-to-image-generator` 是 v1 必有，另两页是第 2 周内容页）</h2>
+  <p>一个骨架三页内容：`?p=image-to-image-generator`（默认）/ `commercial-photography` / `ai-restaurant-menu`。骨架 = 首页去掉「3 步」和「What stays the same」两块：首屏对比图 + 直答块 + 生成栏、可核验事实块（3 条）、成本账单、FAQ（5 条真实问法）、族内互链（4 卡，回首页锚文本按 R8 用「AI image to image」）。按页多出的块：`/commercial-photography` 保留「一张照片 → 一整套图」示范和 Products / Beauty 模板区；`/ai-restaurant-menu` 只放 Food 模板区，生成栏默认 Delivery Menu。直答块都以主词开头、40–60 词；Title 带 (2026)，餐厅页带 for Restaurants。构建时这些内容来自 `site/content/pages/<slug>.ts`（ARCHITECTURE §12），稿里是副本。<b>事实块里的平台尺寸（Amazon 1,000 px、Etsy 2,000 px、Shopify 2048）和餐饮摄影师报价是写内容时要核实的事实，不是设计定的。</b> `/templates` 按 ARCHITECTURE §13 v1 不建，未出稿。</p>
+  <nav><a href="landing.html" target="_blank">Image to image generator</a><a href="landing.html?p=commercial-photography" target="_blank">Commercial photography</a><a href="landing.html?p=ai-restaurant-menu" target="_blank">AI restaurant menu</a><a href="landing.html?p=ai-restaurant-menu&frame=1" target="_blank">375：餐厅页</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="landing.html?p=ai-restaurant-menu&frame=1" title="landing 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>AI restaurant menu</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="landing.html" title="landing 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>Image to image generator</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="landing.html?p=commercial-photography" title="landing 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>Commercial photography</figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>15</span>需求墙 wishlist.html（P1，ARCHITECTURE §15、DESIGN §4.7）· 便签墙版</h2>
+  <p>`?v=wall`（默认）/ `request` / `mine`，`?gate=0` 是还没出过图的账号（能看墙，按钮灰、下面一行「Create one photo first to join」，投票按钮也灰）。墙（Owner 11-06 夜：手机两列、要像便签、要有趣）：每条需求是一张<b>贴在墙上的照片便签</b>：顶上一截半透明胶带、卡片各自歪一点（六种固定角度循环）、描述用 Instrument Serif 斜体当手写字、脱敏名「J***」+ 时间 + 「I want this too」胶囊（手机只留心形 + 计数，768 起带字；已投为安全灯 16% 底 + 实心心形）；`shipped` 的便签盖一个 success 色「SHIPPED」斜章，下面一行链接直达模板。<b>动效</b>：鼠标划过一张便签，它从胶带处被「吹」起来摆三下落回（`.blow`）；页面滚动时整面墙按滚动速度一起偏摆（`--wind`，±6°，停下 120ms 后回正，`?wind=5` 可冻结看）；减少动态时全停。手机两列、768 三列、1024 四列。发帖是流程页（隐藏 tab bar）：三格参考图（0–3 张，取景框样式，`?request=filled` 看已传两张）、「The look」多行文本 ≤300 带计数、Submit 固定在底部（少于 10 字灰），提交回墙出 toast「Sent for review」（`?sent=1`）。My requests：每条缩略图 + 两行描述 + 状态标 Pending / Live / Shipped / Rejected（Rejected 不给原因）+ 票数，Shipped 的可点进模板。</p>
+  <nav><a href="wishlist.html" target="_blank">墙</a><a href="wishlist.html?gate=0&frame=1" target="_blank">375：未达门槛</a><a href="wishlist.html?v=request" target="_blank">发帖</a><a href="wishlist.html?v=request&request=filled" target="_blank">发帖：已填</a><a href="wishlist.html?v=mine" target="_blank">My requests</a><a href="wishlist.html?sent=1&frame=1" target="_blank">375：已提交 toast</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="wishlist.html?frame=1" title="wishlist 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>墙</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="wishlist.html?v=request&request=filled" title="wishlist 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>发帖，已填</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="wishlist.html" title="wishlist 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>墙，三列</figcaption></figure>
+  </div>
+</section>
+
+<section class="row">
+  <h2><span>16</span>Graylum 连接 connect.html（P1，ARCHITECTURE §14.2）</h2>
+  <p>`/connect/graylum?state=…`：未登录先到 `auth.html?next=graylum`（标题下一条「Connecting Graylum.」提示），登录后是这一张卡：两枚字标用三点连起来、衬线标题「Let Graylum make photos with your Shotviva credits?」、当前账号、三条「Graylum 会得到什么」（在 Graylum 里出图并按同样 credit 价扣费 / 看到账号 id 和余额，没有密码 / 随时在 Account → Integrations 断开）、余额胶囊、主按钮「Allow Graylum」+ 安静的「Cancel and go back to Graylum」，底下「Not you?」换账号。`?v=done` 连接成功转圈回跳；`?v=already` 已连接过；`?v=error` 链接无效（过期 / 用过 / 回跳域名不在白名单），写明没有连接也没有扣费。壳和登录页一样裁到字标，顶栏右侧只显示邮箱。左边的 Graylum 图标是 Owner 提供的真图标（`assets/img/graylum-mark.png` / `.svg`）；<b>右边的 Shotviva 图标是占位</b>（字标首字母），等 Shotviva 的 app 图标设计出来后替换，登录页的「Connecting Graylum」提示条同样用了真图标。</p>
+  <nav><a href="connect.html" target="_blank">允许</a><a href="connect.html?v=done" target="_blank">已连接，回跳中</a><a href="connect.html?v=already" target="_blank">已连接过</a><a href="connect.html?v=error" target="_blank">链接无效</a><a href="auth.html?next=graylum" target="_blank">先登录</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="connect.html?frame=1" title="connect 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>允许</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="connect.html?v=error" title="connect 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>链接无效</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="connect.html" title="connect 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>允许</figcaption></figure>
+  </div>
+</section>
+<section class="row">
+  <h2><span>17</span>两个 demo（不进正式稿，Owner 定了再写进页面）：结算庆祝动效 demo-celebrate.html、全站背景动效 demo-background.html</h2>
+  <p><b>结算庆祝</b>：真实的成功卡 + 一个全屏 canvas 粒子引擎（自写，无库），六个商品六档递进：Pack S 勾号弹出 + 数字跳到 +20 + 一次轻闪；Pack M 再加勾号处一圈安全灯火花；Pack L 再加一场短暂的 credit 圆片雨；Starter 从勾号炸开一把彩纸（骨白 / 安全灯 / 石墨）；Pro 先一次强闪，两门「蓝宝石礼炮」从屏幕底角射上来，卡片变成 Pro 的蓝宝石材质并扫过一道光，勾号处再炸一把；Max 先全场变暗、一盏安全灯亮起、再一闪，两门金箔礼炮 + 3.5 秒金箔雨 + 卡片变 Max 黑金、标题走一遍金箔光泽，之后金色余烬飘 6 秒。减少动态只剩卡片淡入。底部控制条是 demo 专用；`?p=<商品 id>` 直接播。<b>全站背景</b>：五层可独立开关的动态背景叠在首页样稿上：胶片颗粒 8fps 步进「呼吸」、两个安全灯光池 42 / 57 秒慢漂、暖色漏光每 80 秒斜扫一次、光池跟随滚动（1/10 速度、滚动中微亮）、暗房墙壁的晕影 10 秒呼吸；三个预设 Quiet / Alive / Bold。全部是 fixed 层上的 transform + opacity，减少动态全停。</p>
+  <nav><a href="demo-celebrate.html?p=starter_monthly" target="_blank">Starter 庆祝</a><a href="demo-celebrate.html?p=pro_monthly" target="_blank">Pro</a><a href="demo-celebrate.html?p=max_monthly" target="_blank">Max</a><a href="demo-celebrate.html?p=pack_l" target="_blank">Pack L</a><a href="demo-background.html?preset=quiet" target="_blank">背景 Quiet</a><a href="demo-background.html?preset=alive" target="_blank">背景 Alive</a><a href="demo-background.html?preset=bold" target="_blank">背景 Bold</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="demo-celebrate.html?p=max_monthly&frame=1" title="celebrate 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>Max 庆祝（打开后自动播）</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="demo-celebrate.html?p=pro_monthly" title="celebrate 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>Pro 庆祝</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="demo-background.html?preset=bold" title="background 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>背景 Bold（滚动看光池跟随）</figcaption></figure>
+  </div>
+</section>
+<section class="row">
+  <h2><span>18</span>工作台批量上传 workspace.html?batch=（T28，ARCHITECTURE §6.2 批量语义）+ 编辑框比例 + 显影式生成动画</h2>
+  <p><b>批量</b>：`?batch=10`（Pro）/ `?batch=30&tier=max`。Ready：「Your photos」变成一盘缩略图（手机 5 列、桌面 6 列，每张带序号和 ×，没满时有「Add more · N left」格），脚行「10 photos · 4:5 as shot · compressed / Pro: up to 10 at once」；主按钮「Generate 10 photos · 20 credits」，提示行写清「每张单独扣费、失败单独退回、3 张同时显影」；付费积分不够时按钮变「Get credits · N needed」并说明批量只用付费积分（§6.2）。Generating：步骤条换成一张一行的列表（缩略图 + Saved to Photos ✓ / Developing 进度 / Queued / Failed · 2 credits refunded + Retry），上面一行「3 of 10 done · 3 developing · 3 queued · 1 failed」，右侧显影盘显示正在做的那张、HUD「Developing 4 of 10」。Done：「9 photos saved to Photos」+ 结果网格（失败的那格盖「Refunded」）+ 主按钮 Open Photos。Starter（`?tier=starter&batch=1`）相册单选，下面一行「One photo at a time on Starter. Pro takes up to 10 at once, Max 30.」。<b>编辑框比例</b>（photo.html 编辑面板）：Size 不再是一句「同原图」，而是八个尺寸格，默认选中这张照片自己的比例，换一个时说明「画面会被延展到新比例，主体不裁」。<b>再做一张</b>（Owner 定了原图随作品保留，规范 #149 / T40）：`?again=1` 是常规——表单顶上一行「Making again: Pure White · Post 4:5 · Standard · note kept, from 28 Oct」，模板、尺寸、清晰度、说明预填，照片格里就是原图（「Original photo, kept with the work · From 28 Oct」），直接可生成；`?again=expired` 只给 T40 之前的老作品和极少数复制失败——照片格换成斜纹空位 +「The original photo isn't available · This work was made before we started keeping originals. Add the same photo again…」+ 拍照 / 相册，主按钮半透明直到加了照片。照片页事实表「Original」行改为「Kept with this photo」，法务样稿改为「用于作品的照片随作品保留，删作品才删；没用的上传 7 天后删」。<b>生成动画</b>（workspace / photo 的 generating 态）：去掉安全灯扫描线，改成显影：原图变灰变暗 → 结果的模糊版淡入 → 清晰版从上到下透过一道柔边（mask）显出来，无线条；减少动态时只显示半透明结果。</p>
+  <nav><a href="workspace.html?t=pure-white&batch=10&state=ready" target="_blank">批量 10：就绪</a><a href="workspace.html?t=pure-white&batch=10&state=generating" target="_blank">批量：生成中</a><a href="workspace.html?t=pure-white&batch=10&state=done" target="_blank">批量：完成</a><a href="workspace.html?t=pure-white&batch=30&tier=max&state=ready" target="_blank">Max 30，积分不够</a><a href="workspace.html?t=pure-white&tier=starter&batch=1&state=empty&frame=1" target="_blank">375：Starter 提示</a><a href="photo.html?edit=typing" target="_blank">编辑框比例</a><a href="workspace.html?t=pure-white&state=generating" target="_blank">显影动画</a><a href="workspace.html?t=pure-white&again=1&state=ready" target="_blank">再做一张</a><a href="workspace.html?t=pure-white&again=expired&state=empty" target="_blank">再做一张：老作品没有原图</a></nav>
+  <div class="frames">
+    <figure><div class="frame f-m"><iframe src="workspace.html?t=pure-white&batch=10&state=ready&frame=1" title="batch 375" loading="lazy"></iframe></div><figcaption><b>375 × 812</b>批量 10 张，就绪</figcaption></figure>
+    <figure><div class="frame f-1280"><iframe src="workspace.html?t=pure-white&batch=10&state=generating" title="batch 1280" loading="lazy"></iframe></div><figcaption><b>1280 × 800</b>批量生成中（列表 + 显影）</figcaption></figure>
+    <figure><div class="frame f-1440"><iframe src="photo.html?edit=typing" title="edit sizes 1440" loading="lazy"></iframe></div><figcaption><b>1440 × 900</b>编辑面板，八个尺寸格</figcaption></figure>
+  </div>
+</section>
+</body>
+</html>

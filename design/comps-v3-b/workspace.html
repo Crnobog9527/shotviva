@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0A09">
+<meta name="robots" content="noindex">
+<title>Pure White · Shotviva</title>
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/studio.css">
+<link rel="stylesheet" href="css/app.css">
+<script src="js/studio.js"></script>
+<style>
+  /* The workspace page is the full-page form of the creation panel: the form markup comes from SV.formHTML (one source
+     with the create-page dialog); this file only owns the page chrome, the two columns and the stage. */
+  body { padding-bottom: calc(var(--sab) + 190px); }
+  .nav { position: sticky; top: 0; z-index: 50; padding: var(--sat) 8px 0;
+    background: linear-gradient(color-mix(in srgb, var(--background) 94%, transparent), color-mix(in srgb, var(--background) 80%, transparent)); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+  .nav-row { height: 52px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+  .back { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 8px 0 4px; font: 500 16px/1 var(--font-sans); text-decoration: none; color: var(--foreground); justify-self: start; }
+  .back .i { width: 22px; height: 22px; stroke-width: 2.2; color: var(--primary); }
+  .nav-title { font: 600 15px/1 var(--font-sans); letter-spacing: -0.01em; opacity: 0; transition: opacity .2s; }
+  .nav.scrolled .nav-title { opacity: 1; }
+  .nav .bal { justify-self: end; margin-right: 8px; }
+
+  .head { display: flex; gap: 12px; align-items: center; padding: 8px var(--gutter) 4px; }
+  .head img { width: 56px; height: 70px; border-radius: 12px; object-fit: cover; box-shadow: inset 0 0 0 1px var(--border); }
+  .head h1 { font: 400 36px/1 var(--font-display); letter-spacing: -0.02em; }
+  .head p { font-size: 14px; color: var(--muted-foreground); margin-top: 4px; text-wrap: pretty; }
+
+  /* fixed bottom bar: the one primary */
+  .bar { position: fixed; z-index: 60; left: 0; right: 0; bottom: 0; padding: 12px var(--gutter) calc(var(--sab) + 8px);
+    background: linear-gradient(color-mix(in srgb, var(--bar) 82%, transparent), color-mix(in srgb, var(--bar) 96%, transparent)); backdrop-filter: blur(24px) saturate(1.3); -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    box-shadow: inset 0 1px 0 var(--border); }
+  .bar .btn-ghost { width: 100%; min-height: 52px; border-radius: 16px; }
+
+  /* ---------- the stage: the print in the tray, one block for every state ---------- */
+  .stage { padding: 8px var(--gutter) 0; }
+  .dev { position: relative; aspect-ratio: 4 / 5; border-radius: 22px; overflow: hidden; background: var(--background); box-shadow: inset 0 0 0 1px var(--border); }
+  [data-state="generating"] .dev { aspect-ratio: 5 / 4; }
+  .dev img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .dev .neg { filter: grayscale(1) contrast(.85) brightness(.7); }
+  @property --left { syntax: "<percentage>"; inherits: true; initial-value: 62%; }
+  /* generating: the way an image comes up in the developer. The uploaded photo dims; a blurred version of the result fades over it;
+     then the sharp result clears from the top down through a soft edge (a mask, not a line). Loops while the comp waits. */
+  @property --p { syntax: "<percentage>"; inherits: false; initial-value: -30%; }
+  .dev .blur { filter: blur(22px) saturate(.85); transform: scale(1.08); opacity: 0; }
+  [data-state="generating"] .dev .blur { animation: dev-blur 8s var(--ease) infinite; }
+  [data-state="generating"] .dev .pos { --p: -30%; animation: dev-clear 8s cubic-bezier(.3, 0, .2, 1) infinite;
+    -webkit-mask-image: linear-gradient(180deg, #000 calc(var(--p) - 28%), rgba(0,0,0,.55) calc(var(--p) - 10%), transparent var(--p)); mask-image: linear-gradient(180deg, #000 calc(var(--p) - 28%), rgba(0,0,0,.55) calc(var(--p) - 10%), transparent var(--p)); }
+  [data-state="generating"] .dev .neg { animation: dev-neg 8s var(--ease) infinite; }
+  @keyframes dev-blur { 0% { opacity: 0; } 18% { opacity: 1; } 100% { opacity: 1; } }
+  @keyframes dev-neg { 0% { opacity: 1; filter: grayscale(1) contrast(.85) brightness(.7); } 22% { opacity: 1; } 40% { opacity: 0; } 100% { opacity: 0; } }
+  @keyframes dev-clear { 0%, 22% { --p: -30%; } 92% { --p: 140%; } 100% { --p: 140%; } }
+  @media (prefers-reduced-motion: reduce) { [data-state="generating"] .dev .blur, [data-state="generating"] .dev .pos, [data-state="generating"] .dev .neg { animation: none; } [data-state="generating"] .dev .blur { opacity: 1; } [data-state="generating"] .dev .pos { -webkit-mask-image: none; mask-image: none; opacity: .35; } }
+  .dev .hud { position: absolute; left: 12px; right: 12px; top: 12px; display: flex; justify-content: space-between; z-index: 2; }
+  .dev .badge-illus { left: 12px; bottom: 12px; }
+  /* empty: the template's sample pair fills the tray */
+  .dev .pair { position: absolute; inset: 0; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
+  .dev .compare { position: absolute; inset: 0; aspect-ratio: auto; border-radius: 0; }
+  .stage-cap { margin-top: 12px; font-size: 14px; color: var(--muted-foreground); }
+
+  /* batch (T28, ARCHITECTURE §6.2 "批量上传的语义"; Owner 11-06 night: show it in the workspace). ?batch=<n>&tier=pro|max.
+     Same template, size, resolution and note for N photos; each photo is its own job, charged and refunded on its own; the
+     batch runs on paid credits only. Ready: a tray of thumbnails with an "Add more" tile. Generating: one row per photo, the
+     stage develops the one in progress. Done: the count, the credits, a grid of results. Starter sees the gallery picker
+     single-select with a line about Pro. */
+  .tray { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 10px; }
+  .tray .ph { position: relative; aspect-ratio: 4 / 5; border-radius: 10px; overflow: hidden; background: var(--muted); }
+  .tray .ph img { width: 100%; height: 100%; object-fit: cover; }
+  .tray .ph .rm { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--photo-scrim); color: var(--foreground); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .tray .ph .rm::before { content: ""; position: absolute; inset: -10px; }
+  .tray .ph .rm .i { width: 12px; height: 12px; stroke-width: 2.4; }
+  .tray .ph .n { position: absolute; left: 4px; bottom: 4px; height: 18px; padding: 0 5px; border-radius: 5px; font: 500 11px/18px var(--font-mono); background: var(--photo-scrim); color: var(--foreground); }
+  .tray .add { aspect-ratio: 4 / 5; border-radius: 10px; display: grid; place-content: center; justify-items: center; gap: 4px; text-align: center; color: var(--bone-dim); background: var(--bone-4); box-shadow: inset 0 0 0 1px var(--input); font: 500 12px/1.2 var(--font-sans); }
+  .tray .add .i { width: 18px; height: 18px; }
+  .tray .add small { font: 400 11px/1 var(--font-mono); color: var(--muted-foreground); }
+  .tray-ft { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 12px 12px; font-size: 14px; color: var(--muted-foreground); }
+  .tray-ft b { color: var(--foreground); font-weight: 500; }
+  /* Make again (spec #149 / T40: originals are kept with the work). ?again=1 is the normal case: the form is the old work's
+     settings and the original photo is already in the tray, ready to generate. ?again=expired is only for works made before
+     T40 and the rare copy failure: the photo slot says the original isn't available and asks for the photo again. */
+  .gone { padding: 14px 16px; display: grid; grid-template-columns: 56px 1fr; gap: 4px 12px; align-items: center; }
+  .gone .ghost { grid-row: 1 / span 2; width: 56px; aspect-ratio: 4 / 5; border-radius: 10px; background: repeating-linear-gradient(135deg, var(--bone-6) 0 4px, transparent 4px 8px); box-shadow: inset 0 0 0 1px var(--input); }
+  .gone b { font: 600 16px/1.3 var(--font-sans); }
+  .gone span { font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
+  .gone .two { grid-column: 1 / -1; margin-top: 8px; }
+  .again-note { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.4; color: var(--bone-dim); background: var(--bone-4); box-shadow: inset 0 0 0 1px var(--border); }
+  .again-note b { color: var(--foreground); font-weight: 500; }
+  .starter-hint { margin-top: 8px; font-size: 14px; color: var(--muted-foreground); }
+  .starter-hint a { color: var(--foreground); }
+  /* generating: one row per photo */
+  .rows { list-style: none; margin: 0; padding: 4px 12px; border-radius: 18px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .rows li { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 12px; min-height: 56px; padding: 6px 0; font-size: 15px; }
+  .rows li + li { border-top: 1px solid var(--hairline); }
+  .rows img { width: 40px; height: 50px; border-radius: 8px; object-fit: cover; }
+  .rows .st { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .rows .st .prog { flex: 1; max-width: 160px; height: 4px; border-radius: 2px; background: var(--bone-8); overflow: hidden; }
+  .rows .st .prog i { display: block; height: 100%; width: 46%; background: var(--primary); border-radius: 2px; }
+  .rows .pct, .rows .q { font: 400 13px/1 var(--font-mono); color: var(--muted-foreground); }
+  .rows .done { color: var(--success); display: inline-flex; align-items: center; gap: 6px; }
+  .rows .done .i { width: 14px; height: 14px; stroke-width: 3; }
+  .rows .fail { color: var(--destructive); display: inline-flex; align-items: center; gap: 6px; }
+  .rows .fail .i { width: 14px; height: 14px; stroke-width: 2.4; }
+  .rows .act { min-height: 32px; padding: 0 10px; border-radius: 999px; font: 600 13px/1 var(--font-sans); background: var(--bone-6); box-shadow: inset 0 0 0 1px var(--border); }
+  .rows .now { font-weight: 500; }
+  .batch-sum { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 14px; color: var(--muted-foreground); }
+  .batch-sum b { color: var(--foreground); font-weight: 500; }
+  /* done: the results */
+  .grid-done { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 10px; }
+  .grid-done .ph { aspect-ratio: 4 / 5; border-radius: 10px; overflow: hidden; background: var(--muted); position: relative; }
+  .grid-done .ph img { width: 100%; height: 100%; object-fit: cover; }
+  .grid-done .ph.failed::after { content: "Refunded"; position: absolute; inset: 0; display: grid; place-items: center; font: 500 11px/1 var(--font-sans); color: var(--foreground); background: rgba(11,10,9,.72); }
+  body.batch .dev .hud .count { font-variant-numeric: tabular-nums; }
+  @media (min-width: 768px) { .tray, .grid-done { grid-template-columns: repeat(6, 1fr); gap: 8px; } }
+  .steps { list-style: none; margin: 0; padding: 4px 16px; border-radius: 18px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .steps li { display: flex; align-items: center; gap: 12px; min-height: 52px; font-size: 16px; }
+  .steps li + li { border-top: 1px solid var(--hairline); }
+  .steps .tick { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
+  .steps .tick .i { width: 12px; height: 12px; stroke-width: 3; }
+  .steps .now .tick { background: color-mix(in srgb, var(--primary) 16%, transparent); }
+  .steps .now .tick::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+  .steps .prog { flex: 1; height: 4px; border-radius: 2px; background: var(--bone-8); overflow: hidden; margin-left: 4px; }
+  .steps .prog i { display: block; height: 100%; width: 46%; background: var(--primary); border-radius: 2px; }
+  .steps .pct { font: 400 14px/1 var(--font-mono); color: var(--muted-foreground); }
+  .leave { margin-top: 12px; font-size: 14px; color: var(--bone-dim); }
+
+  /* result / failure rows */
+  .result { margin-top: 16px; padding: 16px; display: grid; gap: 4px; }
+  .result .t { display: flex; align-items: center; gap: 8px; font: 600 16px/1.25 var(--font-sans); }
+  .result .t .dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
+  .result .t .dot .i { width: 12px; height: 12px; stroke-width: 3; }
+  .result.fail .t .dot { background: color-mix(in srgb, var(--destructive) 14%, transparent); color: var(--destructive); }
+  .result p { font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
+  .result .btn { justify-self: start; margin-top: 8px; }
+  .result .link { font-size: 15px; }
+
+  body[data-state="generating"], body[data-state="done"], body[data-state="failed"] { padding-bottom: calc(var(--sab) + 150px); }
+
+  /* phone: the stage appears above the column once there is a print to show */
+  .cols { display: flex; flex-direction: column; }
+  .col-b { order: -1; }
+  [data-state="empty"] .col-b, [data-state="ready"] .col-b { display: none; }
+  [data-state="failed"] .col-b { order: 0; } /* the message comes first on a failure */
+
+  /* ======================= desktop: two columns from 1024 up ======================= */
+  @media (min-width: 768px) {
+    .nav-row { height: 60px; }
+  }
+  @media (min-width: 1024px) {
+    body, body[data-state="done"], body[data-state="failed"] { padding-bottom: 48px; }
+    .head { padding-top: 24px; }
+    .cols { display: grid; grid-template-columns: minmax(380px, 440px) minmax(0, 1fr); column-gap: 48px; align-items: start; padding: 0 var(--gutter); }
+    .col-a { min-width: 0; }
+    .col-b, [data-state="failed"] .col-b { order: 0; position: sticky; top: 72px; }
+    [data-state="empty"] .col-b, [data-state="ready"] .col-b { display: block; }
+    .sec, .stage, .foot { padding-left: 0; padding-right: 0; }
+    .form .sec:first-child { padding-top: 16px; }
+    /* the stage keeps 4:5 and never exceeds the viewport */
+    .dev { width: min(100%, calc((100dvh - 220px) * 0.8)); margin-inline: auto; }
+    [data-state="generating"] .dev { aspect-ratio: 4 / 5; }
+    .stage-cap { text-align: center; }
+    .steps, .result, .leave { max-width: none; }
+    /* the one primary: sticky at the end of the form column */
+    .bar { position: sticky; left: auto; right: auto; bottom: 0; margin-top: 16px; padding: 24px 0 24px;
+      background: linear-gradient(color-mix(in srgb, var(--background) 0%, transparent), var(--background) 16px); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  }
+</style>
+</head>
+<body data-state="ready">
+<header class="nav" id="nav">
+  <div class="nav-row w">
+    <a class="back" href="create.html"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>Create</a>
+    <span class="nav-title" aria-hidden="true">Pure White</span>
+    <a class="bal" href="paywall.html" id="bal"><span class="coin" aria-hidden="true"></span><span id="bal-t">6 free</span></a>
+  </div>
+</header>
+
+<main class="w">
+  <div class="head">
+    <img src="../assets/img/pure-white-after.webp" alt="" id="tpl-img">
+    <div><h1 id="tpl-name">Pure White</h1><p id="tpl-use">Products &amp; Resale · Clean white background, soft shadow, catalogue-ready.</p></div>
+  </div>
+
+  <div class="cols">
+    <div class="col-a">
+      <div id="form-root"></div>
+
+      <section class="sec" data-show="generating" aria-live="polite" aria-labelledby="gh">
+        <h2 id="gh" class="sr-only">Generating</h2>
+        <ol class="steps">
+          <li><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Compressing</li>
+          <li><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Uploading</li>
+          <li class="now"><span class="tick" aria-hidden="true"></span>Generating<span class="prog" role="progressbar" aria-label="Generating" aria-valuenow="46" aria-valuemin="0" aria-valuemax="100"><i></i></span><span class="pct">46%</span></li>
+        </ol>
+        <p class="leave">Usually 20–40 seconds. You can leave this page: it lands in Photos when it's done.</p>
+      </section>
+
+      <section class="sec" data-show="done" aria-live="polite" aria-labelledby="dh">
+        <h2 id="dh" class="sr-only">Done</h2>
+        <div class="panel result">
+          <span class="t"><span class="dot"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Saved to Photos</span>
+          <p>Standard · 1024 px · 2 credits used. Made with free credits, so it's public with a watermark.</p>
+          <a class="link" href="create.html">Make another <svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>
+        </div>
+      </section>
+
+      <section class="sec" data-show="failed" aria-live="assertive" aria-labelledby="fh">
+        <h2 id="fh" class="sr-only">Failed</h2>
+        <div class="panel result fail">
+          <span class="t"><span class="dot"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span>Generation failed. Your credits were refunded.</span>
+          <p>Your photo and settings are kept. Try again, or change the photo.</p>
+          <button class="btn btn-ghost btn-pill" type="button" data-go="empty">Change photo</button>
+        </div>
+      </section>
+
+      <div class="bar">
+        <div data-show="empty ready" id="bar-root"></div>
+        <div data-show="generating"><a class="btn btn-ghost" href="create.html">Back to Create</a></div>
+        <div data-show="done">
+          <a class="btn btn-primary" href="#" id="share"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7.5 8.5L12 4l4.5 4.5M5 14v4.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V14"/></svg><span class="m-only">Share</span><span class="d-only">Download</span></a>
+        </div>
+        <div data-show="failed">
+          <button class="btn btn-primary" type="button" data-go="generating">Retry <span class="cost" id="retry-cost">· 2 credits</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-b">
+      <div class="stage">
+        <div class="dev" id="dev">
+          <span data-show="empty" id="stage-tpl"></span>
+          <img class="you" src="../assets/img/pure-white-before.webp" alt="Your uploaded photo (illustrative example)" data-show="ready">
+          <img class="neg" src="../assets/img/pure-white-before.webp" alt="" data-show="generating failed">
+          <img class="blur" src="../assets/img/pure-white-after.webp" alt="" aria-hidden="true" data-show="generating">
+          <img class="pos" src="../assets/img/pure-white-after.webp" alt="Your photo restyled with Pure White (illustrative example)" data-show="generating done">
+                    <span class="hud">
+            <span class="pill on-photo" data-show="ready">Your photo</span><span class="pill on-photo" data-show="ready">4:5 · as shot</span>
+            <span class="pill on-photo" data-show="generating">Developing</span>
+            <span class="pill on-photo" data-show="done">Done</span>
+            <span class="pill on-photo" data-show="failed">Not developed</span>
+            <span class="pill on-photo" data-show="generating done failed">Standard · 1024</span>
+          </span>
+          <span class="badge-illus" data-show="ready generating done failed">Illustrative example</span>
+        </div>
+        <p class="stage-cap" data-show="empty">Template example: the phone photo on the left, the AI result on the right.</p>
+        <p class="stage-cap" data-show="ready">Your photo, as shot. The template keeps it and changes the light and background.</p>
+        <p class="stage-cap" data-show="done">Phone photo → <span id="cap-name">Pure White</span>. Long-press to save on a phone.</p>
+        <p class="stage-cap" data-show="failed">Nothing was charged.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  const { T, q, catName, pair, compare, bindCompare, formHTML, barHTML, bindForm, reveal } = window.SV;
+  const t = T.find(x => x.id === q.get('t')) || T[0];
+  document.getElementById('tpl-name').textContent = t.name;
+  document.getElementById('cap-name').textContent = t.name;
+  document.querySelector('.nav-title').textContent = t.name;
+  document.title = t.name + ' · Shotviva';
+  document.getElementById('tpl-img').src = `../assets/img/${t.id}-after.webp`;
+  document.getElementById('tpl-use').textContent = catName(t) + ' · ' + t.desc;
+  ['you', 'neg'].forEach(c => document.querySelector('.dev .' + c).src = `../assets/img/${t.id}-before.webp`);
+  document.querySelector('.dev .blur').src = document.querySelector('.dev .pos').src = `../assets/img/${t.id}-after.webp`;
+  document.querySelector('.dev .pos').alt = `Your photo restyled with ${t.name} (illustrative example)`;
+  const stage = document.getElementById('stage-tpl');
+  stage.innerHTML = t.cat === 'art' ? compare(t, { badge: true }) : pair(t, { lg: true, badge: true, video: true });
+  if (t.cat === 'art') bindCompare(stage);
+
+  // the shared form + primary (same source as the create-page dialog)
+  document.getElementById('form-root').innerHTML = formHTML(t, 'ws');
+  document.getElementById('bar-root').innerHTML = barHTML();
+  const STATES = ['empty', 'ready', 'generating', 'done', 'failed'];
+  const setState = s => { document.body.dataset.state = s; window.scrollTo(0, 0); };
+  // balance: ?balance=0 shows the "not enough credits" state
+  const bal = q.has('balance') ? +q.get('balance') : 6;
+  document.getElementById('bal-t').textContent = bal + ' free';
+  bindForm(document.body, 'ws', { balance: bal, state: setState, onGenerate: () => { if (document.body.dataset.state === 'ready') setState('generating'); },
+    onCost: c => { document.getElementById('retry-cost').textContent = `· ${c} credits`; } });
+  setState(STATES.includes(q.get('state')) ? q.get('state') : 'ready');
+  document.getElementById('share').addEventListener('click', e => e.preventDefault());
+
+
+  /* ---------- Make again, original gone (?again=expired): the form is the old work's settings; the photo slot asks for the photo ---------- */
+  if (q.get('again')) {
+    document.querySelector('.form').insertAdjacentHTML('afterbegin', `<p class="again-note"><b>Making again:</b> Pure White · Post 4:5 · Standard · note kept, from 28 Oct.</p>`);
+    const note = document.getElementById('ws-note'); note.value = 'keep the chain gold'; note.dispatchEvent(new Event('input'));
+    const post = document.querySelector('input[name="ws-size"][value="Post"]'); if (post) { post.checked = true; post.dispatchEvent(new Event('change', { bubbles: true })); }
+    if (q.get('again') !== 'expired') { const ok = document.querySelector('.panel.photo .ok'); if (ok) ok.lastChild.textContent = 'Original photo, kept with the work'; document.querySelector('.panel.photo .size').textContent = 'From 28 Oct · 0.9 MB'; }
+  }
+  if (q.get('again') === 'expired') {
+    const e = document.querySelector('.panel.empty');
+    e.className = 'panel empty gone';
+    e.innerHTML = `<span class="ghost" aria-hidden="true"></span><b>The original photo isn't available</b><span>This work was made before we started keeping originals. Add the same photo again and everything else is as it was.</span>
+      <div class="two"><button class="btn btn-ghost" type="button" data-go="ready">${window.SV.ICON.camera}Take photo</button><button class="btn btn-ghost" type="button" data-go="ready">${window.SV.ICON.gallery}Choose from gallery</button></div>`;
+    document.querySelector('[data-cta]').setAttribute('aria-disabled', 'true');
+    document.querySelector('[data-notice] span').innerHTML = 'Add the photo first. <b>Then it costs 2 credits, like any photo.</b>';
+    document.querySelectorAll('[data-go="ready"]').forEach(b => b.addEventListener('click', () => document.querySelector('[data-cta]').removeAttribute('aria-disabled')));
+  }
+  /* ---------- batch (?batch=<n>&tier=pro|max); Starter (?tier=starter&batch=1) shows the single-select hint ---------- */
+  const tier = q.get('tier') || (q.has('batch') ? 'pro' : 'starter'), LIM = { starter: 1, pro: 10, max: 30 }, CONC = { starter: 1, pro: 3, max: 6 };
+  const N = Math.min(+q.get('batch') || 0, LIM[tier]);
+  const PH = ['pure-white', 'lifestyle-table', 'spa-podium', 'delivery-photo', 'dark-dining', 'promo-poster', 'bright-listing', 'evening-glow', 'pet-studio', 'korean-manhwa'];
+  const IMGB = i => `../assets/img/${PH[i % PH.length]}-before.webp`, IMGA = i => `../assets/img/${PH[i % PH.length]}-after.webp`;
+  if (tier === 'starter' && q.has('batch')) {
+    const e = document.querySelector('.panel.empty'); if (e) e.insertAdjacentHTML('afterend', `<p class="starter-hint">One photo at a time on Starter. <a href="paywall.html">Pro</a> takes up to 10 at once, Max 30.</p>`);
+  }
+  if (N > 1) {
+    document.body.classList.add('batch');
+    const per = +document.querySelector('input[name="ws-res"]:checked').value, paid = q.has('balance') ? +q.get('balance') : 38;
+    document.getElementById('bal-t').textContent = paid + ' credits';
+    /* ready: the tray */
+    const photo = document.querySelector('.panel.photo'); photo.className = 'panel tray-wrap';
+    photo.innerHTML = `<div class="tray" role="list" aria-label="${N} photos">${Array.from({ length: N }, (_, i) => `<div class="ph" role="listitem"><img src="${IMGB(i)}" alt="Photo ${i + 1} (illustrative example)"><span class="n">${i + 1}</span><button class="rm" type="button" aria-label="Remove photo ${i + 1}"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`).join('')}
+      ${N < LIM[tier] ? `<button class="add" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add more<small>${LIM[tier] - N} left</small></button>` : ''}</div>
+      <div class="tray-ft"><span><b>${N} photos</b> · 4:5 as shot · compressed</span><span>${tier === 'max' ? 'Max' : 'Pro'}: up to ${LIM[tier]} at once</span></div>`;
+    document.querySelector('.form .sec-h .meas').textContent = `${N} photos`;
+    document.querySelector('.form .sec-h h2').textContent = 'Your photos';
+    /* the primary and its notice */
+    const cta = document.querySelector('[data-cta]'), notice = document.querySelector('[data-notice] span'), foot = document.querySelector('[data-foot]');
+    const paint = () => { const c = +document.querySelector('input[name="ws-res"]:checked').value, total = c * N;
+      if (total > paid) { cta.classList.add('need'); cta.innerHTML = `Get credits <span class="cost">· ${total - paid} needed</span>`; cta.href = 'paywall.html'; notice.innerHTML = `${N} photos need <b>${total} paid credits</b> and you have ${paid}. A batch runs on paid credits only, so every photo is private and watermark-free.`; }
+      else { cta.classList.remove('need'); cta.innerHTML = `Generate ${N} photos <span class="cost">· ${total} credits</span>`; cta.href = '#'; notice.innerHTML = `${N} photos, <b>${c} credits each</b>. Each one is charged on its own; a failed one is refunded on its own. ${CONC[tier]} develop at a time.`; }
+      foot.textContent = `You have ${paid} paid credits.`; };
+    document.querySelectorAll('input[name="ws-res"]').forEach(r => r.addEventListener('change', paint)); paint();
+    /* generating: the rows */
+    const doneN = Math.min(3, N - 1), nowN = Math.min(CONC[tier], N - doneN - 1);
+    const row = i => { const st = i < doneN ? 'done' : i === doneN + nowN ? 'fail' : i < doneN + nowN ? 'now' : 'queued';
+      return `<li class="${st === 'now' ? 'now' : ''}"><img src="${IMGB(i)}" alt=""><span class="st">${st === 'done' ? `<span class="done"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Saved to Photos</span>` : st === 'now' ? `Developing <span class="prog" role="progressbar" aria-label="Photo ${i + 1}" aria-valuenow="${Math.min(96, 30 + i * 17)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${Math.min(96, 30 + i * 17)}%"></i></span><span class="pct">${Math.min(96, 30 + i * 17)}%</span>` : st === 'fail' ? `<span class="fail"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v5M12 16h.01"/></svg>Failed · ${per} credits refunded</span>` : `<span class="q">Queued</span>`}</span>${st === 'fail' ? '<button class="act" type="button">Retry</button>' : st === 'done' ? `<span class="q">${per} cr</span>` : '<span></span>'}</li>`; };
+    const gen = document.querySelector('[data-show="generating"].sec');
+    gen.querySelector('.steps').outerHTML = `<p class="batch-sum"><b>${doneN} of ${N} done</b><span>${nowN} developing · ${N - doneN - nowN - 1} queued · 1 failed</span></p><ol class="rows">${Array.from({ length: N }, (_, i) => row(i)).join('')}</ol>`;
+    gen.querySelector('.leave').textContent = `${CONC[tier]} at a time, about 20–40 seconds each. You can leave this page: each photo lands in Photos as it's done.`;
+    document.querySelector('.hud [data-show="generating"]').textContent = `Developing ${doneN + 1} of ${N}`;
+    /* done: the grid */
+    const done = document.querySelector('[data-show="done"] .result');
+    done.querySelector('p').textContent = `${N - 1} of ${N} saved to Photos · Standard · ${per * (N - 1)} credits used. One failed and was refunded.`;
+    done.querySelector('.t').lastChild.textContent = `${N - 1} photos saved to Photos`;
+    done.insertAdjacentHTML('beforeend', `<div class="grid-done">${Array.from({ length: N }, (_, i) => `<div class="ph${i === N - 1 ? ' failed' : ''}"><img src="${i === N - 1 ? IMGB(i) : IMGA(i)}" alt=""></div>`).join('')}</div>`);
+    document.querySelector('[data-show="done"] .btn-primary').innerHTML = 'Open Photos';
+    document.querySelector('.hud [data-show="done"]').textContent = `${N - 1} of ${N} done`;
+  }
+
+  const nav = document.getElementById('nav');
+  addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 60), { passive: true });
+  reveal([document.querySelector('.head'), ...document.querySelectorAll('.form > .sec, .form > .foot'), document.querySelector('.stage')]);
+})();
+</script>
+</body>
+</html>

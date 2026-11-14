@@ -1,0 +1,74 @@
+import type { LegalSection } from '@/core/content'
+
+import { entity } from './shared'
+
+// Privacy Policy, part 1: what we collect and why (ARCHITECTURE §7, §8.2, §15, §16).
+
+export const privacyCollectSections: readonly [LegalSection, ...LegalSection[]] = [
+  {
+    id: 'collect',
+    heading: 'What we collect',
+    blocks: [
+      'Information you give us:',
+      {
+        list: [
+          'Account details: your email address and password (stored only in scrambled, hashed form by our sign-in provider), and a display name. If you sign in with Google, we receive your name, email address and profile picture from Google. If you sign in with a mainland China mobile number, we keep that number instead (see "Phone numbers and text messages").',
+          'Photos you upload. Before a photo leaves your device, your browser shrinks it and saves it again, which removes hidden photo data such as camera details and GPS location. If your browser cannot do this, the original file is uploaded and we shrink it on our servers.',
+          'Text you enter for a template, such as a title, a price or a note about what to change.',
+          'The images the Service creates for you (your works), and whether each one is public or private.',
+          'Template requests: the description and reference images you post on the Wishlist, and your votes.',
+          'Messages you send us, through Help & feedback on your account page or by email, for example for support or refunds, and our replies.',
+          'Business inquiries: if you send the form under "For business" on our pricing page, your name, work email, company, the answers you choose and your message, and, if you give them, your job title, phone number, WeChat ID, website, country and team size. We use these contact details only to reply to that inquiry. To limit spam, we keep a scrambled, one-way form of the IP address the form was sent from, never the address itself.',
+        ],
+      },
+      'Information from purchases:',
+      {
+        list: [
+          'What you bought, the price, the date, the payment provider and the payment method type (for example card or Alipay), your subscription status, and a record of every credit added to or used from your account.',
+          'Our payment providers (Stripe, Link and Waffo) collect your payment details on their own pages. We never receive or store your full card number.',
+        ],
+      },
+      'Information collected automatically:',
+      {
+        list: [
+          'Technical data such as your IP address, browser and device type, and the pages you visit, in our server logs.',
+          'The IP address you signed up from, kept on your account to stop people from collecting free credits with many accounts.',
+          'For fraud prevention and to answer payment disputes: the IP address and browser (user agent) you started a card or wallet checkout from, the time you accepted our Terms of Service and Refund Policy at checkout, the IP address each image was created from, and when and from which IP address you first downloaded it (with how many times).',
+          'Signals from our bot check (hCaptcha) on the sign-up, sign-in and password reset pages, where it loads when you open the page, and when you send a business inquiry.',
+          'Usage analytics and error reports, described in "Analytics and cookies" and "Error reports" below.',
+        ],
+      },
+      'We do not ask for sensitive information, such as health, religion or government ID numbers. Please do not upload photos or text that contain it. We do not use your photos to identify anyone or to create face or other biometric templates.',
+    ],
+  },
+  {
+    id: 'use',
+    heading: 'How we use your information',
+    blocks: [
+      {
+        list: [
+          'To run the Service: create your account, sign you in, create images from your photos, show you your works, and keep your credit balance.',
+          'To take payments, add credits, manage subscriptions and handle refunds.',
+          'To show public works, and to run the Wishlist.',
+          'To keep the Service safe: prevent fraud and abuse, enforce limits on free credits, and investigate misuse.',
+          'To answer a chargeback or payment dispute: if you ask your bank to reverse a payment, we send our records of that purchase and of how its credits were used (the dates, IP addresses, browser, Terms acceptance, the images created and whether they were downloaded, your account email and our refund policy) to the payment provider, which passes them to your bank. When a dispute is opened, the account is suspended; contact us if you believe this is a mistake.',
+          'To understand how the Service is used and fix problems, through analytics and error reports.',
+          'To send account emails, such as email confirmation and password reset, and sign-in codes by text message. We do not send marketing emails or messages.',
+          'To answer your messages, and to comply with the law and enforce our terms.',
+        ],
+      },
+      'When it is needed to answer a support request or to keep the Service safe, our support staff may look at the photos you uploaded and the images you created. Every such view is recorded.',
+      `We do not sell your personal information, we do not share it for targeted advertising, and we do not use your photos or works to train AI models.`,
+      'If you are in the European Economic Area, the United Kingdom or Switzerland: we process your information to perform our contract with you (running the Service and taking payments), for our legitimate interests (security, fraud prevention, answering payment disputes, analytics and improving the Service), to comply with legal obligations (such as keeping tax records), and with your consent where we ask for it.',
+    ],
+  },
+  {
+    id: 'public',
+    heading: 'Public works',
+    blocks: [
+      'Images created with free credits are public, and so is any paid work you choose to make public. A public work can be seen by anyone, together with the template name and the text you entered for it. We do not show the photo you uploaded or your email address with a public work.',
+      `You can delete a free work at any time, and you can make a paid work private again. Copies that other people saved or shared before then may still exist outside ${entity.site}.`,
+      'On the Wishlist, other signed-in users see your request with a shortened display name (the first letter followed by ***).',
+    ],
+  },
+]

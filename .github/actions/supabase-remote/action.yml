@@ -1,0 +1,55 @@
+name: Link a remote Supabase project
+description: >
+  Installs the pinned Supabase CLI (./.github/actions/supabase-cli) and links the checkout to one remote project, so the
+  caller's next steps can run `supabase db push` / `supabase migration list --linked`.
+  The calling job sets SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD and SUPABASE_PROJECT_REF
+  in its env (the CLI reads the first two itself); the inputs only name where each value
+  comes from, so a missing one fails with the exact secret or variable to set.
+
+inputs:
+  require-owner-review:
+    description: Verify the Owner's approval before linking (pricing activate / rollback only).
+    required: false
+    default: 'false'
+  owner-review-environment:
+    description: The environment that approval must be on.
+    required: false
+    default: production-pricing
+  token-source:
+    description: Where SUPABASE_ACCESS_TOKEN comes from, for the error message.
+    required: true
+  password-source:
+    description: Where SUPABASE_DB_PASSWORD comes from, for the error message.
+    required: true
+  ref-source:
+    description: Where SUPABASE_PROJECT_REF comes from, for the error message.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - if: inputs.require-owner-review == 'true'
+      uses: ./.github/actions/verify-owner-review
+      with:
+        environment: ${{ inputs.owner-review-environment }}
+
+    # Same pinned CLI as the local-database job, so remote and local agree on migration
+    # handling; cached, and the download is retried on 5xx (T88).
+    - uses: ./.github/actions/supabase-cli
+
+    - name: Check configuration
+      shell: bash
+      env:
+        TOKEN_SOURCE: ${{ inputs.token-source }}
+        PASSWORD_SOURCE: ${{ inputs.password-source }}
+        REF_SOURCE: ${{ inputs.ref-source }}
+      run: |
+        missing=0
+        [ -n "${SUPABASE_ACCESS_TOKEN:-}" ] || { echo "::error::Missing $TOKEN_SOURCE"; missing=1; }
+        [ -n "${SUPABASE_DB_PASSWORD:-}" ] || { echo "::error::Missing $PASSWORD_SOURCE"; missing=1; }
+        [ -n "${SUPABASE_PROJECT_REF:-}" ] || { echo "::error::Missing $REF_SOURCE"; missing=1; }
+        exit "$missing"
+
+    - name: Link project
+      shell: bash
+      run: supabase link --project-ref "$SUPABASE_PROJECT_REF"

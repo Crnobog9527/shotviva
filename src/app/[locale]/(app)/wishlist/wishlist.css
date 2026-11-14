@@ -1,0 +1,250 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
+/* Wishlist tab (design/comps-v3-b/wishlist.html, signed off 2026-11-06; DESIGN §4.7). The wall's
+   prints, tape, lean and breeze are page-specific, so they live here rather than in globals.css.
+   Every colour is a token from globals.css. */
+
+@layer components {
+  /* the wall: prints taped to a wall, two across on the phone, three from 768, four from 1024 */
+  .wl-wall {
+    --wind: 0deg;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 10px;
+    margin: 24px var(--gutter) 0;
+    padding: 12px 0 0;
+    list-style: none;
+  }
+  /* each note hangs from its tape (origin top centre), leans by --r and swings with --wind */
+  .wl-wall > li {
+    min-width: 0;
+    --r: 0deg;
+    --k: 1;
+    transform: rotate(calc(var(--r) + var(--wind) * var(--k)));
+    transform-origin: 50% 0;
+    transition: transform 0.9s var(--ease);
+    will-change: transform;
+  }
+  .wl-wall > li:nth-child(6n + 1) { --r: -2.2deg; --k: 1.15; }
+  .wl-wall > li:nth-child(6n + 2) { --r: 1.6deg; --k: 0.8; }
+  .wl-wall > li:nth-child(6n + 3) { --r: -0.8deg; --k: 1.3; }
+  .wl-wall > li:nth-child(6n + 4) { --r: 2.4deg; --k: 0.95; }
+  .wl-wall > li:nth-child(6n + 5) { --r: -1.4deg; --k: 1.05; }
+  .wl-wall > li:nth-child(6n + 6) { --r: 1deg; --k: 0.7; }
+
+  .wl-req {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    padding: 8px 8px 10px;
+    border-radius: 6px;
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 var(--edge-highlight), 0 18px 28px -18px var(--photo-fade), 0 2px 4px -2px var(--frost);
+  }
+  /* the tape: a translucent strip across the top edge, slightly askew */
+  .wl-req::before {
+    content: "";
+    position: absolute;
+    z-index: 4;
+    left: 50%;
+    top: -9px;
+    width: 64px;
+    height: 20px;
+    transform: translateX(-50%) rotate(var(--tape, -3deg));
+    border-radius: 2px;
+    pointer-events: none;
+    background: linear-gradient(90deg, var(--grab), color-mix(in srgb, var(--foreground) 34%, transparent) 50%, color-mix(in srgb, var(--foreground) 20%, transparent));
+    box-shadow: 0 1px 2px var(--frost), inset 0 0 0 1px var(--wash-strong);
+  }
+  .wl-wall > li:nth-child(odd) .wl-req { --tape: 3deg; }
+
+  .wl-refs {
+    position: relative;
+    min-width: 0;
+    display: flex;
+    gap: 2px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    border-radius: 3px;
+    background: var(--muted);
+  }
+  .wl-refs::-webkit-scrollbar { display: none; }
+  .wl-refs > button { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; }
+  .wl-refs > button + button { flex-basis: 88%; }
+  .wl-refs img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+  .wl-count {
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font: 500 12px/1 var(--font-mono);
+    background: var(--frost-light);
+    color: var(--foreground);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    pointer-events: none;
+  }
+
+  /* the note itself: the serif italic is the handwriting on the print (no italics in Chinese) */
+  .wl-text {
+    min-width: 0;
+    font: italic 400 17px/1.3 var(--font-display);
+    letter-spacing: -0.005em;
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  :lang(zh) .wl-text { font-style: normal; font-size: 16px; line-height: 1.6; letter-spacing: 0; }
+
+  /* the vote: a pill that fills when it's yours; the words come back at 768 */
+  .wl-vote {
+    flex: none;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 0 10px 0 9px;
+    border-radius: 999px;
+    font: 600 14px/1 var(--font-sans);
+    color: var(--foreground);
+    background: var(--wash);
+    box-shadow: inset 0 0 0 1px var(--border);
+    transition: background 0.18s, box-shadow 0.18s, transform 0.18s var(--ease);
+  }
+  .wl-vote .wl-w { display: none; }
+  .wl-vote .wl-c { font: 500 14px/1 var(--font-mono); color: var(--bone-dim); }
+  .wl-vote[aria-pressed="true"] { background: var(--safelight-tint); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 50%, transparent); }
+  .wl-vote[aria-pressed="true"] svg { color: var(--primary); fill: var(--primary); }
+  .wl-vote[aria-pressed="true"] .wl-c { color: var(--foreground); }
+  .wl-vote:active { transform: scale(0.94); }
+  .wl-vote:disabled, .wl-vote[data-static] { opacity: 0.5; }
+  .wl-vote[data-static] { opacity: 1; background: none; box-shadow: none; padding-inline: 2px; }
+
+  /* shipped: a rubber stamp across the print */
+  .wl-stamp {
+    position: absolute;
+    z-index: 5;
+    right: -6px;
+    top: 38px;
+    transform: rotate(12deg);
+    padding: 4px 8px;
+    border: 2px solid var(--success);
+    border-radius: 4px;
+    font: 700 12px/1 var(--font-sans);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--success);
+    background: var(--frost-light);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    mix-blend-mode: screen;
+    pointer-events: none;
+  }
+
+  /* status chips in My requests: a dot and a word, safelight for live, success for shipped */
+  .wl-st { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 8px; font: 500 13px/1 var(--font-sans); background: var(--wash-strong); color: var(--bone-dim); }
+  .wl-st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .wl-st[data-status="live"] { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); }
+  .wl-st[data-status="shipped"] { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); }
+  .wl-st[data-status="rejected"] { color: var(--muted-foreground); }
+
+  /* the first-visit sheet (Owner 2026-11-10, a walk since 2026-11-11): one patch of the wall
+     with the wall's own card on it, acting out each step (guide-demo.tsx) */
+  .wl-guide-plate {
+    display: grid;
+    justify-items: center;
+    padding: 24px 16px 18px;
+    border-radius: 16px;
+    background: var(--background);
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+  /* the shipped copy underneath is invisible and only holds the height of the tallest step */
+  .wl-demo { display: grid; width: min(208px, 100%); }
+  .wl-demo > * { grid-area: 1 / 1; align-self: center; min-width: 0; }
+  .wl-demo-sizer { visibility: hidden; }
+  /* hangs from its tape with the wall's lean; shipped, it straightens up as it goes to the top */
+  .wl-demo-card {
+    --r: -1.6deg;
+    transform: rotate(var(--r));
+    transform-origin: 50% 0;
+    transition: transform 0.6s var(--ease);
+  }
+  .wl-guide-plate[data-step="ship"] .wl-demo-card { --r: 0deg; }
+
+  @media (min-width: 768px) {
+    .wl-demo { width: 248px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    /* say: pinned up, dropping in from above and settling on its tape */
+    .wl-guide-plate[data-step="say"] .wl-demo-card { animation: wl-pin 0.75s var(--ease) both; }
+    /* vote: the pill fills and the count rolls up by one */
+    .wl-demo .wl-vote[aria-pressed="true"] { animation: wl-tick 0.5s var(--ease); }
+    .wl-demo .wl-vote[aria-pressed="true"] .wl-c { display: inline-block; animation: wl-count 0.4s var(--ease); }
+    /* ship: it rises to the top, the stamp lands, then the template line appears */
+    .wl-guide-plate[data-step="ship"] .wl-demo-card { animation: wl-rise 0.6s var(--ease) both; }
+    .wl-guide-plate[data-step="ship"] .wl-stamp { animation: wl-stamp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both; }
+    .wl-guide-plate[data-step="ship"] .wl-req a { animation: wl-reveal 0.4s var(--ease) 0.6s both; }
+    .wl-guide-copy { animation: wl-copy 0.3s var(--ease); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wl-demo-card { transition: none; }
+  }
+
+  @media (min-width: 768px) {
+    .wl-wall { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 18px; margin-top: 28px; }
+    .wl-req { padding: 10px 10px 12px; }
+    .wl-refs img { aspect-ratio: 4 / 3; }
+    .wl-text { font-size: 19px; }
+    .wl-vote { min-height: 40px; padding: 0 14px 0 12px; gap: 8px; }
+    .wl-vote .wl-w { display: inline; }
+  }
+  @media (min-width: 1024px) {
+    .wl-wall { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 20px; }
+  }
+  /* Hovering a print never moves it (Owner 2026-11-11: the old gust swung the vote out from
+     under the pointer); its edge only brightens. */
+  @media (hover: hover) {
+    .wl-vote:not([aria-pressed="true"]):not(:disabled):not([data-static]):hover { background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--input); }
+    .wl-wall > li:hover .wl-req { box-shadow: inset 0 0 0 1px var(--input), inset 0 1px 0 var(--edge-highlight), 0 18px 28px -18px var(--photo-fade), 0 2px 4px -2px var(--frost); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wl-wall > li { transform: none !important; transition: none; }
+  }
+}
+
+@keyframes wl-pin {
+  0% { transform: translateY(-28px) rotate(-7deg) scale(1.03); opacity: 0; }
+  55% { transform: translateY(2px) rotate(calc(var(--r) + 1.2deg)); opacity: 1; }
+  80% { transform: rotate(calc(var(--r) - 0.5deg)); }
+  100% { transform: rotate(var(--r)); }
+}
+@keyframes wl-tick {
+  40% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+@keyframes wl-count {
+  from { transform: translateY(8px); opacity: 0; }
+}
+@keyframes wl-rise {
+  from { transform: translateY(16px) rotate(-1.6deg); }
+}
+@keyframes wl-stamp {
+  from { transform: rotate(12deg) scale(1.9); opacity: 0; }
+}
+@keyframes wl-reveal {
+  from { transform: translateY(4px); opacity: 0; }
+}
+@keyframes wl-copy {
+  from { opacity: 0; transform: translateY(4px); }
+}

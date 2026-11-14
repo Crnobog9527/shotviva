@@ -1,0 +1,158 @@
+import { baselineOffers, type OfferFacts } from '../../offer'
+import { defineContentPage, type CostBills, type ShootDemo } from '@/core/content'
+
+import { site } from '../../../site.config'
+import { caseImage, CATEGORY, SIZE_COUNT, withFirstFrame } from '../../landing-shared'
+import { zhPricingRelated } from '../shared'
+import { foodHalfDayUsd, MENU_DISHES, photoSeconds, usd, usdRange } from '../../offer'
+import { PLATFORM_SPECS, px } from '../../platform-specs'
+import { planLabel, ZH_TIERS, zhFreeImages, zhPlansSentence, zhTierList } from '../offer'
+
+// /zh/ai-restaurant-menu (T44, ARCHITECTURE §17): noindex (中文口径主词表: 「暂不建」, keyword
+// ai菜单). For restaurant owners who put dishes on delivery apps; the US apps' figures are kept
+// because they are what the page is about. Same prices as the English page, in US dollars.
+const brand = site.brand.name
+const [, hd] = ZH_TIERS
+const { doordash, uberEats, grubhub } = PLATFORM_SPECS
+
+function menuBills({ planFrom }: OfferFacts): CostBills {
+  const plan = planFrom ? usd(planFrom.priceUsd) : '暂无月付套餐'
+  return {
+    heading: `菜单配图要花多少钱：请美食摄影师和用 ${brand} 对比`,
+    intro: `${MENU_DISHES} 道菜，做菜单和外卖平台用。同样的活，两张账单。`,
+    photographer: {
+      title: '美食摄影师报价',
+      total: { amount: usdRange(foodHalfDayUsd), when: '拍半天，另加修图' },
+      lines: [
+        { label: '半天美食拍摄', value: usdRange(foodHalfDayUsd) },
+        { label: '食物造型师', value: '通常另算' },
+        { label: '预约、拍摄、修图', value: '几天' },
+      ],
+      fine: `美国 2025～2026 年公开的半天美食拍摄价格（PricingLink、Jobbers、FoodShot）：大约 ${usdRange(foodHalfDayUsd)}；食物造型师通常另外收费。实际报价因人而异。`,
+    },
+    site: {
+      title: brand,
+      total: { amount: plan, suffix: planFrom ? '/月起' : '', when: `每张 ${photoSeconds} 秒左右` },
+      lines: [
+        { label: planLabel(planFrom), value: plan },
+        { label: '准备原图', value: '每道菜一张手机照' },
+        { label: '可做成', value: '菜单图、外卖图、促销海报' },
+      ],
+      fine: `每道菜在出菜口用手机拍一张，光线和造型交给模板。先用 ${zhFreeImages}试试，不用绑卡。`,
+    },
+  }
+}
+
+const fishPhone = caseImage('menu-fish-phone', '真实手机照：白色搪瓷大碗装的酸菜鱼放在后厨不锈钢出菜口，顶灯偏绿')
+const fishDark = caseImage('menu-fish-dark', '真实案例：同一份酸菜鱼重新装进白瓷碗，放在深色原木上，暖色侧光，热气升起')
+
+// 一道菜做成三种成图：菜不变，换碗、换场景、换光。
+const shoot: ShootDemo = {
+  heading: { lead: '一张菜品手机照 → ', emphasis: '一整套菜单大片' },
+  intro: '鲜椒牛蛙，在后厨出菜口用不锈钢盆随手一拍。做成三张成图，每张都是同一道菜：牛蛙、青红鲜椒、青花椒都没变。',
+  phone: {
+    image: caseImage('menu-frog-phone', '真实手机照：不锈钢盆装的鲜椒牛蛙放在后厨台面上，日光灯，后面是单据和碗'),
+    file: 'IMG_2706.jpg',
+    caption: '手机原图。日光灯、不锈钢盆，后面还挂着单据。',
+  },
+  arrow: '三种出图，同一道菜',
+  results: [
+    {
+      image: caseImage('menu-frog-dark', '真实案例：同一道牛蛙装进炭灰石碗，放在石板上，暗色手绘背景，暖色侧光'),
+      title: '菜单主图',
+      template: '暗调布景，侧逆光',
+    },
+    {
+      image: caseImage('menu-frog-pour', '真实案例：白瓷壶往白碗里的同一道菜浇热油，下面垫原木，热气定格在空中'),
+      title: '热油泼椒',
+      template: '热油现浇，热气定格',
+    },
+    {
+      image: caseImage('menu-frog-poster-zh', '真实案例：同一道菜做成菜单海报，暖棕背景，标题是主厨招牌、鲜椒牛蛙'),
+      title: '菜单海报',
+      template: '菜名、一句介绍和价格',
+    },
+  ],
+}
+
+const copy = {
+  slug: 'ai-restaurant-menu',
+  keyword: 'ai菜单',
+  label: 'AI菜单配图',
+  module: 'image',
+  title: `AI菜单配图：手机拍的菜直接做成外卖图（2026） | ${brand}`,
+  description: `AI菜单配图：用你已经拍好的菜品照片，做成菜单、外卖平台和促销图，盘里的菜保持原样。新用户送 ${zhFreeImages}。`,
+  h1: 'AI菜单配图：手机拍一张，菜单图就有了',
+  subtitle: '用你真实拍的菜品照片，换碗、换光线、换环境，不会生成你店里没有的菜。',
+  answerBlock: `AI菜单配图从你真实拍的菜品照片出发，菜保持原样，只换碗、光线和环境，不会凭空生成不存在的菜。在 ${brand} 上传一张手机照片，选「外卖菜单」「暗调氛围」或「促销海报」模板，就能下载${zhTierList}的成图。新用户送 ${zhFreeImages}。`,
+  hero: {
+    before: withFirstFrame(fishPhone),
+    after: fishDark,
+    caption: '你的手机照片 → 菜单主图：还是这份鱼，换了碗和布景',
+    cta: { label: '上传照片', href: '/generate' },
+  },
+  facts: [
+    {
+      label: `DoorDash：横版 ${doordash.ratio}，至少 ${px(doordash.minW)} × ${px(doordash.minH)} px`,
+      value: `DoorDash 要求横版 ${doordash.ratio}、至少 ${px(doordash.minW)} × ${px(doordash.minH)} px，而且必须是实际出餐的那道菜。横幅 16:9 选${hd?.name ?? ''}是 ${px(hd?.px ?? 0)} × ${px(Math.round(((hd?.px ?? 0) * 9) / 16))} px。`,
+    },
+    {
+      label: 'Uber Eats 和 Grubhub',
+      value: `Uber Eats 建议 ${uberEats.ratio}、至少 ${px(uberEats.minW)} × ${px(uberEats.minH)} px，一张图只放一道菜；Grubhub 用方图，至少 ${px(grubhub.minPx)} × ${px(grubhub.minPx)} px。3:2 适合 Uber Eats，1:1 适合 Grubhub；${SIZE_COUNT} 种尺寸都导出 PNG。`,
+    },
+    {
+      label: '菜还是那道菜',
+      value: `外卖平台要的是你实际卖的菜。${brand} 从你自己的手机照片出发，换碗、换光线和背景，不改菜本身。`,
+    },
+  ],
+  headings: {
+    facts: '菜单和外卖平台的图片尺寸',
+    faq: 'AI菜单配图常见问题',
+    related: `${brand} 的其他页面`,
+  },
+  landing: {
+    factsNote: '以上来自各外卖平台自己的商家帮助页面（DoorDash、Uber Eats、Grubhub），2026 年 11 月核对。平台规则会变，上传前请再确认。',
+    shoot,
+    templates: {
+      heading: '菜单配图模板：外卖平台、菜单和海报',
+      intro: `每个模板都从你的菜品手机照片开始，到一张能上菜单的图结束。`,
+      categoryKeys: [CATEGORY.food],
+    },
+  },
+} as const
+
+export const makeZhAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
+  ...copy,
+  costBills: menuBills(offers),
+  faq: [
+    {
+      question: '外卖平台的菜单能用 AI 图吗？',
+      answer: `外卖平台要求图片展示你实际出餐的菜。${brand} 从你自己的手机照片出发，菜保持原样，只换碗、光线和背景，所以图里还是你的菜。上传前请查看平台当下的图片规定。`,
+    },
+    {
+      question: '菜单图片要多大尺寸？',
+      answer: `DoorDash 要横版 ${doordash.ratio}、至少 ${px(doordash.minW)} × ${px(doordash.minH)} px，Uber Eats 是 ${uberEats.ratio}，Grubhub 用方图。印刷菜单和社交媒体常用 4:5 或 1:1。${brand} 导出 PNG，分${zhTierList}三档，${SIZE_COUNT} 种尺寸。`,
+    },
+    {
+      question: '请美食摄影师要多少钱？',
+      answer: `按美国的公开报价，拍半天大约 ${usdRange(foodHalfDayUsd)}，食物造型师通常另外收费。${brand} 用你的手机照片，大约 ${photoSeconds} 秒做好一张菜单图。${zhPlansSentence(offers)}`,
+    },
+    {
+      question: '要自己写提示词吗？',
+      answer: `${brand} 不用写提示词。选「外卖菜单」「暗调氛围」或「促销海报」，光线和造型由模板决定。只有一行选填的「有什么想改的？」，比如写「辣椒油要看得见」。`,
+      link: { href: '/', anchor: '看看 AI改图 的全部模板。' },
+    },
+    {
+      question: '能直接做整张菜单吗？',
+      answer: `${brand} 做的是照片：一次一道菜，另外可以做一张促销海报。整张多道菜的菜单或价目表排版，${brand} 不做。`,
+    },
+  ],
+  related: [
+    { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
+    { href: '/commercial-photography', anchor: '商业摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
+    { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '想看看图生图对一张照片能做什么。' },
+    zhPricingRelated(brand, offers),
+  ],
+})
+
+export const zhAiRestaurantMenu = makeZhAiRestaurantMenu(baselineOffers)

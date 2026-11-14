@@ -1,0 +1,185 @@
+import type Stripe from 'stripe'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { assertOffered, createCheckout } from './checkout'
+import { clearPriceCache } from './prices'
+import { deps, fakeStripe, priceFor, sent, USER } from './test-checkout'
+
+beforeEach(() => clearPriceCache())
+
+describe('assertOffered (the locale gate)', () => {
+  it('takes 中国银行卡 only with a zh locale on Stripe', () => {
+    expect(() => assertOffered({ method: 'cn_card', locale: 'zh' }, 'stripe')).not.toThrow()
+    expect(() => assertOffered({ method: 'cn_card', locale: 'en' }, 'stripe')).toThrow(expect.objectContaining({ code: 'INVALID_INPUT' }))
+    expect(() => assertOffered({ method: 'cn_card', locale: 'zh' }, 'waffo')).toThrow(expect.objectContaining({ code: 'INVALID_INPUT' }))
+  })
+
+  it('keeps card and Alipay on every page and channel', () => {
+    for (const channel of ['stripe', 'waffo'] as const) {
+      for (const locale of ['en', 'zh'] as const) {
+        for (const method of ['card', 'alipay'] as const) expect(() => assertOffered({ method, locale }, channel)).not.toThrow()
+      }
+    }
+  })
+})
+
+describe('createCheckout routing', () => {
+  it('opens a card membership as a Managed Payments subscription, with no method list', async () => {
+    const { stripe, create } = fakeStripe()
+    const d = deps(stripe)
+    const result = await createCheckout(d, { userId: USER, body: { product_id: 'starter_monthly', method: 'card', locale: 'zh' } })
+
+    expect(result).toEqual({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' })
+    const params = sent(create)
+    expect(params).toMatchObject({
+      mode: 'subscription',
+      line_items: [{ price: 'price_starter_monthly_recurring', quantity: 1 }],
+      managed_payments: { enabled: true },
+      client_reference_id: USER,
+      locale: 'zh',
+      metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card' },
+      subscription_data: { metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card' } },
+      success_url: 'https://pr-1.example.app/zh/checkout?session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: expect.stringMatching(/^https:\/\/pr-1\.example\.app\/api\/checkout\/cancel\?p=starter_monthly&m=card&l=zh&c=[0-9a-f-]{36}$/),
+    })
+    expect(params).not.toHaveProperty('payment_method_types')
+    expect(params).not.toHaveProperty('allowed_payment_method_types')
+    expect(d.trackStart).toHaveBeenCalledWith(USER, {
+      product_id: 'starter_monthly',
+      tier: 'starter',
+      interval: 'month',
+      form: 'subscription',
+      channel: 'stripe',
+      method: 'card',
+    }, 'zh')
+  })
+
+  it('opens Alipay as a one-time payment for one period, Shotviva as seller', async () => {
+    const { stripe, create } = fakeStripe()
+    const d = deps(stripe)
+    await createCheckout(d, { userId: USER, body: { product_id: 'pro_yearly', method: 'alipay', locale: 'en' } })
+    const params = sent(create)
+    expect(params).toMatchObject({
+      mode: 'payment',
+      allowed_payment_method_types: ['alipay'],
+      line_items: [{ price: 'price_pro_yearly' }],
+      payment_intent_data: { metadata: { product_id: 'pro_yearly', method: 'alipay' } },
+    })
+    // Said out loud: the Dashboard's "Managed Payments by default" must not pull Alipay into MP.
+    expect(params).toMatchObject({ managed_payments: { enabled: false } })
+    expect(params).not.toHaveProperty('payment_method_types')
+    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'one_time', method: 'alipay', interval: 'year' }), 'en')
+  })
+
+  it('sells a pack by card as a Managed Payments one-time payment', async () => {
+    const { stripe, create } = fakeStripe()
+    await createCheckout(deps(stripe), { userId: USER, body: { product_id: 'pack_s', method: 'card', locale: 'en' } })
+    expect(sent(create)).toMatchObject({ mode: 'payment', managed_payments: { enabled: true }, line_items: [{ price: 'price_pack_s' }] })
+  })
+
+  it('uses a plain card checkout while Managed Payments is off', async () => {
+    const { stripe, create } = fakeStripe()
+    await createCheckout(deps(stripe, { managedPayments: false }), {
+      userId: USER,
+      body: { product_id: 'max_monthly', method: 'card', locale: 'en' },
+    })
+    expect(sent(create)).toMatchObject({ mode: 'subscription', allowed_payment_method_types: ['card'], managed_payments: { enabled: false } })
+    expect(sent(create)).not.toHaveProperty('payment_method_types')
+  })
+})
+
+// Every route states Managed Payments explicitly (control 2026-11-07: the live Dashboard has
+// "Managed Payments enabled by default for all Checkout Sessions" on, and MP takes no Alipay).
+describe('no email from us (T63: phone accounts may have none)', () => {
+  it('never sends customer_email or a customer: Stripe Checkout asks the buyer for the receipt address', async () => {
+    for (const [product_id, method] of [['starter_monthly', 'card'], ['max_yearly', 'alipay'], ['pack_s', 'card']] as const) {
+      const { stripe, create } = fakeStripe()
+      await createCheckout(deps(stripe), { userId: USER, body: { product_id, method, locale: 'zh' } })
+      const params = sent(create)
+      expect(params).toBeDefined()
+      expect(params).not.toHaveProperty('customer_email')
+      expect(params).not.toHaveProperty('customer')
+    }
+  })
+})
+
+describe('Managed Payments is explicit on every route', () => {
+  it.each([
+    ['card membership, MP on', 'pro_monthly', 'card', true, { mode: 'subscription', managed_payments: { enabled: true } }, null],
+    ['card pack, MP on', 'pack_m', 'card', true, { mode: 'payment', managed_payments: { enabled: true } }, null],
+    ['Alipay period, MP on', 'starter_monthly', 'alipay', true, { mode: 'payment', managed_payments: { enabled: false } }, ['alipay']],
+    ['Alipay pack, MP on', 'pack_l', 'alipay', true, { mode: 'payment', managed_payments: { enabled: false } }, ['alipay']],
+    ['card membership, MP off', 'max_yearly', 'card', false, { mode: 'subscription', managed_payments: { enabled: false } }, ['card']],
+    ['card pack, MP off', 'pack_s', 'card', false, { mode: 'payment', managed_payments: { enabled: false } }, ['card']],
+    ['Alipay period, MP off', 'pro_yearly', 'alipay', false, { mode: 'payment', managed_payments: { enabled: false } }, ['alipay']],
+  ] as const)('%s', async (_, productId, method, managedPayments, expected, methods) => {
+    const { stripe, create } = fakeStripe()
+    await createCheckout(deps(stripe, { managedPayments }), { userId: USER, body: { product_id: productId, method, locale: 'en' } })
+    const params = sent(create)
+    expect(params).toMatchObject(expected)
+    if (methods) expect(params?.allowed_payment_method_types).toEqual(methods)
+    else expect(params).not.toHaveProperty('allowed_payment_method_types')
+  })
+})
+
+describe('createCheckout with allowed_payment_method_types (API 2026-09-30.endive)', () => {
+  it('sells an Alipay pack as a one-time payment limited to Alipay', async () => {
+    const { stripe, create } = fakeStripe()
+    await createCheckout(deps(stripe), { userId: USER, body: { product_id: 'pack_s', method: 'alipay', locale: 'zh' } })
+    expect(sent(create)).toMatchObject({ mode: 'payment', allowed_payment_method_types: ['alipay'], locale: 'zh' })
+  })
+
+  it('refuses to send the buyer to a checkout that cannot take Alipay (off in the Dashboard)', async () => {
+    const { stripe } = fakeStripe(priceFor, { enabled: ['card', 'link'] })
+    const d = deps(stripe)
+    await expect(
+      createCheckout(d, { userId: USER, body: { product_id: 'starter_monthly', method: 'alipay', locale: 'en' } }),
+    ).rejects.toThrow(/does not offer alipay/)
+    expect(d.trackStart).not.toHaveBeenCalled()
+  })
+
+})
+
+describe('createCheckout price checks', () => {
+  it.each([
+    ['amount', { unit_amount: 1890 }],
+    ['metadata', { metadata: {} }],
+    ['tax code', { product: { id: 'prod', tax_code: null } as unknown as Stripe.Product }],
+  ])('refuses to sell when the Stripe Price disagrees with site.config (%s)', async (_, overrides) => {
+    const { stripe, create } = fakeStripe((key) => priceFor(key, overrides))
+    await expect(
+      createCheckout(deps(stripe), { userId: USER, body: { product_id: 'starter_monthly', method: 'card', locale: 'en' } }),
+    ).rejects.toMatchObject({ code: 'INTERNAL' })
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a missing Price with a pointer to the setup script', async () => {
+    const { stripe } = fakeStripe()
+    ;(stripe.prices.list as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ data: [] })
+    await expect(
+      createCheckout(deps(stripe), { userId: USER, body: { product_id: 'pack_m', method: 'card', locale: 'en' } }),
+    ).rejects.toThrow(/stripe-setup/)
+  })
+
+  it('looks each Price up once per instance', async () => {
+    const { stripe, list } = fakeStripe()
+    const input = { userId: USER, body: { product_id: 'pack_l' as const, method: 'card' as const, locale: 'en' as const } }
+    await createCheckout(deps(stripe), input)
+    await createCheckout(deps(stripe), input)
+    expect(list).toHaveBeenCalledTimes(1)
+    expect(list).toHaveBeenCalledWith({ lookup_keys: ['pack_l'], active: true, expand: ['data.product'] })
+  })
+})
+
+describe('success URL for a Graylum top-up (ARCHITECTURE §14.5)', () => {
+  it('carries an allowlisted return_to and drops any other', async () => {
+    const { stripe, create } = fakeStripe()
+    const body = { product_id: 'pack_s' as const, method: 'card' as const, locale: 'en' as const }
+    await createCheckout(deps(stripe), { userId: USER, body: { ...body, return_to: 'https://graylum.com/app?x=1' } })
+    await createCheckout(deps(stripe), { userId: USER, body: { ...body, return_to: 'https://evil.example/app' } })
+    expect(create.mock.calls[0]?.[0].success_url).toBe(
+      'https://pr-1.example.app/checkout?session_id={CHECKOUT_SESSION_ID}&from=graylum&return_to=https%3A%2F%2Fgraylum.com%2Fapp%3Fx%3D1',
+    )
+    expect(create.mock.calls[1]?.[0].success_url).toBe('https://pr-1.example.app/checkout?session_id={CHECKOUT_SESSION_ID}')
+  })
+})

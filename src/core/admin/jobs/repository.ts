@@ -1,0 +1,138 @@
+import 'server-only'
+
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { z } from 'zod'
+
+import { AppError } from '@/core/errors'
+import { jobRef, jobRefRange, jobRefsOrShort, modelFromTag } from '@/core/jobs'
+
+import { afterCursor, decodeCursor, PAGE_SIZE, toPage, type Page } from '../cursor'
+import { beijingDayStart, refFilter, type JobFilters } from './filters'
+import { receiptDetail } from './receipt-detail'
+import { TOGGLE_COLUMNS, toggleColumnsSchema, toJobToggles, type JobToggle } from './job-toggles-row'
+
+// All generation jobs, newest first (ARCHITECTURE §10). Index generation_jobs_created_at_id_idx
+// (0160) drives the order, the keyset and the date range; status / template / source / model
+// are filters on that walk; a reference number (T78) is a range on generation_jobs_pkey. Only list columns are read: inputs is a jsonb, so just its
+// resolution key is selected. provider_usage (T33) is at most four integers, read only to tell
+// 「无法计算」 (usage, no price) from a pre-T33 job (neither). The template toggles (T89): job-toggles-row.
+
+const COLUMNS =
+  `id, created_at, finished_at, user_id, template_id, status, source, provider, credit_pool, credits_cost, error_code, resolution:inputs->>resolution, cost_usd, provider_usage, deleted_at, ${TOGGLE_COLUMNS}`
+
+const rowSchema = z.object({
+  id: z.uuid(),
+  created_at: z.string(),
+  finished_at: z.string().nullable(),
+  user_id: z.uuid(),
+  template_id: z.string(),
+  status: z.enum(['running', 'succeeded', 'failed']),
+  source: z.enum(['web', 'graylum']),
+  provider: z.string().nullable(),
+  credit_pool: z.enum(['free', 'paid']),
+  credits_cost: z.number(),
+  error_code: z.string().nullable(),
+  resolution: z.string().nullable(),
+  cost_usd: z.coerce.number().nullable(),
+  provider_usage: z.record(z.string(), z.unknown()).nullable(),
+  // Absent before T41's migration.
+  deleted_at: z.string().nullable().optional(),
+  ...toggleColumnsSchema,
+})
+
+export type AdminJob = {
+  id: string
+  // Reference number (T78): the first 8 characters of the id, longer when another job shares them.
+  ref: string
+  createdAt: string
+  durationMs: number | null
+  userId: string
+  templateId: string
+  status: 'running' | 'succeeded' | 'failed'
+  source: 'web' | 'graylum'
+  model: string
+  resolution: string
+  creditPool: 'free' | 'paid'
+  creditsCost: number
+  errorCode: string | null
+  costUsd: number | null
+  receiptDetail?: string
+  hasUsage: boolean
+  // The user deleted this work (T41): the row stays for the ledger and costs, the files are gone.
+  deletedByUser: boolean
+  // Template toggles as chosen (T89), each with when the user accepted its confirm dialog.
+  toggles: JobToggle[]
+}
+
+function toJob(row: z.infer<typeof rowSchema>): AdminJob {
+  return {
+    id: row.id,
+    ref: jobRef(row.id),
+    createdAt: row.created_at,
+    durationMs: row.finished_at ? Date.parse(row.finished_at) - Date.parse(row.created_at) : null,
+    userId: row.user_id,
+    templateId: row.template_id,
+    status: row.status,
+    source: row.source,
+    model: modelFromTag(row.provider) ?? row.provider ?? '—',
+    // Pre-T16 jobs carry no resolution and were all 1K.
+    resolution: row.resolution ?? '1k',
+    creditPool: row.credit_pool,
+    creditsCost: row.credits_cost,
+    errorCode: row.error_code,
+    costUsd: row.cost_usd,
+    receiptDetail: receiptDetail(row.provider_usage, row.cost_usd),
+    hasUsage: row.provider_usage !== null,
+    deletedByUser: Boolean(row.deleted_at),
+    toggles: toJobToggles(row),
+  }
+}
+
+const baseQuery = (db: SupabaseClient) =>
+  db
+    .from('generation_jobs')
+    .select(COLUMNS)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(PAGE_SIZE + 1)
+
+// A reference number is a range on generation_jobs_pkey (T78).
+function filtered(base: ReturnType<typeof baseQuery>, filters: JobFilters, ref: string | null) {
+  let query = base
+  if (ref) {
+    const { from, to } = jobRefRange(ref)
+    query = query.gte('id', from).lte('id', to)
+  }
+  if (filters.status) query = query.eq('status', filters.status)
+  if (filters.template) query = query.eq('template_id', filters.template)
+  if (filters.source) query = query.eq('source', filters.source)
+  if (filters.model) query = query.like('provider', `%/${filters.model}`)
+  if (filters.from) query = query.gte('created_at', beijingDayStart(filters.from))
+  if (filters.to) query = query.lt('created_at', beijingDayStart(filters.to, 1))
+  const after = decodeCursor(filters.cursor)
+  return after ? query.or(afterCursor(after)) : query
+}
+
+// A reference typed with the wrong shape (too short, not hex) matches nothing; the filter bar
+// says why.
+export async function listJobs(db: SupabaseClient, filters: JobFilters): Promise<Page<AdminJob>> {
+  const { ref, invalid } = refFilter(filters)
+  if (invalid) return { items: [], nextCursor: null }
+  const { data, error } = await filtered(baseQuery(db), filters, ref)
+  if (error) throw new AppError('INTERNAL', 'generation_jobs list failed', { cause: new Error(error.message) })
+  const page = toPage(rowSchema.array().parse(data), toJob)
+  return { ...page, items: await withRefs(db, page.items) }
+}
+
+// One more round trip on the primary key: does any other job share a row's first 8 characters?
+async function withRefs(db: SupabaseClient, jobs: AdminJob[]): Promise<AdminJob[]> {
+  const refs = await jobRefsOrShort(db, jobs.map((job) => job.id))
+  return jobs.map((job) => ({ ...job, ref: refs.get(job.id) ?? job.ref }))
+}
+
+// Filter dropdown: every template id and name. A handful of rows.
+export async function listTemplateOptions(db: SupabaseClient): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await db.from('templates').select('id, name').order('sort_order').order('id')
+  if (error) throw new AppError('INTERNAL', 'templates options failed', { cause: new Error(error.message) })
+  return z.array(z.object({ id: z.string(), name: z.string() })).parse(data)
+}

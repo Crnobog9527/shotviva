@@ -1,0 +1,13 @@
+import { notFound } from 'next/navigation'
+
+import { isWishlistEnabled } from '@/core/wishlist'
+import { site } from '@/site/site.config'
+
+import './wishlist.css'
+
+// Every wishlist page 404s while the feature is off (ARCHITECTURE §15.6), so none of them
+// exists without its tab.
+export default async function WishlistLayout({ children }: LayoutProps<'/[locale]/wishlist'>) {
+  if (!(await isWishlistEnabled(site))) notFound()
+  return children
+}

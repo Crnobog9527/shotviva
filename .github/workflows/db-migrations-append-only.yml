@@ -1,0 +1,42 @@
+# Merged migrations are append-only (AGENTS §5): fails a PR that modifies, renames or
+# deletes a migration file already on main. A baseline squash approved by the Owner passes
+# with `[baseline]` in the PR title; `edited` reruns the check when the title changes.
+name: DB migrations append-only
+
+# Also exercise the trusted checkout and PR fetch when this check itself changes.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/workflows/db-migrations-append-only.yml'
+      - 'scripts/check-migrations-append-only.sh'
+
+concurrency:
+  group: db-append-only-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  append-only:
+    name: merged migrations unchanged
+    # `edited` matters only for the title ([baseline]); a description edit skips the job.
+    if: github.event.action != 'edited' || github.event.changes.title != null
+    runs-on: ubuntu-latest
+    env:
+      PR_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      # Only main supplies executable files (including .nvmrc). Read the PR as Git objects.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: refs/heads/main
+          fetch-depth: 0
+      - name: Fetch the exact PR commit, including for forks
+        run: git fetch --no-tags origin "$PR_HEAD"
+      - name: Check migrations on main are untouched
+        env:
+          # Through env, never interpolated into the script: titles are untrusted input.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: scripts/check-migrations-append-only.sh HEAD "$PR_HEAD"

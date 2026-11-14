@@ -1,0 +1,8 @@
+export { Link } from './localized-link'
+export { NoLinkPrefetch } from './link-prefetch'
+export { FooterLocales, FooterLocalesFallback } from './footer-locales'
+export { LanguageOptions } from './language-options'
+export { LocaleMenu } from './locale-menu'
+export { NavLink } from './nav-link'
+export { LocaleSwitcher, LocaleSwitcherFallback } from './locale-switcher'
+export { TranslatedPathsProvider, useTranslatedPaths } from './translated-paths'

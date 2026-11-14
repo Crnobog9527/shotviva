@@ -1,0 +1,50 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "ignoreCommand": "bash scripts/ci/vercel-ignore-build.sh",
+  "crons": [
+    {
+      "path": "/api/cron/affiliate",
+      "schedule": "5 0 * * *"
+    },
+    {
+      "path": "/api/cron/provider-capabilities",
+      "schedule": "15 0 * * *"
+    },
+    {
+      "path": "/api/cron/moderation",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/sale-floor",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/daily-brief",
+      "schedule": "0 14 * * *"
+    }
+  ],
+  "regions": [
+    "sfo1"
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "main": false,
+      "feat/*": false,
+      "fix/*": false,
+      "perf/*": false,
+      "chore/*": false,
+      "claude/*": false,
+      "assets/*": false,
+      "spec/*": false,
+      "codex/*": false,
+      "copy/*": false,
+      "test/*": false,
+      "seo/*": false,
+      "screenshots/*": false,
+      "docs/*": false,
+      "refactor/*": false
+    }
+  }
+}

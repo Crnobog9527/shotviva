@@ -1,0 +1,61 @@
+# OS
+.DS_Store
+
+# env: only the example file is tracked
+.env*
+!.env.example
+
+# local-only data (seed prompts etc.)
+.local/
+
+# design: only the final B (Darkroom) system and its assets are tracked (T6 manifest,
+# 2026-11-05); drafts, other comps, archives, sources and briefs stay local
+design/*
+!design/DESIGN.md
+!design/PRODUCT.md
+!design/TOKENS.md
+!design/SITE-PLAN.md
+!design/tokens/
+!design/.impeccable/
+design/.impeccable/*
+!design/.impeccable/design.json
+!design/comps-v3-b/
+design/comps-v3-b/shots/
+!design/assets/
+design/assets/*
+!design/assets/img/
+!design/assets/video/
+# final logo (signed off 2026-11-07); superseded top-level export PNGs stay local
+!design/logo/
+design/logo/export/*.png
+
+# deps / build
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+# the public pages' Tailwind source list: written by `pnpm css:sources`, which `pnpm dev` and
+# `pnpm build` run first (scripts/public-css-sources.ts)
+/src/app/public-sources.generated.css
+
+# supabase local state
+supabase/.branches/
+supabase/.temp/
+
+# vercel
+.vercel/
+/.lighthouseci
+/.lighthouseci-simulated
+/.lighthouseci-devtools
+
+# internal docs: moved to the private repo Crnobog9527/shotviva-docs (2026-11-11),
+# cloned locally at ../shotviva-docs. Never commit them here again.
+/规范/
+/seo资料/
+/docs/
+
+# Load-test stub certificates and images (loadtest/README.md)
+/loadtest/.stub/
+/loadtest/results/

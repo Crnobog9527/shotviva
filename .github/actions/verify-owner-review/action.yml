@@ -1,0 +1,22 @@
+name: Verify Owner review
+description: Require an actual approval by the repository owner, on the named environment, for this run.
+inputs:
+  environment:
+    # Since 2026-11-12 only production-pricing (pricing activate / rollback) still has the Owner as
+    # its required reviewer; template sync and manual migrations run without one.
+    description: The environment the Owner must have approved this run for.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Verify the Owner approved this run
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        OWNER_ID: ${{ github.repository_owner_id }}
+        ENVIRONMENT: ${{ inputs.environment }}
+      run: |
+        gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" |
+          jq -e --arg id "$OWNER_ID" --arg env "$ENVIRONMENT" 'any(.[];
+            .state == "approved" and (.user.id | tostring) == $id and
+            any(.environments[]; .name == $env))' >/dev/null

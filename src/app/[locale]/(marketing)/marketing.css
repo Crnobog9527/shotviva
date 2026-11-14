@@ -1,0 +1,887 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
+/* Marketing pages (home, pricing, inner SEO pages): the signed-off v3-b comp
+   (design/comps-v3-b/home.html + css/marketing.css), ported class for class with an `mk-` prefix.
+   Colours come from the tokens in globals.css only. Motion: one hover wipe on template cards, one crossfade on series cards,
+   the safelight breathing behind the bench and a fade-up on entry; all of it stops under
+   prefers-reduced-motion (DESIGN §6). Everything sits in the components layer, so a Tailwind
+   utility on the same element still wins. */
+
+/* The Art Styles seam nudge animates this offset (an at-rule that cannot live inside a layer). */
+@property --nx { syntax: "<length>"; inherits: true; initial-value: 0px; }
+
+@layer components {
+  :root {
+    --mk-content: 1120px;
+    --mk-ground-top: color-mix(in srgb, var(--foreground) 1.2%, var(--background));
+    --mk-seam: color-mix(in srgb, var(--foreground) 28%, transparent);
+  }
+
+  /* ---------- ground and width ---------- */
+  /* On <html>, under the living background (core/ui/living-background), not on body. */
+  html:has(.mk-appbar) {
+    background: linear-gradient(180deg, var(--mk-ground-top) 0, var(--background) 40vh) no-repeat, var(--background);
+  }
+  .mk-w { width: 100%; max-width: calc(var(--mk-content) + 2 * var(--gutter)); margin-inline: auto; }
+  ::selection { background: color-mix(in srgb, var(--primary) 70%, transparent); color: var(--foreground); }
+  input, textarea { caret-color: var(--primary); }
+
+  /* ---------- app bar: wordmark left; Templates · Pricing · globe · Log in · Start free ---------- */
+  .mk-appbar {
+    position: sticky; top: 0; z-index: 50; padding: var(--sat) var(--gutter) 0;
+    background: linear-gradient(color-mix(in srgb, var(--background) 92%, transparent), color-mix(in srgb, var(--background) 72%, transparent));
+    backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  }
+  .mk-appbar-row { height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  /* The tagline beside the wordmark shows only where it fits whole. The brand is one 44px flex
+     line that wraps and clips: when the bar is too narrow (a phone, a signed-in bar, a longer
+     language), the tagline drops to a second line that overflow hides, so the wordmark stands
+     alone. No width breakpoint to keep in sync with the copy or the account state. */
+  .mk-brand {
+    display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; column-gap: 8px; flex: 0 1 auto; min-width: 0;
+    height: 44px; overflow: hidden; text-decoration: none; color: var(--foreground);
+  }
+  .mk-word { font: 400 24px/44px var(--font-display); letter-spacing: -0.02em; white-space: nowrap; }
+  .mk-word i, .mk-foot-word i { color: var(--primary); font-style: normal; }
+  /* margin-right keeps clear air before the nav: the tagline hides rather than touch the globe.
+     Below 1024px: two small lines in a box capped in em, so its size does not move while fonts
+     load. The caps fit the Owner's copy (2026-11-08): "AI edits, true / to your photo" in 7.5em;
+     Chinese breaks after the comma because 9 CJK characters fill exactly 9em. A longer copy
+     needs a new cap here, or it takes a third line that the 44px brand line clips. */
+  .mk-brand-tag {
+    font: 400 12px/15px var(--font-sans); color: var(--muted-foreground); padding-left: 8px; border-left: 1px solid var(--border);
+    margin-right: 4px; width: max-content; max-width: calc(7.5em + 9px); text-wrap: balance;
+  }
+  .mk-brand-tag:lang(zh) { max-width: calc(9.05em + 9px); text-wrap: wrap; }
+  @media (min-width: 1024px) {
+    .mk-brand-tag, .mk-brand-tag:lang(zh) { max-width: none; font-size: 14px; line-height: 1.15; white-space: nowrap; margin-right: 16px; }
+  }
+  .mk-nav { display: flex; align-items: center; gap: 4px; }
+  .mk-nl, .mk-start { display: none; }
+  .mk-ghost-pill {
+    position: relative; display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 16px; border-radius: 999px;
+    font: 600 14px/1 var(--font-sans); letter-spacing: -0.01em; color: var(--foreground); text-decoration: none; white-space: nowrap;
+    background: var(--wash); box-shadow: inset 0 0 0 1px var(--border); transition: background-color .18s, box-shadow .18s, transform .18s var(--ease);
+  }
+  .mk-ghost-pill::before, .mk-start::before { content: ""; position: absolute; inset: -4px -2px; }
+  .mk-ghost-pill:active, .mk-start:active { transform: scale(.975); }
+  .mk-start {
+    position: relative; align-items: center; height: 36px; padding: 0 16px; border-radius: 999px; font: 600 14px/1 var(--font-sans); letter-spacing: -0.01em;
+    white-space: nowrap; text-decoration: none; background: var(--primary); color: var(--primary-foreground); box-shadow: var(--shadow-raised);
+    justify-items: center;
+  }
+  /* Start free and its stand-ins for the scrolled-away generator (nav-account.tsx): one grid
+     cell, so the button is as wide as its widest label whichever shows; <html data-gen-away>
+     (modules/image use-header-upload) picks the label. */
+  .mk-start > span { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: 6px; transition: opacity .2s var(--ease), visibility 0s .2s; }
+  .mk-start svg { width: 18px; height: 18px; margin-left: -2px; }
+  .mk-start-up, .mk-start-gen,
+  html[data-gen-away] .mk-start-free { visibility: hidden; opacity: 0; }
+  html[data-gen-away="upload"] .mk-start-up,
+  html[data-gen-away="generate"] .mk-start-gen { visibility: visible; opacity: 1; transition: opacity .2s var(--ease), visibility 0s; }
+  @media (prefers-reduced-motion: reduce) { .mk-start > span { transition: none; } }
+  @media (min-width: 768px) {
+    .mk-appbar-row { height: 64px; }
+    .mk-nav { gap: 2px; }
+    .mk-nl {
+      display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 999px;
+      font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; transition: color .18s, background-color .18s;
+    }
+    .mk-nl[aria-current="page"] { color: var(--foreground); }
+    /* Use Cases: a disclosure under the nav item, the globe menu's popover look; one above the
+       globe's 「切换到中文？」 bubble (z 60), which it would otherwise sit under */
+    .mk-navmenu { position: relative; }
+    button.mk-nl { gap: 4px; border: 0; background: none; cursor: pointer; }
+    .mk-navmenu-chev { width: 16px; height: 16px; transition: transform .2s var(--ease); }
+    .mk-nl[aria-expanded="true"] { color: var(--foreground); background: var(--wash); }
+    .mk-nl[aria-expanded="true"] .mk-navmenu-chev { transform: rotate(180deg); }
+    .mk-navmenu-list {
+      position: absolute; top: calc(100% + 4px); left: 0; z-index: 61; min-width: 236px; margin: 0; padding: 6px; list-style: none;
+      border-radius: var(--radius-control); background: var(--popover); box-shadow: inset 0 0 0 1px var(--border), 0 24px 48px -16px rgba(0, 0, 0, .7);
+    }
+    .mk-navmenu-list a {
+      display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 10px;
+      font: 500 15px/1.2 var(--font-sans); color: var(--foreground); text-decoration: none; outline: none;
+    }
+    .mk-navmenu-list a:hover, .mk-navmenu-list a:focus-visible { background: var(--wash); }
+    @media (prefers-reduced-motion: reduce) { .mk-navmenu-chev { transition: none; } }
+    .mk-login { margin-left: 8px; }
+    .mk-start { display: inline-grid; margin-left: 8px; }
+  }
+
+  /* ---------- type ---------- */
+  .mk-home h1, .mk-home h2, .mk-home h3 { text-wrap: balance; }
+  .mk-home p { text-wrap: pretty; }
+  .mk-h2 { font: 400 36px/1 var(--font-display); letter-spacing: -0.02em; }
+  .mk-hot em { font-style: normal; color: var(--primary); }
+  .mk-intro { margin-top: 12px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
+  .mk-pill { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 999px; font: 500 14px/1 var(--font-sans); background: var(--wash-strong); color: var(--bone-dim); }
+  .mk-cost { display: inline-block; font: 500 14px/1 var(--font-mono); letter-spacing: 0; color: var(--bone-dim); padding: 4px 6px; border-radius: 6px; background: var(--wash); white-space: nowrap; }
+
+  /* ---------- hero ---------- */
+  .mk-hero { position: relative; padding: 16px var(--gutter) 0; }
+  .mk-hero h1 { margin-top: 4px; font: 400 32px/1 var(--font-display); letter-spacing: -0.02em; }
+  .mk-hero h1 em { font-style: italic; }
+  .mk-lede, .mk-answer { margin-top: 12px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
+  .mk-hero-pair { margin: 20px 0 0; }
+  .mk-cap { margin-top: 10px; font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
+  .mk-generator { display: contents; }
+
+  /* ---------- the side-by-side pair: phone photo left, AI result right, one frame ---------- */
+  .mk-pair { position: relative; display: grid; grid-template-columns: 1fr 1fr; border-radius: 16px; overflow: hidden; background: var(--muted); isolation: isolate; }
+  .mk-pair::after { content: ""; position: absolute; inset: 0; z-index: 4; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 0 1px var(--border); transition: box-shadow .18s; }
+  .mk-pane { position: relative; aspect-ratio: 4 / 5; overflow: hidden; }
+  .mk-pair img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .6s var(--ease); }
+  .mk-pair .mk-b { filter: saturate(.85); }
+  /* The hero phone photo's first frame (photo-pair.tsx): the same picture, small, inline in the HTML. */
+  .mk-pair .mk-ff { filter: saturate(.85); }
+  .mk-pair .mk-ph { z-index: 0; filter: saturate(.85); }
+  .mk-pair .mk-a { z-index: 1; }
+  .mk-pair-static { aspect-ratio: 8 / 5; }
+  .mk-pair-static img { position: static; height: auto; aspect-ratio: 4 / 5; }
+  .mk-hl { position: absolute; z-index: 2; top: 0; bottom: 0; left: 50%; width: 1px; margin-left: -.5px; background: var(--mk-seam); pointer-events: none; }
+  .mk-ws { position: absolute; z-index: 2; top: 0; bottom: 0; left: 0; width: 2px; margin-left: -1px; background: var(--primary); opacity: 0; pointer-events: none; }
+  .mk-tag {
+    position: absolute; z-index: 3; bottom: 8px; height: 24px; padding: 0 8px; border-radius: 8px; display: inline-flex; align-items: center;
+    font: 600 14px/1 var(--font-sans); color: var(--foreground); background: var(--frost); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .mk-tag-l { left: 8px; }
+  .mk-tag-r { right: 8px; background: var(--safelight-tag); color: var(--primary-foreground); }
+  .mk-pair-lg { border-radius: 20px; }
+  .mk-pair-lg .mk-tag { top: 12px; bottom: auto; height: 28px; padding: 0 10px; }
+  .mk-pair-lg .mk-tag-l { left: 12px; }
+  .mk-pair-lg .mk-tag-r { right: 12px; background: var(--primary); }
+
+  /* ---------- a series card (series-card.tsx): its members' pairs stacked in one frame ----------
+     series-motion.ts arms a card on hover / in view (the layers join the layout, still clear, so
+     their lazy images load only then) and crossfades: the incoming pair fades in over the current
+     one, which stays opaque under it; back to the first pair, the top layer fades out over it. */
+  .mk-spair .mk-sb { filter: saturate(.85); }
+  .mk-spair .mk-hl { z-index: 3; }
+  .mk-spair .mk-tag { z-index: 4; }
+  .mk-sl { position: absolute; inset: 0; z-index: 1; display: none; grid-template-columns: 1fr 1fr; opacity: 0; transition: opacity .7s var(--ease); }
+  /* only the layer whose turn is next (series-motion.ts LOADING_CLASS), so its lazy images load just in time */
+  .mk-armed .mk-sl.mk-ld { display: grid; }
+  .mk-sl.mk-was { opacity: 1; transition: none; }
+  .mk-sl.mk-on { z-index: 2; opacity: 1; }
+  a.mk-series { text-decoration: none; transition: transform .3s var(--ease); }
+  a.mk-series:active { transform: scale(.97); }
+  /* The set's size, a small pill under the name (Create's series card: the same look). */
+  .mk-scount { display: inline-block; margin-top: 8px; padding: 4px 8px; border-radius: var(--radius-tag); font: 400 14px/1 var(--font-mono); color: var(--bone-dim); background: var(--wash); }
+  .mk-solo-meta .mk-scount { margin-top: 4px; }
+  /* 「系列」 badge and stacked prints, the same values as Create's series card (#512,
+     modules/image/catalogue/series-card.tsx): two prints the frame's size, turned a couple of
+     degrees so a few px of their corners show; still under reduced motion (nothing moves). */
+  .mk-sstack { position: relative; display: block; }
+  .mk-sprint { position: absolute; inset: 0; border-radius: 16px; box-shadow: inset 0 0 0 1px var(--input); }
+  .mk-sprint-back { transform: translate(3px, 5px) rotate(2.8deg); background: var(--secondary); }
+  .mk-sprint-mid { transform: translate(-2px, 2px) rotate(-2deg); background: var(--accent); }
+  .mk-sframe { position: relative; display: block; border-radius: 16px; box-shadow: 0 6px 16px -8px rgba(0, 0, 0, .75); }
+  .mk-sstack-lg .mk-sprint, .mk-sstack-lg .mk-sframe { border-radius: 20px; }
+  .mk-sbadge {
+    position: absolute; z-index: 5; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 10px;
+    border-radius: var(--radius-tag); font: 600 14px/1 var(--font-sans); color: var(--photo-ink); background: var(--frost); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .mk-sbadge svg { width: 14px; height: 14px; flex: none; }
+  /* In the large single-series row the Phone tag sits top left; it moves down for the badge. */
+  .mk-sstack-lg .mk-tag-l { top: auto; bottom: 12px; }
+  .mk-sstack-lg .mk-sbadge { top: 12px; left: 12px; }
+  @media (prefers-reduced-motion: reduce) {
+    .mk-sl { transition: none; }
+  }
+
+  /* ---------- the home hero's rotating AI scenes (hero-scenes.tsx) ----------
+     The incoming scene fades in on top of the one it replaces, which stays fully opaque under
+     it, so a scene still loading never shows an empty plate; the rest drop out only after that
+     fade, already covered. 0.4 s of each 2 s turn. */
+  .mk-pair .mk-scene { z-index: 0; opacity: 0; transition: opacity 0s .4s; }
+  .mk-pair .mk-scene.mk-was { z-index: 1; opacity: 1; transition: none; }
+  .mk-pair .mk-scene.mk-on { z-index: 2; opacity: 1; transition: opacity .4s var(--ease); }
+  .mk-dots {
+    position: absolute; z-index: 5; bottom: 8px; left: 75%; transform: translateX(-50%); display: flex; padding: 0 2px;
+    border-radius: 999px; background: var(--frost); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .mk-dot { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: none; cursor: pointer; }
+  .mk-dot > span { width: 6px; height: 6px; border-radius: 999px; background: var(--bone-dim); transition: width .3s var(--ease), background-color .3s; }
+  .mk-dot[aria-pressed="true"] > span { width: 14px; background: var(--primary); }
+  .mk-dot:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+  .mk-scene-caps { display: grid; }
+  .mk-scene-caps > span { grid-area: 1 / 1; visibility: hidden; opacity: 0; }
+  .mk-scene-caps > .mk-on { visibility: visible; opacity: 1; transition: opacity .4s var(--ease); }
+  @media (min-width: 768px) {
+    .mk-dots { bottom: 12px; }
+  }
+  @media (hover: hover) {
+    .mk-dot:hover > span { background: var(--foreground); }
+    .mk-dot[aria-pressed="true"]:hover > span { background: var(--primary); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mk-pair .mk-scene, .mk-pair .mk-scene.mk-on, .mk-scene-caps > .mk-on, .mk-dot > span { transition: none; }
+  }
+}
+
+/* ======================= the first-screen generator ======================= */
+@layer components {
+  /* the one primary, same material as the app's (DESIGN "Buttons") */
+  .mk-cta {
+    display: inline-flex; width: 100%; min-height: 56px; align-items: center; justify-content: center; gap: 8px; padding: 0 20px; border: 0; border-radius: var(--radius-tile);
+    font: 600 16px/1.2 var(--font-sans); letter-spacing: -0.01em; text-align: center; text-decoration: none; cursor: pointer;
+    background: var(--primary); color: var(--primary-foreground); box-shadow: var(--shadow-raised); transition: transform .18s var(--ease), filter .18s;
+  }
+  .mk-cta:active { transform: scale(.975); }
+  .mk-cta-neutral { background: var(--foreground); color: var(--background); }
+  .mk-cta-idle, .mk-cta:disabled { background: var(--wash); color: var(--muted-foreground); box-shadow: inset 0 0 0 1px var(--border); cursor: default; }
+  .mk-cost-tag { font: 500 14px/1 var(--font-mono); opacity: .72; }
+
+  /* ---------- the creation panel (home-panel.tsx; Owner 2026-11-12, 方案 B) ----------
+     Phones stack it: template name → preview → upload → template rail → size and note → Generate.
+     From 1024 two columns, the preview kept small (≤ 320 × 260) so the hero pair above stays the
+     page's largest picture (LCP). The preview never crops: the frame takes the cover's own shape
+     inside a height range, the picture is contained, and a blurred copy fills what is left. */
+  .mk-panel {
+    position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "stage" "up" "err" "rail" "row" "cta";
+    margin: 16px -6px 0; padding: 12px; border-radius: var(--radius-sheet); background: linear-gradient(180deg, var(--popover), var(--card));
+    box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 color-mix(in srgb, var(--foreground) 5%, transparent), 0 30px 60px -30px rgba(0, 0, 0, .8);
+  }
+  .mk-panel-head { grid-area: head; display: flex; align-items: center; gap: 8px; padding: 2px 2px 10px; }
+  .mk-panel-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 16px/1.25 var(--font-sans); }
+  .mk-panel-change {
+    flex: none; min-height: 40px; padding: 0 14px; border: 0; border-radius: 10px; cursor: pointer;
+    font: 600 14px/1 var(--font-sans); color: var(--foreground); background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .mk-stage-wrap { grid-area: stage; container-type: inline-size; }
+  .mk-stage {
+    --h: clamp(240px, calc(100cqw / var(--r, .8)), 420px);
+    position: relative; overflow: hidden; isolation: isolate; border-radius: var(--radius-tile); background: var(--muted);
+    height: var(--h); transition: height .35s var(--ease);
+  }
+  .mk-stage::after { content: ""; position: absolute; inset: 0; z-index: 5; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--border); pointer-events: none; }
+  .mk-stage-fill { position: absolute; inset: -24px; width: calc(100% + 48px); height: calc(100% + 48px); object-fit: cover; filter: blur(22px) saturate(1.1) brightness(.45); }
+  /* The picture's box: the largest of its own shape that fits the frame (contain), centred. */
+  .mk-stage-pic {
+    position: absolute; z-index: 1; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(100cqw, calc(var(--h) * var(--pr, .8))); aspect-ratio: var(--pr, .8); max-height: 100%; background: var(--photo-white);
+  }
+  .mk-stage-pic > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .mk-stage-img { animation: mk-stage-in .35s var(--ease); }
+  @keyframes mk-stage-in { from { opacity: 0; } to { opacity: 1; } }
+  /* Over its first frame the opening picture needs no fade (it would only dim the frame first). */
+  .mk-stage-ff + .mk-stage-img { animation: none; }
+  .mk-stage .mk-stage-ai { top: 10px; right: 10px; bottom: auto; z-index: 4; }
+  .mk-inset {
+    position: absolute; z-index: 4; right: 10px; bottom: 10px; width: 28%; max-width: 112px; aspect-ratio: var(--ir, .8); overflow: hidden; border-radius: 10px;
+    background: var(--background); box-shadow: 0 0 0 2px color-mix(in srgb, var(--foreground) 85%, transparent), 0 10px 24px rgba(0, 0, 0, .5);
+  }
+  .mk-inset-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; filter: saturate(.85); }
+  .mk-inset .mk-inset-tag { left: 6px; bottom: 6px; height: 22px; padding: 0 7px; font-size: 12px; }
+  .mk-up {
+    grid-area: up; display: flex; align-items: center; gap: 14px; width: 100%; margin-top: 10px; padding: 12px 14px; border: 0; border-radius: var(--radius-control);
+    text-align: left; cursor: pointer; color: var(--foreground); background: color-mix(in srgb, var(--primary) 7%, var(--card));
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--primary) 55%, transparent);
+  }
+  .mk-up-empty { display: none; }
+  .mk-up-has { background: var(--wash); box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-up-plus { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: var(--primary); color: var(--primary-foreground); }
+  .mk-up-thumb { flex: none; width: 48px; height: 48px; border-radius: 12px; object-fit: cover; }
+  .mk-up-t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+  .mk-up-t b { font: 600 16px/1.25 var(--font-sans); }
+  .mk-up-t small { font-size: 13px; line-height: 1.35; color: var(--muted-foreground); }
+  .mk-up-re { flex: none; display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 10px; font: 600 14px/1 var(--font-sans); background: var(--wash-strong); }
+  .mk-panel-error { grid-area: err; padding: 8px 4px 0; font-size: 14px; line-height: 1.4; color: var(--destructive); }
+  .mk-rail { grid-area: rail; display: flex; gap: 8px; margin: 12px -12px 0; padding: 2px 12px; overflow-x: auto; scrollbar-width: none; }
+  .mk-rail::-webkit-scrollbar { display: none; }
+  .mk-rail-i { flex: 0 0 64px; width: 64px; min-width: 0; padding: 0; border: 0; background: none; text-align: center; cursor: pointer; font: 500 12px/1.25 var(--font-sans); color: var(--bone-dim); }
+  .mk-rail-i img, .mk-rail-blank {
+    display: block; width: 64px; height: 64px; margin-bottom: 4px; object-fit: cover; border-radius: 12px; background: var(--muted); box-shadow: inset 0 0 0 1px var(--border); transition: box-shadow .2s;
+  }
+  .mk-rail-i span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mk-rail-i[aria-pressed="true"] { color: var(--foreground); }
+  .mk-rail-i[aria-pressed="true"] img, .mk-rail-i[aria-pressed="true"] .mk-rail-blank { box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary); }
+  .mk-rail-all {
+    flex: 0 0 64px; height: 64px; padding: 4px; border: 0; border-radius: 12px; cursor: pointer;
+    font: 500 12px/1.2 var(--font-sans); color: var(--bone-dim); background: var(--wash); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .mk-panel-row { grid-area: row; display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .mk-panel-size-d { display: none; }
+  .mk-panel-size-m { flex: none; }
+  .mk-panel-size-m .mk-field { padding: 0; }
+  .mk-panel-size-m .mk-field-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .mk-panel-size-m select { width: auto; max-width: 42vw; }
+  .mk-panel-note-l { flex: 1; min-width: 0; }
+  .mk-panel-note {
+    width: 100%; min-width: 0; height: 44px; padding: 0 14px; border: 0; border-radius: var(--radius-button); font: 400 16px/1 var(--font-sans);
+    color: var(--foreground); background: var(--wash-faint); box-shadow: inset 0 0 0 1px var(--input); transition: box-shadow .2s;
+  }
+  .mk-panel-note::placeholder { color: var(--muted-foreground); }
+  .mk-panel-note:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--primary), 0 0 0 4px var(--safelight-halo); }
+  .mk-panel-cta { grid-area: cta; padding-top: 12px; }
+  .mk-panel-fmt { padding-top: 8px; text-align: center; font-size: 13px; line-height: 1.35; color: var(--muted-foreground); }
+  .mk-panel-gift { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0 2px; font-size: 14px; color: var(--bone-dim); }
+  .mk-gift-i { width: 16px; height: 16px; color: var(--primary); }
+  .mk-field { display: block; padding: 12px 4px 0; }
+  .mk-field-label { display: block; margin-bottom: 8px; font: 500 15px/1.3 var(--font-sans); }
+
+  /* floating primary, phones only: shown while the generator is off screen. From 768px up the
+     header's primary stands in for it (Owner 2026-11-08: a floating bar is a phone pattern). */
+  .mk-dock {
+    position: fixed; z-index: 70; left: 12px; right: 12px; bottom: calc(var(--sab) + 12px); visibility: hidden;
+    transform: translateY(calc(100% + var(--sab) + 40px)); transition: transform .45s var(--ease), visibility 0s .45s;
+  }
+  .mk-dock-show { visibility: visible; transform: none; transition: transform .45s var(--ease), visibility 0s; }
+
+  @media (min-width: 768px) {
+    .mk-panel { max-width: 560px; margin: 24px 0 0; }
+    .mk-dock { display: none; }
+  }
+
+  @media (min-width: 1024px) {
+    .mk-panel {
+      grid-column: 1 / -1; max-width: none; margin-top: 32px; padding: 16px; column-gap: 28px; align-items: start;
+      grid-template-columns: 320px minmax(0, 1fr); grid-template-rows: auto auto auto auto auto 1fr;
+      grid-template-areas: "head up" "stage up" "stage err" "stage rail" "stage row" "stage cta";
+    }
+    .mk-panel-noup { grid-template-rows: auto auto auto auto 1fr; grid-template-areas: "head err" "stage rail" "stage row" "stage cta" "stage ."; }
+    .mk-stage { --h: clamp(200px, calc(100cqw / var(--r, .8)), 260px); }
+    .mk-up { margin-top: 0; padding: 16px 18px; }
+    .mk-rail { margin: 12px 0 0; padding: 2px; }
+    .mk-panel-size-d { display: block; }
+    .mk-panel-size-m { display: none; }
+    /* the Size chip and its list (size-menu.tsx) */
+    .mk-bchip {
+      flex: none; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px 0 8px; border: 0; border-radius: 999px; cursor: pointer;
+      font: 500 15px/1 var(--font-sans); letter-spacing: -0.01em; white-space: nowrap; color: var(--foreground); background: var(--wash);
+      box-shadow: inset 0 0 0 1px var(--border); transition: background-color .18s, box-shadow .18s;
+    }
+    .mk-k { font-size: 14px; font-weight: 400; color: var(--muted-foreground); }
+    .mk-chip-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+    .mk-chev { width: 16px; height: 16px; color: var(--muted-foreground); }
+    .mk-glyph { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--wash); }
+    .mk-glyph i { display: block; border: 1.5px solid var(--bone-dim); border-radius: 2px; }
+    .mk-size { position: relative; flex: none; }
+    .mk-size-list {
+      position: absolute; z-index: 60; left: 0; bottom: calc(100% + 8px); display: grid; min-width: 220px; padding: 6px; border-radius: var(--radius-control);
+      background: var(--popover); box-shadow: inset 0 0 0 1px var(--border), 0 24px 48px -16px rgba(0, 0, 0, .7);
+    }
+    .mk-size-list button {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 0 10px 0 12px; border: 0; border-radius: 10px;
+      background: none; color: var(--foreground); font: 500 15px/1 var(--font-sans); cursor: pointer; text-align: left;
+    }
+    .mk-size-list button svg { color: var(--primary); opacity: 0; }
+    .mk-size-list button[aria-checked="true"] svg { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mk-stage { transition: none; }
+    .mk-stage-img { animation: none; }
+  }
+
+  @media (hover: hover) {
+    .mk-nl:hover { color: var(--foreground); background: var(--wash); }
+    .mk-ghost-pill:hover { background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--input); }
+    .mk-rail-i:hover img { box-shadow: inset 0 0 0 1px var(--input); }
+    .mk-panel-change:hover, .mk-rail-all:hover { background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--input); }
+    .mk-bchip:hover { background: var(--wash-strong); box-shadow: inset 0 0 0 1px var(--input); }
+    .mk-size-list button:hover { background: var(--wash); }
+    .mk-cta:not(:disabled):hover { filter: brightness(1.04); }
+  }
+}
+
+/* ======================= sections ======================= */
+@layer components {
+  .mk-block { padding: 72px var(--gutter) 0; }
+
+  /* the shoot: phone photo → three results, the phone as large as a result */
+  .mk-shoot { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .mk-src { display: contents; }
+  .mk-phone {
+    position: relative; grid-column: 1; grid-row: 1; padding: 4px; border-radius: var(--radius-panel); overflow: hidden; background: var(--secondary);
+    box-shadow: inset 0 0 0 1px var(--border), 0 16px 30px -12px rgba(0, 0, 0, .8);
+  }
+  .mk-phone img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; border-radius: var(--radius-tile); }
+  .mk-phone::before { content: ""; position: absolute; z-index: 2; top: 8px; left: 50%; width: 30px; height: 8px; margin-left: -15px; border-radius: 6px; background: var(--background); }
+  .mk-file {
+    position: absolute; z-index: 2; left: 12px; bottom: 12px; height: 26px; padding: 0 8px; border-radius: 8px; display: inline-flex; align-items: center;
+    font: 500 14px/1 var(--font-mono); color: var(--foreground); background: var(--frost); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .mk-src-meta { grid-column: 2; grid-row: 1; align-self: center; }
+  .mk-src-meta p { font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
+  .mk-develop { grid-column: 1 / -1; grid-row: 2; display: flex; align-items: center; gap: 8px; padding: 4px 0 4px 8px; }
+  .mk-line { width: 1.5px; height: 40px; background: linear-gradient(var(--border), var(--primary)); }
+  .mk-arrow { display: none; }
+  .mk-lbl { font: 500 14px/1.3 var(--font-sans); color: var(--primary); }
+  .mk-outs { display: contents; list-style: none; margin: 0; padding: 0; }
+  .mk-outs li { position: relative; grid-row: 4; aspect-ratio: 4 / 5; border-radius: var(--radius-tile); overflow: hidden; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-outs li:first-child { grid-row: 3; grid-column: 1 / -1; aspect-ratio: 1 / 1; }
+  .mk-outs img { width: 100%; height: 100%; object-fit: cover; }
+  .mk-outs li:first-child img { object-position: 50% 72%; }
+  .mk-out-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 48px 12px 12px; background: linear-gradient(transparent, color-mix(in srgb, var(--background) 90%, transparent) 62%); }
+  .mk-out-cap b { display: block; font: 600 16px/1.2 var(--font-sans); }
+  .mk-out-cap small { display: block; margin-top: 2px; font-size: 14px; color: var(--bone-dim); }
+  .mk-bill { grid-column: 1 / -1; grid-row: 5; margin-top: 4px; display: grid; grid-template-columns: 1fr 1fr; border-radius: var(--radius-media); overflow: hidden; box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-bill > div { padding: 16px; }
+  .mk-bill .mk-them { background: var(--card); }
+  .mk-bill .mk-us { background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 18%, transparent), color-mix(in srgb, var(--primary) 4%, transparent)); }
+  .mk-who { font: 600 14px/1 var(--font-sans); color: var(--muted-foreground); }
+  .mk-bill .mk-us .mk-who { color: var(--primary); }
+  .mk-amt { margin-top: 8px; font: 400 36px/1 var(--font-display); letter-spacing: -0.02em; }
+  .mk-bill .mk-them .mk-amt { color: var(--bone-dim); }
+  .mk-bill small { display: block; margin-top: 8px; font-size: 14px; line-height: 1.35; color: var(--muted-foreground); }
+  .mk-bill-line { grid-column: 1 / -1; grid-row: 6; margin-top: 12px; font-size: 14px; color: var(--muted-foreground); }
+
+  /* edit cases: finished pictures changed in one place, before/after with what changed */
+  .mk-edits { margin: 24px 0 0; padding: 0; list-style: none; display: grid; gap: 32px; }
+  .mk-edit { margin: 0; }
+  .mk-pair-edit { display: grid; }
+  /* a cut-out with an alpha channel: a light checkerboard shows where the picture is transparent */
+  .mk-pane-checker { background: repeating-conic-gradient(#e4e4e4 0 25%, #fff 0 50%) 0 0 / 20px 20px; }
+  .mk-ref {
+    position: absolute; z-index: 3; left: 12px; bottom: 12px; width: 34%; aspect-ratio: 4 / 5; border-radius: 10px; overflow: hidden;
+    box-shadow: 0 0 0 2px var(--background), 0 10px 24px -8px rgba(0, 0, 0, .7);
+  }
+  .mk-ref-tag {
+    position: absolute; z-index: 1; left: 4px; bottom: 4px; height: 20px; padding: 0 6px; border-radius: 6px; display: inline-flex; align-items: center;
+    font: 600 12px/1 var(--font-sans); color: var(--foreground); background: var(--frost); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .mk-edit-cap { margin-top: 12px; padding: 0 4px; }
+  .mk-edit-cap b { display: block; font: 600 16px/1.25 var(--font-sans); letter-spacing: -0.01em; }
+  .mk-edit-cap span { display: block; margin-top: 4px; max-width: 60ch; font-size: 14px; line-height: 1.45; color: var(--muted-foreground); }
+
+  /* steps */
+  .mk-steps { position: relative; list-style: none; margin: 24px 0 0; padding: 0; }
+  .mk-steps::before { content: ""; position: absolute; left: 19px; top: 20px; bottom: 32px; width: 1px; background: linear-gradient(var(--primary), var(--border)); }
+  .mk-steps li { position: relative; display: grid; grid-template-columns: 40px 1fr; gap: 16px; padding-bottom: 24px; }
+  .mk-num {
+    position: relative; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--background);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 40%, transparent); font: 400 24px/1 var(--font-display); color: var(--primary);
+  }
+  .mk-steps h3, .mk-cat-head h3, .mk-free h3, .mk-bill-card h3 { font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; }
+  .mk-steps h3 { padding-top: 8px; }
+  .mk-steps p { margin-top: 4px; font-size: 16px; line-height: 1.5; color: var(--muted-foreground); }
+
+  /* templates: pair cards, one per row on the phone, two per row from 768 */
+  .mk-tpl-wrap { padding-top: 72px; }
+  .mk-hd { padding: 0 var(--gutter); }
+  .mk-cat { margin-top: 36px; padding: 0 var(--gutter); }
+  .mk-cat-head { margin-bottom: 12px; }
+  .mk-cat-head p { margin-top: 4px; font-size: 16px; line-height: 1.5; color: var(--muted-foreground); }
+  .mk-cat-head a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+  .mk-note { margin-top: 16px; padding: 0 var(--gutter); font: 400 14px/1.4 var(--font-sans); color: var(--muted-foreground); }
+  .mk-tgrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 20px 16px; }
+  .mk-tpl { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: left; font: inherit; border-radius: var(--radius-tile); }
+  button.mk-tpl { cursor: pointer; transition: transform .3s var(--ease); }
+  button.mk-tpl:active { transform: scale(.97); }
+  .mk-tpl .mk-pair { width: 100%; }
+  .mk-tpl-meta { display: block; padding: 8px 2px 2px; }
+  .mk-tpl-meta b { display: block; font: 600 16px/1.25 var(--font-sans); letter-spacing: -0.015em; }
+  .mk-use { display: block; margin-top: 2px; font-size: 14px; line-height: 1.35; color: var(--muted-foreground); }
+  .mk-solo { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: center; }
+  .mk-solo-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-bottom: 4px; }
+  .mk-solo-meta b { margin-top: 4px; font: 400 24px/1.05 var(--font-display); letter-spacing: -0.01em; }
+  .mk-solo-meta .mk-ghost-pill { margin-top: 12px; cursor: pointer; border: 0; }
+  .mk-solo .mk-tpl .mk-tpl-meta { display: none; }
+
+  /* the one draggable compare (Art Styles) */
+  .mk-compare { position: relative; aspect-ratio: 4 / 5; border-radius: var(--radius-media); overflow: hidden; background: var(--muted); touch-action: pan-y; user-select: none; }
+  .mk-compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+  .mk-compare .mk-after { clip-path: inset(0 0 0 calc(var(--x, 50%) + var(--nx, 0px))); }
+  .mk-handle { position: absolute; z-index: 2; top: 0; bottom: 0; left: calc(var(--x, 50%) + var(--nx, 0px)); width: 2px; margin-left: -1px; background: color-mix(in srgb, var(--foreground) 95%, transparent); pointer-events: none; }
+  .mk-handle span {
+    position: absolute; top: 50%; left: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%;
+    background: var(--frost); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--foreground) 95%, transparent);
+  }
+  .mk-handle span::before, .mk-handle span::after { content: ""; position: absolute; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border: solid var(--foreground); border-width: 0 0 2px 2px; }
+  .mk-handle span::before { left: 10px; transform: rotate(45deg); }
+  .mk-handle span::after { right: 10px; transform: rotate(-135deg); }
+  .mk-compare input { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
+  .mk-compare .mk-tag { top: 12px; bottom: auto; height: 28px; padding: 0 10px; }
+  .mk-compare .mk-tag-l { left: 12px; }
+  .mk-compare .mk-tag-r { right: 12px; background: var(--primary); }
+  .mk-compare:has(input:focus-visible) { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+  /* facts */
+  .mk-facts { width: 100%; margin-top: 24px; border-collapse: separate; border-spacing: 0; border-radius: var(--radius-media); overflow: hidden; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-facts th, .mk-facts td { padding: 12px 16px; text-align: left; vertical-align: top; border-top: 1px solid var(--hairline); }
+  .mk-facts tr:first-child th, .mk-facts tr:first-child td { border-top: 0; }
+  .mk-facts th { width: 42%; padding-top: 14px; font: 500 14px/1.4 var(--font-sans); color: var(--muted-foreground); }
+  .mk-facts td { font-size: 16px; line-height: 1.4; }
+  .mk-facts .mk-key td { font: 400 24px/1.1 var(--font-display); }
+
+  /* free */
+  .mk-free { display: grid; gap: 8px; margin-top: 24px; }
+  .mk-free article { padding: 16px; border-radius: var(--radius-media); background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-free p { margin-top: 8px; font-size: 16px; line-height: 1.5; color: var(--muted-foreground); }
+  .mk-free p a { color: var(--foreground); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--foreground) 40%, transparent); text-underline-offset: 3px; transition: text-decoration-color .18s; }
+  .mk-free p a:hover { text-decoration-color: var(--primary); }
+  .mk-wm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .mk-wm figure { position: relative; margin: 0; aspect-ratio: 1; border-radius: 12px; overflow: hidden; }
+  .mk-wm img { width: 100%; height: 100%; object-fit: cover; }
+  .mk-wm figcaption { position: absolute; left: 8px; bottom: 8px; height: 26px; }
+  .mk-free-tag { background: color-mix(in srgb, var(--background) 72%, transparent); color: var(--foreground); }
+  .mk-wm .mk-paid-tag { background: var(--primary); color: var(--primary-foreground); }
+  .mk-mark { position: absolute; inset: 0; display: grid; place-items: center; font: italic 400 24px/1 var(--font-display); letter-spacing: .02em; color: color-mix(in srgb, var(--foreground) 55%, transparent); transform: rotate(-18deg); }
+
+  /* what 3 photos cost: two bills, the totals are the loud line */
+  .mk-bills { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 24px; }
+  .mk-bill-card { padding: 20px 16px 16px; border-radius: var(--radius-media); background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-bill-card.mk-us { background: color-mix(in srgb, var(--primary) 9%, var(--card)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 32%, transparent); }
+  .mk-bill-card h3 { color: var(--bone-dim); }
+  .mk-bill-card.mk-us h3 { color: var(--primary); }
+  .mk-total { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .mk-total > .mk-n { font: 400 40px/1 var(--font-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .mk-from { margin-right: 6px; font-size: 20px; color: var(--bone-dim); }
+  .mk-total small { margin-left: 2px; font-size: 20px; color: var(--bone-dim); }
+  .mk-when { font-size: 16px; color: var(--bone-dim); }
+  .mk-lines { list-style: none; margin: 16px 0 0; padding: 0; }
+  .mk-lines li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 0; border-top: 1px solid var(--hairline); font-size: 15px; line-height: 1.35; color: var(--muted-foreground); }
+  /* A value stays on one line when it fits; a long one (en "A listing image, a lifestyle shot and a
+     promo poster") wraps instead of widening the card and the page on a 375px phone. */
+  .mk-lines li > * { min-width: 0; }
+  .mk-lines .mk-n { font: 500 14px/1.3 var(--font-mono); text-align: right; text-wrap: balance; }
+  .mk-them .mk-lines .mk-n { color: var(--bone-dim); }
+  .mk-fine { margin-top: 12px; font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
+  .mk-bill-card.mk-us .mk-fine { color: var(--bone-dim); }
+
+  /* the three monthly plans under the bills: one ruled strip, quieter than the bills; every
+     cell goes to /pricing (SEO launch handbook G10) */
+  .mk-plans { margin-top: 16px; }
+  .mk-plans ul { list-style: none; margin: 0; padding: 0; border-radius: var(--radius-media); box-shadow: inset 0 0 0 1px var(--border); overflow: hidden; }
+  .mk-plans li + li { border-top: 1px solid var(--hairline); }
+  .mk-plans li a {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 14px 16px;
+    text-decoration: none; color: var(--muted-foreground); font-size: 14px; line-height: 1.35; transition: background-color .18s;
+  }
+  .mk-plans b { font: 600 16px/1.25 var(--font-sans); letter-spacing: -0.01em; color: var(--foreground); }
+  .mk-plan-price { grid-column: 2; grid-row: 1 / span 3; align-self: center; font: 400 24px/1 var(--font-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--foreground); }
+  .mk-plan-price small { margin-left: 2px; font: 400 14px/1 var(--font-sans); color: var(--bone-dim); }
+  .mk-plans-more { margin-top: 12px; font-size: 15px; }
+  .mk-plans-more a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+  .mk-plans li a:focus-visible, .mk-plans-more a:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+
+  /* FAQ: <details>, the answers in the HTML (建站规格 G11) */
+  .mk-faq { margin-top: 16px; }
+  /* /pricing: the page already has its gutter. */
+  .mk-pricing-faq > .mk-block { padding: 48px 0 0; }
+  .mk-faq details { border-top: 1px solid var(--border); }
+  .mk-faq details:last-child { border-bottom: 1px solid var(--border); }
+  .mk-faq summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 60px; padding: 12px 0; cursor: pointer; }
+  .mk-faq summary::-webkit-details-marker { display: none; }
+  .mk-faq summary h3 { font: 600 16px/1.35 var(--font-sans); letter-spacing: -0.01em; }
+  .mk-pm { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--wash); transition: transform .3s var(--ease), background-color .2s; }
+  .mk-pm svg { width: 14px; height: 14px; }
+  .mk-faq details[open] .mk-pm { transform: rotate(45deg); background: var(--primary); color: var(--primary-foreground); }
+  .mk-faq details > p { padding: 0 40px 16px 0; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
+  .mk-faq details > p a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+  .mk-faq table { width: 100%; margin: 0 0 16px; border-collapse: collapse; font-size: 15px; line-height: 1.35; }
+  .mk-faq caption { padding-bottom: 8px; text-align: left; font-size: 14px; color: var(--muted-foreground); }
+  .mk-faq th, .mk-faq td { padding: 10px 12px 10px 0; text-align: left; vertical-align: top; border-top: 1px solid var(--hairline); }
+  .mk-faq thead th { padding-top: 0; border-top: 0; font: 600 14px/1.3 var(--font-sans); color: var(--muted-foreground); }
+  .mk-faq tbody th { width: 26%; font: 500 14px/1.35 var(--font-sans); color: var(--muted-foreground); }
+  .mk-faq td { color: var(--bone-dim); }
+  .mk-faq td:first-of-type { color: var(--foreground); }
+
+  /* related links */
+  .mk-links { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
+  .mk-links a {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; padding: 12px 16px; border-radius: var(--radius-tile);
+    text-decoration: none; color: var(--foreground); background: var(--card); box-shadow: inset 0 0 0 1px var(--border); transition: box-shadow .18s;
+  }
+  .mk-links b { display: block; font: 600 16px/1.25 var(--font-sans); }
+  .mk-links small { display: block; margin-top: 2px; font: 400 14px/1.3 var(--font-sans); color: var(--muted-foreground); }
+  .mk-go { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--wash); }
+  .mk-go svg { width: 16px; height: 16px; }
+
+  @media (hover: hover) {
+    .mk-faq summary:hover .mk-pm, .mk-links a:hover .mk-go { background: var(--wash-strong); }
+    .mk-links a:hover { box-shadow: inset 0 0 0 1px var(--input); }
+    .mk-plans li a:hover { background: var(--wash); }
+  }
+}
+
+/* ======================= wider screens ======================= */
+@layer components {
+  /* tablet (768–1023): one column, the card generator stays */
+  @media (min-width: 768px) {
+    .mk-hero { padding-top: 40px; }
+    .mk-hero h1, .mk-lede, .mk-answer, .mk-hero-pair { max-width: 640px; }
+    .mk-hero h1 { font-size: var(--text-title); }
+    .mk-shoot { grid-template-columns: repeat(3, 1fr); }
+    .mk-phone { grid-column: 1; grid-row: 1; }
+    .mk-src-meta { grid-column: 2 / -1; grid-row: 1; }
+    .mk-develop { grid-row: 2; }
+    .mk-outs li, .mk-outs li:first-child { grid-row: 3; grid-column: auto; aspect-ratio: 4 / 5; }
+    .mk-bill { grid-row: 4; }
+    .mk-bill-line { grid-row: 5; }
+    .mk-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .mk-edits { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 16px; }
+    .mk-steps::before { display: none; }
+    .mk-steps li { padding-bottom: 0; }
+    .mk-free { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .mk-free:has(> :nth-child(4)) { grid-template-columns: repeat(2, 1fr); }
+    .mk-links { grid-template-columns: 1fr 1fr; }
+    .mk-tgrid { grid-template-columns: 1fr 1fr; gap: 24px 16px; }
+    .mk-solo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+    .mk-solo-art { grid-template-columns: 360px minmax(0, 1fr); }
+    .mk-cat-head { display: flex; align-items: baseline; gap: 16px; }
+    .mk-cat-head h3 { flex: none; }
+    .mk-cat-head p { margin-top: 0; }
+    .mk-bills { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .mk-bill-card { padding: 24px 24px 20px; }
+    .mk-plans ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .mk-plans li + li { border-top: 0; border-left: 1px solid var(--hairline); }
+    .mk-plans li a { grid-template-columns: minmax(0, 1fr); height: 100%; padding: 16px 20px; }
+    .mk-plan-price { grid-column: 1; grid-row: 2; margin: 6px 0 4px; }
+    .mk-total > .mk-n { font-size: var(--text-large-title); }
+  }
+
+  /* desktop (≥1024): hero row 1 copy | pair, row 2 the bench; sections title left (sticky), content right */
+  @media (min-width: 1024px) {
+    .mk-hero { padding-top: 48px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 48px; align-items: center; }
+    .mk-hero-copy { grid-column: 1; grid-row: 1; }
+    .mk-hero h1, .mk-lede, .mk-answer { max-width: none; }
+    .mk-hero-pair { grid-column: 2; grid-row: 1; margin: 0; max-width: none; }
+    .mk-block, .mk-hd { display: grid; grid-template-columns: 352px minmax(0, 1fr); column-gap: 48px; }
+    .mk-block > h2 { grid-column: 1; grid-row: 1 / span 3; position: sticky; top: 88px; align-self: start; }
+    .mk-block > :not(h2) { grid-column: 2; }
+    .mk-block > .mk-intro, .mk-hd .mk-intro { margin-top: 0; }
+    .mk-steps, .mk-facts, .mk-free, .mk-faq, .mk-links { margin-top: 0; }
+    .mk-block > .mk-intro + .mk-facts { margin-top: 24px; }
+    .mk-steps { gap: 32px; }
+    /* the shoot spans the content width: phone photo as large as a result, the arrow between */
+    #shoot > h2, #cost > h2 { grid-row: 1; position: static; }
+    #shoot > .mk-shoot { grid-column: 1 / -1; margin-top: 32px; }
+    #edits > h2 { grid-row: 1; position: static; }
+    #edits > .mk-edits { grid-column: 1 / -1; margin-top: 32px; }
+    .mk-edits-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .mk-shoot { grid-template-columns: minmax(0, 1fr) 128px repeat(3, minmax(0, 1fr)); grid-template-rows: auto auto auto; gap: 12px 16px; align-items: start; }
+    .mk-src-meta { grid-column: 1; grid-row: 2; align-self: start; padding: 0 4px; }
+    .mk-develop { grid-column: 2; grid-row: 1; align-self: center; flex-direction: column; justify-content: center; gap: 8px; padding: 0; text-align: center; }
+    .mk-line { display: none; }
+    .mk-arrow { display: block; width: 40px; height: 40px; color: var(--primary); }
+    .mk-outs li, .mk-outs li:first-child { grid-row: 1; }
+    .mk-bill { grid-column: 3 / -1; grid-row: 2; margin-top: 12px; }
+    .mk-bill-line { grid-column: 3 / -1; grid-row: 3; margin-top: 0; }
+    .mk-cat { margin-top: 48px; }
+    .mk-cat-head { margin-bottom: 16px; }
+    .mk-tgrid[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .mk-solo-art { grid-template-columns: 420px minmax(0, 1fr); gap: 40px; }
+    #cost > .mk-intro { grid-column: 2; grid-row: 1; align-self: end; margin: 0 0 6px; }
+    #cost > .mk-bills { grid-column: 1 / -1; margin-top: 32px; }
+  }
+
+  /* ---------- footer ---------- */
+  .mk-footer { margin-top: 80px; padding: 28px var(--gutter) calc(var(--sab) + 28px); border-top: 1px solid var(--border); }
+  .mk-foot-word { font: 400 40px/1 var(--font-display); letter-spacing: -0.02em; }
+  .mk-foot-main { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 24px; margin-top: 8px; }
+  .mk-mail { display: inline-flex; align-items: center; min-height: 44px; font: 400 16px/1.4 var(--font-sans); color: var(--foreground); text-decoration: none; }
+  .mk-copy { font-size: 16px; color: var(--bone-dim); }
+  .mk-foot-fine {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 24px; margin-top: 12px; padding-top: 12px;
+    border-top: 1px solid var(--hairline); font: 400 14px/1.4 var(--font-sans); color: var(--muted-foreground);
+  }
+  /* One link run, every item led by a dot. The run sits 22px (gap + dot + gap) left of the column and
+     the nav clips at 4px, so the dot that opens each line is cut off while focus rings still show.
+     The items are inline boxes so text-wrap: balance evens out the lines and never strands one. */
+  .mk-foot-links { overflow: hidden; margin: -4px; padding: 4px; }
+  .mk-foot-run { margin-inline-start: -22px; text-wrap: balance; }
+  .mk-foot-item { display: inline-flex; align-items: center; gap: 8px; margin-inline-start: 8px; vertical-align: top; }
+  .mk-foot-dot { inline-size: 6px; text-align: center; }
+  .mk-foot-lang { display: flex; align-items: center; gap: 8px; }
+  .mk-foot-fine a, .mk-foot-btn { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted-foreground); text-decoration: none; font: inherit; cursor: pointer; }
+  .mk-foot-lang [aria-current] { color: var(--bone-dim); }
+  @media (min-width: 768px) {
+    .mk-footer { padding-top: 40px; }
+    .mk-foot-main { margin-top: 12px; }
+  }
+  @media (hover: hover) {
+    .mk-mail:hover, .mk-foot-fine a:hover, .mk-foot-btn:hover { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+  }
+
+  /* ---------- template picker: 1040px dialog from 768, bottom drawer on phones ---------- */
+  .mk-sheet-x { position: absolute; top: 12px; right: 12px; z-index: 2; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; color: var(--bone-dim); }
+  .mk-sheet-x > span { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--wash-strong); }
+  .mk-pk-scroll { overflow-y: auto; overscroll-behavior: contain; padding: 0 16px calc(var(--sab) + 16px); }
+  .mk-pk-body { display: flex; flex-direction: column; gap: 16px; }
+  .mk-pk-sample { margin-top: 32px; }
+  .mk-pk-sample .mk-pair { width: 100%; }
+  .mk-pk-blank { display: block; aspect-ratio: 8 / 5; border-radius: var(--radius-media); background: var(--muted); }
+  .mk-pk-cap { margin-top: 8px; font-size: 14px; color: var(--muted-foreground); }
+  .mk-pk-side { display: flex; flex-direction: column; min-height: 0; }
+  .mk-pk-title { font: 400 32px/1.05 var(--font-display); letter-spacing: -0.02em; margin-bottom: 4px; }
+  .mk-pk-text { font-size: 14px; color: var(--muted-foreground); }
+  .mk-pk-list { margin-top: 12px; display: grid; gap: 4px; }
+  .mk-pk-cat { padding: 12px 2px 4px; font: 600 14px/1.3 var(--font-sans); color: var(--muted-foreground); }
+  .mk-pk-row {
+    display: flex; width: 100%; align-items: center; gap: 12px; min-height: 56px; padding: 6px 10px 6px 6px; border: 0; border-radius: var(--radius-button);
+    background: none; color: var(--foreground); text-align: left; cursor: pointer; box-shadow: inset 0 0 0 1px transparent; transition: background-color .18s, box-shadow .18s;
+  }
+  .mk-pk-th { flex: none; width: 44px; height: 44px; border-radius: 12px; object-fit: cover; background: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-pk-t { flex: 1; min-width: 0; }
+  .mk-pk-t b { display: block; font: 600 16px/1.25 var(--font-sans); letter-spacing: -0.015em; }
+  .mk-pk-t small { display: block; margin-top: 2px; font-size: 14px; color: var(--muted-foreground); }
+  .mk-pk-row[aria-checked="true"] { background: var(--wash); box-shadow: inset 0 0 0 1.5px var(--foreground); }
+  .mk-pk-go { position: sticky; bottom: 0; margin-top: 4px; padding-top: 12px; background: linear-gradient(transparent, var(--popover) 40%); }
+  /* search and chips over the list (Owner 2026-11-13); a series row opens its members in place */
+  .mk-pk-tools { display: grid; gap: 10px; margin-top: 16px; }
+  .mk-pk-none { padding: 24px 4px; font-size: 14px; color: var(--muted-foreground); }
+  .mk-pk-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px 0 4px; border-radius: var(--radius-button); font: 500 14px/1 var(--font-sans); color: var(--bone-dim); justify-self: start; }
+  .mk-pk-stack { position: relative; flex: none; border-radius: 12px; box-shadow: 3px -3px 0 -1px var(--accent), 6px -6px 0 -2px var(--secondary); margin: 6px 6px 0 0; }
+  .mk-pk-stack .mk-pk-th { display: block; }
+  @media (max-width: 767.98px) { .mk-pk-body[data-searching] .mk-pk-sample { display: none; } }
+  @media (hover: hover) {
+    .mk-pk-row[aria-checked="false"]:hover, .mk-pk-row:not([aria-checked]):hover { background: var(--wash-faint); box-shadow: inset 0 0 0 1px var(--border); }
+    .mk-pk-back:hover { color: var(--foreground); }
+  }
+  @media (min-width: 768px) {
+    .mk-picker { max-height: calc(100dvh - 64px); overflow: hidden; }
+    .mk-pk-tools { margin-top: 12px; }
+    .mk-pk-body { display: grid; grid-template-columns: 46% minmax(0, 1fr); column-gap: 32px; align-items: start; padding: 24px; }
+    .mk-pk-sample { margin-top: 0; }
+    /* a fixed height, so the dialog does not jump as chips and searches change the list */
+    .mk-pk-side { height: min(640px, calc(100dvh - 112px)); }
+    .mk-pk-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+  }
+
+  /* ---------- sign-up prompt ---------- */
+  .mk-gift-box {
+    display: flex; align-items: center; gap: 12px; margin: 16px 0; padding: 12px; border-radius: var(--radius-control);
+    background: linear-gradient(120deg, color-mix(in srgb, var(--primary) 16%, transparent), color-mix(in srgb, var(--primary) 4%, transparent));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, transparent);
+  }
+  .mk-gift-ico { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--primary); color: var(--primary-foreground); }
+  .mk-gift-box b { display: block; font-size: 16px; }
+  .mk-gift-box span span { font-size: 14px; color: var(--muted-foreground); }
+  .mk-alt { display: grid; gap: 8px; margin-top: 8px; }
+  .mk-ghost-btn {
+    display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 16px; border-radius: var(--radius-button); text-decoration: none;
+    font: 600 15px/1 var(--font-sans); color: var(--foreground); background: var(--wash); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .mk-signup-fine { margin-top: 12px; text-align: center; font-size: 14px; color: var(--muted-foreground); }
+  .mk-signup-fine a { color: var(--bone-dim); text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ---------- motion (pointer devices only, never under reduced motion) ---------- */
+  @media (hover: hover) {
+    .mk-lift { transition: transform .3s var(--ease), box-shadow .18s; }
+    .mk-lift:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--input); }
+    .mk-lift:hover .mk-zoom { transform: scale(1.02); }
+    .mk-zoom { transition: transform .6s var(--ease); }
+    button.mk-tpl:hover, a.mk-series:hover { transform: translateY(-2px); }
+    .mk-tpl:hover .mk-pair::after { box-shadow: inset 0 0 0 1px var(--input); }
+  }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    /* the hover wipe (DESIGN §6.9 item 3): the right plate develops from the phone photo to the
+       result, a safelight seam riding the edge; decoration only */
+    .mk-tpl:hover .mk-pane .mk-a { animation: mk-wipe 2.9s infinite; }
+    .mk-tpl:hover .mk-ws { animation: mk-seam 2.9s infinite; }
+    .mk-compare:hover { animation: mk-nudge 1.1s var(--ease) 1; }
+  }
+  @keyframes mk-wipe {
+    0% { clip-path: inset(0 100% 0 0); opacity: 1; animation-timing-function: cubic-bezier(.45, 0, .2, 1); }
+    55%, 76% { clip-path: inset(0 0 0 0); opacity: 1; }
+    90% { clip-path: inset(0 0 0 0); opacity: 0; }
+    100% { clip-path: inset(0 100% 0 0); opacity: 0; }
+  }
+  @keyframes mk-seam {
+    0% { left: 0; opacity: 0; animation-timing-function: cubic-bezier(.45, 0, .2, 1); }
+    2% { left: 0; opacity: 1; animation-timing-function: cubic-bezier(.45, 0, .2, 1); }
+    55% { left: 100%; opacity: 1; }
+    58%, 100% { left: 100%; opacity: 0; }
+  }
+  @keyframes mk-nudge { 0% { --nx: 0px; } 30% { --nx: 6px; } 70% { --nx: -6px; } 100% { --nx: 0px; } }
+
+  /* rise on entry, driven by scroll (no script). Position only, never opacity: the copy must
+     never be hidden from a renderer that does not scroll (建站规格 R5). */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .mk-reveal { animation: mk-rise linear both; animation-timeline: view(); animation-range: entry 0% entry 35%; }
+    }
+  }
+  @keyframes mk-rise { from { transform: translateY(16px); } to { transform: none; } }
+}
+
+@layer components {
+  .mk-facts-note { margin-top: 12px; font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
+}
+
+/* Signed in (DESIGN §6.9 item 4): "Open app" is the bar's primary on every width, next to an
+   account disc the size of the globe. */
+@layer components {
+  .mk-open {
+    position: relative; display: inline-flex; align-items: center; height: 36px; padding: 0 16px; border-radius: 999px; font: 600 14px/1 var(--font-sans);
+    letter-spacing: -0.01em; white-space: nowrap; text-decoration: none; background: var(--primary); color: var(--primary-foreground); box-shadow: var(--shadow-raised);
+  }
+  .mk-open::before, .mk-acct::before { content: ""; position: absolute; inset: -4px -2px; }
+  .mk-open:active { transform: scale(.975); }
+  .mk-acct {
+    position: relative; width: 36px; height: 36px; margin-left: 4px; border-radius: 50%; display: grid; place-items: center; color: var(--bone-dim);
+    background: var(--wash); box-shadow: inset 0 0 0 1px var(--border); transition: background-color .18s, color .18s;
+  }
+  .mk-acct svg { width: 18px; height: 18px; }
+  @media (min-width: 768px) { .mk-open { margin-left: 8px; } .mk-acct { margin-left: 6px; } }
+  @media (hover: hover) { .mk-acct:hover { background: var(--wash-strong); color: var(--foreground); } .mk-open:hover { filter: brightness(1.04); } }
+}
+
+/* A featured template whose covers are not uploaded yet (T53): the pair's frame, hatched. */
+@layer components {
+  .mk-pair-blank .mk-pane { background: repeating-linear-gradient(135deg, var(--hatch) 0 8px, transparent 8px 16px), var(--recess); }
+}
+
+/* "Can't find your template? Make a wish" (Owner 2026-11-10), under the template grid: three
+   pains on hairline rows, then the Wishlist tab's own prints (tape, lean, stamp) as eight
+   examples, two to a row on phones and four from 768px. Static: no JS, the images lazy. */
+@layer components {
+  /* The tilted prints and the stamp swing a few px past the gutter; clip at the section (full viewport width) so they never widen the page. */
+  .mk-wish { overflow-x: clip; }
+  .mk-wish h2 em { font-style: italic; }
+  .mk-wish h2:lang(zh) em { font-style: normal; }
+  .mk-wish-points { list-style: none; margin: 20px 0 0; padding: 0; }
+  .mk-wish-points li { padding: 14px 0; box-shadow: inset 0 1px 0 var(--hairline); }
+  .mk-wish-points li:last-child { padding-bottom: 0; }
+  .mk-wish-points h3 { font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; }
+  .mk-wish-points p { margin-top: 4px; font-size: 16px; line-height: 1.5; color: var(--muted-foreground); }
+
+  .mk-wish-wall { list-style: none; margin: 32px 0 0; padding: 10px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 10px; }
+  .mk-wish-wall > li { min-width: 0; transform: rotate(var(--r, 0deg)); transform-origin: 50% 0; }
+  /* Pinned at the tape, a print's foot swings h·sin(r) sideways. Odd prints lean one way and even
+     the other, so the phone pairs splay apart and every lean stays inside the 16px gutter; where
+     two four-up neighbours swing together (2|3, 6|7) the angles stay small enough to clear the gap. */
+  .mk-wish-wall > li:nth-child(1) { --r: 1.6deg; }
+  .mk-wish-wall > li:nth-child(2) { --r: -1.2deg; }
+  .mk-wish-wall > li:nth-child(3) { --r: 0.8deg; }
+  .mk-wish-wall > li:nth-child(4) { --r: -2deg; }
+  .mk-wish-wall > li:nth-child(5) { --r: 1.2deg; }
+  .mk-wish-wall > li:nth-child(6) { --r: -1.6deg; }
+  .mk-wish-wall > li:nth-child(7) { --r: 0.6deg; }
+  .mk-wish-wall > li:nth-child(8) { --r: -1.4deg; }
+  .mk-wish-print {
+    position: relative; display: grid; padding: 8px 8px 10px; border-radius: 6px; background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 var(--edge-highlight), 0 18px 28px -18px var(--photo-fade);
+  }
+  .mk-wish-print::before {
+    content: ""; position: absolute; z-index: 2; left: 50%; top: -9px; width: 64px; height: 20px; border-radius: 2px; pointer-events: none;
+    transform: translateX(-50%) rotate(var(--tape, -3deg));
+    background: linear-gradient(90deg, var(--grab), color-mix(in srgb, var(--foreground) 34%, transparent) 50%, color-mix(in srgb, var(--foreground) 20%, transparent));
+  }
+  .mk-wish-wall > li:nth-child(even) .mk-wish-print { --tape: 3deg; }
+  .mk-wish-print img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 3px; background: var(--muted); }
+  .mk-wish-text { margin-top: 10px; padding: 0 2px; font: italic 400 17px/1.3 var(--font-display); letter-spacing: -0.005em; text-wrap: pretty; overflow-wrap: anywhere; }
+  .mk-wish-text:lang(zh) { font-style: normal; font-size: 16px; line-height: 1.6; letter-spacing: 0; }
+  .mk-wish-votes { margin-top: 8px; padding: 0 2px; display: flex; justify-content: flex-end; }
+  .mk-wish-votes > span[aria-hidden] { display: inline-flex; align-items: center; gap: 5px; font: 500 14px/1 var(--font-mono); color: var(--bone-dim); }
+  .mk-wish-votes svg { width: 16px; height: 16px; }
+  .mk-wish-stamp {
+    position: absolute; z-index: 3; right: -6px; top: 34px; transform: rotate(12deg); padding: 4px 8px; border: 2px solid var(--success); border-radius: 4px;
+    font: 700 14px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--success); background: var(--frost-light);
+  }
+  .mk-wish-stamp:lang(zh) { letter-spacing: .04em; }
+  .mk-wish-note { margin-top: 20px; }
+  .mk-wish-act { margin-top: 16px; }
+  .mk-wish-cta { width: 100%; }
+
+  @media (min-width: 768px) {
+    .mk-wish-wall { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 18px; }
+    .mk-wish-cta { display: inline-flex; width: auto; min-width: 240px; }
+  }
+  @media (min-width: 1024px) {
+    .mk-wish-points { margin-top: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .mk-wish-wall > li { transform: none; } }
+}

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0A09">
+<meta name="robots" content="noindex">
+<title>Demo · living background · Shotviva</title>
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/studio.css">
+<link rel="stylesheet" href="css/marketing.css">
+<script src="js/studio.js"></script>
+<style>
+  /* DEMO, not a page: five background layers that can be switched on and off over a sample of the home page, so the Owner can pick
+     the mix. Everything is CSS transforms and opacity on fixed layers behind the content (no canvas, no per-frame JS except the
+     scroll-reactive one), so the cost is a few compositor layers. Reduced motion turns them all off.
+       grain      the film grain breathes: the static noise layer steps between 8 offsets at 8 fps (a projector's flicker, not video noise)
+       drift      two safelight pools (6–8% alpha, 900–1200px) drift on 42 s and 57 s loops, never leaving the edges
+       pointer    a third, smaller pool follows the pointer (lerped, a beat behind) and the two big pools lean toward it
+       scroll     the pools follow the scroll at a tenth of its speed and brighten a little while the page is moving
+       breathe    the edge vignette (the darkroom's walls) breathes on a 10 s cycle
+     ?preset=quiet | alive | bold sets a mix. */
+  body { background: var(--background); }
+  body::after { display: none; }                                   /* the static grain is replaced by the living one below */
+  .bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .bg > * { position: absolute; inset: 0; opacity: 0; transition: opacity 1.2s; }
+  .bg [data-on="1"] { opacity: 1; }
+  /* grain: the same SVG noise, stepped */
+  .grain { mix-blend-mode: overlay; opacity: 0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .grain[data-on="1"] { opacity: .08; animation: grain 1s steps(8) infinite; }
+  @keyframes grain { 0% { background-position: 0 0; } 12.5% { background-position: -40px 25px; } 25% { background-position: 30px -50px; } 37.5% { background-position: -70px -10px; } 50% { background-position: 55px 40px; } 62.5% { background-position: -25px 65px; } 75% { background-position: 80px -30px; } 87.5% { background-position: -60px -60px; } 100% { background-position: 0 0; } }
+  /* drift: two pools */
+  .pool { width: 1100px; height: 1100px; inset: auto; border-radius: 50%; will-change: transform; }
+  .pool.a { left: -30%; top: -20%; background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 12%, transparent), transparent 70%); }
+  .pool.b { right: -35%; top: 30%; width: 1300px; height: 1300px; background: radial-gradient(closest-side, color-mix(in srgb, #FFB08F 8%, transparent), transparent 70%); }
+  .pool[data-on="1"].a { animation: drift-a 42s ease-in-out infinite; }
+  .pool[data-on="1"].b { animation: drift-b 57s ease-in-out infinite; }
+  @keyframes drift-a { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(18vw, 12vh) scale(1.12); } 66% { transform: translate(8vw, 28vh) scale(.95); } }
+  @keyframes drift-b { 0%, 100% { transform: translate(0, 0) scale(1); } 40% { transform: translate(-16vw, -14vh) scale(1.08); } 70% { transform: translate(-6vw, 10vh) scale(1.15); } }
+  /* scroll: the wrapper around the pools moves with the page */
+  .pools { will-change: transform; transition: filter .6s; }
+  .pools[data-on="1"] { transform: translateY(calc(var(--sy, 0px) * -0.1)); }
+  body.scrolling .pools[data-on="1"] { filter: brightness(1.5); }
+  /* pointer: a smaller, brighter pool a beat behind the pointer; the big pools lean toward it by a few percent */
+  .cursor { width: 720px; height: 720px; inset: auto; left: 0; top: 0; border-radius: 50%; margin: -360px 0 0 -360px; transform: translate(var(--px, 50vw), var(--py, 40vh)); will-change: transform;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 13%, transparent), transparent 70%); transition: opacity 1.2s; }
+  .cursor[data-on="1"] { opacity: 1; }
+  .pools[data-on="1"] .pool.a { translate: calc(var(--lx, 0) * 4vw) calc(var(--ly, 0) * 3vh); }
+  .pools[data-on="1"] .pool.b { translate: calc(var(--lx, 0) * -3vw) calc(var(--ly, 0) * -2vh); }
+  .pool { transition: translate 1.6s cubic-bezier(.2, .8, .2, 1); }
+  /* breathe: the vignette */
+  .vig { background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0,0,0,.55) 100%); }
+  .vig[data-on="1"] { animation: breathe 10s ease-in-out infinite; }
+  @keyframes breathe { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .bg * { animation: none !important; transform: none !important; } .pools { filter: none !important; } }
+
+  /* sample content (the home page's shapes, so the layers are judged against real density) */
+  .page { position: relative; z-index: 1; }
+  .appbar { position: sticky; top: 0; z-index: 50; padding: var(--sat) var(--gutter) 0;
+    background: linear-gradient(color-mix(in srgb, var(--background) 92%, transparent), color-mix(in srgb, var(--background) 72%, transparent)); backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3); }
+  .appbar-row { height: 56px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; min-height: 44px; }
+  .brand .word { font: 400 24px/1 var(--font-display); letter-spacing: -0.02em; }
+  .brand .word i { color: var(--primary); font-style: normal; }
+  .brand .tag { font: 400 14px/1.15 var(--font-sans); color: var(--muted-foreground); padding-left: 8px; border-left: 1px solid var(--border); white-space: nowrap; }
+  .hero { padding: 40px var(--gutter) 0; }
+  h1 { font: 400 32px/1 var(--font-display); letter-spacing: -0.02em; max-width: 18ch; }
+  h1 em { font-style: italic; }
+  .lede { margin-top: 12px; font-size: 16px; color: var(--bone-dim); max-width: 48ch; }
+  .grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 32px var(--gutter) 0; }
+  .card { padding: 16px; display: grid; gap: 8px; }
+  .card .ph { aspect-ratio: 4 / 3; border-radius: 14px; background: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }
+  .card b { font: 500 16px/1.3 var(--font-sans); }
+  .card span { font-size: 14px; color: var(--muted-foreground); }
+  .block { padding: 56px var(--gutter) 0; }
+  .block h2 { font: 400 32px/1.05 var(--font-display); letter-spacing: -0.02em; }
+  .block p { margin-top: 12px; max-width: 60ch; color: var(--bone-dim); }
+  .tall { height: 60vh; }
+  @media (min-width: 768px) { .appbar-row { height: 64px; } h1 { font-size: 36px; } .grid { grid-template-columns: repeat(3, 1fr); gap: 16px; } }
+  /* demo chrome */
+  .ctl { position: fixed; z-index: 10; left: 0; right: 0; bottom: 0; padding: 10px var(--gutter) calc(var(--sab) + 10px); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; background: var(--bar); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); box-shadow: inset 0 1px 0 var(--border); }
+  .ctl b { width: 100%; text-align: center; font: 500 12px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 2px; }
+  .ctl button { min-height: 36px; padding: 0 14px; border-radius: 999px; font: 600 14px/1 var(--font-sans); color: var(--bone-dim); background: var(--bone-6); box-shadow: inset 0 0 0 1px var(--border); }
+  .ctl button[aria-pressed="true"] { background: var(--foreground); color: var(--background); }
+  .ctl .sep { width: 1px; height: 24px; background: var(--border); margin: 0 6px; }
+  .ctl .pre { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--foreground); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 40%, transparent); }
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true">
+  <div class="vig" data-layer="breathe"></div>
+  <div class="pools" data-layer="scroll"><div class="pool a" data-layer="drift"></div><div class="pool b" data-layer="drift"></div></div>
+  <div class="cursor" data-layer="pointer"></div>
+  <div class="grain" data-layer="grain"></div>
+</div>
+
+<div class="page">
+  <header class="appbar"><div class="appbar-row w"><a class="brand" href="home.html"><span class="word">Shotviva<i>.</i></span><span class="tag">AI photo studio</span></a><span class="muted" style="font-size:14px">Demo · living background</span></div></header>
+  <main class="w">
+    <section class="hero"><h1>Image to Image AI: Restyle a Photo, <em>Keep the Subject</em></h1><p class="lede">The AI photo studio that starts from your real photo. What you shot stays; the template changes the light, the scene or the art style.</p></section>
+    <div class="grid"><div class="panel card"><div class="ph"></div><b>Pure White</b><span>Marketplace</span></div><div class="panel card"><div class="ph"></div><b>Lifestyle Table</b><span>Shop &amp; social</span></div><div class="panel card"><div class="ph"></div><b>Bright Listing</b><span>Rental listings</span></div></div>
+    <section class="block"><h2>One phone photo → a full shoot</h2><p>Scroll to feel the layers move with the page. The pools follow the scroll at a tenth of its speed and brighten a little while the page is moving; a smaller pool trails the pointer, and the big pools lean toward it.</p></section>
+    <div class="tall"></div>
+    <section class="block"><h2>What 3 Product Photos Cost</h2><p>Long pages are where a static background wears thin. The grain and the pools keep the dark alive without competing with photos.</p></section>
+    <div class="tall"></div>
+    <section class="block"><h2>Image to Image AI FAQ</h2><p>Reduced motion turns every layer off and leaves the plain ground.</p></section>
+    <div class="tall"></div>
+  </main>
+</div>
+
+<div class="ctl" role="group" aria-label="Demo controls">
+  <b>Demo · background layers</b>
+  <button type="button" data-l="grain" aria-pressed="true">Grain</button>
+  <button type="button" data-l="drift" aria-pressed="true">Safelight drift</button>
+  <button type="button" data-l="pointer" aria-pressed="true">Follows the pointer</button>
+  <button type="button" data-l="scroll" aria-pressed="true">Scroll-reactive</button>
+  <button type="button" data-l="breathe" aria-pressed="false">Breathing vignette</button>
+  <span class="sep"></span>
+  <button type="button" class="pre" data-pre="quiet">Quiet</button>
+  <button type="button" class="pre" data-pre="alive">Alive</button>
+  <button type="button" class="pre" data-pre="bold">Bold</button>
+</div>
+
+<script>
+(function () {
+  const PRE = { quiet: ['grain', 'drift'], alive: ['grain', 'drift', 'scroll', 'pointer'], bold: ['grain', 'drift', 'scroll', 'pointer', 'breathe'] };
+  const set = on => { document.querySelectorAll('[data-layer]').forEach(el => el.dataset.on = on.includes(el.dataset.layer) ? '1' : '0'); document.querySelectorAll('[data-l]').forEach(b => b.setAttribute('aria-pressed', String(on.includes(b.dataset.l)))); };
+  const current = () => [...document.querySelectorAll('[data-l][aria-pressed="true"]')].map(b => b.dataset.l);
+  document.querySelector('.ctl').addEventListener('click', e => {
+    const l = e.target.closest('[data-l]'), p = e.target.closest('[data-pre]');
+    if (l) { const on = current(); set(on.includes(l.dataset.l) ? on.filter(x => x !== l.dataset.l) : on.concat(l.dataset.l)); }
+    if (p) set(PRE[p.dataset.pre]);
+  });
+  set(PRE[window.SV.q.get('preset')] || PRE.alive);
+  /* scroll-reactive: the pools get the scroll offset, and a class while the page is moving */
+  /* pointer: lerp the small pool toward the pointer (only animating while it is still catching up); the big pools get a -1..1 lean */
+  const root = document.documentElement; let tx = innerWidth / 2, ty = innerHeight * .4, cxp = tx, cyp = ty, moving = 0;
+  const step = () => { cxp += (tx - cxp) * .08; cyp += (ty - cyp) * .08; root.style.setProperty('--px', cxp + 'px'); root.style.setProperty('--py', cyp + 'px');
+    if (Math.abs(tx - cxp) + Math.abs(ty - cyp) > .5) requestAnimationFrame(step); else moving = 0; };
+  addEventListener('pointermove', e => { tx = e.clientX; ty = e.clientY; root.style.setProperty('--lx', ((e.clientX / innerWidth) * 2 - 1).toFixed(3)); root.style.setProperty('--ly', ((e.clientY / innerHeight) * 2 - 1).toFixed(3)); if (!moving) { moving = 1; requestAnimationFrame(step); } }, { passive: true });
+  let t; addEventListener('scroll', () => { document.documentElement.style.setProperty('--sy', scrollY + 'px'); document.body.classList.add('scrolling'); clearTimeout(t); t = setTimeout(() => document.body.classList.remove('scrolling'), 220); }, { passive: true });
+})();
+</script>
+</body>
+</html>

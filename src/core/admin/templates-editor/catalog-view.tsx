@@ -1,0 +1,82 @@
+'use client'
+
+import { useState, type ComponentProps } from 'react'
+import { Button } from '@/core/ui/button'
+import { categoryChoices, type CategoryOption } from './category-options'
+import { catalogSections, filterCatalog, SINGLE_TEMPLATES, type CatalogStatus, type SeriesOption } from './catalog-groups'
+import { catalogCopy as copy, orderCopy } from './copy'
+import type { AdminTemplate } from '../templates/types'
+import { searchCatalog } from './catalog-search'
+import { Input } from '@/core/ui/input'
+import { TemplatesTable, type TableSelection } from './templates-table'
+
+type Props = Omit<ComponentProps<typeof TemplatesTable>, 'selection' | 'order' | 'categoryLabels'> & {
+  query: string
+  onQuery: (query: string) => void
+  // Soft-deleted templates (1401), shown only under 已删除.
+  deleted: AdminTemplate[]
+  categories: readonly CategoryOption[]
+  series: readonly SeriesOption[]
+  onOrder: (group: 'active' | 'inactive', expectedIds: string[]) => (ids: string[]) => Promise<void>
+  selection: Omit<TableSelection, 'onSelectVisible'> & { onSelectGroup: (ids: string[], on: boolean) => void }
+}
+
+const selectClass = 'border-input h-9 max-w-full rounded-md border px-3 text-sm'
+
+export function CatalogView({ templates: all, deleted: allDeleted, query, onQuery, categories, series, selection, onOrder, ...row }: Props) {
+  const [status, setStatus] = useState<CatalogStatus>('active')
+  const [category, setCategory] = useState('')
+  const [seriesId, setSeriesId] = useState('')
+  const [grouped, setGrouped] = useState(false)
+  const options = categoryChoices(categories).concat(categories.filter(c => c.isSystem)
+    .map(c => ({ key: c.key, label: c.nameZh, nameEn: c.nameEn, path: [c.key] })))
+  const paths = new Map(options.map(c => [c.key, c]))
+  const labels = { paths, series: new Map(series.map(s => [s.id, s.nameZh])) }
+  const templates = searchCatalog(all, query, labels)
+  const deleted = searchCatalog(allDeleted, query, labels)
+  const matching = filterCatalog(status === 'deleted' ? deleted : templates, paths, category, seriesId)
+  const live = filterCatalog(templates, paths, category, seriesId)
+  const active = live.filter(t => t.isActive).length
+  const tabs = { active: `${copy.active}（${active}）`, inactive: `${copy.inactive}（${live.length - active}）`, all: copy.all,
+    deleted: `${copy.deleted}（${filterCatalog(deleted, paths, category, seriesId).length}）` }
+  const sections = catalogSections(matching, status, grouped, series)
+  const canReorder = !query.trim() && !category && !seriesId && !grouped && status !== 'deleted'
+  return <div className="grid min-w-0 grid-cols-1 gap-3">
+    <div className="flex flex-wrap items-center gap-2">
+      <Input type="search" className="w-full sm:w-72" aria-label={copy.search} placeholder={copy.search} maxLength={120}
+        value={query} onChange={e => onQuery(e.target.value)} />
+      <div role="group" aria-label={copy.status} className="flex gap-1">
+        {(Object.keys(tabs) as CatalogStatus[]).map(key => <Button key={key} variant={status === key ? 'secondary' : 'ghost'}
+          size="sm" aria-pressed={status === key} onClick={() => setStatus(key)}>{tabs[key]}</Button>)}
+      </div>
+      <select aria-label={copy.category} className={selectClass} value={category} onChange={e => setCategory(e.target.value)}>
+        <option value="">{copy.categories}</option>
+        {options.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+      </select>
+      <select aria-label={copy.seriesFilter} className={selectClass} value={seriesId} onChange={e => setSeriesId(e.target.value)}>
+        <option value="">{copy.allSeries}</option>
+        <option value={SINGLE_TEMPLATES}>{copy.single}</option>
+        {series.map(s => <option key={s.id} value={s.id}>{s.nameZh}</option>)}
+      </select>
+      <Button size="sm" variant={grouped ? 'secondary' : 'outline'} aria-pressed={grouped}
+        onClick={() => setGrouped(!grouped)}>{copy.groupSeries}</Button>
+    </div>
+    <ListHint status={status} searching={!!query.trim()} />
+    {sections.length === 0 && <p className="text-muted-foreground py-8 text-center text-sm">{copy.empty}</p>}
+    {sections.map(({ id, title, rows, orderGroup }) => (
+      <section key={id} className="min-w-0">
+        {title && <h3 className="bg-muted px-3 py-2 text-sm font-semibold">{title}（{rows.length}）</h3>}
+        <TemplatesTable {...row} templates={rows} categoryLabels={paths}
+          order={{ disabled: !canReorder || row.pending, disabledHint: canReorder ? undefined : orderCopy.filtered,
+            onReorder: async ids => { if (canReorder && orderGroup) await onOrder(orderGroup, rows.map(t => t.id))(ids) } }}
+          selection={{ ...selection, onSelectVisible: on => selection.onSelectGroup(rows.map(t => t.id), on) }} />
+      </section>
+    ))}
+  </div>
+}
+
+// Under 已删除 what those rows are; while searching, why dragging is off.
+function ListHint({ status, searching }: { status: CatalogStatus; searching: boolean }) {
+  if (status === 'deleted') return <p className="text-muted-foreground text-sm">{copy.deletedHint}</p>
+  return searching ? <p className="text-muted-foreground text-xs">{orderCopy.filtered}</p> : null
+}

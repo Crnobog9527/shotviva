@@ -1,0 +1,88 @@
+{
+ "cache_key": "cache_problems_failures",
+ "is_cached": false,
+ "last_refresh": "2026-11-08T08:00:00.000000Z",
+ "next_allowed_client_refresh": "2026-11-08T08:01:00.000000Z",
+ "timezone": "UTC",
+ "columns": [
+  "kind",
+  "reason",
+  "n",
+  "n_prev"
+ ],
+ "types": [
+  [
+   "kind",
+   "String"
+  ],
+  [
+   "reason",
+   "String"
+  ],
+  [
+   "n",
+   "UInt64"
+  ],
+  [
+   "n_prev",
+   "UInt64"
+  ]
+ ],
+ "results": [
+  [
+   "upload",
+   "__ok__",
+   950,
+   900
+  ],
+  [
+   "upload",
+   "transfer_failed",
+   31,
+   22
+  ],
+  [
+   "upload",
+   "too_large",
+   12,
+   15
+  ],
+  [
+   "upload",
+   "unsupported",
+   4,
+   0
+  ],
+  [
+   "generate",
+   "__ok__",
+   1200,
+   1100
+  ],
+  [
+   "generate",
+   "PROVIDER_TIMEOUT",
+   18,
+   9
+  ],
+  [
+   "generate",
+   "CONTENT_REJECTED",
+   7,
+   8
+  ]
+ ],
+ "hasMore": false,
+ "limit": 100,
+ "offset": 0,
+ "modifiers": {
+  "personsOnEventsMode": "person_id_override_properties_joined"
+ },
+ "query_status": null,
+ "timings": [
+  {
+   "k": "./query",
+   "t": 0.21
+  }
+ ]
+}

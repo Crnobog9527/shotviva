@@ -1,0 +1,99 @@
+import 'server-only'
+
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+import { AppError } from '../errors'
+import { logger } from '../logger'
+import type { Resolution } from './output-options'
+import { assertPricedTier } from './pricing'
+import { EDIT_TEMPLATE_ID } from './edit-params'
+import { templateFieldsSchema, type TemplateSurface } from './schema'
+import { isStyleRefKey, styleRefsSchema, type StyleRef } from './style-refs'
+import { selectTemplates } from './select-templates'
+import { TEMPLATE_COLUMNS, toTemplate, type PreT75TemplateRow, type Template, type TemplateRow } from './types'
+
+export type GenerationTemplate = {
+  template: Template
+  // Wrapped prompt: server-only, never logged, never returned to a client.
+  prompt: { body: string; styleRefs: StyleRef[]; version: number; providerId: string | null; modelParams: Record<string, unknown> }
+}
+
+type Row = (TemplateRow | PreT75TemplateRow) & {
+  template_sale_approvals: { unpriced_resolutions: Resolution[] } | null
+  partner_image_aspects?: string[]
+  template_prompts: { style_refs: unknown; body: string; version: number; provider_id: string | null; model_params: Record<string, unknown> } | null
+}
+
+function unpricedTiers(row: Row): Resolution[] { return row.template_sale_approvals?.unpriced_resolutions ?? [] }
+
+function privateRefs(id: string, raw: unknown): StyleRef[] {
+  const refs = styleRefsSchema.safeParse(raw)
+  if (!refs.success || !refs.data.every((ref) => isStyleRefKey(id, ref.key))) {
+    throw new AppError('INTERNAL', 'Invalid template reference configuration')
+  }
+  return refs.data
+}
+
+// Needs the service-role client: template_prompts has no client grants (T3). The surface
+// filter keeps partner-only templates such as `freeform` out of the web generate route; null
+// means a built-in template such as `edit`, which is on no surface (ARCHITECTURE §5.2).
+// `drafts`: an admin test run (ARCHITECTURE §10.b, T85) also takes unpublished templates.
+async function generationRow(client: SupabaseClient, id: string, surface: TemplateSurface | null, drafts: boolean) {
+  const extra = ', template_sale_approvals(unpriced_resolutions), template_prompts(body, version, model_params, provider_id, style_refs)'
+  if (surface === 'web' && !drafts) {
+    // A hidden default price does not disable an otherwise published template's higher tiers.
+    const args = { p_template_id: id }
+    const columns = TEMPLATE_COLUMNS + extra
+    const row = await client.rpc('web_generation_template', args).select(columns).maybeSingle<Row>()
+    if (row.error?.code !== 'PGRST202') return row
+    // A deployment restored to the earlier schema still uses its original single-image lookup.
+    const previous = await client.rpc('web_templates', args).select(columns).maybeSingle<Row>()
+    if (previous.error?.code !== 'PGRST202') return previous
+  }
+  return selectTemplates((columns) => {
+    const all = client.from('templates').select(columns).eq('id', id)
+    // Admin trials may run drafts, never a deleted template (1401: it can never go live).
+    const query = drafts ? all.is('deleted_at', null) : all.eq('is_active', true)
+    return (surface ? query.contains('visible_in', [surface]) : query).maybeSingle<Row>()
+  }, extra + (surface === 'partner' ? ', partner_image_aspects' : ''))
+}
+
+async function loadTemplate(client: SupabaseClient, id: string, surface: TemplateSurface | null, drafts = false): Promise<GenerationTemplate> {
+  const { data, error } = await generationRow(client, id, surface, drafts)
+  if (error) throw new AppError('INTERNAL', `loadGenerationTemplate failed: ${error.message}`)
+  if (!data) throw new AppError('NOT_FOUND', 'Template not found')
+
+  const fields = templateFieldsSchema.safeParse(data.fields)
+  if (!data.template_prompts || !fields.success) {
+    logger.error('template is published but cannot generate', { templateId: id, hasPrompt: !!data.template_prompts })
+    throw new AppError('NOT_FOUND', 'Template not found')
+  }
+  const unpricedResolutions = unpricedTiers(data)
+  if (surface === 'partner' && data.partner_image_aspects) {
+    assertPricedTier(unpricedResolutions, '1k')
+    if (!data.partner_image_aspects.length) throw new AppError('MODEL_INPUT_UNSUPPORTED', 'No supported partner output')
+    fields.data.aspectRatios = data.partner_image_aspects
+  }
+  const prompt = data.template_prompts
+  return {
+    template: { ...toTemplate(data), unpricedResolutions, fields: fields.data },
+    prompt: { body: prompt.body, styleRefs: privateRefs(id, prompt.style_refs), version: prompt.version, providerId: prompt.provider_id, modelParams: prompt.model_params },
+  }
+}
+
+export function loadGenerationTemplate(client: SupabaseClient, id: string, surface: TemplateSurface): Promise<GenerationTemplate> {
+  return loadTemplate(client, id, surface)
+}
+
+// The built-in `edit` template, published or NOT_FOUND (editing is off until the Owner turns it on).
+export function loadEditTemplate(client: SupabaseClient): Promise<GenerationTemplate> {
+  return loadTemplate(client, EDIT_TEMPLATE_ID, null)
+}
+
+// An admin test run (§10.b, T85): any template but the built-in edit one, published or not, on
+// whatever surface; the same prompt and fields a user's generation reads.
+// allowEdit: the cover translation (T87) runs on the edit template's own parameters.
+export function loadTestTemplate(client: SupabaseClient, id: string, options: { allowEdit?: boolean } = {}): Promise<GenerationTemplate> {
+  if (id === EDIT_TEMPLATE_ID && !options.allowEdit) throw new AppError('NOT_FOUND', 'Template not found')
+  return loadTemplate(client, id, null, true)
+}

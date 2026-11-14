@@ -1,0 +1,72 @@
+name: Detect code changes
+description: >
+  Sets `code` to 'false' when a pull request, or a push to main, only touches docs and spec files
+  (规范/, seo资料/, docs/, design/, *.md), so the calling job can skip its real work but still
+  finish, quickly and green, under its required check name. Workflow-level paths-ignore would
+  leave required checks pending forever. Anything unexpected gets 'true'. The caller checks out
+  with fetch-depth 2 so a PR merge commit's first parent (the base) is present.
+  With `db: 'true'` it also sets `db`, whether the change can affect the "supabase db tests" job
+  (scripts/ci/db-test-inputs.ts, T88); that needs Node 24 on PATH (actions/setup-node first).
+
+inputs:
+  db:
+    description: "'true' to also compute the `db` output."
+    required: false
+    default: 'false'
+
+outputs:
+  code:
+    description: "'true' when there is anything to build or test."
+    value: ${{ steps.detect.outputs.code }}
+  db:
+    description: "'true' when the supabase db tests need to run (only with `db: 'true'`)."
+    value: ${{ steps.detect.outputs.db }}
+
+runs:
+  using: composite
+  steps:
+    - id: detect
+      shell: bash
+      env:
+        EVENT: ${{ github.event_name }}
+        WANT_DB: ${{ inputs.db }}
+        # Push only: the commit main pointed at before this push (all zeros for a new branch).
+        BEFORE: ${{ github.event.before }}
+      run: |
+        run_all() {
+          [ -z "${1:-}" ] || echo "::warning::$1; running everything."
+          echo "code=true" >> "$GITHUB_OUTPUT"
+          echo "db=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        }
+        case "$EVENT" in
+          pull_request)
+            base=HEAD^1
+            ;;
+          push)
+            # The whole push, not just its last commit.
+            [[ "$BEFORE" =~ ^[0-9a-f]{40}$ && ! "$BEFORE" =~ ^0+$ ]] || run_all
+            git fetch --no-tags --depth=1 origin "$BEFORE" || run_all "Could not fetch the previous main commit"
+            base=$BEFORE
+            ;;
+          *)
+            run_all
+            ;;
+        esac
+        files=$(git -c core.quotepath=off diff --name-only "$base" HEAD) || run_all "Could not list the changed files"
+        code=$(printf '%s\n' "$files" | scripts/ci/has-code-changes.sh)
+        echo "code=$code" >> "$GITHUB_OUTPUT"
+        if [ "$code" = false ]; then
+          echo "::notice::Docs/spec-only change; skipping build, tests and Supabase."
+        fi
+        if [ "$WANT_DB" = true ]; then
+          db=false
+          if [ "$code" = true ]; then
+            db=$(printf '%s\n' "$files" | node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/ci/db-test-inputs.ts) \
+              || run_all "Could not decide whether the DB tests are needed"
+          fi
+          echo "db=$db" >> "$GITHUB_OUTPUT"
+          if [ "$db" = false ] && [ "$code" = true ]; then
+            echo "::notice::Nothing here can affect the database or the DB tests (scripts/ci/db-test-inputs.ts); skipping Supabase and the DB tests."
+          fi
+        fi

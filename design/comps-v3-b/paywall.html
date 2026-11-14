@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0A09">
+<meta name="robots" content="noindex">
+<title>Keep making photos · Shotviva</title>
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/studio.css">
+<link rel="stylesheet" href="css/tiers.css">
+<script src="js/studio.js"></script>
+<style>
+  html, body { background: var(--background); height: 100dvh; overflow: hidden; }
+  /* the workspace behind, pushed back like an iOS page sheet (phone) or simply dimmed (desktop) */
+  .behind { position: fixed; inset: 0; border: 0; width: 100%; height: 100%; transform-origin: 50% 0; transition: transform .45s var(--ease), border-radius .45s, filter .45s; background: var(--background); }
+  body.sheet-open .behind { transform: translateY(calc(var(--sat) * .5)) scale(.92); border-radius: 18px; filter: brightness(.55); pointer-events: none; }
+  .scrim { background: rgba(0,0,0,.25); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .reopen { position: fixed; z-index: 80; left: 16px; right: 16px; bottom: calc(var(--sab) + 92px); opacity: 0; pointer-events: none; transition: opacity .3s; }
+  body:not(.sheet-open) .reopen { opacity: 1; pointer-events: auto; }
+  .reopen .btn { width: 100%; min-height: 52px; background: var(--secondary); }
+
+  .pw { height: calc(100dvh - var(--sat) - 12px); max-height: none; background: var(--card); }
+  .pw .sheet-body { flex: 1; padding-bottom: 20px; }
+  .pw-h { padding: 4px 4px 0; }
+  .pw-h p { margin-top: 8px; font-size: 16px; color: var(--muted-foreground); line-height: 1.45; padding-right: 20px; }
+
+  /* sticky checkout */
+  .checkout { flex: none; padding: 12px var(--gutter) calc(var(--sab) + 8px); background: linear-gradient(color-mix(in srgb, var(--card) 60%, transparent), var(--card) 30%); box-shadow: inset 0 1px 0 var(--border); }
+  .checkout .btn-primary { font-size: 16px; }
+  .checkout .fine { text-align: center; font: 400 14px/1.4 var(--font-sans); color: var(--muted-foreground); margin-top: 8px; }
+  .checkout.max .btn-primary { background: var(--chrome); color: var(--max-black-deep); box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 16px 30px -16px rgba(0,0,0,.9); }
+  .checkout.plain .btn-primary { background: var(--foreground); color: var(--background); box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 16px 30px -16px rgba(0,0,0,.9); }
+
+  /* ======================= desktop: centred dialog ======================= */
+  @media (min-width: 768px) {
+    body.sheet-open .behind { transform: none; border-radius: 0; filter: brightness(.45); }
+    .pw { --dialog-w: 920px; height: auto; max-height: calc(100dvh - 64px); }
+    .pw .sheet-body { padding: 24px 28px 20px; }
+    .pw-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding: 0 48px 0 0; }
+    .pw-h p { max-width: 44ch; margin-top: 8px; padding-right: 0; }
+    .seg { width: 400px; flex: none; margin: 4px 0 0; }
+    .pw .tiers { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 24px; align-items: stretch; }
+    .pw .tier .card { height: 100%; }
+    .pw .tier .saving .vs { display: none; } /* 280px cards: the label is just "You save" */
+    .pw .pays { grid-template-columns: 1fr 1fr; }
+    .checkout { padding: 12px 28px 16px; border-radius: 0 0 22px 22px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 24px; }
+    .checkout .btn-primary { width: auto; min-width: 320px; grid-column: 2; grid-row: 1; }
+    .checkout .fine { grid-column: 1; grid-row: 1; text-align: left; margin: 0; }
+    .reopen { left: 50%; right: auto; width: 320px; transform: translateX(-50%); bottom: 32px; }
+  }
+</style>
+</head>
+<body class="sheet-open">
+<iframe class="behind" id="behind" title="Workspace (behind the sheet)" tabindex="-1" aria-hidden="true"></iframe>
+<div class="reopen"><button class="btn btn-ghost" type="button" id="reopen">Show plans again</button></div>
+
+<div class="scrim" id="scrim" hidden></div>
+<section class="sheet pw" id="pw" role="dialog" aria-modal="true" aria-labelledby="pw-title" tabindex="-1" hidden>
+  <div class="sheet-grab" aria-hidden="true"></div>
+  <button class="sheet-x" type="button" data-close aria-label="Close"><span><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button>
+  <div class="sheet-body">
+    <header class="pw-h">
+      <div>
+        <h2 id="pw-title" class="sheet-title">Keep making photos</h2>
+        <p>You've used your 6 free credits. Photos made with paid credits are private and watermark-free.</p>
+      </div>
+      <div class="seg" id="seg" data-v="y" role="group" aria-label="Billing">
+        <span class="thumb" aria-hidden="true"></span>
+        <button type="button" data-v="m" aria-pressed="false">Monthly</button>
+        <button type="button" data-v="y" aria-pressed="true">Yearly</button>
+      </div>
+    </header>
+
+    <div class="tiers" role="radiogroup" aria-label="Plans" id="tiers"></div>
+
+    <div class="sub-h"><h3>Credit packs</h3><span>Buy credits once, no subscription</span></div>
+    <div class="packs" role="radiogroup" aria-label="Credit packs">
+      <label class="pack p-20"><input type="radio" name="pick" value="p20"><span class="card"><span class="cr">20<small>credits</small></span><span class="usd">$9.90</span><span class="each">$0.50 / credit</span></span></label>
+      <label class="pack p-55"><input type="radio" name="pick" value="p55"><span class="card"><span class="flag">Most popular</span><span class="cr">55<small>credits</small></span><span class="usd">$24.90</span><span class="each">$0.45 / credit</span></span></label>
+      <label class="pack p-115"><input type="radio" name="pick" value="p115"><span class="card"><span class="flag">Best value</span><span class="cr">115<small>credits</small></span><span class="usd">$49.90</span><span class="each">$0.43 / credit</span></span></label>
+    </div>
+
+    <div class="sub-h"><h3>Pay with</h3><span>All prices in USD</span></div>
+    <div class="pays" role="radiogroup" aria-label="Payment method">
+      <label class="pay"><input type="radio" name="pay" value="card" checked><span class="lbl">Card · Apple Pay · Google Pay<small>Plans renew automatically</small></span><span class="marks" aria-hidden="true"><svg class="pm" viewBox="0 0 28 20"><rect x=".75" y=".75" width="26.5" height="18.5" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M1 6.5h26" stroke="currentColor" stroke-width="2.5"/><path d="M5 14h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span></label>
+      <label class="pay"><input type="radio" name="pay" value="alipay"><span class="lbl">Alipay<small>Pays once, no auto-renew</small></span><span class="marks" aria-hidden="true"><svg class="pm" viewBox="0 0 20 20"><rect width="20" height="20" rx="5" fill="#1677FF"/><path d="M5.2 7.2h9.6M10 4.6v2.6M6.6 9.8h6.8c-.6 2.6-2.6 4.6-5.6 5.6M8.2 10.6c.9 1.8 2.8 3.4 6.4 4.4" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></svg></span></label>
+    </div>
+  </div>
+
+  <div class="checkout" id="checkout">
+    <button class="btn btn-primary" type="button" id="cta"></button>
+    <p class="fine" id="fine"></p>
+  </div>
+</section>
+
+<script src="js/tiers.js"></script>
+<script>
+(function () {
+  const { makeSheet } = window.SV;
+  const framed = document.documentElement.classList.contains('framed');
+  document.getElementById('behind').src = 'workspace.html?balance=0' + (framed ? '&frame=2' : '');
+
+  const { P, PK, money, renderTiers, renderSegBadge, paintTiers, motion } = window.TIERS;
+  document.getElementById('tiers').innerHTML = renderTiers({ radio: true, checked: 'pro' });
+  let v = 'y';
+
+  const cta = document.getElementById('cta'), fine = document.getElementById('fine'), co = document.getElementById('checkout');
+  function paintCheckout() {
+    const pick = document.querySelector('input[name=pick]:checked').value;
+    const pay = document.querySelector('input[name=pay]:checked').value;
+    co.classList.toggle('max', pick === 'max');
+    co.classList.toggle('plain', pick === 'starter' || !!PK[pick]);
+    if (PK[pick]) {
+      const [cr, usd] = PK[pick];
+      cta.textContent = `Continue with ${cr} credits · $${usd}`;
+      fine.textContent = `One-time payment of $${usd} · USD`;
+      return;
+    }
+    const p = P[pick], price = v === 'y' ? money(p.y[0]) : money(p.m[0]);
+    cta.textContent = `Continue with ${p.name} · ${price}${v === 'y' ? '/yr' : '/mo'}`;
+    fine.textContent = pay === 'alipay'
+      ? `One-time payment for ${v === 'y' ? '1 year' : '30 days'} · no auto-renew · USD`
+      : `Renews ${v === 'y' ? 'yearly' : 'monthly'} at ${price} · cancel anytime · USD`;
+  }
+
+  const seg = document.getElementById('seg');
+  renderSegBadge(seg);
+  seg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    v = b.dataset.v; seg.dataset.v = v;
+    seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    paintTiers(v); paintCheckout();
+  });
+  document.querySelectorAll('input[name=pick], input[name=pay]').forEach(i => i.addEventListener('change', paintCheckout));
+  paintTiers(v); paintCheckout();
+  if (window.SV.q.get('billing') === 'm') seg.querySelector('[data-v=m]').click();
+  motion();
+
+  const sheet = makeSheet(document.getElementById('pw'), document.getElementById('scrim'), { onClose: () => document.body.classList.remove('sheet-open') });
+  const open = () => { document.body.classList.add('sheet-open'); sheet.open(); };
+  document.getElementById('reopen').addEventListener('click', open);
+  open();
+})();
+</script>
+</body>
+</html>

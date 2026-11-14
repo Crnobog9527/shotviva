@@ -1,0 +1,129 @@
+"use client"
+
+import { XIcon } from "lucide-react"
+import { useTranslations } from "next-intl"
+import { Dialog as DialogPrimitive } from "radix-ui"
+import type { ReactNode } from "react"
+
+import { cn } from "@/core/ui/cn"
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle } from "@/core/ui/drawer"
+import { useMediaQuery } from "@/core/ui/use-media-query"
+
+type Props = {
+  open: boolean
+  onOpenChange(open: boolean): void
+  title: string
+  description: ReactNode
+  children: ReactNode
+  // The paywall (DESIGN §4.5, comps-v3-b): a 920px dialog / a full-height drawer, with `aside`
+  // beside the title from md up and `footer` fixed below the scrolling body.
+  wide?: boolean
+  // Help & feedback (T68): a 640px dialog of fixed height (switching tabs never resizes it) / a
+  // full-height drawer. The body has no bottom padding, so a sticky footer can sit on its edge.
+  tall?: boolean
+  aside?: ReactNode
+  footer?: ReactNode
+  // A walkthrough that must be seen to the end (the Wishlist tour): no close button, and
+  // Escape, the scrim and the drag leave it open until the caller unlocks it.
+  locked?: boolean
+}
+
+// shadcn's Responsive Dialog pattern (DESIGN §8.4): one component that is a bottom Drawer
+// below md and a centred Dialog from md up. Both return focus to the opener on close.
+export function ResponsiveSheet({ open, onOpenChange, title, description, children, wide = false, tall = false, aside, footer, locked }: Props) {
+  const desktop = useMediaQuery("(min-width: 768px)")
+  const change = guardClose(onOpenChange, locked)
+  if (desktop) {
+    return (
+      <DialogPrimitive.Root open={open} onOpenChange={change}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="scrim-motion fixed inset-0 z-90 bg-[var(--scrim)] backdrop-blur-[2px]" />
+          <DialogPrimitive.Content
+            className={cn(
+              "dialog-motion shadow-sheet fixed top-1/2 left-1/2 z-100 flex -translate-1/2 flex-col rounded-panel bg-popover outline-none",
+              dialogSize(wide, tall),
+            )}
+          >
+            <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", wide ? "px-7 pt-6 pb-5" : tall ? "px-6 pt-6 [scrollbar-gutter:stable]" : "p-4 pt-6")}>
+              <SheetHeading title={title} description={description} aside={aside} Title={DialogPrimitive.Title} Description={DialogPrimitive.Description} />
+              {children}
+            </div>
+            {footer}
+            <SheetClose Close={DialogPrimitive.Close} hidden={locked} />
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+    )
+  }
+  return (
+    <Drawer open={open} onOpenChange={change} dismissible={!locked}>
+      <DrawerContent className={wide || tall ? "h-[calc(100dvh-var(--sat)-12px)]" : undefined}>
+        <div className={cn("min-h-0 overflow-y-auto overscroll-contain px-4", drawerBodyPad(wide, tall, Boolean(footer)))}>
+          <SheetHeading title={title} description={description} aside={aside} Title={DrawerTitle} Description={DrawerDescription} />
+          {children}
+        </div>
+        {footer}
+        <SheetClose Close={DrawerClose} hidden={locked} />
+      </DrawerContent>
+    </Drawer>
+  )
+}
+
+// While locked, every way of closing (Escape, the scrim, the drag) is ignored.
+function guardClose(onOpenChange: (open: boolean) => void, locked: boolean | undefined) {
+  return (next: boolean) => {
+    if (next || !locked) onOpenChange(next)
+  }
+}
+
+// The drawer body's bottom room. A plain sheet with a footer leaves the bottom safe area to the
+// footer, which sits below the body, so it is not counted twice.
+function drawerBodyPad(wide: boolean, tall: boolean, footer: boolean): string {
+  if (wide) return "flex-1 pb-5"
+  if (tall) return "flex-1"
+  return footer ? "pb-4" : "pb-[calc(var(--sab)+16px)]"
+}
+
+function dialogSize(wide: boolean, tall: boolean): string {
+  if (wide) return "max-h-[calc(100dvh-64px)] w-[min(920px,calc(100%-64px))]"
+  if (tall) return "h-[min(760px,calc(100dvh-64px))] w-[min(640px,calc(100%-64px))] overflow-hidden"
+  return "max-h-[calc(100dvh-48px)] w-[min(480px,calc(100%-32px))]"
+}
+
+type HeadingProps = {
+  title: string
+  description: ReactNode
+  aside: ReactNode
+  Title: typeof DialogPrimitive.Title | typeof DrawerTitle
+  Description: typeof DialogPrimitive.Description | typeof DrawerDescription
+}
+
+// Title and description; an `aside` (the paywall's billing toggle) goes below them on phones
+// and to their right from md, clear of the close button.
+function SheetHeading({ title, description, aside, Title, Description }: HeadingProps) {
+  return (
+    <div className={cn(aside ? "md:flex md:items-start md:justify-between md:gap-6 md:pr-12" : undefined)}>
+      <div className="min-w-0">
+        <Title className={cn("font-display text-h1 leading-[1.05]", aside ? "mr-12 md:mr-0" : "mr-12")}>{title}</Title>
+        <Description className={cn("mt-1 text-caption text-muted-foreground", aside && "mt-2 text-body leading-[1.45] md:max-w-[44ch]")}>{description}</Description>
+      </div>
+      {aside}
+    </div>
+  )
+}
+
+type CloseComponent = typeof DialogPrimitive.Close | typeof DrawerClose
+
+// 44px close target with a 30px bone disc, top right. vaul keeps its own dialog context, so
+// each variant closes with its own Close.
+function SheetClose({ Close, hidden }: { Close: CloseComponent; hidden?: boolean }) {
+  const t = useTranslations("app.sheet")
+  if (hidden) return null
+  return (
+    <Close aria-label={t("close")} className="absolute top-3 right-3 z-20 grid size-11 place-items-center rounded-full text-bone-dim">
+      <span className="grid size-[30px] place-items-center rounded-full bg-wash-strong">
+        <XIcon className="size-4" strokeWidth={2.2} aria-hidden="true" />
+      </span>
+    </Close>
+  )
+}

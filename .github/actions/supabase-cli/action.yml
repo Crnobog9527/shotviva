@@ -1,0 +1,88 @@
+name: Install the Supabase CLI
+description: >
+  Puts the pinned Supabase CLI on PATH (T88). The binary is kept in the Actions cache, keyed on
+  the version and checksum, so most runs never download it; on a miss it comes from the CLI's
+  GitHub release through scripts/ci/retry.sh (5xx and timeouts are retried with backoff, up to
+  5 attempts) and must match the pinned SHA-256. Replaces supabase/setup-cli, whose one-shot
+  download failed jobs with HTTP 504. The caller has checked out the repo (for scripts/ci).
+  To bump the CLI, change VERSION and SHA256 below together (checksums.txt on the release, the
+  supabase_<version>_linux_amd64.tar.gz line) and regenerate supabase/schema.sql with it.
+
+outputs:
+  version:
+    description: The CLI version on PATH.
+    value: ${{ steps.pin.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - id: pin
+      shell: bash
+      run: |
+        VERSION=2.107.0
+        SHA256=ea233b337be698cee5bbca0795ee3e63b9dd154948c515c03cb72f191b3d103c
+        [ "$RUNNER_OS" = Linux ] && [ "$RUNNER_ARCH" = X64 ] || { echo "::error::Only linux/amd64 runners are supported"; exit 1; }
+        {
+          echo "version=$VERSION"
+          echo "sha256=$SHA256"
+          echo "dir=$HOME/.cache/supabase-cli"
+        } >> "$GITHUB_OUTPUT"
+
+    # Explicit restore and save with a fixed path: the cache version hashes the path, and in a
+    # composite action's post step `steps.*` outputs are empty, so actions/cache saved under a
+    # different path than it restored and never hit.
+    - id: cache
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: ~/.cache/supabase-cli
+        key: supabase-cli-v3-${{ runner.os }}-${{ runner.arch }}-${{ steps.pin.outputs.version }}-${{ steps.pin.outputs.sha256 }}
+
+    - name: Download the CLI
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        VERSION: ${{ steps.pin.outputs.version }}
+        SHA256: ${{ steps.pin.outputs.sha256 }}
+        DIR: ${{ steps.pin.outputs.dir }}
+      run: |
+        # SUPABASE_CLI_BASE_URL (job env) exists only so the retry path can be exercised against
+        # a stand-in server; the checksum still has to match.
+        BASE_URL=${SUPABASE_CLI_BASE_URL:-https://github.com/supabase/cli/releases/download}
+        archive="$RUNNER_TEMP/supabase_${VERSION}_linux_amd64.tar.gz"
+        "$GITHUB_WORKSPACE/scripts/ci/retry.sh" "$GITHUB_WORKSPACE/scripts/ci/download.sh" \
+          "$BASE_URL/v$VERSION/supabase_${VERSION}_linux_amd64.tar.gz" "$archive"
+        echo "$SHA256  $archive" | sha256sum --check --strict
+        mkdir -p "$DIR"
+        # The whole tarball: `supabase` is a shim that runs `supabase-go` from the same directory.
+        tar -xzf "$archive" -C "$DIR"
+        rm -f "$archive"
+
+    - if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: ~/.cache/supabase-cli
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+
+    - shell: bash
+      env:
+        DIR: ${{ steps.pin.outputs.dir }}
+        VERSION: ${{ steps.pin.outputs.version }}
+      run: |
+        echo "$DIR" >> "$GITHUB_PATH"
+        # After every command the Go CLI asks api.github.com for its latest release unless
+        # supabase/.temp/cli-latest is under 10 hours old, and no setting turns that off; on a
+        # slow GitHub it held runs for up to 104 s after `supabase start` was done. The pinned
+        # version is the latest we want, so record it as the answer.
+        if [ -d supabase ]; then
+          mkdir -p supabase/.temp
+          printf 'v%s' "$VERSION" > supabase/.temp/cli-latest
+        fi
+        # The wrapper's own release check and both layers' telemetry, which CI has no use for.
+        {
+          echo "SUPABASE_NO_UPDATE_NOTIFIER=1"
+          echo "SUPABASE_TELEMETRY_DISABLED=1"
+          echo "DO_NOT_TRACK=1"
+        } >> "$GITHUB_ENV"
+        # A broken install fails here, not later inside the `supabase start` retry loop.
+        [ -x "$DIR/supabase-go" ] || { echo "::error::supabase-go is missing from $DIR"; exit 1; }
+        "$DIR/supabase" --version

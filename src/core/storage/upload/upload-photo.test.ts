@@ -1,0 +1,93 @@
+import { describe, expect, it, vi } from 'vitest'
+
+import { targetSize } from './compress-image'
+import { UploadError, uploadPhoto, type UploadDeps } from './upload-photo'
+
+const blob = (size: number, type: string) => new Blob([new Uint8Array(size)], { type })
+
+function deps(overrides: Partial<UploadDeps> = {}) {
+  return {
+    compress: vi.fn(async () => blob(1_200_000, 'image/jpeg')),
+    requestTicket: vi.fn(async () => ({ input_key: 'inputs/u/k.jpg', put_url: 'https://r2/put', headers: { 'Content-Type': 'image/jpeg' } })),
+    put: vi.fn(async (_u: string, _b: Blob, _h: Record<string, string>, onProgress: (f: number) => void) => onProgress(0.5)),
+    track: vi.fn<UploadDeps['track']>(),
+    trackError: vi.fn<UploadDeps['trackError']>(),
+    ...overrides,
+  }
+}
+
+const callbacks = () => ({ onPhase: vi.fn(), onProgress: vi.fn() })
+
+describe('targetSize', () => {
+  it('caps the long edge at 2048 and never enlarges', () => {
+    expect(targetSize(8064, 6048)).toEqual({ width: 2048, height: 1536 })
+    expect(targetSize(3024, 4032)).toEqual({ width: 1536, height: 2048 })
+    expect(targetSize(800, 600)).toEqual({ width: 800, height: 600 })
+  })
+})
+
+describe('uploadPhoto', () => {
+  it('compresses, then PUTs the JPEG with progress through Compressing → Uploading', async () => {
+    const d = deps()
+    const cb = callbacks()
+    await expect(uploadPhoto(blob(18_000_000, 'image/jpeg'), d, cb)).resolves.toBe('inputs/u/k.jpg')
+    expect(cb.onPhase.mock.calls.map(([phase]) => phase)).toEqual(['compressing', 'uploading'])
+    expect(d.requestTicket).toHaveBeenCalledWith('image/jpeg', 1_200_000)
+    expect(cb.onProgress).toHaveBeenLastCalledWith(1)
+    // The picked photo's size bucket, not the re-encoded body's.
+    expect(d.track).toHaveBeenCalledExactlyOnceWith({ size_bucket: '>5MB', compressed: true })
+  })
+
+  it('falls back to the original file when compression fails', async () => {
+    const d = deps({ compress: vi.fn(async () => Promise.reject(new Error('decode'))) })
+    await uploadPhoto(blob(5_000_000, 'image/png'), d, callbacks())
+    expect(d.requestTicket).toHaveBeenCalledWith('image/png', 5_000_000)
+    expect(d.track).toHaveBeenCalledWith({ size_bucket: '1-5MB', compressed: false })
+  })
+
+  it('refuses >20MB and HEIC before uploading anything', async () => {
+    const d = deps()
+    await expect(uploadPhoto(blob(21 * 1024 * 1024, 'image/jpeg'), d, callbacks())).rejects.toMatchObject({ code: 'IMAGE_TOO_LARGE' })
+    await expect(uploadPhoto(blob(10, 'image/heic'), d, callbacks())).rejects.toMatchObject({ code: 'IMAGE_UNSUPPORTED' })
+    expect(d.requestTicket).not.toHaveBeenCalled()
+    // upload_error (T74): one per failure, the reason only.
+    expect(d.trackError).toHaveBeenNthCalledWith(1, 'too_large')
+    expect(d.trackError).toHaveBeenNthCalledWith(2, 'unsupported')
+    expect(d.trackError).toHaveBeenCalledTimes(2)
+  })
+
+  it('reports a failed PUT as UPLOAD_FAILED', async () => {
+    const d = deps({ put: vi.fn(async () => Promise.reject(new Error('network'))) })
+    await expect(uploadPhoto(blob(100, 'image/jpeg'), d, callbacks())).rejects.toMatchObject({ code: 'UPLOAD_FAILED' })
+    expect(d.track).not.toHaveBeenCalled()
+    expect(d.trackError).toHaveBeenCalledExactlyOnceWith('transfer_failed')
+  })
+
+  it('tells a refused ticket from a failed transfer', async () => {
+    const d = deps({ requestTicket: vi.fn(async () => Promise.reject(new UploadError('UPLOAD_FAILED', 'Upload failed'))) })
+    await expect(uploadPhoto(blob(100, 'image/jpeg'), d, callbacks())).rejects.toMatchObject({ code: 'UPLOAD_FAILED' })
+    expect(d.trackError).toHaveBeenCalledExactlyOnceWith('ticket_failed')
+    // The server measured the object as too large: still too_large, whatever the stage.
+    const big = deps({ requestTicket: vi.fn(async () => Promise.reject(new UploadError('IMAGE_TOO_LARGE', 'too large'))) })
+    await expect(uploadPhoto(blob(100, 'image/jpeg'), big, callbacks())).rejects.toThrow()
+    expect(big.trackError).toHaveBeenCalledExactlyOnceWith('too_large')
+  })
+
+  it('stops a cancelled photo: no ticket after compressing, no UPLOAD_FAILED, no event', async () => {
+    const controller = new AbortController()
+    const d = deps({ compress: vi.fn(async () => (controller.abort(), blob(10, 'image/jpeg'))) })
+    await expect(uploadPhoto(blob(100, 'image/jpeg'), d, { ...callbacks(), signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(d.requestTicket).not.toHaveBeenCalled()
+    expect(d.track).not.toHaveBeenCalled()
+    expect(d.trackError).not.toHaveBeenCalled()
+  })
+
+  it('passes the signal to the PUT and keeps its AbortError', async () => {
+    const controller = new AbortController()
+    const put = vi.fn(async () => Promise.reject(new DOMException('aborted', 'AbortError')))
+    const d = deps({ put })
+    await expect(uploadPhoto(blob(100, 'image/jpeg'), d, { ...callbacks(), signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(put.mock.calls[0]).toContain(controller.signal)
+    expect(d.trackError).not.toHaveBeenCalled()
+  })
+})
