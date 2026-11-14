@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { AdminProvider } from '../providers/types'
 import { decisionRoute, withDecisionRoute } from './decision-route'
-import { formFor, toSaveInput } from './form-state'
+import { canSave, formFor, tierOptions, toSaveInput } from './form-state'
 
 const row = (baseUrl: string, model: string): AdminProvider => ({
   id: '00000000-0000-4000-8000-000000000001', module: 'decision', adapter: 'openai_responses', label: 'Judge',
@@ -33,5 +33,13 @@ describe('decision route', () => {
     const typed = withDecisionRoute({ ...official, priceOutputPerM: '0.6' }, 'openrouter')
     expect(typed.priceOutputPerM).toBe('0.6')
     expect(withDecisionRoute({ ...official, model: 'anthropic/x' }, 'openrouter').model).toBe('anthropic/x')
+  })
+
+  it('keeps an edited row saveable after the switch renames its model', () => {
+    const stored = { ...row('https://api.openai.com/v1', 'gpt-6-luna'), resolutions: ['1k', '2k', '4k'] } as AdminProvider
+    const moved = withDecisionRoute(formFor(stored), 'openrouter')
+    const tiers = tierOptions(moved, null, stored)
+    expect(tiers.selected).toEqual(['1k', '2k', '4k'])
+    expect(canSave({ ...moved, resolutions: tiers.selected, apiKey: 'sk-or-test-123456' }, false)).toBe(true)
   })
 })

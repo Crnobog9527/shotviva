@@ -221,6 +221,9 @@ type Saved = Pick<AdminProvider, 'model' | 'resolutions'> | null | undefined
 
 function detectedTiers(form: ProviderForm, catalog: readonly Resolution[] | null, saved: Saved) {
   const model = form.model.trim()
+  // A decision row has no image tiers and hides the control: keep the stored default, so renaming
+  // its model (decision-route.ts) never empties them and blocks Save.
+  if (form.module === 'decision') return { tiers: RESOLUTIONS, known: true }
   if (form.adapter === 'openai_images') return openAIImageTiers(model)
   if (form.adapter === 'ark_images') return { tiers: ARK_RESOLUTIONS, known: true }
   return { tiers: catalog ?? (saved?.model === model ? saved.resolutions : []), known: true }
