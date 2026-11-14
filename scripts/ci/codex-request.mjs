@@ -17,9 +17,9 @@
  *
  * After asking, it waits for Codex to pick the request up (up to 5 minutes; exit 4 if it does
  * not) and then re-runs the head's "Codex findings" run, which waits for the review to finish.
- * Posts nothing (exit 3: run it again later) while a Codex review is running, and nothing when
- * a "@codex review" was posted in the last 10 minutes. Env: GH_TOKEN, REPO, PR, HEAD_SHA,
- * ACTION, CODEX_REVIEW_MODE.
+ * Posts nothing (exit 3: run it again later) while a Codex review is running, and nothing while
+ * an earlier "@codex review" is still waiting for Codex.
+ * Env: GH_TOKEN, REPO, PR, HEAD_SHA, ACTION, CODEX_REVIEW_MODE.
  */
 import { execFileSync } from 'node:child_process'
 
@@ -69,12 +69,17 @@ if (!why) {
   process.exit(0)
 }
 
-const tenMinutesAgo = Date.now() - 10 * 60_000
-const recent = api(`repos/${env.REPO}/issues/${env.PR}/comments?per_page=100`).some(
-  (c) => /@codex review/.test(c.body ?? '') && Date.parse(c.created_at) > tenMinutesAgo,
+// A request newer than Codex's last update of its summary comment has not been picked up yet
+// (Codex edits that comment when a review starts and ends; its 👀 goes away afterwards, so
+// reactions cannot tell). Asking again would only queue a duplicate.
+const comments = api(`repos/${env.REPO}/issues/${env.PR}/comments?per_page=100`)
+const isCodexBot = (c) => /codex/.test(c.user?.login ?? '')
+const lastCodexUpdate = Math.max(0, ...comments.filter(isCodexBot).map((c) => Date.parse(c.updated_at)))
+const pending = comments.some(
+  (c) => !isCodexBot(c) && /^\s*@codex review\b/.test(c.body ?? '') && Date.parse(c.created_at) > lastCodexUpdate,
 )
-if (recent) {
-  console.log('"@codex review" was already asked in the last 10 minutes.')
+if (pending) {
+  console.log('An earlier "@codex review" has not been picked up by Codex yet.')
   process.exit(0)
 }
 
