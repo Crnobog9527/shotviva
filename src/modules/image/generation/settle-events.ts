@@ -3,7 +3,9 @@ import type { JobFailure, TrackedJob } from './job-model'
 // What the app-wide notice says when this tab's jobs settle (the toast, the tab title, the
 // browser notification): pure, so the wording rules are tested without a DOM.
 
-export type Settled = { ready: TrackedJob[]; failed: TrackedJob[] }
+// What a notice needs of a settled job: this tab's TrackedJob, or a server row Photos polled.
+export type SettledItem = Pick<TrackedJob, 'id' | 'templateName' | 'failure'>
+export type Settled = { ready: SettledItem[]; failed: SettledItem[] }
 
 // Jobs that were queued or running at the last look and have settled since. A job seen for the
 // first time already settled (restored after a reload) was announced before, or never needs to be.
@@ -17,8 +19,24 @@ export function newlySettled(before: ReadonlyMap<string, TrackedJob['status']>, 
 
 export const statusMap = (jobs: readonly TrackedJob[]) => new Map(jobs.map((job) => [job.id, job.status]))
 
+// Each job once, even when this tab and the Photos poll both saw it settle.
 export function merge(a: Settled, b: Settled): Settled {
-  return { ready: [...a.ready, ...b.ready], failed: [...a.failed, ...b.failed] }
+  const seen = new Set([...a.ready, ...a.failed].map((item) => item.id))
+  const fresh = (item: SettledItem) => !seen.has(item.id)
+  return { ready: [...a.ready, ...b.ready.filter(fresh)], failed: [...a.failed, ...b.failed.filter(fresh)] }
+}
+
+// Jobs this tab never tracked (started in a tab since closed) that Photos saw settle: the same
+// notice, through this one listener (SettleToast).
+const announced = new Set<(news: Settled) => void>()
+
+export function onAnnounce(listener: (news: Settled) => void): () => void {
+  announced.add(listener)
+  return () => announced.delete(listener)
+}
+
+export function announce(news: Settled) {
+  if (news.ready.length || news.failed.length) announced.forEach((listener) => listener(news))
 }
 
 // Where several failures' credits stand, one line for all: any refund still on hold says so;

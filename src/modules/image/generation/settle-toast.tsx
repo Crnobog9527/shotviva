@@ -5,9 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Link, useRouter } from '@/core/i18n/navigation'
 
-import type { TrackedJob } from './job-model'
 import { notifyIfHidden } from './browser-notify'
-import { merge, newlySettled, refundKey, statusMap, type Settled } from './settle-events'
+import { merge, newlySettled, onAnnounce, refundKey, statusMap, type Settled, type SettledItem } from './settle-events'
 import { useJobs } from './use-jobs'
 import { isWatched } from './watched'
 
@@ -15,7 +14,7 @@ const SHOW_MS = 10_000
 const NONE: Settled = { ready: [], failed: [] }
 
 // Where the news points: one finished photo opens it, several open Photos.
-const hrefOf = (ready: TrackedJob[]) => (ready.length === 1 && ready[0] ? `/photos/${ready[0].id}` : '/photos')
+const hrefOf = (ready: SettledItem[]) => (ready.length === 1 && ready[0] ? `/photos/${ready[0].id}` : '/photos')
 
 // Collects what settled since the last look, minus what a wait screen in front of the user is
 // showing (watched.ts); a tab out of view gets everything, and a browser notification.
@@ -26,7 +25,7 @@ function useSettledNews(onNews: (news: Settled) => void) {
     const news = newlySettled(seen.current, jobs)
     seen.current = statusMap(jobs)
     const inView = document.visibilityState === 'visible'
-    const shown = (job: TrackedJob) => !(inView && isWatched(job.id))
+    const shown = (job: SettledItem) => !(inView && isWatched(job.id))
     const fresh = { ready: news.ready.filter(shown), failed: news.failed.filter(shown) }
     if (fresh.ready.length || fresh.failed.length) onNews(fresh)
   }, [jobs, onNews])
@@ -42,6 +41,7 @@ export function SettleToast() {
   const [news, setNews] = useState<Settled>(NONE)
   const [onNews] = useState(() => (fresh: Settled) => setNews((current) => merge(current, fresh)))
   useSettledNews(onNews)
+  useEffect(() => onAnnounce(onNews), [onNews])
   const total = news.ready.length + news.failed.length
 
   useEffect(() => {
