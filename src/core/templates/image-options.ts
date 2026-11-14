@@ -3,7 +3,9 @@ import { isTallAspect, OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Reso
 // exactPixels: the route delivers the site's size table exactly (OpenAI). OpenRouter models answer
 // with their own native sizes at 1K and 2K, so the picker marks those sizes as approximate.
 // Absent (rows read before migration 1340, which added it) counts as exact, as before.
-export type ImageOptions = { resolutions: Resolution[]; aspectRatios: OutputAspect[]; originalRatio: boolean; exactPixels?: boolean }
+// lockedRatios (1554): the template offers only its own ratios and never 'original', not even as
+// the photo's nearest size; set only when on.
+export type ImageOptions = { resolutions: Resolution[]; aspectRatios: OutputAspect[]; originalRatio: boolean; exactPixels?: boolean; lockedRatios?: boolean }
 
 // Every fixed ratio a provider can be asked for, tall poster ratios included.
 export const PROVIDER_ASPECTS: OutputAspect[] = OUTPUT_ASPECTS.filter((aspect) => aspect !== 'original')
