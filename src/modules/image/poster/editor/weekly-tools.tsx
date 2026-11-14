@@ -12,7 +12,7 @@ export function WeeklyTools({ studio, weekly, names }: Props) {
   const origin = studio.draft.origin
   return (
     <div className="grid gap-2">
-      <LastRow last={weekly.peek.last} reused={origin?.source === 'reuse' ? origin : null} busy={weekly.lastBusy} failed={weekly.lastFailed}
+      <LastRow last={weekly.peek.last} reused={origin?.source === 'reuse' ? { ...origin, missing: weekly.lastMissing } : null} busy={weekly.lastBusy} failed={weekly.lastFailed}
         dirty={weekly.dirty} onTake={() => void weekly.takeLast()} names={names} />
       <StoreRow store={weekly.store} filled={weekly.storeNote !== null} autofill={weekly.autofill} conflicts={weekly.storeConflicts}
         onFill={weekly.fillStore} onUndo={weekly.undoStore} onAutofillOff={weekly.autofillOff} />

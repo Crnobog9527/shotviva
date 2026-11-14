@@ -32,7 +32,7 @@ export function templateIdsOf(templateId: string, also: unknown): string[] {
 }
 
 export async function weeklyPeek(deps: Deps, userId: string, templateIds: readonly string[]): Promise<WeeklyPeek> {
-  // The store details are a nicety: a failed read (or a database without 1510 yet) offers none.
+  // The store details are a nicety: a failed read (or a database without 1520 yet) offers none.
   const [last, store] = await Promise.all([
     peekLast(deps.db, userId, templateIds),
     readStoreText(deps.db, userId).catch((error: unknown) => { logger.warn('weekly.store_read_failed', { error }); return null }),

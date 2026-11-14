@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { connectAdmin, createUser } from './helpers'
 
-// 店铺信息 (1510): the owner reads their own row; only the server writes; the QR key must sit
+// 店铺信息 (1520): the owner reads their own row; only the server writes; the QR key must sit
 // under the owner's own outputs/ prefix.
 let db: Client
 let owner: string

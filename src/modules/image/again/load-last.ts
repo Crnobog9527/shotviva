@@ -23,7 +23,9 @@ export type LastPeek = { jobId: string; templateId: string; madeAt: string }
 // What the form takes back of a plain template's work (Make again's own fields, againValues).
 export type LastFormInputs = Partial<Record<'copy' | 'aspect_ratio' | 'resolution' | 'note' | 'toggles' | 'toggles_confirmed_at', unknown>>
 
-export type LastIssue = LastPeek & { photos: AgainPhoto[] } & (
+// missing: boxes the work had a photo in that could not be copied back (kept copy gone or never
+// made); the editor names them and asks for the photo again.
+export type LastIssue = LastPeek & { photos: AgainPhoto[]; missing: string[] } & (
   | { kind: 'form'; inputs: LastFormInputs }
   | { kind: 'poster'; content: PosterContent }
 )
@@ -61,6 +63,11 @@ async function keptPhotos(store: ObjectStore, works: readonly Work[]): Promise<A
   return photos
 }
 
+function missingSlots(works: readonly Work[], photos: readonly AgainPhoto[]): string[] {
+  const had = new Set(works.flatMap((work) => storedSlotOrder(work.inputs.input_slots)))
+  return [...had].filter((slot) => !photos.some((photo) => photo.slot === slot))
+}
+
 function formInputs(inputs: Record<string, unknown>): LastFormInputs {
   const { copy, aspect_ratio, resolution, note, toggles, toggles_confirmed_at } = inputs
   return { copy, aspect_ratio, resolution, note, toggles, toggles_confirmed_at }
@@ -71,9 +78,13 @@ export async function loadLast(deps: Deps, userId: string, templateIds: readonly
   const [work] = works
   if (!work) return null
   const setId = setOf(work)
-  if (!setId) return { ...peekOf(work), kind: 'form', inputs: formInputs(work.inputs), photos: await keptPhotos(deps.store(), [work]) }
+  if (!setId) {
+    const photos = await keptPhotos(deps.store(), [work])
+    return { ...peekOf(work), kind: 'form', inputs: formInputs(work.inputs), photos, missing: missingSlots([work], photos) }
+  }
   const content = await loadPosterSetContent(deps.db, userId, setId)
   if (!content) return null
   const pages = works.filter((other) => setOf(other) === setId)
-  return { ...peekOf(work), kind: 'poster', content, photos: await keptPhotos(deps.store(), pages) }
+  const photos = await keptPhotos(deps.store(), pages)
+  return { ...peekOf(work), kind: 'poster', content, photos, missing: missingSlots(pages, photos) }
 }

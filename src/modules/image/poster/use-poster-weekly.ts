@@ -42,6 +42,12 @@ async function fillQr(template: StudioTemplate, studio: PosterStudioState, store
   return true
 }
 
+// Typed values a manual fill would replace (asked first): more changes forced than allowed.
+function storeConflicts(content: PosterContent, store: Store | null, sample: PosterContent | undefined): boolean {
+  if (!store) return false
+  return fillPoster(content, store, () => true).changed.length > fillPoster(content, store, (path) => isSampleText(content, sample, path)).changed.length
+}
+
 export function usePosterWeekly(template: StudioTemplate, studio: PosterStudioState, also: readonly string[]) {
   const peek = useWeeklyPeek(template.id, also)
   const store = peek?.store ?? null
@@ -49,6 +55,8 @@ export function usePosterWeekly(template: StudioTemplate, studio: PosterStudioSt
   const [autofill, setAutofill] = useState(true)
   const [lastBusy, setLastBusy] = useState(false)
   const [lastFailed, setLastFailed] = useState(false)
+  // Photo boxes of the last issue whose photo is gone: named, so the user uploads it again.
+  const [lastMissing, setLastMissing] = useState<string[]>([])
   // The content as the editor opened (after any automatic fill): anything else is the user's.
   const baseline = useRef<string | null>(null)
   const applied = useRef(false)
@@ -95,15 +103,15 @@ export function usePosterWeekly(template: StudioTemplate, studio: PosterStudioSt
     studio.startFrom(issue.content, { source: 'reuse', madeAt: issue.madeAt, templateId: issue.templateId })
     const slots = new Set(template.slots.map((slot) => slot.key))
     for (const photo of issue.photos) if (photo.slot && slots.has(photo.slot)) studio.photos.restore({ ...photo, slot: photo.slot }, issue.madeAt)
+    setLastMissing(template.slots.filter((slot) => issue.missing.includes(slot.key)).map((slot) => slot.label))
     setStoreNote(null)
   }
 
   return {
-    peek, store, storeNote, autofill: autofill && Boolean(store?.autofill), lastBusy, lastFailed, dirty, takeLast,
+    peek, store, storeNote, autofill: autofill && Boolean(store?.autofill), lastBusy, lastFailed, lastMissing, dirty, takeLast,
     fillStore: () => void fillStore(true),
     // Typed values a manual fill would replace (asked first).
-    storeConflicts: () => (store ? fillPoster(draft.content, store, () => true).changed.length
-      > fillPoster(draft.content, store, (path) => isSampleText(draft.content, sample, path)).changed.length : false),
+    storeConflicts: () => storeConflicts(draft.content, store, sample),
     undoStore: () => {
       if (!storeNote) return
       studio.update(() => storeNote.before)
