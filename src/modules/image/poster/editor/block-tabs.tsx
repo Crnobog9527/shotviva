@@ -7,7 +7,10 @@ import type { PosterFields } from '@/core/poster'
 import { cn } from '@/core/ui/cn'
 import { FoldSection } from '@/core/ui/fold-section'
 
-import type { BlockProps } from './block-props'
+import { Button } from '@/core/ui/button'
+
+import { clearFooter, clearHeader, clearInfo, clearPrizes, clearSection, clearTable } from '../content-edit'
+import type { BlockProps, ClearPart } from './block-props'
 import { foldsOf, foldStats, type Fold, type FoldStats } from './block-folds'
 import { FooterEditor } from './footer-editor'
 import { HeaderEditor } from './header-editor'
@@ -24,12 +27,12 @@ const EDITORS: Record<'prizes' | 'table' | 'footer' | 'info', ComponentType<Bloc
 // its own, with how many hold a photo.
 export type PagePhotos = { render(kind: string | null): ReactNode; count(kind: string | null): { label: string; filled: number; total: number } | null }
 
-type Props = BlockProps & { poster: PosterFields; unverified: readonly string[]; pagePhotos?: PagePhotos }
+type Props = BlockProps & { poster: PosterFields; unverified: readonly string[]; pagePhotos?: PagePhotos; onClear: ClearPart }
 
 // One tab for what both pages share, then one per page of the set; a dot marks a tab with lines
 // still to check. Inside a tab its blocks fold into titled parts (Owner 2026-11-14), the first
 // open, each saying how much is filled and how many lines are still to check.
-export function BlockTabs({ poster, unverified, pagePhotos, ...props }: Props) {
+export function BlockTabs({ poster, unverified, pagePhotos, onClear, ...props }: Props) {
   const groups = pageGroups(poster)
   const [current, setCurrent] = useState(groups[0]?.key ?? 'shared')
   const foldsFor = (group: PageGroup) => foldsOf(group.blocks, props.content, Boolean(pagePhotos?.count(group.kind)))
@@ -50,7 +53,7 @@ export function BlockTabs({ poster, unverified, pagePhotos, ...props }: Props) {
           const id = `${group.key}:${fold.key}`
           return (
             <PartFold key={id} id={id} fold={fold} kind={group.kind} open={open.includes(id)} onToggle={() => toggle(id)}
-              unverified={unverified} pagePhotos={pagePhotos} onSectionAdded={(index) => setOpen((ids) => [...ids, `${group.key}:section-${index}`])} {...props} />
+              unverified={unverified} pagePhotos={pagePhotos} onClear={onClear} onSectionAdded={(index) => setOpen((ids) => [...ids, `${group.key}:section-${index}`])} {...props} />
           )
         }) : null}
       </div>
@@ -58,9 +61,9 @@ export function BlockTabs({ poster, unverified, pagePhotos, ...props }: Props) {
   )
 }
 
-type PartProps = BlockProps & { id: string; fold: Fold; kind: string | null; open: boolean; onToggle(): void; unverified: readonly string[]; pagePhotos?: PagePhotos; onSectionAdded(index: number): void }
+type PartProps = BlockProps & { id: string; fold: Fold; kind: string | null; open: boolean; onToggle(): void; unverified: readonly string[]; pagePhotos?: PagePhotos; onClear: ClearPart; onSectionAdded(index: number): void }
 
-function PartFold({ id, fold, kind, open, onToggle, unverified, pagePhotos, onSectionAdded, ...props }: PartProps) {
+function PartFold({ id, fold, kind, open, onToggle, unverified, pagePhotos, onClear, onSectionAdded, ...props }: PartProps) {
   const t = useTranslations('app.poster')
   const photos = fold.kind === 'photos' ? pagePhotos?.count(kind) ?? null : null
   const stats = photos ?? foldStats(fold, props.content, unverified)
@@ -69,10 +72,28 @@ function PartFold({ id, fold, kind, open, onToggle, unverified, pagePhotos, onSe
       <FoldSection id={`poster-${id.replace(':', '-')}`} level={3} title={photos?.label ?? foldTitle(fold, props.content, t)} open={open} onToggle={onToggle}
         summary={<FoldSummary stats={{ flagged: 0, ...stats }} />}>
         <FoldBody fold={fold} kind={kind} pagePhotos={pagePhotos} {...props} />
+        {!photos && stats.filled > 0 ? (
+          <div className="mt-3 flex justify-end">
+            <Button variant="ghost" size="sm" className="min-h-11 text-muted-foreground" onClick={() => onClear(...cleared(fold, props.content))}>{t('clearPart')}</Button>
+          </div>
+        ) : null}
       </FoldSection>
       {endsSections(fold, props.content) ? <AddSectionButton content={props.content} onChange={props.onChange} onAdded={onSectionAdded} /> : null}
     </>
   )
+}
+
+// What 清空本块 leaves of a part, and the paths it covered.
+function cleared(fold: Fold, content: BlockProps['content']): [BlockProps['content'], string[]] {
+  switch (fold.kind) {
+    case 'header': return [clearHeader(content, fold.keys), fold.keys.map((key) => `header.${key}`)]
+    case 'info': return [clearInfo(content), ['info']]
+    case 'section': return [clearSection(content, fold.index), [`sections.${fold.index}`]]
+    case 'prizes': return [clearPrizes(content), ['prizes']]
+    case 'table': return [clearTable(content), ['table']]
+    case 'footer': return [clearFooter(content), ['footer']]
+    case 'photos': return [content, []]
+  }
 }
 
 // The add-a-section button sits under the last section (under the heading when there is none).
