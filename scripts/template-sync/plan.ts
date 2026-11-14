@@ -118,6 +118,8 @@ async function templates(ids: readonly string[], goneHere: ReadonlySet<string>, 
     fail(`states ${reason(error)}`)
     return null
   })
+  // A dry run rolls a new template's content back, so its state has nothing to be checked against.
+  const present = run.validateOnly ? await readStates(ids, run.target).catch(() => null) : null
   for (const id of ids) {
     const state = states?.get(id)
     if (state?.deleted || goneHere.has(id)) {
@@ -132,6 +134,10 @@ async function templates(ids: readonly string[], goneHere: ReadonlySet<string>, 
       continue
     }
     if (!state) continue
+    if (present && !present.has(id)) {
+      run.report(`${id} state not checked: new on the target, checked when written`)
+      continue
+    }
     try {
       run.report(`${id} state ${await syncTemplateState(id, state, actor, run.target, run.validateOnly)}`)
     } catch (error) {
