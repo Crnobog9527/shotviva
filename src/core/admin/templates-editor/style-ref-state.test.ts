@@ -30,8 +30,11 @@ describe('template reference budget', () => {
   })
 
   it('follows the active model and handles missing capabilities', () => {
-    expect(budget(0, 2, 2, null)).toMatchObject({ model: { min: 0, max: 4 }, problem: null })
-    expect(budget(0, 2, 3, null).problem).toBe(styleRefCopy.over)
+    expect(budget(0, 2, 2, null)).toMatchObject({ model: { min: 0, max: 16 }, problem: null })
+    // Prize posters: four photo slots plus the cover reference fit the OpenAI line.
+    expect(budget(0, 4, 1, null)).toMatchObject({ total: { min: 1, max: 5 }, problem: null })
+    expect(budget(0, 16, 0, null).problem).toBeNull()
+    expect(budget(0, 16, 1, null).problem).toBe(styleRefCopy.over)
     expect(budget(0, 0, 1, 'missing').problem).toBe(styleRefCopy.missingCap)
   })
 

@@ -50,6 +50,11 @@ describe('fetchImageCapabilities for OpenAI and Ark', () => {
     expect(await fetchImageCapabilities('openai_images', 'https://api.openai.com/v1', 'gpt-image-2.6', undefined, narrowed!.resolutionLimit)).toMatchObject({ resolutions: ['1k', '2k'] })
   })
 
+  it("writes OpenAI's documented 16-image edit limit into the snapshot on every refresh", async () => {
+    expect(await fetchImageCapabilities('openai_images', 'https://api.openai.com/v1', 'gpt-image-2.6'))
+      .toMatchObject({ minReferences: 0, maxReferences: 16 })
+  })
+
   it('gives an unknown model 1K, or what was declared', async () => {
     const plain = await fetchImageCapabilities('openai_images', 'https://api.openai.com/v1', 'gpt-image-3')
     expect(plain).toMatchObject({ resolutions: ['1k'], resolutionSource: 'unknown' })

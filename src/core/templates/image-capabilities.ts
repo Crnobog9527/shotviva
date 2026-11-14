@@ -4,7 +4,10 @@ import { catalogPricingSchema } from './catalog-pricing'
 import { resolutionSchema, withTierKeys } from './db-resolution'
 import { OUTPUT_ASPECTS, RESOLUTIONS } from './output-options'
 
-export const OPENAI_MAX_REFERENCES = 4
+// OpenAI's Images edit endpoint takes up to 16 input images for GPT image models
+// (https://developers.openai.com/api/reference/resources/images/methods/edit). Every photo slot
+// and style reference goes to /images/edits as one image[] entry, so this is the whole count.
+export const OPENAI_MAX_REFERENCES = 16
 
 export const estimatedImageCostsSchema = withTierKeys(z.partialRecord(z.enum(RESOLUTIONS), z.number().positive().finite()))
 export type EstimatedImageCosts = z.infer<typeof estimatedImageCostsSchema>
