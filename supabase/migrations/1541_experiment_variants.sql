@@ -23,9 +23,6 @@ create table public.experiment_variants (
 -- One control per experiment.
 create unique index experiment_variants_control_idx on public.experiment_variants (experiment_id) where is_control;
 
-alter table public.experiments add constraint experiments_winner_variant_id_fkey
-  foreign key (winner_variant_id) references public.experiment_variants (id);
-
 alter table public.experiment_variants enable row level security;
 revoke all on table public.experiment_variants from public, anon, authenticated;
 -- Read by the admin page (service role); written only through the functions in 1543 and 1544.

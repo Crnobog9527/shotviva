@@ -13,7 +13,10 @@ create table public.experiments (
   name text not null check (length(name) between 1 and 80),
   goal text not null check (goal in ('signup', 'first_generation', 'payment')),
   status text not null default 'draft' check (status in ('draft', 'running', 'paused', 'ended')),
-  -- Set when ended; the control when the admin picked none (admin_experiment_act).
+  -- The variant an ended experiment shows everyone; the control when the admin picked none. A
+  -- variant of this experiment (experiment_variants.id, 1541): admin_experiment_act checks that on
+  -- the only write, and a started experiment's variants are never deleted. No foreign key, since
+  -- the variants table comes after this one.
   winner_variant_id bigint,
   started_at timestamptz,
   ended_at timestamptz,
