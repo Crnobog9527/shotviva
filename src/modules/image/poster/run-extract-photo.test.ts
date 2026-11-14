@@ -80,8 +80,10 @@ describe('preparePhotoExtract', () => {
   it('reads one photo per page and sorts them as one notice', async () => {
     const { db, inserted } = fakeDb()
     const KEY2 = KEY.replace('22222222-2222', '55555555-5555')
+    // The photos are read in parallel, so which call answers first is not fixed: one page with
+    // the notice and one blank page read the same in either order.
     let call = 0
-    const fetch = vi.fn(async () => reading((call += 1) === 1 ? notice.slice(0, 6) : notice.slice(7)))
+    const fetch = vi.fn(async () => reading((call += 1) === 1 ? notice : []))
     const prepared = await preparePhotoExtract(deps(db, fetch), { userId: USER, templateId: 't', inputKeys: [KEY, KEY2] })
     const result = prepared.kind === 'model' ? await prepared.run(() => undefined) : null
     expect(fetch).toHaveBeenCalledTimes(2)
