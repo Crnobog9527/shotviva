@@ -15,7 +15,8 @@
  *   CODEX_REVIEW_MODE=on-demand  Codex's automatic review is off. This also asks when a
  *                                high-risk PR is opened, reopened or marked ready.
  *
- * After asking, it re-runs the head's "Codex findings" run so the check waits for the review.
+ * After asking, it waits for Codex to pick the request up (up to 5 minutes; exit 4 if it does
+ * not) and then re-runs the head's "Codex findings" run, which waits for the review to finish.
  * Posts nothing (exit 3: run it again later) while a Codex review is running, and nothing when
  * a "@codex review" was posted in the last 10 minutes. Env: GH_TOKEN, REPO, PR, HEAD_SHA,
  * ACTION, CODEX_REVIEW_MODE.
@@ -81,7 +82,24 @@ execFileSync('gh', ['pr', 'comment', String(env.PR), '--repo', env.REPO, '--body
 console.log(`Asked Codex to review: ${why}.`)
 
 // A comment starts no check on the PR, so "Codex findings" would stay green while this review
-// runs. Re-running its latest pull_request run makes it wait for the review (up to 20 minutes).
+// runs. Re-running its latest pull_request run makes it wait for the review (up to 20 minutes),
+// but only once Codex has picked the request up: before that its summary still shows the previous
+// review as completed, and the re-run would pass on it.
+const before = state.commit
+const ackDeadline = Date.now() + 5 * 60_000
+let acked = false
+while (Date.now() < ackDeadline) {
+  const now = await reviewState()
+  if (now.running || (now.completed && now.commit && now.commit !== before)) {
+    acked = true
+    break
+  }
+  await new Promise((resolve) => setTimeout(resolve, 15_000))
+}
+if (!acked) {
+  console.error('Codex has not picked up the request after 5 minutes; re-run "Codex findings" by hand once it reacts 👀.')
+  process.exit(4)
+}
 const runs = JSON.parse(
   execFileSync('gh', ['run', 'list', '--repo', env.REPO, '--workflow', 'codex-review.yml', '--event', 'pull_request',
     '--commit', env.HEAD_SHA, '--limit', '1', '--json', 'databaseId,status'], { encoding: 'utf8' }),
