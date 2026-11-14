@@ -1,6 +1,6 @@
 'use client'
 
-import { EXPERIMENT_COOKIE, EXPERIMENT_COOKIE_MAX_AGE, parseExperimentCookie, serializeExperimentCookie } from '../../experiments'
+import { EXPERIMENT_COOKIE, EXPERIMENT_COOKIE_MAX_AGE, parseExperimentCookie, serializeExperimentCookie } from '../../experiments/cookie'
 import { track } from './client'
 import { withSdks } from './sdk'
 
