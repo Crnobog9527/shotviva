@@ -707,7 +707,12 @@
         "placeholder": "周4精英赛 开赛时间15:00\n冠军 ……\n赛事规则 ……",
         "sort": "整理内容",
         "sorting": "正在整理…",
-        "manual": "我自己填"
+        "manual": "我自己填",
+        "progress": {
+          "reading": "正在读取原文…",
+          "writing": "正在整理：{block}",
+          "seconds": "{seconds} 秒"
+        }
       },
       "sourceText": "你粘贴的原文",
       "backToPaste": "重新粘贴",
