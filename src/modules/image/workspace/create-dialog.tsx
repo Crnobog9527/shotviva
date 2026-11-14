@@ -7,6 +7,10 @@ import { limitsFor } from '@/core/billing/tier-limits'
 import { useRouter } from '@/core/i18n'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
+import { matchesStore } from '@/core/store-profile'
+
+import { FormWeeklyTools } from '../again/form-weekly-tools'
+import { useFormWeekly } from '../again/use-form-weekly'
 import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { preloadBatchDialog } from '../matrix/batch-dialog-slot'
 import { openBatch } from '../matrix/batch-query'
@@ -45,6 +49,7 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   const router = useRouter()
   const draft = useWorkspaceDraft({ template, ...context, single: true })
   const workspace = `/generate/${template.id}`
+  const weekly = useFormWeekly(template, draft, [template.id])
   // Generate moves to the template's workspace page, kept prefetched while the dialog is open.
   useWarmRoute(workspace, open)
   // A slot template is single-run only (§5.1e): no way to a batch.
@@ -75,7 +80,8 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
           <FavoriteButton template={template} surface="create_dialog" className={tall ? 'right-1 bottom-1' : 'top-1 right-1'} />
         </div>
       }
-      form={
+      form={<>
+        <FormWeeklyTools weekly={weekly} names={{ [template.id]: template.name }} storeFields={matchesStore(template.copyFields)} />
         <WorkspaceForm
           template={template}
           balance={context.balance}
@@ -88,7 +94,7 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
           examples={draft.fromExamples}
           photoExtra={batch ? <BatchLink templateId={template.id} onGo={onClose} /> : null}
         />
-      }
+      </>}
       bar={<FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} placement="sheet" limit={context.concurrency.limit} privateOnly={template.privateOnly} examplesLeft={draft.examplesLeft} />}
     />
   )

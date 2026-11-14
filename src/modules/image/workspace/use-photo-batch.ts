@@ -167,7 +167,8 @@ function useBatchHolds(entries: Entry[]) {
 // A slot template's photos (§5.1e): at most one per named slot, each uploading on its own like a
 // batch photo (same three-at-a-time limit, same holds). Entries are keyed by slot, so a photo can
 // only ever be in its own box. `kept` (Make again) puts each kept photo back in its slot.
-export type SlotKept = { photos: readonly { inputKey: string; bytes: number; url: string; slot?: string }[]; madeAt: string }
+export type KeptSlotPhoto = { inputKey: string; bytes: number; url: string; slot: string }
+export type SlotKept = { photos: readonly (Omit<KeptSlotPhoto, 'slot'> & { slot?: string })[]; madeAt: string }
 
 export function useSlotPhotos(slots: readonly { key: string; required: boolean }[], kept?: SlotKept) {
   const [entries, setEntries] = useState<Entry[]>(() => keptSlotEntries(kept))
@@ -191,10 +192,15 @@ export function useSlotPhotos(slots: readonly { key: string; required: boolean }
     drop(slot)
     setEntries((list) => list.filter((entry) => entry.id !== slot))
   }
+  // An upload made elsewhere (复用上一期's kept photos, the store's QR code, §5.3): shown as done.
+  const restore = (photo: KeptSlotPhoto, madeAt?: string) => {
+    drop(photo.slot)
+    setEntries((list) => [...list.filter((entry) => entry.id !== photo.slot), ...keptSlotEntries({ photos: [photo], madeAt: madeAt ?? '' })])
+  }
   // Switching series members (or a template edit) keeps only slots the template still has.
   const keys = slots.map((slot) => slot.key)
   const shown = entries.filter((entry) => keys.includes(entry.id))
-  return { byKey: Object.fromEntries(shown.map((entry) => [entry.id, entry as BatchPhoto])), status: slotStatus(slots, shown), uploads: slotUploads(keys, shown), set, remove }
+  return { byKey: Object.fromEntries(shown.map((entry) => [entry.id, entry as BatchPhoto])), status: slotStatus(slots, shown), uploads: slotUploads(keys, shown), set, remove, restore }
 }
 
 export type SlotPhotos = ReturnType<typeof useSlotPhotos>

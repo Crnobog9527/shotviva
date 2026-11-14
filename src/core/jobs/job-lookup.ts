@@ -37,3 +37,23 @@ export async function findJobByIdempotencyKey(client: SupabaseClient, userId: st
   if (error) throw new AppError('INTERNAL', `findJobByIdempotencyKey failed: ${error.message}`)
   return data === null ? null : jobRowSchema.parse(data)
 }
+
+// 复用上一期 (§5.3「每周复用」): the owner's latest finished works of these templates (one
+// template, or every style of its series), newest first. A few rows, so the pages of the newest
+// poster set are all there. Uses generation_jobs(user_id, created_at desc).
+export const LAST_WORKS = 8
+
+export async function findLastWorks(client: SupabaseClient, userId: string, templateIds: readonly string[]): Promise<Job[]> {
+  if (templateIds.length === 0) return []
+  const { data, error } = await client
+    .from('generation_jobs')
+    .select(JOB_COLUMNS)
+    .eq('user_id', userId)
+    .in('template_id', templateIds)
+    .eq('status', 'succeeded')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(LAST_WORKS)
+  if (error) throw new AppError('INTERNAL', `findLastWorks failed: ${error.message}`)
+  return (data ?? []).map((row) => jobRowSchema.parse(row))
+}

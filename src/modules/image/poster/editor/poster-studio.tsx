@@ -8,21 +8,30 @@ import { Button } from '@/core/ui/button'
 import { ConfirmAction } from '../../workspace/example-tools'
 import { isSampleText, sampleContactsLeft, typedPoster } from '../content-edit'
 import type { PosterStudioState, StudioTemplate } from '../use-poster-studio'
+import type { PhotoSort } from '../use-photo-sort'
+import type { PosterWeekly } from '../use-poster-weekly'
 import { BlockTabs } from './block-tabs'
 import { GenerateButton, GeneratePanel } from './generate-panel'
 import { pagePhotos } from './page-slots'
 import { PasteStep, SortButton } from './paste-step'
+import { PhotoPick } from './photo-pick'
+import { WeeklyTools } from './weekly-tools'
 
 type Props = { studio: PosterStudioState; template: StudioTemplate; balance: Balance }
+// 每周复用 (§5.3): 用上一期 and the store details, and 拍照识别 on the paste step.
+export type StudioReuse = { weekly: PosterWeekly; names: Record<string, string>; photo: PhotoSort }
+type FormProps = Props & { reuse: StudioReuse }
 
 // The dense-text poster editor's scrolling body (ARCHITECTURE §5.3, DESIGN mobile 375 first):
 // paste → check the sorted blocks → sizes. Its primary sits in the dialog's bar (StudioBar).
-export function StudioForm({ studio, template, balance }: Props) {
+export function StudioForm({ studio, template, balance, reuse }: FormProps) {
   const t = useTranslations('app.poster')
-  if (studio.draft.step === 'paste') return <section className="pt-2"><PasteStep studio={studio} /></section>
+  const tools = <WeeklyTools studio={studio} weekly={reuse.weekly} names={reuse.names} />
+  if (studio.draft.step === 'paste') return <section className="grid gap-6 pt-2">{tools}<PasteStep studio={studio} photo={template.photoCredits > 0 ? <PhotoPick photo={reuse.photo} credits={template.photoCredits} balance={balance} /> : null} /></section>
   return (
     <section className="grid gap-6 pt-2">
       <StudioNotes studio={studio} />
+      {tools}
       {template.poster.sample ? <SampleTools studio={studio} sample={template.poster.sample} /> : null}
       <BlockTabs poster={template.poster} unverified={studio.draft.unverified} content={studio.draft.content}
         flagged={(path) => studio.draft.unverified.includes(path)} onChange={studio.edit} onClear={studio.clearPart}
@@ -56,7 +65,7 @@ function SampleTools({ studio, sample }: { studio: PosterStudioState; sample: St
   const typed = typedPoster(studio.draft.content, studio.draft.fromSample ? sample : undefined)
   return (
     <div className="grid gap-2 rounded-control bg-wash-faint p-3 text-caption">
-      <p className="text-muted-foreground">{t(studio.draft.fromSample ? 'hint' : 'sortedHint')}</p>
+      <p className="text-muted-foreground">{t(sampleHint(studio.draft))}</p>
       <div className="flex flex-wrap gap-2">
         <ConfirmAction variant="outline" label={t('clearAll')} question={t('clearAllQuestion')} risky={typed} onConfirm={studio.clearAll} />
         <ConfirmAction label={t('restore')} question={t('restoreQuestion')} risky={typed} onConfirm={studio.restoreSample} />
@@ -77,10 +86,17 @@ function StudioNotes({ studio }: { studio: PosterStudioState }) {
       {notice ? <p className="rounded-control bg-wash-faint p-3 text-caption">{t(`notice.${notice}`)}</p> : null}
       {studio.draft.source ? (
         <details className="rounded-control bg-wash-faint p-3 text-caption">
-          <summary className="min-h-11 cursor-pointer content-center font-medium">{t('sourceText')}</summary>
+          <summary className="min-h-11 cursor-pointer content-center font-medium">{t(studio.draft.origin?.source === 'photo' ? 'photoText' : 'sourceText')}</summary>
           <p className="whitespace-pre-wrap text-muted-foreground">{studio.draft.source}</p>
         </details>
       ) : null}
     </div>
   )
+}
+
+// What the content started from: the sample, a sorted paste, a photo, or the last issue.
+function sampleHint(draft: PosterStudioState['draft']): 'hint' | 'sortedHint' | 'photoHint' | 'reusedHint' {
+  if (draft.fromSample) return 'hint'
+  if (draft.origin?.source === 'photo') return 'photoHint'
+  return draft.origin?.source === 'reuse' ? 'reusedHint' : 'sortedHint'
 }
