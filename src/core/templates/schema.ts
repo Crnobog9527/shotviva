@@ -5,6 +5,7 @@ import { creditsCostSchema, TEMPLATE_QUALITIES } from './pricing'
 import { RESERVED_KEYS, toggleFieldSchema, TOGGLES_MAX } from './toggles'
 import { COPY_FIELDS_MAX, copyFieldSchema } from './copy-fields'
 import { imageSlotsSchema, slotShapeProblems } from './image-slots'
+import { fieldGroupsSchema, groupShapeProblems } from './field-groups'
 import { posterFieldsSchema } from '../poster/template'
 import { resolutionSchema } from './db-resolution'
 
@@ -33,6 +34,8 @@ export const templateFieldsSchema = z
     // A dense-text poster template (ARCHITECTURE §5.3): its text comes from the confirmed content
     // blocks, never from copy fields, and it makes one or more posters per set.
     poster: posterFieldsSchema.optional(),
+    // Titled groups that fold in the creation form (Owner 2026-11-14); display only.
+    groups: fieldGroupsSchema.optional(),
   })
   .refine((fields) => !fields.poster || fields.copy.length === 0, {
     message: 'a poster template takes its text from the content blocks, not from copy fields',
@@ -52,6 +55,7 @@ export const templateFieldsSchema = z
   })
   .superRefine((fields, ctx) => {
     for (const message of slotShapeProblems(fields)) ctx.addIssue({ code: 'custom', message, path: ['images', 'slots'] })
+    for (const message of groupShapeProblems(fields)) ctx.addIssue({ code: 'custom', message, path: ['groups'] })
   })
   // One key namespace: a copy field, a toggle or an image slot (whose zh text also sits in
   // translations.zh.fields.<key>), never two of them, and never a reserved placeholder.

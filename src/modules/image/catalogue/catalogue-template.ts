@@ -29,6 +29,8 @@ export type CatalogueTemplate = {
   // Named upload boxes in send order (§5.1e), in the page's language; absent or [] for a
   // template that takes the single photo.
   imageSlots?: CatalogueImageSlot[]
+  // Titled groups that fold (fields.groups), in the page's language; absent for the plain layout.
+  groups?: CatalogueFieldGroup[]
   cover: {
     type: CoverMediaType
     before: string | null
@@ -59,6 +61,9 @@ export type CatalogueCopyField = {
 // note: the text field (copyFields key) drawn right under the box.
 export type CatalogueImageSlot = { key: string; label: string; help?: string; required: boolean; note?: string }
 
+// A group of text fields and image slots by key; a block keeps one thing's parts together.
+export type CatalogueFieldGroup = { key: string; label: string; open: boolean; items: (string | { key: string; label: string; items: string[] })[] }
+
 export type CatalogueToggle = { key: string; label: string; hint?: string; confirm?: ToggleConfirm }
 
 // Pass a template already through localizeTemplate (core/templates) for the page's language.
@@ -78,6 +83,7 @@ export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTempl
     creditsCost: template.creditsCost,
     copyFields: template.fields.copy.map(toCatalogueCopy),
     imageSlots: (template.fields.images.slots ?? []).map(({ key, label, help, required, note }) => ({ key, label, required, ...(help ? { help } : {}), ...(note ? { note } : {}) })),
+    ...catalogueGroups(template.fields.groups),
     toggles: (template.fields.toggles ?? []).map(({ key, label, hint, confirm }) => ({ key, label, ...(hint ? { hint } : {}), ...(confirm ? { confirm } : {}) })),
     cover: {
       type: template.coverMediaType,
@@ -88,6 +94,15 @@ export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTempl
     },
   }
 }
+
+type LocalizedGroup = NonNullable<LocalizedTemplate['fields']['groups']>[number]
+
+// Labels are already in the page's language (localizeTemplate); labelZh stays behind.
+const toCatalogueGroup = ({ key, label, open, items }: LocalizedGroup): CatalogueFieldGroup => ({
+  key, label, open, items: items.map((item) => (typeof item === 'string' ? item : { key: item.key, label: item.label, items: [...item.items] })),
+})
+
+const catalogueGroups = (groups: readonly LocalizedGroup[] | undefined) => (groups?.length ? { groups: groups.map(toCatalogueGroup) } : {})
 
 type LocalizedCopy = LocalizedTemplate['fields']['copy'][number]
 

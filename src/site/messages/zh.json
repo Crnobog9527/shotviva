@@ -824,7 +824,18 @@
         "notEnough": "积分不够。",
         "error": "出了点问题，请重试。"
       },
-      "slotHint": "可不传。不传的话，按奖品文字画出奖品。"
+      "slotHint": "可不传。不传的话，按奖品文字画出奖品。",
+      "folds": {
+        "masthead": "页眉",
+        "title": "标题与时间",
+        "info": "栏目总标题",
+        "section": "第 {n} 栏",
+        "prizes": "奖品表",
+        "table": "表格",
+        "footer": "页脚 · 电话与地址",
+        "photos": "上传图片",
+        "flagged": "{count} 处待核对"
+      }
     },
     "sizes": {
       "closest": "接近原图（{ratio}）",
@@ -985,6 +996,12 @@
         "oneAtATime": "这个模板一次做一张。",
         "remove": "移除",
         "replace": "换一张"
+      },
+      "groups": {
+        "filled": "已填 {filled}/{total}",
+        "required": "还有 {count} 项必填",
+        "done": "必填已填好",
+        "invalid": "有内容需要修改"
       }
     },
     "errors": {
