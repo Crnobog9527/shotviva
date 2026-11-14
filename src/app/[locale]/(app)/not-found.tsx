@@ -4,9 +4,10 @@ import { Link } from '@/core/i18n/ui'
 import { EmptyState, STATE_GHOST } from '@/core/ui/empty-state'
 
 // notFound() inside the app (an unknown template, a disabled section, the admin for a member):
-// the 404 as an empty state inside the app shell, so the tab bar and the way back stay. It used
-// to fall to [locale]/not-found.tsx, the marketing 404 under the bare root layout, whose
-// stylesheets every page then carried a copy of in its HTML (inlineCss).
+// the 404 as an empty state inside the app layout (its ground and styles; the tab bar shows where
+// the page's path is a tab root, not on full-screen flows like /generate/<id>), with a way to the
+// templates. It used to fall to [locale]/not-found.tsx, the marketing 404 under the bare root
+// layout, whose stylesheets every page then carried a copy of in its HTML (inlineCss).
 export default async function AppNotFound() {
   const t = await getTranslations('notFound')
   return (
