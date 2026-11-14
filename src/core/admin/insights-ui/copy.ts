@@ -59,6 +59,19 @@ export const INSIGHTS_COPY = {
     breakdownDesc: '整段时间合计。按来源时保留语言筛选，按语言时保留来源筛选。',
     unknownLocale: '老账号和 Google 登录的账号没记注册语言时，看第一次打开的页面是不是中文；还认不出来的不算进任何语言。',
     group: '分组',
+    touch: {
+      landingTitle: '按落地页',
+      sourceTitle: '按来源网站 / utm',
+      desc: '这段时间注册的人，按第一次进站的页面或来源分组，看注册、出图、付费。没有访客列。',
+      covered: (own: number, posthog: number, none: number) =>
+        `${own} 人有自己的首次来源记录（进站时记下、注册时存进账号）；${posthog} 人没有，用 PostHog 第一次访问推断（标「推断」）；${none} 人两边都查不到。`,
+      landing: '落地页',
+      source: '来源',
+      inferred: '推断',
+      noRecord: '没有记录',
+      other: '其他',
+      direct: '直接访问',
+    },
   },
   templates: {
     title: '模板表现',

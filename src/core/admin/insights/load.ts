@@ -7,6 +7,8 @@ import { posthogAccess } from '../analytics/access'
 import { readBlock, type Block } from '../analytics/load'
 import { PostHogQueryError, queryRunner, type RunQuery } from '../analytics/posthog-query'
 import { loadPromoterSlugs } from '../growth/promoters'
+import { logger } from '../../logger'
+import { loadOwnTouches, type OwnTouches } from './first-touch'
 import { parsePeriod, type Bucket, type Period } from './period'
 import { loadShares, loadTouches, loadVisitors, type ShareCounts, type Touches, type VisitorRow } from './posthog'
 import { loadCohort, loadTemplateStats, type Cohort, type TemplateStats } from './reads'
@@ -41,7 +43,14 @@ async function cachedCohort(range: Range) {
   'use cache'
   profile()
   const period = periodOf(range)
-  return { window: asWindow(period), data: { period, cohort: await loadCohort(createAdminSupabase(), period) } }
+  const db = createAdminSupabase()
+  const cohort = await loadCohort(db, period)
+  // The accounts' own first-touch rows (§16.6); without them the tables fall back to PostHog.
+  const own = await loadOwnTouches(db, cohort.people.map((person) => person.id)).catch((error: unknown) => {
+    logger.warn('insights.first_touch_read_failed', { error })
+    return null
+  })
+  return { window: asWindow(period), data: { period, cohort, own } }
 }
 
 async function cachedFunnelPostHog(range: Range, bucket: Bucket, adminIds: string[], userIds: string[]) {
@@ -69,7 +78,7 @@ async function cachedShares(range: Range) {
   return { window: asWindow(period), data: await loadShares(runner(), period) }
 }
 
-export function readCohort(range: Range): Promise<Block<{ period: Period; cohort: Cohort }>> {
+export function readCohort(range: Range): Promise<Block<{ period: Period; cohort: Cohort; own: OwnTouches | null }>> {
   return readBlock('insights.cohort', () => cachedCohort(range))
 }
 

@@ -12014,6 +12014,32 @@ $$;
 ALTER FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."record_first_touch"("p_user" "uuid", "p_touch" "jsonb") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_written integer;
+begin
+  if jsonb_typeof(p_touch) is distinct from 'object' or pg_column_size(p_touch) > 4096 then
+    raise exception 'FIRST_TOUCH_INVALID' using errcode = '23514';
+  end if;
+  insert into public.account_first_touch (
+    user_id, landing_path, referrer_host, utm_source, utm_medium, utm_campaign, utm_term, utm_content,
+    share_template_id, share_id, graylum, affiliate_slug, landed_at)
+  values (
+    p_user, p_touch->>'p', p_touch->>'r', p_touch->>'us', p_touch->>'um', p_touch->>'uc', p_touch->>'ut', p_touch->>'un',
+    p_touch->>'st', p_touch->>'si', coalesce((p_touch->>'g')::integer = 1, false), p_touch->>'a',
+    to_timestamp((p_touch->>'at')::bigint))
+  on conflict (user_id) do nothing;
+  get diagnostics v_written = row_count;
+  return v_written > 0;
+end $$;
+
+
+ALTER FUNCTION "public"."record_first_touch"("p_user" "uuid", "p_touch" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer DEFAULT NULL::integer, "p_output_tokens" integer DEFAULT NULL::integer) RETURNS boolean
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -15018,6 +15044,37 @@ CREATE TABLE IF NOT EXISTS "admin"."waffo_renewal_periods" (
 ALTER TABLE "admin"."waffo_renewal_periods" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."account_first_touch" (
+    "user_id" "uuid" NOT NULL,
+    "landing_path" "text" NOT NULL,
+    "referrer_host" "text",
+    "utm_source" "text",
+    "utm_medium" "text",
+    "utm_campaign" "text",
+    "utm_term" "text",
+    "utm_content" "text",
+    "share_template_id" "text",
+    "share_id" "text",
+    "graylum" boolean DEFAULT false NOT NULL,
+    "affiliate_slug" "text",
+    "landed_at" timestamp with time zone NOT NULL,
+    "recorded_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "account_first_touch_affiliate_slug_check" CHECK (("affiliate_slug" ~ '^[a-z0-9-]{3,24}$'::"text")),
+    CONSTRAINT "account_first_touch_landing_path_check" CHECK (((("length"("landing_path") >= 1) AND ("length"("landing_path") <= 300)) AND ("left"("landing_path", 1) = '/'::"text"))),
+    CONSTRAINT "account_first_touch_referrer_host_check" CHECK (("referrer_host" ~ '^[a-z0-9.-]{1,100}$'::"text")),
+    CONSTRAINT "account_first_touch_share_id_check" CHECK (("share_id" ~ '^[a-z0-9]{8}$'::"text")),
+    CONSTRAINT "account_first_touch_share_template_id_check" CHECK (("share_template_id" ~ '^[a-z0-9][a-z0-9-]{0,63}$'::"text")),
+    CONSTRAINT "account_first_touch_utm_campaign_check" CHECK ((("length"("utm_campaign") >= 1) AND ("length"("utm_campaign") <= 100))),
+    CONSTRAINT "account_first_touch_utm_content_check" CHECK ((("length"("utm_content") >= 1) AND ("length"("utm_content") <= 100))),
+    CONSTRAINT "account_first_touch_utm_medium_check" CHECK ((("length"("utm_medium") >= 1) AND ("length"("utm_medium") <= 100))),
+    CONSTRAINT "account_first_touch_utm_source_check" CHECK ((("length"("utm_source") >= 1) AND ("length"("utm_source") <= 100))),
+    CONSTRAINT "account_first_touch_utm_term_check" CHECK ((("length"("utm_term") >= 1) AND ("length"("utm_term") <= 100)))
+);
+
+
+ALTER TABLE "public"."account_first_touch" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "id" bigint NOT NULL,
     "action" "text" NOT NULL,
@@ -16279,6 +16336,11 @@ ALTER TABLE ONLY "admin"."waffo_renewal_periods"
 
 ALTER TABLE ONLY "admin"."waffo_renewal_periods"
     ADD CONSTRAINT "waffo_renewal_periods_ticket_id_key" UNIQUE ("ticket_id");
+
+
+
+ALTER TABLE ONLY "public"."account_first_touch"
+    ADD CONSTRAINT "account_first_touch_pkey" PRIMARY KEY ("user_id");
 
 
 
@@ -17807,6 +17869,11 @@ ALTER TABLE ONLY "admin"."waffo_renewal_periods"
 
 
 
+ALTER TABLE ONLY "public"."account_first_touch"
+    ADD CONSTRAINT "account_first_touch_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."admin_audit_log"
     ADD CONSTRAINT "admin_audit_log_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
@@ -18465,6 +18532,13 @@ ALTER TABLE "admin"."template_sale_events" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "admin"."waffo_renewal_periods" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."account_first_touch" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "account_first_touch_own" ON "public"."account_first_touch" FOR SELECT TO "authenticated" USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
+
 
 
 ALTER TABLE "public"."admin_audit_log" ENABLE ROW LEVEL SECURITY;
@@ -20635,6 +20709,11 @@ GRANT ALL ON FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "tex
 
 
 
+REVOKE ALL ON FUNCTION "public"."record_first_touch"("p_user" "uuid", "p_touch" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_first_touch"("p_user" "uuid", "p_touch" "jsonb") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer, "p_output_tokens" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."record_identity_refusal"("p_user_id" "uuid", "p_entry" "text", "p_method" "text", "p_excerpt" "text", "p_input_tokens" integer, "p_output_tokens" integer) TO "service_role";
 
@@ -21000,6 +21079,11 @@ GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
 
 
 GRANT SELECT ON TABLE "admin"."users_overview" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."account_first_touch" TO "service_role";
+GRANT SELECT ON TABLE "public"."account_first_touch" TO "authenticated";
 
 
 

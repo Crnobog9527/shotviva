@@ -5,6 +5,8 @@ import { bindReferral } from '../affiliate/referral'
 import { noteSignupGift } from '../alerts'
 import { track } from '../analytics'
 import { parseShareMark, SHARE_COOKIE } from '../analytics/share-link'
+import { FIRST_TOUCH_COOKIE, recordFirstTouchAtSignIn } from '../attribution/sign-in'
+import { serverEnv } from '../env'
 import { signupExperiments, syncExperimentsAtSignIn } from '../experiments/server'
 import type { Locale } from '../i18n/locales'
 import { billingGrant, grantSignupCredits } from './free-credits'
@@ -52,6 +54,8 @@ export async function onVerifiedSignIn(
   const jar = await cookies()
   // A/B variants onto the account, and the account's back into the cookie (ARCHITECTURE §16.5).
   const experiments = await syncExperimentsAtSignIn(admin, userId, first, jar, isSecure(await headers()))
+  // Where this browser first landed, onto the account once (ARCHITECTURE §16.6).
+  await recordFirstTouchAtSignIn(admin, userId, jar.get(FIRST_TOUCH_COOKIE)?.value, serverEnv().SUPABASE_SERVICE_ROLE_KEY)
   if (first) {
     // 1350: tell the Owner when half, then all, of today's signup gifts are gone (after()).
     noteSignupGift()

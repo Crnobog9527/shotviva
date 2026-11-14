@@ -24,6 +24,12 @@ beforeEach(() => resetConsentForTest())
 afterEach(() => vi.unstubAllGlobals())
 
 describe('consent store (T70)', () => {
+  it('copies the answer into a cookie the proxy reads (sv_ft, ARCHITECTURE §16.6)', () => {
+    browser('')
+    chooseConsent('necessary')
+    expect((globalThis.document as { cookie: string }).cookie).toMatch(/^sv_analytics_consent=necessary; path=\/; max-age=31536000; samesite=lax/)
+  })
+
   it('reads the region from the proxy cookie and the answer from localStorage', () => {
     browser('NEXT_LOCALE=en; sv_analytics_region=open')
     expect(readConsent()).toEqual({ regionOpen: true, choice: null })
