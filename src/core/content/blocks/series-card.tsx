@@ -1,7 +1,6 @@
 import { SiteImage as Image } from '@/core/ui/site-image'
 import { useTranslations } from 'next-intl'
 
-import { Link } from '../../i18n/ui'
 import { cn } from '../../ui/cn'
 import { WhiteGroundImage } from '../../ui/white-ground-image'
 import type { TemplateCard } from '../page-content'
@@ -102,14 +101,15 @@ type Props = { card: TemplateCard; media: TemplateLookup; sizes: string; size?: 
 
 // A series card (T102, Owner 2026-11-12): static until a pointer rests on it (or, on a touch
 // screen, until it is in view), then it crossfades through its members' pairs. A 「系列」 badge and
-// stacked prints tell it from a single template at a glance. A link: it opens the series in
-// Create. Name, use and size of the set are in the HTML (建站规格 R5).
+// stacked prints tell it from a single template at a glance. A button, not a link: it opens the
+// series in Create (series-motion-mount.tsx moves there on the click), and Create needs a session
+// and is noindex, so a crawlable <a> to it only spent this page's link equity on the sign-in
+// redirect (SEO 2026-11-14). Name, use and size of the set are in the HTML (建站规格 R5).
 export function SeriesCard({ card, media, sizes, size = 'card' }: Props) {
   const t = useTranslations('marketing.home')
   if (!card.series) return null
   return (
-    // No prefetch: Create needs a session, and a marketing page should not fetch it for every visitor.
-    <Link href={card.series.href} prefetch={false} className="mk-tpl mk-series" aria-label={t('seriesAria', { name: card.name, use: card.use, count: card.series.count })}>
+    <button type="button" data-open-series={card.series.href} className="mk-tpl mk-series" aria-label={t('seriesAria', { name: card.name, use: card.use, count: card.series.count })}>
       {/* Two prints stacked behind the frame, their corners showing past it (as in Create). */}
       <span className={size === 'lg' ? 'mk-sstack mk-sstack-lg' : 'mk-sstack'}>
         <span className="mk-sprint mk-sprint-back" aria-hidden />
@@ -120,6 +120,6 @@ export function SeriesCard({ card, media, sizes, size = 'card' }: Props) {
         </span>
       </span>
       <SeriesMeta card={card} />
-    </Link>
+    </button>
   )
 }

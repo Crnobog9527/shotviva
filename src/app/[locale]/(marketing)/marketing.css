@@ -164,8 +164,8 @@
   .mk-armed .mk-sl.mk-ld { display: grid; }
   .mk-sl.mk-was { opacity: 1; transition: none; }
   .mk-sl.mk-on { z-index: 2; opacity: 1; }
-  a.mk-series { text-decoration: none; transition: transform .3s var(--ease); }
-  a.mk-series:active { transform: scale(.97); }
+  .mk-series { text-decoration: none; transition: transform .3s var(--ease); }
+  .mk-series:active { transform: scale(.97); }
   /* The set's size, a small pill under the name (Create's series card: the same look). */
   .mk-scount { display: inline-block; margin-top: 8px; padding: 4px 8px; border-radius: var(--radius-tag); font: 400 14px/1 var(--font-mono); color: var(--bone-dim); background: var(--wash); }
   .mk-solo-meta .mk-scount { margin-top: 4px; }
@@ -763,7 +763,7 @@
     .mk-lift:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--input); }
     .mk-lift:hover .mk-zoom { transform: scale(1.02); }
     .mk-zoom { transition: transform .6s var(--ease); }
-    button.mk-tpl:hover, a.mk-series:hover { transform: translateY(-2px); }
+    button.mk-tpl:hover, .mk-series:hover { transform: translateY(-2px); }
     .mk-tpl:hover .mk-pair::after { box-shadow: inset 0 0 0 1px var(--input); }
   }
   @media (hover: hover) and (prefers-reduced-motion: no-preference) {
