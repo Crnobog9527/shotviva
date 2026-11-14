@@ -54,7 +54,9 @@ export function GenerateButton({ studio, template, balance }: Props) {
 }
 
 // Every picked photo has finished uploading (a failed one must be picked again or removed).
+// A QR code is read in the browser first (use-qr-check.ts); one that cannot be read stops Generate.
 const slotsReady = (studio: PosterStudioState) => studio.photos.status !== 'uploading' && !Object.values(studio.photos.byKey).some((photo) => photo.upload.phase === 'error')
+  && studio.qrCheck !== 'checking' && studio.qrCheck !== 'unreadable'
 
 // Valid text that makes every page, flagged lines confirmed, credits enough for all.
 function canStart(studio: PosterStudioState, balance: Balance, total: number) {

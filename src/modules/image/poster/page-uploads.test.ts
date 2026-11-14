@@ -18,3 +18,17 @@ describe('pageUploads', () => {
     expect(pageUploads({ poster }, 'prizes', {})).toBeNull()
   })
 })
+
+// The QR code goes with every page (§5.3 「二维码」).
+describe('pageUploads with a QR code', () => {
+  const withQr = posterFieldsSchema.parse({ kinds: [
+    { key: 'prizes', name, blocks: ['header', 'prizes', 'footer'], slots: ['prize_photo'] },
+    { key: 'rules', name, blocks: ['header', 'sections', 'table', 'footer'] },
+  ], qr: { slot: 'qr_code', fallback: { x: 0.05, y: 0.86, size: 0.12 } } })
+
+  it('sends the code with both pages and the prize photo with the prize page only', () => {
+    const uploads = { prize_photo: 'inputs/u/a.webp', qr_code: 'inputs/u/q.png' }
+    expect(pageUploads({ poster: withQr }, 'prizes', uploads)).toEqual(uploads)
+    expect(pageUploads({ poster: withQr }, 'rules', uploads)).toEqual({ qr_code: 'inputs/u/q.png' })
+  })
+})

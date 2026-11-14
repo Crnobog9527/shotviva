@@ -24,6 +24,19 @@ export const posterKindSchema = z.object({
   slots: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(4).default([]),
 })
 
+// A spot on the poster as fractions: x of the width, y of the height (top-left corner), size of
+// the width (it is square).
+const spotSchema = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), size: z.number().min(0.04).max(0.4) })
+
+// The user's QR code (ARCHITECTURE §5.3 「二维码」): `slot` is an image slot with sendToModel
+// false, sent with every page; `fallback` is where code pastes it when the model drew no
+// placeholder (the footer box), per page kind where the pages differ.
+export const posterQrSchema = z.object({
+  slot: z.string().regex(/^[a-z][a-z0-9_]*$/),
+  fallback: spotSchema,
+  pages: z.record(z.string(), spotSchema).optional(),
+})
+
 export const posterFieldsSchema = z.object({
   kinds: z.array(posterKindSchema).min(1).max(4),
   // The level table's header the editor starts from; the user may rename the columns.
@@ -31,6 +44,7 @@ export const posterFieldsSchema = z.object({
     .max(POSTER_LIMITS.tableColumns.max).optional(),
   // The sections column's heading the editor starts from (「赛事信息」 / 「INFORMATION」); editable.
   infoHeading: z.object({ title: z.string().max(12), titleEn: z.string().max(24) }).optional(),
+  qr: posterQrSchema.optional(),
 }).refine((poster) => new Set(poster.kinds.map((kind) => kind.key)).size === poster.kinds.length, {
   message: 'poster kind keys must be unique', path: ['kinds'],
 })
@@ -38,6 +52,10 @@ export const posterFieldsSchema = z.object({
 export type PosterFields = z.infer<typeof posterFieldsSchema>
 export type PosterKind = z.infer<typeof posterKindSchema>
 export type PosterCapacity = z.infer<typeof posterCapacitySchema>
+export type PosterQr = z.infer<typeof posterQrSchema>
+
+// The QR code's fallback spot on one page.
+export const qrFallbackFor = (qr: PosterQr, kind: string) => qr.pages?.[kind] ?? qr.fallback
 
 export const CONTENT_BLOCKS = ['prizes', 'sections', 'table'] as const
 export type ContentBlock = (typeof CONTENT_BLOCKS)[number]

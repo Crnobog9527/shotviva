@@ -13,9 +13,8 @@ import { AppError } from '../errors'
 export const IMAGE_SLOTS_MAX = 4
 export const IMAGE_SLOTS_PLACEHOLDER = 'image_slots'
 
-// Strict: an unknown key is refused, so a later property (e.g. an optional `sendToModel`
-// boolean for a slot that code composites onto the result) is added here as optional, and
-// every saved template stays valid without it.
+// Strict: an unknown key is refused, so a later property is added here as optional, and every
+// saved template stays valid without it (as `sendToModel` was).
 export const imageSlotSchema = z.strictObject({
   key: z.string().regex(/^[a-z][a-z0-9_]*$/),
   // English; also what the prompt's image list calls it.
@@ -25,6 +24,9 @@ export const imageSlotSchema = z.strictObject({
   required: z.boolean().default(false),
   // A text field (fields.copy key) drawn right under this box, e.g. "describe the prize".
   note: z.string().regex(/^[a-z][a-z0-9_]*$/).optional(),
+  // false: code pastes this image onto the result and the model never sees it (a poster's QR
+  // code, ARCHITECTURE §5.3). It is stored, kept and restored like any other slot.
+  sendToModel: z.boolean().optional(),
 })
 export type ImageSlot = z.infer<typeof imageSlotSchema>
 
@@ -34,6 +36,7 @@ type SlotFields = { images: { min: number; max: number; slots?: readonly ImageSl
 
 export const slotsOf = (fields: { images: { slots?: readonly ImageSlot[] } }): readonly ImageSlot[] => fields.images.slots ?? []
 export const hasSlots = (fields: { images: { slots?: readonly ImageSlot[] } }) => slotsOf(fields).length > 0
+export const sentToModel = (slot: Pick<ImageSlot, 'sendToModel'>) => slot.sendToModel !== false
 
 // The schema's refusals for a template's slots (English: the import scripts print them too).
 // With slots, images.max is the number of slots and images.min the required ones, so the

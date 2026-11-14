@@ -1,9 +1,11 @@
 import { AppError } from '../errors'
 import { checkCopyValue, copyLines } from './copy-fields'
-import { checkSlotUploads, IMAGE_SLOTS_PLACEHOLDER, slotMapping, slotsOf } from './image-slots'
+import { checkSlotUploads, IMAGE_SLOTS_PLACEHOLDER, sentToModel, slotMapping, slotsOf } from './image-slots'
 import { NOTE_MAX_LENGTH } from './output-options'
 import type { TemplateFields } from './schema'
 import type { ToggleField, ToggleFragments } from './toggles'
+
+export type FilledSlot = { key: string; label: string; upload: string }
 
 export type GenerationInputs = {
   // Every copy field of the template in its order, cleaned; '' when the optional field was left empty.
@@ -20,7 +22,10 @@ export type GenerationInputs = {
   confirmed: string[]
   // A template with image slots (§5.1e): the filled ones in definition order, each with its
   // English label and upload key; [] when none is filled. Absent for every other template.
-  slots?: { key: string; label: string; upload: string }[]
+  slots?: FilledSlot[]
+  // Filled slots the model never sees (`sendToModel: false`, a poster's QR code, §5.3): code pastes
+  // them onto the result. Absent when the template has none filled.
+  pasted?: FilledSlot[]
   // A poster template's confirmed text for this one poster (ARCHITECTURE §5.3), from the saved set.
   posterText?: string
 }
@@ -101,7 +106,7 @@ function checkToggles(fields: TemplateFields, raw: RawGenerationInputs): Pick<Ge
 // Checks what the user filled in against the template's field definitions (ARCHITECTURE §5).
 export function validateGenerationInputs(fields: TemplateFields, raw: RawGenerationInputs): GenerationInputs {
   const base = () => ({ ...checkCopy(fields, raw.copy ?? {}), aspectRatio: checkAspect(fields, raw), note: checkNote(raw), ...checkToggles(fields, raw) })
-  return slotsOf(fields).length > 0 ? { ...base(), slots: checkSlots(fields, raw) } : { ...checkImageCount(fields, raw), ...base() }
+  return slotsOf(fields).length > 0 ? { ...base(), ...checkSlots(fields, raw) } : { ...checkImageCount(fields, raw), ...base() }
 }
 
 function checkImageCount(fields: TemplateFields, raw: RawGenerationInputs) {
@@ -116,7 +121,10 @@ function checkImageCount(fields: TemplateFields, raw: RawGenerationInputs) {
 // A slot template takes its images by slot only, never the single upload.
 function checkSlots(fields: TemplateFields, raw: RawGenerationInputs) {
   if (raw.imageCount > 0) throw invalid('This template takes its images in named slots')
-  return checkSlotUploads(slotsOf(fields), raw.slots ?? {}).map(({ slot, key }) => ({ key: slot.key, label: slot.label, upload: key }))
+  const filled = checkSlotUploads(slotsOf(fields), raw.slots ?? {})
+  const entry = ({ slot, key }: (typeof filled)[number]): FilledSlot => ({ key: slot.key, label: slot.label, upload: key })
+  const pasted = filled.filter(({ slot }) => !sentToModel(slot)).map(entry)
+  return { slots: filled.filter(({ slot }) => sentToModel(slot)).map(entry), ...(pasted.length ? { pasted } : {}) }
 }
 
 const hasPlaceholder = (body: string, key: string) => new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`).test(body)
