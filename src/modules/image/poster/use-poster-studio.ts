@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
-import { posterContentSchema, splitPoster, type PosterContent, type PosterFields, type PosterPart } from '@/core/poster'
+import { posterContentSchema, splitPoster, type PosterBlock, type PosterContent, type PosterFields, type PosterPart } from '@/core/poster'
 import type { OutputAspect, Resolution } from '@/core/templates/output-options'
 
 import type { CatalogueImageSlot } from '../catalogue/catalogue-template'
@@ -78,6 +78,8 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
   const [aspect, setAspect] = useState<OutputAspect>(template.aspects[0] ?? '9:16')
   const [resolution, setResolution] = useState<Resolution>(() => defaultResolution(template.resolutions))
   const [busy, setBusy] = useState(false)
+  // The block the model is writing while 整理内容 runs (null before the first one starts).
+  const [stage, setStage] = useState<PosterBlock | null>(null)
   const [notice, setNotice] = useState<StudioNotice>(null)
   const photos = useSlotPhotos(template.slots)
   const qrCheck = useQrCheck(photos, template.poster.qr?.slot ?? null)
@@ -90,8 +92,9 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
 
   async function sort() {
     setBusy(true)
+    setStage(null)
     setNotice(null)
-    const reply = await extractPoster(template.id, draft.source)
+    const reply = await extractPoster(template.id, draft.source, setStage)
     setBusy(false)
     if (reply.status === 'ok') {
       // The template's table and sections heading are offered even when the text had none.
@@ -127,7 +130,7 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     toManual: () => setDraft((d) => ({ ...d, step: 'edit', sorted: false })),
     toPaste: () => setDraft((d) => ({ ...d, step: 'paste' })),
     setReviewed: (reviewed: boolean) => setDraft((d) => ({ ...d, reviewed })),
-    edit, sort, generate, parts, valid: parsed.success, busy, notice, photos, qrCheck,
+    edit, sort, generate, parts, valid: parsed.success, busy, stage, notice, photos, qrCheck,
     aspect, setAspect, resolution, setResolution,
   }
 }
