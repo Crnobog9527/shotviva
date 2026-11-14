@@ -7,10 +7,11 @@ import type { SlotPhotos } from '../../workspace/use-photo-batch'
 import type { StudioTemplate } from '../use-poster-studio'
 import type { PagePhotos } from './block-tabs'
 
-type Props = { template: StudioTemplate; kind: string; photos: SlotPhotos }
+type Props = { template: StudioTemplate; kind: string | null; photos: SlotPhotos }
 
-const slotsOf = (template: StudioTemplate, kind: string) => {
-  const listed = template.poster.kinds.find((item) => item.key === kind)?.slots ?? []
+// kind null is the shared tab, which has no upload boxes of its own yet.
+const slotsOf = (template: StudioTemplate, kind: string | null) => {
+  const listed = kind === null ? [] : template.poster.kinds.find((item) => item.key === kind)?.slots ?? []
   return template.slots.filter((slot) => listed.includes(slot.key))
 }
 

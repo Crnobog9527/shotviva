@@ -20,8 +20,9 @@ const EDITORS: Record<'prizes' | 'table' | 'footer' | 'info', ComponentType<Bloc
   prizes: PrizesEditor, table: TableEditor, footer: FooterEditor, info: InfoHeadingEditor,
 }
 
-// A page's upload boxes (e.g. the prize photo): drawn as a part of its own, with how many hold a photo.
-export type PagePhotos = { render(kind: string): ReactNode; count(kind: string): { label: string; filled: number; total: number } | null }
+// A tab's upload boxes (e.g. the prize photo; kind is null for the shared tab): drawn as a part of
+// its own, with how many hold a photo.
+export type PagePhotos = { render(kind: string | null): ReactNode; count(kind: string | null): { label: string; filled: number; total: number } | null }
 
 type Props = BlockProps & { poster: PosterFields; unverified: readonly string[]; pagePhotos?: PagePhotos }
 
@@ -31,7 +32,7 @@ type Props = BlockProps & { poster: PosterFields; unverified: readonly string[];
 export function BlockTabs({ poster, unverified, pagePhotos, ...props }: Props) {
   const groups = pageGroups(poster)
   const [current, setCurrent] = useState(groups[0]?.key ?? 'shared')
-  const foldsFor = (group: PageGroup) => foldsOf(group.blocks, props.content, Boolean(group.kind && pagePhotos?.count(group.kind)))
+  const foldsFor = (group: PageGroup) => foldsOf(group.blocks, props.content, Boolean(pagePhotos?.count(group.kind)))
   const [open, setOpen] = useState<string[]>(() => groups.flatMap((group) => foldsFor(group).slice(0, 1).map((fold) => `${group.key}:${fold.key}`)))
   const toggle = (id: string) => setOpen((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]))
   const group = groups.find((item) => item.key === current) ?? groups[0]
@@ -61,7 +62,7 @@ type PartProps = BlockProps & { id: string; fold: Fold; kind: string | null; ope
 
 function PartFold({ id, fold, kind, open, onToggle, unverified, pagePhotos, onSectionAdded, ...props }: PartProps) {
   const t = useTranslations('app.poster')
-  const photos = fold.kind === 'photos' && kind ? pagePhotos?.count(kind) ?? null : null
+  const photos = fold.kind === 'photos' ? pagePhotos?.count(kind) ?? null : null
   const stats = photos ?? foldStats(fold, props.content, unverified)
   return (
     <>
@@ -81,7 +82,7 @@ const endsSections = (fold: Fold, content: BlockProps['content']) =>
 function FoldBody({ fold, kind, pagePhotos, ...props }: BlockProps & { fold: Fold; kind: string | null; pagePhotos?: PagePhotos }) {
   if (fold.kind === 'header') return <HeaderEditor keys={fold.keys} {...props} />
   if (fold.kind === 'section') return <SectionEditor index={fold.index} {...props} />
-  if (fold.kind === 'photos') return kind && pagePhotos ? <div className="grid gap-4">{pagePhotos.render(kind)}</div> : null
+  if (fold.kind === 'photos') return pagePhotos ? <div className="grid gap-4">{pagePhotos.render(kind)}</div> : null
   const Editor = EDITORS[fold.kind]
   return <Editor {...props} />
 }
