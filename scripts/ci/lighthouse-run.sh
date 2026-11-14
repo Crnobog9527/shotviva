@@ -12,6 +12,12 @@
 #
 # Why: the devtools-throttled LCP gate (1.2 s, median of 5) measured 1.21–1.26 s on runs whose
 # change did not touch the page, and a manual re-run passed each time.
+#
+# The server is started here (not by lhci) and warmed first: every page and the static files it
+# references are requested WARM_ROUNDS times (default 3) before the first measured run. lhci's
+# "median-run" gate judges one representative run, and on a cold server it picked the first run:
+# /zh measured 1509, 1045, 903, 1107, 1085 ms and failed on 1509. Before the jobs were split,
+# the devtools runs came after the simulated ones on an already warm server.
 set -uo pipefail
 
 config=$1
@@ -30,6 +36,8 @@ attempt_config() { # <attempt> <url>...
     const keep = rc.ci.collect.url.filter((url) => urls.includes(new URL(url).pathname))
     if (keep.length !== urls.length) { console.error(`unknown URL in ${urls} for ${config}`); process.exit(1) }
     rc.ci.collect.url = keep
+    delete rc.ci.collect.startServerCommand // started and warmed by this script
+    delete rc.ci.collect.startServerReadyPattern
     rc.ci.upload.outputDir = dir
     process.stdout.write(JSON.stringify(rc))
   ' "$config" "$out/attempt-$n" "$@" > "$out/lighthouserc-$n.json"
@@ -63,8 +71,37 @@ near_miss() { # <assertion-results.json>
   ' "$1" "$margin"
 }
 
+origin=https://localhost:3443
+
+start_server() {
+  node scripts/ci/lighthouse-server.mjs > "$out/server.log" 2>&1 &
+  server=$!
+  trap 'kill "$server" 2>/dev/null' EXIT
+  for _ in $(seq 1 90); do
+    curl -ksf -o /dev/null "$origin/robots.txt" && return 0
+    kill -0 "$server" 2>/dev/null || break
+    sleep 1
+  done
+  echo "::error::The Lighthouse server did not start"; cat "$out/server.log"; return 1
+}
+
+warm() { # <url>...
+  local round url asset
+  for round in $(seq 1 "${WARM_ROUNDS:-3}"); do
+    for url in "$@"; do
+      curl -ks --compressed -o "$out/warm.html" "$origin$url"
+      for asset in $(grep -o '/_next/static/[^"'"'"' )\\]*' "$out/warm.html" | sort -u); do
+        curl -ks -H 'accept-encoding: br, gzip' -o /dev/null "$origin$asset"
+      done
+    done
+  done
+  rm -f "$out/warm.html"
+}
+
 mkdir -p "$out"
 urls=("$@")
+start_server || exit 1
+warm "${urls[@]}"
 measure 1 "${urls[@]}"
 status=$?
 [ "$status" -eq 0 ] && exit 0
