@@ -22,12 +22,14 @@ export type ImageProviderOption = {
 type Props = {
   id: string
   allowKeep?: boolean
+  // The first option's text when the caller names the default differently (作品编辑: 跟随默认线路).
+  defaultLabel?: string
   providers: readonly ImageProviderOption[]
   value: string | null
   onChange: (id: string | null) => void
 }
 
-export function ImageProviderField({ id, providers, value, onChange, allowKeep }: Props) {
+export function ImageProviderField({ id, providers, value, onChange, allowKeep, defaultLabel }: Props) {
   const selected = value ? providers.find(p => p.id === value) : providers.find(p => p.isActive)
   return (
     <div className="grid gap-1.5">
@@ -35,7 +37,7 @@ export function ImageProviderField({ id, providers, value, onChange, allowKeep }
       <select id={id} className="border-input h-9 min-w-0 rounded-md border bg-transparent px-3 text-sm"
         aria-describedby={`${id}-hint`} value={value ?? ''} onChange={(event) => onChange(event.target.value || null)}>
         {allowKeep && <option value="keep">不改</option>}
-        <option value="">{copy.followDefault}</option>
+        <option value="">{defaultLabel ?? copy.followDefault}</option>
         {providers.filter(p => p.id !== 'env').map((provider) => (
           <option key={provider.id} value={provider.id}>{provider.label} · {provider.model}</option>
         ))}

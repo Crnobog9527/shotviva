@@ -89,6 +89,22 @@ describe('template image provider', () => {
   })
 })
 
+describe('edit sizes', () => {
+  it('sends an edit at a size the bound line lacks to the default line; a template is refused', async () => {
+    const deps = dependencies()
+    const ark: ActiveProviderRow = { ...row, id: 'ark', adapter: 'ark_images', model: 'seedream-test', resolutions: ['1k', '2k'],
+      capabilities: { resolutions: ['1k', '2k'], aspectRatios: ['1:1', '4:5'], originalRatio: true, minReferences: 0, maxReferences: 10,
+        fetchedAt: '2026-11-15T00:00:00Z' } }
+    deps.lookup.mockResolvedValue(ark)
+    vi.spyOn(logger, 'info').mockImplementation(() => undefined)
+    const large = { ...request, resolution: '4k' as const }
+    await expect(templateImageProvider(adapters, ark.id, large, deps)).rejects.toThrow('does not support the selected output size')
+    const routed = await templateImageProvider(adapters, ark.id, { ...large, tierFallback: true }, deps)
+    expect(routed).toMatchObject({ id: defaultProvider.id, fallbackReason: 'unsupported_resolution' })
+    expect(deps.readKey).not.toHaveBeenCalled()
+  })
+})
+
 describe('OpenRouter GPT image line', () => {
   // 跟随照片 is the default ratio: a GPT image line on OpenRouter sizes it from the photo.
   it.each([

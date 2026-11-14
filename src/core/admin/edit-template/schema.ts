@@ -11,6 +11,8 @@ export const saveEditTemplateSchema = z.object({
   isActive: z.boolean(),
   creditsCost: creditsCostSchema,
   unpricedResolutions: z.array(resolutionSchema).max(3).optional(),
+  // 「出图模型」: an image line's id, null to follow the default line; left out keeps the stored one.
+  providerId: z.uuid().nullable().optional(),
   // The wrapper that goes before the range paragraph and the user's words.
   wrapper: z.string().trim().min(1).max(20000),
   params: editParamsSchema,

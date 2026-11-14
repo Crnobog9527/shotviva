@@ -5,7 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ServerTrack } from '@/core/analytics'
 import { AppError } from '@/core/errors'
 import { FAIL_OPEN_LOG, IDENTITY_EDIT_ADDENDUM, markJudgeFailed, refuseIdentitySwap, takeJudgeSlot, tooManyJudgeCalls } from '@/core/identity-guard'
-import type { DecisionCost, ProviderInput } from '@/core/jobs'
+import { selectTemplateRoute, type DecisionCost, type GenerationProvider, type ProviderInput, type TemplateProvider } from '@/core/jobs'
 import { logger } from '@/core/logger'
 import type { InputImage } from '@/core/storage'
 import { editParamsSchema, loadEditTemplate, type EditParams, type GenerationTemplate, type Resolution } from '@/core/templates'
@@ -31,6 +31,15 @@ export async function loadEditPipeline(db: SupabaseClient): Promise<EditPipeline
     throw new AppError('NOT_FOUND', 'Editing is not available')
   }
   return { template, prompt, params: params.data }
+}
+
+// The line an edit runs on: the edit template's own binding (「出图模型」 on /admin/templates/edit),
+// else the default line. Routed like a template generation, before anything is charged: a bound
+// line that cannot take this size falls back to the default one (template-image-provider.ts), and
+// the source work is the one input image the line must accept.
+export async function editRoute(provider: TemplateProvider, pipeline: EditPipeline, request: { resolution: Resolution; aspectRatio: string }): Promise<GenerationProvider> {
+  const route = await selectTemplateRoute(provider, pipeline.prompt.providerId, request.resolution, request.aspectRatio, 1, 0, undefined, true)
+  return route.provider
 }
 
 // quiet: an admin test run, refused the same way but leaving no refusal row or event and taking no
