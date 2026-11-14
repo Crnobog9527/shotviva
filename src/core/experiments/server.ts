@@ -49,6 +49,19 @@ export function rewrittenRequest(request: NextRequest, path: string): NextReques
   return new NextRequest(url, request)
 }
 
+// The locale router answers a `/zh/…` address it needs no rewrite for with a plain "go on", which
+// would serve the address the browser asked for, not the option page; that answer gets the rewrite
+// here. Its rewrites (English: `/x/…` → `/en/x/…`) and redirects are kept as they are.
+export function toOptionPage(router: (request: NextRequest) => NextResponse, request: NextRequest, path: string): NextResponse {
+  const target = rewrittenRequest(request, path)
+  const response = router(target)
+  if (!response.headers.has('x-middleware-rewrite') && !response.headers.has('location')) {
+    response.headers.delete('x-middleware-next')
+    response.headers.set('x-middleware-rewrite', target.url)
+  }
+  return response
+}
+
 export function withExperimentCookie(response: NextResponse, outcome: RouteOutcome | null, secure: boolean): NextResponse {
   if (outcome?.cookie) {
     response.cookies.set(EXPERIMENT_COOKIE, outcome.cookie, { path: '/', maxAge: EXPERIMENT_COOKIE_MAX_AGE, sameSite: 'lax', secure })

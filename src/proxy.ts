@@ -10,7 +10,7 @@ import { captureCodeLink } from '@/core/codes/link'
 import { isBadGalleryPage } from '@/core/gallery/page-number'
 import { galleryWorkIdOf, liveGalleryGate } from '@/core/gallery/proxy-gate'
 import { serverEnv } from '@/core/env'
-import { experimentRoute, OPTION_PAGES, rewrittenRequest, withExperimentCookie, type RouteOutcome } from '@/core/experiments/server'
+import { experimentRoute, OPTION_PAGES, toOptionPage, withExperimentCookie, type RouteOutcome } from '@/core/experiments/server'
 import { viaImageCdn } from '@/core/storage/image-cdn-guard'
 import { routing } from '@/core/i18n/routing'
 import { canonicalRedirectResponse, withHostNoindex } from '@/core/seo'
@@ -47,7 +47,7 @@ function closedAddress(request: NextRequest): boolean {
 // The locale router, handed the A/B option's page instead of the address when there is one.
 function experimentForward(experiment: RouteOutcome | null): Forward {
   const rewrite = experiment?.rewrite
-  return rewrite ? (forwarded) => localeRouter(rewrittenRequest(forwarded, rewrite)) : localeRouter
+  return rewrite ? (forwarded) => toOptionPage(localeRouter, forwarded, rewrite) : localeRouter
 }
 
 export async function proxy(request: NextRequest) {
