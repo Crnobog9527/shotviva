@@ -678,7 +678,7 @@
       "hintPair": "Phone photo on the left, the AI result on the right.",
       "viewerOpen": "View {name} full screen",
       "viewerTitle": "{name}, full screen",
-      "viewerClose": "Close full screen",
+      "viewerClose": "Close the large view",
       "viewerSwitch": "Switch between the phone photo and the AI result",
       "viewerHint": "Tap the image to zoom. Swipe to switch between Phone and AI.",
       "viewerHintZoomed": "Drag to look around. Tap again to zoom out."

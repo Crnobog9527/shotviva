@@ -15,7 +15,7 @@ const SampleViewer = dynamic(() => import('./sample-viewer').then((m) => m.Sampl
 
 type Props = { template: SampleTemplate & Pick<CatalogueTemplate, 'name'>; className?: string }
 
-// The creation dialog's sample, opened full screen (SampleViewer). The pair is one big tap target
+// The creation dialog's sample, opened large in a popup the size of the picture (SampleViewer). The pair is one big tap target
 // (the half tapped is the side that opens); the drag compare keeps its drag, so it opens from the
 // corner button only. A motion-only template has no stills to show and stays as it was.
 export function ZoomableSample({ template, className }: Props) {
