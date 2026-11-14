@@ -22,7 +22,7 @@ export { recordJobClientIp, recordJobDownload } from './job-download'
 export { hasInputPreview, originalUrlFor, resolveJobOriginal } from './job-original'
 export { deleteOwnWork } from './delete-work'
 export { deleteWorkFiles, keptInputsOf, photosForAgain, workFileKeys, type AgainPhoto } from './kept-inputs'
-export { findJobByIdempotencyKey, findOwnJob } from './job-lookup'
+export { findJobByIdempotencyKey, findLastWorks, findOwnJob, LAST_WORKS } from './job-lookup'
 export { fileUrlFor, thumbUrlFor, toJobView, type JobView } from './job-view'
 export { FIRST_SCREEN_THUMBS, firstThumbUrls, resolveJobThumb } from './job-thumb'
 export {

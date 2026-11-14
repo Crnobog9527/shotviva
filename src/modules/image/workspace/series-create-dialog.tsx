@@ -13,6 +13,10 @@ import { isCompareSample } from '../catalogue/template-sample'
 import { ZoomableSample } from '../catalogue/zoomable-sample'
 import { ShareButton } from '../share/share-button'
 import { FavoriteButton } from '../favorites/favorite-button'
+import { matchesStore } from '@/core/store-profile'
+
+import { FormWeeklyTools } from '../again/form-weekly-tools'
+import { useFormWeekly } from '../again/use-form-weekly'
 import { BatchLink, type CreateContext } from './create-dialog'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
@@ -53,6 +57,8 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
     draft.change(step.values)
     if (step.clearPhotos) draft.photos.clear()
   }
+  // 用上一期 reads any style of the series (§5.3「每周复用」).
+  const weekly = useFormWeekly(template, draft, series.members.map((member) => member.id))
   const batch = limitsFor(context.tier).batchMax > 1 && template.photoInput !== 'none' && !isSlotTemplate(template) && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
   const workspace = `/generate/${template.id}`
@@ -78,7 +84,8 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
       folded={draft.photos.photos.length > 0}
       picker={<MemberPicker label={t('series.members', { name: series.name, count: series.members.length })} members={series.members} value={template.id} onChange={choose} />}
       sample={<Sample template={template} tall={tall} />}
-      form={
+      form={<>
+        <FormWeeklyTools weekly={weekly} names={Object.fromEntries(series.members.map((member) => [member.id, member.name]))} storeFields={matchesStore(template.copyFields)} />
         <WorkspaceForm
           key={template.id}
           template={template}
@@ -91,7 +98,7 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
           surface="create_dialog"
           photoExtra={batch ? <BatchLink templateId={template.id} onGo={onClose} /> : null}
         />
-      }
+      </>}
       bar={<FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} placement="sheet" limit={context.concurrency.limit} privateOnly={template.privateOnly} />}
     />
   )

@@ -846,7 +846,9 @@
         "sortedHint": "Filled from your pasted notice. You can clear it all or go back to the sample text.",
         "clearAll": "Clear everything",
         "restore": "Back to the sample text",
-        "contactsLeft": "The organiser, phone or address is still the sample’s. Use it anyway?"
+        "contactsLeft": "The organiser, phone or address is still the sample’s. Use it anyway?",
+        "photoHint": "Filled in from the text on your photo. Check each part.",
+        "reusedHint": "You can also clear everything, or go back to the sample."
       }
     },
     "sizes": {
@@ -1619,6 +1621,60 @@
         "method_off": "This way of claiming is turned off for now.",
         "no_identity": "No verified phone number or Google account yet. Verify one first.",
         "not_pending": "This account has no signup credits waiting."
+      }
+    },
+    "weekly": {
+      "useLast": "Use my last one",
+      "lastLoading": "Loading your last one…",
+      "lastFrom": "Last one: <day></day> · {name}",
+      "reused": "Filled in from your poster of <day></day> ({name}). Just change the date and prizes.",
+      "lastFailed": "Couldn't load your last one. Please try again.",
+      "replaceAsk": "This replaces what you've already filled in. Continue?",
+      "replace": "Replace",
+      "cancel": "Cancel",
+      "saveStore": "Save your store details to fill in the name, phone and address next time",
+      "storeFilled": "Your store details are filled in (name, phone, address and more).",
+      "undo": "Undo",
+      "autofillOff": "Don't fill in automatically",
+      "fillStore": "Fill in my store details",
+      "storeReplaceAsk": "Your store details will replace the name, phone or address you typed. Continue?",
+      "photo": {
+        "hint": "No notice text? Take a photo or screenshot of your last poster and we'll read the text on it.",
+        "pick": "Read an old poster from a photo",
+        "uploading": "Uploading the photo…",
+        "reading": "Reading the text in the photo",
+        "error": {
+          "upload": "The photo didn't upload. Please choose it again.",
+          "failed": "Couldn't read the text in this photo. Try a sharper, straight-on photo, or paste the text instead.",
+          "rateLimited": "Too many reads this hour. Please try again later."
+        },
+        "replaceAsk": "The text is read. Replace what you've already filled in?",
+        "replace": "Replace",
+        "keep": "Keep mine"
+      },
+      "storeCard": {
+        "title": "Store details",
+        "open": "Name, phone, address and QR code",
+        "hint": "Type them once; poster templates fill in your name, phone, address and QR code when they open. Only you can see them.",
+        "loading": "Loading…",
+        "loadFailed": "Couldn't load them. Refresh the page and try again.",
+        "name": "Store name",
+        "nameEn": "Name in English (optional)",
+        "phone": "Phone {n}",
+        "address": "Address",
+        "wechat": "WeChat ID (optional)",
+        "qr": "QR code",
+        "qrHint": "Your WeChat or group QR code, placed where the poster has its QR code.",
+        "qrFailed": "The QR code didn't upload. Please choose it again.",
+        "qrUploading": "Uploading…",
+        "qrPick": "Upload QR code",
+        "qrChange": "Change",
+        "qrRemove": "Remove QR code",
+        "autofill": "Fill in when a poster template opens",
+        "save": "Save",
+        "saving": "Saving…",
+        "saved": "Saved.",
+        "failed": "Couldn't save. Please try again."
       }
     }
   },

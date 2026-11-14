@@ -13,6 +13,8 @@ import type { PosterSeries } from '../../catalogue/poster-series'
 import { MemberPicker } from '../../workspace/member-picker'
 import { CreateSheet } from '../../workspace/create-sheet'
 import { carryDraft, usePosterStudio, type StudioTemplate } from '../use-poster-studio'
+import { usePhotoSort } from '../use-photo-sort'
+import { usePosterWeekly } from '../use-poster-weekly'
 import { studioFor, useStudioTemplate } from '../use-studio-template'
 import { PosterSample } from './poster-sample'
 import { StudioBar, StudioForm } from './poster-studio'
@@ -48,6 +50,11 @@ function PosterSheet({ template, summary, open, series, onSwitch, onClose, balan
     onClose()
     router.push('/photos', { transitionTypes: navTypesFor('/photos') })
   })
+  // 用上一期 reads this style and the series' others; their names say where it came from.
+  const members = series?.members ?? []
+  const weekly = usePosterWeekly(template, studio, members.map((member) => member.id).filter((id) => id !== template.id))
+  const names = { ...Object.fromEntries(members.map((member) => [member.id, member.name])), [template.id]: template.name }
+  const photo = usePhotoSort(template, studio, weekly.dirty)
   return (
     <CreateSheet
       open={open}
@@ -62,7 +69,7 @@ function PosterSheet({ template, summary, open, series, onSwitch, onClose, balan
           onChange={(next) => { carryDraft(template.id, next); onSwitch(next) }} />
       ) : undefined}
       sample={<PosterSample cover={summary?.cover ?? null} name={template.name} />}
-      form={<StudioForm studio={studio} template={template} balance={balance} />}
+      form={<StudioForm studio={studio} template={template} balance={balance} reuse={{ weekly, names, photo }} />}
       bar={<ActionBar inline><StudioBar studio={studio} template={template} balance={balance} /></ActionBar>}
     />
   )
