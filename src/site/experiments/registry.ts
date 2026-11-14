@@ -13,6 +13,11 @@ export const HERO_OPTIONS = [
   { id: 'food', label: 'C 餐饮：8 组白盘案例（第 1 组上首屏）' },
 ] as const
 
+// The switch for B, the default option (Owner to decide, 2026-11-14): false = the home page stays
+// as it is for everyone and only B visitors of a running experiment get B's generator order (they
+// are served /x/hero/tote); true = the plain home page itself uses B's order, for every visitor.
+export const DEFAULT_PAGE_USES_HERO_ORDER = false
+
 export const experimentRegistry: ExperimentRegistry = [
-  { surface: 'hero', paths: ['/'], options: HERO_OPTIONS, defaultOption: HERO_DEFAULT_OPTION },
+  { surface: 'hero', paths: ['/'], options: HERO_OPTIONS, defaultOption: HERO_DEFAULT_OPTION, defaultOptionPageInExperiment: !DEFAULT_PAGE_USES_HERO_ORDER },
 ]

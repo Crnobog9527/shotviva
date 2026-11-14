@@ -48,6 +48,11 @@ export type SurfaceRoute = {
   paths: readonly string[]
   options: readonly SurfaceOption[]
   defaultOption: string
+  // Visitors on the default option of a running or paused experiment get its own prerendered page
+  // (/x/<surface>/<default>) instead of the plain address, so the test can change something about
+  // the default group (the home generator's order, §16.5) without changing the page everyone else
+  // and every crawler sees.
+  defaultOptionPageInExperiment?: boolean
 }
 
 // The code's whole list, passed in from site/ (core never imports it).

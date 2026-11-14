@@ -13,7 +13,7 @@ import { cachedPublicSeries } from '@/core/templates/public-series'
 import { pickerBrowse, toCatalogueTemplate } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
 import { creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
-import { heroOptionContent } from '@/site/experiments'
+import { generatorPickFor, heroOptionContent, orderForHero } from '@/site/experiments'
 import { site } from '@/site/site.config'
 
 import { HomeGeneratorSlot } from './home-generator-slot'
@@ -46,10 +46,11 @@ export async function HomeContent({ heroOption }: { heroOption?: string }) {
   const { locale, live, series, index, products, page, wishlistOpen, free, meta } = await load()
   const option = heroOption ? heroOptionContent(heroOption, locale) : null
   const ldMeta = { ...meta, path: localizePath(meta.path, locale) }
-  const catalogue = live.map(toCatalogueTemplate)
+  // The option's own templates first in the generator (generator-order.ts), the rest as today.
+  const { ordered: catalogue, first } = orderForHero(live.map(toCatalogueTemplate), generatorPickFor(heroOption))
   // Series show as one card each, in the admin's order (T102, Owner 2026-11-12).
   const { defaultId: featuredId, ...sections } = featuredSections(live, undefined, series)
-  const defaultId = option && live.some((template) => template.id === option.generatorTemplate) ? option.generatorTemplate : featuredId
+  const defaultId = first ?? featuredId
   const initialCovers = await openingCovers(live.find((template) => template.id === defaultId))
   const shown = option ? { ...page, hero: { ...page.hero, ...option.hero } } : page
   return (
