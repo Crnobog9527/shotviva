@@ -81,6 +81,7 @@ async function writeFixture() {
   await job(imaged, { at: '2021-05-02T03:00:00Z' })
   await pay(imaged, '2021-05-05T00:00:00Z')
   await pay(imaged, '2021-05-06T00:00:00Z')
+  await db.query("insert into public.partner_links (user_id, partner, linked_at) values ($1, 'graylum', $2)", [graylum, at('2021-05-03T02:30:00Z')])
   await job(graylum, { at: '2021-05-03T03:00:00Z', source: 'graylum' })
   await writeTemplateFixture(admin, imaged, graylum)
   const read = async (fn: string, args: unknown[]) => (await db.query<{ s: unknown }>(`select public.${fn}(${args.map((_, i) => `$${i + 1}`).join(', ')}) as s`, args)).rows[0]!.s
@@ -95,8 +96,8 @@ async function writeTemplateFixture(admin: string, a: string, b: string) {
   ids.other = await createPricedTemplate(db)
   const batch = randomUUID()
   // a: a first image, a redraw 10 minutes later, then one an hour later (not a redraw).
-  await job(a, { template, at: '2021-05-02T04:00:00Z', pool: 'paid', cost: 0.1 })
-  await job(a, { template, at: '2021-05-02T04:10:00Z', pool: 'paid', cost: 0.1 })
+  await job(a, { template, at: '2021-05-02T04:00:00Z', pool: 'paid', cost: 1 })
+  await job(a, { template, at: '2021-05-02T04:10:00Z', pool: 'paid', cost: 1 })
   await job(a, { template, at: '2021-05-02T05:10:00Z', status: 'failed', error: 'PROVIDER_TIMEOUT' })
   // b: two cells of one batch (not redraws), two pages of one poster set (not redraws), the same
   // page again (a redraw), and a free redraw that names its source.
@@ -139,7 +140,7 @@ describe('admin_template_stats', () => {
   })
 
   it('sums cost and credits by pool and lists failure codes', () => {
-    expect(tpl).toMatchObject({ costed: 2, paid_cost_usd: 0.2, paid_credits: 8, credits: 32 })
+    expect(tpl).toMatchObject({ costed: 2, paid_cost_usd: 2, paid_credits: 8, credits: 32 })
     expect(tpl.errors).toEqual([{ code: 'PROVIDER_TIMEOUT', count: 1 }])
   })
 

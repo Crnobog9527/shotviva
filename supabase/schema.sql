@@ -6043,16 +6043,14 @@ begin
                'signed_at', pr.created_at,
                'locale', case when u.raw_user_meta_data ->> 'locale' in ('en', 'zh') then u.raw_user_meta_data ->> 'locale' end,
                'graylum', exists (select from public.partner_links pl
-                                   where pl.user_id = pr.id and pl.partner = 'graylum' and pl.linked_at is not null)
-                          or exists (select from public.generation_jobs g
-                                      where g.user_id = pr.id and g.source = 'graylum' and g.created_at < p_end),
+                                   where pl.user_id = pr.id and pl.partner = 'graylum' and pl.linked_at is not null),
                'referred', pr.referred_by is not null,
                'first_image_at', (select g.created_at from public.generation_jobs g
                                    where g.user_id = pr.id and g.status = 'succeeded'
-                                     and g.created_at >= pr.created_at and g.created_at < p_end
+                                     and g.created_at >= pr.created_at
                                    order by g.created_at limit 1),
                'first_paid_at', (select pm.created_at from public.payments pm
-                                  where pm.user_id = pr.id and pm.created_at >= pr.created_at and pm.created_at < p_end
+                                  where pm.user_id = pr.id and pm.created_at >= pr.created_at
                                   order by pm.created_at limit 1)
              ) order by pr.created_at, pr.id)
         from public.profiles pr

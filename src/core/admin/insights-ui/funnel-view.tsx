@@ -9,8 +9,8 @@ import { FunnelSummary } from './funnel-summary'
 import { FunnelTable } from './funnel-table'
 import type { InsightsQuery } from './query'
 
-function notes(posthog: { status: string; data?: { truncated: boolean } }, source: string): string[] {
-  const list: string[] = []
+function notes(posthog: { status: string; data?: { truncated: boolean } }, source: string, maturing: boolean): string[] {
+  const list: string[] = maturing ? [COPY.funnel.maturingNote] : []
   if (source === 'graylum' || source === 'unknown') list.push(COPY.funnel.visitorsNotFor)
   else if (posthog.status !== 'ok') list.push(COPY.funnel.visitorsMissing)
   if (posthog.data?.truncated) list.push(COPY.funnel.truncated)
@@ -26,11 +26,11 @@ export async function FunnelView({ query }: { query: InsightsQuery }) {
   if (db.status !== 'ok') return <SectionError title={COPY.funnel.title} />
   const posthog = await readFunnelPostHog(range, query.bucket, db.data.cohort)
   const ok = posthog.status === 'ok' ? posthog.data : null
-  const input: FunnelInput = { period, bucket: query.bucket, people: db.data.cohort.people, touches: ok?.touches ?? null, visitors: ok?.visitors ?? null }
+  const input: FunnelInput = { period, bucket: query.bucket, people: db.data.cohort.people, touches: ok?.touches ?? null, visitors: ok?.visitors ?? null, asOf: range.end }
   const filters = { locale: query.locale, source: query.source }
   const series = funnelSeries(input, filters)
   const breakdown = funnelBreakdown(input, filters)
-  const lines = notes({ status: posthog.status, data: ok ?? undefined }, query.source)
+  const lines = notes({ status: posthog.status, data: ok ?? undefined }, query.source, series.maturing)
   return (
     <div className="grid min-w-0 gap-6">
       <FiltersForm query={query} days={period.days} />
@@ -38,6 +38,7 @@ export async function FunnelView({ query }: { query: InsightsQuery }) {
       <FunnelSummary counts={series.total} notes={lines} />
       <FunnelTable rows={series.rows} total={series.total} bucket={query.bucket} />
       <BreakdownTable bySource={breakdown.bySource} byLocale={breakdown.byLocale} />
+      <p className="text-xs text-muted-foreground">{COPY.funnel.posthogNote}</p>
     </div>
   )
 }

@@ -12,17 +12,18 @@ const stat = (id: string, extra: Partial<TemplateStat> = {}): TemplateStat => ({
 
 const SERIES = '11111111-1111-4111-8111-111111111111'
 const stats = [
-  stat('a', { series_id: SERIES, series_name: '系列', uses: 10, users: 4, succeeded: 8, failed: 2, redraws: 4, costed: 10, cost_usd: 1, paid_cost_usd: 1, credits: 80, paid_credits: 80, uses_14d: 10, errors: [{ code: 'PROVIDER_FAILED', count: 2 }] }),
-  stat('b', { series_id: SERIES, series_name: '系列', uses: 5, users: 2, succeeded: 5, redraws: 1, costed: 5, cost_usd: 0.5, free_cost_usd: 0.5, credits: 40, uses_14d: 5, favourites: 3 }),
+  stat('a', { series_id: SERIES, series_name: '系列', uses: 10, users: 4, succeeded: 8, failed: 2, redraws: 4, costed: 10, cost_usd: 20, paid_cost_usd: 20, credits: 80, paid_credits: 80, uses_14d: 10, errors: [{ code: 'PROVIDER_FAILED', count: 2 }] }),
+  stat('b', { series_id: SERIES, series_name: '系列', uses: 5, users: 2, succeeded: 5, redraws: 1, costed: 5, cost_usd: 10, free_cost_usd: 10, credits: 40, uses_14d: 5, favourites: 3 }),
   stat('c', { category_key: 'pets', category_name: '宠物' }),
   stat('d', { live: false }),
 ]
-const input = { stats, shares: { a: { shares: 2, opens: 7 } }, creditUsd: 0.05, redrawAlert: 0.3 }
+// Abstract units only (one credit = 1): no real price, cost or credit rate in tests.
+const input = { stats, shares: { a: { shares: 2, opens: 7 } }, creditUsd: 1, redrawAlert: 0.3 }
 
 describe('template lines', () => {
   it('works out rates and a run-time margin per template', () => {
     const [a] = templateLines(input, 'template')
-    expect(a).toMatchObject({ successRate: 0.8, redrawRate: 0.5, costPerImage: 0.125, creditsPerImage: 10, shares: 2, shareOpens: 7 })
+    expect(a).toMatchObject({ successRate: 0.8, redrawRate: 0.5, costPerImage: 2.5, creditsPerImage: 10, shares: 2, shareOpens: 7 })
     expect(a!.margin).toBeCloseTo(0.75)
     expect(a!.flags).toEqual({ idle: false, redraw: true, failing: true })
   })
@@ -58,7 +59,7 @@ describe('template inputs', () => {
   })
 
   it('takes the lowest price per credit', () => {
-    expect(cheapestCreditUsd([{ priceUsd: 10, credits: 100 }, { priceUsd: 30, credits: 600 }])).toBe(0.05)
+    expect(cheapestCreditUsd([{ priceUsd: 2, credits: 1 }, { priceUsd: 3, credits: 3 }])).toBe(1)
     expect(cheapestCreditUsd([])).toBeNull()
   })
 })

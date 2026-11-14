@@ -30,7 +30,7 @@ const visitors = [
   { bucket: 'all', locale: 'en', source: 'share', visitors: 2 },
   { bucket: 'all', locale: 'en', source: 'ads:google', visitors: 3 },
 ]
-const input: FunnelInput = { period, bucket: 'day', people: [a, b, c, d, e], touches, visitors }
+const input: FunnelInput = { period, bucket: 'day', people: [a, b, c, d, e], touches, visitors, asOf: NOW }
 const all = { locale: 'all', source: 'all' } as const
 
 describe('funnel attribution', () => {
@@ -62,6 +62,21 @@ describe('funnel series', () => {
   it('has no visitor number for Graylum or unattributed people, or without PostHog', () => {
     expect(funnelSeries(input, { locale: 'all', source: 'graylum' }).total).toMatchObject({ visitors: null, signups: 1 })
     expect(funnelSeries({ ...input, visitors: null, touches: null }, all).total.visitors).toBeNull()
+  })
+
+  it('marks buckets with sign-ups under 7 days old as still maturing', () => {
+    const { rows, maturing } = funnelSeries(input, all)
+    expect(rows.every((r) => r.maturing)).toBe(true)
+    expect(maturing).toBe(true)
+    const old = parsePeriod('2026-10-01', '2026-10-31', NOW)
+    expect(funnelSeries({ ...input, period: old }, all).rows.some((r) => r.maturing)).toBe(false)
+    expect(funnelSeries({ ...input, period: parsePeriod('2026-11-01', '2026-11-14', NOW) }, all).rows.map((r) => r.maturing).indexOf(true)).toBe(6)
+  })
+
+  it('gives an empty period zeros, not an error', () => {
+    const { rows, total } = funnelSeries({ ...input, people: [], visitors: [] }, all)
+    expect(rows).toHaveLength(3)
+    expect(total).toEqual({ visitors: 0, signups: 0, imaged: 0, imaged24h: 0, paid: 0 })
   })
 
   it('splits the period by source and by language', () => {

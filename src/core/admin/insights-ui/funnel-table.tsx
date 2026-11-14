@@ -1,7 +1,8 @@
+import { Badge } from '../../ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../ui/table'
 import { DASH, n, pct } from '../analytics-ui/format'
 import { Section } from '../growth-ui/section'
-import type { Counts } from '../insights/funnel'
+import type { Counts, FunnelRow } from '../insights/funnel'
 import type { Bucket } from '../insights/period'
 import { stepsOf } from '../insights/steps'
 import { INSIGHTS_COPY as COPY } from './copy'
@@ -38,7 +39,7 @@ export function StepHeads() {
 
 // Newest bucket first, the period's total last. Each row is the people who signed up in that
 // bucket; visitors are the people who came that day or week.
-export function FunnelTable({ rows, total, bucket }: { rows: { bucket: string; counts: Counts }[]; total: Counts; bucket: Bucket }) {
+export function FunnelTable({ rows, total, bucket }: { rows: FunnelRow[]; total: Counts; bucket: Bucket }) {
   return (
     <Section title={COPY.funnel.tableTitle} desc={COPY.funnel.desc}>
       <div className="min-w-0 overflow-x-auto">
@@ -52,7 +53,14 @@ export function FunnelTable({ rows, total, bucket }: { rows: { bucket: string; c
           <TableBody>
             {[...rows].reverse().map((row) => (
               <TableRow key={row.bucket}>
-                <TableCell className="font-mono whitespace-nowrap">{row.bucket}</TableCell>
+                <TableCell className="font-mono whitespace-nowrap">
+                  {row.bucket}
+                  {row.maturing ? (
+                    <Badge variant="outline" className="ml-2 font-sans">
+                      {COPY.funnel.maturing}
+                    </Badge>
+                  ) : null}
+                </TableCell>
                 <StepCells counts={row.counts} />
               </TableRow>
             ))}

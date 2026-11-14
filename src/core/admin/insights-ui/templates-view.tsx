@@ -35,6 +35,7 @@ export async function TemplatesView({ query, creditUsd }: Props) {
         </p>
         {shares.status !== 'ok' ? <p className="text-sm text-muted-foreground">{COPY.templates.sharesMissing}</p> : null}
         <TemplatesTable lines={lines} query={query} redrawText={pct(query.redraw)} />
+        <p className="text-xs text-muted-foreground">{COPY.templates.sharesNote}</p>
       </Section>
     </div>
   )

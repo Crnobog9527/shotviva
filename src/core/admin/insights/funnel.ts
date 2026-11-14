@@ -1,9 +1,9 @@
 import { ALL_BUCKET, type Touches, type VisitorRow } from './posthog'
-import { bucketOf, bucketsOf, type Bucket, type Period } from './period'
+import { bucketEnd, bucketOf, bucketsOf, type Bucket, type Period } from './period'
 import type { CohortPerson } from './reads'
 
 // The 「漏斗」 tab's arithmetic (ARCHITECTURE §16.2c): visitors → sign-ups → first image → first
-// payment, for the people who signed up in each bucket, followed up to the end of the read.
+// payment, for the people who signed up in each bucket, followed up to the moment of the read.
 // Each person has one language and one source; the page only shows the totals worked out here.
 
 export const FUNNEL_SOURCES = ['share', 'graylum', 'affiliate', 'ads', 'organic', 'unknown'] as const
@@ -75,8 +75,18 @@ export type FunnelInput = {
   people: readonly CohortPerson[]
   touches: Touches | null
   visitors: readonly VisitorRow[] | null
+  // The read's moment: everyone is followed up to it, whatever the period.
+  asOf: number
 }
-export type FunnelSeries = { rows: { bucket: string; counts: Counts }[]; total: Counts }
+// A bucket with people who signed up less than 7 days before the read (asOf) is 「仍在累积」: they
+// may still get a first image or pay, so a low number there is not yet a drop.
+export const MATURE_DAYS = 7
+export type FunnelRow = { bucket: string; counts: Counts; maturing: boolean }
+export type FunnelSeries = { rows: FunnelRow[]; total: Counts; maturing: boolean }
+
+export function isMaturing(key: string, bucket: Bucket, asOf: number): boolean {
+  return bucketEnd(key, bucket) > asOf - MATURE_DAYS * DAY_MS
+}
 
 const matches = (input: FunnelInput, filters: FunnelFilters) => (person: CohortPerson) =>
   (filters.locale === 'all' || localeOfPerson(person, input.touches) === filters.locale) &&
@@ -85,7 +95,7 @@ const matches = (input: FunnelInput, filters: FunnelFilters) => (person: CohortP
 export function funnelSeries(input: FunnelInput, filters: FunnelFilters): FunnelSeries {
   const visitors = visitorsBy(input.visitors, filters)
   const of = (bucket: string) => (visitors ? (visitors.get(bucket) ?? 0) : null)
-  const rows = bucketsOf(input.period, input.bucket).map((bucket) => ({ bucket, counts: zero(of(bucket)) }))
+  const rows = bucketsOf(input.period, input.bucket).map((bucket) => ({ bucket, counts: zero(of(bucket)), maturing: isMaturing(bucket, input.bucket, input.asOf) }))
   const byBucket = new Map(rows.map((row) => [row.bucket, row.counts]))
   const total = zero(of(ALL_BUCKET))
   for (const person of input.people.filter(matches(input, filters))) {
@@ -93,7 +103,7 @@ export function funnelSeries(input: FunnelInput, filters: FunnelFilters): Funnel
     if (counts) add(counts, person)
     add(total, person)
   }
-  return { rows, total }
+  return { rows, total, maturing: rows.some((row) => row.maturing) }
 }
 
 // The whole period split by source (keeping the language filter) and by language (keeping the

@@ -60,6 +60,11 @@ export function bucketOf(iso: string, bucket: Bucket): string {
   return beijingDate(midnight(date) - weekday * DAY_MS)
 }
 
+// Where a bucket ends (the next Beijing midnight after its last day), in UTC milliseconds.
+export function bucketEnd(key: string, bucket: Bucket): number {
+  return midnight(key) + (bucket === 'week' ? 7 : 1) * DAY_MS
+}
+
 // Every bucket of the period, oldest first, so a day with nobody still gets its row.
 export function bucketsOf(period: Period, bucket: Bucket): string[] {
   const keys: string[] = []
