@@ -126,6 +126,12 @@
   /* An A/B hero option's one line (ARCHITECTURE §16.5), a step stronger than the answer above it. */
   .mk-hero-tagline { margin-top: 12px; font-size: 15px; line-height: 1.5; color: var(--foreground); font-weight: 500; }
   .mk-hero-pair { margin: 20px 0 0; }
+  /* An A/B hero option's further pairs (hero-strip.tsx): a sideways row on a phone, a grid from 768. */
+  .mk-hero-strip { padding: 28px var(--gutter) 0; }
+  .mk-hero-strip-h { font-size: 15px; font-weight: 500; color: var(--bone-dim); }
+  .mk-hero-strip-list { display: grid; grid-auto-flow: column; grid-auto-columns: 280px; gap: 12px; margin: 12px calc(var(--gutter) * -1) 0; padding: 0 var(--gutter) 4px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--gutter); list-style: none; }
+  .mk-hero-strip-list > li { scroll-snap-align: start; }
+  .mk-hero-strip-list figure { margin: 0; }
   .mk-cap { margin-top: 10px; font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
   .mk-generator { display: contents; }
 
@@ -604,6 +610,7 @@
   @media (min-width: 768px) {
     .mk-hero { padding-top: 40px; }
     .mk-hero h1, .mk-lede, .mk-answer, .mk-hero-tagline, .mk-hero-pair { max-width: 640px; }
+    .mk-hero-strip-list { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); margin: 12px 0 0; padding: 0; overflow: visible; }
     .mk-hero h1 { font-size: var(--text-title); }
     .mk-shoot { grid-template-columns: repeat(3, 1fr); }
     .mk-phone { grid-column: 1; grid-row: 1; }

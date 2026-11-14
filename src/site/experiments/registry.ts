@@ -10,6 +10,7 @@ export const HERO_DEFAULT_OPTION = 'tote'
 export const HERO_OPTIONS = [
   { id: HERO_DEFAULT_OPTION, label: 'B 电商：托特包（现在的首屏）' },
   { id: 'art-style', label: 'A 画风迁移：猫的照片 → 动漫 / 3D / 水彩' },
+  { id: 'food', label: 'C 餐饮：8 组白盘案例（第 1 组上首屏）' },
 ] as const
 
 export const experimentRegistry: ExperimentRegistry = [

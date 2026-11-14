@@ -1,7 +1,8 @@
-import type { HeroBlock, ImageRef } from '@/core/content'
+import type { HeroBlock, HeroStripBlock, ImageRef } from '@/core/content'
 import type { Locale } from '@/core/i18n/locales'
 
 import { withFirstFrame } from '../content/landing-shared'
+import { food } from './hero-food'
 
 export { HERO_DEFAULT_OPTION, HERO_OPTIONS } from './registry'
 
@@ -17,6 +18,8 @@ export type HeroOptionContent = {
   tagline: string
   // The template the first-screen generator opens on, when it is on sale.
   generatorTemplate: string
+  // More real pairs in a row under the first screen (lazy, small).
+  strip?: HeroStripBlock
 }
 
 // All 912 × 1140 (4:5), public/home; one phone photo, three art-style templates (flat-anime-style,
@@ -60,7 +63,7 @@ const artStyle: Record<Locale, HeroOptionContent> = {
   },
 }
 
-const CONTENT: Readonly<Record<string, Record<Locale, HeroOptionContent>>> = { 'art-style': artStyle }
+const CONTENT: Readonly<Record<string, Record<Locale, HeroOptionContent>>> = { 'art-style': artStyle, food }
 
 // null for the default option (the page's own hero) and for an option the code does not have.
 export function heroOptionContent(option: string, locale: Locale): HeroOptionContent | null {

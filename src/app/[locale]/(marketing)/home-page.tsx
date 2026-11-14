@@ -64,6 +64,7 @@ export async function HomeContent({ heroOption }: { heroOption?: string }) {
         isLinkEnabled={isLinkEnabled}
         templates={sections}
         heroTagline={option?.tagline}
+        heroStrip={option?.strip}
         generator={
           <HomeGeneratorSlot templates={catalogue} browse={pickerBrowse(index, catalogue, locale === 'zh')} defaultId={defaultId} homePath={localizePath('/', locale)} freeImages={free} initialCovers={initialCovers} />
         }
