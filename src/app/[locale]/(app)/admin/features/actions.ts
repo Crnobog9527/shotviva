@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { refresh, updateTag } from 'next/cache'
 
-import { runAdminAction, saveFeatureAccess, setFeatureInvite, saveSettingSwitch, saveSignupGiftRules, saveWishlistSwitch, WISHLIST_SWITCH_COPY, type ActionResult } from '@/core/admin'
+import { runAdminAction, saveFeatureAccess, setFeatureInvite, savePosterPhotoPrice, saveSettingSwitch, saveSignupGiftRules, saveWishlistSwitch, WISHLIST_SWITCH_COPY, type ActionResult } from '@/core/admin'
 import { AppError } from '@/core/errors'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { FEATURES_CACHE_TAG } from '@/core/features'
@@ -81,4 +81,10 @@ export async function saveAffiliateSwitchAction(value: boolean): Promise<boolean
   if (error) return false
   refresh()
   return true
+}
+
+// 1521: 拍照识别's price; the editor reads it through the system-settings cache.
+export async function savePosterPhotoPriceAction(input: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(() => savePosterPhotoPrice({ db: createAdminSupabase(), invalidate: settingsChanged }, admin.id, input))
 }

@@ -26,6 +26,8 @@ export type StudioTemplate = {
   // Upload boxes (fields.images.slots) in the page's language, e.g. the prize photo; each page
   // sends only the ones its kind lists (poster.kinds[].slots).
   slots: CatalogueImageSlot[]
+  // 拍照识别's price per run, from the server's setting (1521); 0: not offered.
+  photoCredits: number
 }
 
 // fromSample: the content started from the template's sample text (fields.poster.sample), whose

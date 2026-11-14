@@ -3,6 +3,7 @@ import 'server-only'
 import sharp from 'sharp'
 import { z } from 'zod'
 
+import { callRpc } from '@/core/billing'
 import { AppError } from '@/core/errors'
 import { requireFeature } from '@/core/features'
 import { logger } from '@/core/logger'
@@ -14,7 +15,7 @@ import { loadGenerationTemplate } from '@/core/templates'
 
 import { postResponses, readResponsesOutput } from '../edit/openai-responses'
 import { checkInstructionsOf, READ_EDGE, readingBody } from './run-check'
-import { ask, assertUnderHourlyLimit, costOf, EXTRACT_TEXT_MAX, instructionsOf, okResult, PARSER_PROVIDER, requestBody, type ExtractDeps, type ExtractResult, type ExtractStage } from './run-extract'
+import { ask, costOf, EXTRACT_PER_HOUR, EXTRACT_TEXT_MAX, instructionsOf, okResult, PARSER_PROVIDER, requestBody, type ExtractDeps, type ExtractResult, type ExtractStage } from './run-extract'
 import type { StreamUsage } from './stream-responses'
 
 // 拍照识别 (ARCHITECTURE §5.3「每周复用」): a photo or screenshot of an old poster → the same blocks
@@ -22,11 +23,13 @@ import type { StreamUsage } from './stream-responses'
 // API, openai_responses) transcribes the poster line by line with the template's own reading
 // instructions (model_params.poster_check.instructions, the ones 自动核对 uses), then the lines
 // go through the paste pipeline: the local parser, else the model with streamed progress. One
-// poster_extractions row per photo (source 'photo') carries both calls' tokens and cost, and
-// counts against the same 30-an-hour limit.
+// poster_extractions row per run (source 'photo') carries the calls' tokens and cost, and counts
+// against the same 30-an-hour limit. Each run is charged (price: system setting
+// poster_photo_credits, 1521/1523) before any call; a failed or unreadable run is refunded.
 
 export type PhotoDeps = ExtractDeps & { store: () => ObjectStore }
-export type PhotoResult = ExtractResult & { text?: string }
+// credits: what the run took (an ok run keeps it); a failed run says it was refunded.
+export type PhotoResult = (ExtractResult & { text?: string; credits?: number }) | { status: 'failed'; refunded: number }
 export type PreparedPhoto = { kind: 'done'; result: PhotoResult } | { kind: 'model'; run: (onStage: (stage: ExtractStage) => void) => Promise<PhotoResult> }
 
 const READ_TIMEOUT_MS = 45_000
@@ -41,20 +44,37 @@ async function photoUrl(store: ObjectStore, key: string): Promise<string> {
   return `data:image/jpeg;base64,${jpeg.toString('base64')}`
 }
 
-type Call = { deps: PhotoDeps; credentials: ProviderCredentials; userId: string; id: number }
+type Call = { deps: PhotoDeps; credentials: ProviderCredentials; userId: string; id: number; credits: number }
 
-async function insertPending(deps: PhotoDeps, userId: string, provider: string): Promise<number> {
-  const { data, error } = await deps.db.from('poster_extractions').insert({ user_id: userId, source: 'photo', input_chars: 0, provider, status: 'pending' }).select('id').single<{ id: number }>()
-  if (error) throw new AppError('INTERNAL', 'poster_extractions insert failed', { cause: new Error(error.message) })
-  return data.id
+const startSchema = z.array(z.object({ extraction_id: z.number(), credits: z.number().int() })).length(1)
+
+// The run's row and its debit, in one call (1523): the price, the hourly limit and the pool are
+// the database's. No price saved yet: the feature is off, nothing charged.
+async function start(deps: PhotoDeps, userId: string, provider: string): Promise<{ id: number; credits: number } | null> {
+  try {
+    const [row] = await callRpc(deps.db, 'start_poster_photo', { p_user_id: userId, p_provider: provider, p_per_hour: EXTRACT_PER_HOUR }, startSchema)
+    return { id: row!.extraction_id, credits: row!.credits }
+  } catch (error) {
+    if (error instanceof AppError && error.code === 'NOT_FOUND' && error.message === 'PRICE_UNSET') return null
+    throw error
+  }
 }
 
-async function record(call: Call, row: { ok: boolean; usage: StreamUsage; chars: number; provider?: string }) {
-  const { usage } = row
+const tokens = (usage: StreamUsage) => ({ input: usage?.inputTokens ?? null, output: usage?.outputTokens ?? null })
+
+// An ok run: its usage. A failed one: refunded (1523) with its usage, never left charged.
+async function record(call: Call, row: { ok: boolean; usage: StreamUsage; chars: number }) {
+  const used = tokens(row.usage)
+  const cost = costOf(row.usage, call.credentials.prices)
+  if (!row.ok) {
+    await callRpc(call.deps.db, 'refund_poster_photo', {
+      p_extraction_id: call.id, p_input_chars: row.chars, p_input_tokens: used.input, p_output_tokens: used.output, p_cost_usd: cost,
+    }, z.unknown()).catch((error: unknown) => logger.error('poster.photo.refund_failed', { id: call.id, error }))
+    return
+  }
   const { error } = await call.deps.db.from('poster_extractions').update({
-    status: row.ok ? 'ok' : 'failed', input_chars: row.chars, input_tokens: usage?.inputTokens ?? null, output_tokens: usage?.outputTokens ?? null,
-    cost_usd: costOf(usage, call.credentials.prices), ...(row.provider ? { provider: row.provider } : {}),
-  }).eq('id', call.id)
+    status: 'ok', input_chars: row.chars, input_tokens: used.input, output_tokens: used.output, cost_usd: cost,
+  }).eq('id', call.id).eq('status', 'pending')
   if (error) logger.error('poster.extract.record_failed', { message: error.message })
 }
 
@@ -86,17 +106,17 @@ async function runPhoto(call: Call, prompts: { read: string; sort: string }, key
     if (parsed) {
       await record(call, { ok: true, usage: spent.usage, chars })
       logger.info('poster.extract.done', { source: 'photo', sorter: PARSER_PROVIDER, chars, ms: Math.round(performance.now() - started) })
-      return { ...okResult(parsed, [], text), text }
+      return { ...okResult(parsed, [], text), text, credits: call.credits }
     }
     const answer = await ask(call.deps, call.credentials, requestBody(call.credentials.config.model, prompts.sort, text), onStage)
     spent.usage = add(spent.usage, answer.usage)
     await record(call, { ok: true, usage: spent.usage, chars })
     logger.info('poster.extract.done', { source: 'photo', sorter: 'model', chars, ms: Math.round(performance.now() - started), outputTokens: spent.usage?.outputTokens ?? null })
-    return { ...okResult(answer.content, answer.clipped, text), text }
+    return { ...okResult(answer.content, answer.clipped, text), text, credits: call.credits }
   } catch (error) {
     logger.warn('poster.extract.failed', { source: 'photo', error: error instanceof Error ? error.message : 'unknown' })
     await record(call, { ok: false, usage: spent.usage, chars })
-    return { status: 'failed' }
+    return { status: 'failed', refunded: call.credits }
   }
 }
 
@@ -107,13 +127,14 @@ export async function preparePhotoExtract(deps: PhotoDeps, input: { userId: stri
   await requireFeature(input.userId, POSTER_FEATURE)
   const keys = [...new Set(input.inputKeys)]
   if (keys.length === 0 || keys.length > PHOTOS_MAX || keys.some((key) => !isOwnInputKey(input.userId, key))) throw new AppError('INVALID_INPUT', 'Unknown upload')
-  await assertUnderHourlyLimit(deps.db, input.userId, deps.now?.() ?? new Date())
   const { template, prompt } = await loadGenerationTemplate(deps.db, input.templateId, 'web')
   posterFieldsOf(template.fields)
   const read = checkInstructionsOf(prompt.modelParams)
   const sort = instructionsOf(prompt.modelParams)
   const credentials = await deps.credentials()
   if (!read || !sort || !credentials || credentials.adapter !== 'openai_responses') return { kind: 'done', result: { status: 'unavailable' } }
-  const call: Call = { deps, credentials, userId: input.userId, id: await insertPending(deps, input.userId, credentials.tag) }
+  const started = await start(deps, input.userId, credentials.tag)
+  if (!started) return { kind: 'done', result: { status: 'unavailable' } }
+  const call: Call = { deps, credentials, userId: input.userId, ...started }
   return { kind: 'model', run: (onStage) => runPhoto(call, { read, sort }, keys, onStage) }
 }

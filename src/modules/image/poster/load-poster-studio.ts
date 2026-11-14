@@ -6,6 +6,7 @@ import type { Locale } from '@/core/i18n/locales'
 import { featureAllowed } from '@/core/features'
 import { templateAspectFilter } from '@/core/providers'
 import { POSTER_FEATURE } from '@/core/poster/sets'
+import { cachedSystemSettings, settingValue } from '@/core/system-settings'
 import { listTemplatesIn, type LocalizedTemplate } from '@/core/templates'
 import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
 import type { OutputAspect } from '@/core/templates/output-options'
@@ -25,7 +26,7 @@ export function toStudioTemplate(template: LocalizedTemplate): StudioTemplate | 
   const aspects = template.fields.aspectRatios.filter((ratio): ratio is OutputAspect => (options.aspectRatios as string[]).includes(ratio))
   // Every tier the template's model makes, 1K included; the editor starts on 2K (defaultResolution).
   const slots = (template.fields.images.slots ?? []).map(({ key, label, help, required }) => ({ key, label, required, ...(help ? { help } : {}) }))
-  return { id: template.id, name: template.name, poster, aspects, resolutions: options.resolutions, creditsCost: template.creditsCost, slots }
+  return { id: template.id, name: template.name, poster, aspects, resolutions: options.resolutions, creditsCost: template.creditsCost, slots, photoCredits: 0 }
 }
 
 // Only the sizes /api/generate will take for this template's model: the offered list comes from
@@ -36,7 +37,8 @@ export function narrowToRoute(template: StudioTemplate, accepts: (aspect: string
 
 // `db`: the admin client (the template's model is private).
 export async function loadStudioTemplate(db: SupabaseClient, locale: Locale, id: string): Promise<StudioTemplate | null> {
-  const [found] = await listTemplatesIn(db, locale, { id })
+  const [[found], settings] = await Promise.all([listTemplatesIn(db, locale, { id }), cachedSystemSettings()])
   const template = found ? toStudioTemplate(found) : null
-  return template ? narrowToRoute(template, await templateAspectFilter(db, id)) : null
+  if (!template) return null
+  return { ...narrowToRoute(template, await templateAspectFilter(db, id)), photoCredits: settingValue(settings, 'poster_photo_credits') }
 }
