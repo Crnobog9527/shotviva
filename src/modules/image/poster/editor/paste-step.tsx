@@ -27,7 +27,7 @@ export function PasteStep({ studio }: { studio: PosterStudioState }) {
       <p className="text-right text-caption text-muted-foreground">{draft.source.length} / {TEXT_MAX}</p>
       {busy ? <SortProgress stage={studio.stage} /> : null}
       {studio.notice === 'rateLimited' ? <p role="alert" className="text-caption text-destructive">{t('notice.rateLimited')}</p> : null}
-      <Button variant="ghost" className="min-h-11" disabled={busy} onClick={studio.toManual}>{t('paste.manual')}</Button>
+      <Button variant="ghost" className="min-h-11" disabled={busy} onClick={studio.toManual}>{t(draft.fromSample ? 'paste.manualSample' : 'paste.manual')}</Button>
     </section>
   )
 }

@@ -12,7 +12,7 @@ import { PosterField } from './poster-field'
 
 // The level table: column names, one narrow card per row (number keypad), full-width break rows,
 // and an insert point after every row (DESIGN mobile 375: one row per line, no sideways scroll).
-export function TableEditor({ content, onChange, flagged }: BlockProps) {
+export function TableEditor({ content, onChange, flagged, sample }: BlockProps) {
   const t = useTranslations('app.poster')
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
   const table = content.table
@@ -23,13 +23,13 @@ export function TableEditor({ content, onChange, flagged }: BlockProps) {
   }
   return (
     <div className="grid gap-3">
-      <PosterField label={t('table.title')} value={table.title} flagged={flagged('table.title')} flagNote={t('flagged')}
+      <PosterField label={t('table.title')} value={table.title} flagged={flagged('table.title')} sample={sample('table.title')} flagNote={t('flagged')}
         onChange={(value) => onChange(setTableText(content, 'title', value), 'table.title')} />
       <fieldset className="grid gap-1">
         <legend className="mb-1 text-caption font-medium">{t('table.columns')}</legend>
         <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${table.columns.length}, minmax(0, 1fr))` }}>
           {table.columns.map((column, c) => (
-            <PosterField key={c} compact label={`${t('table.column')} ${c + 1}`} value={column} flagged={flagged(`table.columns.${c}`)}
+            <PosterField key={c} compact label={`${t('table.column')} ${c + 1}`} value={column} flagged={flagged(`table.columns.${c}`)} sample={sample(`table.columns.${c}`)}
               onChange={(value) => onChange(setColumn(content, c, value), `table.columns.${c}`)} />
           ))}
         </div>
@@ -37,23 +37,23 @@ export function TableEditor({ content, onChange, flagged }: BlockProps) {
       <InsertPoint open={insertAfter === -1} onOpen={() => setInsertAfter(-1)} onInsert={(kind) => insert(-1, kind)} />
       {table.rows.map((row, r) => (
         <div key={r} className="grid gap-1">
-          <RowEditor row={row} index={r} columns={table.columns} {...{ content, onChange, flagged }} />
+          <RowEditor row={row} index={r} columns={table.columns} {...{ content, onChange, flagged, sample }} />
           <InsertPoint open={insertAfter === r} onOpen={() => setInsertAfter(r)} onInsert={(kind) => insert(r, kind)} />
         </div>
       ))}
-      <PosterField label={t('table.footnote')} value={table.footnote} flagged={flagged('table.footnote')} flagNote={t('flagged')}
+      <PosterField label={t('table.footnote')} value={table.footnote} flagged={flagged('table.footnote')} sample={sample('table.footnote')} flagNote={t('flagged')}
         onChange={(value) => onChange(setTableText(content, 'footnote', value), 'table.footnote')} />
     </div>
   )
 }
 
-function RowEditor({ row, index, columns, content, onChange, flagged }: BlockProps & { row: TableRow; index: number; columns: readonly string[] }) {
+function RowEditor({ row, index, columns, content, onChange, flagged, sample }: BlockProps & { row: TableRow; index: number; columns: readonly string[] }) {
   const t = useTranslations('app.poster')
   const remove = <Button variant="ghost" size="sm" aria-label={t('remove')} onClick={() => onChange(removeRow(content, index), `table.rows.${index}`)}>✕</Button>
   if (!Array.isArray(row)) {
     return (
       <div className="grid grid-cols-[1fr_auto] items-center gap-1 rounded-control bg-wash-faint p-1">
-        <PosterField compact label={t('table.break')} value={row.break} flagged={flagged(`table.rows.${index}.break`)}
+        <PosterField compact label={t('table.break')} value={row.break} flagged={flagged(`table.rows.${index}.break`)} sample={sample(`table.rows.${index}.break`)}
           onChange={(value) => onChange(setBreak(content, index, value), `table.rows.${index}.break`)} />
         {remove}
       </div>
@@ -63,7 +63,7 @@ function RowEditor({ row, index, columns, content, onChange, flagged }: BlockPro
     <div className="grid items-center gap-1" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr)) auto` }}>
       {row.map((cell, c) => (
         <PosterField key={c} compact inputMode="numeric" label={columns[c] || `${t('table.column')} ${c + 1}`} value={cell}
-          flagged={flagged(`table.rows.${index}.${c}`)} onChange={(value) => onChange(setCell(content, index, c, value), `table.rows.${index}.${c}`)} />
+          flagged={flagged(`table.rows.${index}.${c}`)} sample={sample(`table.rows.${index}.${c}`)} onChange={(value) => onChange(setCell(content, index, c, value), `table.rows.${index}.${c}`)} />
       ))}
       {remove}
     </div>

@@ -712,7 +712,8 @@
           "reading": "Reading your text…",
           "writing": "Sorting: {block}",
           "seconds": "{seconds}s"
-        }
+        },
+        "manualSample": "Edit the sample text instead"
       },
       "sourceText": "Your pasted text",
       "backToPaste": "Paste again",
@@ -838,6 +839,14 @@
         "footer": "Footer · phones & address",
         "photos": "Images",
         "flagged": "{count, plural, one {# line to check} other {# lines to check}}"
+      },
+      "clearPart": "Clear this part",
+      "sample": {
+        "hint": "Every part starts filled with the sample poster’s text (in grey). Type over what changes; grey words go on the poster as they are.",
+        "sortedHint": "Filled from your pasted notice. You can clear it all or go back to the sample text.",
+        "clearAll": "Clear everything",
+        "restore": "Back to the sample text",
+        "contactsLeft": "The organiser, phone or address is still the sample’s. Use it anyway?"
       }
     },
     "sizes": {
