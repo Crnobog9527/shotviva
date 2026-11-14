@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 
 import { Link, useRouter } from '@/core/i18n/navigation'
@@ -31,53 +31,58 @@ function useSettledNews(onNews: (news: Settled) => void) {
   }, [jobs, onNews])
 }
 
+// The notice's two lines: what is ready, and what failed with where its credits stand.
+function useNewsLines(news: Settled): { ready: string | null; failed: string | null } {
+  const t = useTranslations('app.notify')
+  const errors = useTranslations('app.errors')
+  const gap = useLocale() === 'zh' ? '' : ' '
+  const name = (items: SettledItem[]) => items[0]?.templateName ?? ''
+  const { ready, failed } = news
+  return {
+    ready: ready.length ? t('ready', { count: ready.length, name: name(ready) }) : null,
+    failed: failed.length ? `${t('failed', { count: failed.length, name: name(failed) })}${gap}${errors(refundKey(failed.map((job) => job.failure)))}` : null,
+  }
+}
+
 // The app-wide notice when this tab's photos settle (any app page): "ready" with a link, or
 // that it failed and where its credits stand (refunded, as the server reported). Repeated news
 // within the ten seconds adds to the same notice. role=status: read out, never steals focus.
+// Out of view, the browser's own notification says the same (when the user allowed it).
 export function SettleToast() {
-  const t = useTranslations('app.notify')
-  const errors = useTranslations('app.errors')
   const router = useRouter()
   const [news, setNews] = useState<Settled>(NONE)
   const [onNews] = useState(() => (fresh: Settled) => setNews((current) => merge(current, fresh)))
   useSettledNews(onNews)
   useEffect(() => onAnnounce(onNews), [onNews])
+  const lines = useNewsLines(news)
   const total = news.ready.length + news.failed.length
 
   useEffect(() => {
     if (total === 0) return
-    const { ready, failed } = news
-    const lines = [ready.length ? t('ready', { count: ready.length, name: ready[0]?.templateName ?? '' }) : null,
-      failed.length ? `${t('failed', { count: failed.length, name: failed[0]?.templateName ?? '' })} ${errors(refundKey(failed.map((job) => job.failure)))}` : null]
-    notifyIfHidden(lines.filter(Boolean)[0] ?? '', lines.filter(Boolean).slice(1).join(' '), () => router.push(hrefOf(ready)))
+    const [title = '', body = ''] = [lines.ready, lines.failed].filter((line): line is string => line !== null)
+    notifyIfHidden(title, body, () => router.push(hrefOf(news.ready)))
     const hide = setTimeout(() => setNews(NONE), SHOW_MS)
     return () => clearTimeout(hide)
-  }, [news, total, t, errors, router])
+  }, [news, total, lines.ready, lines.failed, router])
 
   if (total === 0) return null
-  return <ToastCard news={news} onClose={() => setNews(NONE)} />
+  return <ToastCard lines={lines} href={news.ready.length ? hrefOf(news.ready) : null} onClose={() => setNews(NONE)} />
 }
 
-function ToastCard({ news, onClose }: { news: Settled; onClose(): void }) {
+function ToastCard({ lines, href, onClose }: { lines: { ready: string | null; failed: string | null }; href: string | null; onClose(): void }) {
   const t = useTranslations('app.notify')
-  const errors = useTranslations('app.errors')
-  const { ready, failed } = news
   return (
     <div
       role="status"
       className="hairline shadow-sheet fixed top-[calc(var(--sat)+12px)] left-1/2 z-[120] flex w-[min(calc(100vw-2*var(--gutter)),480px)] -translate-x-1/2 items-center gap-2.5 rounded-2xl bg-popover py-3 pr-3 pl-3.5 text-label leading-[1.4] motion-safe:animate-[sv-toast-in_350ms_var(--ease)]"
     >
-      <span aria-hidden="true" className={failed.length && !ready.length ? 'size-2 flex-none rounded-full bg-destructive' : 'size-2 flex-none rounded-full bg-success'} />
+      <span aria-hidden="true" className={lines.ready ? 'size-2 flex-none rounded-full bg-success' : 'size-2 flex-none rounded-full bg-destructive'} />
       <p className="min-w-0 flex-1">
-        {ready.length ? <b className="block font-medium">{t('ready', { count: ready.length, name: ready[0]?.templateName ?? '' })}</b> : null}
-        {failed.length ? (
-          <span className="block text-muted-foreground">
-            {t('failed', { count: failed.length, name: failed[0]?.templateName ?? '' })} {errors(refundKey(failed.map((job) => job.failure)))}
-          </span>
-        ) : null}
+        {lines.ready ? <b className="block font-medium">{lines.ready}</b> : null}
+        {lines.failed ? <span className="block text-muted-foreground">{lines.failed}</span> : null}
       </p>
-      {ready.length ? (
-        <Link href={hrefOf(ready)} onClick={onClose} className="press hairline inline-flex min-h-9 flex-none items-center rounded-full bg-wash px-3 text-caption font-semibold">
+      {href ? (
+        <Link href={href} onClick={onClose} className="press hairline inline-flex min-h-9 flex-none items-center rounded-full bg-wash px-3 text-caption font-semibold">
           {t('view')}
         </Link>
       ) : null}
