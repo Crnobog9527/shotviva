@@ -103,3 +103,5 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
 ## License
 
 Proprietary. The source is public to read, but it is not open source: using, copying, modifying or hosting it needs a written commercial license from Grayscale Luminary LLC. See [LICENSE](LICENSE).
+
+<!-- CI timing probe (shotviva#664), not for merge -->
