@@ -20,6 +20,8 @@ export function geistCss(host: string): string {
     '@font-face{font-family:"geist Fallback";src:local(Arial),local(Arimo),local("Liberation Sans");ascent-override:94.56%;descent-override:27.76%;line-gap-override:0%;size-adjust:106.28%}',
     `@font-face{font-family:geistMono;src:url(${host}${GEIST_MONO_FILE}) format("woff2");font-display:swap;font-weight:400 500}`,
     '@font-face{font-family:"geistMono Fallback";src:local(Arial),local(Arimo),local("Liberation Sans");ascent-override:76.43%;descent-override:22.43%;line-gap-override:0%;size-adjust:131.49%}',
+    // Instrument Serif's (globals-body.css declares the face itself), kept with the other two.
+    '@font-face{font-family:"Instrument Serif Fallback";src:local(Arial),local(Arimo),local("Liberation Sans");ascent-override:128.92%;descent-override:40.37%;line-gap-override:0%;size-adjust:76.79%}',
     ':root{--font-geist:geist,"geist Fallback";--font-geist-mono:geistMono,"geistMono Fallback"}',
   ].join('')
 }
