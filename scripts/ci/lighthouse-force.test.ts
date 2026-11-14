@@ -50,3 +50,35 @@ describe('lighthouse-force', () => {
     expect(force()).toBe('true')
   })
 })
+
+describe('ci-gate', async () => {
+  const { gate, lighthouseDecision } = await import('./ci-gate.mjs')
+  const base = { EVENT: 'pull_request', CHECKS: 'success', DB: 'success', BASE: 'success', CODE: 'true', FORCE: 'false', REASON: '' }
+  const pages = JSON.stringify({ '/': 'a', '/zh': 'b', 'public/': 'p' })
+
+  it('explains a skip and names each changed page', () => {
+    expect(lighthouseDecision({ ...base, PAGES: pages, BASE_PAGES: pages }).why).toMatch(/^skipped/)
+    const changed = lighthouseDecision({ ...base, PAGES: pages, BASE_PAGES: JSON.stringify({ '/': 'a', '/zh': 'x', 'public/': 'p' }) })
+    expect(changed.why).toBe('run: changed /zh')
+    expect(changed.rows).toEqual([
+      { name: '/', changed: false },
+      { name: '/zh', changed: true },
+      { name: 'public/', changed: false },
+    ])
+  })
+
+  it('explains forced runs, missing fingerprints and docs-only changes', () => {
+    expect(lighthouseDecision({ ...base, FORCE: 'true', REASON: 'label run-lighthouse' }).why).toBe('run: forced (label run-lighthouse)')
+    expect(lighthouseDecision({ ...base, PAGES: pages, BASE_PAGES: '' }).why).toBe('run: a fingerprint is missing')
+    expect(lighthouseDecision({ ...base, BASE: 'failure' }).why).toMatch(/^run: the baseline/)
+    expect(lighthouseDecision({ ...base, CODE: 'false' }).why).toMatch(/docs-only/)
+  })
+
+  it('passes only when checks and DB passed and Lighthouse passed or was not needed', () => {
+    expect(gate({ CHECKS: 'success', DB: 'success', LIGHTHOUSE: 'skipped' })).toBe(true)
+    expect(gate({ CHECKS: 'success', DB: 'success', LIGHTHOUSE: 'success' })).toBe(true)
+    expect(gate({ CHECKS: 'success', DB: 'success', LIGHTHOUSE: 'failure' })).toBe(false)
+    expect(gate({ CHECKS: 'success', DB: 'cancelled', LIGHTHOUSE: 'skipped' })).toBe(false)
+    expect(gate({ CHECKS: 'failure', DB: 'success', LIGHTHOUSE: 'skipped' })).toBe(false)
+  })
+})
