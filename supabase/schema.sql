@@ -17700,11 +17700,6 @@ ALTER TABLE ONLY "public"."experiments"
 
 
 
-ALTER TABLE ONLY "public"."experiments"
-    ADD CONSTRAINT "experiments_winner_variant_id_fkey" FOREIGN KEY ("winner_variant_id") REFERENCES "public"."experiment_variants"("id");
-
-
-
 ALTER TABLE ONLY "public"."feature_access"
     ADD CONSTRAINT "feature_access_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
