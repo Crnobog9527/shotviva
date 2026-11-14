@@ -40,6 +40,8 @@ export const saveProviderSchema = z.object({
   estimatedImageCosts: estimatedImageCostsSchema.optional(),
   // Slot template floor (1442). Blank clears it; absent (older editors) keeps it.
   extraInputImageUsd: z.preprocess(v => (v === '' ? null : v), z.coerce.number().min(0).max(9.99).nullable().optional()),
+  // 「BYOK（按官方价）」 (1551). Absent (older editors, other lines) keeps the stored value.
+  byokListPrice: z.boolean().optional(),
   label: z.string().trim().min(1).max(80),
   ...modelFields,
   // Write-only: blank keeps the stored key (ARCHITECTURE §3.3).
