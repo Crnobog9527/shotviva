@@ -6,6 +6,7 @@ import { useEffect } from 'react'
 import { readJob } from '../generation/job-api'
 import type { TrackedJob } from '../generation/job-model'
 import { isActive } from '../generation/scheduler'
+import { announce, type Settled } from '../generation/settle-events'
 import { useJobs } from '../generation/use-jobs'
 import type { PhotoItem } from './photo-item'
 
@@ -52,10 +53,31 @@ export function useRunningItems(server: PhotoItem[], covers: Record<string, stri
   useEffect(() => {
     if (!untracked) return
     const timer = setInterval(async () => {
-      const views = await Promise.all(untracked.split(',').map(readJob))
-      if (views.some((view) => view === 'missing' || (view !== null && view.status !== 'running'))) router.refresh()
+      // Not while the tab is out of view (AGENTS §5.1.8); the next look picks it up.
+      if (document.visibilityState !== 'visible') return
+      const ids = untracked.split(',')
+      const views = await Promise.all(ids.map(readJob))
+      if (views.some((view) => view === 'missing' || (view !== null && view.status !== 'running'))) {
+        announce(settledNews(server, ids, views))
+        router.refresh()
+      }
     }, POLL_MS)
     return () => clearInterval(timer)
-  }, [untracked, router])
+  }, [untracked, router, server])
   return rows
+}
+
+// Rows started in a tab since closed, settled now: the app-wide notice says so too (a failed
+// job's credits were refunded by the server, as JobView failures always are).
+function settledNews(server: PhotoItem[], ids: string[], views: Awaited<ReturnType<typeof readJob>>[]): Settled {
+  const names = new Map(server.map((item) => [item.id, item.templateName]))
+  const news: Settled = { ready: [], failed: [] }
+  ids.forEach((id, index) => {
+    const view = views[index]
+    if (!view || view === 'missing' || view.status === 'running') return
+    const item = { id, templateName: names.get(id) ?? '', failure: null }
+    if (view.status === 'succeeded') news.ready.push(item)
+    else news.failed.push({ ...item, failure: { code: view.error_code ?? 'GENERATION_FAILED', message: '', refunded: true } })
+  })
+  return news
 }

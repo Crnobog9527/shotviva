@@ -5,7 +5,10 @@ import { useTranslations } from 'next-intl'
 import { coverImage } from '@/core/ui/cover-image'
 import { Reveal } from '@/core/ui/reveal-item'
 
-import { estimatedProgress, percent } from '../generation/progress'
+import { etaProgress, isLate } from '../generation/eta'
+import { useEta } from '../generation/eta-store'
+import { NotifyButton } from '../generation/notify-button'
+import { percent } from '../generation/progress'
 import { GroundedImg } from '../result/grounded-img'
 import { useNow } from '../workspace/use-now'
 import { runningMeta, type PhotoItem } from './photo-item'
@@ -26,16 +29,24 @@ export function RunningList({ server, covers }: { server: PhotoItem[]; covers: R
       </div>
       <ul aria-live="polite" className="grid gap-3 px-(--gutter) md:grid-cols-2">
         {rows.map((row) => (
-          <RunningRowView key={row.id} row={row} progress={row.queued ? 0 : estimatedProgress(now - row.startedAt)} />
+          <RunningRowView key={row.id} row={row} now={now} />
         ))}
       </ul>
       <p className="mx-(--gutter) mt-3 text-caption text-muted-foreground">{t('closeApp')}</p>
+      <div className="mx-(--gutter)">
+        <NotifyButton />
+      </div>
     </section>
   )
 }
 
-function RunningRowView({ row, progress }: { row: RunningRow; progress: number }) {
+// Each photo its own bar (a two-page poster is two rows), by its template's usual time (eta.ts).
+function RunningRowView({ row, now }: { row: RunningRow; now: number }) {
   const t = useTranslations('app')
+  const eta = useEta(row)
+  const elapsed = now - row.startedAt
+  const progress = row.queued ? 0 : etaProgress(elapsed, eta)
+  const late = !row.queued && isLate(elapsed, eta)
   const thumb = row.previewUrl ?? row.cover
   return (
     <Reveal as="li" className="hairline grid grid-cols-[76px_1fr] items-center gap-4 rounded-media bg-card p-3">
@@ -59,7 +70,7 @@ function RunningRowView({ row, progress }: { row: RunningRow; progress: number }
         </span>
         <span className="mt-2 flex items-center gap-2 text-caption">
           <span aria-hidden="true" className={row.queued ? 'size-2 rounded-full bg-muted-foreground' : 'size-2 rounded-full bg-primary'} />
-          {t(row.queued ? 'photos.waiting' : 'photos.generating')}
+          {t(row.queued ? 'photos.waiting' : late ? 'wait.photosLate' : 'photos.generating')}
         </span>
       </span>
     </Reveal>
