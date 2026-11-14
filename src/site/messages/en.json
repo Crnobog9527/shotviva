@@ -1634,6 +1634,31 @@
         "no_identity": "No verified phone number or Google account yet. Verify one first.",
         "not_pending": "This account has no signup credits waiting."
       }
+    },
+    "wait": {
+      "usual": "Usually takes about {seconds, number} seconds.",
+      "usualMinutes": "Usually takes about {minutes, number} minutes.",
+      "late": "Taking longer than usual. It's still going.",
+      "ahead": "{ahead, plural, =0 {Next in line.} one {# photo ahead of it.} other {# photos ahead of it.}}",
+      "startsIn": "Starts in about {seconds, number} seconds.",
+      "startsInMinutes": "Starts in about {minutes, number} minutes.",
+      "leave": "You can leave this page. It lands in Photos when it's done.",
+      "batchLeave": "{count, number} at a time, usually about {seconds, number} seconds each. You can leave this page: each photo lands in Photos as it's done.",
+      "rowQueuedAhead": "{ahead, plural, =0 {Queued · next} other {Queued · # ahead}}",
+      "rowLate": "Longer than usual",
+      "photosLate": "Longer than usual, still going"
+    },
+    "notify": {
+      "ready": "{count, plural, one {\"{name}\" is ready} other {# photos are ready}}",
+      "failed": "{count, plural, one {\"{name}\" didn't finish.} other {# photos didn't finish.}}",
+      "view": "View",
+      "close": "Close",
+      "ask": "Notify me when it's done",
+      "asked": "We'll notify you when it's done.",
+      "titleProgress": "{done, number}/{count, number} ready",
+      "titleReady": "Ready",
+      "titleFailed": "Didn't finish",
+      "leaveQueued": "Some photos haven't started yet. Closing this tab cancels them (no credits are used)."
     }
   },
   "paywall": {
