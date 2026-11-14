@@ -13,6 +13,8 @@ const snapshotSchema = z.object({
     sort_order: z.int(), is_active: z.boolean(), show_members: z.boolean(),
   }),
   members: z.array(z.string()),
+  // Deleted on the test site (1500–1502): carried to production as a delete, never as a definition.
+  deleted: z.boolean().default(false),
 })
 export type SeriesSnapshot = z.infer<typeof snapshotSchema>
 
@@ -38,4 +40,19 @@ export async function syncSeriesMembers(snapshot: SeriesSnapshot, target: SyncTa
   })
   if (write.error) throw rpcError(write.error, 'SERIES_MEMBERS_WRITE')
   return z.object({ placed: z.array(z.string()), skipped: z.array(z.string()) }).parse(write.data)
+}
+
+// A series deleted on the test site: production unpublishes it if live, moves its members out
+// (they stay templates in their categories) and marks it deleted, in one audited step (1502).
+export async function syncSeriesDelete(slug: string, actor: { id: string; runId: string }, target: SyncTarget, validateOnly: boolean) {
+  const write = await target.db.rpc('sync_preview_series_delete', {
+    p_actor: actor.id, p_slug: slug, p_run_id: actor.runId, p_validate_only: validateOnly,
+  })
+  if (write.error) throw rpcError(write.error, 'SERIES_DELETE')
+  const { result, moved, was_live } = z.object({
+    result: z.enum(['deleted', 'unchanged', 'absent']), moved: z.int().nonnegative(), was_live: z.boolean(),
+  }).parse(write.data)
+  if (result === 'absent') return 'deleted on the test site, not on production: nothing to do'
+  if (result === 'unchanged') return 'deleted on the test site, already deleted on production'
+  return `deleted on the test site: deleted on production${was_live ? ' (was published, now down)' : ''}, ${moved} templates moved out`
 }

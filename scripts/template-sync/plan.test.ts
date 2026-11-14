@@ -6,21 +6,21 @@ import type { SeriesSnapshot } from './series'
 // Each step mocked; the test is about order, what reaches each step, and how failures are reported.
 const calls: string[] = []
 const steps = vi.hoisted(() => ({
-  readSeries: vi.fn(), syncSeriesDefinition: vi.fn(), syncSeriesMembers: vi.fn(),
+  readSeries: vi.fn(), syncSeriesDefinition: vi.fn(), syncSeriesMembers: vi.fn(), syncSeriesDelete: vi.fn(),
   syncCategories: vi.fn(), templateCategoryKeys: vi.fn(), syncTemplate: vi.fn(),
   readStates: vi.fn(), readDeletedIds: vi.fn(), syncTemplateState: vi.fn(), syncSeriesActive: vi.fn(),
 }))
-vi.mock('./series', () => ({ readSeries: steps.readSeries, syncSeriesDefinition: steps.syncSeriesDefinition, syncSeriesMembers: steps.syncSeriesMembers }))
+vi.mock('./series', () => ({ readSeries: steps.readSeries, syncSeriesDefinition: steps.syncSeriesDefinition, syncSeriesMembers: steps.syncSeriesMembers, syncSeriesDelete: steps.syncSeriesDelete }))
 vi.mock('./categories', () => ({ syncCategories: steps.syncCategories, templateCategoryKeys: steps.templateCategoryKeys }))
 vi.mock('./sync', () => ({ syncTemplate: steps.syncTemplate }))
 vi.mock('./state', () => ({ readStates: steps.readStates, readDeletedIds: steps.readDeletedIds, syncTemplateState: steps.syncTemplateState, syncSeriesActive: steps.syncSeriesActive }))
 
 const { runSync } = await import('./plan')
 
-const snapshot = (slug: string, members: string[], active = true): SeriesSnapshot => ({
+const snapshot = (slug: string, members: string[], active = true, deleted = false): SeriesSnapshot => ({
   series: { slug, name_en: slug, name_zh: slug, description_en: null, description_zh: null, cover_url: null,
     category_key: `cat-${slug}`, sort_order: 0, is_active: active, show_members: false },
-  members,
+  members, deleted,
 })
 const side = {} as never
 
@@ -54,6 +54,10 @@ beforeEach(() => {
   steps.syncTemplateState.mockReset().mockImplementation(async (id: string) => {
     calls.push(`state ${id}`)
     return 'sale unchanged, unchanged'
+  })
+  steps.syncSeriesDelete.mockReset().mockImplementation(async (slug: string) => {
+    calls.push(`delete ${slug}`)
+    return 'deleted on the test site: deleted on production, 2 templates moved out'
   })
   steps.syncSeriesActive.mockReset().mockImplementation(async (slug: string, active: boolean) => {
     calls.push(`series ${slug} ${active ? 'up' : 'down'}`)
@@ -136,5 +140,24 @@ describe('runSync', () => {
       'set-2 SKIPPED deleted on production (deletes are not synced)',
       'series set members SKIPPED deleted on production: set-2',
     ]))
+  })
+
+  it('carries a series deleted on the test site to production first, with no definition or member step', async () => {
+    steps.readSeries.mockImplementation(async (slug: string) => slug === 'gone' ? snapshot(slug, [], false, true) : snapshot(slug, [`${slug}-1`]))
+    const { lines, options } = run(true)
+    expect(await runSync({ templateIds: [], seriesSlugs: ['gone', 'set'] }, options)).toBe(true)
+    expect(calls[0]).toBe('delete gone')
+    expect(calls).not.toContain('series gone')
+    expect(calls).not.toContain('members gone')
+    expect(steps.syncSeriesDelete).toHaveBeenCalledWith('gone', { id: 'actor', runId: '9' }, side, true)
+    expect(lines).toContain('series gone deleted on the test site: deleted on production, 2 templates moved out')
+  })
+
+  it('never brings back a series deleted on production, and says so', async () => {
+    steps.syncSeriesDefinition.mockRejectedValueOnce(new SyncError('SERIES_DELETED'))
+    const { lines, options } = run()
+    expect(await runSync({ templateIds: [], seriesSlugs: ['set'] }, options)).toBe(false)
+    expect(lines).toContain('series set SERIES_DELETED on production, not brought back (use a new slug on the test site)')
+    expect(calls).not.toContain('members set')
   })
 })

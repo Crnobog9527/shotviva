@@ -16,7 +16,7 @@ export const seriesCopy = {
   changed: '系列或成员已被其他人修改，请重新加载后再编辑。', reload: '重新加载系列',
   invalidMembers: '部分模板已不存在或属于系统模板，请重新选择。',
   memberTaken: '有模板已加入其他系列。请先从原系列移出，再重新加入。',
-  invalidCategory: '请选择有效的模板分类。', slugTaken: '这个系列网址标识已被使用。',
+  invalidCategory: '请选择有效的模板分类。', slugTaken: '这个系列网址标识已被使用（已删除的系列也会占用它的标识）。',
   forbidden: '只有管理员可以修改系列。', transient: '操作失败，请重试。',
   seriesSearch: '按系列中文名搜索', noSeriesMatch: '没有匹配的系列', saved: '系列已保存', selectStatus: '展示方式', separate: '系列及独立成员', onlySeries: '仅系列',
   // 系列管理 list tools (Owner 2026-11-12).
@@ -33,4 +33,19 @@ export const seriesCopy = {
   orderNumber: (n: number) => `序号 ${n}`,
   orderNumberHint: '创作页里系列卡和单独模板卡按这个数字从小到大混排（同一大类内）。',
   productionNote: '正式站的系列会被测试站同步覆盖，请在测试站修改。',
+  // 删除已下架的系列 (Owner 2026-11-14).
+  actions: '操作', delete: '删除', batchDelete: '删除…', liveNoDelete: '已上架的系列不能删除，请先下架。',
+  tabAll: (n: number) => `全部（${n}）`, tabDeleted: (n: number) => `已删除（${n}）`,
+  deletedHint: '已删除的系列不能恢复、上架或加入模板；它的网址标识仍被占用。原来的成员模板都还在，只是不再属于这个系列。',
+  deletedAt: '删除时间', noDeleted: '没有已删除的系列',
+  deleteTitle: (n: number) => n === 1 ? '删除这个系列？' : `删除 ${n} 个系列？`,
+  deleteBody: '删除后无法恢复，系列从列表消失。模板不会被删除，也不会被下架：成员会移出系列，变成独立模板，所在分类不变。',
+  deleteMoved: (n: number) => n ? `共会移出 ${n} 个模板。` : '这些系列没有成员模板。',
+  deleteWill: (n: number) => `会删除这 ${n} 个：`, deleteSkip: (n: number) => `会跳过这 ${n} 个：`,
+  memberCount: (n: number) => n ? `${n} 个模板` : '无成员',
+  deleteSync: '之后把这些系列同步到正式站时，正式站的同名系列也会被删除（成员同样移出）。',
+  deleteConfirm: (n: number) => `确认删除 ${n} 个`, nothingToDelete: '选中的系列都已上架，没有可以删除的。',
+  deleteResult: '删除结果', dismiss: '关闭',
+  deleteDone: (n: number, moved: number) => `已删除 ${n} 个系列，移出 ${moved} 个模板`,
+  deleteSkipped: (n: number) => `跳过 ${n} 个`,
 } as const
