@@ -70,6 +70,15 @@ async function checkTemplateRow(
   return mismatch ?? { parameters }
 }
 
+function imageRow(row: ActiveProviderRow) {
+  if (row.adapter === 'openai_responses') throw new AppError('INVALID_INPUT', 'An image provider is required')
+  return row
+}
+
+// An edit (tierFallback) at a size the line's stored capabilities lack goes to the default line.
+const editTierFallback = (row: ActiveProviderRow, request: ImageRequestOptions) =>
+  Boolean(request.tierFallback && row.capabilities && !row.capabilities.resolutions.includes(request.resolution))
+
 // Resolve before reserving credits or the trial budget so the ledger and price snapshot
 // both belong to the provider that actually receives the request.
 export async function templateImageProvider(
@@ -81,17 +90,18 @@ export async function templateImageProvider(
     parameters: loadParameters = openRouterImageParameters }: RoutingDeps = {},
 ) {
   if (!id || !request) return fallback()
-  const row = await lookup(id)
-  if (row.adapter === 'openai_responses') throw new AppError('INVALID_INPUT', 'An image provider is required')
-  validateStoredCapabilities(row, request)
-  const selection = await checkTemplateRow(row, request, loadParameters)
-  if ('reason' in selection) {
+  const row = imageRow(await lookup(id))
+  const fallBack = async (reason: string) => {
     const provider = await fallback()
     logger.info('image.provider.fallback', {
-      reason: selection.reason, requestedProvider: providerTag(id, row.model), actualProvider: provider.id,
+      reason, requestedProvider: providerTag(id, row.model), actualProvider: provider.id,
       resolution: request.resolution, aspectRatio: request.aspectRatio, referenceCount: request.referenceCount,
     })
-    return { ...provider, fallbackReason: selection.reason }
+    return { ...provider, fallbackReason: reason }
   }
+  if (editTierFallback(row, request)) return fallBack('unsupported_resolution')
+  validateStoredCapabilities(row, request)
+  const selection = await checkTemplateRow(row, request, loadParameters)
+  if ('reason' in selection) return fallBack(selection.reason)
   return resolveProvider('image', row, serverEnv(), adapters, readKey, selection.parameters)
 }

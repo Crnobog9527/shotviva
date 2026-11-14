@@ -56,7 +56,10 @@ export type GenerationProvider = {
 
 // Web and admin first-generation resolve the saved provider after loading the template.
 // Routing requires the number of references, never the uploaded image bytes.
-export type ImageRequestOptions = Pick<ProviderInput, 'resolution' | 'aspectRatio'> & { referenceCount: number }
+// tierFallback: a size the routed line does not offer falls back to the default line instead of
+// being refused. Only an edit asks for it: its size follows the source work, which the bound line's
+// options never narrowed (a template's own sizes do).
+export type ImageRequestOptions = Pick<ProviderInput, 'resolution' | 'aspectRatio'> & { referenceCount: number; tierFallback?: boolean }
 
 export type TemplateProvider = GenerationProvider | ((id: string | null, request: ImageRequestOptions) => Promise<GenerationProvider>)
 

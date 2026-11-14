@@ -38,7 +38,7 @@ export async function loadEditPipeline(db: SupabaseClient): Promise<EditPipeline
 // line that cannot take this size falls back to the default one (template-image-provider.ts), and
 // the source work is the one input image the line must accept.
 export async function editRoute(provider: TemplateProvider, pipeline: EditPipeline, request: { resolution: Resolution; aspectRatio: string }): Promise<GenerationProvider> {
-  const route = await selectTemplateRoute(provider, pipeline.prompt.providerId, request.resolution, request.aspectRatio, 1, 0)
+  const route = await selectTemplateRoute(provider, pipeline.prompt.providerId, request.resolution, request.aspectRatio, 1, 0, undefined, true)
   return route.provider
 }
 

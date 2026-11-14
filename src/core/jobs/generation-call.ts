@@ -17,8 +17,10 @@ type CallTemplate = { template: Pick<GenerationTemplate['template'], 'id' | 'qua
 
 // Both preflight and generation choose the route before fetching any reference bytes.
 export async function selectTemplateRoute(provider: TemplateProvider, providerId: string | null,
-  resolution: Resolution, aspectRatio: string, photoCount: number, styleRefCount: number, onRoute?: (provider: GenerationProvider) => void) {
-  const selected = await resolveTemplateProvider(provider, providerId, { resolution, aspectRatio, referenceCount: photoCount + styleRefCount })
+  resolution: Resolution, aspectRatio: string, photoCount: number, styleRefCount: number, onRoute?: (provider: GenerationProvider) => void,
+  tierFallback?: boolean) {
+  const referenceCount = photoCount + styleRefCount
+  const selected = await resolveTemplateProvider(provider, providerId, { resolution, aspectRatio, referenceCount, ...(tierFallback ? { tierFallback } : {}) })
   onRoute?.(selected)
   const limit = selected.maxReferences ?? Infinity
   const dropRefs = styleRefCount > 0 && photoCount + styleRefCount > limit

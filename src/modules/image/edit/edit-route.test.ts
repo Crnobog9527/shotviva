@@ -28,13 +28,13 @@ describe('editRoute', () => {
     const resolve = vi.fn(async (id: string | null, request: ImageRequestOptions) => (void request, provider(`${id}/doubao-seedream-5-5`)))
     const route = await editRoute(resolve, pipeline(ARK_LINE), { resolution: '2k', aspectRatio: '4:3' })
     expect(route.id).toBe(`${ARK_LINE}/doubao-seedream-5-5`)
-    expect(resolve).toHaveBeenCalledWith(ARK_LINE, { resolution: '2k', aspectRatio: '4:3', referenceCount: 1 })
+    expect(resolve).toHaveBeenCalledWith(ARK_LINE, { resolution: '2k', aspectRatio: '4:3', referenceCount: 1, tierFallback: true })
   })
 
   it('follows the default line when the edit template has no binding', async () => {
     const resolve = vi.fn(async () => provider('default/gpt'))
     expect((await editRoute(resolve, pipeline(null), { resolution: '1k', aspectRatio: 'original' })).id).toBe('default/gpt')
-    expect(resolve).toHaveBeenCalledWith(null, { resolution: '1k', aspectRatio: 'original', referenceCount: 1 })
+    expect(resolve).toHaveBeenCalledWith(null, { resolution: '1k', aspectRatio: 'original', referenceCount: 1, tierFallback: true })
   })
 
   it('refuses a line that cannot take the source image before anything is charged', async () => {
