@@ -4,6 +4,7 @@ import { refresh } from 'next/cache'
 
 import { compensateJob, refundStuckJobs, runAdminQuery, viewWork, type ActionValue, type RefundOutcome, type WorkLinks } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
+import { refundStalePhotos, type StaleRefund } from '@/core/poster/stale-photos'
 import { r2Store } from '@/core/storage'
 
 // Support actions on jobs (T25). Server actions are public endpoints, so each one re-checks the
@@ -31,6 +32,16 @@ export async function refundStuckAction(input: JobInput): Promise<ActionValue<Re
   const jobId = typeof input.jobId === 'string' ? input.jobId : undefined
   return runAdminQuery(async () => {
     const outcome = await refundStuckJobs(createAdminSupabase(), jobId)
+    refresh()
+    return outcome
+  })
+}
+
+// Charged 拍照识别 runs pending past 10 minutes (§5.3): the database picks them again.
+export async function refundStalePhotosAction(): Promise<ActionValue<StaleRefund>> {
+  await requireAdmin()
+  return runAdminQuery(async () => {
+    const outcome = await refundStalePhotos(createAdminSupabase())
     refresh()
     return outcome
   })
