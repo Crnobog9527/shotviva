@@ -6,9 +6,11 @@ import { Button } from '@/core/ui/button'
 import { EDIT_SCOPES } from '@/core/templates/edit-params'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
-import type { CreditsFloor } from '@/core/templates/pricing'
+import { providerFloor, type ProviderFloors } from '@/core/templates/provider-pricing'
 
+import { editLineProblem } from '../edit-template/line-problem'
 import type { EditTemplateSettings, SaveEditTemplateInput } from '../edit-template/schema'
+import { ImageProviderField, type ImageProviderOption } from '../image-provider-field'
 import { SaleSwitch } from '../templates-editor/sale-switch'
 import type { TemplateAdminActions, ActionResult } from '../templates/types'
 import { useTemplateActions } from '../templates-editor/use-template-actions'
@@ -20,21 +22,30 @@ import { ScopeTextFields } from './scope-text-fields'
 
 type Props = {
   settings: EditTemplateSettings
-  floor: CreditsFloor
+  // Every line's floor (pricingFromOptions); the one shown follows the chosen line.
+  floors: ProviderFloors
+  providers: readonly ImageProviderOption[]
   setSale: TemplateAdminActions['setSale']
   save: (input: SaveEditTemplateInput) => Promise<ActionResult>
 }
 
 // /admin/templates/edit (ARCHITECTURE §5.2): switch, price, wrapper, the classifier instructions
 // the six paragraphs and the reframe paragraph of the built-in edit template, saved together.
-export function EditTemplateEditor({ settings, floor, save, setSale }: Props) {
+export function EditTemplateEditor({ settings, floors, providers, save, setSale }: Props) {
   const [form, setForm] = useState(() => formFor(settings))
   const { pending, error, notice, run } = useTemplateActions()
   const patch = (next: Partial<EditTemplateForm>) => setForm((prev) => ({ ...prev, ...next }))
+  const floor = providerFloor(floors, form.providerId, 'edit')
+  const lineProblem = editLineProblem(floors, form.providerId)
   return (
     <div className="grid gap-4">
       <p className="text-muted-foreground text-sm">{COPY.intro}</p>
       <SaleSwitch template={{ id: 'edit', isActive: settings.isActive, saleEnabled: settings.saleEnabled }} action={setSale} disabled={pending} />
+      <div className="grid gap-1.5 rounded-md border p-3">
+        <ImageProviderField id="edit-provider" providers={providers} value={form.providerId} defaultLabel={COPY.followDefault}
+          onChange={(providerId) => patch({ providerId })} />
+        <p className={lineProblem ? 'text-destructive text-xs' : 'text-muted-foreground text-xs'}>{lineProblem ?? COPY.lineHint}</p>
+      </div>
       <BasicsFields form={form} floor={floor} quality={settings.quality} version={settings.version} onChange={patch} />
       <div className="grid gap-1.5 rounded-md border border-dashed p-3">
         <Label htmlFor="edit-classifier">{COPY.classifier}</Label>
@@ -56,7 +67,7 @@ export function EditTemplateEditor({ settings, floor, save, setSale }: Props) {
       {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
       {error ? <p role="alert" className="text-destructive text-sm">{error}</p> : null}
       <div className="flex">
-        <Button className="ml-auto" disabled={pending || !canSave(form)}
+        <Button className="ml-auto" disabled={pending || !canSave(form) || lineProblem !== null}
           onClick={() => run(() => save(toSaveInput(form)), COPY.saved)}>
           {COPY.save}
         </Button>

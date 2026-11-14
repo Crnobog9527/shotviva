@@ -8,6 +8,7 @@ import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 import { creditsBelowFloor, EDIT_TEMPLATE_ID, type TemplateRow } from '@/core/templates'
 
+import { editLineProblem } from './line-problem'
 import { saveEditTemplateSchema, type EditTemplateSettings } from './schema'
 
 // /admin/templates/edit (ARCHITECTURE §5.2): the built-in template every photo edit runs on.
@@ -51,23 +52,36 @@ const FIXED = {
   sort_order: 0,
 }
 
+const DETAILED_ERRORS = ['MODEL_REFERENCE_LIMIT', 'MODEL_CREDIT_FLOOR', 'TEMPLATE_RETIRED', 'TEMPLATE_PRICE_BELOW_FLOOR']
+
+function saveError(error: { message: string; details: string }): AppError {
+  if (DETAILED_ERRORS.includes(error.message)) return new AppError('INVALID_INPUT', error.details)
+  if (error.message === 'MODEL_CHANGED') return new AppError('INVALID_INPUT', '出图模型或报价有变化，请刷新后重新保存')
+  return new AppError('INTERNAL', `saveEditTemplate failed: ${error.message}`)
+}
+
+// Sent only when the page chose one, so an older page's save keeps the stored binding.
+const bindingField = (providerId: string | null | undefined) => providerId === undefined ? {} : { provider_id: providerId }
+
 export async function saveEditTemplate(db: SupabaseClient, adminId: string, input: unknown, floor: ProviderFloors): Promise<void> {
   const parsed = saveEditTemplateSchema.safeParse(input)
   if (!parsed.success) {
     const detail = parsed.error.issues.map((issue) => issue.path.join('.') || 'input').join('、')
     throw new AppError('INVALID_INPUT', `这些字段没填或不合法：${detail}`)
   }
-  const { isActive, creditsCost, unpricedResolutions, wrapper, params } = parsed.data
-  const { quality } = await loadEditTemplateSettings(db)
-  const low = creditsBelowFloor(quality, creditsCost, providerFloor(floor, null, EDIT_TEMPLATE_ID), unpricedResolutions)
+  const { isActive, creditsCost, unpricedResolutions, wrapper, params, providerId } = parsed.data
+  const stored = await loadEditTemplateSettings(db)
+  // An older page sends no providerId: the stored binding stays and is what the price is held to.
+  const bound = providerId === undefined ? (stored.providerId ?? null) : providerId
+  const problem = editLineProblem(floor, bound)
+  if (problem) throw new AppError('INVALID_INPUT', problem)
+  const low = creditsBelowFloor(stored.quality, creditsCost, providerFloor(floor, bound, EDIT_TEMPLATE_ID), unpricedResolutions)
   if (low.length > 0) throw new AppError('INVALID_INPUT', `积分低于下限：${low.map((v) => `${v.resolution} ${floorGuidance(v.floor)}`).join('；')}`)
   const { error } = await db.rpc('admin_upsert_template', {
-    p_template: { ...FIXED, unpriced_resolutions: unpricedResolutions, ...(floor.providers && { price_floors: floor }), quality, credits_cost: creditsCost, is_active: isActive },
-    p_prompt: { body: wrapper, model_params: params },
+    p_template: { ...FIXED, unpriced_resolutions: unpricedResolutions, ...(floor.providers && { price_floors: floor }), quality: stored.quality, credits_cost: creditsCost, is_active: isActive },
+    p_prompt: { body: wrapper, model_params: params, ...bindingField(providerId) },
   })
-  if (error && ['MODEL_REFERENCE_LIMIT', 'MODEL_CREDIT_FLOOR', 'TEMPLATE_RETIRED', 'TEMPLATE_PRICE_BELOW_FLOOR'].includes(error.message)) throw new AppError('INVALID_INPUT', error.details)
-  if (error) throw new AppError('INTERNAL', `saveEditTemplate failed: ${error.message}`)
+  if (error) throw saveError(error)
   // Texts are core prompts: log that they changed, never what they say.
-  logger.info('admin.edit_template.saved', { adminId, isActive })
+  logger.info('admin.edit_template.saved', { adminId, isActive, providerId: bound })
 }
-

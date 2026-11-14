@@ -385,8 +385,7 @@ declare
   v_min integer;
   v_max integer;
 begin
-  select t.fields->'images',coalesce(jsonb_array_length(tp.style_refs),0),
-         case when t.id <> 'edit' then tp.provider_id end
+  select t.fields->'images',coalesce(jsonb_array_length(tp.style_refs),0),tp.provider_id
     into v_images,v_count,v_provider from public.templates t
     left join public.template_prompts tp on tp.template_id=t.id where t.id=p_id and t.module='image';
   if not found then return; end if;
@@ -431,9 +430,7 @@ declare
 begin
   if exists(select from public.template_sale_approvals s where s.template_id=t.id and s.unpriced_resolutions @> array['1k','2k','4k']) then
     raise exception 'TEMPLATE_PRICE_BELOW_FLOOR' using detail='请先为至少一个可售档位定价'; end if;
-  if t.id<>'edit' then
-    select provider_id into bound from public.template_prompts where template_id=t.id for share;
-  end if;
+  select provider_id into bound from public.template_prompts where template_id=t.id for share;
   -- Keep model selection and its configured estimate stable through this commit.
   select p.id,p.id::text||'/'||p.model,admin.sale_route_resolutions(p) into bound,route_tag,supported
     from public.ai_providers p where p.module='image' and (p.id=bound or (bound is null and p.is_active)) for share;
@@ -1920,10 +1917,18 @@ CREATE OR REPLACE FUNCTION "admin"."relabel_seedream_rebind"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+declare target text := admin.provider_profile(new.provider_id);
 begin
+  if new.template_id='edit' and new.provider_id is distinct from old.provider_id and target<>new.active_profile then
+    delete from public.template_profiles where template_id='edit' and profile=target;
+    update public.template_profiles set profile=target, updated_at=now() where template_id='edit' and profile=new.active_profile;
+    update public.template_prompt_versions set profile=target where template_id='edit';
+    new.active_profile := target;
+    return new;
+  end if;
   if new.provider_id is distinct from old.provider_id
      and old.active_profile='openai' and new.active_profile='openai'
-     and admin.provider_profile(new.provider_id)='seedream'
+     and target='seedream'
      and admin.is_seedream_route(old.provider_id)
      and not exists(select from public.template_profiles where template_id=new.template_id and profile='seedream') then
     update public.template_profiles set profile='seedream', updated_at=now()
@@ -2307,7 +2312,7 @@ begin
   select * into strict t from public.templates where id=p_id for update;
   select admin.sale_route_resolutions(p) into supported
     from public.templates x left join public.template_prompts tp on tp.template_id=x.id
-    left join public.ai_providers p on p.id=coalesce(case when x.id<>'edit' then tp.provider_id end,
+    left join public.ai_providers p on p.id=coalesce(tp.provider_id,
       (select a.id from public.ai_providers a where a.module='image' and a.is_active)) where x.id=p_id;
   select unpriced_resolutions into previous from public.template_sale_approvals where template_id=p_id;
   next_unpriced:=coalesce(p_unpriced, previous, array(select tier from unnest(array['1k','2k','4k']) tier where tier<>all(supported)));
@@ -2523,7 +2528,7 @@ CREATE OR REPLACE FUNCTION "admin"."template_image_options"("public"."templates"
     'exactPixels',p.adapter is distinct from 'openrouter_images')
   from public.templates t left join public.template_sale_approvals s on s.template_id=t.id
   left join public.template_prompts tp on tp.template_id=t.id
-  left join public.ai_providers p on p.id=coalesce(case when t.id<>'edit' then tp.provider_id end,
+  left join public.ai_providers p on p.id=coalesce(tp.provider_id,
     (select a.id from public.ai_providers a where a.module='image' and a.is_active))
   where t.id=$1.id and (t.is_active or current_setting('role',true)='service_role')
 $_$;
@@ -2644,7 +2649,7 @@ CREATE OR REPLACE FUNCTION "admin"."template_sync_quote"("p_receipt" "jsonb", "p
     AS $$
   select jsonb_build_array(p_receipt->'terms',
     p_receipt->'routes'->p_provider::text,
-    case when p_provider is null or p_edit then p_receipt->'routes'->(p_receipt->>'active') end)
+    case when p_provider is null then p_receipt->'routes'->(p_receipt->>'active') end)
 $$;
 
 
@@ -9294,8 +9299,7 @@ begin
   -- 3k from a caller still on the old name is read as 4k (PR-2).
   p_template := public.canonical_tiers(p_template);
   perform 1 from public.templates where id = v_id for update;
-  if v_id='edit' then v_provider:=null;
-  elsif p_prompt ? 'provider_id' then
+  if p_prompt ? 'provider_id' then
     v_provider := (p_prompt ->> 'provider_id')::uuid;
   else
     select provider_id into v_provider from public.template_prompts where template_id = v_id;

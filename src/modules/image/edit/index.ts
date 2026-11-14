@@ -10,4 +10,4 @@ export { createOpenAIResponsesClassifier, KEEP_MAX, type OpenAIResponsesConfig }
 export { editBodySchema, toEditRequest, type EditRequest } from './edit-request'
 export { runEdit, type EditDeps } from './run-edit'
 // The steps a user's edit and an admin test run's edit share (T85).
-export { decideEdit, editDecisionCost, editProviderCall, editRecord, loadEditPipeline, type DecideDeps, type EditPipeline } from './edit-pipeline'
+export { decideEdit, editDecisionCost, editProviderCall, editRecord, editRoute, loadEditPipeline, type DecideDeps, type EditPipeline } from './edit-pipeline'
