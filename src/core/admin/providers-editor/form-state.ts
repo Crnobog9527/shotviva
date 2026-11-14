@@ -54,7 +54,11 @@ export const DEFAULT_FORM: ProviderForm = {
 const priceText = (value: number | null) => (value === null ? '' : String(value))
 
 export function formFor(provider: AdminProvider | null, module: ProviderModule = 'image'): ProviderForm {
-  if (!provider) return { ...DEFAULT_FORM, module, adapter: MODULE_ADAPTER[module] }
+  if (!provider) {
+    const form = { ...DEFAULT_FORM, module, adapter: MODULE_ADAPTER[module] }
+    // A new decision row starts on OpenRouter (decision-route.ts; Owner 2026-11-15).
+    return module === 'decision' ? { ...form, baseUrl: OPENROUTER_BASE_URL } : form
+  }
   return fillOfficial({
     module: provider.module,
     adapter: provider.adapter,
