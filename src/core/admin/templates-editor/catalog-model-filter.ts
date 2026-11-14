@@ -19,12 +19,14 @@ function lineLabel(id: string, lines: ReadonlyMap<string, Line>) {
   if (id === UNBOUND_MODEL) return copy.unboundModel
   const line = lines.get(id)
   if (!line) return copy.unknownModel(id)
-  return `${line.label} · ${line.model}${line.isActive ? '' : copy.inactiveModel}`
+  return `${line.label} · ${line.model}${line.isActive ? copy.defaultModel : ''}`
 }
 
 // One option per line some template is bound to (with how many of `rows` use it), the current
-// default line first. A chosen line that no row uses any more (all just moved away) stays listed
-// at 0, so the select keeps showing what the empty list is filtered by.
+// default line first and marked. Not-default is not 停用: ai_providers.is_active is the one default
+// per module, and a template bound to another line still runs on it. A chosen line that no row
+// uses any more (all just moved away) stays listed at 0, so the select keeps showing what the
+// empty list is filtered by.
 export function modelFilterOptions(rows: readonly ModelRow[], lines: readonly Line[], selected = ''): ModelFilterOption[] {
   const counts = new Map<string, number>()
   for (const template of rows) counts.set(boundTo(template), (counts.get(boundTo(template)) ?? 0) + 1)
