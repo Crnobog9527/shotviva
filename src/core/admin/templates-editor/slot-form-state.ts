@@ -16,6 +16,9 @@ export type SlotFormValue = {
   required: boolean
   // The paired text field's key, '' for none.
   note: string
+  // false: a poster's QR code, pasted by code and never sent to the model (§5.3). No control of
+  // its own: set in the fields JSON (templates:apply) and carried through a save unchanged.
+  sendToModel?: false
 }
 
 export const emptySlot = (): SlotFormValue => ({ key: '', label: '', labelZh: '', help: '', helpZh: '', required: false, note: '' })
@@ -24,7 +27,7 @@ export function toSlotValues(template: AdminTemplate): SlotFormValue[] {
   const zh = template.translations.zh?.fields ?? {}
   return (template.fields.images.slots ?? []).map((slot) => ({
     key: slot.key, label: slot.label, labelZh: zh[slot.key]?.label ?? '', help: slot.help ?? '', helpZh: zh[slot.key]?.help ?? '',
-    required: slot.required, note: slot.note ?? '',
+    required: slot.required, note: slot.note ?? '', ...(slot.sendToModel === false ? { sendToModel: false as const } : {}),
   }))
 }
 
@@ -45,6 +48,7 @@ export function toImages(slots: readonly SlotFormValue[], fromJson: unknown): un
   if (slots.length === 0) return typeof fromJson === 'object' && fromJson !== null ? withoutSlots({ images: fromJson }).images : fromJson
   const stored: ImageSlot[] = slots.map((slot) => ({
     key: trimmed(slot.key), label: trimmed(slot.label), ...optional('help', slot.help), required: slot.required, ...optional('note', slot.note),
+    ...(slot.sendToModel === false ? { sendToModel: false } : {}),
   }) as ImageSlot)
   return { min: stored.filter((slot) => slot.required).length, max: stored.length, slots: stored }
 }

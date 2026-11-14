@@ -11,6 +11,7 @@ import { useSlotPhotos } from '../workspace/use-photo-batch'
 import { startJob } from '../generation/job-store'
 import { emptyContent, tidyContent, withDefaults } from './content-edit'
 import { extractPoster, savePosterSet } from './poster-api'
+import { useQrCheck } from './use-qr-check'
 
 // The poster editor's state (ARCHITECTURE §5.3): paste → sorted blocks the user checks → one job
 // per poster in the shared generation queue. Kept in sessionStorage, so a reload keeps the draft.
@@ -81,6 +82,7 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
   const [stage, setStage] = useState<PosterBlock | null>(null)
   const [notice, setNotice] = useState<StudioNotice>(null)
   const photos = useSlotPhotos(template.slots)
+  const qrCheck = useQrCheck(photos, template.poster.qr?.slot ?? null)
 
   const parsed = useMemo(() => posterContentSchema.safeParse(tidyContent(draft.content)), [draft.content])
   const parts: PosterPart[] = useMemo(() => (parsed.success ? splitPoster(parsed.data, template.poster) : []), [parsed, template.poster])
@@ -128,16 +130,18 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     toManual: () => setDraft((d) => ({ ...d, step: 'edit', sorted: false })),
     toPaste: () => setDraft((d) => ({ ...d, step: 'paste' })),
     setReviewed: (reviewed: boolean) => setDraft((d) => ({ ...d, reviewed })),
-    edit, sort, generate, parts, valid: parsed.success, busy, stage, notice, photos,
+    edit, sort, generate, parts, valid: parsed.success, busy, stage, notice, photos, qrCheck,
     aspect, setAspect, resolution, setResolution,
   }
 }
 
 export type PosterStudioState = ReturnType<typeof usePosterStudio>
 
-// The uploads one page sends: the filled slots its kind lists, or none.
+// The uploads one page sends: the filled slots its kind lists, and the QR code, which every page
+// carries (§5.3); or none.
 export function pageUploads(template: Pick<StudioTemplate, 'poster'>, kind: string, uploads: Record<string, string>): Record<string, string> | null {
-  const listed = template.poster.kinds.find((item) => item.key === kind)?.slots ?? []
+  const qr = template.poster.qr?.slot
+  const listed = [...(template.poster.kinds.find((item) => item.key === kind)?.slots ?? []), ...(qr ? [qr] : [])]
   const entries = Object.entries(uploads).filter(([key]) => listed.includes(key))
   return entries.length ? Object.fromEntries(entries) : null
 }

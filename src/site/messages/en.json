@@ -825,6 +825,9 @@
         "error": "Something went wrong. Please try again."
       },
       "slotHint": "Optional. Leave it empty and the prizes are drawn from their text.",
+      "qrHint": "Optional. Upload one and it is pasted onto both pages exactly as it is, so it always scans. Use a sharp PNG or JPG of the code.",
+      "qrChecking": "Reading the QR code…",
+      "qrUnreadable": "No QR code could be read in this picture. Please upload a sharp picture of the whole code.",
       "folds": {
         "masthead": "Masthead",
         "title": "Title & time",

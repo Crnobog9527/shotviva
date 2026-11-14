@@ -53,6 +53,13 @@ export const templateFieldsSchema = z
     message: 'a poster page can only send image slots the template defines',
     path: ['poster'],
   })
+  // The QR code is pasted by code (§5.3): its slot exists, never goes to the model, and only a
+  // poster template has one; every other slot keeps going to the model.
+  .refine((fields) => (fields.images.slots ?? []).every((slot) => slot.sendToModel !== false || fields.poster?.qr?.slot === slot.key)
+    && (!fields.poster?.qr || (fields.images.slots ?? []).some((slot) => slot.key === fields.poster?.qr?.slot && slot.sendToModel === false && !slot.required)), {
+    message: 'poster.qr must name an optional image slot with sendToModel false, and only that slot may set it',
+    path: ['poster'],
+  })
   .superRefine((fields, ctx) => {
     for (const message of slotShapeProblems(fields)) ctx.addIssue({ code: 'custom', message, path: ['images', 'slots'] })
     for (const message of groupShapeProblems(fields)) ctx.addIssue({ code: 'custom', message, path: ['groups'] })

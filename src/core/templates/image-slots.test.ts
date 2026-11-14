@@ -72,6 +72,19 @@ describe('validateGenerationInputs with image slots', () => {
     expect(() => validateGenerationInputs(fields, raw)).toThrow(expect.objectContaining({ code: 'INVALID_INPUT' }))
   })
 
+  it('keeps a slot the model never sees apart, out of the image list', () => {
+    const poster = templateFieldsSchema.parse({
+      images: { min: 0, max: 2, slots: [{ key: 'prize_photo', label: 'Prize photo' }, { key: 'qr_code', label: 'QR code', sendToModel: false }] },
+      aspectRatios: ['1:2'],
+      poster: { kinds: [{ key: 'prizes', name: { en: 'x', zh: 'x' }, blocks: ['prizes'], slots: ['prize_photo'] }], qr: { slot: 'qr_code', fallback: { x: 0.05, y: 0.86, size: 0.12 } } },
+    })
+    const inputs = validateGenerationInputs(poster, { imageCount: 0, slots: { qr_code: 'inputs/u/q.png', prize_photo: 'inputs/u/a.jpg' } })
+    expect(inputs.slots).toEqual([{ key: 'prize_photo', label: 'Prize photo', upload: 'inputs/u/a.jpg' }])
+    expect(inputs.pasted).toEqual([{ key: 'qr_code', label: 'QR code', upload: 'inputs/u/q.png' }])
+    expect(renderPrompt('Draw {{image_slots}}', inputs)).not.toContain('QR code')
+    expect(validateGenerationInputs(poster, { imageCount: 0, slots: {} }).pasted).toBeUndefined()
+  })
+
   it('refuses slots for a template without them', () => {
     const plain = templateFieldsSchema.parse({ images: { min: 0, max: 1 }, aspectRatios: ['1:1'] })
     expect(() => validateGenerationInputs(plain, { imageCount: 0, slots: {} })).toThrow(expect.objectContaining({ code: 'INVALID_INPUT' }))
