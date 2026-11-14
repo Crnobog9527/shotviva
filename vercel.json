@@ -21,6 +21,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/cron/poster-photos",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/daily-brief",
       "schedule": "0 14 * * *"
     }

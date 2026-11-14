@@ -12607,6 +12607,39 @@ $$;
 ALTER FUNCTION "public"."refund_poster_photo"("p_extraction_id" bigint, "p_input_chars" integer, "p_input_tokens" integer, "p_output_tokens" integer, "p_cost_usd" numeric) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."refund_stale_poster_photos"("p_older_than" interval, "p_limit" integer) RETURNS TABLE("refunded" integer, "skipped" integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id bigint;
+  v_refunded integer := 0;
+  v_skipped integer := 0;
+begin
+  if p_older_than is null or p_older_than < interval '10 minutes' then
+    raise exception 'INVALID_INPUT' using detail = 'only runs pending for at least 10 minutes are refunded';
+  end if;
+  for v_id in
+    select e.id from public.poster_extractions e
+     where e.status = 'pending' and e.credits > 0 and e.created_at < now() - p_older_than
+     order by e.created_at
+     limit least(greatest(coalesce(p_limit, 1), 1), 500)
+  loop
+    begin
+      perform public.refund_poster_photo(v_id, null, null, null, null);
+      v_refunded := v_refunded + 1;
+    exception when others then
+      v_skipped := v_skipped + 1;
+    end;
+  end loop;
+  return query select v_refunded, v_skipped;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."refund_stale_poster_photos"("p_older_than" interval, "p_limit" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."release_batch_zip"("p_user_id" "uuid", "p_batch_id" "uuid", "p_token" "uuid") RETURNS "void"
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -17260,6 +17293,10 @@ CREATE INDEX "poster_checks_user" ON "public"."poster_checks" USING "btree" ("us
 
 
 
+CREATE INDEX "poster_extractions_pending_charged" ON "public"."poster_extractions" USING "btree" ("created_at") WHERE (("status" = 'pending'::"text") AND ("credits" > 0));
+
+
+
 CREATE INDEX "poster_extractions_user_created" ON "public"."poster_extractions" USING "btree" ("user_id", "created_at" DESC);
 
 
@@ -20776,6 +20813,11 @@ GRANT ALL ON FUNCTION "public"."refund_job"("p_job_id" "uuid", "p_error_code" "t
 
 REVOKE ALL ON FUNCTION "public"."refund_poster_photo"("p_extraction_id" bigint, "p_input_chars" integer, "p_input_tokens" integer, "p_output_tokens" integer, "p_cost_usd" numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."refund_poster_photo"("p_extraction_id" bigint, "p_input_chars" integer, "p_input_tokens" integer, "p_output_tokens" integer, "p_cost_usd" numeric) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."refund_stale_poster_photos"("p_older_than" interval, "p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."refund_stale_poster_photos"("p_older_than" interval, "p_limit" integer) TO "service_role";
 
 
 

@@ -13,6 +13,16 @@ export const SUPPORT_COPY = {
     done: (refunded: number, skipped: number) => (skipped > 0 ? `已退回 ${refunded} 个，${skipped} 个已经结算过，没有动` : `已退回 ${refunded} 个`),
     columns: { createdAt: '开始时间', user: '用户', template: '模板', credits: '积分', source: '来源', action: '' },
   },
+  stalePhotos: {
+    title: (n: number) => `卡住的拍照识别（${n}）`,
+    body: '赛事海报「拍照识别旧海报」扣了积分、超过 10 分钟还没结束的，服务器进程一定已经中断。定时任务每 5 分钟自动退回；这里列出它还没处理到的。',
+    refundAll: '全部退回',
+    confirmTitle: (n: number) => `退回全部 ${n} 次卡住的识别？`,
+    confirmBody: '每次识别标为失败，积分退回原来的池，只退一次。已经结束的不会受影响。',
+    confirm: '确认退回',
+    done: (refunded: number, skipped: number) => (skipped > 0 ? `已退回 ${refunded} 次，${skipped} 次已经结束，没有动` : `已退回 ${refunded} 次`),
+    columns: { createdAt: '开始时间', user: '用户', credits: '积分' },
+  },
   compensate: {
     button: '补偿',
     title: '补偿这一单？',
