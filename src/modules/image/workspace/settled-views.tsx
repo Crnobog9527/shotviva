@@ -9,12 +9,12 @@ import { buttonVariants } from '@/core/ui/button'
 import { CompareSlider } from '../catalogue/compare-slider'
 import { EditHint } from '../edit-ui/edit-hint'
 import { editHref } from '../edit-ui/edit-link'
-import type { TrackedJob } from '../generation/job-model'
+import type { JobFailure, TrackedJob } from '../generation/job-model'
 import { SIDE_BY_SIDE } from '../result/action-styles'
 import { ResultPhoto } from '../result/result-photo'
 import { ShareButton } from '../result/share-button'
 import { DevelopTray, StageLayout, TRAY_SIZE, TrayCaption } from './develop-tray'
-import { readFailure, refundLine } from './error-copy'
+import { failCaption, readFailure } from './error-copy'
 import { FailureNotes } from './failure-notes'
 import { costTag, monoTag, ResultPanel } from './result-panel'
 import { tierName, tierPx } from './workspace-options'
@@ -65,6 +65,15 @@ export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps)
   )
 }
 
+// Under the grey photo: the one word on the credits that the title has not said (failCaption).
+function FailCaption({ failure }: { failure: JobFailure }) {
+  const t = useTranslations('app')
+  const errors = useTranslations('app.errors')
+  const caption = failCaption(failure)
+  if (!caption) return null
+  return <TrayCaption>{caption === 'onHold' ? errors('onHold') : t('workspace.failState.caption')}</TrayCaption>
+}
+
 type FailureProps = { job: TrackedJob; onRetry(): void; onNewPhoto(): void; onEditWords(): void }
 
 // Failed (DESIGN §4.4, B comp workspace.html?state=failed): the message leads on a phone. What
@@ -74,14 +83,13 @@ type FailureProps = { job: TrackedJob; onRetry(): void; onNewPhoto(): void; onEd
 // the photo kept: it is the text that has to change, not the photo.
 export function FailureView({ job, onRetry, onNewPhoto, onEditWords }: FailureProps) {
   const t = useTranslations('app')
-  const errors = useTranslations('app.errors')
   const { failure, retry } = readFailure(job.failure, job.inputKey !== null || hasSlotInputs(job))
   const words = failure.code === 'IDENTITY_SWAP_REFUSED'
   const size = t.rich('workspace.developingSize', { tier: tierName(job.resolution, t), px: tierPx(job.resolution, job.aspect), mono: monoTag })
   const tray = (
     <>
       <DevelopTray src={job.previewUrl ?? null} developing={false} negative hud={[t('workspace.failState.hud'), size]} className={TRAY_SIZE} />
-      <TrayCaption>{failure.refunded === false ? refundLine(failure, errors) : t('workspace.failState.caption')}</TrayCaption>
+      <FailCaption failure={failure} />
     </>
   )
   const bar = (
