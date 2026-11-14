@@ -22,12 +22,14 @@ function Headline({ text }: { text: string }) {
 // at 768–1023 (the pair is capped at 640), 268 px from 1024 (the pair takes half the row).
 const HERO_PLATE_SIZES = '(min-width: 1024px) 268px, (min-width: 768px) 320px, 50vw'
 
-type Props = { page: Pick<PageBasics, 'h1' | 'subtitle' | 'answerBlock' | 'hero'>; generator: ReactNode }
+// `tagline`: one line an A/B experiment's hero option adds under the direct answer (ARCHITECTURE
+// §16.5); the H1, subtitle and answer stay the same for every group.
+type Props = { page: Pick<PageBasics, 'h1' | 'subtitle' | 'answerBlock' | 'hero'>; generator: ReactNode; tagline?: string }
 
 // First screen of the home page and every landing page (ARCHITECTURE §13 item 2, DESIGN §6.9): H1, subtitle and the direct answer in
 // the server HTML (建站规格 R5, G1), the phone → AI pair with its caption (R9), then the
 // generator. ≥1024 the copy and the pair share a row and the generator bench spans under them.
-export function HomeHero({ page, generator }: Props) {
+export function HomeHero({ page, generator, tagline }: Props) {
   const { hero } = page
   const t = useTranslations('marketing.home')
   return (
@@ -38,6 +40,7 @@ export function HomeHero({ page, generator }: Props) {
         </h1>
         <p className="mk-lede">{page.subtitle}</p>
         <p className="mk-answer">{page.answerBlock}</p>
+        {tagline ? <p className="mk-hero-tagline">{tagline}</p> : null}
       </div>
       {hero.scenes ? (
         <HeroScenes

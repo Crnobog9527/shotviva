@@ -2064,6 +2064,20 @@ $$;
 ALTER FUNCTION "admin"."require_catalog_v2"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."require_experiment_admin"("p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+begin
+  if not exists (select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'ADMIN_REQUIRED' using errcode = '42501';
+  end if;
+end $$;
+
+
+ALTER FUNCTION "admin"."require_experiment_admin"("p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."require_reference_admin"("p_actor" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -5957,6 +5971,131 @@ end $$;
 
 
 ALTER FUNCTION "public"."admin_edit_reference_asset"("p_actor" "uuid", "p_id" "uuid", "p_fields" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_experiment_act"("p_actor" "uuid", "p_id" bigint, "p_action" "text", "p_variant" bigint DEFAULT NULL::bigint, "p_fallback" bigint DEFAULT NULL::bigint) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_exp public.experiments;
+  v_control bigint;
+  v_target bigint;
+  v_moved integer := 0;
+begin
+  perform admin.require_experiment_admin(p_actor);
+  select * into v_exp from public.experiments where id = p_id for update;
+  if not found then raise exception 'EXPERIMENT_NOT_FOUND'; end if;
+  select id into v_control from public.experiment_variants where experiment_id = p_id and is_control;
+  if p_action = 'start' and v_exp.status = 'draft' then
+    if (select coalesce(sum(weight), 0) from public.experiment_variants where experiment_id = p_id) = 0 then
+      raise exception 'EXPERIMENT_NO_WEIGHT' using errcode = '23514';
+    end if;
+    update public.experiments set status = 'running', started_at = now(), updated_at = now() where id = p_id;
+  elsif p_action = 'pause' and v_exp.status = 'running' then
+    update public.experiments set status = 'paused', updated_at = now() where id = p_id;
+  elsif p_action = 'resume' and v_exp.status = 'paused' then
+    update public.experiments set status = 'running', updated_at = now() where id = p_id;
+  elsif p_action = 'end' and v_exp.status in ('running', 'paused') then
+    v_target := coalesce(p_variant, v_control);
+    if not exists (select 1 from public.experiment_variants where id = v_target and experiment_id = p_id and archived_at is null) then
+      raise exception 'EXPERIMENT_VARIANT_INVALID';
+    end if;
+    update public.experiments set status = 'ended', ended_at = now(), winner_variant_id = v_target, updated_at = now() where id = p_id;
+  elsif p_action = 'archive' and v_exp.status in ('running', 'paused') then
+    v_target := coalesce(p_fallback, v_control);
+    if p_variant = v_control or p_variant = v_target
+       or not exists (select 1 from public.experiment_variants where id = p_variant and experiment_id = p_id and archived_at is null)
+       or not exists (select 1 from public.experiment_variants where id = v_target and experiment_id = p_id and archived_at is null) then
+      raise exception 'EXPERIMENT_VARIANT_INVALID';
+    end if;
+    update public.experiment_variants set archived_at = now(), fallback_variant_id = v_target where id = p_variant;
+    update public.experiment_assignments
+    set current_variant_id = v_target, reassigned_from = p_variant, reassigned_at = now()
+    where current_variant_id = p_variant and experiment_id = p_id;
+    get diagnostics v_moved = row_count;
+    update public.experiments set updated_at = now() where id = p_id;
+  elsif p_action = 'delete' and v_exp.status = 'draft' then
+    delete from public.experiments where id = p_id;
+  else
+    raise exception 'EXPERIMENT_BAD_STATE';
+  end if;
+  insert into public.admin_audit_log (action, user_id, reason, target_id)
+  values (
+    case p_action when 'archive' then 'experiment_archive_variant' else 'experiment_' || p_action end,
+    p_actor,
+    case p_action
+      when 'end' then format('%s: winner variant %s', v_exp.name, v_target)
+      when 'archive' then format('%s: variant %s archived, %s accounts moved to %s', v_exp.name, p_variant, v_moved, v_target)
+      else v_exp.name end,
+    p_id::text);
+end $$;
+
+
+ALTER FUNCTION "public"."admin_experiment_act"("p_actor" "uuid", "p_id" bigint, "p_action" "text", "p_variant" bigint, "p_fallback" bigint) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_experiment_results"("p_id" bigint) RETURNS TABLE("variant_id" bigint, "signups" bigint, "first_generations" bigint, "payments" bigint, "now_on" bigint, "moved" bigint)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  with people as (
+    select a.* from public.experiment_assignments a
+    join public.profiles p on p.id = a.user_id and p.role <> 'admin'
+    where a.experiment_id = p_id
+  ),
+  signed as (
+    select a.user_id, a.first_variant_id, a.assigned_at,
+      exists (select 1 from public.generation_jobs j where j.user_id = a.user_id and j.status = 'succeeded' and j.created_at >= a.assigned_at) as generated,
+      exists (select 1 from public.payments m where m.user_id = a.user_id and m.created_at >= a.assigned_at) as paid
+    from people a where a.source = 'signup'
+  )
+  select v.id,
+    (select count(*) from signed s where s.first_variant_id = v.id),
+    (select count(*) from signed s where s.first_variant_id = v.id and s.generated),
+    (select count(*) from signed s where s.first_variant_id = v.id and s.paid),
+    (select count(*) from people a where a.current_variant_id = v.id),
+    (select count(*) from people a where a.reassigned_from = v.id)
+  from public.experiment_variants v
+  where v.experiment_id = p_id
+  order by v.id
+$$;
+
+
+ALTER FUNCTION "public"."admin_experiment_results"("p_id" bigint) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_experiment_save"("p_actor" "uuid", "p_id" bigint, "p_surface" "text", "p_name" "text", "p_goal" "text", "p_variants" "jsonb") RETURNS bigint
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id bigint;
+begin
+  perform admin.require_experiment_admin(p_actor);
+  if jsonb_typeof(p_variants) is distinct from 'array' or jsonb_array_length(p_variants) not between 2 and 4
+     or (select count(*) from jsonb_array_elements(p_variants) v where (v->>'is_control')::boolean) <> 1
+     or (select count(distinct v->>'option_id') from jsonb_array_elements(p_variants) v) <> jsonb_array_length(p_variants) then
+    raise exception 'EXPERIMENT_VARIANTS_INVALID' using errcode = '23514';
+  end if;
+  if p_id is null then
+    insert into public.experiments (surface, name, goal, created_by) values (p_surface, p_name, p_goal, p_actor) returning id into v_id;
+  else
+    update public.experiments set name = p_name, goal = p_goal, updated_at = now()
+    where id = p_id and status = 'draft' and surface = p_surface returning id into v_id;
+    if v_id is null then raise exception 'EXPERIMENT_NOT_DRAFT'; end if;
+    delete from public.experiment_variants where experiment_id = v_id;
+  end if;
+  insert into public.experiment_variants (experiment_id, option_id, label, weight, is_control)
+  select v_id, v->>'option_id', v->>'label', (v->>'weight')::integer, (v->>'is_control')::boolean
+  from jsonb_array_elements(p_variants) v;
+  insert into public.admin_audit_log (action, user_id, reason, target_id)
+  values ('experiment_save', p_actor, format('%s: %s', p_surface, p_name), v_id::text);
+  return v_id;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_experiment_save"("p_actor" "uuid", "p_id" bigint, "p_surface" "text", "p_name" "text", "p_goal" "text", "p_variants" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_expire_prompt_lab_runs"("p_actor" "uuid") RETURNS "void"
@@ -11014,6 +11153,62 @@ $_$;
 ALTER FUNCTION "public"."entry_template"("public"."web_catalogue_entries") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."experiment_sign_in"("p_user" "uuid", "p_pairs" "jsonb", "p_signup" boolean) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  insert into public.experiment_assignments (experiment_id, user_id, first_variant_id, current_variant_id, source, reassigned_at, reassigned_from)
+  select e.id, p_user, f.id, coalesce(c.fallback_variant_id, c.id),
+    case when p_signup then 'signup' else 'sign_in' end,
+    case when c.archived_at is not null then now() end,
+    case when c.archived_at is not null then c.id end
+  from jsonb_array_elements(case when jsonb_typeof(p_pairs) = 'array' then p_pairs else '[]'::jsonb end) p
+  join public.experiments e on e.id = (p->>'experiment')::bigint and e.status in ('running', 'paused')
+  join public.experiment_variants c on c.id = (p->>'current')::bigint and c.experiment_id = e.id
+  join public.experiment_variants f on f.id = (p->>'first')::bigint and f.experiment_id = e.id
+  on conflict (experiment_id, user_id) do nothing;
+  return (
+    select coalesce(jsonb_agg(jsonb_build_object('experiment', a.experiment_id, 'current', a.current_variant_id, 'first', a.first_variant_id)), '[]'::jsonb)
+    from public.experiment_assignments a
+    join public.experiments e on e.id = a.experiment_id and e.status in ('running', 'paused')
+    where a.user_id = p_user
+  );
+end $$;
+
+
+ALTER FUNCTION "public"."experiment_sign_in"("p_user" "uuid", "p_pairs" "jsonb", "p_signup" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."experiments_live"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  with live as (
+    select e.* from public.experiments e where e.status in ('running', 'paused')
+    union all
+    select * from (
+      select distinct on (e.surface) e.* from public.experiments e
+      where e.status = 'ended'
+        and not exists (select 1 from public.experiments l where l.surface = e.surface and l.status in ('running', 'paused'))
+      order by e.surface, e.ended_at desc
+    ) ended
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', l.id, 'surface', l.surface, 'status', l.status, 'winner', l.winner_variant_id,
+    'variants', (
+      select jsonb_agg(jsonb_build_object(
+        'id', v.id, 'option', v.option_id, 'weight', v.weight, 'control', v.is_control,
+        'archived', v.archived_at is not null, 'fallback', v.fallback_variant_id) order by v.id)
+      from public.experiment_variants v where v.experiment_id = l.id)
+  )), '[]'::jsonb)
+  from live l
+$$;
+
+
+ALTER FUNCTION "public"."experiments_live"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."fail_identity_judge"("p_id" bigint) RETURNS "void"
     LANGUAGE "sql"
     SET "search_path" TO ''
@@ -14751,7 +14946,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -15119,6 +15314,90 @@ ALTER TABLE "public"."credit_ledger" OWNER TO "postgres";
 
 ALTER TABLE "public"."credit_ledger" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "public"."credit_ledger_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."experiment_assignments" (
+    "experiment_id" bigint NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "first_variant_id" bigint NOT NULL,
+    "current_variant_id" bigint NOT NULL,
+    "source" "text" NOT NULL,
+    "assigned_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "reassigned_at" timestamp with time zone,
+    "reassigned_from" bigint,
+    CONSTRAINT "experiment_assignments_check" CHECK ((("reassigned_at" IS NULL) = ("reassigned_from" IS NULL))),
+    CONSTRAINT "experiment_assignments_source_check" CHECK (("source" = ANY (ARRAY['signup'::"text", 'sign_in'::"text"])))
+);
+
+
+ALTER TABLE "public"."experiment_assignments" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."experiment_variants" (
+    "id" bigint NOT NULL,
+    "experiment_id" bigint NOT NULL,
+    "option_id" "text" NOT NULL,
+    "label" "text" NOT NULL,
+    "weight" integer NOT NULL,
+    "is_control" boolean DEFAULT false NOT NULL,
+    "archived_at" timestamp with time zone,
+    "fallback_variant_id" bigint,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "experiment_variants_check" CHECK ((NOT ("is_control" AND ("archived_at" IS NOT NULL)))),
+    CONSTRAINT "experiment_variants_check1" CHECK ((("archived_at" IS NULL) = ("fallback_variant_id" IS NULL))),
+    CONSTRAINT "experiment_variants_label_check" CHECK ((("length"("label") >= 1) AND ("length"("label") <= 40))),
+    CONSTRAINT "experiment_variants_option_id_check" CHECK (("option_id" ~ '^[a-z0-9-]{1,40}$'::"text")),
+    CONSTRAINT "experiment_variants_weight_check" CHECK ((("weight" >= 0) AND ("weight" <= 100)))
+);
+
+
+ALTER TABLE "public"."experiment_variants" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."experiment_variants" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."experiment_variants_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."experiments" (
+    "id" bigint NOT NULL,
+    "surface" "text" NOT NULL,
+    "name" "text" NOT NULL,
+    "goal" "text" NOT NULL,
+    "status" "text" DEFAULT 'draft'::"text" NOT NULL,
+    "winner_variant_id" bigint,
+    "started_at" timestamp with time zone,
+    "ended_at" timestamp with time zone,
+    "created_by" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "experiments_check" CHECK ((("status" = 'draft'::"text") = ("started_at" IS NULL))),
+    CONSTRAINT "experiments_check1" CHECK ((("status" = 'ended'::"text") = ("ended_at" IS NOT NULL))),
+    CONSTRAINT "experiments_goal_check" CHECK (("goal" = ANY (ARRAY['signup'::"text", 'first_generation'::"text", 'payment'::"text"]))),
+    CONSTRAINT "experiments_name_check" CHECK ((("length"("name") >= 1) AND ("length"("name") <= 80))),
+    CONSTRAINT "experiments_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'running'::"text", 'paused'::"text", 'ended'::"text"]))),
+    CONSTRAINT "experiments_surface_check" CHECK (("surface" = ANY (ARRAY['hero'::"text", 'pricing'::"text", 'paywall'::"text"])))
+);
+
+
+ALTER TABLE "public"."experiments" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."experiments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."experiments_id_seq"
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -16047,6 +16326,26 @@ ALTER TABLE ONLY "public"."credit_ledger"
 
 
 
+ALTER TABLE ONLY "public"."experiment_assignments"
+    ADD CONSTRAINT "experiment_assignments_pkey" PRIMARY KEY ("experiment_id", "user_id");
+
+
+
+ALTER TABLE ONLY "public"."experiment_variants"
+    ADD CONSTRAINT "experiment_variants_experiment_id_option_id_key" UNIQUE ("experiment_id", "option_id");
+
+
+
+ALTER TABLE ONLY "public"."experiment_variants"
+    ADD CONSTRAINT "experiment_variants_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."experiments"
+    ADD CONSTRAINT "experiments_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."feature_access"
     ADD CONSTRAINT "feature_access_pkey" PRIMARY KEY ("key");
 
@@ -16637,6 +16936,30 @@ CREATE INDEX "credit_ledger_user_id_created_at_idx" ON "public"."credit_ledger" 
 
 
 CREATE INDEX "credit_ledger_user_plan_idx" ON "public"."credit_ledger" USING "btree" ("user_id", "created_at" DESC, "id" DESC) WHERE (("pool" = 'paid'::"text") AND ("delta" > 0) AND ("product_id" IS NOT NULL) AND (NOT "starts_with"("product_id", 'pack_'::"text")));
+
+
+
+CREATE INDEX "experiment_assignments_current_idx" ON "public"."experiment_assignments" USING "btree" ("current_variant_id");
+
+
+
+CREATE INDEX "experiment_assignments_user_idx" ON "public"."experiment_assignments" USING "btree" ("user_id");
+
+
+
+CREATE UNIQUE INDEX "experiment_variants_control_idx" ON "public"."experiment_variants" USING "btree" ("experiment_id") WHERE "is_control";
+
+
+
+CREATE INDEX "experiments_created_at_id_idx" ON "public"."experiments" USING "btree" ("created_at" DESC, "id" DESC);
+
+
+
+CREATE INDEX "experiments_ended_surface_idx" ON "public"."experiments" USING "btree" ("surface", "ended_at" DESC) WHERE ("status" = 'ended'::"text");
+
+
+
+CREATE UNIQUE INDEX "experiments_live_surface_idx" ON "public"."experiments" USING "btree" ("surface") WHERE ("status" = ANY (ARRAY['running'::"text", 'paused'::"text"]));
 
 
 
@@ -17538,6 +17861,46 @@ ALTER TABLE ONLY "public"."credit_ledger"
 
 
 
+ALTER TABLE ONLY "public"."experiment_assignments"
+    ADD CONSTRAINT "experiment_assignments_current_variant_id_fkey" FOREIGN KEY ("current_variant_id") REFERENCES "public"."experiment_variants"("id");
+
+
+
+ALTER TABLE ONLY "public"."experiment_assignments"
+    ADD CONSTRAINT "experiment_assignments_experiment_id_fkey" FOREIGN KEY ("experiment_id") REFERENCES "public"."experiments"("id");
+
+
+
+ALTER TABLE ONLY "public"."experiment_assignments"
+    ADD CONSTRAINT "experiment_assignments_first_variant_id_fkey" FOREIGN KEY ("first_variant_id") REFERENCES "public"."experiment_variants"("id");
+
+
+
+ALTER TABLE ONLY "public"."experiment_assignments"
+    ADD CONSTRAINT "experiment_assignments_reassigned_from_fkey" FOREIGN KEY ("reassigned_from") REFERENCES "public"."experiment_variants"("id");
+
+
+
+ALTER TABLE ONLY "public"."experiment_assignments"
+    ADD CONSTRAINT "experiment_assignments_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."experiment_variants"
+    ADD CONSTRAINT "experiment_variants_experiment_id_fkey" FOREIGN KEY ("experiment_id") REFERENCES "public"."experiments"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."experiment_variants"
+    ADD CONSTRAINT "experiment_variants_fallback_variant_id_fkey" FOREIGN KEY ("fallback_variant_id") REFERENCES "public"."experiment_variants"("id");
+
+
+
+ALTER TABLE ONLY "public"."experiments"
+    ADD CONSTRAINT "experiments_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
+
+
+
 ALTER TABLE ONLY "public"."feature_access"
     ADD CONSTRAINT "feature_access_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -18056,6 +18419,15 @@ ALTER TABLE "public"."codes" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."credit_ledger" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."experiment_assignments" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."experiment_variants" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."experiments" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."feature_access" ENABLE ROW LEVEL SECURITY;
@@ -18634,6 +19006,10 @@ REVOKE ALL ON FUNCTION "admin"."require_catalog_policy"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "admin"."require_catalog_v2"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."require_experiment_admin"("p_actor" "uuid") FROM PUBLIC;
 
 
 
@@ -19228,6 +19604,21 @@ GRANT ALL ON FUNCTION "public"."admin_due_reference_deletions"("p_actor" "uuid")
 
 REVOKE ALL ON FUNCTION "public"."admin_edit_reference_asset"("p_actor" "uuid", "p_id" "uuid", "p_fields" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_edit_reference_asset"("p_actor" "uuid", "p_id" "uuid", "p_fields" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_experiment_act"("p_actor" "uuid", "p_id" bigint, "p_action" "text", "p_variant" bigint, "p_fallback" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_experiment_act"("p_actor" "uuid", "p_id" bigint, "p_action" "text", "p_variant" bigint, "p_fallback" bigint) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_experiment_results"("p_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_experiment_results"("p_id" bigint) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_experiment_save"("p_actor" "uuid", "p_id" bigint, "p_surface" "text", "p_name" "text", "p_goal" "text", "p_variants" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_experiment_save"("p_actor" "uuid", "p_id" bigint, "p_surface" "text", "p_name" "text", "p_goal" "text", "p_variants" "jsonb") TO "service_role";
 
 
 
@@ -19950,6 +20341,16 @@ GRANT ALL ON FUNCTION "public"."entry_template"("public"."web_catalogue_entries"
 
 
 
+REVOKE ALL ON FUNCTION "public"."experiment_sign_in"("p_user" "uuid", "p_pairs" "jsonb", "p_signup" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."experiment_sign_in"("p_user" "uuid", "p_pairs" "jsonb", "p_signup" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."experiments_live"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."experiments_live"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."fail_identity_judge"("p_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."fail_identity_judge"("p_id" bigint) TO "service_role";
 
@@ -20542,6 +20943,30 @@ GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."credit_ledg
 GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."experiment_assignments" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."experiment_variants" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."experiment_variants_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."experiment_variants_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."experiment_variants_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."experiments" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."experiments_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."experiments_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."experiments_id_seq" TO "service_role";
 
 
 

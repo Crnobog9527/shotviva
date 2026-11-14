@@ -5,14 +5,16 @@ import { isAffiliateEnabled, requiresAffiliateProgram } from '@/core/affiliate/f
 import { notFoundResponse } from '@/core/auth/proxy-gates'
 import { recordReferral } from '@/core/affiliate/referral'
 import { withAnalyticsRegion } from '@/core/analytics/consent'
-import { proxyGate } from '@/core/auth/proxy'
+import { proxyGate, type Forward } from '@/core/auth/proxy'
 import { captureCodeLink } from '@/core/codes/link'
 import { isBadGalleryPage } from '@/core/gallery/page-number'
 import { galleryWorkIdOf, liveGalleryGate } from '@/core/gallery/proxy-gate'
 import { serverEnv } from '@/core/env'
+import { experimentRoute, OPTION_PAGES, toOptionPage, withExperimentCookie, type RouteOutcome } from '@/core/experiments/server'
 import { viaImageCdn } from '@/core/storage/image-cdn-guard'
 import { routing } from '@/core/i18n/routing'
 import { canonicalRedirectResponse, withHostNoindex } from '@/core/seo'
+import { experimentRegistry } from '@/site/experiments/registry'
 import { site } from '@/site/site.config'
 
 const hosts = { canonicalHost: site.brand.domain, redirectHosts: site.indexing.canonicalRedirectHosts }
@@ -35,6 +37,19 @@ function earlyResponse(request: NextRequest) {
   return viaImageCdn(request.headers) ? notFoundResponse() : canonicalRedirectResponse(request, hosts)
 }
 
+// /gallery?page= outside 1–20 (T108): a real 404 here, since the page reads the number inside a
+// Suspense boundary, after its status is sent. The experiments' prerendered option pages
+// (ARCHITECTURE §16.5) are reached only through the rewrite in experimentForward.
+function closedAddress(request: NextRequest): boolean {
+  return isBadGalleryPage(request.nextUrl) || OPTION_PAGES.test(request.nextUrl.pathname)
+}
+
+// The locale router, handed the A/B option's page instead of the address when there is one.
+function experimentForward(experiment: RouteOutcome | null): Forward {
+  const rewrite = experiment?.rewrite
+  return rewrite ? (forwarded) => toOptionPage(localeRouter, forwarded, rewrite) : localeRouter
+}
+
 export async function proxy(request: NextRequest) {
   const early = earlyResponse(request)
   if (early) return early
@@ -45,16 +60,17 @@ export async function proxy(request: NextRequest) {
   if (requiresAffiliateProgram(request.nextUrl.pathname) && !(await isAffiliateEnabled())) {
     return notFoundResponse()
   }
-  // /gallery?page= outside 1–20 (T108): a real 404 here, since the page reads the number inside
-  // a Suspense boundary, after its status is sent.
-  if (isBadGalleryPage(request.nextUrl)) return notFoundResponse()
+  if (closedAddress(request)) return notFoundResponse()
   // /g/<id> (T108): a real 404 unless the gallery is open and shows the work.
   const workId = galleryWorkIdOf(request.nextUrl.pathname)
   if (workId !== null && !(workId && (await isShownWork(workId)))) return notFoundResponse()
   const env = serverEnv()
+  // A/B experiments (ARCHITECTURE §16.5): on a surface's address, which option page answers. The
+  // page itself stays prerendered; only this rewrite and the cookie differ per visitor.
+  const experiment = await experimentRoute(request, experimentRegistry, env.VERCEL_ENV !== 'production')
   const response = captureCodeLink(request) ?? await proxyGate(request, {
     translatedPaths: site.locales.zhPaths,
-    forward: localeRouter,
+    forward: experimentForward(experiment),
     // /generate/upload-test only under `next dev`.
     devPages: env.NODE_ENV === 'development',
     // /error-test, the error-boundary check, on local builds and the test site only.
@@ -65,6 +81,7 @@ export async function proxy(request: NextRequest) {
   // Whether analytics may use cookies for this visitor (ARCHITECTURE §16.1, T70); the test
   // site and local dev accept ?sv_country=XX to act as a visitor from that country.
   withAnalyticsRegion(response, request, { testOverride: env.VERCEL_ENV !== 'production' })
+  withExperimentCookie(response, experiment, request.nextUrl.protocol === 'https:')
   await recordReferral(request, response)
   return withHostNoindex(response, request, hosts.canonicalHost)
 }

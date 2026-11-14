@@ -76,6 +76,8 @@ export const eventSchemas = {
     method: z.enum(['email', 'google', 'phone']), code_kind: z.enum(['invite', 'campaign']).nullable().optional(),
     // The template share link this browser opened before signing up (sv_share cookie), if any.
     share_template_id: slug.optional(), share_id: shareIdSchema.nullable().optional(),
+    // ARCHITECTURE §16.5: the A/B variants this browser saw first, `<experiment>:<variant>` joined by ','.
+    experiments: z.string().regex(/^\d+:\d+(,\d+:\d+)*$/).max(200).optional(),
   }),
   code_redeem: z.strictObject({
     kind: z.enum(['invite', 'campaign']).nullable(), code: campaignCode.optional(),
@@ -138,6 +140,12 @@ export const eventSchemas = {
   }),
   // Template share links (Owner 2026-11-13): the funnel from a shared link to a first photo.
   template_share: z.strictObject({ template_id: slug, category: slug, method: z.enum(TEMPLATE_SHARE_METHODS), share_id: shareIdSchema }),
+  // ARCHITECTURE §16.5: a browser put on an A/B variant (new) or moved off an archived one
+  // (`reassigned`); reported once per change, from the sv_exp cookie. Visitors per variant count these.
+  experiment_exposure: z.strictObject({
+    experiment_id: z.number().int().positive(), variant_id: z.number().int().positive(),
+    first_variant_id: z.number().int().positive(), reassigned: z.boolean(),
+  }),
   template_share_open: z.strictObject({ template_id: slug, share_id: shareIdSchema.nullable(), signed_in: z.boolean(), referrer_host: referrerHost.nullable() }),
   template_share_signup_start: z.strictObject({ template_id: slug, share_id: shareIdSchema.nullable() }),
   template_share_generate: z.strictObject({ template_id: slug, share_id: shareIdSchema.nullable() }),
@@ -186,6 +194,7 @@ export const BROWSER_EVENTS = [
   'gallery_reuse',
   'template_share',
   'template_share_open',
+  'experiment_exposure',
   'template_share_signup_start',
   'template_share_generate',
 ] as const

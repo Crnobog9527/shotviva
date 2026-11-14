@@ -230,3 +230,5 @@ export {
   type DisputeUploadTicket,
 } from './disputes'
 export { DisputeDetail, DisputesList, toCard, type DisputeActions, type DisputeCard } from './disputes-ui'
+export { actOnExperiment, loadExperimentViews, saveExperiment, type ExperimentView } from './experiments'
+export { EXPERIMENTS_COPY, ExperimentsEditor, type ExperimentAdminActions, type SurfaceChoices } from './experiments-ui'
