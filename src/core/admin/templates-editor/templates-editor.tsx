@@ -107,7 +107,7 @@ export function TemplatesEditor({ providers, templates: all, categories, series,
         categories={categories}
         onClear={() => setSelected(new Set())}
       />
-      <CatalogView query={query} onQuery={setQuery} series={series} categories={categories}
+      <CatalogView query={query} onQuery={setQuery} series={series} categories={categories} providers={providers}
         floor={floor}
         templates={templates}
         deleted={deleted}
