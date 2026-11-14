@@ -16,8 +16,6 @@ export type HeroOptionContent = {
   hero: Pick<HeroBlock, 'before' | 'after' | 'caption' | 'scenes'>
   // One line under the direct answer that says who this demo is for.
   tagline: string
-  // The template the first-screen generator opens on, when it is on sale.
-  generatorTemplate: string
   // More real pairs in a row under the first screen (lazy, small).
   strip?: HeroStripBlock
 }
@@ -42,7 +40,6 @@ const artStyle: Record<Locale, HeroOptionContent> = {
       },
     },
     tagline: 'Turn a photo of your pet, your kids or your friends into anime, 3D or watercolor art. The face and pose stay theirs.',
-    generatorTemplate: 'flat-anime-style',
   },
   zh: {
     hero: {
@@ -59,7 +56,6 @@ const artStyle: Record<Locale, HeroOptionContent> = {
       },
     },
     tagline: '把宠物、孩子或朋友的照片变成动漫、3D 或水彩画，长相和姿势还是原来的样子。',
-    generatorTemplate: 'flat-anime-style',
   },
 }
 
