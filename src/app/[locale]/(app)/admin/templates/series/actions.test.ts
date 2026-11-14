@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
   requireAdmin: vi.fn(), createAdminSupabase: vi.fn(), saveAdminSeries: vi.fn(), searchSeriesCandidates: vi.fn(),
-  reorderAdminSeries: vi.fn(), setAdminSeriesFlag: vi.fn(),
+  reorderAdminSeries: vi.fn(), setAdminSeriesFlag: vi.fn(), deleteAdminSeries: vi.fn(),
   revalidatePath: vi.fn(), updateTag: vi.fn(),
 }))
 vi.mock('@/core/auth', () => api)
@@ -11,7 +11,7 @@ vi.mock('next/cache', () => api)
 vi.mock('@/core/admin/template-series', () => api)
 vi.mock('@/core/admin/templates', () => ({ runAdminQuery: async (fn: () => Promise<unknown>) => ({ ok: true, value: await fn() }) }))
 vi.mock('@/core/templates', () => ({ TEMPLATES_CACHE_TAG: 'templates' }))
-const { reorderSeriesAction, saveSeriesAction, searchMembersAction, setSeriesFlagAction } = await import('./actions')
+const { deleteSeriesAction, reorderSeriesAction, saveSeriesAction, searchMembersAction, setSeriesFlagAction } = await import('./actions')
 const input = {
   id: null, revision: null, members: [], reason: null,
   fields: { slug: 'seed', name_en: 'Seed', name_zh: '系列', description_en: null, description_zh: null,
@@ -22,7 +22,7 @@ afterEach(() => { vi.resetAllMocks() })
 it('guards both actions before creating any service client', async () => {
   api.requireAdmin.mockImplementation(() => notFound())
   for (const action of [() => saveSeriesAction(input), () => searchMembersAction('', null), () => reorderSeriesAction(['a']),
-    () => setSeriesFlagAction({ ids: ['a'], field: 'show_members', value: true, reason: null })]) {
+    () => setSeriesFlagAction({ ids: ['a'], field: 'show_members', value: true, reason: null }), () => deleteSeriesAction(['a'])]) {
     await expect(action()).rejects.toMatchObject({ digest: expect.stringMatching(/404/) })
   }
   expect(api.createAdminSupabase).not.toHaveBeenCalled()
@@ -50,4 +50,16 @@ it('reorders and batch-sets as the authenticated admin and refreshes the catalog
   expect(await setSeriesFlagAction(flag)).toEqual({ ok: true, value: 1 })
   expect(api.setAdminSeriesFlag).toHaveBeenCalledWith({}, 'actor', flag)
   expect(api.updateTag).toHaveBeenCalledTimes(2)
+})
+
+it('deletes as the authenticated admin and refreshes the public catalogue and both admin lists', async () => {
+  api.requireAdmin.mockResolvedValue({ id: 'actor' })
+  api.createAdminSupabase.mockReturnValue({})
+  const outcome = { done: [{ id: 'a', moved: 2 }], skipped: [] }
+  api.deleteAdminSeries.mockResolvedValue(outcome)
+  expect(await deleteSeriesAction(['a'])).toEqual({ ok: true, value: outcome })
+  expect(api.deleteAdminSeries).toHaveBeenCalledWith({}, 'actor', { ids: ['a'] })
+  expect(api.updateTag).toHaveBeenCalledWith('templates')
+  expect(api.revalidatePath).toHaveBeenCalledWith('/[locale]/admin/templates', 'page')
+  expect(api.revalidatePath).toHaveBeenCalledWith('/[locale]/admin/templates/series', 'page')
 })

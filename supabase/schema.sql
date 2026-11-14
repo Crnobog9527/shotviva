@@ -1402,6 +1402,40 @@ $$;
 ALTER FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."guard_deleted_series"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if old.deleted_at is not null and new.deleted_at is null then
+    raise exception 'SERIES_DELETED' using detail = '已删除的系列不能恢复';
+  end if;
+  if new.deleted_at is not null and new.is_active then
+    raise exception 'SERIES_DELETED' using detail = '已删除的系列不能上架';
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."guard_deleted_series"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."guard_deleted_series_member"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if new.series_id is not null and (tg_op = 'INSERT' or new.series_id is distinct from old.series_id)
+     and exists(select 1 from public.template_series s where s.id = new.series_id and s.deleted_at is not null) then
+    raise exception 'SERIES_DELETED' using detail = '已删除的系列不能加入模板';
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."guard_deleted_series_member"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."guard_deleted_template"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -2537,6 +2571,7 @@ CREATE TABLE IF NOT EXISTS "public"."template_series" (
     "sort_order" integer DEFAULT 0 NOT NULL,
     "is_active" boolean DEFAULT false NOT NULL,
     "show_members" boolean DEFAULT false NOT NULL,
+    "deleted_at" timestamp with time zone,
     CONSTRAINT "template_series_name_en_check" CHECK (("btrim"("name_en") <> ''::"text")),
     CONSTRAINT "template_series_name_zh_check" CHECK (("btrim"("name_zh") <> ''::"text")),
     CONSTRAINT "template_series_slug_check" CHECK (("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))
@@ -2566,7 +2601,9 @@ begin
   if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
     raise exception 'FORBIDDEN';
   end if;
-  if p_action not in ('template_sync_active', 'template_sync_sale', 'series_sync_active') then raise exception 'INVALID_INPUT'; end if;
+  if p_action not in ('template_sync_active', 'template_sync_sale', 'series_sync_active', 'series_sync_delete') then
+    raise exception 'INVALID_INPUT';
+  end if;
   insert into public.admin_audit_log(action, user_id, target_id, reason) values(p_action, p_actor, p_target, p_reason);
 end $$;
 
@@ -5853,6 +5890,39 @@ end $$;
 ALTER FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_delete_template_series"("p_actor" "uuid", "p_id" "uuid") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  s public.template_series;
+  v_moved integer;
+begin
+  if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
+    raise exception 'FORBIDDEN';
+  end if;
+  if not exists(select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  select * into s from public.template_series where id = p_id for update;
+  if not found then raise exception 'SERIES_MISSING'; end if;
+  if s.deleted_at is not null then return null; end if;
+  if s.is_active then raise exception 'SERIES_LIVE'; end if;
+  perform 1 from public.templates where series_id = p_id order by id for update;
+  update public.templates set series_id = null, series_sort_order = 0 where series_id = p_id;
+  get diagnostics v_moved = row_count;
+  update public.template_series set deleted_at = now() where id = p_id;
+  insert into public.admin_audit_log(action, user_id, target_id, reason)
+    values ('series_delete', p_actor, p_id::text, format('系列管理删除已下架系列 %s，移出 %s 个模板', s.slug, v_moved));
+  return v_moved;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_delete_template_series"("p_actor" "uuid", "p_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_due_reference_deletions"("p_actor" "uuid") RETURNS TABLE("r2_key" "text")
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -7092,10 +7162,11 @@ begin
   end if;
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
   perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
-  perform 1 from public.template_series order by id for update;
+  perform 1 from public.template_series where deleted_at is null order by id for update;
   if p_ids is null or cardinality(p_ids) <> (select count(distinct i) from unnest(p_ids) i)
-     or cardinality(p_ids) <> (select count(*) from public.template_series)
-     or exists(select 1 from unnest(p_ids) i where not exists(select 1 from public.template_series s where s.id = i)) then
+     or cardinality(p_ids) <> (select count(*) from public.template_series where deleted_at is null)
+     or exists(select 1 from unnest(p_ids) i where not exists(
+       select 1 from public.template_series s where s.id = i and s.deleted_at is null)) then
     raise exception 'SERIES_CHANGED';
   end if;
   update public.template_series s set sort_order = m.ord::integer * 10
@@ -7805,7 +7876,7 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series',0));
   if p_id is not null then
     select * into previous from public.template_series where id=p_id for update;
-    if not found or p_revision is distinct from admin.template_series_revision(previous) then
+    if not found or previous.deleted_at is not null or p_revision is distinct from admin.template_series_revision(previous) then
       raise exception 'SERIES_CHANGED';
     end if;
     if previous.is_active and not (p_fields->>'is_active')::boolean and nullif(btrim(p_reason),'') is null then
@@ -8471,7 +8542,7 @@ begin
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
   perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
   perform 1 from public.template_series where id = any(p_ids) order by id for update;
-  if (select count(*) from public.template_series where id = any(p_ids)) <> cardinality(p_ids) then
+  if (select count(*) from public.template_series where id = any(p_ids) and deleted_at is null) <> cardinality(p_ids) then
     raise exception 'SERIES_CHANGED';
   end if;
   if p_field = 'is_active' then
@@ -8722,7 +8793,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_template_series_detail"("p_id" "uuid"
       'cover_url',coalesce(t.cover_after_url,t.cover_locales #>> '{zh,after}',t.cover_locales #>> '{en,after}'),
       'is_active',t.is_active, 'series_id',s.id) order by t.series_sort_order,t.id)
       from public.templates t where t.series_id=s.id),'[]'))
-  from public.template_series s where s.id=p_id
+  from public.template_series s where s.id=p_id and s.deleted_at is null
 $$;
 
 
@@ -11449,7 +11520,8 @@ CREATE OR REPLACE FUNCTION "public"."read_template_series_sync_source"("p_slug" 
       'category_key', s.category_key, 'sort_order', s.sort_order, 'is_active', s.is_active,
       'show_members', s.show_members),
     'members', coalesce((select jsonb_agg(t.id order by t.series_sort_order, t.id)
-      from public.templates t where t.series_id = s.id), '[]'::jsonb))
+      from public.templates t where t.series_id = s.id), '[]'::jsonb),
+    'deleted', s.deleted_at is not null)
   from public.template_series s where s.slug = p_slug
 $$;
 
@@ -13014,6 +13086,7 @@ begin
   end if;
   saved := jsonb_populate_record(null::public.template_series, p_series - 'id');
   select * into previous from public.template_series where slug = v_slug for update;
+  if previous.deleted_at is not null then raise exception 'SERIES_DELETED'; end if;
   if previous.id is null then
     insert into public.template_series(slug, name_en, name_zh, description_en, description_zh, cover_url,
         category_key, sort_order, is_active, show_members)
@@ -13058,6 +13131,7 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
   select * into previous from public.template_series where slug = p_slug for update;
   if previous.id is null then raise exception 'SERIES_MISSING'; end if;
+  if previous.deleted_at is not null then raise exception 'SERIES_DELETED'; end if;
   if previous.is_active is distinct from p_active then
     update public.template_series set is_active = p_active where id = previous.id;
     perform admin.template_sync_audit(p_actor, 'series_sync_active', p_slug,
@@ -13073,12 +13147,48 @@ end $$;
 ALTER FUNCTION "public"."sync_preview_series_active"("p_actor" "uuid", "p_slug" "text", "p_active" boolean, "p_run_id" "text", "p_validate_only" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."sync_preview_series_delete"("p_actor" "uuid", "p_slug" "text", "p_run_id" "text", "p_validate_only" boolean DEFAULT false) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  previous public.template_series;
+  v_moved integer;
+  v_result jsonb;
+begin
+  if nullif(p_run_id, '') is null then raise exception 'INVALID_SYNC'; end if;
+  if not exists(select from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  select * into previous from public.template_series where slug = p_slug for update;
+  if previous.id is null then return jsonb_build_object('result', 'absent', 'moved', 0, 'was_live', false); end if;
+  if previous.deleted_at is not null then return jsonb_build_object('result', 'unchanged', 'moved', 0, 'was_live', false); end if;
+  perform 1 from public.templates where series_id = previous.id order by id for update;
+  update public.templates set series_id = null, series_sort_order = 0 where series_id = previous.id;
+  get diagnostics v_moved = row_count;
+  update public.template_series set is_active = false, deleted_at = now() where id = previous.id;
+  perform admin.template_sync_audit(p_actor, 'series_sync_delete', p_slug,
+    format('T93 sync from preview run %s: deleted on the test site, %s templates moved out%s',
+      p_run_id, v_moved, case when previous.is_active then ', was published' else '' end));
+  v_result := jsonb_build_object('result', 'deleted', 'moved', v_moved, 'was_live', previous.is_active);
+  if p_validate_only then raise exception using errcode = 'Z9301'; end if;
+  return v_result;
+exception when sqlstate 'Z9301' then return v_result;
+end $$;
+
+
+ALTER FUNCTION "public"."sync_preview_series_delete"("p_actor" "uuid", "p_slug" "text", "p_run_id" "text", "p_validate_only" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."sync_preview_series_members"("p_slug" "text", "p_members" "text"[], "p_validate_only" boolean DEFAULT false) RETURNS "jsonb"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
 declare
   v_series uuid;
+  v_deleted timestamptz;
   v_placed text[];
   v_result jsonb;
 begin
@@ -13087,8 +13197,9 @@ begin
   end if;
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
   perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
-  select id into v_series from public.template_series where slug = p_slug for update;
+  select id, deleted_at into v_series, v_deleted from public.template_series where slug = p_slug for update;
   if v_series is null then raise exception 'SERIES_MISSING'; end if;
+  if v_deleted is not null then raise exception 'SERIES_DELETED'; end if;
   perform 1 from public.templates where id = any(p_members) or series_id = v_series order by id for update;
   select coalesce(array_agg(m.id order by m.ord), '{}') into v_placed
     from unnest(p_members) with ordinality as m(id, ord)
@@ -14447,7 +14558,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -16844,6 +16955,10 @@ CREATE OR REPLACE TRIGGER "series_category" BEFORE INSERT OR UPDATE OF "category
 
 
 
+CREATE OR REPLACE TRIGGER "series_deleted_guard" BEFORE UPDATE OF "deleted_at", "is_active" ON "public"."template_series" FOR EACH ROW EXECUTE FUNCTION "admin"."guard_deleted_series"();
+
+
+
 CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "public"."site_announcements" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
@@ -16909,6 +17024,10 @@ CREATE CONSTRAINT TRIGGER "template_publish_floor" AFTER INSERT OR UPDATE OF "is
 
 
 CREATE OR REPLACE TRIGGER "template_request_votes_count" AFTER INSERT OR DELETE ON "public"."template_request_votes" FOR EACH ROW EXECUTE FUNCTION "public"."template_request_votes_count"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_series_member_guard" BEFORE INSERT OR UPDATE OF "series_id" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "admin"."guard_deleted_series_member"();
 
 
 
@@ -18192,6 +18311,14 @@ GRANT ALL ON FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resoluti
 
 
 
+REVOKE ALL ON FUNCTION "admin"."guard_deleted_series"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."guard_deleted_series_member"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."guard_deleted_template"() FROM PUBLIC;
 
 
@@ -18880,6 +19007,11 @@ GRANT ALL ON FUNCTION "public"."admin_delete_template"("p_actor" "uuid", "p_id" 
 
 REVOKE ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_delete_template_series"("p_actor" "uuid", "p_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_template_series"("p_actor" "uuid", "p_id" "uuid") TO "service_role";
 
 
 
@@ -19980,6 +20112,11 @@ GRANT ALL ON FUNCTION "public"."sync_preview_series"("p_series" "jsonb", "p_vali
 
 REVOKE ALL ON FUNCTION "public"."sync_preview_series_active"("p_actor" "uuid", "p_slug" "text", "p_active" boolean, "p_run_id" "text", "p_validate_only" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sync_preview_series_active"("p_actor" "uuid", "p_slug" "text", "p_active" boolean, "p_run_id" "text", "p_validate_only" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sync_preview_series_delete"("p_actor" "uuid", "p_slug" "text", "p_run_id" "text", "p_validate_only" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sync_preview_series_delete"("p_actor" "uuid", "p_slug" "text", "p_run_id" "text", "p_validate_only" boolean) TO "service_role";
 
 
 

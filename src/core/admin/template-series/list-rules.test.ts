@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { autoCovers, selectionNames } from './list-rules'
+import { autoCovers, planSeriesDelete, selectionNames } from './list-rules'
 
 const row = (id: string, cover_url: string | null = null) =>
   ({ id, name_zh: '系列' + id, slug: id, is_active: true, show_members: false, sort_order: 10, cover_url })
@@ -44,4 +44,20 @@ describe('autoCovers', () => {
 
 it('lists the checked series names in list order', () => {
   expect(selectionNames([row('a'), row('b'), row('c')], new Set(['c', 'a']))).toEqual(['系列a', '系列c'])
+})
+
+describe('删除', () => {
+  it('counts every member a series has, published or not', () => {
+    const rows = autoCovers([row('a'), row('b')], [member('a', null), member('a', null, { active: false }), member('a', null, { web: false })])
+    expect(rows.map(r => r.memberCount)).toEqual([3, 0])
+  })
+
+  it('takes unpublished series only, says why the others are skipped, and how many templates move out', () => {
+    const plan = planSeriesDelete([
+      { id: 'a', is_active: false, memberCount: 2 }, { id: 'b', is_active: true, memberCount: 5 }, { id: 'c', is_active: false, memberCount: 0 },
+    ])
+    expect(plan.deletable.map(item => item.id)).toEqual(['a', 'c'])
+    expect(plan.skipped).toEqual([{ item: { id: 'b', is_active: true, memberCount: 5 }, reason: '已上架，先下架才能删除' }])
+    expect(plan.moved).toBe(2)
+  })
 })
