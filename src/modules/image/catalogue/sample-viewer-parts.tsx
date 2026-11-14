@@ -1,0 +1,74 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
+import { useRef, type PointerEvent } from 'react'
+
+import { cn } from '@/core/ui/cn'
+
+export type ViewerSide = 'phone' | 'ai'
+
+// 原图 / AI on the picture's top-left corner, frosted so it reads over any photo.
+export function SideToggle({ side, onSide }: { side: ViewerSide; onSide(side: ViewerSide): void }) {
+  const t = useTranslations('app.template')
+  return (
+    <div role="group" aria-label={t('viewerSwitch')} className="frost absolute top-2 left-2 z-1 inline-flex rounded-full p-1">
+      {(['phone', 'ai'] as const).map((key) => (
+        <button
+          key={key}
+          type="button"
+          aria-pressed={side === key}
+          onClick={() => onSide(key)}
+          className={cn('min-h-9 rounded-full px-4 text-caption font-semibold', side === key ? (key === 'ai' ? 'bg-primary text-primary-foreground' : 'bg-foreground text-background') : 'text-foreground')}
+        >
+          {t(key)}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// A 44 px target on the picture's top-right corner; the visible disc is smaller so it covers
+// less of the photo.
+export function CloseMark() {
+  return (
+    <span className="frost grid size-8 place-items-center rounded-full text-white">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeWidth={2.25} strokeLinecap="round">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </span>
+  )
+}
+
+// A sideways swipe this long (px) switches between the phone photo and the AI result.
+const SWIPE = 48
+
+// One finger, not zoomed: a sideways swipe switches sides. Zoomed, the finger pans instead.
+// A swipe is not also a tap: the click that follows it is consumed.
+export function useSwipe(zoomed: boolean, onSwipe: (direction: 'left' | 'right') => void) {
+  const start = useRef<{ x: number; y: number } | null>(null)
+  const swiped = useRef(false)
+  const consumed = () => {
+    const was = swiped.current
+    swiped.current = false
+    return was
+  }
+  const handlers = {
+    onPointerDown(event: PointerEvent) {
+      swiped.current = false
+      start.current = event.isPrimary && !zoomed ? { x: event.clientX, y: event.clientY } : null
+    },
+    onPointerUp(event: PointerEvent) {
+      const from = start.current
+      start.current = null
+      if (!from) return
+      const dx = event.clientX - from.x
+      if (Math.abs(dx) < SWIPE || Math.abs(dx) <= Math.abs(event.clientY - from.y)) return
+      swiped.current = true
+      onSwipe(dx < 0 ? 'left' : 'right')
+    },
+    onPointerCancel() {
+      start.current = null
+    },
+  }
+  return { handlers, consumed }
+}
