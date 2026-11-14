@@ -29,6 +29,10 @@ export type HeroBlock = {
 
 export type HeroScene = { image: ImageRef; caption: string }
 
+// More real before/after pairs of one A/B hero option, in a row right under the first screen
+// (ARCHITECTURE §16.5): small, lazy pictures, never part of the first paint.
+export type HeroStripBlock = { heading: string; items: readonly { before: ImageRef; after: ImageRef; caption: string }[] }
+
 // Block ②: verifiable facts, at least three (建站规格 G4).
 export type Fact = { label: string; value: string }
 

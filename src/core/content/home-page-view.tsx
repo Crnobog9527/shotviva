@@ -10,7 +10,8 @@ import { ShootSection } from './blocks/shoot-section'
 import { TemplateGrid, type FeaturedSections } from './blocks/template-grid'
 import { TopicCards } from './blocks/topic-section'
 import { WishlistSection } from './blocks/wishlist-section'
-import type { HomePage } from './page-content'
+import { HeroStrip } from './blocks/hero-strip'
+import type { HeroStripBlock, HomePage } from './page-content'
 
 type Props = {
   page: HomePage
@@ -25,6 +26,8 @@ type Props = {
   wishlistCta: ReactNode | null
   // An A/B hero option's line under the direct answer (ARCHITECTURE §16.5).
   heroTagline?: string
+  // An A/B hero option's further pairs, in a row under the first screen.
+  heroStrip?: HeroStripBlock
 }
 
 // Home block order is fixed (ARCHITECTURE §13, 建站规格 §4): H1 + answer → hero + generator →
@@ -33,10 +36,11 @@ type Props = {
 // open, "Can't find your template?" follows the grid (Owner 2026-11-10); it is not one of the six.
 // An optional topic H2 (SEO launch handbook G9) sits between the grid and the wishlist; the
 // optional text-edit cases follow the shoot demo.
-export function HomePageView({ page, brand, isLinkEnabled, templates, generator, wishlistCta, heroTagline }: Props) {
+export function HomePageView({ page, brand, isLinkEnabled, templates, generator, wishlistCta, heroTagline, heroStrip }: Props) {
   return (
     <article className="mk-home mk-w">
       <HomeHero page={page} generator={generator} tagline={heroTagline} />
+      {heroStrip ? <HeroStrip strip={heroStrip} /> : null}
       <ShootSection shoot={page.shoot} />
       {page.edits ? <EditCasesSection edits={page.edits} /> : null}
       <StepsSection steps={page.steps} />
