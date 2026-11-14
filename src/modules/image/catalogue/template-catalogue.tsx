@@ -20,6 +20,7 @@ import { batchableTemplates, isMotion, type CatalogueTemplate } from './catalogu
 import { findSeries, type CatalogueView, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
 import { isPosterIn, PosterDialogSlot } from './poster-dialog-slot'
+import { posterSeriesOf, posterStart } from './poster-series'
 import { SavedEmpty } from './saved-empty'
 import { SearchBox } from './search-box'
 import { FeatureCard } from './feature-card'
@@ -56,7 +57,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
   const favoriteIds = useFavorites()?.ids
   const saved = useMemo(() => (favoriteIds ? savedIn(favoriteIds, openable) : []), [favoriteIds, openable])
   const { active, shown } = filterCatalogue(view.entries, saved, query.selection)
-  const series = findSeries(view.entries, query.seriesKey)
+  const series = useOpenSeries(view.entries, query)
   // Once loaded the panel stays mounted, so closing it can play its motion.
   const [sheetLoaded, setSheetLoaded] = useState(false)
   if (series && !sheetLoaded) setSheetLoaded(true)
@@ -99,10 +100,20 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
-      <PosterDialogSlot id={query.posterId} templates={openable} onClose={query.closePoster} create={create} />
+      <PosterDialogSlot id={query.posterId} templates={openable} series={posterSeriesOf(view.entries, query.posterId)} onSwitch={query.openPoster} onClose={query.closePoster} create={create} />
       <BatchDialogSlot templates={batchable} create={create} />
     </>
   )
+}
+
+// A series of poster templates opens the poster editor (with its styles to switch between),
+// from its card or from a ?series= link alike; any other series opens the series panel.
+function useOpenSeries(entries: CatalogueView['entries'], query: ReturnType<typeof useCatalogueQuery>) {
+  const found = findSeries(entries, query.seriesKey)
+  const seriesPoster = posterStart(found)
+  const { openPoster } = query
+  useEffect(() => { if (seriesPoster) openPoster(seriesPoster) }, [seriesPoster, openPoster])
+  return seriesPoster ? null : found
 }
 
 type Translate = ReturnType<typeof useTranslations<'app.create'>>
