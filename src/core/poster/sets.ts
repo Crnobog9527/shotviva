@@ -82,3 +82,12 @@ export async function loadPosterPart(db: SupabaseClient, userId: string, ref: { 
   if (!part) throw fail('Unknown poster in this set')
   return { content: posterContentSchema.parse(row.data.content), part }
 }
+
+// 复用上一期 (§5.3「每周复用」): the whole text of one of the caller's own sets; null when it is
+// not theirs or no longer reads as poster text.
+export async function loadPosterSetContent(db: SupabaseClient, userId: string, setId: string): Promise<PosterContent | null> {
+  const { data, error } = await db.from('poster_sets').select('content').eq('id', setId).eq('user_id', userId).maybeSingle()
+  if (error) throw new AppError('INTERNAL', 'poster_sets read failed', { cause: new Error(error.message) })
+  const content = posterContentSchema.safeParse((data as { content?: unknown } | null)?.content)
+  return content.success ? content.data : null
+}

@@ -178,6 +178,7 @@ export {
 export {
   FEATURES_COPY,
   FeaturesEditor,
+  PosterPhotoCard,
   SignupGiftCard,
   WISHLIST_SWITCH_COPY,
   type FeatureAdminActions,
@@ -187,9 +188,11 @@ export {
 } from './features-editor'
 export {
   loadSettingSwitch,
+  loadPosterPhotoPrice,
   loadSignupGift,
   loadWishlistSwitch,
   saveSettingSwitch,
+  savePosterPhotoPrice,
   saveSignupGiftRules,
   saveWishlistSwitch,
   type SignupGiftRules,

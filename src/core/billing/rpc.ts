@@ -54,6 +54,9 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   TEST_PHOTO_NOT_FOUND: 'NOT_FOUND',
   // T87: a cover translation can only be its target language's "after".
   TRANSLATE_TARGET_ONLY: 'INVALID_INPUT',
+  // 拍照识别 (1523): over the hourly limit; no price saved yet (the feature is off).
+  RATE_LIMITED: 'RATE_LIMITED',
+  PRICE_UNSET: 'NOT_FOUND',
 }
 
 export function toRpcError(fn: string, error: { message: string; code?: string }): AppError {

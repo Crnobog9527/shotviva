@@ -5,7 +5,6 @@ import { setRequestLocale } from 'next-intl/server'
 import { AnnouncementBanner } from '@/core/announcements'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { GeistFonts } from '@/core/ui/geist-fonts'
-import { InstrumentSerifPreload } from '@/core/ui/instrument-serif'
 import { loadMessages } from '@/site/i18n/messages'
 import { site } from '@/site/site.config'
 
@@ -26,7 +25,6 @@ export default async function GlobalNotFound() {
     <html lang="en" className="h-full antialiased">
       <body className="flex min-h-full flex-col">
         <GeistFonts />
-        <InstrumentSerifPreload />
         <NextIntlClientProvider locale="en" messages={await loadMessages('en')}>
           <TranslatedPathsProvider paths={site.locales.zhPaths}>
             <AnnouncementBanner />

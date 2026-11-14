@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { contentTypeOfKey, inputPreviewKeyFor, isKeptInputKey, isOwnInputKey, keptInputKeyFor, newInputKey, newRequestImageKey, outputKeyFor, workThumbKeyFor } from './keys'
+import { contentTypeOfKey, inputPreviewKeyFor, isKeptInputKey, isOwnInputKey, isStoreQrKey, keptInputKeyFor, newInputKey, newRequestImageKey, newStoreQrKey, outputKeyFor, workThumbKeyFor } from './keys'
 
 const USER = '0b6f3f0e-5d1c-4c47-9a49-6a3f6f8d2e11'
 const OTHER = '7d1e2c3b-0000-4000-8000-000000000000'
@@ -38,5 +38,16 @@ describe('storage keys', () => {
     expect(isKeptInputKey(USER, job, `outputs/${USER}/${job}-input.webp`)).toBe(false)
     expect(contentTypeOfKey(kept)).toBe('image/jpeg')
     expect(contentTypeOfKey('outputs/x/y.gif')).toBeNull()
+  })
+})
+
+describe('store QR keys', () => {
+  it('live under the owner\'s outputs/ prefix and are told apart from every other key', () => {
+    const key = newStoreQrKey(USER, 'image/png')
+    expect(key).toMatch(new RegExp(`^outputs/${USER}/store-qr-[0-9a-f-]{36}\\.png$`))
+    expect(isStoreQrKey(USER, key)).toBe(true)
+    expect(isStoreQrKey(OTHER, key)).toBe(false)
+    expect(isStoreQrKey(USER, newInputKey(USER, 'image/png'))).toBe(false)
+    expect(isOwnInputKey(USER, key)).toBe(false)
   })
 })

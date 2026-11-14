@@ -49,8 +49,24 @@ export async function extractPoster(templateId: string, text: string, onStage?: 
   }
 }
 
-export async function savePosterSet(templateId: string, content: PosterContent, source: 'paste' | 'manual'): Promise<SaveReply> {
+export async function savePosterSet(templateId: string, content: PosterContent, source: 'paste' | 'photo' | 'reuse' | 'manual'): Promise<SaveReply> {
   const { ok, json } = await post('/api/poster/sets', { template_id: templateId, content, source })
   if (ok) return { ok: true, id: String(json.id), parts: json.parts as PosterPart[] }
   return { ok: false, code: codeOf(json), message: typeof json.message === 'string' ? json.message : '' }
+}
+
+// 拍照识别: the uploaded photos of an old poster (one per page), read and sorted like a paste; `text` is what the
+// photo said, shown beside the blocks like a pasted notice.
+// credits: what an ok run took; refunded: what a failed run gave back.
+export type PhotoReply = (ExtractReply & { text?: string; credits?: number }) | { status: 'failed'; refunded: number }
+
+export async function extractPosterPhoto(templateId: string, inputKeys: readonly string[], onStage?: (stage: PosterBlock) => void): Promise<PhotoReply> {
+  try {
+    const response = await fetch('/api/poster/extract-photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ template_id: templateId, input_keys: inputKeys }) })
+    if (!response.ok) return { status: 'error', code: codeOf((await response.json().catch(() => ({}))) as Record<string, unknown>) }
+    if (response.body && response.headers.get('Content-Type')?.includes('ndjson')) return await readProgress(response.body, onStage)
+    return ((await response.json().catch(() => null)) as PhotoReply | null) ?? { status: 'error', code: 'INTERNAL' }
+  } catch {
+    return { status: 'error', code: 'NETWORK' }
+  }
 }

@@ -3,3 +3,4 @@ export { FeaturesEditor, type FeatureAdminActions, type WishlistSwitchState } fr
 export type { GallerySwitchKey, GallerySwitchState } from './gallery-switches'
 export { WISHLIST_SWITCH_COPY } from './wishlist-copy'
 export { SignupGiftCard } from './signup-gift-card'
+export { PosterPhotoCard } from './poster-photo-card'

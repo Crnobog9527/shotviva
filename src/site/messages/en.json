@@ -848,8 +848,11 @@
         "restore": "Back to the sample text",
         "contactsLeft": "The organiser, phone or address is still the sample’s. Use it anyway?",
         "clearAllQuestion": "This removes what you typed too. Clear everything?",
-        "restoreQuestion": "This replaces what you typed. Go back to the sample?"
-      }
+        "restoreQuestion": "This replaces what you typed. Go back to the sample?",
+        "photoHint": "Filled in from the text on your photo. Check each part.",
+        "reusedHint": "You can also clear everything, or go back to the sample."
+      },
+      "photoText": "Text read from your photos"
     },
     "sizes": {
       "closest": "Closest to original ({ratio})",
@@ -1659,6 +1662,66 @@
       "titleReady": "Ready",
       "titleFailed": "Didn't finish",
       "leaveQueued": "Some photos haven't started yet. Closing this tab cancels them (no credits are used)."
+    },
+    "weekly": {
+      "useLast": "Use my last one",
+      "lastLoading": "Loading your last one…",
+      "lastFrom": "Last one: <day></day> · {name}",
+      "reused": "Filled in from your poster of <day></day> ({name}). Just change the date and prizes.",
+      "lastFailed": "Couldn't load your last one. Please try again.",
+      "replaceAsk": "This replaces what you've already filled in. Continue?",
+      "replace": "Replace",
+      "cancel": "Cancel",
+      "saveStore": "Save your store details to fill in the name, phone and address next time",
+      "storeFilled": "Your store details are filled in (name, phone, address and more).",
+      "undo": "Undo",
+      "autofillOff": "Don't fill in automatically",
+      "fillStore": "Fill in my store details",
+      "storeReplaceAsk": "Your store details will replace the name, phone or address you typed. Continue?",
+      "photo": {
+        "hint": "No notice text? Pick photos or screenshots of your last poster (both pages at once) and we'll read the text on them.",
+        "pick": "Read an old poster from photos",
+        "uploading": "Uploading the photo…",
+        "reading": "Reading the text in the photo",
+        "error": {
+          "upload": "The photo didn't upload, nothing was charged. Please choose it again.",
+          "failed": "Couldn't read the text in this photo; your {credits} credits are back. Try a sharper, straight-on photo, or paste the text instead.",
+          "rateLimited": "Too many reads this hour, nothing was charged. Please try again later.",
+          "credits": "Not enough credits: reading costs {credits}.",
+          "unavailable": "Reading photos isn't available right now, nothing was charged. Please paste the text instead."
+        },
+        "replaceAsk": "The text is read. Replace what you've already filled in?",
+        "replace": "Replace",
+        "keep": "Keep mine",
+        "cost": "Costs {credits} credits per read (one photo or both pages)",
+        "notEnough": "Not enough credits: reading costs {credits}.",
+        "getCredits": "Get credits"
+      },
+      "storeCard": {
+        "title": "Store details",
+        "open": "Name, phone, address and QR code",
+        "hint": "Type them once; poster templates fill in your name, phone, address and QR code when they open. Only you can see them.",
+        "loading": "Loading…",
+        "loadFailed": "Couldn't load them. Refresh the page and try again.",
+        "name": "Store name",
+        "nameEn": "Name in English (optional)",
+        "phone": "Phone {n}",
+        "address": "Address",
+        "wechat": "WeChat ID (optional)",
+        "qr": "QR code",
+        "qrHint": "Your WeChat or group QR code, placed where the poster has its QR code.",
+        "qrFailed": "The QR code didn't upload. Please choose it again.",
+        "qrUploading": "Uploading…",
+        "qrPick": "Upload QR code",
+        "qrChange": "Change",
+        "qrRemove": "Remove QR code",
+        "autofill": "Fill in when a poster template opens",
+        "save": "Save",
+        "saving": "Saving…",
+        "saved": "Saved.",
+        "failed": "Couldn't save. Please try again."
+      },
+      "photosGone": "The photos from that issue are gone: {boxes}. Please upload them again."
     }
   },
   "paywall": {

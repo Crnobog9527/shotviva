@@ -110,9 +110,9 @@ function SoloSeries({ card, media }: { card: TemplateCard; media: TemplateLookup
         <span className="mk-use">{card.use}</span>
         <span className="mk-scount">{t('seriesCount', { count: card.series?.count ?? 0 })}</span>
         {card.series ? (
-          <Link className="mk-ghost-pill" href={card.series.href} prefetch={false} tabIndex={-1} aria-hidden>
+          <button type="button" className="mk-ghost-pill" data-open-series={card.series.href} tabIndex={-1} aria-hidden>
             {t('seriesOpen')}
-          </Link>
+          </button>
         ) : null}
       </div>
     </div>
@@ -171,8 +171,8 @@ export function TemplateGrid({ grid, sections, isLinkEnabled }: Props) {
         <Category key={category.name} category={category} media={media} isLinkEnabled={isLinkEnabled} />
       ))}
       {grid.note ? <p className="mk-note">{grid.note}</p> : null}
-      {/* The series cards' crossfade; nothing to load where no series has a second pair. */}
-      {categories.some((category) => category.templates.some((card) => (card.series?.members.length ?? 0) > 1)) ? <SeriesMotion /> : null}
+      {/* Any series card: its click handler (and the crossfade, for a series with more than one pair). */}
+      {categories.some((category) => category.templates.some((card) => card.series)) ? <SeriesMotion /> : null}
     </section>
   )
 }

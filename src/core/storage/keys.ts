@@ -20,6 +20,9 @@ import type { UploadContentType } from './rules'
 //                                     PNG or 白底 JPEG, or the 白底 + 透明 pair as one ZIP, made on
 //                                     first download and reused; 7-day lifecycle like every
 //                                     inputs/ key, removed with the work too
+//   outputs/{user_id}/store-qr-{uuid}.{ext}
+//                                     the store profile's QR code (§5.3 店铺信息), a copy of the
+//                                     user's upload; replaced on save, removed with the account
 //   requests/{user_id}/{uuid}.jpg     wishlist reference image, re-encoded; kept until the
 //                                     request is rejected or taken down (ARCHITECTURE §15.1)
 //   tickets/{user_id}/{ticket_id}/{uuid}.webp
@@ -37,6 +40,7 @@ const CONTENT_TYPE: Record<string, UploadContentType> = { jpg: 'image/jpeg', png
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 const INPUT_KEY = new RegExp(`^inputs/(${UUID})/${UUID}\\.(jpg|png|webp)$`)
+const STORE_QR_KEY = new RegExp(`^outputs/(${UUID})/store-qr-${UUID}\\.(jpg|png|webp)$`)
 const KEPT_KEY = new RegExp(`^outputs/(${UUID})/(${UUID})-in-[1-9][0-9]?\\.(jpg|png|webp)$`)
 
 export function newInputKey(userId: string, contentType: UploadContentType): string {
@@ -95,5 +99,15 @@ export function contentTypeOfKey(key: string): UploadContentType | null {
 // Keys come back from the browser, so ownership is checked by shape, never trusted.
 export function isOwnInputKey(userId: string, key: string): boolean {
   const match = INPUT_KEY.exec(key)
+  return match !== null && match[1] === userId.toLowerCase()
+}
+
+// The store profile's QR code (§5.3 店铺信息): kept under outputs/, so no 7-day lifecycle.
+export function newStoreQrKey(userId: string, contentType: UploadContentType): string {
+  return `outputs/${userId}/store-qr-${randomUUID()}.${EXTENSION[contentType]}`
+}
+
+export function isStoreQrKey(userId: string, key: string): boolean {
+  const match = STORE_QR_KEY.exec(key)
   return match !== null && match[1] === userId.toLowerCase()
 }

@@ -19,6 +19,9 @@ type SettingTypes = {
   // 1480: whether a pending account may claim with a verified phone / a Google account.
   signup_gift_claim_phone: boolean
   signup_gift_claim_google: boolean
+  // 1521: 拍照识别's price per run in credits (§5.3「每周复用」); 0 (no row) keeps the feature off.
+  // start_poster_photo reads the row itself.
+  poster_photo_credits: number
 }
 
 export type SystemSettingKey = keyof SettingTypes
@@ -34,6 +37,7 @@ export const SYSTEM_SETTINGS: { [K in SystemSettingKey]: SettingDefinition<Setti
   signup_gift_per_ip: { schema: z.number().int().min(0).max(1000), fallback: 5 },
   signup_gift_claim_phone: { schema: z.boolean(), fallback: true },
   signup_gift_claim_google: { schema: z.boolean(), fallback: true },
+  poster_photo_credits: { schema: z.number().int().min(1).max(1000), fallback: 0 },
 }
 
 export function isSystemSettingKey(key: string): key is SystemSettingKey {
