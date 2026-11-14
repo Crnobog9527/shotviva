@@ -9,8 +9,10 @@
 #   - the build and server setup: next.config, dependencies, Node version
 #   - the measurement itself: lighthouserc*.json, the Lighthouse scripts, the fingerprint, the
 #     CI workflow and the change detection
-# No paths at all prints `true`.
+# No paths at all prints `true`. The path that forced it goes to stderr, for the CI log.
 set -u
+
+forced() { echo "$1" >&2; echo true; exit 0; }
 
 any=false
 while IFS= read -r path || [ -n "$path" ]; do
@@ -22,21 +24,22 @@ while IFS= read -r path || [ -n "$path" ]; do
     next.config.* | package.json | pnpm-lock.yaml | pnpm-workspace.yaml | .npmrc | .nvmrc | \
     lighthouserc*.json | scripts/ci/lighthouse-* | scripts/ci/page-fingerprint.mjs | \
     .github/workflows/ci.yml | .github/actions/changes/* | scripts/ci/has-code-changes.sh)
-      echo true; exit 0 ;;
+      forced "$path" ;;
     # Files directly in the measured routes' folders (page, layout, loading, error, route-local
     # components): src/app/[locale]/*, (marketing)/*, (marketing)/pricing/*, (marketing)/[slug]/*.
     'src/app/[locale]/'*)
       rest=${path#'src/app/[locale]/'}
       case "$rest" in
         */*/*/*) ;;
-        '(marketing)/pricing/'* | '(marketing)/[slug]/'*) echo true; exit 0 ;;
+        '(marketing)/pricing/'* | '(marketing)/[slug]/'*) forced "$path" ;;
         '(marketing)/'*/*) ;;
-        '(marketing)/'*) echo true; exit 0 ;;
+        '(marketing)/'*) forced "$path" ;;
         */*) ;;
-        *) echo true; exit 0 ;;
+        *) forced "$path" ;;
       esac
       ;;
   esac
 done
 
-if [ "$any" = true ]; then echo false; else echo true; fi
+[ "$any" = true ] || forced '(no changed files listed)'
+echo false
