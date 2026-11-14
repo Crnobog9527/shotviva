@@ -1,0 +1,80 @@
+name: Sync production templates to preview
+run-name: To preview ${{ inputs.write && 'WRITE' || 'dry run' }} ${{ inputs.template_ids }} series ${{ inputs.series_slugs }}
+
+# The reverse of template-sync.yml (2026-11-14): production is read, the test site is written. The
+# same scripts/template-sync code runs with `--to-preview`, which reads production only through a
+# guard that refuses any write (read-only.ts), so this workflow can never change production. Dry
+# run by default: it lists what would change, then checks every write inside the preview's own
+# transactions and rolls it back. Covers and style references are copied into the preview's
+# buckets only on a write. Users, credits, provider keys and costs, and system settings are never
+# read or written; sort order and featured rank stay the test site's own, as in the forward sync.
+
+on:
+  workflow_dispatch:
+    inputs:
+      template_ids:
+        description: Template IDs, separated by commas or spaces (optional when series are given)
+        required: false
+        default: ''
+        type: string
+      series_slugs:
+        description: Series slugs, separated by commas or spaces (optional when template IDs are given)
+        required: false
+        default: ''
+        type: string
+      write:
+        description: Write to the test site (unchecked = dry run, everything rolled back)
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+# Shares the forward sync's group: one sync at a time, in either direction.
+concurrency:
+  group: template-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # The production read key and bucket token live in production-manual (main only), as for the
+    # forward sync.
+    environment: production-manual
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - run: pnpm install --frozen-lockfile
+      - name: Sync categories, series and templates to the test site
+        env:
+          SYNC_IDS: ${{ inputs.template_ids }}
+          SYNC_SERIES: ${{ inputs.series_slugs }}
+          SYNC_WRITE: ${{ inputs.write && '--write' || '' }}
+          # The test-site admin whose profile id 上下架 and 开放售卖 changes are made and audited as.
+          SYNC_PREVIEW_ACTOR_ID: ${{ vars.SYNC_PREVIEW_ACTOR_ID }}
+          SYNC_PREVIEW_ASSETS_BASE: ${{ vars.SYNC_PREVIEW_ASSETS_BASE }}
+          # Production's private uploads bucket, read for style references.
+          SYNC_PRODUCTION_PRIVATE_BUCKET: ${{ vars.SYNC_PRODUCTION_PRIVATE_BUCKET }}
+          OPENAI_IMAGE_MODEL: ${{ vars.OPENAI_IMAGE_MODEL }}
+          SYNC_PREVIEW_SERVICE_KEY: ${{ secrets.SYNC_PREVIEW_SERVICE_KEY }}
+          SYNC_PREVIEW_R2_ACCOUNT_ID: ${{ secrets.SYNC_PREVIEW_R2_ACCOUNT_ID }}
+          SYNC_PREVIEW_R2_ACCESS_KEY_ID: ${{ secrets.SYNC_PREVIEW_R2_ACCESS_KEY_ID }}
+          SYNC_PREVIEW_R2_SECRET_ACCESS_KEY: ${{ secrets.SYNC_PREVIEW_R2_SECRET_ACCESS_KEY }}
+          SYNC_PRODUCTION_SERVICE_KEY: ${{ secrets.SYNC_PRODUCTION_SERVICE_KEY }}
+          SYNC_PRODUCTION_R2_ACCOUNT_ID: ${{ secrets.SYNC_PRODUCTION_R2_ACCOUNT_ID }}
+          SYNC_PRODUCTION_R2_ACCESS_KEY_ID: ${{ secrets.SYNC_PRODUCTION_R2_ACCESS_KEY_ID }}
+          SYNC_PRODUCTION_R2_SECRET_ACCESS_KEY: ${{ secrets.SYNC_PRODUCTION_R2_SECRET_ACCESS_KEY }}
+        # SYNC_WRITE is either empty or the fixed flag above, never user text.
+        run: pnpm exec tsx --conditions=react-server scripts/template-sync/run.ts --to-preview $SYNC_WRITE
+      - name: Note on the test site's cache
+        if: ${{ inputs.write }}
+        run: echo '::notice::The test site shows the synced templates within the hour (its catalogue cache is not expired by this workflow).'
