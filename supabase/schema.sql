@@ -2577,10 +2577,15 @@ CREATE OR REPLACE FUNCTION "admin"."template_image_options"("public"."templates"
     'aspectRatios',(select coalesce(jsonb_agg(a.r order by a.n),'[]'::jsonb)
       from jsonb_array_elements_text(case when p.adapter='openrouter_images' then coalesce(p.capabilities->'aspectRatios','[]'::jsonb)
         else '["16:9","4:5","1:1","9:16","3:2","4:3","2:3","1:2","1:3"]'::jsonb end) with ordinality a(r,n)
-      where a.r not in ('1:2','1:3') or coalesce(t.fields->'aspectRatios','[]'::jsonb) ? a.r),
-    'originalRatio',case when p.adapter='openrouter_images' then coalesce(p.capabilities->'originalRatio','false'::jsonb) else 'true'::jsonb end,
+      where case when l.locked then coalesce(t.fields->'aspectRatios','[]'::jsonb) ? a.r
+        else a.r not in ('1:2','1:3') or coalesce(t.fields->'aspectRatios','[]'::jsonb) ? a.r end),
+    'originalRatio',case when l.locked then 'false'::jsonb
+      when p.adapter='openrouter_images' then coalesce(p.capabilities->'originalRatio','false'::jsonb) else 'true'::jsonb end,
     'exactPixels',p.adapter is distinct from 'openrouter_images')
-  from public.templates t left join public.template_sale_approvals s on s.template_id=t.id
+    || case when l.locked then '{"lockedRatios":true}'::jsonb else '{}'::jsonb end
+  from public.templates t
+  cross join lateral (select coalesce(t.fields->'lockAspectRatios'='true'::jsonb,false) as locked) l
+  left join public.template_sale_approvals s on s.template_id=t.id
   left join public.template_prompts tp on tp.template_id=t.id
   left join public.ai_providers p on p.id=coalesce(tp.provider_id,
     (select a.id from public.ai_providers a where a.module='image' and a.is_active))

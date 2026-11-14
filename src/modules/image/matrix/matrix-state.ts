@@ -46,6 +46,7 @@ export function sharedOptions(templates: readonly CatalogueTemplate[]): ImageOpt
     aspectRatios: all[0]!.aspectRatios.filter((ratio) => all.every((options) => options.aspectRatios.includes(ratio))),
     originalRatio: all.every((options) => options.originalRatio),
     ...(all.some((options) => options.exactPixels === false) && { exactPixels: false }),
+    ...(all.some((options) => options.lockedRatios) && { lockedRatios: true }),
   }
 }
 

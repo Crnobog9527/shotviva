@@ -29,6 +29,8 @@ export const templateFieldsSchema = z
     images: z.object({ min: z.number().int().min(0).max(4), max: z.number().int().min(0).max(4), slots: imageSlotsSchema.optional() }),
     copy: z.array(copyFieldSchema).max(COPY_FIELDS_MAX).default([]),
     aspectRatios: z.array(z.string().regex(/^\d{1,2}:\d{1,2}$/)).min(1),
+    // On (1554): the site offers exactly these ratios the bound line supports, and no 「跟随照片」.
+    lockAspectRatios: z.boolean().optional(),
     // Optional on/off choices (T89), off by default; their prompt text is private.
     toggles: z.array(toggleFieldSchema).max(TOGGLES_MAX).default([]),
     // A dense-text poster template (ARCHITECTURE §5.3): its text comes from the confirmed content

@@ -41,6 +41,24 @@ describe('template output options on the Data API', () => {
     await db.query(`update public.templates set fields = jsonb_set(fields, '{aspectRatios}', '["4:5","1:1"]') where id = $1`, [templateId])
   })
 
+  it('offers exactly the listed ratios the line makes, and no original, when the lock is on (1554)', async () => {
+    const options = async () => (await anonSupabase().from('templates').select('template_image_options').eq('id', templateId).single()).data?.template_image_options
+    const old = await db.query('select fields from public.templates where id=$1', [templateId])
+    try {
+      await db.query(`update public.ai_providers set capabilities = capabilities || '{"aspectRatios":["16:9","1:1","2:3","1:2"],"originalRatio":true}' where id = $1`, [provider])
+      await db.query(`update public.templates set fields = fields || '{"aspectRatios":["2:3","1:2","3:4"],"lockAspectRatios":true}' where id = $1`, [templateId])
+      // Line order, and 3:4 dropped because the line cannot make it.
+      expect(await options()).toMatchObject({ aspectRatios: ['2:3', '1:2'], originalRatio: false, lockedRatios: true })
+      await db.query(`update public.templates set fields = fields - 'lockAspectRatios' where id = $1`, [templateId])
+      const unlocked = await options()
+      expect(unlocked).toMatchObject({ aspectRatios: ['16:9', '1:1', '2:3', '1:2'], originalRatio: true })
+      expect(unlocked).not.toHaveProperty('lockedRatios')
+    } finally {
+      await db.query(`update public.ai_providers set capabilities = $2 where id = $1`, [provider, caps])
+      await db.query('update public.templates set fields=$2 where id=$1', [templateId, old.rows[0].fields])
+    }
+  })
+
   it('uses the bound provider for web and the actual default provider for partners', async () => {
     const { data, error } = await anonSupabase().from('templates').select('template_image_options,partner_image_aspects').eq('id',templateId).single()
     expect(error).toBeNull()

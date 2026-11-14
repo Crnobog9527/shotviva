@@ -29,10 +29,11 @@ export const SIZE_OPTIONS: readonly SizeOption[] = SIZE_ORDER.map((id) => ({
 }))
 
 // The nearest-size tile follows each source photo. Fixed tiles stay available so a batch
-// can also request a single size for all photos.
+// can also request a single size for all photos. A template with locked ratios has no such tile.
 export function sizeChoices(options: ImageOptions, ratio?: number | null) {
-  const nearest = !options.originalRatio ? closestAspect(ratio, options) : null
-  return SIZE_OPTIONS.filter(({ id }) => id === 'original' ? options.originalRatio || nearest !== null : options.aspectRatios.includes(id))
+  const nearest = !options.originalRatio && !options.lockedRatios ? closestAspect(ratio, options) : null
+  const follows = !options.lockedRatios && (options.originalRatio || nearest !== null)
+  return SIZE_OPTIONS.filter(({ id }) => id === 'original' ? follows : options.aspectRatios.includes(id))
     .map((size) => size.id === 'original' && nearest
       ? { ...size, nearest, glyph: { ...glyphFor(nearest), dashed: true } }
       : { ...size, nearest: null })

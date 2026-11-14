@@ -21,7 +21,9 @@ export function closestAspect(ratio: number | null | undefined, options: ImageOp
 
 // 'original' stays a user preference: when auto isn't supported, a photo gets its nearest
 // concrete ratio (a batch uses its first photo's for all, batch-request.ts). With no decodable photo the user can still choose any fixed size.
+// A template with locked ratios takes the first of its own ratios for 'original' (the default).
 export function chosenAspect(wanted: OutputAspect, options: ImageOptions, photoRatio?: number | null): OutputAspect | null {
+  if (wanted === 'original' && options.lockedRatios) return options.aspectRatios[0] ?? null
   if (wanted === 'original') return options.originalRatio ? 'original' : closestAspect(photoRatio, options)
   if (options.aspectRatios.includes(wanted)) return wanted
   return closestAspect(numericRatio(wanted), options) ?? (options.originalRatio ? 'original' : null)
@@ -46,7 +48,8 @@ export function hasOutputOptions(options: ImageOptions) {
 }
 
 // An unavailable fixed choice from an older work/draft is replaced immediately. Keep
-// 'original' as the UI choice even when it resolves to a concrete, per-photo ratio.
+// 'original' as the UI choice even when it resolves to a concrete, per-photo ratio, except on a
+// template with locked ratios, which has no 'original' tile to show it.
 export function selectedAspect(wanted: OutputAspect, options: ImageOptions) {
-  return wanted === 'original' ? wanted : chosenAspect(wanted, options) ?? wanted
+  return wanted === 'original' && !options.lockedRatios ? wanted : chosenAspect(wanted, options) ?? wanted
 }
