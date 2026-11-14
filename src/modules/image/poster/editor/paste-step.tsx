@@ -26,7 +26,7 @@ export function PasteStep({ studio }: { studio: PosterStudioState }) {
         placeholder={t('paste.placeholder')} onChange={(event) => studio.setSource(event.target.value)} className={`${fieldClass} min-h-[260px]`} />
       <p className="text-right text-caption text-muted-foreground">{draft.source.length} / {TEXT_MAX}</p>
       {busy ? <SortProgress stage={studio.stage} /> : null}
-      {studio.notice === 'rateLimited' ? <p className="text-caption text-destructive">{t('notice.rateLimited')}</p> : null}
+      {studio.notice === 'rateLimited' ? <p role="alert" className="text-caption text-destructive">{t('notice.rateLimited')}</p> : null}
       <Button variant="ghost" className="min-h-11" disabled={busy} onClick={studio.toManual}>{t('paste.manual')}</Button>
     </section>
   )
