@@ -52,3 +52,6 @@ export function insightsHref(query: InsightsQuery, patch: Partial<InsightsQuery>
   }
   return `/admin/analytics?${params.toString()}`
 }
+
+// CI timing probe (shotviva#664), not for merge.
+export const CI_PROBE_ADMIN = true
