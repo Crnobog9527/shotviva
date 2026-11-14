@@ -10,7 +10,11 @@ import { PaywallButton } from '@/core/billing/paywall'
 import { cn } from '@/core/ui/cn'
 
 import type { TrackedJob } from '../generation/job-model'
-import { estimatedProgress, percent } from '../generation/progress'
+import { etaProgress, isLate, queueSpot } from '../generation/eta'
+import { useEta } from '../generation/eta-store'
+import { getQueueLimit } from '../generation/job-store'
+import { percent } from '../generation/progress'
+import { useJobs } from '../generation/use-jobs'
 import { canRetry, failureReason, refundLine } from './error-copy'
 
 const pill = 'press hairline inline-flex min-h-9 items-center rounded-full bg-wash px-3 text-caption font-semibold'
@@ -60,8 +64,7 @@ function Status({ job, now }: { job: TrackedJob; now: number }) {
   const t = useTranslations('app')
   const errors = useTranslations('app.errors')
   const tiers = useTranslations('paywall.tiers')
-  const format = useFormatter()
-  if (job.status === 'queued') return <span className="font-mono text-caption text-muted-foreground">{t('workspace.batch.rowQueued')}</span>
+  if (job.status === 'queued') return <Queued job={job} />
   if (job.status === 'succeeded') {
     return (
       <span className="inline-flex items-center gap-1.5 text-label text-success">
@@ -83,10 +86,26 @@ function Status({ job, now }: { job: TrackedJob; now: number }) {
       </span>
     )
   }
-  const fraction = estimatedProgress(now - job.startedAt)
+  return <Developing job={job} now={now} />
+}
+
+// Its place in this tab's line (scheduler.ts): photos ahead of it, here and in other batches.
+function Queued({ job }: { job: TrackedJob }) {
+  const t = useTranslations('app.wait')
+  const spot = queueSpot(useJobs(), job, getQueueLimit(), null)
+  return <span className="font-mono text-caption text-muted-foreground">{t('rowQueuedAhead', { ahead: spot?.ahead ?? 0 })}</span>
+}
+
+// The bar goes by how long this template usually takes at this size (eta.ts).
+function Developing({ job, now }: { job: TrackedJob; now: number }) {
+  const t = useTranslations('app')
+  const format = useFormatter()
+  const eta = useEta(job)
+  const elapsed = now - job.startedAt
+  const fraction = etaProgress(elapsed, eta)
   return (
     <span className="flex items-center gap-2 text-label">
-      {t('workspace.developing')}
+      {t(isLate(elapsed, eta) ? 'wait.rowLate' : 'workspace.developing')}
       <span role="progressbar" aria-label={t('workspace.generating')} aria-valuenow={percent(fraction)} aria-valuemin={0} aria-valuemax={100} className="h-1 max-w-40 flex-1 overflow-hidden rounded-full bg-wash-strong">
         <span className="block h-full rounded-full bg-primary transition-[width] duration-1000" style={{ width: `${percent(fraction)}%` }} />
       </span>

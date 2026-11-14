@@ -28,6 +28,8 @@ export const APP_ONLY_APP_KEYS = [
   'series',
   'work',
   'share',
+  'wait',
+  'notify',
 ] as const
 
 type Messages = Record<string, unknown>

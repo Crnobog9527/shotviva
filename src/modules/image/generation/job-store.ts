@@ -74,6 +74,9 @@ export function getJobs(): TrackedJob[] {
 
 export const getServerJobs = () => EMPTY
 
+// The account's concurrency the queue goes by (the wait screen's place in line).
+export const getQueueLimit = () => limit
+
 // The jobs a template's workspace shows (empty: the form). Stable references, for
 // useSyncExternalStore.
 export function getWorkspaceJobs(templateId: string): readonly string[] {

@@ -9,6 +9,7 @@ import { isSlotTemplate } from '../catalogue/catalogue-template'
 import type { TrackedJob } from '../generation/job-model'
 import { retryJob, setWorkspaceJobs } from '../generation/job-store'
 import { useJob, useWorkspaceJobs } from '../generation/use-jobs'
+import { useWatchJobs } from '../generation/watched'
 import { useBatchRefusal } from '../batch/use-batch-refusal'
 import { MatrixEntry } from '../matrix/matrix-entry'
 import { BatchProgressView } from './batch-progress-view'
@@ -33,6 +34,8 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
   const draft = useWorkspaceDraft(input)
   const jobIds = useWorkspaceJobs(template.id)
   const single = useJob(jobIds.length === 1 ? (jobIds[0] ?? null) : null)
+  // Settling here shows its result in place: no app-wide toast for these (generation/watched.ts).
+  useWatchJobs(jobIds)
   const reveal = useReveal<HTMLDivElement>()
   // template_view (T74, ARCHITECTURE §16.2): once per template the workspace opens on.
   const { id: templateId, category } = template

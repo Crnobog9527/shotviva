@@ -196,6 +196,8 @@ function jobInputs(req: GenerationRequest, prepared: Prepared, resolution: Resol
     attempt_id: attemptId,
     ...batchInputs(req),
     ...(prepared.poster ? { poster: prepared.poster } : {}),
+    // Moved into generation_jobs.again_of by the insert trigger, or dropped (1513).
+    ...(req.againOf ? { again_of: req.againOf } : {}),
   }
 }
 
