@@ -54,7 +54,11 @@ export const DEFAULT_FORM: ProviderForm = {
 const priceText = (value: number | null) => (value === null ? '' : String(value))
 
 export function formFor(provider: AdminProvider | null, module: ProviderModule = 'image'): ProviderForm {
-  if (!provider) return { ...DEFAULT_FORM, module, adapter: MODULE_ADAPTER[module] }
+  if (!provider) {
+    const form = { ...DEFAULT_FORM, module, adapter: MODULE_ADAPTER[module] }
+    // A new decision row starts on OpenRouter (decision-route.ts; Owner 2026-11-15).
+    return module === 'decision' ? { ...form, baseUrl: OPENROUTER_BASE_URL } : form
+  }
   return fillOfficial({
     module: provider.module,
     adapter: provider.adapter,
@@ -217,6 +221,9 @@ type Saved = Pick<AdminProvider, 'model' | 'resolutions'> | null | undefined
 
 function detectedTiers(form: ProviderForm, catalog: readonly Resolution[] | null, saved: Saved) {
   const model = form.model.trim()
+  // A decision row has no image tiers and hides the control: keep the stored default, so renaming
+  // its model (decision-route.ts) never empties them and blocks Save.
+  if (form.module === 'decision') return { tiers: RESOLUTIONS, known: true }
   if (form.adapter === 'openai_images') return openAIImageTiers(model)
   if (form.adapter === 'ark_images') return { tiers: ARK_RESOLUTIONS, known: true }
   return { tiers: catalog ?? (saved?.model === model ? saved.resolutions : []), known: true }

@@ -16,7 +16,7 @@ export const PROVIDERS_COPY = {
     },
     decision: {
       title: '判断（作品编辑）',
-      notice: '作品编辑先用它判断用户这句话要改的范围和要保留的元素，再加对应的约束段落。第一版用 OpenAI 官方地址、模型 gpt-6-luna。判断指令和约束段落在「模板与提示词 → 作品编辑」里改。',
+      notice: '作品编辑先用它判断用户这句话要改的范围和要保留的元素，再加对应的约束段落。OpenAI 模型经 OpenRouter 调用（模型 openai/gpt-6-luna）。换脸判断、海报拍照/粘贴识别和逐字核对、提示词实验室倒推也用它。判断指令和约束段落在「模板与提示词 → 作品编辑」里改。',
       none: '当前没有启用的判断供应商：所有作品编辑都用「兜底」约束段落。',
       modelHint: '例如 gpt-6-luna',
     },
@@ -80,8 +80,15 @@ export const PROVIDERS_COPY = {
       openai_images: 'OpenAI Images 接口（官方地址或兼容服务）。',
       openrouter_images: '通过 OpenRouter 图片接口出图。测试连接只检查模型和密钥，免费。',
       ark_images: '火山方舟（大陆北京）Seedream 出图，按张计费。只有标准和高清两档。测试连接发一个不出图的请求，免费，并显示往返耗时。',
-      openai_responses: 'OpenAI Responses API（结构化 JSON 输出，推理用最低档）。OpenAI 模型一律经 OpenRouter：地址填 https://openrouter.ai/api/v1，模型名带 openai/ 前缀（如 openai/gpt-6-luna）。',
+      openai_responses: 'OpenAI Responses API（结构化 JSON 输出，推理用最低档）。',
     } satisfies Record<ProviderAdapterId, string>,
+    // The decision row's endpoint (decision-route.ts): one Responses adapter, two addresses.
+    decisionRoutes: { openrouter: 'OpenRouter（Responses 接口）', openai: 'OpenAI 官方（Responses 接口）' },
+    decisionRouteHint: {
+      openrouter: 'OpenAI 模型一律经 OpenRouter，用 OpenRouter 的密钥（OpenAI 密钥在 OpenRouter 里配成 BYOK）。地址固定为 https://openrouter.ai/api/v1，模型名带 openai/ 前缀，如 openai/gpt-6-luna。测试连接检查 OpenRouter 密钥，免费。',
+      openai: 'OpenAI 官方地址，模型名不带前缀，如 gpt-6-luna。只用于还没迁到 OpenRouter 的旧线路。',
+    },
+    decisionModelHint: '例如 openai/gpt-6-luna',
     resolutions: '支持的清晰度',
     tiersHint: '只能在模型支持的档位里取消勾选；取消后，绑定这个供应商的模板不再提供该档。',
     tiersUnknown: '代码里没有这个模型的规格，默认只开 1K。勾选 2K 或 4K 就是人工声明：保存时会写入审计记录，请先确认模型真的能出这个尺寸。',
