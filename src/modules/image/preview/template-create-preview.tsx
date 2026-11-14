@@ -49,7 +49,7 @@ export function TemplateCreatePreview({ template, series, width }: Omit<Template
 // The keys and kinds the creation form is built from, not their wording.
 function formShape(card: CatalogueTemplate): string {
   return JSON.stringify([card.photoInput, (card.copyFields ?? []).map(field => [field.key, field.type, field.required]),
-    (card.toggles ?? []).map(toggle => toggle.key), (card.imageSlots ?? []).map(slot => [slot.key, slot.required])])
+    (card.toggles ?? []).map(toggle => toggle.key), (card.imageSlots ?? []).map(slot => [slot.key, slot.required]), (card.groups ?? []).map(group => [group.key, group.open])])
 }
 
 type BodyProps = { draftId: string; members: CatalogueTemplate[]; seriesName: string | null; width: TemplatePreviewProps['width'] }

@@ -52,7 +52,7 @@ export function SlotBoxes({ slots, photos, fields, copy, onCopy, missing = null 
 }
 
 // Make again without its photos (T40): the same words as the single-photo template's notice.
-function MissingSlotPhotos({ reason }: { reason: 'old' | 'failed' }) {
+export function MissingSlotPhotos({ reason }: { reason: 'old' | 'failed' }) {
   const t = useTranslations('app.workspace.again')
   return (
     <p role="status" className="hairline-lit grid gap-1 rounded-panel bg-card px-4 py-3.5">

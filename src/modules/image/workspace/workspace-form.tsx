@@ -20,6 +20,7 @@ import { ResolutionPicker, SizePicker } from './option-pickers'
 import { PhotoCard } from './photo-card'
 import { PhotoPickers } from './photo-pickers'
 import { CopyFields, NoteField } from './text-fields'
+import { FieldGroups } from './field-groups'
 import { canOpenOnOverPick, useOverPick } from './use-over-pick'
 import { SlotBoxes } from './slot-boxes'
 import type { PhotoBatch, SlotPhotos } from './use-photo-batch'
@@ -61,8 +62,7 @@ export function WorkspaceForm({ template, balance, tier, photos, slots, values, 
   return (
     <>
       {again ? <AgainNote again={again} template={template} photoRatio={ratioForSize} /> : null}
-      <ImagesSection template={template} photos={photos} slots={slots} values={values} onChange={onChange} again={again} tier={tier} photoExtra={photoExtra} />
-      <TextFields template={template} values={values} onChange={onChange} />
+      <AskedFor template={template} photos={photos} slots={slots} values={values} onChange={onChange} again={again} tier={tier} photoExtra={photoExtra} />
       <TemplateToggles className="pt-6" template={template} values={values.toggles} onChange={(toggles) => onChange({ toggles })} surface={surface} />
       <div className="pt-6">
         <NoteField value={values.note} placeholder={notePlaceholder(template.category, noteT)} onChange={(note) => onChange({ note })} />
@@ -92,8 +92,27 @@ export function WorkspaceForm({ template, balance, tier, photos, slots, values, 
   )
 }
 
+type AskedProps = Pick<Props, 'template' | 'photos' | 'slots' | 'values' | 'onChange' | 'again' | 'tier' | 'photoExtra'>
+
+// What the template asks for: its titled groups when it has them (fields.groups, Owner
+// 2026-11-14), else the photo or slot boxes followed by the text fields.
+function AskedFor(props: AskedProps) {
+  const { template, slots, values, onChange, again } = props
+  const groups = template.groups ?? []
+  if (groups.length > 0 && (slots || !isSlotTemplate(template))) {
+    return <FieldGroups groups={groups} fields={template.copyFields} slots={slotsOfTemplate(template)} photos={slots}
+      copy={values.copy} onCopy={(copy) => onChange({ copy })} missing={again?.missing ?? null} />
+  }
+  return (
+    <>
+      <ImagesSection {...props} />
+      <TextFields template={template} values={values} onChange={onChange} />
+    </>
+  )
+}
+
 // The named image slots (§5.1e) for a slot template, else the photo section.
-function ImagesSection({ template, photos, slots, values, onChange, again, tier, photoExtra }: Pick<Props, 'template' | 'photos' | 'slots' | 'values' | 'onChange' | 'again' | 'tier' | 'photoExtra'>) {
+function ImagesSection({ template, photos, slots, values, onChange, again, tier, photoExtra }: AskedProps) {
   if (!slots || !isSlotTemplate(template)) return <PhotoSection template={template} photos={photos} again={again} tier={tier} photoExtra={photoExtra} />
   return <SlotBoxes slots={slotsOfTemplate(template)} photos={slots} fields={template.copyFields} copy={values.copy} onCopy={(copy) => onChange({ copy })} missing={again?.missing ?? null} />
 }
