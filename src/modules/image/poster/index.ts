@@ -1,5 +1,5 @@
 export { EXTRACT_PER_HOUR, EXTRACT_TEXT_MAX, prepareExtract, runExtract, type ExtractDeps, type ExtractResult, type ExtractStage } from './run-extract'
-export { preparePhotoExtract, type PhotoResult } from './run-extract-photo'
+export { PHOTOS_MAX, preparePhotoExtract, type PhotoResult } from './run-extract-photo'
 export { runPosterCheck, type CheckDeps, type CheckStatus } from './run-check'
 export { schedulePosterCheck } from './schedule-check'
 export { loadStudioTemplate, posterAllowed } from './load-poster-studio'

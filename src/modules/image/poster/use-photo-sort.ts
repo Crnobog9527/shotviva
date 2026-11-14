@@ -15,6 +15,8 @@ import type { PosterStudioState, StudioTemplate } from './use-poster-studio'
 
 export type PhotoPhase = 'idle' | 'uploading' | 'reading'
 export type PhotoError = 'upload' | 'failed' | 'rateLimited' | null
+// The route's limit (run-extract-photo.ts PHOTOS_MAX): a set's pages, at most 4.
+const PHOTOS_MAX = 4
 type Found = { content: PosterContent; unverified: string[]; text: string }
 
 export function usePhotoSort(template: Pick<StudioTemplate, 'id'>, studio: PosterStudioState, dirty: () => boolean) {
@@ -28,18 +30,20 @@ export function usePhotoSort(template: Pick<StudioTemplate, 'id'>, studio: Poste
     studio.startFrom(found.content, { source: 'photo' }, { unverified: found.unverified, source: found.text })
   }
 
-  async function pick(file: File) {
+  // One photo per page of the set; any more are left out.
+  async function pick(files: readonly File[]) {
     setError(null)
     setPending(null)
     setStage(null)
     setPhase('uploading')
-    const inputKey = await uploadPhoto(file, uploadDeps, { onPhase: () => undefined, onProgress: () => undefined }).catch(() => null)
-    if (!inputKey) {
+    const upload = (file: File) => uploadPhoto(file, uploadDeps, { onPhase: () => undefined, onProgress: () => undefined }).catch(() => null)
+    const keys = await Promise.all(files.slice(0, PHOTOS_MAX).map(upload))
+    if (keys.length === 0 || keys.some((key) => key === null)) {
       setPhase('idle')
       return setError('upload')
     }
     setPhase('reading')
-    const reply = await extractPosterPhoto(template.id, inputKey, setStage)
+    const reply = await extractPosterPhoto(template.id, keys as string[], setStage)
     setPhase('idle')
     if (reply.status !== 'ok') return setError(reply.status === 'error' && reply.code === 'RATE_LIMITED' ? 'rateLimited' : 'failed')
     const found = { content: posterContentSchema.parse(reply.content), unverified: reply.unverified, text: reply.text ?? '' }

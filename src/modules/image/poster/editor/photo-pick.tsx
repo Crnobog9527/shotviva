@@ -20,8 +20,8 @@ export function PhotoPick({ photo }: { photo: PhotoSort }) {
   return (
     <div className="grid gap-2 rounded-control bg-wash-faint p-3 text-caption">
       <p className="text-muted-foreground">{t('hint')}</p>
-      <input ref={input} type="file" accept={ACCEPT} className="sr-only" tabIndex={-1} aria-hidden
-        onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void photo.pick(file) }} />
+      <input ref={input} type="file" accept={ACCEPT} multiple className="sr-only" tabIndex={-1} aria-hidden
+        onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ''; if (files.length) void photo.pick(files) }} />
       <Button variant="outline" size="sm" className="min-h-11 justify-self-start" disabled={photo.busy} onClick={() => input.current?.click()}>
         <Camera aria-hidden className="size-4" />{photo.phase === 'uploading' ? t('uploading') : t('pick')}
       </Button>

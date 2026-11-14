@@ -55,13 +55,13 @@ export async function savePosterSet(templateId: string, content: PosterContent, 
   return { ok: false, code: codeOf(json), message: typeof json.message === 'string' ? json.message : '' }
 }
 
-// 拍照识别: the uploaded photo of an old poster, read and sorted like a paste; `text` is what the
+// 拍照识别: the uploaded photos of an old poster (one per page), read and sorted like a paste; `text` is what the
 // photo said, shown beside the blocks like a pasted notice.
 export type PhotoReply = ExtractReply & { text?: string }
 
-export async function extractPosterPhoto(templateId: string, inputKey: string, onStage?: (stage: PosterBlock) => void): Promise<PhotoReply> {
+export async function extractPosterPhoto(templateId: string, inputKeys: readonly string[], onStage?: (stage: PosterBlock) => void): Promise<PhotoReply> {
   try {
-    const response = await fetch('/api/poster/extract-photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ template_id: templateId, input_key: inputKey }) })
+    const response = await fetch('/api/poster/extract-photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ template_id: templateId, input_keys: inputKeys }) })
     if (!response.ok) return { status: 'error', code: codeOf((await response.json().catch(() => ({}))) as Record<string, unknown>) }
     if (response.body && response.headers.get('Content-Type')?.includes('ndjson')) return await readProgress(response.body, onStage)
     return ((await response.json().catch(() => null)) as PhotoReply | null) ?? { status: 'error', code: 'INTERNAL' }

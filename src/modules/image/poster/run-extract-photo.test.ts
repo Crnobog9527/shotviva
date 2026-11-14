@@ -50,7 +50,7 @@ describe('preparePhotoExtract', () => {
   it('reads the photo with the template reading instructions, then sorts the lines like a paste', async () => {
     const { db, inserted } = fakeDb()
     const fetch = vi.fn(async () => reading(notice))
-    const prepared = await preparePhotoExtract(deps(db, fetch), { userId: USER, templateId: 't', inputKey: KEY })
+    const prepared = await preparePhotoExtract(deps(db, fetch), { userId: USER, templateId: 't', inputKeys: [KEY] })
     expect(prepared.kind).toBe('model')
     const result = prepared.kind === 'model' ? await prepared.run(() => undefined) : null
     expect(result).toMatchObject({ status: 'ok', content: { header: { cup: '星海杯' } }, text: notice.join('\n') })
@@ -59,9 +59,22 @@ describe('preparePhotoExtract', () => {
     expect(inserted[0]).toMatchObject({ source: 'photo', status: 'ok', provider: 'decision/gpt-6-luna', input_tokens: 1500, output_tokens: 400, cost_usd: 0.00094 })
   })
 
+  it('reads one photo per page and sorts them as one notice', async () => {
+    const { db, inserted } = fakeDb()
+    const KEY2 = KEY.replace('22222222-2222', '55555555-5555')
+    let call = 0
+    const fetch = vi.fn(async () => reading((call += 1) === 1 ? notice.slice(0, 6) : notice.slice(7)))
+    const prepared = await preparePhotoExtract(deps(db, fetch), { userId: USER, templateId: 't', inputKeys: [KEY, KEY2] })
+    const result = prepared.kind === 'model' ? await prepared.run(() => undefined) : null
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(result).toMatchObject({ status: 'ok' })
+    expect(inserted).toHaveLength(1)
+    expect(inserted[0]).toMatchObject({ input_tokens: 3000, output_tokens: 800 })
+  })
+
   it('records a failed reading and answers failed, so the editor keeps the paste step', async () => {
     const { db, inserted } = fakeDb()
-    const prepared = await preparePhotoExtract(deps(db, vi.fn(async () => reading([]))), { userId: USER, templateId: 't', inputKey: KEY })
+    const prepared = await preparePhotoExtract(deps(db, vi.fn(async () => reading([]))), { userId: USER, templateId: 't', inputKeys: [KEY] })
     const result = prepared.kind === 'model' ? await prepared.run(() => undefined) : null
     expect(result).toEqual({ status: 'failed' })
     expect(inserted[0]).toMatchObject({ source: 'photo', status: 'failed' })
@@ -69,12 +82,12 @@ describe('preparePhotoExtract', () => {
 
   it('refuses someone else\'s upload, and counts against the hourly limit', async () => {
     const other = KEY.replace(USER, '33333333-3333-4333-8333-333333333333')
-    await expect(preparePhotoExtract(deps(fakeDb().db, vi.fn()), { userId: USER, templateId: 't', inputKey: other })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
-    await expect(preparePhotoExtract(deps(fakeDb(30).db, vi.fn()), { userId: USER, templateId: 't', inputKey: KEY })).rejects.toMatchObject({ code: 'RATE_LIMITED' })
+    await expect(preparePhotoExtract(deps(fakeDb().db, vi.fn()), { userId: USER, templateId: 't', inputKeys: [other] })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(preparePhotoExtract(deps(fakeDb(30).db, vi.fn()), { userId: USER, templateId: 't', inputKeys: [KEY] })).rejects.toMatchObject({ code: 'RATE_LIMITED' })
   })
 
   it('is unavailable without reading instructions', async () => {
     loadGenerationTemplate.mockResolvedValue({ template: { id: 't', fields }, prompt: { modelParams: { poster_extract: { instructions: 'Sort.' } } } })
-    await expect(preparePhotoExtract(deps(fakeDb().db, vi.fn()), { userId: USER, templateId: 't', inputKey: KEY })).resolves.toEqual({ kind: 'done', result: { status: 'unavailable' } })
+    await expect(preparePhotoExtract(deps(fakeDb().db, vi.fn()), { userId: USER, templateId: 't', inputKeys: [KEY] })).resolves.toEqual({ kind: 'done', result: { status: 'unavailable' } })
   })
 })

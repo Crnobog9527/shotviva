@@ -58,22 +58,28 @@ async function record(call: Call, row: { ok: boolean; usage: StreamUsage; chars:
   if (error) logger.error('poster.extract.record_failed', { message: error.message })
 }
 
-// The poster's lines, top to bottom, as one notice (at most what a paste may hold).
-async function transcribe(call: Call, instructions: string, key: string, spent: { usage: StreamUsage }): Promise<string> {
+// One photo's lines, top to bottom. Blank lines stay (one at most): they split the notice into
+// the paragraphs the parser reads.
+async function readPhoto(call: Call, instructions: string, key: string, spent: { usage: StreamUsage }): Promise<string> {
   const body = readingBody(call.credentials.config.model, instructions, await photoUrl(call.deps.store(), key))
   const answer = readResponsesOutput(await postResponses({ ...call.credentials.config, fetch: call.deps.fetch }, body, AbortSignal.timeout(READ_TIMEOUT_MS)))
-  spent.usage = answer.usage
+  spent.usage = add(spent.usage, answer.usage)
   const lines = z.object({ lines: z.array(z.string()) }).parse(answer.json).lines
-  // Blank lines stay (one at most): they split the notice into the paragraphs the parser reads.
-  return lines.map((line) => line.trim()).join('\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, EXTRACT_TEXT_MAX)
+  return lines.map((line) => line.trim()).join('\n').replace(/\n{3,}/g, '\n\n').trim()
 }
 
-async function runPhoto(call: Call, prompts: { read: string; sort: string }, key: string, onStage: (stage: ExtractStage) => void): Promise<PhotoResult> {
+// Every page's photo, read at once, as one notice (at most what a paste may hold).
+async function transcribe(call: Call, instructions: string, keys: readonly string[], spent: { usage: StreamUsage }): Promise<string> {
+  const pages = await Promise.all(keys.map((key) => readPhoto(call, instructions, key, spent)))
+  return pages.filter(Boolean).join('\n\n').slice(0, EXTRACT_TEXT_MAX)
+}
+
+async function runPhoto(call: Call, prompts: { read: string; sort: string }, keys: readonly string[], onStage: (stage: ExtractStage) => void): Promise<PhotoResult> {
   const started = performance.now()
   const spent: { usage: StreamUsage } = { usage: null }
   let chars = 0
   try {
-    const text = await transcribe(call, prompts.read, key, spent)
+    const text = await transcribe(call, prompts.read, keys, spent)
     chars = text.length
     if (!text) throw new Error('no text on the photo')
     const parsed = parsePosterNotice(text)
@@ -94,9 +100,13 @@ async function runPhoto(call: Call, prompts: { read: string; sort: string }, key
   }
 }
 
-export async function preparePhotoExtract(deps: PhotoDeps, input: { userId: string; templateId: string; inputKey: string }): Promise<PreparedPhoto> {
+// Up to this many photos in one go: a set's pages (at most 4), one photo each.
+export const PHOTOS_MAX = 4
+
+export async function preparePhotoExtract(deps: PhotoDeps, input: { userId: string; templateId: string; inputKeys: readonly string[] }): Promise<PreparedPhoto> {
   await requireFeature(input.userId, POSTER_FEATURE)
-  if (!isOwnInputKey(input.userId, input.inputKey)) throw new AppError('INVALID_INPUT', 'Unknown upload')
+  const keys = [...new Set(input.inputKeys)]
+  if (keys.length === 0 || keys.length > PHOTOS_MAX || keys.some((key) => !isOwnInputKey(input.userId, key))) throw new AppError('INVALID_INPUT', 'Unknown upload')
   await assertUnderHourlyLimit(deps.db, input.userId, deps.now?.() ?? new Date())
   const { template, prompt } = await loadGenerationTemplate(deps.db, input.templateId, 'web')
   posterFieldsOf(template.fields)
@@ -105,5 +115,5 @@ export async function preparePhotoExtract(deps: PhotoDeps, input: { userId: stri
   const credentials = await deps.credentials()
   if (!read || !sort || !credentials || credentials.adapter !== 'openai_responses') return { kind: 'done', result: { status: 'unavailable' } }
   const call: Call = { deps, credentials, userId: input.userId, id: await insertPending(deps, input.userId, credentials.tag) }
-  return { kind: 'model', run: (onStage) => runPhoto(call, { read, sort }, input.inputKey, onStage) }
+  return { kind: 'model', run: (onStage) => runPhoto(call, { read, sort }, keys, onStage) }
 }
