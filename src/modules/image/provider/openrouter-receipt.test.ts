@@ -27,6 +27,15 @@ it('does not assign another request’s charge, and books BYOK as upstream plus 
   expect(jobCostUsd(byok, null)).toBe(0.02)
 })
 
+it('looks up the upstream bill a BYOK response left out, keeping the reported fee', async () => {
+  const { fetch, receipt } = read({ usage: { cost: 0, is_byok: true } }, { id: gen, total_cost: 0, is_byok: true, upstream_inference_cost: 0.0425 })
+  const usage = await receipt
+  expect(usage).toMatchObject({ cost: 0, is_byok: true, upstream_inference_cost: 0.0425 })
+  expect(usage.cost_source).toBeUndefined()
+  expect(jobCostUsd(usage, null)).toBe(0.0425)
+  expect(fetch).toHaveBeenCalledOnce()
+})
+
 it('uses the response without another call when it supplies the charge and billing mode', async () => {
   const { fetch, receipt } = read({ usage: { cost: 0.018, is_byok: false } }, {})
   expect(await receipt).toMatchObject({ cost: 0.018, generation_id: gen })
