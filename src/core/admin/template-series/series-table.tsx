@@ -6,7 +6,7 @@ import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/core/ui/ta
 import { SortableList } from '../ui/sortable'
 import { seriesCopy as copy } from './copy'
 import type { SeriesListItem } from './list-rules'
-import { SeriesRow } from './series-row'
+import { SeriesRow, stickyActionsClass } from './series-row'
 
 type Props = {
   ids: string[]; byId: Map<string, SeriesListItem>; visible: (id: string) => boolean; query: string; pending: boolean
@@ -23,7 +23,7 @@ export function SeriesTable({ ids, byId, visible, query, pending, selection, onR
       <TableHeader><TableRow>
         <TableHead><Checkbox aria-label={copy.selectAll} checked={allChecked} onCheckedChange={on => selection.setAll(on === true)} /></TableHead>
         {[copy.drag, copy.cover, copy.name_zh, copy.status, copy.selectStatus].map(label => <TableHead key={label}>{label}</TableHead>)}
-        <TableHead className="text-right">{copy.actions}</TableHead>
+        <TableHead className={stickyActionsClass + ' text-right'}>{copy.actions}</TableHead>
       </TableRow></TableHeader>
       <TableBody>
         <SortableList ids={ids} labelOf={id => byId.get(id)?.name_zh ?? id} onReorder={onReorder}

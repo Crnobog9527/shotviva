@@ -12,6 +12,10 @@ import { seriesCopy as copy } from './copy'
 import type { SeriesListItem, SeriesThumb } from './list-rules'
 
 export const SERIES_PATH = '/admin/templates/series'
+// Pinned to the right edge as in the template list, so 删除 stays in reach while a phone scrolls
+// the table sideways.
+export const stickyActionsClass =
+  'sticky right-0 z-[1] bg-background shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.45)] [tr:hover>&]:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))] [tr[data-state=selected]>&]:bg-muted'
 
 // An auto cover is a member's: its 原图 and AI 出图 side by side; a custom cover is one picture.
 function thumbImages(thumb: SeriesThumb) {
@@ -25,7 +29,7 @@ type Props = { item: SeriesListItem; checked: boolean; pending: boolean; onSelec
 // and says why on hover and to screen readers.
 function DeleteCell({ item, pending, onDelete }: Pick<Props, 'item' | 'pending' | 'onDelete'>) {
   return (
-    <TableCell className="text-right">
+    <TableCell className={stickyActionsClass + ' text-right'}>
       <span title={item.is_active ? copy.liveNoDelete : undefined} className="inline-block">
         <Button variant="ghost" size="sm" className="text-destructive" disabled={pending || item.is_active} onClick={onDelete}
           aria-label={`${copy.delete} ${item.name_zh}${item.is_active ? '：' + copy.liveNoDelete : ''}`}>{copy.delete}</Button>

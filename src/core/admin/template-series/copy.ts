@@ -43,7 +43,7 @@ export const seriesCopy = {
   deleteMoved: (n: number) => n ? `共会移出 ${n} 个模板。` : '这些系列没有成员模板。',
   deleteWill: (n: number) => `会删除这 ${n} 个：`, deleteSkip: (n: number) => `会跳过这 ${n} 个：`,
   memberCount: (n: number) => n ? `${n} 个模板` : '无成员',
-  deleteSync: '正式站同步这个系列时也会删除它（成员同样移出）。',
+  deleteSync: '之后把这些系列同步到正式站时，正式站的同名系列也会被删除（成员同样移出）。',
   deleteConfirm: (n: number) => `确认删除 ${n} 个`, nothingToDelete: '选中的系列都已上架，没有可以删除的。',
   deleteResult: '删除结果', dismiss: '关闭',
   deleteDone: (n: number, moved: number) => `已删除 ${n} 个系列，移出 ${moved} 个模板`,
