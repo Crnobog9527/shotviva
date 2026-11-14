@@ -49,27 +49,33 @@ type Props = {
   error?: string | null
   // A poster template (gallery-excluded root): free credits still watermark, but never publish.
   privateOnly?: boolean
+  // The shop, phone or address fields still holding the cover's text (copy-examples.ts): one line
+  // asking whether to use them, in place of the usual notice; Generate stays enabled.
+  examplesLeft?: readonly string[]
 }
 
 // The creation form's bottom bar: one notice line at most, then the one primary (DESIGN §4.3
 // steps 4–5). The free-credit notice shows only when this photo would use free credits; a
 // batch (T28) says how many photos and that it is paid credits only.
-export function FormAction({ state, resolution, batch, onGenerate, placement = 'page', addFirst = null, limit = 1, error = null, privateOnly = false }: Props) {
-  const t = useTranslations('app.workspace')
+export function FormAction({ state, resolution, batch, onGenerate, placement = 'page', addFirst = null, limit = 1, error = null, privateOnly = false, examplesLeft = [] }: Props) {
   return (
     <ActionBar inline={placement === 'sheet'} className={placement === 'page' ? PAGE : undefined}>
-      {error ? (
-        <ActionNotice>
-          <span role="alert">{error}</span>
-        </ActionNotice>
-      ) : state.kind === 'need-photo' && addFirst !== null ? (
-        <ActionNotice>{t.rich('again.addFirst', { ...rich, count: addFirst })}</ActionNotice>
-      ) : (
-        <Notice state={state} resolution={resolution} limit={limit} privateOnly={privateOnly} />
-      )}
+      <BarNotice state={state} resolution={resolution} addFirst={addFirst} limit={limit} error={error} privateOnly={privateOnly} examplesLeft={examplesLeft} />
       <Primary state={state} batch={batch} onGenerate={onGenerate} />
     </ActionBar>
   )
+}
+
+// The bar's one line: the refusal, what Make again costs once its photo is in, the cover's text
+// still in the shop / phone / address fields, or the usual notice.
+function BarNotice({ state, resolution, addFirst, limit, error, privateOnly, examplesLeft }: Required<Pick<Props, 'state' | 'resolution' | 'addFirst' | 'limit' | 'error' | 'privateOnly' | 'examplesLeft'>>) {
+  const t = useTranslations('app.workspace')
+  if (error) return <ActionNotice><span role="alert">{error}</span></ActionNotice>
+  if (state.kind === 'need-photo' && addFirst !== null) return <ActionNotice>{t.rich('again.addFirst', { ...rich, count: addFirst })}</ActionNotice>
+  if (state.kind === 'generate' && examplesLeft.length > 0) {
+    return <ActionNotice><span role="status" className="text-primary">{t('examples.left', { fields: examplesLeft.join(t('examples.joiner')) })}</span></ActionNotice>
+  }
+  return <Notice state={state} resolution={resolution} limit={limit} privateOnly={privateOnly} />
 }
 
 // The one primary: Get credits (opens the paywall), Generate, or a disabled label saying what is

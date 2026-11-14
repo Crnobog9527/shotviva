@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { posterFieldsSchema, splitPoster, pagesReady, posterContentSchema } from '@/core/poster'
 import sample from '@/core/poster/fixtures/xinglan-sample.json'
 
-import { clearAll, clearPrizes, clearTable, emptyContent, isSampleText, sampleContactsLeft, setFooter, setHeader, setPrize, startContent, tidyContent } from './content-edit'
+import { clearAll, clearPrizes, clearTable, emptyContent, isSampleText, sampleContactsLeft, setFooter, setHeader, setPrize, startContent, tidyContent, typedPoster } from './content-edit'
 import { freshDraft, readDraft } from './use-poster-studio'
 
 // The two-page tournament set with the cover poster's text as its sample (fields.poster.sample).
@@ -87,6 +87,9 @@ describe('sample marks', () => {
     content = setFooter(content, 'address', '岳阳市')
     expect(sampleContactsLeft(content, withSample.sample)).toBe(true)
     content = { ...content, footer: { ...content.footer, phones: ['139 1111 2222'] } }
+    // The organiser's English name is still the sample's: still a reminder.
+    expect(sampleContactsLeft(content, withSample.sample)).toBe(true)
+    content = setHeader(content, 'brandEn', 'JINDING')
     expect(sampleContactsLeft(content, withSample.sample)).toBe(false)
     expect(sampleContactsLeft(clearAll(startContent(withSample)), withSample.sample)).toBe(false)
     expect(sampleContactsLeft(content, undefined)).toBe(false)
@@ -106,5 +109,16 @@ describe('stored drafts', () => {
     const draft = readDraft({ poster: withSample }, JSON.stringify({ step: 'edit', content: typed, sorted: false, fromSample: false }))
     expect(draft.content.header.title).toBe('周4精英赛')
     expect(draft.fromSample).toBe(false)
+  })
+})
+
+describe('typed text', () => {
+  it('asks before wiping only when the user typed something', () => {
+    const content = startContent(withSample)
+    expect(typedPoster(content, withSample.sample)).toBe(false)
+    expect(typedPoster(clearAll(content), withSample.sample)).toBe(false)
+    expect(typedPoster(setPrize(content, 2, 'prize', '奖杯'), withSample.sample)).toBe(true)
+    // A sorted notice (no sample to compare with) is all the user's.
+    expect(typedPoster(content, undefined)).toBe(true)
   })
 })

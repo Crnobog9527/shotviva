@@ -17,6 +17,9 @@ export type CopyFormValue = {
   placeholderZh: string
   help: string
   helpZh: string
+  // The cover's text the user form starts with (fields.copy[].example), English and Chinese.
+  example: string
+  exampleZh: string
   required: boolean
   // Text boxes, parsed on save (blank min / max: no bound).
   maxLength: string
@@ -28,20 +31,24 @@ export type CopyFormValue = {
 
 export function emptyCopyField(type: CopyFieldType = 'short'): CopyFormValue {
   return {
-    key: '', type, label: '', labelZh: '', placeholder: '', placeholderZh: '', help: '', helpZh: '', required: false,
+    key: '', type, label: '', labelZh: '', placeholder: '', placeholderZh: '', help: '', helpZh: '', example: '', exampleZh: '', required: false,
     maxLength: String(COPY_DEFAULT_LENGTH[type]), min: '', max: '', public: false,
     options: type === 'select' ? [{ value: '', labelZh: '' }, { value: '', labelZh: '' }] : [],
   }
 }
 
-type ZhCopyText = { label?: string; placeholder?: string; help?: string; options?: Record<string, string | undefined> }
+type ZhCopyText = { label?: string; placeholder?: string; help?: string; example?: string; options?: Record<string, string | undefined> }
 
 const text = (value: number | undefined) => (value === undefined ? '' : String(value))
 
+// The texts each card holds in English and Chinese ('' when not set).
+const TEXTS = ['placeholder', 'help', 'example'] as const
+const texts = (field: CopyField, zh: ZhCopyText) =>
+  Object.fromEntries(TEXTS.flatMap((key) => [[key, field[key] ?? ''], [`${key}Zh`, zh[key] ?? '']])) as Pick<CopyFormValue, (typeof TEXTS)[number] | `${(typeof TEXTS)[number]}Zh`>
+
 function toCopyValue(field: CopyField, zh: ZhCopyText = {}): CopyFormValue {
   return {
-    key: field.key, type: field.type ?? 'short', label: field.label, labelZh: zh.label ?? '',
-    placeholder: field.placeholder ?? '', placeholderZh: zh.placeholder ?? '', help: field.help ?? '', helpZh: zh.help ?? '',
+    key: field.key, type: field.type ?? 'short', label: field.label, labelZh: zh.label ?? '', ...texts(field, zh),
     required: field.required, maxLength: String(field.maxLength), min: text(field.min), max: text(field.max),
     options: (field.options ?? []).map((value) => ({ value, labelZh: zh.options?.[value] ?? '' })),
     public: field.public ?? false,
@@ -76,6 +83,7 @@ export function toCopyFields(fields: readonly CopyFormValue[]): Record<string, u
     label: trimmed(field.label),
     ...optional('placeholder', field.placeholder),
     ...optional('help', field.help),
+    ...optional('example', field.example),
     required: field.required,
     maxLength: field.type === 'select' ? COPY_DEFAULT_LENGTH.select : Number(trimmed(field.maxLength)),
     ...(field.type === 'select' ? { options: field.options.map((option) => optionValue(option.value)) } : {}),
@@ -92,7 +100,7 @@ export function toZhCopyText(fields: readonly CopyFormValue[]): Record<string, Z
         ? Object.fromEntries(field.options.filter((option) => optionValue(option.value) && trimmed(option.labelZh)).map((option) => [optionValue(option.value), trimmed(option.labelZh)]))
         : {}
       const entry = {
-        ...optional('label', field.labelZh), ...optional('placeholder', field.placeholderZh), ...optional('help', field.helpZh),
+        ...optional('label', field.labelZh), ...optional('placeholder', field.placeholderZh), ...optional('help', field.helpZh), ...optional('example', field.exampleZh),
         ...(Object.keys(options).length > 0 ? { options } : {}),
       }
       return Object.keys(entry).length > 0 ? [[trimmed(field.key), entry]] : []

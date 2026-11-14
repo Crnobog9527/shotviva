@@ -846,7 +846,9 @@
         "sortedHint": "已按你粘贴的通知填好。也可以全部清空，或换回示例内容。",
         "clearAll": "全部清空",
         "restore": "恢复示例内容",
-        "contactsLeft": "店名、电话、地址还是示例内容，确认要用吗？"
+        "contactsLeft": "店名、电话、地址还是示例内容，确认要用吗？",
+        "clearAllQuestion": "会把你改过的内容也清掉，确定全部清空吗？",
+        "restoreQuestion": "会覆盖你改过的内容，确定恢复示例吗？"
       }
     },
     "sizes": {
@@ -1014,6 +1016,18 @@
         "required": "还有 {count} 项必填",
         "done": "必填已填好",
         "invalid": "有内容需要修改"
+      },
+      "examples": {
+        "hint": "各项已填好示例海报上的字（灰色字）。只改要变的地方就行，没改的灰色字会照样画上去。",
+        "clearAll": "全部清空",
+        "clearAllQuestion": "会把你改过的内容也清掉，确定全部清空吗？",
+        "restore": "恢复示例内容",
+        "restoreQuestion": "会覆盖你改过的内容，确定恢复示例吗？",
+        "confirm": "确定",
+        "cancel": "取消",
+        "clearGroup": "清空本组",
+        "left": "{fields}还是示例内容，确认要用吗？",
+        "joiner": "、"
       }
     },
     "errors": {
