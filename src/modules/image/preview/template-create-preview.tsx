@@ -81,8 +81,8 @@ function PreviewBody({ draftId, members, seriesName, width }: BodyProps) {
       </div>
     ),
     picker: seriesName ? <MemberPicker label={t('series.members', { name: seriesName, count: members.length })} members={members} value={template.id} onChange={choose} /> : null,
-    form: <WorkspaceForm key={template.id} template={template} balance={PREVIEW_ACCOUNT.balance} tier={null} photos={draft.photos} slots={draft.slots} values={draft.values} onChange={draft.change} surface="create_dialog" />,
-    bar: <FormAction state={draft.state} resolution={draft.values.resolution} batch={false} onGenerate={() => {}} placement="sheet" limit={1} privateOnly={template.privateOnly} />,
+    form: <WorkspaceForm key={template.id} template={template} balance={PREVIEW_ACCOUNT.balance} tier={null} photos={draft.photos} slots={draft.slots} values={draft.values} onChange={draft.change} surface="create_dialog" examples={draft.fromExamples} />,
+    bar: <FormAction state={draft.state} resolution={draft.values.resolution} batch={false} onGenerate={() => {}} placement="sheet" limit={1} privateOnly={template.privateOnly} examplesLeft={draft.examplesLeft} />,
   }
   if (width === 'desktop') {
     return <Frame className={cn(DESKTOP_FRAME, 'size-full')}><DesktopPanes {...panes} Title="h2" Description="p" /></Frame>

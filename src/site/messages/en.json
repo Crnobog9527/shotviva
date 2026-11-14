@@ -846,7 +846,9 @@
         "sortedHint": "Filled from your pasted notice. You can clear it all or go back to the sample text.",
         "clearAll": "Clear everything",
         "restore": "Back to the sample text",
-        "contactsLeft": "The organiser, phone or address is still the sample’s. Use it anyway?"
+        "contactsLeft": "The organiser, phone or address is still the sample’s. Use it anyway?",
+        "clearAllQuestion": "This removes what you typed too. Clear everything?",
+        "restoreQuestion": "This replaces what you typed. Go back to the sample?"
       }
     },
     "sizes": {
@@ -1014,6 +1016,18 @@
         "required": "{count, plural, one {# required item left} other {# required items left}}",
         "done": "Required items done",
         "invalid": "Something here needs a fix"
+      },
+      "examples": {
+        "hint": "The fields start with the sample poster’s text (in grey). Type over what changes; grey text goes on the poster as it is.",
+        "clearAll": "Clear everything",
+        "clearAllQuestion": "This removes what you typed too. Clear everything?",
+        "restore": "Back to the sample text",
+        "restoreQuestion": "This replaces what you typed. Go back to the sample?",
+        "confirm": "Yes",
+        "cancel": "Cancel",
+        "clearGroup": "Clear this group",
+        "left": "{fields} still show the sample’s text. Use it anyway?",
+        "joiner": ", "
       }
     },
     "errors": {
