@@ -11,6 +11,8 @@ describe('review-risk', () => {
       'src/core/billing/credits.ts',
       'src/core/jobs/job-cost.ts',
       'src/site/billing/catalogue.ts',
+      'src/core/templates/pricing.ts',
+      'src/core/templates/provider-pricing.ts',
       'src/app/api/webhooks/stripe/route.ts',
       'src/app/api/checkout/route.ts',
       'src/core/auth/session.ts',

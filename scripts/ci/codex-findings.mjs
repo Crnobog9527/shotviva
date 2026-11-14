@@ -70,9 +70,19 @@ export function parseReviewState(body) {
   }
 }
 
+/** Every page of a REST list (100 per page). */
+async function all(path) {
+  const items = []
+  for (let page = 1; ; page++) {
+    const batch = await github(`${path}?per_page=100&page=${page}`)
+    items.push(...batch)
+    if (batch.length < 100) return items
+  }
+}
+
 export async function reviewState() {
-  const comments = await github(`/repos/${owner}/${name}/issues/${env.PR}/comments?per_page=100`)
-  const reviews = await github(`/repos/${owner}/${name}/pulls/${env.PR}/reviews?per_page=100`)
+  const comments = await all(`/repos/${owner}/${name}/issues/${env.PR}/comments`)
+  const reviews = await all(`/repos/${owner}/${name}/pulls/${env.PR}/reviews`)
   const summary = comments.filter((c) => isCodex(c.user?.login)).map((c) => parseReviewState(c.body)).filter(Boolean).at(-1)
   const reviewed = reviews.filter((r) => isCodex(r.user?.login)).map((r) => r.commit_id)
   // A review in progress outranks earlier ones: until it ends its findings are unknown, so the

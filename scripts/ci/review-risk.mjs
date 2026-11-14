@@ -28,6 +28,8 @@ export const HIGH = [
   /^src\/core\/(billing|jobs|codes|affiliate|partner|account|identity-guard|moderation|storage)\//,
   /^src\/core\/admin\/(orders|clawback-ui|disputes|disputes-ui|costs|products|code-editor|code-reports)\//,
   /^src\/site\/(billing|template-pricing)\//,
+  // Template credit prices, floors and the cost guards behind them.
+  /^src\/core\/templates\/[^/]*pric[^/]*\.ts$/,
   /^src\/site\/dispute-evidence\.ts$/,
   /^src\/app\/api\/(checkout|webhooks|generate|edit|poster|partner|codes|affiliate|account|uploads|files|cron|admin)\//,
   /^src\/app\/\[locale\]\/\(app\)\/checkout\//,
