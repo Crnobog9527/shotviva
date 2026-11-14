@@ -42,3 +42,16 @@ describe('POST /api/generate body (T16)', () => {
     expect(generateBodySchema.safeParse({ template_id: 'pet-studio', batch_size: 0 }).success).toBe(false)
   })
 })
+
+describe('Make again source (ARCHITECTURE §16.2c)', () => {
+  const id = '11111111-1111-4111-8111-111111111111'
+
+  it('passes the claimed source work on, for the database to check', () => {
+    expect(toGenerationRequest('user-1', generateBodySchema.parse({ template_id: 'pet-studio', again_of: id })).againOf).toBe(id)
+    expect(toGenerationRequest('user-1', generateBodySchema.parse({ template_id: 'pet-studio' }))).not.toHaveProperty('againOf')
+  })
+
+  it('refuses anything that is not a uuid', () => {
+    expect(generateBodySchema.safeParse({ template_id: 'pet-studio', again_of: 'x' }).success).toBe(false)
+  })
+})

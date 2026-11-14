@@ -66,8 +66,8 @@ export function useWorkspaceDraft({ template, balance, tier, concurrency, again 
     // A dialog that starts here then moves to the template's workspace page, whose pending view
     // draws this template's head before the server answers (pending-template.ts).
     rememberTemplate(template)
-    if (slotted) return run.start(slotInputs(template, values, slots), [])
-    return run.start(startInputs(template, values, summary.ready), summary.ready)
+    if (slotted) return run.start(withAgainOf(slotInputs(template, values, slots), again), [])
+    return run.start(withAgainOf(startInputs(template, values, summary.ready), again), summary.ready)
   }
   const changeValues = (next: Partial<FormValues>) => {
     run.clearError()
@@ -157,6 +157,13 @@ function photoCta(template: CatalogueTemplate, photos: PhotoBatch, slots: SlotPh
 const slotInputs = (template: CatalogueTemplate, values: FormValues, slots: SlotPhotos): StartInput[] => {
   const input = slotStartInput(template, values, slots.uploads)
   return input ? [input] : []
+}
+
+// Make again from the user's own work records where it came from (ARCHITECTURE §16.2c); 一键复用
+// from someone else's public work (from: 'gallery') does not.
+export function withAgainOf(inputs: StartInput[], again: AgainStart | null): StartInput[] {
+  if (!again || again.from === 'gallery') return inputs
+  return inputs.map((input) => ({ ...input, body: { ...input.body, again_of: again.jobId } }))
 }
 
 export type WorkspaceDraft = ReturnType<typeof useWorkspaceDraft>

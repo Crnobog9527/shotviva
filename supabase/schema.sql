@@ -8984,40 +8984,24 @@ CREATE OR REPLACE FUNCTION "public"."admin_template_stats"("p_start" timestamp w
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare
-  v_gap interval;
 begin
   if p_start is null or p_end is null or p_start >= p_end
      or p_end - p_start > interval '93 days' or p_end > now() + interval '5 minutes'
      or p_redraw_minutes is null or p_redraw_minutes < 1 or p_redraw_minutes > 1440 then
     raise exception 'INVALID_INPUT' using detail = 'one ordered period of at most 93 days, not in the future; redraw gap 1–1440 minutes';
   end if;
-  v_gap := make_interval(mins => p_redraw_minutes);
 
   return (
     with staff as (
       select pr.id from public.profiles pr where pr.role = 'admin'
     ),
-    scanned as (
-      select g.id, g.user_id, g.template_id, g.status, g.error_code, g.created_at, g.batch_id,
-             g.parent_job_id, g.credits_cost, g.credit_pool, g.cost_usd,
-             coalesce(g.inputs -> 'poster' ? 'redraw_of', false) as poster_redraw,
-             lag(g.created_at) over w as prev_at,
-             lag(g.batch_id) over w as prev_batch
-        from public.generation_jobs g
-       where g.created_at >= p_start - v_gap and g.created_at < p_end and g.status <> 'running'
-         and not exists (select from staff s where s.id = g.user_id)
-      window w as (partition by g.user_id, g.template_id, g.inputs -> 'poster' ->> 'set_id', g.inputs -> 'poster' ->> 'part'
-                   order by g.created_at, g.id)
-    ),
     jobs as (
-      select x.*,
-             x.poster_redraw or (
-               x.parent_job_id is null and x.prev_at is not null and x.created_at - x.prev_at <= v_gap
-               and (x.batch_id is null or x.prev_batch is distinct from x.batch_id)
-             ) as redraw
-        from scanned x
-       where x.created_at >= p_start
+      select g.id, g.user_id, g.template_id, g.status, g.error_code, g.created_at,
+             g.credits_cost, g.credit_pool, g.cost_usd,
+             g.again_of is not null or coalesce(g.inputs -> 'poster' ? 'redraw_of', false) as redraw
+        from public.generation_jobs g
+       where g.created_at >= p_start and g.created_at < p_end and g.status <> 'running'
+         and not exists (select from staff s where s.id = g.user_id)
     ),
     per_template as (
       select j.template_id,
@@ -9068,6 +9052,9 @@ begin
     select jsonb_build_object(
       'timezone', 'Asia/Shanghai',
       'redraw_minutes', p_redraw_minutes,
+      -- When redraws started to be counted: the first job ever recorded as Make again. Null
+      -- until there is one. The page shows no redraw rate for a period that starts earlier.
+      'redraw_since', (select min(g.created_at) from public.generation_jobs g where g.again_of is not null),
       'templates', coalesce(jsonb_agg(jsonb_build_object(
         'template_id', i.id,
         'name', t.name,
@@ -10717,6 +10704,7 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "screen_attempts" integer DEFAULT 0 NOT NULL,
     "last_screen_at" timestamp with time zone,
     "gallery_excluded" boolean DEFAULT false NOT NULL,
+    "again_of" "uuid",
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
     CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
@@ -10739,6 +10727,10 @@ ALTER TABLE "public"."generation_jobs" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."generation_jobs"."deleted_at" IS 'When the owner deleted this work (T41). Set only by delete_own_job; user-facing reads skip it.';
+
+
+
+COMMENT ON COLUMN "public"."generation_jobs"."again_of" IS 'Make again: the caller''s own succeeded work, same template, this job was made again from (1513). Null otherwise.';
 
 
 
@@ -12867,6 +12859,35 @@ $$;
 
 
 ALTER FUNCTION "public"."session_identity"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."set_job_again_of"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_raw text := new.inputs ->> 'again_of';
+  v_source uuid;
+begin
+  -- Only this trigger sets the column: a value written straight into it is dropped too.
+  new.again_of := null;
+  if not (new.inputs ? 'again_of') then
+    return new;
+  end if;
+  new.inputs := new.inputs - 'again_of';
+  if v_raw ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    select g.id into v_source
+      from public.generation_jobs g
+     where g.id = v_raw::uuid and g.user_id = new.user_id and g.template_id = new.template_id
+       and g.status = 'succeeded' and g.deleted_at is null;
+    new.again_of := v_source;
+  end if;
+  return new;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."set_job_again_of"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."set_job_visibility"("p_job_id" "uuid", "p_user_id" "uuid", "p_visibility" "text") RETURNS "public"."generation_jobs"
@@ -16942,6 +16963,10 @@ CREATE UNIQUE INDEX "experiments_live_surface_idx" ON "public"."experiments" USI
 
 
 
+CREATE INDEX "generation_jobs_again_of_idx" ON "public"."generation_jobs" USING "btree" ("again_of") WHERE ("again_of" IS NOT NULL);
+
+
+
 CREATE INDEX "generation_jobs_batch_slot" ON "public"."generation_jobs" USING "btree" ("user_id", "batch_id", ((("inputs" ->> 'batch_position'::"text"))::integer)) WHERE (("batch_id" IS NOT NULL) AND ("status" <> 'failed'::"text"));
 
 
@@ -17399,6 +17424,10 @@ CREATE OR REPLACE TRIGGER "codes_enforce_gift_policy" BEFORE INSERT OR UPDATE OF
 
 
 CREATE CONSTRAINT TRIGGER "draft_sale_floor" AFTER UPDATE OF "credits_cost", "quality" ON "public"."templates" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN ((NOT "new"."is_active")) EXECUTE FUNCTION "admin"."check_template_publish_floor"();
+
+
+
+CREATE OR REPLACE TRIGGER "generation_jobs_again_of" BEFORE INSERT ON "public"."generation_jobs" FOR EACH ROW EXECUTE FUNCTION "public"."set_job_again_of"();
 
 
 
@@ -17884,6 +17913,11 @@ ALTER TABLE ONLY "public"."feature_user_grants"
 
 ALTER TABLE ONLY "public"."feature_user_grants"
     ADD CONSTRAINT "feature_user_grants_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."generation_jobs"
+    ADD CONSTRAINT "generation_jobs_again_of_fkey" FOREIGN KEY ("again_of") REFERENCES "public"."generation_jobs"("id") ON DELETE SET NULL;
 
 
 
@@ -20582,6 +20616,10 @@ GRANT ALL ON FUNCTION "public"."resume_catalog_checkout"("p_user" "uuid", "p_tok
 
 REVOKE ALL ON FUNCTION "public"."session_identity"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."session_identity"() TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."set_job_again_of"() FROM PUBLIC;
 
 
 

@@ -1634,6 +1634,31 @@
         "no_identity": "还没有验证过的手机号或 Google 账号，请先完成验证。",
         "not_pending": "这个账号没有待领取的注册赠分。"
       }
+    },
+    "wait": {
+      "usual": "通常约 {seconds, number} 秒。",
+      "usualMinutes": "通常约 {minutes, number} 分钟。",
+      "late": "比平时久一些，还在生成。",
+      "ahead": "{ahead, plural, =0 {下一张就是它。} other {前面还有 # 张。}}",
+      "startsIn": "大约 {seconds, number} 秒后开始。",
+      "startsInMinutes": "大约 {minutes, number} 分钟后开始。",
+      "leave": "可以离开这个页面，完成后会出现在「作品」里。",
+      "batchLeave": "同时生成 {count, number} 张，每张通常约 {seconds, number} 秒。可以离开这个页面，每张生成好就会出现在「作品」里。",
+      "rowQueuedAhead": "{ahead, plural, =0 {排队中 · 下一张} other {排队中 · 前面 # 张}}",
+      "rowLate": "比平时久",
+      "photosLate": "比平时久，还在生成"
+    },
+    "notify": {
+      "ready": "{count, plural, =1 {「{name}」生成好了} other {# 张生成好了}}",
+      "failed": "{count, plural, =1 {「{name}」没有生成成功。} other {# 张没有生成成功。}}",
+      "view": "查看",
+      "close": "关闭",
+      "ask": "生成好了提醒我",
+      "asked": "生成好了会提醒你。",
+      "titleProgress": "已完成 {done, number}/{count, number}",
+      "titleReady": "生成好了",
+      "titleFailed": "没有成功",
+      "leaveQueued": "还有照片没开始生成，关掉这个标签页就会取消它们（不扣积分）。"
     }
   },
   "paywall": {
