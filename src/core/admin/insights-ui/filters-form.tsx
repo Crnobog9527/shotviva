@@ -44,7 +44,7 @@ export function FiltersForm({ query, days }: { query: InsightsQuery; days: numbe
         {funnel ? (
           <>
             <Select name="bucket" label={COPY.filters.bucket} value={query.bucket} options={BUCKETS.map((b) => ({ value: b, label: COPY.filters.buckets[b] }))} />
-            <Select name="locale" label={COPY.filters.locale} value={query.locale} options={LOCALE_FILTERS.map((l) => ({ value: l, label: COPY.filters.locales[l] }))} />
+            <Select name="lang" label={COPY.filters.locale} value={query.locale} options={LOCALE_FILTERS.map((l) => ({ value: l, label: COPY.filters.locales[l] }))} />
             <Select name="source" label={COPY.filters.source} value={query.source} options={SOURCE_FILTERS.map((s) => ({ value: s, label: COPY.sources[s] }))} />
           </>
         ) : (
