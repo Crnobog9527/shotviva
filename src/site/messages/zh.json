@@ -851,7 +851,8 @@
         "restoreQuestion": "会覆盖你改过的内容，确定恢复示例吗？",
         "photoHint": "已按照片里的文字填好，请逐项核对。",
         "reusedHint": "也可以全部清空，或换回示例内容。"
-      }
+      },
+      "photoText": "照片里读出的文字"
     },
     "sizes": {
       "closest": "接近原图（{ratio}）",
