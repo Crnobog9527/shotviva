@@ -96,6 +96,7 @@ export {
   IMAGE_SLOTS_PLACEHOLDER,
   imageSlotSchema,
   keptSlotIndex,
+  sentToModel,
   slotMapping,
   slotsOf,
   slotSurfaceProblems,
@@ -109,6 +110,7 @@ export {
   PROMPT_MAX_LENGTH,
   renderPrompt,
   validateGenerationInputs,
+  type FilledSlot,
   type GenerationInputs,
   type RawGenerationInputs,
 } from './generation-inputs'

@@ -87,7 +87,9 @@ async function storeOutput(deps: SettleDeps, job: Job, output: { key: string; by
 }
 
 // decision: the photo-edit step's cost (T30). inputKeys: the job's own uploads, kept with it (T40).
-export type SettleExtras = { decision?: DecisionCost; inputKeys?: string[] }
+// finishOutput: what code does to the image before it is stored (a poster's QR code pasted on,
+// §5.3), returning PNG; when it throws, the job fails and is refunded like any store failure.
+export type SettleExtras = { decision?: DecisionCost; inputKeys?: string[]; finishOutput?: (bytes: Uint8Array) => Promise<Uint8Array> }
 
 // Who pays and where the result goes: a user's job (credits, generation_jobs, outputs/) or an
 // admin test run (nobody, admin_test_runs, admin-tests/; T85). The provider call, its deadline,
@@ -155,13 +157,16 @@ export function settleGeneration(
   job: Job,
   call: Omit<ProviderInput, 'signal'>,
   outputKey: string,
-  { decision, inputKeys = [] }: SettleExtras = {},
+  { decision, inputKeys = [], finishOutput }: SettleExtras = {},
 ): Promise<Job> {
   const ledger: SettleLedger<Job> = {
     id: job.id,
     source: job.source,
     alerts: true,
-    store: (output) => storeOutput(deps, job, { key: outputKey, bytes: output.bytes, contentType: output.contentType }, inputKeys),
+    store: async (output) => {
+      const finished = finishOutput ? { bytes: await finishOutput(output.bytes), contentType: 'image/png' } : output
+      return storeOutput(deps, job, { key: outputKey, bytes: finished.bytes, contentType: finished.contentType }, inputKeys)
+    },
     confirm: (keptInputs, cost) => confirmJob(deps.db, { jobId: job.id, outputKey, keptInputs, ...cost }),
     fail: (errorCode, cost) => refundSafely(deps.db, job.id, errorCode, cost),
   }

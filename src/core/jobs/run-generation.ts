@@ -40,7 +40,7 @@ import { reserveJob } from './settlement'
 import { callRpc } from '../billing/rpc'
 import { logger } from '../logger'
 import { z } from 'zod'
-import { posterPart, redrawSlots } from './poster-generation'
+import { posterPart, posterQrFinisher, redrawSlots } from './poster-generation'
 
 // `track` is injectable so tests can assert the `generate` event without PostHog.
 // `identityJudge`: the text-only decision call of ARCHITECTURE §5.1a; null or absent means the
@@ -79,9 +79,14 @@ function assertSingleRun(req: GenerationRequest, template: Template) {
   }
 }
 
-// The job's uploads in the order the model gets them: the one photo, or the filled slots.
+// The job's uploads: the one photo, or the filled slots in send order followed by the ones code
+// pastes (a poster's QR code). The same order is stored (input_slots) and kept (T40), so kept copy
+// n is still the n-th stored slot.
+const allSlots = (inputs: GenerationInputs) => [...(inputs.slots ?? []), ...(inputs.pasted ?? [])]
 const uploadKeys = (req: GenerationRequest, inputs: GenerationInputs): string[] =>
-  inputs.slots ? inputs.slots.map((slot) => slot.upload) : req.inputKey ? [req.inputKey] : []
+  inputs.slots ? allSlots(inputs).map((slot) => slot.upload) : req.inputKey ? [req.inputKey] : []
+// Only these reach the model.
+const sentCount = (keys: string[], inputs: GenerationInputs) => keys.length - (inputs.pasted?.length ?? 0)
 
 // The first redraw of a poster whose text check failed is free (Owner 2026-11-13): once it has
 // succeeded, grant_poster_free_redraw (1347) gives back what it reserved, at most once per poster.
@@ -126,7 +131,7 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
     ...(inputSlots ? { slots: inputSlots } : {}),
     aspects: requestAspects(req, template),
   })
-  const { inputs, poster } = withPoster(validated, await posterPart(deps, req, template, validated))
+  const { inputs, poster, qr } = withPoster(validated, await posterPart(deps, req, template, validated))
   const keys = uploadKeys(req, inputs)
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
   if (keys.some((key) => !isOwnInputKey(req.userId, key))) throw new AppError('INVALID_INPUT', 'Unknown upload')
@@ -135,12 +140,16 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
     idempotencyKey: req.idempotencyKey,
   })
   // In parallel: the decision call usually finishes while the upload is still being read.
-  const [screen, images] = await Promise.all([screenWords(deps, req, inputs), Promise.all(keys.map((key) => loadInputImage(deps.store, key)))])
-  return { template, prompt, inputs, images, keys, screen, poster }
+  const [screen, images, finishOutput] = await Promise.all([
+    screenWords(deps, req, inputs),
+    Promise.all(keys.slice(0, sentCount(keys, inputs)).map((key) => loadInputImage(deps.store, key))),
+    qr ? posterQrFinisher(deps, qr) : undefined,
+  ])
+  return { template, prompt, inputs, images, keys, screen, poster, finishOutput }
 }
 
 function withPoster(inputs: GenerationInputs, poster: Awaited<ReturnType<typeof posterPart>>) {
-  return poster ? { inputs: { ...inputs, posterText: poster.text }, poster: poster.record } : { inputs, poster: null }
+  return poster ? { inputs: { ...inputs, posterText: poster.text }, poster: poster.record, qr: poster.qr } : { inputs, poster: null, qr: null }
 }
 
 // Every word the user typed that reaches the image model: the template's text fields and the
@@ -182,7 +191,7 @@ function jobInputs(req: GenerationRequest, prepared: Prepared, resolution: Resol
     input_key: inputs.slots ? null : req.inputKey ?? null,
     // [{ key, upload }] in send order (an array: jsonb would re-sort object keys); Make again puts
     // kept copy n back in the n-th slot (§5.1e).
-    ...(inputs.slots ? { input_slots: toStoredSlots(inputs.slots) } : {}),
+    ...(inputs.slots ? { input_slots: toStoredSlots(allSlots(inputs)) } : {}),
     prompt_version: prompt.version,
     attempt_id: attemptId,
     ...batchInputs(req),
@@ -249,6 +258,7 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
     settleGeneration({ ...deps, provider }, job, call, outputKeyFor(req.userId, job.id), {
       inputKeys: prepared.keys,
       decision: screenCost(deps.identityJudge, prepared.screen),
+      finishOutput: prepared.finishOutput,
     })
   const settled = await settleTracked(job, template.category, settle, {
     track: deps.track,

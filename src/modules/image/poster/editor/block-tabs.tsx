@@ -18,8 +18,9 @@ const EDITORS: Record<PosterBlock, ComponentType<BlockProps>> = {
   header: HeaderEditor, prizes: PrizesEditor, sections: SectionsEditor, table: TableEditor, footer: FooterEditor,
 }
 
-// `pageExtra`: what a page shows under its blocks (its upload boxes, e.g. the prize photo).
-type Props = BlockProps & { poster: PosterFields; unverified: readonly string[]; pageExtra?: (kind: string) => ReactNode }
+// `pageExtra`: what a tab shows under its blocks (its upload boxes, e.g. the prize photo on its
+// page, the QR code under what both pages share); `kind` is null for the shared tab.
+type Props = BlockProps & { poster: PosterFields; unverified: readonly string[]; pageExtra?: (kind: string | null) => ReactNode }
 
 // One tab for what both pages share, then one per page of the set; a dot marks a tab with lines
 // still to check. Each tab shows its blocks one under the other, each under its own heading.
@@ -38,7 +39,7 @@ export function BlockTabs({ poster, unverified, pageExtra, ...props }: Props) {
       </div>
       <div role="tabpanel" className="grid gap-6">
         {group?.blocks.map((block) => <BlockSection key={block} block={block} {...props} />)}
-        {group?.kind && pageExtra ? pageExtra(group.kind) : null}
+        {group && pageExtra ? pageExtra(group.kind) : null}
       </div>
     </div>
   )
