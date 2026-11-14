@@ -23,6 +23,8 @@ type Props = {
   // The wishlist section's CTA (signed in or not, a request-time slot); null while the
   // wishlist is off, which drops the whole section.
   wishlistCta: ReactNode | null
+  // An A/B hero option's line under the direct answer (ARCHITECTURE §16.5).
+  heroTagline?: string
 }
 
 // Home block order is fixed (ARCHITECTURE §13, 建站规格 §4): H1 + answer → hero + generator →
@@ -31,10 +33,10 @@ type Props = {
 // open, "Can't find your template?" follows the grid (Owner 2026-11-10); it is not one of the six.
 // An optional topic H2 (SEO launch handbook G9) sits between the grid and the wishlist; the
 // optional text-edit cases follow the shoot demo.
-export function HomePageView({ page, brand, isLinkEnabled, templates, generator, wishlistCta }: Props) {
+export function HomePageView({ page, brand, isLinkEnabled, templates, generator, wishlistCta, heroTagline }: Props) {
   return (
     <article className="mk-home mk-w">
-      <HomeHero page={page} generator={generator} />
+      <HomeHero page={page} generator={generator} tagline={heroTagline} />
       <ShootSection shoot={page.shoot} />
       {page.edits ? <EditCasesSection edits={page.edits} /> : null}
       <StepsSection steps={page.steps} />
