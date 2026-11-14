@@ -707,7 +707,12 @@
         "placeholder": "Thursday Elite · starts 15:00\nChampion  …\nRules …",
         "sort": "Sort into blocks",
         "sorting": "Sorting…",
-        "manual": "Type it in myself"
+        "manual": "Type it in myself",
+        "progress": {
+          "reading": "Reading your text…",
+          "writing": "Sorting: {block}",
+          "seconds": "{seconds}s"
+        }
       },
       "sourceText": "Your pasted text",
       "backToPaste": "Paste again",
