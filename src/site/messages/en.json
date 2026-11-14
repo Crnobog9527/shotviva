@@ -1653,7 +1653,7 @@
     },
     "notify": {
       "ready": "{count, plural, one {\"{name}\" is ready} other {# photos are ready}}",
-      "failed": "{count, plural, one {\"{name}\" didn't finish} other {# photos didn't finish}}",
+      "failed": "{count, plural, one {\"{name}\" didn't finish.} other {# photos didn't finish.}}",
       "view": "View",
       "close": "Close",
       "ask": "Notify me when it's done",

@@ -1653,7 +1653,7 @@
     },
     "notify": {
       "ready": "{count, plural, =1 {「{name}」生成好了} other {# 张生成好了}}",
-      "failed": "{count, plural, =1 {「{name}」没有生成成功} other {# 张没有生成成功}}",
+      "failed": "{count, plural, =1 {「{name}」没有生成成功。} other {# 张没有生成成功。}}",
       "view": "查看",
       "close": "关闭",
       "ask": "生成好了提醒我",
