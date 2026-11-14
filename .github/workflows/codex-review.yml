@@ -1,16 +1,16 @@
 name: Codex review
 
 # Codex reviews in proportion to risk, and its findings block the merge until handled
-# (scripts/ci/review-risk.mjs decides the risk from the changed paths):
+# (scripts/ci/review-risk.mjs decides the risk from the changed paths).
 #
-#   - "request Codex review": asks "@codex review" for high-risk PRs (money, sign-in, database,
-#     image providers, proxy, config, CI) when commits after Codex's last review touch high-risk
-#     paths, and, with the repository variable CODEX_REVIEW_MODE=on-demand (Codex's own automatic
-#     review switched off in its settings), when such a PR is opened. Other PRs are reviewed only
-#     when someone comments "@codex review".
-#   - "Codex findings": fails while a Codex review thread is unresolved on current code, and for
-#     high-risk PRs until a Codex review has finished (scripts/ci/codex-findings.mjs). Re-runs
-#     on every push, review and review comment.
+# "Codex findings" (scripts/ci/codex-findings.mjs):
+#   - fails while a Codex review thread is unresolved on current code. Fix: push the fix.
+#     Won't fix: resolve the thread, then reply in it with the reason (the reply re-runs this).
+#   - lists unresolved threads on lines a later commit changed as warnings, without failing;
+#   - fails for high-risk PRs (money, sign-in, database, providers, proxy, config, CI) until a
+#     Codex review has finished, and warns when the head is newer than the reviewed commit.
+# Codex ignores "@codex review" from bots, so the review is asked for by a person or by the
+# session that opened the PR (scripts/ci/codex-request.mjs, with the Owner's gh login).
 on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize]
@@ -30,31 +30,6 @@ permissions:
   pull-requests: read
 
 jobs:
-  request:
-    name: request Codex review
-    if: >-
-      github.event_name == 'pull_request' && !github.event.pull_request.draft &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version-file: .nvmrc
-      - env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          ACTION: ${{ github.event.action }}
-          CODEX_REVIEW_MODE: ${{ vars.CODEX_REVIEW_MODE }}
-        run: node scripts/ci/codex-request.mjs
-
   findings:
     name: Codex findings
     if: ${{ !github.event.pull_request.draft }}

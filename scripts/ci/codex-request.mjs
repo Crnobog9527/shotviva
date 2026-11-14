@@ -1,6 +1,13 @@
 /**
- * Asks Codex to review a high-risk pull request (.github/workflows/codex-review.yml), so that
- * risky changes are always reviewed while small ones are not, whatever Codex's own trigger does.
+ * Asks Codex to review a high-risk pull request, so that risky changes are always reviewed while
+ * small ones are not. Run it from the session that opened or pushed to the PR, logged in to gh
+ * as a person: Codex ignores "@codex review" comments from bots (github-actions[bot] was tried
+ * on #666), so this cannot run in a workflow.
+ *
+ *   REPO=Crnobog9527/shotviva PR=123 node scripts/ci/codex-request.mjs
+ *
+ * HEAD_SHA defaults to the PR's head, ACTION to "synchronize" (ask when high-risk paths changed
+ * since Codex's last review, or it never finished one); ACTION=opened with on-demand asks anyway.
  *
  *   CODEX_REVIEW_MODE=auto       (default) Codex's "review on open" is on in its settings, so it
  *                                reviews every new PR itself. This only asks again when commits
@@ -18,6 +25,11 @@ import { reviewState } from './codex-findings.mjs'
 import { reviewRisk } from './review-risk.mjs'
 
 const env = process.env
+env.GH_TOKEN ??= execFileSync('gh', ['auth', 'token'], { encoding: 'utf8' }).trim()
+env.ACTION ??= 'synchronize'
+env.HEAD_SHA ??= execFileSync('gh', ['pr', 'view', String(env.PR), '--repo', env.REPO, '--json', 'headRefOid', '-q', '.headRefOid'], {
+  encoding: 'utf8',
+}).trim()
 const api = (path) => JSON.parse(execFileSync('gh', ['api', '--paginate', '--slurp', path], { encoding: 'utf8' })).flat()
 
 const mode = env.CODEX_REVIEW_MODE === 'on-demand' ? 'on-demand' : 'auto'
@@ -62,5 +74,5 @@ if (recent) {
   process.exit(0)
 }
 
-execFileSync('gh', ['pr', 'comment', String(env.PR), '--repo', env.REPO, '--body', `@codex review\n\n<sub>Requested by CI: ${why}.</sub>`])
+execFileSync('gh', ['pr', 'comment', String(env.PR), '--repo', env.REPO, '--body', `@codex review\n\n<sub>${why}.</sub>`])
 console.log(`Asked Codex to review: ${why}.`)

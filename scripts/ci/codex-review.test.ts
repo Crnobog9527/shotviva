@@ -63,6 +63,8 @@ describe('codex-findings', () => {
     const result = judge({ risk: 'high', codexThreads: [thread({ isResolved: true }), thread({ isOutdated: true })], state: done })
     expect(result.ok).toBe(true)
     expect(result.stale).toBe(1)
+    expect(result.lines).toEqual([expect.stringContaining('Outdated Codex finding still unresolved, check it was handled: P2 Fix the guard')])
+    expect(result.table).toEqual([expect.stringContaining('⚠️ outdated | P2 Fix the guard')])
   })
 
   it('needs a finished Codex review for high-risk changes only', () => {
