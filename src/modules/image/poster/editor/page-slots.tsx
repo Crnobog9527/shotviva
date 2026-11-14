@@ -10,47 +10,48 @@ import type { PagePhotos } from './block-tabs'
 
 type Props = { template: StudioTemplate; kind: string | null; photos: SlotPhotos; qrCheck: QrCheck }
 
-// A tab's upload boxes: the page's own (kind) or, for what both pages share (kind null), the QR code.
-function slotsOf(template: StudioTemplate, kind: string | null) {
+// kind null is the shared tab: the QR code (§5.3 「二维码」), which every page carries.
+const slotsOf = (template: StudioTemplate, kind: string | null) => {
   const qr = template.poster.qr?.slot
   const listed = kind === null ? (qr ? [qr] : []) : template.poster.kinds.find((item) => item.key === kind)?.slots ?? []
   return template.slots.filter((slot) => listed.includes(slot.key))
 }
 
 // A tab's upload boxes (ARCHITECTURE §5.3, the named slots of §5.1e): e.g. the prize photo on
-// the prize page, and under what both pages share (kind null) the QR code, which every page
-// carries. Optional; left empty, the model draws the prizes from their text and the QR code as
-// it always has.
+// the prize page, the QR code under what both pages share. Optional; left empty, the model draws
+// the prizes from their text and the QR box as it always has.
 export function PageSlots({ template, kind, photos, qrCheck }: Props) {
-  const qr = template.poster.qr?.slot
+  const t = useTranslations('app')
   const slots = slotsOf(template, kind)
   if (slots.length === 0) return null
-  return <>{slots.map((slot) => <SlotSection key={slot.key} slot={slot} photos={photos} qrCheck={slot.key === qr ? qrCheck : null} titled={slots.length > 1} />)}</>
-}
-
-type SlotProps = { slot: StudioTemplate['slots'][number]; photos: SlotPhotos; qrCheck: QrCheck | null; titled: boolean }
-
-// One box; its own title only when the part holds several (else the part is titled by it).
-function SlotSection({ slot, photos, qrCheck, titled }: SlotProps) {
-  const t = useTranslations('app')
   return (
-    <section className="grid gap-3">
-      {titled ? (
-        <h4 className="flex items-baseline gap-2 text-label font-semibold">
-          {slot.label}
-          {slot.required ? null : <span className="font-normal text-muted-foreground">{t('workspace.optional')}</span>}
-        </h4>
-      ) : null}
-      <SlotBox slot={slot} photos={photos} />
-      {qrCheck === 'unreadable' ? <p role="alert" className="text-caption text-destructive">{t('poster.qrUnreadable')}</p>
-        : qrCheck === 'checking' ? <p className="text-caption text-muted-foreground">{t('poster.qrChecking')}</p>
-          : <p className="text-caption text-muted-foreground">{slot.help ?? t(qrCheck ? 'poster.qrHint' : 'poster.slotHint')}</p>}
-    </section>
+    <>
+      {slots.map((slot) => (
+        <section key={slot.key} className="grid gap-3">
+          {slots.length > 1 ? (
+            <h4 className="flex items-baseline gap-2 text-label font-semibold">
+              {slot.label}
+              {slot.required ? null : <span className="font-normal text-muted-foreground">{t('workspace.optional')}</span>}
+            </h4>
+          ) : null}
+          <SlotBox slot={slot} photos={photos} />
+          <SlotNote help={slot.help} qrCheck={slot.key === template.poster.qr?.slot ? qrCheck : null} />
+        </section>
+      ))}
+    </>
   )
 }
 
-// The editor's part for a tab's uploads: titled by the slot when there is one, else 上传图片.
-export function pagePhotos(template: StudioTemplate, photos: SlotPhotos, qrCheck: QrCheck, fallback: string): PagePhotos {
+// Under the box: the QR code's reading in the browser (use-qr-check.ts), else the slot's help.
+function SlotNote({ help, qrCheck }: { help?: string; qrCheck: QrCheck | null }) {
+  const t = useTranslations('app.poster')
+  if (qrCheck === 'unreadable') return <p role="alert" className="text-caption text-destructive">{t('qrUnreadable')}</p>
+  if (qrCheck === 'checking') return <p className="text-caption text-muted-foreground">{t('qrChecking')}</p>
+  return <p className="text-caption text-muted-foreground">{help ?? t(qrCheck ? 'qrHint' : 'slotHint')}</p>
+}
+
+// The editor's part for a page's uploads: titled by the slot when there is one, else 上传图片.
+export function pagePhotos(template: StudioTemplate, photos: SlotPhotos, fallback: string, qrCheck: QrCheck): PagePhotos {
   return {
     render: (kind) => <PageSlots template={template} kind={kind} photos={photos} qrCheck={qrCheck} />,
     count: (kind) => {

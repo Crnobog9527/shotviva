@@ -23,7 +23,7 @@ export function StudioForm({ studio, template, balance }: Props) {
       <StudioNotes studio={studio} />
       <BlockTabs poster={template.poster} unverified={studio.draft.unverified} content={studio.draft.content}
         flagged={(path) => studio.draft.unverified.includes(path)} onChange={studio.edit}
-        pagePhotos={pagePhotos(template, studio.photos, studio.qrCheck, t('folds.photos'))} />
+        pagePhotos={pagePhotos(template, studio.photos, t('folds.photos'), studio.qrCheck)} />
       <GeneratePanel studio={studio} template={template} balance={balance} />
       <Button variant="ghost" className="min-h-11" onClick={studio.toPaste}>{t('backToPaste')}</Button>
     </section>
