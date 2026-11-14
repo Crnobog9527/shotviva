@@ -43,8 +43,10 @@ function tierPrice(rates: CatalogRate[], tier: Resolution, usesReferences: boole
 const OPENAI_LIST_RATES: Record<string, number> = { input_image: 8e-6, input_text: 5e-6, output_image: 30e-6 }
 
 // OpenRouter bills OpenAI's GPT image models per token, so no per-image rate exists. Their cost
-// per image is the official line's estimate (high quality, the dearer of the two the site sells,
-// prompt and input images included), scaled up when a route's token rates exceed OpenAI's list.
+// per image is the official line's estimate, scaled up when a route's token rates exceed OpenAI's
+// list. The stored estimate has one figure per tier, not per quality, so it is the medium one:
+// nearly every template runs medium, and a high estimate would push them off sale. High templates
+// (tournament posters) are held by the route's measured p95 for high once jobs record it.
 function openAITokenScale(rates: CatalogRate[]) {
   if (!rates.length) return null
   let scale = 0
@@ -61,7 +63,7 @@ function openAIEstimates(quote: CatalogPricing, resolutions: readonly Resolution
   const scales = quote.endpoints.map(p => openAITokenScale(p.rates))
   if (!scales.length || !scales.every((s): s is number => s !== null)) return {}
   const scale = Math.max(1, ...scales)
-  return Object.fromEntries(resolutions.map(tier => [tier, OPENAI_ESTIMATES.high[tier] * scale * OPENROUTER_TOP_UP_FACTOR]))
+  return Object.fromEntries(resolutions.map(tier => [tier, OPENAI_ESTIMATES.medium[tier] * scale * OPENROUTER_TOP_UP_FACTOR]))
 }
 
 export function catalogImageEstimates(quote: CatalogPricing, caps: Pick<ImageCapabilities, 'resolutions' | 'maxReferences'>, model = ''): EstimatedImageCosts {

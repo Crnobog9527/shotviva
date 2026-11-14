@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { PROVIDER_ASPECTS } from '../templates/image-options'
+import { creditMinimum } from '../templates/pricing'
+import { imageCostBudget, modelCreditFloor } from '../templates/provider-pricing'
 import { fetchImageCapabilities } from './image-capabilities'
 import { openRouterInputMismatch } from './openrouter-input'
 import { catalogImageEstimates, parseEndpointPrices } from './openrouter-pricing'
@@ -31,10 +33,10 @@ describe('OpenAI GPT image models on OpenRouter', () => {
     const caps = await fetchImageCapabilities('openrouter_images', base, model, catalog(tokenRates))
     expect(caps).toMatchObject({ resolutions: ['1k', '2k', '4k'], resolutionSource: 'catalog', originalRatio: true, maxReferences: 16 })
     expect(caps?.providerAspectRatios).toEqual(PROVIDER_ASPECTS)
-    // The official line's high-quality estimate plus OpenRouter's top-up fee.
-    expect(caps?.catalogImageCosts?.['1k']).toBeCloseTo(0.081 * 1.055, 8)
-    expect(caps?.catalogImageCosts?.['2k']).toBeCloseTo(0.135 * 1.055, 8)
-    expect(caps?.catalogImageCosts?.['4k']).toBeCloseTo(0.206 * 1.055, 8)
+    // The official line's medium estimate plus OpenRouter's top-up fee.
+    expect(caps?.catalogImageCosts?.['1k']).toBeCloseTo(0.055 * 1.055, 8)
+    expect(caps?.catalogImageCosts?.['2k']).toBeCloseTo(0.095 * 1.055, 8)
+    expect(caps?.catalogImageCosts?.['4k']).toBeCloseTo(0.135 * 1.055, 8)
   })
 
   it('keeps gpt-image-1 at its one fixed tier', async () => {
@@ -51,9 +53,9 @@ describe('OpenAI GPT image models on OpenRouter', () => {
     const quote = (rates: unknown[]) => parseEndpointPrices('openai/gpt-image-2', { id: 'openai/gpt-image-2', endpoints: [{ provider_name: 'X', pricing: rates }] })
     const caps = { resolutions: ['1k'] as '1k'[], maxReferences: 16 }
     const dearer = tokenRates.map(r => r.billable === 'output_image' ? { ...r, cost_usd: 0.00006 } : r)
-    expect(catalogImageEstimates(quote(dearer), caps, 'openai/gpt-image-2')['1k']).toBeCloseTo(0.081 * 2 * 1.055, 8)
+    expect(catalogImageEstimates(quote(dearer), caps, 'openai/gpt-image-2')['1k']).toBeCloseTo(0.055 * 2 * 1.055, 8)
     const cheaper = tokenRates.map(r => ({ ...r, cost_usd: r.cost_usd / 2 }))
-    expect(catalogImageEstimates(quote(cheaper), caps, 'openai/gpt-image-2')['1k']).toBeCloseTo(0.081 * 1.055, 8)
+    expect(catalogImageEstimates(quote(cheaper), caps, 'openai/gpt-image-2')['1k']).toBeCloseTo(0.055 * 1.055, 8)
     // A charge the estimate does not cover leaves the tier for an admin's estimate.
     expect(catalogImageEstimates(quote([...tokenRates, { billable: 'request', unit: 'request', cost_usd: 0.01 }]), caps, 'openai/gpt-image-2')).toEqual({})
   })
@@ -65,5 +67,21 @@ describe('OpenAI GPT image models on OpenRouter', () => {
       .toMatchObject({ reason: 'reference_image_limit' })
     expect(openRouterInputMismatch({ ...request, resolution: '2k' }, parameters as never, 'openai/gpt-image-1'))
       .toMatchObject({ reason: 'unsupported_resolution' })
+  })
+})
+
+describe('the sale floor on the OpenRouter GPT image route', () => {
+  // Test site's lowest credit price, 2026-11-15; the official line's extra-input cost.
+  const budget = imageCostBudget(0.00530357142857142857)
+  const estimates = { '1k': 0.055 * 1.055, '2k': 0.095 * 1.055, '4k': 0.135 * 1.055 }
+  const floor = (extraInputUsd: number | null) => modelCreditFloor({
+    openAI: false, resolutions: ['1k', '2k', '4k'], estimates, p95: {}, slotCosts: { extraInputUsd, p95Full: {} },
+  }, budget)
+
+  it('keeps a four-slot medium prize poster under 79 / 99 / 149 once the extra-input cost is filled in', () => {
+    const f = floor(0.0125 * 1.055)
+    expect(creditMinimum(f, 'medium', '1k', 4)).toBeLessThan(79)
+    expect(creditMinimum(f, 'medium', '2k', 4)).toBeLessThan(99)
+    expect(creditMinimum(f, 'medium', '4k', 4)).toBeLessThan(149)
   })
 })
