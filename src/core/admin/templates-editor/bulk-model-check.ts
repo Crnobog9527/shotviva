@@ -1,4 +1,4 @@
-import type { ImageCapabilities } from '@/core/templates/image-capabilities'
+import { OPENAI_MAX_REFERENCES, type ImageCapabilities } from '@/core/templates/image-capabilities'
 import type { Resolution } from '@/core/templates/output-options'
 import type { ImageProviderOption } from '../image-provider-field'
 import type { BulkEditFailure, BulkEditPatch } from '../templates/bulk-edit-rules'
@@ -10,7 +10,7 @@ function fitsInputs(t: Candidate, count: number, caps: ImageCapabilities | null)
   if (!t.fields.images && !count) return true
   const { min, max } = t.fields.images ?? { min: 0, max: 0 }
   const minimum = caps?.minReferences ?? 0
-  const maximum = caps?.maxReferences ?? 4
+  const maximum = caps?.maxReferences ?? OPENAI_MAX_REFERENCES
   return min + count >= minimum && max + count <= maximum
 }
 

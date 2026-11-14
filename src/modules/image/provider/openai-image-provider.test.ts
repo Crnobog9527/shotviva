@@ -192,6 +192,15 @@ it('sends the user photo first and private WebP styles after it with matching fi
   expect(await Promise.all(files.map(async (file) => new Uint8Array(await file.arrayBuffer())))).toEqual(images.map((image) => image.bytes))
 })
 
+it('sends four photo slots and one cover reference as five image[] entries, in order', async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(async () => json({ data: [{ b64_json: PNG_B64 }] }))
+  const photos = [1, 2, 3, 4].map((n) => ({ bytes: Uint8Array.of(n), contentType: 'image/jpeg' }))
+  const images = [...photos, { bytes: Uint8Array.of(5), contentType: 'image/webp' }]
+  await provider(fetch, 'gpt-image-2.6').generate(input({ images, photoCount: 4 }))
+  const files = (fetch.mock.calls[0]?.[1]?.body as FormData).getAll('image[]') as File[]
+  expect(files.map((file) => file.name)).toEqual(['input-0.jpg', 'input-1.jpg', 'input-2.jpg', 'input-3.jpg', 'input-4.webp'])
+})
+
 it('keeps the square original size on a text-only template with a portrait style reference', async () => {
   const fetch = vi.fn<typeof globalThis.fetch>(async () => json({ data: [{ b64_json: PNG_B64 }] }))
   const images = [{ bytes: Uint8Array.of(41), contentType: 'image/webp', width: 600, height: 900 }]

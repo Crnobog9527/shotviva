@@ -67,6 +67,20 @@ describe('template image provider', () => {
     }))
   })
 
+  it('takes four photo slots plus one cover reference on the OpenAI line, and falls back above its limit', async () => {
+    const openAI: ActiveProviderRow = {
+      id: 'openai', adapter: 'openai_images', baseUrl: 'https://api.openai.com/v1', model: 'gpt-image-2.6', resolutions: ['1k'],
+      prices: { inputTextPerM: null, inputImagePerM: null, outputPerM: null },
+    }
+    const withOpenAI: ProviderAdapters = { openai_images: () => ({ id: 'openai-image', generate: vi.fn() }) }
+    const deps = { ...dependencies(), lookup: vi.fn(async () => openAI) }
+    vi.spyOn(logger, 'info').mockImplementation(() => undefined)
+    const five = await templateImageProvider(withOpenAI, openAI.id, { ...request, referenceCount: 5 }, deps)
+    expect(five).toMatchObject({ id: 'openai/gpt-image-2.6', maxReferences: 16 })
+    expect(await templateImageProvider(withOpenAI, openAI.id, { ...request, referenceCount: 17 }, deps))
+      .toMatchObject({ ...defaultProvider, fallbackReason: 'reference_image_limit' })
+  })
+
   it('rejects a decision provider submitted directly by the admin client', async () => {
     const deps = dependencies()
     deps.lookup.mockResolvedValue({ ...row, adapter: 'openai_responses' })
