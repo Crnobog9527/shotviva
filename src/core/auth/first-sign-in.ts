@@ -5,6 +5,7 @@ import { bindReferral } from '../affiliate/referral'
 import { noteSignupGift } from '../alerts'
 import { track } from '../analytics'
 import { parseShareMark, SHARE_COOKIE } from '../analytics/share-link'
+import { signupExperiments, syncExperimentsAtSignIn } from '../experiments/server'
 import type { Locale } from '../i18n/locales'
 import { billingGrant, grantSignupCredits } from './free-credits'
 import { consumeSignupCode, type SignupBenefits } from './signup-code'
@@ -21,6 +22,17 @@ export type SignInMethod = 'email' | 'google' | 'phone'
 // same-IP rule refuses never has a grant applied. Without one (local dev) it falls back to the
 // grant, whose signup idempotency key applies only once.
 // `locale` is the language the account signed up in (user_metadata) or else the page's.
+// A template share link opened before signing up (core/analytics/share-link.ts), and the A/B
+// variants this browser saw first (ARCHITECTURE §16.5).
+function signupMarks(shareCookie: string | undefined, experiments: Parameters<typeof signupExperiments>[0]) {
+  const share = parseShareMark(shareCookie)
+  const seen = signupExperiments(experiments)
+  return { ...(share ? { share_template_id: share.templateId, share_id: share.shareId } : {}), ...(seen ? { experiments: seen } : {}) }
+}
+
+// Local dev runs on http; everywhere else the cookie is Secure.
+const isSecure = (head: Headers) => head.get('x-forwarded-proto') !== 'http'
+
 export async function onVerifiedSignIn(
   userId: string,
   benefits: SignupBenefits,
@@ -37,14 +49,13 @@ export async function onVerifiedSignIn(
   const first = address ? ipStored : granted
   if (claimed && !first) noteSignupGift()
   const kind = await consumeSignupCode(admin, userId, first, benefits.invite, locale)
+  const jar = await cookies()
+  // A/B variants onto the account, and the account's back into the cookie (ARCHITECTURE §16.5).
+  const experiments = await syncExperimentsAtSignIn(admin, userId, first, jar, isSecure(await headers()))
   if (first) {
     // 1350: tell the Owner when half, then all, of today's signup gifts are gone (after()).
     noteSignupGift()
-    const jar = await cookies()
-    // A template share link opened before signing up (core/analytics/share-link.ts).
-    const share = parseShareMark(jar.get(SHARE_COOKIE)?.value)
-    const shared = share ? { share_template_id: share.templateId, share_id: share.shareId } : {}
-    track('signup', { method, code_kind: kind, ...shared }, { distinctId: userId, locale })
+    track('signup', { method, code_kind: kind, ...signupMarks(jar.get(SHARE_COOKIE)?.value, experiments) }, { distinctId: userId, locale })
     await bindReferral(userId, jar.get('sv_ref')?.value, 'signup')
   }
 }

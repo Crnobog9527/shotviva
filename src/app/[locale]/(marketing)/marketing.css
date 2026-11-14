@@ -123,6 +123,8 @@
   .mk-hero h1 { margin-top: 4px; font: 400 32px/1 var(--font-display); letter-spacing: -0.02em; }
   .mk-hero h1 em { font-style: italic; }
   .mk-lede, .mk-answer { margin-top: 12px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
+  /* An A/B hero option's one line (ARCHITECTURE §16.5), a step stronger than the answer above it. */
+  .mk-hero-tagline { margin-top: 12px; font-size: 15px; line-height: 1.5; color: var(--foreground); font-weight: 500; }
   .mk-hero-pair { margin: 20px 0 0; }
   .mk-cap { margin-top: 10px; font-size: 14px; line-height: 1.4; color: var(--muted-foreground); }
   .mk-generator { display: contents; }
@@ -601,7 +603,7 @@
   /* tablet (768–1023): one column, the card generator stays */
   @media (min-width: 768px) {
     .mk-hero { padding-top: 40px; }
-    .mk-hero h1, .mk-lede, .mk-answer, .mk-hero-pair { max-width: 640px; }
+    .mk-hero h1, .mk-lede, .mk-answer, .mk-hero-tagline, .mk-hero-pair { max-width: 640px; }
     .mk-hero h1 { font-size: var(--text-title); }
     .mk-shoot { grid-template-columns: repeat(3, 1fr); }
     .mk-phone { grid-column: 1; grid-row: 1; }
@@ -636,7 +638,7 @@
   @media (min-width: 1024px) {
     .mk-hero { padding-top: 48px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 48px; align-items: center; }
     .mk-hero-copy { grid-column: 1; grid-row: 1; }
-    .mk-hero h1, .mk-lede, .mk-answer { max-width: none; }
+    .mk-hero h1, .mk-lede, .mk-answer, .mk-hero-tagline { max-width: none; }
     .mk-hero-pair { grid-column: 2; grid-row: 1; margin: 0; max-width: none; }
     .mk-block, .mk-hd { display: grid; grid-template-columns: 352px minmax(0, 1fr); column-gap: 48px; }
     .mk-block > h2 { grid-column: 1; grid-row: 1 / span 3; position: sticky; top: 88px; align-self: start; }
