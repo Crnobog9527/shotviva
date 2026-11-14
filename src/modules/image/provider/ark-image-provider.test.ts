@@ -5,7 +5,7 @@ import { jobCostUsd, ProviderError, type ProviderInput } from '@/core/jobs'
 import { providerUsage } from '@/core/jobs/provider-usage'
 import { ARK_MAX_PIXELS, ARK_MIN_PIXELS } from '@/core/providers/ark'
 
-import { arkRequest, arkSize, createArkImageProvider } from './ark-image-provider'
+import { arkRequest, arkSize, createArkImageProvider, networkCode } from './ark-image-provider'
 
 const model = 'doubao-seedream-5-5-261028'
 const config = { apiKey: 'test-key', model, cnyPerUsd: 6.72 }
@@ -147,5 +147,14 @@ describe('Ark responses and cost', () => {
     const controller = new AbortController()
     const aborting = vi.fn<typeof fetch>(async () => { controller.abort(); throw new DOMException('aborted', 'AbortError') })
     await expect(createArkImageProvider({ ...config, fetch: aborting }).generate(input({ signal: controller.signal }))).rejects.toMatchObject({ kind: 'timeout' })
+  })
+})
+
+describe('a fetch that threw', () => {
+  it('names the network failure of a fetch that threw, by code only', async () => {
+    const reset = vi.fn<typeof fetch>(async () => { throw new TypeError('fetch failed', { cause: Object.assign(new Error('read ECONNRESET https://x?token=1'), { code: 'ECONNRESET' }) }) })
+    await expect(createArkImageProvider({ ...config, fetch: reset }).generate(input())).rejects.toMatchObject({ kind: 'failed', message: 'ark request failed (ECONNRESET)' })
+    expect(networkCode(new TypeError('fetch failed'))).toBe('TypeError')
+    expect(networkCode(new TypeError('fetch failed', { cause: { code: 'not a code: secret' } }))).toBe('TypeError')
   })
 })
