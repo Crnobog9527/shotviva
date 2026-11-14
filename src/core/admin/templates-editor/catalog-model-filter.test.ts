@@ -42,10 +42,10 @@ describe('filterByModel', () => {
 })
 
 describe('modelFilterOptions', () => {
-  it('lists each bound line with counts, default line first, inactive marked, unbound last', () => {
+  it('lists each bound line with counts, default line first and marked, unbound last', () => {
     expect(modelFilterOptions(rows, lines)).toEqual([
-      { value: NEW, label: 'Openai-image-2.6 · gpt-image-2.6-sunburst', count: 1 },
-      { value: OLD, label: 'OpenAI 官方 · gpt-image-2（已停用）', count: 4 },
+      { value: NEW, label: 'Openai-image-2.6 · gpt-image-2.6-sunburst（当前默认）', count: 1 },
+      { value: OLD, label: 'OpenAI 官方 · gpt-image-2', count: 4 },
       { value: UNBOUND_MODEL, label: '未绑定（跟随默认线路）', count: 1 },
     ])
   })
