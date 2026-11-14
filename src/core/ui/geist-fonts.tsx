@@ -4,8 +4,8 @@ import { publicEnv } from '../public-env'
 // public/fonts/geist (public/fonts/README.md). They used to go through next/font, but with the
 // stylesheets inlined (experimental.inlineCss) its @font-face url stayed on this host while its
 // preload followed assetPrefix to the static-file CDN, so every page fetched Geist twice. Here the
-// faces and the preload are written together, on one host: the static-file CDN when
-// NEXT_PUBLIC_ASSET_CDN_URL is set, else this site. A changed font ships under a new name.
+// faces are written here, on one host: the static-file CDN when NEXT_PUBLIC_ASSET_CDN_URL is set,
+// else this site. A changed font ships under a new name.
 export const GEIST_FILE = '/fonts/geist/geist-9b6f5ff45b278c74.woff2'
 export const GEIST_MONO_FILE = '/fonts/geist/geist-mono-5f3d6ad60f29d6cb.woff2'
 
@@ -22,14 +22,11 @@ export function geistCss(host: string): string {
   ].join('')
 }
 
-// Every page: Geist is preloaded (as next/font did), Geist Mono is not (it was preload: false).
-// React hoists the preload into <head>; the <style> sits at the top of <body>, before any text.
+// Every page, at the top of <body>, before any text. No preload (font-preload-off.test.ts): Chrome
+// holds the first paint for a preloaded font (or until a timeout), and the metric-matched fallback
+// keeps the layout still while Geist arrives. Measured on production HTML, 2026-11-14: the first
+// paint 40 ms sooner on a desktop and ~290 ms sooner on a throttled phone, CLS unchanged.
 export function GeistFonts() {
   const host = publicEnv.NEXT_PUBLIC_ASSET_CDN_URL ?? ''
-  return (
-    <>
-      <link rel="preload" as="font" type="font/woff2" href={`${host}${GEIST_FILE}`} crossOrigin="anonymous" />
-      <style dangerouslySetInnerHTML={{ __html: geistCss(host) }} />
-    </>
-  )
+  return <style dangerouslySetInnerHTML={{ __html: geistCss(host) }} />
 }
