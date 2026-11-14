@@ -2,6 +2,7 @@
 
 import type { ApprovedTariff, CreditsFloor, Resolution, TemplateQuality } from '@/core/templates'
 import { OPENAI_MAX_REFERENCES, type ImageCapabilities } from '@/core/templates/image-capabilities'
+import { openAIFreeSizeModel } from '@/core/providers/tier-support'
 import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
 import { Label } from '@/core/ui/label'
 
@@ -45,13 +46,20 @@ export function ImageProviderField({ id, providers, value, onChange, allowKeep }
   )
 }
 
+// The official line and, since #659, OpenAI's GPT image models on OpenRouter (exact pixel size)
+// send the template's medium/high; other OpenRouter models and Ark do not.
+function sendsQuality(provider: ImageProviderOption) {
+  const model = provider.model.trim()
+  return provider.openAI || (model.startsWith('openai/') && openAIFreeSizeModel(model.slice('openai/'.length)))
+}
+
 function capabilitySummary(provider: ImageProviderOption) {
   if (!provider.capabilities && !provider.openAI) return copy.unknown
   const caps = provider.capabilities ?? { ...FULL_IMAGE_OPTIONS, minReferences: 0, maxReferences: OPENAI_MAX_REFERENCES, fetchedAt: null, providerAspectRatios: undefined }
   const ratios = caps.providerAspectRatios ?? caps.aspectRatios
   const time = caps.fetchedAt ? new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'short', timeStyle: 'short' }).format(new Date(caps.fetchedAt)) : '固定能力'
   return [provider.model, caps.resolutions.map(r => r.toUpperCase()).join(' / '),
-    ...(provider.openAI ? [] : [copy.routerQuality]),
+    ...(sendsQuality(provider) ? [] : [copy.routerQuality]),
     `比例 ${ratios.length} 种（${ratios.join('、')}）`, caps.originalRatio ? '支持原图比例' : '不支持原图比例',
     `参考图 ${caps.minReferences}–${caps.maxReferences} 张`, `上次刷新：${time}`].join(' · ')
 }
