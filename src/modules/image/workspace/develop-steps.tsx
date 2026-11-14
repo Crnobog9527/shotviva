@@ -3,7 +3,9 @@
 import { useFormatter, useTranslations } from 'next-intl'
 
 import type { TrackedJob } from '../generation/job-model'
-import { estimatedProgress, percent } from '../generation/progress'
+import { etaProgress } from '../generation/eta'
+import { useEta } from '../generation/eta-store'
+import { percent } from '../generation/progress'
 import { Tick } from './photo-card'
 import { useNow } from './use-now'
 
@@ -15,7 +17,8 @@ export function DevelopSteps({ job, done }: { job: TrackedJob; done: string[] })
   const t = useTranslations('app')
   const format = useFormatter()
   const waiting = job.status === 'queued'
-  const fraction = waiting ? 0 : estimatedProgress(now - job.startedAt)
+  const eta = useEta(job)
+  const fraction = waiting ? 0 : etaProgress(now - job.startedAt, eta)
   return (
     <ol className="hairline rounded-tile bg-card px-4 py-1 [&>li+li]:border-t [&>li+li]:border-hairline">
       {done.map((label) => (

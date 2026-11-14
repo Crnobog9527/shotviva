@@ -6,6 +6,9 @@ import { Link } from '@/core/i18n/ui'
 import { ActionBar } from '@/core/app-shell'
 import { buttonVariants } from '@/core/ui/button'
 
+import { roundedSeconds } from '../generation/eta'
+import { NotifyButton } from '../generation/notify-button'
+import { useEta } from '../generation/eta-store'
 import type { TrackedJob } from '../generation/job-model'
 import { useJobs } from '../generation/use-jobs'
 import { BatchDone } from './batch-done'
@@ -47,6 +50,10 @@ function BatchTray({ jobs, tally }: { jobs: TrackedJob[]; tally: BatchTally }) {
 function Running({ jobs, tally, limit, onRetry }: { jobs: TrackedJob[]; tally: BatchTally; limit: number; onRetry(id: string): void }) {
   const t = useTranslations('app.workspace')
   const now = useNow()
+  // Every photo of a batch shares its template's size; a multi-template batch reads the first.
+  const eta = useEta(jobs[0])
+  const wait = useTranslations('app.wait')
+  const notify = useTranslations('app.notify')
   return (
     <>
       <h2 id="batch-h" className="sr-only">{t('batchTitle', { count: tally.count })}</h2>
@@ -59,7 +66,9 @@ function Running({ jobs, tally, limit, onRetry }: { jobs: TrackedJob[]; tally: B
           <BatchJobRow key={job.id} job={job} index={index + 1} now={now} onRetry={() => onRetry(job.id)} />
         ))}
       </ol>
-      <p className="mt-3 text-caption text-bone-dim">{t('batch.leave', { count: limit })}</p>
+      <p className="mt-3 text-caption text-bone-dim">{eta ? wait('batchLeave', { count: limit, seconds: roundedSeconds(eta.p50Ms) }) : t('batch.leave', { count: limit })}</p>
+      {tally.queued > 0 ? <p className="mt-1 text-caption text-bone-dim">{notify('leaveQueued')}</p> : null}
+      <NotifyButton />
       <ActionBar className="md:px-0">
         <Link href="/generate" className={buttonVariants({ variant: 'glass', size: 'cta', className: 'w-full rounded-control' })}>
           {t('backToCreate')}
