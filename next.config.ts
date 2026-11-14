@@ -93,7 +93,7 @@ const nextConfig: NextConfig = {
       },
       // Instrument Serif (globals.css): content-hashed names too, the same rule.
       {
-        source: '/fonts/instrument-serif/:asset(.+\\.woff2)',
+        source: '/fonts/:family(instrument-serif|geist)/:asset(.+\\.woff2)',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
           { key: 'Access-Control-Allow-Origin', value: '*' },
