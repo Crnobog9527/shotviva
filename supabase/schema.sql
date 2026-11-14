@@ -588,7 +588,8 @@ begin
     return '所选模型不支持所填积分档位';
   end if;
   ratios:=coalesce(caps->'providerAspectRatios',caps->'aspectRatios');
-  if ratios is not null and exists(select from jsonb_array_elements_text(t.fields->'aspectRatios') r where not (ratios ? r)) then
+  if ratios is not null and exists(select from jsonb_array_elements_text(t.fields->'aspectRatios') r
+      where r = any(array['16:9','4:5','1:1','9:16','3:2','4:3','2:3','1:2','1:3']) and not (ratios ? r)) then
     return '所选模型不支持模板配置的比例';
   end if;
   if coalesce((t.fields#>>'{images,min}')::int,case when refs>0 then 0 end)+refs<coalesce((caps->>'minReferences')::int,0) or
