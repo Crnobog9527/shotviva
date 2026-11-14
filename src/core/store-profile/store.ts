@@ -8,7 +8,7 @@ import { logger } from '../logger'
 import { contentTypeOfKey, isOwnInputKey, isStoreQrKey, newInputKey, newStoreQrKey, type ObjectStore } from '../storage'
 import { EMPTY_STORE, storeIsEmpty, storeTextSchema, type StoreProfile, type StoreQr, type StoreText } from './profile'
 
-// Reading and saving 店铺信息 (§5.3「每周复用」, table store_profiles 1510). Service-role client:
+// Reading and saving 店铺信息 (§5.3「每周复用」, table store_profiles 1520). Service-role client:
 // the table takes no client writes. The QR code lives under outputs/{user_id}/ as a copy of the
 // user's upload (server-side R2 copy, no bytes through a function, AGENTS §6); the editors get
 // a fresh upload copied from it each time, exactly like Make again's kept photos (T40).

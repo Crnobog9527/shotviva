@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 import { cleanPosterLine } from '../poster/content'
 
-// 店铺信息 (ARCHITECTURE §5.3「每周复用」, table 1510): what a store owner types once and every
+// 店铺信息 (ARCHITECTURE §5.3「每周复用」, table 1520): what a store owner types once and every
 // poster template with matching fields fills in. Pure, shared by the settings card, the API and
 // the editors. Limits match the poster blocks they fill (header.brand, footer.phones, …).
 
