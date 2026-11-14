@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { POSTER_BLOCKS, POSTER_LIMITS } from './content'
+import { POSTER_BLOCKS, POSTER_LIMITS, posterContentSchema } from './content'
 
 // A poster template's set (templates.fields.poster, ARCHITECTURE §5.3): which posters it makes,
 // which blocks each one carries and how much one poster holds before the set gets another page.
@@ -44,6 +44,10 @@ export const posterFieldsSchema = z.object({
     .max(POSTER_LIMITS.tableColumns.max).optional(),
   // The sections column's heading the editor starts from (「赛事信息」 / 「INFORMATION」); editable.
   infoHeading: z.object({ title: z.string().max(12), titleEn: z.string().max(24) }).optional(),
+  // The cover poster's whole text (Owner 2026-11-14: users only change words, never the blocks):
+  // the editor starts from it, every block, row and column filled, so nothing is built by hand.
+  // Editable in the admin and synced with the template like every other field.
+  sample: posterContentSchema.optional(),
   qr: posterQrSchema.optional(),
 }).refine((poster) => new Set(poster.kinds.map((kind) => kind.key)).size === poster.kinds.length, {
   message: 'poster kind keys must be unique', path: ['kinds'],
