@@ -75,8 +75,15 @@ if (!why) {
 const comments = api(`repos/${env.REPO}/issues/${env.PR}/comments?per_page=100`)
 const isCodexBot = (c) => /codex/.test(c.user?.login ?? '')
 const lastCodexUpdate = Math.max(0, ...comments.filter(isCodexBot).map((c) => Date.parse(c.updated_at)))
+// Bots' requests never count (Codex ignores them), and none older than 10 minutes does, so a
+// request Codex dropped cannot hold back later ones.
+const tenMinutesAgo = Date.now() - 10 * 60_000
 const pending = comments.some(
-  (c) => !isCodexBot(c) && /^\s*@codex review\b/.test(c.body ?? '') && Date.parse(c.created_at) > lastCodexUpdate,
+  (c) =>
+    c.user?.type !== 'Bot' &&
+    !/\[bot\]$/.test(c.user?.login ?? '') &&
+    /^\s*@codex review\b/.test(c.body ?? '') &&
+    Date.parse(c.created_at) > Math.max(lastCodexUpdate, tenMinutesAgo),
 )
 if (pending) {
   console.log('An earlier "@codex review" has not been picked up by Codex yet.')
