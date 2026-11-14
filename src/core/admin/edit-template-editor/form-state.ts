@@ -7,6 +7,8 @@ import type { EditTemplateSettings, SaveEditTemplateInput } from '../edit-templa
 
 export type EditTemplateForm = {
   isActive: boolean
+  // 「出图模型」: the bound image line, null to follow the default line.
+  providerId: string | null
   storedCredits: CreditsCost
   credits: Record<Resolution, string>
   wrapper: string
@@ -28,6 +30,7 @@ export function formFor(settings: EditTemplateSettings): EditTemplateForm {
   const fidelity = settings.params.input_fidelity
   return {
     isActive: settings.isActive,
+    providerId: settings.providerId ?? null,
     storedCredits: settings.creditsCost,
     credits: editablePrices(settings.creditsCost, settings.unpricedResolutions),
     wrapper: settings.wrapper,
@@ -42,6 +45,7 @@ export function formFor(settings: EditTemplateSettings): EditTemplateForm {
 export function toSaveInput(form: EditTemplateForm): SaveEditTemplateInput {
   return {
     isActive: form.isActive,
+    providerId: form.providerId,
     ...storedPrices(form.credits, form.storedCredits),
     wrapper: form.wrapper,
     params: {

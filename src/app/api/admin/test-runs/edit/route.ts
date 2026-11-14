@@ -16,8 +16,8 @@ export async function POST(request: NextRequest) {
     const admin = await requireApiAdmin()
     const body = testEditBodySchema.safeParse(await request.json().catch(() => null))
     if (!body.success) throw new AppError('INVALID_INPUT', 'run_id, batch_id, parent_id and instruction are required')
-    const [provider, classifier] = await Promise.all([imageProvider(), editScopeClassifier()])
-    const deps = { db: createAdminSupabase(), store: r2Store(), provider, classifier }
+    // The line is chosen once the edit template's binding and the size are known (editRoute).
+    const deps = { db: createAdminSupabase(), store: r2Store(), provider: imageProvider, classifier: await editScopeClassifier() }
     return jsonResponse(await signRun(deps.store, await runTestEdit(deps, { actorId: admin.id, body: body.data })))
   } catch (error) {
     return errorResponse(error, 'admin-test-runs-edit')

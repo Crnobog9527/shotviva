@@ -16,8 +16,8 @@ export async function POST(request: NextRequest) {
     const user = await requireApiUser()
     const body = editBodySchema.safeParse(await request.json().catch(() => null))
     if (!body.success) throw new AppError('INVALID_INPUT', 'source_job_id and instruction are required')
-    const [provider, classifier] = await Promise.all([imageProvider(), editScopeClassifier()])
-    const deps = { db: createAdminSupabase(), store: r2Store(), provider, classifier }
+    // The line is chosen once the edit template's binding and the size are known (editRoute).
+    const deps = { db: createAdminSupabase(), store: r2Store(), provider: imageProvider, classifier: await editScopeClassifier() }
     // The IP is kept on the job as dispute evidence (T82).
     return jsonResponse(await runEdit(deps, { ...toEditRequest(user.id, body.data), clientIp: clientIp(request.headers) }))
   } catch (error) {
