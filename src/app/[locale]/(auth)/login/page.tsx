@@ -1,9 +1,6 @@
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
-import { Suspense } from 'react'
 
-import { nextIn } from '@/core/auth'
-import { LoginForm } from '@/core/auth/ui'
 import { currentLocale } from '@/core/i18n/server'
 import { CONNECT_PAGE_PATH } from '@/core/partner'
 
@@ -34,8 +31,6 @@ export default async function LoginPage() {
     phone: locale === 'zh' ? phone : undefined,
   }
   return (
-    <Suspense fallback={<LoginForm {...form} next={nextIn(null, locale)} notice={null} />}>
-      <LoginScreen {...form} locale={locale} connectPath={CONNECT_PAGE_PATH} />
-    </Suspense>
+    <LoginScreen {...form} locale={locale} connectPath={CONNECT_PAGE_PATH} />
   )
 }
