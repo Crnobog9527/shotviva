@@ -7,7 +7,7 @@ import type { NewUserStep } from '../growth/funnel'
 type Metric = { label: string; help: string }
 
 export const GROWTH_COPY = {
-  views: { overview: '总览', details: '明细（旧版）' },
+  views: { overview: '总览', funnel: '漏斗', templates: '模板', details: '明细（旧版）' },
   viewLabel: '页面',
   detailsNote:
     '这里是旧版明细，留给需要细看时用。访客没有去掉管理员；「付款环节」「新用户激活」「模板表现」「体验问题」四块还混有测试站的数据。数字以「总览」为准。',
