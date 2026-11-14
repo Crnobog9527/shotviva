@@ -9,6 +9,8 @@ import type { CatalogueCopyField, CatalogueFieldGroup, CatalogueImageSlot } from
 import { groupState, initialOpen, type GroupState } from './field-group-state'
 import { SlotBox, MissingSlotPhotos } from './slot-boxes'
 import { CopyFields } from './text-fields'
+import { clearCopy } from './copy-examples'
+import { Button } from '@/core/ui/button'
 import type { SlotPhotos } from './use-photo-batch'
 
 type Props = {
@@ -21,9 +23,14 @@ type Props = {
   onCopy(next: Record<string, string>): void
   // Make again whose photos could not come back (as SlotBoxes says it).
   missing?: 'old' | 'failed' | null
+  // The form opened with the cover's text: values still equal to it are drawn greyer.
+  examples?: boolean
 }
 
-type Shared = Pick<Props, 'fields' | 'slots' | 'photos' | 'copy' | 'onCopy'>
+type Shared = Pick<Props, 'fields' | 'slots' | 'photos' | 'copy' | 'onCopy' | 'examples'>
+
+// The text fields a group holds, its blocks' included (清空本组 blanks these; photos stay).
+const groupKeys = (group: CatalogueFieldGroup): string[] => group.items.flatMap((item) => (typeof item === 'string' ? [item] : item.items))
 
 // A template's text fields and image slots in titled groups that fold (Owner 2026-11-14): the
 // groups marked open (else the first) start open; each folded one says how far it is filled, and
@@ -45,10 +52,23 @@ export function FieldGroups({ groups, missing = null, ...shared }: Props) {
             {group.items.map((item) => (typeof item === 'string'
               ? <Member key={item} memberKey={item} {...shared} />
               : <Block key={item.key} block={item} {...shared} />))}
+            <ClearGroup group={group} {...shared} />
           </div>
         </FoldSection>
       ))}
       {shared.slots.length > 0 ? <p className="text-caption text-muted-foreground">{t('slots.oneAtATime')}</p> : null}
+    </div>
+  )
+}
+
+// 清空本组: the group's text gone, its photos kept; only while some of its text is filled.
+function ClearGroup({ group, fields, copy, onCopy }: Shared & { group: CatalogueFieldGroup }) {
+  const t = useTranslations('app.workspace.examples')
+  const keys = groupKeys(group).filter((key) => fields.some((field) => field.key === key))
+  if (!keys.some((key) => copy[key]?.trim())) return null
+  return (
+    <div className="flex justify-end">
+      <Button variant="ghost" size="sm" className="min-h-11 text-muted-foreground" onClick={() => onCopy(clearCopy(copy, keys))}>{t('clearGroup')}</Button>
     </div>
   )
 }
@@ -72,9 +92,9 @@ function Block({ block, ...shared }: Shared & { block: Exclude<CatalogueFieldGro
 }
 
 // A text field or an image slot, by key.
-function Member({ memberKey, fields, slots, photos, copy, onCopy }: Shared & { memberKey: string }) {
+function Member({ memberKey, fields, slots, photos, copy, onCopy, examples }: Shared & { memberKey: string }) {
   const field = fields.find((item) => item.key === memberKey)
-  if (field) return <CopyFields fields={[field]} values={copy} onChange={onCopy} />
+  if (field) return <CopyFields fields={[field]} values={copy} onChange={onCopy} examples={examples} />
   const slot = slots.find((item) => item.key === memberKey)
   return slot && photos ? <SlotMember slot={slot} photos={photos} /> : null
 }

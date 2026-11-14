@@ -16,6 +16,7 @@ import { rememberTemplate } from './pending-template'
 import { chosenAspect, closestResolution, hasOutputOptions, selectedAspect, templateOptions } from './output-choice'
 import { ctaState, type CtaState } from './cta-state'
 import { missingRequiredCopy } from './text-fields'
+import { copyExamples, examplesLeft } from './copy-examples'
 import type { ReadyPhoto } from './photo-batch'
 import { usePhotoBatch, useSlotPhotos, type PhotoBatch, type SlotPhotos } from './use-photo-batch'
 import type { FormValues } from './workspace-form'
@@ -72,7 +73,12 @@ export function useWorkspaceDraft({ template, balance, tier, concurrency, again 
     run.clearError()
     change(next)
   }
-  return { photos, slots, values, change: changeValues, state, start, error: run.error, missingPhoto: again?.missing != null }
+  // A fresh form starts from the cover's text (copy-examples.ts); Make again keeps its own.
+  const fromExamples = !again
+  return {
+    photos, slots, values, change: changeValues, state, start, error: run.error, missingPhoto: again?.missing != null,
+    fromExamples, examplesLeft: fromExamples ? examplesLeft(template.copyFields, values.copy) : [],
+  }
 }
 
 // Generate: one photo is queued at once, as it always was. Two or more go through the batch
@@ -114,7 +120,7 @@ function useDraftStart(template: CatalogueTemplate, limit: number, again: AgainS
 }
 
 function useOutputValues(template: CatalogueTemplate, again: AgainStart | null) {
-  const [requested, setValues] = useState(again?.values ?? DEFAULTS)
+  const [requested, setValues] = useState(() => again?.values ?? { ...DEFAULTS, copy: copyExamples(template.copyFields) })
   const options = templateOptions(template)
   const values = {
     ...requested,

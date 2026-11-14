@@ -96,10 +96,11 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
           values={draft.values}
           onChange={draft.change}
           surface="create_dialog"
+          examples={draft.fromExamples}
           photoExtra={batch ? <BatchLink templateId={template.id} onGo={onClose} /> : null}
         />
       </>}
-      bar={<FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} placement="sheet" limit={context.concurrency.limit} privateOnly={template.privateOnly} />}
+      bar={<FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} placement="sheet" limit={context.concurrency.limit} privateOnly={template.privateOnly} examplesLeft={draft.examplesLeft} />}
     />
   )
 }

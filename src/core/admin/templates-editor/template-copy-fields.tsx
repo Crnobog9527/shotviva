@@ -106,6 +106,8 @@ function CopyCard({ index, field, body, onChange, onRemove, onUp }: CardProps) {
         <Field id={`${id}-placeholder-zh`} label={COPY.placeholderZh} value={field.placeholderZh} placeholder={field.placeholder} onChange={(placeholderZh) => set({ placeholderZh })} />
         <Field id={`${id}-help`} label={COPY.help} value={field.help} onChange={(help) => set({ help })} />
         <Field id={`${id}-help-zh`} label={COPY.helpZh} value={field.helpZh} placeholder={field.help} onChange={(helpZh) => set({ helpZh })} />
+        <Field id={`${id}-example`} label={COPY.example} value={field.example} onChange={(example) => set({ example })} />
+        <Field id={`${id}-example-zh`} label={COPY.exampleZh} value={field.exampleZh} placeholder={field.example} onChange={(exampleZh) => set({ exampleZh })} />
       </div>
       {field.type === 'select' ? <OptionRows id={id} field={field} set={set} /> : null}
       <div className="grid gap-2">

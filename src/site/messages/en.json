@@ -847,6 +847,8 @@
         "clearAll": "Clear everything",
         "restore": "Back to the sample text",
         "contactsLeft": "The organiser, phone or address is still the sample’s. Use it anyway?",
+        "clearAllQuestion": "This removes what you typed too. Clear everything?",
+        "restoreQuestion": "This replaces what you typed. Go back to the sample?",
         "photoHint": "Filled in from the text on your photo. Check each part.",
         "reusedHint": "You can also clear everything, or go back to the sample."
       },
@@ -1017,6 +1019,18 @@
         "required": "{count, plural, one {# required item left} other {# required items left}}",
         "done": "Required items done",
         "invalid": "Something here needs a fix"
+      },
+      "examples": {
+        "hint": "The fields start with the sample poster’s text (in grey). Type over what changes; grey text goes on the poster as it is.",
+        "clearAll": "Clear everything",
+        "clearAllQuestion": "This removes what you typed too. Clear everything?",
+        "restore": "Back to the sample text",
+        "restoreQuestion": "This replaces what you typed. Go back to the sample?",
+        "confirm": "Yes",
+        "cancel": "Cancel",
+        "clearGroup": "Clear this group",
+        "left": "{fields} still show the sample’s text. Use it anyway?",
+        "joiner": ", "
       }
     },
     "errors": {

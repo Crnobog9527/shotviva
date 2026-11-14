@@ -1,4 +1,4 @@
-import type { PosterContent, PosterFields, PosterSection, PosterTable, TableRow } from '@/core/poster'
+import { posterStrings, type PosterContent, type PosterFields, type PosterSection, type PosterTable, type TableRow } from '@/core/poster'
 
 // Immutable edits of the poster text the editor shows (ARCHITECTURE §5.3). Pure, so the editor's
 // add / remove / insert-break behaviour is tested without React.
@@ -176,12 +176,20 @@ export function isSampleText(content: PosterContent, sample: PosterContent | und
   return Boolean(before?.trim()) && valueAt(content, path) === before
 }
 
+// Text the user typed themselves (not blank, not the sample's word for word): 全部清空 and
+// 恢复示例 ask before wiping it.
+export const typedPoster = (content: PosterContent, sample: PosterContent | undefined): boolean =>
+  posterStrings(content).some(({ path, text }) => text.trim() !== '' && !isSampleText(content, sample, path))
+
 // The sample's organiser, phones or address still on the set: the one-line reminder before
 // generating (「店名、电话、地址还是示例内容，确认要用吗？」), which never blocks.
 export function sampleContactsLeft(content: PosterContent, sample: PosterContent | undefined): boolean {
   if (!sample) return false
   const same = (value: string, before: string) => Boolean(before.trim()) && value.trim() === before.trim()
+  // The English name counts on its own (总控 2026-11-14): a new organiser over the sample's
+  // English name is still the sample's poster.
   return same(content.header.brand, sample.header.brand)
+    || same(content.header.brandEn, sample.header.brandEn)
     || same(content.footer.address, sample.footer.address)
     || content.footer.phones.some((phone) => sample.footer.phones.some((before) => same(phone, before)))
 }
