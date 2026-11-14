@@ -32,18 +32,20 @@ async function user(name: string, signedAt: string, opts: { role?: 'admin'; loca
   return id
 }
 
-type Job = { status?: 'succeeded' | 'failed'; at: string; template?: string; source?: 'web' | 'graylum'; batch?: string; inputs?: object; pool?: 'free' | 'paid'; cost?: number; error?: string }
+type Job = { status?: 'succeeded' | 'failed'; at: string; template?: string; source?: 'web' | 'graylum'; batch?: string; inputs?: object; pool?: 'free' | 'paid'; cost?: number; error?: string; againOf?: string }
 
-async function job(userId: string, j: Job) {
+async function job(userId: string, j: Job): Promise<string> {
+  const id = randomUUID()
   const ok = (j.status ?? 'succeeded') === 'succeeded'
   await db.query(
     `insert into public.generation_jobs
        (id, user_id, module, template_id, inputs, provider, source, status, visibility, credits_cost, credit_pool,
         output_key, error_code, created_at, finished_at, batch_id, cost_usd)
      values ($1, $2, 'image', $3, $4, 'test/model', $5, $6, 'public', 4, $7, $8, $9, $10, $10, $11, $12)`,
-    [randomUUID(), userId, j.template ?? 'freeform', JSON.stringify({ resolution: '1k', ...j.inputs }), j.source ?? 'web', ok ? 'succeeded' : 'failed',
+    [id, userId, j.template ?? 'freeform', JSON.stringify({ resolution: '1k', ...j.inputs, ...(j.againOf ? { again_of: j.againOf } : {}) }), j.source ?? 'web', ok ? 'succeeded' : 'failed',
       j.pool ?? 'free', ok ? 'outputs/x.png' : null, ok ? null : (j.error ?? 'PROVIDER_FAILED'), at(j.at), j.batch ?? null, j.cost ?? null],
   )
+  return id
 }
 
 async function pay(userId: string, createdAt: string) {
@@ -95,12 +97,13 @@ async function writeTemplateFixture(admin: string, a: string, b: string) {
   const template = (ids.template = await createPricedTemplate(db))
   ids.other = await createPricedTemplate(db)
   const batch = randomUUID()
-  // a: a first image, a redraw 10 minutes later, then one an hour later (not a redraw).
-  await job(a, { template, at: '2021-05-02T04:00:00Z', pool: 'paid', cost: 1 })
-  await job(a, { template, at: '2021-05-02T04:10:00Z', pool: 'paid', cost: 1 })
-  await job(a, { template, at: '2021-05-02T05:10:00Z', status: 'failed', error: 'PROVIDER_TIMEOUT' })
-  // b: two cells of one batch (not redraws), two pages of one poster set (not redraws), the same
-  // page again (a redraw), and a free redraw that names its source.
+  // a: a first image, Make again from it (a redraw), then one 10 minutes later without Make again
+  // (not a redraw: 1514 dropped the time-gap estimate).
+  const first = await job(a, { template, at: '2021-05-02T04:00:00Z', pool: 'paid', cost: 1 })
+  await job(a, { template, at: '2021-05-02T04:10:00Z', pool: 'paid', cost: 1, againOf: first })
+  await job(a, { template, at: '2021-05-02T04:20:00Z', status: 'failed', error: 'PROVIDER_TIMEOUT' })
+  // b: two cells of one batch, three poster pages (none of them redraws without a source), and a
+  // free poster redraw that names its source.
   await job(b, { template, at: '2021-05-03T04:00:00Z', batch })
   await job(b, { template, at: '2021-05-03T04:00:01Z', batch })
   await job(b, { template, at: '2021-05-04T04:00:00Z', inputs: { poster: { set_id: 's1', part: 0 } } })
@@ -135,8 +138,8 @@ describe('admin_template_stats', () => {
     expect(tpl).toMatchObject({ uses: 9, users: 2, succeeded: 8, failed: 1, live: true })
   })
 
-  it('counts redraws: within 30 minutes, not in one batch, poster only on the same page or when named', () => {
-    expect(tpl.redraws).toBe(3)
+  it('counts redraws exactly: Make again (again_of) and named poster redraws only', () => {
+    expect(tpl.redraws).toBe(2)
   })
 
   it('sums cost and credits by pool and lists failure codes', () => {

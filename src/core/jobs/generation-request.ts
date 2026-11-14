@@ -51,6 +51,9 @@ export const generateBodySchema = z.object({
   // Dense-text posters (ARCHITECTURE §5.3): which poster of a saved set this job makes.
   // redraw_of: the poster job this one redraws (its first redraw after a failed text check is free).
   poster: z.object({ set_id: z.uuid(), part: z.int().min(0).max(11), redraw_of: z.uuid().optional() }).optional(),
+  // Make again (T40): the work the workspace was opened from. Only a claim: the database keeps it
+  // only when it is the caller's own succeeded work with the same template (1513).
+  again_of: z.uuid().optional(),
 })
 
 export type GenerationRequest = {
@@ -85,6 +88,8 @@ export type GenerationRequest = {
   clientIp?: string | null
   // A poster template's job: the set and the poster in it; its text is read from the set.
   poster?: { setId: string; part: number; redrawOf?: string }
+  // Make again's source work, as the browser claimed it (checked in the database, 1513).
+  againOf?: string
 }
 
 export function toGenerationRequest(userId: string, body: z.infer<typeof generateBodySchema>): GenerationRequest {
@@ -108,5 +113,6 @@ export function toGenerationRequest(userId: string, body: z.infer<typeof generat
     batchId: body.batch_id,
     batchCell: body.batch_cell,
     ...(body.poster ? { poster: { setId: body.poster.set_id, part: body.poster.part, redrawOf: body.poster.redraw_of } } : {}),
+    ...(body.again_of ? { againOf: body.again_of } : {}),
   }
 }

@@ -17,6 +17,8 @@ export type GenerateBody = {
   inputs: { copy: Record<string, string>; aspect_ratio: string; resolution: string; note?: string; toggles?: Record<string, boolean>; toggles_confirmed?: string[] }
   // A dense-text poster (ARCHITECTURE §5.3): which poster of the saved set this job makes.
   poster?: { set_id: string; part: number; redraw_of?: string }
+  // Make again from one of the user's own works (T40): that work's id (ARCHITECTURE §16.2c).
+  again_of?: string
 }
 
 // A photo edit (ARCHITECTURE §5.2): goes to /api/edit, settles and polls like any job.
