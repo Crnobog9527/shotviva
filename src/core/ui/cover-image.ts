@@ -39,10 +39,15 @@ export function cdnLoader(cdn: string): ImageLoader & { origin: string } {
   return Object.assign(loader, { origin: cdn })
 }
 
-// The CDN loader for a next/image src that is a cover, or undefined (switch off, a static import,
-// a public/ picture, another host).
+// The site's own pictures in public/ (marketing heroes, cases, intros…), which /_next/image also
+// serves. Never /api/… (signed-in users' photos) or anything else on this host.
+const PUBLIC_PICTURE_DIRS = ['/home/', '/cases/', '/intros/', '/partners/', '/brand/', '/og/', '/icons/']
+export const isPublicPicture = (src: string) => PUBLIC_PICTURE_DIRS.some((dir) => src.startsWith(dir))
+
+// The CDN loader for a next/image src that is a cover or one of the site's public pictures, or
+// undefined (switch off, a static import, a user's photo, another host).
 export function coverLoaderFor(src: unknown, base?: string, cdn: string | undefined = publicEnv.NEXT_PUBLIC_IMAGE_CDN_URL) {
-  return cdn && typeof src === 'string' && isCoverUrl(src, base) ? cdnLoader(cdn) : undefined
+  return cdn && typeof src === 'string' && (isCoverUrl(src, base) || isPublicPicture(src)) ? cdnLoader(cdn) : undefined
 }
 
 // One optimised URL at least `width` px wide, for the places that take no srcset (a <video>

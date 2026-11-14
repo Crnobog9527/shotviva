@@ -39,6 +39,13 @@ export const publicEnvSchema = z.object({
     .url({ protocol: /^https$/ })
     .transform((url) => url.replace(/\/+$/, ''))
     .optional(),
+  // The static-file CDN switch (same EdgeOne host as images, plan A1 phase 2): Next's assetPrefix
+  // for /_next/static (scripts, styles, next/font files) plus the self-hosted fonts in public/fonts
+  // (MiSans, Instrument Serif). Unset: everything from this site, as before. Read at build.
+  NEXT_PUBLIC_ASSET_CDN_URL: z
+    .url({ protocol: /^https$/ })
+    .transform((url) => url.replace(/\/+$/, ''))
+    .optional(),
   // This build's version (T90): set by next.config.ts from the deployment id; `dev` locally.
   NEXT_PUBLIC_APP_VERSION: z.string().min(1).default('dev'),
 })

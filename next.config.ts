@@ -28,7 +28,7 @@ const POSTHOG_ASSETS = 'https://us-assets.i.posthog.com'
 // The NEXT_PUBLIC_* values are inlined into the bundles at build, so they are checked here,
 // once: an invalid one fails the build (core/public-env-schema.ts). The browser reads them
 // without zod (core/public-env.ts).
-parsePublicEnv(rawPublicEnv)
+const publicEnvAtBuild = parsePublicEnv(rawPublicEnv)
 
 // Pre-launch indexing switch (ARCHITECTURE §12.0), read at build: an invalid SITE_INDEXING fails
 // the build, and changing it needs a redeploy. Closed → X-Robots-Tag on every response; open →
@@ -41,6 +41,10 @@ const indexingIsOpen = indexingOpen(parseIndexingEnv(process.env))
 const assets = readAssetsEnv(process.env)
 
 const nextConfig: NextConfig = {
+  // /_next/static from the static-file CDN when NEXT_PUBLIC_ASSET_CDN_URL is set (EdgeOne, which
+  // forwards those paths to this site and caches them; core/public-env-schema.ts). Vercel already
+  // answers them with Access-Control-Allow-Origin: *, which the cross-origin font files need.
+  assetPrefix: publicEnvAtBuild.NEXT_PUBLIC_ASSET_CDN_URL,
   cacheComponents: true,
   // Vercel builds skip next build's type-check step: only main and validation/preview deploy, and
   // both receive code only through PRs whose required CI check ("lint · typecheck · test · build")
@@ -81,12 +85,19 @@ const nextConfig: NextConfig = {
       ...assetsHeaders(),
       {
         source: '/fonts/misans/:asset(.+\\.(?:woff2|css))',
-        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+          // Read cross-origin when the static-file CDN serves them (fonts need CORS).
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+        ],
       },
       // Instrument Serif (globals.css): content-hashed names too, the same rule.
       {
         source: '/fonts/instrument-serif/:asset(.+\\.woff2)',
-        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+        ],
       },
       // The marketing pictures in public/home (hero scenes, demo sets, wish cards): cached for a
       // year, which /_next/image inherits for its resized copies (it keeps the larger of this and
