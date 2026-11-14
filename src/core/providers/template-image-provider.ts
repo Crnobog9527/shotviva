@@ -63,7 +63,7 @@ async function checkTemplateRow(
   if (lostOriginalSupport(row, request.aspectRatio, parameters)) {
     return { reason: 'catalog_changed' }
   }
-  const mismatch = openRouterInputMismatch(request, parameters)
+  const mismatch = openRouterInputMismatch(request, parameters, row.model)
   return mismatch ?? { parameters }
 }
 

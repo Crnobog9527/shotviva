@@ -24,7 +24,8 @@ export const OPENAI_MINIMUM: CreditsFloor = {
   high: { '1k': 2, '2k': 4, '4k': 6 },
   medium: { '1k': 1, '2k': 2, '4k': 3 },
 }
-const OPENAI_ESTIMATES: CreditsFloor = {
+// Also the base of the OpenRouter estimate for the same models (core/providers/openrouter-pricing).
+export const OPENAI_ESTIMATES: CreditsFloor = {
   high: { '1k': 0.081, '2k': 0.135, '4k': 0.206 },
   medium: { '1k': 0.055, '2k': 0.095, '4k': 0.135 },
 }

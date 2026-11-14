@@ -6,7 +6,8 @@ import { RESOLUTIONS, type Resolution } from '../templates/output-options'
 //     the source. gpt-image-2 and later take any size up to 3840 px a side and 8,294,400 pixels,
 //     which is the site's 4K table; gpt-image-1, 1.5 and 1-mini make fixed sizes up to 1536 px,
 //     so only 1K. A snapshot such as `gpt-image-2.6-2026-10-01` counts as its family.
-//   - OpenRouter: the catalogue's resolution parameter (catalogCapabilities).
+//   - OpenRouter: the catalogue's resolution parameter (catalogCapabilities), except OpenAI's
+//     gpt-image-2 family, which the catalogue lists without one (openRouterPixelSize).
 //   - Ark: ARK_RESOLUTIONS.
 // A model the table does not know offers 1K only until an admin declares more (audited).
 
@@ -14,6 +15,12 @@ const OPENAI_FAMILIES: ReadonlyArray<{ pattern: RegExp; tiers: readonly Resoluti
   { pattern: /^gpt-image-2(\.5|\.6)?(-|$)/, tiers: ['1k', '2k', '4k'] },
   { pattern: /^gpt-image-1(\.5|-mini)?(-|$)/, tiers: ['1k'] },
 ]
+
+// gpt-image-2 and later take any WxH within OpenAI's limits, which is what lets a relay that
+// forwards an explicit size (OpenRouter's `openai/...` models) offer all three tiers.
+export function openAIFreeSizeModel(model: string): boolean {
+  return OPENAI_FAMILIES[0].pattern.test(model.trim())
+}
 
 export const UNKNOWN_MODEL_TIERS: readonly Resolution[] = ['1k']
 
