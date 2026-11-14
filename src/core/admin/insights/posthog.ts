@@ -62,10 +62,14 @@ export function touchesQuery(p: Period, userIds: readonly string[], promoters: r
   return {
     name: 'insights.touches',
     query: `
-SELECT user_id, source, locale, shared
+SELECT user_id, source, locale, shared, landing, ref_host, utm, medium
 FROM (
   SELECT person_id,
     argMinIf(${source(false)}, timestamp, is_view) AS source,
+    argMinIf(src_path, timestamp, is_view) AS landing,
+    argMinIf(src_domain, timestamp, is_view) AS ref_host,
+    argMinIf(src_utm, timestamp, is_view) AS utm,
+    argMinIf(src_medium, timestamp, is_view) AS medium,
     argMinIf(${ZH_VIEW}, timestamp, is_view) AS locale,
     max(event = 'signup' AND share_mark) AS shared,
     groupUniqArrayIf(distinct_id, is_user) AS users
@@ -98,11 +102,17 @@ GROUP BY template LIMIT 1000`,
 }
 
 const visitorRow = z.object({ bucket: label, locale: label, source: label, visitors: count })
-const touchRow = z.object({ user_id: label, source: label, locale: label, shared: z.preprocess((v) => v === 1 || v === true || v === '1', z.boolean()) })
+const touchRow = z.object({
+  user_id: label, source: label, locale: label, shared: z.preprocess((v) => v === 1 || v === true || v === '1', z.boolean()),
+  landing: label.optional(), ref_host: label.optional(), utm: label.optional(), medium: label.optional(),
+})
 const shareRow = z.object({ template: label, shares: count, opens: count })
 
 export type VisitorRow = z.infer<typeof visitorRow>
-export type Touch = { source: string; locale: 'en' | 'zh' | null; shared: boolean }
+// landing / refHost / utm / medium: the first public page view's path, referring domain and
+// campaign, the fallback of the 「落地页」 and 「来源网站 / utm」 tables (§16.6) for accounts without
+// a first-touch row; empty when PostHog has none.
+export type Touch = { source: string; locale: 'en' | 'zh' | null; shared: boolean; landing?: string; refHost?: string; utm?: string; medium?: string }
 // Plain objects so they survive the 'use cache' round trip.
 export type Touches = Record<string, Touch>
 export type ShareCounts = Record<string, { shares: number; opens: number }>
@@ -117,7 +127,7 @@ export async function loadTouches(run: RunQuery, p: Period, userIds: readonly st
   const touches: Touches = {}
   for (const row of rows) {
     const locale = row.source === '' ? null : row.locale === 'zh' ? 'zh' : 'en'
-    touches[row.user_id] = { source: row.source, locale, shared: row.shared }
+    touches[row.user_id] = { source: row.source, locale, shared: row.shared, landing: row.landing ?? '', refHost: row.ref_host ?? '', utm: row.utm ?? '', medium: row.medium ?? '' }
   }
   return { touches, truncated: rows.length >= TOUCH_LIMIT }
 }

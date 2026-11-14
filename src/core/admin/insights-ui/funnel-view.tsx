@@ -1,5 +1,6 @@
 import { SectionError } from '../growth-ui/section'
-import { funnelBreakdown, funnelSeries, type FunnelInput } from '../insights/funnel'
+import { funnelBreakdown, funnelSeries, localeOfPerson, type FunnelInput } from '../insights/funnel'
+import { touchBreakdown } from '../insights/landing'
 import { readCohort, readEnd, readFunnelPostHog } from '../insights/load'
 import { parsePeriod } from '../insights/period'
 import { BreakdownTable } from './breakdown-table'
@@ -7,6 +8,7 @@ import { INSIGHTS_COPY as COPY } from './copy'
 import { FiltersForm } from './filters-form'
 import { FunnelSummary } from './funnel-summary'
 import { FunnelTable } from './funnel-table'
+import { TouchTables } from './touch-tables'
 import type { InsightsQuery } from './query'
 
 function notes(posthog: { status: string; data?: { truncated: boolean } }, source: string, maturing: boolean): string[] {
@@ -30,6 +32,8 @@ export async function FunnelView({ query }: { query: InsightsQuery }) {
   const filters = { locale: query.locale, source: query.source }
   const series = funnelSeries(input, filters)
   const breakdown = funnelBreakdown(input, filters)
+  const sameLocale = db.data.cohort.people.filter((person) => query.locale === 'all' || localeOfPerson(person, input.touches) === query.locale)
+  const touches = touchBreakdown(sameLocale, db.data.own, input.touches)
   const lines = notes({ status: posthog.status, data: ok ?? undefined }, query.source, series.maturing)
   return (
     <div className="grid min-w-0 gap-6">
@@ -38,6 +42,7 @@ export async function FunnelView({ query }: { query: InsightsQuery }) {
       <FunnelSummary counts={series.total} notes={lines} />
       <FunnelTable rows={series.rows} total={series.total} bucket={query.bucket} />
       <BreakdownTable bySource={breakdown.bySource} byLocale={breakdown.byLocale} />
+      <TouchTables byLanding={touches.byLanding} bySource={touches.bySource} covered={touches.covered} />
       <p className="text-xs text-muted-foreground">{COPY.funnel.posthogNote}</p>
     </div>
   )

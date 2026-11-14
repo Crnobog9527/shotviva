@@ -54,3 +54,15 @@ describe('withAnalyticsRegion (T70)', () => {
     expect(test).toBeUndefined()
   })
 })
+
+describe('analyticsCookiesAllowed', () => {
+  const at = (country: string, cookie?: string) =>
+    new NextRequest('https://shotviva.com/', { headers: { 'x-vercel-ip-country': country, ...(cookie ? { cookie } : {}) } })
+  it('follows the answer on the bar first, then the region', async () => {
+    const { analyticsCookiesAllowed } = await import('./region-proxy')
+    expect(analyticsCookiesAllowed(at('US'), { testOverride: false })).toBe(true)
+    expect(analyticsCookiesAllowed(at('DE'), { testOverride: false })).toBe(false)
+    expect(analyticsCookiesAllowed(at('DE', 'sv_analytics_consent=accepted'), { testOverride: false })).toBe(true)
+    expect(analyticsCookiesAllowed(at('US', 'sv_analytics_consent=necessary'), { testOverride: false })).toBe(false)
+  })
+})

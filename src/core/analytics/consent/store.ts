@@ -1,4 +1,4 @@
-import { barWanted, CONSENT_KEY, parseChoice, type Consent, type ConsentChoice } from './decision'
+import { barWanted, CONSENT_COOKIE, CONSENT_COOKIE_MAX_AGE, CONSENT_KEY, parseChoice, type Consent, type ConsentChoice } from './decision'
 import { REGION_COOKIE, REGION_OPEN } from './region'
 
 // Browser-side consent state (T70): the region cookie the proxy set, the answer kept in
@@ -63,6 +63,8 @@ export function chooseConsent(choice: ConsentChoice): void {
   } catch {
     // Not remembered; it still applies to this page.
   }
+  const secure = window.location?.protocol === 'https:' ? '; secure' : ''
+  document.cookie = `${CONSENT_COOKIE}=${choice}; path=/; max-age=${CONSENT_COOKIE_MAX_AGE}; samesite=lax${secure}`
   reopened = false
   const consent = { ...readConsent(), choice }
   publish(consent)
