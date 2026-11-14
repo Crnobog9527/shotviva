@@ -1690,7 +1690,8 @@
         "saving": "Saving…",
         "saved": "Saved.",
         "failed": "Couldn't save. Please try again."
-      }
+      },
+      "photosGone": "The photos from that issue are gone: {boxes}. Please upload them again."
     }
   },
   "paywall": {

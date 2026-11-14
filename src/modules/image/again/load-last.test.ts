@@ -50,6 +50,13 @@ describe('loadLast', () => {
     expect(last).toMatchObject({ kind: 'poster', jobId: page2.id, content })
     expect(last?.photos.map((photo) => photo.slot)).toEqual(['qr_code', 'prize_photo'])
     expect(r2.copies).toEqual([kept(7, 1), kept(6, 1), kept(6, 2)])
+    expect(last?.missing).toEqual([])
+  })
+
+  it('names the boxes whose kept photo is gone', async () => {
+    const gone = job(5, { copy: {}, input_slots: [{ key: 'logo', upload: 'l' }, { key: 'prize_1', upload: 'p' }], kept_inputs: [kept(5, 1)] }, 'prize-poster-receipt')
+    const last = await loadLast({ db: fakeDb([gone]).db, store: () => store().store }, USER, ['prize-poster-receipt'])
+    expect(last).toMatchObject({ photos: [{ slot: 'logo' }], missing: ['prize_1'] })
   })
 
   it('gives a plain template\'s form fields and kept slot photos', async () => {

@@ -15,9 +15,11 @@ import { ShortDay } from './short-day'
 const box = 'grid gap-2 rounded-control bg-wash-faint p-3 text-caption'
 
 type Work = { madeAt: string; templateId: string }
+// missing: the names of photo boxes whose photo from that issue is gone.
+type Reused = Work & { missing: readonly string[] }
 export type LastRowProps = {
   last: Work | null
-  reused: Work | null
+  reused: Reused | null
   busy: boolean
   failed: boolean
   dirty(): boolean
@@ -28,7 +30,14 @@ export type LastRowProps = {
 export function LastRow({ last, reused, busy, failed, dirty, onTake, names }: LastRowProps) {
   const t = useTranslations('app.weekly')
   const [asking, setAsking] = useState(false)
-  if (reused) return <div role="status" className={box}><p>{t.rich('reused', { day: () => <ShortDay iso={reused.madeAt} />, name: names[reused.templateId] ?? '' })}</p></div>
+  if (reused) {
+    return (
+      <div role="status" className={box}>
+        <p>{t.rich('reused', { day: () => <ShortDay iso={reused.madeAt} />, name: names[reused.templateId] ?? '' })}</p>
+        {reused.missing.length ? <p className="text-destructive">{t('photosGone', { boxes: reused.missing.join('、') })}</p> : null}
+      </div>
+    )
+  }
   if (!last) return null
   const go = () => { setAsking(false); onTake() }
   return (

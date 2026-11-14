@@ -19,7 +19,7 @@ import { fetchLastIssue, fetchWeeklyPeek, turnAutofillOff } from './weekly-api'
 export const weeklyApplies = (template: CatalogueTemplate): boolean =>
   template.copyFields.length > 0 && (matchesStore(template.copyFields) || (template.groups?.length ?? 0) > 0)
 
-type Reused = { madeAt: string; templateId: string }
+type Reused = { madeAt: string; templateId: string; missing: string[] }
 const asText = (copy: Record<string, string>) => JSON.stringify(Object.entries(copy).filter(([, value]) => value.trim()).sort())
 
 function usePeek(ids: readonly string[], enabled: boolean) {
@@ -70,7 +70,8 @@ export function useFormWeekly(template: CatalogueTemplate, draft: WorkspaceDraft
     draft.change(againValues(issue.inputs, template))
     const slots = new Set((template.imageSlots ?? []).map((slot) => slot.key))
     if (isSlotTemplate(template)) for (const photo of issue.photos) if (photo.slot && slots.has(photo.slot)) draft.slots.restore({ ...photo, slot: photo.slot }, issue.madeAt)
-    setReused({ madeAt: issue.madeAt, templateId: issue.templateId })
+    const missing = (template.imageSlots ?? []).filter((slot) => issue.missing.includes(slot.key)).map((slot) => slot.label)
+    setReused({ madeAt: issue.madeAt, templateId: issue.templateId, missing })
     setFilled(null)
   }
 
