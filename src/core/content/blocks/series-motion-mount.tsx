@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 
+import { useRouter } from '../../i18n/navigation'
 import { cycler, HOVER_DELAY_MS, HOVER_HOLD_MS, VIEW_HOLD_MS, type Cycler } from './series-motion'
 
 // Wires every series card on the page once (one effect, no per-card React state): with a fine
@@ -30,7 +31,25 @@ function wire(frame: HTMLElement, touch: boolean, observer: IntersectionObserver
   }
 }
 
+// A series card (and a lone series' "Open" pill) is a <button data-open-series="/generate?series=…">:
+// no crawlable link to Create, which needs a session and is noindex (SEO 2026-11-14). One click
+// handler for the page moves to it, in the page's language; signed out, Create sends the visitor
+// to sign in and back, as the link did.
+function useOpenSeries() {
+  const router = useRouter()
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target.closest('[data-open-series]') : null
+      const href = target?.getAttribute('data-open-series')
+      if (href?.startsWith('/generate')) router.push(href)
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [router])
+}
+
 export function SeriesMotion() {
+  useOpenSeries()
   useEffect(() => {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const frames = [...document.querySelectorAll<HTMLElement>('[data-series-pairs]')]
