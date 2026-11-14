@@ -57,6 +57,8 @@ export async function proxy(request: NextRequest) {
     forward: localeRouter,
     // /generate/upload-test only under `next dev`.
     devPages: env.NODE_ENV === 'development',
+    // /error-test, the error-boundary check, on local builds and the test site only.
+    validationPages: env.VERCEL_ENV !== 'production',
     // Seals the proxy's session check for the page, so the page does not repeat it (ARCHITECTURE §7).
     identitySecret: env.SUPABASE_SERVICE_ROLE_KEY,
   })
