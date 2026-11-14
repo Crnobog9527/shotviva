@@ -22,7 +22,7 @@ export function VariantFields({ variants, options, onChange }: Props) {
     <fieldset className="grid gap-2 text-sm">
       <legend className="mb-1 font-medium">{COPY.variants}</legend>
       {variants.map((variant, index) => (
-        <div key={index} className="grid grid-cols-[1fr] gap-2 rounded-md border p-2 sm:grid-cols-[2fr_1.2fr_70px_auto_auto] sm:items-center">
+        <div key={index} className="grid grid-cols-[1fr] gap-2 rounded-md border p-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_5rem_auto_auto] sm:items-center">
           <select
             aria-label={COPY.option}
             className="h-9 rounded-md border border-input bg-transparent px-2"
