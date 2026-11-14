@@ -1,5 +1,6 @@
 import type { NextRequest, NextResponse } from 'next/server'
 
+import { CONSENT_COOKIE, parseChoice } from './decision'
 import { needsConsent, REGION_COOKIE, REGION_OPEN, TEST_COUNTRY_COOKIE, TEST_COUNTRY_PARAM } from './region'
 
 type Options = { testOverride: boolean }
@@ -36,4 +37,12 @@ export function withAnalyticsRegion(response: NextResponse, request: NextRequest
     response.cookies.delete(REGION_COOKIE)
   }
   return response
+}
+
+// Whether analytics may keep something in this visitor's browser, decided as the browser decides it
+// for PostHog (decision.ts cookiesAllowed): an answer on the bar wins either way (the proxy reads
+// its cookie copy), otherwise the region. Used for sv_ft (ARCHITECTURE §16.6).
+export function analyticsCookiesAllowed(request: NextRequest, options: Options): boolean {
+  const choice = parseChoice(request.cookies.get(CONSENT_COOKIE)?.value)
+  return choice ? choice === 'accepted' : !needsConsent(countryOf(request, options))
 }

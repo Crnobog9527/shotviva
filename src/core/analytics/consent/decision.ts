@@ -4,6 +4,10 @@ import { splitLocale } from '../../i18n/paths'
 // CONSENT_KEY and nothing else is stored there by us (T70).
 export type ConsentChoice = 'accepted' | 'necessary'
 export const CONSENT_KEY = 'sv_analytics_consent'
+// The same answer as a first-party cookie, so the proxy can honour it for sv_ft (ARCHITECTURE
+// §16.6), which it sets before any script runs. One year, like the PostHog cookie.
+export const CONSENT_COOKIE = CONSENT_KEY
+export const CONSENT_COOKIE_MAX_AGE = 365 * 24 * 60 * 60
 
 export type Consent = {
   // The proxy marked this visitor as outside the EU/EEA/UK/CH (region.ts).

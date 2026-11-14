@@ -1,16 +1,17 @@
 import createMiddleware from 'next-intl/middleware'
-import type { NextRequest } from 'next/server'
+import type { NextRequest, NextResponse } from 'next/server'
 
 import { isAffiliateEnabled, requiresAffiliateProgram } from '@/core/affiliate/feature'
 import { notFoundResponse } from '@/core/auth/proxy-gates'
 import { recordReferral } from '@/core/affiliate/referral'
-import { withAnalyticsRegion } from '@/core/analytics/consent'
+import { analyticsCookiesAllowed, withAnalyticsRegion } from '@/core/analytics/consent'
+import { withFirstTouch } from '@/core/attribution/proxy'
 import { proxyGate, type Forward } from '@/core/auth/proxy'
 import { captureCodeLink } from '@/core/codes/link'
 import { isBadGalleryPage } from '@/core/gallery/page-number'
 import { galleryWorkIdOf, liveGalleryGate } from '@/core/gallery/proxy-gate'
 import { serverEnv } from '@/core/env'
-import { experimentRoute, OPTION_PAGES, toOptionPage, withExperimentCookie, type RouteOutcome } from '@/core/experiments/server'
+import { experimentRoute, isBotRequest, OPTION_PAGES, toOptionPage, withExperimentCookie, type RouteOutcome } from '@/core/experiments/server'
 import { viaImageCdn } from '@/core/storage/image-cdn-guard'
 import { routing } from '@/core/i18n/routing'
 import { canonicalRedirectResponse, withHostNoindex } from '@/core/seo'
@@ -50,6 +51,21 @@ function experimentForward(experiment: RouteOutcome | null): Forward {
   return rewrite ? (forwarded) => toOptionPage(localeRouter, forwarded, rewrite) : localeRouter
 }
 
+// The cookies every page answer may carry. Whether analytics may use cookies for this visitor
+// (ARCHITECTURE §16.1, T70; the test site and local dev accept ?sv_country=XX to act as a visitor
+// from that country); the A/B assignment (§16.5); the first-touch landing (§16.6), kept only where
+// analytics may keep something, and sealed with a server-only key (none, none set).
+function visitorCookies(response: NextResponse, request: NextRequest, experiment: RouteOutcome | null) {
+  const env = serverEnv()
+  const options = { testOverride: env.VERCEL_ENV !== 'production' }
+  withAnalyticsRegion(response, request, options)
+  withExperimentCookie(response, experiment, request.nextUrl.protocol === 'https:')
+  const secret = env.SUPABASE_SERVICE_ROLE_KEY
+  if (secret) {
+    withFirstTouch(response, request, { secret, allowed: analyticsCookiesAllowed(request, options), bot: isBotRequest(request), ownHost: site.brand.domain })
+  }
+}
+
 export async function proxy(request: NextRequest) {
   const early = earlyResponse(request)
   if (early) return early
@@ -78,10 +94,7 @@ export async function proxy(request: NextRequest) {
     // Seals the proxy's session check for the page, so the page does not repeat it (ARCHITECTURE §7).
     identitySecret: env.SUPABASE_SERVICE_ROLE_KEY,
   })
-  // Whether analytics may use cookies for this visitor (ARCHITECTURE §16.1, T70); the test
-  // site and local dev accept ?sv_country=XX to act as a visitor from that country.
-  withAnalyticsRegion(response, request, { testOverride: env.VERCEL_ENV !== 'production' })
-  withExperimentCookie(response, experiment, request.nextUrl.protocol === 'https:')
+  visitorCookies(response, request, experiment)
   await recordReferral(request, response)
   return withHostNoindex(response, request, hosts.canonicalHost)
 }
