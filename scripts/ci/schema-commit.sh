@@ -8,6 +8,7 @@
 #   HEAD_REF      the PR branch;  OLD_HEAD  the commit that was tested
 #   PR_TITLE      for the migration guards' [baseline] / [contract] escapes
 #   CHECKS_RESULT, DB_RESULT  the results of the two required jobs in this run
+#   GATE_RESULT   optional: the "CI gate" result of this run, posted the same way
 #   REPO, RUN_URL, GH_TOKEN (contents: write, checks: write)
 #
 # Pushing with GITHUB_TOKEN starts no new workflow run, so nothing loops and nothing reruns:
@@ -62,6 +63,7 @@ post() { # <name> <conclusion> <summary>
 carried="Carried over from $RUN_URL, which tested ${OLD_HEAD} merged with main. This commit only adds the regenerated supabase/schema.sql, and its merge with main is exactly the tree that run tested, so the result holds here (T88)."
 post 'lint · typecheck · test · build' "$(conclusion "$CHECKS_RESULT")" "$carried"
 post 'supabase db tests' "$(conclusion "$DB_RESULT")" "$carried"
+[ -z "${GATE_RESULT:-}" ] || post 'CI gate' "$(conclusion "$GATE_RESULT")" "$carried"
 if [ "$migrations" = true ]; then
   ran="Ran in $RUN_URL against this commit before it was pushed (T88)."
   post 'merged migrations unchanged' success "$ran"
