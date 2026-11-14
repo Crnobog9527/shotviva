@@ -3,18 +3,21 @@
  * per line) on stdin and prints one word:
  *
  *   high     touches money, credits, sign-in, permissions, the database, image providers, the
- *            proxy, secrets/config or CI itself (HIGH below): Codex always reviews it, and the
- *            "Codex findings" check needs a finished Codex review.
+ *            proxy, secrets/config or CI itself (HIGH below), or any server action (a file that
+ *            starts with 'use server': each one is an endpoint with its own sign-in or role
+ *            check, e.g. admin/orders/actions.ts replays and claws back payments): Codex always
+ *            reviews it, and the "Codex findings" check needs a finished Codex review.
  *   trivial  only docs, notes, design files, message catalogs or public images (TRIVIAL below):
  *            no Codex review unless someone asks with "@codex review".
  *   normal   everything else (pages, components, admin screens, styles): no automatic Codex
  *            review; unresolved Codex threads still fail "Codex findings" if one was requested.
  *
- * No paths at all prints `high`, so an unexpected empty diff gets the full review.
+ * No paths at all prints `high`, so an unexpected empty diff gets the full review. Server actions
+ * are recognised by reading the changed files, so run it from a checkout of the PR.
  *
  *   git diff --name-only base HEAD | node scripts/ci/review-risk.mjs
  */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 export const HIGH = [
@@ -53,10 +56,19 @@ export const TRIVIAL = [
   /^public\/.+\.(png|jpe?g|webp|avif|svg|ico)$/,
 ]
 
-export function reviewRisk(paths) {
+const SERVER_DIRECTIVE = /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*['"]use server['"]/
+
+/** Whether the file at `path` (relative to the working directory) is a server action module. */
+export function isServerAction(path) {
+  if (!/\.(ts|tsx|js|mjs)$/.test(path) || !existsSync(path) || !statSync(path).isFile()) return false
+  return SERVER_DIRECTIVE.test(readFileSync(path, 'utf8'))
+}
+
+export function reviewRisk(paths, { serverAction = isServerAction } = {}) {
   const changed = paths.map((path) => path.trim()).filter(Boolean)
   if (changed.length === 0) return 'high'
   if (changed.some((path) => HIGH.some((pattern) => pattern.test(path)))) return 'high'
+  if (changed.some((path) => serverAction(path))) return 'high'
   if (changed.every((path) => TRIVIAL.some((pattern) => pattern.test(path)))) return 'trivial'
   return 'normal'
 }

@@ -15,9 +15,9 @@
  *   CODEX_REVIEW_MODE=on-demand  Codex's automatic review is off. This also asks when a
  *                                high-risk PR is opened, reopened or marked ready.
  *
- * Posts nothing while a Codex review is running or a "@codex review" was posted in the last
- * 10 minutes. Env: GH_TOKEN, REPO, PR, HEAD_SHA, ACTION (the pull_request action),
- * CODEX_REVIEW_MODE.
+ * Posts nothing (exit 3: run it again later) while a Codex review is running, and nothing when
+ * a "@codex review" was posted in the last 10 minutes. Env: GH_TOKEN, REPO, PR, HEAD_SHA,
+ * ACTION, CODEX_REVIEW_MODE.
  */
 import { execFileSync } from 'node:child_process'
 
@@ -40,9 +40,11 @@ if (reviewRisk(prFiles) !== 'high') {
 }
 
 const state = await reviewState()
+// Codex reviews the head it sees when it starts. A request now would be ignored or overlap, and
+// nothing re-asks later (no workflow posts requests), so say so and let the caller re-run this.
 if (state.running) {
-  console.log('A Codex review is already running.')
-  process.exit(0)
+  console.error('A Codex review is running. Run this again once it has finished, to cover commits pushed since it started.')
+  process.exit(3)
 }
 
 let why = null

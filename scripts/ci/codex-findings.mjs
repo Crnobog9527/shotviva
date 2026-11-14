@@ -75,9 +75,12 @@ export async function reviewState() {
   const reviews = await github(`/repos/${owner}/${name}/pulls/${env.PR}/reviews?per_page=100`)
   const summary = comments.filter((c) => isCodex(c.user?.login)).map((c) => parseReviewState(c.body)).filter(Boolean).at(-1)
   const reviewed = reviews.filter((r) => isCodex(r.user?.login)).map((r) => r.commit_id)
+  // A review in progress outranks earlier ones: until it ends its findings are unknown, so the
+  // check waits for it instead of passing on an older review.
+  const running = Boolean(summary && summary.status !== 'completed')
   return {
-    completed: summary?.status === 'completed' || reviewed.length > 0,
-    running: Boolean(summary && summary.status !== 'completed'),
+    completed: !running && (summary?.status === 'completed' || reviewed.length > 0),
+    running,
     commit: summary?.status === 'completed' ? summary.commit_sha : (reviewed.at(-1) ?? null),
   }
 }
@@ -106,7 +109,10 @@ export function judge({ risk, codexThreads, state }) {
     lines.push(`::warning file=${t.path}::Outdated Codex finding still unresolved, check it was handled: ${titleOf(t)} (${url})`)
     table.push(`| ⚠️ outdated | ${titleOf(t)} | \`${t.path}\` | ${url} |`)
   }
-  if (risk === 'high' && !state.completed) {
+  if (state.running) {
+    ok = false
+    lines.push('::error::A Codex review is still running; this check re-runs when it posts findings, or re-run it once Codex reacts 👍.')
+  } else if (risk === 'high' && !state.completed) {
     ok = false
     lines.push(
       '::error::High-risk change (money, sign-in, database, providers, proxy or CI) without a finished Codex review. ' +
@@ -126,7 +132,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const risk = env.RISK ?? 'high'
   const deadline = Date.now() + Number(env.WAIT_MINUTES ?? 20) * 60_000
   let state = await reviewState()
-  while (risk === 'high' && !state.completed && Date.now() < deadline) {
+  while ((state.running || (risk === 'high' && !state.completed)) && Date.now() < deadline) {
     console.log(state.running ? 'Codex review running; waiting for it…' : 'No Codex review yet; waiting for one…')
     await new Promise((resolve) => setTimeout(resolve, 30_000))
     state = await reviewState()

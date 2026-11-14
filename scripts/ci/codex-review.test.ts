@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { judge, parseReviewState } from './codex-findings.mjs'
-import { reviewRisk } from './review-risk.mjs'
+import { isServerAction, reviewRisk } from './review-risk.mjs'
 
 // Codex reviews by risk (.github/workflows/codex-review.yml).
 describe('review-risk', () => {
@@ -33,6 +33,19 @@ describe('review-risk', () => {
   it('is normal for pages, components, admin screens and styles', () => {
     expect(reviewRisk(['src/app/[locale]/(marketing)/home-page.tsx', 'src/core/admin/insights-ui/query.ts'])).toBe('normal')
     expect(reviewRisk(['src/app/globals.css', 'README.md'])).toBe('normal')
+  })
+
+  it('is high for any server action, whatever its folder', () => {
+    const serverAction = (path: string) => path.endsWith('actions.ts')
+    expect(reviewRisk(['src/app/[locale]/(app)/admin/orders/actions.ts'], { serverAction })).toBe('high')
+    expect(reviewRisk(['src/app/[locale]/(app)/account/subscription-actions.ts'], { serverAction })).toBe('high')
+    expect(reviewRisk(['src/app/[locale]/(app)/admin/orders/orders-table.tsx'], { serverAction })).toBe('normal')
+  })
+
+  it('recognises a server action by its directive', () => {
+    expect(isServerAction('src/app/[locale]/(app)/admin/orders/actions.ts')).toBe(true)
+    expect(isServerAction('scripts/ci/review-risk.mjs')).toBe(false)
+    expect(isServerAction('does/not/exist.ts')).toBe(false)
   })
 
   it('is high when nothing is listed', () => {
@@ -71,6 +84,12 @@ describe('codex-findings', () => {
     expect(judge({ risk: 'high', codexThreads: [], state: none }).ok).toBe(false)
     expect(judge({ risk: 'normal', codexThreads: [], state: none }).ok).toBe(true)
     expect(judge({ risk: 'trivial', codexThreads: [], state: none }).ok).toBe(true)
+  })
+
+  it('waits for a review in progress, even after an earlier one finished', () => {
+    const result = judge({ risk: 'normal', codexThreads: [], state: { completed: false, running: true, commit: 'abc1234' } })
+    expect(result.ok).toBe(false)
+    expect(result.lines[0]).toContain('still running')
   })
 
   it("reads Codex's review state from its summary comment", () => {
