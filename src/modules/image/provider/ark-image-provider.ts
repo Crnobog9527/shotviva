@@ -116,6 +116,15 @@ function failure(status: number, code: string | undefined, usage: ProviderUsage 
   return new ProviderError(timeout ? 'timeout' : 'failed', detail, { usage })
 }
 
+// Which network failure a thrown fetch was (undici puts it on `cause.code`, e.g. ECONNRESET or
+// UND_ERR_CONNECT_TIMEOUT): a bare "request failed" told us nothing on 2026-11-14. A code only,
+// never the message, which could carry the request.
+export function networkCode(error: unknown): string {
+  const cause = error instanceof Error ? error.cause : undefined
+  const code = cause && typeof cause === 'object' && 'code' in cause ? cause.code : undefined
+  return typeof code === 'string' && /^[A-Z0-9_]{2,40}$/.test(code) ? code : error instanceof Error ? error.name : 'unknown'
+}
+
 async function send(config: ArkImageConfig, input: ProviderInput, request: ArkRequest): Promise<Response> {
   try {
     input.signal.throwIfAborted()
@@ -127,9 +136,9 @@ async function send(config: ArkImageConfig, input: ProviderInput, request: ArkRe
       redirect: 'error',
       cache: 'no-store',
     })
-  } catch {
+  } catch (error) {
     if (input.signal.aborted) throw new ProviderError('timeout', 'ark request aborted at deadline')
-    throw new ProviderError('failed', 'ark request failed')
+    throw new ProviderError('failed', `ark request failed (${networkCode(error)})`)
   }
 }
 

@@ -59,4 +59,16 @@ describe('findWebTemplate', () => {
   it('is null when neither has it (the page 404s)', async () => {
     await expect(findWebTemplate(db, 'en', 'gone', { cached: async () => [], live: async () => [] })).resolves.toBeNull()
   })
+
+  // A read that fails (a statement timeout under load, 2026-11-14 on the test site) must reach the
+  // app's error state with its Retry, never look like a template that does not exist.
+  it('throws, never null, when the cached read fails', async () => {
+    const timeout = new Error('listTemplates failed: canceling statement due to statement timeout')
+    await expect(findWebTemplate(db, 'en', 'a', { cached: async () => { throw timeout }, live: async () => [tpl('a')] })).rejects.toBe(timeout)
+  })
+
+  it('throws, never null, when the live read of a cache miss fails', async () => {
+    const timeout = new Error('listTemplates failed: canceling statement due to statement timeout')
+    await expect(findWebTemplate(db, 'en', 'new', { cached: async () => [], live: async () => { throw timeout } })).rejects.toBe(timeout)
+  })
 })

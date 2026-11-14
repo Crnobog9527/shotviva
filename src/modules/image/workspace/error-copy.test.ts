@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { echoTranslate } from '../echo-translate'
-import { canRetry, failureReason, readFailure, refundLine, refundState, specificReason } from './error-copy'
+import { canRetry, failCaption, failureReason, readFailure, refundLine, refundState, specificReason } from './error-copy'
 
 const t = echoTranslate(['PROVIDER_TIMEOUT', 'RATE_LIMITED'])
 
@@ -43,5 +43,14 @@ describe('failure copy', () => {
     const failure = { code: 'GENERATION_FAILED', message: '', refunded: true }
     expect(readFailure(failure, false).retry).toBe(false)
     expect(readFailure({ ...failure, code: 'CONTENT_REJECTED' }).retry).toBe(false)
+  })
+})
+
+describe('failCaption', () => {
+  it('says one thing about the credits: refunded (in the title), on hold, or never charged', () => {
+    const failure = { code: 'PROVIDER_FAILED', message: '' }
+    expect(failCaption({ ...failure, refunded: true })).toBeNull()
+    expect(failCaption({ ...failure, refunded: false })).toBe('onHold')
+    expect(failCaption({ ...failure, refunded: null })).toBe('notCharged')
   })
 })

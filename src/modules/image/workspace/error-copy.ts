@@ -32,6 +32,14 @@ export function specificReason(failure: JobFailure, t: Translate, values?: Recor
   return t(failure.code, values)
 }
 
+// The failed view says one thing about the credits, as the server reported it: the title says
+// "refunded" when they were (so nothing under the photo), otherwise the caption says they are on
+// hold (the refund failed) or that nothing was charged. Never both "refunded" and "not charged".
+export function failCaption(failure: JobFailure): 'onHold' | 'notCharged' | null {
+  if (failure.refunded === true) return null
+  return failure.refunded === false ? 'onHold' : 'notCharged'
+}
+
 // Where the credits of a failed photo stand, for a select in the copy: refunded, on hold
 // (the refund failed), or never charged.
 export const refundState = (failure: JobFailure) => (failure.refunded === true ? 'refunded' : failure.refunded === false ? 'hold' : 'none')
