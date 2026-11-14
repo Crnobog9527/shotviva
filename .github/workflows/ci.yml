@@ -39,6 +39,11 @@ jobs:
     outputs:
       code: ${{ steps.changes.outputs.code }}
       fingerprint: ${{ steps.fingerprint.outputs.hash }}
+      pages: ${{ steps.fingerprint.outputs.pages }}
+      reason: ${{ steps.force.outputs.reason }}
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -97,6 +102,7 @@ jobs:
           if node scripts/ci/page-fingerprint.mjs http://localhost:3000 > "$RUNNER_TEMP/fingerprint.json"; then
             cat "$RUNNER_TEMP/fingerprint.json"
             echo "hash=$(jq -r .hash "$RUNNER_TEMP/fingerprint.json")" >> "$GITHUB_OUTPUT"
+            echo "pages=$(jq -c .pages "$RUNNER_TEMP/fingerprint.json")" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::Could not fingerprint the Lighthouse pages; Lighthouse will run."
           fi
@@ -116,16 +122,9 @@ jobs:
   # (AGENTS §5), which used to start its own database in a separate workflow. T88: it runs only
   # when the change can affect the database or the DB tests (scripts/ci/db-test-inputs.ts);
   # otherwise it stops after change detection and reports success under the same required name.
-  # The DB test files run one at a time (they share one database), so they are split into two
-  # shards, each with its own database: ~7 min → ~4.5 min. "supabase db tests" below sums them up
-  # under the required name.
-  db-shard:
-    name: supabase db tests (${{ matrix.shard }}/2)
+  db:
+    name: supabase db tests
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
     outputs:
       schema-fix: ${{ steps.schema.outputs.fix }}
       schema-tree: ${{ steps.schema.outputs.tree }}
@@ -173,31 +172,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           FIX_DIR: ${{ runner.temp }}/schema-fix
         run: scripts/ci/schema-check.sh
-      - if: steps.schema.outputs.fix == 'true' && matrix.shard == 1
+      - if: steps.schema.outputs.fix == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: schema-sql
           path: ${{ runner.temp }}/schema-fix/schema.sql
           retention-days: 3
-      - if: steps.changes.outputs.db == 'true' && matrix.shard == 1
+      - if: steps.changes.outputs.db == 'true'
         run: pnpm exec vitest run --project pricing-release
       - if: steps.changes.outputs.db == 'true'
-        run: pnpm test:db --shard=${{ matrix.shard }}/2
-
-  db:
-    name: supabase db tests
-    needs: db-shard
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    outputs:
-      schema-fix: ${{ needs.db-shard.outputs.schema-fix }}
-      schema-tree: ${{ needs.db-shard.outputs.schema-tree }}
-    steps:
-      - env:
-          RESULT: ${{ needs.db-shard.result }}
-        run: |
-          echo "DB test shards: $RESULT"
-          [ "$RESULT" = success ]
+        run: pnpm test:db
 
   # The base commit's fingerprint, built here in parallel with the checks. Skipped when the change
   # forces Lighthouse anyway (scripts/ci/lighthouse-force.sh) or has no code.
@@ -209,18 +193,31 @@ jobs:
       code: ${{ steps.changes.outputs.code }}
       force: ${{ steps.force.outputs.force }}
       fingerprint: ${{ steps.fingerprint.outputs.hash }}
+      pages: ${{ steps.fingerprint.outputs.pages }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 2
       - id: changes
         uses: ./.github/actions/changes
+      # Forced by the "run-lighthouse" label (read now, so a re-run after adding it counts), or by
+      # a path the fingerprint cannot judge (scripts/ci/lighthouse-force.sh).
       - id: force
         if: steps.changes.outputs.code == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LABELS_URL: repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels
         run: |
-          force=$(git -c core.quotepath=off diff --name-only HEAD^1 HEAD | scripts/ci/lighthouse-force.sh) || force=true
+          if gh api "$LABELS_URL" --jq '.[].name' | grep -qx run-lighthouse; then
+            force=true reason='label run-lighthouse'
+          elif path=$(git -c core.quotepath=off diff --name-only HEAD^1 HEAD | scripts/ci/lighthouse-force.sh 2>&1 >/dev/null) && [ -n "$path" ]; then
+            force=true reason="changed: $path"
+          else
+            force=false reason=''
+          fi
           echo "force=$force" >> "$GITHUB_OUTPUT"
-          [ "$force" = false ] || echo "::notice::This change touches what Lighthouse measures beyond the page bytes; it runs."
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+          [ "$force" = false ] || echo "::notice::Lighthouse runs whatever the fingerprint says ($reason)."
           # This PR's fingerprint script, used on the base checkout below.
           cp scripts/ci/page-fingerprint.mjs "$RUNNER_TEMP/"
       - if: steps.force.outputs.force == 'false'
@@ -253,6 +250,7 @@ jobs:
           node "$RUNNER_TEMP/page-fingerprint.mjs" http://localhost:3000 > "$RUNNER_TEMP/fingerprint.json"
           cat "$RUNNER_TEMP/fingerprint.json"
           echo "hash=$(jq -r .hash "$RUNNER_TEMP/fingerprint.json")" >> "$GITHUB_OUTPUT"
+          echo "pages=$(jq -c .pages "$RUNNER_TEMP/fingerprint.json")" >> "$GITHUB_OUTPUT"
 
   # Mobile Lighthouse on the marketing pages of the checks job's build (performance pass, B8):
   # simulated throttling (lighthouserc.json: score ≥ 0.85, CLS ≤ 0.1; warns on LCP > 2.5 s and
@@ -318,27 +316,22 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          sparse-checkout: scripts/ci
+          persist-credentials: false
       - env:
           CHECKS: ${{ needs.checks.result }}
           DB: ${{ needs.db.result }}
           LIGHTHOUSE: ${{ needs.lighthouse.result }}
           BASE: ${{ needs.lighthouse-base.result }}
-          FINGERPRINT: ${{ needs.checks.outputs.fingerprint }}
-          BASE_FINGERPRINT: ${{ needs.lighthouse-base.outputs.fingerprint }}
+          CODE: ${{ needs.checks.outputs.code }}
           FORCE: ${{ needs.lighthouse-base.outputs.force }}
-        run: |
-          echo "lint · typecheck · test · build: $CHECKS"
-          echo "supabase db tests: $DB"
-          echo "lighthouse baseline: $BASE (force=$FORCE)"
-          echo "lighthouse: $LIGHTHOUSE"
-          if [ "$LIGHTHOUSE" = skipped ] && [ "$CHECKS" = success ] && [ -n "$FINGERPRINT" ] && [ "$FINGERPRINT" = "$BASE_FINGERPRINT" ]; then
-            echo "::notice::Lighthouse skipped: the marketing pages send the same bytes as on the base commit ($FINGERPRINT)."
-          fi
-          ok=true
-          [ "$CHECKS" = success ] || ok=false
-          [ "$DB" = success ] || ok=false
-          case "$LIGHTHOUSE" in success | skipped) ;; *) ok=false ;; esac
-          [ "$ok" = true ]
+          REASON: ${{ needs.lighthouse-base.outputs.reason }}
+          PAGES: ${{ needs.checks.outputs.pages }}
+          BASE_PAGES: ${{ needs.lighthouse-base.outputs.pages }}
+          EVENT: ${{ github.event_name }}
+        run: node scripts/ci/ci-gate.mjs
 
   # T88: commits the schema.sql the db job regenerated to the PR branch, once both required jobs
   # and the gate have finished, and posts their results on the new commit
