@@ -215,6 +215,8 @@ export {
 export { parseFunnelDim, parsePageSort, parseRange, posthogProjectId, type FunnelDim, type PageSort, type Range } from './analytics'
 export { ANALYTICS_COPY, AnalyticsView, parseView, RangeTabs, Unconfigured, ViewTabs, type AnalyticsQuery } from './analytics-ui'
 export { GROWTH_COPY, GrowthView } from './growth-ui'
+export { cheapestCreditUsd } from './insights'
+export { INSIGHTS_COPY, InsightsPanel } from './insights-ui'
 export {
   attachDisputeFile,
   createDisputeUpload,

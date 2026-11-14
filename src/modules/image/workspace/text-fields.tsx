@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { isExample } from './copy-examples'
 import { CopyFieldInput, fieldClass, reveal } from './copy-field-input'
 
 // "Anything to change? (optional)" (DESIGN §4.3 step 2b): never called a prompt, ≤300 chars.
@@ -36,11 +37,12 @@ export function NoteField({ value, placeholder, onChange }: { value: string; pla
 }
 
 // idPrefix: field ids must stay unique when several templates' fields share a page (T107).
-type CopyProps = { fields: CatalogueTemplate['copyFields']; values: Record<string, string>; onChange(next: Record<string, string>): void; idPrefix?: string }
+// examples: the form opened with the cover's text, so a value still equal to it is drawn greyer.
+type CopyProps = { fields: CatalogueTemplate['copyFields']; values: Record<string, string>; onChange(next: Record<string, string>): void; idPrefix?: string; examples?: boolean }
 
 // Only what a template asks for, e.g. a poster's headline and price (DESIGN §4.3 step 2): each
 // field as its admin-chosen type, with its help line and, for long text, a counter.
-export function CopyFields({ fields, values, onChange, idPrefix = 'copy' }: CopyProps) {
+export function CopyFields({ fields, values, onChange, idPrefix = 'copy', examples = false }: CopyProps) {
   const t = useTranslations('app.workspace')
   if (fields.length === 0) return null
   return (
@@ -56,7 +58,7 @@ export function CopyFields({ fields, values, onChange, idPrefix = 'copy' }: Copy
               {field.label}
               {field.required ? null : <span className="font-normal text-muted-foreground">{t('optional')}</span>}
             </label>
-            <CopyFieldInput field={field} id={id} value={value} describedBy={describedBy} onChange={(next) => onChange({ ...values, [field.key]: next })} />
+            <CopyFieldInput field={field} id={id} value={value} describedBy={describedBy} example={examples && isExample(field, value)} onChange={(next) => onChange({ ...values, [field.key]: next })} />
             {field.help || counted ? (
               <p className="mt-2 flex items-baseline justify-between gap-3 text-caption leading-[1.4] text-muted-foreground">
                 <span id={`${id}-help`}>{field.help}</span>

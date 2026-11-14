@@ -1402,6 +1402,40 @@ $$;
 ALTER FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."guard_deleted_series"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if old.deleted_at is not null and new.deleted_at is null then
+    raise exception 'SERIES_DELETED' using detail = '已删除的系列不能恢复';
+  end if;
+  if new.deleted_at is not null and new.is_active then
+    raise exception 'SERIES_DELETED' using detail = '已删除的系列不能上架';
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."guard_deleted_series"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."guard_deleted_series_member"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if new.series_id is not null and (tg_op = 'INSERT' or new.series_id is distinct from old.series_id)
+     and exists(select 1 from public.template_series s where s.id = new.series_id and s.deleted_at is not null) then
+    raise exception 'SERIES_DELETED' using detail = '已删除的系列不能加入模板';
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "admin"."guard_deleted_series_member"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."guard_deleted_template"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -2537,6 +2571,7 @@ CREATE TABLE IF NOT EXISTS "public"."template_series" (
     "sort_order" integer DEFAULT 0 NOT NULL,
     "is_active" boolean DEFAULT false NOT NULL,
     "show_members" boolean DEFAULT false NOT NULL,
+    "deleted_at" timestamp with time zone,
     CONSTRAINT "template_series_name_en_check" CHECK (("btrim"("name_en") <> ''::"text")),
     CONSTRAINT "template_series_name_zh_check" CHECK (("btrim"("name_zh") <> ''::"text")),
     CONSTRAINT "template_series_slug_check" CHECK (("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))
@@ -2566,7 +2601,9 @@ begin
   if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
     raise exception 'FORBIDDEN';
   end if;
-  if p_action not in ('template_sync_active', 'template_sync_sale', 'series_sync_active') then raise exception 'INVALID_INPUT'; end if;
+  if p_action not in ('template_sync_active', 'template_sync_sale', 'series_sync_active', 'series_sync_delete') then
+    raise exception 'INVALID_INPUT';
+  end if;
   insert into public.admin_audit_log(action, user_id, target_id, reason) values(p_action, p_actor, p_target, p_reason);
 end $$;
 
@@ -5853,6 +5890,39 @@ end $$;
 ALTER FUNCTION "public"."admin_delete_template_category"("p_key" "text", "p_move_to" "text", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_delete_template_series"("p_actor" "uuid", "p_id" "uuid") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  s public.template_series;
+  v_moved integer;
+begin
+  if coalesce(current_setting('role', true), 'none') <> 'service_role' and session_user <> 'postgres' then
+    raise exception 'FORBIDDEN';
+  end if;
+  if not exists(select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  select * into s from public.template_series where id = p_id for update;
+  if not found then raise exception 'SERIES_MISSING'; end if;
+  if s.deleted_at is not null then return null; end if;
+  if s.is_active then raise exception 'SERIES_LIVE'; end if;
+  perform 1 from public.templates where series_id = p_id order by id for update;
+  update public.templates set series_id = null, series_sort_order = 0 where series_id = p_id;
+  get diagnostics v_moved = row_count;
+  update public.template_series set deleted_at = now() where id = p_id;
+  insert into public.admin_audit_log(action, user_id, target_id, reason)
+    values ('series_delete', p_actor, p_id::text, format('系列管理删除已下架系列 %s，移出 %s 个模板', s.slug, v_moved));
+  return v_moved;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_delete_template_series"("p_actor" "uuid", "p_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_due_reference_deletions"("p_actor" "uuid") RETURNS TABLE("r2_key" "text")
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -6022,6 +6092,47 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_finish_test_run"("p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_duration_ms" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_funnel_cohort"("p_start" timestamp with time zone, "p_end" timestamp with time zone) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_start is null or p_end is null or p_start >= p_end
+     or p_end - p_start > interval '93 days' or p_end > now() + interval '5 minutes' then
+    raise exception 'INVALID_INPUT' using detail = 'one ordered period of at most 93 days, not in the future';
+  end if;
+
+  return jsonb_build_object(
+    'timezone', 'Asia/Shanghai',
+    'admin_ids', coalesce((select jsonb_agg(pr.id order by pr.id) from public.profiles pr where pr.role = 'admin'), '[]'::jsonb),
+    'people', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', pr.id,
+               'signed_at', pr.created_at,
+               'locale', case when u.raw_user_meta_data ->> 'locale' in ('en', 'zh') then u.raw_user_meta_data ->> 'locale' end,
+               'graylum', exists (select from public.partner_links pl
+                                   where pl.user_id = pr.id and pl.partner = 'graylum' and pl.linked_at is not null),
+               'referred', pr.referred_by is not null,
+               'first_image_at', (select g.created_at from public.generation_jobs g
+                                   where g.user_id = pr.id and g.status = 'succeeded'
+                                     and g.created_at >= pr.created_at
+                                   order by g.created_at limit 1),
+               'first_paid_at', (select pm.created_at from public.payments pm
+                                  where pm.user_id = pr.id and pm.created_at >= pr.created_at
+                                  order by pm.created_at limit 1)
+             ) order by pr.created_at, pr.id)
+        from public.profiles pr
+        left join auth.users u on u.id = pr.id
+       where pr.role <> 'admin' and pr.created_at >= p_start and pr.created_at < p_end
+    ), '[]'::jsonb)
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_funnel_cohort"("p_start" timestamp with time zone, "p_end" timestamp with time zone) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_get_dispute"("p_dispute_id" "text") RETURNS TABLE("stripe_dispute_id" "text", "stripe_charge_id" "text", "payment_id" bigint, "user_id" "uuid", "email" "text", "product_id" "text", "amount" integer, "currency" "text", "reason" "text", "responder" "text", "due_by" timestamp with time zone, "auto_banned_at" timestamp with time zone, "evidence_drafted_at" timestamp with time zone, "submitted_at" timestamp with time zone, "reminded_at" timestamp with time zone, "created_at" timestamp with time zone)
@@ -7092,10 +7203,11 @@ begin
   end if;
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
   perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
-  perform 1 from public.template_series order by id for update;
+  perform 1 from public.template_series where deleted_at is null order by id for update;
   if p_ids is null or cardinality(p_ids) <> (select count(distinct i) from unnest(p_ids) i)
-     or cardinality(p_ids) <> (select count(*) from public.template_series)
-     or exists(select 1 from unnest(p_ids) i where not exists(select 1 from public.template_series s where s.id = i)) then
+     or cardinality(p_ids) <> (select count(*) from public.template_series where deleted_at is null)
+     or exists(select 1 from unnest(p_ids) i where not exists(
+       select 1 from public.template_series s where s.id = i and s.deleted_at is null)) then
     raise exception 'SERIES_CHANGED';
   end if;
   update public.template_series s set sort_order = m.ord::integer * 10
@@ -7805,7 +7917,7 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series',0));
   if p_id is not null then
     select * into previous from public.template_series where id=p_id for update;
-    if not found or p_revision is distinct from admin.template_series_revision(previous) then
+    if not found or previous.deleted_at is not null or p_revision is distinct from admin.template_series_revision(previous) then
       raise exception 'SERIES_CHANGED';
     end if;
     if previous.is_active and not (p_fields->>'is_active')::boolean and nullif(btrim(p_reason),'') is null then
@@ -8471,7 +8583,7 @@ begin
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
   perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
   perform 1 from public.template_series where id = any(p_ids) order by id for update;
-  if (select count(*) from public.template_series where id = any(p_ids)) <> cardinality(p_ids) then
+  if (select count(*) from public.template_series where id = any(p_ids) and deleted_at is null) <> cardinality(p_ids) then
     raise exception 'SERIES_CHANGED';
   end if;
   if p_field = 'is_active' then
@@ -8722,11 +8834,142 @@ CREATE OR REPLACE FUNCTION "public"."admin_template_series_detail"("p_id" "uuid"
       'cover_url',coalesce(t.cover_after_url,t.cover_locales #>> '{zh,after}',t.cover_locales #>> '{en,after}'),
       'is_active',t.is_active, 'series_id',s.id) order by t.series_sort_order,t.id)
       from public.templates t where t.series_id=s.id),'[]'))
-  from public.template_series s where s.id=p_id
+  from public.template_series s where s.id=p_id and s.deleted_at is null
 $$;
 
 
 ALTER FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_template_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone, "p_redraw_minutes" integer DEFAULT 30) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_gap interval;
+begin
+  if p_start is null or p_end is null or p_start >= p_end
+     or p_end - p_start > interval '93 days' or p_end > now() + interval '5 minutes'
+     or p_redraw_minutes is null or p_redraw_minutes < 1 or p_redraw_minutes > 1440 then
+    raise exception 'INVALID_INPUT' using detail = 'one ordered period of at most 93 days, not in the future; redraw gap 1–1440 minutes';
+  end if;
+  v_gap := make_interval(mins => p_redraw_minutes);
+
+  return (
+    with staff as (
+      select pr.id from public.profiles pr where pr.role = 'admin'
+    ),
+    scanned as (
+      select g.id, g.user_id, g.template_id, g.status, g.error_code, g.created_at, g.batch_id,
+             g.parent_job_id, g.credits_cost, g.credit_pool, g.cost_usd,
+             coalesce(g.inputs -> 'poster' ? 'redraw_of', false) as poster_redraw,
+             lag(g.created_at) over w as prev_at,
+             lag(g.batch_id) over w as prev_batch
+        from public.generation_jobs g
+       where g.created_at >= p_start - v_gap and g.created_at < p_end and g.status <> 'running'
+         and not exists (select from staff s where s.id = g.user_id)
+      window w as (partition by g.user_id, g.template_id, g.inputs -> 'poster' ->> 'set_id', g.inputs -> 'poster' ->> 'part'
+                   order by g.created_at, g.id)
+    ),
+    jobs as (
+      select x.*,
+             x.poster_redraw or (
+               x.parent_job_id is null and x.prev_at is not null and x.created_at - x.prev_at <= v_gap
+               and (x.batch_id is null or x.prev_batch is distinct from x.batch_id)
+             ) as redraw
+        from scanned x
+       where x.created_at >= p_start
+    ),
+    per_template as (
+      select j.template_id,
+             count(*) as uses,
+             count(distinct j.user_id) as users,
+             count(*) filter (where j.status = 'succeeded') as succeeded,
+             count(*) filter (where j.status = 'failed') as failed,
+             count(*) filter (where j.redraw) as redraws,
+             count(*) filter (where j.cost_usd is not null) as costed,
+             coalesce(sum(j.cost_usd), 0) as cost_usd,
+             coalesce(sum(j.cost_usd) filter (where j.credit_pool = 'paid'), 0) as paid_cost_usd,
+             coalesce(sum(j.cost_usd) filter (where j.credit_pool = 'free'), 0) as free_cost_usd,
+             coalesce(sum(j.credits_cost) filter (where j.status = 'succeeded'), 0) as credits,
+             coalesce(sum(j.credits_cost) filter (where j.status = 'succeeded' and j.credit_pool = 'paid'), 0) as paid_credits
+        from jobs j
+       group by j.template_id
+    ),
+    errors as (
+      select e.template_id, jsonb_agg(jsonb_build_object('code', e.code, 'count', e.n) order by e.n desc, e.code) as top
+        from (
+          select j.template_id, coalesce(j.error_code, 'UNKNOWN') as code, count(*) as n,
+                 row_number() over (partition by j.template_id order by count(*) desc, coalesce(j.error_code, 'UNKNOWN')) as rank
+            from jobs j
+           where j.status = 'failed'
+           group by j.template_id, coalesce(j.error_code, 'UNKNOWN')
+        ) e
+       where e.rank <= 3
+       group by e.template_id
+    ),
+    recent as (
+      select g.template_id, count(*) as uses_14d
+        from public.generation_jobs g
+       where g.created_at >= now() - interval '14 days' and g.status <> 'running'
+         and not exists (select from staff s where s.id = g.user_id)
+       group by g.template_id
+    ),
+    favourites as (
+      select f.template_id, count(*) as total, count(*) filter (where f.created_at >= p_start and f.created_at < p_end) as added
+        from public.template_favorites f
+       where not exists (select from staff s where s.id = f.user_id)
+       group by f.template_id
+    ),
+    ids as (
+      select t.id from public.templates t where t.deleted_at is null
+      union
+      select p.template_id from per_template p
+    )
+    select jsonb_build_object(
+      'timezone', 'Asia/Shanghai',
+      'redraw_minutes', p_redraw_minutes,
+      'templates', coalesce(jsonb_agg(jsonb_build_object(
+        'template_id', i.id,
+        'name', t.name,
+        'name_zh', t.translations -> 'zh' ->> 'name',
+        'category_key', t.category_key,
+        'category_name', c.name_zh,
+        'subcategory_key', t.subcategory_key,
+        'series_id', t.series_id,
+        'series_name', s.name_zh,
+        'live', coalesce(t.is_active and t.deleted_at is null and 'web' = any (t.visible_in), false),
+        'uses', coalesce(p.uses, 0),
+        'users', coalesce(p.users, 0),
+        'succeeded', coalesce(p.succeeded, 0),
+        'failed', coalesce(p.failed, 0),
+        'redraws', coalesce(p.redraws, 0),
+        'costed', coalesce(p.costed, 0),
+        'cost_usd', coalesce(p.cost_usd, 0),
+        'paid_cost_usd', coalesce(p.paid_cost_usd, 0),
+        'free_cost_usd', coalesce(p.free_cost_usd, 0),
+        'credits', coalesce(p.credits, 0),
+        'paid_credits', coalesce(p.paid_credits, 0),
+        'errors', coalesce(e.top, '[]'::jsonb),
+        'uses_14d', coalesce(r.uses_14d, 0),
+        'favourites', coalesce(f.total, 0),
+        'favourites_added', coalesce(f.added, 0)
+      ) order by coalesce(p.uses, 0) desc, i.id), '[]'::jsonb)
+    )
+      from ids i
+      left join public.templates t on t.id = i.id
+      left join public.template_series s on s.id = t.series_id
+      left join public.template_categories c on c.key = t.category_key
+      left join per_template p on p.template_id = i.id
+      left join errors e on e.template_id = i.id
+      left join recent r on r.template_id = i.id
+      left join favourites f on f.template_id = i.id
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_template_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone, "p_redraw_minutes" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_test_budget_status"() RETURNS "jsonb"
@@ -11449,7 +11692,8 @@ CREATE OR REPLACE FUNCTION "public"."read_template_series_sync_source"("p_slug" 
       'category_key', s.category_key, 'sort_order', s.sort_order, 'is_active', s.is_active,
       'show_members', s.show_members),
     'members', coalesce((select jsonb_agg(t.id order by t.series_sort_order, t.id)
-      from public.templates t where t.series_id = s.id), '[]'::jsonb))
+      from public.templates t where t.series_id = s.id), '[]'::jsonb),
+    'deleted', s.deleted_at is not null)
   from public.template_series s where s.slug = p_slug
 $$;
 
@@ -13014,6 +13258,7 @@ begin
   end if;
   saved := jsonb_populate_record(null::public.template_series, p_series - 'id');
   select * into previous from public.template_series where slug = v_slug for update;
+  if previous.deleted_at is not null then raise exception 'SERIES_DELETED'; end if;
   if previous.id is null then
     insert into public.template_series(slug, name_en, name_zh, description_en, description_zh, cover_url,
         category_key, sort_order, is_active, show_members)
@@ -13058,6 +13303,7 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
   select * into previous from public.template_series where slug = p_slug for update;
   if previous.id is null then raise exception 'SERIES_MISSING'; end if;
+  if previous.deleted_at is not null then raise exception 'SERIES_DELETED'; end if;
   if previous.is_active is distinct from p_active then
     update public.template_series set is_active = p_active where id = previous.id;
     perform admin.template_sync_audit(p_actor, 'series_sync_active', p_slug,
@@ -13073,12 +13319,48 @@ end $$;
 ALTER FUNCTION "public"."sync_preview_series_active"("p_actor" "uuid", "p_slug" "text", "p_active" boolean, "p_run_id" "text", "p_validate_only" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."sync_preview_series_delete"("p_actor" "uuid", "p_slug" "text", "p_run_id" "text", "p_validate_only" boolean DEFAULT false) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  previous public.template_series;
+  v_moved integer;
+  v_result jsonb;
+begin
+  if nullif(p_run_id, '') is null then raise exception 'INVALID_SYNC'; end if;
+  if not exists(select from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
+  select * into previous from public.template_series where slug = p_slug for update;
+  if previous.id is null then return jsonb_build_object('result', 'absent', 'moved', 0, 'was_live', false); end if;
+  if previous.deleted_at is not null then return jsonb_build_object('result', 'unchanged', 'moved', 0, 'was_live', false); end if;
+  perform 1 from public.templates where series_id = previous.id order by id for update;
+  update public.templates set series_id = null, series_sort_order = 0 where series_id = previous.id;
+  get diagnostics v_moved = row_count;
+  update public.template_series set is_active = false, deleted_at = now() where id = previous.id;
+  perform admin.template_sync_audit(p_actor, 'series_sync_delete', p_slug,
+    format('T93 sync from preview run %s: deleted on the test site, %s templates moved out%s',
+      p_run_id, v_moved, case when previous.is_active then ', was published' else '' end));
+  v_result := jsonb_build_object('result', 'deleted', 'moved', v_moved, 'was_live', previous.is_active);
+  if p_validate_only then raise exception using errcode = 'Z9301'; end if;
+  return v_result;
+exception when sqlstate 'Z9301' then return v_result;
+end $$;
+
+
+ALTER FUNCTION "public"."sync_preview_series_delete"("p_actor" "uuid", "p_slug" "text", "p_run_id" "text", "p_validate_only" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."sync_preview_series_members"("p_slug" "text", "p_members" "text"[], "p_validate_only" boolean DEFAULT false) RETURNS "jsonb"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
 declare
   v_series uuid;
+  v_deleted timestamptz;
   v_placed text[];
   v_result jsonb;
 begin
@@ -13087,8 +13369,9 @@ begin
   end if;
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.category_tree', 0));
   perform pg_advisory_xact_lock(hashtextextended('shotviva.template_series', 0));
-  select id into v_series from public.template_series where slug = p_slug for update;
+  select id, deleted_at into v_series, v_deleted from public.template_series where slug = p_slug for update;
   if v_series is null then raise exception 'SERIES_MISSING'; end if;
+  if v_deleted is not null then raise exception 'SERIES_DELETED'; end if;
   perform 1 from public.templates where id = any(p_members) or series_id = v_series order by id for update;
   select coalesce(array_agg(m.id order by m.ord), '{}') into v_placed
     from unnest(p_members) with ordinality as m(id, ord)
@@ -14447,7 +14730,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -16844,6 +17127,10 @@ CREATE OR REPLACE TRIGGER "series_category" BEFORE INSERT OR UPDATE OF "category
 
 
 
+CREATE OR REPLACE TRIGGER "series_deleted_guard" BEFORE UPDATE OF "deleted_at", "is_active" ON "public"."template_series" FOR EACH ROW EXECUTE FUNCTION "admin"."guard_deleted_series"();
+
+
+
 CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "public"."site_announcements" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
@@ -16909,6 +17196,10 @@ CREATE CONSTRAINT TRIGGER "template_publish_floor" AFTER INSERT OR UPDATE OF "is
 
 
 CREATE OR REPLACE TRIGGER "template_request_votes_count" AFTER INSERT OR DELETE ON "public"."template_request_votes" FOR EACH ROW EXECUTE FUNCTION "public"."template_request_votes_count"();
+
+
+
+CREATE OR REPLACE TRIGGER "template_series_member_guard" BEFORE INSERT OR UPDATE OF "series_id" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "admin"."guard_deleted_series_member"();
 
 
 
@@ -18192,6 +18483,14 @@ GRANT ALL ON FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resoluti
 
 
 
+REVOKE ALL ON FUNCTION "admin"."guard_deleted_series"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."guard_deleted_series_member"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."guard_deleted_template"() FROM PUBLIC;
 
 
@@ -18883,6 +19182,11 @@ GRANT ALL ON FUNCTION "public"."admin_delete_template_category"("p_key" "text", 
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_delete_template_series"("p_actor" "uuid", "p_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_template_series"("p_actor" "uuid", "p_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_due_reference_deletions"("p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_due_reference_deletions"("p_actor" "uuid") TO "service_role";
 
@@ -18910,6 +19214,11 @@ GRANT ALL ON FUNCTION "public"."admin_finish_prompt_lab_run"("p_actor" "uuid", "
 
 REVOKE ALL ON FUNCTION "public"."admin_finish_test_run"("p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_duration_ms" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_finish_test_run"("p_run_id" "uuid", "p_status" "text", "p_output_key" "text", "p_error_code" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_duration_ms" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_funnel_cohort"("p_start" timestamp with time zone, "p_end" timestamp with time zone) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_funnel_cohort"("p_start" timestamp with time zone, "p_end" timestamp with time zone) TO "service_role";
 
 
 
@@ -19265,6 +19574,11 @@ GRANT ALL ON FUNCTION "public"."admin_template_profile_scope"("p_scope" "text", 
 
 REVOKE ALL ON FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_template_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone, "p_redraw_minutes" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_template_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone, "p_redraw_minutes" integer) TO "service_role";
 
 
 
@@ -19980,6 +20294,11 @@ GRANT ALL ON FUNCTION "public"."sync_preview_series"("p_series" "jsonb", "p_vali
 
 REVOKE ALL ON FUNCTION "public"."sync_preview_series_active"("p_actor" "uuid", "p_slug" "text", "p_active" boolean, "p_run_id" "text", "p_validate_only" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sync_preview_series_active"("p_actor" "uuid", "p_slug" "text", "p_active" boolean, "p_run_id" "text", "p_validate_only" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sync_preview_series_delete"("p_actor" "uuid", "p_slug" "text", "p_run_id" "text", "p_validate_only" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sync_preview_series_delete"("p_actor" "uuid", "p_slug" "text", "p_run_id" "text", "p_validate_only" boolean) TO "service_role";
 
 
 

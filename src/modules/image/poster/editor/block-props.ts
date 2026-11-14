@@ -6,4 +6,9 @@ export type BlockProps = {
   content: PosterContent
   onChange(next: PosterContent, path: string): void
   flagged(path: string): boolean
+  // Still the template's sample text, untouched: drawn greyer until the user types over it.
+  sample(path: string): boolean
 }
+
+// 清空本块: the part's words gone, and the paths it covered, whose 「待核对」 flags go too.
+export type ClearPart = (next: PosterContent, prefixes: readonly string[]) => void

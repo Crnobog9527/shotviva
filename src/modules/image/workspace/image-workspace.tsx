@@ -70,6 +70,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
           values={draft.values}
           onChange={draft.change}
           again={input.again}
+          examples={draft.fromExamples}
           photoExtra={<MatrixLink template={template} tier={tier} />}
         />
         <FormAction
@@ -80,6 +81,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
           limit={concurrency.limit}
           error={refusal.message(draft.error)}
           privateOnly={template.privateOnly}
+          examplesLeft={draft.examplesLeft}
           onGenerate={generate}
         />
       </div>

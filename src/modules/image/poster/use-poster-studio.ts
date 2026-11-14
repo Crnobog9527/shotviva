@@ -9,7 +9,7 @@ import type { CatalogueImageSlot } from '../catalogue/catalogue-template'
 import { useSlotPhotos } from '../workspace/use-photo-batch'
 
 import { startJob } from '../generation/job-store'
-import { emptyContent, tidyContent, withDefaults } from './content-edit'
+import { clearAll, emptyContent, startContent, tidyContent, withDefaults } from './content-edit'
 import { extractPoster, savePosterSet } from './poster-api'
 import { useQrCheck } from './use-qr-check'
 
@@ -28,7 +28,9 @@ export type StudioTemplate = {
   slots: CatalogueImageSlot[]
 }
 
-type Draft = { step: 'paste' | 'edit'; source: string; content: PosterContent; unverified: string[]; reviewed: boolean; sorted: boolean }
+// fromSample: the content started from the template's sample text (fields.poster.sample), whose
+// untouched values the editor shows greyer; a sorted paste replaces it.
+type Draft = { step: 'paste' | 'edit'; source: string; content: PosterContent; unverified: string[]; reviewed: boolean; sorted: boolean; fromSample: boolean }
 
 const storageKey = (id: string) => `poster-draft:${id}`
 
@@ -41,13 +43,22 @@ export function carryDraft(from: string, to: string) {
   } catch { /* private mode: nothing to carry */ }
 }
 
-const freshDraft = (template: StudioTemplate): Draft =>
-  ({ step: 'paste', source: '', content: emptyContent(template.poster), unverified: [], reviewed: false, sorted: false })
+export const freshDraft = (template: Pick<StudioTemplate, 'poster'>): Draft =>
+  ({ step: 'paste', source: '', content: startContent(template.poster), unverified: [], reviewed: false, sorted: false, fromSample: Boolean(template.poster.sample) })
+
+// A stored draft whose content is still the bare skeleton (saved before the template had sample
+// text, nothing typed) starts from the sample instead.
+export function readDraft(template: Pick<StudioTemplate, 'poster'>, raw: string): Draft {
+  const fresh = freshDraft(template)
+  const stored = { ...fresh, ...(JSON.parse(raw) as Partial<Draft>) }
+  const untouched = JSON.stringify(stored.content) === JSON.stringify(emptyContent(template.poster))
+  return untouched ? { ...stored, content: fresh.content, fromSample: fresh.fromSample } : stored
+}
 
 function storedDraft(template: StudioTemplate): Draft | null {
   try {
     const raw = sessionStorage.getItem(storageKey(template.id))
-    return raw ? { ...freshDraft(template), ...(JSON.parse(raw) as Partial<Draft>) } : null
+    return raw ? readDraft(template, raw) : null
   } catch {
     return null
   }
@@ -103,6 +114,9 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
 
   const edit = (next: PosterContent, path?: string) =>
     setDraft((d) => ({ ...d, content: next, unverified: path ? d.unverified.filter((p) => p !== path) : d.unverified }))
+  // A cleared part (清空本块) has nothing left to check: its flags go with its words.
+  const clearPart = (next: PosterContent, prefixes: readonly string[]) =>
+    setDraft((d) => ({ ...d, content: next, unverified: d.unverified.filter((p) => !prefixes.some((prefix) => p === prefix || p.startsWith(`${prefix}.`))) }))
 
   async function sort() {
     setBusy(true)
@@ -113,7 +127,7 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     if (reply.status === 'ok') {
       // The template's table and sections heading are offered even when the text had none.
       const content = withDefaults(posterContentSchema.parse(reply.content), template.poster)
-      setDraft((d) => ({ ...d, step: 'edit', content, unverified: reply.unverified, reviewed: false, sorted: true }))
+      setDraft((d) => ({ ...d, step: 'edit', content, unverified: reply.unverified, reviewed: false, sorted: true, fromSample: false }))
       if (reply.clipped?.length) setNotice('clipped')
       return
     }
@@ -147,7 +161,10 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     toManual: () => setDraft((d) => ({ ...d, step: 'edit', sorted: false })),
     toPaste: () => setDraft((d) => ({ ...d, step: 'paste' })),
     setReviewed: (reviewed: boolean) => setDraft((d) => ({ ...d, reviewed })),
-    edit, sort, generate, parts, valid: parsed.success, busy, stage, notice, photos, qrCheck,
+    // 全部清空 keeps the shape and drops every word; 恢复示例 puts the template's text back.
+    clearAll: () => setDraft((d) => ({ ...d, content: clearAll(d.content), unverified: [], reviewed: false })),
+    restoreSample: () => setDraft((d) => ({ ...d, content: startContent(template.poster), unverified: [], reviewed: false, sorted: false, fromSample: true })),
+    edit, clearPart, sort, generate, parts, valid: parsed.success, busy, stage, notice, photos, qrCheck,
     aspect, setAspect, resolution, setResolution,
   }
 }

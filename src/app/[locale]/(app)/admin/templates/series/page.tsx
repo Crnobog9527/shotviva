@@ -3,10 +3,10 @@ import { z } from 'zod'
 
 import { listAdminCategoryTree } from '@/core/admin/template-categories'
 import { categoryChoices } from '@/core/admin/templates-editor'
-import { CoverPicker, getAdminSeries, listAdminSeries, searchSeriesCandidates, seriesCopy, SeriesCatalogue, SeriesDialog, SeriesEditor } from '@/core/admin/template-series'
+import { CoverPicker, getAdminSeries, listAdminSeries, listDeletedSeries, searchSeriesCandidates, seriesCopy, SeriesCatalogue, SeriesDialog, SeriesEditor } from '@/core/admin/template-series'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { serverEnv } from '@/core/env'
-import { reorderSeriesAction, saveSeriesAction, searchMembersAction, setSeriesFlagAction } from './actions'
+import { deleteSeriesAction, reorderSeriesAction, saveSeriesAction, searchMembersAction, setSeriesFlagAction } from './actions'
 
 export const instant = false
 export const metadata = { title: seriesCopy.title }
@@ -24,13 +24,13 @@ export default async function AdminSeriesPage({ searchParams }: {
   const p = parsed.data
   const db = createAdminSupabase()
   const dialog = p.cover ? coverDialog(db, p.cover) : p.id || p.new ? editorDialog(db, p.id) : null
-  const [items, editor] = await Promise.all([listAdminSeries(db), dialog])
+  const [items, deleted, editor] = await Promise.all([listAdminSeries(db), listDeletedSeries(db), dialog])
   // Production's series follow the test site (T93): edits there are overwritten by the next sync.
   const production = serverEnv().VERCEL_ENV === 'production'
   return (
     <>
-      <SeriesCatalogue items={items} saved={!!p.saved} production={production}
-        actions={{ reorder: reorderSeriesAction, setFlag: setSeriesFlagAction }} />
+      <SeriesCatalogue items={items} deleted={deleted} saved={!!p.saved} production={production}
+        actions={{ reorder: reorderSeriesAction, setFlag: setSeriesFlagAction, remove: deleteSeriesAction }} />
       {editor}
     </>
   )
