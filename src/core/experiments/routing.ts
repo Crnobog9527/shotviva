@@ -38,8 +38,10 @@ export function surfaceAt(pathname: string, registry: ExperimentRegistry): Surfa
 }
 
 // The option page of `route` in the language of `pathname`, or null for the default option.
-export function optionPath(pathname: string, route: SurfaceRoute, option: string): string | null {
-  if (option === route.defaultOption || !route.options.some((known) => known.id === option)) return null
+// `inExperiment`: the visitor is in a running or paused experiment (see defaultOptionPageInExperiment).
+export function optionPath(pathname: string, route: SurfaceRoute, option: string, inExperiment = false): string | null {
+  if (!route.options.some((known) => known.id === option)) return null
+  if (option === route.defaultOption && !(inExperiment && route.defaultOptionPageInExperiment)) return null
   const { locale } = splitLocale(pathname)
   return `${locale === 'en' ? '' : `/${locale}`}/x/${route.surface}/${option}`
 }
@@ -65,11 +67,11 @@ function assigned(input: RouteInput, experiment: LiveExperiment): { option: stri
 export function routeExperiment(input: RouteInput, live: readonly LiveExperiment[], registry: ExperimentRegistry): RouteOutcome {
   const route = surfaceAt(input.pathname, registry)
   if (!route) return NOTHING
-  const at = (option: string, cookie: string | null = null): RouteOutcome => ({ option, rewrite: optionPath(input.pathname, route, option), cookie })
+  const at = (option: string, cookie: string | null = null, inExperiment = false): RouteOutcome => ({ option, rewrite: optionPath(input.pathname, route, option, inExperiment), cookie })
   const preview = input.params.get(PREVIEW_PARAM)
   if (preview) return at(preview)
   const experiment = live.find((candidate) => candidate.surface === route.surface)
   if (input.isBot || !experiment) return at(route.defaultOption)
   const { option, cookie } = assigned(input, experiment)
-  return at(option ?? route.defaultOption, cookie)
+  return at(option ?? route.defaultOption, cookie, experiment.status !== 'ended')
 }

@@ -70,6 +70,17 @@ describe('routeExperiment', () => {
   })
 })
 
+describe('default option page inside an experiment', () => {
+  const withPage: ExperimentRegistry = [{ ...registry[0]!, defaultOptionPageInExperiment: true }]
+  it('serves B visitors of a live experiment their own page, and leaves everyone else on the plain one', () => {
+    expect(routeExperiment(input({ random: () => 0 }), live, withPage)).toMatchObject({ option: 'tote', rewrite: '/x/hero/tote' })
+    expect(routeExperiment(input({ pathname: '/zh', cookie: '3.10.10' }), live, withPage).rewrite).toBe('/zh/x/hero/tote')
+    expect(routeExperiment(input(), [], withPage).rewrite).toBeNull()
+    expect(routeExperiment(input({ isBot: true }), live, withPage).rewrite).toBeNull()
+    expect(routeExperiment(input({ cookie: '3.10.10' }), [{ ...live[0]!, status: 'ended', winner: 10 }], withPage).rewrite).toBeNull()
+  })
+})
+
 describe('OPTION_PAGES', () => {
   it('matches the option pages in both languages and nothing else', () => {
     expect(['/x/hero/art-style', '/zh/x/hero/a', '/x'].every((path) => OPTION_PAGES.test(path))).toBe(true)

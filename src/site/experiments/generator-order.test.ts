@@ -1,17 +1,26 @@
 import { describe, expect, it } from 'vitest'
 
 import { generatorPickFor, orderForHero } from './generator-order'
+import { DEFAULT_PAGE_USES_HERO_ORDER } from './registry'
 
 const t = (id: string, category: string, categoryPath?: string[]) => ({ id, category, ...(categoryPath ? { categoryPath } : {}) })
 const catalogue = [t('manhwa', 'art-styles'), t('tote-promo', 'posters'), t('white-background', 'products-resale'), t('wd-garden', 'food-drink'), t('wd-dappled-slate', 'food-drink'), t('apparel', 'products-resale', ['products-resale', 'apparel']), t('flat-anime-style', 'art-styles')]
 const ids = (list: { id: string }[]) => list.map((template) => template.id)
+
+describe('generatorPickFor', () => {
+  it('leaves the plain home page in today’s order while the B switch is off', () => {
+    expect(DEFAULT_PAGE_USES_HERO_ORDER).toBe(false)
+    expect(generatorPickFor(undefined)).toBeUndefined()
+    expect(generatorPickFor('tote')?.first).toBe('white-background')
+  })
+})
 
 describe('orderForHero', () => {
   it('puts the option template first, its categories next, the rest in today’s order', () => {
     const food = orderForHero(catalogue, generatorPickFor('food'))
     expect(food.first).toBe('wd-dappled-slate')
     expect(ids(food.ordered)).toEqual(['wd-dappled-slate', 'wd-garden', 'manhwa', 'tote-promo', 'white-background', 'apparel', 'flat-anime-style'])
-    expect(ids(orderForHero(catalogue, generatorPickFor(undefined)).ordered).slice(0, 2)).toEqual(['white-background', 'apparel'])
+    expect(ids(orderForHero(catalogue, generatorPickFor('tote')).ordered).slice(0, 2)).toEqual(['white-background', 'apparel'])
     expect(ids(orderForHero(catalogue, generatorPickFor('art-style')).ordered).slice(0, 2)).toEqual(['flat-anime-style', 'manhwa'])
   })
 

@@ -1,4 +1,4 @@
-import { HERO_DEFAULT_OPTION } from './registry'
+import { DEFAULT_PAGE_USES_HERO_ORDER, HERO_DEFAULT_OPTION } from './registry'
 
 // Which templates the first-screen generator offers first for each home hero option (Owner
 // 2026-11-14: 「落地页的生成组件优先显示的模板也要匹配对应品类用户」). The generator's rail is the
@@ -33,6 +33,9 @@ export function orderForHero<T extends Placed>(templates: readonly T[], pick: Ge
   return { ordered: [...(first ? [first] : []), ...matching, ...rest], first: first?.id ?? matching[0]?.id ?? null }
 }
 
+// `option` undefined = the plain home page, which follows DEFAULT_PAGE_USES_HERO_ORDER (registry.ts);
+// an option page (including /x/hero/tote, B inside an experiment) always uses its order.
 export function generatorPickFor(option: string | undefined): GeneratorPick | undefined {
-  return HERO_GENERATOR[option ?? HERO_DEFAULT_OPTION]
+  if (option === undefined) return DEFAULT_PAGE_USES_HERO_ORDER ? HERO_GENERATOR[HERO_DEFAULT_OPTION] : undefined
+  return HERO_GENERATOR[option]
 }
