@@ -16,10 +16,10 @@ const CHOICES: BatchChoice[] = [
   { field: 'show_members', value: false, label: copy.batchShowOff },
 ]
 
-type Props = { names: string[]; pending: boolean; clear: () => void; apply: (choice: BatchChoice, reason: string | null) => void }
+type Props = { names: string[]; pending: boolean; clear: () => void; apply: (choice: BatchChoice, reason: string | null) => void; remove: () => void }
 
 // Shown while series are checked: one flag for all of them, after a confirmation that lists them.
-export function BatchBar({ names, pending, clear, apply }: Props) {
+export function BatchBar({ names, pending, clear, apply, remove }: Props) {
   const [choice, setChoice] = useState<BatchChoice | null>(null)
   const [reason, setReason] = useState('')
   const needsReason = choice?.field === 'is_active' && !choice.value
@@ -30,6 +30,7 @@ export function BatchBar({ names, pending, clear, apply }: Props) {
       {CHOICES.map(item => (
         <Button key={item.label} size="sm" variant="outline" disabled={pending} onClick={() => setChoice(item)}>{item.label}</Button>
       ))}
+      <Button size="sm" variant="outline" className="text-destructive" disabled={pending} onClick={remove}>{copy.batchDelete}</Button>
       <Button size="sm" variant="ghost" disabled={pending} onClick={clear}>{copy.clear}</Button>
       <Dialog open={!!choice} onOpenChange={open => !open && close()}>
         <DialogContent>

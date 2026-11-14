@@ -31,7 +31,7 @@ const membersSchema = z.array(z.object({
 
 export async function listAdminSeries(db: SupabaseClient): Promise<SeriesListItem[]> {
   const series = await db.from('template_series')
-    .select('id,name_zh,slug,is_active,show_members,sort_order,cover_url').order('sort_order').order('id').limit(LIMIT)
+    .select('id,name_zh,slug,is_active,show_members,sort_order,cover_url').is('deleted_at', null).order('sort_order').order('id').limit(LIMIT)
   if (series.error) throw new AppError('INTERNAL', 'list series failed', { cause: series.error })
   const rows = rowsSchema.parse(series.data)
   if (!rows.length) return []
@@ -40,6 +40,16 @@ export async function listAdminSeries(db: SupabaseClient): Promise<SeriesListIte
     .in('series_id', rows.map(row => row.id)).order('series_sort_order').order('id')
   if (members.error) throw new AppError('INTERNAL', 'list series members failed', { cause: members.error })
   return autoCovers(rows, membersSchema.parse(members.data))
+}
+
+// 已删除 (1500): read-only, newest first. Deleted series never take part in ordering or batch flags.
+const deletedSchema = z.array(z.object({ id: z.uuid(), name_zh: z.string(), slug: z.string(), deleted_at: z.string() }))
+export type DeletedSeries = z.infer<typeof deletedSchema>[number]
+export async function listDeletedSeries(db: SupabaseClient): Promise<DeletedSeries[]> {
+  const { data, error } = await db.from('template_series').select('id,name_zh,slug,deleted_at')
+    .not('deleted_at', 'is', null).order('deleted_at', { ascending: false }).order('id').limit(LIMIT)
+  if (error) throw new AppError('INTERNAL', 'list deleted series failed', { cause: error })
+  return deletedSchema.parse(data)
 }
 
 const MESSAGES: Record<string, string> = { SERIES_CHANGED: copy.listChanged, SERIES_REASON_REQUIRED: copy.reason }
