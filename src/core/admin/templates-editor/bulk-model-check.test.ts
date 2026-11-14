@@ -25,3 +25,10 @@ it('rejects changing an unoffered price without changing the model', () => {
   expect(bulkModelFailures([base], { creditsCost: { '4k': 80 } }, [provider])).toMatchObject([{ id: 'first', reason: 'model' }])
   expect(bulkModelFailures([base], { creditsCost: { '2k': 80 } }, [provider])).toEqual([])
 })
+
+it('ignores a stored ratio the site never offers (3:4) but still refuses a site ratio the model lacks', () => {
+  const legacy = { ...base, id: 'legacy', fields: { ...base.fields, aspectRatios: ['3:4', '1:1'] } }
+  const tall = { ...base, id: 'tall', fields: { ...base.fields, aspectRatios: ['3:4', '9:16'] } }
+  expect(bulkModelFailures([legacy, tall], { providerId: 'model' }, [provider]))
+    .toMatchObject([{ id: 'tall', reason: 'model', detail: '所选模型不支持模板配置的比例' }])
+})

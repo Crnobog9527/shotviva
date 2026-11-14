@@ -55,6 +55,15 @@ it('lists every incompatible template and leaves its valid sibling untouched', a
   expect(await bindings(ids)).toEqual([{ provider_id: null }])
 })
 
+it('moves a template that stores 3:4, which the site never offers, and still refuses a site ratio the model lacks', async () => {
+  const legacy = await draft(1, '3:4')
+  const tall = await draft(1, '9:16')
+  const { failures } = await apply([legacy, tall], { provider_id: target })
+  expect(failures).toEqual([{ id: tall, name: tall, reason: 'model', detail: '所选模型不支持模板配置的比例' }])
+  expect(await apply([legacy], { provider_id: target })).toEqual({ failures: [], changed: 1 })
+  expect(await bindings([legacy])).toEqual([{ provider_id: target }])
+})
+
 it('changes supported prices and bindings together, protects hidden tiers, and can return to the default', async () => {
   const ids = [await draft(), await draft()]
   expect(await apply(ids, { provider_id: target, credits_cost: { '2k': 123 } })).toEqual({ failures: [], changed: 2 })

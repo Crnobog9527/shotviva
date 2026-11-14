@@ -7,6 +7,7 @@ import { catalogSections, filterCatalog, SINGLE_TEMPLATES, type CatalogStatus, t
 import { catalogCopy as copy, orderCopy } from './copy'
 import type { AdminTemplate } from '../templates/types'
 import { searchCatalog } from './catalog-search'
+import { filterByModel, modelFilterOptions } from './catalog-model-filter'
 import { Input } from '@/core/ui/input'
 import { TemplatesTable, type TableSelection } from './templates-table'
 
@@ -17,30 +18,36 @@ type Props = Omit<ComponentProps<typeof TemplatesTable>, 'selection' | 'order' |
   deleted: AdminTemplate[]
   categories: readonly CategoryOption[]
   series: readonly SeriesOption[]
+  // Provider lines, for the 出图模型 filter's names.
+  providers: readonly { id: string; label: string; model: string; isActive: boolean }[]
   onOrder: (group: 'active' | 'inactive', expectedIds: string[]) => (ids: string[]) => Promise<void>
   selection: Omit<TableSelection, 'onSelectVisible'> & { onSelectGroup: (ids: string[], on: boolean) => void }
 }
 
 const selectClass = 'border-input h-9 max-w-full rounded-md border px-3 text-sm'
 
-export function CatalogView({ templates: all, deleted: allDeleted, query, onQuery, categories, series, selection, onOrder, ...row }: Props) {
+export function CatalogView({ templates: all, deleted: allDeleted, query, onQuery, categories, series, providers, selection, onOrder, ...row }: Props) {
   const [status, setStatus] = useState<CatalogStatus>('active')
   const [category, setCategory] = useState('')
   const [seriesId, setSeriesId] = useState('')
+  const [model, setModel] = useState('')
   const [grouped, setGrouped] = useState(false)
   const options = categoryChoices(categories).concat(categories.filter(c => c.isSystem)
     .map(c => ({ key: c.key, label: c.nameZh, nameEn: c.nameEn, path: [c.key] })))
   const paths = new Map(options.map(c => [c.key, c]))
   const labels = { paths, series: new Map(series.map(s => [s.id, s.nameZh])) }
-  const templates = searchCatalog(all, query, labels)
-  const deleted = searchCatalog(allDeleted, query, labels)
+  const searched = searchCatalog(all, query, labels)
+  // Counts per line follow the search, category and series filters, across 已上架 and 已下架.
+  const models = modelFilterOptions(filterCatalog(searched, paths, category, seriesId), providers, model)
+  const templates = filterByModel(searched, model)
+  const deleted = filterByModel(searchCatalog(allDeleted, query, labels), model)
   const matching = filterCatalog(status === 'deleted' ? deleted : templates, paths, category, seriesId)
   const live = filterCatalog(templates, paths, category, seriesId)
   const active = live.filter(t => t.isActive).length
   const tabs = { active: `${copy.active}（${active}）`, inactive: `${copy.inactive}（${live.length - active}）`, all: copy.all,
     deleted: `${copy.deleted}（${filterCatalog(deleted, paths, category, seriesId).length}）` }
   const sections = catalogSections(matching, status, grouped, series)
-  const canReorder = !query.trim() && !category && !seriesId && !grouped && status !== 'deleted'
+  const canReorder = !query.trim() && !category && !seriesId && !model && !grouped && status !== 'deleted'
   return <div className="grid min-w-0 grid-cols-1 gap-3">
     <div className="flex flex-wrap items-center gap-2">
       <Input type="search" className="w-full sm:w-72" aria-label={copy.search} placeholder={copy.search} maxLength={120}
@@ -57,6 +64,10 @@ export function CatalogView({ templates: all, deleted: allDeleted, query, onQuer
         <option value="">{copy.allSeries}</option>
         <option value={SINGLE_TEMPLATES}>{copy.single}</option>
         {series.map(s => <option key={s.id} value={s.id}>{s.nameZh}</option>)}
+      </select>
+      <select aria-label={copy.modelFilter} className={selectClass} value={model} onChange={e => setModel(e.target.value)}>
+        <option value="">{copy.allModels}</option>
+        {models.map(m => <option key={m.value} value={m.value}>{m.label}（{m.count}）</option>)}
       </select>
       <Button size="sm" variant={grouped ? 'secondary' : 'outline'} aria-pressed={grouped}
         onClick={() => setGrouped(!grouped)}>{copy.groupSeries}</Button>
