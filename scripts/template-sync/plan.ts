@@ -1,11 +1,12 @@
 import { syncCategories, templateCategoryKeys } from './categories'
 import { SyncError } from './covers'
-import { readSeries, syncSeriesDefinition, syncSeriesMembers, type SeriesSnapshot } from './series'
+import { readSeries, syncSeriesDefinition, syncSeriesDelete, syncSeriesMembers, type SeriesSnapshot } from './series'
 import { readDeletedIds, readStates, syncSeriesActive, syncTemplateState } from './state'
 import { syncTemplate, type SyncTarget } from './sync'
 
 // One dispatch (2026-11-12): templates by id and whole series by slug, the test site being the only
-// source. The order keeps every step's prerequisites in place on production: categories (parents
+// source. Series deleted on the test site are deleted on production first (2026-11-14). The order
+// then keeps every step's prerequisites in place on production: categories (parents
 // first), series definitions, series going down, the templates (content, then sale and publication;
 // members included), each series' member order, series going up. So a series is never live without
 // its members, and goes down before they do. Every step is its own transaction; a failing item is
@@ -39,6 +40,19 @@ async function readAll(slugs: readonly string[], run: Run, fail: (line: string) 
   return found
 }
 
+// Series deleted on the test site (2026-11-14): deleted on production too, before anything else, so
+// none of the later steps can file a template in them. They have no members to carry.
+async function deletions(series: readonly SeriesSnapshot[], run: Run, fail: (line: string) => void) {
+  const actor = { id: run.actorId, runId: run.runId }
+  for (const item of series) {
+    try {
+      run.report(`series ${item.series.slug} ${await syncSeriesDelete(item.series.slug, actor, run.target, run.validateOnly)}`)
+    } catch (error) {
+      fail(`series ${item.series.slug} delete ${reason(error)}`)
+    }
+  }
+}
+
 async function categories(series: readonly SeriesSnapshot[], ids: readonly string[], run: Run, fail: (line: string) => void) {
   try {
     const keys = [...series.map((item) => item.series.category_key), ...await templateCategoryKeys(ids, run.source)]
@@ -58,7 +72,9 @@ async function definitions(series: readonly SeriesSnapshot[], run: Run, fail: (l
       run.report(`series ${item.series.slug} ${await syncSeriesDefinition(item, run.source, run.target, run.validateOnly)}`)
       defined.push(item)
     } catch (error) {
-      fail(`series ${item.series.slug} ${reason(error)}`)
+      const why = reason(error)
+      // Deleted on production but not on the test site: production keeps it deleted (1502).
+      fail(`series ${item.series.slug} ${why}${why === 'SERIES_DELETED' ? ' on production, not brought back (use a new slug on the test site)' : ''}`)
     }
   }
   return defined
@@ -131,7 +147,9 @@ export async function runSync(request: SyncRequest, run: Run): Promise<boolean> 
     ok = false
     run.report(line)
   }
-  const series = await readAll(unique(request.seriesSlugs), run, fail)
+  const read = await readAll(unique(request.seriesSlugs), run, fail)
+  await deletions(read.filter(item => item.deleted), run, fail)
+  const series = read.filter(item => !item.deleted)
   const ids = unique([...request.templateIds, ...series.flatMap((item) => item.members)])
   await categories(series, ids, run, fail)
   const defined = await definitions(series, run, fail)

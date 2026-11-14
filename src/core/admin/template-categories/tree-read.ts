@@ -25,8 +25,9 @@ function toNode(row: Row): AdminCategoryNode {
 export async function listAdminCategoryTree(client: SupabaseClient): Promise<AdminCategoryNode[]> {
   const nodes: AdminCategoryNode[] = []
   for (;;) {
+    // seriesCount leaves out deleted series (1500), as templateCount leaves out deleted templates.
     const query = client.from('template_categories').select(COLUMNS)
-      .eq('kind', 'template').order('key').limit(250)
+      .eq('kind', 'template').is('series.deleted_at', null).order('key').limit(250)
     const last = nodes.at(-1)
     if (last) query.gt('key', last.key)
     const { data, error } = await query.returns<Row[]>()

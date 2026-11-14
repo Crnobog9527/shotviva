@@ -2,6 +2,7 @@
 
 import { Link } from '@/core/i18n/navigation'
 import { Badge } from '@/core/ui/badge'
+import { Button } from '@/core/ui/button'
 import { Checkbox } from '@/core/ui/checkbox'
 import { TableCell, TableRow } from '@/core/ui/table'
 
@@ -11,6 +12,10 @@ import { seriesCopy as copy } from './copy'
 import type { SeriesListItem, SeriesThumb } from './list-rules'
 
 export const SERIES_PATH = '/admin/templates/series'
+// Pinned to the right edge as in the template list, so 删除 stays in reach while a phone scrolls
+// the table sideways.
+export const stickyActionsClass =
+  'sticky right-0 z-[1] bg-background shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.45)] [tr:hover>&]:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))] [tr[data-state=selected]>&]:bg-muted'
 
 // An auto cover is a member's: its 原图 and AI 出图 side by side; a custom cover is one picture.
 function thumbImages(thumb: SeriesThumb) {
@@ -18,7 +23,22 @@ function thumbImages(thumb: SeriesThumb) {
 }
 
 // One series: dragged by its handle (or long-pressed on touch); the name opens its editor dialog.
-export function SeriesRow({ item, checked, onSelect }: { item: SeriesListItem; checked: boolean; onSelect: (on: boolean) => void }) {
+type Props = { item: SeriesListItem; checked: boolean; pending: boolean; onSelect: (on: boolean) => void; onDelete: () => void }
+
+// 删除 only for an unpublished series (1500); on a published one the button stays visible but off,
+// and says why on hover and to screen readers.
+function DeleteCell({ item, pending, onDelete }: Pick<Props, 'item' | 'pending' | 'onDelete'>) {
+  return (
+    <TableCell className={stickyActionsClass + ' text-right'}>
+      <span title={item.is_active ? copy.liveNoDelete : undefined} className="inline-block">
+        <Button variant="ghost" size="sm" className="text-destructive" disabled={pending || item.is_active} onClick={onDelete}
+          aria-label={`${copy.delete} ${item.name_zh}${item.is_active ? '：' + copy.liveNoDelete : ''}`}>{copy.delete}</Button>
+      </span>
+    </TableCell>
+  )
+}
+
+export function SeriesRow({ item, checked, pending, onSelect, onDelete }: Props) {
   const sortable = useSortableItem(item.id)
   return (
     <TableRow {...sortable.row} className={sortableRowClass} data-state={checked ? 'selected' : undefined}>
@@ -44,10 +64,11 @@ export function SeriesRow({ item, checked, onSelect }: { item: SeriesListItem; c
       </TableCell>
       <TableCell>
         <Link href={`${SERIES_PATH}?id=${item.id}`} scroll={false} className="font-medium underline">{item.name_zh}</Link>
-        <span className="text-muted-foreground block text-xs">{item.slug}</span>
+        <span className="text-muted-foreground block text-xs">{item.slug} · {copy.memberCount(item.memberCount)}</span>
       </TableCell>
       <TableCell>{item.is_active ? copy.published : copy.unpublished}</TableCell>
       <TableCell>{item.show_members ? copy.separate : copy.onlySeries}</TableCell>
+      <DeleteCell item={item} pending={pending} onDelete={onDelete} />
     </TableRow>
   )
 }

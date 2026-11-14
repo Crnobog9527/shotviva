@@ -8,6 +8,8 @@ const KNOWN = new Set([
   // 上下架 and 开放售卖 (1274): production's own checks, by the names its functions and triggers use.
   'NOT_ADMIN', 'TEMPLATE_MISSING', 'LIVE_TEMPLATE_INCOMPLETE', 'SALE_ROUTE_NOT_ALLOWED', 'TEMPLATE_RETIRED',
   'TEMPLATE_PRICE_BELOW_FLOOR', 'UNPUBLISH_FIRST', 'FORBIDDEN', 'MODEL_CREDIT_FLOOR',
+  // A series deleted on production (1500): never brought back by a sync.
+  'SERIES_DELETED',
 ])
 
 export function rpcError(error: { message: string; code?: string }, fallback: string): SyncError {

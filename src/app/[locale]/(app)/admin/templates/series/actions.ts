@@ -2,7 +2,7 @@
 
 import { revalidatePath, updateTag } from 'next/cache'
 import { runAdminQuery } from '@/core/admin/templates'
-import { reorderAdminSeries, saveAdminSeries, searchSeriesCandidates, setAdminSeriesFlag, type SaveSeriesInput } from '@/core/admin/template-series'
+import { deleteAdminSeries, reorderAdminSeries, saveAdminSeries, searchSeriesCandidates, setAdminSeriesFlag, type SaveSeriesInput } from '@/core/admin/template-series'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { TEMPLATES_CACHE_TAG } from '@/core/templates'
 
@@ -45,5 +45,17 @@ export async function setSeriesFlagAction(input: { ids: string[]; field: 'is_act
     const changed = await setAdminSeriesFlag(createAdminSupabase(), admin.id, input)
     refreshSeries()
     return changed
+  })
+}
+
+// 删除已下架的系列, one or several (Owner 2026-11-14): one audited call per series, per-series results.
+// Members leave the series, so the template list's series column changes too.
+export async function deleteSeriesAction(ids: string[]) {
+  const admin = await requireAdmin()
+  return runAdminQuery(async () => {
+    const outcome = await deleteAdminSeries(createAdminSupabase(), admin.id, { ids })
+    refreshSeries()
+    revalidatePath('/[locale]/admin/templates', 'page')
+    return outcome
   })
 }
