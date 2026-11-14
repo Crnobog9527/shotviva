@@ -1556,6 +1556,11 @@
         "body": "Something went wrong on our side. Your photos and credits are safe. Try again in a moment.",
         "retry": "Try again",
         "more": "Still stuck? Write to {email}"
+      },
+      "templateUnavailable": {
+        "title": "This template is temporarily unavailable",
+        "body": "It will be back soon. In the meantime, try a similar template.",
+        "similar": "See similar templates"
       }
     },
     "checkout": {

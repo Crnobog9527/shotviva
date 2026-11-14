@@ -9,14 +9,27 @@ import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
 import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
-import { findWebTemplate, loadEditOffer } from '@/core/templates'
+import { findOffSaleTemplate, findWebTemplate, loadEditOffer } from '@/core/templates'
 import { r2Store } from '@/core/storage'
-import { ImageWorkspace, loadAgain, loadReuse, posterHref, toCatalogueTemplate, WorkspaceHead, WorkspacePending } from '@/modules/image'
+import { ImageWorkspace, loadAgain, loadReuse, posterHref, TemplateUnavailable, toCatalogueTemplate, WorkspaceHead, WorkspacePending } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 function Nav({ title, aside }: { title: string; aside?: ReactNode }) {
   const t = useTranslations('app.workspace')
   return <FlowNav back={{ href: '/generate', label: t('back') }} title={title} aside={aside} />
+}
+
+// Not in the live catalogue: a published template held back from sale says so (with its
+// category); a missing, deleted or unpublished one is a 404.
+async function Unavailable({ templateId }: { templateId: string }) {
+  const offSale = await findOffSaleTemplate(createAdminSupabase(), templateId)
+  if (!offSale) notFound()
+  return (
+    <>
+      <Nav title="" />
+      <TemplateUnavailable categoryPath={offSale.categoryPath} />
+    </>
+  )
 }
 
 type RouteProps = { params: Promise<{ templateId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
@@ -31,7 +44,7 @@ async function Workspace({ params, searchParams }: RouteProps) {
   // The cached catalogue, members included; a template the cache has not seen yet is read live.
   const locale = await currentLocale()
   const found = await findWebTemplate(supabase, locale, templateId)
-  if (!found) notFound()
+  if (!found) return <Unavailable templateId={templateId} />
   const template = toCatalogueTemplate(found)
   // A poster template is made in its editor dialog on Create (ARCHITECTURE §5.3), never here.
   const posterPath = posterHref(template)
