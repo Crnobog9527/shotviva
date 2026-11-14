@@ -5,7 +5,6 @@ import { useTranslations } from 'next-intl'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useRef, useState } from 'react'
 
-import { cn } from '@/core/ui/cn'
 import { coverImage } from '@/core/ui/cover-image'
 
 import { CloseMark, SideToggle, useSwipe, type ViewerSide } from './sample-viewer-parts'
@@ -37,8 +36,13 @@ const FIT = {
   maxWidth: `calc(100vw - 2 * ${GUTTER})`,
   maxHeight: `calc(100dvh - var(--sat) - var(--sab) - 2 * ${GUTTER} - 2.75rem)`,
 } as const
-const ZOOMED = { cursor: 'zoom-out', width: '200%' } as const
 const PAN = { touchAction: 'pan-x pan-y pinch-zoom' } as const
+const ZOOMED = { cursor: 'zoom-out', width: '200%', maxWidth: 'none' } as const
+const CENTRE = { ...LAYER, top: '50%', left: '50%', width: 'max-content', translate: '-50% -50%', gap: 8 } as const
+const FRAME = { background: 'var(--photo-ground)', minWidth: 'min(16rem, calc(100vw - 24px))', minHeight: '10rem' } as const
+const SCROLLER = { ...PAN, width: '100%', height: '100%', overflow: 'auto' } as const
+const CLOSE = { top: 0, right: 0, zIndex: 1 } as const
+const HINT = { maxWidth: 'calc(100vw - 2rem)', padding: '4px 12px' } as const
 
 // The template's two covers in a popup the size of the picture itself (Owner 2026-11-14: the
 // full-screen black viewer left the picture small in the middle and its ✕ far away). One image
@@ -64,16 +68,16 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
         <DialogPrimitive.Overlay style={SCRIM} className="fixed inset-0" />
         <DialogPrimitive.Content
           aria-describedby={undefined}
-          style={LAYER}
-          className="fixed top-1/2 left-1/2 flex w-max -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 text-white outline-none"
+          style={CENTRE}
+          className="fixed flex flex-col items-center text-white outline-none"
         >
           <DialogPrimitive.Title className="sr-only">{t('viewerTitle', { name })}</DialogPrimitive.Title>
           <div
             ref={frame}
-            style={box ?? undefined}
-            className="hairline relative grid min-h-40 min-w-[min(16rem,calc(100vw-24px))] place-items-center overflow-hidden rounded-media bg-photo-ground"
+            style={box ? { ...FRAME, ...box } : FRAME}
+            className="hairline relative grid place-items-center overflow-hidden rounded-media"
           >
-            <div {...swipe.handlers} style={PAN} className={cn('overscroll-contain', box && 'size-full overflow-auto')}>
+            <div {...swipe.handlers} style={box ? SCROLLER : PAN} className="overscroll-contain">
               {(['phone', 'ai'] as const).map((key) => (
                 <img
                   key={key}
@@ -83,17 +87,17 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
                   decoding="async"
                   onClick={toggleZoom}
                   style={box ? ZOOMED : FIT}
-                  className={cn('block select-none', box ? 'max-w-none' : 'h-auto w-auto')}
+                  className="block select-none"
                   draggable={false}
                 />
               ))}
             </div>
             <SideToggle side={side} onSide={pick} />
-            <DialogPrimitive.Close aria-label={t('viewerClose')} className="press absolute top-0 right-0 z-1 grid size-11 place-items-center rounded-full">
+            <DialogPrimitive.Close aria-label={t('viewerClose')} style={CLOSE} className="press absolute grid size-11 place-items-center rounded-full">
               <CloseMark />
             </DialogPrimitive.Close>
           </div>
-          <p className="frost max-w-[calc(100vw-2rem)] rounded-full px-3 py-1 text-center text-caption text-foreground">{t(box ? 'viewerHintZoomed' : 'viewerHint')}</p>
+          <p style={HINT} className="frost rounded-full text-center text-caption text-foreground">{t(box ? 'viewerHintZoomed' : 'viewerHint')}</p>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

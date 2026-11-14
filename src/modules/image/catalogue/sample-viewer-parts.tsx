@@ -7,18 +7,22 @@ import { cn } from '@/core/ui/cn'
 
 export type ViewerSide = 'phone' | 'ai'
 
+// Inline, so the public pages' sheet stays small (scripts/public-css-check.ts).
+const CORNER = { top: 8, left: 8, zIndex: 1 } as const
+const DISC = { width: 32, height: 32 } as const
+
 // 原图 / AI on the picture's top-left corner, frosted so it reads over any photo.
 export function SideToggle({ side, onSide }: { side: ViewerSide; onSide(side: ViewerSide): void }) {
   const t = useTranslations('app.template')
   return (
-    <div role="group" aria-label={t('viewerSwitch')} className="frost absolute top-2 left-2 z-1 inline-flex rounded-full p-1">
+    <div role="group" aria-label={t('viewerSwitch')} style={CORNER} className="frost absolute inline-flex rounded-full p-1">
       {(['phone', 'ai'] as const).map((key) => (
         <button
           key={key}
           type="button"
           aria-pressed={side === key}
           onClick={() => onSide(key)}
-          className={cn('min-h-9 rounded-full px-4 text-caption font-semibold', side === key ? (key === 'ai' ? 'bg-primary text-primary-foreground' : 'bg-foreground text-background') : 'text-foreground')}
+          className={cn('min-h-9 rounded-full px-5 text-caption font-semibold', side === key ? (key === 'ai' ? 'bg-primary text-primary-foreground' : 'bg-foreground text-background') : 'text-foreground')}
         >
           {t(key)}
         </button>
@@ -31,8 +35,8 @@ export function SideToggle({ side, onSide }: { side: ViewerSide; onSide(side: Vi
 // less of the photo.
 export function CloseMark() {
   return (
-    <span className="frost grid size-8 place-items-center rounded-full text-white">
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeWidth={2.25} strokeLinecap="round">
+    <span style={DISC} className="frost grid place-items-center rounded-full text-white">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
         <path d="M6 6l12 12M18 6L6 18" />
       </svg>
     </span>
