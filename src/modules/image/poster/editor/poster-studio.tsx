@@ -8,7 +8,7 @@ import { Button } from '@/core/ui/button'
 import type { PosterStudioState, StudioTemplate } from '../use-poster-studio'
 import { BlockTabs } from './block-tabs'
 import { GenerateButton, GeneratePanel } from './generate-panel'
-import { PageSlots } from './page-slots'
+import { pagePhotos } from './page-slots'
 import { PasteStep, SortButton } from './paste-step'
 
 type Props = { studio: PosterStudioState; template: StudioTemplate; balance: Balance }
@@ -30,7 +30,7 @@ export function StudioForm({ studio, template, balance }: Props) {
       ) : null}
       <BlockTabs poster={template.poster} unverified={studio.draft.unverified} content={studio.draft.content}
         flagged={(path) => studio.draft.unverified.includes(path)} onChange={studio.edit}
-        pageExtra={(kind) => <PageSlots template={template} kind={kind} photos={studio.photos} />} />
+        pagePhotos={pagePhotos(template, studio.photos, t('folds.photos'))} />
       <GeneratePanel studio={studio} template={template} balance={balance} />
       <Button variant="ghost" className="min-h-11" onClick={studio.toPaste}>{t('backToPaste')}</Button>
     </section>

@@ -819,7 +819,18 @@
         "notEnough": "Not enough credits.",
         "error": "Something went wrong. Please try again."
       },
-      "slotHint": "Optional. Leave it empty and the prizes are drawn from their text."
+      "slotHint": "Optional. Leave it empty and the prizes are drawn from their text.",
+      "folds": {
+        "masthead": "Masthead",
+        "title": "Title & time",
+        "info": "Column heading",
+        "section": "Section {n}",
+        "prizes": "Prize list",
+        "table": "Table",
+        "footer": "Footer · phones & address",
+        "photos": "Images",
+        "flagged": "{count, plural, one {# line to check} other {# lines to check}}"
+      }
     },
     "sizes": {
       "closest": "Closest to original ({ratio})",
@@ -980,6 +991,12 @@
         "oneAtATime": "This template makes one image at a time.",
         "remove": "Remove",
         "replace": "Replace"
+      },
+      "groups": {
+        "filled": "{filled} of {total} filled",
+        "required": "{count, plural, one {# required item left} other {# required items left}}",
+        "done": "Required items done",
+        "invalid": "Something here needs a fix"
       }
     },
     "errors": {

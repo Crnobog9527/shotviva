@@ -1,5 +1,6 @@
 import type { Locale } from '../i18n/locales'
 import { localizeCategory, type LocalizedCategory } from './categories'
+import { localizeGroups } from './field-groups'
 import { withLocaleCover } from './cover-locales'
 import type { CopyField } from './copy-fields'
 import type { TemplateFields, TemplateTranslation } from './schema'
@@ -77,14 +78,15 @@ export function localizeTemplate(template: Template, locale: Locale): LocalizedT
   const shown = withLocaleCover(template, locale)
   const text = locale === 'en' ? undefined : template.translations[locale]
   const copy = template.fields.copy.map((field) => localizeCopy(field, text))
-  if (!text) return { ...shown, categoryView, fields: { ...template.fields, copy } }
+  const groups = template.fields.groups ? { groups: localizeGroups(template.fields.groups, locale) } : {}
+  if (!text) return { ...shown, categoryView, fields: { ...template.fields, copy, ...groups } }
   return {
     ...shown,
     categoryView,
     name: text.name || template.name,
     description: text.description || template.description,
     fields: {
-      ...template.fields, copy, images: localizeImages(template.fields.images, text),
+      ...template.fields, copy, ...groups, images: localizeImages(template.fields.images, text),
       toggles: template.fields.toggles.map((toggle) => localizeToggle(toggle, text)),
     },
   }
