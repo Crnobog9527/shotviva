@@ -20,7 +20,9 @@ const COPY_KEYS: Record<string, (store: StoreValues) => string> = {
   wechat: (store) => store.wechat,
 }
 
-type Field = { key: string; maxLength: number; type?: string }
+// example: the cover's text a field starts from (fields.copy[].example, shotviva#638); a value
+// still equal to it is replaced like an empty one.
+type Field = { key: string; maxLength: number; type?: string; example?: string }
 
 // The fields of this template the profile can fill, with what goes in each (empty values left out).
 export function storeCopyValues(fields: readonly Field[], store: StoreValues): Record<string, string> {
@@ -33,16 +35,22 @@ export function storeCopyValues(fields: readonly Field[], store: StoreValues): R
 // Whether the template has any field the profile fills (the editors only offer it then).
 export const matchesStore = (fields: readonly Pick<Field, 'key'>[]): boolean => fields.some((field) => field.key in COPY_KEYS)
 
-// The copy with the profile filled into the empty fields; `force` also replaces typed values
-// (the user confirmed). Returns the keys that changed.
-export function fillCopy(copy: Record<string, string>, values: Record<string, string>, force = false) {
-  const changed = Object.keys(values).filter((key) => values[key] !== copy[key] && (force || !copy[key]?.trim()))
+// Whether a field's value is the user's own: not blank and not still the cover's example.
+export function typedBy(fields: readonly Pick<Field, 'key' | 'example'>[], copy: Record<string, string>) {
+  const examples = new Map(fields.map((field) => [field.key, field.example]))
+  return (key: string): boolean => Boolean(copy[key]?.trim()) && copy[key] !== examples.get(key)
+}
+
+// The copy with the profile filled into fields the user has not typed; `force` also replaces
+// typed values (the user confirmed). Returns the keys that changed.
+export function fillCopy(copy: Record<string, string>, values: Record<string, string>, typed: (key: string) => boolean, force = false) {
+  const changed = Object.keys(values).filter((key) => values[key] !== copy[key] && (force || !typed(key)))
   return { copy: { ...copy, ...Object.fromEntries(changed.map((key) => [key, values[key]!])) }, changed }
 }
 
 // Typed values the profile would replace (asked before a manual fill).
-export const copyConflicts = (copy: Record<string, string>, values: Record<string, string>): string[] =>
-  Object.keys(values).filter((key) => Boolean(copy[key]?.trim()) && copy[key] !== values[key])
+export const copyConflicts = (copy: Record<string, string>, values: Record<string, string>, typed: (key: string) => boolean): string[] =>
+  Object.keys(values).filter((key) => typed(key) && copy[key] !== values[key])
 
 export const POSTER_STORE_PATHS = ['header.brand', 'header.brandEn', 'footer.phones', 'footer.address'] as const
 type PosterPath = (typeof POSTER_STORE_PATHS)[number]

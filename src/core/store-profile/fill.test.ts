@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { posterContentSchema } from '../poster/content'
-import { copyConflicts, fillCopy, fillPoster, matchesStore, storeCopyValues } from './fill'
+import { copyConflicts, fillCopy, fillPoster, matchesStore, storeCopyValues, typedBy } from './fill'
 import { contactLine, storeTextSchema } from './profile'
 
 const store = { name: '星澜棋牌', nameEn: 'Xinglan', phones: ['138 0000 0000', '021-1234'], address: '静安区 1 号', wechat: 'xinglan01' }
@@ -22,9 +22,18 @@ describe('store details on plain copy fields', () => {
   it('fills only empty fields unless forced, and names what a forced fill would replace', () => {
     const values = storeCopyValues(prizeFields, store)
     const copy = { venue: '我的店', title: '周赛', address: '  ' }
-    expect(fillCopy(copy, values)).toEqual({ copy: { ...copy, venue_en: 'Xinglan', address: '静安区 1 号', contact: values.contact }, changed: ['venue_en', 'address', 'contact'] })
-    expect(copyConflicts(copy, values)).toEqual(['venue'])
-    expect(fillCopy(copy, values, true).copy.venue).toBe('星澜棋牌')
+    const typed = typedBy(prizeFields, copy)
+    expect(fillCopy(copy, values, typed)).toEqual({ copy: { ...copy, venue_en: 'Xinglan', address: '静安区 1 号', contact: values.contact }, changed: ['venue_en', 'address', 'contact'] })
+    expect(copyConflicts(copy, values, typed)).toEqual(['venue'])
+    expect(fillCopy(copy, values, typed, true).copy.venue).toBe('星澜棋牌')
+  })
+
+  it('replaces a value that is still the cover\'s example', () => {
+    const fields = [{ key: 'venue', maxLength: 30, example: '示例棋牌' }, { key: 'address', maxLength: 60, example: '示例地址' }]
+    const copy = { venue: '示例棋牌', address: '我的地址' }
+    const typed = typedBy(fields, copy)
+    expect(fillCopy(copy, storeCopyValues(fields, store), typed)).toMatchObject({ changed: ['venue'] })
+    expect(copyConflicts(copy, storeCopyValues(fields, store), typed)).toEqual(['address'])
   })
 })
 

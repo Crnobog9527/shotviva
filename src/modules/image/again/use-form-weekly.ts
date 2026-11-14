@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import { copyConflicts, fillCopy, matchesStore, storeCopyValues } from '@/core/store-profile'
+import { copyConflicts, fillCopy, matchesStore, storeCopyValues, typedBy } from '@/core/store-profile'
 
 import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { WorkspaceDraft } from '../workspace/use-workspace-draft'
@@ -49,7 +49,7 @@ export function useFormWeekly(template: CatalogueTemplate, draft: WorkspaceDraft
   const values = store ? storeCopyValues(template.copyFields, store) : {}
 
   const fill = (force: boolean) => {
-    const next = fillCopy(copy, values, force)
+    const next = fillCopy(copy, values, typedBy(template.copyFields, copy), force)
     if (next.changed.length) { draft.change({ copy: next.copy }); setFilled(copy) }
     return next.copy
   }
@@ -77,7 +77,7 @@ export function useFormWeekly(template: CatalogueTemplate, draft: WorkspaceDraft
   return {
     peek, store, reused, busy, failed, filled: filled !== null, autofill: autofill && Boolean(store?.autofill), takeLast,
     dirty: () => baseline.current !== null && asText(copy) !== baseline.current,
-    conflicts: () => copyConflicts(copy, values).length > 0,
+    conflicts: () => copyConflicts(copy, values, typedBy(template.copyFields, copy)).length > 0,
     fill: () => void fill(true),
     undo: () => { if (filled) draft.change({ copy: filled }); setFilled(null) },
     autofillOff: () => { setAutofill(false); void turnAutofillOff(ids[0]!) },
