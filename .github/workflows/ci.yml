@@ -40,10 +40,6 @@ jobs:
       code: ${{ steps.changes.outputs.code }}
       fingerprint: ${{ steps.fingerprint.outputs.hash }}
       pages: ${{ steps.fingerprint.outputs.pages }}
-      reason: ${{ steps.force.outputs.reason }}
-    permissions:
-      contents: read
-      pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -192,8 +188,12 @@ jobs:
     outputs:
       code: ${{ steps.changes.outputs.code }}
       force: ${{ steps.force.outputs.force }}
+      reason: ${{ steps.force.outputs.reason }}
       fingerprint: ${{ steps.fingerprint.outputs.hash }}
       pages: ${{ steps.fingerprint.outputs.pages }}
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

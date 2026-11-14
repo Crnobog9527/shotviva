@@ -60,10 +60,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     `| lighthouse | ${env.LIGHTHOUSE} — ${why} |`,
     '',
   ]
-  if (rows.length > 0) {
+  // Page by page only when both fingerprints exist; otherwise there was nothing to compare.
+  const pages = parse(env.PAGES)
+  const base = parse(env.BASE_PAGES)
+  if (pages && base) {
     lines.push('| Lighthouse page | vs base |', '|---|---|')
     for (const row of rows) lines.push(`| \`${row.name}\` | ${row.changed ? 'changed' : 'same'} |`)
     lines.push('')
+  } else if (env.CODE === 'true' && env.EVENT !== 'push') {
+    lines.push('Pages not compared: the base fingerprint was not built (forced run or baseline missing).', '')
   }
   const text = lines.join('\n')
   console.log(text)
