@@ -1,4 +1,5 @@
 import { rate } from '../analytics/values'
+import { beijingDate } from './period'
 import type { ShareCounts } from './posthog'
 import type { TemplateStat } from './reads'
 
@@ -61,7 +62,15 @@ function mergeErrors(into: Map<string, number>, errors: TemplateStat['errors']) 
   for (const e of errors) into.set(e.code, (into.get(e.code) ?? 0) + e.count)
 }
 
-export type TableInput = { stats: readonly TemplateStat[]; shares: ShareCounts | null; creditUsd: number | null; redrawAlert: number }
+// redrawCounted: redraws were already recorded when the period started (redrawCounted()); before
+// that, a redraw rate would be a misleading 0%, so it has none and raises no flag.
+export type TableInput = { stats: readonly TemplateStat[]; shares: ShareCounts | null; creditUsd: number | null; redrawAlert: number; redrawCounted: boolean }
+
+// Redraws count from the Beijing day of the first recorded Make again (1514); a period starting
+// on or after that day has a redraw rate.
+export function redrawCounted(since: string | null | undefined, from: string): boolean {
+  return Boolean(since) && beijingDate(Date.parse(since!)) <= from
+}
 
 // Lines for one grouping. A series or category sums its templates; its user count is the sum of
 // its templates' (someone who used two of its templates counts twice), and its top errors are the
@@ -87,7 +96,7 @@ function lineOf(key: string, label: string, stats: readonly TemplateStat[], inpu
   }, { shares: 0, opens: 0 })
   const live = stats.some((s) => s.live)
   const successRate = rate(sums.succeeded, sums.succeeded + sums.failed)
-  const redrawRate = rate(sums.redraws, sums.succeeded)
+  const redrawRate = input.redrawCounted ? rate(sums.redraws, sums.succeeded) : null
   const value = input.creditUsd === null ? 0 : sums.paid_credits * input.creditUsd
   return {
     ...sums,

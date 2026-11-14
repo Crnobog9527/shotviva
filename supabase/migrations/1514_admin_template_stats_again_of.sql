@@ -7,8 +7,10 @@
 -- p_redraw_minutes stays in the signature (callers still pass it) and is still validated, but
 -- no longer used; redraw_minutes is still returned so the running code's reader keeps working.
 -- Everything else is as in 1511. Same signature, so create or replace keeps the grants
--- (service_role only). Index: generation_jobs_created_at_id_idx, as before; again_of is read
--- from the rows already scanned, so generation_jobs_again_of_idx is not needed here.
+-- (service_role only). It also returns redraw_since, the first Make again ever recorded, so the
+-- page can say from when redraws count and show no rate for a period that starts earlier.
+-- Index: generation_jobs_created_at_id_idx, as before; redraw_since reads only the rows of
+-- generation_jobs_again_of_idx (partial, Make again jobs only).
 
 create or replace function public.admin_template_stats(
   p_start timestamptz,
@@ -89,6 +91,9 @@ begin
     select jsonb_build_object(
       'timezone', 'Asia/Shanghai',
       'redraw_minutes', p_redraw_minutes,
+      -- When redraws started to be counted: the first job ever recorded as Make again. Null
+      -- until there is one. The page shows no redraw rate for a period that starts earlier.
+      'redraw_since', (select min(g.created_at) from public.generation_jobs g where g.again_of is not null),
       'templates', coalesce(jsonb_agg(jsonb_build_object(
         'template_id', i.id,
         'name', t.name,

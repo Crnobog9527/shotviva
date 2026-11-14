@@ -70,7 +70,7 @@ export const INSIGHTS_COPY = {
       users: { label: '用户', help: '用过的人数。按系列或分类汇总时是各模板人数相加（一个人用了两个模板算两次）。' },
       success: { label: '成功率', help: '成功 ÷（成功 + 失败）。低于 90% 标红。' },
       errors: { label: '失败原因', help: '失败最多的 3 个错误码和次数。' },
-      redraw: { label: '重画率', help: '重画次数 ÷ 成功数，可能超过 100%。重画：用户从自己的作品点「再来一张」出的图（同一模板），以及海报的「重画这一张」。「再来一张」从这一版上线起才记录，更早的出图除了海报重画都不算重画。' },
+      redraw: { label: '重画率', help: '重画次数 ÷ 成功数，可能超过 100%。重画：用户从自己的作品点「再来一张」出的图（同一模板），以及海报的「重画这一张」。开始日期之前的时间段不显示重画率。' },
       cost: { label: '单张成本', help: '真实成本合计 ÷ 成功张数（失败的成本也摊进去）。只算有成本记录的任务。' },
       credits: { label: '单张积分', help: '成功图平均扣的积分。' },
       margin: { label: '毛利', help: '付费积分出的图：1 −（真实成本 ÷ 积分价值）。积分价值按所有套餐里最便宜的每积分单价算，是最保守的口径。免费积分出的图没有收入，只看下一列成本。' },
@@ -86,6 +86,11 @@ export const INSIGHTS_COPY = {
     },
     flagSummary: (idle: number, redraw: number, failing: number) => `预警：${idle} 个在架模板 14 天没人用，${redraw} 个重画率偏高，${failing} 个成功率偏低。`,
     sharesMissing: '分享数来自 PostHog，现在没有读到。',
+    redrawSince: (day: string | null) => (day ? `从 ${day} 起统计。` : '还没有记下过「再来一张」，暂不统计。'),
+    redrawNotCounted: (day: string | null) =>
+      day
+        ? `重画从 ${day} 起统计（第一次记下「再来一张」的那天），这段时间开始得更早，重画率先不显示（显示「—」），也不算重画预警。`
+        : '还没有记下过「再来一张」，重画率先不显示（显示「—」），也不算重画预警。',
     sharesNote: '分享次数来自 PostHog，装了广告拦截的浏览器会少记，是近似值；其余列以数据库为准。',
     empty: '没有模板。',
     members: (count: number) => `${count} 个模板`,

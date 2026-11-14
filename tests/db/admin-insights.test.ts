@@ -19,6 +19,7 @@ let db: Client
 let cohort: Cohort
 let tpl: TemplateStat
 let otherTpl: TemplateStat
+let redrawSince: string | null | undefined
 const ids: Record<string, string> = {}
 
 async function user(name: string, signedAt: string, opts: { role?: 'admin'; locale?: string; referred?: string } = {}) {
@@ -90,6 +91,7 @@ async function writeFixture() {
   cohort = await loadCohort({ rpc: async () => ({ data: await read('admin_funnel_cohort', [PERIOD.start, PERIOD.end]), error: null }) }, PERIOD)
   const stats = await loadTemplateStats({ rpc: async () => ({ data: await read('admin_template_stats', [PERIOD.start, PERIOD.end, 30]), error: null }) }, PERIOD)
   tpl = stats.templates.find((t) => t.template_id === ids.template)!
+  redrawSince = stats.redraw_since
   otherTpl = stats.templates.find((t) => t.template_id === ids.other)!
 }
 
@@ -140,6 +142,11 @@ describe('admin_template_stats', () => {
 
   it('counts redraws exactly: Make again (again_of) and named poster redraws only', () => {
     expect(tpl.redraws).toBe(2)
+  })
+
+  it('says since when redraws are recorded: the first Make again', () => {
+    expect(redrawSince).not.toBeNull()
+    expect(Date.parse(redrawSince!)).toBeLessThanOrEqual(Date.parse('2021-05-02T04:10:00Z'))
   })
 
   it('sums cost and credits by pool and lists failure codes', () => {

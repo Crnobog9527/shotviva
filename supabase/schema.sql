@@ -8913,6 +8913,9 @@ begin
     select jsonb_build_object(
       'timezone', 'Asia/Shanghai',
       'redraw_minutes', p_redraw_minutes,
+      -- When redraws started to be counted: the first job ever recorded as Make again. Null
+      -- until there is one. The page shows no redraw rate for a period that starts earlier.
+      'redraw_since', (select min(g.created_at) from public.generation_jobs g where g.again_of is not null),
       'templates', coalesce(jsonb_agg(jsonb_build_object(
         'template_id', i.id,
         'name', t.name,

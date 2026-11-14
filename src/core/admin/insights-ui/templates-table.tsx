@@ -74,7 +74,14 @@ function LineRow({ line, query, redrawText }: { line: TemplateLine; query: Insig
   )
 }
 
-export function TemplatesTable({ lines, query, redrawText }: { lines: TemplateLine[]; query: InsightsQuery; redrawText: string }) {
+// The redraw column's help names the day redraws count from (1514).
+function metricOf(col: Col, redrawSince: string | null) {
+  return col === 'redraw' ? { label: COLS.redraw.label, help: `${COLS.redraw.help}${COPY.templates.redrawSince(redrawSince)}` } : COLS[col]
+}
+
+type TableProps = { lines: TemplateLine[]; query: InsightsQuery; redrawText: string; redrawSince: string | null }
+
+export function TemplatesTable({ lines, query, redrawText, redrawSince }: TableProps) {
   if (!lines.length) return <Empty text={COPY.templates.empty} />
   return (
     <div className="min-w-0 overflow-x-auto">
@@ -86,7 +93,7 @@ export function TemplatesTable({ lines, query, redrawText }: { lines: TemplateLi
               <TableHead key={col} className="text-right whitespace-nowrap">
                 <MetricLabel
                   id={`insights-tpl-${col}`}
-                  metric={COLS[col]}
+                  metric={metricOf(col, redrawSince)}
                   className="justify-end"
                   sort={sort ? { href: insightsHref(query, { sort }), current: query.sort === sort, hint: `按${COLS[col].label}排序` } : undefined}
                 />
