@@ -3,13 +3,14 @@ import { parseFunnelDim, type FunnelDim } from '../analytics/funnel-options'
 import type { PageSort } from '../analytics/pages'
 
 // The page's state lives in the URL (view, range, funnel dimension, page sort); defaults are left
-// out. 「总览」 is the default view; the old blocks are 「明细」 (ARCHITECTURE §16.2b).
-export const VIEWS = ['overview', 'details'] as const
+// out. 「总览」 is the default view; 「漏斗」 and 「模板」 (§16.2c) carry their own filters in the
+// URL (insights-ui/query.ts); the old blocks are 「明细」 (ARCHITECTURE §16.2b).
+export const VIEWS = ['overview', 'funnel', 'templates', 'details'] as const
 export type AnalyticsView = (typeof VIEWS)[number]
 export type AnalyticsQuery = { view: AnalyticsView; range: Range; dim: FunnelDim; sort: PageSort }
 
 export function parseView(value: unknown): AnalyticsView {
-  return value === 'details' ? 'details' : 'overview'
+  return (VIEWS as readonly unknown[]).includes(value) ? (value as AnalyticsView) : 'overview'
 }
 
 export function analyticsHref(query: AnalyticsQuery, patch: Partial<AnalyticsQuery> = {}, hash = ''): string {
