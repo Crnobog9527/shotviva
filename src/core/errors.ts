@@ -36,6 +36,8 @@ export const ERROR_CODES = [
   'AUTH_SMS_DAILY_LIMIT',
   'AUTH_SMS_FAILED',
   'AUTH_OTP_INVALID',
+  'AUTH_SIGNUP_LIMITED',
+  'AUTH_PHONE_TAKEN',
   // Idempotency key reused for a different request, or a job settled the other way.
   'CONFLICT',
   // Per-account generation limit (core/jobs/rate-limit.ts).
@@ -106,6 +108,8 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   AUTH_SMS_DAILY_LIMIT: 429,
   AUTH_SMS_FAILED: 502,
   AUTH_OTP_INVALID: 401,
+  AUTH_SIGNUP_LIMITED: 429,
+  AUTH_PHONE_TAKEN: 409,
   CONFLICT: 409,
   RATE_LIMITED: 429,
   TIER_REQUIRED: 403,

@@ -52,10 +52,10 @@ export async function searchSeriesCandidates(db: SupabaseClient, search: unknown
   return { items, next: rows.length > PAGE ? items[PAGE - 1].id : null }
 }
 
-export async function listAdminSeriesOptions(db: SupabaseClient): Promise<{ id: string; nameZh: string }[]> {
-  const options: { id: string; nameZh: string }[] = []
+export async function listAdminSeriesOptions(db: SupabaseClient): Promise<{ id: string; nameZh: string; nameEn: string }[]> {
+  const options: { id: string; nameZh: string; nameEn: string }[] = []
   for (;;) {
-    const query = db.from('template_series').select('id,nameZh:name_zh').order('id').limit(250)
+    const query = db.from('template_series').select('id,nameZh:name_zh,nameEn:name_en').order('id').limit(250)
     const last = options.at(-1)
     if (last) query.gt('id', last.id)
     const { data, error } = await query.returns<typeof options>()

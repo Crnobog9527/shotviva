@@ -52,8 +52,8 @@ export const slotFieldCopy = {
   note: '挂在下面的文字字段（选填）',
   noNote: '不挂',
   placement: (used: boolean) => (used
-    ? '提示词里有 {{image_slots}}，会填成「Image 1: …; Image 2: …」这样的图片清单。'
-    : '提示词里没有 {{image_slots}}，图片清单会以一行「Images: Image 1: …」加在正文后面。'),
+    ? '提示词里有 {{image_slots}}，会填成「Image 1 is the …; Image 2 is the ….」这样的图片清单，后面跟一句「这些名字只用来区分图片，不要写进画面」。'
+    : '提示词里没有 {{image_slots}}，图片清单会以一行「Images: Image 1 is the ….」加在正文后面（同样带那句「不要写进画面」）。'),
 } as const
 
 // The English text in 公开信息 (T52).

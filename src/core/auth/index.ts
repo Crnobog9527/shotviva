@@ -18,5 +18,7 @@ export { handleAccountLocale } from './flows/account-locale'
 export { assertSameOrigin, requireApiAdmin, requireApiBuyer, requireApiUser } from './api-guards'
 export type { AccountStorage } from './account-deletion'
 export { readSignupGift, signupGiftRefused, type SignupGiftRefusal } from './signup-gift'
+export { readClaimOptions, type ClaimMethod, type ClaimOptions, type ClaimStatus } from './signup-gift-claim'
+export { claimWithGoogle, sendClaimPhoneCode, verifyClaimPhoneCode, type ClaimState } from './flows/claim-gift'
 // T82: the request's IP for checkout and per-work dispute evidence.
 export { clientIp } from './signup-ip'

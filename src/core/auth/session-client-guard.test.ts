@@ -13,6 +13,8 @@ const ALLOWED = new Set([
   'src/core/auth/supabase-server.ts',
   'src/core/auth/delete-account-route.ts',
   'src/core/auth/flows/account-locale.ts',
+  // 1480: the account page's gift claim (phone change, Google link), Server Actions only.
+  'src/core/auth/flows/claim-gift.ts',
   'src/core/auth/flows/phone.ts',
   'src/core/auth/flows/sign-in.ts',
   'src/core/auth/flows/sign-up.ts',

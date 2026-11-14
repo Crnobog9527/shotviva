@@ -98,6 +98,8 @@ export function TemplatesEditor({ providers, templates: all, categories, series,
       <FeaturedPanel featured={featured} templates={templates} pending={pending} />
       <BulkPublish providers={providers}
         selected={selectedInOrder(templates, selected)}
+        all={templates}
+        series={series}
         busy={pending}
         actions={actions}
         featured={{ ids: featured.ids, locked: featured.locked }}

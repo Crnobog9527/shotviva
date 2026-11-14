@@ -81,6 +81,13 @@ export async function loadAdminInquiry(db: SupabaseClient, id: string): Promise<
   return data ? detailRow.parse(data) : null
 }
 
+// Several inquiries by primary key, newest first (the CSV export of the ticked rows).
+export async function loadAdminInquiries(db: SupabaseClient, ids: readonly string[]): Promise<AdminInquiry[]> {
+  const { data, error } = await db.from('business_inquiries').select(DETAIL_COLUMNS).in('id', [...ids]).order('created_at', { ascending: false })
+  if (error) readFailed('read many', error)
+  return detailRow.array().parse(data)
+}
+
 // The nav badge: an exact count of status = 'new' on business_inquiries_status_created_at_idx.
 export async function newInquiryCount(db: SupabaseClient): Promise<number> {
   const { count, error } = await db.from('business_inquiries').select('id', { count: 'exact' }).eq('status', 'new').limit(1)

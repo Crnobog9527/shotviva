@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { estimateRunUsd, INPUT_ALLOWANCE_USD } from '../../src/modules/image/test-run/estimate'
+import { estimateRunUsd } from '../../src/modules/image/test-run/estimate'
 import { cellEstimateUsd, JUDGE_ALLOWANCE_USD } from './estimate'
 
 const cell = { resolution: '1k' as const }
@@ -8,7 +8,7 @@ const cell = { resolution: '1k' as const }
 describe('cellEstimateUsd', () => {
   it('uses a per-image provider’s own estimate for that tier', () => {
     const usd = cellEstimateUsd(cell, 'medium', { prices: null, estimatedImageCosts: { '1k': 0.018, '2k': 0.018 } })
-    expect(usd).toBeCloseTo(0.018 + INPUT_ALLOWANCE_USD + JUDGE_ALLOWANCE_USD, 6)
+    expect(usd).toBeCloseTo(0.018 + JUDGE_ALLOWANCE_USD, 6)
   })
 
   it('falls back to the token estimate when the tier has no per-image cost', () => {

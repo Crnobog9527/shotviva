@@ -5,8 +5,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { posterContentSchema, splitPoster, type PosterContent, type PosterFields, type PosterPart } from '@/core/poster'
 import type { OutputAspect, Resolution } from '@/core/templates/output-options'
 
+import type { CatalogueImageSlot } from '../catalogue/catalogue-template'
+import { useSlotPhotos } from '../workspace/use-photo-batch'
+
 import { startJob } from '../generation/job-store'
-import { emptyContent, tidyContent } from './content-edit'
+import { emptyContent, tidyContent, withDefaults } from './content-edit'
 import { extractPoster, savePosterSet } from './poster-api'
 
 // The poster editor's state (ARCHITECTURE §5.3): paste → sorted blocks the user checks → one job
@@ -19,6 +22,9 @@ export type StudioTemplate = {
   aspects: OutputAspect[]
   resolutions: Resolution[]
   creditsCost: Record<Resolution, number>
+  // Upload boxes (fields.images.slots) in the page's language, e.g. the prize photo; each page
+  // sends only the ones its kind lists (poster.kinds[].slots).
+  slots: CatalogueImageSlot[]
 }
 
 type Draft = { step: 'paste' | 'edit'; source: string; content: PosterContent; unverified: string[]; reviewed: boolean; sorted: boolean }
@@ -72,6 +78,7 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
   const [resolution, setResolution] = useState<Resolution>(() => defaultResolution(template.resolutions))
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<StudioNotice>(null)
+  const photos = useSlotPhotos(template.slots)
 
   const parsed = useMemo(() => posterContentSchema.safeParse(tidyContent(draft.content)), [draft.content])
   const parts: PosterPart[] = useMemo(() => (parsed.success ? splitPoster(parsed.data, template.poster) : []), [parsed, template.poster])
@@ -85,8 +92,8 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     const reply = await extractPoster(template.id, draft.source)
     setBusy(false)
     if (reply.status === 'ok') {
-      // The template's table is offered even when the text had none, so it can be typed in.
-      const content = reply.content.table ? reply.content : { ...reply.content, table: emptyContent(template.poster).table }
+      // The template's table and sections heading are offered even when the text had none.
+      const content = withDefaults(posterContentSchema.parse(reply.content), template.poster)
       setDraft((d) => ({ ...d, step: 'edit', content, unverified: reply.unverified, reviewed: false, sorted: true }))
       if (reply.clipped?.length) setNotice('clipped')
       return
@@ -103,10 +110,13 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     setBusy(false)
     if (!saved.ok) return setNotice(saved.code === 'INVALID_INPUT' ? 'invalid' : 'error')
     const credits = template.creditsCost[resolution]
-    saved.parts.forEach((_, part) => startJob({
-      templateId: template.id, templateName: template.name, resolution, aspect, credits, inputKey: null, batchId: undefined,
-      body: { template_id: template.id, input_key: null, expected_credits: credits, inputs: { copy: {}, aspect_ratio: aspect, resolution }, poster: { set_id: saved.id, part } },
-    }, concurrency))
+    saved.parts.forEach((page, part) => {
+      const slots = pageUploads(template, page.kind, photos.uploads)
+      startJob({
+        templateId: template.id, templateName: template.name, resolution, aspect, credits, inputKey: null, batchId: undefined,
+        body: { template_id: template.id, input_key: null, expected_credits: credits, inputs: { copy: {}, aspect_ratio: aspect, resolution }, poster: { set_id: saved.id, part }, ...(slots ? { input_slots: slots } : {}) },
+      }, concurrency)
+    })
     onStarted()
   }
 
@@ -115,9 +125,16 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     toManual: () => setDraft((d) => ({ ...d, step: 'edit', sorted: false })),
     toPaste: () => setDraft((d) => ({ ...d, step: 'paste' })),
     setReviewed: (reviewed: boolean) => setDraft((d) => ({ ...d, reviewed })),
-    edit, sort, generate, parts, valid: parsed.success, busy, notice,
+    edit, sort, generate, parts, valid: parsed.success, busy, notice, photos,
     aspect, setAspect, resolution, setResolution,
   }
 }
 
 export type PosterStudioState = ReturnType<typeof usePosterStudio>
+
+// The uploads one page sends: the filled slots its kind lists, or none.
+export function pageUploads(template: Pick<StudioTemplate, 'poster'>, kind: string, uploads: Record<string, string>): Record<string, string> | null {
+  const listed = template.poster.kinds.find((item) => item.key === kind)?.slots ?? []
+  const entries = Object.entries(uploads).filter(([key]) => listed.includes(key))
+  return entries.length ? Object.fromEntries(entries) : null
+}

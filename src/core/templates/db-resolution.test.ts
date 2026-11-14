@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { fromDbTiers, resolutionSchema, toDbTiers, withDbTiers, withTierKeys } from './db-resolution'
+import { fromDbTiers, resolutionSchema, withDbTiers, withTierKeys } from './db-resolution'
 import { creditsCostSchema } from './pricing'
 import { imageCapabilitiesSchema } from './image-capabilities'
 import { normalizeResolution } from './output-options'
@@ -25,15 +25,15 @@ describe('tier ids between the site (4k) and the database (3k until the contract
       unpriced_resolutions: ['4k'],
       tags: ['4k'],
     }
-    const db = toDbTiers(site)
-    expect(db).toEqual({
+    // A row stored before migration 1451 (or job history, which keeps the old name).
+    const db = {
       credits_cost: { '1k': 2, '2k': 4, '3k': 6 },
       inputs: { resolution: '3k', copy: { headline: '4k', note: 'make it 4k' } },
       resolutions: ['1k', '3k'],
       capabilities: { resolutions: ['3k'], resolutionLimit: ['1k', '3k'], catalogImageCosts: { '3k': 0.2 }, aspectRatios: ['1:1'] },
       unpriced_resolutions: ['3k'],
       tags: ['4k'],
-    })
+    }
     expect(fromDbTiers(db)).toEqual(site)
     // Already-renamed rows (after the contract migration) read unchanged.
     expect(fromDbTiers(site)).toEqual(site)
@@ -46,13 +46,11 @@ describe('tier ids between the site (4k) and the database (3k until the contract
     }
     const row = JSON.parse('{"constructor":"a","toString":"b","__proto__":"c","resolution":"toString"}')
     expect(fromDbTiers(row)).toEqual(row)
-    expect(JSON.stringify(toDbTiers(row))).toBe(JSON.stringify(row))
   })
 
   it('renames a bare tier id or tier list returned by an RPC', () => {
     expect(fromDbTiers(['1k', '3k'])).toEqual(['1k', '4k'])
     expect(fromDbTiers('3k')).toBe('4k')
-    expect(toDbTiers(['4k'])).toEqual(['3k'])
     expect(fromDbTiers(['3k', 'other'])).toEqual(['3k', 'other'])
   })
 
@@ -72,11 +70,11 @@ describe('tier ids between the site (4k) and the database (3k until the contract
 describe('withDbTiers (the Supabase clients\' fetch)', () => {
   const json = (body: unknown, init?: ResponseInit) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json; charset=utf-8', 'content-length': '999' }, ...init })
 
-  it('sends database names and returns site names for PostgREST calls', async () => {
+  it('sends requests unchanged and reads the old name in responses as 4k', async () => {
     const base = vi.fn(async (...args: [RequestInfo | URL, RequestInit?]) => args && json([{ id: 'a', credits_cost: { '1k': 1, '2k': 2, '3k': 3 } }]))
     const tierFetch = withDbTiers(base as typeof fetch)
     const response = await tierFetch('https://x.supabase.co/rest/v1/rpc/reserve_credits', { method: 'POST', body: JSON.stringify({ p_inputs: { resolution: '4k' } }) })
-    expect(JSON.parse(base.mock.calls[0]![1]!.body as string)).toEqual({ p_inputs: { resolution: '3k' } })
+    expect(JSON.parse(base.mock.calls[0]![1]!.body as string)).toEqual({ p_inputs: { resolution: '4k' } })
     expect(await response.json()).toEqual([{ id: 'a', credits_cost: { '1k': 1, '2k': 2, '4k': 3 } }])
     expect(response.headers.get('content-length')).toBeNull()
     expect(response.status).toBe(200)

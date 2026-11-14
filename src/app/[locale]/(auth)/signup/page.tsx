@@ -1,9 +1,7 @@
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
-import { Suspense } from 'react'
 
-import { nextIn } from '@/core/auth'
-import { SignupCodeProvider, SignupForm } from '@/core/auth/ui'
+import { SignupCodeProvider } from '@/core/auth/ui'
 import { currentLocale } from '@/core/i18n/server'
 import { CONNECT_PAGE_PATH } from '@/core/partner'
 import { site } from '@/site/site.config'
@@ -29,7 +27,7 @@ export default async function SignupPage() {
   const locale = await currentLocale()
   const form = {
     action: signupAction,
-    google: { action: googleAction, mainlandNote: locale === 'zh' },
+    google: { action: googleAction, mainlandNote: locale === 'zh' || ('zone' as const) },
     resendAction: resendSignupAction,
     giftCredits: site.billing.freeCredits,
     sender,
@@ -37,9 +35,7 @@ export default async function SignupPage() {
   }
   return (
     <SignupCodeProvider>
-      <Suspense fallback={<SignupForm {...form} next={nextIn(null, locale)} initialTab="phone" />}>
-        <SignupScreen {...form} locale={locale} connectPath={CONNECT_PAGE_PATH} />
-      </Suspense>
+      <SignupScreen {...form} locale={locale} connectPath={CONNECT_PAGE_PATH} />
     </SignupCodeProvider>
   )
 }

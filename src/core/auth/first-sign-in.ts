@@ -8,6 +8,7 @@ import { parseShareMark, SHARE_COOKIE } from '../analytics/share-link'
 import type { Locale } from '../i18n/locales'
 import { billingGrant, grantSignupCredits } from './free-credits'
 import { consumeSignupCode, type SignupBenefits } from './signup-code'
+import { claimQuietly } from './signup-gift-claim'
 import { clientIp, recordSignupIp } from './signup-ip'
 import { createAdminSupabase } from './supabase-admin'
 
@@ -30,7 +31,11 @@ export async function onVerifiedSignIn(
   const address = clientIp(await headers())
   const ipStored = await recordSignupIp(admin, userId, address)
   const granted = await grantSignupCredits(billingGrant(admin), userId, benefits.freeCredits)
+  // 1480: an account over the per-network allowance is pending; a confirmed phone or a linked
+  // Google account pays it now (a phone or Google sign-up, or a Google account just linked).
+  const claimed = !granted && benefits.freeCredits > 0 && (await claimQuietly(admin, userId))
   const first = address ? ipStored : granted
+  if (claimed && !first) noteSignupGift()
   const kind = await consumeSignupCode(admin, userId, first, benefits.invite, locale)
   if (first) {
     // 1350: tell the Owner when half, then all, of today's signup gifts are gone (after()).

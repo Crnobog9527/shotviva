@@ -32,7 +32,7 @@ describe('ticket rows open the dialog', () => {
       id, userId: '0b6f3f0e-5d1c-4c47-9a49-6a3f6f8d2e11', email: 'a@example.com', type: 'feedback', status: 'open', refundDecision: null,
       createdAt: '2026-11-13T00:00:00Z', lastMessageAt: '2026-11-13T00:00:00Z', preview: 'Hello', tier: null, dueAt: '2026-11-14T00:00:00Z', overdue: false,
     } as const
-    const html = renderToStaticMarkup(createElement(TicketsView, { filter: { status: 'all' }, page: { items: [row], nextCursor: null }, paged: false }))
+    const html = renderToStaticMarkup(createElement(TicketsView, { filter: { status: 'all' }, page: { items: [row], nextCursor: null }, paged: false, bulk: { reply: async () => ({ ok: true as const, value: { done: [], skipped: [] } }) } }))
     expect(html).toContain(`href="/admin/tickets?status=all&amp;ticket=${id}"`)
     expect(html).not.toContain(`/admin/tickets/${id}`)
   })

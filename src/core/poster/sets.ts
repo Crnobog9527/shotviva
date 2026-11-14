@@ -55,8 +55,10 @@ export async function savePosterSet(db: SupabaseClient, input: SavePosterSet): P
   const content = posterContentSchema.safeParse(input.content)
   if (!content.success) throw fail(content.error.issues[0]?.message ?? 'Invalid poster text')
   const parts = splitPoster(content.data, fields)
-  if (parts.length === 0) throw fail('Add some text before making the posters')
-  if (parts.length > POSTER_PARTS_MAX) throw fail(`At most ${POSTER_PARTS_MAX} posters per set; shorten the text`)
+  // Always the template's pages, each with its own text and within its capacity (§5.3).
+  if (parts.some((part) => part.empty)) throw fail('Fill every page before making the posters')
+  if (parts.some((part) => part.over)) throw fail('A page holds more than fits; shorten it')
+  if (parts.length > POSTER_PARTS_MAX) throw fail(`At most ${POSTER_PARTS_MAX} posters per set`)
   await assertUnderDailyLimit(db, input.userId, input.now ?? new Date())
   const { data, error } = await db.from('poster_sets')
     .insert({ user_id: input.userId, template_id: input.templateId, source: input.source, content: content.data, parts })

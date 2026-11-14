@@ -22,6 +22,13 @@ export const ARK_PRICES: Readonly<Record<string, ArkPrice>> = {
     asOf: '2026-11-13',
     source: ARK_PRICING,
   },
+  'doubao-seedream-5-0-flash-260915': {
+    // "doubao-seedream-5-0-flash：输入图 免费；输出图 0.12" (one price for every size).
+    outputBands: [{ maxPixels: Number.POSITIVE_INFINITY, cny: 0.12 }],
+    inputImageCny: 0,
+    asOf: '2026-11-14',
+    source: ARK_PRICING,
+  },
 }
 
 export function arkPrice(model: string): ArkPrice | null {

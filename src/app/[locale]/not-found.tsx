@@ -1,26 +1,23 @@
-// Rendered under the root layout alone, which carries no stylesheet of its own.
-import '../globals-public.css'
+import { getTranslations } from 'next-intl/server'
 
-import { AnnouncementBanner } from '@/core/announcements'
-import { currentLocale } from '@/core/i18n/server'
+import { Link } from '@/core/i18n/ui'
 
-import { MarketingFooter, MarketingHeader } from './marketing-chrome'
-import { NotFoundContent } from './not-found-content'
-
-// notFound() anywhere under [locale] (an unknown template, an unknown inner page), in the
-// page's language, inside the marketing shell. In-app misses (a photo that is not there) have
-// their own state next to the page. The site announcement sits over the top bar as on every
-// marketing page (gap audit B13).
+// Only for notFound() thrown by a group's own layout: pages are caught by the groups'
+// not-found.tsx inside their layouts ((marketing), (app)); an address that matches no route is
+// app/global-not-found.tsx, and /zh addresses without a Chinese page get the proxy's 404. Here
+// only the root layout stands, which carries no stylesheet, and this boundary imports none on
+// purpose: with inlineCss every page would carry a copy of it in its HTML. So it is plain text.
 export default async function NotFound() {
-  const locale = await currentLocale()
+  const t = await getTranslations('notFound')
   return (
-    <>
-      <AnnouncementBanner />
-      <MarketingHeader locale={locale} />
-      <main className="flex flex-1 flex-col">
-        <NotFoundContent locale={locale} />
-      </main>
-      <MarketingFooter locale={locale} />
-    </>
+    <main style={{ maxWidth: 560, margin: '0 auto', padding: '64px 16px', fontFamily: 'system-ui, sans-serif', lineHeight: 1.5 }}>
+      <h1 style={{ fontSize: 28, margin: '0 0 12px' }}>
+        {t('heading')} {t('headingEm')}
+      </h1>
+      <p>{t('body')}</p>
+      <p>
+        <Link href="/">{t('home')}</Link>
+      </p>
+    </main>
   )
 }

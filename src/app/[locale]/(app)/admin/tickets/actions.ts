@@ -5,6 +5,7 @@ import { after } from 'next/server'
 import { getTranslations } from 'next-intl/server'
 import { z } from 'zod'
 
+import type { BulkOutcome } from '@/core/admin/shell/bulk'
 import { loadUser, runAdminAction, runAdminQuery, type ActionResult, type ActionValue } from '@/core/admin'
 import type { TicketDialogData } from '@/core/admin/tickets-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
@@ -14,6 +15,7 @@ import { jobRefOrShort } from '@/core/jobs'
 import { appOrigin } from '@/core/site-url'
 import { r2Store } from '@/core/storage'
 import {
+  bulkReplyTickets,
   decideRefund,
   loadAdminTicket,
   loadRenewalReview,
@@ -23,6 +25,7 @@ import {
   showMessages,
   ticketAuthor,
   withTicketImages,
+  type BulkTicketSkip,
 } from '@/core/support'
 import { site } from '@/site/site.config'
 
@@ -113,5 +116,20 @@ export async function resolveRenewalAction(input: unknown): Promise<ActionResult
   return runAdminAction(async () => {
     await resolveRenewal(createAdminSupabase(), admin.id, input)
     refresh()
+  })
+}
+
+// The list's batch (close, or one reply to each ticked ticket): each ticket through
+// admin_reply_ticket as its dialog would send it. Only a written reply emails its author, one
+// email per ticket that took it; a bare close emails nobody. Never touches a refund decision or a
+// renewal check: those tickets are skipped (core/support/rules/bulk.ts).
+export async function bulkReplyTicketsAction(input: unknown): Promise<ActionValue<BulkOutcome<BulkTicketSkip>>> {
+  await requireAdmin()
+  return runAdminQuery(async () => {
+    const outcome = await bulkReplyTickets(createAdminSupabase(), input)
+    const body = z.object({ body: z.string() }).safeParse(input)
+    if (body.success && body.data.body.trim()) for (const id of outcome.done) emailAuthorAfterReply(id)
+    if (outcome.done.length > 0) refresh()
+    return outcome
   })
 }

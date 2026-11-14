@@ -28,8 +28,8 @@ async function savepoint<T>(work: () => Promise<T>) {
   try { return await work() } catch (error) { await db.query('rollback to savepoint sp'); throw error }
 }
 
-async function saveSeedream(body = 'Seedream body', cost = { '1k': 80, '2k': 160, '3k': 160 }, expected: number | null = null) {
-  return (await one<{ v: number }>(`select public.admin_save_template_profile($1,$2,'seedream',$3,'medium',$4,'{3k}',$5) v`,
+async function saveSeedream(body = 'Seedream body', cost = { '1k': 80, '2k': 160, '4k': 160 }, expected: number | null = null) {
+  return (await one<{ v: number }>(`select public.admin_save_template_profile($1,$2,'seedream',$3,'medium',$4,'{4k}',$5) v`,
     [actor, id, JSON.stringify({ body, model_params: {}, provider_id: ark, style_refs: [] }), JSON.stringify(cost), expected])).v
 }
 const switchTo = async (target: string, validateOnly = false, ids = [id]) =>
@@ -42,12 +42,12 @@ beforeEach(async () => {
   actor = await createUser(db)
   await db.query("update public.profiles set role='admin' where id=$1", [actor])
   await db.query(`insert into public.ai_providers(id,label,adapter,model,resolutions,estimated_image_costs,capabilities) values
-    ($1,'GPT fixture','openai_images','gpt-fixture','{1k,2k,3k}','{"1k":0.01,"2k":0.01,"3k":0.01}','{}'),
+    ($1,'GPT fixture','openai_images','gpt-fixture','{1k,2k,4k}','{"1k":0.01,"2k":0.01,"4k":0.01}','{}'),
     ($2,'Ark fixture','ark_images','ark-fixture','{1k,2k}','{"1k":0.01,"2k":0.01}','{"resolutions":["1k","2k"]}')`, [openai, ark])
   await db.query("select public.admin_set_provider_key($1,'test-key-0123456789abcdef'), public.admin_set_provider_key($2,'test-key-0123456789abcdef')", [openai, ark])
   id = `prof-${randomUUID().slice(0, 8)}`
   await db.query(`insert into public.templates (id,name,category,fields,quality,credits_cost,is_active,visible_in)
-    values ($1,'Profile fixture','pets',$2,'medium','{"1k":120,"2k":240,"3k":360}',false,array['web'])`,
+    values ($1,'Profile fixture','pets',$2,'medium','{"1k":120,"2k":240,"4k":360}',false,array['web'])`,
   [id, JSON.stringify({ images: { min: 0, max: 1 }, copy: [], aspectRatios: ['1:1'] })])
   await db.query(`insert into public.template_prompts(template_id,body,provider_id) values ($1,'GPT body',$2)`, [id, openai])
   await db.query('insert into public.template_sale_approvals(template_id,enabled) values ($1,true)', [id])
@@ -61,18 +61,18 @@ describe('the live profile follows the existing columns', () => {
     expect(before.active_profile).toBe('openai')
     expect(await profile('openai')).toMatchObject({ prompt_version: before.version, credits_cost: { '1k': 120 } })
     await db.query("update public.template_prompts set body='GPT body 2' where template_id=$1", [id])
-    await db.query(`update public.templates set credits_cost='{"1k":130,"2k":240,"3k":360}' where id=$1`, [id])
-    await db.query("update public.template_sale_approvals set unpriced_resolutions='{3k}' where template_id=$1", [id])
+    await db.query(`update public.templates set credits_cost='{"1k":130,"2k":240,"4k":360}' where id=$1`, [id])
+    await db.query("update public.template_sale_approvals set unpriced_resolutions='{4k}' where template_id=$1", [id])
     const after = await live()
     expect(after.version).toBeGreaterThan(before.version)
-    expect(await profile('openai')).toMatchObject({ prompt_version: after.version, credits_cost: { '1k': 130 }, unpriced_resolutions: ['3k'] })
+    expect(await profile('openai')).toMatchObject({ prompt_version: after.version, credits_cost: { '1k': 130 }, unpriced_resolutions: ['4k'] })
     expect(await drift()).toEqual([])
     expect((await one<{ profile: string }>('select profile from public.template_prompt_versions where template_id=$1 and version=$2', [id, after.version])).profile).toBe('openai')
   })
 
   it('starts a new prompt bound to an Ark model as the Seedream profile', async () => {
     const other = `prof-ark-${randomUUID().slice(0, 6)}`
-    await db.query(`insert into public.templates (id,name,category,quality,credits_cost) values ($1,'Ark','pets','medium','{"1k":120,"2k":240,"3k":360}')`, [other])
+    await db.query(`insert into public.templates (id,name,category,quality,credits_cost) values ($1,'Ark','pets','medium','{"1k":120,"2k":240,"4k":360}')`, [other])
     await db.query('insert into public.template_prompts(template_id,body,provider_id) values ($1,$2,$3)', [other, 'Ark body', ark])
     expect((await one<{ active_profile: string }>('select active_profile from public.template_prompts where template_id=$1', [other])).active_profile).toBe('seedream')
     expect(await one('select profile from public.template_profiles where template_id=$1', [other])).toEqual({ profile: 'seedream' })
@@ -97,9 +97,9 @@ describe('the inactive profile', () => {
     // Same content again: same version. A stale form is refused.
     expect(await saveSeedream('Seedream body', undefined, v)).toBe(v)
     await expect(savepoint(() => saveSeedream('Changed', undefined, null))).rejects.toThrow(/STALE_PROMPT/)
-    await expect(savepoint(() => one(`select public.admin_save_template_profile($1,$2,'openai','{"body":"x"}','medium','{"1k":1,"2k":1,"3k":1}','{}',null)`, [actor, id])))
+    await expect(savepoint(() => one(`select public.admin_save_template_profile($1,$2,'openai','{"body":"x"}','medium','{"1k":1,"2k":1,"4k":1}','{}',null)`, [actor, id])))
       .rejects.toThrow(/PROFILE_ACTIVE/)
-    await expect(savepoint(() => one(`select public.admin_save_template_profile($1,$2,'seedream',$3,'medium','{"1k":1,"2k":1,"3k":1}','{3k}',$4)`,
+    await expect(savepoint(() => one(`select public.admin_save_template_profile($1,$2,'seedream',$3,'medium','{"1k":1,"2k":1,"4k":1}','{4k}',$4)`,
       [actor, id, JSON.stringify({ body: 'x', provider_id: openai }), v]))).rejects.toThrow(/PROFILE_PROVIDER_MISMATCH/)
   })
 
@@ -115,7 +115,7 @@ describe('switching', () => {
     const seedream = await saveSeedream()
     const count = await versions()
     const [row] = await switchTo('seedream')
-    expect(row).toMatchObject({ ok: true, from: 'openai', to: 'seedream', before: { resolutions: ['1k', '2k', '3k'] }, after: { resolutions: ['1k', '2k'] } })
+    expect(row).toMatchObject({ ok: true, from: 'openai', to: 'seedream', before: { resolutions: ['1k', '2k', '4k'] }, after: { resolutions: ['1k', '2k'] } })
     expect(await live()).toMatchObject({ active_profile: 'seedream', version: seedream, body: 'Seedream body', provider_id: ark, is_active: true, credits_cost: { '1k': 80 } })
     expect(await drift()).toEqual([])
     const [back] = await switchTo('openai')
@@ -159,7 +159,7 @@ describe('switching', () => {
 describe('templates:apply ops', () => {
   it('saves a Seedream profile and switches through the batch function', async () => {
     const ops = [
-      { op: 'save_profile', id, profile: 'seedream', quality: 'medium', credits_cost: { '1k': 80, '2k': 160, '3k': 160 }, unpriced_resolutions: ['3k'],
+      { op: 'save_profile', id, profile: 'seedream', quality: 'medium', credits_cost: { '1k': 80, '2k': 160, '4k': 160 }, unpriced_resolutions: ['4k'],
         prompt: { body: 'Apply seedream', model_params: {}, provider_id: ark, style_refs: [] } },
       { op: 'switch_profile', id, profile: 'seedream' },
     ]
@@ -202,5 +202,22 @@ describe('slot floor (1442)', () => {
     [user, id, JSON.stringify({ resolution: '1k', quality: 'medium', input_slots: [{ key: 'a' }, { key: 'b' }, { key: 'c' }] }), tag()])
     expect(await floor(3)).toBe(10)
     expect(await floor(2)).toBe(10 + Math.ceil(0.01 * 1.10 / budget))
+  })
+
+  it('ignores jobs whose input_slots is an object, a string or null instead of failing (1445)', async () => {
+    const user = await createUser(db)
+    await db.query('set local session_replication_role = replica')
+    for (const slots of [{ logo: 'inputs/u/a.png' }, 'inputs/u/a.png', null]) {
+      await db.query(`insert into public.generation_jobs (id,user_id,module,template_id,inputs,provider,source,status,visibility,credits_cost,credit_pool,cost_usd,output_key,finished_at)
+        select gen_random_uuid(),$1,'image',$2,$3,$4,'web','succeeded','private',1,'paid',0.5,'t1445/x',now() from generate_series(1,10)`,
+      [user, id, JSON.stringify({ resolution: '1k', quality: 'medium', input_slots: slots }), tag()])
+    }
+    // Every reader of the slot count: the editor's pricing read, the slot floor and the reports that use it.
+    await expect(one("select public.template_sync_pricing_input('env-model') r")).resolves.toBeTruthy()
+    expect((await one<{ c: Record<string, unknown> }>('select admin.route_slot_costs($1) c', [tag()])).c).toMatchObject({ p95_full: {} })
+    expect(await floor(3)).toBe(30)
+    await expect(one('select admin.slot_floor_credits(t,$2,$3,10) f from public.templates t where t.id=$1', [id, tag(), '1k'])).resolves.toEqual({ f: 10 })
+    await expect(one('select admin.sale_floor_hidden() h')).resolves.toBeTruthy()
+    expect((await one<{ n: number | null }>("select admin.slot_count('{\"input_slots\":\"x\"}'::jsonb) n")).n).toBeNull()
   })
 })

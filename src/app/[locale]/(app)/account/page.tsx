@@ -4,8 +4,8 @@ import { getTranslations } from 'next-intl/server'
 
 import { hasAffiliateDashboard } from '@/core/affiliate/feature'
 import { AppPage } from '@/core/app-shell'
-import { AccountHeader, AccountView, InviteCard, RedeemCard, STRIP_FRAMES } from '@/core/account/ui'
-import { createAdminSupabase, createServerSupabase, requireUser, readSignupGift } from '@/core/auth'
+import { AccountHeader, AccountView, GiftClaimCard, InviteCard, RedeemCard, STRIP_FRAMES } from '@/core/account/ui'
+import { createAdminSupabase, createServerSupabase, readClaimOptions, readSignupGift, requireUser } from '@/core/auth'
 import { maskPhone } from '@/core/auth/phone'
 import { readPendingDiscount } from '@/core/codes/server'
 import { readBalance } from '@/core/billing'
@@ -23,6 +23,7 @@ import { contractProducts, displayProducts } from '@/site/billing/display-produc
 import { site } from '@/site/site.config'
 
 import { actions, helpActions } from './account-actions'
+import { claimGoogleAction, claimPhoneSendAction, claimPhoneVerifyAction } from './claim-actions'
 import { loadMyInvites } from './invite-action'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -52,6 +53,8 @@ async function Account() {
     displayProducts(),
     history,
   ])
+  // 1480: an account over the per-network allowance can still claim its signup gift.
+  const claimOptions = signupGift.reason === 'same_ip_pending' ? await readClaimOptions(admin) : null
   const purchases = paymentChoices(payments, identities, t as unknown as Translate, { money: formatMoney(locale) })
   const last = lastMembership(payments, identities)
   const more = payments.length >= PICKER_LIMIT
@@ -62,6 +65,7 @@ async function Account() {
   return (
     <>
       <AccountView data={data} actions={actions} site={{ brand: site.brand.name, products: offers, freeCredits: signupGift.granted }}>
+        {claimOptions ? <GiftClaimCard credits={site.billing.freeCredits} options={claimOptions} actions={claimActions} /> : null}
         <InviteCard load={loadMyInvites} />
         <RedeemCard pending={discount} />
       </AccountView>
@@ -69,6 +73,8 @@ async function Account() {
     </>
   )
 }
+
+const claimActions = { sendCode: claimPhoneSendAction, verifyCode: claimPhoneVerifyAction, google: claimGoogleAction }
 
 export default function AccountPage() {
   return (

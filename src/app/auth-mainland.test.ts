@@ -18,7 +18,7 @@ async function render(element: ReactElement, locale: 'en' | 'zh') {
 const action = async () => IDLE
 const phone = { send: action, verify: action }
 const base = { action, resendAction: action, next: '/zh/generate', sender: 'Shotviva <mail@shotviva.com>' }
-const login = (mainlandNote: boolean, extra: object = {}) =>
+const login = (mainlandNote: boolean | 'zone', extra: object = {}) =>
   createElement(LoginForm, { ...base, google: { action, mainlandNote }, notice: null, ...extra })
 
 describe('before hydration', () => {
@@ -46,8 +46,23 @@ describe('Google on mainland networks', () => {
   })
 
   it('shows on English pages for mainland time zones only (the page is static)', async () => {
-    const { inMainlandZone } = await import('./[locale]/(auth)/mainland-zone')
+    const { inMainlandZone } = await import('@/core/auth/mainland-zone')
     for (const zone of ['Asia/Shanghai', 'Asia/Urumqi']) expect(inMainlandZone(zone)).toBe(true)
     for (const zone of ['Asia/Hong_Kong', 'Asia/Macau', 'Asia/Taipei', 'America/New_York', 'UTC']) expect(inMainlandZone(zone)).toBe(false)
+  })
+
+  it("English pages' cached HTML carries the line hidden and shows it before the first paint for a mainland time zone", async () => {
+    const html = await render(login('zone'), 'en')
+    const at = html.indexOf('<p class="au-hint au-gnote" hidden="">')
+    expect(at).toBeGreaterThan(-1)
+    const script = /<p class="au-hint au-gnote" hidden="">[^<]*<\/p><script>([\s\S]*?)<\/script>/.exec(html)?.[1]
+    expect(script).toBeDefined()
+    const { runInNewContext } = await import('node:vm')
+    for (const [zone, shown] of [['Asia/Shanghai', true], ['Asia/Urumqi', true], ['Asia/Hong_Kong', false], ['America/New_York', false]] as const) {
+      const note = { hidden: true }
+      const Intl = { DateTimeFormat: () => ({ resolvedOptions: () => ({ timeZone: zone }) }) }
+      runInNewContext(script!.replace(/&quot;/g, '"'), { Intl, document: { currentScript: { previousElementSibling: note } } })
+      expect(note.hidden).toBe(!shown)
+    }
   })
 })

@@ -25,6 +25,10 @@ const ADMIN = /^\/admin(\/|$)/
 const SIGNED_IN = /^\/(account|checkout|generate|photos|posters|wishlist|reset\/update)(\/|$)|^\/connect\/graylum\/?$/
 // Development-only harnesses (the T4 upload test): a real 404 everywhere else, in any language.
 const DEV_ONLY = /^\/generate\/upload-test\/?$/
+// Validation-only pages (/error-test, which throws to show the error boundary): local builds and
+// the test site, a real 404 on production and under /zh. The page's own check runs after the 200
+// shell has streamed, so it cannot change the status.
+const VALIDATION_ONLY = /^\/error-test\/?$/
 // Route handlers and files outside the locale tree: session refresh only, no locale routing.
 const NOT_A_PAGE = /^\/(api|auth|ingest|monitoring)(\/|$)|^\/(sitemap[\w-]*\.xml|robots\.txt|llms\.txt)$/
 
@@ -36,6 +40,8 @@ export type ProxyGateOptions = {
   translatedPaths: readonly string[]
   forward: Forward
   devPages?: boolean
+  // Validation-only pages answer (everywhere but production).
+  validationPages?: boolean
   // Tests pass their own; the proxy uses fetch.
   fetchPage?: FetchPage
   // Key material for the identity header handed to the page (forwarded-identity.ts): the
@@ -96,6 +102,13 @@ export function lowercasePath(pathname: string): string | null {
   return lower === pathname ? null : lower
 }
 
+// A development or validation harness outside the environments it is for, or under /zh.
+function closedHarness(path: string, locale: string, options: Pick<ProxyGateOptions, 'devPages' | 'validationPages'>): boolean {
+  if (DEV_ONLY.test(path)) return !options.devPages || locale !== DEFAULT_LOCALE
+  if (VALIDATION_ONLY.test(path)) return !options.validationPages || locale !== DEFAULT_LOCALE
+  return false
+}
+
 // Answers that need no session: wrong case, development-only pages, /zh addresses of
 // English-only pages (ARCHITECTURE §17). null means "go on to the gates".
 async function addressAnswer(request: NextRequest, options: ProxyGateOptions): Promise<NextResponse | null> {
@@ -106,7 +119,7 @@ async function addressAnswer(request: NextRequest, options: ProxyGateOptions): P
   if (path === NOT_FOUND_PAGE) {
     return request.headers.get(NOT_FOUND_RENDER_HEADER) === '1' ? null : localizedNotFound(request, locale, options.fetchPage)
   }
-  if (DEV_ONLY.test(path) && (!options.devPages || locale !== DEFAULT_LOCALE)) return notFoundResponse()
+  if (closedHarness(path, locale, options)) return notFoundResponse()
   if (locale !== DEFAULT_LOCALE && !matchesPaths(path, options.translatedPaths)) {
     return localizedNotFound(request, locale, options.fetchPage)
   }

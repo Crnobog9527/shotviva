@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
-import { toDbTiers } from '../../src/core/templates/db-resolution'
 import { readTemplateQuote } from '../../src/site/template-pricing'
 import { connectAdmin, createUser, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
@@ -33,7 +32,7 @@ async function sync(run: string, active: 'openai' | 'seedream', body: string, in
   const { floors, receipt, envModel } = await readTemplateQuote(serviceSupabase())
   return serviceClient().rpc('sync_preview_template', {
     p_template: template(), p_prompt: { body, version: 1, model_params: {}, style_refs: [] }, p_provider: active === 'seedream' ? ark : gpt,
-    p_floors: toDbTiers({ ...floors, quote_receipt: receipt, env_model: envModel }), p_run_id: run, p_locales: ['en', 'zh'],
+    p_floors: { ...floors, quote_receipt: receipt, env_model: envModel }, p_run_id: run, p_locales: ['en', 'zh'],
     p_target_token: (target.data as { token: string }).token, p_catalog_version: 'v1',
     p_profiles: { active, inactive }, p_validate_only: false,
   })

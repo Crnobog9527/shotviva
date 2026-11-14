@@ -11,7 +11,14 @@ import { legacyHelpRedirects } from './src/core/support/legacy-redirects'
 import { assetsHeaders, assetsRemotePatterns, assetsRewrites, readAssetsEnv } from './src/core/storage/assets-env'
 import { SITE_DOMAIN } from './src/site/domain'
 
-const withNextIntl = createNextIntlPlugin('./src/site/i18n/request.ts')
+// Messages are compiled to next-intl's compact form at build time (precompile), so pages ship and
+// run its small formatter instead of the ICU parser (~9 KB gz on every page) and no message is
+// parsed in the browser. Only the catalogs under src/site/messages are compiled; plain strings stay
+// strings, so code that reads one as text (the zh manifest) is unaffected.
+const withNextIntl = createNextIntlPlugin({
+  requestConfig: './src/site/i18n/request.ts',
+  experimental: { messages: { path: './src/site/messages', format: 'json', locales: ['en', 'zh'], precompile: true } },
+})
 
 // PostHog US cloud behind our own origin (ARCHITECTURE §16.1), so ad blockers that block
 // *.posthog.com do not drop events. Static assets (lazy-loaded extensions) have their own host.
@@ -39,13 +46,23 @@ const nextConfig: NextConfig = {
   // answers them with Access-Control-Allow-Origin: *, which the cross-origin font files need.
   assetPrefix: publicEnvAtBuild.NEXT_PUBLIC_ASSET_CDN_URL,
   cacheComponents: true,
+  // Vercel builds skip next build's type-check step: only main and validation/preview deploy, and
+  // both receive code only through PRs whose required CI check ("lint · typecheck · test · build")
+  // already ran `pnpm typecheck` on it. Local and CI builds (no VERCEL=1) still type-check.
+  typescript: { ignoreBuildErrors: process.env.VERCEL === '1' },
   // Development action arguments can contain admin-only prompt bodies and private asset keys.
   logging: { serverFunctions: false },
   // The build's version, read by the new-version banner and /api/version (T90, core/app-update).
   env: { NEXT_PUBLIC_APP_VERSION: appVersion(process.env) },
   // Pages live under app/[locale]; an address matching no route at all has no root layout,
   // so app/global-not-found.tsx renders it (ARCHITECTURE §17).
-  experimental: { globalNotFound: true },
+  // inlineCss: every page's stylesheets arrive inside the HTML as <style>, so the first screen paints
+  // as soon as the parser reaches it instead of waiting for 7 CSS files that share a slow link with
+  // the scripts, fonts and pictures. Mobile LCP with throttling applied: / 2.76 -> 1.04 s, /zh
+  // 2.68 -> 1.10 s, /login 2.96 -> 1.20 s (local A/B, PR #622). Global in Next 16.4 (no per-route
+  // switch): a signed-in page's first full load carries the app's sheet in its HTML (~28 KB br)
+  // instead of a cached file; moves inside the app are unchanged (Next uses <link> for those).
+  experimental: { globalNotFound: true, inlineCss: true },
   // Off for the site as a whole: with it on, every page's HTML also embeds a runtime prefetch
   // of itself (a second copy of the page tree and of the client messages, about 40% of the
   // marketing pages' HTML) and the server renders the page twice to produce it. The signed-in

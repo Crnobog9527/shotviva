@@ -197,6 +197,8 @@
       "AUTH_SMS_DAILY_LIMIT": "No more codes today for this number. Try again tomorrow, or use email.",
       "AUTH_SMS_FAILED": "The text message didn't go out. Try again in a moment, or use email.",
       "AUTH_OTP_INVALID": "That code is wrong or has expired. Check it, or get a new one.",
+      "AUTH_SIGNUP_LIMITED": "Too many sign-ups from this network in the last hour. Please try again in an hour.",
+      "AUTH_PHONE_TAKEN": "This number already belongs to another account. Try a different number.",
       "INTERNAL": "Something went wrong. Please try again.",
       "CONFLICT": "That request was already handled."
     },
@@ -629,7 +631,7 @@
       "paid": "You have {paid, plural, one {# credit} other {# credits}}.",
       "getCredits": "Get credits",
       "panelTitle": "Credits",
-      "signupGiftRefused": "No sign-up credits were recorded for this account. Sign-up gifts are limited to one per network in 24 hours.",
+      "signupGiftRefused": "No signup credits yet: this network already used today's allowance. Verify a phone number or a Google account below to claim them.",
       "signupGiftRefusedCap": "No sign-up credits for this account: that day's sign-up gifts had all been given out.",
       "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up."
     },
@@ -717,6 +719,10 @@
         "footer": "Footer",
         "pending": "has lines to check"
       },
+      "pages": {
+        "shared": "Both pages",
+        "page": "Page {page} · {name}"
+      },
       "flagged": "Not found in your pasted text, or cut to fit. Check it.",
       "header": {
         "brand": "Organiser",
@@ -746,7 +752,11 @@
           "plain": "Plain"
         },
         "lines": "Lines (one per row)",
-        "add": "Add a section"
+        "add": "Add a section",
+        "heading": {
+          "title": "Column heading",
+          "titleEn": "Column heading (English)"
+        }
       },
       "table": {
         "none": "This style has no table.",
@@ -770,8 +780,14 @@
       "remove": "Remove",
       "split": {
         "count": "{count, plural, =0 {Nothing to make yet} one {Makes # poster} other {Makes # posters}}",
-        "part": "{name} {page}/{pages}",
-        "oversized": "A section is longer than one poster can hold. Shorten it or split it into two sections."
+        "part": "Page {page} · {name}",
+        "ready": "ready",
+        "empty": "Nothing on this page yet. Fill it in, or paste a notice that has it.",
+        "over": {
+          "prizeRows": "Too many prizes for one page: {count} rows, at most {max}. Shorten the list.",
+          "chars": "Too much text for one page: {count} characters in the sections, at most {max}. Shorten it.",
+          "tableRows": "Too many table rows for one page: {count}, at most {max}. Remove some rows."
+        }
       },
       "size": "Size",
       "resolution": "Resolution",
@@ -787,6 +803,8 @@
         "expected": "Confirmed: ",
         "seen": "On the poster: ",
         "notFound": "Not found on the poster",
+        "extra": "Added on the poster: ",
+        "repeated": "Row drawn more than once: ",
         "redraw": "Redraw this poster · {credits} credits",
         "redrawFree": "Redraw this poster for free",
         "freeNote": "Your first redraw of a poster that failed the check is free: {credits} credits are held while it draws and all given back once it is done.",
@@ -800,7 +818,8 @@
         "invalid": "Some text is too long or a table row is incomplete. Check the blocks.",
         "notEnough": "Not enough credits.",
         "error": "Something went wrong. Please try again."
-      }
+      },
+      "slotHint": "Optional. Leave it empty and the prizes are drawn from their text."
     },
     "sizes": {
       "closest": "Closest to original ({ratio})",
@@ -1544,6 +1563,29 @@
       "copied": "Link copied",
       "text": "A phone photo made into this with the {name} template on Shotviva:",
       "copyByHand": "Copy this link to share it:"
+    },
+    "giftClaim": {
+      "title": "Claim your signup credits",
+      "body": "{perIp} accounts on this network already received signup credits in the last 24 hours, so this one is waiting. Verify a phone number or a Google account to get {credits} credits. Each phone number and each Google account can claim once.",
+      "phoneButton": "Add a phone number to get {credits} credits",
+      "googleButton": "Claim with Google",
+      "phoneLabel": "Phone number",
+      "phonePlaceholder": "11-digit number",
+      "consent": "I have read and agree to the <terms>Terms of Service</terms>, <privacy>Privacy Policy</privacy> and <aup>Acceptable Use Policy</aup>.",
+      "send": "Send code",
+      "sent": "We sent a code to {phone}. It works for {minutes} minutes.",
+      "codeLabel": "Code",
+      "verify": "Verify and get {credits} credits",
+      "bindNote": "You can also sign in to this account with this number afterwards.",
+      "granted": "{credits} credits added.",
+      "reasons": {
+        "already_used": "This phone number or Google account already claimed signup credits. Each can claim once.",
+        "daily_cap": "Today's signup credits are all given out. Please come back tomorrow.",
+        "paused": "Signup credits are paused. Please come back later.",
+        "method_off": "This way of claiming is turned off for now.",
+        "no_identity": "No verified phone number or Google account yet. Verify one first.",
+        "not_pending": "This account has no signup credits waiting."
+      }
     }
   },
   "paywall": {
