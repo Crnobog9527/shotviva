@@ -17,14 +17,19 @@ const AS_OF = '2026-11-06'
 // GPT Image 2.x bills its output as image tokens; there is no separate text-output price.
 const GPT_IMAGE_2X: ModelPrice = { prices: { inputTextPerM: 5, inputImagePerM: 8, outputPerM: 30 }, asOf: AS_OF, source: OPENAI_PRICING }
 
+// The edit classifier (T30). Input and output only: its preview image is billed as input
+// tokens. Short-context rate (≤272K input tokens); a 3 s classification never gets near that.
+const GPT_6_LUNA: ModelPrice = { prices: { inputTextPerM: 0.1, inputImagePerM: null, outputPerM: 0.5 }, asOf: AS_OF, source: OPENAI_PRICING }
+
 export const MODEL_PRICES: Readonly<Record<string, ModelPrice>> = {
   'gpt-image-2.6-sunburst': GPT_IMAGE_2X,
   'gpt-image-2.6-flare': GPT_IMAGE_2X,
   'gpt-image-2.5-sunburst': GPT_IMAGE_2X,
   'gpt-image-2.5-flare': GPT_IMAGE_2X,
-  // The edit classifier (T30). Input and output only: its preview image is billed as input
-  // tokens. Short-context rate (≤272K input tokens); a 3 s classification never gets near that.
-  'gpt-6-luna': { prices: { inputTextPerM: 0.1, inputImagePerM: null, outputPerM: 0.5 }, asOf: AS_OF, source: OPENAI_PRICING },
+  'gpt-6-luna': GPT_6_LUNA,
+  // The same model as the decision row on OpenRouter (2026-11-15: OpenAI only via OpenRouter, with
+  // the Owner's OpenAI key as BYOK). BYOK bills OpenAI's own rate upstream, so the price is OpenAI's.
+  'openai/gpt-6-luna': GPT_6_LUNA,
 }
 
 // Exact model name, ignoring surrounding spaces and case. Own-property lookup only, so a model

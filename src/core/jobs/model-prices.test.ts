@@ -19,6 +19,9 @@ describe('MODEL_PRICES', () => {
     expect(officialPrice('gpt-image-2.6-sunburst')?.prices).toEqual({ inputTextPerM: 5, inputImagePerM: 8, outputPerM: 30 })
     expect(officialPrice('gpt-image-2.5-sunburst')?.prices).toEqual({ inputTextPerM: 5, inputImagePerM: 8, outputPerM: 30 })
     expect(officialPrice('gpt-6-luna')?.prices).toEqual({ inputTextPerM: 0.1, inputImagePerM: null, outputPerM: 0.5 })
+    expect(officialPrice('openai/gpt-6-luna')?.prices).toEqual({ inputTextPerM: 0.1, inputImagePerM: null, outputPerM: 0.5 })
+    // The OpenRouter image line is costed from OpenRouter's own usage, never from this table.
+    expect(officialPrice('openai/gpt-image-2.6-sunburst')).toBeNull()
     // Not on OpenAI's pricing page on 2026-11-06: never guessed.
     expect(officialPrice('gpt-image-2.6')).toBeNull()
   })

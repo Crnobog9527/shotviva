@@ -1,6 +1,6 @@
 import 'server-only'
 
-import type { ProviderAdapterId } from './types'
+import { OPENROUTER_BASE_URL, type ProviderAdapterId } from './types'
 
 // Use OpenRouter's authenticated /key endpoint: its public catalogue is accessible without a key.
 // Only the HTTP status leaves this function because a vendor body can echo the request.
@@ -50,7 +50,10 @@ function requestFor(config: TestTarget): { url: string; init: RequestInit } {
     url: `${config.baseUrl}/images/generations`,
     init: { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: config.model ?? '' }) },
   }
-  const path = config.adapter === 'openrouter_images' ? 'key' : 'models'
+  // OpenRouter's /models is public, so it would pass with any key: ask /key instead, for the
+  // Responses (decision) row on OpenRouter too.
+  const openRouter = config.adapter === 'openrouter_images' || config.baseUrl.replace(/\/+$/, '') === OPENROUTER_BASE_URL
+  const path = openRouter ? 'key' : 'models'
   return { url: `${config.baseUrl}/${path}`, init: { method: 'GET', headers: auth } }
 }
 
