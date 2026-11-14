@@ -244,7 +244,8 @@
 }
 @font-face {
   font-family: "Instrument Serif Fallback";
-  src: local("Arial");
+  /* Arimo and Liberation Sans share Arial's metrics, for systems without Arial (geist-fonts.tsx). */
+  src: local("Arial"), local("Arimo"), local("Liberation Sans");
   ascent-override: 128.92%;
   descent-override: 40.37%;
   line-gap-override: 0%;
