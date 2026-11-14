@@ -1,9 +1,7 @@
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
-import { Suspense } from 'react'
 
 import { EMAIL_LINK_HOURS } from '@/core/auth'
-import { ResetRequestForm } from '@/core/auth/ui'
 
 import { resetRequestAction } from '@/app/auth/actions'
 
@@ -20,8 +18,6 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function ResetPage() {
   const form = { action: resetRequestAction, linkHours: EMAIL_LINK_HOURS, sender }
   return (
-    <Suspense fallback={<ResetRequestForm {...form} linkExpired={false} />}>
-      <ResetScreen {...form} />
-    </Suspense>
+    <ResetScreen {...form} />
   )
 }
