@@ -7,6 +7,10 @@ import { pageMetadata } from '@/core/seo'
 import { acceptableUsePage, privacyPage, refundPolicyPage, termsPage, withWechatPay } from '@/site/content'
 import { site } from '@/site/site.config'
 
+// Only the four legal pages draw .mk-legal; every other marketing page went without these rules
+// inlined into its HTML (they came with the group's layout before).
+import './legal.css'
+
 // The four legal routes (T45, design/comps-v3-b/legal.html). English only (Owner 2026-11-06,
 // ARCHITECTURE §17): there is no /zh version, a Chinese page's legal links open these, and the
 // language switch here offers the /zh home. None is in the keyword map, so all are noindex.
