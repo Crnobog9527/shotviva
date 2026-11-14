@@ -15,7 +15,9 @@ import type { AdminProvider, ProviderAdminActions } from '../providers/types'
 
 import { PROVIDERS_COPY } from './copy'
 import { canSave, formFor, tierOptions, usesTokenPrices, withBaseUrl, withAdapter, withModel, withTier, type ProviderForm, type TierOptions } from './form-state'
+import { ByokField } from './byok-field'
 import { CatalogPrices } from './catalog-prices'
+import { DECISION_ROUTES, decisionRoute, withDecisionRoute, type DecisionRoute } from './decision-route'
 import { ImageCostFields } from './image-cost-fields'
 import { PriceFields } from './price-fields'
 import { useModelResolutions } from './use-model-resolutions'
@@ -102,7 +104,23 @@ function CatalogPreview({ catalog }: { catalog: ReturnType<typeof useModelResolu
 function modelHint(form: ProviderForm) {
   if (form.adapter === 'openrouter_images') return COPY.routerModelHint
   if (form.adapter === 'ark_images') return COPY.arkModelHint
+  if (form.module === 'decision' && decisionRoute(form) === 'openrouter') return COPY.decisionModelHint
   return PROVIDERS_COPY.modules[form.module].modelHint
+}
+
+type SetForm = React.Dispatch<React.SetStateAction<ProviderForm>>
+
+// The decision row's endpoint: OpenRouter or OpenAI's own, both on the Responses adapter.
+function DecisionRouteField({ form, setForm }: { form: ProviderForm; setForm: SetForm }) {
+  const route = decisionRoute(form)
+  return (
+    <Field id="adapter" label={COPY.adapter} hint={COPY.decisionRouteHint[route]}>
+      <select id="provider-adapter" className="border-input h-9 rounded-md border px-3 text-sm" value={route}
+        onChange={(event) => setForm((prev) => withDecisionRoute(prev, event.target.value as DecisionRoute))}>
+        {DECISION_ROUTES.map((id) => <option key={id} value={id}>{COPY.decisionRoutes[id]}</option>)}
+      </select>
+    </Field>
+  )
 }
 
 type PricesProps = {
@@ -138,15 +156,19 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
           <Field id="label" label={COPY.label} hint={COPY.labelHint}>
             {input('label')}
           </Field>
-          <Field id="adapter" label={COPY.adapter} hint={COPY.adapterHint[form.adapter]}>
-            <select id="provider-adapter" className="border-input h-9 rounded-md border px-3 text-sm"
-              value={form.adapter} disabled={provider !== null || form.module === 'decision'}
-              onChange={(event) => setForm(withAdapter(form, event.target.value as ProviderAdapterId))}>
-              {MODULE_ADAPTERS[form.module].map((id) => <option key={id} value={id}>{PROVIDERS_COPY.adapters[id]}</option>)}
-            </select>
-          </Field>
+          {form.module === 'decision' ? <DecisionRouteField form={form} setForm={setForm} /> : (
+            <Field id="adapter" label={COPY.adapter} hint={COPY.adapterHint[form.adapter]}>
+              <select id="provider-adapter" className="border-input h-9 rounded-md border px-3 text-sm"
+                value={form.adapter} disabled={provider !== null}
+                onChange={(event) => setForm(withAdapter(form, event.target.value as ProviderAdapterId))}>
+                {MODULE_ADAPTERS[form.module].map((id) => <option key={id} value={id}>{PROVIDERS_COPY.adapters[id]}</option>)}
+              </select>
+            </Field>
+          )}
           <Field id="baseUrl" label={COPY.baseUrl} hint={COPY.baseUrlHint}>
-            {input('baseUrl', true)}
+            {form.module === 'decision' && decisionRoute(form) === 'openrouter'
+              ? <Input id="provider-baseUrl" className="font-mono" value={form.baseUrl} readOnly disabled />
+              : input('baseUrl', true)}
           </Field>
           <Field id="model" label={COPY.model} hint={modelHint(form)}>
             {input('model', true)}
@@ -155,6 +177,7 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
           <CatalogPreview catalog={catalog} />
           {form.module === 'image' && (
             <>
+              <ByokField form={form} onChange={(on) => setForm((prev) => ({ ...prev, byokListPrice: on }))} />
               <TierChoice tiers={tiers} onToggle={(tier, on) => setForm((prev) => withTier(prev, tiers.selected, tier, on))} />
               <ImageCostFields adapter={form.adapter} tiers={form.resolutions} values={form.imageCosts} estimates={estimates}
                 onChange={(tier, value) => setForm((prev) => ({ ...prev, imageCosts: { ...prev.imageCosts, [tier]: value } }))} />

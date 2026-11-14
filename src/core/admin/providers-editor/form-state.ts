@@ -21,6 +21,8 @@ export type ProviderForm = {
   imageCosts: Partial<Record<Resolution, string>>
   // USD per extra input image of a slot job (1442), as typed; blank means not set.
   extraInputCost: string
+  // 「BYOK（按官方价）」 (1551): only shown, and only saved, for an OpenRouter openai/gpt-image-* line.
+  byokListPrice: boolean
   label: string
   baseUrl: string
   model: string
@@ -43,6 +45,7 @@ export const DEFAULT_FORM: ProviderForm = {
   resolutions: [...RESOLUTIONS],
   imageCosts: {},
   extraInputCost: '',
+  byokListPrice: true,
   model: '',
   apiKey: '',
   notes: '',
@@ -54,13 +57,18 @@ export const DEFAULT_FORM: ProviderForm = {
 const priceText = (value: number | null) => (value === null ? '' : String(value))
 
 export function formFor(provider: AdminProvider | null, module: ProviderModule = 'image'): ProviderForm {
-  if (!provider) return { ...DEFAULT_FORM, module, adapter: MODULE_ADAPTER[module] }
+  if (!provider) {
+    const form = { ...DEFAULT_FORM, module, adapter: MODULE_ADAPTER[module] }
+    // A new decision row starts on OpenRouter (decision-route.ts; Owner 2026-11-15).
+    return module === 'decision' ? { ...form, baseUrl: OPENROUTER_BASE_URL } : form
+  }
   return fillOfficial({
     module: provider.module,
     adapter: provider.adapter,
     resolutions: provider.resolutions,
     imageCosts: Object.fromEntries(Object.entries(provider.estimatedImageCosts ?? {}).map(([tier, cost]) => [tier, String(cost)])),
     extraInputCost: provider.extraInputImageUsd == null ? '' : String(provider.extraInputImageUsd),
+    byokListPrice: provider.byokListPrice ?? true,
     label: provider.label,
     baseUrl: provider.baseUrl,
     model: provider.model,
@@ -176,6 +184,10 @@ export function tiersFor(adapter: ProviderAdapterId): readonly Resolution[] {
 // not used, and the floor needs a hand-entered per-image estimate for every tier until it has samples.
 export const usesTokenPrices = (form: Pick<ProviderForm, 'adapter'>) => form.adapter !== 'ark_images'
 
+// The lines admin.provider_list_priced can price like the official OpenAI line (1551).
+export const byokApplies = (form: Pick<ProviderForm, 'module' | 'adapter' | 'model'>) =>
+  form.module === 'image' && form.adapter === 'openrouter_images' && form.model.trim().startsWith('openai/gpt-image-')
+
 export function toSaveInput(form: ProviderForm, provider: AdminProvider | null): SaveProviderInput {
   return {
     ...(provider ? { id: provider.id } : {}),
@@ -184,6 +196,7 @@ export function toSaveInput(form: ProviderForm, provider: AdminProvider | null):
     resolutions: form.resolutions,
     estimatedImageCosts: Object.fromEntries(form.resolutions.filter((tier) => form.imageCosts[tier]?.trim()).map((tier) => [tier, Number(form.imageCosts[tier])])),
     ...(form.module === 'image' ? { extraInputImageUsd: form.extraInputCost.trim() } : {}),
+    ...(byokApplies(form) ? { byokListPrice: form.byokListPrice } : {}),
     label: form.label,
     baseUrl: form.baseUrl,
     model: form.model,
@@ -217,6 +230,9 @@ type Saved = Pick<AdminProvider, 'model' | 'resolutions'> | null | undefined
 
 function detectedTiers(form: ProviderForm, catalog: readonly Resolution[] | null, saved: Saved) {
   const model = form.model.trim()
+  // A decision row has no image tiers and hides the control: keep the stored default, so renaming
+  // its model (decision-route.ts) never empties them and blocks Save.
+  if (form.module === 'decision') return { tiers: RESOLUTIONS, known: true }
   if (form.adapter === 'openai_images') return openAIImageTiers(model)
   if (form.adapter === 'ark_images') return { tiers: ARK_RESOLUTIONS, known: true }
   return { tiers: catalog ?? (saved?.model === model ? saved.resolutions : []), known: true }

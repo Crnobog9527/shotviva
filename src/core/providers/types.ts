@@ -56,6 +56,9 @@ export type AdminProvider = {
   estimatedImageCosts?: EstimatedImageCosts
   // Slot floor (1442): each extra input image a slot job sends, in USD; null = not set.
   extraInputImageUsd?: number | null
+  // 1551: an OpenRouter openai/gpt-image-* line billed through the Owner's own OpenAI key (BYOK)
+  // is priced like the official line; undefined on a database without the column.
+  byokListPrice?: boolean
   model: string
   apiKeyLast4: string | null
   isActive: boolean
