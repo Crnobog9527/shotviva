@@ -7,7 +7,7 @@ import { FoldSection } from '@/core/ui/fold-section'
 
 import type { CatalogueCopyField, CatalogueFieldGroup, CatalogueImageSlot } from '../catalogue/catalogue-template'
 import { groupState, initialOpen, type GroupState } from './field-group-state'
-import { SlotBox, MissingSlotPhotos } from './slot-boxes'
+import { SlotBox, MissingSlotPhotos, NameOnlyHint } from './slot-boxes'
 import { CopyFields } from './text-fields'
 import { clearCopy } from './copy-examples'
 import { Button } from '@/core/ui/button'
@@ -52,6 +52,7 @@ export function FieldGroups({ groups, missing = null, ...shared }: Props) {
             {group.items.map((item) => (typeof item === 'string'
               ? <Member key={item} memberKey={item} {...shared} />
               : <Block key={item.key} block={item} {...shared} />))}
+            <NameOnlyHint keys={groupKeys(group)} slots={shared.slots} fields={shared.fields} copy={shared.copy} photos={shared.photos} />
             <ClearGroup group={group} {...shared} />
           </div>
         </FoldSection>

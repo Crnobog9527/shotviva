@@ -11,6 +11,7 @@ import type { CatalogueCopyField, CatalogueImageSlot } from '../catalogue/catalo
 import { ICONS } from './photo-pickers'
 import { PhotoSize, UploadStage } from './photo-card'
 import { CopyFields } from './text-fields'
+import { namedWithoutPhoto } from './field-group-state'
 import type { SlotPhotos } from './use-photo-batch'
 
 type Props = {
@@ -46,9 +47,19 @@ export function SlotBoxes({ slots, photos, fields, copy, onCopy, missing = null 
           </section>
         )
       })}
+      <NameOnlyHint keys={slots.map((slot) => slot.key)} slots={slots} fields={fields} copy={copy} photos={photos} />
       <p className="text-caption text-muted-foreground">{t('slots.oneAtATime')}</p>
     </div>
   )
+}
+
+// A friendly line, only while some slot among `keys` has its name typed and no photo: the model
+// then draws the real product the name describes, which may differ from the user's own. No block.
+export function NameOnlyHint({ keys, slots, fields, copy, photos }: { keys: readonly string[]; slots: readonly CatalogueImageSlot[]; fields: readonly CatalogueCopyField[]; copy: Record<string, string>; photos?: SlotPhotos }) {
+  const t = useTranslations('app.workspace.slots')
+  if (!photos) return null
+  if (namedWithoutPhoto(keys, { fields, slots, copy, photos: new Set(Object.keys(photos.byKey)) }).length === 0) return null
+  return <p role="status" data-testid="slot-name-only-hint" className="rounded-inner bg-wash-faint px-3 py-2.5 text-caption leading-[1.4] text-muted-foreground">{t('nameOnly')}</p>
 }
 
 // Make again without its photos (T40): the same words as the single-photo template's notice.

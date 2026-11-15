@@ -55,3 +55,18 @@ export function initialOpen(groups: readonly Pick<CatalogueFieldGroup, 'key' | '
   const marked = groups.filter((group) => group.open).map((group) => group.key)
   return marked.length > 0 ? marked : groups.slice(0, 1).map((group) => group.key)
 }
+
+// A slot's name field: the text field keyed `<slot key>_name` (prize_1 ↔ prize_1_name), read from
+// the template's fields, never its id, so any template that pairs a name with a photo slot gets it.
+export const slotNameKey = (slotKey: string) => `${slotKey}_name`
+
+// The slots among `keys` whose name is typed but whose photo is empty. With no photo the model
+// draws the real product the name describes (Owner's rule; a photo always wins), and the form
+// says so while this list is not empty. Nothing is blocked.
+export function namedWithoutPhoto(keys: readonly string[], { fields, slots, copy, photos }: Inputs): string[] {
+  return slots.flatMap((slot) => {
+    if (!keys.includes(slot.key) || photos.has(slot.key)) return []
+    const name = slotNameKey(slot.key)
+    return fields.some((field) => field.key === name) && (copy[name] ?? '').trim() !== '' ? [slot.key] : []
+  })
+}
