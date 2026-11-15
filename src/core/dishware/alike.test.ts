@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { looksAlike } from './alike'
+import { looksAlike, sameColourFamily } from './alike'
 
 // Shape lines in the style of the library's (§5.1c「器皿图库」), against the reading's dishware text.
 const USER = 'A white oval platter with a plain rim'
@@ -15,6 +15,12 @@ describe('a library vessel that looks like the user own (Owner 2026-11-15)', () 
     expect(looksAlike('A round ivory-white plate', 'A round white plate')).toBe(true)
     expect(looksAlike('An oval-shaped plate in off-white', USER)).toBe(true)
     expect(looksAlike('A fish-shaped dish, white glaze', 'A white boat-shaped dish')).toBe(true)
+  })
+
+  it('tells the same colour family apart from the form', () => {
+    expect(sameColourFamily('A teardrop platter, satin ivory-white glaze', USER)).toBe(true)
+    expect(sameColourFamily('A black boat-shaped tray', USER)).toBe(false)
+    expect(sameColourFamily('A white oval plate', 'An oval platter')).toBe(false)
   })
 
   it('never lets a material stand in for a colour', () => {

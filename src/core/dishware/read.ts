@@ -10,7 +10,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { AppError } from '../errors'
 import type { ObjectStore } from '../storage'
 import type { DishCategory } from '../templates/food-flow'
-import { looksAlike } from './alike'
+import { looksAlike, sameColourFamily } from './alike'
 import { DISHWARE_COLUMNS, dishwareRowSchema, toDishwareItem, type DishwareItem } from './types'
 
 // Every admin save or delete expires this tag (updateTag), so a new vessel is picked at once.
@@ -31,11 +31,15 @@ export async function cachedActiveDishware(): Promise<DishwareItem[]> {
   return loadActiveDishware(createAdminSupabase())
 }
 
-// A random vessel of the category (Owner: random or rotating), never one that looks like the
-// user's own (`userDishware`, the reading's text; looksAlike), or null when none remains.
+// A random vessel of the category, never one that looks like the user's own (`userDishware`, the
+// reading's text; looksAlike). Among the rest, the user's colour family comes first, so the swap
+// changes the form and keeps the colour (Owner 2026-11-15); without one, any of them. Null when
+// none remains: the user's own vessel stays.
 export function pickVessel(items: readonly DishwareItem[], category: DishCategory, random: (n: number) => number = randomInt, userDishware = ''): DishwareItem | null {
   const pool = items.filter((item) => item.isActive && item.category === category && !looksAlike(item.shape, userDishware))
-  return pool.length ? pool[random(pool.length)]! : null
+  const preferred = pool.filter((item) => sameColourFamily(item.shape, userDishware))
+  const from = preferred.length ? preferred : pool
+  return from.length ? from[random(from.length)]! : null
 }
 
 // The vessel's stored bytes (already an opaque WebP, see admin.ts). Keys carry a content hash, so
