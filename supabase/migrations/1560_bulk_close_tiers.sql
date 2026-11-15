@@ -1,0 +1,225 @@
+-- Per-template offered resolutions (2026-11-15). Which of 1K / 2K / 4K a template offers stays
+-- template_sale_approvals.unpriced_resolutions (an unoffered tier is a closed one: the create page
+-- and the poster editor leave it out through admin.template_image_options, and generation refuses
+-- it). This lets 批量编辑 close tiers too: admin_bulk_edit_templates takes an optional
+-- close_resolutions list. Closed tiers skip the floor check, a tier cannot be priced and closed in
+-- one edit, and a template left with no tier on offer fails the batch as no_tier. Same signature;
+-- a caller that sends no close_resolutions gets exactly the 1451 behaviour.
+
+CREATE OR REPLACE FUNCTION "public"."admin_bulk_edit_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_ids text[] := array(select distinct u.id from unnest(coalesce(p_ids, '{}')) as u(id));
+  -- 3k from a caller still on the old name is read as 4k (PR-2).
+  v_patch jsonb := coalesce(public.canonical_tiers(p_patch), '{}');
+  v_cost jsonb := coalesce(public.canonical_tiers(p_patch) -> 'credits_cost', '{}');
+  -- Tiers to stop offering (1560): closed for sale on every template, as a blank editor price.
+  v_close text[];
+  v_visible text[];
+  change_model boolean := p_patch ? 'provider_id';
+  target uuid := (p_patch->>'provider_id')::uuid;
+  v_category text := p_patch ->> 'category_key';
+  v_failures jsonb;
+  catalog_minimums jsonb:=case when admin.is_template_catalog_v2() then admin.template_catalog_minimums() else '{}' end;
+  v_changed integer;
+begin
+  -- 3k from a caller still on the old name is read as 4k (PR-2).
+  p_patch := public.canonical_tiers(p_patch);
+  p_floor := public.canonical_tiers(p_floor);
+  if p_actor is null then
+    raise exception 'INVALID_INPUT' using detail = 'actor is required';
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin' and p.banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if cardinality(v_ids) = 0 or cardinality(v_ids) > 200 then
+    raise exception 'INVALID_INPUT' using detail = 'between 1 and 200 templates';
+  end if;
+  if jsonb_typeof(v_patch) <> 'object' or v_patch = '{}' or v_patch - 'credits_cost' - 'close_resolutions' - 'visible_in' - 'quality' - 'category_key' - 'provider_id' <> '{}' then
+    raise exception 'INVALID_INPUT' using detail = 'patch must name credits_cost, close_resolutions, visible_in, quality or category_key';
+  end if;
+  if v_patch ? 'close_resolutions' then
+    if jsonb_typeof(v_patch -> 'close_resolutions') <> 'array' then
+      raise exception 'INVALID_INPUT' using detail = 'close_resolutions must be an array';
+    end if;
+    v_close := public.canonical_tier_array(array(select jsonb_array_elements_text(v_patch -> 'close_resolutions')));
+    if v_close is null or cardinality(v_close) = 0 or not (v_close <@ array['1k','2k','4k'])
+       or array_position(v_close, null) is not null then
+      raise exception 'INVALID_INPUT' using detail = 'close_resolutions must name 1k, 2k or 4k';
+    end if;
+  end if;
+  v_close := coalesce(v_close, '{}');
+  if v_patch ? 'quality' and (v_patch ->> 'quality') is distinct from 'high' and (v_patch ->> 'quality') is distinct from 'medium' then
+    raise exception 'INVALID_INPUT' using detail = 'quality must be high or medium';
+  end if;
+  if jsonb_typeof(v_cost) <> 'object' then
+    raise exception 'INVALID_INPUT' using detail = 'credits_cost must be an object';
+  end if;
+  if exists (
+    select 1 from jsonb_each(v_cost) as e(key, value)
+    where e.key not in ('1k', '2k', '4k') or jsonb_typeof(e.value) <> 'number' or e.value::text !~ '^[1-9][0-9]{0,2}$'
+  ) then
+    raise exception 'INVALID_INPUT' using detail = 'credits_cost tiers must be whole numbers 1..999';
+  end if;
+  if exists (select from unnest(v_close) tier where v_cost ? tier) then
+    raise exception 'INVALID_INPUT' using detail = 'a tier cannot be priced and closed in one edit';
+  end if;
+  if v_patch ? 'visible_in' then
+    if jsonb_typeof(v_patch -> 'visible_in') <> 'array' then
+      raise exception 'INVALID_INPUT' using detail = 'visible_in must be an array';
+    end if;
+    v_visible := array(select distinct x from jsonb_array_elements_text(v_patch -> 'visible_in') as v(x) order by x desc);
+    if cardinality(v_visible) = 0 or not (v_visible <@ array['web', 'partner']) then
+      raise exception 'INVALID_INPUT' using detail = 'visible_in must be web, partner or both';
+    end if;
+  end if;
+  if v_patch ? 'category_key' then
+    -- Held until commit, so the category cannot be deleted under this write.
+    perform 1 from public.template_categories c where c.key = v_category and not c.is_system for share;
+    if not found then
+      raise exception 'CATEGORY_NOT_FOUND' using detail = 'category_key must name a category that is not a system one';
+    end if;
+  end if;
+  if p_floor is null or exists (
+    select 1 from unnest(array['high', 'medium']) as q(quality), unnest(array['1k', '2k', '4k']) as r(res)
+    where jsonb_typeof(p_floor -> q.quality -> r.res) is distinct from 'number'
+  ) then
+    raise exception 'INVALID_INPUT' using detail = 'floor table is incomplete';
+  end if;
+
+  -- The rows are checked and written under one lock, so no other save slips in between.
+  perform 1 from public.templates t where t.id = any (v_ids) order by t.id for update;
+  if change_model then
+    perform 1 from public.template_prompts where template_id=any(v_ids) order by template_id for update;
+    perform 1 from public.ai_providers where module='image' and (id=target or (target is null and is_active)) for share;
+    if target is not null and not found then raise exception 'MODEL_CHANGED'; end if;
+  end if;
+
+  if admin.is_template_catalog_v2() and (p_floor->>'version') is distinct from 'v2' then
+    raise exception 'MODEL_CHANGED' using detail='请刷新模板报价后再保存';
+  end if;
+  -- A supplier may have switched since the admin action read costs. Re-read the effective
+  -- binding under the template lock; a missing/different model requires a fresh preview.
+  if p_floor ? 'models' and exists (
+    select 1 from public.templates t
+      left join public.template_prompts tp on tp.template_id = t.id
+      left join public.ai_providers active on active.is_active and active.module = 'image'
+      left join public.ai_providers p on p.id = coalesce(case when change_model then target else tp.provider_id end, active.id)
+     where t.id = any(v_ids) and (
+       not (p_floor->'providers' ? coalesce(p.id::text, 'env'))
+       or (p.id is not null and p.model is distinct from (p_floor->'models'->>p.id::text)))
+  ) then raise exception 'MODEL_CHANGED'; end if;
+
+  with planned as (
+    select a.id, t.id is not null as found, coalesce(t.name, a.id) as name, t.is_active,
+           t.description, t.cover_before_url, t.cover_after_url, t.cover_locales, t.visible_in as old_visible,
+           coalesce(v_patch ->> 'quality', t.quality) as quality,
+           coalesce(p_floor -> 'providers' -> coalesce((case when change_model then target else tp.provider_id end)::text, active.id::text, 'env'), p_floor) as floor,
+           admin.template_approved_prices(coalesce(case when change_model then target else tp.provider_id end,active.id))->t.id as approved,
+           catalog_minimums->t.id as tariff,
+           coalesce(sale.unpriced_resolutions, array(select tier from unnest(array['1k','2k','4k']) tier
+             where tier<>all(admin.sale_route_resolutions(previous)))) as unpriced_resolutions,
+           admin.sale_route_resolutions(chosen) as supported,
+           t.credits_cost || v_cost as credits_cost,
+           coalesce(v_visible, t.visible_in) as visible_in,
+           a.id in ('edit', 'freeform') or coalesce(c.is_system, false) as is_builtin,
+           case when change_model then admin.bulk_model_problem(t,tp,chosen,v_cost)
+                when exists(select from jsonb_object_keys(v_cost) tier where not(tier=any(admin.sale_route_resolutions(chosen))))
+                then '所选模型不支持所填积分档位' end model_problem
+    from unnest(v_ids) as a(id)
+    left join public.templates t on t.id = a.id
+    left join public.template_categories c on c.key = t.category_key
+    left join public.template_sale_approvals sale on sale.template_id = t.id
+    left join public.template_prompts tp on tp.template_id = t.id
+    left join public.ai_providers active on active.module = 'image' and active.is_active
+    left join public.ai_providers previous on previous.id=coalesce(tp.provider_id,active.id)
+    left join public.ai_providers chosen on chosen.id=coalesce(case when change_model then target else tp.provider_id end,active.id)
+  ),
+  failures as (
+    select jsonb_build_object('id', p.id, 'name', p.name, 'reason', case when p.found then 'system' else 'not_found' end) as failure
+    from planned p
+    where not p.found or p.is_builtin
+    union all
+    select jsonb_build_object('id',p.id,'name',p.name,'reason','model','detail',p.model_problem)
+    from planned p where p.found and not p.is_builtin and p.model_problem is not null
+    union all
+    select jsonb_build_object(
+      'id', p.id, 'name', p.name, 'reason', 'below_floor', 'resolution', r.res,
+      'floor', minimum.credits, 'given', (p.credits_cost ->> r.res)::integer
+    )
+    from planned p
+    cross join unnest(array['1k', '2k', '4k']) as r(res)
+    cross join lateral (select greatest((p.floor -> p.quality ->> r.res)::integer,
+      case when p.tariff->>'quality'=p.quality then (p.tariff->'costs'->>r.res)::integer end) as credits) minimum
+    where p.found and not p.is_builtin
+      and (v_cost ? r.res or not (r.res=any(p.unpriced_resolutions)))
+      and not (r.res = any(v_close))
+      and (p.credits_cost ->> r.res)::integer < minimum.credits
+      and not coalesce(p.approved->>'quality'=p.quality and p.approved->'costs'->r.res=p.credits_cost->r.res,false)
+    union all
+    -- At least one tier stays on offer after the edit.
+    select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'no_tier')
+    from planned p
+    where p.found and not p.is_builtin and cardinality(v_close) > 0
+      -- Counted against the resulting model: a priced tier it cannot make offers nothing.
+      and not exists (select from unnest(p.supported) tier
+        where not (tier = any(p.unpriced_resolutions) and not (v_cost ? tier)) and not (tier = any(v_close)))
+    union all
+    select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
+    from planned p
+    where p.found and not p.is_builtin and p.is_active
+      and 'web' = any (p.visible_in) and not ('web' = any (p.old_visible))
+      and (nullif(btrim(p.description), '') is null
+           or not (nullif(btrim(p.cover_before_url), '') is not null or exists (
+             select 1 from unnest(coalesce(p_locales, '{}')) as l(code)
+             where nullif(btrim(p.cover_locales -> l.code ->> 'before'), '') is not null))
+           or not (nullif(btrim(p.cover_after_url), '') is not null or exists (
+             select 1 from unnest(coalesce(p_locales, '{}')) as l(code)
+             where nullif(btrim(p.cover_locales -> l.code ->> 'after'), '') is not null)))
+  )
+  select coalesce(jsonb_agg(f.failure), '[]'::jsonb) into v_failures from failures f;
+
+  if jsonb_array_length(v_failures) > 0 then
+    return jsonb_build_object('failures', v_failures);
+  end if;
+
+  -- Capture missing legacy tier markers against the old route before changing a binding.
+  if change_model or v_cost <> '{}'::jsonb or cardinality(v_close) > 0 then
+    perform admin.set_template_unpriced_resolutions(t.id, null)
+      from public.templates t where t.id=any(v_ids)
+        and not exists(select from public.template_sale_approvals s where s.template_id=t.id);
+  end if;
+
+  update public.templates t
+  set quality = coalesce(v_patch ->> 'quality', t.quality),
+      credits_cost = t.credits_cost || v_cost,
+      visible_in = coalesce(v_visible, t.visible_in),
+      -- templates.category (the English name) follows through T75's trigger.
+      category_key = coalesce(v_category, t.category_key),
+      featured_rank = case when v_visible is not null and not ('web' = any (v_visible)) then null else t.featured_rank end
+  where t.id = any (v_ids);
+  get diagnostics v_changed = row_count;
+
+  if change_model then
+    update public.template_prompts set provider_id=target where template_id=any(v_ids) and provider_id is distinct from target;
+  end if;
+
+  -- A capability expansion or a model change alone never opens a previously unpriced tier.
+  -- Priced tiers reopen and 停售 tiers close in one setter call per template, so its floor
+  -- assertion judges the final set of open tiers, never an intermediate one.
+  if v_cost <> '{}'::jsonb or cardinality(v_close) > 0 then
+    perform admin.set_template_unpriced_resolutions(s.template_id, f.unpriced)
+    from public.template_sale_approvals s
+    cross join lateral (select array(select tier from unnest(array['1k','2k','4k']) tier
+      where (tier = any(s.unpriced_resolutions) and not (v_cost ? tier)) or tier = any(v_close)) as unpriced) f
+    where s.template_id=any(v_ids)
+      and not (f.unpriced <@ s.unpriced_resolutions and s.unpriced_resolutions <@ f.unpriced);
+  end if;
+  return jsonb_build_object('failures', '[]'::jsonb, 'changed', v_changed);
+end;
+$_$;
+
+revoke execute on function public.admin_bulk_edit_templates(text[], jsonb, jsonb, uuid, text[]) from public, anon, authenticated;
+grant execute on function public.admin_bulk_edit_templates(text[], jsonb, jsonb, uuid, text[]) to service_role;

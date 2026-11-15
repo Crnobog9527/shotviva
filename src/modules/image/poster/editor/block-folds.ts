@@ -22,6 +22,10 @@ function blockFolds(block: PosterBlock, content: PosterContent): Fold[] {
   return [{ key: block, kind: block }]
 }
 
+// The key of a tab's first part, the one that starts open.
+export const firstFoldKey = (blocks: readonly PosterBlock[]): string | null =>
+  blocks[0] === undefined ? null : blocks[0] === 'header' ? 'masthead' : blocks[0] === 'sections' ? 'info' : blocks[0]
+
 // A tab's parts in order: its blocks, then its upload boxes when the page has any.
 export function foldsOf(blocks: readonly PosterBlock[], content: PosterContent, photos: boolean): Fold[] {
   return [...blocks.flatMap((block) => blockFolds(block, content)), ...(photos ? [{ key: 'photos', kind: 'photos' } as const] : [])]

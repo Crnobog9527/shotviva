@@ -36,7 +36,7 @@ describe('templateFieldsSchema with image slots', () => {
     ['a slot key that is a copy key', { ...slotted, copy: [...slotted.copy, { key: 'logo', label: 'Logo text' }] }],
     ['the reserved image_slots key', { ...slotted, copy: [...slotted.copy, { key: 'image_slots', label: 'x' }] }],
     ['an unknown slot property', { ...slotted, images: { ...slotted.images, slots: [{ ...slotted.images.slots[0], extra: true }, ...slotted.images.slots.slice(1)] } }],
-    ['five slots', { ...slotted, images: { min: 0, max: 5, slots: ['a', 'b', 'c', 'd', 'e'].map((key) => ({ key, label: key })) } }],
+    ['nine slots', { ...slotted, images: { min: 0, max: 9, slots: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map((key) => ({ key, label: key })) } }],
   ])('refuses %s', (_, value) => {
     expect(templateFieldsSchema.safeParse(value).success).toBe(false)
   })

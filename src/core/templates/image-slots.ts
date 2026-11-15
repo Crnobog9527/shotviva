@@ -2,15 +2,15 @@ import { z } from 'zod'
 
 import { AppError } from '../errors'
 
-// Named image slots (ARCHITECTURE §5.1e, Owner 2026-11-12): a template may ask for up to four
-// images, each in its own clearly labelled upload box (e.g. "Venue logo", "1st prize photo"),
-// so a user cannot put a photo in the wrong place. The filled slots go to the model in the
+// Named image slots (ARCHITECTURE §5.1e, Owner 2026-11-12): a template may ask for up to eight
+// images (four until a poster's featured prizes each took a photo, §5.3 展示位, 2026-11-15), each
+// in its own clearly labelled upload box (e.g. "Venue logo", "1st prize photo"), so a user cannot put a photo in the wrong place. The filled slots go to the model in the
 // order they are defined, and the prompt learns which image is which through {{image_slots}}.
 // Stored in templates.fields.images.slots (jsonb, no migration). A template without slots keeps
 // the count-based single upload. No `server-only`: the editor, the workspace and the scripts
 // share these shapes. Nothing here is specific to one kind of template.
 
-export const IMAGE_SLOTS_MAX = 4
+export const IMAGE_SLOTS_MAX = 8
 export const IMAGE_SLOTS_PLACEHOLDER = 'image_slots'
 
 // Strict: an unknown key is refused, so a later property is added here as optional, and every

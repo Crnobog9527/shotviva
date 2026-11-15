@@ -11,7 +11,8 @@ import type { PosterStudioState, StudioTemplate } from '../use-poster-studio'
 import type { PhotoSort } from '../use-photo-sort'
 import type { PosterWeekly } from '../use-poster-weekly'
 import { BlockTabs } from './block-tabs'
-import { GenerateButton, GeneratePanel } from './generate-panel'
+import { GenerateButton, GeneratePanel, waitsOnReview } from './generate-panel'
+import { ReviewNudge } from './review-check'
 import { pagePhotos } from './page-slots'
 import { PasteStep, SortButton } from './paste-step'
 import { PhotoPick } from './photo-pick'
@@ -34,7 +35,7 @@ export function StudioForm({ studio, template, balance, reuse }: FormProps) {
       {tools}
       {template.poster.sample ? <SampleTools studio={studio} sample={template.poster.sample} /> : null}
       <BlockTabs poster={template.poster} unverified={studio.draft.unverified} content={studio.draft.content}
-        flagged={(path) => studio.draft.unverified.includes(path)} onChange={studio.edit} onClear={studio.clearPart}
+        flagged={(path) => studio.draft.unverified.includes(path)} onChange={studio.edit} onClear={studio.clearPart} nav={studio.nav}
         sample={(path) => studio.draft.fromSample && isSampleText(studio.draft.content, template.poster.sample, path)}
         pagePhotos={pagePhotos(template, studio.photos, t('folds.photos'), studio.qrCheck)} />
       <GeneratePanel studio={studio} template={template} balance={balance} />
@@ -52,6 +53,7 @@ export function StudioBar({ studio, template, balance }: Props) {
   return (
     <div className="grid w-full gap-2">
       {left ? <p role="status" className="text-caption text-primary">{t('sample.contactsLeft')}</p> : null}
+      {waitsOnReview(studio, balance, template) ? <ReviewNudge studio={studio} /> : null}
       <GenerateButton studio={studio} template={template} balance={balance} />
     </div>
   )
