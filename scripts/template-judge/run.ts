@@ -2,7 +2,10 @@
  * The automatic image judge for trial results (README「模板批量脚本」):
  *
  *   pnpm templates:judge .local/templates/batch.json --dry-run       # what would be judged, nothing called
- *   pnpm templates:judge .local/templates/batch.json [--only a,b] [--budget 0.2] [--concurrency 2] [--effort low|medium|high]
+ *   pnpm templates:judge .local/templates/batch.json [--only a,b] [--budget 0.2] [--concurrency 2] [--effort low|medium|high] [--rejudge-failed]
+ *
+ * --rejudge-failed: a result whose verdict has a ✗ from the model is judged once more (once per
+ * result, ever: the second verdict is kept beside the first). It counts as failed only if both fail.
  *
  * Judges every result of the current prompt version that templates:trial downloaded
  * (.local/trials/state.json) against the batch file's checklist (`judge.bar`, a template's
@@ -34,17 +37,18 @@ import { buildPage } from '../template-trial/page'
 import { photoHashes } from '../template-trial/photos'
 import { readTrialState, trialsRoot } from '../template-trial/results'
 import { effectiveModels } from '../template-trial/setup'
-import { jobHash, judgeAll, planJobs, type ImageReader, type Job, type JobResult, type JudgeContext } from './judge'
-import { latestByRun, readLedger, writeLedger } from './ledger'
+import { jobHash, judgeAll, judgeModelKey, planJobs, type ImageReader, type Job, type JobResult, type JudgeContext } from './judge'
+import { latestByRun, readLedger, rejudgeHash, writeLedger, type Verdict } from './ledger'
 import { lockLedger } from './lock'
 import { DEFAULT_EFFORT, EFFORTS, judgeEstimateUsd, type JudgeLine } from './model'
 
-const USAGE = '用法：pnpm templates:judge .local/<路径>/<批次文件>.json [--dry-run] [--only a,b] [--budget 0.2] [--concurrency 2] [--effort medium]'
+const USAGE = '用法：pnpm templates:judge .local/<路径>/<批次文件>.json [--dry-run] [--only a,b] [--budget 0.2] [--concurrency 2] [--effort medium] [--rejudge-failed]'
 
 const flags = z.object({
   only: z.string().optional().transform(v => v ? new Set(v.split(',').map(s => s.trim()).filter(Boolean)) : undefined),
   budget: z.coerce.number().positive().max(5).default(0.2),
   effort: z.enum(EFFORTS).default(DEFAULT_EFFORT),
+  'rejudge-failed': z.boolean().default(false),
   concurrency: z.coerce.number().int().min(1).max(4).default(2),
   'dry-run': z.boolean().default(false),
 })
@@ -52,7 +56,7 @@ const flags = z.object({
 function readFlags(args: string[]) {
   const string = { type: 'string' } as const
   const { values, positionals } = parseArgs({ args, allowPositionals: true,
-    options: { only: string, budget: string, concurrency: string, effort: string, 'dry-run': { type: 'boolean' } } })
+    options: { only: string, budget: string, concurrency: string, effort: string, 'dry-run': { type: 'boolean' }, 'rejudge-failed': { type: 'boolean' } } })
   if (positionals.length !== 1) throw new RunError(USAGE)
   const parsed = flags.safeParse(values)
   if (!parsed.success) throw new RunError('参数不对：--budget 不超过 5（美元），--concurrency 1～4，--effort low|medium|high')
@@ -116,21 +120,30 @@ async function withHashes(p: Prepared, tag: string, refsReadable: boolean): Prom
 
 const mark = (pass: boolean) => pass ? '✓' : '✗'
 
+const failedLines = (verdict: Verdict) => verdict.items.filter(item => !item.pass).map(item => `    ✗ ${item.id}. ${item.text}\n      ${item.reason}\n`).join('')
+const score = (verdict: Verdict) => `${mark(verdict.pass)} ${verdict.items.filter(item => item.pass).length}/${verdict.items.length}`
+
 function line(r: JobResult) {
   const { cell } = r.job
   const head = `${cell.templateId} v${cell.version} #${cell.inputIndex + 1}.${cell.k + 1}`
   if (!r.verdict) return `${head} ${r.outcome} ${r.code ?? ''}\n`
-  const failed = r.verdict.items.filter(item => !item.pass)
-  const detail = failed.map(item => `    ✗ ${item.id}. ${item.text}\n      ${item.reason}\n`).join('')
-  return `${head} ${mark(r.verdict.pass)} ${r.verdict.items.length - failed.length}/${r.verdict.items.length}${r.outcome === 'reused' ? '（已判过）' : ''}\n${detail}`
+  const first = `${head} ${score(r.verdict)}${r.outcome === 'reused' ? '（已判过）' : ''}\n${failedLines(r.verdict)}`
+  if (r.rejudge) {
+    const label = r.rejudge.pass ? '复判通过' : '两次都不过'
+    return `${first}  复判 ${score(r.rejudge)}（${label}${r.rejudgeReused ? '，已判过' : ''}）\n${failedLines(r.rejudge)}`
+  }
+  return r.rejudgeCode ? `${first}  复判没做：${r.rejudgeCode}\n` : first
 }
 
-function dryRun(p: Prepared, jobs: Job[], ledger: Awaited<ReturnType<typeof readLedger>>, prices: JudgeLine['prices']) {
+function dryRun(p: Prepared, jobs: Job[], ledger: Awaited<ReturnType<typeof readLedger>>, prices: JudgeLine['prices'], rejudgeFailed: boolean) {
   const rows = new Map<string, { cached: number; pending: number; usd: number }>()
   for (const job of jobs) {
     const key = `${job.cell.templateId} v${job.cell.version}`
     const row = rows.get(key) ?? { cached: 0, pending: 0, usd: 0 }
-    if (ledger.verdicts[job.hash]) row.cached++
+    const cached = ledger.verdicts[job.hash]
+    // With --rejudge-failed, a stored ✗ from the model without its second look is one more look.
+    const second = rejudgeFailed && cached && !cached.pass && cached.items.some(item => item.source === 'model' && !item.pass) && !ledger.verdicts[rejudgeHash(cached.hash)]
+    if (cached && !second) row.cached++
     else {
       row.pending++
       if (job.checklist.items.length) row.usd += judgeEstimateUsd(1 + job.sources.inputs.length + (job.sources.cover ? 1 : 0) + job.sources.refs.length, prices) ?? Number.NaN
@@ -148,9 +161,9 @@ async function main() {
   const { privateStore } = await targetStores(p.target)
   if (!privateStore && p.planned.jobs.some(job => job.sources.refs.length)) process.stdout.write('没有测试站 R2 密钥（TEMPLATE_TOOLS_R2_*）：这次不给评审机看画风参考图。\n')
   // The effort changes the answer, so it is part of the model a verdict is reused for.
-  const model = `${judge.tag}@${p.options.effort}`
+  const model = judgeModelKey(judge.tag, p.options.effort)
   const jobs = await withHashes(p, model, Boolean(privateStore))
-  if (p.options.dryRun) return dryRun(p, jobs, await readLedger(p.root), judge.prices)
+  if (p.options.dryRun) return dryRun(p, jobs, await readLedger(p.root), judge.prices, p.options['rejudge-failed'])
   // Held from reading the ledger until it is written back: two runs on the same .local/trials
   // would otherwise pay for the same results and the last writer would drop the other's spend.
   const unlock = await lockLedger(p.root)
@@ -173,7 +186,7 @@ async function judgeRun(p: Prepared, judge: Awaited<ReturnType<typeof judgeRow>>
     ref: async key => { if (!privateStore) throw new Error('JUDGE_REFS_UNAVAILABLE'); return privateStore.get(key) },
   }
   const ctx: JudgeContext = { line: { tag: model, effort: p.options.effort, prices: judge.prices, config: { apiKey, model: judge.row.model, baseUrl: judge.row.baseUrl } },
-    images, ledger, budgetUsd: p.options.budget, spentUsd: 0, reservedUsd: 0 }
+    images, ledger, budgetUsd: p.options.budget, spentUsd: 0, reservedUsd: 0, rejudgeFailed: p.options['rejudge-failed'] }
   process.on('SIGINT', () => {
     if (ctx.stopped === 'INTERRUPTED') process.exit(130)
     ctx.stopped = 'INTERRUPTED'
@@ -183,11 +196,13 @@ async function judgeRun(p: Prepared, judge: Awaited<ReturnType<typeof judgeRow>>
   await writeLedger(p.root, ledger)
   await writeFile(join(p.root, 'index.html'), buildPage(p.state, p.batch.templates, p.root, p.baseDir, new Date(), latestByRun(ledger)))
   const count = (outcome: JobResult['outcome']) => results.filter(r => r.outcome === outcome).length
-  const passed = results.filter(r => r.verdict?.pass).length
-  process.stdout.write(`\n评审 ${results.length} 张：通过 ${passed}，不通过 ${results.filter(r => r.verdict && !r.verdict.pass).length}` +
+  const passed = results.filter(r => r.verdict?.pass || r.rejudge?.pass).length
+  const rejudged = results.filter(r => r.rejudge)
+  const second = rejudged.length ? `；复判 ${rejudged.length} 张，复判通过 ${rejudged.filter(r => r.rejudge!.pass).length}，两次都不过 ${rejudged.filter(r => !r.rejudge!.pass).length}` : ''
+  process.stdout.write(`\n评审 ${results.length} 张：通过 ${passed}，不通过 ${results.filter(r => r.verdict && !r.verdict.pass && !r.rejudge?.pass).length}${second}` +
     `（新判 ${count('judged')}，已判过 ${count('reused')}，失败 ${count('failed')}，跳过 ${count('skipped')}）。` +
     `本次花费约 $${ctx.spentUsd.toFixed(4)}（${judge.tag}，按回传 token 计价；失败的按预留额计）。对照页：${relative(process.cwd(), join(p.root, 'index.html'))}\n`)
-  if (count('failed') || count('skipped') || p.problems.length) process.exitCode = 1
+  if (count('failed') || count('skipped') || results.some(r => r.rejudgeCode) || p.problems.length) process.exitCode = 1
 }
 
 main().catch((error: unknown) => {

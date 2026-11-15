@@ -4,8 +4,8 @@ import type { Batch, TemplateItem } from '../template-apply/schema'
 import { digest, MAX_ATTEMPTS, runIdOf, type Cell } from '../template-trial/cells'
 import type { TrialRecord, TrialState } from '../template-trial/results'
 import { checklistFor, type Checklist } from './checklist'
-import { lineUsd, type JudgeLedger, type Verdict, type VerdictItem } from './ledger'
-import { askJudge, judgeEstimateUsd, SKELETON_VERSION, type JudgeImage, type JudgeLine } from './model'
+import { lineUsd, rejudgeHash, type JudgeLedger, type Verdict, type VerdictItem } from './ledger'
+import { askJudge, judgeEstimateUsd, SKELETON_VERSION, type Effort, type JudgeImage, type JudgeLine } from './model'
 import { alphaCheck, qrCheck, readQr, type PixelVerdict } from './pixels'
 
 // Judging the trial results of a batch: which results there are (the current prompt version's
@@ -60,6 +60,9 @@ export function jobHash(resultBytes: Uint8Array, cell: Cell, sources: JudgeSourc
     inputs: { photo: cell.photoHash, slots: cell.slotHashes }, cover: sources.cover, refs: sources.refs })
 }
 
+// The judge model a verdict is reused for: the line and the effort (the effort changes the answer).
+export const judgeModelKey = (tag: string, effort: Effort) => `${tag}@${effort}`
+
 export type PlannedJob = Omit<Job, 'hash'>
 
 // One job per current cell that has a result on this machine. Cells without one are counted so the
@@ -88,11 +91,17 @@ export type JudgeContext = {
   spentUsd: number
   reservedUsd: number
   stopped?: string
+  // --rejudge-failed: a verdict with a ✗ from the model gets one second look, kept beside it.
+  rejudgeFailed?: boolean
   now?: () => string
   sleep?: (ms: number) => Promise<void>
 }
 
-export type JobResult = { job: Job; outcome: 'judged' | 'reused' | 'failed' | 'skipped'; verdict?: Verdict; code?: string }
+export type JobResult = {
+  job: Job; outcome: 'judged' | 'reused' | 'failed' | 'skipped'; verdict?: Verdict; code?: string
+  // The second look (--rejudge-failed), and why there is none when one was due.
+  rejudge?: Verdict; rejudgeCode?: string; rejudgeReused?: boolean
+}
 
 const TIMEOUT_MS = 120_000
 const RETRY_PAUSE_MS = 5_000
@@ -169,12 +178,32 @@ async function lookWithRetry(job: Job, ctx: JudgeContext, images: JudgeImage[]) 
   }
 }
 
-export async function judgeJob(job: Job, ctx: JudgeContext): Promise<JobResult> {
+// The first look, or its stored verdict.
+async function firstLook(job: Job, ctx: JudgeContext): Promise<JobResult> {
   const cached = ctx.ledger.verdicts[job.hash]
   if (cached) {
     ctx.ledger.current[job.record.runId] = job.hash
     return { job, outcome: 'reused', verdict: cached }
   }
+  return freshLook(job, ctx)
+}
+
+// A failed verdict whose ✗ came from the model gets one second look, stored under its own hash
+// (so it is paid once, ever) and shown beside the first. A ✗ from the pixel checks would only
+// repeat itself, so it is not looked at again.
+export async function judgeJob(job: Job, ctx: JudgeContext): Promise<JobResult> {
+  const first = await firstLook(job, ctx)
+  const verdict = first.verdict
+  if (!ctx.rejudgeFailed || !verdict || verdict.pass || !verdict.items.some(item => item.source === 'model' && !item.pass)) return first
+  const key = rejudgeHash(verdict.hash)
+  const stored = ctx.ledger.verdicts[key]
+  if (stored) return { ...first, rejudge: stored, rejudgeReused: true }
+  if (ctx.stopped) return { ...first, rejudgeCode: ctx.stopped }
+  const second = await freshLook({ ...job, hash: key }, ctx, verdict.hash)
+  return second.verdict ? { ...first, rejudge: second.verdict } : { ...first, rejudgeCode: second.code }
+}
+
+async function freshLook(job: Job, ctx: JudgeContext, rejudgeOf?: string): Promise<JobResult> {
   if (ctx.stopped) return { job, outcome: 'skipped', code: ctx.stopped }
   try {
     const result = await ctx.images.file(job.sources.result)
@@ -186,24 +215,25 @@ export async function judgeJob(job: Job, ctx: JudgeContext): Promise<JobResult> 
       if ('skipped' in looked) { ctx.stopped = looked.skipped; return { job, outcome: 'skipped', code: looked.skipped } }
       const texts = new Map(job.checklist.items.map(item => [item.id, item.text]))
       items.push(...looked.answer!.answers.map(a => ({ id: a.id, text: texts.get(a.id)!, pass: a.pass, reason: a.reason, source: 'model' as const })))
-      const verdict = toVerdict(job, items, ctx, looked.answer!.costUsd)
+      const verdict = toVerdict(job, items, ctx, looked.answer!.costUsd, rejudgeOf)
       return { job, outcome: 'judged', verdict }
     }
-    return { job, outcome: 'judged', verdict: toVerdict(job, items, ctx, 0) }
+    return { job, outcome: 'judged', verdict: toVerdict(job, items, ctx, 0, rejudgeOf) }
   } catch (error) {
     return { job, outcome: 'failed', code: codeOf(error) }
   }
 }
 
-function toVerdict(job: Job, items: VerdictItem[], ctx: JudgeContext, costUsd: number | null): Verdict {
+function toVerdict(job: Job, items: VerdictItem[], ctx: JudgeContext, costUsd: number | null, rejudgeOf?: string): Verdict {
   const { cell, record } = job
   const verdict: Verdict = {
     hash: job.hash, runId: record.runId, templateId: cell.templateId, version: cell.version, inputIndex: cell.inputIndex, k: cell.k,
     model: job.checklist.items.length ? ctx.line.tag : null, pass: items.every(item => item.pass), items, costUsd,
-    at: (ctx.now ?? (() => new Date().toISOString()))(),
+    at: (ctx.now ?? (() => new Date().toISOString()))(), ...(rejudgeOf ? { rejudgeOf } : {}),
   }
   ctx.ledger.verdicts[job.hash] = verdict
-  ctx.ledger.current[record.runId] = job.hash
+  // The second look sits beside the first; the run's current verdict stays the first.
+  if (!rejudgeOf) ctx.ledger.current[record.runId] = job.hash
   return verdict
 }
 

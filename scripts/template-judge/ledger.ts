@@ -4,6 +4,8 @@ import { join } from 'node:path'
 
 import { z } from 'zod'
 
+import { digest } from '../template-trial/cells'
+
 // The judge's verdicts and spend on this machine: .local/trials/judge.json, beside the trials'
 // state.json. A verdict is keyed by its content hash (the images, the checklist, the judge model
 // and the skeleton version), so judging an unchanged result again is free. Every call, failed
@@ -18,6 +20,8 @@ const itemSchema = z.object({
 export const verdictSchema = z.object({
   hash: z.string(), runId: z.string(), templateId: z.string(), version: z.int(), inputIndex: z.int(), k: z.int(),
   model: z.string().nullable(), pass: z.boolean(), items: z.array(itemSchema), costUsd: z.number().nullable(), at: z.string(),
+  // A second look at a failed verdict (--rejudge-failed): the first verdict's hash.
+  rejudgeOf: z.string().optional(),
 })
 export type Verdict = z.infer<typeof verdictSchema>
 export type VerdictItem = z.infer<typeof itemSchema>
@@ -63,30 +67,54 @@ export function spentUsd(ledger: JudgeLedger, runIds?: Set<string>) {
   return ledger.spend.filter(line => !runIds || runIds.has(line.runId)).reduce((sum, line) => sum + lineUsd(line), 0)
 }
 
+// Where the second look at a failed verdict is kept: one per first verdict, so it is paid once.
+export const rejudgeHash = (hash: string) => digest(['rejudge', hash])
+
+// A first verdict with its second look, when there is one.
+export type ShownVerdict = Verdict & { rejudge?: Verdict }
+
+// Batch-mode rule: a failed result is judged once more and counts as failed only if both fail.
+export type JudgeOutcome = 'pass' | 'fail' | 'fail-twice' | 'pass-on-rejudge'
+export function outcomeOf(verdict: ShownVerdict): JudgeOutcome {
+  if (verdict.pass) return 'pass'
+  if (!verdict.rejudge) return 'fail'
+  return verdict.rejudge.pass ? 'pass-on-rejudge' : 'fail-twice'
+}
+export const counted = (verdict: ShownVerdict) => outcomeOf(verdict) === 'pass' || outcomeOf(verdict) === 'pass-on-rejudge'
+
 // The verdict per trial run that the review page and templates:status show: the one the last judge
-// run used (a re-used earlier verdict counts), else the newest.
-export function latestByRun(ledger: JudgeLedger): Map<string, Verdict> {
+// run used (a re-used earlier verdict counts), else the newest first look; with its second look.
+export function latestByRun(ledger: JudgeLedger): Map<string, ShownVerdict> {
   const latest = new Map<string, Verdict>()
   for (const verdict of Object.values(ledger.verdicts)) {
+    if (verdict.rejudgeOf) continue
     const seen = latest.get(verdict.runId)
     if (!seen || seen.at < verdict.at) latest.set(verdict.runId, verdict)
   }
   for (const [runId, hash] of Object.entries(ledger.current ?? {})) {
     const verdict = ledger.verdicts[hash]
-    if (verdict) latest.set(runId, verdict)
+    if (verdict && !verdict.rejudgeOf) latest.set(runId, verdict)
   }
-  return latest
+  const shown = new Map<string, ShownVerdict>()
+  for (const [runId, verdict] of latest) {
+    const rejudge = ledger.verdicts[rejudgeHash(verdict.hash)]
+    shown.set(runId, rejudge ? { ...verdict, rejudge } : verdict)
+  }
+  return shown
 }
 
-// "✓3 ✗1 未判 2" for a template's current results.
-export function judgeSummary(runIds: string[], latest: Map<string, Verdict>): string {
-  let passed = 0
-  let failed = 0
+// "✓3（复判通过 1） ✗1（两次都不过 1） 未判 2" for a template's current results. A pass on the
+// second look counts as a pass.
+export function judgeSummary(runIds: string[], latest: Map<string, ShownVerdict>): string {
+  const counts: Record<JudgeOutcome, number> = { pass: 0, fail: 0, 'fail-twice': 0, 'pass-on-rejudge': 0 }
   for (const id of runIds) {
     const verdict = latest.get(id)
-    if (verdict?.pass) passed++
-    else if (verdict) failed++
+    if (verdict) counts[outcomeOf(verdict)]++
   }
+  const passed = counts.pass + counts['pass-on-rejudge']
+  const failed = counts.fail + counts['fail-twice']
   const open = runIds.length - passed - failed
-  return runIds.length === 0 ? '无结果' : `✓${passed} ✗${failed}${open ? ` 未判 ${open}` : ''}`
+  if (runIds.length === 0) return '无结果'
+  return `✓${passed}${counts['pass-on-rejudge'] ? `（复判通过 ${counts['pass-on-rejudge']}）` : ''} ✗${failed}` +
+    `${counts['fail-twice'] ? `（两次都不过 ${counts['fail-twice']}）` : ''}${open ? ` 未判 ${open}` : ''}`
 }

@@ -12,8 +12,8 @@ import { planCells, runIdOf, type Cell } from '../template-trial/cells'
 import type { TrialState } from '../template-trial/results'
 import type { AdminTemplate } from '../../src/core/admin/templates/types'
 import { checklistFor, defaultAlpha, EXPECTED_TEXT_PART, textItems } from './checklist'
-import { judgeAll, judgeJob, jobHash, planJobs, recordOf, type ImageReader, type Job, type JudgeContext } from './judge'
-import { judgeSummary, latestByRun, spentUsd, type JudgeLedger } from './ledger'
+import { judgeAll, judgeJob, jobHash, judgeModelKey, planJobs, recordOf, type ImageReader, type Job, type JudgeContext } from './judge'
+import { judgeSummary, latestByRun, outcomeOf, rejudgeHash, spentUsd, type JudgeLedger } from './ledger'
 import { LOCK_FILE, lockLedger } from './lock'
 import { judgeCostUsd, judgeEstimateUsd, readAnswer, requestBody } from './model'
 import { alphaCheck, qrCheck, readQr } from './pixels'
@@ -232,6 +232,83 @@ describe('judging a result', () => {
     Object.values(failed.records)[0].outcome = 'failed'
     expect(recordOf(cells[0] as Cell, failed)).toBeNull()
     expect(planJobs(batch, cells, state, judged).jobs[0].sources).toMatchObject({ cover: null, refs: [], inputs: [{ label: 'photo', path: 'dish.jpg' }] })
+  })
+})
+
+describe('re-judging a fail (--rejudge-failed)', () => {
+  const answer = (pass: boolean) => responsesBody([{ id: '1', pass, reason: pass ? 'Same dish.' : 'Another dish.' }, { id: '2', pass: true, reason: 'b' }, { id: '3', pass: true, reason: 'c' }])
+
+  it('leaves a fail alone without the flag', async () => {
+    const fetch = fakeFetch(answer(false), answer(true))
+    const { job, ctx } = await setup({ fetch })
+    const result = await judgeJob(job, ctx)
+    expect(result.rejudge).toBeUndefined()
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('looks once more at a fail, keeps both, and counts a pass on the second look as a pass', async () => {
+    const fetch = fakeFetch(answer(false), answer(true))
+    const { batch, state, job, ctx, ledger } = await setup({ fetch })
+    ctx.rejudgeFailed = true
+    const result = await judgeJob(job, ctx)
+    expect(result.verdict?.pass).toBe(false)
+    expect(result.rejudge).toMatchObject({ pass: true, rejudgeOf: job.hash, hash: rejudgeHash(job.hash) })
+    expect(Object.keys(ledger.verdicts)).toHaveLength(2)
+    expect(ledger.current[job.record.runId]).toBe(job.hash)
+    expect(ledger.spend.map(line => line.hash)).toEqual([job.hash, rejudgeHash(job.hash)])
+    const shown = latestByRun(ledger).get(job.record.runId)!
+    expect(outcomeOf(shown)).toBe('pass-on-rejudge')
+    expect(judgeSummary([job.record.runId], latestByRun(ledger))).toBe('✓1（复判通过 1） ✗0')
+    const html = buildPage(state, batch.templates, '/r/.local/trials', '/r/.local/templates', new Date(0), latestByRun(ledger))
+    expect(html).toContain('评审机 ✓ 复判通过（首判 ✗ 1/4）')
+    expect(html).toContain('<p>首判</p>')
+  })
+
+  it('pays for the second look once: a later run reuses both', async () => {
+    const fetch = fakeFetch(answer(false), answer(false))
+    const { job, ctx, ledger } = await setup({ fetch })
+    ctx.rejudgeFailed = true
+    await judgeJob(job, ctx)
+    const again = await judgeJob(job, ctx)
+    expect(again).toMatchObject({ outcome: 'reused', rejudgeReused: true })
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(outcomeOf(latestByRun(ledger).get(job.record.runId)!)).toBe('fail-twice')
+    expect(judgeSummary([job.record.runId], latestByRun(ledger))).toBe('✓0 ✗1（两次都不过 1）')
+  })
+
+  it('re-judges a fail stored by an earlier run without the flag', async () => {
+    const fetch = fakeFetch(answer(false), answer(false))
+    const { job, ctx } = await setup({ fetch })
+    await judgeJob(job, ctx)
+    ctx.rejudgeFailed = true
+    const later = await judgeJob(job, ctx)
+    expect(later).toMatchObject({ outcome: 'reused', rejudge: { pass: false } })
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not look again when only a pixel check failed', async () => {
+    const fetch = fakeFetch(answer(true))
+    const { job, ctx } = await setup({ fetch, result: await png(0.5) })
+    ctx.rejudgeFailed = true
+    const result = await judgeJob(job, ctx)
+    expect(result.verdict?.pass).toBe(false)
+    expect(result.rejudge).toBeUndefined()
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports a second look the budget could not hold', async () => {
+    const fetch = fakeFetch(answer(false))
+    const { job, ctx } = await setup({ fetch, budget: 0.003 })
+    ctx.rejudgeFailed = true
+    expect(await judgeJob(job, ctx)).toMatchObject({ outcome: 'judged', rejudgeCode: 'RUN_BUDGET_REACHED' })
+  })
+
+  it('keeps the effort in the cache key', async () => {
+    const { job } = await setup({ fetch: fakeFetch(500) })
+    const bytes = await png()
+    expect(judgeModelKey('line', 'low')).not.toBe(judgeModelKey('line', 'medium'))
+    expect(jobHash(bytes, job.cell, job.sources, job.checklist, judgeModelKey('line', 'low')))
+      .not.toBe(jobHash(bytes, job.cell, job.sources, job.checklist, judgeModelKey('line', 'medium')))
   })
 })
 
