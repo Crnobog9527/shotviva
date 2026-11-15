@@ -57,14 +57,14 @@ const PREVIEW_STORAGE = {
   assetsBase: 'https://pub-a55455bd73cf4b79827ce1f299ac1ca1.r2.dev',
 }
 
-function checkStorage(env: Env, storage: typeof PREVIEW_STORAGE) {
+function checkStorage(env: Omit<Env, 'SHOTVIVA_IMPORT_ADMIN_ID'>, storage: typeof PREVIEW_STORAGE) {
   const wrong = [['R2_BUCKET', env.R2_BUCKET, storage.privateBucket], ['R2_PUBLIC_BUCKET', env.R2_PUBLIC_BUCKET, storage.publicBucket],
     ['NEXT_PUBLIC_ASSETS_BASE_URL', env.NEXT_PUBLIC_ASSETS_BASE_URL?.replace(/\/+$/, ''), storage.assetsBase]]
     .filter(([, given, fixed]) => given !== undefined && given !== fixed).map(([name]) => name)
   if (wrong.length) throw new Error(`.env.local 的 ${wrong.join('、')} 不是测试站的设置，停止（封面和参考图只写测试站的桶）`)
 }
 
-export function targetOf(env: Env): Target {
+export function targetOf(env: Omit<Env, 'SHOTVIVA_IMPORT_ADMIN_ID'>): Target {
   let ref: string
   try {
     ref = assertQaTarget({ supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_ROLE_KEY, extraRefs: LOCAL_REF })

@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { NOTE_MAX_LENGTH, OUTPUT_ASPECTS } from '../../src/core/templates/output-options'
 import { resolutionSchema } from '../../src/core/templates/db-resolution'
+import { inputJudgeSchema } from './judge-schema'
 
 // What `pnpm templates:trial` runs for a template (templates:apply ignores it). Each input set is one
 // trial of the admin's 「首次出图」: at most one test photo (a path relative to the batch file) or, for
@@ -19,6 +20,9 @@ export const trialInputSchema = z.strictObject({
   aspectRatio: z.enum(OUTPUT_ASPECTS).optional(),
   note: z.string().trim().max(NOTE_MAX_LENGTH).optional(),
   toggles: z.record(z.string().max(64), z.boolean()).optional(),
+  // templates:judge only: extra checklist items for this input set. Not part of the trial's
+  // content hash, so editing them never re-runs a trial.
+  judge: inputJudgeSchema.optional(),
 }).refine((input) => !(input.photo && input.slots), { message: 'use either photo or slots, not both' })
 
 export const trialSchema = z.strictObject({

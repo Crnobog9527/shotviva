@@ -21,8 +21,9 @@ import { readBatchFile, RunError, targetStores } from '../template-apply/batch-f
 import { envSchema, localBatchPath, targetOf } from '../template-apply/options'
 import { planCells, type Cell } from './cells'
 import { buildPage } from './page'
-import { ensureTestPhoto, readPhoto } from './photos'
+import { ensureTestPhoto, photoHashes } from './photos'
 import { readTrialState, recordResults, trialsRoot } from './results'
+import { latestByRun, readLedger } from '../template-judge/ledger'
 import { peekCell, runAll, type CellResult, type RunContext } from './runner'
 import { summaryTable } from './summary'
 import { assertAdmin, effectiveModels, estimates } from './setup'
@@ -49,16 +50,6 @@ function readFlags(args: string[]) {
   const parsed = flags.safeParse(values)
   if (!parsed.success) throw new RunError('参数不对：--n 1～5，--budget 不超过 50（美元），--concurrency 1～4')
   return { ...parsed.data, file: localBatchPath(positionals[0]), dryRun: parsed.data['dry-run'] }
-}
-
-async function photoHashes(items: ReturnType<typeof readBatchFile>['templates'], baseDir: string) {
-  const photos = new Map<string, { bytes: Uint8Array; hash: string }>()
-  for (const input of items.flatMap(item => item.trial?.inputs ?? [])) {
-    for (const path of [input.photo, ...Object.values(input.slots ?? {})]) {
-      if (path && !photos.has(path)) photos.set(path, await readPhoto(baseDir, path))
-    }
-  }
-  return photos
 }
 
 async function dryRun(cells: Cell[], db: RunContext['deps']['db'], target: string) {
@@ -116,7 +107,7 @@ const line = (r: CellResult) => `${r.cell.templateId} v${r.cell.version} #${r.ce
 async function finish(p: Prepared, store: PrivateStore, ctx: RunContext, results: CellResult[]) {
   const state = await readTrialState(p.root)
   await recordResults(store, p.root, state, results)
-  await writeFile(join(p.root, 'index.html'), buildPage(state, p.batch.templates, p.root, p.baseDir))
+  await writeFile(join(p.root, 'index.html'), buildPage(state, p.batch.templates, p.root, p.baseDir, new Date(), latestByRun(await readLedger(p.root))))
   const stopped = ctx.stopped ? `（${ctx.stopped}，已停止开新任务）` : ''
   process.stdout.write(`\n${summaryTable(results)}\n本次预算占用约 $${ctx.spentUsd.toFixed(3)}（有实际成本按实际，否则按估价；没有费用的失败实际不收费，以后台成本对账为准）${stopped}。对照页：${relative(process.cwd(), join(p.root, 'index.html'))}\n`)
   if (results.some(r => r.outcome === 'failed') || p.problems.length) process.exitCode = 1

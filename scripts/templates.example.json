@@ -1,5 +1,6 @@
 {
-  "$comment": "Format example for pnpm templates:apply. Copy to .local/templates/<batch>.json (gitignored) and replace everything; every value here is fake. Paths are relative to the batch file. Omitted fields keep what the database has.",
+  "$comment": "Format example for pnpm templates:apply. Copy to .local/templates/<batch>.json (gitignored) and replace everything; every value here is fake. Paths are relative to the batch file. Omitted fields keep what the database has. `judge` (top level, per template, per input set) is the checklist pnpm templates:judge asks about each trial result; apply and trial ignore it.",
+  "judge": { "bar": ["Fake item: the subject matches the input photo, including its colours.", "Fake item: no text or watermark was added."] },
   "categories": [
     { "key": "example-western", "nameEn": "Example Western", "nameZh": "示例西餐", "parent": "food-drink" },
     { "key": "example-western-dark", "nameEn": "Example Dark", "nameZh": "示例暗调", "parent": "example-western" }
@@ -49,13 +50,14 @@
       "publish": false,
       "trial": {
         "inputs": [
-          { "photo": "before-photos/example-burger.jpg", "aspectRatio": "4:5" },
+          { "photo": "before-photos/example-burger.jpg", "aspectRatio": "4:5", "judge": ["Fake item: what only this input set promises."] },
           { "photo": "before-photos/example-burger-2.jpg", "fields": {}, "note": "Fake note." }
         ],
         "references": ["reference-images/example/benchmark-1.jpg"],
         "n": 2,
         "resolution": "1k"
       },
+      "judge": { "bar": ["Fake item: this template's own check."], "alpha": "opaque" },
       "review": { "status": "pass", "version": 1, "pick": "00000000-0000-4000-8000-000000000001", "notes": "Fake verdict." }
     },
     {

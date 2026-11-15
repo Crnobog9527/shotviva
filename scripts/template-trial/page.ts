@@ -1,6 +1,7 @@
 import { relative, resolve } from 'node:path'
 
 import type { TemplateItem } from '../template-apply/schema'
+import type { Verdict } from '../template-judge/ledger'
 import type { TrialRecord, TrialState } from './results'
 
 // The local review page (.local/trials/index.html): per template its benchmarks, its input sets
@@ -18,12 +19,21 @@ function reviewLine(item: TemplateItem) {
   return `<p><strong>评审（v${review.version}）：${verdict}</strong>${review.notes ? ' · ' + escape(review.notes) : ''}</p>`
 }
 
-function resultCard(record: TrialRecord, pick?: string) {
+// The image judge's verdict on one result (templates:judge): overall, then each item with its reason.
+function judgeBlock(verdict: Verdict | undefined) {
+  if (!verdict) return ''
+  const items = verdict.items.map(item => `<li class="${item.pass ? 'ok' : 'bad'}">${item.pass ? '✓' : '✗'} ${escape(item.text)}<br><span>${escape(item.reason)}</span></li>`).join('')
+  const failed = verdict.items.filter(item => !item.pass).length
+  const summary = verdict.pass ? '✓ 全部通过' : `✗ ${failed}/${verdict.items.length} 项不过`
+  return `<details class="judge"${verdict.pass ? '' : ' open'}><summary class="${verdict.pass ? 'ok' : 'bad'}">评审机 ${summary}</summary><ul>${items}</ul></details>`
+}
+
+function resultCard(record: TrialRecord, pick?: string, verdict?: Verdict) {
   const meta = [`#${record.inputIndex + 1}.${record.k + 1}`, record.provider?.split('/').slice(1).join('/') || '', money(record.costUsd),
     record.durationMs ? `${Math.round(record.durationMs / 1000)}s` : ''].filter(Boolean).join(' · ')
   const body = record.file ? img(record.file, record.runId) : `<div class="miss">${escape(record.outcome)} ${escape(record.code ?? '')}</div>`
   const picked = record.runId === pick ? ' class="pick"' : ''
-  return `<figure${picked}>${body}<figcaption>${picked ? '★ 选为封面 · ' : ''}${escape(meta)}<br><code>${escape(record.runId)}</code></figcaption></figure>`
+  return `<figure${picked}>${body}<figcaption>${picked ? '★ 选为封面 · ' : ''}${escape(meta)}<br><code>${escape(record.runId)}</code></figcaption>${judgeBlock(verdict)}</figure>`
 }
 
 function inputsBlock(item: TemplateItem, root: string, baseDir: string) {
@@ -36,12 +46,12 @@ function inputsBlock(item: TemplateItem, root: string, baseDir: string) {
   }).join('')
 }
 
-function templateSection(item: TemplateItem, records: TrialRecord[], root: string, baseDir: string) {
+function templateSection(item: TemplateItem, records: TrialRecord[], root: string, baseDir: string, verdicts: Map<string, Verdict>) {
   const refs = (item.trial?.references ?? []).map((p, i) => img(relative(root, resolve(baseDir, p)), `对标 ${i + 1}`)).join('')
   const versions = [...new Set(records.map(r => r.version))].sort((a, b) => b - a)
   const spent = records.reduce((sum, r) => sum + (r.costUsd ?? 0), 0)
   const rows = versions.map(v => {
-    const cards = records.filter(r => r.version === v).sort((a, b) => a.inputIndex - b.inputIndex || a.k - b.k).map(r => resultCard(r, item.review?.pick)).join('')
+    const cards = records.filter(r => r.version === v).sort((a, b) => a.inputIndex - b.inputIndex || a.k - b.k).map(r => resultCard(r, item.review?.pick, verdicts.get(r.runId))).join('')
     return `<h3>提示词 v${v}</h3><div class="grid">${cards}</div>`
   }).join('')
   return `<section id="${escape(item.id)}"><h2>${escape(item.id)} <small>${escape(item.name ?? '')} · 试跑 ${records.length} 次 · ${money(spent)}</small></h2>
@@ -56,13 +66,14 @@ section{border-top:1px solid var(--line);padding:16px 0}h2 small,figcaption,.mis
 .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
 figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px}
-img{width:100%;height:auto;border-radius:4px;display:block}figure.pick{outline:3px solid #16a34a}code{font-size:11px;word-break:break-all}nav a{margin-right:12px}`
+img{width:100%;height:auto;border-radius:4px;display:block}.judge{font-size:12px;margin-top:4px}.judge ul{margin:4px 0 0;padding-left:0;list-style:none}.judge li{margin:3px 0}.judge li span{color:var(--muted)}.ok{color:#16a34a}.bad{color:#dc2626}figure.pick{outline:3px solid #16a34a}code{font-size:11px;word-break:break-all}nav a{margin-right:12px}`
 
-export function buildPage(state: TrialState, items: TemplateItem[], root: string, baseDir: string, generatedAt = new Date()) {
+// verdicts: the image judge's newest verdict per run id (templates:judge), shown under each result.
+export function buildPage(state: TrialState, items: TemplateItem[], root: string, baseDir: string, generatedAt = new Date(), verdicts = new Map<string, Verdict>()) {
   const records = Object.values(state.records)
   const shown = items.filter(item => item.trial || records.some(r => r.templateId === item.id))
   const nav = shown.map(item => `<a href="#${escape(item.id)}">${escape(item.id)}</a>`).join('')
-  const sections = shown.map(item => templateSection(item, records.filter(r => r.templateId === item.id), root, baseDir)).join('\n')
+  const sections = shown.map(item => templateSection(item, records.filter(r => r.templateId === item.id), root, baseDir, verdicts)).join('\n')
   return `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>模板试跑对照</title><style>${STYLE}</style></head><body><h1>模板试跑对照</h1>
 <p class="miss">本地文件，不要上传。生成于 ${escape(generatedAt.toLocaleString('zh-CN'))}。</p><nav>${nav}</nav>${sections}</body></html>`
