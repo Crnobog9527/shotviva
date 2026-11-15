@@ -2561,11 +2561,12 @@ CREATE OR REPLACE FUNCTION "admin"."template_breakeven_budget"() RETURNS numeric
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select min(i.cents/(100*i.credits::numeric) * (10000-admin.catalog_fee_bp(i.kind))/10000)
-    from (select c.kind, c.credits,
-            case when c.id in ('pack_m','pack_l') then round(c.cents*0.85) else c.cents end as cents
-          from admin.catalog_candidate(null,null,null,false) c) i
-   where admin.is_template_catalog_v2() and admin.catalog_policy() is not null and i.cents>0 and i.credits>0
+  select case when admin.is_template_catalog_v2() and admin.template_policy_valid() then (
+    select min(i.cents/(100*i.credits::numeric) * (10000-admin.catalog_fee_bp(i.kind))/10000)
+      from (select c.kind, c.credits,
+              case when c.id in ('pack_m','pack_l') then round(c.cents*0.85) else c.cents end as cents
+            from admin.catalog_candidate(null,null,null,false) c) i
+     where i.cents>0 and i.credits>0) end
 $$;
 
 
@@ -2646,11 +2647,29 @@ CREATE OR REPLACE FUNCTION "admin"."template_margin_target_bp"() RETURNS integer
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select (admin.catalog_policy()->>'margin_bp')::int where admin.template_breakeven_budget() is not null
+  select case when admin.template_breakeven_budget() is not null then
+    (select (s.value->>'margin_bp')::int from public.system_settings s where s.key='catalog_economics_policy') end
 $$;
 
 
 ALTER FUNCTION "admin"."template_margin_target_bp"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_policy_valid"() RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+  select coalesce((select case
+      when jsonb_typeof(s.value) is distinct from 'object' then false
+      when exists (select from unnest(array['payment_bp','refund_bp','yearly_commission_bp','other_commission_bp','margin_bp']) k
+             where jsonb_typeof(s.value->k) is distinct from 'number' or (s.value->>k) !~ '^[0-9]{1,4}$') then false
+      else (s.value->>'payment_bp')::int + (s.value->>'refund_bp')::int
+        + greatest((s.value->>'yearly_commission_bp')::int, (s.value->>'other_commission_bp')::int) < 10000 end
+    from public.system_settings s where s.key='catalog_economics_policy'), false)
+$_$;
+
+
+ALTER FUNCTION "admin"."template_policy_valid"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_price_state"("t" "public"."templates") RETURNS "jsonb"
@@ -8769,13 +8788,18 @@ begin
     -- 1568: the catalogue economics policy (§6.2 第 5 项), the same shape admin.catalog_policy()
     -- accepts: exactly the five basis-point integers, fees + the larger commission under 100%.
     when 'catalog_economics_policy' then
-      if jsonb_typeof(p_value) is distinct from 'object'
-         or p_value - array['payment_bp','refund_bp','yearly_commission_bp','other_commission_bp','margin_bp'] <> '{}'::jsonb
+      -- Separate steps: no cast runs before the shape is known (SQL does not short-circuit OR).
+      if jsonb_typeof(p_value) is distinct from 'object' then
+        raise exception 'INVALID_INPUT' using detail = 'catalog_economics_policy must be an object';
+      end if;
+      if p_value - array['payment_bp','refund_bp','yearly_commission_bp','other_commission_bp','margin_bp'] <> '{}'::jsonb
          or exists (select from unnest(array['payment_bp','refund_bp','yearly_commission_bp','other_commission_bp','margin_bp']) k
-              where jsonb_typeof(p_value->k) is distinct from 'number' or (p_value->>k) !~ '^[0-9]{1,4}$')
-         or (p_value->>'payment_bp')::int + (p_value->>'refund_bp')::int
-            + greatest((p_value->>'yearly_commission_bp')::int, (p_value->>'other_commission_bp')::int) >= 10000 then
-        raise exception 'INVALID_INPUT' using detail = 'catalog_economics_policy must be five basis-point integers with fees under 100%';
+              where jsonb_typeof(p_value->k) is distinct from 'number' or (p_value->>k) !~ '^[0-9]{1,4}$') then
+        raise exception 'INVALID_INPUT' using detail = 'catalog_economics_policy must be five basis-point integers';
+      end if;
+      if (p_value->>'payment_bp')::int + (p_value->>'refund_bp')::int
+         + greatest((p_value->>'yearly_commission_bp')::int, (p_value->>'other_commission_bp')::int) >= 10000 then
+        raise exception 'INVALID_INPUT' using detail = 'catalog_economics_policy fees must stay under 100%';
       end if;
     else
       raise exception 'INVALID_INPUT' using detail = 'unknown setting';
@@ -19734,6 +19758,11 @@ REVOKE ALL ON FUNCTION "admin"."template_leaves_series_on_unpublish"() FROM PUBL
 
 REVOKE ALL ON FUNCTION "admin"."template_margin_target_bp"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."template_margin_target_bp"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_policy_valid"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_policy_valid"() TO "service_role";
 
 
 
