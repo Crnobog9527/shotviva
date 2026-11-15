@@ -34,7 +34,12 @@ declare
   cached text := current_setting('shotviva.breakeven_budget', true);
   budget numeric;
 begin
-  if cached is not null and split_part(cached, '|', 1) = stamp then
+  -- Only a value written during this very statement counts: a value left by an earlier statement
+  -- (or set by anyone before it) carries another timestamp and is recomputed. Anything that does
+  -- not look like what this function writes is ignored too. Clients cannot set it at all: the
+  -- API exposes no way to call set_config, and the setting is not in PostgREST's request.* space.
+  if cached is not null and split_part(cached, '|', 1) = stamp
+     and split_part(cached, '|', 2) ~ '^([0-9]+(\.[0-9]+)?)?$' and cached ~ '^[^|]+\|[^|]*$' then
     return nullif(split_part(cached, '|', 2), '')::numeric;
   end if;
   budget := admin.template_breakeven_budget_now();
