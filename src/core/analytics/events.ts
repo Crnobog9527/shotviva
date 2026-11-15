@@ -5,6 +5,7 @@ import { MAX_BATCH_SIZE } from '../billing/tier-limits'
 import { productIdSchema } from '../config/product-id'
 import { INQUIRY_USES, MONTHLY_VOLUMES } from '../inquiries/summary-choices'
 import { EDIT_SCOPES } from '../templates/edit-params'
+import { IMAGE_SLOTS_MAX } from '../templates/image-slots'
 import { UPLOAD_SIZE_BUCKETS } from './event-values'
 import { findPii } from './pii'
 import { resolutionSchema } from '@/core/templates/db-resolution'
@@ -108,7 +109,7 @@ export const eventSchemas = {
     // The template's toggles as chosen (T89), key → on; {} for a template without any.
     toggles: z.record(toggleKey, z.boolean()).optional(),
     // A slot template's filled image slots (§5.1e), keys only, in send order; [] otherwise.
-    slots_filled: z.array(toggleKey).max(4).optional(),
+    slots_filled: z.array(toggleKey).max(IMAGE_SLOTS_MAX).optional(),
   }),
   // A request refused before charging (ARCHITECTURE §5.1a, T81): which entry, never the words.
   generate_refused: z.strictObject({ reason: z.enum(['identity_swap']), source: z.enum(IDENTITY_SOURCES) }),

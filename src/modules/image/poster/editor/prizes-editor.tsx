@@ -31,7 +31,7 @@ export function PrizesEditor({ content, onChange, flagged, sample, display }: Bl
   const remove = (i: number) => {
     const spot = chosen.find((item) => item.row === i)?.spot
     if (display && spot !== undefined) display.clear(spot)
-    onChange(removePrize(content, i), `prizes.rows.${i}`)
+    onChange(removePrize(content, i, display?.count), `prizes.rows.${i}`)
   }
   const spotOf = (i: number): RowSpot | null => {
     if (!display) return null

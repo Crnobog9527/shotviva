@@ -238,3 +238,12 @@ describe('generate_refused (ARCHITECTURE §5.1a, T81)', () => {
     expect(validateEvent('work_report', { reason: 'other', note: 'hi' }).ok).toBe(false)
   })
 })
+
+// A poster with an organiser logo and four featured prize photos fills five slots (shotviva#678).
+describe('generate slots_filled', () => {
+  it('takes as many keys as a template can have slots', () => {
+    const slots = eventSchemas.generate.shape.slots_filled
+    expect(slots.safeParse(['logo', 'prize_a', 'prize_b', 'prize_c', 'prize_d']).success).toBe(true)
+    expect(slots.safeParse(Array.from({ length: 9 }, (_, i) => `s${i}`)).success).toBe(false)
+  })
+})

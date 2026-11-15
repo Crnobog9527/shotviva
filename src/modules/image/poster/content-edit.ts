@@ -70,9 +70,12 @@ export function addPrize(content: PosterContent): PosterContent {
   return { ...content, prizes: { ...prizes, rows: [...prizes.rows, { ...EMPTY_ROW }] } }
 }
 
-export function removePrize(content: PosterContent, index: number): PosterContent {
+// With a display area (featuredCount), the rows' spots are written in first, so a draft saved
+// before they were never moves a photo onto the next prize when a row above goes.
+export function removePrize(content: PosterContent, index: number, featuredCount?: number): PosterContent {
   const prizes = prizesOf(content)
-  return { ...content, prizes: { ...prizes, rows: prizes.rows.filter((_, i) => i !== index) } }
+  const rows = featuredCount ? withFeaturedSpots(prizes.rows, { count: featuredCount }) : prizes.rows
+  return { ...content, prizes: { ...prizes, rows: rows.filter((_, i) => i !== index) } }
 }
 
 export function setSection(content: PosterContent, index: number, change: Partial<PosterSection>): PosterContent {
