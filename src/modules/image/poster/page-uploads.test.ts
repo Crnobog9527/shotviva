@@ -52,3 +52,15 @@ describe('pageUploads with an organiser logo', () => {
     expect(pageUploads({ poster: withLogo }, 'rules', { prize_photo: 'inputs/u/a.webp' })).toBeNull()
   })
 })
+
+// Featured prizes' photos (§5.3 展示位): a photo no featured prize holds is never sent.
+describe('pageUploads with featured prize photos', () => {
+  it('leaves out the unused photo slots', () => {
+    const withPhotos = posterFieldsSchema.parse({ kinds: [
+      { key: 'prizes', name, blocks: ['header', 'prizes', 'footer'], slots: ['prize_a', 'prize_b'] },
+      { key: 'rules', name, blocks: ['header', 'sections', 'table', 'footer'] },
+    ], featured: { count: 2, photos: ['prize_a', 'prize_b'] } })
+    const uploads = { prize_a: 'inputs/u/a.webp', prize_b: 'inputs/u/b.webp' }
+    expect(pageUploads({ poster: withPhotos }, 'prizes', uploads, ['prize_b'])).toEqual({ prize_a: 'inputs/u/a.webp' })
+  })
+})

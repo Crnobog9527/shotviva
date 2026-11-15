@@ -34,7 +34,14 @@ export const headerSchema = z.object({
 // the table's own title (「级别结构　STRUCTURE」).
 export const infoSchema = z.object({ title: text(12), titleEn: text(24) })
 
-export const prizeRowSchema = z.object({ rank: text(8), rankEn: text(16), prize: text(40) })
+// featured: the display-area spot (1-based) this prize holds when the template draws a few prizes
+// as products (fields.poster.featured, §5.3「展示位」); spot k takes the template's k-th prize photo
+// slot. Absent: text in the prize list only. Older sets have none and read as the top rows.
+export const FEATURED_MAX = 8
+export const prizeRowSchema = z.object({
+  rank: text(8), rankEn: text(16), prize: text(40),
+  featured: z.number().int().min(1).max(FEATURED_MAX).optional(),
+})
 
 export const prizesSchema = z.object({
   headline: text(20), note: text(24),

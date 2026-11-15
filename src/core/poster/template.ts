@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { POSTER_BLOCKS, POSTER_LIMITS, posterContentSchema } from './content'
+import { FEATURED_MAX, POSTER_BLOCKS, POSTER_LIMITS, posterContentSchema } from './content'
 
 // A poster template's set (templates.fields.poster, ARCHITECTURE §5.3): which posters it makes,
 // which blocks each one carries and how much one poster holds before the set gets another page.
@@ -21,7 +21,7 @@ export const posterKindSchema = z.object({
   capacity: posterCapacitySchema.default({}),
   // The template's image slots (fields.images.slots) this page sends to the model, e.g. the prize
   // photo on the prize page only; every other page sends none.
-  slots: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(4).default([]),
+  slots: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(8).default([]),
 })
 
 // A spot on the poster as fractions: x of the width, y of the height (top-left corner), size of
@@ -37,6 +37,19 @@ export const posterQrSchema = z.object({
   pages: z.record(z.string(), spotSchema).optional(),
 })
 
+// 展示位 (§5.3, Owner 2026-11-15): the prize page's display area draws `count` prizes as products;
+// the user picks which (the top rows until they do), the rest stay text in the prize list.
+// `photos`: one optional image slot per spot, in spot order (spot k ↔ photos[k-1]), listed by the
+// page that carries the prizes; none: every featured prize is drawn from its name.
+export const posterFeaturedSchema = z.object({
+  count: z.number().int().min(1).max(FEATURED_MAX),
+  photos: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(FEATURED_MAX).default([]),
+}).refine((featured) => featured.photos.length === 0 || featured.photos.length === featured.count, {
+  message: 'poster.featured.photos needs one slot per spot (or none)', path: ['photos'],
+}).refine((featured) => new Set(featured.photos).size === featured.photos.length, {
+  message: 'poster.featured.photos must be different slots', path: ['photos'],
+})
+
 export const posterFieldsSchema = z.object({
   kinds: z.array(posterKindSchema).min(1).max(4),
   // The level table's header the editor starts from; the user may rename the columns.
@@ -49,14 +62,18 @@ export const posterFieldsSchema = z.object({
   // Editable in the admin and synced with the template like every other field.
   sample: posterContentSchema.optional(),
   qr: posterQrSchema.optional(),
+  featured: posterFeaturedSchema.optional(),
 }).refine((poster) => new Set(poster.kinds.map((kind) => kind.key)).size === poster.kinds.length, {
   message: 'poster kind keys must be unique', path: ['kinds'],
+}).refine((poster) => !poster.featured || poster.featured.photos.every((key) => key !== poster.qr?.slot && poster.kinds.find((kind) => kind.blocks.includes('prizes'))?.slots.includes(key)), {
+  message: 'poster.featured needs a page with prizes, which lists every featured photo slot', path: ['featured'],
 })
 
 export type PosterFields = z.infer<typeof posterFieldsSchema>
 export type PosterKind = z.infer<typeof posterKindSchema>
 export type PosterCapacity = z.infer<typeof posterCapacitySchema>
 export type PosterQr = z.infer<typeof posterQrSchema>
+export type PosterFeatured = z.infer<typeof posterFeaturedSchema>
 
 // The QR code's fallback spot on one page.
 export const qrFallbackFor = (qr: PosterQr, kind: string) => qr.pages?.[kind] ?? qr.fallback
