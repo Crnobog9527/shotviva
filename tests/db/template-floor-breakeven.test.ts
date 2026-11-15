@@ -21,6 +21,12 @@ const routeFloor = () => num("select (admin.alternate_route_floor($1,'1k','mediu
 const fallbackFloor = () => num("select admin.fallback_route_floor($1,'1k','medium')", [tag])
 const setPrice = (price: number) => db.query(`update public.templates set credits_cost=jsonb_set(credits_cost,'{1k}',to_jsonb($2::int)) where id=$1`, [template, price])
 const assertFloor = () => db.query('select admin.assert_template_sale_floor(t) from public.templates t where id=$1', [template])
+// An expected exception aborts the test transaction: run it in a savepoint and roll back to it.
+async function refuses(run: () => Promise<unknown>, error: RegExp) {
+  await db.query('savepoint refused')
+  await expect(run()).rejects.toThrow(error)
+  await db.query('rollback to savepoint refused')
+}
 
 // The rule in plain TypeScript, from the raw tables: min over listed products of price per credit
 // (M/L packs at 0.85) x (1 - payment - refund - the highest commission for that kind).
@@ -52,7 +58,7 @@ beforeEach(async () => {
   await db.query(`insert into public.system_settings(key,value) values('pricing_catalog_version','"v2"')
     on conflict(key) do update set value=excluded.value`)
   await db.query("delete from public.system_settings where key='catalog_economics_policy'")
-  template = await createPricedTemplate(db, { '1k': 1000, '2k': 1000, '3k': 1000 }, 'medium')
+  template = await createPricedTemplate(db, { '1k': 999, '2k': 999, '3k': 999 }, 'medium')
   await db.query(`insert into public.ai_providers(id,label,adapter,model,resolutions,capabilities,estimated_image_costs,extra_input_image_usd)
     values($1,'T1568 fixture','openrouter_images','t1568-test','{1k,2k}',$2,$3,0.01)`, [provider,
     { resolutions: ['1k', '2k'], aspectRatios: ['1:1'], originalRatio: false, minReferences: 0, maxReferences: 8, fetchedAt: new Date().toISOString() },
@@ -92,7 +98,7 @@ describe('template floor budget', () => {
     const floor = await routeFloor()
     expect(floor).toBeLessThan(Math.ceil(estimate * 1.10 / await legacyBudget()))
     await setPrice(floor - 1)
-    await expect(assertFloor()).rejects.toThrow(/TEMPLATE_PRICE_BELOW_FLOOR/)
+    await refuses(assertFloor, /TEMPLATE_PRICE_BELOW_FLOOR/)
     await setPrice(floor)
     await expect(assertFloor()).resolves.toBeDefined()
   })
@@ -152,7 +158,7 @@ describe('before the policy row exists (production at deploy)', () => {
     await setPrice(floor)
     await expect(assertFloor()).resolves.toBeDefined()
     await setPrice(floor - 1)
-    await expect(assertFloor()).rejects.toThrow(/TEMPLATE_PRICE_BELOW_FLOOR/)
+    await refuses(assertFloor, /TEMPLATE_PRICE_BELOW_FLOOR/)
   })
 
   it('the reservation re-check keeps the old floor without erroring', async () => {
@@ -195,14 +201,11 @@ describe('admin_set_system_setting catalog_economics_policy', () => {
     delete missing.margin_bp
     for (const bad of [{ ...policy, extra: 1 }, { ...policy, refund_bp: 1.5 }, { ...policy, refund_bp: '250' },
       { ...policy, payment_bp: 5000, refund_bp: 4000, other_commission_bp: 1000 }, missing, [1]]) {
-      await db.query('savepoint s')
-      await expect(write(bad, actor)).rejects.toThrow(/INVALID_INPUT/)
-      await db.query('rollback to savepoint s')
+      await refuses(() => write(bad, actor), /INVALID_INPUT/)
     }
-    await db.query('savepoint s')
-    await expect(write(policy, await createUser(db))).rejects.toThrow(/NOT_ADMIN/)
-    await db.query('rollback to savepoint s')
+    const stranger = await createUser(db)
+    await refuses(() => write(policy, stranger), /NOT_ADMIN/)
     await db.query('update public.profiles set banned_at=now() where id=$1', [actor])
-    await expect(write(policy, actor)).rejects.toThrow(/NOT_ADMIN/)
+    await refuses(() => write(policy, actor), /NOT_ADMIN/)
   })
 })
