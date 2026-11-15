@@ -1,6 +1,7 @@
 import 'server-only'
 
 import type { OpenAIResponsesConfig } from '../edit/openai-responses'
+import { postResponsesRequest } from '../edit/responses-request'
 import { readPieces } from './read-pieces'
 
 // OpenAI's Responses API with stream: true (server-sent events): each piece of the answer's text
@@ -44,23 +45,15 @@ function readEvent(block: string, state: StreamState, onText: (delta: string) =>
 
 export async function streamResponses(config: OpenAIResponsesConfig, body: unknown, signal: AbortSignal, onDelta: (delta: string) => void): Promise<StreamedAnswer> {
   const started = performance.now()
-  const response = await (config.fetch ?? fetch)(`${config.baseUrl}/responses`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-    body: JSON.stringify(body),
-    signal,
-  })
-  if (!response.ok || !response.body) {
-    await response.body?.cancel().catch(() => undefined)
-    throw new Error(`openai responses ${response.status}`)
-  }
+  const response = await postResponsesRequest(config, body, signal, 'text/event-stream')
   const state: StreamState = { text: '', usage: null, completed: false, firstTokenMs: null }
   const onText = (delta: string) => {
     state.firstTokenMs ??= Math.round(performance.now() - started)
     state.text += delta
     onDelta(delta)
   }
-  await readPieces(response.body, '\n\n', (block) => readEvent(block, state, onText))
+  // postResponsesRequest only returns a response with a body.
+  await readPieces(response.body as ReadableStream<Uint8Array>, '\n\n', (block) => readEvent(block, state, onText))
   // A refusal has no output text; it is a failure like any other.
   if (!state.completed || !state.text) throw new Error('openai responses ended without an answer')
   return { json: JSON.parse(state.text), usage: state.usage, firstTokenMs: state.firstTokenMs }
