@@ -5,7 +5,7 @@ import sharp from 'sharp'
 import { MAX_COVER_IMAGE_BYTES } from '../../src/core/admin/covers'
 import { sniffImageType, type ObjectStore } from '../../src/core/storage'
 import { isStyleRefKey, type StyleRef } from '../../src/core/templates/style-refs'
-import { SyncError } from './covers'
+import { bucketStep, SyncError } from './covers'
 
 // Each side's private uploads bucket (2026-11-12). Only style-refs/<template>/… keys are read or written.
 export type PrivateStore = Pick<ObjectStore, 'head' | 'get' | 'put'>
@@ -15,9 +15,9 @@ const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest(
 // The stored WebP the test site's row describes: a WebP of exactly the recorded size and pixels.
 async function readSource(id: string, ref: StyleRef, source: PrivateStore) {
   if (!isStyleRefKey(id, ref.key)) throw new SyncError('INVALID_STYLE_REFS')
-  const head = await source.head(ref.key)
+  const head = await bucketStep('STYLE_REF_READ_FAILED', () => source.head(ref.key))
   if (!head || head.size < 1 || head.size > MAX_COVER_IMAGE_BYTES) throw new SyncError('STYLE_REF_MISSING')
-  const bytes = await source.get(ref.key, MAX_COVER_IMAGE_BYTES)
+  const bytes = await bucketStep('STYLE_REF_READ_FAILED', () => source.get(ref.key, MAX_COVER_IMAGE_BYTES))
   if (bytes.length !== head.size || sniffImageType(bytes) !== 'image/webp') throw new SyncError('INVALID_STYLE_REF_OBJECT')
   const meta = await sharp(bytes).metadata().catch(() => null)
   if (meta?.width !== ref.width || meta.height !== ref.height) throw new SyncError('INVALID_STYLE_REF_OBJECT')
@@ -32,13 +32,13 @@ export async function copyStyleRefs(id: string, refs: readonly StyleRef[], sourc
   let written = 0
   for (const ref of refs) {
     const bytes = await readSource(id, ref, source)
-    const existing = await target.head(ref.key)
+    const existing = await bucketStep('STYLE_REF_WRITE_FAILED', () => target.head(ref.key))
     if (existing) {
-      const stored = existing.size === bytes.length ? await target.get(ref.key, MAX_COVER_IMAGE_BYTES) : null
+      const stored = existing.size === bytes.length ? await bucketStep('STYLE_REF_WRITE_FAILED', () => target.get(ref.key, MAX_COVER_IMAGE_BYTES)) : null
       if (!stored || digest(stored) !== digest(bytes)) throw new SyncError('STYLE_REF_CONFLICT')
       continue
     }
-    await target.put(ref.key, bytes, 'image/webp')
+    await bucketStep('STYLE_REF_WRITE_FAILED', () => target.put(ref.key, bytes, 'image/webp'))
     written += 1
   }
   return written
