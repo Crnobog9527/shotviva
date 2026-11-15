@@ -28,7 +28,7 @@ export function withReadCost(decision: DecisionCost | undefined, usage: DishRead
 // 240 s inside the route's 300: past this the step gives up (the reading may still finish, unused).
 export const FOOD_STEP_TIMEOUT_MS = 30_000
 
-const flow1 = (call: Call, fallback: FoodChoice['fallback']): FoodOutcome => ({ call, usage: null, choice: { kind: 'both_off', fallback } })
+const flow1 = (call: Call, fallback: FoodChoice['fallback'], readError: string): FoodOutcome => ({ call, usage: null, choice: { kind: 'both_off', fallback }, readError })
 
 // Nothing here may throw past the settlement that refunds the credits, nor outlast its deadline.
 async function bounded(run: Promise<FoodOutcome>, base: Call, ids: Record<string, string>, ms = FOOD_STEP_TIMEOUT_MS): Promise<FoodOutcome> {
@@ -36,13 +36,13 @@ async function bounded(run: Promise<FoodOutcome>, base: Call, ids: Record<string
   const late = new Promise<FoodOutcome>((resolve) => {
     timer = setTimeout(() => {
       logger.warn('food_flow.timeout', ids)
-      resolve(flow1(base, 'read_failed'))
+      resolve(flow1(base, 'read_failed', `food step over ${ms / 1000} s`))
     }, ms)
   })
   try {
     return await Promise.race([run.catch((error: unknown) => {
       logger.error('food_flow.failed', { ...ids, error })
-      return flow1(base, 'read_failed')
+      return flow1(base, 'read_failed', 'food step failed')
     }), late])
   } finally {
     clearTimeout(timer)
@@ -75,5 +75,6 @@ export async function foodStep(
     ...ids, flow: outcome.choice.kind, fallback: outcome.choice.fallback ?? null,
     category: outcome.category ?? null, vesselId: outcome.vesselId ?? null, ms: Math.round(performance.now() - started),
   })
+  deps.food?.onOutcome?.({ flow: outcome.choice.kind, fallback: outcome.choice.fallback ?? null, readError: outcome.readError ?? null })
   return { call: outcome.call, decision: withReadCost(parts.decision, outcome.usage, outcome.prices ?? null) }
 }

@@ -1,3 +1,4 @@
+import type { FoodReport } from '../../src/core/jobs/food-flow'
 import { AppError } from '../../src/core/errors'
 import type { TestRun } from '../../src/modules/image/test-run/test-run-row'
 import { findTestRun } from '../../src/modules/image/test-run/test-run-store'
@@ -25,7 +26,11 @@ const NEVER_RETRY = new Set(['CONTENT_REJECTED', 'IDENTITY_SWAP_REFUSED'])
 // The admin panel's cleanup marks a run still running after 10 minutes as failed (0785).
 const STALE_MS = 10 * 60 * 1000
 
-export type CellResult = { cell: Cell; run?: TestRun; reused?: boolean; outcome: 'succeeded' | 'failed' | 'running' | 'skipped'; code?: string; failure?: Failure | null }
+export type CellResult = {
+  cell: Cell; run?: TestRun; reused?: boolean; outcome: 'succeeded' | 'failed' | 'running' | 'skipped'; code?: string; failure?: Failure | null
+  // A food flow that did not run as its toggles asked (§5.1c), said before anyone tunes on it.
+  food?: string
+}
 
 export type RunContext = {
   deps: Parameters<typeof runTestGenerate>[0]
@@ -39,6 +44,13 @@ export type RunContext = {
   retryFailed?: boolean
   stopped?: string
   sleep?: (ms: number) => Promise<void>
+}
+
+// Only a fallback is worth a line; a flow that ran as asked says nothing.
+export function foodNote(report: FoodReport): string | undefined {
+  if (!report.fallback) return undefined
+  const why = report.fallback === 'read_failed' ? `dish read failed${report.readError ? ` (${report.readError})` : ''}` : report.fallback
+  return `food_flow fell back to ${report.flow}: ${why}`
 }
 
 const cost = (run: TestRun) => run.costUsd ?? run.estimateUsd
@@ -71,12 +83,14 @@ async function call(cell: Cell, ctx: RunContext, attempt: number): Promise<CellR
   const estimate = ctx.estimateOf(cell)
   if (ctx.spentUsd + ctx.reservedUsd + estimate > ctx.budgetUsd) return { cell, outcome: 'skipped', code: 'RUN_BUDGET_REACHED' }
   ctx.reservedUsd += estimate
-  const slot: { failure?: Failure | null } = {}
+  const slot: { failure?: Failure | null; food?: string } = {}
   try {
-    const deps = { ...ctx.deps, provider: watchedProvider(ctx.deps.provider, slot) }
+    const food = ctx.deps.food ? { ...ctx.deps.food, onOutcome: (report: FoodReport) => { slot.food = foodNote(report) } } : ctx.deps.food
+    const deps = { ...ctx.deps, food, provider: watchedProvider(ctx.deps.provider, slot) }
     const run = await runTestGenerate(deps, { actorId: ctx.actorId, body: bodyOf(cell, ctx, runIdOf(cell, attempt)) })
     ctx.spentUsd += cost(run)
-    return run.status === 'succeeded' ? { cell, run, outcome: 'succeeded' } : { cell, run, outcome: 'failed', code: run.errorCode ?? 'FAILED', failure: slot.failure }
+    const note = slot.food ? { food: slot.food } : {}
+    return run.status === 'succeeded' ? { cell, run, outcome: 'succeeded', ...note } : { cell, run, outcome: 'failed', code: run.errorCode ?? 'FAILED', failure: slot.failure, ...note }
   } catch (error) {
     if (error instanceof BoundProviderUnavailable) {
       if (!ctx.stopped) process.stderr.write(`${error.message}\n`)

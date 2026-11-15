@@ -86,6 +86,14 @@ describe('the food flows (§5.1c)', () => {
 })
 
 describe('the food flows fall back (§5.1c)', () => {
+  it('tells the caller which flow ran and why it fell back', async () => {
+    const { deps, base, photo } = await setup(new Error('openai responses 400'))
+    const reports: unknown[] = []
+    const watched = { ...deps, food: { ...deps.food, onOutcome: (report: unknown) => reports.push(report) } }
+    await foodStep(watched, plan(true, false), { call: base, photos: [photo], inputs }, { templateId: 't', runId: 'r' }, {})
+    expect(reports).toEqual([{ flow: 'both_off', fallback: 'read_failed', readError: 'openai responses 400' }])
+  })
+
   it('a failed reading leaves the ordinary call (flow 1) and costs nothing extra', async () => {
     const { deps, base, photo } = await setup(new Error('openai responses 400'))
     const out = await runFoodFlow(deps, plan(true, true), base, [photo], inputs)
