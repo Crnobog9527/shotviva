@@ -23,18 +23,28 @@ async function copyFile(id: string, url: string, source: Assets, target: Assets)
   if (!url.startsWith(prefix) || !/^covers\/[a-z0-9-]+\/[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(key)) {
     throw new SyncError('INVALID_COVER_URL')
   }
-  const head = await source.store.head(key)
+  const head = await bucketStep('COVER_READ_FAILED', () => source.store.head(key))
   if (!head || !head.size || head.size > maxBytesFor(head.contentType ?? '')) throw new SyncError('INVALID_COVER_OBJECT')
-  const bytes = await source.store.get(key)
+  const bytes = await bucketStep('COVER_READ_FAILED', () => source.store.get(key))
   const type = sniffCover(bytes)
   if (!type || bytes.length !== head.size || bytes.length > maxBytesFor(type)) throw new SyncError('INVALID_COVER_OBJECT')
   const digest = createHash('sha256').update(bytes).digest('hex')
   const dest = `covers/${id}/sync-${digest}.${extensions[type]}`
-  await target.store.put(dest, bytes, type, { cacheControl: ASSETS_CACHE_CONTROL })
+  await bucketStep('COVER_WRITE_FAILED', () => target.store.put(dest, bytes, type, { cacheControl: ASSETS_CACHE_CONTROL }))
   return `${target.base}/${dest}`
 }
 
 export class SyncError extends Error {}
+
+// A bucket call that failed (a token without read or write on that bucket, a network error) names
+// its side, so a run log tells which token to fix; the bucket's own message is never shown.
+export async function bucketStep<T>(code: string, call: () => Promise<T>): Promise<T> {
+  try {
+    return await call()
+  } catch (error) {
+    throw error instanceof SyncError ? error : new SyncError(code)
+  }
+}
 
 export async function copyCovers(id: string, row: unknown, source: Assets, target: Assets) {
   const parsed = coverSchema.safeParse(row)
