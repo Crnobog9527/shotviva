@@ -57,7 +57,7 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   // 拍照识别 (1523): over the hourly limit; no price saved yet (the feature is off).
   RATE_LIMITED: 'RATE_LIMITED',
   PRICE_UNSET: 'NOT_FOUND',
-  // The vessel library (1557): an admin edit or delete of a vessel that is gone.
+  // The vessel library (1563): an admin edit or delete of a vessel that is gone.
   DISHWARE_NOT_FOUND: 'NOT_FOUND',
 }
 

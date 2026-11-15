@@ -2,7 +2,7 @@
 -- empty serving pieces sorted by dish shape, each with a one-line generic shape description that
 -- goes into the image prompt. Images live in the private bucket under dishware/ (the key carries
 -- the row id and a content hash). Private: RLS on, no policy, service role only; written only
--- through admin_save_dishware / admin_delete_dishware (1557).
+-- through admin_save_dishware / admin_delete_dishware (1563).
 create table public.dishware_library (
   id uuid primary key,
   label text not null

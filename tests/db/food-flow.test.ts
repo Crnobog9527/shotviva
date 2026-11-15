@@ -117,7 +117,7 @@ describe('food toggle flows (§5.1c)', () => {
   })
 })
 
-describe('vessel library writes (1557)', () => {
+describe('vessel library writes (1563)', () => {
   it('lets only an admin save or delete, and hands back the replaced image key', async () => {
     const someone = await createUser(db)
     const other = { ...vessel, id: randomUUID(), imageKey: `dishware/${randomUUID()}-fedcba9876543210.webp` }

@@ -1,4 +1,4 @@
--- Admin writes of the vessel library (1556), service role only, each checking that p_actor is an
+-- Admin writes of the vessel library (1562), service role only, each checking that p_actor is an
 -- admin like admin_save_template_category (0582). Messages the admin code turns into Chinese:
 --   NOT_ADMIN           p_actor is not an admin
 --   INVALID_INPUT       a missing or malformed field (the table's checks say which)

@@ -4,7 +4,7 @@ import { DISH_CATEGORIES } from '../templates/food-flow'
 
 // The vessel library of the food templates' tableware toggle (ARCHITECTURE §5.1c「器皿图库」):
 // empty serving pieces sorted by dish shape, each with a one-line generic shape description.
-// Private table dishware_library (1556), private bucket under dishware/. No `server-only`: the
+// Private table dishware_library (1562), private bucket under dishware/. No `server-only`: the
 // admin page shares these shapes.
 
 export const DISHWARE_LABEL_MAX = 40

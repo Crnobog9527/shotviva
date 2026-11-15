@@ -14,7 +14,7 @@ import { DISHWARE_COLUMNS, DISHWARE_EDGE, dishwareInputSchema, dishwareKey, dish
 
 // Admin writes of the vessel library (ARCHITECTURE §5.1c「器皿图库」). The image goes the way a
 // style reference does (§8.1): the browser PUTs to a staging key, the server re-encodes it into the
-// private bucket. Rows change only through admin_save_dishware / admin_delete_dishware (1557).
+// private bucket. Rows change only through admin_save_dishware / admin_delete_dishware (1563).
 
 const STILL_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 const MAX_BYTES = 20 * 1024 * 1024
