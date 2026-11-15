@@ -2,7 +2,7 @@ import 'server-only'
 
 import sharp from 'sharp'
 
-import { matteFor, type Matte } from './rules'
+import { MATTE_WHITE, matteFor, type Matte } from './rules'
 
 // Server half of rules/alpha-matte.ts: which ground a see-through image gets before it is sent to
 // an image model, and laying it there. Image models read only colour: a transparent area either
@@ -31,5 +31,19 @@ export async function opaqueWebp(bytes: Uint8Array): Promise<Uint8Array> {
   const matte = await matteOf(bytes).catch(() => null)
   if (!matte) return bytes
   const output = await sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS }).flatten({ background: matte }).webp({ quality: 86 }).toBuffer()
+  return new Uint8Array(output)
+}
+
+// A generated PNG without its alpha channel, see-through areas laid on the same ground an upload
+// gets. Settle applies it to every result whose template did not ask for a transparent background:
+// given a transparent logo, GPT image may answer with a see-through poster even when told opaque
+// (2026-11-15, OpenRouter). An image without an alpha channel comes back as the same bytes, and so
+// does one that will not decode: every adapter has already checked its output is a real image.
+export async function opaquePng(bytes: Uint8Array): Promise<Uint8Array> {
+  // sharp throws synchronously on empty input, hence the async wrapper.
+  const meta = await (async () => sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS }).metadata())().catch(() => null)
+  if (!meta?.hasAlpha) return bytes
+  const matte = (await matteOf(bytes)) ?? MATTE_WHITE
+  const output = await sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS }).flatten({ background: matte }).png().toBuffer()
   return new Uint8Array(output)
 }
