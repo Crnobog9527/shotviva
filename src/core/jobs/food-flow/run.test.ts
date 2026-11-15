@@ -98,6 +98,15 @@ describe('the food flows (§5.1c)', () => {
     expect((await runFoodFlow(empty.deps, plan(true, true), empty.base, [empty.photo], inputs)).choice).toEqual({ kind: 'plating', fallback: 'no_vessel' })
   })
 
+  it('never swaps in a library vessel that looks like the user own: a white oval platter stays', async () => {
+    const lookalike = { ...VESSEL, shape: 'A long white oval plate with a wide flat rim' }
+    const { deps, base, photo } = await setup({ ...READING, dishware: 'A white oval platter' }, [lookalike])
+    const only = await runFoodFlow(deps, plan(false, true), base, [photo], inputs)
+    expect(only).toMatchObject({ call: base, choice: { kind: 'both_off', fallback: 'no_vessel' } })
+    const both = await runFoodFlow(deps, plan(true, true), base, [photo], inputs)
+    expect(both.choice).toEqual({ kind: 'plating', fallback: 'no_vessel' })
+  })
+
   it('without the cover reference or a reader there is nothing to run', async () => {
     const { deps, base, photo, read } = await setup()
     const bare = { ...base, images: [photo] }

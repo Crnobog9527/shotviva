@@ -10,6 +10,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { AppError } from '../errors'
 import type { ObjectStore } from '../storage'
 import type { DishCategory } from '../templates/food-flow'
+import { looksAlike } from './alike'
 import { DISHWARE_COLUMNS, dishwareRowSchema, toDishwareItem, type DishwareItem } from './types'
 
 // Every admin save or delete expires this tag (updateTag), so a new vessel is picked at once.
@@ -30,9 +31,10 @@ export async function cachedActiveDishware(): Promise<DishwareItem[]> {
   return loadActiveDishware(createAdminSupabase())
 }
 
-// A random vessel of the category (Owner: random or rotating), or null when it has none.
-export function pickVessel(items: readonly DishwareItem[], category: DishCategory, random: (n: number) => number = randomInt): DishwareItem | null {
-  const pool = items.filter((item) => item.isActive && item.category === category)
+// A random vessel of the category (Owner: random or rotating), never one that looks like the
+// user's own (`userDishware`, the reading's text; looksAlike), or null when none remains.
+export function pickVessel(items: readonly DishwareItem[], category: DishCategory, random: (n: number) => number = randomInt, userDishware = ''): DishwareItem | null {
+  const pool = items.filter((item) => item.isActive && item.category === category && !looksAlike(item.shape, userDishware))
   return pool.length ? pool[random(pool.length)]! : null
 }
 
