@@ -128,3 +128,81 @@ describe('template floor budget', () => {
     expect(after.unit_price).toBe(before.unit_price)
   })
 })
+
+// Rollout: 1568 reaches production on merge, before anyone writes the policy row. Every check must
+// then behave exactly as before (the old budget), never error or block.
+describe('before the policy row exists (production at deploy)', () => {
+  const legacyFloor = async () => Math.ceil(estimate * 1.10 / await legacyBudget())
+  const allowed = (price: number, fallback: boolean) => db.query(
+    "select admin.reservation_route_allowed(t,$2,'1k',$3,$4,true) ok from public.templates t where id=$1", [template, tag, price, fallback])
+
+  it('the four floors and the editor read equal the old formula', async () => {
+    const floor = await legacyFloor()
+    expect(await routeFloor()).toBe(floor)
+    expect(await fallbackFloor()).toBe(floor)
+    expect(await num('select admin.slot_route_floor($1,$2,$3,3,$4)', [tag, '1k', 'medium', floor]))
+      .toBe(floor + Math.ceil(2 * 0.01 * 1.10 / await legacyBudget()))
+    const read = (await db.query("select public.admin_image_pricing_catalog('fallback') c")).rows[0].c
+    expect(read).toMatchObject({ breakeven_budget: null, margin_target_bp: null })
+    expect(read.floor_budget).toBeCloseTo(await legacyBudget(), 12)
+  })
+
+  it('save and sale checks keep the old floor without erroring', async () => {
+    const floor = await legacyFloor()
+    await setPrice(floor)
+    await expect(assertFloor()).resolves.toBeDefined()
+    await setPrice(floor - 1)
+    await expect(assertFloor()).rejects.toThrow(/TEMPLATE_PRICE_BELOW_FLOOR/)
+  })
+
+  it('the reservation re-check keeps the old floor without erroring', async () => {
+    const floor = await legacyFloor()
+    await setPrice(floor)
+    expect((await allowed(floor, true)).rows[0].ok).toBe(true)
+    expect((await allowed(floor - 1, true)).rows[0].ok).toBe(false)
+    expect((await allowed(floor - 1, false)).rows[0].ok).toBe(true)
+  })
+
+  it('an invalid policy row is the same as none', async () => {
+    await db.query(`insert into public.system_settings(key,value) values('catalog_economics_policy','{"payment_bp":"x"}')`)
+    expect(await floorBudget()).toBeCloseTo(await legacyBudget(), 12)
+    expect(await routeFloor()).toBe(await legacyFloor())
+  })
+})
+
+// The policy row is written through admin_set_system_setting (scripts/set-catalog-policy.ts).
+describe('admin_set_system_setting catalog_economics_policy', () => {
+  const policy = { payment_bp: 850, refund_bp: 250, yearly_commission_bp: 1301, other_commission_bp: 2001, margin_bp: 5000 }
+  const write = (value: unknown, actor: string) =>
+    db.query("select public.admin_set_system_setting('catalog_economics_policy',$1::jsonb,$2)", [JSON.stringify(value), actor])
+  const admin = async () => {
+    const id = await createUser(db)
+    await db.query("update public.profiles set role='admin' where id=$1", [id])
+    return id
+  }
+
+  it('stores a valid policy that the floors then use', async () => {
+    const actor = await admin()
+    await write(policy, actor)
+    expect((await db.query("select value, updated_by from public.system_settings where key='catalog_economics_policy'")).rows[0])
+      .toEqual({ value: policy, updated_by: actor })
+    expect(await num('select admin.template_margin_target_bp()')).toBe(5000)
+  })
+
+  it('refuses a malformed policy, a non-admin and a banned admin', async () => {
+    const actor = await admin()
+    const missing: Partial<typeof policy> = { ...policy }
+    delete missing.margin_bp
+    for (const bad of [{ ...policy, extra: 1 }, { ...policy, refund_bp: 1.5 }, { ...policy, refund_bp: '250' },
+      { ...policy, payment_bp: 5000, refund_bp: 4000, other_commission_bp: 1000 }, missing, [1]]) {
+      await db.query('savepoint s')
+      await expect(write(bad, actor)).rejects.toThrow(/INVALID_INPUT/)
+      await db.query('rollback to savepoint s')
+    }
+    await db.query('savepoint s')
+    await expect(write(policy, await createUser(db))).rejects.toThrow(/NOT_ADMIN/)
+    await db.query('rollback to savepoint s')
+    await db.query('update public.profiles set banned_at=now() where id=$1', [actor])
+    await expect(write(policy, actor)).rejects.toThrow(/NOT_ADMIN/)
+  })
+})
