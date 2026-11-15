@@ -7,7 +7,7 @@ import type { GenerationInputs } from '../../templates'
 import type { ProviderImage, ProviderInput } from '../provider'
 import type { DishReader, DishReading } from './reading'
 import { nearestAspect, runFoodFlow, type FoodDeps, type FoodPlan } from './run'
-import { foodStep, withReadCost } from './step'
+import { FOOD_STEP_TIMEOUT_MS, foodStep, withReadCost } from './step'
 
 // Fake prompts only (ARCHITECTURE §5.1c: the real ones are private).
 const PROMPTS = {
@@ -112,16 +112,40 @@ describe('the food step', () => {
   it('adds the reading to the screen tokens at the decision prices, and leaves a plan-less call alone', async () => {
     const { deps, base, photo } = await setup()
     const screen = { usage: { decision_input_tokens: 50, decision_output_tokens: 2 }, prices: null }
-    const step = await foodStep(deps, plan(true, false), { call: base, photos: [photo], inputs, decision: screen }, { templateId: 't', runId: 'r' })
+    const step = await foodStep(deps, plan(true, false), { call: base, photos: [photo], inputs, decision: screen }, { templateId: 't', runId: 'r' }, {})
     expect(step.decision?.usage).toEqual({ decision_input_tokens: 950, decision_output_tokens: 122 })
-    expect(await foodStep(deps, null, { call: base, photos: [photo], inputs }, { templateId: 't', runId: 'r' })).toEqual({ call: base, decision: undefined })
+    expect(await foodStep(deps, null, { call: base, photos: [photo], inputs }, { templateId: 't', runId: 'r' }, {})).toEqual({ call: base, decision: undefined })
     expect(withReadCost(undefined, { inputTokens: 1, outputTokens: 2 }, null)).toEqual({ usage: { decision_input_tokens: 1, decision_output_tokens: 2 }, prices: null })
   })
 
   it('never throws once credits are held: an unexpected error sends the ordinary call', async () => {
     const { deps, base, photo } = await setup()
     const broken = { ...deps, food: { ...deps.food, reader: async () => { throw new Error('vault down') } } }
-    const step = await foodStep(broken, plan(true, true), { call: base, photos: [photo], inputs }, { templateId: 't', runId: 'r' })
+    const step = await foodStep(broken, plan(true, true), { call: base, photos: [photo], inputs }, { templateId: 't', runId: 'r' }, {})
     expect(step.call).toBe(base)
+  })
+  it('gives up after its ceiling, sending the ordinary call with time left to settle', async () => {
+    vi.useFakeTimers()
+    try {
+      const { deps, base, photo } = await setup()
+      const stuck = { ...deps, food: { ...deps.food, vessels: () => new Promise<never>(() => {}) } }
+      const pending = foodStep(stuck, plan(false, true), { call: base, photos: [photo], inputs }, { templateId: 't', runId: 'r' }, {})
+      await vi.advanceTimersByTimeAsync(FOOD_STEP_TIMEOUT_MS)
+      expect((await pending).call).toBe(base)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the ordinary call when the routed model would refuse the rebuilt one', async () => {
+    const { deps, base, photo } = await setup()
+    const twoNeeded = await foodStep(deps, plan(true, false), { call: base, photos: [photo], inputs }, { templateId: 't', runId: 'r' }, { minReferences: 2 })
+    expect(twoNeeded.call).toBe(base)
+    const accepts = vi.fn(() => false)
+    const refused = await foodStep(deps, plan(true, false), { call: { ...base, aspectRatio: 'original' }, photos: [photo], inputs }, { templateId: 't', runId: 'r' }, { accepts })
+    expect(refused.call.prompt).toBe('BOTH-OFF')
+    expect(accepts).toHaveBeenCalledWith({ resolution: '1k', aspectRatio: '4:3', referenceCount: 1 })
+    // The reading was still made, so its tokens are still paid for.
+    expect(refused.decision?.usage.decision_input_tokens).toBe(900)
   })
 })

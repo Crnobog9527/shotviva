@@ -50,6 +50,9 @@ export type GenerationProvider = {
   // result really is a cut-out (OpenAI images, Ark). OpenRouter sends it only when the model lists
   // that value, so its results stay unknown. Settle flattens any alpha a template did not ask for.
   honoursBackground?: boolean
+  // Optional: whether the model takes this request (OpenRouter checks its catalogue entry). A call
+  // that code rebuilt after routing (a food flow, §5.1c) is checked here before it is sent.
+  accepts?(request: ImageRequestOptions): boolean
   // Optional bounded, read-only invoice lookup after the generation deadline has stopped.
   completeUsage?(usage: ProviderUsage): Promise<ProviderUsage>
   generate(input: ProviderInput): Promise<ProviderOutput>

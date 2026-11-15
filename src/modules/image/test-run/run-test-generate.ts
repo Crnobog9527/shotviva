@@ -108,7 +108,7 @@ export async function runTestGenerate(deps: FirstRunDeps, req: TestGenerateReque
   // The face-swap judge (§5.1a) only now, with the budget held: a click over the budget calls nothing.
   const step = async () => {
     const screen = await screenIdentityText({ ...deps, quiet: true }, { userId: req.actorId, entry: 'workspace', texts: typedWords(inputs) })
-    return foodStep(deps, food, { call, photos: images, inputs, decision: screenCost(deps.identityJudge, screen) }, { templateId: loaded.template.id, runId: run.id })
+    return foodStep(deps, food, { call, photos: images, inputs, decision: screenCost(deps.identityJudge, screen) }, { templateId: loaded.template.id, runId: run.id }, provider)
   }
   return continueTestRun({ ...deps, provider }, run, step, deps.identityJudge?.prices)
 }

@@ -75,6 +75,8 @@ function imageRequest(model: string, input: ProviderInput, supported: OpenRouter
 export function createOpenRouterImageProvider(config: OpenRouterImageConfig): GenerationProvider {
   return {
     id: 'openrouter-image',
+    // Without the catalogue entry at hand nothing is known; generate() still checks it.
+    accepts: request => !config.imageParameters || !openRouterInputMismatch(request, config.imageParameters, config.model),
     completeUsage: usage => completeReceipt(usage, { ...config, baseUrl: config.baseUrl ?? OPENROUTER_BASE_URL }),
     async generate(input) {
       const baseUrl = config.baseUrl ?? OPENROUTER_BASE_URL

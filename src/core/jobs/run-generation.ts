@@ -262,7 +262,7 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
 
   // The food flow reads the dish only now, with the credits held (§5.1c).
   const settle = async () => {
-    const step = await foodStep(deps, food, { call, photos: images, inputs, decision: screenCost(deps.identityJudge, prepared.screen) }, { templateId: template.id, runId: job.id })
+    const step = await foodStep(deps, food, { call, photos: images, inputs, decision: screenCost(deps.identityJudge, prepared.screen) }, { templateId: template.id, runId: job.id }, provider)
     return settleGeneration({ ...deps, provider }, job, step.call, outputKeyFor(req.userId, job.id), {
       inputKeys: prepared.keys, decision: step.decision, finishOutput: prepared.finishOutput,
     })

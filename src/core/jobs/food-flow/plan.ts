@@ -6,7 +6,7 @@ import { PLATING_TOGGLE, TABLEWARE_TOGGLE, type DishCategory, type DishReadCateg
 
 export type FoodFlowKind = 'both_off' | 'dishware' | 'plating' | 'plating_vessel'
 // Why a job with a toggle on still ran another flow; logged with the job.
-export type FoodFallback = 'read_failed' | 'unclassifiable' | 'no_vessel'
+export type FoodFallback = 'read_failed' | 'unclassifiable' | 'no_vessel' | 'unsupported'
 
 export type FoodChoice = { kind: FoodFlowKind; fallback?: FoodFallback }
 
