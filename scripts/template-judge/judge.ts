@@ -65,8 +65,9 @@ export const judgeModelKey = (tag: string, effort: Effort) => `${tag}@${effort}`
 
 export type PlannedJob = Omit<Job, 'hash'>
 
-// One job per current cell that has a result on this machine. Cells without one are counted so the
-// command can say what is missing.
+// One job per current cell that has a result on this machine, every k a trial made (cells are
+// planned up to TRIAL_N_MAX: a re-run with --n 3 adds k = 1, 2 beyond the batch's n). Only cells
+// within the batch's own n count as missing, so the command can say what is.
 export function planJobs(batch: Batch, cells: Cell[], state: TrialState,
   templates: Map<string, { coverAfterUrl: string | null; styleRefs: string[]; modelParams: Record<string, unknown> }>) {
   const items = new Map(batch.templates.map(item => [item.id, item]))
@@ -76,7 +77,10 @@ export function planJobs(batch: Batch, cells: Cell[], state: TrialState,
     const item = items.get(cell.templateId)
     const template = templates.get(cell.templateId)
     const record = recordOf(cell, state)
-    if (!item || !template || !record) { missing.push(cell); continue }
+    if (!item || !template || !record) {
+      if (cell.k < (item?.trial?.n ?? 1)) missing.push(cell)
+      continue
+    }
     const checklist = checklistFor(batch.judge, item.judge, cell.input, template.modelParams)
     jobs.push({ cell, record, item, checklist, sources: sourcesOf(cell, record, template) })
   }

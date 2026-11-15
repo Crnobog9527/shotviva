@@ -16,6 +16,7 @@
  * spend go to .local/trials/judge.json; an unchanged result is never judged twice. Prints ids,
  * verdicts and costs only.
  */
+import { TRIAL_N_MAX } from '../template-apply/trial-schema'
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
@@ -95,7 +96,7 @@ async function prepare() {
   const db = createClient(env.data.NEXT_PUBLIC_SUPABASE_URL, env.data.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: withDbTiers() } })
   const templates = new Map((await listAdminTemplates(db)).map(t => [t.id, t]))
   const photos = await photoHashes(batch.templates, baseDir)
-  const { cells, problems } = planCells(batch.templates, templates, new Map([...photos].map(([p, v]) => [p, v.hash])), { only: options.only, model: await effectiveModels(db) })
+  const { cells, problems } = planCells(batch.templates, templates, new Map([...photos].map(([p, v]) => [p, v.hash])), { only: options.only, n: TRIAL_N_MAX, model: await effectiveModels(db) })
   for (const p of problems) process.stdout.write(`${p.templateId}: ${p.problem}\n`)
   const state = await readTrialState(root)
   const judged = new Map([...templates].map(([id, t]) => [id, { coverAfterUrl: t.coverAfterUrl, styleRefs: t.prompt?.styleRefs.map(r => r.key) ?? [], modelParams: t.prompt?.modelParams ?? {} }]))

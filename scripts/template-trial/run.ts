@@ -8,6 +8,7 @@
  * photos and results live in the test site's private bucket). Results and the review page go to
  * .local/trials/. Prints ids, versions, outcomes and costs only.
  */
+import { TRIAL_N_MAX } from '../template-apply/trial-schema'
 import { writeFile } from 'node:fs/promises'
 import { dirname, join, relative } from 'node:path'
 import { parseArgs } from 'node:util'
@@ -35,7 +36,7 @@ const USAGE = '用法：pnpm templates:trial .local/<路径>/<批次文件>.json
 
 const flags = z.object({
   only: z.string().optional().transform(v => v ? new Set(v.split(',').map(s => s.trim()).filter(Boolean)) : undefined),
-  n: z.coerce.number().int().min(1).max(5).optional(),
+  n: z.coerce.number().int().min(1).max(TRIAL_N_MAX).optional(),
   budget: z.coerce.number().positive().max(50).default(2),
   concurrency: z.coerce.number().int().min(1).max(4).default(2),
   'dry-run': z.boolean().default(false),
