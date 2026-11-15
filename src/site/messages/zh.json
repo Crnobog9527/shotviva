@@ -748,7 +748,13 @@
         "rank": "名次",
         "rankEn": "名次英文",
         "prize": "奖品",
-        "add": "加一个名次"
+        "add": "加一个名次",
+        "featuredIntro": "展示区会把 {count} 件奖品画成实物：勾选要画的奖品（已选 {chosen}/{count}），其余奖品只在奖品表里列文字。",
+        "featured": "放进展示区（画出实物）",
+        "featuredFull": "展示区已满，先取消另一件",
+        "featuredLast": "展示区至少要有一件奖品",
+        "featuredPhoto": "这件奖品的照片（选填）",
+        "featuredPhotoHint": "传了照片就照着画这件商品；不传就按奖品名画出真实的商品。"
       },
       "sections": {
         "title": "栏目标题",
@@ -798,7 +804,6 @@
       },
       "size": "尺寸",
       "resolution": "清晰度",
-      "reviewed": "我已核对标黄的 {count} 行",
       "proofread": "海报由 AI 绘制，打印或转发前请逐字核对。",
       "generate": "生成 {count} 张海报 · {credits} 积分",
       "starting": "正在开始…",
@@ -853,7 +858,13 @@
         "photoHint": "已按照片里的文字填好，请逐项核对。",
         "reusedHint": "也可以全部清空，或换回示例内容。"
       },
-      "photoText": "照片里读出的文字"
+      "photoText": "照片里读出的文字",
+      "review": {
+        "explain": "有 {count} 行标黄了：要么原文里找不到这一项，要么内容太长、已经自动截短。请点「去核对」逐行看一下意思对不对，需要的话直接改；确认无误后勾选下面这一项，才能生成。",
+        "go": "去核对",
+        "confirm": "我已核对标黄的 {count} 行",
+        "blocked": "还差一步：核对标黄的 {count} 行，并勾选「我已核对」。"
+      }
     },
     "sizes": {
       "closest": "接近原图（{ratio}）",

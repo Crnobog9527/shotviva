@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
-import { posterContentSchema, splitPoster, type PosterBlock, type PosterContent, type PosterFields, type PosterPart } from '@/core/poster'
+import { posterContentSchema, splitPoster, unusedPhotoSlots, type PosterBlock, type PosterContent, type PosterFields, type PosterPart } from '@/core/poster'
 import type { OutputAspect, Resolution } from '@/core/templates/output-options'
 
 import type { CatalogueImageSlot } from '../catalogue/catalogue-template'
@@ -11,6 +11,7 @@ import { useSlotPhotos } from '../workspace/use-photo-batch'
 import { startJob } from '../generation/job-store'
 import { clearAll, emptyContent, startContent, tidyContent, withDefaults } from './content-edit'
 import { extractPoster, savePosterSet } from './poster-api'
+import { useBlockNav } from './editor/use-block-nav'
 import { useQrCheck } from './use-qr-check'
 
 // The poster editor's state (ARCHITECTURE §5.3): paste → sorted blocks the user checks → one job
@@ -113,6 +114,7 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
   const [notice, setNotice] = useState<StudioNotice>(null)
   const photos = useSlotPhotos(template.slots)
   const qrCheck = useQrCheck(photos, template.poster.qr?.slot ?? null)
+  const nav = useBlockNav(template.poster)
 
   const parsed = useMemo(() => posterContentSchema.safeParse(tidyContent(draft.content)), [draft.content])
   const parts: PosterPart[] = useMemo(() => (parsed.success ? splitPoster(parsed.data, template.poster) : []), [parsed, template.poster])
@@ -152,7 +154,7 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     if (!saved.ok) return setNotice(saved.code === 'INVALID_INPUT' ? 'invalid' : 'error')
     const credits = template.creditsCost[resolution]
     saved.parts.forEach((page, part) => {
-      const slots = pageUploads(template, page.kind, photos.uploads)
+      const slots = pageUploads(template, page.kind, photos.uploads, unusedPhotoSlots(template.poster.featured, parsed.data.prizes?.rows))
       startJob({
         templateId: template.id, templateName: template.name, resolution, aspect, credits, inputKey: null, batchId: undefined,
         body: { template_id: template.id, input_key: null, expected_credits: credits, inputs: { copy: {}, aspect_ratio: aspect, resolution }, poster: { set_id: saved.id, part }, ...(slots ? { input_slots: slots } : {}) },
@@ -170,7 +172,8 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
     clearAll: () => setDraft((d) => ({ ...d, content: clearAll(d.content), unverified: [], reviewed: false })),
     restoreSample: () => setDraft((d) => ({ ...d, content: startContent(template.poster), unverified: [], reviewed: false, sorted: false, fromSample: true, origin: undefined })),
     ...reuseActions(setDraft, template), ready, edit, clearPart, sort, generate, parts, valid: parsed.success, busy, stage, notice, photos, qrCheck,
-    aspect, setAspect, resolution, setResolution,
+    // 去核对: the next yellow line, opened, scrolled to and shaken (Owner 2026-11-15).
+    aspect, setAspect, resolution, setResolution, nav, review: () => nav.jump(draft.content, draft.unverified),
   }
 }
 
@@ -187,10 +190,10 @@ function reuseActions(setDraft: (change: (draft: Draft) => Draft) => void, templ
 }
 
 // The uploads one page sends: the filled slots its kind lists, and the QR code, which every page
-// carries (§5.3); or none.
-export function pageUploads(template: Pick<StudioTemplate, 'poster'>, kind: string, uploads: Record<string, string>): Record<string, string> | null {
+// carries (§5.3); or none. `unused`: photo slots no featured prize holds (§5.3 展示位), never sent.
+export function pageUploads(template: Pick<StudioTemplate, 'poster'>, kind: string, uploads: Record<string, string>, unused: readonly string[] = []): Record<string, string> | null {
   const qr = template.poster.qr?.slot
   const listed = [...(template.poster.kinds.find((item) => item.key === kind)?.slots ?? []), ...(qr ? [qr] : [])]
-  const entries = Object.entries(uploads).filter(([key]) => listed.includes(key))
+  const entries = Object.entries(uploads).filter(([key]) => listed.includes(key) && !unused.includes(key))
   return entries.length ? Object.fromEntries(entries) : null
 }

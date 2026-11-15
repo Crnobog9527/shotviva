@@ -7,6 +7,8 @@ import type { SlotPhotos } from '../../workspace/use-photo-batch'
 import type { StudioTemplate } from '../use-poster-studio'
 import type { QrCheck } from '../use-qr-check'
 import type { PagePhotos } from './block-tabs'
+import { featuredPhotoSlot } from '@/core/poster'
+
 import { slotKeysAt, type SlotPlace } from './slot-places'
 
 type Props = { template: StudioTemplate; place: SlotPlace; photos: SlotPhotos; qrCheck: QrCheck; titled?: boolean }
@@ -58,11 +60,31 @@ export function pagePhotos(template: StudioTemplate, photos: SlotPhotos, fallbac
   return {
     render: (kind) => <PageSlots template={template} place={placeOf(kind)} photos={photos} qrCheck={qrCheck} />,
     header: () => <PageSlots template={template} place="header" photos={photos} qrCheck={qrCheck} titled />,
+    display: displayOf(template, photos),
     count: (kind) => {
       const slots = slotsAt(template, placeOf(kind))
       if (slots.length === 0) return null
       const label = slots.length === 1 ? slots[0]!.label : fallback
       return { label, filled: slots.filter((slot) => photos.byKey[slot.key]).length, total: slots.length }
+    },
+  }
+}
+
+// The display area's spots (§5.3 展示位): how many, and each spot's own photo box, or null when the
+// template takes no photo for it. clear empties a spot's box when its prize leaves the area.
+function displayOf(template: StudioTemplate, photos: SlotPhotos): PagePhotos['display'] {
+  const featured = template.poster.featured
+  if (!featured) return null
+  const slotOf = (spot: number) => template.slots.find((slot) => slot.key === featuredPhotoSlot(featured, spot)) ?? null
+  return {
+    count: featured.count,
+    photo: (spot) => {
+      const slot = slotOf(spot)
+      return slot ? <SlotBox slot={slot} photos={photos} /> : null
+    },
+    clear: (spot) => {
+      const slot = slotOf(spot)
+      if (slot && photos.byKey[slot.key]) photos.remove(slot.key)
     },
   }
 }

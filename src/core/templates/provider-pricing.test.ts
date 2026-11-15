@@ -48,6 +48,8 @@ describe('slot template floors (1442)', () => {
     expect(creditMinimum(floor, 'medium', '1k', 3)).toBe(single + Math.ceil(2 * 0.01 * 1.10 / budget))
     expect(creditMinimum(floor, 'medium', '1k', 4)).toBe(single)
     expect(creditMinimum(floor, 'medium', '2k', 2)).toBe(Math.ceil(0.2 * 1.10 / budget))
+    // Past four slots too (a poster's logo, four prize photos and QR code), like the database.
+    expect(creditMinimum(floor, 'medium', '1k', 6)).toBe(single + Math.ceil(5 * 0.01 * 1.10 / budget))
     // The template's approved tariff still stands above the route floor.
     expect(creditMinimum({ ...floor, tariff: { quality: 'medium', costs: { '1k': 99, '2k': 99, '4k': 99 } } }, 'medium', '1k', 3)).toBe(99)
   })

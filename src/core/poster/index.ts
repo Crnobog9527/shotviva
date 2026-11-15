@@ -17,8 +17,9 @@ export {
   type TableRow,
 } from './content'
 export { compareReading, partStrings, type PosterDiff } from './compare'
+export { displayAreaText, featuredPhotoSlot, featuredPrizes, toggleFeatured, unusedPhotoSlots, withFeaturedSpots, type FeaturedPrize } from './featured'
 export { partText } from './format'
 export { parsePosterNotice } from './parse-notice'
 export { PAGE_LIMITS, pagesReady, splitPoster, type PageLimit, type PosterPart } from './split'
-export { kindFor, posterFieldsSchema, type PosterCapacity, type PosterFields, type PosterKind } from './template'
+export { kindFor, posterFieldsSchema, type PosterCapacity, type PosterFeatured, type PosterFields, type PosterKind } from './template'
 export { normalizeForMatch, unverifiedPaths } from './verbatim'
