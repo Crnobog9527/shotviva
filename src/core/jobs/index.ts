@@ -12,7 +12,7 @@ export {
 } from './job-schema'
 export { confirmJob, deleteOwnJob, refundJob, reserveJob, setJobVisibility, type JobCost, type ReserveJobInput } from './settlement'
 export { jobCostUsd } from './job-cost'
-export { effectivePrices, MODEL_PRICES, officialPrice, type ModelPrice } from './model-prices'
+export { catalogPriceSchema, effectivePrices, livePrices, type CatalogPrice } from './catalog-price'
 export { GenerationFailure } from './generation-failure'
 export { generateBodySchema, toGenerationRequest, type GenerationRequest } from './generation-request'
 export { resolveJobFile, resolveJobPair, type JobFile } from './job-file'
@@ -41,7 +41,10 @@ export { listMonthWorks, listOwnJobs, listRunningJobIds, type MonthWorks, type O
 export { ENV_PROVIDER_SOURCE, modelFromTag, providerTag } from './provider-tag'
 export { runGeneration, type GenerationDeps } from './run-generation'
 // Shared with the admin test run (T85): the same provider call and screening cost.
-export { screenCost, templateCall, typedWords } from './generation-call'
+export { screenCost, selectTemplateRoute, templateCall, typedWords } from './generation-call'
+export { dishReadingSchema, flowExtraImages, foodPlanOf, foodStep, type DishReader, type DishReaderUsage, type DishReading, type FoodDeps, type FoodPlan } from './food-flow'
+// The photo edit path routes and alerts on a fallback exactly like a template generation.
+export { routeFallbackReason, withFallbackNotice } from './fallback-notice'
 export { PROVIDER_TIMEOUT_MS, settleGeneration, settleProviderCall, type DecisionCost, type SettleDeps, type SettleExtras, type SettleLedger } from './settle-generation'
 // The photo edit path (modules/image/edit, T30) settles and tracks exactly like a generation.
 export { settleTracked } from './generation-analytics'

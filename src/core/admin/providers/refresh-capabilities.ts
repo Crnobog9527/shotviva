@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { assertPublicBaseUrl, fetchImageCapabilities, findProvider, listProviders, persistRefreshedCapabilities, ProviderSettingError, type AdminProvider } from '@/core/providers'
+import { assertPublicBaseUrl, catalogModelFor, fetchCatalogPrice, fetchImageCapabilities, findProvider, listProviders, persistCatalogPrice, persistRefreshedCapabilities, ProviderSettingError, type AdminProvider } from '@/core/providers'
 import { CapabilityWriteConflict } from '@/core/providers/repository'
 import { nextCapabilitySync } from '@/core/providers/capability-expiry'
 import { staticCapabilities } from '@/core/providers/types'
@@ -51,9 +51,25 @@ export async function syncDueProvider(deps: ProviderCommandDeps, input: unknown,
   return true
 }
 
+// Re-read a line's catalogue price (ARCHITECTURE §10.0) and keep it on the row. A catalogue that
+// cannot be read keeps the last snapshot, whose fetchedAt then shows its age. false: the line has
+// no catalogue (Ark, another host) or nothing new was stored.
+export async function refreshCatalogPrice(deps: ProviderCommandDeps, row: Pick<AdminProvider, 'id' | 'adapter' | 'baseUrl' | 'model'>) {
+  if (!catalogModelFor(row.adapter, row.baseUrl, row.model)) return false
+  const price = await fetchCatalogPrice(row.adapter, row.baseUrl, row.model, deps.fetch ?? fetch)
+  if (!price) throw new Error('catalogue price unavailable')
+  return persistCatalogPrice(deps.db, row, price)
+}
+
+// The daily cron: image capabilities (OpenRouter catalogue), then each line's catalogue price.
+async function refreshRow(deps: ProviderCommandDeps, row: AdminProvider) {
+  if (row.module === 'image') await refresh(deps, row)
+  await refreshCatalogPrice(deps, row)
+}
+
 export async function refreshAllCapabilities(deps: ProviderCommandDeps) {
-  const rows = (await listProviders(deps.db)).filter((row) => row.module === 'image')
-  const results = await Promise.allSettled(rows.map((row) => refresh(deps, row)))
+  const rows = (await listProviders(deps.db)).filter((row) => row.module === 'image' || catalogModelFor(row.adapter, row.baseUrl, row.model))
+  const results = await Promise.allSettled(rows.map((row) => refreshRow(deps, row)))
   let failures = 0
   for (const [index, result] of results.entries()) {
     if (result.status === 'rejected') {

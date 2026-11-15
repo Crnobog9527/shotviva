@@ -1,7 +1,7 @@
 'use client'
 
 import { useLocale, useTranslations } from 'next-intl'
-import { useState, type ComponentType, type ReactNode } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 
 import type { PosterFields } from '@/core/poster'
 import { cn } from '@/core/ui/cn'
@@ -15,45 +15,50 @@ import { foldsOf, foldStats, type Fold, type FoldStats } from './block-folds'
 import { FooterEditor } from './footer-editor'
 import { HeaderEditor } from './header-editor'
 import { pageGroups, type PageGroup } from './page-groups'
-import { PrizesEditor } from './prizes-editor'
+import { PrizesEditor, type Display } from './prizes-editor'
 import { AddSectionButton, InfoHeadingEditor, SectionEditor } from './sections-editor'
 import { TableEditor } from './table-editor'
+import type { BlockNav } from './use-block-nav'
 
-const EDITORS: Record<'prizes' | 'table' | 'footer' | 'info', ComponentType<BlockProps>> = {
-  prizes: PrizesEditor, table: TableEditor, footer: FooterEditor, info: InfoHeadingEditor,
+const EDITORS: Record<'table' | 'footer' | 'info', ComponentType<BlockProps>> = {
+  table: TableEditor, footer: FooterEditor, info: InfoHeadingEditor,
 }
 
 // A tab's upload boxes (e.g. the prize photo; kind is null for the shared tab): drawn as a part of
-// its own, with how many hold a photo.
-export type PagePhotos = { render(kind: string | null): ReactNode; count(kind: string | null): { label: string; filled: number; total: number } | null }
+// its own, with how many hold a photo. header: the boxes the shared header carries (the organiser
+// logo), drawn under the shared tab's masthead.
+export type PagePhotos = {
+  render(kind: string | null): ReactNode
+  header(): ReactNode
+  count(kind: string | null): { label: string; filled: number; total: number } | null
+  // The prize page's display area (§5.3 展示位), drawn inside the prize list; null: none.
+  display: Display | null
+}
 
-type Props = BlockProps & { poster: PosterFields; unverified: readonly string[]; pagePhotos?: PagePhotos; onClear: ClearPart }
+type Props = BlockProps & { poster: PosterFields; unverified: readonly string[]; pagePhotos?: PagePhotos; onClear: ClearPart; nav: BlockNav }
 
 // One tab for what both pages share, then one per page of the set; a dot marks a tab with lines
 // still to check. Inside a tab its blocks fold into titled parts (Owner 2026-11-14), the first
 // open, each saying how much is filled and how many lines are still to check.
-export function BlockTabs({ poster, unverified, pagePhotos, onClear, ...props }: Props) {
+export function BlockTabs({ poster, unverified, pagePhotos, onClear, nav, ...props }: Props) {
   const groups = pageGroups(poster)
-  const [current, setCurrent] = useState(groups[0]?.key ?? 'shared')
   const foldsFor = (group: PageGroup) => foldsOf(group.blocks, props.content, Boolean(pagePhotos?.count(group.kind)))
-  const [open, setOpen] = useState<string[]>(() => groups.flatMap((group) => foldsFor(group).slice(0, 1).map((fold) => `${group.key}:${fold.key}`)))
-  const toggle = (id: string) => setOpen((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]))
-  const group = groups.find((item) => item.key === current) ?? groups[0]
+  const group = groups.find((item) => item.key === nav.current) ?? groups[0]
   return (
     <div className="grid gap-4">
       <div role="tablist" className="flex gap-1 overflow-x-auto">
         {groups.map((item) => (
           <GroupTab key={item.key} group={item} poster={poster} chosen={item.key === group?.key}
             pending={unverified.some((path) => item.blocks.some((block) => path === block || path.startsWith(`${block}.`)))}
-            onChoose={() => setCurrent(item.key)} />
+            onChoose={() => nav.choose(item.key)} />
         ))}
       </div>
       <div role="tabpanel" className="grid gap-3">
         {group ? foldsFor(group).map((fold) => {
           const id = `${group.key}:${fold.key}`
           return (
-            <PartFold key={id} id={id} fold={fold} kind={group.kind} open={open.includes(id)} onToggle={() => toggle(id)}
-              unverified={unverified} pagePhotos={pagePhotos} onClear={onClear} onSectionAdded={(index) => setOpen((ids) => [...ids, `${group.key}:section-${index}`])} {...props} />
+            <PartFold key={id} id={id} fold={fold} kind={group.kind} open={nav.open.includes(id)} onToggle={() => nav.toggle(id)}
+              unverified={unverified} pagePhotos={pagePhotos} onClear={onClear} onSectionAdded={(index) => nav.reveal(`${group.key}:section-${index}`)} {...props} />
           )
         }) : null}
       </div>
@@ -100,10 +105,20 @@ function cleared(fold: Fold, content: BlockProps['content']): [BlockProps['conte
 const endsSections = (fold: Fold, content: BlockProps['content']) =>
   fold.kind === 'info' ? content.sections.length === 0 : fold.kind === 'section' && fold.index === content.sections.length - 1
 
-function FoldBody({ fold, kind, pagePhotos, ...props }: BlockProps & { fold: Fold; kind: string | null; pagePhotos?: PagePhotos }) {
-  if (fold.kind === 'header') return <HeaderEditor keys={fold.keys} {...props} />
+type BodyProps = BlockProps & { kind: string | null; pagePhotos?: PagePhotos }
+
+// The shared tab's masthead also carries the boxes every page sends (the organiser logo).
+function HeaderBody({ fold, kind, pagePhotos, ...props }: BodyProps & { fold: Extract<Fold, { kind: 'header' }> }) {
+  const editor = <HeaderEditor keys={fold.keys} {...props} />
+  if (kind !== null || fold.key !== 'masthead' || !pagePhotos) return editor
+  return <div className="grid gap-4">{editor}{pagePhotos.header()}</div>
+}
+
+function FoldBody({ fold, kind, pagePhotos, ...props }: BodyProps & { fold: Fold }) {
+  if (fold.kind === 'header') return <HeaderBody fold={fold} kind={kind} pagePhotos={pagePhotos} {...props} />
   if (fold.kind === 'section') return <SectionEditor index={fold.index} {...props} />
   if (fold.kind === 'photos') return pagePhotos ? <div className="grid gap-4">{pagePhotos.render(kind)}</div> : null
+  if (fold.kind === 'prizes') return <PrizesEditor display={pagePhotos?.display ?? null} {...props} />
   const Editor = EDITORS[fold.kind]
   return <Editor {...props} />
 }

@@ -8,6 +8,8 @@ import {
   activateProvider,
   adminDeleteProvider,
   assertPublicBaseUrl,
+  catalogModelFor,
+  fetchCatalogPrice,
   fetchImageCapabilities,
   findProvider,
   findProviderRow,
@@ -22,7 +24,10 @@ import {
 import { UNKNOWN_MODEL_TIERS } from '@/core/providers/tier-support'
 import type { ImageCapabilities } from '@/core/templates/image-capabilities'
 
-import { lookupModelSchema, providerIdSchema, saveProviderSchema } from './schema'
+import type { CatalogPrice } from '@/core/jobs'
+
+import { refreshCatalogPrice } from './refresh-capabilities'
+import { lookupModelSchema, lookupPriceSchema, providerIdSchema, saveProviderSchema } from './schema'
 
 // Business rules for /admin/providers. Callers pass a service-role client and the admin's id
 // after requireAdmin(). Keys go straight into Vault and never come back to the browser.
@@ -48,6 +53,17 @@ export async function lookupProviderModel(input: unknown) {
   return fetchImageCapabilities('openrouter_images', await assertPublicBaseUrl(baseUrl), model, retry ? fetch : undefined)
 }
 
+// The catalogue price the editor pre-fills from (§10.0). Public catalogue only, never a Vault key;
+// the request goes to OpenRouter's fixed address, never to the typed one. null: this line has no
+// catalogue, so the admin types the price in from the provider's page.
+export async function lookupProviderPrice(input: unknown): Promise<CatalogPrice | null> {
+  const { adapter, baseUrl, model, retry } = parseOrThrow(lookupPriceSchema, input)
+  if (!catalogModelFor(adapter, baseUrl, model)) return null
+  const price = await fetchCatalogPrice(adapter, baseUrl, model, retry ? fetch : undefined)
+  if (!price) throw new ProviderSettingError('openrouter_catalog_unavailable', 'Cannot load the OpenRouter model catalogue')
+  return price
+}
+
 // Tiers turned on beyond what the model's table says (unknown OpenAI models only): the save
 // records an audit entry for them in the same transaction (admin_save_provider).
 const declaredTiers = (caps: ImageCapabilities | null) =>
@@ -61,6 +77,33 @@ async function saveExtraInputCost(deps: ProviderCommandDeps, adminId: string, id
   // A database without migration 1440 has no such field; an empty one has nothing to save.
   if (error?.code === 'PGRST202' && usd === null) return
   if (error) throw new ProviderSettingError('internal', 'Saving the extra input image cost failed')
+}
+
+// 「BYOK（按官方价）」 (1551); only an OpenRouter openai/gpt-image-* line reads it. Undefined (an
+// older editor, another line) keeps it.
+async function saveByokListPrice(deps: ProviderCommandDeps, adminId: string, id: string,
+  { module, byokListPrice: on }: { module: string; byokListPrice?: boolean }) {
+  if (module !== 'image' || on === undefined) return
+  const { error } = await deps.db.rpc('admin_set_provider_byok_list_price', { p_actor: adminId, p_id: id, p_on: on })
+  if (error) throw new ProviderSettingError('internal', 'Saving the BYOK setting failed')
+}
+
+// An Ark line's admin-entered list price (1566). Undefined (an older editor, another line) keeps it.
+async function saveListPrice(deps: ProviderCommandDeps, adminId: string, id: string,
+  { adapter, listPrice }: { adapter: string; listPrice?: z.infer<typeof saveProviderSchema>['listPrice'] }) {
+  if (adapter !== 'ark_images' || listPrice === undefined) return
+  const { error } = await deps.db.rpc('admin_set_provider_list_price', { p_actor: adminId, p_id: id, p_price: listPrice })
+  if (error) throw new ProviderSettingError('internal', 'Saving the list price failed')
+}
+
+// The line's catalogue price, read now so the first job is costed (§10.0). A catalogue outage does
+// not fail the save: the daily cron reads it again, and the list flags a line with no price.
+async function saveCatalogPrice(deps: ProviderCommandDeps, row: Parameters<typeof refreshCatalogPrice>[1]) {
+  try {
+    await refreshCatalogPrice(deps, row)
+  } catch {
+    logger.warn('admin.provider.catalog_price_failed', { providerId: row.id })
+  }
 }
 
 // Save the confirmed catalogue snapshot and the optional Vault key in the same transaction.
@@ -85,6 +128,9 @@ export async function saveProvider(deps: ProviderCommandDeps, adminId: string, i
   if (error) throw new ProviderSettingError('internal', 'Saving provider failed')
   const id = providerIdSchema.parse({ id: data }).id
   await saveExtraInputCost(deps, adminId, id, parsed)
+  await saveByokListPrice(deps, adminId, id, parsed)
+  await saveListPrice(deps, adminId, id, parsed)
+  await saveCatalogPrice(deps, { id, adapter: parsed.adapter, baseUrl, model: parsed.model })
   logger.info('admin.provider.saved', { adminId, providerId: id, isNew: !parsed.id, keyChanged: Boolean(parsed.apiKey), declared })
   return id
 }

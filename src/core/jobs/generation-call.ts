@@ -6,6 +6,7 @@ import { logger } from '../logger'
 import type { InputImage, ObjectStore } from '../storage'
 import { PROMPT_MAX_LENGTH, providerParams, renderPrompt, toggleFragments, type GenerationInputs, type GenerationTemplate, type Resolution } from '../templates'
 import { resolveTemplateProvider, type GenerationProvider, type ProviderInput, type TemplateProvider } from './provider'
+import { flowExtraImages, type FoodPlan } from './food-flow'
 import { readStyleImages } from './style-reference-images'
 import type { DecisionCost } from './settle-generation'
 
@@ -17,8 +18,10 @@ type CallTemplate = { template: Pick<GenerationTemplate['template'], 'id' | 'qua
 
 // Both preflight and generation choose the route before fetching any reference bytes.
 export async function selectTemplateRoute(provider: TemplateProvider, providerId: string | null,
-  resolution: Resolution, aspectRatio: string, photoCount: number, styleRefCount: number, onRoute?: (provider: GenerationProvider) => void) {
-  const selected = await resolveTemplateProvider(provider, providerId, { resolution, aspectRatio, referenceCount: photoCount + styleRefCount })
+  resolution: Resolution, aspectRatio: string, photoCount: number, styleRefCount: number, onRoute?: (provider: GenerationProvider) => void,
+  tierFallback?: boolean) {
+  const referenceCount = photoCount + styleRefCount
+  const selected = await resolveTemplateProvider(provider, providerId, { resolution, aspectRatio, referenceCount, ...(tierFallback ? { tierFallback } : {}) })
   onRoute?.(selected)
   const limit = selected.maxReferences ?? Infinity
   const dropRefs = styleRefCount > 0 && photoCount + styleRefCount > limit
@@ -32,11 +35,15 @@ export async function selectTemplateRoute(provider: TemplateProvider, providerId
 export async function templateCall(
   deps: { store: ObjectStore; provider: TemplateProvider },
   { template, prompt }: CallTemplate, inputs: GenerationInputs, photos: readonly InputImage[],
-  options: { resolution: Resolution; providerId: string | null; omitStyleRefs?: boolean; onRoute?: (provider: GenerationProvider) => void },
+  options: { resolution: Resolution; providerId: string | null; omitStyleRefs?: boolean; onRoute?: (provider: GenerationProvider) => void; food?: FoodPlan | null },
 ) {
   const requested = options.omitStyleRefs ? [] : prompt.styleRefs
+  // A food flow (§5.1c) may add a library vessel: the route must take it before credits are held.
+  // Its ordinary call is flow 1, both toggles off, which is what any fallback of the flow sends.
+  const extra = options.food ? flowExtraImages(options.food.toggles) : 0
+  if (options.food) inputs = { ...inputs, toggles: Object.fromEntries(Object.keys(inputs.toggles).map((key) => [key, false])) }
   const { provider, dropRefs } = await selectTemplateRoute(deps.provider, options.providerId,
-    options.resolution, inputs.aspectRatio, photos.length, requested.length, options.onRoute)
+    options.resolution, inputs.aspectRatio, photos.length + extra, requested.length, options.onRoute)
   if (dropRefs) {
     logger.warn('image.style_refs.omitted', {
       templateId: template.id, version: prompt.version, provider: provider.id,

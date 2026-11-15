@@ -5,13 +5,14 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { pagesReady } from '@/core/poster'
 
 import type { Balance } from '@/core/billing/pools'
+import { setCredits } from '@/core/templates/set-price'
 import { Button } from '@/core/ui/button'
-import { Checkbox } from '@/core/ui/checkbox'
 
 import { canAfford } from '../../workspace/cta-state'
 import { ResolutionPicker, SizePicker } from '../../workspace/option-pickers'
 import type { PosterStudioState, StudioTemplate } from '../use-poster-studio'
 import { PageStatus } from './page-status'
+import { ReviewCheck } from './review-check'
 
 type Props = { studio: PosterStudioState; template: StudioTemplate; balance: Balance }
 
@@ -27,13 +28,8 @@ export function GeneratePanel({ studio, template, balance }: Props) {
       <h3 id="size-h" className="text-caption font-medium">{t('size')}</h3>
       <SizePicker options={options} value={studio.aspect} onChange={studio.setAspect} />
       <h3 id="res-h" className="text-caption font-medium">{t('resolution')}</h3>
-      <ResolutionPicker options={options} aspect={studio.aspect} value={studio.resolution} costs={template.creditsCost} balance={balance} onChange={studio.setResolution} />
-      {studio.draft.unverified.length > 0 ? (
-        <label className="flex min-h-11 items-center gap-3 text-caption">
-          <Checkbox checked={studio.draft.reviewed} onCheckedChange={(checked) => studio.setReviewed(checked === true)} />
-          {t('reviewed', { count: studio.draft.unverified.length })}
-        </label>
-      ) : null}
+      <ResolutionPicker options={options} aspect={studio.aspect} value={studio.resolution} costs={template.creditsCost} images={studio.parts.length} balance={balance} onChange={studio.setResolution} />
+      {studio.draft.unverified.length > 0 ? <ReviewCheck studio={studio} /> : null}
       <p className="text-caption text-muted-foreground">{t('proofread')}</p>
       {studio.notice && studio.notice !== 'sortFailed' && studio.notice !== 'clipped' ? <p className="text-caption text-destructive">{t(`notice.${studio.notice}`)}</p> : null}
     </section>
@@ -41,11 +37,11 @@ export function GeneratePanel({ studio, template, balance }: Props) {
 }
 
 // One ordinary job per poster, so the total is the template's price at this resolution times
-// the number of posters.
+// the number of posters: the same set total the resolution cards show.
 export function GenerateButton({ studio, template, balance }: Props) {
   const t = useTranslations('app.poster')
   const format = useFormatter()
-  const total = template.creditsCost[studio.resolution] * studio.parts.length
+  const total = setCredits(template.creditsCost[studio.resolution], studio.parts.length)
   return (
     <Button className="min-h-12 w-full" disabled={!canStart(studio, balance, total) || studio.busy} onClick={() => void studio.generate()}>
       {studio.busy ? t('starting') : t('generate', { count: studio.parts.length, credits: format.number(total) })}
@@ -59,8 +55,14 @@ const slotsReady = (studio: PosterStudioState) => studio.photos.status !== 'uplo
   && studio.qrCheck !== 'checking' && studio.qrCheck !== 'unreadable'
 
 // Valid text that makes every page, flagged lines confirmed, credits enough for all.
-function canStart(studio: PosterStudioState, balance: Balance, total: number) {
-  const mustReview = studio.draft.unverified.length > 0 && !studio.draft.reviewed
+function canStart(studio: PosterStudioState, balance: Balance, total: number, reviewed = studio.draft.reviewed) {
+  const mustReview = studio.draft.unverified.length > 0 && !reviewed
   return studio.valid && pagesReady(studio.parts) && slotsReady(studio) && !mustReview && canAfford(balance, total)
+}
+
+// 生成 is off for one reason only, the unticked 我已核对 box: the bar says so, with 去核对.
+export function waitsOnReview(studio: PosterStudioState, balance: Balance, template: StudioTemplate) {
+  const total = setCredits(template.creditsCost[studio.resolution], studio.parts.length)
+  return !studio.busy && !canStart(studio, balance, total) && canStart(studio, balance, total, true)
 }
 

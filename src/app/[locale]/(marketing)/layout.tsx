@@ -8,7 +8,6 @@ import { NoLinkPrefetch } from '@/core/i18n/ui'
 import { LivingBackground } from '@/core/ui/living-background'
 
 import { MarketingFooter, MarketingHeader } from '../marketing-chrome'
-import './legal.css'
 
 // Marketing shell (DESIGN §6.9 items 4–5): the site announcement over the top bar (whose globe
 // carries the 「切换到中文？」 hint, ARCHITECTURE §17), the page, the footer (§10). The living

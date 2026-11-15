@@ -10,12 +10,15 @@ import {
   findOwnJob,
   recordJobClientIp,
   reserveJob,
+  routeFallbackReason,
   settleGeneration,
   settleTracked,
   toJobView,
   type Job,
   type JobView,
   type SettleDeps,
+  type TemplateProvider,
+  withFallbackNotice,
 } from '@/core/jobs'
 import { loadOutputImage, outputKeyFor } from '@/core/storage'
 import { assertPricedTier, assertTemplateQuote, allowedWebAspects, DEFAULT_RESOLUTION, instructionSchema, RESOLUTIONS, type Resolution } from '@/core/templates'
@@ -23,12 +26,14 @@ import { assertPricedTier, assertTemplateQuote, allowedWebAspects, DEFAULT_RESOL
 import type { ScopeClassifier } from './classifier'
 import type { EditClassification } from './classify-scope'
 import type { EditRequest } from './edit-request'
-import { decideEdit, editDecisionCost, editProviderCall, editRecord, loadEditPipeline } from './edit-pipeline'
+import { decideEdit, editDecisionCost, editProviderCall, editRecord, editRoute, loadEditPipeline } from './edit-pipeline'
 
 // A photo edit (ARCHITECTURE §5.2): one ordinary generation on the built-in `edit` template whose
 // input is the caller's own finished work, read server-side from R2. Charging, refunds, the
 // watermark rule and the `generate` event are exactly those of a template generation.
-export type EditDeps = SettleDeps & {
+// `provider`: the image route resolver (imageProvider) or, in tests, one fixed provider.
+export type EditDeps = Omit<SettleDeps, 'provider'> & {
+  provider: TemplateProvider
   classifier: ScopeClassifier | null
   now?: () => Date
   track?: ServerTrack
@@ -62,11 +67,12 @@ async function prepare(deps: EditDeps, req: EditRequest) {
   }
   const limits = await accountLimits(deps.db, req.userId)
   await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, { jobId: req.jobId })
+  const route = await editRoute(deps.provider, pipeline, { resolution, aspectRatio: aspect })
   const image = await loadOutputImage(deps.store, source.outputKey)
   // The size asked for (T47: the panel offers the eight), else the work's own; another size
   // than the work's ends the prompt with the reframe paragraph.
   const reframed = aspect !== sourceAspect(source)
-  return { instruction: instruction.data, source, pipeline, image, aspect, reframed }
+  return { instruction: instruction.data, source, pipeline, image, aspect, reframed, route }
 }
 
 type Prepared = Awaited<ReturnType<typeof prepare>>
@@ -95,23 +101,25 @@ export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView
   const decision = await decideEdit(deps, { userId: req.userId, pipeline: prepared.pipeline, image: prepared.image, instruction: prepared.instruction })
   const resolution = req.resolution ?? sourceResolution(prepared.source)
   const attemptId = randomUUID()
-  const job = await reserveJob(deps.db, {
+  const { route, pipeline } = prepared
+  const fallback = routeFallbackReason(route, pipeline.prompt.providerId, 'web')
+  const job = await withFallbackNotice(pipeline.template.id, async (selected) => { selected(fallback); return reserveJob(deps.db, {
     jobId: req.jobId ?? randomUUID(),
     userId: req.userId,
     module: prepared.pipeline.template.module,
     templateId: prepared.pipeline.template.id,
     expectedCredits: req.expectedCredits,
     source: 'web',
-    provider: deps.provider.id,
+    provider: route.id,
     parentJobId: prepared.source.id,
-    inputs: jobInputs(prepared, decision, resolution, attemptId),
-  })
+    inputs: { ...jobInputs(prepared, decision, resolution, attemptId), ...(fallback ? { fallback_route: true } : {}) },
+  }) })
   // Two concurrent requests with one job id: only the one that created the row calls the model.
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
   // Dispute evidence (T82): the IP that started this edit.
   await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })
 
   const call = editProviderCall(prepared.pipeline, decision, { image: prepared.image, instruction: prepared.instruction, aspect: prepared.aspect, reframed: prepared.reframed, resolution })
-  const settle = () => settleGeneration(deps, job, call, outputKeyFor(req.userId, job.id), { decision: editDecisionCost(deps.classifier, decision) })
+  const settle = () => settleGeneration({ ...deps, provider: route }, job, call, outputKeyFor(req.userId, job.id), { decision: editDecisionCost(deps.classifier, decision) })
   return toJobView(await settleTracked(job, prepared.pipeline.template.category, settle, { track: deps.track }))
 }

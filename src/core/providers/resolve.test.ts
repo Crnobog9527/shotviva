@@ -47,26 +47,27 @@ describe('resolveProvider', () => {
     expect((await resolveProvider('image', row, env, drops, async () => RELAY_KEY)).honoursBackground).toBeUndefined()
   })
 
+  it("keeps the adapter's input check, so a rebuilt food call is checked against the routed model (§5.1c)", async () => {
+    const accepts = vi.fn(() => false)
+    const env = parseServerEnv({})
+    const checks: ProviderAdapters = { openai_images: () => ({ id: 'relay', accepts, generate: vi.fn() }) }
+    const request = { resolution: '1k' as const, aspectRatio: '4:3', referenceCount: 1 }
+    expect((await resolveProvider('image', row, env, checks, async () => RELAY_KEY)).accepts?.(request)).toBe(false)
+    expect(accepts).toHaveBeenCalledWith(request)
+    const plain: ProviderAdapters = { openai_images: () => ({ id: 'relay', generate: vi.fn() }) }
+    expect((await resolveProvider('image', row, env, plain, async () => RELAY_KEY)).accepts).toBeUndefined()
+  })
+
   it('falls back to OPENAI_* when no provider is active, without reading Vault', async () => {
     const { adapters, configs } = recordingAdapters()
     const readKey = vi.fn(async () => null)
     const env = parseServerEnv({ OPENAI_API_KEY: 'sk-env-0123456789', OPENAI_IMAGE_MODEL: 'gpt-image-2.5-sunburst' })
     const provider = await resolveProvider('image', null, env, adapters, readKey)
     expect(provider.id).toBe('env/gpt-image-2.5-sunburst')
-    // No row to hold prices, so the model's official price applies (§10.0).
-    expect(provider.prices).toEqual({ inputTextPerM: 5, inputImagePerM: 8, outputPerM: 30 })
+    // No row to hold a price and no price table in code (§10.0): usage is recorded, not a cost.
+    expect(provider.prices).toBeNull()
     expect(readKey).not.toHaveBeenCalled()
     expect(configs).toEqual([{ baseUrl: 'https://api.openai.com/v1', model: 'gpt-image-2.5-sunburst', apiKey: 'sk-env-0123456789' }])
-  })
-
-  it("fills a row's empty prices from the price table for its model, keeping the ones it has", async () => {
-    const { adapters } = recordingAdapters()
-    const env = parseServerEnv({})
-    const empty = { inputTextPerM: null, inputImagePerM: null, outputPerM: null }
-    const official = { ...row, model: 'gpt-image-2.6-sunburst', prices: { ...empty, outputPerM: 40 } }
-    expect((await resolveProvider('image', official, env, adapters, async () => RELAY_KEY)).prices).toEqual({ inputTextPerM: 5, inputImagePerM: 8, outputPerM: 40 })
-    // A model the table does not know, with nothing filled in: no snapshot, so jobs are uncosted.
-    expect((await resolveProvider('image', { ...row, prices: empty }, env, adapters, async () => RELAY_KEY)).prices).toBeNull()
   })
 
   it('fails without a fallback key, and when the active row has no key (no silent env fallback)', async () => {
@@ -80,6 +81,26 @@ describe('resolveProvider', () => {
 
   it('refuses a row whose adapter is not registered', async () => {
     await expect(resolveProvider('image', row, parseServerEnv({}), {}, async () => RELAY_KEY)).rejects.toThrow(/not registered/)
+  })
+})
+
+describe('resolveProvider prices (§10.0)', () => {
+  it("prices an official OpenAI line from its catalogue snapshot, filling gaps from the row's own", async () => {
+    const { adapters } = recordingAdapters()
+    const env = parseServerEnv({})
+    const empty = { inputTextPerM: null, inputImagePerM: null, outputPerM: null }
+    // Fixture catalogue snapshot (real ones come from OpenRouter's public catalogue).
+    const catalogPrice = {
+      status: 'quoted' as const, catalogModel: 'openai/gpt-image-2.6-sunburst', source: 'https://openrouter.ai/openai/gpt-image-2.6-sunburst',
+      fetchedAt: '2026-11-15T00:00:00.000Z', prices: { inputTextPerM: 5, inputImagePerM: null, outputPerM: 30 },
+    }
+    const official = { ...row, baseUrl: 'https://api.openai.com/v1', model: 'gpt-image-2.6-sunburst', prices: { ...empty, inputImagePerM: 9, outputPerM: 40 }, catalogPrice }
+    // The catalogue wins where it quotes a price; the admin's entry fills the rest.
+    expect((await resolveProvider('image', official, env, adapters, async () => RELAY_KEY)).prices).toEqual({ inputTextPerM: 5, inputImagePerM: 9, outputPerM: 30 })
+    // A snapshot for another model prices nothing.
+    expect((await resolveProvider('image', { ...official, model: 'gpt-image-3', prices: empty }, env, adapters, async () => RELAY_KEY)).prices).toBeNull()
+    // A relay host has no catalogue: only what the admin typed in.
+    expect((await resolveProvider('image', { ...row, prices: empty, catalogPrice }, env, adapters, async () => RELAY_KEY)).prices).toBeNull()
   })
 })
 
@@ -98,4 +119,16 @@ it('applies both the saved and current input limits to the resolved model', () =
     .toEqual({ minReferences: 2, maxReferences: 3 })
   expect(effectiveReferenceRange(saved, { input_references: { type: 'range', min: 0, max: 2 } }))
     .toEqual({ minReferences: 1, maxReferences: 2 })
+})
+
+describe('Ark list price on resolve (1566)', () => {
+  it("hands the adapter the row's list price only while it is for the row's model", async () => {
+    const configs: ProviderConfig[] = []
+    const adapters: ProviderAdapters = { ark_images: (config) => (configs.push(config), { id: 'ark', generate: vi.fn() }) }
+    const listPrice = { model: 'doubao-x', outputBands: [{ maxPixels: null, cny: 0.12 }], inputImageCny: 0, source: 'https://example.com/p', asOf: '2026-11-15' }
+    const ark = { ...row, adapter: 'ark_images' as const, baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-x', listPrice }
+    await resolveProvider('image', ark, parseServerEnv({}), adapters, async () => RELAY_KEY)
+    await resolveProvider('image', { ...ark, model: 'doubao-y' }, parseServerEnv({}), adapters, async () => RELAY_KEY)
+    expect(configs.map((config) => config.listPrice)).toEqual([listPrice, null])
+  })
 })

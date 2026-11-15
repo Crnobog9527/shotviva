@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GenerationProvider, ImageRequestOptions } from '../jobs'
 import { logger } from '../logger'
 import type { OpenRouterImageParameters } from './openrouter-catalog'
+import { catalogCapabilities } from './image-capabilities'
 import { ProviderSettingError } from './setting-error'
 import { templateImageProvider } from './template-image-provider'
 import type { ActiveProviderRow, ProviderAdapters } from './types'
@@ -67,9 +68,63 @@ describe('template image provider', () => {
     }))
   })
 
+  it('takes four photo slots plus one cover reference on the OpenAI line, and falls back above its limit', async () => {
+    const openAI: ActiveProviderRow = {
+      id: 'openai', adapter: 'openai_images', baseUrl: 'https://api.openai.com/v1', model: 'gpt-image-2.6', resolutions: ['1k'],
+      prices: { inputTextPerM: null, inputImagePerM: null, outputPerM: null },
+    }
+    const withOpenAI: ProviderAdapters = { openai_images: () => ({ id: 'openai-image', generate: vi.fn() }) }
+    const deps = { ...dependencies(), lookup: vi.fn(async () => openAI) }
+    vi.spyOn(logger, 'info').mockImplementation(() => undefined)
+    const five = await templateImageProvider(withOpenAI, openAI.id, { ...request, referenceCount: 5 }, deps)
+    expect(five).toMatchObject({ id: 'openai/gpt-image-2.6', maxReferences: 16 })
+    expect(await templateImageProvider(withOpenAI, openAI.id, { ...request, referenceCount: 17 }, deps))
+      .toMatchObject({ ...defaultProvider, fallbackReason: 'reference_image_limit' })
+  })
+
   it('rejects a decision provider submitted directly by the admin client', async () => {
     const deps = dependencies()
     deps.lookup.mockResolvedValue({ ...row, adapter: 'openai_responses' })
     await expect(templateImageProvider(adapters, row.id, request, deps)).rejects.toThrow('image provider')
+  })
+})
+
+describe('edit sizes', () => {
+  it('sends an edit at a size the bound line lacks to the default line; a template is refused', async () => {
+    const deps = dependencies()
+    const ark: ActiveProviderRow = { ...row, id: 'ark', adapter: 'ark_images', model: 'seedream-test', resolutions: ['1k', '2k'],
+      capabilities: { resolutions: ['1k', '2k'], aspectRatios: ['1:1', '4:5'], originalRatio: true, minReferences: 0, maxReferences: 10,
+        fetchedAt: '2026-11-15T00:00:00Z' } }
+    deps.lookup.mockResolvedValue(ark)
+    vi.spyOn(logger, 'info').mockImplementation(() => undefined)
+    const large = { ...request, resolution: '4k' as const }
+    await expect(templateImageProvider(adapters, ark.id, large, deps)).rejects.toThrow('does not support the selected output size')
+    const routed = await templateImageProvider(adapters, ark.id, { ...large, tierFallback: true }, deps)
+    expect(routed).toMatchObject({ id: defaultProvider.id, fallbackReason: 'unsupported_resolution' })
+    expect(deps.readKey).not.toHaveBeenCalled()
+  })
+})
+
+describe('OpenRouter GPT image line', () => {
+  // 跟随照片 is the default ratio: a GPT image line on OpenRouter sizes it from the photo.
+  it.each([
+    ['without auto', ['1:1', '3:4']],
+    ['with auto', ['1:1', '3:4', 'auto']],
+    ['without any ratio list', null],
+  ] as const)('keeps an original-ratio request on the OpenRouter GPT image line (catalogue %s)', async (_label, ratios) => {
+    const parameters: OpenRouterImageParameters = {
+      ...(ratios ? { aspect_ratio: { type: 'enum', values: [...ratios] } } : {}),
+      quality: { type: 'enum', values: ['medium', 'high'] }, input_references: { type: 'range', min: 0, max: 16 },
+    }
+    const model = 'openai/gpt-image-2.6-sunburst'
+    const gpt: ActiveProviderRow = { ...row, id: 'or-gpt', model, resolutions: ['1k', '2k', '4k'],
+      capabilities: catalogCapabilities(model, parameters, '2026-11-15T00:00:00.000Z') }
+    const deps = { ...dependencies(), lookup: vi.fn(async () => gpt), parameters: vi.fn(async () => parameters) }
+    for (const resolution of ['1k', '2k'] as const) {
+      const selected = await templateImageProvider(adapters, gpt.id, { resolution, aspectRatio: 'original', referenceCount: 2 }, deps)
+      expect(selected.id).toBe(`or-gpt/${model}`)
+      expect(selected.fallbackReason).toBeUndefined()
+    }
+    expect(deps.fallback).not.toHaveBeenCalled()
   })
 })

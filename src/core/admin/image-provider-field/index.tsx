@@ -2,6 +2,7 @@
 
 import type { ApprovedTariff, CreditsFloor, Resolution, TemplateQuality } from '@/core/templates'
 import { OPENAI_MAX_REFERENCES, type ImageCapabilities } from '@/core/templates/image-capabilities'
+import { openAIFreeSizeModel } from '@/core/providers/tier-support'
 import { FULL_IMAGE_OPTIONS } from '@/core/templates/image-options'
 import { Label } from '@/core/ui/label'
 
@@ -21,12 +22,14 @@ export type ImageProviderOption = {
 type Props = {
   id: string
   allowKeep?: boolean
+  // The first option's text when the caller names the default differently (作品编辑: 跟随默认线路).
+  defaultLabel?: string
   providers: readonly ImageProviderOption[]
   value: string | null
   onChange: (id: string | null) => void
 }
 
-export function ImageProviderField({ id, providers, value, onChange, allowKeep }: Props) {
+export function ImageProviderField({ id, providers, value, onChange, allowKeep, defaultLabel }: Props) {
   const selected = value ? providers.find(p => p.id === value) : providers.find(p => p.isActive)
   return (
     <div className="grid gap-1.5">
@@ -34,7 +37,7 @@ export function ImageProviderField({ id, providers, value, onChange, allowKeep }
       <select id={id} className="border-input h-9 min-w-0 rounded-md border bg-transparent px-3 text-sm"
         aria-describedby={`${id}-hint`} value={value ?? ''} onChange={(event) => onChange(event.target.value || null)}>
         {allowKeep && <option value="keep">不改</option>}
-        <option value="">{copy.followDefault}</option>
+        <option value="">{defaultLabel ?? copy.followDefault}</option>
         {providers.filter(p => p.id !== 'env').map((provider) => (
           <option key={provider.id} value={provider.id}>{provider.label} · {provider.model}</option>
         ))}
@@ -45,13 +48,20 @@ export function ImageProviderField({ id, providers, value, onChange, allowKeep }
   )
 }
 
+// The official line and, since #659, OpenAI's GPT image models on OpenRouter (exact pixel size)
+// send the template's medium/high; other OpenRouter models and Ark do not.
+function sendsQuality(provider: ImageProviderOption) {
+  const model = provider.model.trim()
+  return provider.openAI || (model.startsWith('openai/') && openAIFreeSizeModel(model.slice('openai/'.length)))
+}
+
 function capabilitySummary(provider: ImageProviderOption) {
   if (!provider.capabilities && !provider.openAI) return copy.unknown
   const caps = provider.capabilities ?? { ...FULL_IMAGE_OPTIONS, minReferences: 0, maxReferences: OPENAI_MAX_REFERENCES, fetchedAt: null, providerAspectRatios: undefined }
   const ratios = caps.providerAspectRatios ?? caps.aspectRatios
   const time = caps.fetchedAt ? new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'short', timeStyle: 'short' }).format(new Date(caps.fetchedAt)) : '固定能力'
   return [provider.model, caps.resolutions.map(r => r.toUpperCase()).join(' / '),
-    ...(provider.openAI ? [] : [copy.routerQuality]),
+    ...(sendsQuality(provider) ? [] : [copy.routerQuality]),
     `比例 ${ratios.length} 种（${ratios.join('、')}）`, caps.originalRatio ? '支持原图比例' : '不支持原图比例',
     `参考图 ${caps.minReferences}–${caps.maxReferences} 张`, `上次刷新：${time}`].join(' · ')
 }

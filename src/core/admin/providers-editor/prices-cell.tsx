@@ -1,22 +1,23 @@
-import type { ProviderPrices } from '@/core/jobs'
-import { arkPrice } from '@/core/jobs/ark-prices'
-import { effectivePrices } from '@/core/jobs/model-prices'
-import type { ProviderAdapterId, ProviderModule } from '@/core/providers/types'
+import { effectivePrices } from '@/core/jobs/catalog-price'
+import { currentCatalogPrice } from '@/core/providers/catalog-model'
+import { isTextModule } from '@/core/providers/types'
+
+import type { AdminProvider } from '../providers/types'
 
 import { PROVIDERS_COPY as COPY } from './copy'
-import { missingPrices, pricesFromTable } from './form-state'
+import { missingPrices, pricedFromCatalog } from './form-state'
 
 const price = (value: number | null) => (value === null ? COPY.priceUnset : `$${value}`)
 
-type Props = { adapter: ProviderAdapterId; prices: ProviderPrices; module: ProviderModule; model: string }
+type Props = { provider: Pick<AdminProvider, 'adapter' | 'baseUrl' | 'model' | 'module' | 'prices' | 'catalogPrice'> }
 
-// The prices the module's jobs are costed with: the row's own, empty ones from the official price
-// table (§10.0). Red with a warning when one it needs is in neither.
-export function PricesCell({ prices, module, model, adapter }: Props) {
-  const shown = effectivePrices(model, prices) ?? prices
-  const priceModule = adapter === 'openrouter_images' ? 'decision' : module
-  const missing = missingPrices(prices, priceModule, model)
-  const fromTable = pricesFromTable(prices, priceModule, model)
+// The prices the module's jobs are costed with: the OpenRouter catalogue's, else the admin's own
+// (§10.0). Red with a warning when one it needs is in neither.
+export function PricesCell({ provider }: Props) {
+  const shown = effectivePrices(currentCatalogPrice(provider), provider.prices) ?? provider.prices
+  const priceModule = provider.adapter === 'openrouter_images' || isTextModule(provider.module) ? 'decision' : provider.module
+  const missing = missingPrices(provider, priceModule)
+  const catalog = pricedFromCatalog(provider, priceModule)
   const text =
     priceModule === 'decision'
       ? COPY.decisionPrices(price(shown.inputTextPerM), price(shown.outputPerM))
@@ -24,21 +25,26 @@ export function PricesCell({ prices, module, model, adapter }: Props) {
   return (
     <div className={`w-52 text-xs whitespace-normal ${missing ? 'text-destructive' : ''}`}>
       <div className="font-mono">{text} · {COPY.tokenUnit}</div>
-      {fromTable ? <div className="text-muted-foreground">{COPY.pricesFromTable(fromTable)}</div> : null}
-      {missing ? <div role="note">{adapter === 'openrouter_images' ? COPY.fallbackPricesMissing : COPY.pricesMissing}</div> : null}
+      {catalog ? <div className="text-muted-foreground">{COPY.pricesFromCatalog(catalog.fetchedAt.slice(0, 10))}</div> : null}
+      {missing ? <div role="note">{provider.adapter === 'openrouter_images' ? COPY.fallbackPricesMissing : COPY.pricesMissing}</div> : null}
     </div>
   )
 }
 
-// Ark rows bill per image from the code price table (yuan), converted at CNY_PER_USD.
-export function ArkPricesCell({ model }: { model: string }) {
-  const entry = arkPrice(model)
-  if (!entry) return <div role="note" className="text-destructive w-52 text-xs whitespace-normal">{COPY.arkPriceMissing}</div>
-  const bands = entry.outputBands.map((band) => `≤${(band.maxPixels / 1e6).toFixed(2)}M 像素 ¥${band.cny}`).join(' · ')
+const megapixels = (pixels: number) => Number((pixels / 1e6).toFixed(2))
+
+// Ark rows bill per image from their admin-entered list price (yuan), converted at CNY_PER_USD.
+export function ArkPricesCell({ listPrice }: Pick<AdminProvider, 'listPrice'>) {
+  if (!listPrice) return <div role="note" className="text-destructive w-52 text-xs whitespace-normal">{COPY.arkPriceMissing}</div>
+  const bands = listPrice.outputBands.map((band, index) => {
+    const previous = listPrice.outputBands[index - 1]?.maxPixels
+    const scope = band.maxPixels !== null ? COPY.arkBandUpTo(megapixels(band.maxPixels)) : previous ? COPY.arkBandAbove(megapixels(previous)) : COPY.arkBandAll
+    return `${scope} ¥${band.cny}`
+  }).join(' · ')
   return (
     <div className="w-52 text-xs whitespace-normal">
-      <div className="font-mono">{COPY.arkPriceLine(bands, entry.inputImageCny)}</div>
-      <div className="text-muted-foreground">{COPY.arkPriceAsOf(entry.asOf, entry.source)}</div>
+      <div className="font-mono">{COPY.arkPriceLine(bands, listPrice.inputImageCny)}</div>
+      <div className="text-muted-foreground">{COPY.arkPriceAsOf(listPrice.asOf, listPrice.source)}</div>
     </div>
   )
 }

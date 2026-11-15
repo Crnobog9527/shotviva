@@ -1,5 +1,6 @@
 import { RESOLUTIONS, type Resolution } from './output-options'
 import { MISSING_COST, TEMPLATE_QUALITIES, type ApprovedTariff, type CreditsCost, type CreditsFloor } from './pricing'
+import { IMAGE_SLOTS_MAX } from './image-slots'
 
 type Costs = Partial<Record<Resolution, number>>
 export type ProviderFloors = CreditsFloor & {
@@ -24,7 +25,8 @@ export const OPENAI_MINIMUM: CreditsFloor = {
   high: { '1k': 2, '2k': 4, '4k': 6 },
   medium: { '1k': 1, '2k': 2, '4k': 3 },
 }
-const OPENAI_ESTIMATES: CreditsFloor = {
+// Also the base of the OpenRouter estimate for the same models (core/providers/openrouter-pricing).
+export const OPENAI_ESTIMATES: CreditsFloor = {
   high: { '1k': 0.081, '2k': 0.135, '4k': 0.206 },
   medium: { '1k': 0.055, '2k': 0.095, '4k': 0.135 },
 }
@@ -56,7 +58,8 @@ type ModelCosts = {
   slotCosts?: { extraInputUsd?: number | null; p95Full?: Partial<Record<(typeof TEMPLATE_QUALITIES)[number], Partial<Record<Resolution, Record<string, number>>>>> }
 }
 
-const SLOT_COUNTS = [2, 3, 4] as const
+// Every slot count a template can have, as admin.slot_route_floor takes any (1442).
+const SLOT_COUNTS = Array.from({ length: IMAGE_SLOTS_MAX - 1 }, (_, i) => i + 2)
 
 // The same three steps as admin.slot_route_floor: full-slot p95 (never below the single floor),
 // else single + the extra inputs, else nothing here (creditMinimum falls back to single × n).
@@ -81,7 +84,7 @@ function routeMinimum(model: ModelCosts, quality: Quality, resolution: Resolutio
   return model.openAI ? Math.max(min, OPENAI_MINIMUM[quality][resolution]) : min
 }
 
-// The slot floors this route's data allows (n = 2..4); none means single × n.
+// The slot floors this route's data allows (n = 2..IMAGE_SLOTS_MAX); none means single × n.
 function slotFloors(model: ModelCosts, quality: Quality, resolution: Resolution, single: number, budget: number) {
   const entries = SLOT_COUNTS.flatMap(n => {
     const slot = slotFloor(model, quality, resolution, single, n, budget)

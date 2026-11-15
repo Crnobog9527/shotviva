@@ -1,4 +1,5 @@
-import type { ImageCapabilities } from '@/core/templates/image-capabilities'
+import { OPENAI_MAX_REFERENCES, type ImageCapabilities } from '@/core/templates/image-capabilities'
+import { PROVIDER_ASPECTS } from '@/core/templates/image-options'
 import type { Resolution } from '@/core/templates/output-options'
 import type { ImageProviderOption } from '../image-provider-field'
 import type { BulkEditFailure, BulkEditPatch } from '../templates/bulk-edit-rules'
@@ -10,13 +11,18 @@ function fitsInputs(t: Candidate, count: number, caps: ImageCapabilities | null)
   if (!t.fields.images && !count) return true
   const { min, max } = t.fields.images ?? { min: 0, max: 0 }
   const minimum = caps?.minReferences ?? 0
-  const maximum = caps?.maxReferences ?? 4
+  const maximum = caps?.maxReferences ?? OPENAI_MAX_REFERENCES
   return min + count >= minimum && max + count <= maximum
 }
 
+// Only the ratios the site offers count. A stored ratio it never offers (3:4 on 123 production
+// templates) is dropped at generation for a bound template on any line (storedAspectAccepted), so
+// it cannot block a move between lines. Same rule as admin.bulk_model_problem (1550).
+const SITE_RATIOS: readonly string[] = PROVIDER_ASPECTS
+
 function fitsRatios(t: Candidate, caps: ImageCapabilities | null) {
-  const ratios = caps?.providerAspectRatios ?? caps?.aspectRatios
-  return !ratios || (t.fields.aspectRatios ?? []).every(ratio => ratios.includes(ratio))
+  const ratios: readonly string[] | undefined = caps?.providerAspectRatios ?? caps?.aspectRatios
+  return !ratios || (t.fields.aspectRatios ?? []).every(ratio => !SITE_RATIOS.includes(ratio) || ratios.includes(ratio))
 }
 
 function replacementProblem(t: Candidate, provider: ImageProviderOption | undefined) {

@@ -21,8 +21,8 @@ export type ReconcileRow = OurDay & {
   difference: number | null
 }
 
-// Consecutive days on which ours and billed differ by more than STALE_DRIFT: the price table
-// (MODEL_PRICES) or a row's prices may be out of date. Oldest and newest day of the longest run.
+// Consecutive days on which ours and billed differ by more than STALE_DRIFT: a line's catalogue
+// snapshot or hand-entered price may be out of date. Oldest and newest day of the longest run.
 export type PriceDrift = { days: number; from: string; to: string }
 
 export type Reconciliation = {

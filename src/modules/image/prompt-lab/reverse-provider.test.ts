@@ -27,4 +27,17 @@ describe('vision provider dispatch', () => {
     const answer = await requestReverse(row, 'test', instruction, privateImage, transportReply('incomplete', draft))
     expect(answer).toEqual({ prompt: null, cost: 0.00028 })
   })
+
+  it.each([
+    [{ cost: 0.001, is_byok: false }, 0.001055],
+    [{ cost: 0, is_byok: true, cost_details: { upstream_inference_cost: 0.0004 } }, 0.0004],
+    [{ cost: 0.00002, is_byok: true, cost_details: { upstream_inference_cost: 0.0004 } }, 0.000421],
+    [{ cost: 0, is_byok: true }, null],
+  ])('books an OpenRouter receipt %j as %s', async (billing, cost) => {
+    const router = { ...row, baseUrl: 'https://openrouter.ai/api/v1' } as AdminProvider
+    const send = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ status: 'completed',
+      output: [{ content: [{ type: 'output_text', text: draft }] }], usage: { input_tokens: 100, output_tokens: 20, ...billing },
+    }))
+    expect((await requestReverse(router, 'test', instruction, privateImage, send)).cost).toBe(cost)
+  })
 })

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { ARK_RESOLUTIONS } from '@/core/providers/ark'
+import { arkPriceSchema } from '@/core/jobs/ark-prices'
 import { apiKeySchema } from '@/core/providers/keys'
 import { estimatedImageCostsSchema } from '@/core/templates/image-capabilities'
 import { RESOLUTIONS } from '@/core/templates/output-options'
@@ -28,6 +29,8 @@ const modelFields = {
   model: z.string().trim().regex(/^[A-Za-z0-9._:/@+-]{1,120}$/),
 }
 export const lookupModelSchema = z.object({ ...modelFields, retry: z.boolean().optional() })
+// The catalogue price preview for a line being edited (§10.0).
+export const lookupPriceSchema = z.object({ ...modelFields, adapter: z.enum(PROVIDER_ADAPTERS), retry: z.boolean().optional() })
 
 export const saveProviderSchema = z.object({
   // Absent for a new row.
@@ -40,6 +43,8 @@ export const saveProviderSchema = z.object({
   estimatedImageCosts: estimatedImageCostsSchema.optional(),
   // Slot template floor (1442). Blank clears it; absent (older editors) keeps it.
   extraInputImageUsd: z.preprocess(v => (v === '' ? null : v), z.coerce.number().min(0).max(9.99).nullable().optional()),
+  // 「BYOK（按官方价）」 (1551). Absent (older editors, other lines) keeps the stored value.
+  byokListPrice: z.boolean().optional(),
   label: z.string().trim().min(1).max(80),
   ...modelFields,
   // Write-only: blank keeps the stored key (ARCHITECTURE §3.3).
@@ -48,12 +53,16 @@ export const saveProviderSchema = z.object({
   priceInputTextPerM: pricePerM,
   priceInputImagePerM: pricePerM,
   priceOutputPerM: pricePerM,
+  // 1566: an Ark line's list price, typed in from Ark's price page. null clears it; absent keeps it.
+  listPrice: arkPriceSchema.nullable().optional(),
 })
   .refine((input) => MODULE_ADAPTERS[input.module].some((adapter) => adapter === input.adapter), { path: ['adapter'] })
   // Ark's sale floor has no list price to fall back on: until it has measured samples it uses these
   // per-image estimates, so every tier it offers needs one (the form enforces the same).
   .refine((input) => input.adapter !== 'ark_images' || ARK_RESOLUTIONS.every((tier) => (input.estimatedImageCosts?.[tier] ?? 0) > 0),
     { path: ['estimatedImageCosts'] })
+  // An Ark price is for the model saved with it (1566).
+  .refine((input) => !input.listPrice || input.listPrice.model === input.model, { path: ['listPrice'] })
 
 export type SaveProviderInput = z.input<typeof saveProviderSchema>
 

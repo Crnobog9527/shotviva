@@ -5,10 +5,11 @@ import { randomUUID } from 'node:crypto'
 import type { z } from 'zod'
 
 import { AppError } from '@/core/errors'
+import type { GenerationProvider, TemplateProvider } from '@/core/jobs'
 import { loadOutputImage } from '@/core/storage'
 import { instructionSchema } from '@/core/templates'
 
-import { decideEdit, editDecisionCost, editProviderCall, editRecord, loadEditPipeline, type ScopeClassifier } from '../edit'
+import { decideEdit, editDecisionCost, editProviderCall, editRecord, editRoute, loadEditPipeline, type ScopeClassifier } from '../edit'
 import { estimateRunUsd } from './estimate'
 import type { TestRunDeps } from './run-test-generate'
 import { continueTestRun } from './test-ledger'
@@ -21,7 +22,8 @@ import { beginTestRun, findTestRun, recordDecision } from './test-run-store'
 // with its fallback and face-swap answer, paragraphs, sizes and provider call; the result is a new
 // run whose parent is the one edited, so edits of edits form the tree the panel draws.
 
-export type TestEditDeps = TestRunDeps & { classifier: ScopeClassifier | null; classifierTimeoutMs?: number }
+// `provider`: the route resolver, so a trial edit runs on the line a user's edit would (editRoute).
+export type TestEditDeps = Omit<TestRunDeps, 'provider'> & { provider: TemplateProvider; classifier: ScopeClassifier | null; classifierTimeoutMs?: number }
 
 export type TestEditRequest = { actorId: string; body: z.infer<typeof testEditBodySchema> }
 
@@ -40,12 +42,13 @@ async function prepare(deps: TestEditDeps, { body }: TestEditRequest) {
   const pipeline = await loadEditPipeline(deps.db)
   const image = await loadOutputImage(deps.store, parent.outputKey)
   const aspect = body.aspect_ratio ?? runAspect(parent)
-  return { instruction: instruction.data, parent, pipeline, image, aspect, reframed: aspect !== runAspect(parent) }
+  const route = await editRoute(deps.provider, pipeline, { resolution: body.resolution ?? parent.resolution, aspectRatio: aspect })
+  return { instruction: instruction.data, parent, pipeline, image, aspect, reframed: aspect !== runAspect(parent), route }
 }
 
 type Prepared = Awaited<ReturnType<typeof prepare>>
 
-function begin(deps: TestEditDeps, req: TestEditRequest, p: Prepared, attemptId: string) {
+function begin(deps: TestEditDeps & { provider: GenerationProvider }, req: TestEditRequest, p: Prepared, attemptId: string) {
   const resolution = req.body.resolution ?? p.parent.resolution
   return beginTestRun(deps.db, {
     actorId: req.actorId,
@@ -69,7 +72,8 @@ export async function runTestEdit(deps: TestEditDeps, req: TestEditRequest): Pro
   if (existing) return existing
   const p = await prepare(deps, req)
   const attemptId = randomUUID()
-  const run = await begin(deps, req, p, attemptId)
+  const routed = { ...deps, provider: p.route }
+  const run = await begin(routed, req, p, attemptId)
   if (run.status !== 'running' || run.inputs.attempt_id !== attemptId) return run
   // The scope call (which also answers the face-swap question) only now, with the budget held.
   const step = async () => {
@@ -78,5 +82,5 @@ export async function runTestEdit(deps: TestEditDeps, req: TestEditRequest): Pro
     const call = editProviderCall(p.pipeline, decision, { image: p.image, instruction: p.instruction, aspect: p.aspect, reframed: p.reframed, resolution: run.resolution })
     return { call, decision: editDecisionCost(deps.classifier, decision) }
   }
-  return continueTestRun(deps, run, step, deps.classifier?.prices)
+  return continueTestRun(routed, run, step, deps.classifier?.prices)
 }

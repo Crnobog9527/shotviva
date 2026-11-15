@@ -8,7 +8,7 @@ import { serverEnv } from '../env'
 import { logger } from '../logger'
 import { providerTag, type GenerationProvider, type ImageRequestOptions } from '../jobs'
 import { openRouterImageParameters, type OpenRouterImageParameters } from './openrouter-catalog'
-import { openRouterInputMismatch } from './openrouter-input'
+import { openRouterInputMismatch, openRouterPixelSize } from './openrouter-input'
 import { ProviderSettingError } from './setting-error'
 import { defaultTemplateProvider, PROVIDERS_CACHE_TAG } from './active-provider'
 import { readProviderKey } from './keys'
@@ -42,7 +42,10 @@ function validateStoredCapabilities(row: ActiveProviderRow, request: ImageReques
   }
 }
 
+// A pixel-size model (GPT image on OpenRouter) sizes 'original' from the photo, so it never needs
+// the catalogue's 'auto'.
 function lostOriginalSupport(row: ActiveProviderRow, aspect: string, parameters: OpenRouterImageParameters) {
+  if (openRouterPixelSize(row.model, parameters)) return false
   return row.capabilities?.originalRatio && aspect === 'original' && !parameters.aspect_ratio?.values.includes('auto')
 }
 
@@ -63,9 +66,18 @@ async function checkTemplateRow(
   if (lostOriginalSupport(row, request.aspectRatio, parameters)) {
     return { reason: 'catalog_changed' }
   }
-  const mismatch = openRouterInputMismatch(request, parameters)
+  const mismatch = openRouterInputMismatch(request, parameters, row.model)
   return mismatch ?? { parameters }
 }
+
+function imageRow(row: ActiveProviderRow) {
+  if (row.adapter === 'openai_responses') throw new AppError('INVALID_INPUT', 'An image provider is required')
+  return row
+}
+
+// An edit (tierFallback) at a size the line's stored capabilities lack goes to the default line.
+const editTierFallback = (row: ActiveProviderRow, request: ImageRequestOptions) =>
+  Boolean(request.tierFallback && row.capabilities && !row.capabilities.resolutions.includes(request.resolution))
 
 // Resolve before reserving credits or the trial budget so the ledger and price snapshot
 // both belong to the provider that actually receives the request.
@@ -78,17 +90,18 @@ export async function templateImageProvider(
     parameters: loadParameters = openRouterImageParameters }: RoutingDeps = {},
 ) {
   if (!id || !request) return fallback()
-  const row = await lookup(id)
-  if (row.adapter === 'openai_responses') throw new AppError('INVALID_INPUT', 'An image provider is required')
-  validateStoredCapabilities(row, request)
-  const selection = await checkTemplateRow(row, request, loadParameters)
-  if ('reason' in selection) {
+  const row = imageRow(await lookup(id))
+  const fallBack = async (reason: string) => {
     const provider = await fallback()
     logger.info('image.provider.fallback', {
-      reason: selection.reason, requestedProvider: providerTag(id, row.model), actualProvider: provider.id,
+      reason, requestedProvider: providerTag(id, row.model), actualProvider: provider.id,
       resolution: request.resolution, aspectRatio: request.aspectRatio, referenceCount: request.referenceCount,
     })
-    return { ...provider, fallbackReason: selection.reason }
+    return { ...provider, fallbackReason: reason }
   }
+  if (editTierFallback(row, request)) return fallBack('unsupported_resolution')
+  validateStoredCapabilities(row, request)
+  const selection = await checkTemplateRow(row, request, loadParameters)
+  if ('reason' in selection) return fallBack(selection.reason)
   return resolveProvider('image', row, serverEnv(), adapters, readKey, selection.parameters)
 }

@@ -14,6 +14,9 @@ export type BulkEditPatch = {
   providerId?: string | null
   // Only the tiers that change; the rest keep each template's own price.
   creditsCost?: Partial<CreditsCost>
+  // Tiers to stop offering (closed for sale, like a blank price in the editor). A tier given a
+  // price above is opened instead, so the two never name the same tier.
+  closeResolutions?: Resolution[]
   visibleIn?: TemplateSurface[]
   quality?: TemplateQuality
   // A template_categories key (T75), never a system category.
@@ -23,7 +26,7 @@ export type BulkEditPatch = {
 export type BulkEditFailure =
   | { id: string; name: string; reason: 'below_floor'; resolution: Resolution; floor: number; given: number }
   | { id: string; name: string; reason: 'model'; detail: string }
-  | { id: string; name: string; reason: 'web_incomplete' | 'not_found' | 'system' }
+  | { id: string; name: string; reason: 'web_incomplete' | 'not_found' | 'system' | 'no_tier' }
 
 export type BulkEditOutcome = { changed: number; failures: BulkEditFailure[] }
 
@@ -43,7 +46,7 @@ export const isBulkEditable = (template: { id: string; categoryInfo?: { isSystem
 const RESOLUTION_LABEL: Record<Resolution, string> = { '1k': '1K', '2k': '2K', '4k': '4K' }
 
 export const isEmptyPatch = (patch: BulkEditPatch) =>
-  Object.keys(patch.creditsCost ?? {}).length === 0 && !patch.visibleIn && !patch.quality && !patch.categoryKey && patch.providerId === undefined
+  Object.keys(patch.creditsCost ?? {}).length === 0 && !patch.closeResolutions?.length && !patch.visibleIn && !patch.quality && !patch.categoryKey && patch.providerId === undefined
 
 const blank = (text: string | null) => !text || text.trim() === ''
 
@@ -60,7 +63,8 @@ function candidatePricing(template: BulkEditCandidate, patch: BulkEditPatch, flo
   const prices = providerFloor(floor, route, template.id)
   const previous = providerFloor(floor, template.prompt?.providerId, template.id)
   const unpriced = template.unpricedResolutions ?? RESOLUTIONS.filter(tier => previous.resolutions && !previous.resolutions.includes(tier))
-  return { quality, visibleIn, prices, unpriced: unpriced.filter(tier => patch.creditsCost?.[tier] === undefined) }
+  const kept = unpriced.filter(tier => patch.creditsCost?.[tier] === undefined)
+  return { quality, visibleIn, prices, unpriced: RESOLUTIONS.filter(tier => kept.includes(tier) || patch.closeResolutions?.includes(tier)) }
 }
 
 // Each template as it would be after the edit, checked against the floor of its (possibly new)
@@ -78,7 +82,11 @@ export function bulkEditFailures(
     const low = creditsBelowFloor(quality, cost, prices, unpriced, slotFloorFactor(template.fields))
       .map(v => ({ id, name, reason: 'below_floor' as const, ...v }))
     const web = webIncomplete(template, visibleIn)
-    return web ? [...low, { id, name, reason: 'web_incomplete' }] : low
+    // At least one tier stays on offer (the editor's 「提供」 rule).
+    // Counted against the resulting model: a priced tier it cannot make offers nothing.
+    const open = (prices.resolutions ?? RESOLUTIONS).filter(tier => !unpriced.includes(tier))
+    const none = patch.closeResolutions?.length && open.length === 0 ? [{ id, name, reason: 'no_tier' as const }] : []
+    return [...low, ...none, ...(web ? [{ id, name, reason: 'web_incomplete' as const }] : [])]
   })
 }
 
@@ -90,6 +98,8 @@ export function describeFailure(failure: BulkEditFailure): string {
     case 'model': return failure.detail
     case 'web_incomplete':
       return '已上架，缺英文说明或前后对比封面，不能加到站内'
+    case 'no_tier':
+      return '会停售全部清晰度，至少要留一档'
     case 'system':
       return '系统模板（作品编辑 / 伙伴自由生成），不参与批量编辑'
     case 'not_found':
@@ -97,13 +107,19 @@ export function describeFailure(failure: BulkEditFailure): string {
   }
 }
 
+function tierLines(patch: BulkEditPatch): string[] {
+  const tiers = RESOLUTIONS.filter((resolution) => patch.creditsCost?.[resolution] !== undefined)
+  const closed = patch.closeResolutions ?? []
+  return [
+    ...(tiers.length > 0 ? [`积分：${tiers.map((r) => `${RESOLUTION_LABEL[r]} → ${patch.creditsCost?.[r]}`).join('，')}`] : []),
+    ...(closed.length > 0 ? [`停售：${closed.map((r) => RESOLUTION_LABEL[r]).join('，')}`] : []),
+  ]
+}
+
 // The confirm step's list of what changes, in the editor's own words.
 export function describePatch(patch: BulkEditPatch, categoryName: (key: string) => string = (key) => key, modelName = (id: string) => id): string[] {
   const lines: string[] = []
-  const tiers = RESOLUTIONS.filter((resolution) => patch.creditsCost?.[resolution] !== undefined)
-  if (tiers.length > 0) {
-    lines.push(`积分：${tiers.map((r) => `${RESOLUTION_LABEL[r]} → ${patch.creditsCost?.[r]}`).join('，')}`)
-  }
+  lines.push(...tierLines(patch))
   if (patch.visibleIn) {
     const label = { web: '站内', partner: '伙伴' } as const
     lines.push(`展示入口 → ${patch.visibleIn.map((surface) => label[surface]).join(' + ')}`)

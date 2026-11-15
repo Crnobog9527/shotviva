@@ -1,13 +1,19 @@
 import type { ImageCapabilities, EstimatedImageCosts } from '../templates/image-capabilities'
 import type { OpenRouterImageParameters } from './openrouter-catalog'
 import type { Resolution } from '../templates/output-options'
-import type { GenerationProvider, ProviderPrices } from '../jobs'
+import type { CatalogPrice, GenerationProvider, ProviderPrices } from '../jobs'
+import type { ArkPrice } from '../jobs/ark-prices'
 
 // Provider settings (ARCHITECTURE §3.3). Mirrors the checks on public.ai_providers.
 
-// 'decision' classifies what an edit instruction changes (ARCHITECTURE §5.2, T30).
-export const PROVIDER_MODULES = ['image', 'decision'] as const
+// 'decision' classifies what an edit instruction changes (ARCHITECTURE §5.2, T30). 'dish_read' reads
+// the user's dish photo for the food templates' toggle flows (§5.1c), on its own model so the
+// judge keeps its cheaper one; without an active row the reading uses the 'decision' row.
+export const PROVIDER_MODULES = ['image', 'decision', 'dish_read'] as const
 export type ProviderModule = (typeof PROVIDER_MODULES)[number]
+
+// Lines that answer in text over the Responses API (no image output, no tiers, token prices).
+export const isTextModule = (module: ProviderModule): boolean => module !== 'image'
 
 // Code adapters a row can name. A vendor with a different API shape is a new adapter (code),
 // not an admin setting.
@@ -17,12 +23,14 @@ export type ProviderAdapterId = (typeof PROVIDER_ADAPTERS)[number]
 export const MODULE_ADAPTERS: Record<ProviderModule, readonly ProviderAdapterId[]> = {
   image: ['openai_images', 'openrouter_images', 'ark_images'],
   decision: ['openai_responses'],
+  dish_read: ['openai_responses'],
 }
 
 // Default for new rows.
 export const MODULE_ADAPTER: Record<ProviderModule, ProviderAdapterId> = {
   image: 'openai_images',
   decision: 'openai_responses',
+  dish_read: 'openai_responses',
 }
 
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
@@ -37,7 +45,11 @@ export const staticCapabilities = (adapter: ProviderAdapterId) => adapter !== 'o
 
 // What an adapter needs to call its vendor. The key is plaintext, read from Vault per request:
 // never keep, log or return it.
-export type ProviderConfig = { baseUrl: string; model: string; apiKey: string; resolutions?: readonly Resolution[]; imageParameters?: OpenRouterImageParameters }
+// listPrice: an Ark line's admin-entered yuan price (1566), which its adapter costs each job with.
+export type ProviderConfig = {
+  baseUrl: string; model: string; apiKey: string; resolutions?: readonly Resolution[]; imageParameters?: OpenRouterImageParameters
+  listPrice?: ArkPrice | null
+}
 
 export type ProviderAdapter = (config: ProviderConfig) => GenerationProvider
 
@@ -56,12 +68,19 @@ export type AdminProvider = {
   estimatedImageCosts?: EstimatedImageCosts
   // Slot floor (1442): each extra input image a slot job sends, in USD; null = not set.
   extraInputImageUsd?: number | null
+  // 1551: an OpenRouter openai/gpt-image-* line billed through the Owner's own OpenAI key (BYOK)
+  // is priced like the official line; undefined on a database without the column.
+  byokListPrice?: boolean
   model: string
   apiKeyLast4: string | null
   isActive: boolean
   notes: string | null
-  // Per-million-token prices (T33); a null one is flagged on the admin page.
+  // Per-million-token prices the admin typed in (T33); used only where catalogPrice has none.
   prices: ProviderPrices
+  // 1566: the last OpenRouter catalogue price for this model (text and official OpenAI lines).
+  catalogPrice?: CatalogPrice | null
+  // 1566: an Ark line's admin-entered yuan price.
+  listPrice?: ArkPrice | null
   updatedAt: string
 }
 
@@ -77,4 +96,6 @@ export type ActiveProviderRow = {
   model: string
   // Snapshot used to cost each job (T33). Cached with the row; a save expires the tag.
   prices: ProviderPrices
+  catalogPrice?: CatalogPrice | null
+  listPrice?: ArkPrice | null
 }

@@ -255,6 +255,8 @@ export const catalogCopy = {
   seriesFilter: '筛选系列', allSeries: '全部系列', single: '单个模板', groupSeries: '按系列分组',
   empty: '没有匹配的模板',
   status: '上架状态', category: '筛选分类', categories: '全部分类', search: '搜索名称、ID、分类或系列',
+  modelFilter: '筛选出图模型', allModels: '全部模型', unboundModel: '未绑定（跟随默认线路）', defaultModel: '（当前默认）',
+  unknownModel: (id: string) => `未知线路 ${id.slice(0, 8)}`,
 }
 
 // The catalogue row (2026-11-12): the cover thumbnail, the id that copies itself, the actions.

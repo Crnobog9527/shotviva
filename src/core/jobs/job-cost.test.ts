@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+import { logger } from '../logger'
 
 import { jobCostUsd } from './job-cost'
 
@@ -45,7 +47,24 @@ describe('OpenRouter image cost', () => {
     expect(jobCostUsd({ cost: 0, is_byok: false }, null)).toBe(0)
     expect(jobCostUsd({ cost: 0 }, null)).toBeNull()
     expect(jobCostUsd({ cost: 0.018 }, null)).toBeNull()
-    expect(jobCostUsd({ cost: 0.01, is_byok: true, upstream_inference_cost: 0.2 }, PRICES)).toBeNull()
+  })
+
+  it('books a BYOK job as the upstream bill plus the BYOK fee, only the fee taking the top-up factor', () => {
+    // Inside the free allowance OpenRouter charges nothing; OpenAI bills the key for upstream.
+    expect(jobCostUsd({ cost: 0, is_byok: true, upstream_inference_cost: 0.0612 }, PRICES)).toBe(0.0612)
+    // 5% fee on list price, paid from credits: 0.2 + 0.01 x 1.055.
+    expect(jobCostUsd({ cost: 0.01, is_byok: true, upstream_inference_cost: 0.2 }, PRICES)).toBe(0.21055)
+    expect(jobCostUsd({ cost: 0, is_byok: true, upstream_inference_cost: 0.05, decision_input_tokens: 1000 }, null, PRICES)).toBe(0.055)
+  })
+
+  it('leaves a BYOK job without the upstream figure uncosted and says so', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined)
+    try {
+      expect(jobCostUsd({ cost: 0, is_byok: true, generation_id: 'gen-1' }, PRICES)).toBeNull()
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('upstream'), { generationId: 'gen-1' })
+    } finally {
+      warn.mockRestore()
+    }
   })
 
   it('does not book a token estimate when billed USD is missing', () => {

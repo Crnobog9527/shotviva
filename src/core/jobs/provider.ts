@@ -43,12 +43,16 @@ export type GenerationProvider = {
   fallbackReason?: string
   minReferences?: number
   maxReferences?: number
-  // Price snapshot taken when the provider was resolved for this request: the row's prices with
-  // empty ones filled from MODEL_PRICES; null when neither has any (the job then has no cost).
+  // Price snapshot taken when the provider was resolved for this request: the live catalogue price,
+  // empty fields filled from the row's own; null when neither has any (the job then has no cost).
   prices?: ProviderPrices | null
   // true: the adapter sends model_params.background to the model, so a transparent template's
-  // result really is a cut-out (OpenAI images). OpenRouter drops it; its results stay unknown.
+  // result really is a cut-out (OpenAI images, Ark). OpenRouter sends it only when the model lists
+  // that value, so its results stay unknown. Settle flattens any alpha a template did not ask for.
   honoursBackground?: boolean
+  // Optional: whether the model takes this request (OpenRouter checks its catalogue entry). A call
+  // that code rebuilt after routing (a food flow, §5.1c) is checked here before it is sent.
+  accepts?(request: ImageRequestOptions): boolean
   // Optional bounded, read-only invoice lookup after the generation deadline has stopped.
   completeUsage?(usage: ProviderUsage): Promise<ProviderUsage>
   generate(input: ProviderInput): Promise<ProviderOutput>
@@ -56,7 +60,10 @@ export type GenerationProvider = {
 
 // Web and admin first-generation resolve the saved provider after loading the template.
 // Routing requires the number of references, never the uploaded image bytes.
-export type ImageRequestOptions = Pick<ProviderInput, 'resolution' | 'aspectRatio'> & { referenceCount: number }
+// tierFallback: a size the routed line does not offer falls back to the default line instead of
+// being refused. Only an edit asks for it: its size follows the source work, which the bound line's
+// options never narrowed (a template's own sizes do).
+export type ImageRequestOptions = Pick<ProviderInput, 'resolution' | 'aspectRatio'> & { referenceCount: number; tierFallback?: boolean }
 
 export type TemplateProvider = GenerationProvider | ((id: string | null, request: ImageRequestOptions) => Promise<GenerationProvider>)
 

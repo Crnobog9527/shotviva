@@ -23,6 +23,7 @@ import { envSchema, localBatchPath, targetOf } from '../template-apply/options'
 import { formatTable } from '../template-apply/report'
 import { buildPage } from '../template-trial/page'
 import { readTrialState, trialsRoot } from '../template-trial/results'
+import { judgeSummary, latestByRun, readLedger, spentUsd as judgeSpentUsd } from '../template-judge/ledger'
 import { readProgress } from './progress'
 import { missingPicks } from './picks'
 import { finalizeBatch, reviewState, spentUsd, stageOf } from './stages'
@@ -56,7 +57,7 @@ const REVIEW_LABEL = { none: '待评审', pass: '通过', fail: '不通过', sta
 async function review(file: string, { batch, progress }: Loaded) {
   const root = trialsRoot(file)
   if (existsSync(join(root, 'state.json'))) {
-    await writeFile(join(root, 'index.html'), buildPage(await readTrialState(root), batch.templates, root, dirname(file)))
+    await writeFile(join(root, 'index.html'), buildPage(await readTrialState(root), batch.templates, root, dirname(file), new Date(), latestByRun(await readLedger(root))))
   }
   const rows = batch.templates.map(item => {
     const p = progress.get(item.id)!
@@ -67,18 +68,22 @@ async function review(file: string, { batch, progress }: Loaded) {
   process.stdout.write(`${formatTable(rows)}\n对照页：${relative(process.cwd(), join(root, 'index.html'))}\n`)
 }
 
-async function status({ batch, progress }: Loaded) {
+async function status(file: string, { batch, progress }: Loaded) {
   const runs = await readSyncRuns()
+  const ledger = await readLedger(trialsRoot(file))
+  const verdicts = latestByRun(ledger)
   const rows = batch.templates.map(item => {
     const p = progress.get(item.id)!
     const current = p.runs.filter(run => run.promptVersion === p.version)
     const ok = current.filter(run => run.status === 'succeeded').length
     const sync = p.exists ? syncState(item.id, p.seriesSlug ?? null, p.changedAt ?? null, runs) : '未同步'
     return { item: item.id, ok: true, actions: stageOf(item, p),
-      result: `v${p.version ?? '-'} · 试跑 ${p.runs.length} 次（当前版本成功 ${ok}/${current.length}）· $${spentUsd(p.runs).toFixed(3)} · 正式站：${sync}` }
+      result: `v${p.version ?? '-'} · 试跑 ${p.runs.length} 次（当前版本成功 ${ok}/${current.length}）· $${spentUsd(p.runs).toFixed(3)}` +
+        ` · 评审机：${judgeSummary(current.filter(run => run.status === 'succeeded').map(run => run.id), verdicts)} · 正式站：${sync}` }
   })
   const total = [...progress.values()].reduce((sum, p) => sum + spentUsd(p.runs), 0)
-  process.stdout.write(`${formatTable(rows)}\n这批模板的试跑累计花费 $${total.toFixed(3)}（只算已核实的成本）。\n`)
+  const judged = judgeSpentUsd(ledger, new Set([...progress.values()].flatMap(p => p.runs.map(run => run.id))))
+  process.stdout.write(`${formatTable(rows)}\n这批模板的试跑累计花费 $${total.toFixed(3)}（只算已核实的成本）；评审机花费 $${judged.toFixed(4)}（本机 judge.json）。\n`)
   process.stdout.write(runs ? '正式站同步状态来自 GitHub 上「Sync preview templates to production」的成功运行（按模板 id 和系列 slug 匹配），不读正式库。\n'
     : '正式站同步状态无法确认：读不到 GitHub 上的同步运行记录（gh 没登录或网络不通）。\n')
 }
@@ -109,7 +114,7 @@ async function main() {
   const loaded = await load(args.file)
   process.stdout.write(`${loaded.target.name}\n`)
   if (args.command === 'review') return review(args.file, loaded)
-  if (args.command === 'status') return status(loaded)
+  if (args.command === 'status') return status(args.file, loaded)
   return finalize(args.file, loaded, args.dryRun)
 }
 

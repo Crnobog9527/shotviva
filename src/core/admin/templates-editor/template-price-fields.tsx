@@ -3,9 +3,10 @@
 import { catalogCopy } from './copy'
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
-import { RESOLUTIONS } from '@/core/templates/output-options'
+import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 import { TEMPLATE_QUALITIES, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
 
+import { withOffered } from './sale-tier-fields'
 import { tierGuidance, unsupportedTier } from './tier-price'
 import { creditProblems, TIER_LABEL, type TemplateFormValues } from './form-state'
 
@@ -19,7 +20,8 @@ type Props = {
 const QUALITY_LABEL: Record<TemplateQuality, string> = { high: 'high', medium: 'medium' }
 
 // Quality tier + one credit number per resolution (ARCHITECTURE §5, §10). Each box shows its
-// floor; a number under it is flagged here and refused again by the server.
+// floor; a number under it is flagged here and refused again by the server. 「提供」 picks which
+// tiers the template offers at all (at least one); an unticked tier is closed for sale.
 export function TemplatePriceFields({ values, floor, modelField, onChange }: Props) {
   const problems = creditProblems(values, floor)
   return (
@@ -44,12 +46,15 @@ export function TemplatePriceFields({ values, floor, modelField, onChange }: Pro
       <div className="grid grid-cols-3 gap-3">
         {RESOLUTIONS.map((resolution) => (
           <div key={resolution} className="grid gap-1.5">
-            <Label htmlFor={`tpl-credits-${resolution}`}>{`${TIER_LABEL[resolution]} 积分`}</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor={`tpl-credits-${resolution}`}>{`${TIER_LABEL[resolution]} 积分`}</Label>
+              <OfferedBox values={values} floor={floor} resolution={resolution} onChange={onChange} />
+            </div>
             <Input
               id={`tpl-credits-${resolution}`}
               inputMode="numeric"
               aria-invalid={problems[resolution] ? true : undefined}
-              disabled={unsupportedTier(floor, resolution)}
+              disabled={unsupportedTier(floor, resolution) || !values.credits[resolution].trim()}
               placeholder={unsupportedTier(floor, resolution) ? '不可用' : '未定价，此档不售'}
               value={unsupportedTier(floor, resolution) ? '' : values.credits[resolution]}
               onChange={(event) => onChange({ credits: { ...values.credits, [resolution]: event.target.value } })}
@@ -64,5 +69,19 @@ export function TemplatePriceFields({ values, floor, modelField, onChange }: Pro
         ))}
       </div>
     </fieldset>
+  )
+}
+
+type OfferedProps = Pick<Props, 'values' | 'floor' | 'onChange'> & { resolution: Resolution }
+
+function OfferedBox({ values, floor, resolution, onChange }: OfferedProps) {
+  if (unsupportedTier(floor, resolution)) return null
+  const offered = values.credits[resolution].trim() !== ''
+  return (
+    <label className="flex items-center gap-1 text-xs">
+      <input type="checkbox" checked={offered} aria-label={`提供 ${TIER_LABEL[resolution]}`}
+        onChange={(event) => onChange({ credits: withOffered(values.credits, resolution, event.target.checked, values.storedCredits) })} />
+      提供
+    </label>
   )
 }

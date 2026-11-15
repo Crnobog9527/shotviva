@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { createMemoryStore } from '../../../tests/fakes/memory-store'
 import { loadInputImage, normalizeInputImage } from './input-image'
 import { MATTE_DARK, MATTE_WHITE, matteFor } from './rules'
-import { opaqueWebp } from './see-through'
+import { opaquePng, opaqueWebp } from './see-through'
 
 // A 64² transparent canvas with a 32² opaque square in the middle: a logo exported with alpha.
 async function logo(color: { r: number; g: number; b: number }, format: 'png' | 'webp' = 'png'): Promise<Uint8Array> {
@@ -67,5 +67,26 @@ describe('transparent uploads sent to the model (2026-11-14 black-logo bug)', ()
     expect(await opaqueWebp(opaque)).toBe(opaque)
     const junk = Uint8Array.of(1, 2, 3)
     expect(await opaqueWebp(junk)).toBe(junk)
+  })
+})
+
+describe('opaquePng (generated results)', () => {
+  it('drops the alpha channel, laying see-through areas on the upload ground', async () => {
+    const flattened = await opaquePng(await logo(NAVY))
+    expect(await sharp(flattened).metadata()).toMatchObject({ format: 'png', hasAlpha: false, width: 64, height: 64 })
+    const corner = await pixel(flattened, 2, 2)
+    expect(Math.min(corner.r, corner.g, corner.b)).toBeGreaterThan(245)
+  })
+
+  it('drops an alpha channel that is fully opaque', async () => {
+    const solid = new Uint8Array(await sharp({ create: { width: 8, height: 8, channels: 4, background: { ...NAVY, alpha: 1 } } }).png().toBuffer())
+    expect((await sharp(await opaquePng(solid)).metadata()).hasAlpha).toBe(false)
+  })
+
+  it('returns an image without alpha, or one that will not decode, as the same bytes', async () => {
+    const rgb = new Uint8Array(await sharp({ create: { width: 8, height: 8, channels: 3, background: NAVY } }).png().toBuffer())
+    expect(await opaquePng(rgb)).toBe(rgb)
+    const junk = Uint8Array.of(1, 2, 3)
+    expect(await opaquePng(junk)).toBe(junk)
   })
 })

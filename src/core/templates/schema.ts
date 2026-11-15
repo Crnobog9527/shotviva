@@ -4,7 +4,7 @@ import { styleRefsSchema } from './style-refs'
 import { creditsCostSchema, TEMPLATE_QUALITIES } from './pricing'
 import { RESERVED_KEYS, toggleFieldSchema, TOGGLES_MAX } from './toggles'
 import { COPY_FIELDS_MAX, copyFieldSchema } from './copy-fields'
-import { imageSlotsSchema, slotShapeProblems } from './image-slots'
+import { IMAGE_SLOTS_MAX, imageSlotsSchema, slotShapeProblems } from './image-slots'
 import { fieldGroupsSchema, groupShapeProblems } from './field-groups'
 import { posterFieldsSchema } from '../poster/template'
 import { resolutionSchema } from './db-resolution'
@@ -25,10 +25,14 @@ const slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'lowercase letters, di
 
 export const templateFieldsSchema = z
   .object({
-    // slots (§5.1e): named upload boxes; with them max = slots and min = required slots.
-    images: z.object({ min: z.number().int().min(0).max(4), max: z.number().int().min(0).max(4), slots: imageSlotsSchema.optional() }),
+    // slots (§5.1e): named upload boxes; with them max = slots and min = required slots. Without
+    // slots a template takes at most four photos; with them up to IMAGE_SLOTS_MAX boxes.
+    images: z.object({ min: z.number().int().min(0).max(IMAGE_SLOTS_MAX), max: z.number().int().min(0).max(IMAGE_SLOTS_MAX), slots: imageSlotsSchema.optional() })
+      .refine((images) => images.slots !== undefined || images.max <= 4, { message: 'a template without image slots takes at most 4 photos', path: ['max'] }),
     copy: z.array(copyFieldSchema).max(COPY_FIELDS_MAX).default([]),
     aspectRatios: z.array(z.string().regex(/^\d{1,2}:\d{1,2}$/)).min(1),
+    // On (1554): the site offers exactly these ratios the bound line supports, and no 「跟随照片」.
+    lockAspectRatios: z.boolean().optional(),
     // Optional on/off choices (T89), off by default; their prompt text is private.
     toggles: z.array(toggleFieldSchema).max(TOGGLES_MAX).default([]),
     // A dense-text poster template (ARCHITECTURE §5.3): its text comes from the confirmed content

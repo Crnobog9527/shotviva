@@ -38,3 +38,16 @@ describe('edit template form', () => {
     expect(toSaveInput({ ...form, reframe: '  ' }).params).not.toHaveProperty('reframe')
   })
 })
+
+describe('edit template 「出图模型」', () => {
+  const line = '00000000-0000-4000-8000-0000000000a1'
+  it('opens on the stored line, null following the default line, and saves what was chosen', () => {
+    expect(formFor(settings).providerId).toBeNull()
+    const form = { ...formFor({ ...settings, providerId: line }), classifier: 'c' }
+    expect(form.providerId).toBe(line)
+    expect(toSaveInput(form)).toMatchObject({ providerId: line })
+    expect(toSaveInput({ ...form, providerId: null })).toMatchObject({ providerId: null })
+    expect(saveEditTemplateSchema.safeParse(toSaveInput(form)).success).toBe(true)
+    expect(saveEditTemplateSchema.safeParse({ ...toSaveInput(form), providerId: 'not-a-line' }).success).toBe(false)
+  })
+})

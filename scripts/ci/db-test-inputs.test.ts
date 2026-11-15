@@ -36,7 +36,7 @@ describe('db-test-inputs', () => {
     expect(needs('src/app/[locale]/(marketing)/page.tsx', 'src/site/messages/en.json')).toBe(false)
     expect(needs('src/app/globals.css', 'public/og.png', 'README.md')).toBe(false)
     expect(needs('scripts/qa/reset.ts', 'scripts/seo-check.ts')).toBe(false)
-    expect(needs('.github/workflows/lighthouse.yml')).toBe(false)
+    expect(needs('lighthouserc.json')).toBe(false)
     expect(dbTestClosure(root).has('src/app/layout.tsx')).toBe(false)
   })
 

@@ -2,6 +2,7 @@ import { getImageProps, type ImageLoader } from 'next/image'
 import { preconnect } from 'react-dom'
 
 import { publicEnv } from '../public-env'
+import { capSrcSet } from './srcset-cap'
 
 // A template cover at the size it is shown: the image optimiser's srcset for the slot `sizes`
 // describes (AVIF / WebP, next.config.ts) instead of the stored file, which is up to 1600 px on
@@ -29,7 +30,8 @@ export function coverImage(url: string, sizes: string, base?: string, cdn: strin
   // (React hoists this into <head>; repeated calls collapse into one link).
   if (cdn) preconnect(cdn)
   const { props } = getImageProps({ src: url, alt: '', fill: true, sizes, ...(cdn ? { loader: cdnLoader(cdn) } : {}) })
-  return { sizes: props.sizes, srcSet: props.srcSet, src: props.src }
+  // Without the candidates no screen up to 2× picks (srcset-cap.ts).
+  return capSrcSet({ sizes: props.sizes, srcSet: props.srcSet, src: props.src }, sizes)
 }
 
 // Next's own default-loader URL (url, w, q in that order; covers are remote, so no dpl), on the
