@@ -47,6 +47,17 @@ describe('resolveProvider', () => {
     expect((await resolveProvider('image', row, env, drops, async () => RELAY_KEY)).honoursBackground).toBeUndefined()
   })
 
+  it("keeps the adapter's input check, so a rebuilt food call is checked against the routed model (§5.1c)", async () => {
+    const accepts = vi.fn(() => false)
+    const env = parseServerEnv({})
+    const checks: ProviderAdapters = { openai_images: () => ({ id: 'relay', accepts, generate: vi.fn() }) }
+    const request = { resolution: '1k' as const, aspectRatio: '4:3', referenceCount: 1 }
+    expect((await resolveProvider('image', row, env, checks, async () => RELAY_KEY)).accepts?.(request)).toBe(false)
+    expect(accepts).toHaveBeenCalledWith(request)
+    const plain: ProviderAdapters = { openai_images: () => ({ id: 'relay', generate: vi.fn() }) }
+    expect((await resolveProvider('image', row, env, plain, async () => RELAY_KEY)).accepts).toBeUndefined()
+  })
+
   it('falls back to OPENAI_* when no provider is active, without reading Vault', async () => {
     const { adapters, configs } = recordingAdapters()
     const readKey = vi.fn(async () => null)

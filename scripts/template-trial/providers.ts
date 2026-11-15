@@ -6,6 +6,7 @@ import { openRouterImageParameters } from '../../src/core/providers/openrouter-c
 import { findProviderRow, loadActiveProviderRow } from '../../src/core/providers/repository'
 import type { ProviderModule } from '../../src/core/providers/types'
 import { identityJudge } from '../../src/modules/image/edit/classifier-provider'
+import { scriptFoodDeps } from '../../src/modules/image/food/food-deps'
 import { IMAGE_ADAPTERS } from '../../src/modules/image/provider'
 import { refuseFallback } from './bound-provider'
 import type { EstimateSource } from './estimate'
@@ -35,5 +36,5 @@ export function scriptProviders(db: SupabaseClient) {
     const provider = await resolveProvider('image', row, serverEnv(), IMAGE_ADAPTERS, readKey)
     return { prices: provider.prices, estimatedImageCosts: row.estimatedImageCosts }
   }
-  return { provider, bound, judge: () => identityJudge(loadRow) }
+  return { provider, bound, judge: () => identityJudge(loadRow), food: scriptFoodDeps(db, loadRow) }
 }

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { FOOD_PLACEHOLDERS, foodFlowProblems } from './food-flow'
+
 // Optional on/off choices a template offers (ARCHITECTURE §5 `fields.toggles`, T89), the first
 // one "Upgrade plating & tableware". What each state says to the model lives in the private
 // template_prompts.model_params.toggles.<key>.on / .off, never in the public row. No
@@ -10,7 +12,7 @@ export const TOGGLES_MAX = 3
 export const FIELD_KEY = /^[a-z][a-z0-9_]*$/
 
 // Placeholders renderPrompt fills itself; a toggle or copy field may not take these names.
-export const RESERVED_KEYS = ['aspect_ratio', 'photo_count', 'style_ref_count', 'image_slots'] as const
+export const RESERVED_KEYS = ['aspect_ratio', 'photo_count', 'style_ref_count', 'image_slots', ...FOOD_PLACEHOLDERS] as const
 
 // The dialog shown before a toggle can be turned on. The text is the template's own data (per
 // template, per language), never hard-coded per category.
@@ -50,13 +52,14 @@ export function toggleFragments(modelParams: Record<string, unknown>): ToggleFra
 }
 
 // What the image provider gets of model_params: everything but the fragments, which only feed
-// renderPrompt, and a poster template's private extraction and checking instructions
-// (ARCHITECTURE §5.3), which only the text model reads.
+// renderPrompt, a poster template's private extraction and checking instructions
+// (ARCHITECTURE §5.3), which only the text model reads, and a food template's flow prompts (§5.1c).
 export function providerParams(modelParams: Record<string, unknown>): Record<string, unknown> {
   const rest = { ...modelParams }
   delete rest.toggles
   delete rest.poster_extract
   delete rest.poster_check
+  delete rest.food_flow
   return rest
 }
 
@@ -68,7 +71,8 @@ const hasPlaceholder = (body: string, key: string) => new RegExp(`\\{\\{\\s*${ke
 // shows them (DESIGN §7).
 export function toggleSetupProblems(toggles: readonly ToggleField[], body: string, modelParams: Record<string, unknown>): string[] {
   const fragments = toggleFragments(modelParams)
-  return toggles.flatMap((toggle) => {
+  const flow = foodFlowProblems(toggles.map((toggle) => toggle.key), modelParams)
+  return [...flow, ...toggles.flatMap((toggle) => {
     const problems: string[] = []
     if (!hasPlaceholder(body, toggle.key)) problems.push(`开关 ${toggle.key}：提示词正文里没有占位符 {{${toggle.key}}}`)
     const own = fragments[toggle.key]
@@ -76,5 +80,5 @@ export function toggleSetupProblems(toggles: readonly ToggleField[], body: strin
     if (!own?.off.trim()) problems.push(`开关 ${toggle.key}：缺「关」那段（model_params.toggles.${toggle.key}.off）`)
     if (own && (own.on.includes('{{') || own.off.includes('{{'))) problems.push(`开关 ${toggle.key}：「开」「关」两段里不能有 {{ 占位符`)
     return problems
-  })
+  })]
 }
