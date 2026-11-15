@@ -1023,6 +1023,7 @@
       "slots": {
         "upload": "Upload image",
         "oneAtATime": "This template makes one image at a time.",
+        "nameOnly": "Prizes without a photo are drawn as the real product their name describes. To match yours exactly, upload a photo.",
         "remove": "Remove",
         "replace": "Replace"
       },
