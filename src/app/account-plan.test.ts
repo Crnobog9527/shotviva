@@ -179,6 +179,40 @@ describe('account Plan card without a card subscription', () => {
   })
 })
 
+// Waffo drill 2026-11-15: Starter card subscription cancelled at period end, then Pro bought
+// once by Alipay. The card shows Pro until paid_until, on Stripe and Waffo alike.
+describe('account Plan card after an upgrade by a one-time method', () => {
+  const last = lastMembership([{ productId: 'starter_monthly', method: 'card' }, { productId: 'pro_monthly', method: 'alipay' }], site.billing.products)
+  const ids = (provider: 'stripe' | 'waffo') => (provider === 'stripe' ? { provider, stripeSubscriptionId: 'sub_s', waffoOrderId: null } : { provider, stripeSubscriptionId: null, waffoOrderId: 'ORD_s' })
+
+  it.each(['stripe', 'waffo'] as const)('the old plan cancelling: Pro, ends at paid_until, no Starter (%s)', async (provider) => {
+    const oldStarter = row({ ...ids(provider), productId: 'starter_monthly', currentPeriodEnd: days(9), cancelAtPeriodEnd: true })
+    for (const locale of ['en', 'zh'] as const) {
+      const { html, text } = await render(summarize([oldStarter], days(69), 'pro'), locale, 38, last)
+      expect(html).toContain('data-plan="wallet"')
+      expect(html).toContain('data-tier="pro"')
+      expect(text).not.toMatch(/Starter|入门版|Nov 15|11月15日|Cancel subscription|取消订阅/)
+    }
+    expect((await render(summarize([oldStarter], days(69), 'pro'), 'en', 38, last)).text).toContain('Member Ends Jan 14, 2027 Pro')
+  })
+
+  it('the old plan still renewing (Stripe): a secondary line and Manage subscription', async () => {
+    const oldStarter = row({ ...ids('stripe'), productId: 'starter_monthly', currentPeriodEnd: days(9) })
+    const { html, text } = await render(summarize([oldStarter], days(69), 'pro'), 'en', 38, last)
+    expect(text).toContain('Member Ends Jan 14, 2027 Pro')
+    expect(text).toContain('Your earlier Starter card subscription is still set to renew on Nov 15, 2026.')
+    expect(buttons(html)).toContain('Manage subscription')
+  })
+
+  it('the old plan still renewing (Waffo): a secondary line and our Cancel subscription', async () => {
+    const oldStarter = row({ ...ids('waffo'), productId: 'starter_monthly', currentPeriodEnd: days(9) })
+    const { html, text } = await render(summarize([oldStarter], days(69), 'pro'), 'zh', 38, last)
+    expect(html).toContain('data-tier="pro"')
+    expect(text).toContain('你之前的入门版卡订阅仍会在 2026年11月15日 自动续费。')
+    expect(buttons(html)).toContain('取消订阅')
+  })
+})
+
 // Gap audit C12: the active card names how the plan is paid, as account.html does.
 describe('account Plan card payment method (gap audit C12)', () => {
   const paidWith = (productId: string, method: 'card' | 'alipay' | 'cn_card') => lastMembership([{ productId, method, grantedCredits: 50 }], site.billing.products)
