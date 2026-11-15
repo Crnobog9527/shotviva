@@ -32,3 +32,23 @@ describe('pageUploads with a QR code', () => {
     expect(pageUploads({ poster: withQr }, 'rules', uploads)).toEqual({ qr_code: 'inputs/u/q.png' })
   })
 })
+
+// The organiser logo (listed by both pages) goes with both pages when uploaded, and with none
+// when left empty (Owner 2026-11-15: 不传就不放 Logo).
+describe('pageUploads with an organiser logo', () => {
+  const withLogo = posterFieldsSchema.parse({ kinds: [
+    { key: 'prizes', name, blocks: ['header', 'prizes', 'footer'], slots: ['logo', 'prize_photo'] },
+    { key: 'rules', name, blocks: ['header', 'sections', 'table', 'footer'], slots: ['logo'] },
+  ], qr: { slot: 'qr_code', fallback: { x: 0.05, y: 0.86, size: 0.12 } } })
+
+  it('sends the logo with every page', () => {
+    const uploads = { logo: 'inputs/u/l.png', qr_code: 'inputs/u/q.png' }
+    expect(pageUploads({ poster: withLogo }, 'prizes', uploads)).toEqual(uploads)
+    expect(pageUploads({ poster: withLogo }, 'rules', uploads)).toEqual(uploads)
+  })
+
+  it('sends nothing for a set without a logo', () => {
+    expect(pageUploads({ poster: withLogo }, 'prizes', {})).toBeNull()
+    expect(pageUploads({ poster: withLogo }, 'rules', { prize_photo: 'inputs/u/a.webp' })).toBeNull()
+  })
+})
