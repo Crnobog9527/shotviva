@@ -151,7 +151,8 @@ describe('batch edit of templates', () => {
     expect(saved).toEqual({ changed: 2, failures: [] })
     for (const id of pair) expect(await closed(id)).toEqual(['2k', '4k'])
     const none = await bulkEditTemplates(client, admin, { ids: pair, patch: { closeResolutions: ['1k'] } }, CREDITS_FLOOR)
-    expect(none.failures).toEqual(pair.map((id) => ({ id, name: id, reason: 'no_tier' })))
+    // The SQL union gives no order across templates.
+    expect([...none.failures].sort((a, b) => a.id.localeCompare(b.id))).toEqual(pair.map((id) => ({ id, name: id, reason: 'no_tier' })))
     expect(await closed(ids[4]!)).toEqual(['2k', '4k'])
     await expect(bulkEditTemplates(client, admin, { ids: pair, patch: { creditsCost: { '2k': 4 }, closeResolutions: ['2k'] } }, CREDITS_FLOOR))
       .rejects.toMatchObject({ code: 'INVALID_INPUT' })
