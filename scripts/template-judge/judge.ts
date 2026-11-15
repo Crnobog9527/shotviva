@@ -171,7 +171,10 @@ async function lookWithRetry(job: Job, ctx: JudgeContext, images: JudgeImage[]) 
 
 export async function judgeJob(job: Job, ctx: JudgeContext): Promise<JobResult> {
   const cached = ctx.ledger.verdicts[job.hash]
-  if (cached) return { job, outcome: 'reused', verdict: cached }
+  if (cached) {
+    ctx.ledger.current[job.record.runId] = job.hash
+    return { job, outcome: 'reused', verdict: cached }
+  }
   if (ctx.stopped) return { job, outcome: 'skipped', code: ctx.stopped }
   try {
     const result = await ctx.images.file(job.sources.result)
@@ -200,6 +203,7 @@ function toVerdict(job: Job, items: VerdictItem[], ctx: JudgeContext, costUsd: n
     at: (ctx.now ?? (() => new Date().toISOString()))(),
   }
   ctx.ledger.verdicts[job.hash] = verdict
+  ctx.ledger.current[record.runId] = job.hash
   return verdict
 }
 

@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import sharp from 'sharp'
@@ -9,9 +11,10 @@ import { buildPage } from '../template-trial/page'
 import { planCells, runIdOf, type Cell } from '../template-trial/cells'
 import type { TrialState } from '../template-trial/results'
 import type { AdminTemplate } from '../../src/core/admin/templates/types'
-import { checklistFor, defaultAlpha } from './checklist'
+import { checklistFor, defaultAlpha, EXPECTED_TEXT_PART, textItems } from './checklist'
 import { judgeAll, judgeJob, jobHash, planJobs, recordOf, type ImageReader, type Job, type JudgeContext } from './judge'
 import { judgeSummary, latestByRun, spentUsd, type JudgeLedger } from './ledger'
+import { LOCK_FILE, lockLedger } from './lock'
 import { judgeCostUsd, judgeEstimateUsd, readAnswer, requestBody } from './model'
 import { alphaCheck, qrCheck, readQr } from './pixels'
 
@@ -54,7 +57,7 @@ async function setup(options: { bar?: string[]; fetch: ReturnType<typeof fakeFet
   const result = options.result ?? await png()
   const job: Job = { ...planned[0], hash: jobHash(result, planned[0].cell, planned[0].sources, planned[0].checklist, 'line') }
   const reader: ImageReader = { file: vi.fn(async () => result), cover: vi.fn(async () => png()), ref: vi.fn(async () => png()) }
-  const ledger: JudgeLedger = { version: 1, verdicts: {}, spend: [] }
+  const ledger: JudgeLedger = { version: 1, verdicts: {}, spend: [], current: {} }
   const ctx: JudgeContext = { line: { tag: 'line', prices: PRICES, config: { apiKey: 'k', model: 'gpt-x', baseUrl: 'https://judge.test/v1', fetch: options.fetch } },
     images: reader, ledger, budgetUsd: options.budget ?? 1, spentUsd: 0, reservedUsd: 0, sleep: async () => {}, now: () => '2026-11-15T01:00:00Z' }
   return { batch, cells, state, job, ctx, reader, ledger }
@@ -67,6 +70,16 @@ describe('checklist', () => {
     expect(list.items.map(i => i.id)).toEqual(['1', '2', '3', '4', '5'])
     expect(list.alpha).toBe('opaque')
     expect(list.qr).toBeNull()
+  })
+
+  it('checks every character of a long copy field, in ordered parts', () => {
+    const long = 'A'.repeat(EXPECTED_TEXT_PART) + 'B'.repeat(EXPECTED_TEXT_PART) + 'tail'
+    const items = textItems(long)
+    expect(items).toHaveLength(3)
+    expect(items[2]).toContain('part 3 of 3')
+    expect(items.map(item => /"([^"]*)"$/.exec(item)![1]).join('')).toBe(long)
+    expect(textItems('  ')).toEqual([])
+    expect(textItems('Grand Final')).toEqual(['The image shows the text "Grand Final" exactly as written, every character correct.'])
   })
 
   it('expects a cut-out only from a template that asks for a transparent background', () => {
@@ -156,6 +169,19 @@ describe('judging a result', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
+  it('shows the verdict the last run used, also when it reused an older one', async () => {
+    const answer = (pass: boolean) => responsesBody([{ id: '1', pass, reason: 'a' }, { id: '2', pass: true, reason: 'b' }, { id: '3', pass: true, reason: 'c' }])
+    const { job, ctx, ledger } = await setup({ fetch: fakeFetch(answer(true), answer(false)) })
+    const other = { ...job, hash: 'checklist-b' }
+    let clock = 0
+    ctx.now = () => `2026-11-15T0${clock++}:00:00Z`
+    await judgeJob(job, ctx)
+    await judgeJob(other, ctx)
+    expect(latestByRun(ledger).get(job.record.runId)?.pass).toBe(false)
+    expect(await judgeJob(job, ctx)).toMatchObject({ outcome: 'reused' })
+    expect(latestByRun(ledger).get(job.record.runId)?.pass).toBe(true)
+  })
+
   it('a different result, checklist or judge model is a new verdict', async () => {
     const { job } = await setup({ fetch: fakeFetch(500) })
     expect(jobHash(await png(0.5), job.cell, job.sources, job.checklist, 'line')).not.toBe(job.hash)
@@ -221,5 +247,19 @@ describe('where verdicts show', () => {
     expect(html).toContain('✓ The dish matches the photo.')
     expect(judgeSummary([job.record.runId, 'other'], latest)).toBe('✓0 ✗1 未判 1')
     expect(judgeSummary([], latest)).toBe('无结果')
+  })
+})
+
+describe('the ledger lock', () => {
+  it('lets one paid run at a time use a ledger, takes over a dead run\'s lock, and lets go', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'judge-lock-'))
+    const unlock = await lockLedger(root)
+    await expect(lockLedger(root)).rejects.toThrow(/另一个 templates:judge 正在用/)
+    await unlock()
+    expect(existsSync(join(root, LOCK_FILE))).toBe(false)
+    await writeFile(join(root, LOCK_FILE), '999999')
+    const again = await lockLedger(root, () => false)
+    expect(readFileSync(join(root, LOCK_FILE), 'utf8')).toBe(String(process.pid))
+    await again()
   })
 })

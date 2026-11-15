@@ -30,14 +30,19 @@ const spendSchema = z.object({
 })
 export type SpendLine = z.infer<typeof spendSchema>
 
-const ledgerSchema = z.object({ version: z.literal(1), verdicts: z.record(z.string(), verdictSchema), spend: z.array(spendSchema) })
+const ledgerSchema = z.object({
+  version: z.literal(1), verdicts: z.record(z.string(), verdictSchema), spend: z.array(spendSchema),
+  // Run id → the hash of the verdict the last judge run used for it, judged or reused. Absent in
+  // files written before it existed: those fall back to the newest verdict.
+  current: z.record(z.string(), z.string()).default({}),
+})
 export type JudgeLedger = z.infer<typeof ledgerSchema>
 
 export const LEDGER_FILE = 'judge.json'
 
 export async function readLedger(root: string): Promise<JudgeLedger> {
   const path = join(root, LEDGER_FILE)
-  if (!existsSync(path)) return { version: 1, verdicts: {}, spend: [] }
+  if (!existsSync(path)) return { version: 1, verdicts: {}, spend: [], current: {} }
   const parsed = ledgerSchema.safeParse(JSON.parse(await readFile(path, 'utf8')))
   if (!parsed.success) throw new Error(`${path} 格式不对：先把它改名备份再重跑（已判过的会重新收费）`)
   return parsed.data
@@ -58,12 +63,17 @@ export function spentUsd(ledger: JudgeLedger, runIds?: Set<string>) {
   return ledger.spend.filter(line => !runIds || runIds.has(line.runId)).reduce((sum, line) => sum + lineUsd(line), 0)
 }
 
-// The newest verdict per trial run: what the review page and templates:status show.
+// The verdict per trial run that the review page and templates:status show: the one the last judge
+// run used (a re-used earlier verdict counts), else the newest.
 export function latestByRun(ledger: JudgeLedger): Map<string, Verdict> {
   const latest = new Map<string, Verdict>()
   for (const verdict of Object.values(ledger.verdicts)) {
     const seen = latest.get(verdict.runId)
     if (!seen || seen.at < verdict.at) latest.set(verdict.runId, verdict)
+  }
+  for (const [runId, hash] of Object.entries(ledger.current ?? {})) {
+    const verdict = ledger.verdicts[hash]
+    if (verdict) latest.set(runId, verdict)
   }
   return latest
 }

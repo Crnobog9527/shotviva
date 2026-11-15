@@ -36,6 +36,7 @@ import { readTrialState, trialsRoot } from '../template-trial/results'
 import { effectiveModels } from '../template-trial/setup'
 import { jobHash, judgeAll, planJobs, type ImageReader, type Job, type JobResult, type JudgeContext } from './judge'
 import { latestByRun, readLedger, writeLedger } from './ledger'
+import { lockLedger } from './lock'
 import { DEFAULT_EFFORT, EFFORTS, judgeEstimateUsd, type JudgeLine } from './model'
 
 const USAGE = '用法：pnpm templates:judge .local/<路径>/<批次文件>.json [--dry-run] [--only a,b] [--budget 0.2] [--concurrency 2] [--effort medium]'
@@ -149,8 +150,20 @@ async function main() {
   // The effort changes the answer, so it is part of the model a verdict is reused for.
   const model = `${judge.tag}@${p.options.effort}`
   const jobs = await withHashes(p, model, Boolean(privateStore))
+  if (p.options.dryRun) return dryRun(p, jobs, await readLedger(p.root), judge.prices)
+  // Held from reading the ledger until it is written back: two runs on the same .local/trials
+  // would otherwise pay for the same results and the last writer would drop the other's spend.
+  const unlock = await lockLedger(p.root)
+  try {
+    await judgeRun(p, judge, privateStore, jobs, model)
+  } finally {
+    await unlock()
+  }
+}
+
+async function judgeRun(p: Prepared, judge: Awaited<ReturnType<typeof judgeRow>>, privateStore: Awaited<ReturnType<typeof targetStores>>['privateStore'],
+  jobs: Job[], model: string) {
   const ledger = await readLedger(p.root)
-  if (p.options.dryRun) return dryRun(p, jobs, ledger, judge.prices)
   if (judgeEstimateUsd(1, judge.prices) === null) throw new RunError('判断线路没填价格（后台 /admin/providers），无法预留预算，没有调用模型')
   const apiKey = await readProviderKey(p.db, judge.row.id)
   if (!apiKey) throw new RunError('判断线路没有密钥，没有调用模型')
