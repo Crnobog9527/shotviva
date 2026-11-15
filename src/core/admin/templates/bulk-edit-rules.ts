@@ -83,7 +83,9 @@ export function bulkEditFailures(
       .map(v => ({ id, name, reason: 'below_floor' as const, ...v }))
     const web = webIncomplete(template, visibleIn)
     // At least one tier stays on offer (the editor's 「提供」 rule).
-    const none = unpriced.length === RESOLUTIONS.length ? [{ id, name, reason: 'no_tier' as const }] : []
+    // Counted against the resulting model: a priced tier it cannot make offers nothing.
+    const open = (prices.resolutions ?? RESOLUTIONS).filter(tier => !unpriced.includes(tier))
+    const none = patch.closeResolutions?.length && open.length === 0 ? [{ id, name, reason: 'no_tier' as const }] : []
     return [...low, ...none, ...(web ? [{ id, name, reason: 'web_incomplete' as const }] : [])]
   })
 }
