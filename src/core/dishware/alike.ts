@@ -42,3 +42,9 @@ export function looksAlike(shape: string, userDishware: string): boolean {
   return shares(families(shape, COLOURS), families(userDishware, COLOURS))
     && shares(families(shape, OUTLINES), families(userDishware, OUTLINES))
 }
+
+// Same colour family as the user's own vessel (Owner 2026-11-15: 「优先同色系、换器型」). With
+// looksAlike already ruled out, a vessel of the user's colour has a different form.
+export function sameColourFamily(shape: string, userDishware: string): boolean {
+  return shares(families(shape, COLOURS), families(userDishware, COLOURS))
+}
