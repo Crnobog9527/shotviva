@@ -27,6 +27,24 @@ describe('vessel pick (§5.1c)', () => {
     expect(pickVessel([items[0]!], 'long', () => 0)?.id).toBe('white-oval')
   })
 
+  it('prefers the user colour family with another form: a white oval platter gets a white teardrop or boat plate', () => {
+    const plate = (id: string, shape: string) => ({ ...item(id, 'long'), shape })
+    const items = [
+      plate('white-oval', 'A white oval plate'), plate('black-boat', 'A charcoal-black lacquer boat-shaped tray'),
+      plate('white-teardrop', 'A teardrop platter, satin ivory-white glaze'), plate('white-boat', 'A white boat-shaped dish'),
+    ]
+    const seen = new Set([0, 1].map((n) => pickVessel(items, 'long', (size) => { expect(size).toBe(2); return n }, 'A white oval platter')?.id))
+    expect(seen).toEqual(new Set(['white-teardrop', 'white-boat']))
+  })
+
+  it('draws from all that remain when the user vessel names no colour, or when its whole colour family is ruled out', () => {
+    const plate = (id: string, shape: string) => ({ ...item(id, 'long'), shape })
+    const items = [plate('white-oval', 'A white oval plate'), plate('black-boat', 'A black boat-shaped tray'), plate('green-leaf', 'A celadon leaf platter')]
+    expect(pickVessel(items, 'long', (size) => { expect(size).toBe(3); return 2 }, 'An oval platter')?.id).toBe('green-leaf')
+    expect(pickVessel(items, 'long', (size) => { expect(size).toBe(2); return 0 }, 'A white oval platter')?.id).toBe('black-boat')
+    expect(pickVessel([items[0]!], 'long', () => 0, 'A white oval platter')).toBeNull()
+  })
+
   it('reads a vessel once per process and retries a failed read', async () => {
     const r2 = createMemoryStore()
     await expect(readVesselBytes(r2.store, 'dishware/missing.webp')).rejects.toThrow()
