@@ -18,6 +18,14 @@ describe('decision route', () => {
       .toMatchObject({ module: 'decision', adapter: 'openai_responses', baseUrl: 'https://openrouter.ai/api/v1' })
   })
 
+  it('starts a new dish-reading row the same way: OpenRouter, Responses, no tiers to pick', () => {
+    const form = formFor(null, 'dish_read')
+    expect(form).toMatchObject({ module: 'dish_read', adapter: 'openai_responses', baseUrl: 'https://openrouter.ai/api/v1' })
+    const ready = { ...form, label: 'Reader', model: 'openai/gpt-6-sol', apiKey: 'sk-or-test-123456' }
+    expect(tierOptions(ready, null, undefined).selected).toEqual(['1k', '2k', '4k'])
+    expect(toSaveInput({ ...ready, resolutions: ['1k', '2k', '4k'] }, null)).toMatchObject({ module: 'dish_read', adapter: 'openai_responses', model: 'openai/gpt-6-sol' })
+  })
+
   it('opens a stored row by its address, and fills the table price for the openai/ name', () => {
     const router = formFor(row('https://openrouter.ai/api/v1/', 'openai/gpt-6-luna'))
     expect(decisionRoute(router)).toBe('openrouter')

@@ -544,8 +544,8 @@ CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     CONSTRAINT "ai_providers_key_pair" CHECK ((("vault_secret_id" IS NULL) = ("api_key_last4" IS NULL))),
     CONSTRAINT "ai_providers_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 80))),
     CONSTRAINT "ai_providers_model_check" CHECK ((("char_length"("model") >= 1) AND ("char_length"("model") <= 120))),
-    CONSTRAINT "ai_providers_module_adapter" CHECK (((("module" = 'image'::"text") AND ("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text", 'ark_images'::"text"]))) OR (("module" = 'decision'::"text") AND ("adapter" = 'openai_responses'::"text")))),
-    CONSTRAINT "ai_providers_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'decision'::"text"]))),
+    CONSTRAINT "ai_providers_module_adapter" CHECK (((("module" = 'image'::"text") AND ("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text", 'ark_images'::"text"]))) OR (("module" = ANY (ARRAY['decision'::"text", 'dish_read'::"text"])) AND ("adapter" = 'openai_responses'::"text")))),
+    CONSTRAINT "ai_providers_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'decision'::"text", 'dish_read'::"text"]))),
     CONSTRAINT "ai_providers_notes_check" CHECK ((("notes" IS NULL) OR ("char_length"("notes") <= 500))),
     CONSTRAINT "ai_providers_prices_nonnegative" CHECK (((COALESCE("price_input_text_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_input_image_per_m", (0)::numeric) >= (0)::numeric) AND (COALESCE("price_output_per_m", (0)::numeric) >= (0)::numeric))),
     CONSTRAINT "ai_providers_resolutions_check" CHECK ((("cardinality"("resolutions") > 0) AND ("array_ndims"("resolutions") = 1) AND ("resolutions" <@ ARRAY['1k'::"text", '2k'::"text", '4k'::"text"])))
@@ -7960,7 +7960,7 @@ begin
      or (p_capabilities->>'fetchedAt')::timestamptz is null) then
     raise exception 'INVALID_PROVIDER_CAPABILITIES' using errcode='23514';
   end if;
-  if p_settings->>'module'='decision' then v_tiers := array['1k','2k','3k']; end if;
+  if p_settings->>'module' in ('decision','dish_read') then v_tiers := array['1k','2k','3k']; end if;
   if p_id is null then
     if p_key is null then raise exception 'PROVIDER_KEY_REQUIRED'; end if;
     insert into public.ai_providers (module,adapter,label,base_url,model,notes,updated_by,capabilities,resolutions,

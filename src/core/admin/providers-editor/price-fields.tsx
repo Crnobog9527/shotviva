@@ -4,6 +4,8 @@ import { catalogTokenPrices, type CatalogPricing } from '@/core/templates/catalo
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 
+import { isTextModule } from '@/core/providers/types'
+
 import { PROVIDERS_COPY } from './copy'
 import { MODULE_PRICE_FIELDS, priceOrigin, type PriceField, type PriceOrigin, type ProviderForm } from './form-state'
 
@@ -20,7 +22,7 @@ function originText(origin: PriceOrigin): string | null {
 
 function priceLabel(form: ProviderForm, field: PriceField): string {
   if (form.adapter === 'openrouter_images') return field === 'priceOutputPerM' ? COPY.routerOutput : COPY.routerInput
-  return form.module === 'decision' && field === 'priceOutputPerM' ? COPY.priceTextOutputPerM : COPY[field]
+  return isTextModule(form.module) && field === 'priceOutputPerM' ? COPY.priceTextOutputPerM : COPY[field]
 }
 
 // The module's per-million-token prices (T33): three for images, input / output for decisions. Free text so a half-typed decimal is not fought;

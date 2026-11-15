@@ -52,7 +52,7 @@ async function readDish(food: FoodDeps, reader: DishReader | null, instructions:
 async function vesselFor(store: ObjectStore, food: FoodDeps, reading: DishReading | null, toggles: FoodToggles) {
   if (!reading || !toggles.tableware || !isLibraryCategory(reading.category)) return null
   try {
-    const item = pickVessel(await food.vessels(), reading.category, food.random)
+    const item = pickVessel(await food.vessels(), reading.category, food.random, reading.dishware)
     if (!item) return null
     const image: ProviderImage = { bytes: await readVesselBytes(store, item.imageKey), contentType: 'image/webp', width: item.width, height: item.height }
     return { item, image }

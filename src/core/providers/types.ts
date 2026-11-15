@@ -5,9 +5,14 @@ import type { GenerationProvider, ProviderPrices } from '../jobs'
 
 // Provider settings (ARCHITECTURE §3.3). Mirrors the checks on public.ai_providers.
 
-// 'decision' classifies what an edit instruction changes (ARCHITECTURE §5.2, T30).
-export const PROVIDER_MODULES = ['image', 'decision'] as const
+// 'decision' classifies what an edit instruction changes (ARCHITECTURE §5.2, T30). 'dish_read' reads
+// the user's dish photo for the food templates' toggle flows (§5.1c), on its own model so the
+// judge keeps its cheaper one; without an active row the reading uses the 'decision' row.
+export const PROVIDER_MODULES = ['image', 'decision', 'dish_read'] as const
 export type ProviderModule = (typeof PROVIDER_MODULES)[number]
+
+// Lines that answer in text over the Responses API (no image output, no tiers, token prices).
+export const isTextModule = (module: ProviderModule): boolean => module !== 'image'
 
 // Code adapters a row can name. A vendor with a different API shape is a new adapter (code),
 // not an admin setting.
@@ -17,12 +22,14 @@ export type ProviderAdapterId = (typeof PROVIDER_ADAPTERS)[number]
 export const MODULE_ADAPTERS: Record<ProviderModule, readonly ProviderAdapterId[]> = {
   image: ['openai_images', 'openrouter_images', 'ark_images'],
   decision: ['openai_responses'],
+  dish_read: ['openai_responses'],
 }
 
 // Default for new rows.
 export const MODULE_ADAPTER: Record<ProviderModule, ProviderAdapterId> = {
   image: 'openai_images',
   decision: 'openai_responses',
+  dish_read: 'openai_responses',
 }
 
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'

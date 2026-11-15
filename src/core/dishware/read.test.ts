@@ -18,6 +18,15 @@ describe('vessel pick (§5.1c)', () => {
     expect(pickVessel([item('d', 'long', false)], 'long')).toBeNull()
   })
 
+  it('skips a vessel that looks like the user own and draws again within the category, none when only those remain', () => {
+    const plate = (id: string, shape: string) => ({ ...item(id, 'long'), shape })
+    const items = [plate('white-oval', 'A white oval plate with a wide rim'), plate('teardrop', 'A teardrop platter, satin ivory glaze')]
+    const user = 'A white oval platter'
+    for (const pick of [() => 0, () => 0]) expect(pickVessel(items, 'long', pick, user)?.id).toBe('teardrop')
+    expect(pickVessel([items[0]!], 'long', () => 0, user)).toBeNull()
+    expect(pickVessel([items[0]!], 'long', () => 0)?.id).toBe('white-oval')
+  })
+
   it('reads a vessel once per process and retries a failed read', async () => {
     const r2 = createMemoryStore()
     await expect(readVesselBytes(r2.store, 'dishware/missing.webp')).rejects.toThrow()

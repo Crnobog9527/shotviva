@@ -1,7 +1,7 @@
 import type { ProviderPrices } from '@/core/jobs'
 import { arkPrice } from '@/core/jobs/ark-prices'
 import { effectivePrices } from '@/core/jobs/model-prices'
-import type { ProviderAdapterId, ProviderModule } from '@/core/providers/types'
+import { isTextModule, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
 
 import { PROVIDERS_COPY as COPY } from './copy'
 import { missingPrices, pricesFromTable } from './form-state'
@@ -14,7 +14,7 @@ type Props = { adapter: ProviderAdapterId; prices: ProviderPrices; module: Provi
 // table (§10.0). Red with a warning when one it needs is in neither.
 export function PricesCell({ prices, module, model, adapter }: Props) {
   const shown = effectivePrices(model, prices) ?? prices
-  const priceModule = adapter === 'openrouter_images' ? 'decision' : module
+  const priceModule = adapter === 'openrouter_images' || isTextModule(module) ? 'decision' : module
   const missing = missingPrices(prices, priceModule, model)
   const fromTable = pricesFromTable(prices, priceModule, model)
   const text =
