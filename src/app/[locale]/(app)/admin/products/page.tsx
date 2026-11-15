@@ -4,22 +4,26 @@ import { CatalogTable, PRODUCTS_COPY } from '@/core/admin/products'
 import { E } from '@/core/admin/products/editor-copy'
 import { readPage, readEditor, readRelease } from '@/core/admin/products/editor-data'
 import { DraftForm } from '@/core/admin/products/editor-form'
-import { CatalogList, CatalogNotice, EditorView } from '@/core/admin/products/editor-view'
+import { CatalogList, CatalogNotice, EditorView, WaffoSeededNotice, WaffoSeededReview } from '@/core/admin/products/editor-view'
 import { archivable } from '@/core/admin/products/workflow'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { readProductCatalog } from '@/core/billing/product-catalog'
-import { paymentChannel } from '@/core/billing/waffo/config'
+import { paymentChannel, waffoConfig } from '@/core/billing/waffo/config'
 import { site } from '@/site/site.config'
-import { catalogAction } from './actions'
+import { catalogAction, waffoSeededAction } from './actions'
 
 export const instant = false
 export const metadata = { title: PRODUCTS_COPY.title }
-type Search = { sku?: string; after?: string; before?: string; beforeId?: string; release?: string; error?: string; done?: string }
+type Search = { waffo?: string; sku?: string; after?: string; before?: string; beforeId?: string; release?: string; error?: string; done?: string }
+
+function waffoConfigured() {
+  try { waffoConfig(); return true } catch { return false }
+}
 
 async function Listing({ actor, after }: { actor: string; after?: string }) {
   const db = createAdminSupabase()
   const rows = await readPage(db,actor,after ?? '')
-  if (rows) return <CatalogList rows={rows} />
+  if (rows) return <>{waffoConfigured() && <WaffoSeededReview action={waffoSeededAction} />}<CatalogList rows={rows} /></>
   return <><p>{E.migration}</p><CatalogTable rows={await readProductCatalog(db,site.billing.pricingVersion)} /></>
 }
 
@@ -36,7 +40,7 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
   const actor = await requireAdmin()
   const query = await searchParams
   return <AdminPage title={query.sku === 'new' ? E.create : query.sku || PRODUCTS_COPY.title}>
-    <CatalogNotice error={query.error} done={query.done} />
+    <CatalogNotice error={query.error} done={query.done} /><WaffoSeededNotice result={query.waffo} />
     {query.sku ? <Detail sku={query.sku} actor={actor.id} query={query} /> : <Listing actor={actor.id} after={query.after} />}
   </AdminPage>
 }
