@@ -1,13 +1,15 @@
 import { readFileSync, unlinkSync } from 'node:fs'
-import { mkdir, open, readFile, unlink } from 'node:fs/promises'
+import { mkdir, open, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { RunError } from '../template-apply/batch-file'
 
 // One paid templates:judge run per .local/trials at a time: judge.json is read, paid for and
 // written back as one transaction, so a second run must not start in between. The lock is a file
-// created exclusively, holding the owner's pid. A lock whose process is gone (killed, crashed) is
-// taken over; a live one stops the second run before it reads or spends anything.
+// created exclusively, holding the owner's pid; only that exclusive create ever takes it. A lock
+// whose process is gone (killed, crashed) is never taken over automatically: two runs could both
+// see it stale and one would delete the other's fresh lock. The run stops and says which file to
+// delete instead, which is fine for a local tool.
 
 export const LOCK_FILE = 'judge.lock'
 
@@ -21,26 +23,19 @@ const alive = (pid: number) => {
   }
 }
 
-async function create(path: string) {
-  const handle = await open(path, 'wx')
-  try { await handle.writeFile(String(process.pid)) } finally { await handle.close() }
-}
-
 export async function lockLedger(root: string, isAlive: (pid: number) => boolean = alive): Promise<() => Promise<void>> {
   await mkdir(root, { recursive: true })
   const path = join(root, LOCK_FILE)
   try {
-    await create(path)
+    const handle = await open(path, 'wx')
+    try { await handle.writeFile(String(process.pid)) } finally { await handle.close() }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
     const owner = Number((await readFile(path, 'utf8').catch(() => '')).trim())
     if (Number.isInteger(owner) && owner > 0 && isAlive(owner)) {
       throw new RunError(`另一个 templates:judge 正在用 ${root}（进程 ${owner}），等它结束再跑；没有调用模型`)
     }
-    // Left by a run that died: take it over. Another run doing the same at this instant loses the
-    // exclusive create below and stops.
-    await unlink(path).catch(() => undefined)
-    await create(path).catch(() => { throw new RunError(`另一个 templates:judge 刚刚开始用 ${root}，没有调用模型`) })
+    throw new RunError(`${path} 是上次中断的评审留下的锁（进程已不在）。确认没有别的 templates:judge 在跑后删掉这个文件再重跑；没有调用模型`)
   }
   // A second Ctrl-C exits at once (process.exit skips finally blocks): drop the lock on the way out.
   const onExit = () => {

@@ -251,15 +251,21 @@ describe('where verdicts show', () => {
 })
 
 describe('the ledger lock', () => {
-  it('lets one paid run at a time use a ledger, takes over a dead run\'s lock, and lets go', async () => {
+  it('lets one paid run at a time use a ledger and lets go', async () => {
     const root = await mkdtemp(join(tmpdir(), 'judge-lock-'))
     const unlock = await lockLedger(root)
     await expect(lockLedger(root)).rejects.toThrow(/另一个 templates:judge 正在用/)
     await unlock()
     expect(existsSync(join(root, LOCK_FILE))).toBe(false)
-    await writeFile(join(root, LOCK_FILE), '999999')
-    const again = await lockLedger(root, () => false)
+    const again = await lockLedger(root)
     expect(readFileSync(join(root, LOCK_FILE), 'utf8')).toBe(String(process.pid))
     await again()
+  })
+
+  it('never deletes a dead run\'s lock itself: it stops and names the file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'judge-lock-'))
+    await writeFile(join(root, LOCK_FILE), '999999')
+    await expect(lockLedger(root, () => false)).rejects.toThrow(/删掉这个文件/)
+    expect(readFileSync(join(root, LOCK_FILE), 'utf8')).toBe('999999')
   })
 })
