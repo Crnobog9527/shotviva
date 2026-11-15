@@ -662,6 +662,7 @@
     },
     "template": {
       "fromCredits": "{count} 积分起",
+      "fromCreditsSet": "{count} 积分起 · 一套 {images} 张",
       "cardAlt": "{name} 模板真实案例：左边是手机原图，右边是 AI 出图",
       "phone": "原图",
       "ai": "AI",
@@ -1402,6 +1403,7 @@
       }
     },
     "creditsUnit": "{count, plural, other {积分}}",
+    "creditsPerSet": "{count, plural, other {积分}} · 一套 {images} 张",
     "units": {
       "px": "{px, number, ::group-off} px",
       "size": "{width, number, ::group-off}×{height, number, ::group-off}",

@@ -662,6 +662,7 @@
     },
     "template": {
       "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
+      "fromCreditsSet": "from {count, plural, one {# credit} other {# credits}} · set of {images}",
       "cardAlt": "{name} template, real example: phone photo on the left, AI result on the right",
       "phone": "Phone",
       "ai": "AI",
@@ -1402,6 +1403,7 @@
       }
     },
     "creditsUnit": "{count, plural, one {credit} other {credits}}",
+    "creditsPerSet": "{count, plural, one {credit} other {credits}} · set of {images}",
     "units": {
       "px": "{px, number, ::group-off} px",
       "size": "{width, number, ::group-off}×{height, number, ::group-off}",

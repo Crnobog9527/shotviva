@@ -1,7 +1,7 @@
 import type { StyleRef } from '@/core/templates/style-refs'
 import { MISSING_COST, floorGuidance } from '@/core/templates/provider-pricing'
 import { unsupportedTier } from './tier-price'
-import { editablePrices, storedPrices } from './sale-tier-fields'
+import { editablePrices, offeredTiers, storedPrices } from './sale-tier-fields'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 import { approvedCredit, creditMinimum, type CreditsCost, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
 import { toggleFragments, toggleSetupProblems } from '@/core/templates/toggles'
@@ -212,6 +212,7 @@ export function buildPayload(values: TemplateFormValues, isNew: boolean, floor: 
   if (low.length > 0) {
     return { ok: false, message: low.map(([r, m]) => `${TIER_LABEL[r as Resolution]}：${m}`).join('；') }
   }
+  if (offeredTiers(values.credits, floor.resolutions).length === 0) return { ok: false, message: '至少提供一档清晰度（1K / 2K / 4K）' }
   const fields = parseJson(values.fieldsJson, '字段定义')
   if (!fields.ok) return fields
   const modelParams = parseJson(values.modelParamsJson, '模型参数')

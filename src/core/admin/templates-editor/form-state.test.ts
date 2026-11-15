@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { templateFieldsSchema } from '@/core/templates'
 
+import { offeredTiers, withOffered } from './sale-tier-fields'
 import { versionPatch } from './version-patch'
 import type { AdminTemplate } from '../templates/types'
 import { emptyCopyField } from './copy-form-state'
@@ -310,5 +311,19 @@ describe('cost floor of a slot template (§5.1e, migration 1310)', () => {
     const values = { ...toFormValues(template), credits: { '1k': '3', '2k': '8', '4k': '12' }, imageSlots: slots }
     expect(creditProblems(values, FLOOR)['1k']).toContain('4')
     expect(creditProblems({ ...values, credits: { '1k': '4', '2k': '8', '4k': '12' } }, FLOOR)).toEqual({})
+  })
+})
+
+describe('offered tiers (提供)', () => {
+  it('reads the offered tiers from the price boxes and toggles one back from the stored price', () => {
+    const fields = { '1k': '120', '2k': '', '4k': '' }
+    expect(offeredTiers(fields)).toEqual(['1k'])
+    expect(offeredTiers(fields, ['2k', '4k'])).toEqual([])
+    expect(withOffered(fields, '2k', true, { '1k': 120, '2k': 240, '4k': 360 })).toEqual({ '1k': '120', '2k': '240', '4k': '' })
+    expect(withOffered(fields, '1k', false)).toEqual({ '1k': '', '2k': '', '4k': '' })
+  })
+  it('refuses to save a template that offers no tier', () => {
+    const values = { ...toFormValues(template), credits: { '1k': '', '2k': '', '4k': '' } }
+    expect(buildPayload(values, false, FLOOR)).toEqual({ ok: false, message: '至少提供一档清晰度（1K / 2K / 4K）' })
   })
 })
