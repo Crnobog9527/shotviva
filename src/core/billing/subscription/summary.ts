@@ -19,23 +19,29 @@ export type MirrorRow = {
 
 export type SubscriptionState = 'active' | 'cancels' | 'past_due' | 'paused'
 
+// A card subscription still to be renewed. On Stripe "Manage subscription" opens the Portal; on
+// Waffo the card offers "Cancel subscription" (T50).
+export type SubscribedSummary = {
+  kind: 'subscription'
+  provider: SubscriptionProvider
+  productId: ProductId
+  tier: MembershipTier
+  interval: ProductInterval
+  state: SubscriptionState
+  // Renews on (active) or ends on (cancels): Stripe's current period end.
+  periodEnd: Date
+  // past_due: whether the paid period has already run out.
+  expired: boolean
+}
+
 export type SubscriptionSummary =
-  // A card subscription still to be renewed. On Stripe "Manage subscription" opens the Portal; on
-  // Waffo the card offers "Cancel subscription" (T50).
-  | {
-      kind: 'subscription'
-      provider: SubscriptionProvider
-      productId: ProductId
-      tier: MembershipTier
-      interval: ProductInterval
-      state: SubscriptionState
-      // Renews on (active) or ends on (cancels): Stripe's current period end.
-      periodEnd: Date
-      // past_due: whether the paid period has already run out.
-      expired: boolean
-    }
+  | SubscribedSummary
   // An Alipay period (or a cancelled subscription whose time is left): "Paid until …" + Renew.
-  | { kind: 'paid_until'; tier: MembershipTier | null; paidUntil: Date }
+  // stillBills: a card subscription of another tier that may still charge (an upgrade by a
+  // one-time method whose cancel of the old plan failed and was alerted), so the card can offer
+  // its Manage / Cancel button. Another tier's subscription that is already cancelling is not
+  // shown at all: it charges nothing more and paid_until already covers its period.
+  | { kind: 'paid_until'; tier: MembershipTier | null; paidUntil: Date; stillBills?: SubscribedSummary }
   // Membership ran out; paid credits stay usable (§6.2).
   | { kind: 'expired'; paidUntil: Date }
   | { kind: 'free' }
@@ -83,23 +89,34 @@ function shownFirst(rows: readonly MirrorRow[], tier: MembershipTier | null, pro
   )
 }
 
-function liveSubscription(input: Input): SubscriptionSummary | null {
+// Live membership subscriptions, the one to show first.
+function liveSubscriptions(input: Input): SubscribedSummary[] {
+  const out: SubscribedSummary[] = []
   for (const row of shownFirst(input.rows, input.tier, input.products)) {
     const live = LIVE[row.status]
     const product = input.products.find((p) => p.id === row.productId)
     if (!live || !product || product.tier === 'pack') continue
     const state = live === 'active' && row.cancelAtPeriodEnd ? 'cancels' : live
     const expired = input.paidUntil === null || input.paidUntil <= input.now
-    return { kind: 'subscription', provider: row.provider, productId: product.id, tier: product.tier, interval: product.interval, state, periodEnd: row.currentPeriodEnd, expired }
+    out.push({ kind: 'subscription', provider: row.provider, productId: product.id, tier: product.tier, interval: product.interval, state, periodEnd: row.currentPeriodEnd, expired })
   }
-  return null
+  return out
 }
 
+// The card describes the tier the member holds now (current_tier()) and its paid_until. A live
+// subscription of another tier is not that plan: after an upgrade by a one-time method (Alipay
+// Pro over a cancelling Starter card subscription, Waffo drill 2026-11-15) the old row stays
+// live until its period end, and showing it said "Starter · Cancelled · ends Dec 15" while the
+// account was Pro until Jan 14. Without a current tier (membership ran out) the live row still
+// leads, so a failed renewal shows as past due.
 export function summarizeSubscription(input: Input): SubscriptionSummary {
-  const live = liveSubscription(input)
-  if (live) return live
-  if (input.paidUntil && input.paidUntil > input.now) {
-    return { kind: 'paid_until', tier: input.tier, paidUntil: input.paidUntil }
+  const live = liveSubscriptions(input)
+  const paidAhead = input.paidUntil !== null && input.paidUntil > input.now
+  const current = input.tier === null || !paidAhead ? live[0] : live.find((s) => s.tier === input.tier)
+  if (current) return current
+  if (input.paidUntil && paidAhead) {
+    const stillBills = live.find((s) => s.state !== 'cancels')
+    return { kind: 'paid_until', tier: input.tier, paidUntil: input.paidUntil, ...(stillBills ? { stillBills } : {}) }
   }
   return input.paidUntil ? { kind: 'expired', paidUntil: input.paidUntil } : { kind: 'free' }
 }

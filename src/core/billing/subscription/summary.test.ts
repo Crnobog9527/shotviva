@@ -85,6 +85,36 @@ describe('summarizeSubscription with several rows (T66)', () => {
   })
 })
 
+describe('summarizeSubscription after an upgrade by a one-time method (Waffo drill 2026-11-15)', () => {
+  // Starter card subscription cancelled at period end, then Pro bought once by Alipay: the
+  // Starter row stays live until its end, current_tier() is Pro and paid_until is later. The
+  // card shows Pro until paid_until, never "Starter · Cancelled", on both providers.
+  const ids = (provider: 'stripe' | 'waffo') => (provider === 'stripe' ? { stripeSubscriptionId: 'sub_s', waffoOrderId: null } : { stripeSubscriptionId: null, waffoOrderId: 'ORD_s' })
+
+  it.each(['stripe', 'waffo'] as const)('a cancelling subscription of the old tier is not shown (%s)', (provider) => {
+    const oldStarter = row({ provider, ...ids(provider), productId: 'starter_monthly', currentPeriodEnd: days(30), cancelAtPeriodEnd: true })
+    expect(summarize([oldStarter], days(60), 'pro')).toEqual({ kind: 'paid_until', tier: 'pro', paidUntil: days(60) })
+  })
+
+  it.each(['stripe', 'waffo'] as const)('an old-tier subscription that may still charge is secondary info (%s)', (provider) => {
+    const oldStarter = row({ provider, ...ids(provider), productId: 'starter_monthly', currentPeriodEnd: days(30) })
+    expect(summarize([oldStarter], days(60), 'pro')).toMatchObject({
+      kind: 'paid_until',
+      tier: 'pro',
+      paidUntil: days(60),
+      stillBills: { provider, tier: 'starter', state: 'active', periodEnd: days(30) },
+    })
+    const pastDue = { ...oldStarter, status: 'past_due' }
+    expect(summarize([pastDue], days(60), 'pro')).toMatchObject({ kind: 'paid_until', tier: 'pro', stillBills: { tier: 'starter', state: 'past_due' } })
+  })
+
+  it('a live row of the current tier still leads, even next to the old one', () => {
+    const oldStarter = row({ stripeSubscriptionId: 'sub_s', productId: 'starter_monthly', currentPeriodEnd: days(30), cancelAtPeriodEnd: true })
+    const pro = row({ stripeSubscriptionId: 'sub_p', productId: 'pro_monthly', currentPeriodEnd: days(60) })
+    expect(summarize([oldStarter, pro], days(60), 'pro')).toMatchObject({ kind: 'subscription', tier: 'pro', state: 'active' })
+  })
+})
+
 describe('summarizeSubscription, single states', () => {
   it('cancelled in the Portal: cancels at period end', () => {
     expect(summarize([row({ cancelAtPeriodEnd: true })], days(300))).toMatchObject({ kind: 'subscription', state: 'cancels', periodEnd: days(300) })
