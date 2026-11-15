@@ -747,7 +747,13 @@
         "rank": "Rank",
         "rankEn": "Rank in English",
         "prize": "Prize",
-        "add": "Add a rank"
+        "add": "Add a rank",
+        "featuredIntro": "The display area draws {count} prizes as real products. Tick the ones to show ({chosen}/{count} picked); the rest appear only as text in the prize list.",
+        "featured": "Show in the display area",
+        "featuredFull": "The display area is full; untick another prize first",
+        "featuredLast": "The display area needs at least one prize",
+        "featuredPhoto": "Photo of this prize (optional)",
+        "featuredPhotoHint": "With a photo, this product is drawn from it; without one, the real product named is drawn."
       },
       "sections": {
         "title": "Section title",
@@ -797,7 +803,6 @@
       },
       "size": "Size",
       "resolution": "Resolution",
-      "reviewed": "{count, plural, one {I've checked the highlighted line} other {I've checked the # highlighted lines}}",
       "proofread": "The posters are drawn by AI. Check every word on them before you print or share.",
       "generate": "{count, plural, one {Make # poster} other {Make # posters}} · {credits} credits",
       "starting": "Starting…",
@@ -852,7 +857,13 @@
         "photoHint": "Filled in from the text on your photo. Check each part.",
         "reusedHint": "You can also clear everything, or go back to the sample."
       },
-      "photoText": "Text read from your photos"
+      "photoText": "Text read from your photos",
+      "review": {
+        "explain": "{count, plural, one {# line is highlighted in yellow: it either isn't in your pasted text, or it was too long and has been cut to fit.} other {# lines are highlighted in yellow: each either isn't in your pasted text, or was too long and has been cut to fit.}} Tap Review to go through them and make sure the meaning is still right; edit anything that isn't. Then tick the box below to make the posters.",
+        "go": "Review",
+        "confirm": "{count, plural, one {I've checked the highlighted line} other {I've checked the # highlighted lines}}",
+        "blocked": "{count, plural, one {One step left: check the highlighted line and tick “I've checked”.} other {One step left: check the # highlighted lines and tick “I've checked”.}}"
+      }
     },
     "sizes": {
       "closest": "Closest to original ({ratio})",

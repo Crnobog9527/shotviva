@@ -1,4 +1,4 @@
-import { posterStrings, type PosterContent, type PosterFields, type PosterSection, type PosterTable, type TableRow } from '@/core/poster'
+import { posterStrings, toggleFeatured, withFeaturedSpots, type PosterContent, type PosterFields, type PosterSection, type PosterTable, type TableRow } from '@/core/poster'
 
 // Immutable edits of the poster text the editor shows (ARCHITECTURE §5.3). Pure, so the editor's
 // add / remove / insert-break behaviour is tested without React.
@@ -26,12 +26,21 @@ export const emptyInfo = (fields: PosterFields): PosterContent['info'] => ({ tit
 export const startContent = (fields: PosterFields): PosterContent =>
   fields.sample ? withDefaults(structuredClone(fields.sample), fields) : emptyContent(fields)
 
-// The sorted text keeps what the model found; an empty heading takes the template's.
+// The sorted text keeps what the model found; an empty heading takes the template's; the display
+// area's spots are written onto their rows (the top rows unless already picked, §5.3 展示位).
 export const withDefaults = (content: PosterContent, fields: PosterFields): PosterContent => ({
   ...content,
   info: content.info.title || content.info.titleEn ? content.info : emptyInfo(fields),
   table: content.table ?? emptyContent(fields).table,
+  prizes: content.prizes ? { ...content.prizes, rows: withFeaturedSpots(content.prizes.rows, fields.featured) } : null,
 })
+
+// 放进展示区 on or off for one prize; `freed` / `taken`: the spot whose photo slot is to be emptied.
+export function setFeatured(content: PosterContent, index: number, on: boolean, count: number): { content: PosterContent; freed?: number; taken?: number } {
+  const prizes = prizesOf(content)
+  const { rows, ...spots } = toggleFeatured(prizes.rows, index, on, { count })
+  return { content: { ...content, prizes: { ...prizes, rows } }, ...spots }
+}
 
 export const setInfo = (content: PosterContent, key: keyof PosterContent['info'], value: string): PosterContent =>
   ({ ...content, info: { ...content.info, [key]: value } })
@@ -51,7 +60,7 @@ const prizesOf = (content: PosterContent) => content.prizes ?? { headline: '', n
 export const setPrizeHeading = (content: PosterContent, key: 'headline' | 'note', value: string): PosterContent =>
   ({ ...content, prizes: { ...prizesOf(content), [key]: value } })
 
-export function setPrize(content: PosterContent, index: number, key: keyof PrizeRow, value: string): PosterContent {
+export function setPrize(content: PosterContent, index: number, key: Exclude<keyof PrizeRow, 'featured'>, value: string): PosterContent {
   const prizes = prizesOf(content)
   return { ...content, prizes: { ...prizes, rows: prizes.rows.map((row, i) => (i === index ? { ...row, [key]: value } : row)) } }
 }
@@ -145,7 +154,7 @@ export const clearSection = (content: PosterContent, index: number): PosterConte
 
 export const clearPrizes = (content: PosterContent): PosterContent => {
   const prizes = prizesOf(content)
-  return { ...content, prizes: { headline: '', note: '', rows: prizes.rows.map(() => ({ ...EMPTY_ROW })) } }
+  return { ...content, prizes: { headline: '', note: '', rows: prizes.rows.map((row) => ({ ...EMPTY_ROW, ...(row.featured ? { featured: row.featured } : {}) })) } }
 }
 
 export const clearTable = (content: PosterContent): PosterContent => withTable(content, (table) => ({
