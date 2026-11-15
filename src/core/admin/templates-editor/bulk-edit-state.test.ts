@@ -27,3 +27,8 @@ it('distinguishes keeping a binding, following the default, and selecting a mode
   expect(readBulkEdit({ ...form, provider: '' }).patch).toEqual({ providerId: null })
   expect(readBulkEdit({ ...form, provider: 'seed' }).patch).toEqual({ providerId: 'seed' })
 })
+
+it('closes ticked 停售 tiers and ignores their credit boxes', () => {
+  const form = { ...emptyBulkEdit(), credits: { '1k': '3', '2k': '9', '4k': '' }, closed: { '1k': false, '2k': true, '4k': true } }
+  expect(readBulkEdit(form)).toEqual({ patch: { creditsCost: { '1k': 3 }, closeResolutions: ['2k', '4k'] }, problems: {} })
+})

@@ -5,6 +5,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { pagesReady } from '@/core/poster'
 
 import type { Balance } from '@/core/billing/pools'
+import { setCredits } from '@/core/templates/set-price'
 import { Button } from '@/core/ui/button'
 import { Checkbox } from '@/core/ui/checkbox'
 
@@ -27,7 +28,7 @@ export function GeneratePanel({ studio, template, balance }: Props) {
       <h3 id="size-h" className="text-caption font-medium">{t('size')}</h3>
       <SizePicker options={options} value={studio.aspect} onChange={studio.setAspect} />
       <h3 id="res-h" className="text-caption font-medium">{t('resolution')}</h3>
-      <ResolutionPicker options={options} aspect={studio.aspect} value={studio.resolution} costs={template.creditsCost} balance={balance} onChange={studio.setResolution} />
+      <ResolutionPicker options={options} aspect={studio.aspect} value={studio.resolution} costs={template.creditsCost} images={studio.parts.length} balance={balance} onChange={studio.setResolution} />
       {studio.draft.unverified.length > 0 ? (
         <label className="flex min-h-11 items-center gap-3 text-caption">
           <Checkbox checked={studio.draft.reviewed} onCheckedChange={(checked) => studio.setReviewed(checked === true)} />
@@ -41,11 +42,11 @@ export function GeneratePanel({ studio, template, balance }: Props) {
 }
 
 // One ordinary job per poster, so the total is the template's price at this resolution times
-// the number of posters.
+// the number of posters: the same set total the resolution cards show.
 export function GenerateButton({ studio, template, balance }: Props) {
   const t = useTranslations('app.poster')
   const format = useFormatter()
-  const total = template.creditsCost[studio.resolution] * studio.parts.length
+  const total = setCredits(template.creditsCost[studio.resolution], studio.parts.length)
   return (
     <Button className="min-h-12 w-full" disabled={!canStart(studio, balance, total) || studio.busy} onClick={() => void studio.generate()}>
       {studio.busy ? t('starting') : t('generate', { count: studio.parts.length, credits: format.number(total) })}

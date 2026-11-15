@@ -87,7 +87,7 @@ function CardMeta({ template }: { template: CatalogueTemplate }) {
     <span className="block pt-2">
       <span className="block text-body leading-[1.25] font-semibold tracking-[-0.015em]">{template.name}</span>
       <span className="mt-1 block text-caption leading-[1.35] text-muted-foreground">{kind}</span>
-      {cost !== null ? <span className="mt-2 inline-block rounded-tag bg-wash px-2 py-1 font-mono text-caption leading-none text-bone-dim">{t('fromCredits', { count: cost })}</span> : null}
+      {cost !== null ? <span className="mt-2 inline-block rounded-tag bg-wash px-2 py-1 font-mono text-caption leading-none text-bone-dim">{t(template.imagesPerSet ? 'fromCreditsSet' : 'fromCredits', { count: cost, images: template.imagesPerSet ?? 1 })}</span> : null}
     </span>
   )
 }

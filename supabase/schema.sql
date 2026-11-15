@@ -4840,6 +4840,8 @@ declare
   -- 3k from a caller still on the old name is read as 4k (PR-2).
   v_patch jsonb := coalesce(public.canonical_tiers(p_patch), '{}');
   v_cost jsonb := coalesce(public.canonical_tiers(p_patch) -> 'credits_cost', '{}');
+  -- Tiers to stop offering (1560): closed for sale on every template, as a blank editor price.
+  v_close text[];
   v_visible text[];
   change_model boolean := p_patch ? 'provider_id';
   target uuid := (p_patch->>'provider_id')::uuid;
@@ -4860,9 +4862,20 @@ begin
   if cardinality(v_ids) = 0 or cardinality(v_ids) > 200 then
     raise exception 'INVALID_INPUT' using detail = 'between 1 and 200 templates';
   end if;
-  if jsonb_typeof(v_patch) <> 'object' or v_patch = '{}' or v_patch - 'credits_cost' - 'visible_in' - 'quality' - 'category_key' - 'provider_id' <> '{}' then
-    raise exception 'INVALID_INPUT' using detail = 'patch must name credits_cost, visible_in, quality or category_key';
+  if jsonb_typeof(v_patch) <> 'object' or v_patch = '{}' or v_patch - 'credits_cost' - 'close_resolutions' - 'visible_in' - 'quality' - 'category_key' - 'provider_id' <> '{}' then
+    raise exception 'INVALID_INPUT' using detail = 'patch must name credits_cost, close_resolutions, visible_in, quality or category_key';
   end if;
+  if v_patch ? 'close_resolutions' then
+    if jsonb_typeof(v_patch -> 'close_resolutions') <> 'array' then
+      raise exception 'INVALID_INPUT' using detail = 'close_resolutions must be an array';
+    end if;
+    v_close := public.canonical_tier_array(array(select jsonb_array_elements_text(v_patch -> 'close_resolutions')));
+    if v_close is null or cardinality(v_close) = 0 or not (v_close <@ array['1k','2k','4k'])
+       or array_position(v_close, null) is not null then
+      raise exception 'INVALID_INPUT' using detail = 'close_resolutions must name 1k, 2k or 4k';
+    end if;
+  end if;
+  v_close := coalesce(v_close, '{}');
   if v_patch ? 'quality' and (v_patch ->> 'quality') is distinct from 'high' and (v_patch ->> 'quality') is distinct from 'medium' then
     raise exception 'INVALID_INPUT' using detail = 'quality must be high or medium';
   end if;
@@ -4874,6 +4887,9 @@ begin
     where e.key not in ('1k', '2k', '4k') or jsonb_typeof(e.value) <> 'number' or e.value::text !~ '^[1-9][0-9]{0,2}$'
   ) then
     raise exception 'INVALID_INPUT' using detail = 'credits_cost tiers must be whole numbers 1..999';
+  end if;
+  if exists (select from unnest(v_close) tier where v_cost ? tier) then
+    raise exception 'INVALID_INPUT' using detail = 'a tier cannot be priced and closed in one edit';
   end if;
   if v_patch ? 'visible_in' then
     if jsonb_typeof(v_patch -> 'visible_in') <> 'array' then
@@ -4963,8 +4979,15 @@ begin
       case when p.tariff->>'quality'=p.quality then (p.tariff->'costs'->>r.res)::integer end) as credits) minimum
     where p.found and not p.is_builtin
       and (v_cost ? r.res or not (r.res=any(p.unpriced_resolutions)))
+      and not (r.res = any(v_close))
       and (p.credits_cost ->> r.res)::integer < minimum.credits
       and not coalesce(p.approved->>'quality'=p.quality and p.approved->'costs'->r.res=p.credits_cost->r.res,false)
+    union all
+    -- At least one tier stays on offer after the edit.
+    select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'no_tier')
+    from planned p
+    where p.found and not p.is_builtin and cardinality(v_close) > 0
+      and array['1k','2k','4k'] <@ (array(select tier from unnest(p.unpriced_resolutions) tier where not (v_cost ? tier)) || v_close)
     union all
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
     from planned p
@@ -4985,7 +5008,7 @@ begin
   end if;
 
   -- Capture missing legacy tier markers against the old route before changing a binding.
-  if change_model or v_cost <> '{}'::jsonb then
+  if change_model or v_cost <> '{}'::jsonb or cardinality(v_close) > 0 then
     perform admin.set_template_unpriced_resolutions(t.id, null)
       from public.templates t where t.id=any(v_ids)
         and not exists(select from public.template_sale_approvals s where s.template_id=t.id);
@@ -5011,6 +5034,12 @@ begin
       array(select tier from unnest(s.unpriced_resolutions) tier where not (v_cost ? tier)))
     from public.template_sale_approvals s where s.template_id=any(v_ids)
       and exists(select from unnest(s.unpriced_resolutions) tier where v_cost ? tier);
+  end if;
+  if cardinality(v_close) > 0 then
+    perform admin.set_template_unpriced_resolutions(s.template_id,
+      array(select tier from unnest(array['1k','2k','4k']) tier where tier = any(s.unpriced_resolutions || v_close)))
+    from public.template_sale_approvals s where s.template_id=any(v_ids)
+      and not (v_close <@ s.unpriced_resolutions);
   end if;
   return jsonb_build_object('failures', '[]'::jsonb, 'changed', v_changed);
 end;
@@ -12009,12 +12038,15 @@ CREATE OR REPLACE FUNCTION "public"."read_template_sync_source"("p_id" "text") R
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
-  select jsonb_build_object('catalog', admin.template_sync_catalog(), 'template', to_jsonb(t),
+  select jsonb_build_object('catalog', admin.template_sync_catalog(),
+    'template', to_jsonb(t) - case when t.unpriced_resolutions is null then 'unpriced_resolutions' else '' end,
     'prompt', to_jsonb(p), 'provider', to_jsonb(a))
   from (select tt.id,tt.module,tt.name,tt.description,tt.category_key,tt.subcategory_key,
           s.slug as series_slug,tt.series_sort_order,tt.translations,tt.fields,tt.quality,tt.credits_cost,tt.visible_in,
-          tt.cover_before_url,tt.cover_after_url,tt.cover_media_type,tt.cover_video_url,tt.cover_poster_url,tt.cover_locales
-          from public.templates tt left join public.template_series s on s.id=tt.series_id where tt.id=p_id) t
+          tt.cover_before_url,tt.cover_after_url,tt.cover_media_type,tt.cover_video_url,tt.cover_poster_url,tt.cover_locales,
+          sale.unpriced_resolutions
+          from public.templates tt left join public.template_series s on s.id=tt.series_id
+          left join public.template_sale_approvals sale on sale.template_id=tt.id where tt.id=p_id) t
   left join lateral (select body,version,model_params,provider_id from public.template_prompts
     where template_id=t.id) p on true
   left join lateral (select adapter,model,base_url from public.ai_providers
