@@ -120,3 +120,15 @@ it('applies both the saved and current input limits to the resolved model', () =
   expect(effectiveReferenceRange(saved, { input_references: { type: 'range', min: 0, max: 2 } }))
     .toEqual({ minReferences: 1, maxReferences: 2 })
 })
+
+describe('Ark list price on resolve (1566)', () => {
+  it("hands the adapter the row's list price only while it is for the row's model", async () => {
+    const configs: ProviderConfig[] = []
+    const adapters: ProviderAdapters = { ark_images: (config) => (configs.push(config), { id: 'ark', generate: vi.fn() }) }
+    const listPrice = { model: 'doubao-x', outputBands: [{ maxPixels: null, cny: 0.12 }], inputImageCny: 0, source: 'https://example.com/p', asOf: '2026-11-15' }
+    const ark = { ...row, adapter: 'ark_images' as const, baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-x', listPrice }
+    await resolveProvider('image', ark, parseServerEnv({}), adapters, async () => RELAY_KEY)
+    await resolveProvider('image', { ...ark, model: 'doubao-y' }, parseServerEnv({}), adapters, async () => RELAY_KEY)
+    expect(configs.map((config) => config.listPrice)).toEqual([listPrice, null])
+  })
+})

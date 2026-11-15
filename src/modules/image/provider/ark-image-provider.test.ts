@@ -10,6 +10,7 @@ import { arkRequest, arkSize, createArkImageProvider, networkCode } from './ark-
 const model = 'doubao-seedream-5-5-261028'
 // Fixture list price: a real line's is typed in by the admin (ai_providers.list_price).
 const listPrice = {
+  model,
   outputBands: [{ maxPixels: 2_610_000, cny: 0.13 }, { maxPixels: 4_630_000, cny: 0.23 }],
   inputImageCny: 0.05, source: 'https://example.com/price', asOf: '2026-11-15',
 }

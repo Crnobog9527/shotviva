@@ -8,6 +8,8 @@ import { z } from 'zod'
 // price still generates, but its jobs have no cost and the admin list says so.
 
 export const arkPriceSchema = z.object({
+  // The model this price is for: a price typed for another model (a concurrent edit) prices nothing.
+  model: z.string().trim().min(1).max(120),
   // Ascending by maxPixels; the first band whose maxPixels holds the output image's pixels applies.
   // null maxPixels: no upper limit (the last band).
   outputBands: z.array(z.object({ maxPixels: z.number().int().positive().nullable(), cny: z.number().nonnegative().finite() })).min(1).max(5),
@@ -16,6 +18,11 @@ export const arkPriceSchema = z.object({
   asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 })
 export type ArkPrice = z.infer<typeof arkPriceSchema>
+
+// The row's list price, only while it is for the row's model.
+export function currentListPrice(row: { model: string; listPrice?: ArkPrice | null }): ArkPrice | null {
+  return row.listPrice && row.listPrice.model === row.model.trim() ? row.listPrice : null
+}
 
 // numeric(10, 6) like cost_usd.
 const round6 = (value: number) => Math.round(value * 1e6) / 1e6

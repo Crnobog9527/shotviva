@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { arkListCost, arkPriceSchema, type ArkPrice } from './ark-prices'
 
 // Fixtures only: a real line's price is typed in by the admin (ai_providers.list_price).
-const FLAT: ArkPrice = { outputBands: [{ maxPixels: null, cny: 0.12 }], inputImageCny: 0, source: 'https://example.com/p', asOf: '2026-11-15' }
+const FLAT: ArkPrice = { model: 'doubao-x', outputBands: [{ maxPixels: null, cny: 0.12 }], inputImageCny: 0, source: 'https://example.com/p', asOf: '2026-11-15' }
 const BANDED: ArkPrice = {
+  model: 'doubao-x',
   outputBands: [{ maxPixels: 2_610_000, cny: 0.13 }, { maxPixels: 4_630_000, cny: 0.23 }],
   inputImageCny: 0.05, source: 'https://example.com/p', asOf: '2026-11-15',
 }

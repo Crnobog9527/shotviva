@@ -80,7 +80,7 @@ describe('catalogue price on save', () => {
 })
 
 describe('Ark list price on save', () => {
-  const listPrice = { outputBands: [{ maxPixels: null, cny: 0.12 }], inputImageCny: 0, source: 'https://example.com/price', asOf: '2026-11-15' }
+  const listPrice = { model: 'doubao-x', outputBands: [{ maxPixels: null, cny: 0.12 }], inputImageCny: 0, source: 'https://example.com/price', asOf: '2026-11-15' }
   const ark = {
     module: 'image', adapter: 'ark_images', label: 'Seedream', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-x',
     apiKey: 'ark-fixture-key-1234', resolutions: ['1k', '2k'], estimatedImageCosts: { '1k': 0.03, '2k': 0.05 },
@@ -98,5 +98,17 @@ describe('Ark list price on save', () => {
     expect(rpc).not.toHaveBeenCalledWith('admin_set_provider_list_price', expect.anything())
     expect(await runProviderAction(() => saveProvider({ db, resolveHost }, actor, { ...ark, listPrice: { ...listPrice, source: 'not a url' } })))
       .toEqual({ ok: false, reason: 'invalid_input' })
+  })
+})
+
+describe('Ark list price belongs to its model', () => {
+  it('refuses a price typed for another model than the one saved', async () => {
+    const { db } = fakeDb()
+    const ark = {
+      module: 'image', adapter: 'ark_images', label: 'Seedream', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-y',
+      apiKey: 'ark-fixture-key-1234', resolutions: ['1k', '2k'], estimatedImageCosts: { '1k': 0.03, '2k': 0.05 },
+    }
+    const listPrice = { model: 'doubao-x', outputBands: [{ maxPixels: null, cny: 0.12 }], inputImageCny: 0, source: 'https://example.com/price', asOf: '2026-11-15' }
+    expect(await runProviderAction(() => saveProvider({ db, resolveHost }, actor, { ...ark, listPrice }))).toEqual({ ok: false, reason: 'invalid_input' })
   })
 })

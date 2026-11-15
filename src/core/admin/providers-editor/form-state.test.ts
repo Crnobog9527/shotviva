@@ -150,6 +150,7 @@ describe('Ark list price (typed in, 1566)', () => {
 
   it('saves one band or two, and reads them back', () => {
     expect(arkPriceFromForm(priced)).toEqual({
+      model: 'doubao-seedream-x',
       outputBands: [{ maxPixels: 2_610_000, cny: 0.13 }, { maxPixels: null, cny: 0.23 }], inputImageCny: 0.05,
       source: 'https://www.volcengine.com/docs/82379/1544106', asOf: '2026-11-15',
     })
@@ -157,8 +158,10 @@ describe('Ark list price (typed in, 1566)', () => {
     expect(arkPriceFromForm(flat)).toMatchObject({ outputBands: [{ maxPixels: null, cny: 0.13 }] })
     const input = toSaveInput(priced, null)
     expect(saveProviderSchema.safeParse(input).success).toBe(true)
-    const row: AdminProvider = { ...provider, adapter: 'ark_images', listPrice: input.listPrice ?? null }
+    const row: AdminProvider = { ...provider, adapter: 'ark_images', model: 'doubao-seedream-x', listPrice: input.listPrice ?? null }
     expect(formFor(row)).toMatchObject({ arkOutputCny: '0.13', arkSplitMp: '2.61', arkOutputCnyAbove: '0.23', arkInputCny: '0.05' })
+    // A price stored for another model (a concurrent edit) is not shown or used.
+    expect(formFor({ ...row, model: 'doubao-other' })).toMatchObject({ arkOutputCny: '', arkSource: '' })
   })
 })
 

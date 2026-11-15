@@ -4,6 +4,7 @@ import type { ServerEnv } from '../env'
 import { AppError } from '../errors'
 import { effectivePrices, ENV_PROVIDER_SOURCE, providerTag, type GenerationProvider, type ProviderPrices } from '../jobs'
 import { catalogTokenPrices } from '../templates/catalog-pricing'
+import { currentListPrice } from '../jobs/ark-prices'
 import { currentCatalogPrice } from './catalog-model'
 import { OPENAI_MAX_REFERENCES } from '../templates/image-capabilities'
 import { DEFAULT_BASE_URL, type ActiveProviderRow, type ProviderAdapters, type ProviderConfig, type ProviderModule } from './types'
@@ -84,5 +85,5 @@ export async function resolveProvider(
   if (!apiKey) throw new AppError('INTERNAL', `active provider ${row.id} has no API key; set it in /admin/providers`)
   const references = effectiveReferenceRange(row, imageParameters)
   return build(adapters, row.adapter, row.id, { baseUrl: row.baseUrl, model: row.model, apiKey, resolutions: row.resolutions, imageParameters,
-    ...(row.adapter === 'ark_images' ? { listPrice: row.listPrice ?? null } : {}) }, rowPrices(row), references)
+    ...(row.adapter === 'ark_images' ? { listPrice: currentListPrice(row) } : {}) }, rowPrices(row), references)
 }

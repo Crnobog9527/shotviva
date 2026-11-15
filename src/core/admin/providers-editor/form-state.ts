@@ -1,4 +1,4 @@
-import type { ArkPrice } from '@/core/jobs/ark-prices'
+import { currentListPrice, type ArkPrice } from '@/core/jobs/ark-prices'
 import { effectivePrices, livePrices, type CatalogPrice } from '@/core/jobs/catalog-price'
 import { currentCatalogPrice } from '@/core/providers/catalog-model'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
@@ -101,7 +101,7 @@ export function formFor(provider: AdminProvider | null, module: ProviderModule =
     priceInputTextPerM: priceText(provider.prices.inputTextPerM),
     priceInputImagePerM: priceText(provider.prices.inputImagePerM),
     priceOutputPerM: priceText(provider.prices.outputPerM),
-    ...arkFields(provider.listPrice),
+    ...arkFields(currentListPrice(provider)),
   }
 }
 
@@ -188,7 +188,7 @@ export function arkPriceFromForm(form: ProviderForm): ArkPrice | null | 'invalid
   const source = form.arkSource.trim()
   const asOf = form.arkAsOf.trim()
   if (!arkNumbersOk(form) || !sourceOk(source) || !DATE_PATTERN.test(asOf)) return 'invalid'
-  return { outputBands: arkBands(form), inputImageCny: Number(form.arkInputCny), source, asOf }
+  return { model: form.model.trim(), outputBands: arkBands(form), inputImageCny: Number(form.arkInputCny), source, asOf }
 }
 
 // Complete enough to save: Ark has no catalogue, so its list price is required.

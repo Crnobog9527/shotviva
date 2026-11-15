@@ -61,6 +61,8 @@ export const saveProviderSchema = z.object({
   // per-image estimates, so every tier it offers needs one (the form enforces the same).
   .refine((input) => input.adapter !== 'ark_images' || ARK_RESOLUTIONS.every((tier) => (input.estimatedImageCosts?.[tier] ?? 0) > 0),
     { path: ['estimatedImageCosts'] })
+  // An Ark price is for the model saved with it (1566).
+  .refine((input) => !input.listPrice || input.listPrice.model === input.model, { path: ['listPrice'] })
 
 export type SaveProviderInput = z.input<typeof saveProviderSchema>
 

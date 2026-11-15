@@ -8617,10 +8617,13 @@ begin
                   or (jsonb_typeof(b->'maxPixels') = 'number' and (b->>'maxPixels')::numeric <= 0))
      or jsonb_typeof(p_price->'inputImageCny') <> 'number' or (p_price->>'inputImageCny')::numeric < 0
      or coalesce(p_price->>'source', '') !~ '^https://'
-     or coalesce(p_price->>'asOf', '') !~ '^\d{4}-\d{2}-\d{2}$') then
+     or coalesce(p_price->>'asOf', '') !~ '^\d{4}-\d{2}-\d{2}$'
+     or coalesce(p_price->>'model', '') = '') then
     raise exception 'INVALID_INPUT';
   end if;
-  update public.ai_providers set list_price=p_price where id=p_id and adapter='ark_images';
+  -- Only onto the model the price was typed for: a save that changed the model in between wins.
+  update public.ai_providers set list_price=p_price
+   where id=p_id and adapter='ark_images' and (p_price is null or model=p_price->>'model');
   if not found then raise exception 'PROVIDER_NOT_FOUND'; end if;
 end $_$;
 

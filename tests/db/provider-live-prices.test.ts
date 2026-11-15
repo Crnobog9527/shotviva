@@ -19,7 +19,7 @@ import { anonSupabase, serviceSupabase } from './supabase-env'
 const PREFIX = 'T1566 live price'
 const KEY = 'sk-t1566-live-price-0123456789'
 const models = { data: [{ id: 'openai/gpt-6.1-sol', pricing: { prompt: '0.000002', completion: '0.00001' } }] }
-const LIST_PRICE = { outputBands: [{ maxPixels: 2_610_000, cny: 0.13 }, { maxPixels: null, cny: 0.23 }], inputImageCny: 0.05, source: 'https://example.com/price', asOf: '2026-11-15' }
+const LIST_PRICE = { model: 'doubao-seedream-fixture', outputBands: [{ maxPixels: 2_610_000, cny: 0.13 }, { maxPixels: null, cny: 0.23 }], inputImageCny: 0.05, source: 'https://example.com/price', asOf: '2026-11-15' }
 
 let pg: Client
 let adminId: string
@@ -83,6 +83,9 @@ describe('admin-entered Ark list price', () => {
     expect((await call(adminId, id, { ...LIST_PRICE, outputBands: [{ maxPixels: null, cny: -1 }] })).error?.message).toContain('INVALID_INPUT')
     expect((await call(adminId, id, { ...LIST_PRICE, outputBands: [{ maxPixels: 0, cny: 0.1 }] })).error?.message).toContain('INVALID_INPUT')
     expect((await call(adminId, id, { ...LIST_PRICE, outputBands: [] })).error?.message).toContain('INVALID_INPUT')
+    // A price for another model than the row now runs (a concurrent model change) is not written.
+    expect((await call(adminId, id, { ...LIST_PRICE, model: 'doubao-other' })).error?.message).toContain('PROVIDER_NOT_FOUND')
+    expect((await call(adminId, id, { ...LIST_PRICE, model: '' })).error?.message).toContain('INVALID_INPUT')
     const text = await saveProvider(deps(), adminId, { ...judge, label: label() })
     expect((await call(adminId, text, LIST_PRICE)).error?.message).toContain('PROVIDER_NOT_FOUND')
   })
