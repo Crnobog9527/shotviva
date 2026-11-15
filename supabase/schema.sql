@@ -12221,6 +12221,18 @@ $$;
 ALTER FUNCTION "public"."read_template_sync_target"("p_id" "text", "p_run_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."read_waffo_bindings"("p_store" "text", "p_mode" "text") RETURNS TABLE("product_id" "text", "revision" integer, "one_time_id" "text", "recurring_id" "text", "usd_cents" integer)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select b.product_id,b.revision,b.one_time_id,b.recurring_id,b.usd_cents from admin.catalog_waffo_bindings b
+   where b.store_id=p_store and b.mode=p_mode order by b.product_id,b.revision
+$$;
+
+
+ALTER FUNCTION "public"."read_waffo_bindings"("p_store" "text", "p_mode" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."read_waffo_offers"("p_version" "text", "p_store" "text", "p_mode" "text") RETURNS TABLE("product_id" "text", "tier" "text", "kind" "text", "revision" integer, "usd_cents" integer, "credits" integer, "paid_days" integer, "listed" boolean, "name_en" "text", "name_zh" "text", "benefit_en" "text", "benefit_zh" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -21066,6 +21078,11 @@ GRANT ALL ON FUNCTION "public"."read_template_sync_style_refs"("p_id" "text", "p
 
 REVOKE ALL ON FUNCTION "public"."read_template_sync_target"("p_id" "text", "p_run_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."read_template_sync_target"("p_id" "text", "p_run_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."read_waffo_bindings"("p_store" "text", "p_mode" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."read_waffo_bindings"("p_store" "text", "p_mode" "text") TO "service_role";
 
 
 

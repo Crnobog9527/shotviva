@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 
 import { waffoProductIdsSchema, waffoSubscriptionIdsSchema } from '../../waffo-env'
 import { TEST_PRODUCTS } from '../stripe/test-products'
-import { catalogCheckMode, catalogReport, compareCatalog } from './catalog-check'
+import { catalogCheckMode, catalogReport, checkedMaps, compareCatalog } from './catalog-check'
 
 it('checks both mappings against checkout quotes, rejecting missing, inactive and mispriced products', () => {
   const products = TEST_PRODUCTS.map(p => ({ ...p, priceUsd: 11.23 }))
@@ -39,4 +39,18 @@ it('reports by product and last four id characters, with the Waffo channel state
     'max_yearly recurring …9876 USD cents: Waffo=missing quote=4567 CHECK waffo-channel=hidden',
   ])
   expect(catalogReport(rows)[0]).toBe('pack_s once …1234 USD cents: Waffo=1123 quote=1123 OK')
+})
+
+it('checks a published revision against its binding and leaves an unbound new one unmapped', () => {
+  const [pack, plan] = [TEST_PRODUCTS.find(p => p.tier === 'pack')!, TEST_PRODUCTS.find(p => p.tier !== 'pack')!]
+  const products = [{ ...pack, revision: 2 }, { ...plan, revision: 3 }, { ...pack, id: 'pack_new' as const, revision: 1 }, { ...plan, id: 'max_monthly' as const, revision: 4 }]
+  const env = { productIds: { [pack.id]: 'PROD_envpack', [plan.id]: 'PROD_envonce' }, subscriptionProductIds: { [plan.id]: 'PROD_envcycle' } }
+  const bindings = [{ product_id: plan.id, revision: 3, one_time_id: 'PROD_bonce', recurring_id: 'PROD_bcycle', usd_cents: 1 },
+    { product_id: plan.id, revision: 2, one_time_id: 'PROD_old', recurring_id: 'PROD_old2', usd_cents: 1 }]
+  const { maps, unmapped, mapped } = checkedMaps(products, env, bindings)
+  expect(maps.productIds).toEqual({ [pack.id]: 'PROD_envpack', [plan.id]: 'PROD_bonce' })
+  expect(maps.subscriptionProductIds[plan.id]).toBe('PROD_bcycle')
+  expect(unmapped).toEqual(['pack_new', 'max_monthly'])
+  expect(mapped).toHaveLength(2)
+  expect(() => compareCatalog(products, maps, { onetimeProducts: [], subscriptionProducts: [] })).not.toThrow()
 })

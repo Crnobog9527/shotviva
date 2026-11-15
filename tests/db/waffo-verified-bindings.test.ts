@@ -49,6 +49,10 @@ it('binds a reviewed seeded version for one store and mode only', async () => {
   expect(await offers('STO_other')).toEqual([])
   expect(await offers('STO_shop', 'prod')).toEqual([])
   expect((await price('pro_monthly', true)).rows[0].id).toBe('PROD_cycle')
+  const read = await db.query("select product_id,revision,one_time_id,recurring_id from public.read_waffo_bindings('STO_shop','test')")
+  expect(read.rows).toEqual([{ product_id: 'pack_s', revision: 2, one_time_id: 'PROD_pack', recurring_id: null },
+    { product_id: 'pro_monthly', revision: 2, one_time_id: 'PROD_once', recurring_id: 'PROD_cycle' }])
+  expect((await db.query("select * from public.read_waffo_bindings('STO_shop','prod')")).rowCount).toBe(0)
   expect((await price('pro_monthly', false)).rows[0].id).toBe('PROD_once')
   await rejects(() => price('pro_monthly', true, 'STO_other'), 'CATALOG_CHANNEL_UNVERIFIED')
   const audit = await db.query("select reason from public.admin_audit_log where action='catalog_waffo' and target_id='pro_monthly'")

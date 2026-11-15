@@ -77,3 +77,14 @@ begin
 end $$;
 revoke all on function public.admin_catalog_waffo_seeded(uuid,text,int,text,text,text,text) from public,anon,authenticated;
 grant execute on function public.admin_catalog_waffo_seeded(uuid,text,int,text,text,text,text) to service_role;
+
+-- pnpm pricing:waffo checks the Waffo products checkout actually uses: a version's binding when it
+-- has one for this store and mode, the environment mapping only for unbound seeded versions.
+create function public.read_waffo_bindings(p_store text,p_mode text)
+returns table(product_id text,revision integer,one_time_id text,recurring_id text,usd_cents integer)
+language sql stable security definer set search_path='' as $$
+  select b.product_id,b.revision,b.one_time_id,b.recurring_id,b.usd_cents from admin.catalog_waffo_bindings b
+   where b.store_id=p_store and b.mode=p_mode order by b.product_id,b.revision
+$$;
+revoke all on function public.read_waffo_bindings(text,text) from public,anon,authenticated;
+grant execute on function public.read_waffo_bindings(text,text) to service_role;
