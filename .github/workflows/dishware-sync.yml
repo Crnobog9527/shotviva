@@ -1,0 +1,44 @@
+name: Sync vessel library to production
+
+# The food templates' vessel library (ARCHITECTURE §5.1c「器皿图库」) follows the test site, like
+# template style references: every test row and its image, production rows the test site no longer
+# has switched off. Dispatched by the control window on main.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dishware-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production-manual
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - run: pnpm install --frozen-lockfile
+      - name: Sync the vessel library
+        env:
+          SYNC_PRODUCTION_ACTOR_ID: ${{ vars.SYNC_PRODUCTION_ACTOR_ID }}
+          SYNC_PRODUCTION_PRIVATE_BUCKET: ${{ vars.SYNC_PRODUCTION_PRIVATE_BUCKET }}
+          SYNC_PREVIEW_SERVICE_KEY: ${{ secrets.SYNC_PREVIEW_SERVICE_KEY }}
+          SYNC_PREVIEW_R2_ACCOUNT_ID: ${{ secrets.SYNC_PREVIEW_R2_ACCOUNT_ID }}
+          SYNC_PREVIEW_R2_ACCESS_KEY_ID: ${{ secrets.SYNC_PREVIEW_R2_ACCESS_KEY_ID }}
+          SYNC_PREVIEW_R2_SECRET_ACCESS_KEY: ${{ secrets.SYNC_PREVIEW_R2_SECRET_ACCESS_KEY }}
+          SYNC_PRODUCTION_SERVICE_KEY: ${{ secrets.SYNC_PRODUCTION_SERVICE_KEY }}
+          SYNC_PRODUCTION_R2_ACCOUNT_ID: ${{ secrets.SYNC_PRODUCTION_R2_ACCOUNT_ID }}
+          SYNC_PRODUCTION_R2_ACCESS_KEY_ID: ${{ secrets.SYNC_PRODUCTION_R2_ACCESS_KEY_ID }}
+          SYNC_PRODUCTION_R2_SECRET_ACCESS_KEY: ${{ secrets.SYNC_PRODUCTION_R2_SECRET_ACCESS_KEY }}
+        run: pnpm exec tsx --conditions=react-server scripts/dishware/sync.ts

@@ -6,7 +6,7 @@ import { AppError } from '@/core/errors'
 import { localeOfReferer } from '@/core/i18n'
 import { generateBodySchema, runGeneration, toGenerationRequest } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
-import { identityJudge, imageProvider, schedulePosterCheck } from '@/modules/image'
+import { foodDeps, identityJudge, imageProvider, schedulePosterCheck } from '@/modules/image'
 
 // Synchronous generation (ARCHITECTURE §4); the provider gets 240s of these 300 so a timeout
 // can still be refunded. Signed-in only. Answers with the job (status + file_url), never bytes.
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     if (!body.success) throw new AppError('INVALID_INPUT', 'template_id is required')
     // The private template selects the image model; the decision provider screens user text.
     const judge = await identityJudge()
-    const deps = { db: createAdminSupabase(), store: r2Store(), provider: imageProvider, identityJudge: judge, afterPoster: schedulePosterCheck }
+    const deps = { db: createAdminSupabase(), store: r2Store(), provider: imageProvider, identityJudge: judge, afterPoster: schedulePosterCheck, food: foodDeps() }
     // The `generate` event's locale: the workspace page's language, else the account's.
     const locale = localeOfReferer(request.headers.get('referer')) ?? user.locale ?? undefined
     // The IP is kept on the job as dispute evidence (T82).

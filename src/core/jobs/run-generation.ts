@@ -26,6 +26,7 @@ import {
 import { routeFallbackReason, withFallbackNotice } from './fallback-notice'
 import { settleTracked } from './generation-analytics'
 import { screenCost, templateCall, typedWords } from './generation-call'
+import { foodPlanOf, foodStep, type FoodDeps } from './food-flow'
 import type { GenerationRequest } from './generation-request'
 import { findOwnJob } from './job-lookup'
 import type { Job, JobSource } from './job-schema'
@@ -55,6 +56,8 @@ export type GenerationDeps = Omit<SettleDeps, 'provider'> & {
   allowPoster?: (userId: string) => Promise<void>
   // A finished poster's text check (§5.3 自动核对), scheduled after the response by the route.
   afterPoster?: (job: Job) => void
+  // A food template's toggle flows (§5.1c): the dish reader and the vessel library.
+  food?: FoodDeps | null
 }
 
 const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'partner' }
@@ -238,9 +241,10 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
   const jobId = req.jobId ?? randomUUID()
   const resolution = req.resolution ?? DEFAULT_RESOLUTION
   const attemptId = randomUUID()
+  const food = foodPlanOf(prompt.modelParams, inputs.toggles)
   const { job, call, provider } = await withFallbackNotice(template.id, async (selected) => {
     const route = await templateCall(deps, { template, prompt }, inputs, images, {
-      resolution, providerId: req.source === 'web' ? prompt.providerId : null,
+      resolution, providerId: req.source === 'web' ? prompt.providerId : null, food,
       onRoute: actual => selected(routeFallbackReason(actual, prompt.providerId, req.source)),
     })
     const reason = routeFallbackReason(route.provider, prompt.providerId, req.source)
@@ -256,12 +260,13 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
   // Dispute evidence (T82): the IP that started this paid or free work.
   await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })
 
-  const settle = () =>
-    settleGeneration({ ...deps, provider }, job, call, outputKeyFor(req.userId, job.id), {
-      inputKeys: prepared.keys,
-      decision: screenCost(deps.identityJudge, prepared.screen),
-      finishOutput: prepared.finishOutput,
+  // The food flow reads the dish only now, with the credits held (§5.1c).
+  const settle = async () => {
+    const step = await foodStep(deps, food, { call, photos: images, inputs, decision: screenCost(deps.identityJudge, prepared.screen) }, { templateId: template.id, runId: job.id })
+    return settleGeneration({ ...deps, provider }, job, step.call, outputKeyFor(req.userId, job.id), {
+      inputKeys: prepared.keys, decision: step.decision, finishOutput: prepared.finishOutput,
     })
+  }
   const settled = await settleTracked(job, template.category, settle, {
     track: deps.track,
     batchSize: req.batchSize ?? 1,

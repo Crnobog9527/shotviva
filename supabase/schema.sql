@@ -5846,6 +5846,28 @@ $$;
 ALTER FUNCTION "public"."admin_decide_refund"("p_ticket_id" "uuid", "p_decision" "text", "p_amount_cents" integer, "p_body" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_delete_dishware"("p_id" "uuid", "p_actor" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_key text;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  delete from public.dishware_library d where d.id = p_id returning d.image_key into v_key;
+  if v_key is null then
+    raise exception 'DISHWARE_NOT_FOUND';
+  end if;
+  return v_key;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_delete_dishware"("p_id" "uuid", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_delete_provider"("p_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -7788,6 +7810,45 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_save_dishware"("p_item" "jsonb", "p_actor" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id uuid;
+  v_previous text;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  begin
+    v_id := (p_item ->> 'id')::uuid;
+  exception when invalid_text_representation then
+    raise exception 'INVALID_INPUT' using detail = 'id';
+  end;
+  if v_id is null or jsonb_typeof(p_item -> 'is_active') <> 'boolean' then
+    raise exception 'INVALID_INPUT' using detail = 'id and is_active are required';
+  end if;
+  select d.image_key into v_previous from public.dishware_library d where d.id = v_id for update;
+  insert into public.dishware_library as d (id, label, category, shape, image_key, width, height, is_active, updated_by)
+  values (
+    v_id, btrim(p_item ->> 'label'), p_item ->> 'category', btrim(p_item ->> 'shape'), p_item ->> 'image_key',
+    (p_item ->> 'width')::integer, (p_item ->> 'height')::integer, (p_item ->> 'is_active')::boolean, p_actor
+  )
+  on conflict (id) do update set
+    label = excluded.label, category = excluded.category, shape = excluded.shape, image_key = excluded.image_key,
+    width = excluded.width, height = excluded.height, is_active = excluded.is_active, updated_by = p_actor;
+  return jsonb_build_object('previous_key', v_previous);
+exception
+  when check_violation or not_null_violation or unique_violation or invalid_text_representation then
+    raise exception 'INVALID_INPUT' using detail = sqlerrm;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_save_dishware"("p_item" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") RETURNS "void"
@@ -15577,6 +15638,30 @@ ALTER TABLE "public"."credit_ledger" ALTER COLUMN "id" ADD GENERATED ALWAYS AS I
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."dishware_library" (
+    "id" "uuid" NOT NULL,
+    "label" "text" NOT NULL,
+    "category" "text" NOT NULL,
+    "shape" "text" NOT NULL,
+    "image_key" "text" NOT NULL,
+    "width" integer NOT NULL,
+    "height" integer NOT NULL,
+    "is_active" boolean DEFAULT true NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid",
+    CONSTRAINT "dishware_library_category_check" CHECK (("category" = ANY (ARRAY['long'::"text", 'soup_stew'::"text", 'stir_fry'::"text", 'dim_sum'::"text", 'cold'::"text", 'noodle_rice'::"text"]))),
+    CONSTRAINT "dishware_library_height_check" CHECK (("height" > 0)),
+    CONSTRAINT "dishware_library_image_key_check" CHECK (("image_key" ~ '^dishware/[0-9a-f-]{36}-[0-9a-f]{16}\.webp$'::"text")),
+    CONSTRAINT "dishware_library_label_check" CHECK (((("char_length"("label") >= 1) AND ("char_length"("label") <= 40)) AND ("label" = "btrim"("label")))),
+    CONSTRAINT "dishware_library_shape_check" CHECK (((("char_length"("shape") >= 1) AND ("char_length"("shape") <= 200)) AND ("shape" = "btrim"("shape")))),
+    CONSTRAINT "dishware_library_width_check" CHECK (("width" > 0))
+);
+
+
+ALTER TABLE "public"."dishware_library" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."experiment_assignments" (
     "experiment_id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -16612,6 +16697,11 @@ ALTER TABLE ONLY "public"."credit_ledger"
 
 
 
+ALTER TABLE ONLY "public"."dishware_library"
+    ADD CONSTRAINT "dishware_library_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."experiment_assignments"
     ADD CONSTRAINT "experiment_assignments_pkey" PRIMARY KEY ("experiment_id", "user_id");
 
@@ -17230,6 +17320,10 @@ CREATE INDEX "credit_ledger_user_plan_idx" ON "public"."credit_ledger" USING "bt
 
 
 
+CREATE UNIQUE INDEX "dishware_library_image_key_key" ON "public"."dishware_library" USING "btree" ("image_key");
+
+
+
 CREATE INDEX "experiment_assignments_current_idx" ON "public"."experiment_assignments" USING "btree" ("current_variant_id");
 
 
@@ -17718,6 +17812,10 @@ CREATE OR REPLACE TRIGGER "codes_enforce_gift_policy" BEFORE INSERT OR UPDATE OF
 
 
 
+CREATE OR REPLACE TRIGGER "dishware_library_set_updated_at" BEFORE UPDATE ON "public"."dishware_library" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
 CREATE CONSTRAINT TRIGGER "draft_sale_floor" AFTER UPDATE OF "credits_cost", "quality" ON "public"."templates" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN ((NOT "new"."is_active")) EXECUTE FUNCTION "admin"."check_template_publish_floor"();
 
 
@@ -18158,6 +18256,11 @@ ALTER TABLE ONLY "public"."credit_ledger"
 
 ALTER TABLE ONLY "public"."credit_ledger"
     ADD CONSTRAINT "credit_ledger_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."dishware_library"
+    ADD CONSTRAINT "dishware_library_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
 
 
@@ -18731,6 +18834,9 @@ ALTER TABLE "public"."codes" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."credit_ledger" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."dishware_library" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."experiment_assignments" ENABLE ROW LEVEL SECURITY;
@@ -19906,6 +20012,11 @@ GRANT ALL ON FUNCTION "public"."admin_decide_refund"("p_ticket_id" "uuid", "p_de
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_delete_dishware"("p_id" "uuid", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_dishware"("p_id" "uuid", "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "service_role";
 
@@ -20168,6 +20279,11 @@ GRANT ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "
 
 REVOKE ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_save_dishware"("p_item" "jsonb", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_dishware"("p_item" "jsonb", "p_actor" "uuid") TO "service_role";
 
 
 
@@ -21307,6 +21423,10 @@ GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."credit_ledg
 GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."dishware_library" TO "service_role";
 
 
 
