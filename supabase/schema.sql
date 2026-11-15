@@ -2051,7 +2051,7 @@ begin
     clock_timestamp())
   on conflict (singleton) do update set breakeven=excluded.breakeven, floor_budget=excluded.floor_budget,
     margin_target_bp=excluded.margin_target_bp, refreshed_at=excluded.refreshed_at;
-  perform set_config('shotviva.stmt_memo', '', true);
+  perform set_config('shotviva.stmt_memo', gen_random_uuid()::text, true);
 end $$;
 
 
@@ -2537,11 +2537,15 @@ CREATE OR REPLACE FUNCTION "admin"."slot_route_floor"("p_tag" "text", "p_resolut
     SET "search_path" TO ''
     AS $$
 declare
-  k text := concat_ws('|', 'slot', quote_nullable(p_tag), quote_nullable(p_resolution), quote_nullable(p_quality),
-    quote_nullable(p_slots), quote_nullable(p_single));
-  hit jsonb := admin.stmt_memo(k);
+  k text;
+  hit jsonb;
   v integer;
 begin
+  if p_single is null then return null; end if;
+  if coalesce(p_slots, 0) <= 1 then return p_single; end if;
+  k := concat_ws('|', 'slot', quote_nullable(p_tag), quote_nullable(p_resolution), quote_nullable(p_quality),
+    quote_nullable(p_slots), quote_nullable(p_single));
+  hit := admin.stmt_memo(k);
   if hit ? 'v' and jsonb_typeof(hit->'v') in ('number', 'null') then return (hit->>'v')::integer; end if;
   v := admin.slot_route_floor_now(p_tag, p_resolution, p_quality, p_slots, p_single);
   perform admin.stmt_memo_put(k, to_jsonb(v));
@@ -2588,14 +2592,14 @@ CREATE OR REPLACE FUNCTION "admin"."stmt_memo"("p_key" "text") RETURNS "jsonb"
     SET "search_path" TO ''
     AS $$
 declare
-  raw text := current_setting('shotviva.stmt_memo', true);
-  stamp text := statement_timestamp()::text || '|';
+  stamp text := statement_timestamp()::text || '#' || coalesce(current_setting('shotviva.stmt_memo', true), '') || '|';
+  raw text := current_setting('shotviva.m_' || md5(p_key), true);
   body text;
 begin
   if raw is null or left(raw, length(stamp)) <> stamp then return null; end if;
   body := substr(raw, length(stamp) + 1);
   if not pg_input_is_valid(body, 'jsonb') then return null; end if;
-  return case when jsonb_typeof(body::jsonb) = 'object' then body::jsonb -> p_key end;
+  return jsonb_build_object('v', body::jsonb);
 end $$;
 
 
@@ -2607,7 +2611,7 @@ CREATE OR REPLACE FUNCTION "admin"."stmt_memo_clear"() RETURNS "trigger"
     SET "search_path" TO ''
     AS $$
 begin
-  perform set_config('shotviva.stmt_memo', '', true);
+  perform set_config('shotviva.stmt_memo', gen_random_uuid()::text, true);
   return null;
 end $$;
 
@@ -2619,17 +2623,10 @@ CREATE OR REPLACE FUNCTION "admin"."stmt_memo_put"("p_key" "text", "p_value" "js
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
-declare
-  raw text := current_setting('shotviva.stmt_memo', true);
-  stamp text := statement_timestamp()::text || '|';
-  body text;
-  memo jsonb := '{}';
 begin
-  if raw is not null and left(raw, length(stamp)) = stamp then
-    body := substr(raw, length(stamp) + 1);
-    if pg_input_is_valid(body, 'jsonb') and jsonb_typeof(body::jsonb) = 'object' then memo := body::jsonb; end if;
-  end if;
-  perform set_config('shotviva.stmt_memo', stamp || (memo || jsonb_build_object(p_key, jsonb_build_object('v', p_value)))::text, true);
+  perform set_config('shotviva.m_' || md5(p_key),
+    statement_timestamp()::text || '#' || coalesce(current_setting('shotviva.stmt_memo', true), '') || '|'
+      || coalesce(p_value, 'null'::jsonb)::text, true);
 end $$;
 
 
