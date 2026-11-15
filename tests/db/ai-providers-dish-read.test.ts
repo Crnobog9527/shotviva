@@ -19,7 +19,9 @@ const KEY = 'sk-or-dish-read-secret-0123456789'
 let pg: Client
 let adminId: string
 
-const deps = () => ({ db: serviceSupabase(), resolveHost: publicHost })
+// No network: the catalogue is unreachable, so the hand-entered prices are what jobs are costed with.
+const offline = async () => new Response(null, { status: 503 })
+const deps = () => ({ db: serviceSupabase(), resolveHost: publicHost, fetch: offline })
 const save = () => saveProvider(deps(), adminId, {
   label: `${PREFIX} ${randomUUID().slice(0, 6)}`, module: 'dish_read', adapter: 'openai_responses',
   baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-6-sol', apiKey: KEY,

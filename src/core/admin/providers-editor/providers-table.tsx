@@ -114,7 +114,7 @@ export function ProvidersTable({ providers, testResults, testing, pending, ...ha
               </TableCell>
               <TableCell className="font-mono text-xs">{COPY.keyMasked(provider.apiKeyLast4)}</TableCell>
               <TableCell>
-                {provider.adapter === 'openrouter_images' ? <CatalogPrices pricing={provider.capabilities?.catalogPricing} /> : provider.adapter === 'ark_images' ? <ArkPricesCell model={provider.model} /> : <PricesCell adapter={provider.adapter} prices={provider.prices} module={provider.module} model={provider.model} />}
+                {provider.adapter === 'openrouter_images' ? <CatalogPrices pricing={provider.capabilities?.catalogPricing} /> : provider.adapter === 'ark_images' ? <ArkPricesCell listPrice={provider.listPrice} /> : <PricesCell provider={provider} />}
               </TableCell>
               <TableCell>
                 <Badge variant={provider.isActive ? 'default' : 'secondary'}>{provider.isActive ? COPY.active : COPY.inactive}</Badge>

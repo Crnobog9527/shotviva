@@ -49,6 +49,7 @@ export {
   activate as activateProvider,
   refreshProviderCapabilities,
   lookupProviderModel,
+  lookupProviderPrice,
   removeProvider,
   runProviderAction,
   saveProvider,

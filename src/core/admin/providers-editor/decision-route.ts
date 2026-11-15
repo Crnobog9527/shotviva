@@ -1,6 +1,6 @@
 import { DEFAULT_BASE_URL, OPENROUTER_BASE_URL } from '@/core/providers/types'
 
-import { withModel, type ProviderForm } from './form-state'
+import type { ProviderForm } from './form-state'
 
 // The decision row (T30) always talks the Responses protocol (adapter openai_responses, no
 // migration). Which endpoint it uses is a form-only choice read from the stored address: OpenAI
@@ -23,10 +23,10 @@ function modelFor(route: DecisionRoute, model: string): string {
   return name.startsWith('openai/') ? name.slice('openai/'.length) : name
 }
 
-// Switching the route sets (and on OpenRouter locks) the address and renames the model; prices
-// that were blank or the old model's table price follow the new name (withModel).
+// Switching the route sets (and on OpenRouter locks) the address and renames the model. It is the
+// same model under another name, so typed prices stay; the catalogue price is looked up again.
 export function withDecisionRoute(form: ProviderForm, route: DecisionRoute): ProviderForm {
   const baseUrl = route === 'openrouter' ? OPENROUTER_BASE_URL : DEFAULT_BASE_URL
-  return withModel({ ...form, baseUrl }, modelFor(route, form.model))
+  return { ...form, baseUrl, model: modelFor(route, form.model) }
 }
 

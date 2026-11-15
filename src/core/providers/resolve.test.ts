@@ -64,20 +64,10 @@ describe('resolveProvider', () => {
     const env = parseServerEnv({ OPENAI_API_KEY: 'sk-env-0123456789', OPENAI_IMAGE_MODEL: 'gpt-image-2.5-sunburst' })
     const provider = await resolveProvider('image', null, env, adapters, readKey)
     expect(provider.id).toBe('env/gpt-image-2.5-sunburst')
-    // No row to hold prices, so the model's official price applies (§10.0).
-    expect(provider.prices).toEqual({ inputTextPerM: 5, inputImagePerM: 8, outputPerM: 30 })
+    // No row to hold a price and no price table in code (§10.0): usage is recorded, not a cost.
+    expect(provider.prices).toBeNull()
     expect(readKey).not.toHaveBeenCalled()
     expect(configs).toEqual([{ baseUrl: 'https://api.openai.com/v1', model: 'gpt-image-2.5-sunburst', apiKey: 'sk-env-0123456789' }])
-  })
-
-  it("fills a row's empty prices from the price table for its model, keeping the ones it has", async () => {
-    const { adapters } = recordingAdapters()
-    const env = parseServerEnv({})
-    const empty = { inputTextPerM: null, inputImagePerM: null, outputPerM: null }
-    const official = { ...row, model: 'gpt-image-2.6-sunburst', prices: { ...empty, outputPerM: 40 } }
-    expect((await resolveProvider('image', official, env, adapters, async () => RELAY_KEY)).prices).toEqual({ inputTextPerM: 5, inputImagePerM: 8, outputPerM: 40 })
-    // A model the table does not know, with nothing filled in: no snapshot, so jobs are uncosted.
-    expect((await resolveProvider('image', { ...row, prices: empty }, env, adapters, async () => RELAY_KEY)).prices).toBeNull()
   })
 
   it('fails without a fallback key, and when the active row has no key (no silent env fallback)', async () => {
@@ -91,6 +81,26 @@ describe('resolveProvider', () => {
 
   it('refuses a row whose adapter is not registered', async () => {
     await expect(resolveProvider('image', row, parseServerEnv({}), {}, async () => RELAY_KEY)).rejects.toThrow(/not registered/)
+  })
+})
+
+describe('resolveProvider prices (§10.0)', () => {
+  it("prices an official OpenAI line from its catalogue snapshot, filling gaps from the row's own", async () => {
+    const { adapters } = recordingAdapters()
+    const env = parseServerEnv({})
+    const empty = { inputTextPerM: null, inputImagePerM: null, outputPerM: null }
+    // Fixture catalogue snapshot (real ones come from OpenRouter's public catalogue).
+    const catalogPrice = {
+      status: 'quoted' as const, catalogModel: 'openai/gpt-image-2.6-sunburst', source: 'https://openrouter.ai/openai/gpt-image-2.6-sunburst',
+      fetchedAt: '2026-11-15T00:00:00.000Z', prices: { inputTextPerM: 5, inputImagePerM: null, outputPerM: 30 },
+    }
+    const official = { ...row, baseUrl: 'https://api.openai.com/v1', model: 'gpt-image-2.6-sunburst', prices: { ...empty, inputImagePerM: 9, outputPerM: 40 }, catalogPrice }
+    // The catalogue wins where it quotes a price; the admin's entry fills the rest.
+    expect((await resolveProvider('image', official, env, adapters, async () => RELAY_KEY)).prices).toEqual({ inputTextPerM: 5, inputImagePerM: 9, outputPerM: 30 })
+    // A snapshot for another model prices nothing.
+    expect((await resolveProvider('image', { ...official, model: 'gpt-image-3', prices: empty }, env, adapters, async () => RELAY_KEY)).prices).toBeNull()
+    // A relay host has no catalogue: only what the admin typed in.
+    expect((await resolveProvider('image', { ...row, prices: empty, catalogPrice }, env, adapters, async () => RELAY_KEY)).prices).toBeNull()
   })
 })
 

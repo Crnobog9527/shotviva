@@ -3,6 +3,7 @@ import { z } from 'zod'
 import sharp from 'sharp'
 import { AppError } from '@/core/errors'
 import { effectivePrices } from '@/core/jobs'
+import { currentCatalogPrice } from '@/core/providers/catalog-model'
 import { OPENROUTER_BASE_URL, type AdminProvider } from '@/core/providers'
 import { OPENROUTER_TOP_UP_FACTOR, openRouterChargeUsd } from '@/core/jobs/openrouter-fee'
 
@@ -18,7 +19,7 @@ const reply = z.object({
 })
 
 export function reverseEstimate(row: AdminProvider, instruction: string) {
-  const prices = effectivePrices(row.model, row.prices)
+  const prices = effectivePrices(currentCatalogPrice(row), row.prices)
   if (prices?.inputTextPerM == null || prices.outputPerM == null) throw new AppError('INVALID_INPUT', '倒推模型缺少价格')
   // Conservative quote for one downscaled low-detail image, one instruction and bounded output.
   const imageRate = prices.inputImagePerM ?? prices.inputTextPerM
@@ -42,7 +43,7 @@ function routerCost(usage: Usage) {
 function actualCost(row: AdminProvider, usage: Usage | null | undefined) {
   if (!usage) return null
   if (endpoint(row) === OPENROUTER_BASE_URL) return routerCost(usage)
-  const rates = effectivePrices(row.model, row.prices)
+  const rates = effectivePrices(currentCatalogPrice(row), row.prices)
   // Responses reports aggregate input tokens. Separate image pricing cannot be reconstructed.
   if (rates?.inputTextPerM == null || rates.outputPerM == null) return null
   if (rates.inputImagePerM != null && rates.inputImagePerM !== rates.inputTextPerM) return null

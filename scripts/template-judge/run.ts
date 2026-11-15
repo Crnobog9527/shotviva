@@ -24,6 +24,7 @@ import { listAdminTemplates } from '../../src/core/admin/templates/repository'
 import { AppError } from '../../src/core/errors'
 import { effectivePrices, providerTag } from '../../src/core/jobs'
 import { readProviderKey } from '../../src/core/providers'
+import { currentCatalogPrice } from '../../src/core/providers/catalog-model'
 import { loadActiveProviderRow } from '../../src/core/providers/repository'
 import { withDbTiers } from '../../src/core/templates/db-resolution'
 import { readBatchFile, RunError, targetStores } from '../template-apply/batch-file'
@@ -65,7 +66,7 @@ async function judgeRow(db: SupabaseClient) {
   const row = await loadActiveProviderRow(db, 'decision')
   if (!row) throw new RunError('目标站没有启用的判断线路（后台 /admin/providers 的「判断」），没有调用模型')
   if (row.adapter !== 'openai_responses') throw new RunError(`判断线路的适配器 ${row.adapter} 不是 Responses 接口，评审机用不了`)
-  return { row, tag: providerTag(row.id, row.model), prices: effectivePrices(row.model, row.prices) }
+  return { row, tag: providerTag(row.id, row.model), prices: effectivePrices(currentCatalogPrice(row), row.prices) }
 }
 
 const MAX_COVER_BYTES = 20 * 1024 * 1024

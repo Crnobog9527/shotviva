@@ -14,7 +14,7 @@ import { z } from 'zod'
 
 import { ALLOW_EXAMPLES, REFUSE_EXAMPLES, type IdentityExample } from '../src/core/identity-guard/examples.test-data'
 import { IDENTITY_EDIT_ADDENDUM, IDENTITY_JUDGE_INSTRUCTIONS, IDENTITY_PROMPT_VERSION } from '../src/core/identity-guard/question'
-import { MODEL_PRICES } from '../src/core/jobs/model-prices'
+import { fetchCatalogPrice } from '../src/core/providers/catalog-price'
 import { createOpenAIIdentityJudge } from '../src/modules/image/edit/openai-identity-judge'
 
 const env = z
@@ -69,7 +69,9 @@ async function main() {
   const avg = (values: number[]) => values.reduce((a, b) => a + b, 0) / Math.max(1, values.length)
   const inTok = avg(answered.map((row) => row.inTok))
   const outTok = avg(answered.map((row) => row.outTok))
-  const prices = MODEL_PRICES[env.IDENTITY_MODEL]?.prices
+  // The model's live OpenRouter catalogue price (no price table in code); null cost when it has none.
+  const catalog = await fetchCatalogPrice('openai_responses', env.OPENAI_BASE_URL, env.IDENTITY_MODEL, fetch)
+  const prices = catalog?.status === 'quoted' ? catalog.prices : null
   const cost = prices ? (inTok * (prices.inputTextPerM ?? 0) + outTok * (prices.outputPerM ?? 0)) / 1_000_000 : null
 
   // What merging into the edit scope call adds: the addendum's tokens, measured as the difference

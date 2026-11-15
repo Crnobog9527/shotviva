@@ -18,7 +18,8 @@ const KEY = 'sk-pr1b-tiers-secret-0123456789'
 let pg: Client
 let adminId: string
 
-const deps = () => ({ db: serviceSupabase(), resolveHost: publicHost })
+// No network: the catalogue price lookup on save finds the catalogue unreachable.
+const deps = () => ({ db: serviceSupabase(), resolveHost: publicHost, fetch: async () => new Response(null, { status: 503 }) })
 const save = (input: Record<string, unknown>) =>
   saveProvider(deps(), adminId, {
     label: `${PREFIX} ${randomUUID().slice(0, 6)}`,

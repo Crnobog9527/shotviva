@@ -535,14 +535,18 @@ CREATE TABLE IF NOT EXISTS "public"."ai_providers" (
     "estimated_image_costs" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     "extra_input_image_usd" numeric,
     "byok_list_price" boolean DEFAULT true NOT NULL,
+    "catalog_price" "jsonb",
+    "list_price" "jsonb",
     CONSTRAINT "ai_providers_adapter_check" CHECK (("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text", 'ark_images'::"text", 'openai_responses'::"text"]))),
     CONSTRAINT "ai_providers_api_key_last4_check" CHECK ((("char_length"("api_key_last4") >= 1) AND ("char_length"("api_key_last4") <= 4))),
     CONSTRAINT "ai_providers_base_url_check" CHECK ((("base_url" ~ '^https://[^\s/?#@]+(/[^\s?#]*)?$'::"text") AND ("char_length"("base_url") <= 300))),
     CONSTRAINT "ai_providers_capabilities_check" CHECK (("jsonb_typeof"("capabilities") = 'object'::"text")),
+    CONSTRAINT "ai_providers_catalog_price_check" CHECK ((("catalog_price" IS NULL) OR ("jsonb_typeof"("catalog_price") = 'object'::"text"))),
     CONSTRAINT "ai_providers_estimated_image_costs_check" CHECK ((("jsonb_typeof"("estimated_image_costs") = 'object'::"text") AND (("estimated_image_costs" - ARRAY['1k'::"text", '2k'::"text", '4k'::"text"]) = '{}'::"jsonb") AND (NOT "jsonb_path_exists"("estimated_image_costs", '$.*?(@.type() != "number" || @ <= 0)'::"jsonpath")))),
     CONSTRAINT "ai_providers_extra_input_image_usd_check" CHECK ((("extra_input_image_usd" IS NULL) OR (("extra_input_image_usd" >= (0)::numeric) AND ("extra_input_image_usd" < (10)::numeric)))),
     CONSTRAINT "ai_providers_key_pair" CHECK ((("vault_secret_id" IS NULL) = ("api_key_last4" IS NULL))),
     CONSTRAINT "ai_providers_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 80))),
+    CONSTRAINT "ai_providers_list_price_check" CHECK ((("list_price" IS NULL) OR ("jsonb_typeof"("list_price") = 'object'::"text"))),
     CONSTRAINT "ai_providers_model_check" CHECK ((("char_length"("model") >= 1) AND ("char_length"("model") <= 120))),
     CONSTRAINT "ai_providers_module_adapter" CHECK (((("module" = 'image'::"text") AND ("adapter" = ANY (ARRAY['openai_images'::"text", 'openrouter_images'::"text", 'ark_images'::"text"]))) OR (("module" = ANY (ARRAY['decision'::"text", 'dish_read'::"text"])) AND ("adapter" = 'openai_responses'::"text")))),
     CONSTRAINT "ai_providers_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'decision'::"text", 'dish_read'::"text"]))),
@@ -8597,6 +8601,31 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_provider_list_price"("p_actor" "uuid", "p_id" "uuid", "p_price" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+begin
+  if not exists(select from public.profiles where id=p_actor and role='admin' and banned_at is null) then raise exception 'NOT_ADMIN'; end if;
+  if p_price is not null and (jsonb_typeof(p_price) <> 'object'
+     or jsonb_typeof(p_price->'outputBands') <> 'array' or jsonb_array_length(p_price->'outputBands') not between 1 and 5
+     or exists(select from jsonb_array_elements(p_price->'outputBands') b
+               where jsonb_typeof(b) <> 'object' or jsonb_typeof(b->'cny') <> 'number' or (b->>'cny')::numeric < 0
+                  or coalesce(jsonb_typeof(b->'maxPixels'), 'null') not in ('null', 'number')
+                  or (jsonb_typeof(b->'maxPixels') = 'number' and (b->>'maxPixels')::numeric <= 0))
+     or jsonb_typeof(p_price->'inputImageCny') <> 'number' or (p_price->>'inputImageCny')::numeric < 0
+     or coalesce(p_price->>'source', '') !~ '^https://'
+     or coalesce(p_price->>'asOf', '') !~ '^\d{4}-\d{2}-\d{2}$') then
+    raise exception 'INVALID_INPUT';
+  end if;
+  update public.ai_providers set list_price=p_price where id=p_id and adapter='ark_images';
+  if not found then raise exception 'PROVIDER_NOT_FOUND'; end if;
+end $_$;
+
+
+ALTER FUNCTION "public"."admin_set_provider_list_price"("p_actor" "uuid", "p_id" "uuid", "p_price" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_system_setting"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") RETURNS "void"
@@ -20422,6 +20451,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_provider_extra_input_cost"("p_actor" "
 
 REVOKE ALL ON FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_provider_key"("p_id" "uuid", "p_key" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_provider_list_price"("p_actor" "uuid", "p_id" "uuid", "p_price" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_provider_list_price"("p_actor" "uuid", "p_id" "uuid", "p_price" "jsonb") TO "service_role";
 
 
 
