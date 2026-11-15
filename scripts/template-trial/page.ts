@@ -1,7 +1,7 @@
 import { relative, resolve } from 'node:path'
 
 import type { TemplateItem } from '../template-apply/schema'
-import type { Verdict } from '../template-judge/ledger'
+import { outcomeOf, type ShownVerdict, type Verdict } from '../template-judge/ledger'
 import type { TrialRecord, TrialState } from './results'
 
 // The local review page (.local/trials/index.html): per template its benchmarks, its input sets
@@ -20,15 +20,24 @@ function reviewLine(item: TemplateItem) {
 }
 
 // The image judge's verdict on one result (templates:judge): overall, then each item with its reason.
-function judgeBlock(verdict: Verdict | undefined) {
+// A failed result judged a second time (--rejudge-failed) shows both looks and counts as failed
+// only if both fail.
+const itemList = (verdict: Verdict) => `<ul>${verdict.items.map(item => `<li class="${item.pass ? 'ok' : 'bad'}">${item.pass ? '✓' : '✗'} ${escape(item.text)}<br><span>${escape(item.reason)}</span></li>`).join('')}</ul>`
+const failedOf = (verdict: Verdict) => `${verdict.items.filter(item => !item.pass).length}/${verdict.items.length}`
+
+function judgeBlock(verdict: ShownVerdict | undefined) {
   if (!verdict) return ''
-  const items = verdict.items.map(item => `<li class="${item.pass ? 'ok' : 'bad'}">${item.pass ? '✓' : '✗'} ${escape(item.text)}<br><span>${escape(item.reason)}</span></li>`).join('')
-  const failed = verdict.items.filter(item => !item.pass).length
-  const summary = verdict.pass ? '✓ 全部通过' : `✗ ${failed}/${verdict.items.length} 项不过`
-  return `<details class="judge"${verdict.pass ? '' : ' open'}><summary class="${verdict.pass ? 'ok' : 'bad'}">评审机 ${summary}</summary><ul>${items}</ul></details>`
+  const outcome = outcomeOf(verdict)
+  const summary = outcome === 'pass' ? '✓ 全部通过'
+    : outcome === 'fail' ? `✗ ${failedOf(verdict)} 项不过`
+      : outcome === 'fail-twice' ? `✗ 两次都不过（${failedOf(verdict)}、复判 ${failedOf(verdict.rejudge!)}）`
+        : `✓ 复判通过（首判 ✗ ${failedOf(verdict)}）`
+  const good = outcome === 'pass' || outcome === 'pass-on-rejudge'
+  const second = verdict.rejudge ? `<p>首判</p>${itemList(verdict)}<p>复判</p>${itemList(verdict.rejudge)}` : itemList(verdict)
+  return `<details class="judge"${outcome === 'pass' ? '' : ' open'}><summary class="${good ? 'ok' : 'bad'}">评审机 ${summary}</summary>${second}</details>`
 }
 
-function resultCard(record: TrialRecord, pick?: string, verdict?: Verdict) {
+function resultCard(record: TrialRecord, pick?: string, verdict?: ShownVerdict) {
   const meta = [`#${record.inputIndex + 1}.${record.k + 1}`, record.provider?.split('/').slice(1).join('/') || '', money(record.costUsd),
     record.durationMs ? `${Math.round(record.durationMs / 1000)}s` : ''].filter(Boolean).join(' · ')
   const body = record.file ? img(record.file, record.runId) : `<div class="miss">${escape(record.outcome)} ${escape(record.code ?? '')}</div>`
@@ -46,7 +55,7 @@ function inputsBlock(item: TemplateItem, root: string, baseDir: string) {
   }).join('')
 }
 
-function templateSection(item: TemplateItem, records: TrialRecord[], root: string, baseDir: string, verdicts: Map<string, Verdict>) {
+function templateSection(item: TemplateItem, records: TrialRecord[], root: string, baseDir: string, verdicts: Map<string, ShownVerdict>) {
   const refs = (item.trial?.references ?? []).map((p, i) => img(relative(root, resolve(baseDir, p)), `对标 ${i + 1}`)).join('')
   const versions = [...new Set(records.map(r => r.version))].sort((a, b) => b - a)
   const spent = records.reduce((sum, r) => sum + (r.costUsd ?? 0), 0)
@@ -66,10 +75,10 @@ section{border-top:1px solid var(--line);padding:16px 0}h2 small,figcaption,.mis
 .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
 figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px}
-img{width:100%;height:auto;border-radius:4px;display:block}.judge{font-size:12px;margin-top:4px}.judge ul{margin:4px 0 0;padding-left:0;list-style:none}.judge li{margin:3px 0}.judge li span{color:var(--muted)}.ok{color:#16a34a}.bad{color:#dc2626}figure.pick{outline:3px solid #16a34a}code{font-size:11px;word-break:break-all}nav a{margin-right:12px}`
+img{width:100%;height:auto;border-radius:4px;display:block}.judge{font-size:12px;margin-top:4px}.judge ul{margin:4px 0 0;padding-left:0;list-style:none}.judge li{margin:3px 0}.judge li span{color:var(--muted)}.judge p{margin:4px 0 0;font-weight:600}.ok{color:#16a34a}.bad{color:#dc2626}figure.pick{outline:3px solid #16a34a}code{font-size:11px;word-break:break-all}nav a{margin-right:12px}`
 
 // verdicts: the image judge's newest verdict per run id (templates:judge), shown under each result.
-export function buildPage(state: TrialState, items: TemplateItem[], root: string, baseDir: string, generatedAt = new Date(), verdicts = new Map<string, Verdict>()) {
+export function buildPage(state: TrialState, items: TemplateItem[], root: string, baseDir: string, generatedAt = new Date(), verdicts = new Map<string, ShownVerdict>()) {
   const records = Object.values(state.records)
   const shown = items.filter(item => item.trial || records.some(r => r.templateId === item.id))
   const nav = shown.map(item => `<a href="#${escape(item.id)}">${escape(item.id)}</a>`).join('')

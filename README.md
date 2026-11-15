@@ -63,7 +63,7 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
   "required"?, "note"? }]` (1–4, the order the model gets them). With slots, `images.max` must be
   the number of slots and `images.min` the number of required ones; `note` names a text field shown
   under that box; such a template must be `visibleIn: ["web"]` only.
-- `pnpm templates:judge <batch>.json [--dry-run] [--only a,b] [--budget 0.2] [--concurrency 2] [--effort medium]`
+- `pnpm templates:judge <batch>.json [--dry-run] [--only a,b] [--budget 0.2] [--concurrency 2] [--effort medium] [--rejudge-failed]`
   is the automatic image judge. It looks at every result of the current prompt version that
   `templates:trial` downloaded, together with the test image(s) it was made from, the template's
   cover and its style references, and answers the batch file's checklist with a yes/no and a short
@@ -77,7 +77,9 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
   (the active 判断 provider, key read from the database). Each look holds its estimate against
   `--budget` (USD, default 0.2) before it is made; a look costs well under $0.002. Verdicts and
   spend go to `.local/trials/judge.json`, keyed by a content hash (the images, the checklist, the
-  judge model and effort), so an unchanged result is never judged twice. The review page shows each
+  judge model and effort), so an unchanged result is never judged twice. `--rejudge-failed` gives a result
+  whose verdict has a ✗ from the model one second look (once per result, ever; both verdicts are
+  kept): it counts as failed only if both fail, and the page and status say "两次都不过" or "复判通过". The review page shows each
   item with its reason under the result, and `templates:status` gets a judge column.
 - Review and finish: write each template's verdict into the file as
   `"review": { "status": "pass" | "fail", "version": <prompt version>, "pick": "<trial run id>", "notes": "…" }`
