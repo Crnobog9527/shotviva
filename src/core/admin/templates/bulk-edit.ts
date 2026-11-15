@@ -9,6 +9,7 @@ import { AppError } from '@/core/errors'
 import { LOCALES } from '@/core/i18n/locales'
 import { logger } from '@/core/logger'
 import { withTierKeys } from '@/core/templates/db-resolution'
+import { RESOLUTIONS } from '@/core/templates/output-options'
 import { TEMPLATE_QUALITIES } from '@/core/templates/pricing'
 import { TEMPLATE_SURFACES } from '@/core/templates/schema'
 
@@ -30,6 +31,8 @@ const inputSchema = z.object({
       providerId: z.uuid().nullable().optional(),
       // A tab opened before the 4K rename still sends '3k': read it as '4k', like the template save.
       creditsCost: withTierKeys(z.strictObject({ '1k': tier.optional(), '2k': tier.optional(), '4k': tier.optional() })).optional(),
+      closeResolutions: z.array(z.enum(RESOLUTIONS)).min(1).max(RESOLUTIONS.length)
+        .refine((tiers) => new Set(tiers).size === tiers.length, 'tiers must be unique').optional(),
       visibleIn: z
         .array(z.enum(TEMPLATE_SURFACES))
         .min(1)
@@ -39,7 +42,8 @@ const inputSchema = z.object({
       // A template_categories key (T75); the SQL function refuses unknown and system ones.
       categoryKey: z.string().min(1).max(40).optional(),
     })
-    .refine((patch) => !isEmptyPatch(patch), '至少改一项'),
+    .refine((patch) => !isEmptyPatch(patch), '至少改一项')
+    .refine((patch) => !patch.closeResolutions?.some((tier) => patch.creditsCost?.[tier] !== undefined), '同一档不能既填积分又停售'),
 })
 
 const resultSchema = z.object({
@@ -55,13 +59,14 @@ const resultSchema = z.object({
         given: z.number(),
       }),
       z.object({ id: z.string(), name: z.string(), reason: z.literal('model'), detail: z.string() }),
-      z.object({ id: z.string(), name: z.string(), reason: z.enum(['web_incomplete', 'not_found', 'system']) }),
+      z.object({ id: z.string(), name: z.string(), reason: z.enum(['web_incomplete', 'not_found', 'system', 'no_tier']) }),
     ]),
   ),
 })
 
 const toSqlPatch = (patch: BulkEditPatch) => ({
   ...(patch.creditsCost && Object.keys(patch.creditsCost).length > 0 ? { credits_cost: patch.creditsCost } : {}),
+  ...(patch.closeResolutions?.length ? { close_resolutions: patch.closeResolutions } : {}),
   ...(patch.visibleIn ? { visible_in: patch.visibleIn } : {}),
   ...(patch.providerId !== undefined && { provider_id: patch.providerId }),
   ...(patch.quality ? { quality: patch.quality } : {}),

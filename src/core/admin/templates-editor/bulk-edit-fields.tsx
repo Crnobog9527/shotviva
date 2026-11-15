@@ -22,7 +22,8 @@ type Props = {
   onChange: (values: BulkEditValues) => void
 }
 
-// The batch-edit form: three optional credit boxes, entry points, quality. Each starts on 不改.
+// The batch-edit form: three optional credit boxes (each can instead close its tier: 停售),
+// entry points, quality. Each starts on 不改.
 export function BulkEditFields({ values, problems, providers, categories, onChange }: Props) {
   return (
     <div className="grid gap-4">
@@ -33,11 +34,19 @@ export function BulkEditFields({ values, problems, providers, categories, onChan
         <div className="grid grid-cols-3 gap-3">
           {RESOLUTIONS.map((resolution) => (
             <div key={resolution} className="grid gap-1.5">
-              <Label htmlFor={`bulk-credits-${resolution}`}>{TIER_LABEL[resolution]}</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor={`bulk-credits-${resolution}`}>{TIER_LABEL[resolution]}</Label>
+                <label className="flex items-center gap-1 text-xs">
+                  <input type="checkbox" checked={values.closed[resolution]} aria-label={`停售 ${TIER_LABEL[resolution]}`}
+                    onChange={(event) => onChange({ ...values, closed: { ...values.closed, [resolution]: event.target.checked } })} />
+                  停售
+                </label>
+              </div>
               <Input
                 id={`bulk-credits-${resolution}`}
                 inputMode="numeric"
-                placeholder="不改"
+                disabled={values.closed[resolution]}
+                placeholder={values.closed[resolution] ? '停售此档' : '不改'}
                 aria-invalid={problems[resolution] ? true : undefined}
                 value={values.credits[resolution]}
                 onChange={(event) => onChange({ ...values, credits: { ...values.credits, [resolution]: event.target.value } })}
