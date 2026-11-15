@@ -5,6 +5,8 @@ import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { phases, review, safeFailure } from '@/core/admin/products/workflow'
 import { saveDraft } from '@/core/admin/products/editor-data'
 import { productIdSchema } from '@/core/config/product-id'
+import { bindSeededWaffo } from '@/core/admin/products/waffo-seeded'
+import { currentProducts } from '@/site/billing/display-products'
 
 export async function catalogAction(form: FormData) {
   const actor = await requireAdmin()
@@ -23,6 +25,24 @@ export async function catalogAction(form: FormData) {
     }
     revalidatePath('/[locale]/admin/products','page')
     query.set('done','1')
+  } catch (error) {
+    unstable_rethrow(error)
+    query.set('error',safeFailure(error))
+  }
+  redirect('/admin/products?'+query.toString())
+}
+
+// Binds the seeded versions whose Waffo products match the current quote (ARCHITECTURE §6.3).
+export async function waffoSeededAction(form: FormData) {
+  const actor = await requireAdmin()
+  const query = new URLSearchParams()
+  try {
+    if (actor.banned || form.get('waffo_period') !== 'on') throw new Error('Confirmation required')
+    const db = createAdminSupabase()
+    const outcomes = await bindSeededWaffo(db, actor.id, await currentProducts(db))
+    if (outcomes.some(o => o.status === 'bound')) updateTag('billing-products')
+    revalidatePath('/[locale]/admin/products','page')
+    query.set('waffo', outcomes.map(o => `${o.sku}:${o.status}`).join(','))
   } catch (error) {
     unstable_rethrow(error)
     query.set('error',safeFailure(error))

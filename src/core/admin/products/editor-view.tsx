@@ -4,9 +4,24 @@ import { Economics } from './economics'
 import { Differences, DraftForm, type CatalogAction } from './editor-form'
 import { ArchiveReview, ManualReview, WaffoReview } from './manual-review'
 import type { CatalogPageRows, Editor } from './model'
+import { Button } from '../../ui/button'
 
 const path = '/admin/products'
 const href = (product: string) => path + '?sku=' + encodeURIComponent(product)
+// Shown wherever this deployment has Waffo configured, so the bindings exist before a switch.
+export function WaffoSeededReview({ action }: { action: CatalogAction }) {
+  return <form action={action} className="grid max-w-xl gap-2 rounded border p-3"><h2>{E.waffoSeeded}</h2><p>{E.waffoSeededHelp}</p>
+    <input type="hidden" name="op" value="waffo_seeded" />
+    <label><input type="checkbox" name="waffo_period" value="on" required /> {E.waffoSeededPeriod}</label>
+    <Button type="submit">{E.waffoSeededCheck}</Button></form>
+}
+const seededStatus = { bound: E.waffoBound, mismatch: E.waffoMismatch, stale: E.waffoStale } as const
+export function WaffoSeededNotice({ result }: { result?: string }) {
+  const rows = (result ?? '').split(',').map(part => /^([a-z0-9_]{1,40}):(bound|mismatch|stale)$/.exec(part)).filter(m => m !== null)
+  if (!rows.length) return null
+  return <ul role="status" className="rounded border p-2">{rows.map(([, sku, status]) =>
+    <li key={sku}>{sku} · {seededStatus[status as keyof typeof seededStatus]}</li>)}</ul>
+}
 export function CatalogList({ rows }: { rows: CatalogPageRows }) {
   return <section className="grid gap-3"><Link href={href('new')} className="underline">{E.create}</Link>
     <table className="w-full text-left text-sm"><thead><tr>{[E.nameZh,E.id,E.amount,E.credits,E.version,E.status,E.edit].map(s => <th key={s}>{s}</th>)}</tr></thead>
