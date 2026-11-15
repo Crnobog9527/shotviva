@@ -6,8 +6,9 @@ import { noteGenerationFailure, noteSaleFloorCheck } from '../alerts'
 import { captureError } from '../analytics'
 import { logger } from '../logger'
 import { scheduleScreen } from '../moderation'
-import { keepJobInputs, shouldWatermark, writeWorkThumb, type ObjectStore } from '../storage'
+import { keepJobInputs, opaquePng, shouldWatermark, writeWorkThumb, type ObjectStore } from '../storage'
 import { classifyFailure, GenerationFailure, type FailureStage } from './generation-failure'
+import { keepsAlpha } from './job-background'
 import { estimatedRouterCost, jobCostUsd } from './job-cost'
 import type { Job } from './job-schema'
 import { ProviderError, type GenerationProvider, type ProviderInput, type ProviderOutput, type ProviderPrices, type ProviderUsage } from './provider'
@@ -113,6 +114,12 @@ async function verifiedUsage(provider: GenerationProvider, usage: ProviderUsage 
   try { return await provider.completeUsage(usage) } catch { return usage }
 }
 
+// Before any ledger writes it, so a user's job, an admin test run and a prompt-lab cell alike store
+// an opaque image unless the template asked for a cut-out (keepsAlpha).
+async function storable(output: ProviderOutput, params: Record<string, unknown>): Promise<ProviderOutput> {
+  return keepsAlpha(params) ? output : { ...output, bytes: await opaquePng(output.bytes) }
+}
+
 // Steps 2–3 of ARCHITECTURE §4 for a freshly started job: provider → write output → confirm.
 // Any failure, timeout included, is settled through the ledger before the error reaches the
 // client. A failure after the provider answered still records what it reported using.
@@ -131,7 +138,7 @@ export async function settleProviderCall<T>(
     )
     usage = await verifiedUsage(deps.provider, output.usage ?? null)
     stage = 'store_output'
-    const stored = await ledger.store(output)
+    const stored = await ledger.store(await storable(output, call.params))
     stage = 'confirm'
     return await ledger.confirm(stored, costOf(deps.provider, usage, decision))
   } catch (error) {

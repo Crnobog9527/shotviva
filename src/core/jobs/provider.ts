@@ -47,7 +47,8 @@ export type GenerationProvider = {
   // empty ones filled from MODEL_PRICES; null when neither has any (the job then has no cost).
   prices?: ProviderPrices | null
   // true: the adapter sends model_params.background to the model, so a transparent template's
-  // result really is a cut-out (OpenAI images). OpenRouter drops it; its results stay unknown.
+  // result really is a cut-out (OpenAI images, Ark). OpenRouter sends it only when the model lists
+  // that value, so its results stay unknown. Settle flattens any alpha a template did not ask for.
   honoursBackground?: boolean
   // Optional bounded, read-only invoice lookup after the generation deadline has stopped.
   completeUsage?(usage: ProviderUsage): Promise<ProviderUsage>

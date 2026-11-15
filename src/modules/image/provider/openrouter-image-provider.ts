@@ -32,6 +32,14 @@ function requestedAspect(input: ProviderInput, supported: OpenRouterImageParamet
   return 'auto'
 }
 
+// The template's model_params.background, when the model lists that value. Without it GPT image
+// chose for itself and, given a transparent logo, returned a see-through poster (2026-11-15).
+// A value the model does not list is left out; settle flattens any alpha the template did not ask for.
+function requestedBackground(input: ProviderInput, supported: OpenRouterImageParameters) {
+  const value = input.params.background
+  return typeof value === 'string' && supported.background?.values.includes(value) ? value : undefined
+}
+
 // OpenAI's GPT image models: the exact size and quality the official line sends (output-size.ts),
 // so the tier, ratio and the quality a template's price assumes all reach OpenAI.
 function pixelSizeRequest(model: string, input: ProviderInput, supported: OpenRouterImageParameters) {
@@ -41,6 +49,7 @@ function pixelSizeRequest(model: string, input: ProviderInput, supported: OpenRo
     size: formatSize(outputSize(input.resolution, input.aspectRatio, sourcePhoto(input))),
     quality: supported.quality?.values.includes(input.quality) ? input.quality : undefined,
     output_format: supported.output_format?.values.includes('png') ? 'png' : undefined,
+    background: requestedBackground(input, supported),
     input_references: referenceImages(input.images),
   }
 }
@@ -58,6 +67,7 @@ function imageRequest(model: string, input: ProviderInput, supported: OpenRouter
     resolution: supported.resolution ? OPENROUTER_IMAGE_SIZE[input.resolution] : undefined,
     aspect_ratio: supported.aspect_ratio?.values.includes(aspect) ? aspect : undefined,
     output_format: supported.output_format?.values.includes('png') ? 'png' : undefined,
+    background: requestedBackground(input, supported),
     input_references: referenceImages(input.images),
   }
 }
