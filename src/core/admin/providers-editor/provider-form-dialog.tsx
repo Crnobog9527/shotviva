@@ -8,7 +8,7 @@ import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
 
-import { MODULE_ADAPTERS, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
+import { isTextModule, MODULE_ADAPTERS, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 
 import type { AdminProvider, ProviderAdminActions } from '../providers/types'
@@ -104,7 +104,7 @@ function CatalogPreview({ catalog }: { catalog: ReturnType<typeof useModelResolu
 function modelHint(form: ProviderForm) {
   if (form.adapter === 'openrouter_images') return COPY.routerModelHint
   if (form.adapter === 'ark_images') return COPY.arkModelHint
-  if (form.module === 'decision' && decisionRoute(form) === 'openrouter') return COPY.decisionModelHint
+  if (isTextModule(form.module) && decisionRoute(form) === 'openrouter') return COPY.decisionModelHint
   return PROVIDERS_COPY.modules[form.module].modelHint
 }
 
@@ -156,7 +156,7 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
           <Field id="label" label={COPY.label} hint={COPY.labelHint}>
             {input('label')}
           </Field>
-          {form.module === 'decision' ? <DecisionRouteField form={form} setForm={setForm} /> : (
+          {isTextModule(form.module) ? <DecisionRouteField form={form} setForm={setForm} /> : (
             <Field id="adapter" label={COPY.adapter} hint={COPY.adapterHint[form.adapter]}>
               <select id="provider-adapter" className="border-input h-9 rounded-md border px-3 text-sm"
                 value={form.adapter} disabled={provider !== null}
@@ -166,7 +166,7 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
             </Field>
           )}
           <Field id="baseUrl" label={COPY.baseUrl} hint={COPY.baseUrlHint}>
-            {form.module === 'decision' && decisionRoute(form) === 'openrouter'
+            {isTextModule(form.module) && decisionRoute(form) === 'openrouter'
               ? <Input id="provider-baseUrl" className="font-mono" value={form.baseUrl} readOnly disabled />
               : input('baseUrl', true)}
           </Field>

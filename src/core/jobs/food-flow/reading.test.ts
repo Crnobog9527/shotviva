@@ -19,9 +19,13 @@ describe('the dish reading (§5.1c)', () => {
   })
 
   it('cuts a long answer instead of refusing it, and refuses an unknown category', () => {
-    const long = dishReadingSchema.parse({ ...reading, sauce: 'x'.repeat(500), main_ingredients: Array(20).fill({ name: 'a', color: 'b' }) })
+    const long = dishReadingSchema.parse({ ...reading, sauce: 'x'.repeat(500), main_ingredients: Array(20).fill({ name: 'n'.repeat(300), color: 'b' }),
+      garnish: [{ item: 'i'.repeat(300), shape: 's'.repeat(300), count: 'c'.repeat(300) }] })
     expect(long.sauce).toHaveLength(200)
     expect(long.main_ingredients).toHaveLength(8)
+    // Room for the visible features the reading writes into a name (kind, head, skin, cut, count).
+    expect(long.main_ingredients[0]?.name).toHaveLength(200)
+    expect(long.garnish[0]).toEqual({ item: 'i'.repeat(120), shape: 's'.repeat(120), count: 'c'.repeat(40) })
     expect(dishReadingSchema.safeParse({ ...reading, category: 'dessert' }).success).toBe(false)
   })
 })
