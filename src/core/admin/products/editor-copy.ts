@@ -19,5 +19,8 @@ export const E = {
   unit: '每积分实收（USD）', budget: '固定生成成本预算（USD/积分）', margin: '按预算预计毛利',
   confirmText: '已复核本次修改、会员价和受影响的商品，锁定此版本', reviewAmount: '请先核对改动，准备后只能发布已确认的版本。',
   invalid: '请核对输入内容。', stale: '版本已更新。请刷新后核对最新差异。', denied: '当前账号不能操作。', failed: '操作未完成，请核对后重试。',
+  waffoSeeded: 'Waffo 通道核对（种子版本）', waffoSeededHelp: '读回本环境 Waffo 商品映射里的售价和状态，与每个商品当前报价比对。全部一致的版本登记后才会在 Waffo 通道显示；不一致的保持隐藏，先改 Waffo 后台再核对。',
+  waffoSeededPeriod: '已在 Waffo 后台核对各订阅商品的周期和发放积分', waffoSeededCheck: '读回 Waffo 售价并登记一致的版本',
+  waffoBound: '已登记', waffoMismatch: 'Waffo 售价或状态与报价不符，未登记', waffoStale: '此版本有发布记录，请在商品页核对',
   v2: '请先激活 v2 积分系统。', mismatch: 'Stripe 读回不符', migration: '目录编辑功能等待数据库迁移。',
 } as const

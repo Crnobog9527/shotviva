@@ -36,3 +36,22 @@ export function compareCatalog(products: readonly SiteProduct[], maps: Maps, res
     return [once, compare(product.id, 'recurring', recurringId, price, remote.subscriptionProducts)]
   })
 }
+
+export type CatalogRow = ReturnType<typeof compareCatalog>[number]
+
+// `pnpm pricing:waffo` (scripts/check-waffo-catalog.ts). A build checks only when it routes test
+// checkouts to Waffo; an operator run reads either mode, and `--prod` refuses anything but prod
+// so a pulled preview env cannot pass for the production check. Read-only in every mode.
+export function catalogCheckMode(argv: readonly string[], env: { PAYMENT_CHANNEL: string; WAFFO_ENVIRONMENT: string }) {
+  if (argv.includes('--build')) return env.PAYMENT_CHANNEL === 'waffo' && env.WAFFO_ENVIRONMENT === 'test' ? 'check' : 'skip'
+  if (argv.includes('--prod') && env.WAFFO_ENVIRONMENT !== 'prod') throw new Error('--prod needs WAFFO_ENVIRONMENT=prod')
+  return 'check'
+}
+
+// Product ids appear only as their last four characters; amounts are USD cents.
+export function catalogReport(rows: readonly CatalogRow[], shown?: ReadonlySet<string>) {
+  return rows.map(row => {
+    const channel = shown ? ` waffo-channel=${shown.has(row.sku) ? 'shown' : 'hidden'}` : ''
+    return `${row.sku} ${row.form} …${row.suffix} USD cents: Waffo=${row.actual ?? 'missing'} quote=${row.expected} ${row.ok ? 'OK' : 'CHECK'}${channel}`
+  })
+}
