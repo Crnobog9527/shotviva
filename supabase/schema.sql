@@ -95,6 +95,26 @@ $$;
 ALTER FUNCTION "admin"."activate_template_price_catalog_v2"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."active_image_line"() RETURNS "uuid"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  hit jsonb := admin.stmt_memo('active_image_line');
+  v uuid;
+begin
+  if hit ? 'v' and jsonb_typeof(hit->'v') in ('string', 'null') and coalesce(hit->>'v', '') ~ '^([0-9a-f-]{36})?$' then
+    return (hit->>'v')::uuid;
+  end if;
+  select a.id into v from public.ai_providers a where a.module='image' and a.is_active;
+  perform admin.stmt_memo_put('active_image_line', to_jsonb(v));
+  return v;
+end $_$;
+
+
+ALTER FUNCTION "admin"."active_image_line"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -1574,6 +1594,42 @@ end $$;
 ALTER FUNCTION "admin"."keep_gallery_excluded_private"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."line_image_options"("p_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  k text := 'line_image_options|' || quote_nullable(p_id);
+  hit jsonb := admin.stmt_memo(k);
+  v jsonb;
+begin
+  if hit ? 'v' and jsonb_typeof(hit->'v') = 'object' then return hit->'v'; end if;
+  v := admin.line_image_options_now(p_id);
+  perform admin.stmt_memo_put(k, v);
+  return v;
+end $$;
+
+
+ALTER FUNCTION "admin"."line_image_options"("p_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."line_image_options_now"("p_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object(
+    'resolutions', to_jsonb(admin.sale_route_resolutions(p)),
+    'ratios', case when p.adapter='openrouter_images' then coalesce(p.capabilities->'aspectRatios','[]'::jsonb)
+      else '["16:9","4:5","1:1","9:16","3:2","4:3","2:3","1:2","1:3"]'::jsonb end,
+    'originalRatio', case when p.adapter='openrouter_images' then coalesce(p.capabilities->'originalRatio','false'::jsonb) else 'true'::jsonb end,
+    'exactPixels', to_jsonb(p.adapter is distinct from 'openrouter_images'))
+  from (select 1) one left join public.ai_providers p on p.id=p_id
+$$;
+
+
+ALTER FUNCTION "admin"."line_image_options_now"("p_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."lock_prompt_lab"("p_session_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -1995,7 +2051,7 @@ begin
     clock_timestamp())
   on conflict (singleton) do update set breakeven=excluded.breakeven, floor_budget=excluded.floor_budget,
     margin_target_bp=excluded.margin_target_bp, refreshed_at=excluded.refreshed_at;
-  perform set_config('shotviva.stmt_memo', '', true);
+  perform set_config('shotviva.stmt_memo', gen_random_uuid()::text, true);
 end $$;
 
 
@@ -2481,11 +2537,15 @@ CREATE OR REPLACE FUNCTION "admin"."slot_route_floor"("p_tag" "text", "p_resolut
     SET "search_path" TO ''
     AS $$
 declare
-  k text := concat_ws('|', 'slot', quote_nullable(p_tag), quote_nullable(p_resolution), quote_nullable(p_quality),
-    quote_nullable(p_slots), quote_nullable(p_single));
-  hit jsonb := admin.stmt_memo(k);
+  k text;
+  hit jsonb;
   v integer;
 begin
+  if p_single is null then return null; end if;
+  if coalesce(p_slots, 0) <= 1 then return p_single; end if;
+  k := concat_ws('|', 'slot', quote_nullable(p_tag), quote_nullable(p_resolution), quote_nullable(p_quality),
+    quote_nullable(p_slots), quote_nullable(p_single));
+  hit := admin.stmt_memo(k);
   if hit ? 'v' and jsonb_typeof(hit->'v') in ('number', 'null') then return (hit->>'v')::integer; end if;
   v := admin.slot_route_floor_now(p_tag, p_resolution, p_quality, p_slots, p_single);
   perform admin.stmt_memo_put(k, to_jsonb(v));
@@ -2532,14 +2592,14 @@ CREATE OR REPLACE FUNCTION "admin"."stmt_memo"("p_key" "text") RETURNS "jsonb"
     SET "search_path" TO ''
     AS $$
 declare
-  raw text := current_setting('shotviva.stmt_memo', true);
-  stamp text := statement_timestamp()::text || '|';
+  stamp text := statement_timestamp()::text || '#' || coalesce(current_setting('shotviva.stmt_memo', true), '') || '|';
+  raw text := current_setting('shotviva.m_' || md5(p_key), true);
   body text;
 begin
   if raw is null or left(raw, length(stamp)) <> stamp then return null; end if;
   body := substr(raw, length(stamp) + 1);
   if not pg_input_is_valid(body, 'jsonb') then return null; end if;
-  return case when jsonb_typeof(body::jsonb) = 'object' then body::jsonb -> p_key end;
+  return jsonb_build_object('v', body::jsonb);
 end $$;
 
 
@@ -2551,7 +2611,7 @@ CREATE OR REPLACE FUNCTION "admin"."stmt_memo_clear"() RETURNS "trigger"
     SET "search_path" TO ''
     AS $$
 begin
-  perform set_config('shotviva.stmt_memo', '', true);
+  perform set_config('shotviva.stmt_memo', gen_random_uuid()::text, true);
   return null;
 end $$;
 
@@ -2563,17 +2623,10 @@ CREATE OR REPLACE FUNCTION "admin"."stmt_memo_put"("p_key" "text", "p_value" "js
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
-declare
-  raw text := current_setting('shotviva.stmt_memo', true);
-  stamp text := statement_timestamp()::text || '|';
-  body text;
-  memo jsonb := '{}';
 begin
-  if raw is not null and left(raw, length(stamp)) = stamp then
-    body := substr(raw, length(stamp) + 1);
-    if pg_input_is_valid(body, 'jsonb') and jsonb_typeof(body::jsonb) = 'object' then memo := body::jsonb; end if;
-  end if;
-  perform set_config('shotviva.stmt_memo', stamp || (memo || jsonb_build_object(p_key, jsonb_build_object('v', p_value)))::text, true);
+  perform set_config('shotviva.m_' || md5(p_key),
+    statement_timestamp()::text || '#' || coalesce(current_setting('shotviva.stmt_memo', true), '') || '|'
+      || coalesce(p_value, 'null'::jsonb)::text, true);
 end $$;
 
 
@@ -2775,6 +2828,44 @@ ALTER FUNCTION "admin"."template_floor_budget_changed"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_image_options"("public"."templates") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  tid text;
+  lock_flag jsonb;
+  ratios jsonb;
+  unpriced text[];
+  line uuid;
+  o jsonb;
+  locked boolean;
+begin
+  -- Only the two keys this needs, not the whole row.
+  select x.id, x.fields->'lockAspectRatios', coalesce(x.fields->'aspectRatios','[]'::jsonb) into tid, lock_flag, ratios
+    from public.templates x
+    where x.id=$1.id and (x.is_active or current_setting('role',true)='service_role');
+  if not found then return null; end if;
+  select s.unpriced_resolutions into unpriced from public.template_sale_approvals s where s.template_id=tid;
+  select tp.provider_id into line from public.template_prompts tp where tp.template_id=tid;
+  if line is null then line := admin.active_image_line(); end if;
+  o := admin.line_image_options(line);
+  locked := coalesce(lock_flag='true'::jsonb, false);
+  return jsonb_build_object(
+    'resolutions', array(select r from jsonb_array_elements_text(o->'resolutions') r where not(r=any(coalesce(unpriced,'{}')))),
+    'aspectRatios', (select coalesce(jsonb_agg(a.r order by a.n),'[]'::jsonb)
+      from jsonb_array_elements_text(o->'ratios') with ordinality a(r,n)
+      where case when locked then ratios ? a.r
+        else a.r not in ('1:2','1:3') or ratios ? a.r end),
+    'originalRatio', case when locked then 'false'::jsonb else o->'originalRatio' end,
+    'exactPixels', o->'exactPixels')
+    || case when locked then '{"lockedRatios":true}'::jsonb else '{}'::jsonb end;
+end $_$;
+
+
+ALTER FUNCTION "admin"."template_image_options"("public"."templates") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_image_options_now"("public"."templates") RETURNS "jsonb"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $_$
@@ -2799,7 +2890,7 @@ CREATE OR REPLACE FUNCTION "admin"."template_image_options"("public"."templates"
 $_$;
 
 
-ALTER FUNCTION "admin"."template_image_options"("public"."templates") OWNER TO "postgres";
+ALTER FUNCTION "admin"."template_image_options_now"("public"."templates") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_leaves_series_on_unpublish"() RETURNS "trigger"
@@ -19527,6 +19618,11 @@ REVOKE ALL ON FUNCTION "admin"."activate_template_price_catalog_v2"() FROM PUBLI
 
 
 
+REVOKE ALL ON FUNCTION "admin"."active_image_line"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."active_image_line"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") TO "service_role";
 
@@ -19784,6 +19880,16 @@ REVOKE ALL ON FUNCTION "admin"."keep_gallery_excluded_private"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "admin"."line_image_options"("p_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."line_image_options"("p_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."line_image_options_now"("p_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."line_image_options_now"("p_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."lock_prompt_lab"("p_session_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."lock_prompt_lab"("p_session_id" "uuid") TO "service_role";
 
@@ -20032,6 +20138,11 @@ REVOKE ALL ON FUNCTION "admin"."template_image_options"("public"."templates") FR
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "anon";
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "authenticated";
 GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_image_options_now"("public"."templates") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_image_options_now"("public"."templates") TO "service_role";
 
 
 
