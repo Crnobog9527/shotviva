@@ -15,11 +15,15 @@ import type { AdminProvider, ProviderAdminActions } from '../providers/types'
 
 import { PROVIDERS_COPY } from './copy'
 import { canSave, formFor, tierOptions, usesTokenPrices, withBaseUrl, withAdapter, withModel, withTier, type ProviderForm, type TierOptions } from './form-state'
+import type { CatalogPrice } from '@/core/jobs/catalog-price'
+
+import { ArkPriceFields } from './ark-price-fields'
 import { ByokField } from './byok-field'
 import { CatalogPrices } from './catalog-prices'
 import { DECISION_ROUTES, decisionRoute, withDecisionRoute, type DecisionRoute } from './decision-route'
 import { ImageCostFields } from './image-cost-fields'
-import { PriceFields } from './price-fields'
+import { PriceFields, type LivePrice } from './price-fields'
+import { useCatalogPrice } from './use-catalog-price'
 import { useModelResolutions } from './use-model-resolutions'
 
 type Props = {
@@ -29,8 +33,10 @@ type Props = {
   pending: boolean
   error: string | null
   lookupModel: ProviderAdminActions['lookupModel']
+  lookupPrice: ProviderAdminActions['lookupPrice']
   onCancel: () => void
-  onSubmit: (form: ProviderForm) => void
+  // `live`: the catalogue price shown, whose fields are not stored on the row.
+  onSubmit: (form: ProviderForm, live: CatalogPrice | null) => void
 }
 
 type FieldProps = { id: keyof ProviderForm; label: string; hint?: string; children: React.ReactNode }
@@ -49,13 +55,15 @@ function Field({ id, label, hint, children }: FieldProps) {
 // input is a new-password field (no autofill of a saved login), never filled from the server.
 const COPY = PROVIDERS_COPY.form
 
-function useFormState(provider: AdminProvider | null, module: ProviderModule, lookupModel: Props['lookupModel']) {
+function useFormState(provider: AdminProvider | null, module: ProviderModule, lookupModel: Props['lookupModel'], lookupPrice: Props['lookupPrice']) {
   const [draft, setForm] = useState(() => formFor(provider, module))
   const catalog = useModelResolutions(draft.adapter === 'openrouter_images', draft.baseUrl.trim(), draft.model.trim(), lookupModel)
+  const live = useCatalogPrice({ adapter: draft.adapter, baseUrl: draft.baseUrl.trim(), model: draft.model.trim() }, provider, lookupPrice)
   const tiers = tierOptions(draft, catalog.snapshot?.resolutions ?? null, provider)
   const form = { ...draft, resolutions: tiers.selected }
-  const canSubmit = !catalog.pending && catalog.result?.ok !== false && canSave(form, !provider?.apiKeyLast4)
-  return { form, setForm, catalog, canSubmit, tiers, estimates: catalog.snapshot?.catalogImageCosts }
+  // Save waits for the catalogue price, so a save never stores a typed copy of a price it has.
+  const canSubmit = !catalog.pending && catalog.result?.ok !== false && !live.pending && canSave(form, !provider?.apiKeyLast4)
+  return { form, setForm, catalog, live, canSubmit, tiers, estimates: catalog.snapshot?.catalogImageCosts }
 }
 
 // One checkbox per site tier (PR-1b): a tier the model lacks is disabled; an OpenAI model the
@@ -126,20 +134,22 @@ function DecisionRouteField({ form, setForm }: { form: ProviderForm; setForm: Se
 type PricesProps = {
   form: ProviderForm
   catalog: ReturnType<typeof useModelResolutions>
+  live: LivePrice
   setForm: React.Dispatch<React.SetStateAction<ProviderForm>>
 }
 
-// Token prices, or for Ark (billed per image from the code table) a note instead.
-function Prices({ form, catalog, setForm }: PricesProps) {
-  if (!usesTokenPrices(form)) return <p className="text-muted-foreground text-xs">{COPY.arkPrices}</p>
-  return <PriceFields form={form} catalogPricing={catalog.snapshot?.catalogPricing} onChange={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))} />
+// Token prices (from the catalogue where it has them), or for Ark its hand-entered yuan price.
+function Prices({ form, catalog, live, setForm }: PricesProps) {
+  const change = (field: keyof ProviderForm, value: string) => setForm((prev) => ({ ...prev, [field]: value }))
+  if (!usesTokenPrices(form)) return <ArkPriceFields form={form} onChange={change} />
+  return <PriceFields form={form} catalogPricing={catalog.snapshot?.catalogPricing} live={live} onChange={change} />
 }
 
-export function ProviderFormDialog({ provider, module, pending, error, lookupModel, onCancel, onSubmit }: Props) {
-  const { form, setForm, catalog, canSubmit, tiers, estimates } = useFormState(provider, module, lookupModel)
+export function ProviderFormDialog({ provider, module, pending, error, lookupModel, lookupPrice, onCancel, onSubmit }: Props) {
+  const { form, setForm, catalog, live, canSubmit, tiers, estimates } = useFormState(provider, module, lookupModel, lookupPrice)
   const set = (key: keyof ProviderForm) => (event: { target: { value: string } }) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }))
-  // The model drives the official-price pre-fill (§10.0).
+  // The model drives the catalogue price lookup (§10.0).
   const setModel = (event: { target: { value: string } }) => setForm((prev) => withModel(prev, event.target.value))
   const input = (key: 'label' | 'baseUrl' | 'model', mono = false) => (
     <Input id={`provider-${key}`} className={mono ? 'font-mono' : undefined} value={form[key]} onChange={key === 'model' ? setModel : key === 'baseUrl' ? e => setForm(prev => withBaseUrl(prev, e.target.value)) : set(key)} />
@@ -194,7 +204,7 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
           >
             <Input id="provider-apiKey" type="password" autoComplete="new-password" className="font-mono" value={form.apiKey} onChange={set('apiKey')} />
           </Field>
-          <Prices form={form} catalog={catalog} setForm={setForm} />
+          <Prices form={form} catalog={catalog} live={live} setForm={setForm} />
           <Field id="notes" label={COPY.notes}>
             <Textarea id="provider-notes" maxLength={500} value={form.notes} onChange={set('notes')} />
           </Field>
@@ -208,7 +218,7 @@ export function ProviderFormDialog({ provider, module, pending, error, lookupMod
           <Button variant="outline" onClick={onCancel} disabled={pending}>
             {COPY.cancel}
           </Button>
-          <Button disabled={pending || !canSubmit} onClick={() => onSubmit(form)}>
+          <Button disabled={pending || !canSubmit} onClick={() => onSubmit(form, live.price)}>
             {COPY.save}
           </Button>
         </DialogFooter>

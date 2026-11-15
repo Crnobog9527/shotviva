@@ -1,5 +1,6 @@
-import type { ProviderPrices } from '@/core/jobs'
-import { effectivePrices, officialPrice } from '@/core/jobs/model-prices'
+import { currentListPrice, type ArkPrice } from '@/core/jobs/ark-prices'
+import { effectivePrices, livePrices, type CatalogPrice } from '@/core/jobs/catalog-price'
+import { currentCatalogPrice } from '@/core/providers/catalog-model'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 import { ARK_RESOLUTIONS } from '@/core/providers/ark'
 import { openAIImageTiers, UNKNOWN_MODEL_TIERS } from '@/core/providers/tier-support'
@@ -32,7 +33,20 @@ export type ProviderForm = {
   priceInputTextPerM: string
   priceInputImagePerM: string
   priceOutputPerM: string
+  // An Ark line's list price in yuan (1566), as typed from Ark's price page: the output price per
+  // image, optionally a second price above `arkSplitMp` million pixels; per input image; the page's
+  // URL and the date it was read. All blank: no price (jobs then have no cost).
+  arkOutputCny: string
+  arkSplitMp: string
+  arkOutputCnyAbove: string
+  arkInputCny: string
+  arkSource: string
+  arkAsOf: string
 }
+
+type ArkFields = Pick<ProviderForm, 'arkOutputCny' | 'arkSplitMp' | 'arkOutputCnyAbove' | 'arkInputCny' | 'arkSource' | 'arkAsOf'>
+
+const BLANK_ARK: ArkFields = { arkOutputCny: '', arkSplitMp: '', arkOutputCnyAbove: '', arkInputCny: '', arkSource: '', arkAsOf: '' }
 
 export const PRICE_FIELDS = ['priceInputTextPerM', 'priceInputImagePerM', 'priceOutputPerM'] as const
 export type PriceField = (typeof PRICE_FIELDS)[number]
@@ -52,9 +66,19 @@ export const DEFAULT_FORM: ProviderForm = {
   priceInputTextPerM: '',
   priceInputImagePerM: '',
   priceOutputPerM: '',
+  ...arkFields(null),
 }
 
 const priceText = (value: number | null) => (value === null ? '' : String(value))
+
+
+// The form's text for a stored price: one band, or a split at the first band's pixel limit.
+function arkFields(price: ArkPrice | null | undefined): ArkFields {
+  if (!price) return BLANK_ARK
+  const [first, second] = price.outputBands
+  const split = second && first.maxPixels ? { arkSplitMp: String(first.maxPixels / 1e6), arkOutputCnyAbove: String(second.cny) } : {}
+  return { ...BLANK_ARK, ...split, arkOutputCny: String(first.cny), arkInputCny: String(price.inputImageCny), arkSource: price.source, arkAsOf: price.asOf }
+}
 
 export function formFor(provider: AdminProvider | null, module: ProviderModule = 'image'): ProviderForm {
   if (!provider) {
@@ -62,7 +86,7 @@ export function formFor(provider: AdminProvider | null, module: ProviderModule =
     // A new decision or dish-reading row starts on OpenRouter (decision-route.ts; Owner 2026-11-15).
     return isTextModule(module) ? { ...form, baseUrl: OPENROUTER_BASE_URL } : form
   }
-  return fillOfficial({
+  return {
     module: provider.module,
     adapter: provider.adapter,
     resolutions: provider.resolutions,
@@ -77,7 +101,8 @@ export function formFor(provider: AdminProvider | null, module: ProviderModule =
     priceInputTextPerM: priceText(provider.prices.inputTextPerM),
     priceInputImagePerM: priceText(provider.prices.inputImagePerM),
     priceOutputPerM: priceText(provider.prices.outputPerM),
-  })
+    ...arkFields(currentListPrice(provider)),
+  }
 }
 
 // The prices each module's jobs are costed with. The decision step (T30) is billed as input and
@@ -90,72 +115,48 @@ export const MODULE_PRICE_FIELDS: Record<ProviderModule, readonly PriceField[]> 
 
 const PRICE_OF = { priceInputTextPerM: 'inputTextPerM', priceInputImagePerM: 'inputImagePerM', priceOutputPerM: 'outputPerM' } as const
 
-// A provider without the prices its module needs, in its row or in the price table for its
-// model, cannot cost its jobs; the list flags it (T33, §10.0).
-export function missingPrices(prices: ProviderPrices, module: ProviderModule = 'image', model = ''): boolean {
-  const effective = effectivePrices(model, prices)
+type PricedProvider = Pick<AdminProvider, 'adapter' | 'baseUrl' | 'model' | 'prices' | 'catalogPrice'>
+
+// A provider without the prices its module needs, from the catalogue or typed in by the admin,
+// cannot cost its jobs; the list flags it (T33, §10.0).
+export function missingPrices(provider: PricedProvider, module: ProviderModule = 'image'): boolean {
+  const effective = effectivePrices(currentCatalogPrice(provider), provider.prices)
   return MODULE_PRICE_FIELDS[module].some((field) => (effective?.[PRICE_OF[field]] ?? null) === null)
 }
 
-// Fields the row leaves empty that the price table fills; the list says so.
-export function pricesFromTable(prices: ProviderPrices, module: ProviderModule, model: string): string | null {
-  const entry = officialPrice(model)
-  if (!entry) return null
-  const filled = MODULE_PRICE_FIELDS[module].some((field) => prices[PRICE_OF[field]] === null && entry.prices[PRICE_OF[field]] !== null)
-  return filled ? entry.asOf : null
+// The catalogue snapshot that prices this row, when it quotes the module's fields; the list says so.
+export function pricedFromCatalog(provider: PricedProvider, module: ProviderModule): CatalogPrice | null {
+  const catalog = currentCatalogPrice(provider)
+  const live = livePrices(catalog)
+  return live && MODULE_PRICE_FIELDS[module].some((field) => live[PRICE_OF[field]] !== null) ? catalog : null
 }
 
-// The official price (MODEL_PRICES) for this form's model, as the form's text; '' where none.
-function officialText(module: ProviderModule, model: string): Partial<Record<PriceField, string>> {
-  const official = officialPrice(model)?.prices
-  if (!official) return {}
-  return Object.fromEntries(MODULE_PRICE_FIELDS[module].map((field) => [field, priceText(official[PRICE_OF[field]])]))
-}
-
-// Opening a row whose prices are blank: pre-fill them from the price table (§10.0).
-function fillOfficial(form: ProviderForm): ProviderForm {
-  if (form.adapter !== 'openai_images' && form.module === 'image') return form
-  const official = officialText(form.module, form.model)
-  const filled = { ...form }
-  for (const field of MODULE_PRICE_FIELDS[form.module]) {
-    if (filled[field].trim() === '' && official[field]) filled[field] = official[field]
-  }
-  return filled
-}
-
-// Typing a model name: a price field that is blank or still shows the previous model's official
-// price follows the new model's (blank when the table has none). One the Owner typed stays.
+// Typing a model name: the admin's own prices were for the previous model, so they are cleared;
+// the new model's catalogue price (if any) is looked up and shown instead (§10.0).
 export function withModel(form: ProviderForm, model: string): ProviderForm {
-  if (form.adapter === 'openrouter_images' && model !== form.model) return { ...clearPrices(form), model }
-  if (form.adapter === 'ark_images') return { ...form, model }
-  const before = officialText(form.module, form.model)
-  const after = officialText(form.module, model)
-  const next = { ...form, model, imageCosts: model === form.model ? form.imageCosts : {} }
-  for (const field of MODULE_PRICE_FIELDS[form.module]) {
-    const value = form[field].trim()
-    if (value === '' || value === before[field]) next[field] = after[field] ?? ''
-  }
-  return next
+  if (model === form.model) return form
+  return { ...clearPrices(form), model, ...(form.adapter === 'ark_images' ? arkFields(null) : {}) }
 }
 
-export type PriceOrigin =
-  | { kind: 'official'; asOf: string }
-  | { kind: 'edited'; asOf: string }
-  | { kind: 'none' }
-  | null
+// What the price fields show: the catalogue's price (read-only, with its source and date) or, when
+// the catalogue has none for this model, the admin's own entry from the provider's price page.
+// null before a model is typed or while the lookup runs.
+export type PriceOrigin = { kind: 'catalog'; price: CatalogPrice } | { kind: 'manual'; reason: 'missing' | 'no_catalog' } | null
 
-// What the price fields show against the table: the official price, an override of it, or a
-// model the table does not know. null before a model is typed.
-export function priceOrigin(form: ProviderForm): PriceOrigin {
-  if (form.model.trim() === '') return null
-  const entry = officialPrice(form.model)
-  if (!entry) return { kind: 'none' }
-  const official = officialText(form.module, form.model)
-  const same = MODULE_PRICE_FIELDS[form.module].every((field) => {
-    const typed = form[field].trim()
-    return typed === '' || Number(typed) === Number(official[field])
-  })
-  return { kind: same ? 'official' : 'edited', asOf: entry.asOf }
+export function priceOrigin(form: ProviderForm, live: CatalogPrice | null | undefined, lookedUp: boolean): PriceOrigin {
+  if (form.model.trim() === '' || !lookedUp) return null
+  if (live?.status === 'quoted') return { kind: 'catalog', price: live }
+  return { kind: 'manual', reason: live ? 'missing' : 'no_catalog' }
+}
+
+// The fields the catalogue fills (shown read-only and not stored on the row).
+export function catalogFields(form: ProviderForm, live: CatalogPrice | null | undefined): PriceField[] {
+  const prices = livePrices(live)
+  return prices ? MODULE_PRICE_FIELDS[form.module].filter((field) => prices[PRICE_OF[field]] !== null) : []
+}
+
+export function catalogText(live: CatalogPrice | null | undefined, field: PriceField): string {
+  return priceText(livePrices(live)?.[PRICE_OF[field]] ?? null)
 }
 
 // Blank or a non-negative decimal; anything else keeps Save disabled.
@@ -163,6 +164,37 @@ const PRICE_PATTERN = /^\s*(\d+(\.\d+)?)?\s*$/
 
 function clearPrices(form: ProviderForm): ProviderForm {
   return { ...form, imageCosts: {}, priceInputTextPerM: '', priceInputImagePerM: '', priceOutputPerM: '' }
+}
+
+const ARK_FIELDS = ['arkOutputCny', 'arkSplitMp', 'arkOutputCnyAbove', 'arkInputCny', 'arkSource', 'arkAsOf'] as const
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+// The Ark price as typed, or null when every field is blank; 'invalid' while incomplete.
+const sourceOk = (source: string) => /^https:\/\/\S+$/.test(source) && source.length <= 500
+
+function arkNumbersOk(form: ProviderForm): boolean {
+  const split = form.arkSplitMp.trim() !== ''
+  const numbers = [form.arkOutputCny, form.arkInputCny, ...(split ? [form.arkSplitMp, form.arkOutputCnyAbove] : [])]
+  return numbers.every((value) => value.trim() !== '' && PRICE_PATTERN.test(value)) && (!split || Number(form.arkSplitMp) > 0)
+}
+
+function arkBands(form: ProviderForm): ArkPrice['outputBands'] {
+  if (!form.arkSplitMp.trim()) return [{ maxPixels: null, cny: Number(form.arkOutputCny) }]
+  return [{ maxPixels: Math.round(Number(form.arkSplitMp) * 1e6), cny: Number(form.arkOutputCny) }, { maxPixels: null, cny: Number(form.arkOutputCnyAbove) }]
+}
+
+export function arkPriceFromForm(form: ProviderForm): ArkPrice | null | 'invalid' {
+  if (ARK_FIELDS.every((field) => form[field].trim() === '')) return null
+  const source = form.arkSource.trim()
+  const asOf = form.arkAsOf.trim()
+  if (!arkNumbersOk(form) || !sourceOk(source) || !DATE_PATTERN.test(asOf)) return 'invalid'
+  return { model: form.model.trim(), outputBands: arkBands(form), inputImageCny: Number(form.arkInputCny), source, asOf }
+}
+
+// Complete enough to save: Ark has no catalogue, so its list price is required.
+export const arkPriceComplete = (form: ProviderForm) => {
+  const price = arkPriceFromForm(form)
+  return price !== null && price !== 'invalid'
 }
 
 export function withBaseUrl(form: ProviderForm, baseUrl: string): ProviderForm {
@@ -181,15 +213,20 @@ export function tiersFor(adapter: ProviderAdapterId): readonly Resolution[] {
   return adapter === 'ark_images' ? ARK_RESOLUTIONS : RESOLUTIONS
 }
 
-// Ark bills per image in yuan from the code price table (ark-prices.ts); its token price fields are
-// not used, and the floor needs a hand-entered per-image estimate for every tier until it has samples.
+// Ark bills per image in yuan from its admin-entered list price; its token price fields are not
+// used, and the floor needs a hand-entered per-image estimate for every tier until it has samples.
 export const usesTokenPrices = (form: Pick<ProviderForm, 'adapter'>) => form.adapter !== 'ark_images'
 
 // The lines admin.provider_list_priced can price like the official OpenAI line (1551).
 export const byokApplies = (form: Pick<ProviderForm, 'module' | 'adapter' | 'model'>) =>
   form.module === 'image' && form.adapter === 'openrouter_images' && form.model.trim().startsWith('openai/gpt-image-')
 
-export function toSaveInput(form: ProviderForm, provider: AdminProvider | null): SaveProviderInput {
+// `live`: the catalogue price shown in the form. Fields it fills are not stored on the row, so a
+// price change upstream reaches the next job without anyone retyping it.
+export function toSaveInput(form: ProviderForm, provider: AdminProvider | null, live?: CatalogPrice | null): SaveProviderInput {
+  const fromCatalog = catalogFields(form, live)
+  const manual = (field: PriceField) => (usesTokenPrices(form) && !fromCatalog.includes(field) ? form[field] : '')
+  const listPrice = form.adapter === 'ark_images' ? arkPriceFromForm(form) : undefined
   return {
     ...(provider ? { id: provider.id } : {}),
     module: form.module,
@@ -204,9 +241,10 @@ export function toSaveInput(form: ProviderForm, provider: AdminProvider | null):
     apiKey: form.apiKey,
     notes: form.notes,
     // Ark rows keep no token prices (fields hidden); blank is stored as null.
-    priceInputTextPerM: usesTokenPrices(form) ? form.priceInputTextPerM : '',
-    priceInputImagePerM: usesTokenPrices(form) ? form.priceInputImagePerM : '',
-    priceOutputPerM: usesTokenPrices(form) ? form.priceOutputPerM : '',
+    priceInputTextPerM: manual('priceInputTextPerM'),
+    priceInputImagePerM: manual('priceInputImagePerM'),
+    priceOutputPerM: manual('priceOutputPerM'),
+    ...(listPrice !== undefined && listPrice !== 'invalid' ? { listPrice } : {}),
   }
 }
 
@@ -214,7 +252,9 @@ export function toSaveInput(form: ProviderForm, provider: AdminProvider | null):
 // is required for a new row and for a row that has none.
 export function canSave(form: ProviderForm, needsKey: boolean): boolean {
   const filled = [form.label, form.baseUrl, form.model].every((value) => value.trim() !== '')
-  const pricesOk = PRICE_FIELDS.every((field) => PRICE_PATTERN.test(form[field]))
+  const pricesOk = PRICE_FIELDS.every((field) => PRICE_PATTERN.test(form[field])) &&
+    // Ark has no catalogue: its list price is typed in, with its source and date, before a save.
+    (form.adapter !== 'ark_images' || arkPriceComplete(form))
   const estimatesOk = form.resolutions.every((tier) => {
     const cost = form.imageCosts[tier]?.trim()
     if (!cost && form.adapter === 'ark_images') return false

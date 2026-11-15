@@ -4,6 +4,8 @@ import type { ServerEnv } from '../env'
 import { AppError } from '../errors'
 import { effectivePrices, ENV_PROVIDER_SOURCE, providerTag, type GenerationProvider, type ProviderPrices } from '../jobs'
 import { catalogTokenPrices } from '../templates/catalog-pricing'
+import { currentListPrice } from '../jobs/ark-prices'
+import { currentCatalogPrice } from './catalog-model'
 import { OPENAI_MAX_REFERENCES } from '../templates/image-capabilities'
 import { DEFAULT_BASE_URL, type ActiveProviderRow, type ProviderAdapters, type ProviderConfig, type ProviderModule } from './types'
 
@@ -33,9 +35,7 @@ function build(
   const adapter = adapters[adapterId]
   if (!adapter) throw new AppError('INTERNAL', `provider adapter ${adapterId} is not registered`)
   const provider = adapter(config)
-  // Row prices first, then the official price table for the model (ARCHITECTURE §10.0).
-  const snapshot = adapterId === 'openrouter_images' ? prices : effectivePrices(config.model, prices)
-  return { id: providerTag(source, config.model), prices: snapshot, ...references,
+  return { id: providerTag(source, config.model), prices, ...references,
     ...(provider.honoursBackground ? { honoursBackground: true } : {}),
     ...(provider.accepts ? { accepts: provider.accepts.bind(provider) } : {}),
     completeUsage: provider.completeUsage?.bind(provider), generate: provider.generate.bind(provider) } satisfies GenerationProvider
@@ -53,8 +53,12 @@ export function effectiveReferenceRange(row: ActiveProviderRow, parameters?: Pro
   return { minReferences, maxReferences }
 }
 
-function rowPrices(row: ActiveProviderRow) {
-  if (row.adapter !== 'openrouter_images') return row.prices
+// The prices a job on this row is costed with (ARCHITECTURE §10.0): the live catalogue price, each
+// empty field filled from the admin's own entry. OpenRouter image lines read the catalogue quote
+// kept in their capabilities; other lines the catalogue snapshot (catalog_price). Ark is billed per
+// image from its admin-entered list price in the adapter, so it has no token prices.
+export function rowPrices(row: ActiveProviderRow): ProviderPrices | null {
+  if (row.adapter !== 'openrouter_images') return effectivePrices(currentCatalogPrice(row), row.prices)
   const automatic = catalogTokenPrices(row.capabilities?.catalogPricing)
   return {
     inputTextPerM: row.prices.inputTextPerM ?? automatic.inputTextPerM ?? null,
@@ -73,12 +77,13 @@ export async function resolveProvider(
 ): Promise<GenerationProvider> {
   if (!row) {
     const fallback = envFallback(module, env)
-    // The env fallback has no row to hold prices; its model's official prices still apply.
+    // The env fallback has no row to hold a price, so its jobs record usage but no cost.
     return build(adapters, fallback.adapter, ENV_PROVIDER_SOURCE, fallback.config, null, { minReferences: 0, maxReferences: OPENAI_MAX_REFERENCES })
   }
   // No silent fallback to env: a provider the Owner switched to must be the one that runs.
   const apiKey = await readKey(row.id)
   if (!apiKey) throw new AppError('INTERNAL', `active provider ${row.id} has no API key; set it in /admin/providers`)
   const references = effectiveReferenceRange(row, imageParameters)
-  return build(adapters, row.adapter, row.id, { baseUrl: row.baseUrl, model: row.model, apiKey, resolutions: row.resolutions, imageParameters }, rowPrices(row), references)
+  return build(adapters, row.adapter, row.id, { baseUrl: row.baseUrl, model: row.model, apiKey, resolutions: row.resolutions, imageParameters,
+    ...(row.adapter === 'ark_images' ? { listPrice: currentListPrice(row) } : {}) }, rowPrices(row), references)
 }

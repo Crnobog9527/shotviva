@@ -8,7 +8,13 @@ import { ARK_MAX_PIXELS, ARK_MIN_PIXELS } from '@/core/providers/ark'
 import { arkRequest, arkSize, createArkImageProvider, networkCode } from './ark-image-provider'
 
 const model = 'doubao-seedream-5-5-261028'
-const config = { apiKey: 'test-key', model, cnyPerUsd: 6.72 }
+// Fixture list price: a real line's is typed in by the admin (ai_providers.list_price).
+const listPrice = {
+  model,
+  outputBands: [{ maxPixels: 2_610_000, cny: 0.13 }, { maxPixels: 4_630_000, cny: 0.23 }],
+  inputImageCny: 0.05, source: 'https://example.com/price', asOf: '2026-11-15',
+}
+const config = { apiKey: 'test-key', model, cnyPerUsd: 6.72, listPrice }
 const photo = { bytes: new Uint8Array([1, 2]), contentType: 'image/jpeg', width: 3000, height: 2000 }
 const style = { bytes: new Uint8Array([3, 4]), contentType: 'image/webp' }
 const input = (overrides: Partial<ProviderInput> = {}): ProviderInput => ({
@@ -102,8 +108,8 @@ describe('Ark responses and cost', () => {
     expect(result.usage).toMatchObject({ list_cost_cny: 0.38, list_cost_usd: 0.056548 })
   })
 
-  it('records counts but no price for a model missing from the table', async () => {
-    const result = await createArkImageProvider({ ...config, model: 'doubao-seedream-9-9', fetch: fake(await ok()) }).generate(input())
+  it('records counts but no price for a line without a list price', async () => {
+    const result = await createArkImageProvider({ ...config, listPrice: null, fetch: fake(await ok()) }).generate(input())
     expect(result.usage).toEqual({ generated_images: 1, input_images: 1 })
     expect(jobCostUsd(result.usage, null)).toBeNull()
   })

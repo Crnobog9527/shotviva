@@ -79,7 +79,7 @@ export const COSTS_COPY = {
   },
   dash: '—',
   drift: (provider: CostProvider, days: number, from: string, to: string, percent: number) =>
-    `${from} 到 ${to} 连续 ${days} 天，我们记录的成本和 ${PROVIDER_NAMES[provider]} 实际扣费相差超过 ${percent}%。价目表里的官方价可能过期了（或后台供应商单价填错、有算不出成本的单），请对照 ${PROVIDER_NAMES[provider]} 价格页核对。`,
+    `${from} 到 ${to} 连续 ${days} 天，我们记录的成本和 ${PROVIDER_NAMES[provider]} 实际扣费相差超过 ${percent}%。目录价或后台手填的单价可能过期了（或有算不出成本的单），请对照 ${PROVIDER_NAMES[provider]} 价格页核对。`,
   key: {
     title: 'OpenAI 管理员密钥',
     body: '在 OpenAI 组织设置的 Admin keys 里新建一把（和出图用的密钥分开），只用来读账单。存进 Supabase Vault，页面上只显示后 4 位。',

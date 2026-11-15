@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { saveProviderSchema } from '../providers/schema'
 import type { AdminProvider } from '../providers/types'
 
-import { canSave, DEFAULT_FORM, formFor, missingPrices, priceOrigin, pricesFromTable, toSaveInput, withAdapter, withModel, tierOptions, withTier, type ProviderForm } from './form-state'
+import type { CatalogPrice } from '@/core/jobs/catalog-price'
+
+import { arkPriceFromForm, canSave, catalogFields, DEFAULT_FORM, formFor, missingPrices, priceOrigin, pricedFromCatalog, toSaveInput, withAdapter, withModel, tierOptions, withTier, type ProviderForm } from './form-state'
 import type { Resolution } from '@/core/templates/output-options'
 
 const provider: AdminProvider = {
@@ -61,11 +63,12 @@ describe('provider form state', () => {
     const form = formFor(provider)
     expect(form).toMatchObject({ priceInputTextPerM: '5', priceInputImagePerM: '8', priceOutputPerM: '30' })
     expect(toSaveInput(form, provider)).toMatchObject({ priceInputTextPerM: '5', priceOutputPerM: '30' })
-    expect(missingPrices(provider.prices)).toBe(false)
-    expect(missingPrices({ ...provider.prices, outputPerM: null })).toBe(true)
+    const priced = (prices: AdminProvider['prices']) => ({ ...provider, prices })
+    expect(missingPrices(provider)).toBe(false)
+    expect(missingPrices(priced({ ...provider.prices, outputPerM: null }))).toBe(true)
     // A decision row (T30) needs no image price.
-    expect(missingPrices({ ...provider.prices, inputImagePerM: null }, 'decision')).toBe(false)
-    expect(missingPrices({ ...provider.prices, outputPerM: null }, 'decision')).toBe(true)
+    expect(missingPrices(priced({ ...provider.prices, inputImagePerM: null }), 'decision')).toBe(false)
+    expect(missingPrices(priced({ ...provider.prices, outputPerM: null }), 'decision')).toBe(true)
   })
 
   it('keeps Save disabled while a price is not a non-negative number; blank is allowed', () => {
@@ -84,42 +87,81 @@ it('keeps per-image USD estimates on edit and clears them when switching models'
   expect(canSave({ ...form, imageCosts: { '1k': '-1' } }, false)).toBe(false)
 })
 
-describe('official price pre-fill (§10.0)', () => {
-  it('pre-fills the official price when a typed model is in the price table (§10.0)', () => {
-    const form = withModel({ ...DEFAULT_FORM, label: 'OpenAI' }, 'gpt-image-2.6-sunburst')
-    expect(form).toMatchObject({ model: 'gpt-image-2.6-sunburst', priceInputTextPerM: '5', priceInputImagePerM: '8', priceOutputPerM: '30' })
-    expect(priceOrigin(form)).toEqual({ kind: 'official', asOf: '2026-11-06' })
-    // A decision row gets input / output only.
-    const decision = withModel({ ...DEFAULT_FORM, module: 'decision' }, 'gpt-6-luna')
-    expect(decision).toMatchObject({ priceInputTextPerM: '0.1', priceInputImagePerM: '', priceOutputPerM: '0.5' })
+// Fixture prices only: real ones come from the OpenRouter catalogue or the admin.
+const SOL: CatalogPrice = {
+  status: 'quoted', catalogModel: 'openai/gpt-6.1-sol', source: 'https://openrouter.ai/openai/gpt-6.1-sol',
+  fetchedAt: '2026-11-15T03:00:00.000Z', prices: { inputTextPerM: 2, inputImagePerM: null, outputPerM: 10 },
+}
+const textRow: AdminProvider = {
+  ...provider, module: 'decision', adapter: 'openai_responses', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-6.1-sol',
+  prices: { inputTextPerM: null, inputImagePerM: null, outputPerM: null }, catalogPrice: SOL,
+}
+
+describe('catalogue prices (§10.0, no price table in code)', () => {
+  it('shows the catalogue price with its source and date and does not store a copy of it', () => {
+    const form = formFor(textRow)
+    expect(priceOrigin(form, SOL, true)).toEqual({ kind: 'catalog', price: SOL })
+    expect(catalogFields(form, SOL)).toEqual(['priceInputTextPerM', 'priceOutputPerM'])
+    // Even a stale typed value is not saved while the catalogue prices that field.
+    const typed = { ...form, priceInputTextPerM: '0.1', priceOutputPerM: '0.5' }
+    expect(toSaveInput(typed, textRow, SOL)).toMatchObject({ priceInputTextPerM: '', priceOutputPerM: '' })
   })
 
-  it("lets the Owner override, keeps a typed price when the model changes, and clears an untouched pre-fill", () => {
-    const prefilled = withModel(DEFAULT_FORM, 'gpt-image-2.6-sunburst')
-    const edited = { ...prefilled, priceOutputPerM: '32' }
-    expect(priceOrigin(edited)).toEqual({ kind: 'edited', asOf: '2026-11-06' })
-    const other = withModel(edited, 'gpt-image-2.6')
-    expect(other).toMatchObject({ priceInputTextPerM: '', priceInputImagePerM: '', priceOutputPerM: '32' })
-    expect(priceOrigin(other)).toEqual({ kind: 'none' })
-    expect(priceOrigin(DEFAULT_FORM)).toBeNull()
+  it('asks for a hand-entered price when the catalogue has none, and keeps what is typed', () => {
+    const missing: CatalogPrice = { ...SOL, status: 'missing', prices: { inputTextPerM: null, inputImagePerM: null, outputPerM: null } }
+    const form = { ...formFor(textRow), priceInputTextPerM: '3', priceOutputPerM: '12' }
+    expect(priceOrigin(form, missing, true)).toEqual({ kind: 'manual', reason: 'missing' })
+    expect(priceOrigin(form, null, true)).toEqual({ kind: 'manual', reason: 'no_catalog' })
+    expect(priceOrigin(form, null, false)).toBeNull()
+    expect(toSaveInput(form, textRow, missing)).toMatchObject({ priceInputTextPerM: '3', priceOutputPerM: '12' })
   })
 
-  it('fills blank prices when opening a row on a table model, never ones it has', () => {
-    const empty = { inputTextPerM: null, inputImagePerM: null, outputPerM: 31 }
-    const form = formFor({ ...provider, model: 'gpt-image-2.6-sunburst', prices: empty })
-    expect(form).toMatchObject({ priceInputTextPerM: '5', priceInputImagePerM: '8', priceOutputPerM: '31' })
-    expect(formFor({ ...provider, prices: empty }).priceInputTextPerM).toBe('')
+  it("clears the previous model's own prices when the model changes", () => {
+    const form = { ...formFor(textRow), priceInputTextPerM: '3', priceOutputPerM: '12' }
+    expect(withModel(form, 'openai/gpt-6-luna')).toMatchObject({ model: 'openai/gpt-6-luna', priceInputTextPerM: '', priceOutputPerM: '' })
+    expect(withModel(form, form.model)).toBe(form)
   })
 
-  it('flags missing prices only when neither the row nor the table has them, and says what the table fills', () => {
-    const empty = { inputTextPerM: null, inputImagePerM: null, outputPerM: null }
-    expect(missingPrices(empty, 'image', 'gpt-image-2.6-sunburst')).toBe(false)
-    expect(missingPrices(empty, 'decision', 'gpt-6-luna')).toBe(false)
-    expect(missingPrices(empty, 'image', 'gpt-6-luna')).toBe(true)
-    expect(missingPrices(empty, 'image', 'gpt-image-2.6')).toBe(true)
-    expect(pricesFromTable(empty, 'image', 'gpt-image-2.6-sunburst')).toBe('2026-11-06')
-    expect(pricesFromTable(provider.prices, 'image', 'gpt-image-2.6-sunburst')).toBeNull()
-    expect(pricesFromTable(empty, 'image', 'gpt-image-2.6')).toBeNull()
+  it('prices a row from its catalogue snapshot only while the snapshot is for its model', () => {
+    expect(missingPrices(textRow, 'decision')).toBe(false)
+    expect(pricedFromCatalog(textRow, 'decision')).toBe(SOL)
+    const renamed = { ...textRow, model: 'openai/gpt-6-luna' }
+    expect(missingPrices(renamed, 'decision')).toBe(true)
+    expect(pricedFromCatalog(renamed, 'decision')).toBeNull()
+    // The admin's own entry still prices a row the catalogue does not.
+    expect(missingPrices({ ...renamed, prices: { inputTextPerM: 1, inputImagePerM: null, outputPerM: 4 } }, 'decision')).toBe(false)
+  })
+})
+
+describe('Ark list price (typed in, 1566)', () => {
+  const ark: ProviderForm = {
+    ...withAdapter(formFor(null), 'ark_images'), label: 'Seedream', model: 'doubao-seedream-x', apiKey: 'ark-fixture-key-1234',
+    resolutions: ['1k', '2k'], imageCosts: { '1k': '0.03', '2k': '0.05' },
+  }
+  const priced = { ...ark, arkOutputCny: '0.13', arkSplitMp: '2.61', arkOutputCnyAbove: '0.23', arkInputCny: '0.05', arkSource: 'https://www.volcengine.com/docs/82379/1544106', arkAsOf: '2026-11-15' }
+
+  it('needs every price, the source page and the date before a save', () => {
+    expect(canSave(ark, true)).toBe(false)
+    expect(canSave(priced, true)).toBe(true)
+    expect(canSave({ ...priced, arkSource: 'volcengine.com' }, true)).toBe(false)
+    expect(canSave({ ...priced, arkAsOf: '' }, true)).toBe(false)
+    expect(canSave({ ...priced, arkOutputCnyAbove: '' }, true)).toBe(false)
+  })
+
+  it('saves one band or two, and reads them back', () => {
+    expect(arkPriceFromForm(priced)).toEqual({
+      model: 'doubao-seedream-x',
+      outputBands: [{ maxPixels: 2_610_000, cny: 0.13 }, { maxPixels: null, cny: 0.23 }], inputImageCny: 0.05,
+      source: 'https://www.volcengine.com/docs/82379/1544106', asOf: '2026-11-15',
+    })
+    const flat = { ...priced, arkSplitMp: '', arkOutputCnyAbove: '' }
+    expect(arkPriceFromForm(flat)).toMatchObject({ outputBands: [{ maxPixels: null, cny: 0.13 }] })
+    const input = toSaveInput(priced, null)
+    expect(saveProviderSchema.safeParse(input).success).toBe(true)
+    const row: AdminProvider = { ...provider, adapter: 'ark_images', model: 'doubao-seedream-x', listPrice: input.listPrice ?? null }
+    expect(formFor(row)).toMatchObject({ arkOutputCny: '0.13', arkSplitMp: '2.61', arkOutputCnyAbove: '0.23', arkInputCny: '0.05' })
+    // A price stored for another model (a concurrent edit) is not shown or used.
+    expect(formFor({ ...row, model: 'doubao-other' })).toMatchObject({ arkOutputCny: '', arkSource: '' })
   })
 })
 

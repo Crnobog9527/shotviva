@@ -43,8 +43,8 @@ export type GenerationProvider = {
   fallbackReason?: string
   minReferences?: number
   maxReferences?: number
-  // Price snapshot taken when the provider was resolved for this request: the row's prices with
-  // empty ones filled from MODEL_PRICES; null when neither has any (the job then has no cost).
+  // Price snapshot taken when the provider was resolved for this request: the live catalogue price,
+  // empty fields filled from the row's own; null when neither has any (the job then has no cost).
   prices?: ProviderPrices | null
   // true: the adapter sends model_params.background to the model, so a transparent template's
   // result really is a cut-out (OpenAI images, Ark). OpenRouter sends it only when the model lists

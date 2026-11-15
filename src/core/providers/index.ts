@@ -1,5 +1,7 @@
 // Image (later video) provider settings and per-request resolution (ARCHITECTURE §3.3).
 export { fetchImageCapabilities } from './image-capabilities'
+export { fetchCatalogPrice } from './catalog-price'
+export { catalogModelFor, currentCatalogPrice } from './catalog-model'
 export { templateImageProvider } from './template-image-provider'
 export { storedAspectAccepted, templateAspectFilter } from './stored-capabilities'
 export { activeCredentials, activeProvider, defaultTemplateProvider, PROVIDERS_CACHE_TAG, type ProviderCredentials } from './active-provider'
@@ -11,6 +13,7 @@ export {
   activateProvider,
   adminDeleteProvider,
   findProvider,
+  persistCatalogPrice,
   persistRefreshedCapabilities,
   findProviderRow,
   listProviders,

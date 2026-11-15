@@ -1,7 +1,8 @@
 import type { ImageCapabilities, EstimatedImageCosts } from '../templates/image-capabilities'
 import type { OpenRouterImageParameters } from './openrouter-catalog'
 import type { Resolution } from '../templates/output-options'
-import type { GenerationProvider, ProviderPrices } from '../jobs'
+import type { CatalogPrice, GenerationProvider, ProviderPrices } from '../jobs'
+import type { ArkPrice } from '../jobs/ark-prices'
 
 // Provider settings (ARCHITECTURE §3.3). Mirrors the checks on public.ai_providers.
 
@@ -44,7 +45,11 @@ export const staticCapabilities = (adapter: ProviderAdapterId) => adapter !== 'o
 
 // What an adapter needs to call its vendor. The key is plaintext, read from Vault per request:
 // never keep, log or return it.
-export type ProviderConfig = { baseUrl: string; model: string; apiKey: string; resolutions?: readonly Resolution[]; imageParameters?: OpenRouterImageParameters }
+// listPrice: an Ark line's admin-entered yuan price (1566), which its adapter costs each job with.
+export type ProviderConfig = {
+  baseUrl: string; model: string; apiKey: string; resolutions?: readonly Resolution[]; imageParameters?: OpenRouterImageParameters
+  listPrice?: ArkPrice | null
+}
 
 export type ProviderAdapter = (config: ProviderConfig) => GenerationProvider
 
@@ -70,8 +75,12 @@ export type AdminProvider = {
   apiKeyLast4: string | null
   isActive: boolean
   notes: string | null
-  // Per-million-token prices (T33); a null one is flagged on the admin page.
+  // Per-million-token prices the admin typed in (T33); used only where catalogPrice has none.
   prices: ProviderPrices
+  // 1566: the last OpenRouter catalogue price for this model (text and official OpenAI lines).
+  catalogPrice?: CatalogPrice | null
+  // 1566: an Ark line's admin-entered yuan price.
+  listPrice?: ArkPrice | null
   updatedAt: string
 }
 
@@ -87,4 +96,6 @@ export type ActiveProviderRow = {
   model: string
   // Snapshot used to cost each job (T33). Cached with the row; a save expires the tag.
   prices: ProviderPrices
+  catalogPrice?: CatalogPrice | null
+  listPrice?: ArkPrice | null
 }

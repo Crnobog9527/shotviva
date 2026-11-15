@@ -9,6 +9,8 @@ import type { AdminProvider, ProviderAdminActions } from '../providers/types'
 import { ActivateDialog } from './activate-dialog'
 import { connectionText, PROVIDERS_COPY as COPY } from './copy'
 import { DeleteDialog } from './delete-dialog'
+import type { CatalogPrice } from '@/core/jobs/catalog-price'
+
 import { toSaveInput, type ProviderForm } from './form-state'
 import { ProviderFormDialog } from './provider-form-dialog'
 import { ProviderSection } from './provider-section'
@@ -34,10 +36,10 @@ export function ProvidersEditor({ providers, actions }: Props) {
     clearError()
     setEditing({ provider, module })
   }
-  const save = (form: ProviderForm) => {
+  const save = (form: ProviderForm, live: CatalogPrice | null) => {
     const provider = editing?.provider ?? null
     run(
-      () => actions.save(toSaveInput(form, provider)),
+      () => actions.save(toSaveInput(form, provider, live)),
       () => {
         setEditing(null)
         return COPY.form.saved(form.label.trim())
@@ -95,6 +97,7 @@ export function ProvidersEditor({ providers, actions }: Props) {
           error={error}
           onCancel={() => setEditing(null)}
           lookupModel={actions.lookupModel}
+          lookupPrice={actions.lookupPrice}
           onSubmit={save}
         />
       ) : null}
