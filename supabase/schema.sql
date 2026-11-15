@@ -131,7 +131,7 @@ CREATE OR REPLACE FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_re
            when catalog is not null then 'catalog' when list is not null then 'list' end as basis
     from sources
   ), budget as (
-    select admin.lowest_credit_price()*0.761*0.4 as usd
+    select admin.template_floor_budget() as usd
   )
   select jsonb_build_object('usd',priced.usd,'basis',priced.basis,'samples',priced.n,
     'credits',case when priced.usd is not null and budget.usd>0 then greatest(
@@ -443,7 +443,7 @@ begin
   -- see that setting. Take the highest eligible model p95 per tier in that case, at the
   -- template's own quality (1295).
   if bound is null then
-    budget := admin.lowest_credit_price()*0.761*0.4;
+    budget := admin.template_floor_budget();
     select jsonb_object_agg(r, cost) into env_p95 from (
       select r, max(p95) cost from (
         select provider, public.canonical_resolution(coalesce(inputs->>'resolution','1k')) r,
@@ -1393,7 +1393,7 @@ CREATE OR REPLACE FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_res
         ((case when p_quality='medium' then '{"1k":0.055,"2k":0.095,"4k":0.135}'
           else '{"1k":0.081,"2k":0.135,"4k":0.206}' end)::jsonb->>public.canonical_resolution(p_resolution))::numeric end
     ) as usd from route
-  ), budget as (select admin.lowest_credit_price()*0.761*0.4 as usd)
+  ), budget as (select admin.template_floor_budget() as usd)
   select greatest(1,ceil(priced.usd*1.10/budget.usd),
     case when listed then
       ((case when p_quality='medium' then '{"1k":1,"2k":2,"4k":3}'
@@ -2290,7 +2290,7 @@ CREATE OR REPLACE FUNCTION "admin"."route_slot_costs"("p_tag" "text") RETURNS "j
           from public.generation_jobs g
           where g.provider=any((select admin.route_cost_tags(p_tag))::text[]) and g.inputs->>'quality' in ('medium','high') and g.inputs->>'resolution' in ('1k','2k','3k','4k')
             and g.status='succeeded' and g.cost_usd is not null and g.created_at>=now()-interval '30 days'
-            and admin.slot_count(g.inputs) between 2 and 4
+            and admin.slot_count(g.inputs) between 2 and 8
           group by 1,2,3 having count(*)>=10
         ) per_n group by quality, res
       ) per_res group by quality
@@ -2421,7 +2421,7 @@ CREATE OR REPLACE FUNCTION "admin"."slot_route_floor"("p_tag" "text", "p_resolut
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
-  with budget as (select admin.lowest_credit_price()*0.761*0.4 as usd),
+  with budget as (select admin.template_floor_budget() as usd),
   full_slots as (
     select percentile_cont(0.95) within group (order by g.cost_usd)::numeric as usd
       from public.generation_jobs g
@@ -2557,6 +2557,22 @@ $$;
 ALTER FUNCTION "admin"."template_approved_prices"("p_provider" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."template_breakeven_budget"() RETURNS numeric
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select case when admin.is_template_catalog_v2() and admin.template_policy_valid() then (
+    select min(i.cents/(100*i.credits::numeric) * (10000-admin.catalog_fee_bp(i.kind))/10000)
+      from (select c.kind, c.credits,
+              case when c.id in ('pack_m','pack_l') then round(c.cents*0.85) else c.cents end as cents
+            from admin.catalog_candidate(null,null,null,false) c) i
+     where i.cents>0 and i.credits>0) end
+$$;
+
+
+ALTER FUNCTION "admin"."template_breakeven_budget"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."template_catalog_minimums"() RETURNS "jsonb"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -2570,6 +2586,17 @@ $$;
 
 
 ALTER FUNCTION "admin"."template_catalog_minimums"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_floor_budget"() RETURNS numeric
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select coalesce(admin.template_breakeven_budget(), admin.lowest_credit_price()*0.761*0.4)
+$$;
+
+
+ALTER FUNCTION "admin"."template_floor_budget"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_image_options"("public"."templates") RETURNS "jsonb"
@@ -2614,6 +2641,35 @@ end $$;
 
 
 ALTER FUNCTION "admin"."template_leaves_series_on_unpublish"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_margin_target_bp"() RETURNS integer
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select case when admin.template_breakeven_budget() is not null then
+    (select (s.value->>'margin_bp')::int from public.system_settings s where s.key='catalog_economics_policy') end
+$$;
+
+
+ALTER FUNCTION "admin"."template_margin_target_bp"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_policy_valid"() RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+  select coalesce((select case
+      when jsonb_typeof(s.value) is distinct from 'object' then false
+      when exists (select from unnest(array['payment_bp','refund_bp','yearly_commission_bp','other_commission_bp','margin_bp']) k
+             where jsonb_typeof(s.value->k) is distinct from 'number' or (s.value->>k) !~ '^[0-9]{1,4}$') then false
+      else (s.value->>'payment_bp')::int + (s.value->>'refund_bp')::int
+        + greatest((s.value->>'yearly_commission_bp')::int, (s.value->>'other_commission_bp')::int) < 10000 end
+    from public.system_settings s where s.key='catalog_economics_policy'), false)
+$_$;
+
+
+ALTER FUNCTION "admin"."template_policy_valid"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_price_state"("t" "public"."templates") RETURNS "jsonb"
@@ -6636,6 +6692,9 @@ CREATE OR REPLACE FUNCTION "public"."admin_image_pricing_catalog"("p_env_model" 
     AS $$
   select jsonb_build_object('version',case when admin.is_template_catalog_v2() then 'v2' else 'v1' end,
     'unit_price',admin.lowest_credit_price(),'tariffs',admin.template_catalog_minimums(),
+    'floor_budget',admin.template_floor_budget(),
+    'breakeven_budget',admin.template_breakeven_budget(),
+    'margin_target_bp',admin.template_margin_target_bp(),
     'providers',coalesce((select jsonb_agg(to_jsonb(p)||jsonb_build_object('approved',admin.template_approved_prices(p.provider_id))
       || jsonb_build_object('list_priced',coalesce((select admin.provider_list_priced(a) from public.ai_providers a where a.id=p.provider_id),
            p.adapter='openai_images'))
@@ -8679,7 +8738,8 @@ begin
   if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin'
       and (p_key not in ('code_gift_policy','code_inviter_window_days','gallery_enabled','gallery_auto_approve',
                          'signup_gift_daily_cap','signup_gift_paused','signup_gift_per_ip',
-                         'signup_gift_claim_phone','signup_gift_claim_google','poster_photo_credits')
+                         'signup_gift_claim_phone','signup_gift_claim_google','poster_photo_credits',
+                         'catalog_economics_policy')
            or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
@@ -8724,6 +8784,22 @@ begin
          (p_value->>'maxCreditsPerCode')::numeric > 2147483647 or
          p_value - array['requirePaidGiftCap','maxCreditsPerCode'] <> '{}'::jsonb then
         raise exception 'INVALID_INPUT' using detail = 'invalid gift code policy';
+      end if;
+    -- 1568: the catalogue economics policy (§6.2 第 5 项), the same shape admin.catalog_policy()
+    -- accepts: exactly the five basis-point integers, fees + the larger commission under 100%.
+    when 'catalog_economics_policy' then
+      -- Separate steps: no cast runs before the shape is known (SQL does not short-circuit OR).
+      if jsonb_typeof(p_value) is distinct from 'object' then
+        raise exception 'INVALID_INPUT' using detail = 'catalog_economics_policy must be an object';
+      end if;
+      if p_value - array['payment_bp','refund_bp','yearly_commission_bp','other_commission_bp','margin_bp'] <> '{}'::jsonb
+         or exists (select from unnest(array['payment_bp','refund_bp','yearly_commission_bp','other_commission_bp','margin_bp']) k
+              where jsonb_typeof(p_value->k) is distinct from 'number' or (p_value->>k) !~ '^[0-9]{1,4}$') then
+        raise exception 'INVALID_INPUT' using detail = 'catalog_economics_policy must be five basis-point integers';
+      end if;
+      if (p_value->>'payment_bp')::int + (p_value->>'refund_bp')::int
+         + greatest((p_value->>'yearly_commission_bp')::int, (p_value->>'other_commission_bp')::int) >= 10000 then
+        raise exception 'INVALID_INPUT' using detail = 'catalog_economics_policy fees must stay under 100%';
       end if;
     else
       raise exception 'INVALID_INPUT' using detail = 'unknown setting';
@@ -19654,8 +19730,18 @@ GRANT ALL ON FUNCTION "admin"."template_approved_prices"("p_provider" "uuid") TO
 
 
 
+REVOKE ALL ON FUNCTION "admin"."template_breakeven_budget"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_breakeven_budget"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."template_catalog_minimums"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."template_catalog_minimums"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_floor_budget"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_floor_budget"() TO "service_role";
 
 
 
@@ -19667,6 +19753,16 @@ GRANT ALL ON FUNCTION "admin"."template_image_options"("public"."templates") TO 
 
 
 REVOKE ALL ON FUNCTION "admin"."template_leaves_series_on_unpublish"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_margin_target_bp"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_margin_target_bp"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_policy_valid"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_policy_valid"() TO "service_role";
 
 
 

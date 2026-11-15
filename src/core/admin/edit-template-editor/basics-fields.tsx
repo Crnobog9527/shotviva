@@ -6,6 +6,7 @@ import { Switch } from '@/core/ui/switch'
 import { Textarea } from '@/core/ui/textarea'
 import { RESOLUTIONS } from '@/core/templates/output-options'
 import { tierGuidance, unsupportedTier } from '../templates-editor/tier-price'
+import { MarginNote } from '../templates-editor/margin-note'
 import { approvedCredit, creditMinimum, type CreditsFloor, type TemplateQuality } from '@/core/templates/pricing'
 
 import { TIER_LABEL } from '../templates-editor/form-state'
@@ -39,6 +40,7 @@ export function BasicsFields({ form, floor, quality, version, onChange }: Props)
               <Input id={`edit-credits-${r}`} inputMode="numeric" placeholder="未定价，此档不售" disabled={unsupportedTier(floor, r)} value={unsupportedTier(floor, r) ? '' : form.credits[r]}
                 onChange={(event) => onChange({ credits: { ...form.credits, [r]: event.target.value } })} />
               <p className={Number(form.credits[r]) < creditMinimum(floor, quality, r) && Number(form.credits[r]) !== approvedCredit(floor, quality, r) ? 'text-xs text-destructive' : 'text-muted-foreground text-xs'}>{tierGuidance(floor, quality, r)}</p>
+              {Number(form.credits[r]) >= creditMinimum(floor, quality, r) && <MarginNote floor={floor} quality={quality} resolution={r} price={form.credits[r]} />}
             </div>
           ))}
         </div>
