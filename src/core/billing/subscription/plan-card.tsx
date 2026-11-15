@@ -125,6 +125,24 @@ function WaffoPass({ summary, ctx }: { summary: Subscribed; ctx: Ctx }) {
 
 const walletOf = (method: keyof typeof METHOD_KEYS) => (method === 'alipay' || method === 'wechat_pay' ? method : null)
 
+// A card subscription of another tier that may still charge next to a one-period plan (the old
+// plan's cancel failed after an upgrade): a secondary line, and its Manage / Cancel button.
+function StillBillsLine({ other }: { other?: Subscribed }) {
+  const t = useTranslations('app.account.plan')
+  const names = useNames()
+  if (!other) return null
+  return <Muted>{t('stillBills', { tier: names.tier(other.tier), date: other.periodEnd })}</Muted>
+}
+
+function StillBillsAct({ other, ctx }: { other?: Subscribed; ctx: Ctx }) {
+  const t = useTranslations('app.account.plan')
+  const names = useNames()
+  if (!other) return null
+  const name = names.tier(other.tier)
+  if (other.provider === 'waffo') return <WaffoCancelButton action={ctx.cancelWaffo} tierName={name} periodEnd={other.periodEnd} />
+  return <PortalButton manage={ctx.manage}>{t('manage')}</PortalButton>
+}
+
 // Alipay (Stripe or Waffo) or WeChat Pay (Stripe, T73): one period paid once. The newest membership purchase says which period and
 // how it was paid when it is the tier the account has now.
 function WalletPass({ summary, ctx }: { summary: Extract<SubscriptionSummary, { kind: 'paid_until' }>; ctx: Ctx }) {
@@ -141,9 +159,10 @@ function WalletPass({ summary, ctx }: { summary: Extract<SubscriptionSummary, { 
   const options = summary.tier ? { tier: summary.tier, period: last?.product.interval, planId: offer?.id } : undefined
   const renew = offer ? t.rich('renewPrice', { ...richTags, price: names.usd(offer.priceUsd) }) : t('renew')
   return (
-    <Pass state="wallet" tier={summary.tier} brand={ctx.facts.brand} head={<><span>{t('member')}</span><Status>{t('endsPlain', { date })}</Status></>} foot={<SinceFoot facts={ctx.facts}><PaywallPill main options={options}>{renew}</PaywallPill></SinceFoot>}>
+    <Pass state="wallet" tier={summary.tier} brand={ctx.facts.brand} head={<><span>{t('member')}</span><Status>{t('endsPlain', { date })}</Status></>} foot={<SinceFoot facts={ctx.facts}><PaywallPill main options={options}>{renew}</PaywallPill><StillBillsAct other={summary.stillBills} ctx={ctx} /></SinceFoot>}>
       <PassName>{names.tier(summary.tier)}</PassName>
       <Why>{why}</Why>
+      <StillBillsLine other={summary.stillBills} />
     </Pass>
   )
 }

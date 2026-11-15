@@ -1023,6 +1023,7 @@
       "slots": {
         "upload": "Upload image",
         "oneAtATime": "This template makes one image at a time.",
+        "nameOnly": "Prizes without a photo are drawn as the real product their name describes. To match yours exactly, upload a photo.",
         "remove": "Remove",
         "replace": "Replace"
       },
@@ -1319,6 +1320,7 @@
         "pastDueEndedWhy": "We couldn't take your last payment, so your plan has ended. Update the card: once a payment goes through, the plan starts again. Your credits still work.",
         "updatePayment": "Update payment method",
         "walletWhy": "Paid once, so it doesn't renew by itself: renew before {date, date, medium} to keep the plan, or let it end and your credits still work.",
+        "stillBills": "Your earlier {tier} card subscription is still set to renew on {date, date, medium}.",
         "renew": "Renew",
         "paused": "Paused",
         "pausedWhy": "Your subscription is paused. Nothing is charged and no credits are added until it resumes.",

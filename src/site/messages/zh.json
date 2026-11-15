@@ -1023,6 +1023,7 @@
       "slots": {
         "upload": "上传图片",
         "oneAtATime": "这个模板一次做一张。",
+        "nameOnly": "没传奖品照片的，会按奖品名画出对应的真实产品；想和实物一模一样，请上传照片。",
         "remove": "移除",
         "replace": "换一张"
       },
@@ -1319,6 +1320,7 @@
         "pastDueEndedWhy": "上一次扣款没有成功，会员已结束。请更新银行卡：扣款成功后会员会重新生效。积分仍可正常使用。",
         "updatePayment": "更新付款方式",
         "walletWhy": "这是一次性付款，不会自动续费：{date, date, medium} 前续费可以保留会员；不续费的话，积分仍可使用。",
+        "stillBills": "你之前的{tier}卡订阅仍会在 {date, date, medium} 自动续费。",
         "renew": "续费",
         "paused": "已暂停",
         "pausedWhy": "订阅已暂停。恢复之前不会扣款，也不会发放积分。",
