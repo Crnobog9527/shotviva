@@ -159,7 +159,9 @@ export function templateSyncDryRunEnv() {
   }
 }
 
-export function templateSyncEnv() {
+// `to-preview` (2026-11-14): the reverse run, production read and the preview written; its 上下架
+// and 开放售卖 changes are made as a preview admin (SYNC_PREVIEW_ACTOR_ID), the same keys otherwise.
+export function templateSyncEnv(direction: 'to-production' | 'to-preview' = 'to-production') {
   const endpoint = z.object({
     serviceKey: z.string().min(1), accountId: z.string().regex(/^[0-9a-f]{32}$/),
     accessKeyId: z.string().min(1), secretAccessKey: z.string().min(1),
@@ -175,8 +177,8 @@ export function templateSyncEnv() {
   return {
     ...syncSelection(),
     runId: z.string().regex(/^\d+$/).parse(process.env.GITHUB_RUN_ID),
-    // The production admin (profile id) that 上下架 and 开放售卖 changes are made and audited as.
-    actorId: z.uuid().parse(process.env.SYNC_PRODUCTION_ACTOR_ID),
+    // The target's admin (profile id) that 上下架 and 开放售卖 changes are made and audited as.
+    actorId: z.uuid().parse(direction === 'to-preview' ? process.env.SYNC_PREVIEW_ACTOR_ID : process.env.SYNC_PRODUCTION_ACTOR_ID),
     preview: read('SYNC_PREVIEW_', process.env.SYNC_PREVIEW_ASSETS_BASE),
     production: read('SYNC_PRODUCTION_', 'https://shotviva.com/assets'),
     productionPrivateBucket: syncPrivateBucket(process.env.SYNC_PRODUCTION_PRIVATE_BUCKET),
