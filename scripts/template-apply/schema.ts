@@ -5,6 +5,7 @@ import { creditsCostSchema, TEMPLATE_QUALITIES } from '../../src/core/templates/
 import { RESOLUTIONS } from '../../src/core/templates/output-options'
 import { promptInputSchema, TEMPLATE_MODULES, templateInputSchema } from '../../src/core/templates/schema'
 import { MAX_STYLE_REFS } from '../../src/core/templates/style-refs'
+import { familyJudgeSchema, templateJudgeSchema } from './judge-schema'
 import { trialSchema } from './trial-schema'
 
 // The batch file `pnpm templates:apply` reads (format: scripts/templates.example.json). It lives
@@ -100,6 +101,8 @@ export const templateItemSchema = templateFields.extend({
   // templates:review / finalize: the verdict on the trial results of prompt version `version`; a
   // pass names the trial run whose result becomes the cover. Apply ignores it.
   review: reviewSchema.optional(),
+  // templates:judge: this template's own checklist items and pixel checks. Apply ignores it.
+  judge: templateJudgeSchema.optional(),
   cover: coverSchema.optional(),
   openSale: z.boolean().optional(),
   publish: z.boolean().optional(),
@@ -117,6 +120,8 @@ export const batchItemCount = (b: { categories: unknown[]; referenceCategories: 
 
 export const batchSchema = z.strictObject({
   $comment: z.string().optional(),
+  // templates:judge: the family's checklist (every template's results are judged on it).
+  judge: familyJudgeSchema.optional(),
   categories: z.array(categorySchema).max(100).default([]),
   referenceCategories: z.array(referenceCategorySchema).max(100).default([]),
   series: z.array(seriesSchema).max(100).default([]),

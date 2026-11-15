@@ -10,6 +10,7 @@ import { matteOf } from '../../src/core/storage/see-through'
 import { sniffImageType, type ObjectStore } from '../../src/core/storage'
 import { confirmTestPhoto } from '../../src/modules/image/test-run/test-photos'
 import { findTestPhoto } from '../../src/modules/image/test-run/test-run-store'
+import type { TemplateItem } from '../template-apply/schema'
 import { digest, uuidFrom } from './cells'
 
 // Test photos from local files, as the admin panel's upload makes them: the browser's compression
@@ -44,4 +45,15 @@ export async function ensureTestPhoto(deps: { db: SupabaseClient; store: ObjectS
   await deps.store.put(key, await compress(photo.bytes, matte), 'image/jpeg')
   await confirmTestPhoto(deps, actorId, id, key)
   return id
+}
+
+// Every test image the batch's trial inputs name (photo or slots), read once: path → bytes and hash.
+export async function photoHashes(items: TemplateItem[], baseDir: string) {
+  const photos = new Map<string, { bytes: Uint8Array; hash: string }>()
+  for (const input of items.flatMap(item => item.trial?.inputs ?? [])) {
+    for (const path of [input.photo, ...Object.values(input.slots ?? {})]) {
+      if (path && !photos.has(path)) photos.set(path, await readPhoto(baseDir, path))
+    }
+  }
+  return photos
 }

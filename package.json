@@ -18,6 +18,7 @@
     "dishware:import": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/dishware/import.ts",
     "templates:apply": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/template-apply/run.ts",
     "templates:trial": "NODE_USE_ENV_PROXY=1 tsx --conditions=react-server --env-file-if-exists=.env.local scripts/template-trial/run.ts",
+    "templates:judge": "NODE_USE_ENV_PROXY=1 tsx --conditions=react-server --env-file-if-exists=.env.local scripts/template-judge/run.ts",
     "templates:review": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/template-review/run.ts review",
     "templates:finalize": "NODE_USE_ENV_PROXY=1 tsx --conditions=react-server --env-file-if-exists=.env.local scripts/template-review/run.ts finalize",
     "templates:status": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/template-review/run.ts status",

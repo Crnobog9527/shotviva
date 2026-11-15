@@ -63,6 +63,22 @@ pnpm templates:apply .local/templates/<batch>.json             # apply to the te
   "required"?, "note"? }]` (1–4, the order the model gets them). With slots, `images.max` must be
   the number of slots and `images.min` the number of required ones; `note` names a text field shown
   under that box; such a template must be `visibleIn: ["web"]` only.
+- `pnpm templates:judge <batch>.json [--dry-run] [--only a,b] [--budget 0.2] [--concurrency 2] [--effort medium]`
+  is the automatic image judge. It looks at every result of the current prompt version that
+  `templates:trial` downloaded, together with the test image(s) it was made from, the template's
+  cover and its style references, and answers the batch file's checklist with a yes/no and a short
+  reason per item. The checklist is local, like the prompts: the family's items in the file's
+  top-level `"judge": { "bar": ["…"] }`, a template's own in its `"judge": { "bar": [...] }`, and
+  an input set's own (a toggle's promise) in that set's `"judge": ["…"]` (which does not change
+  the trial's run ids). Write each item so that "yes" means good. Pixel checks need no model:
+  `"alpha": "opaque" | "transparent" | "any"` (default: what the template asks the model for) and
+  `"qr": { "text": "…" }` or `{ "slot": "<slot key>" }`; `"expectText": true` turns each copy field
+  of the input set into an item ("shows this text exactly"). The model is the admin's judge line
+  (the active 判断 provider, key read from the database). Each look holds its estimate against
+  `--budget` (USD, default 0.2) before it is made; a look costs well under $0.002. Verdicts and
+  spend go to `.local/trials/judge.json`, keyed by a content hash (the images, the checklist, the
+  judge model and effort), so an unchanged result is never judged twice. The review page shows each
+  item with its reason under the result, and `templates:status` gets a judge column.
 - Review and finish: write each template's verdict into the file as
   `"review": { "status": "pass" | "fail", "version": <prompt version>, "pick": "<trial run id>", "notes": "…" }`
   (a pass needs `pick`, the result that becomes the cover; a review of an older prompt version no
