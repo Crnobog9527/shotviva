@@ -83,6 +83,9 @@ describe('the food flows (§5.1c)', () => {
     expect(nearestAspect(1080, 1920)).toBe('9:16')
   })
 
+})
+
+describe('the food flows fall back (§5.1c)', () => {
   it('a failed reading leaves the ordinary call (flow 1) and costs nothing extra', async () => {
     const { deps, base, photo } = await setup(new Error('openai responses 400'))
     const out = await runFoodFlow(deps, plan(true, true), base, [photo], inputs)
