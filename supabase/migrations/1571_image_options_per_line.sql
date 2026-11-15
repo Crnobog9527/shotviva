@@ -111,3 +111,73 @@ begin
     'exactPixels', o->'exactPixels')
     || case when locked then '{"lockedRatios":true}'::jsonb else '{}'::jsonb end;
 end $_$;
+
+-- ---- cheaper statement memo (1570's) ----------------------------------------------------------
+-- 1570 kept every entry in one jsonb text that each read parsed whole. Now each key has its own
+-- transaction-local setting, and 'shotviva.stmt_memo' holds a generation that a clear replaces, so
+-- an entry counts only if it carries this statement's timestamp and the current generation. Same
+-- rules as before: only what this statement wrote since the last clear is used.
+
+create or replace function admin.stmt_memo(p_key text) returns jsonb
+  language plpgsql stable set search_path to '' as $$
+declare
+  stamp text := statement_timestamp()::text || '#' || coalesce(current_setting('shotviva.stmt_memo', true), '') || '|';
+  raw text := current_setting('shotviva.m_' || md5(p_key), true);
+  body text;
+begin
+  if raw is null or left(raw, length(stamp)) <> stamp then return null; end if;
+  body := substr(raw, length(stamp) + 1);
+  if not pg_input_is_valid(body, 'jsonb') then return null; end if;
+  return jsonb_build_object('v', body::jsonb);
+end $$;
+
+create or replace function admin.stmt_memo_put(p_key text, p_value jsonb) returns void
+  language plpgsql volatile set search_path to '' as $$
+begin
+  perform set_config('shotviva.m_' || md5(p_key),
+    statement_timestamp()::text || '#' || coalesce(current_setting('shotviva.stmt_memo', true), '') || '|'
+      || coalesce(p_value, 'null'::jsonb)::text, true);
+end $$;
+
+create or replace function admin.stmt_memo_clear() returns trigger
+  language plpgsql set search_path to '' as $$
+begin
+  perform set_config('shotviva.stmt_memo', gen_random_uuid()::text, true);
+  return null;
+end $$;
+
+-- 1570's body; only the last line now starts a new memo generation.
+create or replace function admin.refresh_template_floor_budget() returns void
+  language plpgsql volatile security definer set search_path to '' as $$
+declare b numeric;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_floor_budget_cache', 0));
+  b := admin.template_breakeven_budget_now();
+  insert into admin.template_floor_budget_cache as c (singleton, breakeven, floor_budget, margin_target_bp, refreshed_at)
+  values (true, b, coalesce(b, admin.lowest_credit_price()*0.761*0.4),
+    case when b is not null then (select (s.value->>'margin_bp')::int from public.system_settings s where s.key='catalog_economics_policy') end,
+    clock_timestamp())
+  on conflict (singleton) do update set breakeven=excluded.breakeven, floor_budget=excluded.floor_budget,
+    margin_target_bp=excluded.margin_target_bp, refreshed_at=excluded.refreshed_at;
+  perform set_config('shotviva.stmt_memo', gen_random_uuid()::text, true);
+end $$;
+
+-- A template without slots takes the single-image floor (the body's first two cases) with no memo
+-- lookup; most templates have none.
+create or replace function admin.slot_route_floor(p_tag text, p_resolution text, p_quality text, p_slots integer, p_single integer) returns integer
+  language plpgsql stable set search_path to '' as $$
+declare
+  k text;
+  hit jsonb;
+  v integer;
+begin
+  if p_single is null then return null; end if;
+  if coalesce(p_slots, 0) <= 1 then return p_single; end if;
+  k := concat_ws('|', 'slot', quote_nullable(p_tag), quote_nullable(p_resolution), quote_nullable(p_quality),
+    quote_nullable(p_slots), quote_nullable(p_single));
+  hit := admin.stmt_memo(k);
+  if hit ? 'v' and jsonb_typeof(hit->'v') in ('number', 'null') then return (hit->>'v')::integer; end if;
+  v := admin.slot_route_floor_now(p_tag, p_resolution, p_quality, p_slots, p_single);
+  perform admin.stmt_memo_put(k, to_jsonb(v));
+  return v;
+end $$;
