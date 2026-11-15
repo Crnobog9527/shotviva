@@ -20,7 +20,9 @@ const KEY = 'sk-t30-decision-secret-0123456789'
 let pg: Client
 let adminId: string
 
-const deps = () => ({ db: serviceSupabase(), resolveHost: publicHost })
+// No network: a mocked OpenRouter catalogue with fixture prices for the line's model.
+const catalogue = async () => Response.json({ data: [{ id: 'openai/gpt-6-luna', pricing: { prompt: '0.0000001', completion: '0.0000005' } }] })
+const deps = () => ({ db: serviceSupabase(), resolveHost: publicHost, fetch: catalogue })
 const save = (input: Record<string, unknown>) =>
   saveProvider(deps(), adminId, {
     label: `${PREFIX} ${randomUUID().slice(0, 6)}`,
@@ -74,7 +76,7 @@ describe('decision providers', () => {
       (id) => readProviderKey(serviceSupabase(), id),
     )
     expect(credentials).toMatchObject({ tag: `${second}/gpt-6-luna`, adapter: 'openai_responses', config: { apiKey: KEY } })
-    // No prices on the row: gpt-6-luna's official input / output prices apply (§10.0).
+    // No prices on the row: the catalogue price read on save for openai/gpt-6-luna applies (§10.0).
     expect(credentials?.prices).toEqual({ inputTextPerM: 0.1, inputImagePerM: null, outputPerM: 0.5 })
   })
 })

@@ -7,7 +7,7 @@ import { ProviderError, type GenerationProvider, type ProviderInput, type Provid
 import { ARK_BASE_URL } from '@/core/providers/types'
 import { ARK_MAX_PIXELS, ARK_MIN_PIXELS, ARK_RESOLUTIONS } from '@/core/providers/ark'
 
-import { arkListCost, arkPrice } from '@/core/jobs/ark-prices'
+import { arkListCost, type ArkPrice } from '@/core/jobs/ark-prices'
 import { pngFromBase64 } from './image-output'
 import { formatSize, outputSize, sourcePhoto, type OutputSize } from './output-size'
 
@@ -22,6 +22,8 @@ export type ArkImageConfig = {
   model: string
   // Yuan per US dollar for cost_usd (env CNY_PER_USD).
   cnyPerUsd: number
+  // The line's admin-entered list price (ai_providers.list_price, 1566); without one jobs have no cost.
+  listPrice?: ArkPrice | null
   fetch?: typeof fetch
   baseUrl?: string
 }
@@ -104,7 +106,7 @@ function usageOf(body: ArkResponse, input: ProviderInput, config: ArkImageConfig
   const { generatedImages, inputImages } = counts(body, input, Boolean(image))
   const usage: ProviderUsage = { generated_images: generatedImages, input_images: inputImages }
   if (generatedImages === 0) return usage
-  const cost = arkListCost(arkPrice(config.model), { generatedImages, inputImages, pixels: pixelsOf(image?.size, requested) }, config.cnyPerUsd)
+  const cost = arkListCost(config.listPrice, { generatedImages, inputImages, pixels: pixelsOf(image?.size, requested) }, config.cnyPerUsd)
   return cost ? { ...usage, ...cost } : usage
 }
 

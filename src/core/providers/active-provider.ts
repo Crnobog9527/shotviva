@@ -5,13 +5,13 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { createAdminSupabase } from '../auth/supabase-admin'
 import { serverEnv } from '../env'
 import { AppError } from '../errors'
-import { effectivePrices, providerTag, type GenerationProvider, type ImageRequestOptions, type ProviderPrices } from '../jobs'
+import { providerTag, type GenerationProvider, type ImageRequestOptions, type ProviderPrices } from '../jobs'
 import { ARK_RESOLUTIONS } from './ark'
 import { openRouterImageParameters } from './openrouter-catalog'
 import { PROVIDERS_CACHE_TAG } from './cache-tag'
 import { readProviderKey } from './keys'
 import { loadActiveProviderRow } from './repository'
-import { resolveProvider, type ReadProviderKey } from './resolve'
+import { resolveProvider, rowPrices, type ReadProviderKey } from './resolve'
 import type { ActiveProviderRow, ProviderAdapterId, ProviderAdapters, ProviderConfig, ProviderModule } from './types'
 
 // The admin page expires this tag on every save or switch (updateTag), so the next generation
@@ -54,7 +54,7 @@ export async function defaultTemplateProvider(adapters: ProviderAdapters, reques
   return resolveProvider('image', row, serverEnv(), adapters, (id) => readProviderKey(createAdminSupabase(), id), parameters)
 }
 
-// `prices`: the row's own, empty ones filled from MODEL_PRICES; null when neither has any.
+// `prices`: the live catalogue price, empty fields filled from the row's own; null when neither has any.
 export type ProviderCredentials = { tag: string; adapter: ProviderAdapterId; config: ProviderConfig; prices: ProviderPrices | null }
 
 // For a module that is not a GenerationProvider and has no env fallback ('decision', T30): the
@@ -68,5 +68,5 @@ export async function activeCredentials(
   if (!row) return null
   const apiKey = await readKey(row.id)
   if (!apiKey) throw new AppError('INTERNAL', `active ${module} provider ${row.id} has no API key`)
-  return { tag: providerTag(row.id, row.model), adapter: row.adapter, config: { baseUrl: row.baseUrl, model: row.model, apiKey }, prices: effectivePrices(row.model, row.prices) }
+  return { tag: providerTag(row.id, row.model), adapter: row.adapter, config: { baseUrl: row.baseUrl, model: row.model, apiKey }, prices: rowPrices(row) }
 }

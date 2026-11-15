@@ -8,6 +8,7 @@ import {
   type DryRunResult,
   refreshProviderCapabilities,
   lookupProviderModel,
+  lookupProviderPrice,
   removeProvider,
   runProviderAction,
   saveProvider,
@@ -33,6 +34,11 @@ function providersChanged() {
 export async function lookupProviderModelAction(input: unknown) {
   await requireAdmin()
   return runProviderAction(() => lookupProviderModel(input))
+}
+
+export async function lookupProviderPriceAction(input: unknown) {
+  await requireAdmin()
+  return runProviderAction(() => lookupProviderPrice(input))
 }
 
 export async function saveProviderAction(input: unknown): Promise<ProviderActionResult<string>> {

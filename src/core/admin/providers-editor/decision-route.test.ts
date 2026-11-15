@@ -26,17 +26,17 @@ describe('decision route', () => {
     expect(toSaveInput({ ...ready, resolutions: ['1k', '2k', '4k'] }, null)).toMatchObject({ module: 'dish_read', adapter: 'openai_responses', model: 'openai/gpt-6-sol' })
   })
 
-  it('opens a stored row by its address, and fills the table price for the openai/ name', () => {
+  it('opens a stored row by its address, with no price filled in from code', () => {
     const router = formFor(row('https://openrouter.ai/api/v1/', 'openai/gpt-6-luna'))
     expect(decisionRoute(router)).toBe('openrouter')
-    expect(router).toMatchObject({ priceInputTextPerM: '0.1', priceOutputPerM: '0.5' })
+    expect(router).toMatchObject({ priceInputTextPerM: '', priceOutputPerM: '' })
     expect(decisionRoute(formFor(row('https://api.openai.com/v1', 'gpt-6-luna')))).toBe('openai')
   })
 
   it('switching sets the address and renames the model, keeping typed prices', () => {
     const official = formFor(row('https://api.openai.com/v1', 'gpt-6-luna'))
     const moved = withDecisionRoute(official, 'openrouter')
-    expect(moved).toMatchObject({ baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-6-luna', priceInputTextPerM: '0.1', priceOutputPerM: '0.5' })
+    expect(moved).toMatchObject({ baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-6-luna', priceInputTextPerM: '', priceOutputPerM: '' })
     expect(withDecisionRoute(moved, 'openai')).toMatchObject({ baseUrl: 'https://api.openai.com/v1', model: 'gpt-6-luna' })
     const typed = withDecisionRoute({ ...official, priceOutputPerM: '0.6' }, 'openrouter')
     expect(typed.priceOutputPerM).toBe('0.6')

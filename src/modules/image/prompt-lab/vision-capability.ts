@@ -3,11 +3,12 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { AppError } from '@/core/errors'
 import { effectivePrices } from '@/core/jobs'
+import { currentCatalogPrice } from '@/core/providers/catalog-model'
 import { assertPublicBaseUrl, DEFAULT_BASE_URL, OPENROUTER_BASE_URL, readProviderKey, type AdminProvider } from '@/core/providers'
 import { getCatalogJson } from '@/core/providers/catalog-request'
 
 export function isPromptLabVisionProvider(row: AdminProvider) {
-  const prices = effectivePrices(row.model, row.prices)
+  const prices = effectivePrices(currentCatalogPrice(row), row.prices)
   return row.module === 'decision' && row.adapter === 'openai_responses' && !!row.apiKeyLast4 &&
     prices?.inputTextPerM != null && prices.outputPerM != null && (prices.outputPerM + prices.inputTextPerM > 0)
 }
