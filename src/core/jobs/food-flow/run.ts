@@ -23,7 +23,11 @@ export type FoodDeps = {
   vessels: () => Promise<readonly DishwareItem[]>
   random?: (n: number) => number
   timeoutMs?: number
+  // Told which flow each job ran and why it fell back (templates:trial prints it per run).
+  onOutcome?: (report: FoodReport) => void
 }
+
+export type FoodReport = { flow: FoodChoice['kind']; fallback: FoodChoice['fallback'] | null; readError: string | null }
 
 export const DISH_READ_TIMEOUT_MS = 20_000
 // Enough to count garnish and see the skin's colour; a few hundred input tokens.
@@ -31,21 +35,29 @@ const READ_EDGE = 1024
 
 export type FoodPlan = { prompts: FoodFlowPrompts; toggles: FoodToggles }
 type Call = Omit<ProviderInput, 'signal'>
-export type FoodOutcome = { call: Call; usage: DishReaderUsage | null; prices?: ProviderPrices | null; choice: FoodChoice; vesselId?: string | undefined; category?: string | undefined }
+export type FoodOutcome = {
+  call: Call; usage: DishReaderUsage | null; prices?: ProviderPrices | null; choice: FoodChoice
+  vesselId?: string | undefined; category?: string | undefined
+  // Why the reading failed, when it did (shown by templates:trial).
+  readError?: string | undefined
+}
 
 async function photoDataUrl(photo: InputImage): Promise<string> {
   const jpeg = await sharp(photo.bytes).resize({ width: READ_EDGE, height: READ_EDGE, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer()
   return `data:image/jpeg;base64,${jpeg.toString('base64')}`
 }
 
+// Why a reading failed, short and ours (adapters only put the status in their messages).
+const failureOf = (error: unknown) => (error instanceof Error ? error.message : 'unknown').slice(0, 160)
+
 async function readDish(food: FoodDeps, reader: DishReader | null, instructions: string, photo: InputImage) {
-  if (!reader) return null
+  if (!reader) return { error: 'no dish-reading or decision line switched on' }
   try {
     const signal = AbortSignal.timeout(food.timeoutMs ?? DISH_READ_TIMEOUT_MS)
     return await reader.read({ imageDataUrl: await photoDataUrl(photo), instructions, signal })
   } catch (error) {
     logger.warn('food_flow.read_failed', { error })
-    return null
+    return { error: failureOf(error) }
   }
 }
 
@@ -110,10 +122,11 @@ const FLOW_1: FoodChoice = { kind: 'both_off', fallback: 'read_failed' }
 async function decide(store: ObjectStore, food: FoodDeps, plan: FoodPlan, photo: InputImage) {
   const reader = await food.reader()
   const read = await readDish(food, reader, plan.prompts.read, photo)
-  const reading = read?.reading ?? null
+  const reading = 'reading' in read ? read.reading : null
   const vessel = await vesselFor(store, food, reading, plan.toggles)
   const choice = chooseFoodFlow(plan.toggles, reading, vessel !== null)
-  const facts = { usage: read?.usage ?? null, prices: reader?.prices ?? null, category: reading?.category, vesselId: vessel?.item.id }
+  const facts = { usage: 'usage' in read ? read.usage : null, prices: reader?.prices ?? null, category: reading?.category,
+    vesselId: vessel?.item.id, readError: 'error' in read ? read.error : undefined }
   return { reading, vessel, choice, facts }
 }
 

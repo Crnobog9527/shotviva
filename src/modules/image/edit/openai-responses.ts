@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { DECIDED_SCOPES } from '@/core/templates'
 
 import type { ClassifierAnswer, ClassifierInput, ClassifierUsage, ScopeClassifier } from './classifier'
+import { postResponsesRequest } from './responses-request'
 
 // The 'openai_responses' classifier (ARCHITECTURE §3.3, §5.2): OpenAI's Responses API with a
 // strict JSON schema, lowest reasoning effort, nothing stored on OpenAI's side. Plain fetch so
@@ -81,17 +82,9 @@ function toAnswer(body: unknown): ClassifierAnswer {
 }
 
 // POST {baseUrl}/responses. Only the HTTP status leaves on failure: a body can echo the request.
+// A model that cannot turn reasoning off is retried at the lowest effort (responses-request.ts).
 export async function postResponses(config: OpenAIResponsesConfig, body: unknown, signal: AbortSignal): Promise<unknown> {
-  const response = await (config.fetch ?? fetch)(`${config.baseUrl}/responses`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal,
-  })
-  if (!response.ok) {
-    await response.body?.cancel().catch(() => undefined)
-    throw new Error(`openai responses ${response.status}`)
-  }
+  const response = await postResponsesRequest(config, body, signal)
   return response.json().catch(() => null)
 }
 

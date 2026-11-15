@@ -102,7 +102,8 @@ function onInterrupt(ctx: RunContext) {
 }
 
 const line = (r: CellResult) => `${r.cell.templateId} v${r.cell.version} #${r.cell.inputIndex + 1}.${r.cell.k + 1} ${r.outcome}` +
-  `${r.code ? ' ' + r.code : ''}${r.failure?.status ? ` HTTP ${r.failure.status}` : ''}${r.reused ? '（已有）' : ''}\n`
+  `${r.code ? ' ' + r.code : ''}${r.failure?.status ? ` HTTP ${r.failure.status}` : ''}${r.reused ? '（已有）' : ''}\n` +
+  (r.food ? `  ⚠ ${r.food}\n` : '')
 
 async function finish(p: Prepared, store: PrivateStore, ctx: RunContext, results: CellResult[]) {
   const state = await readTrialState(p.root)
