@@ -8,8 +8,9 @@ import { rpcError } from './rpc-error'
 // its ancestors, parents before children, so production never answers SUBCATEGORY_MISSING for a
 // category the test site has. Present ones only take the test site's names and position.
 
-const category = z.looseObject({ key: z.string(), level: z.int(), is_system: z.boolean() })
-export type CategoryOutcome = { key: string; result: string } | { key: string; error: string }
+const category = z.looseObject({ key: z.string(), level: z.int(), is_system: z.boolean(), parent_id: z.string().nullable().optional() })
+// `parent`: the category's parent on the source, for a dry run's prerequisites (staging.ts).
+export type CategoryOutcome = ({ result: string } | { error: string }) & { key: string; parent: string | null }
 
 export async function syncCategories(keys: readonly string[], source: SyncTarget, target: SyncTarget, validateOnly: boolean) {
   if (keys.length === 0) return []
@@ -19,8 +20,9 @@ export async function syncCategories(keys: readonly string[], source: SyncTarget
   const outcomes: CategoryOutcome[] = []
   for (const row of rows) {
     const write = await target.db.rpc('sync_preview_category', { p_category: row, p_validate_only: validateOnly })
-    if (write.error) outcomes.push({ key: row.key, error: rpcError(write.error, 'CATEGORY_WRITE').message })
-    else outcomes.push({ key: row.key, result: z.string().parse(write.data) })
+    const parent = row.parent_id ?? null
+    if (write.error) outcomes.push({ key: row.key, parent, error: rpcError(write.error, 'CATEGORY_WRITE').message })
+    else outcomes.push({ key: row.key, parent, result: z.string().parse(write.data) })
   }
   return outcomes
 }
