@@ -20,7 +20,7 @@ export const dishwareCopy = {
   pickImage: '选择图片（JPEG / PNG / WebP，不超过 20MB）',
   upload: '上传并保存',
   uploading: '上传中…',
-  syncNote: '正式站的图库用导入脚本 pnpm dishware:import 和测试站保持一致（总控操作）。',
+  syncNote: '正式站的图库由总控在 GitHub Actions 运行「Sync vessel library to production」，从测试站同步过去。',
 } as const
 
 export const CATEGORY_NAMES: Record<DishCategory, string> = {
