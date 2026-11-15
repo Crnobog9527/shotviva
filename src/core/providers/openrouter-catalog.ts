@@ -20,6 +20,9 @@ const imageParameters = z.object({
   aspect_ratio: enumParameter.optional(),
   output_format: enumParameter.optional(),
   quality: enumParameter.optional(),
+  // GPT image lists auto / opaque (and transparent on the models that can cut out). Dropping it
+  // here meant a template's background never reached the model (2026-11-15, see-through posters).
+  background: enumParameter.optional(),
   input_references: referenceRange.optional(),
 }).refine(value => Object.keys(value).length > 0)
 export type OpenRouterImageParameters = z.infer<typeof imageParameters>

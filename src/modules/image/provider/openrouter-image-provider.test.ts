@@ -38,7 +38,10 @@ const catalogue = { data: [
   { id: 'openai/gpt-image', supported_parameters: { output_format: enumOf('png'), input_references: range(16) } },
   { id: sunburst, supported_parameters: {
     aspect_ratio: enumOf('1:1', '3:4', 'auto'), output_format: enumOf('png', 'jpeg'),
-    quality: enumOf('auto', 'low', 'medium', 'high'), input_references: range(16),
+    quality: enumOf('auto', 'low', 'medium', 'high'), background: enumOf('auto', 'transparent', 'opaque'), input_references: range(16),
+  } },
+  { id: 'openai/gpt-image-2', supported_parameters: {
+    aspect_ratio: enumOf('1:1', 'auto'), output_format: enumOf('png'), quality: enumOf('medium'), background: enumOf('auto', 'opaque'), input_references: range(16),
   } },
 ] }
 
@@ -77,8 +80,30 @@ describe('OpenRouter image requests', () => {
 
 })
 
+describe('OpenRouter and the template background', () => {
+  // 2026-11-15: the catalogue key was dropped, so an opaque prize poster with a transparent logo
+  // came back see-through.
+  it.each([
+    [sunburst, 'opaque', 'opaque'], [sunburst, 'transparent', 'transparent'],
+    ['openai/gpt-image-2', 'opaque', 'opaque'], ['openai/gpt-image-2', 'transparent', undefined],
+    [sunburst, 'see-through', undefined], [sunburst, undefined, undefined],
+  ] as const)('%s with background %s sends %s', async (model, background, sent) => {
+    const fetch = fake(reply(await imageData('png')))
+    await createOpenRouterImageProvider({ ...config, model, fetch })
+      .generate(input({ aspectRatio: '1:1', images: [], params: background ? { background } : {} }))
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body)).background).toBe(sent)
+  })
+
+  it('never sends background to a model whose catalogue does not list it', async () => {
+    const fetch = fake(reply(await imageData('png')))
+    await createOpenRouterImageProvider({ ...config, model: flux, fetch })
+      .generate(input({ aspectRatio: 'original', resolution: '2k', images: [], params: { background: 'opaque' } }))
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).not.toHaveProperty('background')
+  })
+})
+
 describe('OpenRouter and the cut-out record', () => {
-  it('does not send model_params.background, so a transparent template routed here is left unknown', () => {
+  it('leaves a transparent template routed here unknown in the job record', () => {
     const provider = createOpenRouterImageProvider({ ...config, fetch: vi.fn() })
     expect(provider.honoursBackground).toBeFalsy()
     expect(backgroundInput({ background: 'transparent' }, provider)).toEqual({})
