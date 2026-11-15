@@ -121,6 +121,7 @@ begin
            catalog_minimums->t.id as tariff,
            coalesce(sale.unpriced_resolutions, array(select tier from unnest(array['1k','2k','4k']) tier
              where tier<>all(admin.sale_route_resolutions(previous)))) as unpriced_resolutions,
+           admin.sale_route_resolutions(chosen) as supported,
            t.credits_cost || v_cost as credits_cost,
            coalesce(v_visible, t.visible_in) as visible_in,
            a.id in ('edit', 'freeform') or coalesce(c.is_system, false) as is_builtin,
@@ -162,7 +163,9 @@ begin
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'no_tier')
     from planned p
     where p.found and not p.is_builtin and cardinality(v_close) > 0
-      and array['1k','2k','4k'] <@ (array(select tier from unnest(p.unpriced_resolutions) tier where not (v_cost ? tier)) || v_close)
+      -- Counted against the resulting model: a priced tier it cannot make offers nothing.
+      and not exists (select from unnest(p.supported) tier
+        where not (tier = any(p.unpriced_resolutions) and not (v_cost ? tier)) and not (tier = any(v_close)))
     union all
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
     from planned p
@@ -204,17 +207,15 @@ begin
   end if;
 
   -- A capability expansion or a model change alone never opens a previously unpriced tier.
-  if v_cost <> '{}'::jsonb then
-    perform admin.set_template_unpriced_resolutions(s.template_id,
-      array(select tier from unnest(s.unpriced_resolutions) tier where not (v_cost ? tier)))
-    from public.template_sale_approvals s where s.template_id=any(v_ids)
-      and exists(select from unnest(s.unpriced_resolutions) tier where v_cost ? tier);
-  end if;
-  if cardinality(v_close) > 0 then
-    perform admin.set_template_unpriced_resolutions(s.template_id,
-      array(select tier from unnest(array['1k','2k','4k']) tier where tier = any(s.unpriced_resolutions || v_close)))
-    from public.template_sale_approvals s where s.template_id=any(v_ids)
-      and not (v_close <@ s.unpriced_resolutions);
+  -- Priced tiers reopen and 停售 tiers close in one setter call per template, so its floor
+  -- assertion judges the final set of open tiers, never an intermediate one.
+  if v_cost <> '{}'::jsonb or cardinality(v_close) > 0 then
+    perform admin.set_template_unpriced_resolutions(s.template_id, f.unpriced)
+    from public.template_sale_approvals s
+    cross join lateral (select array(select tier from unnest(array['1k','2k','4k']) tier
+      where (tier = any(s.unpriced_resolutions) and not (v_cost ? tier)) or tier = any(v_close)) as unpriced) f
+    where s.template_id=any(v_ids)
+      and not (f.unpriced <@ s.unpriced_resolutions and s.unpriced_resolutions <@ f.unpriced);
   end if;
   return jsonb_build_object('failures', '[]'::jsonb, 'changed', v_changed);
 end;

@@ -286,11 +286,13 @@ it('rolls back a live sync and its receipt when the submitted floor understates 
 it('carries the closed tiers with the template, and only when the source has them', async () => {
   const template = fixture()
   expect(await write(await prepare(template, 'tiers-seed'))).toEqual(ok(1))
+  type Snapshot = { template: { unpriced_resolutions?: string[] } }
+  const sourceTemplate = async () => ((await source(template.id)).data as Snapshot).template
   const closed = async () => (await db.query('select unpriced_resolutions from public.template_sale_approvals where template_id=$1', [template.id])).rows[0]?.unpriced_resolutions
   await db.query('delete from public.template_sale_approvals where template_id=$1', [template.id])
-  expect((await source(template.id)).data.template).not.toHaveProperty('unpriced_resolutions')
+  expect(await sourceTemplate()).not.toHaveProperty('unpriced_resolutions')
   await db.query("insert into public.template_sale_approvals(template_id,unpriced_resolutions) values ($1, array['2k','4k'])", [template.id])
-  const read = (await source(template.id)).data.template
+  const read = await sourceTemplate()
   expect(read.unpriced_resolutions).toEqual(['2k', '4k'])
   // Production opened every tier; the sync closes the two the test site closed.
   await db.query("update public.template_sale_approvals set unpriced_resolutions='{}' where template_id=$1", [template.id])

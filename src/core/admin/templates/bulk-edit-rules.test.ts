@@ -126,3 +126,12 @@ describe('batch edit closing tiers (offered resolutions)', () => {
     expect(describeFailure(failures[0]!)).toBe('会停售全部清晰度，至少要留一档')
   })
 })
+
+describe('batch edit closing tiers against the model', () => {
+  it('counts only tiers the model can make when checking that one stays on offer', () => {
+    const floor = { ...FLOOR, resolutions: ['1k', '2k'] as ('1k' | '2k' | '4k')[] }
+    const failures = bulkEditFailures([template('a')], { closeResolutions: ['1k', '2k'] }, floor)
+    expect(failures).toEqual([{ id: 'a', name: 'A', reason: 'no_tier' }])
+    expect(bulkEditFailures([template('a')], { closeResolutions: ['2k'] }, floor)).toEqual([])
+  })
+})

@@ -162,6 +162,17 @@ describe('batch edit of templates', () => {
     expect(await closed(ids[4]!)).toEqual(['4k'])
   })
 
+  // One setter call per template: reopening 2K is judged with 4K already closed in the same batch.
+  it('reopens one tier and closes another (below its floor) in the same batch', async () => {
+    const id = ids[2]!
+    await pg.query("update public.templates set credits_cost = credits_cost || '{\"4k\": 1}' where id = $1", [id])
+    await pg.query("select admin.set_template_unpriced_resolutions($1, array['2k'])", [id])
+    const saved = await bulkEditTemplates(client, admin, { ids: [id], patch: { creditsCost: { '2k': 4 }, closeResolutions: ['4k'] } }, CREDITS_FLOOR)
+    expect(saved).toEqual({ changed: 1, failures: [] })
+    const { rows: [row] } = await pg.query('select unpriced_resolutions from public.template_sale_approvals where template_id=$1', [id])
+    expect(row.unpriced_resolutions).toEqual(['4k'])
+  })
+
   it('still resolves the four named arguments sent by the T85 admin server', async () => {
     const id = 'test-bulkedit-nope'
     const { data, error } = await client.rpc('admin_bulk_edit_templates', {
