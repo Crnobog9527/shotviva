@@ -87,7 +87,10 @@ function templateCells(item: TemplateItem, template: AdminTemplate, photoHashes:
   trial.inputs.forEach((input, inputIndex) => {
     const photoHash = input.photo ? photoHashes.get(input.photo) ?? null : null
     const slotHashes = input.slots ? Object.fromEntries(Object.entries(input.slots).map(([slot, path]) => [slot, photoHashes.get(path) ?? ''])) : null
-    const hash = digest({ ...base, input: { ...input, photo: photoHash, ...(slotHashes ? { slots: slotHashes } : {}) } })
+    // The judge's checklist items never change the picture, so they stay out of the hash.
+    const pictured = { ...input }
+    delete pictured.judge
+    const hash = digest({ ...base, input: { ...pictured, photo: photoHash, ...(slotHashes ? { slots: slotHashes } : {}) } })
     const occurrence = seen.get(hash) ?? 0
     seen.set(hash, occurrence + 1)
     for (let k = 0; k < n; k++) cells.push({ templateId: item.id, version: prompt.version, inputIndex, occurrence, k, hash, resolution, input, photoHash, slotHashes, providerId: base.model.providerId })
