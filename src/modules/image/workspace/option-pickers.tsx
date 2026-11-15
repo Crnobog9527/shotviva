@@ -6,6 +6,7 @@ import type { ImageOptions } from '@/core/templates/image-options'
 import type { Balance } from '@/core/billing/pools'
 import type { CreditsCost } from '@/core/templates/pricing'
 import type { OutputAspect, Resolution } from '@/core/templates/output-options'
+import { setCredits } from '@/core/templates/set-price'
 import { cn } from '@/core/ui/cn'
 
 import { canAfford } from './cta-state'
@@ -46,18 +47,20 @@ type ResolutionProps = {
   options: ImageOptions; value: Resolution; costs: CreditsCost; balance: Balance; onChange(next: Resolution): void
   // The chosen size and the first photo's ratio, so each card shows the real output pixels.
   aspect?: OutputAspect; photoRatio?: number | null
+  // Images one run makes (a poster set's pages): each card then shows that set's total.
+  images?: number
 }
 
 // Resolution (DESIGN §4.3 step 3b): 1K / 2K / 4K as stacked cards with the output size and this
 // template's credits on the right; a tier neither pool covers shows its credits greyed. Only the
 // tiers the template's model supports are offered.
-export function ResolutionPicker({ value, costs, balance, onChange, options, aspect = 'original', photoRatio }: ResolutionProps) {
+export function ResolutionPicker({ value, costs, balance, onChange, options, aspect = 'original', photoRatio, images = 1 }: ResolutionProps) {
   const t = useTranslations('app')
   const format = useFormatter()
   return (
     <div role="radiogroup" aria-labelledby="res-h" className="grid gap-2">
       {TIER_OPTIONS.filter(({ id }) => options.resolutions.includes(id)).map((tier) => {
-        const cost = costs[tier.id]
+        const cost = setCredits(costs[tier.id], images)
         const affordable = canAfford(balance, cost)
         const size = tierSize(tier.id, aspect, photoRatio)
         return (
@@ -70,7 +73,7 @@ export function ResolutionPicker({ value, costs, balance, onChange, options, asp
               </span>
               <span className={cn('col-start-2 row-span-2 row-start-1 text-right font-display text-[24px] leading-none', !affordable && 'text-muted-foreground')}>
                 {format.number(cost)}
-                <small className="mt-1 block font-sans text-caption leading-none text-muted-foreground">{t('creditsUnit', { count: cost })}</small>
+                <small className="mt-1 block font-sans text-caption leading-none text-muted-foreground">{t(images > 1 ? 'creditsPerSet' : 'creditsUnit', { count: cost, images })}</small>
               </span>
               <span className="col-start-1 text-caption text-muted-foreground">
                 {t(`tiers.${tier.id}.use`)}

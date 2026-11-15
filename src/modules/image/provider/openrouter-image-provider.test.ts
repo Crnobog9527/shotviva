@@ -242,3 +242,13 @@ it('sends a style-only request to a model requiring references, and blocks an em
     aspect_ratio: '1:1', input_references: [{ type: 'image_url', image_url: { url: 'data:image/webp;base64,AQI=' } }],
   })
 })
+
+it('answers whether it takes a rebuilt request from its catalogue entry, before anything is sent', () => {
+  const provider = createOpenRouterImageProvider({ ...config, model: flux, imageParameters: {
+    aspect_ratio: { type: 'enum', values: ['auto', '1:1'] }, input_references: { type: 'range', min: 1, max: 2 },
+  } })
+  expect(provider.accepts?.({ resolution: '1k', aspectRatio: '1:1', referenceCount: 2 })).toBe(true)
+  expect(provider.accepts?.({ resolution: '1k', aspectRatio: '4:3', referenceCount: 1 })).toBe(false)
+  expect(provider.accepts?.({ resolution: '1k', aspectRatio: '1:1', referenceCount: 3 })).toBe(false)
+  expect(createOpenRouterImageProvider(config).accepts?.({ resolution: '1k', aspectRatio: '4:3', referenceCount: 9 })).toBe(true)
+})

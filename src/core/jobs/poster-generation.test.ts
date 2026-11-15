@@ -4,7 +4,7 @@ vi.mock('server-only', () => ({}))
 
 import { posterFieldsSchema } from '../poster'
 import { templateFieldsSchema } from '../templates/schema'
-import { assertPageSlots } from './poster-generation'
+import { assertPageSlots, displayArea } from './poster-generation'
 
 const name = { en: 'x', zh: 'x' }
 const poster = posterFieldsSchema.parse({ kinds: [
@@ -50,5 +50,31 @@ describe('a poster QR code slot', () => {
     expect(templateFieldsSchema.safeParse({ ...fields, images: { min: 0, max: 2, slots: [prize, { ...qrSlot, sendToModel: true }] } }).success).toBe(false)
     expect(templateFieldsSchema.safeParse({ ...fields, images: { min: 1, max: 2, slots: [prize, { ...qrSlot, required: true }] } }).success).toBe(false)
     expect(templateFieldsSchema.safeParse({ ...fields, poster: { kinds } }).success).toBe(false)
+  })
+})
+
+// 展示位 (§5.3, Owner 2026-11-15): only the featured prizes go to the display area, each with the
+// attached image it is sent as; a photo for a prize that is not featured is refused.
+describe('the display area of a prize page', () => {
+  const featuredPoster = posterFieldsSchema.parse({ kinds: [
+    { key: 'prizes', name, blocks: ['prizes'], slots: ['logo', 'prize_a', 'prize_b'] },
+    { key: 'rules', name, blocks: ['table'] },
+  ], featured: { count: 2, photos: ['prize_a', 'prize_b'] } })
+  const rows = [{ rank: '冠军', rankEn: '', prize: '手机', featured: 2 }, { rank: '亚军', rankEn: '', prize: '平板' }, { rank: '季军', rankEn: '', prize: '耳机', featured: 1 }]
+  const part = { prizes: { headline: '', note: '', rows } }
+  const sent = (...keys: string[]) => keys.map((key) => ({ key, label: key, upload: `inputs/u/${key}.webp` }))
+
+  it('names the featured prizes in list order with their image numbers', () => {
+    const text = displayArea(featuredPoster, part, sent('logo', 'prize_b'))
+    expect(text).toContain('Featured 1: 冠军 | 手机 - draw exactly the product in Image 2')
+    expect(text).toContain('Featured 2: 季军 | 耳机 - no photo')
+    expect(text).not.toContain('平板')
+  })
+
+  it('refuses a photo whose prize is not featured, and says nothing on a page without prizes', () => {
+    const one = { prizes: { headline: '', note: '', rows: [{ rank: 'a', rankEn: '', prize: 'b', featured: 1 }] } }
+    expect(() => displayArea(featuredPoster, one, sent('prize_b'))).toThrow(/not featured/)
+    expect(displayArea(featuredPoster, {}, sent('logo'))).toBe('')
+    expect(displayArea(poster, part, undefined)).toBe('')
   })
 })

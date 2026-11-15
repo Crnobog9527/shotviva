@@ -128,6 +128,7 @@ export {
 } from './toggles'
 
 export { allowedWebAspects } from './allowed-web-aspects'
+export { DISH_CATEGORIES, DISH_READ_CATEGORIES, foodFlowOf, foodFlowProblems, PLATING_TOGGLE, TABLEWARE_TOGGLE, type DishCategory, type DishReadCategory, type FoodFlowPrompts } from './food-flow'
 export { estimatedImageCostsSchema, imageCapabilitiesSchema } from './image-capabilities'
 export { imageCostBudget, maxCostPerCredit, modelCreditFloor, UNPRICED, type ProviderFloors } from './provider-pricing'
 export { cachedPosterTemplates, cachedWebTemplates, findWebTemplate } from './cached-catalogue'

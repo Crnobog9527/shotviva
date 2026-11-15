@@ -6,7 +6,7 @@ import type { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 import { screenIdentityText, type IdentityJudge } from '@/core/identity-guard'
-import { screenCost, templateCall, typedWords, type SettleDeps, type TemplateProvider } from '@/core/jobs'
+import { flowExtraImages, foodPlanOf, foodStep, screenCost, templateCall, typedWords, type FoodDeps, type FoodPlan, type SettleDeps, type TemplateProvider } from '@/core/jobs'
 import { loadInputImage } from '@/core/storage'
 import { DEFAULT_RESOLUTION, loadTestTemplate, OUTPUT_ASPECTS, validateGenerationInputs } from '@/core/templates'
 
@@ -23,7 +23,7 @@ import { beginTestRun, findTestPhoto, findTestRun } from './test-run-store'
 // including drafts; admin_test_runs in place of generation_jobs. Nothing reaches works, stats or
 // PostHog.
 
-export type TestRunDeps = SettleDeps & { identityJudge?: IdentityJudge | null; identityJudgeTimeoutMs?: number }
+export type TestRunDeps = SettleDeps & { identityJudge?: IdentityJudge | null; identityJudgeTimeoutMs?: number; food?: FoodDeps | null }
 
 export type TestGenerateRequest = { actorId: string; body: z.infer<typeof testGenerateBodySchema> }
 
@@ -64,17 +64,24 @@ async function prepare(deps: FirstRunDeps, { body }: TestGenerateRequest) {
 // Which test photo was in which slot (§5.1e); nothing for any other template.
 const slotPhotoInputs = (req: TestGenerateRequest) => (req.body.slot_photos ? { slot_photos: req.body.slot_photos } : {})
 
+// The same toggle flow as a user's job (§5.1c); a run without the references has no cover to use.
+const testFoodPlan = (req: TestGenerateRequest, modelParams: Record<string, unknown>, toggles: Record<string, boolean>) =>
+  (req.body.omit_style_refs ? null : foodPlanOf(modelParams, toggles))
+// The images the run sends: its photos and, for a tableware flow, the library vessel.
+const sentImages = (photos: number, food: FoodPlan | null) => photos + (food ? flowExtraImages(food.toggles) : 0)
+
 export async function runTestGenerate(deps: FirstRunDeps, req: TestGenerateRequest): Promise<TestRun> {
   const existing = await findTestRun(deps.db, req.body.run_id)
   if (existing) return existing
   const { loaded, photo, inputs, images, providerId } = await prepare(deps, req)
   const resolution = req.body.inputs.resolution ?? DEFAULT_RESOLUTION
+  const food = testFoodPlan(req, loaded.prompt.modelParams, inputs.toggles)
   const { call, provider, styleRefKeys } = await templateCall(deps, loaded, inputs, images, {
-    resolution, providerId, omitStyleRefs: req.body.omit_style_refs,
+    resolution, providerId, omitStyleRefs: req.body.omit_style_refs, food,
   })
   // Marks the request that created the row; a concurrent repeat gets the row and calls nothing.
   const attemptId = randomUUID()
-  const estimateUsd = await testRunEstimateUsd(deps.db, provider, resolution, loaded.template.quality, images.length)
+  const estimateUsd = await testRunEstimateUsd(deps.db, provider, resolution, loaded.template.quality, sentImages(images.length, food))
   const run = await beginTestRun(deps.db, {
     actorId: req.actorId,
     runId: req.body.run_id,
@@ -101,7 +108,7 @@ export async function runTestGenerate(deps: FirstRunDeps, req: TestGenerateReque
   // The face-swap judge (§5.1a) only now, with the budget held: a click over the budget calls nothing.
   const step = async () => {
     const screen = await screenIdentityText({ ...deps, quiet: true }, { userId: req.actorId, entry: 'workspace', texts: typedWords(inputs) })
-    return { call, decision: screenCost(deps.identityJudge, screen) }
+    return foodStep(deps, food, { call, photos: images, inputs, decision: screenCost(deps.identityJudge, screen) }, { templateId: loaded.template.id, runId: run.id }, provider)
   }
   return continueTestRun({ ...deps, provider }, run, step, deps.identityJudge?.prices)
 }

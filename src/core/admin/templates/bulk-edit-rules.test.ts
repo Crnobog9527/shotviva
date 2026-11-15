@@ -110,3 +110,28 @@ it('uses the previous route only for legacy rows without a saved tier decision',
   expect(bulkEditFailures([{ ...row, unpricedResolutions: [] }], { providerId: null }, floors))
     .toMatchObject([{ resolution: '4k', given: 1 }])
 })
+
+describe('batch edit closing tiers (offered resolutions)', () => {
+  it('skips the floor for a closed tier and lists the closing in the summary', () => {
+    const cheap = template('a', { creditsCost: { '1k': 2, '2k': 1, '4k': 1 } })
+    expect(bulkEditFailures([cheap], { closeResolutions: ['2k', '4k'] }, FLOOR)).toEqual([])
+    expect(isEmptyPatch({ closeResolutions: ['4k'] })).toBe(false)
+    expect(describePatch({ closeResolutions: ['2k', '4k'] })).toEqual(['停售：2K，4K'])
+  })
+
+  it('refuses a batch that would leave a template with no tier on offer', () => {
+    const one = template('a', { unpricedResolutions: ['2k', '4k'] })
+    const failures = bulkEditFailures([one, template('b')], { closeResolutions: ['1k'] }, FLOOR)
+    expect(failures).toEqual([{ id: 'a', name: 'A', reason: 'no_tier' }])
+    expect(describeFailure(failures[0]!)).toBe('会停售全部清晰度，至少要留一档')
+  })
+})
+
+describe('batch edit closing tiers against the model', () => {
+  it('counts only tiers the model can make when checking that one stays on offer', () => {
+    const floor = { ...FLOOR, resolutions: ['1k', '2k'] as ('1k' | '2k' | '4k')[] }
+    const failures = bulkEditFailures([template('a')], { closeResolutions: ['1k', '2k'] }, floor)
+    expect(failures).toEqual([{ id: 'a', name: 'A', reason: 'no_tier' }])
+    expect(bulkEditFailures([template('a')], { closeResolutions: ['2k'] }, floor)).toEqual([])
+  })
+})

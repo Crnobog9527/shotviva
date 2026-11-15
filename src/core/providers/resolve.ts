@@ -37,6 +37,7 @@ function build(
   const snapshot = adapterId === 'openrouter_images' ? prices : effectivePrices(config.model, prices)
   return { id: providerTag(source, config.model), prices: snapshot, ...references,
     ...(provider.honoursBackground ? { honoursBackground: true } : {}),
+    ...(provider.accepts ? { accepts: provider.accepts.bind(provider) } : {}),
     completeUsage: provider.completeUsage?.bind(provider), generate: provider.generate.bind(provider) } satisfies GenerationProvider
 }
 

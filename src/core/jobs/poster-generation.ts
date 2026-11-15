@@ -3,7 +3,7 @@ import 'server-only'
 import { AppError } from '../errors'
 import { logger } from '../logger'
 import { requireFeature } from '../features'
-import { partText } from '../poster'
+import { displayAreaText, featuredPhotoSlot, featuredPrizes, partText, unusedPhotoSlots, type PosterPart } from '../poster'
 import { pasteUserQr, readUserQr } from '../poster/qr-paste'
 import { QR_PLACEHOLDER_INSTRUCTION, type QrFallback } from '../poster/qr-placeholder'
 import { loadPosterPart, POSTER_FEATURE } from '../poster/sets'
@@ -35,8 +35,23 @@ export async function posterPart(deps: GenerationDeps, req: GenerationRequest, t
   if (redrawOf) await assertSamePoster(deps, req.userId, redrawOf, { setId, part: index, templateId: template.id, resolution, aspectRatio })
   const qr = posterQr(template.fields.poster, part.kind, inputs.pasted)
   const record = { set_id: setId, part: index, kind: part.kind, page: part.page, pages: part.pages, ...(redrawOf ? { redraw_of: redrawOf } : {}), ...(qr ? { qr: true } : {}) }
-  const text = partText(content, part)
+  const text = [partText(content, part), displayArea(template.fields.poster, part, inputs.slots)].filter(Boolean).join('\n\n')
   return { text: qr ? `${text}\n\n${QR_PLACEHOLDER_INSTRUCTION}` : text, record, qr }
+}
+
+// 展示位 (§5.3): the featured prizes of this page and which attached image shows each. A photo in a
+// slot no featured prize holds is refused, so the model only ever sees featured prizes' photos.
+export function displayArea(poster: PosterFields, part: Pick<PosterPart, 'prizes'>, slots: GenerationInputs['slots']): string {
+  const featured = poster.featured
+  if (!featured || !part.prizes) return ''
+  const sent = (slots ?? []).map((slot) => slot.key)
+  const stray = unusedPhotoSlots(featured, part.prizes.rows).filter((key) => sent.includes(key))
+  if (stray.length > 0) throw new AppError('INVALID_INPUT', 'A prize photo belongs to a prize that is not featured')
+  const imageOf = (spot: number) => {
+    const index = sent.indexOf(featuredPhotoSlot(featured, spot) ?? '')
+    return index < 0 ? null : index + 1
+  }
+  return displayAreaText(featuredPrizes(part.prizes.rows, featured), imageOf)
 }
 
 // The user's QR code on this page (ARCHITECTURE §5.3 「二维码」): its upload and the page's fixed

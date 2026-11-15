@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { posterFieldsSchema } from '@/core/poster'
 
-import { addPrize, emptyContent, insertRow, linesOf, removeRow, setCell, setPrize, setSection, tidyContent } from './content-edit'
+import { addPrize, emptyContent, removePrize, insertRow, linesOf, removeRow, setCell, setPrize, setSection, tidyContent } from './content-edit'
 
 const fields = posterFieldsSchema.parse({
   kinds: [{ key: 'rules', name: { en: 'Rules', zh: '规则' }, blocks: ['header', 'table', 'footer'] }],
@@ -33,5 +33,16 @@ describe('content edits', () => {
     const content = setSection({ ...emptyContent(fields), sections: [{ title: '规则', style: 'numbered', lines: [] }] }, 0, { lines: linesOf('第一条\n\n') })
     expect(content.sections[0]?.lines).toEqual(['第一条', '', ''])
     expect(tidyContent(content).sections[0]?.lines).toEqual(['第一条'])
+  })
+})
+
+// A draft saved before the spots were written in (Codex on #678): removing the first featured prize
+// keeps the second on its own spot, so its photo stays with it.
+describe('removePrize with a display area', () => {
+  it('writes the spots in before the row goes', () => {
+    const row = (prize: string) => ({ rank: '', rankEn: '', prize })
+    const content = { ...emptyContent(fields), prizes: { headline: '', note: '', rows: [row('A'), row('B'), row('C')] } }
+    const rows = removePrize(content, 0, 2).prizes?.rows
+    expect(rows).toEqual([{ ...row('B'), featured: 2 }, row('C')])
   })
 })

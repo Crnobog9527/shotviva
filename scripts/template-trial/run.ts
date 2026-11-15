@@ -120,7 +120,7 @@ async function main() {
   if (!privateStore) throw new RunError('缺测试站 R2 密钥（TEMPLATE_TOOLS_R2_*）：测试照片和结果都在测试站的私有桶里，没有调用模型')
   await assertAdmin(p.db, p.env.SHOTVIVA_IMPORT_ADMIN_ID)
   const providers = scriptProviders(p.db)
-  const deps = { db: p.db, store: privateStore, provider: providers.provider, identityJudge: await providers.judge() }
+  const deps = { db: p.db, store: privateStore, provider: providers.provider, identityJudge: await providers.judge(), food: providers.food }
   const ctx: RunContext = {
     deps, actorId: p.env.SHOTVIVA_IMPORT_ADMIN_ID, photoIds: await uploadPhotos(p, deps), budgetUsd: p.options.budget,
     spentUsd: 0, reservedUsd: 0, estimateOf: await estimates(p.cells, p.templates, providers.bound), retryFailed: p.options['retry-failed'],

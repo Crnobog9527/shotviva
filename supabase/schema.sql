@@ -4840,6 +4840,8 @@ declare
   -- 3k from a caller still on the old name is read as 4k (PR-2).
   v_patch jsonb := coalesce(public.canonical_tiers(p_patch), '{}');
   v_cost jsonb := coalesce(public.canonical_tiers(p_patch) -> 'credits_cost', '{}');
+  -- Tiers to stop offering (1560): closed for sale on every template, as a blank editor price.
+  v_close text[];
   v_visible text[];
   change_model boolean := p_patch ? 'provider_id';
   target uuid := (p_patch->>'provider_id')::uuid;
@@ -4860,9 +4862,20 @@ begin
   if cardinality(v_ids) = 0 or cardinality(v_ids) > 200 then
     raise exception 'INVALID_INPUT' using detail = 'between 1 and 200 templates';
   end if;
-  if jsonb_typeof(v_patch) <> 'object' or v_patch = '{}' or v_patch - 'credits_cost' - 'visible_in' - 'quality' - 'category_key' - 'provider_id' <> '{}' then
-    raise exception 'INVALID_INPUT' using detail = 'patch must name credits_cost, visible_in, quality or category_key';
+  if jsonb_typeof(v_patch) <> 'object' or v_patch = '{}' or v_patch - 'credits_cost' - 'close_resolutions' - 'visible_in' - 'quality' - 'category_key' - 'provider_id' <> '{}' then
+    raise exception 'INVALID_INPUT' using detail = 'patch must name credits_cost, close_resolutions, visible_in, quality or category_key';
   end if;
+  if v_patch ? 'close_resolutions' then
+    if jsonb_typeof(v_patch -> 'close_resolutions') <> 'array' then
+      raise exception 'INVALID_INPUT' using detail = 'close_resolutions must be an array';
+    end if;
+    v_close := public.canonical_tier_array(array(select jsonb_array_elements_text(v_patch -> 'close_resolutions')));
+    if v_close is null or cardinality(v_close) = 0 or not (v_close <@ array['1k','2k','4k'])
+       or array_position(v_close, null) is not null then
+      raise exception 'INVALID_INPUT' using detail = 'close_resolutions must name 1k, 2k or 4k';
+    end if;
+  end if;
+  v_close := coalesce(v_close, '{}');
   if v_patch ? 'quality' and (v_patch ->> 'quality') is distinct from 'high' and (v_patch ->> 'quality') is distinct from 'medium' then
     raise exception 'INVALID_INPUT' using detail = 'quality must be high or medium';
   end if;
@@ -4874,6 +4887,9 @@ begin
     where e.key not in ('1k', '2k', '4k') or jsonb_typeof(e.value) <> 'number' or e.value::text !~ '^[1-9][0-9]{0,2}$'
   ) then
     raise exception 'INVALID_INPUT' using detail = 'credits_cost tiers must be whole numbers 1..999';
+  end if;
+  if exists (select from unnest(v_close) tier where v_cost ? tier) then
+    raise exception 'INVALID_INPUT' using detail = 'a tier cannot be priced and closed in one edit';
   end if;
   if v_patch ? 'visible_in' then
     if jsonb_typeof(v_patch -> 'visible_in') <> 'array' then
@@ -4930,6 +4946,7 @@ begin
            catalog_minimums->t.id as tariff,
            coalesce(sale.unpriced_resolutions, array(select tier from unnest(array['1k','2k','4k']) tier
              where tier<>all(admin.sale_route_resolutions(previous)))) as unpriced_resolutions,
+           admin.sale_route_resolutions(chosen) as supported,
            t.credits_cost || v_cost as credits_cost,
            coalesce(v_visible, t.visible_in) as visible_in,
            a.id in ('edit', 'freeform') or coalesce(c.is_system, false) as is_builtin,
@@ -4963,8 +4980,17 @@ begin
       case when p.tariff->>'quality'=p.quality then (p.tariff->'costs'->>r.res)::integer end) as credits) minimum
     where p.found and not p.is_builtin
       and (v_cost ? r.res or not (r.res=any(p.unpriced_resolutions)))
+      and not (r.res = any(v_close))
       and (p.credits_cost ->> r.res)::integer < minimum.credits
       and not coalesce(p.approved->>'quality'=p.quality and p.approved->'costs'->r.res=p.credits_cost->r.res,false)
+    union all
+    -- At least one tier stays on offer after the edit.
+    select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'no_tier')
+    from planned p
+    where p.found and not p.is_builtin and cardinality(v_close) > 0
+      -- Counted against the resulting model: a priced tier it cannot make offers nothing.
+      and not exists (select from unnest(p.supported) tier
+        where not (tier = any(p.unpriced_resolutions) and not (v_cost ? tier)) and not (tier = any(v_close)))
     union all
     select jsonb_build_object('id', p.id, 'name', p.name, 'reason', 'web_incomplete')
     from planned p
@@ -4985,7 +5011,7 @@ begin
   end if;
 
   -- Capture missing legacy tier markers against the old route before changing a binding.
-  if change_model or v_cost <> '{}'::jsonb then
+  if change_model or v_cost <> '{}'::jsonb or cardinality(v_close) > 0 then
     perform admin.set_template_unpriced_resolutions(t.id, null)
       from public.templates t where t.id=any(v_ids)
         and not exists(select from public.template_sale_approvals s where s.template_id=t.id);
@@ -5006,11 +5032,15 @@ begin
   end if;
 
   -- A capability expansion or a model change alone never opens a previously unpriced tier.
-  if v_cost <> '{}'::jsonb then
-    perform admin.set_template_unpriced_resolutions(s.template_id,
-      array(select tier from unnest(s.unpriced_resolutions) tier where not (v_cost ? tier)))
-    from public.template_sale_approvals s where s.template_id=any(v_ids)
-      and exists(select from unnest(s.unpriced_resolutions) tier where v_cost ? tier);
+  -- Priced tiers reopen and 停售 tiers close in one setter call per template, so its floor
+  -- assertion judges the final set of open tiers, never an intermediate one.
+  if v_cost <> '{}'::jsonb or cardinality(v_close) > 0 then
+    perform admin.set_template_unpriced_resolutions(s.template_id, f.unpriced)
+    from public.template_sale_approvals s
+    cross join lateral (select array(select tier from unnest(array['1k','2k','4k']) tier
+      where (tier = any(s.unpriced_resolutions) and not (v_cost ? tier)) or tier = any(v_close)) as unpriced) f
+    where s.template_id=any(v_ids)
+      and not (f.unpriced <@ s.unpriced_resolutions and s.unpriced_resolutions <@ f.unpriced);
   end if;
   return jsonb_build_object('failures', '[]'::jsonb, 'changed', v_changed);
 end;
@@ -5844,6 +5874,28 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_decide_refund"("p_ticket_id" "uuid", "p_decision" "text", "p_amount_cents" integer, "p_body" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_delete_dishware"("p_id" "uuid", "p_actor" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_key text;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  delete from public.dishware_library d where d.id = p_id returning d.image_key into v_key;
+  if v_key is null then
+    raise exception 'DISHWARE_NOT_FOUND';
+  end if;
+  return v_key;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_delete_dishware"("p_id" "uuid", "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_delete_provider"("p_id" "uuid") RETURNS "void"
@@ -7788,6 +7840,45 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_save_dishware"("p_item" "jsonb", "p_actor" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id uuid;
+  v_previous text;
+begin
+  if p_actor is null or not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin') then
+    raise exception 'NOT_ADMIN';
+  end if;
+  begin
+    v_id := (p_item ->> 'id')::uuid;
+  exception when invalid_text_representation then
+    raise exception 'INVALID_INPUT' using detail = 'id';
+  end;
+  if v_id is null or jsonb_typeof(p_item -> 'is_active') <> 'boolean' then
+    raise exception 'INVALID_INPUT' using detail = 'id and is_active are required';
+  end if;
+  select d.image_key into v_previous from public.dishware_library d where d.id = v_id for update;
+  insert into public.dishware_library as d (id, label, category, shape, image_key, width, height, is_active, updated_by)
+  values (
+    v_id, btrim(p_item ->> 'label'), p_item ->> 'category', btrim(p_item ->> 'shape'), p_item ->> 'image_key',
+    (p_item ->> 'width')::integer, (p_item ->> 'height')::integer, (p_item ->> 'is_active')::boolean, p_actor
+  )
+  on conflict (id) do update set
+    label = excluded.label, category = excluded.category, shape = excluded.shape, image_key = excluded.image_key,
+    width = excluded.width, height = excluded.height, is_active = excluded.is_active, updated_by = p_actor;
+  return jsonb_build_object('previous_key', v_previous);
+exception
+  when check_violation or not_null_violation or unique_violation or invalid_text_representation then
+    raise exception 'INVALID_INPUT' using detail = sqlerrm;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_save_dishware"("p_item" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") RETURNS "void"
@@ -12009,12 +12100,15 @@ CREATE OR REPLACE FUNCTION "public"."read_template_sync_source"("p_id" "text") R
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
-  select jsonb_build_object('catalog', admin.template_sync_catalog(), 'template', to_jsonb(t),
+  select jsonb_build_object('catalog', admin.template_sync_catalog(),
+    'template', to_jsonb(t) - case when t.unpriced_resolutions is null then 'unpriced_resolutions' else '' end,
     'prompt', to_jsonb(p), 'provider', to_jsonb(a))
   from (select tt.id,tt.module,tt.name,tt.description,tt.category_key,tt.subcategory_key,
           s.slug as series_slug,tt.series_sort_order,tt.translations,tt.fields,tt.quality,tt.credits_cost,tt.visible_in,
-          tt.cover_before_url,tt.cover_after_url,tt.cover_media_type,tt.cover_video_url,tt.cover_poster_url,tt.cover_locales
-          from public.templates tt left join public.template_series s on s.id=tt.series_id where tt.id=p_id) t
+          tt.cover_before_url,tt.cover_after_url,tt.cover_media_type,tt.cover_video_url,tt.cover_poster_url,tt.cover_locales,
+          sale.unpriced_resolutions
+          from public.templates tt left join public.template_series s on s.id=tt.series_id
+          left join public.template_sale_approvals sale on sale.template_id=tt.id where tt.id=p_id) t
   left join lateral (select body,version,model_params,provider_id from public.template_prompts
     where template_id=t.id) p on true
   left join lateral (select adapter,model,base_url from public.ai_providers
@@ -15577,6 +15671,30 @@ ALTER TABLE "public"."credit_ledger" ALTER COLUMN "id" ADD GENERATED ALWAYS AS I
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."dishware_library" (
+    "id" "uuid" NOT NULL,
+    "label" "text" NOT NULL,
+    "category" "text" NOT NULL,
+    "shape" "text" NOT NULL,
+    "image_key" "text" NOT NULL,
+    "width" integer NOT NULL,
+    "height" integer NOT NULL,
+    "is_active" boolean DEFAULT true NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid",
+    CONSTRAINT "dishware_library_category_check" CHECK (("category" = ANY (ARRAY['long'::"text", 'soup_stew'::"text", 'stir_fry'::"text", 'dim_sum'::"text", 'cold'::"text", 'noodle_rice'::"text"]))),
+    CONSTRAINT "dishware_library_height_check" CHECK (("height" > 0)),
+    CONSTRAINT "dishware_library_image_key_check" CHECK (("image_key" ~ '^dishware/[0-9a-f-]{36}-[0-9a-f]{16}\.webp$'::"text")),
+    CONSTRAINT "dishware_library_label_check" CHECK (((("char_length"("label") >= 1) AND ("char_length"("label") <= 40)) AND ("label" = "btrim"("label")))),
+    CONSTRAINT "dishware_library_shape_check" CHECK (((("char_length"("shape") >= 1) AND ("char_length"("shape") <= 200)) AND ("shape" = "btrim"("shape")))),
+    CONSTRAINT "dishware_library_width_check" CHECK (("width" > 0))
+);
+
+
+ALTER TABLE "public"."dishware_library" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."experiment_assignments" (
     "experiment_id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -16612,6 +16730,11 @@ ALTER TABLE ONLY "public"."credit_ledger"
 
 
 
+ALTER TABLE ONLY "public"."dishware_library"
+    ADD CONSTRAINT "dishware_library_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."experiment_assignments"
     ADD CONSTRAINT "experiment_assignments_pkey" PRIMARY KEY ("experiment_id", "user_id");
 
@@ -17230,6 +17353,10 @@ CREATE INDEX "credit_ledger_user_plan_idx" ON "public"."credit_ledger" USING "bt
 
 
 
+CREATE UNIQUE INDEX "dishware_library_image_key_key" ON "public"."dishware_library" USING "btree" ("image_key");
+
+
+
 CREATE INDEX "experiment_assignments_current_idx" ON "public"."experiment_assignments" USING "btree" ("current_variant_id");
 
 
@@ -17718,6 +17845,10 @@ CREATE OR REPLACE TRIGGER "codes_enforce_gift_policy" BEFORE INSERT OR UPDATE OF
 
 
 
+CREATE OR REPLACE TRIGGER "dishware_library_set_updated_at" BEFORE UPDATE ON "public"."dishware_library" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
 CREATE CONSTRAINT TRIGGER "draft_sale_floor" AFTER UPDATE OF "credits_cost", "quality" ON "public"."templates" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN ((NOT "new"."is_active")) EXECUTE FUNCTION "admin"."check_template_publish_floor"();
 
 
@@ -18158,6 +18289,11 @@ ALTER TABLE ONLY "public"."credit_ledger"
 
 ALTER TABLE ONLY "public"."credit_ledger"
     ADD CONSTRAINT "credit_ledger_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."dishware_library"
+    ADD CONSTRAINT "dishware_library_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
 
 
@@ -18731,6 +18867,9 @@ ALTER TABLE "public"."codes" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."credit_ledger" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."dishware_library" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."experiment_assignments" ENABLE ROW LEVEL SECURITY;
@@ -19906,6 +20045,11 @@ GRANT ALL ON FUNCTION "public"."admin_decide_refund"("p_ticket_id" "uuid", "p_de
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_delete_dishware"("p_id" "uuid", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_dishware"("p_id" "uuid", "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "service_role";
 
@@ -20168,6 +20312,11 @@ GRANT ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "
 
 REVOKE ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_save_code"("p_actor" "uuid", "p_code_id" "uuid", "p_fields" "jsonb", "p_catalog" "jsonb", "p_floor_product_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_save_dishware"("p_item" "jsonb", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_dishware"("p_item" "jsonb", "p_actor" "uuid") TO "service_role";
 
 
 
@@ -21307,6 +21456,10 @@ GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."credit_ledg
 GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."credit_ledger_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."dishware_library" TO "service_role";
 
 
 
