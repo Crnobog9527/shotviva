@@ -41,3 +41,12 @@ it('copies a series cover from the test bucket into the folder it came from; kee
   expect(await copySeriesCover(null, source, target, false)).toBeNull()
   await expect(copySeriesCover(`${source.base}/uploads/x.png`, source, target, false)).rejects.toThrow('INVALID_COVER_URL')
 })
+
+it('names the side whose bucket refused: COVER_READ_FAILED on the source, COVER_WRITE_FAILED on the target', async () => {
+  const key = 'covers/demo/side.png'
+  source.upload(key, png, 'image/png')
+  const row = { cover_before_url: `${source.base}/${key}`, cover_after_url: null, cover_video_url: null, cover_poster_url: null, cover_locales: {} }
+  const refused = async () => { throw new Error('403 AccessDenied') }
+  await expect(copyCovers('demo', row, { ...source, store: { ...source.store, head: refused } }, target)).rejects.toThrow('COVER_READ_FAILED')
+  await expect(copyCovers('demo', row, source, { ...target, store: { ...target.store, put: refused } })).rejects.toThrow('COVER_WRITE_FAILED')
+})

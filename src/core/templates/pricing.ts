@@ -29,6 +29,9 @@ export type CreditsFloor = Record<TemplateQuality, CreditsCost> & {
   // The route's floor for a template with n image slots (n = "2".."4"), when its data allows one
   // below single × n (1442); absent means single × n.
   slots?: Partial<Record<TemplateQuality, Partial<Record<Resolution, Record<string, number>>>>>
+  // 1568: set when the floors above are worst-case break-even (the database's break-even budget
+  // and margin policy): the advisory worst-margin target, as a fraction. Absent: no margin shown.
+  marginTarget?: number
 }
 
 export function approvedCredit(floor: CreditsFloor, quality: TemplateQuality, resolution: Resolution) {
@@ -51,6 +54,22 @@ export function creditMinimum(floor: CreditsFloor, quality: TemplateQuality, res
   const route = floor[quality][resolution]
   if (route === MISSING_COST || slots <= 1) return Math.max(tariff, route)
   return Math.max(tariff, floor.slots?.[quality]?.[resolution]?.[String(slots)] ?? route * slots)
+}
+
+// The worst-case margin of a price on this route (1568): 1 - break-even credits / price, from the
+// route floor (cost x 1.10 / break-even budget, rounded up), so it errs low. Only for a break-even
+// floor with a known cost; advice, never a refusal.
+const breakevenCredits = (floor: CreditsFloor, quality: TemplateQuality, resolution: Resolution, slots: number) => {
+  const route = floor[quality][resolution]
+  if (route === MISSING_COST) return undefined
+  return slots <= 1 ? route : floor.slots?.[quality]?.[resolution]?.[String(slots)] ?? route * slots
+}
+
+export function worstMargin(floor: CreditsFloor, quality: TemplateQuality, resolution: Resolution, price: number, slots = 1) {
+  const breakeven = breakevenCredits(floor, quality, resolution, slots)
+  if (floor.marginTarget === undefined || breakeven === undefined || !(price > 0) || !Number.isFinite(price)) return undefined
+  const margin = 1 - breakeven / price
+  return { margin, target: floor.marginTarget, low: margin < floor.marginTarget }
 }
 
 export function assertPricedTier(unpriced: readonly Resolution[] | undefined, tier: Resolution) {

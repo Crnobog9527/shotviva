@@ -1,16 +1,16 @@
 'use client'
 
-import { describeFailure, describePatch, type BulkEditFailure, type BulkEditPatch } from '../templates/bulk-edit-rules'
+import { describeFailure, describePatch, type BulkEditFailure, type BulkEditPatch, type BulkMarginWarning } from '../templates/bulk-edit-rules'
 import type { ImageProviderOption } from '../image-provider-field'
 import type { AdminTemplate } from '../templates/types'
 import { categoryChoices, type CategoryOption } from './category-options'
 import { bulkEditCopy as COPY } from './copy'
 
-type Props = { providers: readonly ImageProviderOption[]; templates: AdminTemplate[]; patch: BulkEditPatch; failures: BulkEditFailure[]; categories: readonly CategoryOption[] }
+type Props = { providers: readonly ImageProviderOption[]; templates: AdminTemplate[]; patch: BulkEditPatch; failures: BulkEditFailure[]; marginWarnings?: BulkMarginWarning[]; categories: readonly CategoryOption[] }
 
 // The confirm step (T79): what changes, on which templates, and every template that would fail
 // the floor or the web rules (the whole batch is then refused).
-export function BulkEditReview({ templates, patch, failures, categories, providers }: Props) {
+export function BulkEditReview({ templates, patch, failures, marginWarnings = [], categories, providers }: Props) {
   const categoryName = (key: string) => categoryChoices(categories).find(node => node.key === key)?.label ?? key
   const offWeb = patch.visibleIn !== undefined && !patch.visibleIn.includes('web')
   const featured = offWeb ? templates.filter((template) => template.featuredRank !== null) : []
@@ -25,6 +25,7 @@ export function BulkEditReview({ templates, patch, failures, categories, provide
         </ul>
       </div>
       {failures.length > 0 ? <FailureList failures={failures} /> : null}
+      {marginWarnings.length > 0 ? <MarginWarnings warnings={marginWarnings} /> : null}
       {featured.length > 0 ? (
         <p className="text-amber-700">{COPY.featuredNote(featured.map((t) => `「${t.name}」`).join('、'))}</p>
       ) : null}
@@ -52,6 +53,24 @@ function FailureList({ failures }: { failures: BulkEditFailure[] }) {
         {failures.map((failure, index) => (
           <li key={`${failure.id}-${index}`}>
             「{failure.name}」<span className="font-mono text-xs opacity-80">{failure.id}</span>：{describeFailure(failure)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+const pct = (fraction: number) => `${Math.floor(fraction * 100 + 1e-9)}%`
+
+// Advice only (1568): the batch can still be saved.
+function MarginWarnings({ warnings }: { warnings: BulkMarginWarning[] }) {
+  return (
+    <div data-margin-low="true" className="rounded-md border border-amber-500/40 p-3 text-amber-700 dark:text-amber-400">
+      <p className="font-medium">{`${new Set(warnings.map(w => w.id)).size} 个模板低于目标毛利（只是提醒，可以保存）`}</p>
+      <ul className="mt-1 list-disc pl-5">
+        {warnings.map(w => (
+          <li key={`${w.id}-${w.resolution}`}>
+            「{w.name}」{w.resolution.toUpperCase()}：最坏毛利 {pct(w.margin)}（目标 {pct(w.target)}）
           </li>
         ))}
       </ul>

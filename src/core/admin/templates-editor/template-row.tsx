@@ -1,6 +1,6 @@
 'use client'
 
-import { type CreditsFloor } from '@/core/templates/pricing'
+import { slotFloorFactor, type CreditsFloor } from '@/core/templates/pricing'
 import { Badge } from '@/core/ui/badge'
 import { Checkbox } from '@/core/ui/checkbox'
 import { Switch } from '@/core/ui/switch'
@@ -9,7 +9,7 @@ import { TableCell, TableRow } from '@/core/ui/table'
 import type { AdminTemplate } from '../templates/types'
 import { DragHandle, MoveButtons, sortableRowClass, useSortableItem } from '../ui/sortable'
 import { bulkCopy, featuredCopy, rowCopy } from './copy'
-import { summaryPrice } from './tier-price'
+import { lowMarginTiers, summaryPrice } from './tier-price'
 import { canFeature } from './featured-state'
 import { ActionsCell, NameCell } from './row-cells'
 import { CATALOGUE_GAP_LABEL, catalogueGapText } from './catalogue-gap'
@@ -74,6 +74,7 @@ export function TemplateRow(props: Props) {
       <TableCell>
         {summaryPrice(template.creditsCost, price, template.unpricedResolutions)}
         <span className="text-muted-foreground block text-xs">{template.quality}</span>
+        <LowMarginBadge template={template} price={price} />
         {template.catalogueGap && (
           <Badge variant="destructive" className="mt-1" title={catalogueGapText(template.catalogueGap)}>
             {CATALOGUE_GAP_LABEL}
@@ -114,5 +115,16 @@ function FeaturedSwitch({ template, state, pending, onFeature }: { template: Adm
       aria-label={`${on ? '移出' : '加入'}首页精选 ${template.name}`}
       onCheckedChange={(checked) => onFeature(template, checked)}
     />
+  )
+}
+
+// 1568: a yellow note on tiers priced under the margin target (advice; the floor still refuses losses).
+function LowMarginBadge({ template, price }: { template: AdminTemplate; price: CreditsFloor }) {
+  const low = lowMarginTiers(template.creditsCost, price, template.quality, template.unpricedResolutions, slotFloorFactor(template.fields))
+  if (low.length === 0 || price.marginTarget === undefined) return null
+  return (
+    <span className="mt-1 block text-xs font-medium text-amber-600 dark:text-amber-400" data-margin-low="true">
+      {`${low.map(tier => tier.toUpperCase()).join('/')} 低于目标毛利 ${Math.round(price.marginTarget * 100)}%`}
+    </span>
   )
 }
