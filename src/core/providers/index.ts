@@ -25,6 +25,7 @@ export {
   MODULE_ADAPTERS,
   OPENROUTER_BASE_URL,
   PROVIDER_ADAPTERS,
+  isTextModule,
   PROVIDER_MODULES,
   type ActiveProviderRow,
   type AdminProvider,

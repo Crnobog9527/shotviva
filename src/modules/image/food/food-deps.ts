@@ -8,15 +8,17 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { createOpenAIDishReader } from './openai-dish-reader'
 
-// Dish reader adapters by the id a 'decision' row names (ARCHITECTURE §3.3), like the judge's.
+// Dish reader adapters by the id a 'dish_read' or 'decision' row names (ARCHITECTURE §3.3).
 export const DISH_READER_ADAPTERS: Partial<Record<ProviderAdapterId, (config: ProviderConfig, tag: string) => DishReader>> = {
   openai_responses: (config, tag) => createOpenAIDishReader(config, tag),
 }
 
-// Null when no decision row is switched on or it cannot be built: a food flow then runs flow 1.
+// The active 'dish_read' row (its own, stronger model; Owner 2026-11-15), else the 'decision'
+// row, so the judge keeps its cheaper model. Null when neither is switched on or the row cannot be
+// built: a food flow then runs flow 1. Prices come from the row that reads.
 export async function dishReader(loadRow?: Parameters<typeof activeCredentials>[1]): Promise<DishReader | null> {
   try {
-    const credentials = await activeCredentials('decision', loadRow)
+    const credentials = (await activeCredentials('dish_read', loadRow)) ?? (await activeCredentials('decision', loadRow))
     if (!credentials) return null
     const build = DISH_READER_ADAPTERS[credentials.adapter]
     if (!build) throw new Error(`adapter ${credentials.adapter} is not a dish reader`)

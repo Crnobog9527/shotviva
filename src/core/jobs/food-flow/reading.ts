@@ -14,9 +14,10 @@ const text = (max: number) => z.string().transform((value) => value.trim().slice
 // gets stays far below PROMPT_MAX_LENGTH whatever the reader writes.
 export const dishReadingSchema = z.object({
   dish_name: text(120),
-  main_ingredients: z.array(z.object({ name: text(80), color: text(80) })).transform((items) => items.slice(0, 8)),
+  // A name carries the visible features too (kind, head, skin, cut, piece count), so it gets room.
+  main_ingredients: z.array(z.object({ name: text(200), color: text(80) })).transform((items) => items.slice(0, 8)),
   sauce: text(200),
-  garnish: z.array(z.object({ item: text(80), shape: text(80), count: text(40) })).transform((items) => items.slice(0, 8)),
+  garnish: z.array(z.object({ item: text(120), shape: text(120), count: text(40) })).transform((items) => items.slice(0, 8)),
   dishware: text(300),
   category: z.enum(DISH_READ_CATEGORIES),
 })

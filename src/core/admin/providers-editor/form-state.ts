@@ -3,7 +3,7 @@ import { effectivePrices, officialPrice } from '@/core/jobs/model-prices'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 import { ARK_RESOLUTIONS } from '@/core/providers/ark'
 import { openAIImageTiers, UNKNOWN_MODEL_TIERS } from '@/core/providers/tier-support'
-import { ARK_BASE_URL, DEFAULT_BASE_URL, MODULE_ADAPTER, OPENROUTER_BASE_URL, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
+import { ARK_BASE_URL, DEFAULT_BASE_URL, isTextModule, MODULE_ADAPTER, OPENROUTER_BASE_URL, type ProviderAdapterId, type ProviderModule } from '@/core/providers/types'
 
 import type { AdminProvider, SaveProviderInput } from '../providers/types'
 
@@ -59,8 +59,8 @@ const priceText = (value: number | null) => (value === null ? '' : String(value)
 export function formFor(provider: AdminProvider | null, module: ProviderModule = 'image'): ProviderForm {
   if (!provider) {
     const form = { ...DEFAULT_FORM, module, adapter: MODULE_ADAPTER[module] }
-    // A new decision row starts on OpenRouter (decision-route.ts; Owner 2026-11-15).
-    return module === 'decision' ? { ...form, baseUrl: OPENROUTER_BASE_URL } : form
+    // A new decision or dish-reading row starts on OpenRouter (decision-route.ts; Owner 2026-11-15).
+    return isTextModule(module) ? { ...form, baseUrl: OPENROUTER_BASE_URL } : form
   }
   return fillOfficial({
     module: provider.module,
@@ -85,6 +85,7 @@ export function formFor(provider: AdminProvider | null, module: ProviderModule =
 export const MODULE_PRICE_FIELDS: Record<ProviderModule, readonly PriceField[]> = {
   image: PRICE_FIELDS,
   decision: ['priceInputTextPerM', 'priceOutputPerM'],
+  dish_read: ['priceInputTextPerM', 'priceOutputPerM'],
 }
 
 const PRICE_OF = { priceInputTextPerM: 'inputTextPerM', priceInputImagePerM: 'inputImagePerM', priceOutputPerM: 'outputPerM' } as const
@@ -232,7 +233,7 @@ function detectedTiers(form: ProviderForm, catalog: readonly Resolution[] | null
   const model = form.model.trim()
   // A decision row has no image tiers and hides the control: keep the stored default, so renaming
   // its model (decision-route.ts) never empties them and blocks Save.
-  if (form.module === 'decision') return { tiers: RESOLUTIONS, known: true }
+  if (isTextModule(form.module)) return { tiers: RESOLUTIONS, known: true }
   if (form.adapter === 'openai_images') return openAIImageTiers(model)
   if (form.adapter === 'ark_images') return { tiers: ARK_RESOLUTIONS, known: true }
   return { tiers: catalog ?? (saved?.model === model ? saved.resolutions : []), known: true }

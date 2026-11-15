@@ -83,6 +83,9 @@ describe('the food flows (§5.1c)', () => {
     expect(nearestAspect(1080, 1920)).toBe('9:16')
   })
 
+})
+
+describe('the food flows fall back (§5.1c)', () => {
   it('a failed reading leaves the ordinary call (flow 1) and costs nothing extra', async () => {
     const { deps, base, photo } = await setup(new Error('openai responses 400'))
     const out = await runFoodFlow(deps, plan(true, true), base, [photo], inputs)
@@ -96,6 +99,15 @@ describe('the food flows (§5.1c)', () => {
     expect(both.choice).toEqual({ kind: 'plating', fallback: 'unclassifiable' })
     const empty = await setup(READING, [])
     expect((await runFoodFlow(empty.deps, plan(true, true), empty.base, [empty.photo], inputs)).choice).toEqual({ kind: 'plating', fallback: 'no_vessel' })
+  })
+
+  it('never swaps in a library vessel that looks like the user own: a white oval platter stays', async () => {
+    const lookalike = { ...VESSEL, shape: 'A long white oval plate with a wide flat rim' }
+    const { deps, base, photo } = await setup({ ...READING, dishware: 'A white oval platter' }, [lookalike])
+    const only = await runFoodFlow(deps, plan(false, true), base, [photo], inputs)
+    expect(only).toMatchObject({ call: base, choice: { kind: 'both_off', fallback: 'no_vessel' } })
+    const both = await runFoodFlow(deps, plan(true, true), base, [photo], inputs)
+    expect(both.choice).toEqual({ kind: 'plating', fallback: 'no_vessel' })
   })
 
   it('without the cover reference or a reader there is nothing to run', async () => {
