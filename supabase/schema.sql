@@ -96,6 +96,25 @@ ALTER FUNCTION "admin"."activate_template_price_catalog_v2"() OWNER TO "postgres
 
 
 CREATE OR REPLACE FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare
+  k text := concat_ws('|', 'alternate', quote_nullable(p_tag), quote_nullable(p_resolution), quote_nullable(p_quality));
+  hit jsonb := admin.stmt_memo(k);
+  v jsonb;
+begin
+  if hit ? 'v' then return case when jsonb_typeof(hit->'v') = 'null' then null else hit->'v' end; end if;
+  v := admin.alternate_route_floor_now(p_tag, p_resolution, p_quality);
+  perform admin.stmt_memo_put(k, v);
+  return v;
+end $$;
+
+
+ALTER FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."alternate_route_floor_now"("p_tag" "text", "p_resolution" "text", "p_quality" "text") RETURNS "jsonb"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
@@ -142,7 +161,7 @@ CREATE OR REPLACE FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_re
 $$;
 
 
-ALTER FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") OWNER TO "postgres";
+ALTER FUNCTION "admin"."alternate_route_floor_now"("p_tag" "text", "p_resolution" "text", "p_quality" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."alternate_route_meets_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_price" integer) RETURNS boolean
@@ -1365,6 +1384,25 @@ ALTER FUNCTION "admin"."default_template_profile"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") RETURNS numeric
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare
+  k text := concat_ws('|', 'fallback', quote_nullable(p_tag), quote_nullable(p_resolution), quote_nullable(p_quality));
+  hit jsonb := admin.stmt_memo(k);
+  v numeric;
+begin
+  if hit ? 'v' and jsonb_typeof(hit->'v') in ('number', 'null') then return (hit->>'v')::numeric; end if;
+  v := admin.fallback_route_floor_now(p_tag, p_resolution, p_quality);
+  perform admin.stmt_memo_put(k, to_jsonb(v));
+  return v;
+end $$;
+
+
+ALTER FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."fallback_route_floor_now"("p_tag" "text", "p_resolution" "text", "p_quality" "text") RETURNS numeric
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
@@ -1403,7 +1441,7 @@ CREATE OR REPLACE FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_res
 $$;
 
 
-ALTER FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text") OWNER TO "postgres";
+ALTER FUNCTION "admin"."fallback_route_floor_now"("p_tag" "text", "p_resolution" "text", "p_quality" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."guard_deleted_series"() RETURNS "trigger"
@@ -1943,6 +1981,27 @@ $$;
 ALTER FUNCTION "admin"."reference_tags_valid"("p_tags" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."refresh_template_floor_budget"() RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare b numeric;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.template_floor_budget_cache', 0));
+  b := admin.template_breakeven_budget_now();
+  insert into admin.template_floor_budget_cache as c (singleton, breakeven, floor_budget, margin_target_bp, refreshed_at)
+  values (true, b, coalesce(b, admin.lowest_credit_price()*0.761*0.4),
+    case when b is not null then (select (s.value->>'margin_bp')::int from public.system_settings s where s.key='catalog_economics_policy') end,
+    clock_timestamp())
+  on conflict (singleton) do update set breakeven=excluded.breakeven, floor_budget=excluded.floor_budget,
+    margin_target_bp=excluded.margin_target_bp, refreshed_at=excluded.refreshed_at;
+  perform set_config('shotviva.stmt_memo', '', true);
+end $$;
+
+
+ALTER FUNCTION "admin"."refresh_template_floor_budget"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."relabel_seedream_rebind"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2418,6 +2477,26 @@ ALTER FUNCTION "admin"."slot_floor_factor"("t" "public"."templates") OWNER TO "p
 
 
 CREATE OR REPLACE FUNCTION "admin"."slot_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_slots" integer, "p_single" integer) RETURNS integer
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare
+  k text := concat_ws('|', 'slot', quote_nullable(p_tag), quote_nullable(p_resolution), quote_nullable(p_quality),
+    quote_nullable(p_slots), quote_nullable(p_single));
+  hit jsonb := admin.stmt_memo(k);
+  v integer;
+begin
+  if hit ? 'v' and jsonb_typeof(hit->'v') in ('number', 'null') then return (hit->>'v')::integer; end if;
+  v := admin.slot_route_floor_now(p_tag, p_resolution, p_quality, p_slots, p_single);
+  perform admin.stmt_memo_put(k, to_jsonb(v));
+  return v;
+end $$;
+
+
+ALTER FUNCTION "admin"."slot_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_slots" integer, "p_single" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."slot_route_floor_now"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_slots" integer, "p_single" integer) RETURNS integer
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
@@ -2445,7 +2524,60 @@ CREATE OR REPLACE FUNCTION "admin"."slot_route_floor"("p_tag" "text", "p_resolut
 $$;
 
 
-ALTER FUNCTION "admin"."slot_route_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_slots" integer, "p_single" integer) OWNER TO "postgres";
+ALTER FUNCTION "admin"."slot_route_floor_now"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_slots" integer, "p_single" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."stmt_memo"("p_key" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+declare
+  raw text := current_setting('shotviva.stmt_memo', true);
+  stamp text := statement_timestamp()::text || '|';
+  body text;
+begin
+  if raw is null or left(raw, length(stamp)) <> stamp then return null; end if;
+  body := substr(raw, length(stamp) + 1);
+  if not pg_input_is_valid(body, 'jsonb') then return null; end if;
+  return case when jsonb_typeof(body::jsonb) = 'object' then body::jsonb -> p_key end;
+end $$;
+
+
+ALTER FUNCTION "admin"."stmt_memo"("p_key" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."stmt_memo_clear"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform set_config('shotviva.stmt_memo', '', true);
+  return null;
+end $$;
+
+
+ALTER FUNCTION "admin"."stmt_memo_clear"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."stmt_memo_put"("p_key" "text", "p_value" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  raw text := current_setting('shotviva.stmt_memo', true);
+  stamp text := statement_timestamp()::text || '|';
+  body text;
+  memo jsonb := '{}';
+begin
+  if raw is not null and left(raw, length(stamp)) = stamp then
+    body := substr(raw, length(stamp) + 1);
+    if pg_input_is_valid(body, 'jsonb') and jsonb_typeof(body::jsonb) = 'object' then memo := body::jsonb; end if;
+  end if;
+  perform set_config('shotviva.stmt_memo', stamp || (memo || jsonb_build_object(p_key, jsonb_build_object('v', p_value)))::text, true);
+end $$;
+
+
+ALTER FUNCTION "admin"."stmt_memo_put"("p_key" "text", "p_value" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."switch_template_profile"("p_actor" "uuid", "p_id" "text", "p_target" "text", "p_reason" "text") RETURNS "jsonb"
@@ -2562,16 +2694,15 @@ CREATE OR REPLACE FUNCTION "admin"."template_breakeven_budget"() RETURNS numeric
     SET "search_path" TO ''
     AS $_$
 declare
+  c admin.template_floor_budget_cache;
   stamp text := statement_timestamp()::text;
   cached text := current_setting('shotviva.breakeven_budget', true);
   budget numeric;
 begin
-  -- Only a value written during this very statement counts: a value left by an earlier statement
-  -- (or set by anyone before it) carries another timestamp and is recomputed. Anything that does
-  -- not look like what this function writes is ignored too. Clients cannot set it at all: the
-  -- API exposes no way to call set_config, and the setting is not in PostgREST's request.* space.
+  select * into c from admin.template_floor_budget_cache where singleton;
+  if found then return c.breakeven; end if;
   if cached is not null and split_part(cached, '|', 1) = stamp
-     and split_part(cached, '|', 2) ~ '^([0-9]+(\.[0-9]+)?)?$' and cached ~ '^[^|]+\|[^|]*$' then
+     and split_part(cached, '|', 2) ~ '^([0-9]+([.][0-9]+)?)?$' and cached ~ '^[^|]+[|][^|]*$' then
     return nullif(split_part(cached, '|', 2), '')::numeric;
   end if;
   budget := admin.template_breakeven_budget_now();
@@ -2616,14 +2747,31 @@ ALTER FUNCTION "admin"."template_catalog_minimums"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_floor_budget"() RETURNS numeric
-    LANGUAGE "sql" STABLE SECURITY DEFINER
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select coalesce(admin.template_breakeven_budget(), admin.lowest_credit_price()*0.761*0.4)
-$$;
+declare c admin.template_floor_budget_cache;
+begin
+  select * into c from admin.template_floor_budget_cache where singleton;
+  if found then return c.floor_budget; end if;
+  return coalesce(admin.template_breakeven_budget(), admin.lowest_credit_price()*0.761*0.4);
+end $$;
 
 
 ALTER FUNCTION "admin"."template_floor_budget"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_floor_budget_changed"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform admin.refresh_template_floor_budget();
+  return null;
+end $$;
+
+
+ALTER FUNCTION "admin"."template_floor_budget_changed"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_image_options"("public"."templates") RETURNS "jsonb"
@@ -2671,12 +2819,16 @@ ALTER FUNCTION "admin"."template_leaves_series_on_unpublish"() OWNER TO "postgre
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_margin_target_bp"() RETURNS integer
-    LANGUAGE "sql" STABLE SECURITY DEFINER
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select case when admin.template_breakeven_budget() is not null then
-    (select (s.value->>'margin_bp')::int from public.system_settings s where s.key='catalog_economics_policy') end
-$$;
+declare c admin.template_floor_budget_cache;
+begin
+  select * into c from admin.template_floor_budget_cache where singleton;
+  if found then return c.margin_target_bp; end if;
+  return case when admin.template_breakeven_budget() is not null then
+    (select (s.value->>'margin_bp')::int from public.system_settings s where s.key='catalog_economics_policy') end;
+end $$;
 
 
 ALTER FUNCTION "admin"."template_margin_target_bp"() OWNER TO "postgres";
@@ -15262,6 +15414,19 @@ CREATE TABLE IF NOT EXISTS "admin"."template_copy_requests" (
 ALTER TABLE "admin"."template_copy_requests" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "admin"."template_floor_budget_cache" (
+    "singleton" boolean DEFAULT true NOT NULL,
+    "breakeven" numeric,
+    "floor_budget" numeric,
+    "margin_target_bp" integer,
+    "refreshed_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "template_floor_budget_cache_singleton_check" CHECK ("singleton")
+);
+
+
+ALTER TABLE "admin"."template_floor_budget_cache" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "admin"."template_price_batches" (
     "id" bigint NOT NULL,
     "applied_at" timestamp with time zone DEFAULT "clock_timestamp"() NOT NULL,
@@ -16724,6 +16889,11 @@ ALTER TABLE ONLY "admin"."template_copy_requests"
 
 
 
+ALTER TABLE ONLY "admin"."template_floor_budget_cache"
+    ADD CONSTRAINT "template_floor_budget_cache_pkey" PRIMARY KEY ("singleton");
+
+
+
 ALTER TABLE ONLY "admin"."template_price_batches"
     ADD CONSTRAINT "template_price_batches_pkey" PRIMARY KEY ("id");
 
@@ -17941,6 +18111,18 @@ CREATE OR REPLACE TRIGGER "catalog_publish_requires_v2" BEFORE INSERT OR UPDATE 
 
 
 
+CREATE OR REPLACE TRIGGER "zz_template_floor_budget" AFTER INSERT OR DELETE OR UPDATE OR TRUNCATE ON "admin"."catalog_product_versions" FOR EACH STATEMENT EXECUTE FUNCTION "admin"."template_floor_budget_changed"();
+
+
+
+CREATE OR REPLACE TRIGGER "zz_template_floor_budget" AFTER INSERT OR DELETE OR UPDATE OR TRUNCATE ON "admin"."catalog_products" FOR EACH STATEMENT EXECUTE FUNCTION "admin"."template_floor_budget_changed"();
+
+
+
+CREATE OR REPLACE TRIGGER "zz_template_floor_budget" AFTER INSERT OR DELETE OR UPDATE OR TRUNCATE ON "admin"."product_terms_v2" FOR EACH STATEMENT EXECUTE FUNCTION "admin"."template_floor_budget_changed"();
+
+
+
 CREATE OR REPLACE TRIGGER "aa_canonical_tiers" BEFORE INSERT OR UPDATE OF "resolution" ON "public"."admin_test_runs" FOR EACH ROW EXECUTE FUNCTION "admin"."canonical_run_tier"();
 
 
@@ -18181,7 +18363,35 @@ CREATE OR REPLACE TRIGGER "test_photo_deleted" BEFORE UPDATE OF "photo_id" ON "p
 
 
 
+CREATE OR REPLACE TRIGGER "zz_floor_memo_clear" AFTER INSERT OR DELETE OR UPDATE OR TRUNCATE ON "public"."ai_providers" FOR EACH STATEMENT EXECUTE FUNCTION "admin"."stmt_memo_clear"();
+
+
+
+CREATE OR REPLACE TRIGGER "zz_floor_memo_clear" AFTER INSERT OR DELETE OR UPDATE OR TRUNCATE ON "public"."generation_jobs" FOR EACH STATEMENT EXECUTE FUNCTION "admin"."stmt_memo_clear"();
+
+
+
 CREATE OR REPLACE TRIGGER "zz_template_category_path" BEFORE INSERT OR UPDATE OF "category", "category_key", "subcategory_key" ON "public"."templates" FOR EACH ROW EXECUTE FUNCTION "admin"."check_template_category_path"();
+
+
+
+CREATE OR REPLACE TRIGGER "zz_template_floor_budget" AFTER INSERT OR DELETE OR UPDATE OR TRUNCATE ON "public"."affiliate_rate_overrides" FOR EACH STATEMENT EXECUTE FUNCTION "admin"."template_floor_budget_changed"();
+
+
+
+CREATE OR REPLACE TRIGGER "zz_template_floor_budget" AFTER INSERT OR DELETE OR UPDATE OR TRUNCATE ON "public"."affiliate_rates" FOR EACH STATEMENT EXECUTE FUNCTION "admin"."template_floor_budget_changed"();
+
+
+
+CREATE OR REPLACE TRIGGER "zz_template_floor_budget" AFTER INSERT OR DELETE OR UPDATE OR TRUNCATE ON "public"."affiliates" FOR EACH STATEMENT EXECUTE FUNCTION "admin"."template_floor_budget_changed"();
+
+
+
+CREATE OR REPLACE TRIGGER "zz_template_floor_budget" AFTER INSERT OR DELETE OR UPDATE OR TRUNCATE ON "public"."products" FOR EACH STATEMENT EXECUTE FUNCTION "admin"."template_floor_budget_changed"();
+
+
+
+CREATE OR REPLACE TRIGGER "zz_template_floor_budget" AFTER INSERT OR DELETE OR UPDATE OR TRUNCATE ON "public"."system_settings" FOR EACH STATEMENT EXECUTE FUNCTION "admin"."template_floor_budget_changed"();
 
 
 
@@ -18961,6 +19171,9 @@ ALTER TABLE "admin"."product_terms_v2" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "admin"."template_copy_requests" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "admin"."template_floor_budget_cache" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "admin"."template_price_batches" ENABLE ROW LEVEL SECURITY;
 
 
@@ -19319,6 +19532,11 @@ GRANT ALL ON FUNCTION "admin"."alternate_route_floor"("p_tag" "text", "p_resolut
 
 
 
+REVOKE ALL ON FUNCTION "admin"."alternate_route_floor_now"("p_tag" "text", "p_resolution" "text", "p_quality" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."alternate_route_floor_now"("p_tag" "text", "p_resolution" "text", "p_quality" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."alternate_route_meets_floor"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_price" integer) FROM PUBLIC;
 
 
@@ -19531,6 +19749,11 @@ GRANT ALL ON FUNCTION "admin"."fallback_route_floor"("p_tag" "text", "p_resoluti
 
 
 
+REVOKE ALL ON FUNCTION "admin"."fallback_route_floor_now"("p_tag" "text", "p_resolution" "text", "p_quality" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."fallback_route_floor_now"("p_tag" "text", "p_resolution" "text", "p_quality" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."guard_deleted_series"() FROM PUBLIC;
 
 
@@ -19641,6 +19864,11 @@ GRANT ALL ON FUNCTION "admin"."reference_tags_valid"("p_tags" "text"[]) TO "serv
 
 
 
+REVOKE ALL ON FUNCTION "admin"."refresh_template_floor_budget"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."refresh_template_floor_budget"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."relabel_seedream_rebind"() FROM PUBLIC;
 
 
@@ -19737,6 +19965,25 @@ GRANT ALL ON FUNCTION "admin"."slot_route_floor"("p_tag" "text", "p_resolution" 
 
 
 
+REVOKE ALL ON FUNCTION "admin"."slot_route_floor_now"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_slots" integer, "p_single" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."slot_route_floor_now"("p_tag" "text", "p_resolution" "text", "p_quality" "text", "p_slots" integer, "p_single" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."stmt_memo"("p_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."stmt_memo"("p_key" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."stmt_memo_clear"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."stmt_memo_put"("p_key" "text", "p_value" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."stmt_memo_put"("p_key" "text", "p_value" "jsonb") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "admin"."switch_template_profile"("p_actor" "uuid", "p_id" "text", "p_target" "text", "p_reason" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."switch_template_profile"("p_actor" "uuid", "p_id" "text", "p_target" "text", "p_reason" "text") TO "service_role";
 
@@ -19774,6 +20021,10 @@ GRANT ALL ON FUNCTION "admin"."template_catalog_minimums"() TO "service_role";
 
 REVOKE ALL ON FUNCTION "admin"."template_floor_budget"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."template_floor_budget"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_floor_budget_changed"() FROM PUBLIC;
 
 
 
@@ -21586,6 +21837,10 @@ GRANT SELECT ON TABLE "public"."affiliate_balances" TO "service_role";
 
 
 GRANT SELECT,INSERT ON TABLE "admin"."template_copy_requests" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "admin"."template_floor_budget_cache" TO "service_role";
 
 
 

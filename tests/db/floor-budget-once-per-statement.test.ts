@@ -41,7 +41,8 @@ it('lists 120 templates as anon computing the budget once, well under a second',
   const ms = performance.now() - started
   await db.query('reset role')
   expect(rows).toHaveLength(COUNT)
-  expect((await computed()) - before).toBe(1)
+  // 1570 reads the stored budget: at most one calculation (none when the row exists).
+  expect((await computed()) - before).toBeLessThanOrEqual(1)
   expect(ms).toBeLessThan(1000)
 })
 
