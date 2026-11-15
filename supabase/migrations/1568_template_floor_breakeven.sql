@@ -23,13 +23,28 @@
 -- Expand-only: unchanged signatures; admin_image_pricing_catalog gains three keys and
 -- admin_set_system_setting accepts one more key (catalog_economics_policy, unbanned admins only).
 
+-- Whether the policy row is valid, decided without casting anything first: admin.catalog_policy()
+-- (1127) can raise on a malformed row, because SQL does not promise to evaluate its checks in order.
+-- The floors must never error on a bad row; they fall back to the old budget instead.
+create function admin.template_policy_valid() returns boolean
+  language sql stable security definer set search_path to '' as $$
+  select coalesce((select case
+      when jsonb_typeof(s.value) is distinct from 'object' then false
+      when exists (select from unnest(array['payment_bp','refund_bp','yearly_commission_bp','other_commission_bp','margin_bp']) k
+             where jsonb_typeof(s.value->k) is distinct from 'number' or (s.value->>k) !~ '^[0-9]{1,4}$') then false
+      else (s.value->>'payment_bp')::int + (s.value->>'refund_bp')::int
+        + greatest((s.value->>'yearly_commission_bp')::int, (s.value->>'other_commission_bp')::int) < 10000 end
+    from public.system_settings s where s.key='catalog_economics_policy'), false)
+$$;
+
 create function admin.template_breakeven_budget() returns numeric
   language sql stable security definer set search_path to '' as $$
-  select min(i.cents/(100*i.credits::numeric) * (10000-admin.catalog_fee_bp(i.kind))/10000)
-    from (select c.kind, c.credits,
-            case when c.id in ('pack_m','pack_l') then round(c.cents*0.85) else c.cents end as cents
-          from admin.catalog_candidate(null,null,null,false) c) i
-   where admin.is_template_catalog_v2() and admin.catalog_policy() is not null and i.cents>0 and i.credits>0
+  select case when admin.is_template_catalog_v2() and admin.template_policy_valid() then (
+    select min(i.cents/(100*i.credits::numeric) * (10000-admin.catalog_fee_bp(i.kind))/10000)
+      from (select c.kind, c.credits,
+              case when c.id in ('pack_m','pack_l') then round(c.cents*0.85) else c.cents end as cents
+            from admin.catalog_candidate(null,null,null,false) c) i
+     where i.cents>0 and i.credits>0) end
 $$;
 
 create function admin.template_floor_budget() returns numeric
@@ -40,12 +55,13 @@ $$;
 -- The advisory target, only with the policy that also gives the break-even budget.
 create function admin.template_margin_target_bp() returns integer
   language sql stable security definer set search_path to '' as $$
-  select (admin.catalog_policy()->>'margin_bp')::int where admin.template_breakeven_budget() is not null
+  select case when admin.template_breakeven_budget() is not null then
+    (select (s.value->>'margin_bp')::int from public.system_settings s where s.key='catalog_economics_policy') end
 $$;
 
-revoke all on function admin.template_breakeven_budget(), admin.template_floor_budget(), admin.template_margin_target_bp()
+revoke all on function admin.template_policy_valid(), admin.template_breakeven_budget(), admin.template_floor_budget(), admin.template_margin_target_bp()
   from public, anon, authenticated;
-grant execute on function admin.template_breakeven_budget(), admin.template_floor_budget(), admin.template_margin_target_bp()
+grant execute on function admin.template_policy_valid(), admin.template_breakeven_budget(), admin.template_floor_budget(), admin.template_margin_target_bp()
   to service_role;
 
 create or replace function admin.alternate_route_floor(p_tag text, p_resolution text, p_quality text) returns jsonb
@@ -325,13 +341,18 @@ begin
     -- 1568: the catalogue economics policy (§6.2 第 5 项), the same shape admin.catalog_policy()
     -- accepts: exactly the five basis-point integers, fees + the larger commission under 100%.
     when 'catalog_economics_policy' then
-      if jsonb_typeof(p_value) is distinct from 'object'
-         or p_value - array['payment_bp','refund_bp','yearly_commission_bp','other_commission_bp','margin_bp'] <> '{}'::jsonb
+      -- Separate steps: no cast runs before the shape is known (SQL does not short-circuit OR).
+      if jsonb_typeof(p_value) is distinct from 'object' then
+        raise exception 'INVALID_INPUT' using detail = 'catalog_economics_policy must be an object';
+      end if;
+      if p_value - array['payment_bp','refund_bp','yearly_commission_bp','other_commission_bp','margin_bp'] <> '{}'::jsonb
          or exists (select from unnest(array['payment_bp','refund_bp','yearly_commission_bp','other_commission_bp','margin_bp']) k
-              where jsonb_typeof(p_value->k) is distinct from 'number' or (p_value->>k) !~ '^[0-9]{1,4}$')
-         or (p_value->>'payment_bp')::int + (p_value->>'refund_bp')::int
-            + greatest((p_value->>'yearly_commission_bp')::int, (p_value->>'other_commission_bp')::int) >= 10000 then
-        raise exception 'INVALID_INPUT' using detail = 'catalog_economics_policy must be five basis-point integers with fees under 100%';
+              where jsonb_typeof(p_value->k) is distinct from 'number' or (p_value->>k) !~ '^[0-9]{1,4}$') then
+        raise exception 'INVALID_INPUT' using detail = 'catalog_economics_policy must be five basis-point integers';
+      end if;
+      if (p_value->>'payment_bp')::int + (p_value->>'refund_bp')::int
+         + greatest((p_value->>'yearly_commission_bp')::int, (p_value->>'other_commission_bp')::int) >= 10000 then
+        raise exception 'INVALID_INPUT' using detail = 'catalog_economics_policy fees must stay under 100%';
       end if;
     else
       raise exception 'INVALID_INPUT' using detail = 'unknown setting';

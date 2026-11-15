@@ -23,7 +23,7 @@
     "templates:finalize": "NODE_USE_ENV_PROXY=1 tsx --conditions=react-server --env-file-if-exists=.env.local scripts/template-review/run.ts finalize",
     "templates:status": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/template-review/run.ts status",
     "pricing:waffo": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/check-waffo-catalog.ts",
-    "settings:catalog-policy": "tsx --env-file-if-exists=.env.local scripts/set-catalog-policy.ts",
+    "settings:catalog-policy": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/set-catalog-policy.ts",
     "pricing:waffo:prod": "tsx --conditions=react-server --env-file=.env.production.local scripts/check-waffo-catalog.ts --prod",
     "pricing:prepromote": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/check-pricing-promotion.ts",
     "qa:accounts": "tsx --env-file=.env.local scripts/qa/accounts.ts",

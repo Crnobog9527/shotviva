@@ -20,6 +20,7 @@ import { parseArgs } from 'node:util'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import { withDbTiers } from '../src/core/templates/db-resolution'
 import { checkPolicyTarget, parsePolicy } from './set-catalog-policy-rules'
 
 const env = z.object({
@@ -34,7 +35,7 @@ async function main() {
   const policy = parsePolicy(JSON.parse(readFileSync(file, 'utf8')))
   const config = env.parse(process.env)
   const target = checkPolicyTarget(config.NEXT_PUBLIC_SUPABASE_URL, Boolean(values.prod))
-  const client = createClient(config.NEXT_PUBLIC_SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+  const client = createClient(config.NEXT_PUBLIC_SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false }, global: { fetch: withDbTiers() } })
   const current = await client.from('system_settings').select('value').eq('key', 'catalog_economics_policy').maybeSingle()
   if (current.error) throw new Error(`Could not read the current policy: ${current.error.message}`)
   process.stdout.write(`target: ${target}\ncurrent: ${JSON.stringify(current.data?.value ?? null)}\nnew:     ${JSON.stringify(policy)}\n`)

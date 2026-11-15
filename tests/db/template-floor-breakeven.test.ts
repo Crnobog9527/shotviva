@@ -173,6 +173,10 @@ describe('before the policy row exists (production at deploy)', () => {
     await db.query(`insert into public.system_settings(key,value) values('catalog_economics_policy','{"payment_bp":"x"}')`)
     expect(await floorBudget()).toBeCloseTo(await legacyBudget(), 12)
     expect(await routeFloor()).toBe(await legacyFloor())
+    await db.query(`update public.system_settings set value='{"payment_bp":9000,"refund_bp":900,"yearly_commission_bp":900,"other_commission_bp":900,"margin_bp":0}' where key='catalog_economics_policy'`)
+    expect(await floorBudget()).toBeCloseTo(await legacyBudget(), 12)
+    await setPrice(await legacyFloor())
+    await expect(assertFloor()).resolves.toBeDefined()
   })
 })
 
@@ -200,7 +204,7 @@ describe('admin_set_system_setting catalog_economics_policy', () => {
     const missing: Partial<typeof policy> = { ...policy }
     delete missing.margin_bp
     for (const bad of [{ ...policy, extra: 1 }, { ...policy, refund_bp: 1.5 }, { ...policy, refund_bp: '250' },
-      { ...policy, payment_bp: 5000, refund_bp: 4000, other_commission_bp: 1000 }, missing, [1]]) {
+      { ...policy, payment_bp: 5000, refund_bp: 4000, other_commission_bp: 1000 }, missing, [1], 5]) {
       await refuses(() => write(bad, actor), /INVALID_INPUT/)
     }
     const stranger = await createUser(db)
