@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { dishReadingSchema, dishText } from './reading'
+import { DISH_NAME_MAX, dishReadingSchema, dishText, userDishName } from './reading'
 
 const reading = {
   dish_name: 'Steamed whole fish',
@@ -27,5 +27,15 @@ describe('the dish reading (§5.1c)', () => {
     expect(long.main_ingredients[0]?.name).toHaveLength(200)
     expect(long.garnish[0]).toEqual({ item: 'i'.repeat(120), shape: 's'.repeat(120), count: 'c'.repeat(40) })
     expect(dishReadingSchema.safeParse({ ...reading, category: 'dessert' }).success).toBe(false)
+  })
+})
+
+describe('the dish name the user typed (Owner 2026-11-15)', () => {
+  it('is one clean line of at most 60 characters, or nothing', () => {
+    expect(userDishName({ dish_name: '  红烧鳝段  ' })).toBe('红烧鳝段')
+    expect(userDishName({})).toBe('')
+    expect(userDishName({ dish_name: '   ' })).toBe('')
+    expect(userDishName({ dish_name: 'braised\neel\r\n\tsegments\u2028' })).toBe('braised eel segments')
+    expect(userDishName({ dish_name: 'x'.repeat(200) })).toHaveLength(DISH_NAME_MAX)
   })
 })
