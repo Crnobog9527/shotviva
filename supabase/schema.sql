@@ -2558,6 +2558,33 @@ ALTER FUNCTION "admin"."template_approved_prices"("p_provider" "uuid") OWNER TO 
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_breakeven_budget"() RETURNS numeric
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  stamp text := statement_timestamp()::text;
+  cached text := current_setting('shotviva.breakeven_budget', true);
+  budget numeric;
+begin
+  -- Only a value written during this very statement counts: a value left by an earlier statement
+  -- (or set by anyone before it) carries another timestamp and is recomputed. Anything that does
+  -- not look like what this function writes is ignored too. Clients cannot set it at all: the
+  -- API exposes no way to call set_config, and the setting is not in PostgREST's request.* space.
+  if cached is not null and split_part(cached, '|', 1) = stamp
+     and split_part(cached, '|', 2) ~ '^([0-9]+(\.[0-9]+)?)?$' and cached ~ '^[^|]+\|[^|]*$' then
+    return nullif(split_part(cached, '|', 2), '')::numeric;
+  end if;
+  budget := admin.template_breakeven_budget_now();
+  perform set_config('shotviva.breakeven_budget', stamp || '|' || coalesce(budget::text, ''), true);
+  return budget;
+end;
+$_$;
+
+
+ALTER FUNCTION "admin"."template_breakeven_budget"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "admin"."template_breakeven_budget_now"() RETURNS numeric
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -2570,7 +2597,7 @@ CREATE OR REPLACE FUNCTION "admin"."template_breakeven_budget"() RETURNS numeric
 $$;
 
 
-ALTER FUNCTION "admin"."template_breakeven_budget"() OWNER TO "postgres";
+ALTER FUNCTION "admin"."template_breakeven_budget_now"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "admin"."template_catalog_minimums"() RETURNS "jsonb"
@@ -19732,6 +19759,11 @@ GRANT ALL ON FUNCTION "admin"."template_approved_prices"("p_provider" "uuid") TO
 
 REVOKE ALL ON FUNCTION "admin"."template_breakeven_budget"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."template_breakeven_budget"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "admin"."template_breakeven_budget_now"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."template_breakeven_budget_now"() TO "service_role";
 
 
 
