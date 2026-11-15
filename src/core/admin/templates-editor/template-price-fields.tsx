@@ -8,6 +8,7 @@ import { TEMPLATE_QUALITIES, type CreditsFloor, type TemplateQuality } from '@/c
 
 import { withOffered } from './sale-tier-fields'
 import { tierGuidance, unsupportedTier } from './tier-price'
+import { MarginNote } from './margin-note'
 import { creditProblems, TIER_LABEL, type TemplateFormValues } from './form-state'
 
 type Props = {
@@ -64,6 +65,9 @@ export function TemplatePriceFields({ values, floor, modelField, onChange }: Pro
             </p>
             {problems[resolution] && !tierGuidance(floor, values.quality, resolution).includes(problems[resolution]!) && (
               <p className="text-destructive text-xs">{problems[resolution]}</p>
+            )}
+            {!problems[resolution] && (
+              <MarginNote floor={floor} quality={values.quality} resolution={resolution} price={values.credits[resolution]} slots={values.imageSlots.length} />
             )}
           </div>
         ))}

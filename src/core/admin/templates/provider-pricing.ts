@@ -33,7 +33,13 @@ const receiptSchema = z.object({
 })
 const quoteSchema = z.object({ input: z.unknown(), receipt: receiptSchema })
 const catalogSchema = z.object({
-  version: z.enum(['v1', 'v2']), tariffs: tariffs.optional(), unit_price: z.coerce.number().positive(), providers: z.array(rowSchema.required({ approved: true })),
+  version: z.enum(['v1', 'v2']), tariffs: tariffs.optional(), unit_price: z.coerce.number().positive(),
+  // 1568: the credit budget of every floor (worst-case break-even with a valid policy, else the
+  // old 60%-margin budget), and the break-even budget and margin target for the advisory margin.
+  floor_budget: z.coerce.number().positive().optional(),
+  breakeven_budget: z.coerce.number().positive().nullish(),
+  margin_target_bp: z.number().int().min(0).max(9999).nullish(),
+  providers: z.array(rowSchema.required({ approved: true })),
 })
 
 const slotCostsOf = (row: z.infer<typeof rowSchema>) =>
@@ -43,10 +49,17 @@ const slotCostsOf = (row: z.infer<typeof rowSchema>) =>
 const estimatesOf = (row: z.infer<typeof rowSchema>, listed: boolean, caps?: ImageCapabilities) =>
   listed ? { ...row.estimated_image_costs } : { ...caps?.catalogImageCosts, ...row.estimated_image_costs }
 
+// The worst margin is shown only when the floors divide by the break-even budget itself.
+function marginTargetOf(catalog: z.infer<typeof catalogSchema> | null) {
+  if (!catalog?.breakeven_budget || catalog.margin_target_bp == null || catalog.floor_budget !== catalog.breakeven_budget) return undefined
+  return catalog.margin_target_bp / 10000
+}
+
 function optionsFromInput(input: unknown, legacyBudget?: number): ImageProviderOption[] {
   const catalog = Array.isArray(input) ? null : catalogSchema.parse(input)
-  const budget = catalog ? imageCostBudget(catalog.unit_price) : legacyBudget
+  const budget = catalog ? catalog.floor_budget ?? imageCostBudget(catalog.unit_price) : legacyBudget
   if (budget === undefined) throw new AppError('INTERNAL', '旧目录缺少积分成本')
+  const marginTarget = marginTargetOf(catalog)
   const rows = catalog?.providers ?? z.array(rowSchema).parse(input)
   return rows.map(row => {
     const caps = imageCapabilitiesSchema.safeParse(row.capabilities)
@@ -54,7 +67,7 @@ function optionsFromInput(input: unknown, legacyBudget?: number): ImageProviderO
     const listed = row.list_priced ?? openAI
     const estimates = estimatesOf(row, listed, caps.data)
     const resolutions = openAI ? row.resolutions : row.resolutions.filter(tier => caps.data?.resolutions.includes(tier))
-    const floor = modelCreditFloor({ openAI: listed, resolutions, estimates, p95: row.p95, p95ByQuality: row.p95_by_quality, slotCosts: slotCostsOf(row) }, budget)
+    const floor = { ...modelCreditFloor({ openAI: listed, resolutions, estimates, p95: row.p95, p95ByQuality: row.p95_by_quality, slotCosts: slotCostsOf(row) }, budget), marginTarget }
     return {
       fallbackFloors: row.fallback_floors, approved: row.approved, version: catalog?.version, tariffs: row.is_active ? catalog?.tariffs : undefined,
       id: row.provider_id ?? 'env', label: row.label, model: row.model, isActive: row.is_active, fixedCapabilities: row.adapter !== 'openrouter_images',

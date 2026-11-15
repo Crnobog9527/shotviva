@@ -2,7 +2,7 @@ import { hasCompleteCoverSet } from '@/core/templates/cover-locales'
 import { EDIT_TEMPLATE_ID } from '@/core/templates/edit-params'
 import { RESOLUTIONS, type Resolution } from '@/core/templates/output-options'
 import { MISSING_COST, floorGuidance, providerFloor, type ProviderFloors } from '@/core/templates/provider-pricing'
-import { creditsBelowFloor, slotFloorFactor, type CreditsCost, type TemplateQuality } from '@/core/templates/pricing'
+import { creditsBelowFloor, slotFloorFactor, worstMargin, type CreditsCost, type TemplateQuality } from '@/core/templates/pricing'
 import type { TemplateSurface } from '@/core/templates/schema'
 import type { Template } from '@/core/templates/types'
 
@@ -87,6 +87,23 @@ export function bulkEditFailures(
     const open = (prices.resolutions ?? RESOLUTIONS).filter(tier => !unpriced.includes(tier))
     const none = patch.closeResolutions?.length && open.length === 0 ? [{ id, name, reason: 'no_tier' as const }] : []
     return [...low, ...none, ...(web ? [{ id, name, reason: 'web_incomplete' as const }] : [])]
+  })
+}
+
+export type BulkMarginWarning = { id: string; name: string; resolution: Resolution; margin: number; target: number }
+
+// 1568: tiers the edit leaves at or above the floor but under the advisory margin target. A
+// warning only: the batch still saves.
+export function bulkMarginWarnings(templates: readonly BulkEditCandidate[], patch: BulkEditPatch, floor: ProviderFloors): BulkMarginWarning[] {
+  return templates.flatMap(template => {
+    if (!isBulkEditable(template)) return []
+    const { quality, prices, unpriced } = candidatePricing(template, patch, floor)
+    const cost = { ...template.creditsCost, ...patch.creditsCost }
+    return RESOLUTIONS.flatMap(resolution => {
+      if (unpriced.includes(resolution) || prices.resolutions?.includes(resolution) === false) return []
+      const m = worstMargin(prices, quality, resolution, cost[resolution], slotFloorFactor(template.fields))
+      return m?.low && m.margin >= 0 ? [{ id: template.id, name: template.name, resolution, margin: m.margin, target: m.target }] : []
+    })
   })
 }
 

@@ -4,7 +4,7 @@ import { Button } from '@/core/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/core/ui/dialog'
 import type { ProviderFloors } from '@/core/templates/provider-pricing'
 
-import { bulkEditFailures, isEmptyPatch } from '../templates/bulk-edit-rules'
+import { bulkEditFailures, bulkMarginWarnings, isEmptyPatch } from '../templates/bulk-edit-rules'
 import type { AdminTemplate } from '../templates/types'
 import { BulkEditFields } from './bulk-edit-fields'
 import { bulkModelFailures } from './bulk-model-check'
@@ -33,6 +33,7 @@ export function BulkEditDialog({ edit, templates, skipped, floor, providers, cat
   const invalid = Object.keys(problems).length > 0
   // The server's list when it refused; until then, the same rules run here.
   const failures = edit.failures ?? [...bulkEditFailures(templates, patch, floor), ...bulkModelFailures(templates, patch, providers)]
+  const marginWarnings = bulkMarginWarnings(templates, patch, floor)
   const reviewing = edit.step === 'review'
   return (
     <Dialog open={edit.open} onOpenChange={(open) => !open && !edit.pending && edit.close()}>
@@ -43,7 +44,7 @@ export function BulkEditDialog({ edit, templates, skipped, floor, providers, cat
         </DialogHeader>
         <SkippedNote skipped={skipped} none={templates.length === 0} />
         {reviewing ? (
-          <BulkEditReview providers={providers} templates={templates} patch={patch} failures={failures} categories={categories} />
+          <BulkEditReview providers={providers} templates={templates} patch={patch} failures={failures} marginWarnings={marginWarnings} categories={categories} />
         ) : (
           <BulkEditFields providers={providers} values={edit.values} problems={problems} categories={categories} onChange={edit.setValues} />
         )}
