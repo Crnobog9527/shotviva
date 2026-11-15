@@ -11,6 +11,17 @@ describe('a library vessel that looks like the user own (Owner 2026-11-15)', () 
     expect(looksAlike('A white oval plate', USER)).toBe(true)
   })
 
+  it('reads hyphenated compounds by their parts', () => {
+    expect(looksAlike('A round ivory-white plate', 'A round white plate')).toBe(true)
+    expect(looksAlike('An oval-shaped plate in off-white', USER)).toBe(true)
+    expect(looksAlike('A fish-shaped dish, white glaze', 'A white boat-shaped dish')).toBe(true)
+  })
+
+  it('never lets a material stand in for a colour', () => {
+    expect(looksAlike('A white round porcelain plate', 'A blue round porcelain plate')).toBe(false)
+    expect(looksAlike('A round stone plate', 'A round grey stone plate')).toBe(false)
+  })
+
   it('is not alike when only one of them matches', () => {
     expect(looksAlike('A long leaf-shaped platter, pale celadon satin glaze', 'A pale green oval plate')).toBe(false)
     expect(looksAlike('A streamlined long, low platter shaped like an elongated teardrop, satin ivory-white glaze', USER)).toBe(false)
