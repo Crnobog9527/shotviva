@@ -24,8 +24,13 @@ const EDITORS: Record<'prizes' | 'table' | 'footer' | 'info', ComponentType<Bloc
 }
 
 // A tab's upload boxes (e.g. the prize photo; kind is null for the shared tab): drawn as a part of
-// its own, with how many hold a photo.
-export type PagePhotos = { render(kind: string | null): ReactNode; count(kind: string | null): { label: string; filled: number; total: number } | null }
+// its own, with how many hold a photo. header: the boxes the shared header carries (the organiser
+// logo), drawn under the shared tab's masthead.
+export type PagePhotos = {
+  render(kind: string | null): ReactNode
+  header(): ReactNode
+  count(kind: string | null): { label: string; filled: number; total: number } | null
+}
 
 type Props = BlockProps & { poster: PosterFields; unverified: readonly string[]; pagePhotos?: PagePhotos; onClear: ClearPart }
 
@@ -101,7 +106,11 @@ const endsSections = (fold: Fold, content: BlockProps['content']) =>
   fold.kind === 'info' ? content.sections.length === 0 : fold.kind === 'section' && fold.index === content.sections.length - 1
 
 function FoldBody({ fold, kind, pagePhotos, ...props }: BlockProps & { fold: Fold; kind: string | null; pagePhotos?: PagePhotos }) {
-  if (fold.kind === 'header') return <HeaderEditor keys={fold.keys} {...props} />
+  if (fold.kind === 'header') {
+    const editor = <HeaderEditor keys={fold.keys} {...props} />
+    if (kind !== null || fold.key !== 'masthead' || !pagePhotos) return editor
+    return <div className="grid gap-4">{editor}{pagePhotos.header()}</div>
+  }
   if (fold.kind === 'section') return <SectionEditor index={fold.index} {...props} />
   if (fold.kind === 'photos') return pagePhotos ? <div className="grid gap-4">{pagePhotos.render(kind)}</div> : null
   const Editor = EDITORS[fold.kind]
