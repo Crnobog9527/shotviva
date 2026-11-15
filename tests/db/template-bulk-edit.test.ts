@@ -140,6 +140,28 @@ describe('batch edit of templates', () => {
     })
   })
 
+  // Offered resolutions: 停售 closes tiers on every template, skips their floor, and keeps one on offer.
+  it('closes tiers in a batch, refusing one that would leave a template with none', async () => {
+    const closed = async (id: string) => (await pg.query<{ unpriced_resolutions: string[] }>(
+      'select unpriced_resolutions from public.template_sale_approvals where template_id=$1', [id])).rows[0]?.unpriced_resolutions
+    const pair = [ids[3]!, ids[4]!]
+    // 4K under the floor is fine once it is closed in the same edit.
+    await pg.query("update public.templates set credits_cost = credits_cost || '{\"4k\": 1}' where id = $1", [ids[3]])
+    const saved = await bulkEditTemplates(client, admin, { ids: pair, patch: { closeResolutions: ['2k', '4k'] } }, CREDITS_FLOOR)
+    expect(saved).toEqual({ changed: 2, failures: [] })
+    for (const id of pair) expect(await closed(id)).toEqual(['2k', '4k'])
+    const none = await bulkEditTemplates(client, admin, { ids: pair, patch: { closeResolutions: ['1k'] } }, CREDITS_FLOOR)
+    expect(none.failures).toEqual(pair.map((id) => ({ id, name: id, reason: 'no_tier' })))
+    expect(await closed(ids[4]!)).toEqual(['2k', '4k'])
+    await expect(bulkEditTemplates(client, admin, { ids: pair, patch: { creditsCost: { '2k': 4 }, closeResolutions: ['2k'] } }, CREDITS_FLOOR))
+      .rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(pg.query('select public.admin_bulk_edit_templates($1, $2, $3, $4, $5)',
+      [pair, { credits_cost: { '2k': 4 }, close_resolutions: ['2k'] }, CREDITS_FLOOR, admin, LOCALES])).rejects.toThrow(/INVALID_INPUT/)
+    // Pricing a closed tier reopens it, as before.
+    expect(await bulkEditTemplates(client, admin, { ids: [ids[4]!], patch: { creditsCost: { '2k': 4 } } }, CREDITS_FLOOR)).toEqual({ changed: 1, failures: [] })
+    expect(await closed(ids[4]!)).toEqual(['4k'])
+  })
+
   it('still resolves the four named arguments sent by the T85 admin server', async () => {
     const id = 'test-bulkedit-nope'
     const { data, error } = await client.rpc('admin_bulk_edit_templates', {

@@ -1,4 +1,5 @@
 import { FULL_IMAGE_OPTIONS, type ImageOptions } from '@/core/templates/image-options'
+import { imagesPerSet, setCredits } from '@/core/templates/set-price'
 import type { CopyFieldType, CoverMediaType, CreditsCost, LocalizedTemplate, ToggleConfirm } from '@/core/templates'
 
 // What the browser needs of a template to draw its card, preview and workspace header. Plain
@@ -22,6 +23,8 @@ export type CatalogueTemplate = {
   photoInput?: 'required' | 'optional' | 'none'
   imageOptions?: ImageOptions
   creditsCost: CreditsCost
+  // Images one run makes, when more than one (a poster set's pages); prices show that set's total.
+  imagesPerSet?: number
   // Text the template asks for (a headline, a price); most templates have none (DESIGN §4.3).
   copyFields: CatalogueCopyField[]
   // On/off options (T89), off by default, in the page's language; [] for most templates.
@@ -83,6 +86,7 @@ export function toCatalogueTemplate(template: LocalizedTemplate): CatalogueTempl
     photoInput: template.fields.images.max === 0 ? 'none' : template.fields.images.min === 0 ? 'optional' : 'required',
     imageOptions: template.imageOptions ?? FULL_IMAGE_OPTIONS,
     creditsCost: template.creditsCost,
+    ...(imagesPerSet(template.fields) > 1 ? { imagesPerSet: imagesPerSet(template.fields) } : {}),
     copyFields: template.fields.copy.map(toCatalogueCopy),
     imageSlots: (template.fields.images.slots ?? []).map(({ key, label, help, required, note }) => ({ key, label, required, ...(help ? { help } : {}), ...(note ? { note } : {}) })),
     ...catalogueGroups(template.fields.groups),
@@ -147,10 +151,11 @@ export function categoriesOf(templates: readonly CatalogueTemplate[]): Catalogue
     .map((template) => ({ key: template.category, name: template.categoryName }))
 }
 
+// The cheapest offered tier, for one run (a whole set for a multi-image template).
 export function cardPrice(template: CatalogueTemplate) {
   const options = template.imageOptions ?? FULL_IMAGE_OPTIONS
   if ((!options.originalRatio && !options.aspectRatios.length) || !options.resolutions.length) return null
-  return Math.min(...options.resolutions.map((tier) => template.creditsCost[tier]))
+  return Math.min(...options.resolutions.map((tier) => setCredits(template.creditsCost[tier], template.imagesPerSet)))
 }
 
 // A motion card plays only with both its file and its poster (the table check guarantees it).

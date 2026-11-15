@@ -64,7 +64,7 @@ export function PickerRow({ template, chosen, onSelect, thumb }: RowProps) {
         <b>{template.name}</b>
         {template.description ? <small>{template.description}</small> : null}
       </span>
-      {cost !== null ? <span className="mk-cost">{t('fromCredits', { count: cost })}</span> : null}
+      {cost !== null ? <span className="mk-cost">{t(template.imagesPerSet ? 'fromCreditsSet' : 'fromCredits', { count: cost, images: template.imagesPerSet ?? 1 })}</span> : null}
     </button>
   )
 }

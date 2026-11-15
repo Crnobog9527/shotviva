@@ -32,6 +32,11 @@ describe('catalogue helpers', () => {
     expect(cardPrice({ ...tpl('a', 'x'), creditsCost: { '1k': 1, '2k': 2, '4k': 3 } })).toBe(1)
   })
 
+  it('prices a multi-image template for the whole set, over the tiers it offers', () => {
+    const set = { ...tpl('p', 'x'), imagesPerSet: 2, imageOptions: { resolutions: ['2k' as const], aspectRatios: ['1:2' as const], originalRatio: false } }
+    expect(cardPrice(set)).toBe(8)
+  })
+
   it('treats a card as motion only with its file and poster', () => {
     expect(isMotion(tpl('v', 'x', { type: 'video', motion: 'https://a/v.mp4', poster: 'https://a/p.webp' }))).toBe(true)
     expect(isMotion(tpl('v', 'x', { type: 'video', motion: null, poster: 'https://a/p.webp' }))).toBe(false)

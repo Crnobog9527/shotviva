@@ -280,3 +280,20 @@ it('rolls back a live sync and its receipt when the submitted floor understates 
     await db.query("update public.ai_providers set estimated_image_costs='{}' where id=$1", [providerId])
   }
 })
+
+// Offered resolutions (1561): the test site's closed tiers reach production with the template;
+// no sale row on the test site sends no key, so production keeps its own.
+it('carries the closed tiers with the template, and only when the source has them', async () => {
+  const template = fixture()
+  expect(await write(await prepare(template, 'tiers-seed'))).toEqual(ok(1))
+  const closed = async () => (await db.query('select unpriced_resolutions from public.template_sale_approvals where template_id=$1', [template.id])).rows[0]?.unpriced_resolutions
+  await db.query('delete from public.template_sale_approvals where template_id=$1', [template.id])
+  expect((await source(template.id)).data.template).not.toHaveProperty('unpriced_resolutions')
+  await db.query("insert into public.template_sale_approvals(template_id,unpriced_resolutions) values ($1, array['2k','4k'])", [template.id])
+  const read = (await source(template.id)).data.template
+  expect(read.unpriced_resolutions).toEqual(['2k', '4k'])
+  // Production opened every tier; the sync closes the two the test site closed.
+  await db.query("update public.template_sale_approvals set unpriced_resolutions='{}' where template_id=$1", [template.id])
+  expect(await write(await prepare({ ...template, unpriced_resolutions: read.unpriced_resolutions } as never, 'tiers-sync'))).toEqual(ok(2))
+  expect(await closed()).toEqual(['2k', '4k'])
+})
