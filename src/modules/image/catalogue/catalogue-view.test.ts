@@ -65,6 +65,14 @@ describe('Create grid entries (T102)', () => {
     expect(buildCatalogueView(index, templates, true).filters[0]).toMatchObject({ name: 'food 中', intro: '菜品' })
   })
 
+  it('keeps a category with only a series card and no individual member cards', () => {
+    const onlySeries = { ...index, entries: [index.entries[0]] }
+    const result = buildCatalogueView(onlySeries, [template('m1'), template('m2')], true)
+    expect(result.entries).toHaveLength(1)
+    expect(result.entries[0]).toMatchObject({ type: 'series', series: { members: [{ id: 'm2' }, { id: 'm1' }] } })
+    expect(result.filters[0].children[0].slug).toBe('dark')
+  })
+
   it('falls back to the flat list by root category when the index read failed', () => {
     const flat = buildCatalogueView(null, [template('t1'), template('t2', 'pets')], false)
     expect(flat.filters.map((f) => f.slug)).toEqual(['food', 'pets'])
