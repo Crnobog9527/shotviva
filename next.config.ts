@@ -7,6 +7,7 @@ import { rawPublicEnv } from './src/core/public-env'
 import { parsePublicEnv } from './src/core/public-env-schema'
 import { indexingOpen, parseIndexingEnv, xRobotsTagRules } from './src/core/seo/indexing-env'
 import { legacyUserRedirects } from './src/core/admin/users/legacy-redirects'
+import { securityHeaderRules } from './src/core/security/response-headers'
 import { legacyHelpRedirects } from './src/core/support/legacy-redirects'
 import { assetsHeaders, assetsRemotePatterns, assetsRewrites, readAssetsEnv } from './src/core/storage/assets-env'
 import { SITE_DOMAIN } from './src/site/domain'
@@ -81,6 +82,7 @@ const nextConfig: NextConfig = {
   // LICENSE.pdf keep the default caching.
   async headers() {
     return [
+      ...securityHeaderRules(publicEnvAtBuild, process.env.VERCEL_ENV !== 'production' && process.env.NODE_ENV !== 'development'),
       ...xRobotsTagRules(indexingIsOpen, SITE_DOMAIN),
       ...assetsHeaders(),
       {
