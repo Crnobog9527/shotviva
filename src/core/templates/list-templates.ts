@@ -24,11 +24,11 @@ function partnerRow(row: CatalogueRow): Template[] {
   }]
 }
 
-function legacyList(db: SupabaseClient, surface: TemplateSurface, id?: string) {
+function legacyList(db: SupabaseClient, surface: TemplateSurface, id: string | undefined, from: number, to: number) {
   return selectTemplates<CatalogueRow[]>(columns => {
     const query = db.from('templates').select(columns).eq('is_active', true).contains('visible_in', [surface])
     if (id) query.eq('id', id)
-    return query.order('sort_order').order('id').returns<CatalogueRow[]>()
+    return query.order('sort_order').order('id').range(from, to).returns<CatalogueRow[]>()
   }, surface === 'partner' ? ',partner_image_aspects' : '')
 }
 
@@ -36,24 +36,30 @@ function legacyList(db: SupabaseClient, surface: TemplateSurface, id?: string) {
 // they stay out of the catalogue, the home page and batches. A lookup by id finds either kind.
 type WebLookup = { id?: string; includeSeriesMembers?: boolean; posters?: boolean }
 
-async function catalogueRows(db: SupabaseClient, surface: TemplateSurface, lookup: WebLookup) {
+async function cataloguePage(db: SupabaseClient, surface: TemplateSurface, lookup: WebLookup, from: number, to: number) {
   if (surface === 'web') {
     const result = await db.rpc('web_templates', { p_template_id: lookup.id ?? null, p_include_members: lookup.includeSeriesMembers ?? false }).select(TEMPLATE_COLUMNS)
-      .order('sort_order').order('id').returns<CatalogueRow[]>()
+      .order('sort_order').order('id').range(from, to).returns<CatalogueRow[]>()
     if (result.error?.code !== 'PGRST202') return result
   } else {
     const result = await db.from('templates').select(TEMPLATE_COLUMNS + ',partner_image_aspects,category_path,template_series(id,slug,name_en,is_active)')
-      .eq('is_active', true).contains('visible_in', [surface]).order('sort_order').order('id').returns<CatalogueRow[]>()
+      .eq('is_active', true).contains('visible_in', [surface]).order('sort_order').order('id').range(from, to).returns<CatalogueRow[]>()
     if (!result.error || !['PGRST200', '42703'].includes(result.error.code)) return result
   }
   // Deployment restored onto the pre-taxonomy schema.
-  return legacyList(db, surface, lookup.id)
+  return legacyList(db, surface, lookup.id, from, to)
 }
 
 export async function listTemplates(db: SupabaseClient, surface: TemplateSurface, lookup: WebLookup = {}): Promise<Template[]> {
-  const { data, error } = await catalogueRows(db, surface, lookup)
-  if (error || !Array.isArray(data)) throw new Error(`listTemplates failed: ${error?.message ?? 'no data'}`)
-  return surface === 'partner' ? data.flatMap(partnerRow) : data.map(toTemplate)
+  const rows: CatalogueRow[] = []
+  const pageSize = 500
+  for (;;) {
+    const { data, error } = await cataloguePage(db, surface, lookup, rows.length, rows.length + pageSize - 1)
+    if (error || !Array.isArray(data)) throw new Error(`listTemplates failed: ${error?.message ?? 'no data'}`)
+    rows.push(...data)
+    if (data.length < pageSize) break
+  }
+  return surface === 'partner' ? rows.flatMap(partnerRow) : rows.map(toTemplate)
 }
 
 // Passing an id opens a visible series member in the workspace even when its series hides individual cards.

@@ -12,6 +12,7 @@ as $$
 declare
   v_ids text[] := coalesce(p_ids, '{}');
 begin
+  lock table public.templates in share row exclusive mode;
   if cardinality(v_ids) <> (select count(distinct id) from unnest(v_ids) as u(id)) then
     raise exception 'featured templates must not repeat' using errcode = '22023';
   end if;
@@ -32,3 +33,24 @@ begin
 end;
 $$;
 
+
+-- Compare and save under the same lock used by featured reordering and all template writes.
+create function public.admin_set_featured_templates(p_ids text[], p_expected_ids text[])
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_current text[];
+begin
+  lock table public.templates in share row exclusive mode;
+  select coalesce(array_agg(id order by featured_rank), '{}'::text[]) into v_current
+  from public.templates where featured_rank is not null;
+  if v_current is distinct from p_expected_ids then
+    raise exception 'FEATURED_CONFLICT' using errcode = '40001';
+  end if;
+  perform public.admin_set_featured_templates(p_ids);
+end;
+$$;
+revoke execute on function public.admin_set_featured_templates(text[], text[]) from public, anon, authenticated;
+grant execute on function public.admin_set_featured_templates(text[], text[]) to service_role;

@@ -35,12 +35,16 @@ const rowSchema = z.array(z.object({
 
 // One read: the current featured rows and the ticked ones (primary key and the featured_rank filter).
 async function loadRows(client: SupabaseClient, ids: readonly string[]) {
-  const { data, error } = await client
-    .from('templates')
-    .select('id, name, is_active, visible_in, featured_rank')
-    .or(`featured_rank.not.is.null,id.in.(${ids.join(',')})`)
-  if (error) throw new AppError('INTERNAL', `bulk featured read failed: ${error.message}`)
-  return rowSchema.parse(data)
+  const rows: z.infer<typeof rowSchema> = []
+  const pageSize = 500
+  for (;;) {
+    const { data, error } = await client.from('templates').select('id, name, is_active, visible_in, featured_rank')
+      .or(`featured_rank.not.is.null,id.in.(${ids.join(',')})`).order('id').range(rows.length, rows.length + pageSize - 1)
+    if (error) throw new AppError('INTERNAL', `bulk featured read failed: ${error.message}`)
+    const page = rowSchema.parse(data)
+    rows.push(...page)
+    if (page.length < pageSize) return rows
+  }
 }
 
 const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((value, i) => value === b[i])
@@ -61,7 +65,7 @@ export async function setTemplatesFeatured(client: SupabaseClient, adminId: stri
     return row ? { id: row.id, name: row.name, isActive: row.is_active, visibleIn: row.visible_in } : { id: ticked, name: ticked, missing: true as const }
   }), featured)
   if (planBlocked(plan) || plan.changed.length === 0) return plan
-  await repo.setFeaturedTemplates(client, plan.next)
+  await repo.setFeaturedTemplates(client, plan.next, expectedIds)
   // One line per template, like the 上架 switch and the batch edit: who put what on the home page.
   for (const template of plan.changed) logger.info('admin.template.featured_changed', { adminId, templateId: template.id, featured })
   return plan

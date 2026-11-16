@@ -76,6 +76,12 @@ describe('home featured templates', () => {
     await setFeaturedTemplates(client, ADMIN_ID, [A, C, B])
   })
 
+  it('rejects a stale list atomically and preserves the newer selection', async () => {
+    await expect(setFeaturedTemplates(client, ADMIN_ID, { ids: [A], expectedIds: [A, B] }))
+      .rejects.toMatchObject({ code: 'CONFLICT' })
+    expect(await ranks()).toMatchObject({ [A]: 1, [C]: 2, [B]: 3 })
+  })
+
   it('refuses repeats and unpublished templates, changing nothing', async () => {
     await expect(setFeaturedTemplates(client, ADMIN_ID, [A, A])).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     await expect(setFeaturedTemplates(client, ADMIN_ID, [A, HIDDEN])).rejects.toMatchObject({ code: 'INVALID_INPUT' })

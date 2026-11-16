@@ -13,7 +13,8 @@ const row = (id: string, rank: number | null, over: Partial<Row> = {}): Row => (
 
 // The one read: .from('templates').select(…).or(…) resolves to these rows; the filter is recorded.
 function fakeClient(rows: Row[]) {
-  const or = vi.fn().mockResolvedValue({ data: rows, error: null })
+  const range = vi.fn(async (from: number, to: number) => ({ data: rows.slice(from, to + 1), error: null }))
+  const or = vi.fn(() => ({ order: () => ({ range }) }))
   const client = { from: () => ({ select: () => ({ or }) }) } as unknown as SupabaseClient
   return { client, or }
 }
@@ -28,7 +29,7 @@ describe('setTemplatesFeatured', () => {
     const { client, or } = fakeClient([row('a', 1), row('b', 2), row('c', null), row('d', null)])
     const plan = await setTemplatesFeatured(client, 'admin-1', { ids: ['c', 'a', 'd'], featured: true, expectedIds: ['a', 'b'] })
     expect(or).toHaveBeenCalledWith('featured_rank.not.is.null,id.in.(c,a,d)')
-    expect(repo.setFeaturedTemplates).toHaveBeenCalledExactlyOnceWith(client, ['a', 'b', 'c', 'd'])
+    expect(repo.setFeaturedTemplates).toHaveBeenCalledExactlyOnceWith(client, ['a', 'b', 'c', 'd'], ['a', 'b'])
     expect(plan.unchanged.map((item) => item.id)).toEqual(['a'])
     expect(logger.info.mock.calls).toEqual([
       ['admin.template.featured_changed', { adminId: 'admin-1', templateId: 'c', featured: true }],
@@ -55,13 +56,22 @@ describe('setTemplatesFeatured', () => {
     const { client } = fakeClient([...full, row('x', null)])
     const plan = await setTemplatesFeatured(client, 'admin-1', { ids: ['x'], featured: true, expectedIds: full.map((r) => r.id) })
     expect(plan.next).toHaveLength(13)
-    expect(repo.setFeaturedTemplates).toHaveBeenCalledWith(client, [...full.map((r) => r.id), 'x'])
+    expect(repo.setFeaturedTemplates).toHaveBeenCalledWith(client, [...full.map((r) => r.id), 'x'], full.map((r) => r.id))
+  })
+
+  it('detects a stale page when more than 1000 templates are featured', async () => {
+    const all = Array.from({ length: 1001 }, (_, i) => row(`f${i.toString().padStart(4, '0')}`, i + 1))
+    const { client } = fakeClient([...all, row('x', null)])
+    await expect(setTemplatesFeatured(client, 'admin-1', {
+      ids: ['x'], featured: true, expectedIds: all.slice(0, 1000).map((r) => r.id),
+    })).rejects.toMatchObject({ code: 'CONFLICT' })
+    expect(repo.setFeaturedTemplates).not.toHaveBeenCalled()
   })
 
   it('clears the ticked ones and keeps the order of the rest', async () => {
     const { client } = fakeClient([row('a', 1), row('b', 2), row('c', 3)])
     await setTemplatesFeatured(client, 'admin-1', { ids: ['b'], featured: false, expectedIds: ['a', 'b', 'c'] })
-    expect(repo.setFeaturedTemplates).toHaveBeenCalledWith(client, ['a', 'c'])
+    expect(repo.setFeaturedTemplates).toHaveBeenCalledWith(client, ['a', 'c'], ['a', 'b', 'c'])
   })
 
   it('rejects ids that are not template slugs before building the filter', async () => {
