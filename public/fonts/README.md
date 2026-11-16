@@ -11,6 +11,11 @@ The version and copyright for each file below are read from that file's own `nam
 | `public/fonts/instrument-serif/instrument-serif-<hash>.woff2` | Instrument Serif Regular | 1.000 | [Instrument/instrument-serif](https://github.com/Instrument/instrument-serif) | OFL 1.1, see [`OFL.txt`](instrument-serif/OFL.txt) next to the files |
 | `public/fonts/instrument-serif/instrument-serif-italic-<hash>.woff2` | Instrument Serif Italic | 1.000 | [Instrument/instrument-serif](https://github.com/Instrument/instrument-serif) | OFL 1.1, see [`OFL.txt`](instrument-serif/OFL.txt) next to the files |
 
+The `geist-mono-ui-<hash>.woff2` file is a subset of the Geist Mono file above. It keeps its
+variable weights, namespace and license. To regenerate it with FontTools' `pyftsubset`, use
+`--flavor=woff2 --name-IDs='*' --unicodes='U+0020-007E,U+00A0,U+00B7,U+00D7,U+2000-200B,U+2010-2027,U+202F,U+2212'`.
+Keep the complementary range in `geist-fonts.tsx` in sync with the original font's cmap.
+
 ## License files
 
 - **`geist/OFL.txt`** starts with the copyright line embedded in the Geist and Geist Mono files above: "Copyright 2024 The Geist Project Authors". The file is verbatim from Google Fonts (`google/fonts`, `ofl/geist/OFL.txt`; `ofl/geistmono/OFL.txt` is identical). Its license body matches `OFL.txt` in vercel/geist-font. That repo's current `OFL.txt` says "Copyright 2026" because it covers newer releases. If the font files are ever updated, take the license text from the same release.

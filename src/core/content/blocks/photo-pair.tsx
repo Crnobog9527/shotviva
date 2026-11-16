@@ -18,6 +18,7 @@ type Props = {
   // here made every plate download at twice the pixels it shows.
   sizes: string
   className?: string
+  decorative?: boolean
 }
 
 // The side-by-side pair (DESIGN §6.9 item 1): the phone photo on the left, the AI result on the
@@ -45,14 +46,14 @@ export function BeforePane({ image, preload, sizes }: { image: ImageRef; preload
   )
 }
 
-export function PhotoPair({ before, after, size = 'card', preload = false, sizes, className }: Props) {
+export function PhotoPair({ before, after, size = 'card', preload = false, sizes, className, decorative }: Props) {
   const t = useTranslations('marketing.home')
   return (
-    <span className={cn('mk-pair', size === 'lg' && 'mk-pair-lg', className)}>
-      <BeforePane image={before} preload={preload} sizes={sizes} />
+    <span className={cn('mk-pair', size === 'lg' && 'mk-pair-lg', className)} aria-hidden={decorative || undefined}>
+      <BeforePane image={decorative ? { ...before, alt: '' } : before} preload={preload} sizes={sizes} />
       <span className="mk-pane">
         <Image className="mk-ph" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" />
-        <WhiteGroundImage className="mk-a" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} {...afterLoading(preload)} />
+        <WhiteGroundImage className="mk-a" src={after.src} alt={decorative ? '' : after.alt} width={after.width} height={after.height} sizes={sizes} {...afterLoading(preload)} />
         <span className="mk-ws" aria-hidden />
       </span>
       <span className="mk-hl" aria-hidden />
