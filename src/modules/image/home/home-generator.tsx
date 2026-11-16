@@ -2,33 +2,32 @@
 
 import { useTranslations } from 'next-intl'
 import dynamic from 'next/dynamic'
-import { useCallback, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 
-import { trackTemplateView } from '@/core/analytics/browser'
 import type { FormAction } from '@/core/auth/ui'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
 import { allowsNoPhoto, isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
-import { FavoritesProvider } from '../favorites/favorites-provider'
-import { FavoriteReturn } from '../favorites/favorite-return-effect'
 import type { HomeViewer } from './home-cta'
 import type { HomeCatalogueSource } from './home-catalogue'
 import { HomeDock } from './home-dock'
 import { HomePanel, type InitialCovers } from './home-panel'
-import { sampleFor, thumbFor } from './home-samples'
+import { thumbFor } from './home-samples'
 import { useGeneratorAway } from './use-generator-away'
 import { useHeaderUpload } from './use-header-upload'
 import { useHomeCatalogue } from './use-home-catalogue'
 import { useHomeGenerator } from './use-home-generator'
 import { useOpenFromQuery, usePickEvents } from './use-pick-events'
+import { HomeViewerContext } from './home-viewer-feed'
+import { HomeFavoritesSlot } from './home-favorites-slot'
 
 export type HomeGeneratorProps = {
   // On home this is only the opening template and the rail. Landing pages supply their catalogue.
   templates: CatalogueTemplate[]
   catalogue: HomeCatalogueSource
   defaultId: string | null
-  // null: signed out (or not known yet while the page streams).
-  viewer: HomeViewer | null
+  // The request-time visitor data streams into the shared panel.
+  viewerSlot: ReactNode
   googleAction: FormAction
   // This home page in its language ('/' or '/zh'): where sign-in comes back to.
   homePath: string
@@ -40,7 +39,6 @@ export type HomeGeneratorProps = {
 }
 
 // Both dialogs are used after the corresponding action, and never rendered in the initial panel.
-const TemplatePicker = dynamic(() => import('./template-picker').then((m) => m.TemplatePicker), { ssr: false })
 const SignupSheet = dynamic(() => import('./signup-sheet').then((m) => m.SignupSheet), { ssr: false })
 
 const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth')
@@ -49,13 +47,16 @@ const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matc
 // stacked on phones and two columns from 1024px (home-panel.tsx). Signed in it starts the photo through the workspace's own
 // pipeline and moves to that template's workspace; signed out it keeps the setup in this
 // browser and asks for an account.
-export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, googleAction, homePath, freeImages, initialCovers }: HomeGeneratorProps) {
+export function HomeGenerator({ templates: all, catalogue, defaultId, viewerSlot, googleAction, homePath, freeImages, initialCovers }: HomeGeneratorProps) {
   // The panel has one upload card: a template with named image slots (§5.1e) opens in its own
   // workspace instead, never here.
+  const [resolvedViewer, setResolvedViewer] = useState<{ viewer: HomeViewer | null } | null>(null)
+  const viewer = resolvedViewer?.viewer ?? null
+  const setViewer = useCallback((next: HomeViewer | null) => setResolvedViewer({ viewer: next }), [])
   const templates = useMemo(() => all.filter((template) => !isSlotTemplate(template)), [all])
   const t = useTranslations('home.generator')
   const picker = useHomeCatalogue(templates, catalogue)
-  const state = useHomeGenerator({ templates, defaultId, viewer, find: picker.find })
+  const state = useHomeGenerator({ templates, defaultId, viewer, viewerKnown: resolvedViewer !== null, find: picker.find })
   const [pickerOn, setPickerOn] = useState<string | null>(null)
   // Null means it has never opened. Afterwards the sheet owns its exit animation and focus.
   const [signUp, setSignUp] = useState<boolean | null>(null)
@@ -99,9 +100,9 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, go
   // Signed in, the picker's hearts save on the visitor's account; signed out a heart goes to
   // sign-in and comes back here to save it (T83).
   return (
-    <FavoritesProvider initialIds={viewer?.favoriteIds ?? []} signedIn={viewer !== null} returnTo={homePath}>
+    <HomeViewerContext.Provider value={setViewer}>
     <div className="mk-generator">
-      <FavoriteReturn signedIn={viewer !== null} find={picker.find} onSaved={onPreview} />
+      {viewerSlot}
       <HomePanel ref={panel} initialCovers={initialCovers} thumbOf={thumbFor} {...shared} />
       {/* Visually hidden, not display:none: the primary is a <label for> it, which some phone
           browsers (Huawei, older iOS) ignore when the input is display:none or clicked from JS. */}
@@ -119,23 +120,10 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, go
           event.currentTarget.value = ''
         }}
       />
-      {pickerOn !== null && <TemplatePicker
-        openOn={pickerOn}
-        catalogue={picker.data}
-        failed={picker.failed}
-        onRetry={picker.open}
-        onClose={() => setPickerOn(null)}
-        onPick={(picked) => {
-          setPickerOn(null)
-          trackTemplateView(picked, 'home_picker')
-          onPick(picked.id)
-        }}
-        sampleOf={sampleFor}
-        thumbOf={thumbFor}
-      />}
+      <HomeFavoritesSlot viewer={resolvedViewer} homePath={homePath} picker={picker} pickerOn={pickerOn} setPickerOn={setPickerOn} onPreview={onPreview} onPick={onPick} />
       {!viewer && signUp !== null && <SignupSheet open={signUp} onOpenChange={setSignUp} googleAction={googleAction} next={homePath} gift={freeImages} />}
       <HomeDock show={away && !footer} canStartWithoutPicking={canStartWithoutPicking} onClick={bring} />
     </div>
-    </FavoritesProvider>
+    </HomeViewerContext.Provider>
   )
 }

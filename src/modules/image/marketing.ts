@@ -5,6 +5,7 @@
 export { toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalogue-template'
 export { pickerBrowse } from './catalogue/picker-browse'
 export { HomeGenerator } from './home/home-generator-island'
+export { HomeViewerFeed } from './home/home-viewer-feed'
 export type { HomeGeneratorProps } from './home/home-generator'
 export { HomeDraftNote } from './home/home-draft-note'
 export type { HomeViewer } from './home/home-cta'

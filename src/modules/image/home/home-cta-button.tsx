@@ -1,9 +1,8 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 
-import { PaywallButton } from '@/core/billing/paywall/provider'
 import { Link } from '@/core/i18n/ui'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 import { cn } from '@/core/ui/cn'
@@ -30,6 +29,14 @@ const PRIMARY = 'mk-cta'
 export function HomeCtaButton({ cta, templateId, onPhotoPicked, onSignUp, onGenerate }: Props) {
   const t = useTranslations('app.workspace')
   const home = useTranslations('home.generator')
+  const initialInput = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    const input = initialInput.current
+    const file = input?.files?.[0]
+    if (!file || !input) return
+    onPhotoPicked(file)
+    input.value = ''
+  }, [onPhotoPicked])
   const generate = (count: number) => t.rich('generateCta', { cost: costTag, count })
   switch (cta.kind) {
     case 'pick-photo':
@@ -37,6 +44,7 @@ export function HomeCtaButton({ cta, templateId, onPhotoPicked, onSignUp, onGene
         <label className={cn(PRIMARY, 'mk-upload-cta')}>
           {/* The native label opens the picker on touch; the input handles Tab, Enter and Space. */}
           <input
+            ref={initialInput}
             type="file"
             accept={UPLOAD_ACCEPT}
             className="sr-only"
@@ -66,9 +74,9 @@ export function HomeCtaButton({ cta, templateId, onPhotoPicked, onSignUp, onGene
       )
     case 'get-credits':
       return (
-        <PaywallButton trigger="insufficient_credits" className={cn(PRIMARY, 'mk-cta-neutral')}>
+        <button type="button" onClick={() => window.dispatchEvent(new Event('shotviva:home-paywall'))} className={cn(PRIMARY, 'mk-cta-neutral')}>
           <span>{t.rich('getCreditsCta', { cost: costTag, mono, count: cta.needed })}</span>
-        </PaywallButton>
+        </button>
       )
     case 'needs-copy':
       return templateId ? (
