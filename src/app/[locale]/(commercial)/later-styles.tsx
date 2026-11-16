@@ -19,7 +19,6 @@ export function CommercialLaterStyles() {
     document.head.appendChild(link)
   }, [])
   return <>
-    <link rel="preload" as="style" href={HREF} />
     <script dangerouslySetInnerHTML={{ __html: INSERT }} />
     <noscript><link rel="stylesheet" href={HREF} /></noscript>
   </>
