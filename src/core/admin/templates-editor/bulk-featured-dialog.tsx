@@ -3,7 +3,7 @@
 import { Button } from '@/core/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/core/ui/dialog'
 
-import { describeFeaturedFailure, FEATURED_LIMIT, planBlocked, planFeaturedChange, type FeaturedPlan } from '../templates/bulk-featured-rules'
+import { describeFeaturedFailure, planBlocked, planFeaturedChange, type FeaturedPlan } from '../templates/bulk-featured-rules'
 import type { AdminTemplate } from '../templates/types'
 import { bulkCopy, bulkFeaturedCopy as copy } from './copy'
 import type { BulkFeatured } from './use-bulk-featured'
@@ -66,10 +66,10 @@ function PlanList({ plan, nameOf }: { plan: FeaturedPlan; nameOf: (id: string) =
 }
 
 function PlanVerdict({ plan, before }: { plan: FeaturedPlan; before: number }) {
-  const problem = plan.failures.length > 0 ? copy.blocked : plan.over > 0 ? copy.over(plan.over, FEATURED_LIMIT) : null
+  const problem = plan.failures.length > 0 ? copy.blocked : null
   return (
     <div className="grid gap-1 text-sm">
-      <p className="tabular-nums">{copy.count(before, plan.next.length, FEATURED_LIMIT)}</p>
+      <p className="tabular-nums">{copy.count(before, plan.next.length)}</p>
       {problem ? <p role="alert" className="text-destructive">{problem}</p> : null}
       {!problem && plan.changed.length === 0 ? <p className="text-muted-foreground">{copy.nothing(plan.featured)}</p> : null}
     </div>

@@ -33,6 +33,11 @@ describe('featured templates from the database', () => {
     expect(featuredTemplates(rows).map((t) => t.id)).toEqual(['c', 'a'])
   })
 
+  it('keeps all featured templates beyond the former limit', () => {
+    const rows = Array.from({ length: 15 }, (_, i) => live(`many-${i}`, 'pets', { rank: i + 1 }))
+    expect(featuredSections(rows).categories.flatMap((c) => c.templates)).toHaveLength(15)
+  })
+
   it('falls back to the six most recently published when nothing is featured', () => {
     const rows = Array.from({ length: 8 }, (_, i) => live(`t${i}`, 'pets'))
     expect(featuredTemplates(rows).map((t) => t.id)).toEqual(['t7', 't6', 't5', 't4', 't3', 't2'].slice(0, FALLBACK_COUNT))
