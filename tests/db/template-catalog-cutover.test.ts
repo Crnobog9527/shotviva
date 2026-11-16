@@ -98,6 +98,22 @@ describe('activated template prices', () => {
     await refuses(() => db.query('select admin.rollback_template_price_catalog_v2()'),'TEMPLATE_CATALOG_HAS_NEW_JOBS')
   })
 
+  it('sells edit at the approved 15 / 20 and still refuses anything under it', async () => {
+    await activate()
+    const tariffs = (await db.query('select admin.template_catalog_minimums() m')).rows[0].m
+    expect(tariffs.edit.costs).toEqual({ '1k': 15, '2k': 20, '4k': 58 })
+    // Only the edit row moved: the other tariffs are the ones the cutover shipped with.
+    expect(tariffs.freeform.costs).toEqual(costs)
+    expect((await db.query("select credits_cost c from public.templates where id='edit'")).rows[0].c).toEqual(tariffs.edit.costs)
+    const save = (one: number, two: number) => db.query('update public.templates set credits_cost=$1 where id=$2',
+      [{ '1k': one, '2k': two, '4k': 98 }, 'edit'])
+    await save(15, 20)
+    await refuses(() => save(14, 20), 'MODEL_CREDIT_FLOOR')
+    await refuses(() => save(15, 19), 'MODEL_CREDIT_FLOOR')
+    await refuses(() => save(14, 19), 'MODEL_CREDIT_FLOOR')
+    expect((await db.query("select credits_cost c from public.templates where id='edit'")).rows[0].c).toEqual({ '1k': 15, '2k': 20, '4k': 98 })
+  })
+
   it('retains approved live tariffs and refuses an old-price non-catalogue publication at commit', async () => {
     await activate()
     await db.query('set constraints template_publish_floor, prompt_publish_floor immediate')
