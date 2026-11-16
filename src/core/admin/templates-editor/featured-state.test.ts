@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { AdminTemplate } from '../templates/types'
-import { canFeature, FEATURED_LIMIT, featuredIds, toggleFeatured } from './featured-state'
+import { canFeature, featuredIds, toggleFeatured } from './featured-state'
 
 const make = (id: string, extra: Partial<AdminTemplate> = {}) =>
   ({ id, name: id, isActive: true, visibleIn: ['web'], featuredRank: null, ...extra }) as AdminTemplate
@@ -17,11 +17,11 @@ describe('home featured list (T53)', () => {
     expect(toggleFeatured(['a'], make('a'), true)).toBeNull()
   })
 
-  it('refuses an unpublished or partner-only template, and a 13th one', () => {
+  it('refuses an unpublished or partner-only template but allows a 13th', () => {
     expect(canFeature(make('x', { isActive: false }))).toBe(false)
     expect(canFeature(make('x', { visibleIn: ['partner'] }))).toBe(false)
     expect(toggleFeatured([], make('x', { isActive: false }), true)).toBeNull()
-    const full = Array.from({ length: FEATURED_LIMIT }, (_, i) => `t${i}`)
-    expect(toggleFeatured(full, make('extra'), true)).toBeNull()
+    const full = Array.from({ length: 12 }, (_, i) => `t${i}`)
+    expect(toggleFeatured(full, make('extra'), true)).toHaveLength(13)
   })
 })

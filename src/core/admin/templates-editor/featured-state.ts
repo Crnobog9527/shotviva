@@ -1,9 +1,9 @@
-import { FEATURED_LIMIT, isFeaturable as canFeature } from '../templates/bulk-featured-rules'
+import { isFeaturable as canFeature } from '../templates/bulk-featured-rules'
 import type { AdminTemplate } from '../templates/types'
 
-// The home featured list (T53, ARCHITECTURE §12): at most 12, published web templates only. The
+// The home featured list (T53, ARCHITECTURE §12): published web templates only. The
 // rule lives with the batch plan, so the switch and the bulk bar cannot drift apart.
-export { FEATURED_LIMIT, canFeature }
+export { canFeature }
 
 // The featured ids in display order (featured_rank ascending).
 export function featuredIds(templates: readonly AdminTemplate[]): string[] {
@@ -14,11 +14,11 @@ export function featuredIds(templates: readonly AdminTemplate[]): string[] {
 }
 
 // Switching one on appends it; switching it off drops it. Null when the list would not change
-// or would break the rules (13th template, not published on the web).
+// or would break the rules (not published on the web).
 export function toggleFeatured(ids: readonly string[], template: AdminTemplate, on: boolean): string[] | null {
   const has = ids.includes(template.id)
   if (on === has) return null
   if (!on) return ids.filter((id) => id !== template.id)
-  if (!canFeature(template) || ids.length >= FEATURED_LIMIT) return null
+  if (!canFeature(template)) return null
   return [...ids, template.id]
 }
