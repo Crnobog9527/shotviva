@@ -20,8 +20,9 @@ const SOURCES = ['/home/hero-set-phone.webp', '/home/hero-art-photo.webp', '/hom
 // twice on the home page.
 const WIDTH = 288
 const QUALITY = 45
-// The menu fish photo is busier (steam, chilies, steel): a lower quality keeps it under 9 KB.
-const QUALITY_FOR: Readonly<Record<string, number>> = { '/cases/menu-fish-phone.webp': 38 }
+// The home frame appears in both HTML and hydration data; the full image replaces it on load.
+// The menu fish photo is busier, so its lower quality keeps it under 9 KB.
+const QUALITY_FOR: Readonly<Record<string, number>> = { '/home/hero-set-phone.webp': 25, '/cases/menu-fish-phone.webp': 38 }
 
 async function main() {
   const entries: string[] = []
