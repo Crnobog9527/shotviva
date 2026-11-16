@@ -63,7 +63,19 @@ const nextConfig: NextConfig = {
   // 2.68 -> 1.10 s, /login 2.96 -> 1.20 s (local A/B, PR #622). Global in Next 16.4 (no per-route
   // switch): a signed-in page's first full load carries the app's sheet in its HTML (~28 KB br)
   // instead of a cached file; moves inside the app are unchanged (Next uses <link> for those).
-  experimental: { globalNotFound: true, inlineCss: true },
+  // Fewer initial requests on mobile. This is global: account and generator bundles can grow,
+  // and future builds should recheck both cold loads and navigation caching.
+  experimental: {
+    globalNotFound: true,
+    inlineCss: true,
+    turbopackChunking: {
+      maxChunkCountPerGroup: 2,
+      minChunkSize: 300000,
+      maxMergeChunkSize: 700000,
+      priorityRoutes: [/^\/$/, /^\/zh$/, /^\/x\/hero/, /^\/zh\/x\/hero/],
+      priorityBoost: 5,
+    },
+  },
   // Off for the site as a whole: with it on, every page's HTML also embeds a runtime prefetch
   // of itself (a second copy of the page tree and of the client messages, about 40% of the
   // marketing pages' HTML) and the server renders the page twice to produce it. The signed-in
