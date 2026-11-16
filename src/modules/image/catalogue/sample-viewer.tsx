@@ -8,7 +8,7 @@ import { useRef, useState } from 'react'
 import { coverImage } from '@/core/ui/cover-image'
 import { cn } from '@/core/ui/cn'
 
-import { CloseMark, SideToggle, useSwipe, type ViewerSide } from './sample-viewer-parts'
+import { CloseMark, SideToggle, useViewerGestures, type ViewerSide } from './sample-viewer-parts'
 import { templateImageGestureClass, templateImageGestures } from './template-image-gestures'
 import { useBackToClose } from './use-back-to-close'
 
@@ -58,9 +58,9 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
   const [box, setBox] = useState<Box | null>(null)
   const dismiss = useBackToClose(() => onOpenChange(false))
   const pick = (next: ViewerSide) => (setBox(null), onSide(next))
-  const swipe = useSwipe(box !== null, (direction) => pick(direction === 'left' ? 'ai' : 'phone'))
+  const gestures = useViewerGestures(box !== null, (direction) => pick(direction === 'left' ? 'ai' : 'phone'))
   const toggleZoom = () => {
-    if (swipe.consumed()) return
+    if (gestures.consumeClick()) return
     const rect = frame.current?.getBoundingClientRect()
     setBox((was) => (was || !rect ? null : { width: rect.width, height: rect.height }))
   }
@@ -79,7 +79,7 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
             style={box ? { ...FRAME, ...box } : FRAME}
             className="hairline relative grid place-items-center overflow-hidden rounded-media"
           >
-            <div {...swipe.handlers} {...templateImageGestures} style={box ? SCROLLER : PAN} className={cn('overscroll-contain', templateImageGestureClass)}>
+            <div {...gestures.handlers} {...templateImageGestures} style={box ? SCROLLER : PAN} className={cn('overscroll-contain', templateImageGestureClass)}>
               {(['phone', 'ai'] as const).map((key) => (
                 <img
                   key={key}
