@@ -153,6 +153,11 @@ describe('proxyGate on /zh (ARCHITECTURE §17)', () => {
   })
 })
 
+it('serves the root ARD route without handing it to the locale router', async () => {
+  expect((await gate('/.well-known/ard.json')).headers.get('x-forwarded-to')).toBeNull()
+  expect((await gate('/.well-known/other.json')).headers.get('x-forwarded-to')).toBe('locale-router')
+})
+
 describe('proxyGate on mixed-case addresses', () => {
   it('sends every non-lowercase page address to its lowercase form before any gate', async () => {
     for (const [path, target] of [
