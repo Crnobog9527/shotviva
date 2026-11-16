@@ -8798,6 +8798,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_set_featured_templates"("p_ids" "text
 declare
   v_ids text[] := coalesce(p_ids, '{}');
 begin
+  lock table public.templates in share row exclusive mode;
   if cardinality(v_ids) <> (select count(distinct id) from unnest(v_ids) as u(id)) then
     raise exception 'featured templates must not repeat' using errcode = '22023';
   end if;
@@ -8820,6 +8821,27 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_current text[];
+begin
+  lock table public.templates in share row exclusive mode;
+  select coalesce(array_agg(id order by featured_rank), '{}'::text[]) into v_current
+  from public.templates where featured_rank is not null;
+  if v_current is distinct from p_expected_ids then
+    raise exception 'FEATURED_CONFLICT' using errcode = '40001';
+  end if;
+  perform public.admin_set_featured_templates(p_ids);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_openai_admin_key"("p_key" "text") RETURNS "void"
@@ -20966,6 +20988,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_ke
 
 REVOKE ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) TO "service_role";
 
 
 
