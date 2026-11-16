@@ -36,8 +36,11 @@ export function useHomeCatalogue(templates: readonly CatalogueTemplate[], source
     void load().catch(() => undefined)
   }, [load])
   const find = useCallback(async (id: string) => {
-    const initial = templates.find((template) => template.id === id)
-    return initial ?? (await load()).templates.find((template) => template.id === id) ?? null
-  }, [load, templates])
+    // After the picker has loaded, use the same template data for its preview and the panel.
+    const candidates = data?.templates ?? templates
+    const known = candidates.find((template) => template.id === id)
+    if (known || data) return known ?? null
+    return (await load()).templates.find((template) => template.id === id) ?? null
+  }, [data, load, templates])
   return { data: locale ? data : { templates, browse }, failed, open, find }
 }
