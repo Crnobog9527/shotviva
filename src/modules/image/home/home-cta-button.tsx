@@ -1,9 +1,8 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import type { ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 
-import { PaywallButton } from '@/core/billing/paywall/provider'
 import { Link } from '@/core/i18n/ui'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 import { cn } from '@/core/ui/cn'
@@ -27,25 +26,47 @@ const PRIMARY = 'mk-cta'
 // The generator's one primary (DESIGN §6.9 item 9), with the workspace's own labels:
 // "Generate · 2 credits", "Get credits · N needed" (neutral, opens the paywall), or a disabled
 // state while the photo uploads or a slot is busy.
-export function HomeCtaButton({ cta, templateId, onPhotoPicked, onSignUp, onGenerate }: Props) {
+export function HomeCtaButton(props: Props) {
+  const inputId = useId()
+  const initialInput = useRef<HTMLInputElement>(null)
+  const { onPhotoPicked } = props
+  useEffect(() => {
+    const input = initialInput.current
+    const file = input?.files?.[0]
+    if (!file || !input) return
+    onPhotoPicked(file)
+    input.value = ''
+  }, [onPhotoPicked])
+  const isUpload = props.cta.kind === 'pick-photo'
+  return (
+    <>
+      <input
+        ref={initialInput}
+        id={inputId}
+        type="file"
+        accept={UPLOAD_ACCEPT}
+        className="sr-only"
+        tabIndex={isUpload ? undefined : -1}
+        aria-hidden={isUpload ? undefined : true}
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0]
+          if (file) onPhotoPicked(file)
+          event.currentTarget.value = ''
+        }}
+      />
+      <CtaAction {...props} inputId={inputId} />
+    </>
+  )
+}
+
+function CtaAction({ cta, templateId, onSignUp, onGenerate, inputId }: Props & { inputId: string }) {
   const t = useTranslations('app.workspace')
   const home = useTranslations('home.generator')
   const generate = (count: number) => t.rich('generateCta', { cost: costTag, count })
   switch (cta.kind) {
     case 'pick-photo':
       return (
-        <label className={cn(PRIMARY, 'mk-upload-cta')}>
-          {/* The native label opens the picker on touch; the input handles Tab, Enter and Space. */}
-          <input
-            type="file"
-            accept={UPLOAD_ACCEPT}
-            className="sr-only"
-            onChange={(event) => {
-              const file = event.currentTarget.files?.[0]
-              if (file) onPhotoPicked(file)
-              event.currentTarget.value = ''
-            }}
-          />
+        <label className={cn(PRIMARY, 'mk-upload-cta')} htmlFor={inputId}>
           <CameraIcon />
           <span>{home('uploadPhoto')}</span>
         </label>
@@ -66,9 +87,9 @@ export function HomeCtaButton({ cta, templateId, onPhotoPicked, onSignUp, onGene
       )
     case 'get-credits':
       return (
-        <PaywallButton trigger="insufficient_credits" className={cn(PRIMARY, 'mk-cta-neutral')}>
+        <button type="button" onClick={() => window.dispatchEvent(new Event('shotviva:home-paywall'))} className={cn(PRIMARY, 'mk-cta-neutral')}>
           <span>{t.rich('getCreditsCta', { cost: costTag, mono, count: cta.needed })}</span>
-        </PaywallButton>
+        </button>
       )
     case 'needs-copy':
       return templateId ? (
@@ -84,7 +105,9 @@ export function HomeCtaButton({ cta, templateId, onPhotoPicked, onSignUp, onGene
 function DisabledCta({ kind }: { kind: HomeCta['kind'] }) {
   const t = useTranslations('app.workspace')
   const home = useTranslations('home.generator')
+  const pending = useTranslations('auth.pending')
   const labels = { wait: 'wait', uploading: 'uploadingCta', 'need-size': 'pickSize', 'no-options': 'noOptions' } as const
   const key = labels[kind as keyof typeof labels]
-  return <button type="button" className={cn(PRIMARY, 'mk-cta-idle')} disabled>{key ? t(key) : home('noTemplates')}</button>
+  const label = kind === 'checking-viewer' ? pending('loading') : key ? t(key) : home('noTemplates')
+  return <button type="button" className={cn(PRIMARY, 'mk-cta-idle')} disabled>{label}</button>
 }

@@ -18,6 +18,7 @@ export type HomePhotoStatus = 'none' | 'uploading' | 'ready' | 'error'
 // (cta-state.ts): Get credits · N needed → wait → photo → Generate. Signed out it never
 // charges: no photo asks for one, a photo opens the sign-up prompt.
 export type HomeCta =
+  | { kind: 'checking-viewer' }
   | { kind: 'no-template' }
   | { kind: 'sign-up'; cost: number }
   | { kind: 'pick-photo'; cost: number }
