@@ -66,7 +66,7 @@ export async function cachedPosterTemplates(locale: Locale): Promise<LocalizedTe
   'use cache'
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   cacheLife(CATALOGUE_LIFE)
-  return listTemplatesIn(createAdminSupabase(), locale, { posters: true })
+  return listTemplatesIn(createAdminSupabase(), locale, { posters: true, includeSeriesMembers: true })
 }
 
 type TemplateReads = {
