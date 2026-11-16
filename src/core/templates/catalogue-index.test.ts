@@ -8,7 +8,7 @@ vi.mock('./list-templates', () => ({ listTemplatesIn }))
 
 const { logger } = await import('../logger')
 const { FAILED_READ_LIFE } = await import('../cache-life')
-const { CATALOGUE_LIFE, readCatalogue } = await import('./cached-catalogue')
+const { CATALOGUE_LIFE, readCatalogue, cachedPosterTemplates } = await import('./cached-catalogue')
 const { catalogueIndexOrNull } = await import('./cached-taxonomy')
 const { toCatalogueIndex } = await import('./catalogue-index')
 
@@ -64,4 +64,9 @@ describe('web catalogue for marketing pages', () => {
     await readCatalogue('zh')
     expect(listTemplatesIn).toHaveBeenCalledWith(expect.anything(), 'zh', { includeSeriesMembers: true })
   })
+})
+
+it('reads poster series members even when their individual cards are hidden', async () => {
+  await cachedPosterTemplates('zh')
+  expect(listTemplatesIn).toHaveBeenCalledWith(expect.anything(), 'zh', { posters: true, includeSeriesMembers: true })
 })
