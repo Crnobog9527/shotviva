@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 
 import { Link } from '@/core/i18n/navigation'
 import { Button } from '@/core/ui/button'
@@ -51,17 +51,74 @@ function useSelection(shown: string[]) {
   return { selected, select, setAll, clear: () => setSelected(new Set()) }
 }
 
-function Tabs({ showDeleted, counts, onChange }: { showDeleted: boolean; counts: [number, number]; onChange: (deleted: boolean) => void }) {
+function Tabs({ showDeleted, counts, onChange, disabled }: { showDeleted: boolean; counts: [number, number]; onChange: (deleted: boolean) => void; disabled: boolean }) {
   return (
     <div role="tablist" className="flex gap-2">
       {[false, true].map(deleted => (
         <Button key={String(deleted)} role="tab" aria-selected={showDeleted === deleted} size="sm"
-          variant={showDeleted === deleted ? 'default' : 'outline'} onClick={() => onChange(deleted)}>
+          disabled={disabled} variant={showDeleted === deleted ? 'default' : 'outline'} onClick={() => onChange(deleted)}>
           {deleted ? copy.tabDeleted(counts[1]) : copy.tabAll(counts[0])}
         </Button>
       ))}
     </div>
   )
+}
+
+function useSeriesView(items: SeriesListItem[], draft: string[] | null, filter: string) {
+  const byId = useMemo(() => new Map(items.map(item => [item.id, item])), [items])
+  const ids = draft ?? items.map(item => item.id)
+  const query = filter.trim().toLowerCase()
+  const visible = (id: string) => !query || (byId.get(id)?.name_zh.toLowerCase().includes(query) ?? false)
+  return { byId, ids, query, visible, shown: ids.filter(visible) }
+}
+
+function CatalogueHeader({ editing }: { editing: boolean }) {
+  return <header className="flex flex-wrap items-center gap-4">
+    <h1 className="mr-auto text-xl font-semibold">{copy.title}</h1>
+    {!editing && <><Link className="text-sm underline" href="/admin/templates">{copy.templates}</Link>
+      <Button asChild><Link href={SERIES_PATH + '?new=1'} scroll={false}>{copy.create}</Link></Button></>}
+  </header>
+}
+
+function unchangedOrder(draft: string[] | null, items: SeriesListItem[]) {
+  return draft?.every((id, index) => id === items[index]?.id) ?? true
+}
+
+function OrderControls({ editing, pending, saving, disabled, unchanged, start, save, cancel }: {
+  editing: boolean; pending: boolean; saving: boolean; disabled: boolean; unchanged: boolean
+  start: () => void; save: () => void; cancel: () => void
+}) {
+  return <div className="flex flex-wrap items-center gap-2">
+    {editing ? <>
+      <Button onClick={save} disabled={pending || unchanged}>{saving ? copy.busy : copy.saveOrder}</Button>
+      <Button variant="outline" disabled={pending} onClick={cancel}>{copy.cancel}</Button>
+      <span className="text-muted-foreground text-sm">{copy.orderDraft}</span>
+    </> : <Button variant="outline" disabled={disabled} onClick={start}>{copy.editOrder}</Button>}
+  </div>
+}
+
+function useOrderDraft(reorder: SeriesListActions['reorder'], setMessage: (message: string) => void) {
+  const router = useRouter()
+  const [pending, saveOrder] = useTransition()
+  const [draft, setDraft] = useState<string[] | null>(null)
+  useEffect(() => {
+    if (!draft) return
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [draft])
+  function save() {
+    if (!draft) return
+    saveOrder(async () => {
+      const result = await reorder(draft).catch(() => null)
+      if (result?.ok) {
+        setMessage(copy.orderSaved)
+        router.refresh()
+        setDraft(null)
+      } else setMessage(result?.message ?? copy.orderFailed)
+    })
+  }
+  return { draft, setDraft, pending, save }
 }
 
 // 系列管理 (Owner 2026-11-12): drag the whole list into order (saved in one call), check series for
@@ -72,20 +129,12 @@ export function SeriesCatalogue({ items, deleted, saved, production, actions }: 
   const [showDeleted, setShowDeleted] = useState(false)
   const [message, setMessage] = useSavedMessage(saved)
   const [flagPending, run] = useTransition()
-  const byId = useMemo(() => new Map(items.map(item => [item.id, item])), [items])
-  const ids = items.map(item => item.id)
-  const query = filter.trim().toLowerCase()
-  const visible = (id: string) => !query || (byId.get(id)?.name_zh.toLowerCase().includes(query) ?? false)
-  const shown = ids.filter(visible)
+  const { draft, setDraft, pending: orderPending, save: saveDraft } = useOrderDraft(actions.reorder, setMessage)
+  const { byId, ids, query, visible, shown } = useSeriesView(items, draft, filter)
   const selection = useSelection(shown)
   const removal = useSeriesDelete(actions.remove, selection.clear)
-  const pending = flagPending || removal.pending
+  const pending = [flagPending, removal.pending, orderPending].some(Boolean)
 
-  async function reorder(next: string[]) {
-    const result = await actions.reorder(next).catch(() => null)
-    setMessage(result?.ok ? copy.orderSaved : result?.message ?? copy.orderFailed)
-    router.refresh()
-  }
   function apply(choice: BatchChoice, reason: string | null) {
     const chosen = [...selection.selected]
     run(async () => {
@@ -100,24 +149,23 @@ export function SeriesCatalogue({ items, deleted, saved, production, actions }: 
 
   return (
     <main className="mx-auto grid w-full max-w-5xl gap-4 p-4 sm:p-6">
-      <header className="flex flex-wrap items-center gap-4">
-        <h1 className="mr-auto text-xl font-semibold">{copy.title}</h1>
-        <Link className="text-sm underline" href="/admin/templates">{copy.templates}</Link>
-        <Button asChild><Link href={SERIES_PATH + '?new=1'} scroll={false}>{copy.create}</Link></Button>
-      </header>
+      <CatalogueHeader editing={!!draft} />
       {production && <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">{copy.productionNote}</p>}
       <OrderHelp />
       {message && <p role="status" className="text-sm">{message}</p>}
       <DeleteResult state={removal} />
-      <Tabs showDeleted={showDeleted} counts={[items.length, deleted.length]} onChange={setShowDeleted} />
+      <Tabs showDeleted={showDeleted} counts={[items.length, deleted.length]} onChange={setShowDeleted} disabled={!!draft} />
+      {!showDeleted && <OrderControls editing={!!draft} pending={pending} saving={orderPending} unchanged={unchangedOrder(draft, items)} disabled={[pending, !!query, !items.length].some(Boolean)}
+        start={() => { selection.clear(); setMessage(''); setDraft(items.map(item => item.id)) }} save={saveDraft}
+        cancel={() => { setDraft(null); setMessage('') }} />}
       {showDeleted ? <DeletedSeriesList items={deleted} /> : <>
         <Input type="search" className="max-w-md" aria-label={copy.seriesSearch} placeholder={copy.seriesSearch} maxLength={160}
-          value={filter} onChange={event => setFilter(event.target.value)} />
+          disabled={!!draft} value={filter} onChange={event => setFilter(event.target.value)} />
         {selection.selected.size > 0 && <BatchBar names={selectionNames(items, selection.selected)} pending={pending} clear={selection.clear} apply={apply}
           remove={() => removal.open(items.filter(item => selection.selected.has(item.id)))} />}
         {shown.length
-          ? <SeriesTable ids={ids} byId={byId} visible={visible} query={query} pending={pending} selection={selection}
-            onReorder={reorder} onDelete={item => removal.open([item])} />
+          ? <SeriesTable ids={ids} byId={byId} visible={visible} query={query} pending={pending} editing={!!draft} selection={selection}
+            onReorder={async next => { setDraft(next) }} onDelete={item => removal.open([item])} />
           : <p className="text-muted-foreground text-sm">{query ? copy.noSeriesMatch : copy.empty}</p>}
       </>}
       <DeleteSeriesDialog items={removal.target} pending={removal.pending} production={production}
