@@ -47,7 +47,7 @@ begin
   select coalesce(array_agg(id order by featured_rank), '{}'::text[]) into v_current
   from public.templates where featured_rank is not null;
   if v_current is distinct from p_expected_ids then
-    raise exception 'FEATURED_CONFLICT' using errcode = '40001';
+    raise exception 'FEATURED_CONFLICT';
   end if;
   perform public.admin_set_featured_templates(p_ids);
 end;
