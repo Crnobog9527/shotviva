@@ -17,7 +17,7 @@ export default async function MarketingLayout({ children }: LayoutProps<'/[local
   // Public pages load a link on the click only (core/i18n/ui/link-prefetch.tsx: mainland China).
   return (
     <NoLinkPrefetch>
-      <AnnouncementBanner />
+      <AnnouncementBanner checkPath={false} />
       <MarketingHeader locale={locale} />
       <main className="flex flex-1 flex-col">{children}</main>
       <MarketingFooter locale={locale} />
