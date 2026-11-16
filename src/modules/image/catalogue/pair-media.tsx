@@ -14,6 +14,7 @@ type Props = {
   // A video template's loop, played on the right plate by useHoverWipe (or the Quiet Loop).
   video?: string
   size?: 'card' | 'pair' | 'feature' | 'thumb'
+  contain?: boolean
   // Rendered width of ONE plate (half the pair), for the covers' srcset.
   sizes: string
   className?: string
@@ -23,10 +24,11 @@ type Props = {
 // photo on the left plate and the AI result on the right, a hairline between them, "Phone" and
 // "AI" on the bottom corners. The right plate keeps the phone photo under the result and a
 // safelight seam for the hover wipe (useHoverWipe finds them by data-wipe).
-export function PairMedia({ before, after, alt, eager = false, video, size = 'card', sizes, className }: Props) {
+export function PairMedia({ before, after, alt, eager = false, video, size = 'card', contain = false, sizes, className }: Props) {
   const loading = eager ? 'eager' : 'lazy'
   const phone = coverImage(before, sizes)
-  const plate = 'absolute inset-0 size-full object-cover transition-transform duration-600 ease-house group-hover:scale-[1.02]'
+  const plate = cn('absolute inset-0 size-full', contain || size === 'pair' || size === 'thumb'
+    ? 'object-contain' : 'object-cover transition-transform duration-600 ease-house group-hover:scale-[1.02]')
   return (
     <span className={cn('hairline relative isolate grid aspect-[8/5] grid-cols-2 overflow-hidden bg-muted', size === 'card' ? 'rounded-control' : 'rounded-media', className)}>
       <span className="relative overflow-hidden">
