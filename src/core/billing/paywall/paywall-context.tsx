@@ -33,10 +33,11 @@ const PaywallContext = createContext<PaywallApi | null>(null)
 // It also holds what the buyer already has (T66, fed by StandingSlot), so a member opens on a
 // plan they can actually buy; the rule that decides it is fetched only for members.
 // `perkFacts`: the wishlist switch and the live Standard prices the plan cards read (perk-facts).
-type ProviderProps = { products: readonly SiteProduct[]; perkFacts: PerkFacts; channel: PaymentChannel; wechatPay: boolean; children: ReactNode }
+type ProviderProps = { products: readonly SiteProduct[]; perkFacts: PerkFacts; channel: PaymentChannel; wechatPay: boolean; deferSheet?: boolean; children: ReactNode }
 
-export function PaywallProvider({ products, perkFacts, channel, wechatPay, children }: ProviderProps) {
+export function PaywallProvider({ products, perkFacts, channel, wechatPay, deferSheet = false, children }: ProviderProps) {
   const [open, setOpen] = useState(false)
+  const [sheetMounted, setSheetMounted] = useState(!deferSheet)
   // The paywall is the start of a checkout: the new-version banner waits until it closes (T90).
   useUpdateHold("checkout", open)
   const [trigger, setTrigger] = useState<PaywallTrigger>("account")
@@ -51,6 +52,7 @@ export function PaywallProvider({ products, perkFacts, channel, wechatPay, child
           reset(picked)
           setTrigger(next)
           setMoment({ moment: options?.moment, needed: options?.needed, tier: picked?.tier ?? options?.tier })
+          setSheetMounted(true)
           setOpen(true)
           trackPaywallView(next)
         }
@@ -71,7 +73,7 @@ export function PaywallProvider({ products, perkFacts, channel, wechatPay, child
           <PerkFactsContext.Provider value={perkFacts}>
             <PaywallContext.Provider value={api}>
               {children}
-              <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} moment={moment.moment} needed={moment.needed} momentTier={moment.tier} products={products} state={state} />
+              {sheetMounted && <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} moment={moment.moment} needed={moment.needed} momentTier={moment.tier} products={products} state={state} />}
             </PaywallContext.Provider>
           </PerkFactsContext.Provider>
         </StandingContext.Provider>
