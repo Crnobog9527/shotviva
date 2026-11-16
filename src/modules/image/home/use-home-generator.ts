@@ -134,7 +134,8 @@ export function useHomeGenerator({ templates, defaultId, viewer, viewerKnown, fi
   useRestoreDraft({ viewerKnown, signedIn: viewer !== null, selectedFile: photo.file, apply, pick: photo.pick })
   const running = useRunning(viewer?.concurrency.runningIds ?? [])
   const { options, photoRatio, outputAspect, cost } = useHomeOutput(template, aspect, photo)
-  const cta = generatorCta(template, viewer, photo, running, cost, outputAspect)
+  const resolvedCta = generatorCta(template, viewer, photo, running, cost, outputAspect)
+  const cta: HomeCta = !viewerKnown && resolvedCta.kind === 'sign-up' ? { kind: 'checking-viewer' } : resolvedCta
   const start = useStart(viewer, template, photo)
   return {
     template,
