@@ -171,3 +171,11 @@ export const isCompareCategory = (template: Pick<CatalogueTemplate, 'compare'>) 
 export function hasStills(template: Pick<CatalogueTemplate, 'cover'>): boolean {
   return template.cover.before !== null && template.cover.after !== null
 }
+
+// A series' own artwork is always one member's after cover, so the card can still show that
+// member's phone photo beside it (the Always-Visible Split Rule, Owner 2026-11-16): the member
+// whose after cover is the artwork and that has a phone photo. null for artwork that is no
+// member's cover (a collage), which shows alone.
+export function pairedMember<T extends Pick<CatalogueTemplate, 'cover'>>(cover: string, members: readonly T[]): T | null {
+  return members.find(member => member.cover.after === cover && member.cover.before !== null) ?? null
+}
