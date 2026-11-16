@@ -45,34 +45,38 @@ export function CloseMark() {
 
 // A sideways swipe this long (px) switches between the phone photo and the AI result.
 const SWIPE = 48
+const LONG_PRESS_MS = 500
 
 // One finger, not zoomed: a sideways swipe switches sides. Zoomed, the finger pans instead.
-// A swipe is not also a tap: the click that follows it is consumed.
-export function useSwipe(zoomed: boolean, onSwipe: (direction: 'left' | 'right') => void) {
-  const start = useRef<{ x: number; y: number } | null>(null)
-  const swiped = useRef(false)
-  const consumed = () => {
-    const was = swiped.current
-    swiped.current = false
-    return was
+// Safari can deliver a click when a long press ends, even with the image callout disabled.
+export function useViewerGestures(zoomed: boolean, onSwipe: (direction: 'left' | 'right') => void) {
+  const start = useRef<{ x: number; y: number; at: number } | null>(null)
+  const ignoreClick = useRef(false)
+  const consumeClick = () => {
+    const ignored = ignoreClick.current
+    ignoreClick.current = false
+    return ignored
   }
   const handlers = {
     onPointerDown(event: PointerEvent) {
-      swiped.current = false
-      start.current = event.isPrimary && !zoomed ? { x: event.clientX, y: event.clientY } : null
+      ignoreClick.current = false
+      start.current = event.isPrimary ? { x: event.clientX, y: event.clientY, at: event.timeStamp } : null
     },
     onPointerUp(event: PointerEvent) {
       const from = start.current
       start.current = null
       if (!from) return
+      ignoreClick.current = event.pointerType === 'touch' && event.timeStamp - from.at >= LONG_PRESS_MS
+      if (zoomed) return
       const dx = event.clientX - from.x
       if (Math.abs(dx) < SWIPE || Math.abs(dx) <= Math.abs(event.clientY - from.y)) return
-      swiped.current = true
+      ignoreClick.current = true
       onSwipe(dx < 0 ? 'left' : 'right')
     },
     onPointerCancel() {
+      if (start.current) ignoreClick.current = true
       start.current = null
     },
   }
-  return { handlers, consumed }
+  return { handlers, consumeClick }
 }
