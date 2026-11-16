@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import dynamic from 'next/dynamic'
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useId, useMemo, useRef, useState } from 'react'
 
 import { trackTemplateView } from '@/core/analytics/browser'
 import type { FormAction } from '@/core/auth/ui'
@@ -39,20 +39,9 @@ export type HomeGeneratorProps = {
   initialCovers: InitialCovers
 }
 
-// Keep the template picker warm for browsing, but defer the signup sheet to the first attempt
-// to generate while signed out.
-const loadPicker = () => import('./template-picker')
-const TemplatePicker = dynamic(() => loadPicker().then((m) => m.TemplatePicker), { ssr: false })
+// Both dialogs are used after the corresponding action, and never rendered in the initial panel.
+const TemplatePicker = dynamic(() => import('./template-picker').then((m) => m.TemplatePicker), { ssr: false })
 const SignupSheet = dynamic(() => import('./signup-sheet').then((m) => m.SignupSheet), { ssr: false })
-
-function usePrefetchPicker() {
-  useEffect(() => {
-    const start = () => void loadPicker()
-    if (typeof window.requestIdleCallback !== 'function') return void window.setTimeout(start, 1500)
-    const id = window.requestIdleCallback(start, { timeout: 4000 })
-    return () => window.cancelIdleCallback(id)
-  }, [])
-}
 
 const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth')
 
@@ -100,7 +89,6 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, go
     }).catch(() => setPickerOn(id))
   }, [choose, bring])
   usePickEvents(onPick, onPreview)
-  usePrefetchPicker()
   useOpenFromQuery(onPreview)
   const pickPhoto = () => file.current?.click()
   const askToSignUp = () => {
@@ -131,7 +119,7 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, go
           event.currentTarget.value = ''
         }}
       />
-      <TemplatePicker
+      {pickerOn !== null && <TemplatePicker
         openOn={pickerOn}
         catalogue={picker.data}
         failed={picker.failed}
@@ -144,7 +132,7 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, go
         }}
         sampleOf={sampleFor}
         thumbOf={thumbFor}
-      />
+      />}
       {!viewer && signUp !== null && <SignupSheet open={signUp} onOpenChange={setSignUp} googleAction={googleAction} next={homePath} gift={freeImages} />}
       <HomeDock show={away && !footer} canStartWithoutPicking={canStartWithoutPicking} onClick={bring} />
     </div>

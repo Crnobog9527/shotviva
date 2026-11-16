@@ -10,9 +10,8 @@ type Props = {
   after: ImageRef
   // 'lg': the hero and single-template rows (20px corners, labels on top); default: a card.
   size?: 'lg' | 'card'
-  // The hero pair is above the fold: never lazy (建站规格 R9). Only the phone photo is
-  // preloaded, so on a phone one right-sized image, not two, competes with the CSS for the
-  // first paint.
+  // The hero pair is above the fold: never lazy (建站规格 R9). Prioritize the phone photo
+  // when it does not already have a first frame in the document.
   preload?: boolean
   // Rendered width of ONE plate (half the pair), for the image srcset. The pair's own width
   // here made every plate download at twice the pixels it shows.
@@ -37,11 +36,12 @@ const afterLoading = (preload: boolean) => (preload ? ({ loading: 'eager', fetch
 // plain <img> with `decoding="sync"`, so the frame is decoded for the very first paint; as a CSS
 // background it was decoded off-thread and appeared a few frames late, behind hydration.
 export function BeforePane({ image, preload, sizes }: { image: ImageRef; preload: boolean; sizes: string }) {
+  const firstFrame = preload ? image.firstFrame : undefined
   return (
     <span className="mk-pane">
       {/* eslint-disable-next-line @next/next/no-img-element -- a data: URI, nothing for next/image to resize */}
-      {preload && image.firstFrame ? <img className="mk-ff" src={image.firstFrame} width={image.width} height={image.height} alt="" aria-hidden decoding="sync" /> : null}
-      <Image className="mk-b" src={image.src} alt={image.alt} width={image.width} height={image.height} sizes={sizes} preload={preload} loading={preload ? undefined : 'lazy'} />
+      {firstFrame ? <img className="mk-ff" src={firstFrame} width={image.width} height={image.height} alt="" aria-hidden decoding="sync" /> : null}
+      <Image className="mk-b" src={image.src} alt={image.alt} width={image.width} height={image.height} sizes={sizes} preload={preload && !firstFrame} loading={preload ? undefined : 'lazy'} fetchPriority={firstFrame ? 'low' : undefined} />
     </span>
   )
 }

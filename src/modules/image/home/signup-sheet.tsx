@@ -9,6 +9,8 @@ import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
 
 import { GiftIcon } from './home-icons'
 
+import './signup-sheet.css'
+
 type Props = {
   open: boolean
   onOpenChange(open: boolean): void

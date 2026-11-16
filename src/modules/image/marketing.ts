@@ -4,7 +4,8 @@
 // home page shipped the whole app. This entry exports only what those pages render.
 export { toCatalogueTemplate, type CatalogueTemplate } from './catalogue/catalogue-template'
 export { pickerBrowse } from './catalogue/picker-browse'
-export { HomeGenerator, type HomeGeneratorProps } from './home/home-generator'
+export { HomeGenerator } from './home/home-generator-island'
+export type { HomeGeneratorProps } from './home/home-generator'
 export { HomeDraftNote } from './home/home-draft-note'
 export type { HomeViewer } from './home/home-cta'
 export { homePanelTemplates } from './home/home-catalogue'
