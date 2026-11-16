@@ -10,6 +10,7 @@ import { useMediaQuery } from '@/core/ui/use-media-query'
 
 import type { CatalogueTemplate } from './catalogue-template'
 import { SplitTags } from './split-tags'
+import { templateImageGestureClass, templateImageGestures } from './template-image-gestures'
 import { REDUCED_MOTION, useQuietLoop } from './use-motion'
 
 // A motion template with no before / after stills: its loop (or animated WebP) over the split
@@ -43,7 +44,7 @@ function AnimatedImage({ src, poster, label, sizes }: { src: string; poster: str
   const reduce = useMediaQuery(REDUCED_MOTION)
   return (
     <>
-      <img {...(reduce ? coverImage(poster, sizes) : { src })} alt={label} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
+      <img {...templateImageGestures} draggable={false} {...(reduce ? coverImage(poster, sizes) : { src })} alt={label} loading="lazy" decoding="async" className={cn('absolute inset-0 size-full object-cover', templateImageGestureClass)} />
       <SplitTags hidden={!reduce} />
     </>
   )

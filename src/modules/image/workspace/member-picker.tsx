@@ -8,6 +8,7 @@ import { hasStills, type CatalogueTemplate } from '../catalogue/catalogue-templa
 import { COVER_SIZES } from '../catalogue/cover-sizes'
 import { PairMedia } from '../catalogue/pair-media'
 import { SeriesBadge } from '../catalogue/series-badge'
+import { templateImageGestureClass, templateImageGestures } from '../catalogue/template-image-gestures'
 
 // `label`: the series' name and size ("Neon Night · 4 templates"), naming the group.
 type Props = { label: string; members: readonly CatalogueTemplate[]; value: string; onChange(id: string): void }
@@ -57,7 +58,7 @@ function Thumb({ member, eager }: { member: CatalogueTemplate; eager: boolean })
   const poster = member.cover.poster ?? member.cover.after
   if (!poster) return <span className="hairline block aspect-[8/5] rounded-[9px] bg-muted" />
   return (
-    <span className="hairline relative block aspect-[8/5] overflow-hidden rounded-[9px] bg-muted">
+    <span {...templateImageGestures} className={cn('hairline relative block aspect-[8/5] overflow-hidden rounded-[9px] bg-muted', templateImageGestureClass)}>
       <img {...coverImage(poster, COVER_SIZES.memberFrame)} alt="" aria-hidden="true" loading={eager ? 'eager' : 'lazy'} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" />
       <img {...coverImage(poster, COVER_SIZES.memberFrame)} alt="" loading={eager ? 'eager' : 'lazy'} decoding="async" className="absolute inset-0 size-full object-contain" />
     </span>

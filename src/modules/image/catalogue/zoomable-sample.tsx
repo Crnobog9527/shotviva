@@ -8,6 +8,7 @@ import { cn } from '@/core/ui/cn'
 
 import { hasStills, type CatalogueTemplate } from './catalogue-template'
 import type { ViewerSide } from './sample-viewer'
+import { templateImageGestureClass, templateImageGestures } from './template-image-gestures'
 import { isCompareSample, TemplateSample, type SampleTemplate } from './template-sample'
 
 // Fetched on the first open only (scripts/js-budget.json).
@@ -31,7 +32,7 @@ export function ZoomableSample({ template, className }: Props) {
   return (
     <>
       {sample}
-      {compare ? null : <button type="button" aria-label={t('viewerOpen', { name: template.name })} onClick={openAt} className="absolute inset-0 z-4 rounded-media" />}
+      {compare ? null : <button {...templateImageGestures} type="button" aria-label={t('viewerOpen', { name: template.name })} onClick={openAt} className={cn('absolute inset-0 z-4 rounded-media', templateImageGestureClass)} />}
       <button
         type="button"
         aria-label={t('viewerOpen', { name: template.name })}
