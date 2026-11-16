@@ -34,11 +34,9 @@ export function PairMedia({ before, after, alt, eager = false, video, size = 'ca
     ? 'object-contain' : 'object-cover transition-transform duration-600 ease-house group-hover:scale-[1.02]')
   return (
     <span className={cn('hairline relative isolate grid aspect-[8/5] grid-cols-2 overflow-hidden bg-muted', size === 'card' ? 'rounded-control' : 'rounded-media', className)}>
+      <BeforePlate src={before} sizes={sizes} loading={loading} fit={fit} plate={plate} />
       <span className="relative flex items-center justify-center overflow-hidden">
-        {!fit ? <img {...phone} alt="" loading={loading} decoding="async" className={cn(plate, 'saturate-[.85]')} /> : null}
-      </span>
-      <span className="relative overflow-hidden">
-        <img {...phone} alt="" loading={loading} decoding="async" className={cn(plate, 'saturate-[.85]')} />
+        {fit ? <Backdrop src={after} sizes={sizes} loading={loading} /> : <img {...phone} alt="" loading={loading} decoding="async" className={cn(plate, 'saturate-[.85]')} />}
         {/* White behind the result: a transparent cut-out cover reads as white, not as the phone photo underneath. */}
         <GroundedImg data-wipe="ai" ground="white" {...coverImage(after, sizes)} alt={alt} loading={loading} decoding="async" className={fit ? 'relative z-1 max-h-full max-w-full object-contain' : cn(plate, 'z-1')} />
         {video ? <video data-wipe="video" data-src={video} muted playsInline preload="none" aria-hidden="true" className="absolute inset-0 z-2 size-full object-cover opacity-0" /> : null}
@@ -48,4 +46,15 @@ export function PairMedia({ before, after, alt, eager = false, video, size = 'ca
       <SplitTags size={size} />
     </span>
   )
+}
+
+function BeforePlate({ src, sizes, loading, fit, plate }: { src: string; sizes: string; loading: 'eager' | 'lazy'; fit: boolean; plate: string }) {
+  return <span className="relative overflow-hidden">
+    {fit ? <Backdrop src={src} sizes={sizes} loading={loading} /> : null}
+    <img {...coverImage(src, sizes)} alt="" loading={loading} decoding="async" className={cn(plate, 'saturate-[.85]')} />
+  </span>
+}
+
+function Backdrop({ src, sizes, loading }: { src: string; sizes: string; loading: 'eager' | 'lazy' }) {
+  return <img {...coverImage(src, sizes)} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" />
 }
