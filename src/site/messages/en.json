@@ -714,7 +714,7 @@
           "writing": "Sorting: {block}",
           "seconds": "{seconds}s"
         },
-        "manualSample": "Edit the sample text instead"
+        "manualSample": "Open the custom text editor"
       },
       "sourceText": "Your pasted text",
       "backToPaste": "Paste again",
