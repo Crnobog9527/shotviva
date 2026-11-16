@@ -1,4 +1,4 @@
-import type { PostHog, PostHogConfig } from 'posthog-js'
+import type { PostHog, PostHogConfig } from 'posthog-js/dist/module.slim'
 
 import { persistenceFor, replayAllowed, type Consent } from '../consent/decision'
 

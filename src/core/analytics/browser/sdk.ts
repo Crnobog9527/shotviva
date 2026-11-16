@@ -1,54 +1,61 @@
-import type { PostHog } from 'posthog-js'
+import type { PostHog } from 'posthog-js/dist/module.slim'
 
 type SentrySdk = typeof import('./sentry-entry')
-export type Sdks = { sentry: SentrySdk | null; posthog: PostHog | null }
-export type SdkLoaders = { sentry: (() => Promise<SentrySdk>) | null; posthog: (() => Promise<PostHog>) | null }
+type Job<T> = (sdk: T) => void
 
-type Job = (sdks: Sdks) => void
-
-// Events and errors of the first seconds, before the SDKs are in. A page that keeps failing
-// before load must not grow this without bound.
+// Keep errors and events independent: a slow or blocked analytics request must not stop
+// monitoring, and a blocked Sentry chunk must not drop traffic.
 export const MAX_QUEUED = 50
 
-let sdks: Sdks | null = null
-let queue: Job[] = []
+export function createSdk<T>() {
+  let sdk: T | null | undefined
+  const queue: Job<T>[] = []
 
-// Runs `job` with the SDKs, now if they are loaded, else once they are (in order).
-export function withSdks(job: Job): void {
-  if (sdks) {
-    job(sdks)
-    return
-  }
-  if (queue.length < MAX_QUEUED) queue.push(job)
-}
-
-export const loadedSdks = (): Sdks | null => sdks
-
-export async function loadSdks(load: SdkLoaders): Promise<void> {
-  const [sentry, posthog] = await Promise.all([load.sentry ? load.sentry() : null, load.posthog ? load.posthog() : null])
-  sdks = { sentry, posthog }
-  const pending = queue
-  queue = []
-  for (const job of pending) {
+  const runSafely = (job: Job<T>, active: T) => {
     try {
-      job(sdks)
+      job(active)
     } catch {
-      // A failed capture must not stop the ones after it.
+      // Analytics failures must not break the UI or stop later jobs from being reported.
     }
   }
+
+  return {
+    current: () => sdk,
+    run(job: Job<T>) {
+      if (sdk) runSafely(job, sdk)
+      else if (sdk === undefined && queue.length < MAX_QUEUED) queue.push(job)
+    },
+    async load(loader: (() => Promise<T>) | null) {
+      try {
+        sdk = loader ? await loader() : null
+      } catch {
+        sdk = null
+      }
+      const pending = queue.splice(0)
+      if (sdk) for (const job of pending) runSafely(job, sdk)
+    },
+  }
 }
 
-// Both SDKs (≈160 KB gzip together) used to load and start before hydration on every page,
-// competing with the CSS and the page's own code for a phone's bandwidth. They now start once
-// the page has loaded and the main thread is idle.
+export const sentrySdk = createSdk<SentrySdk>()
+export const posthogSdk = createSdk<PostHog>()
+
+// Wait for the page to load, and give pending input and rendering priority over SDK work.
 export function afterLoad(start: () => void): void {
   const idle = () => (typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(start, { timeout: 3000 }) : window.setTimeout(start, 1))
   if (document.readyState === 'complete') idle()
   else window.addEventListener('load', idle, { once: true })
 }
 
-// Tests only.
-export function resetSdksForTest(): void {
-  sdks = null
-  queue = []
+// Give PostHog a turn to start on its own without making Sentry wait on a stalled import.
+export function afterPosthog(posthog: Promise<void>, start: () => void): void {
+  let scheduled = false
+  const schedule = () => {
+    if (scheduled) return
+    scheduled = true
+    window.clearTimeout(timer)
+    afterLoad(start)
+  }
+  const timer = window.setTimeout(schedule, 1000)
+  void posthog.then(schedule)
 }

@@ -1,4 +1,4 @@
-import type { CaptureResult, PostHogConfig } from 'posthog-js'
+import type { CaptureResult, PostHogConfig } from 'posthog-js/dist/module.slim'
 
 import { localeOfPath } from '../../i18n/paths'
 import { persistenceFor, replayAllowed, type Consent } from '../consent/decision'
