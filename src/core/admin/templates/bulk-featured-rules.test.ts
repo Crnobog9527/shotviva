@@ -24,11 +24,10 @@ describe('planFeaturedChange', () => {
     expect(planBlocked(plan)).toBe(true)
   })
 
-  it('counts how far past 12 the list would go', () => {
+  it('allows more than 12 featured templates', () => {
     const plan = planFeaturedChange(ids(11), [live('x'), live('y'), live('z')], true)
     expect(plan.next).toHaveLength(14)
-    expect(plan.over).toBe(2)
-    expect(planBlocked(plan)).toBe(true)
+    expect(planBlocked(plan)).toBe(false)
     expect(planBlocked(planFeaturedChange(ids(11), [live('x')], true))).toBe(false)
   })
 

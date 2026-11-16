@@ -7,13 +7,13 @@ import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 import { TEMPLATE_SURFACES } from '@/core/templates/schema'
 
-import { FEATURED_LIMIT, planBlocked, planFeaturedChange, type FeaturedPlan } from './bulk-featured-rules'
+import { planBlocked, planFeaturedChange, type FeaturedPlan } from './bulk-featured-rules'
 import * as repo from './repository'
 
 // Batch 首页精选 (2026-11-12): the ticked templates in or out of the home featured list. Planned
 // here against the live rows, written by the same admin_set_featured_templates call the single
-// switch uses (one transaction; it re-checks "published, on the web" and the limit of 12). A
-// failure or going past the limit saves nothing, like the batch edit (T79).
+// switch uses (one transaction; it re-checks "published, on the web" ). A
+// failure saves nothing, like the batch edit (T79).
 
 const id = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(64)
 const unique = (ids: string[]) => new Set(ids).size === ids.length
@@ -22,7 +22,7 @@ const inputSchema = z.object({
   featured: z.boolean(),
   // The featured list as the page showed it. A different list on the server means it was changed
   // elsewhere since; the batch is refused instead of being built on top of what the admin never saw.
-  expectedIds: z.array(id).max(FEATURED_LIMIT).refine(unique, 'ids must be unique'),
+  expectedIds: z.array(id).refine(unique, 'ids must be unique'),
 })
 
 const rowSchema = z.array(z.object({
@@ -33,14 +33,22 @@ const rowSchema = z.array(z.object({
   featured_rank: z.number().int().nullable(),
 }))
 
-// One read: the current featured rows and the ticked ones (primary key and the featured_rank filter).
+// Read the current featured rows and the ticked ones. The save checks the list under a lock.
 async function loadRows(client: SupabaseClient, ids: readonly string[]) {
-  const { data, error } = await client
-    .from('templates')
-    .select('id, name, is_active, visible_in, featured_rank')
-    .or(`featured_rank.not.is.null,id.in.(${ids.join(',')})`)
-  if (error) throw new AppError('INTERNAL', `bulk featured read failed: ${error.message}`)
-  return rowSchema.parse(data)
+  const rows: z.infer<typeof rowSchema> = []
+  const pageSize = 500
+  let after: string | null = null
+  for (;;) {
+    const query = client.from('templates').select('id, name, is_active, visible_in, featured_rank')
+      .or(`featured_rank.not.is.null,id.in.(${ids.join(',')})`).order('id').limit(pageSize)
+    if (after) query.gt('id', after)
+    const { data, error } = await query
+    if (error) throw new AppError('INTERNAL', `bulk featured read failed: ${error.message}`)
+    const page = rowSchema.parse(data)
+    rows.push(...page)
+    if (page.length < pageSize) return rows
+    after = page[page.length - 1].id
+  }
 }
 
 const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((value, i) => value === b[i])
@@ -61,7 +69,7 @@ export async function setTemplatesFeatured(client: SupabaseClient, adminId: stri
     return row ? { id: row.id, name: row.name, isActive: row.is_active, visibleIn: row.visible_in } : { id: ticked, name: ticked, missing: true as const }
   }), featured)
   if (planBlocked(plan) || plan.changed.length === 0) return plan
-  await repo.setFeaturedTemplates(client, plan.next)
+  await repo.setFeaturedTemplates(client, plan.next, expectedIds)
   // One line per template, like the 上架 switch and the batch edit: who put what on the home page.
   for (const template of plan.changed) logger.info('admin.template.featured_changed', { adminId, templateId: template.id, featured })
   return plan

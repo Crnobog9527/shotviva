@@ -4,8 +4,6 @@ import type { TemplateSurface } from '@/core/templates/schema'
 // clearing the ticked templates does to the featured list. Pure, so the confirm dialog shows the
 // same verdict the server reaches before it writes anything.
 
-export const FEATURED_LIMIT = 12
-
 export type FeaturedCandidate = {
   id: string
   name: string
@@ -25,8 +23,6 @@ export type FeaturedPlan = {
   // Already in (setting) or already out (clearing): nothing to do for them.
   unchanged: FeaturedItem[]
   failures: FeaturedFailure[]
-  // How many past the limit the list would be; 0 when it fits.
-  over: number
 }
 
 export const isFeaturable = (template: Pick<FeaturedCandidate, 'isActive' | 'visibleIn'>) =>
@@ -42,7 +38,7 @@ export function planFeaturedChange(
   selected: readonly (FeaturedCandidate | (FeaturedItem & { missing: true }))[],
   featured: boolean,
 ): FeaturedPlan {
-  const plan: FeaturedPlan = { featured, next: [...current], changed: [], unchanged: [], failures: [], over: 0 }
+  const plan: FeaturedPlan = { featured, next: [...current], changed: [], unchanged: [], failures: [] }
   for (const template of selected) {
     const isIn = plan.next.includes(template.id)
     if ('missing' in template) {
@@ -59,12 +55,11 @@ export function planFeaturedChange(
       plan.changed.push(item(template))
     }
   }
-  plan.over = Math.max(0, plan.next.length - FEATURED_LIMIT)
   return plan
 }
 
-// Saved only as a whole: any failure or going past the limit saves nothing.
-export const planBlocked = (plan: FeaturedPlan) => plan.failures.length > 0 || plan.over > 0
+// Saved only as a whole: any failure saves nothing.
+export const planBlocked = (plan: FeaturedPlan) => plan.failures.length > 0
 
 export function describeFeaturedFailure(failure: FeaturedFailure): string {
   return failure.reason === 'not_live' ? '未上架或不在站内显示，不能上首页' : '模板不存在（可能已被删除），请刷新页面'
