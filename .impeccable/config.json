@@ -1,0 +1,35 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/modules/image/workspace/member-picker.tsx"
+        ],
+        "createdAt": "2026-11-16T06:59:52.934Z",
+        "reason": "Codex: image source is supplied by coverImage via JSX spread"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/modules/image/catalogue/series-card.tsx"
+        ],
+        "createdAt": "2026-11-16T06:59:52.945Z",
+        "reason": "Codex: image sources are supplied by coverImage via JSX spread"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/modules/image/catalogue/pair-media.tsx"
+        ],
+        "createdAt": "2026-11-16T07:00:16.640Z",
+        "reason": "Codex: image sources are supplied by coverImage via JSX spread"
+      }
+    ]
+  }
+}
