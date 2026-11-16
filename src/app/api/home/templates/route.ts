@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 import { LOCALES } from '@/core/i18n'
 import { logger } from '@/core/logger'
-import { loadHomeCatalogue } from '@/modules/image/home-server'
+import { loadHomeCatalogue } from '@/modules/image/marketing'
 
 const localeSchema = z.enum(LOCALES)
 

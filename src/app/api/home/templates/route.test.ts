@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { loadHomeCatalogue } from '@/modules/image/home-server'
+import { loadHomeCatalogue } from '@/modules/image/marketing'
 
 import { GET } from './route'
 
-vi.mock('@/modules/image/home-server', () => ({ loadHomeCatalogue: vi.fn() }))
+vi.mock('@/modules/image/marketing', () => ({ loadHomeCatalogue: vi.fn() }))
 vi.mock('@/core/logger', () => ({ logger: { error: vi.fn() } }))
 
 const request = (query: string) => new Request(`https://shotviva.test/api/home/templates${query}`)
