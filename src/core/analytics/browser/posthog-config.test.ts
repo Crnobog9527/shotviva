@@ -61,6 +61,23 @@ describe('scrubCapture', () => {
     expect(JSON.stringify(scrubbed)).not.toContain('jane@example.com')
   })
 
+  it('scrubs URLs in session props, vitals attribution and heatmap keys without losing attribution or points', () => {
+    const landing = 'https://shotviva.com/?utm_source=x'
+    const tagged = `${landing}&token=secret#access_token=other`
+    const result = scrubCapture(capture({
+      $session_entry_url: tagged,
+      $set_once: { $initial_current_url: tagged },
+      $web_vitals_LCP_event: { navigationURL: tagged, value: 850 },
+      $heatmap_data: { [tagged]: [{ x: 1 }], [landing]: [{ x: 2 }] },
+    }))
+    expect(result?.properties).toEqual({
+      $session_entry_url: landing,
+      $set_once: { $initial_current_url: landing },
+      $web_vitals_LCP_event: { navigationURL: landing, value: 850 },
+      $heatmap_data: { [landing]: [{ x: 1 }, { x: 2 }] },
+    })
+  })
+
   it('passes a dropped event through', () => {
     expect(scrubCapture(null)).toBeNull()
   })
