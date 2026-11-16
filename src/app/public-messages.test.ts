@@ -67,10 +67,13 @@ describe('messages on public pages', () => {
   it('no public client code reads a namespace or app subtree the root layout leaves out', () => {
     const offenders: string[] = []
     for (const [file, text] of files) {
+      // Schema diagnostics and log event names can resemble translation paths, but are never
+      // looked up in the client message catalogue.
+      const translationText = text.replace(/(?:message:\s*|logger\.(?:error|warn|info)\(\s*)['"][^'"]*['"]/g, '')
       for (const ns of APP_ONLY_NAMESPACES) if (new RegExp(`useTranslations\\(\\s*['"]${ns}[.'"]`).test(text)) offenders.push(`${file}: ${ns}`)
       for (const key of APP_ONLY_APP_KEYS) {
         // A key path inside the subtree ('result.title', `photos.${x}`), from any t, or a namespace into it.
-        if (new RegExp(`['"\`]${key}\\.[A-Za-z$]|useTranslations\\(\\s*['"]app\\.${key}[.'"]`).test(text)) offenders.push(`${file}: app.${key}`)
+        if (new RegExp(`['"\`]${key}\\.[A-Za-z$]|useTranslations\\(\\s*['"]app\\.${key}[.'"]`).test(translationText)) offenders.push(`${file}: app.${key}`)
       }
       if (/\buseMessages\(/.test(text)) offenders.push(`${file}: useMessages`)
     }

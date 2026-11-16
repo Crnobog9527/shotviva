@@ -3,6 +3,8 @@ import { getTranslations } from 'next-intl/server'
 import { notFound, redirect } from 'next/navigation'
 import { Suspense } from 'react'
 
+import '@/core/billing/checkout-return/celebration/celebration.css'
+
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { readBalance } from '@/core/billing'
 import { PendingReturn, SuccessReturn, partnerParams, readCheckoutFacts, readReturnQuery, returnView } from '@/core/billing/checkout-return'
