@@ -386,7 +386,7 @@ CREATE TABLE IF NOT EXISTS "public"."templates" (
     CONSTRAINT "templates_credits_cost_check" CHECK ((("jsonb_typeof"("credits_cost") = 'object'::"text") AND ("credits_cost" ?& ARRAY['1k'::"text", '2k'::"text", '4k'::"text"]) AND (((("credits_cost" - '1k'::"text") - '2k'::"text") - '4k'::"text") = '{}'::"jsonb") AND ("jsonb_typeof"(("credits_cost" -> '1k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '1k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '2k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '2k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text") AND ("jsonb_typeof"(("credits_cost" -> '4k'::"text")) = 'number'::"text") AND (("credits_cost" ->> '4k'::"text") ~ '^[1-9][0-9]{0,2}$'::"text"))),
     CONSTRAINT "templates_description_check" CHECK ((("description" IS NULL) OR (("char_length"("description") >= 1) AND ("char_length"("description") <= 160)))),
     CONSTRAINT "templates_featured_live_check" CHECK ((("featured_rank" IS NULL) OR ("is_active" AND ('web'::"text" = ANY ("visible_in"))))),
-    CONSTRAINT "templates_featured_rank_check" CHECK ((("featured_rank" IS NULL) OR (("featured_rank" >= 1) AND ("featured_rank" <= 12)))),
+    CONSTRAINT "templates_featured_rank_check" CHECK ((("featured_rank" IS NULL) OR ("featured_rank" >= 1))),
     CONSTRAINT "templates_fields_check" CHECK (("jsonb_typeof"("fields") = 'object'::"text")),
     CONSTRAINT "templates_id_check" CHECK ((("id" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text") AND ("char_length"("id") <= 64))),
     CONSTRAINT "templates_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
@@ -8798,9 +8798,6 @@ CREATE OR REPLACE FUNCTION "public"."admin_set_featured_templates"("p_ids" "text
 declare
   v_ids text[] := coalesce(p_ids, '{}');
 begin
-  if cardinality(v_ids) > 12 then
-    raise exception 'at most 12 featured templates' using errcode = '22023';
-  end if;
   if cardinality(v_ids) <> (select count(distinct id) from unnest(v_ids) as u(id)) then
     raise exception 'featured templates must not repeat' using errcode = '22023';
   end if;
