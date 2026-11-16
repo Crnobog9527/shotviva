@@ -9,7 +9,7 @@ import { PROMPT_MAX_LENGTH, renderPrompt, type GenerationInputs } from '../../te
 import type { FoodFlowPrompts } from '../../templates/food-flow'
 import type { ProviderImage, ProviderInput, ProviderPrices } from '../provider'
 import { chooseFoodFlow, isLibraryCategory, type FoodChoice, type FoodToggles } from './plan'
-import { dishText, type DishReader, type DishReaderUsage, type DishReading } from './reading'
+import { dishText, userDishName, type DishReader, type DishReaderUsage, type DishReading } from './reading'
 
 // The flow step of a food template's job (ARCHITECTURE §5.1c「餐饮开关的出图流程」), run once the
 // job's credits (or a test run's budget) are held: read the dish, pick a vessel, and turn the
@@ -50,11 +50,11 @@ async function photoDataUrl(photo: InputImage): Promise<string> {
 // Why a reading failed, short and ours (adapters only put the status in their messages).
 const failureOf = (error: unknown) => (error instanceof Error ? error.message : 'unknown').slice(0, 160)
 
-async function readDish(food: FoodDeps, reader: DishReader | null, instructions: string, photo: InputImage) {
+async function readDish(food: FoodDeps, reader: DishReader | null, instructions: string, photo: InputImage, dishName: string) {
   if (!reader) return { error: 'no dish-reading or decision line switched on' }
   try {
     const signal = AbortSignal.timeout(food.timeoutMs ?? DISH_READ_TIMEOUT_MS)
-    return await reader.read({ imageDataUrl: await photoDataUrl(photo), instructions, signal })
+    return await reader.read({ imageDataUrl: await photoDataUrl(photo), instructions, signal, ...(dishName ? { userDishName: dishName } : {}) })
   } catch (error) {
     logger.warn('food_flow.read_failed', { error })
     return { error: failureOf(error) }
@@ -119,9 +119,9 @@ function flowCall(base: Call, prompts: FoodFlowPrompts, choice: FoodChoice, part
 const FLOW_1: FoodChoice = { kind: 'both_off', fallback: 'read_failed' }
 
 // The reading, the vessel and the choice, before any call is built.
-async function decide(store: ObjectStore, food: FoodDeps, plan: FoodPlan, photo: InputImage) {
+async function decide(store: ObjectStore, food: FoodDeps, plan: FoodPlan, photo: InputImage, dishName: string) {
   const reader = await food.reader()
-  const read = await readDish(food, reader, plan.prompts.read, photo)
+  const read = await readDish(food, reader, plan.prompts.read, photo, dishName)
   const reading = 'reading' in read ? read.reading : null
   const vessel = await vesselFor(store, food, reading, plan.toggles)
   const choice = chooseFoodFlow(plan.toggles, reading, vessel !== null)
@@ -136,7 +136,7 @@ export async function runFoodFlow(deps: { store: ObjectStore; food?: FoodDeps | 
   const [photo] = photos
   // Every flow puts the dish into the cover; without a reference (or a photo) there is nothing to edit.
   if (!deps.food || !photo || refs.length === 0) return { call: base, usage: null, choice: FLOW_1 }
-  const { reading, vessel, choice, facts } = await decide(deps.store, deps.food, plan, photo)
+  const { reading, vessel, choice, facts } = await decide(deps.store, deps.food, plan, photo, userDishName(inputs.copy))
   if (!reading || choice.kind === 'both_off') return { ...facts, choice, call: base }
   const call = flowCall(base, plan.prompts, choice, { photo, vessel, refs, reading }, inputs)
   return call ? { ...facts, choice, call } : { ...facts, choice: FLOW_1, call: base }

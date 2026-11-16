@@ -25,11 +25,14 @@ export const trialInputSchema = z.strictObject({
   judge: inputJudgeSchema.optional(),
 }).refine((input) => !(input.photo && input.slots), { message: 'use either photo or slots, not both' })
 
+// The most results per input set a trial makes (the batch's n and templates:trial --n alike).
+export const TRIAL_N_MAX = 5
+
 export const trialSchema = z.strictObject({
   inputs: z.array(trialInputSchema).min(1).max(10),
   references: z.array(localImage).max(12).optional(),
   // Results per input set.
-  n: z.int().min(1).max(5).optional(),
+  n: z.int().min(1).max(TRIAL_N_MAX).optional(),
   resolution: resolutionSchema.optional(),
 })
 

@@ -1,3 +1,4 @@
+import { TRIAL_N_MAX } from '../template-apply/trial-schema'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -232,6 +233,23 @@ describe('judging a result', () => {
     Object.values(failed.records)[0].outcome = 'failed'
     expect(recordOf(cells[0] as Cell, failed)).toBeNull()
     expect(planJobs(batch, cells, state, judged).jobs[0].sources).toMatchObject({ cover: null, refs: [], inputs: [{ label: 'photo', path: 'dish.jpg' }] })
+  })
+})
+
+describe('every run a trial made (re-runs with --n)', () => {
+  it('judges each k that has a result, even past the batch n, and counts only the batch n as missing', async () => {
+    const { batch, state } = await setup({ fetch: fakeFetch(500) })
+    const templates = new Map([['cn-a', template('cn-a')]])
+    const { cells } = planCells(batch.templates, templates, new Map([['dish.jpg', 'f'.repeat(64)]]), { n: TRIAL_N_MAX, model: () => ({ providerId: 'p', model: 'm' }) })
+    expect(cells.map(c => c.k)).toEqual([0, 1, 2, 3, 4])
+    const first = Object.values(state.records)[0]!
+    const second = { ...first, runId: runIdOf(cells[1]!, 0), k: 1, file: 'cn-a/v3/y.png' }
+    const rerun: TrialState = { version: 1, records: { ...state.records, [second.runId]: second } }
+    const judged = new Map([['cn-a', { coverAfterUrl: null, styleRefs: [], modelParams: {} }]])
+    const planned = planJobs(batch, cells, rerun, judged)
+    expect(planned.jobs.map(j => [j.cell.k, j.record.runId])).toEqual([[0, first.runId], [1, second.runId]])
+    expect(planned.missing).toEqual([])
+    expect(planJobs(batch, cells, { version: 1, records: {} }, judged).missing.map(c => c.k)).toEqual([0])
   })
 })
 

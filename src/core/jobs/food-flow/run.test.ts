@@ -86,6 +86,14 @@ describe('the food flows (§5.1c)', () => {
 })
 
 describe('the food flows fall back (§5.1c)', () => {
+  it('hands the reader the dish name the user typed, cleaned, and nothing when the field is empty', async () => {
+    const { deps, base, photo, read } = await setup()
+    await runFoodFlow(deps, plan(true, false), base, [photo], { ...inputs, copy: { dish_name: ' 红烧\n鳝段 ' } })
+    expect(read.mock.calls[0]?.[0].userDishName).toBe('红烧 鳝段')
+    await runFoodFlow(deps, plan(true, false), base, [photo], { ...inputs, copy: { dish_name: '' } })
+    expect(read.mock.calls[1]?.[0]).not.toHaveProperty('userDishName')
+  })
+
   it('tells the caller which flow ran and why it fell back', async () => {
     const { deps, base, photo } = await setup(new Error('openai responses 400'))
     const reports: unknown[] = []

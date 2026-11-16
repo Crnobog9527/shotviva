@@ -31,7 +31,8 @@ export type DishReader = {
   // The decision row's per-million prices, to cost the step with the job (T33).
   prices?: ProviderPrices | null
   // `imageDataUrl`: the photo as a data: URL. Throws on any failure; the flow then falls back.
-  read(input: { imageDataUrl: string; instructions: string; signal: AbortSignal }): Promise<{ reading: DishReading; usage: DishReaderUsage | null }>
+  // `userDishName`: what the user typed as the dish's name (userDishName), never an instruction.
+  read(input: { imageDataUrl: string; instructions: string; signal: AbortSignal; userDishName?: string }): Promise<{ reading: DishReading; usage: DishReaderUsage | null }>
 }
 
 const filled = (value: string) => value.length > 0
@@ -49,4 +50,15 @@ export function dishText(reading: DishReading): string {
     filled(reading.sauce) ? `Sauce: ${reading.sauce}.` : '',
     garnish.length ? `Garnish: ${garnish.join('; ')}.` : '',
   ].filter(filled).join(' ')
+}
+
+// The template's optional copy field the user may type the dish's name into (Owner 2026-11-15).
+export const DISH_NAME_FIELD = 'dish_name'
+export const DISH_NAME_MAX = 60
+
+// The typed name as the reader may see it: one line, no control characters, at most 60
+// characters; '' when nothing usable is left. It stays data: the reader quotes it, never obeys it.
+export function userDishName(copy: Record<string, string>): string {
+  const raw = copy[DISH_NAME_FIELD] ?? ''
+  return raw.replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, DISH_NAME_MAX).trim()
 }
