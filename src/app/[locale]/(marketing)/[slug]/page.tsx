@@ -79,7 +79,7 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   const defaultId = wanted && live.some((template) => template.id === wanted) ? wanted : firstFeatured
   const initialCovers = await openingCovers(live.find((template) => template.id === defaultId))
   const generator = (
-    <HomeGeneratorSlot templates={catalogue} browse={pickerBrowse(index, catalogue, locale === 'zh')} defaultId={defaultId} homePath={localizePath(path, locale)} freeImages={free} initialCovers={initialCovers} />
+    <HomeGeneratorSlot templates={catalogue} catalogue={{ browse: pickerBrowse(index, catalogue, locale === 'zh') }} defaultId={defaultId} homePath={localizePath(path, locale)} freeImages={free} initialCovers={initialCovers} />
   )
   return (
     <>

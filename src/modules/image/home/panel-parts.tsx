@@ -8,6 +8,7 @@ import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { GroundedImg } from '../result/grounded-img'
 import { UPLOAD_FORMAT_NAMES, UPLOAD_MAX_MB } from '../workspace/upload-formats'
+import { HOME_RAIL_SIZE } from './home-catalogue'
 import { PlusIcon } from './home-icons'
 import { thumbImage } from './thumb-image'
 import type { HomeGeneratorState } from './use-home-generator'
@@ -52,10 +53,9 @@ export function PanelFormats({ state }: { state: HomeGeneratorState }) {
 }
 
 // The chosen template first, then the next few in catalogue order; the full picker one tap away.
-const RAIL = 4
 function railOf(templates: readonly CatalogueTemplate[], chosen: CatalogueTemplate | null): CatalogueTemplate[] {
   const rest = templates.filter((template) => template.id !== chosen?.id)
-  return (chosen ? [chosen, ...rest] : rest).slice(0, RAIL)
+  return (chosen ? [chosen, ...rest] : rest).slice(0, HOME_RAIL_SIZE)
 }
 
 export function PanelRail({ state, thumbOf, onOpenPicker }: { state: HomeGeneratorState; thumbOf(template: CatalogueTemplate): string | null; onOpenPicker(): void }) {
