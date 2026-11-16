@@ -6,8 +6,10 @@ import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useRef, useState } from 'react'
 
 import { coverImage } from '@/core/ui/cover-image'
+import { cn } from '@/core/ui/cn'
 
 import { CloseMark, SideToggle, useSwipe, type ViewerSide } from './sample-viewer-parts'
+import { templateImageGestureClass, templateImageGestures } from './template-image-gestures'
 import { useBackToClose } from './use-back-to-close'
 
 export type { ViewerSide } from './sample-viewer-parts'
@@ -77,7 +79,7 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
             style={box ? { ...FRAME, ...box } : FRAME}
             className="hairline relative grid place-items-center overflow-hidden rounded-media"
           >
-            <div {...swipe.handlers} style={box ? SCROLLER : PAN} className="overscroll-contain">
+            <div {...swipe.handlers} {...templateImageGestures} style={box ? SCROLLER : PAN} className={cn('overscroll-contain', templateImageGestureClass)}>
               {(['phone', 'ai'] as const).map((key) => (
                 <img
                   key={key}

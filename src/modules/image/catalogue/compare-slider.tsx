@@ -9,6 +9,7 @@ import { coverImage } from '@/core/ui/cover-image'
 
 import { GroundedImg, type PhotoGround } from '../result/grounded-img'
 import { SplitTags } from './split-tags'
+import { templateImageGestureClass, templateImageGestures } from './template-image-gestures'
 
 type Props = {
   before: string
@@ -39,9 +40,10 @@ export function CompareSlider({ before, after, afterAlt, afterGround = 'white', 
   const media = (url: string) => (cover ? { ...coverImage(url, cover.sizes), loading: cover.lazy ? ('lazy' as const) : undefined } : { src: url })
   return (
     <div
+      {...(cover ? templateImageGestures : {})}
       data-vaul-no-drag=""
       style={{ '--x': `${x}%` } as CSSProperties}
-      className={cn('relative aspect-[4/5] touch-pan-y overflow-hidden rounded-media bg-muted select-none', className)}
+      className={cn('relative aspect-[4/5] touch-pan-y overflow-hidden rounded-media bg-muted select-none', cover && templateImageGestureClass, className)}
     >
       <img {...media(before)} alt={t('phonePhotoAlt')} className="pointer-events-none absolute inset-0 size-full object-cover" />
       <GroundedImg {...media(after)} alt={afterAlt} ground={afterGround} className="pointer-events-none absolute inset-0 size-full object-cover [clip-path:inset(0_0_0_var(--x))]" />

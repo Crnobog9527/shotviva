@@ -5,6 +5,7 @@ import { coverImage } from '@/core/ui/cover-image'
 
 import { GroundedImg } from '../result/grounded-img'
 import { SplitTags } from './split-tags'
+import { templateImageGestureClass, templateImageGestures } from './template-image-gestures'
 
 type Props = {
   before: string
@@ -35,7 +36,7 @@ export function PairMedia({ before, after, alt, eager = false, video, size = 'ca
   const plate = cn('absolute inset-0 size-full', fit
     ? 'object-contain' : 'object-cover')
   return (
-    <span className={cn('hairline relative isolate grid aspect-[8/5] grid-cols-2 overflow-hidden bg-muted', size === 'card' ? 'rounded-control' : 'rounded-media', className)}>
+    <span {...templateImageGestures} className={cn('hairline relative isolate grid aspect-[8/5] grid-cols-2 overflow-hidden bg-muted', size === 'card' ? 'rounded-control' : 'rounded-media', templateImageGestureClass, className)}>
       <BeforePlate src={before} sizes={sizes} loading={loading} fit={fit} plate={plate} />
       <span className="relative overflow-hidden" style={fitContainer(fit)}>
         {fit ? <Backdrop src={after} sizes={sizes} loading={loading} /> : <img {...phone} alt="" loading={loading} decoding="async" className={cn(plate, 'saturate-[.85]')} />}
