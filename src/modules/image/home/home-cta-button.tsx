@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 
 import { Link } from '@/core/i18n/ui'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
@@ -26,10 +26,10 @@ const PRIMARY = 'mk-cta'
 // The generator's one primary (DESIGN §6.9 item 9), with the workspace's own labels:
 // "Generate · 2 credits", "Get credits · N needed" (neutral, opens the paywall), or a disabled
 // state while the photo uploads or a slot is busy.
-export function HomeCtaButton({ cta, templateId, onPhotoPicked, onSignUp, onGenerate }: Props) {
-  const t = useTranslations('app.workspace')
-  const home = useTranslations('home.generator')
+export function HomeCtaButton(props: Props) {
+  const inputId = useId()
   const initialInput = useRef<HTMLInputElement>(null)
+  const { onPhotoPicked } = props
   useEffect(() => {
     const input = initialInput.current
     const file = input?.files?.[0]
@@ -37,23 +37,36 @@ export function HomeCtaButton({ cta, templateId, onPhotoPicked, onSignUp, onGene
     onPhotoPicked(file)
     input.value = ''
   }, [onPhotoPicked])
+  const isUpload = props.cta.kind === 'pick-photo'
+  return (
+    <>
+      <input
+        ref={initialInput}
+        id={inputId}
+        type="file"
+        accept={UPLOAD_ACCEPT}
+        className="sr-only"
+        tabIndex={isUpload ? undefined : -1}
+        aria-hidden={isUpload ? undefined : true}
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0]
+          if (file) onPhotoPicked(file)
+          event.currentTarget.value = ''
+        }}
+      />
+      <CtaAction {...props} inputId={inputId} />
+    </>
+  )
+}
+
+function CtaAction({ cta, templateId, onSignUp, onGenerate, inputId }: Props & { inputId: string }) {
+  const t = useTranslations('app.workspace')
+  const home = useTranslations('home.generator')
   const generate = (count: number) => t.rich('generateCta', { cost: costTag, count })
   switch (cta.kind) {
     case 'pick-photo':
       return (
-        <label className={cn(PRIMARY, 'mk-upload-cta')}>
-          {/* The native label opens the picker on touch; the input handles Tab, Enter and Space. */}
-          <input
-            ref={initialInput}
-            type="file"
-            accept={UPLOAD_ACCEPT}
-            className="sr-only"
-            onChange={(event) => {
-              const file = event.currentTarget.files?.[0]
-              if (file) onPhotoPicked(file)
-              event.currentTarget.value = ''
-            }}
-          />
+        <label className={cn(PRIMARY, 'mk-upload-cta')} htmlFor={inputId}>
           <CameraIcon />
           <span>{home('uploadPhoto')}</span>
         </label>
