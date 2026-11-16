@@ -1,6 +1,6 @@
 'use client'
 
-import type { PostHog } from 'posthog-js/dist/module.slim'
+import type { PostHog } from 'posthog-js'
 
 import { EXPERIMENT_COOKIE, EXPERIMENT_COOKIE_MAX_AGE, parseExperimentCookie, serializeExperimentCookie, type CookieEntry } from '../../experiments/cookie'
 import { posthogSdk } from './sdk'

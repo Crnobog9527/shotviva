@@ -1,4 +1,4 @@
-import type { PostHog } from 'posthog-js/dist/module.slim'
+import type { PostHog } from 'posthog-js'
 
 type SentrySdk = typeof import('./sentry-entry')
 type Job<T> = (sdk: T) => void

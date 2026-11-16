@@ -1,4 +1,4 @@
-import type { CaptureResult } from 'posthog-js/dist/module.slim'
+import type { CaptureResult } from 'posthog-js'
 import { describe, expect, it } from 'vitest'
 
 import type { Consent } from '../consent/decision'
