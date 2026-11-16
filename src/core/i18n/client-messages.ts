@@ -23,6 +23,7 @@ export const APP_ONLY_APP_KEYS = [
   'support',
   'wishlist',
   'photos',
+  'poster',
   'edit',
   'checkout',
   'create',
