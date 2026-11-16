@@ -4,7 +4,6 @@
     "generator": {
       "label": "用你的照片试一下",
       "replace": "更换",
-      "replaceAria": "你的照片，点击更换",
       "template": "模板",
       "size": "尺寸",
       "change": "换模板",

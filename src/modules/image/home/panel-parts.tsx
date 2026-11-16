@@ -1,6 +1,7 @@
 'use client'
 
 import { useFormatter, useTranslations } from 'next-intl'
+import { useId } from 'react'
 
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
@@ -23,26 +24,33 @@ function useFormats(): string {
 export function PanelUpload({ url, onPick }: { url: string | null; onPick(): void }) {
   const t = useTranslations('home.generator')
   const formats = useFormats()
-  return (
-    <button type="button" className={url ? 'mk-up mk-up-has' : 'mk-up mk-up-empty'} onClick={onPick} aria-label={url ? t('replaceAria') : undefined}>
-      {url ? (
-        // eslint-disable-next-line @next/next/no-img-element -- a local object URL
-        <img className={`${REPLAY_BLOCK_CLASS} mk-up-thumb`} src={url} alt="" />
-      ) : (
+  const statusId = useId()
+  if (!url) {
+    return (
+      <button type="button" className="mk-up mk-up-empty" onClick={onPick}>
         <span className="mk-up-plus" aria-hidden>
           <PlusIcon className="size-6" />
         </span>
-      )}
-      <span className="mk-up-t">
-        <b>{url ? t('photoReady') : t('uploadPhoto')}</b>
-        <small>{url ? t('photoReadyHint') : formats}</small>
-      </span>
-      {url ? (
-        <span className="mk-up-re" aria-hidden>
-          {t('replace')}
+        <span className="mk-up-t">
+          <b>{t('uploadPhoto')}</b>
+          <small>{formats}</small>
         </span>
-      ) : null}
-    </button>
+      </button>
+    )
+  }
+  return (
+    <div className="mk-up mk-up-has relative">
+      {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL */}
+      <img className={`${REPLAY_BLOCK_CLASS} mk-up-thumb`} src={url} alt="" />
+      <span id={statusId} className="mk-up-t">
+        <b>{t('photoReady')}</b>
+        <small>{t('photoReadyHint')}</small>
+      </span>
+      {/* Keep the full card tappable while the visible action supplies the button's name. */}
+      <button type="button" className="mk-up-re after:absolute after:inset-0" onClick={onPick} aria-describedby={statusId}>
+        {t('replace')}
+      </button>
+    </div>
   )
 }
 
