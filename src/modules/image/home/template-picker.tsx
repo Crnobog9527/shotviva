@@ -96,7 +96,7 @@ export function TemplatePicker({ openOn, catalogue, failed, onRetry, onClose, on
   const ready = catalogue !== null
   const view = useMemo(() => openOn && ready ? browseView(browse, templates, zh) : null, [openOn, ready, browse, templates, zh])
   const { template: chosen, choose } = useChosen(openOn, templates)
-  if (!openOn || (view && !chosen)) return null
+  if (openOn === null || (ready && chosen === null)) return null
   const onOpenChange = (open: boolean) => (open ? undefined : onClose())
   const body = (header: ReactNode) => view && chosen
     ? <PickerBody header={header} chosen={chosen} choose={choose} view={view} onPick={onPick} sampleOf={sampleOf} thumbOf={thumbOf} />
