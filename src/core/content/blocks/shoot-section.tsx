@@ -1,4 +1,4 @@
-import { SiteImage as Image } from '@/core/ui/site-image'
+import { StaticSiteImage as Image } from '@/core/ui/static-site-image'
 
 import type { ShootDemo } from '../page-content'
 import { phoneSlot } from './phone-sizes'
