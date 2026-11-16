@@ -98,6 +98,10 @@ const nextConfig: NextConfig = {
       ...xRobotsTagRules(indexingIsOpen, SITE_DOMAIN),
       ...assetsHeaders(),
       {
+        source: '/marketing-styles/:asset(content-[a-f0-9]{16}\\.css)',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+      {
         source: '/fonts/misans/:asset(.+\\.(?:woff2|css))',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },

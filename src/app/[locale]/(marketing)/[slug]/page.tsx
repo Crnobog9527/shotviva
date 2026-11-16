@@ -38,7 +38,7 @@ const NO_PAGES = [{ slug: '__no-content-pages__' }]
 
 export function generateStaticParams({ params }: { params: { locale: string } }) {
   const locale: Locale = isLocale(params.locale) ? params.locale : 'en'
-  const slugs = contentPagesIn(locale).filter(isEnabled).map((page) => ({ slug: page.slug }))
+  const slugs = contentPagesIn(locale).filter((page) => page.slug !== 'commercial-photography' && isEnabled(page)).map((page) => ({ slug: page.slug }))
   return slugs.length > 0 ? slugs : NO_PAGES
 }
 

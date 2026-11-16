@@ -145,7 +145,8 @@ async function forwardSiteRequest(request: NextRequest, event: NextFetchEvent) {
 // /ingest is the PostHog proxy (next.config.ts rewrites): no session work for analytics beacons.
 // fonts/ holds public, content-addressed font files only (MiSans, ARCHITECTURE §17; Instrument Serif).
 // assets/ is the template-cover rewrite to the public bucket (ARCHITECTURE §8.3, T51).
+// marketing-styles/ holds only versioned public stylesheets and does not need locale routing.
 // api/version is the open tabs' version check (T90): no session work, no locale routing.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|api/version$|fonts/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|marketing-styles/content-[a-f0-9]{16}\\.css$|api/version$|fonts/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)'],
 }
