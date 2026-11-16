@@ -83,6 +83,13 @@ describe('metadata in two languages (建站规格 §6.1, LAUNCH §7.6)', () => {
     expect(terms.alternates?.languages).toBeUndefined()
     expect(terms.alternates?.canonical).toBe('https://example.com/terms')
   })
+
+  it('points only English and default alternates to the transparent background page', () => {
+    expect(pageMetadata(site, { ...page, path: '/transparent-background' }).alternates?.languages).toEqual({
+      en: 'https://example.com/transparent-background',
+      'x-default': 'https://example.com/transparent-background',
+    })
+  })
 })
 
 describe('json-ld', () => {
