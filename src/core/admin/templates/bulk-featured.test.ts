@@ -11,10 +11,19 @@ const { setTemplatesFeatured } = await import('./bulk-featured')
 type Row = { id: string; name: string; is_active: boolean; visible_in: string[]; featured_rank: number | null }
 const row = (id: string, rank: number | null, over: Partial<Row> = {}): Row => ({ id, name: `Name ${id}`, is_active: true, visible_in: ['web'], featured_rank: rank, ...over })
 
-// The one read: .from('templates').select(…).or(…) resolves to these rows; the filter is recorded.
 function fakeClient(rows: Row[]) {
-  const range = vi.fn(async (from: number, to: number) => ({ data: rows.slice(from, to + 1), error: null }))
-  const or = vi.fn(() => ({ order: () => ({ range }) }))
+  const byId = [...rows].sort((a, b) => a.id.localeCompare(b.id))
+  const or = vi.fn(() => ({ order: () => ({
+    limit: (limit: number) => {
+      let after: string | null = null
+      return {
+        gt: (_column: string, value: string) => { after = value },
+        then: (resolve: (result: { data: Row[]; error: null }) => void) => resolve({
+          data: byId.filter((row) => after === null || row.id > after).slice(0, limit), error: null,
+        }),
+      }
+    },
+  }) }))
   const client = { from: () => ({ select: () => ({ or }) }) } as unknown as SupabaseClient
   return { client, or }
 }

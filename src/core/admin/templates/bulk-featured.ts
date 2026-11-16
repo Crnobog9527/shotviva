@@ -33,17 +33,21 @@ const rowSchema = z.array(z.object({
   featured_rank: z.number().int().nullable(),
 }))
 
-// One read: the current featured rows and the ticked ones (primary key and the featured_rank filter).
+// Read the current featured rows and the ticked ones. The save checks the list under a lock.
 async function loadRows(client: SupabaseClient, ids: readonly string[]) {
   const rows: z.infer<typeof rowSchema> = []
   const pageSize = 500
+  let after: string | null = null
   for (;;) {
-    const { data, error } = await client.from('templates').select('id, name, is_active, visible_in, featured_rank')
-      .or(`featured_rank.not.is.null,id.in.(${ids.join(',')})`).order('id').range(rows.length, rows.length + pageSize - 1)
+    const query = client.from('templates').select('id, name, is_active, visible_in, featured_rank')
+      .or(`featured_rank.not.is.null,id.in.(${ids.join(',')})`).order('id').limit(pageSize)
+    if (after) query.gt('id', after)
+    const { data, error } = await query
     if (error) throw new AppError('INTERNAL', `bulk featured read failed: ${error.message}`)
     const page = rowSchema.parse(data)
     rows.push(...page)
     if (page.length < pageSize) return rows
+    after = page[page.length - 1].id
   }
 }
 
