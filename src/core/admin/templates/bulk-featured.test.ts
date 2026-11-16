@@ -42,15 +42,20 @@ describe('setTemplatesFeatured', () => {
     expect(repo.setFeaturedTemplates).not.toHaveBeenCalled()
   })
 
-  it('saves nothing when one template cannot go on the home page or the list would pass 12', async () => {
+  it('saves nothing when one template cannot go on the home page', async () => {
     const { client } = fakeClient([row('a', null), row('b', null, { is_active: false })])
     const plan = await setTemplatesFeatured(client, 'admin-1', { ids: ['a', 'b', 'gone'], featured: true, expectedIds: [] })
     expect(plan.failures.map((item) => [item.id, item.reason])).toEqual([['b', 'not_live'], ['gone', 'not_found']])
-    const full = Array.from({ length: 12 }, (_, i) => row(`f${i}`, i + 1))
-    const over = await setTemplatesFeatured(fakeClient([...full, row('x', null)]).client, 'admin-1', { ids: ['x'], featured: true, expectedIds: full.map((r) => r.id) })
-    expect(over.over).toBe(1)
     expect(repo.setFeaturedTemplates).not.toHaveBeenCalled()
     expect(logger.info).not.toHaveBeenCalled()
+  })
+
+  it('adds a thirteenth featured template', async () => {
+    const full = Array.from({ length: 12 }, (_, i) => row(`f${i}`, i + 1))
+    const { client } = fakeClient([...full, row('x', null)])
+    const plan = await setTemplatesFeatured(client, 'admin-1', { ids: ['x'], featured: true, expectedIds: full.map((r) => r.id) })
+    expect(plan.next).toHaveLength(13)
+    expect(repo.setFeaturedTemplates).toHaveBeenCalledWith(client, [...full.map((r) => r.id), 'x'])
   })
 
   it('clears the ticked ones and keeps the order of the rest', async () => {

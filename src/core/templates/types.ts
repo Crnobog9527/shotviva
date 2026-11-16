@@ -38,7 +38,7 @@ export type Template = {
   visibleIn: TemplateSurface[]
   // Other languages' display text; read through localizeTemplate (ARCHITECTURE §5).
   translations: TemplateTranslations
-  // Home featured position (T53): 1..12, small first; null when not featured.
+  // Home featured position (T53): positive, small first; null when not featured.
   featuredRank: number | null
   createdAt: string
   updatedAt: string

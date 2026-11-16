@@ -7,13 +7,13 @@ import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 import { TEMPLATE_SURFACES } from '@/core/templates/schema'
 
-import { FEATURED_LIMIT, planBlocked, planFeaturedChange, type FeaturedPlan } from './bulk-featured-rules'
+import { planBlocked, planFeaturedChange, type FeaturedPlan } from './bulk-featured-rules'
 import * as repo from './repository'
 
 // Batch 首页精选 (2026-11-12): the ticked templates in or out of the home featured list. Planned
 // here against the live rows, written by the same admin_set_featured_templates call the single
-// switch uses (one transaction; it re-checks "published, on the web" and the limit of 12). A
-// failure or going past the limit saves nothing, like the batch edit (T79).
+// switch uses (one transaction; it re-checks "published, on the web" ). A
+// failure saves nothing, like the batch edit (T79).
 
 const id = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(64)
 const unique = (ids: string[]) => new Set(ids).size === ids.length
@@ -22,7 +22,7 @@ const inputSchema = z.object({
   featured: z.boolean(),
   // The featured list as the page showed it. A different list on the server means it was changed
   // elsewhere since; the batch is refused instead of being built on top of what the admin never saw.
-  expectedIds: z.array(id).max(FEATURED_LIMIT).refine(unique, 'ids must be unique'),
+  expectedIds: z.array(id).refine(unique, 'ids must be unique'),
 })
 
 const rowSchema = z.array(z.object({

@@ -63,9 +63,20 @@ describe('home featured templates', () => {
     expect(live.find((row) => row.id === C)?.featuredRank).toBe(2)
   })
 
-  it('refuses more than 12, repeats and unpublished templates, changing nothing', async () => {
-    const thirteen = Array.from({ length: 13 }, (_, i) => `test-feat-${i}`)
-    await expect(setFeaturedTemplates(client, ADMIN_ID, thirteen)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  it('saves and reorders more than 12 published templates', async () => {
+    const extra = Array.from({ length: 11 }, (_, i) => `test-feat-extra-${i}`)
+    for (const id of extra) await saveTemplate(client, ADMIN_ID, { isNew: true, template: template(id), prompt }, CREDITS_FLOOR)
+    await approveFixtures(pg, ...extra)
+    for (const id of extra) await setTemplateActive(client, ADMIN_ID, { id, active: true }, CREDITS_FLOOR)
+    const all = [A, C, B, ...extra]
+    await setFeaturedTemplates(client, ADMIN_ID, all)
+    expect((await ranks())[extra[10]]).toBe(14)
+    await setFeaturedTemplates(client, ADMIN_ID, [...all].reverse())
+    expect((await ranks())[extra[10]]).toBe(1)
+    await setFeaturedTemplates(client, ADMIN_ID, [A, C, B])
+  })
+
+  it('refuses repeats and unpublished templates, changing nothing', async () => {
     await expect(setFeaturedTemplates(client, ADMIN_ID, [A, A])).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     await expect(setFeaturedTemplates(client, ADMIN_ID, [A, HIDDEN])).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     // Past the app's own check, the database still refuses.
