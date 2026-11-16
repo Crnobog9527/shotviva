@@ -57,19 +57,22 @@ function Meta({ card }: { card: TemplateCard }) {
 function PairCard({ card, media, size = 'card' }: { card: TemplateCard; media: TemplateMedia; size?: 'lg' | 'card' }) {
   const t = useTranslations('marketing.home')
   const pictures = images(card, media, t)
-  const pair = pictures ? <PhotoPair {...pictures} size={size} sizes={CARD_SIZES} /> : blankPair
+  const pair = pictures ? <PhotoPair {...pictures} size={size} sizes={CARD_SIZES} decorative={media.live} /> : blankPair
+  // In a solo row the visible title is next to the button. Give that photo button the same
+  // title without duplicating the row's markup; in the grid the button uses its visible text.
+  const meta = size === 'lg' ? <span className="sr-only">{card.name}</span> : <Meta card={card} />
   if (!media.live) {
     return (
       <div className="mk-tpl">
         {pair}
-        <Meta card={card} />
+        {size === 'lg' ? null : meta}
       </div>
     )
   }
   return (
-    <button type="button" className="mk-tpl" data-pick-template={card.id} aria-label={t('pickAria', { name: card.name, use: card.use })}>
+    <button type="button" className="mk-tpl" data-pick-template={card.id}>
       {pair}
-      <Meta card={card} />
+      {meta}
     </button>
   )
 }

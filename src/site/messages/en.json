@@ -4,7 +4,6 @@
     "generator": {
       "label": "Try it on your photo",
       "replace": "Replace",
-      "replaceAria": "Your photo. Replace it",
       "template": "Template",
       "size": "Size",
       "change": "Change",
@@ -22,6 +21,8 @@
       "noTemplates": "Templates are on the way",
       "gift": "{images} for new users",
       "pickerTitle": "Pick a template",
+      "pickerLoading": "Loading templates…",
+      "pickerLoadFailed": "Couldn’t load templates.",
       "pickerText": "Each one keeps your subject as shot and changes the light, the scene or the style.",
       "pickTemplate": "Pick {name}",
       "pickerSearch": "Search by name, use or category",
