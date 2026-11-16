@@ -13,15 +13,15 @@ import { isCompareSample, TemplateSample, type SampleTemplate } from './template
 // Fetched on the first open only (scripts/js-budget.json).
 const SampleViewer = dynamic(() => import('./sample-viewer').then((m) => m.SampleViewer), { ssr: false })
 
-type Props = { template: SampleTemplate & Pick<CatalogueTemplate, 'name'>; className?: string }
+type Props = { template: SampleTemplate & Pick<CatalogueTemplate, 'name'>; className?: string; fill?: boolean }
 
 // The creation dialog's sample, opened large in a popup the size of the picture (SampleViewer). The pair is one big tap target
 // (the half tapped is the side that opens); the drag compare keeps its drag, so it opens from the
 // corner button only. A motion-only template has no stills to show and stays as it was.
-export function ZoomableSample({ template, className }: Props) {
+export function ZoomableSample({ template, className, fill = false }: Props) {
   const t = useTranslations('app.template')
   const [side, setSide] = useState<ViewerSide | null>(null)
-  const sample = <TemplateSample template={template} className={className} />
+  const sample = <TemplateSample template={template} className={className} fill={fill} />
   if (!hasStills(template)) return sample
   const compare = isCompareSample(template)
   const openAt = (event: MouseEvent<HTMLElement>) => {

@@ -12,10 +12,10 @@ const CORNER = { top: 8, left: 8, zIndex: 1 } as const
 const DISC = { width: 32, height: 32 } as const
 
 // 原图 / AI on the picture's top-left corner, frosted so it reads over any photo.
-export function SideToggle({ side, onSide }: { side: ViewerSide; onSide(side: ViewerSide): void }) {
+export function SideToggle({ side, onSide, poster = false }: { side: ViewerSide; onSide(side: ViewerSide): void; poster?: boolean }) {
   const t = useTranslations('app.template')
   return (
-    <div role="group" aria-label={t('viewerSwitch')} style={CORNER} className="frost absolute inline-flex rounded-full p-1">
+    <div role="group" aria-label={t(poster ? 'viewerSwitchPages' : 'viewerSwitch')} style={CORNER} className="frost absolute inline-flex rounded-full p-1">
       {(['phone', 'ai'] as const).map((key) => (
         <button
           key={key}
@@ -24,7 +24,7 @@ export function SideToggle({ side, onSide }: { side: ViewerSide; onSide(side: Vi
           onClick={() => onSide(key)}
           className={cn('min-h-9 rounded-full px-5 text-caption font-semibold', side === key ? (key === 'ai' ? 'bg-primary text-primary-foreground' : 'bg-foreground text-background') : 'text-foreground')}
         >
-          {t(key)}
+          {t(poster ? (key === 'phone' ? 'viewerPage1' : 'viewerPage2') : key)}
         </button>
       ))}
     </div>

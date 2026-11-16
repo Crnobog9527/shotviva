@@ -20,6 +20,8 @@ type Props = {
   name: string
   side: ViewerSide
   onSide(side: ViewerSide): void
+  poster?: boolean
+  single?: boolean
 }
 
 type Box = { width: number; height: number }
@@ -49,14 +51,14 @@ const HINT = { maxWidth: 'calc(100vw - 2rem)', padding: '4px 12px' } as const
 // at a time in its own aspect ratio; 原图 / AI on its top-left corner (or a sideways swipe), ✕ on
 // its top-right. A tap zooms to twice the width inside the same frame, panned by scrolling; the
 // browser's own pinch zoom stays on. ✕, Esc, a tap on the scrim and Back all close it.
-export function SampleViewer({ open, onOpenChange, before, after, name, side, onSide }: Props) {
+export function SampleViewer({ open, onOpenChange, before, after, name, side, onSide, poster = false, single = false }: Props) {
   const t = useTranslations('app.template')
   const frame = useRef<HTMLDivElement>(null)
   // Zoomed keeps the frame at the size it had, so the picture grows inside it.
   const [box, setBox] = useState<Box | null>(null)
   const dismiss = useBackToClose(() => onOpenChange(false))
   const pick = (next: ViewerSide) => (setBox(null), onSide(next))
-  const swipe = useSwipe(box !== null, (direction) => pick(direction === 'left' ? 'ai' : 'phone'))
+  const swipe = useSwipe(box !== null || single, (direction) => pick(direction === 'left' ? 'ai' : 'phone'))
   const toggleZoom = () => {
     if (swipe.consumed()) return
     const rect = frame.current?.getBoundingClientRect()
@@ -83,7 +85,7 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
                   key={key}
                   {...coverImage(key === 'phone' ? before : after, box ? '200vw' : '100vw')}
                   hidden={key !== side}
-                  alt={key === 'phone' ? t('phonePhotoAlt') : t('resultAlt', { name })}
+                  alt={poster ? t('viewerPageAlt', { name, page: key === 'phone' ? 1 : 2 }) : key === 'phone' ? t('phonePhotoAlt') : t('resultAlt', { name })}
                   decoding="async"
                   onClick={toggleZoom}
                   style={box ? ZOOMED : FIT}
@@ -92,12 +94,12 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
                 />
               ))}
             </div>
-            <SideToggle side={side} onSide={pick} />
+            {single ? null : <SideToggle side={side} onSide={pick} poster={poster} />}
             <DialogPrimitive.Close aria-label={t('viewerClose')} style={CLOSE} className="press absolute grid size-11 place-items-center rounded-full">
               <CloseMark />
             </DialogPrimitive.Close>
           </div>
-          <p style={HINT} className="frost rounded-full text-center text-caption text-foreground">{t(box ? 'viewerHintZoomed' : 'viewerHint')}</p>
+          <p style={HINT} className="frost rounded-full text-center text-caption text-foreground">{t(box ? 'viewerHintZoomed' : single ? 'viewerHintSingle' : poster ? 'viewerHintPages' : 'viewerHint')}</p>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
