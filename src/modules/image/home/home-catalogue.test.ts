@@ -7,11 +7,34 @@ import { homePanelTemplates } from './home-catalogue'
 function template(id: string, slot = false): LocalizedTemplate {
   return {
     id,
+    module: 'image',
     name: id,
-    fields: { images: { min: 1, max: 1, ...(slot ? { slots: [{ key: 'photo', label: 'Photo', required: true }] } : {}) }, copy: [] },
-    categoryInfo: {},
-    categoryView: {},
-  } as LocalizedTemplate
+    description: null,
+    category: 'food-drink',
+    categoryInfo: { key: 'food-drink', nameEn: 'Food', nameZh: '餐饮', introEn: null, introZh: null, sortOrder: 10, cardStyle: 'pair', isSystem: false },
+    categoryView: { key: 'food-drink', name: 'Food', intro: '', compare: false, sortOrder: 10 },
+    coverBeforeUrl: null,
+    coverAfterUrl: null,
+    coverVideoUrl: null,
+    coverPosterUrl: null,
+    coverMediaType: 'image',
+    coverLocales: {},
+    fields: {
+      images: { min: 1, max: 1, ...(slot ? { slots: [{ key: 'photo', label: 'Photo', required: true }] } : {}) },
+      copy: [],
+      toggles: [],
+      aspectRatios: ['1:1'],
+    },
+    quality: 'high',
+    creditsCost: { '1k': 1, '2k': 1, '4k': 1 },
+    sortOrder: 0,
+    isActive: true,
+    visibleIn: ['web'],
+    translations: {},
+    featuredRank: null,
+    createdAt: '',
+    updatedAt: '',
+  }
 }
 
 const catalogue = [template('slot', true), ...['one', 'two', 'three', 'four', 'featured', 'deferred'].map((id) => template(id))]
