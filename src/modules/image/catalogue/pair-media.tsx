@@ -20,6 +20,8 @@ type Props = {
   className?: string
 }
 
+const shouldContain = (contain: boolean, size: Props['size']) => contain || size === 'pair' || size === 'thumb'
+
 // The side-by-side pair (DESIGN §6.9 item 1, B comp app.css .pair): one 8:5 frame, the phone
 // photo on the left plate and the AI result on the right, a hairline between them, "Phone" and
 // "AI" on the bottom corners. The right plate keeps the phone photo under the result and a
@@ -27,7 +29,7 @@ type Props = {
 export function PairMedia({ before, after, alt, eager = false, video, size = 'card', contain = false, sizes, className }: Props) {
   const loading = eager ? 'eager' : 'lazy'
   const phone = coverImage(before, sizes)
-  const fit = contain || size === 'pair' || size === 'thumb'
+  const fit = shouldContain(contain, size)
   const plate = cn('absolute inset-0 size-full', fit
     ? 'object-contain' : 'object-cover transition-transform duration-600 ease-house group-hover:scale-[1.02]')
   return (
