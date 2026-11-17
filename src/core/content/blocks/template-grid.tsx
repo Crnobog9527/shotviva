@@ -57,7 +57,7 @@ function Meta({ card }: { card: TemplateCard }) {
 function PairCard({ card, media, size = 'card' }: { card: TemplateCard; media: TemplateMedia; size?: 'lg' | 'card' }) {
   const t = useTranslations('marketing.home')
   const pictures = images(card, media, t)
-  const pair = pictures ? <PhotoPair {...pictures} size={size} sizes={CARD_SIZES} decorative={media.live} /> : blankPair
+  const pair = pictures ? <PhotoPair {...pictures} size={size} sizes={CARD_SIZES} decorative={media.live} showcase /> : blankPair
   // In a solo row the visible title is next to the button. Give that photo button the same
   // title without duplicating the row's markup; in the grid the button uses its visible text.
   const meta = size === 'lg' ? <span className="sr-only">{card.name}</span> : <Meta card={card} />
