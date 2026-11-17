@@ -28,7 +28,7 @@ async function Matrix({ searchParams }: { searchParams: Promise<Record<string, s
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
   const query = await searchParams
-  const [{ templates, initial }, balance, tier] = await Promise.all([
+  const [{ templates, initial, browse }, balance, tier] = await Promise.all([
     // Series members included: a series dialog's link arrives with a member's id (?t=).
     loadBatchCatalogue(await currentLocale(), query.t),
     readBalance(supabase, user.id),
@@ -45,7 +45,7 @@ async function Matrix({ searchParams }: { searchParams: Promise<Record<string, s
           </>
         }
       />
-      <MatrixWorkspace templates={templates} initial={initial} balance={balance} tier={tier} limit={limitsFor(tier).concurrency} />
+      <MatrixWorkspace templates={templates} browse={browse} initial={initial} balance={balance} tier={tier} limit={limitsFor(tier).concurrency} />
     </>
   )
 }
