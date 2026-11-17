@@ -3,6 +3,7 @@ import 'server-only'
 import type Stripe from 'stripe'
 import { z } from 'zod'
 
+import { notifyOwner } from '../../alerts'
 import { trackPurchase } from '../../analytics/funnel'
 import type { SiteProduct } from '../../config'
 import { AppError } from '../../errors'
@@ -132,7 +133,13 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
     payment,
   })
   const discount = sessionDiscount(session, purchase.product)
-  if (change.applied) track(deps, session, purchase, payment.method, discount)
+  if (change.applied) {
+    track(deps, session, purchase, payment.method, discount)
+    // Only the call that granted alerts (never a replay); keyed by the session, so the completed +
+    // async_payment_succeeded pair and Stripe's retries cannot send it twice.
+    notifyOwner({ kind: 'payment_received', channel: 'stripe', ref: session.id, userId: purchase.userId, productId: purchase.product.id,
+      amount: { cents: payment.amountTotal, currency: payment.currency }, method: payment.method, renewal: false })
+  }
   await deps.applyCodes({
     channel: 'stripe', reference: session.id, userId: purchase.userId, productId: purchase.product.id,
     codeId: discount.codeId, amountDiscount: discount.amountDiscount, locale: session.locale === 'zh' ? 'zh' : 'en',

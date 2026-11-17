@@ -13,6 +13,7 @@ import type {
   OwnerAlert,
   OwnerAlertKind,
   PaymentFailedAlert,
+  PaymentReceivedAlert,
   RefundAlert,
   RenewalReviewAlert,
   SaleFloorExample,
@@ -168,6 +169,18 @@ function paymentFailed(alert: PaymentFailedAlert): Rendered {
   return { line, path: '/admin/orders' }
 }
 
+const METHODS: Record<string, string> = { card: '银行卡', cn_card: '中国银行卡', alipay: '支付宝', wechat_pay: '微信支付' }
+
+// A grant landed. Amount, product and masked buyer only (no payment ids); a renewal says so.
+function paymentReceived(alert: PaymentReceivedAlert, who: string): Rendered {
+  const paid = `${money(alert.amount)}（${METHODS[alert.method] ?? '其他方式'}）`
+  const known = PRODUCT_NAMES[alert.productId]
+  const line = alert.renewal
+    ? `【收到续费】${who} 的 ${known ?? '订阅'} 自动续费 ${paid}。`
+    : `【收到付款】${who} ${known ? `买了 ${known}，` : '付了 '}${paid}。`
+  return { line, path: '/admin/orders' }
+}
+
 function generationSpike(alert: GenerationSpikeAlert): Rendered {
   const rate = Math.round((alert.failed / alert.total) * 100)
   return {
@@ -284,6 +297,7 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   dispute_closed: disputeClosed,
   dispute_due_soon: disputeDueSoon,
   payment_failed: paymentFailed,
+  payment_received: paymentReceived,
   waffo_renewal_review: renewalReview,
   generation_spike: generationSpike,
   catalog_publish_failed: a => ({ line: `【商品发布待核对】发布号 ${a.request}，步骤 ${a.step}。请到商品目录查看并重试。`, path: '/admin/products' }),

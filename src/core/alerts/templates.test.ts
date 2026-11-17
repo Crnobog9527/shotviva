@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { OwnerAlert } from './alert-kinds'
+import { alertPolicy } from './alert-kinds'
 import { renderAlert, type RenderContext } from './templates'
 
 const USER = '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b'
@@ -121,6 +122,22 @@ describe('renderAlert: operations', () => {
       `【新企业咨询】「Acme Foods」想合作，每月预计出图 500–2,000 张，用途：电商商品图、社交媒体内容。请到后台查看联系方式并跟进。\n去后台看：https://shotviva.com/admin/inquiries/${TICKET}`,
     )
     expect(text({ ...inquiry, company: 'x'.repeat(60) })).toContain(`「${'x'.repeat(40)}…」`)
+  })
+
+  it('payment received: buyer, product, USD amount, method and the orders link; a renewal says so', () => {
+    const paid = { kind: 'payment_received', channel: 'stripe', ref: 'cs_live_a1B2', userId: USER, productId: 'starter_monthly', amount: usd(1990), method: 'wechat_pay', renewal: false } as const
+    expect(text(paid)).toBe('【收到付款】j***@gmail.com 买了 Starter 月付，$19.90（微信支付）。\n去后台看：https://shotviva.com/admin/orders')
+    expect(text({ ...paid, renewal: true, method: 'card' })).toContain('【收到续费】j***@gmail.com 的 Starter 月付 自动续费 $19.90（银行卡）。')
+    expect(text({ ...paid, productId: 'unlisted', amount: { cents: 1500, currency: 'eur' } }, { who: null })).toContain('一位用户 付了 15.00 EUR（微信支付）。')
+    // No payment ref, user id or full contact in the text.
+    expect(text(paid)).not.toMatch(/cs_live|[0-9a-f]{8}-|wechat_pay/)
+  })
+
+  it('payment received: one key per payment, money-class, so a redelivery never alerts twice', () => {
+    const paid = { kind: 'payment_received', channel: 'waffo', ref: 'PAY_1', userId: USER, productId: 'pro_monthly', amount: usd(4990), method: 'card', renewal: false } as const
+    expect(alertPolicy(paid)).toEqual({ key: 'payment_received:waffo:PAY_1', money: true })
+    expect(alertPolicy({ ...paid })).toEqual(alertPolicy(paid))
+    expect(alertPolicy({ ...paid, channel: 'stripe' }).key).not.toBe(alertPolicy(paid).key)
   })
 
   it('marks the test site, and puts no ids, codes or event names in the sentence', () => {
