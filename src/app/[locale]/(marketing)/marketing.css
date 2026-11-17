@@ -167,7 +167,8 @@
   .mk-spair .mk-sb { filter: saturate(.85); }
   .mk-spair .mk-hl { z-index: 3; }
   .mk-spair .mk-tag { z-index: 4; }
-  .mk-sl { position: absolute; inset: 0; z-index: 1; display: none; grid-template-columns: 1fr 1fr; opacity: 0; transition: opacity .7s var(--ease); }
+  /* Opaque margins on each member keep the previous pair from showing through after the fade. */
+  .mk-sl { position: absolute; inset: 0; z-index: 1; display: none; grid-template-columns: 1fr 1fr; background: var(--muted); opacity: 0; transition: opacity .7s var(--ease); }
   /* only the layer whose turn is next (series-motion.ts LOADING_CLASS), so its lazy images load just in time */
   .mk-armed .mk-sl.mk-ld { display: grid; }
   .mk-sl.mk-was { opacity: 1; transition: none; }
@@ -482,6 +483,8 @@
   button.mk-tpl { cursor: pointer; transition: transform .3s var(--ease); }
   button.mk-tpl:active { transform: scale(.97); }
   .mk-tpl .mk-pair { width: 100%; }
+  /* Fill the available plate without cropping. Portrait results keep the white backing inside their edges. */
+  .mk-tpl-wrap .mk-tpl .mk-pair img { width: auto; max-width: 100%; margin: auto; object-fit: contain; }
   .mk-tpl-meta { display: block; padding: 8px 2px 2px; }
   .mk-tpl-meta b { display: block; font: 600 16px/1.25 var(--font-sans); letter-spacing: -0.015em; }
   .mk-use { display: block; margin-top: 2px; font-size: 14px; line-height: 1.35; color: var(--muted-foreground); }
