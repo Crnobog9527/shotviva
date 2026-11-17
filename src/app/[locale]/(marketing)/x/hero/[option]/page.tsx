@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
-import { HERO_DEFAULT_OPTION, HERO_OPTIONS } from '@/site/experiments'
+import { HERO_OPTIONS } from '@/site/experiments'
 
 import { HomeContent, homeMetadata } from '../../../home-page'
 
@@ -11,7 +11,9 @@ import { HomeContent, homeMetadata } from '../../../home-page'
 // the home page's own, canonical `/` included.
 import '../../../explainer.css'
 
-const OPTIONS: readonly string[] = HERO_OPTIONS.map((option) => option.id).filter((id) => id !== HERO_DEFAULT_OPTION)
+// Every option, the default one too: B visitors of a running experiment are served /x/hero/tote
+// (registry.ts DEFAULT_PAGE_USES_HERO_ORDER), the same page as / apart from the generator order.
+const OPTIONS: readonly string[] = HERO_OPTIONS.map((option) => option.id)
 
 export function generateStaticParams() {
   return OPTIONS.map((option) => ({ option }))

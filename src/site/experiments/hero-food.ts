@@ -68,7 +68,6 @@ function foodIn(locale: Locale): HeroOptionContent {
       scenes: undefined,
     },
     tagline: copy.tagline,
-    generatorTemplate: 'wd-dappled-slate',
     strip: {
       heading: copy.strip,
       items: DISHES[locale].map((dish, index) => ({ before: small(`food-${index + 2}-photo`, dish.phone), after: small(`food-${index + 2}-ai`, dish.ai), caption: dish.caption })),
