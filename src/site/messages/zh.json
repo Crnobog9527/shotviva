@@ -681,6 +681,12 @@
       "viewerTitle": "{name} 大图",
       "viewerClose": "关闭大图",
       "viewerSwitch": "切换原图和 AI 出图",
+      "viewerSwitchPages": "切换海报页面",
+      "viewerPage1": "第 1 页",
+      "viewerPage2": "第 2 页",
+      "viewerPageAlt": "{name} 样图第 {page} 页",
+      "viewerHintPages": "点图片放大，左右滑动切换页面。",
+      "viewerHintSingle": "点图片放大。",
       "viewerHint": "点图片放大，左右滑动切换原图和 AI。",
       "viewerHintZoomed": "拖动查看细节，再点一下缩回。"
     },
@@ -702,6 +708,7 @@
     "poster": {
       "dialogHint": "粘贴活动通知，逐行核对后一次生成整套海报。",
       "sampleAlt": "{name} 样图第 {page} 页",
+      "sampleOpen": "放大查看 {name} 第 {page} 页",
       "paste": {
         "heading": "粘贴活动通知",
         "hint": "把标题、时间、奖品、规则和级别表整段粘贴进来。我们先帮你分好块，你核对无误后才生成海报。",

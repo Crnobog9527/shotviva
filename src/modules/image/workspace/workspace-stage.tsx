@@ -8,7 +8,7 @@ import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { useReveal } from '@/core/ui/reveal'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
-import { TemplateSample } from '../catalogue/template-sample'
+import { ZoomableSample } from '../catalogue/zoomable-sample'
 import type { BatchPhoto } from './photo-batch'
 
 // The workspace's right column from lg up, the "stage" (B comp workspace.html .stage): a 4:5
@@ -34,7 +34,7 @@ export function WorkspaceStage({ template, photo }: { template: CatalogueTemplat
             </span>
           </>
         ) : (
-          <TemplateSample template={template} fill />
+          <ZoomableSample template={template} fill />
         )}
       </div>
       <p className="mt-3 text-center text-caption text-muted-foreground">{t(photo ? 'workspace.stageYoursCaption' : 'workspace.stageSampleCaption')}</p>

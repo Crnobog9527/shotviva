@@ -681,6 +681,12 @@
       "viewerTitle": "{name}, full screen",
       "viewerClose": "Close the large view",
       "viewerSwitch": "Switch between the phone photo and the AI result",
+      "viewerSwitchPages": "Switch poster pages",
+      "viewerPage1": "Page 1",
+      "viewerPage2": "Page 2",
+      "viewerPageAlt": "{name}, sample page {page}",
+      "viewerHintPages": "Tap the image to zoom. Swipe to switch pages.",
+      "viewerHintSingle": "Tap the image to zoom.",
       "viewerHint": "Tap the image to zoom. Swipe to switch between Phone and AI.",
       "viewerHintZoomed": "Drag to look around. Tap again to zoom out."
     },
@@ -702,6 +708,7 @@
     "poster": {
       "dialogHint": "Paste your event notice, check every line, then make the whole set.",
       "sampleAlt": "{name}, sample page {page}",
+      "sampleOpen": "Enlarge {name}, page {page}",
       "paste": {
         "heading": "Paste your event notice",
         "hint": "Paste everything: title, time, prizes, rules and the level table. We sort it into blocks for you to check before any poster is made.",
