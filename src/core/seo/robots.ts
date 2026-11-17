@@ -23,7 +23,7 @@ export function robotsRules(site: SiteConfig, open: boolean = indexingOpenNow())
   return {
     rules: [
       { userAgent: '*', allow: '/', disallow: [...PRIVATE_PATHS] },
-      ...AI_CRAWLERS.map((userAgent) => ({ userAgent, allow: '/' })),
+      { userAgent: [...AI_CRAWLERS], allow: '/', disallow: [...PRIVATE_PATHS] },
       ...BLOCKED_CRAWLERS.map((userAgent) => ({ userAgent, disallow: '/' })),
     ],
     sitemap: `${siteOrigin(site)}/sitemap.xml`,
