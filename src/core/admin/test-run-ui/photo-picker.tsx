@@ -1,7 +1,7 @@
 'use client'
 
 import { ImagePlus, LoaderCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
@@ -12,6 +12,7 @@ import { uploadTestPhoto } from './api'
 import { TestThumbnail } from './test-thumbnail'
 import { TEST_RUN_COPY as COPY } from './copy'
 import { failureMessage } from './messages'
+import { useFileDrop } from '../ui/use-file-drop'
 
 export const MAX_PICKED = 3
 
@@ -38,15 +39,21 @@ function toggle(picked: readonly string[], id: string, max = MAX_PICKED): string
 export function PhotoPicker({ slot, photos, picked, onPick, onUploaded, onError, onNotice }: Props) {
   const max = slot ? 1 : MAX_PICKED
   const [progress, setProgress] = useState<number | null>(null)
+  const inFlight = useRef(false)
+  const currentPicked = useRef(picked)
+  useEffect(() => { currentPicked.current = picked }, [picked])
   const upload = async (file: File) => {
+    if (inFlight.current) return
+    inFlight.current = true
     setProgress(0)
     try {
       const photo = await uploadTestPhoto(file, setProgress)
       onUploaded()
-      onPick(toggle(picked, photo.id, max))
+      onPick(toggle(currentPicked.current, photo.id, max))
     } catch (error) {
       onError(failureMessage(error))
     } finally {
+      inFlight.current = false
       setProgress(null)
     }
   }
@@ -72,8 +79,10 @@ export function PhotoPicker({ slot, photos, picked, onPick, onUploaded, onError,
 
 function UploadTile({ progress, onFile }: { progress: number | null; onFile: (file: File) => void }) {
   const busy = progress !== null
+  const drop = useFileDrop(onFile, busy)
   return (
-    <label className={cn(buttonVariants({ variant: 'outline' }), 'aspect-square h-auto w-full flex-col gap-1 text-xs', busy && 'pointer-events-none opacity-70')}>
+    <label onDragOver={drop.onDragOver} onDragLeave={drop.onDragLeave} onDrop={drop.onDrop}
+      className={cn(buttonVariants({ variant: 'outline' }), 'aspect-square h-auto w-full flex-col gap-1 text-xs', busy && 'opacity-70', drop.active && 'border-primary ring-primary ring-2')}>
       <input
         type="file"
         accept={ACCEPT}
@@ -87,6 +96,8 @@ function UploadTile({ progress, onFile }: { progress: number | null; onFile: (fi
       />
       {busy ? <LoaderCircle className="animate-spin" aria-hidden /> : <ImagePlus aria-hidden />}
       {busy ? `${Math.round(progress * 100)}%` : COPY.first.upload}
+      {!busy && <span className="text-muted-foreground text-[11px]">或拖放照片</span>}
+      {drop.error && <span role="alert" className="text-destructive">{drop.error}</span>}
     </label>
   )
 }

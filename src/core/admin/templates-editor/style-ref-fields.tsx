@@ -12,6 +12,7 @@ import { isRefFromAfterCover, type AfterCover } from '../covers/client'
 import { reuseAfterCover, uploadStyleRef } from './style-ref-upload'
 import { PreviewThumb } from '../ui/image-preview'
 import { styleRefUrl } from './style-ref-url'
+import { useFileDrop } from '../ui/use-file-drop'
 
 type Props = {
   cover: AfterCover | null
@@ -57,6 +58,9 @@ export function StyleRefFields({ cover, templateId, refs, budget, busy, onBusy, 
   }
   const keys = refs.map(ref => ref.key)
   const reorder = async (order: string[]) => onChange(order.flatMap(key => refs.filter(ref => ref.key === key)))
+  const upload = (file: File, replaced: string | null) => {
+    if (templateId && !busy && (replaced || !full)) void add(() => uploadStyleRef(templateId, file), replaced)
+  }
   return (
     <fieldset className="grid gap-2 rounded-md border p-3 text-sm" disabled={busy}>
       <legend className="px-1 font-medium">{copy.title}</legend>
@@ -65,17 +69,18 @@ export function StyleRefFields({ cover, templateId, refs, budget, busy, onBusy, 
       <p>{copy.limit(budget.users, refs.length, budget.total, budget.model)}</p>
       <SortableList ids={keys} labelOf={key => copy.label(keys.indexOf(key) + 1)} onReorder={reorder} disabled={busy}>
         {order => <ol className="grid gap-1">{order.map((key, i) => (
-          <RefRow key={key} refKey={key} label={copy.label(i + 1)} pick={pick} remove={() => onChange(refs.filter(r => r.key !== key))} />
+          <RefRow key={key} refKey={key} label={copy.label(i + 1)} pick={pick} busy={busy || !templateId}
+            upload={upload} remove={() => onChange(refs.filter(r => r.key !== key))} />
         ))}</ol>}
       </SortableList>
       <input ref={picker} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={event => {
         const file = event.target.files?.[0]
         event.target.value = ''
-        if (file && templateId) void add(() => uploadStyleRef(templateId, file), replacing.current)
+        if (file) upload(file, replacing.current)
       }} />
       {templateId ? (
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => pick(null)} disabled={busy || full}>{copy.add}</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <AddRefDropZone disabled={busy || full} pick={() => pick(null)} upload={file => upload(file, null)} />
           <Button type="button" variant="outline" size="sm" disabled={busy || !!hint}
             onClick={() => cover && void add(() => reuseAfterCover(templateId, cover), null)}>{copy.reuse}</Button>
         </div>
@@ -87,11 +92,25 @@ export function StyleRefFields({ cover, templateId, refs, budget, busy, onBusy, 
   )
 }
 
-function RefRow({ refKey, label, pick, remove }: { refKey: string; label: string; pick: (key: string) => void; remove: () => void }) {
+function AddRefDropZone({ disabled, pick, upload }: { disabled: boolean; pick: () => void; upload: (file: File) => void }) {
+  const drop = useFileDrop(upload, disabled)
+  return (
+    <div onDragOver={drop.onDragOver} onDragLeave={drop.onDragLeave} onDrop={drop.onDrop}
+      className={cn('flex flex-wrap items-center gap-2 rounded-md', drop.active && 'ring-primary ring-2')}>
+      <Button type="button" variant="outline" size="sm" onClick={pick} disabled={disabled}>{copy.add}</Button>
+      <span className="text-xs text-muted-foreground">或拖放图片到这里</span>
+      {drop.error && <span role="alert" className="text-destructive text-xs">{drop.error}</span>}
+    </div>
+  )
+}
+
+function RefRow({ refKey, label, pick, upload, remove, busy }: { refKey: string; label: string; pick: (key: string) => void; upload: (file: File, replaced: string) => void; remove: () => void; busy: boolean }) {
   const item = useSortableItem(refKey)
   const url = styleRefUrl(refKey)
+  const drop = useFileDrop(file => upload(file, refKey), busy)
   return (
-    <li {...item.row} className={cn('flex items-center gap-2 rounded-md border p-1', sortableRowClass)}>
+    <li {...item.row} onDragOver={drop.onDragOver} onDragLeave={drop.onDragLeave} onDrop={drop.onDrop}
+      className={cn('flex flex-wrap items-center gap-2 rounded-md border p-1', sortableRowClass, drop.active && 'border-primary ring-primary ring-2')}>
       <DragHandle handle={item.handle} />
       {/* A same-origin admin gate signs the private image only when it is drawn; the large view reads the same gate. */}
       <PreviewThumb title={label} images={url ? [{ url, label }] : []}>
@@ -101,6 +120,8 @@ function RefRow({ refKey, label, pick, remove }: { refKey: string; label: string
       <MoveButtons item={item} />
       <Button type="button" variant="outline" size="sm" onClick={() => pick(refKey)}>{copy.replace}</Button>
       <Button type="button" variant="ghost" size="sm" onClick={remove}>{copy.remove}</Button>
+      <span className="text-xs text-muted-foreground">拖入图片可替换</span>
+      {drop.error && <span role="alert" className="text-destructive text-xs">{drop.error}</span>}
     </li>
   )
 }
