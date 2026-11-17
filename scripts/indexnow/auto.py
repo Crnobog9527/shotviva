@@ -3,8 +3,10 @@
 import hashlib
 import json
 import os
+import time
 from html.parser import HTMLParser
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
@@ -18,12 +20,20 @@ AGENT = 'Mozilla/5.0 (compatible; ShotvivaIndexBot/1.0; +https://shotviva.com/)'
 
 def read_url(url, data=None):
     request = Request(url, data=data, headers={'User-Agent': AGENT, **({'Content-Type': 'application/json'} if data else {})})
-    with urlopen(request, timeout=30) as response:
-        if response.geturl() != url:
-            raise ValueError(f'Unexpected redirect for {url}')
-        if 'noindex' in response.headers.get('X-Robots-Tag', '').lower():
-            raise ValueError(f'Noindex response for {url}')
-        return response.status, response.read()
+    for attempt in range(3):
+        try:
+            with urlopen(request, timeout=30) as response:
+                if response.geturl() != url:
+                    raise ValueError(f'Unexpected redirect for {url}')
+                if 'noindex' in response.headers.get('X-Robots-Tag', '').lower():
+                    raise ValueError(f'Noindex response for {url}')
+                return response.status, response.read()
+        except (HTTPError, URLError, TimeoutError, ConnectionError) as error:
+            transient = not isinstance(error, HTTPError) or error.code in (429, 500, 502, 503, 504)
+            if data is not None or not transient or attempt == 2:
+                raise
+            time.sleep(attempt + 1)
+    raise RuntimeError('Unreachable')
 
 
 def production_url(url):

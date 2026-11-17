@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import URLError
 
 import auto
 
@@ -22,6 +23,16 @@ class AutoIndexNowTests(unittest.TestCase):
     def test_noindex_pages_are_not_used_as_a_snapshot(self):
         with self.assertRaises(ValueError):
             auto.page_hash(b'<meta name="robots" content="noindex, follow"><p>Not public</p>')
+
+    def test_transient_read_failure_retries_but_submission_does_not(self):
+        with patch.object(auto, 'urlopen', side_effect=URLError('temporary')) as request, patch.object(auto.time, 'sleep'):
+            with self.assertRaises(URLError):
+                auto.read_url('https://shotviva.com/')
+            self.assertEqual(request.call_count, 3)
+            request.reset_mock()
+            with self.assertRaises(URLError):
+                auto.read_url('https://api.indexnow.org/indexnow', b'{}')
+            self.assertEqual(request.call_count, 1)
 
     def test_snapshot_advances_only_after_successful_submission(self):
         page = 'https://shotviva.com/'
