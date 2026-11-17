@@ -58,7 +58,8 @@ function Thumb({ member, eager }: { member: CatalogueTemplate; eager: boolean })
   if (!poster) return <span className="hairline block aspect-[8/5] rounded-[9px] bg-muted" />
   return (
     <span className="hairline relative block aspect-[8/5] overflow-hidden rounded-[9px] bg-muted">
-      <img {...coverImage(poster, COVER_SIZES.memberFrame)} alt="" loading={eager ? 'eager' : 'lazy'} decoding="async" className="absolute inset-0 size-full object-cover" />
+      <img {...coverImage(poster, COVER_SIZES.memberFrame)} alt="" aria-hidden="true" loading={eager ? 'eager' : 'lazy'} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" />
+      <img {...coverImage(poster, COVER_SIZES.memberFrame)} alt="" loading={eager ? 'eager' : 'lazy'} decoding="async" className="absolute inset-0 size-full object-contain" />
     </span>
   )
 }

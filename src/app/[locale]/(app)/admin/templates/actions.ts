@@ -105,7 +105,7 @@ export async function setTemplatesFeaturedAction(input: unknown): Promise<Action
   const admin = await requireAdmin()
   return runAdminQuery(async () => {
     const plan = await setTemplatesFeatured(createAdminSupabase(), admin.id, input)
-    if (plan.changed.length > 0 && plan.failures.length === 0 && plan.over === 0) catalogueChanged()
+    if (plan.changed.length > 0 && plan.failures.length === 0) catalogueChanged()
     return plan
   })
 }

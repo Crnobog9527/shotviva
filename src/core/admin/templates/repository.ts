@@ -222,17 +222,12 @@ export async function setTemplatesActive(client: SupabaseClient, ids: readonly s
   if (error) throw new AppError('INTERNAL', `setTemplatesActive failed: ${error.message}`)
 }
 
-// The featured ids in featured_rank order (partial filter on featured_rank).
-export async function readFeaturedIds(client: SupabaseClient): Promise<string[]> {
-  const { data, error } = await client.from('templates').select('id').not('featured_rank', 'is', null).order('featured_rank')
-  if (error) throw new AppError('INTERNAL', `readFeaturedIds failed: ${error.message}`)
-  return (data as { id: string }[]).map((row) => row.id)
-}
-
-// The home featured list in display order (T53); the SQL function checks the rules.
-export async function setFeaturedTemplates(client: SupabaseClient, ids: string[]): Promise<void> {
-  const { error } = await client.rpc('admin_set_featured_templates', { p_ids: ids })
+// The database checks the expected order while holding its write lock.
+export async function setFeaturedTemplates(client: SupabaseClient, ids: string[], expectedIds?: string[]): Promise<void> {
+  const args = expectedIds ? { p_ids: ids, p_expected_ids: expectedIds } : { p_ids: ids }
+  const { error } = await client.rpc('admin_set_featured_templates', args)
   if (error) {
+    if (error.message.includes('FEATURED_CONFLICT')) throw new AppError('CONFLICT', '首页精选在别处改过了，请刷新页面后再试')
     if (error.code === '22023') throw new AppError('INVALID_INPUT', error.message)
     throw new AppError('INTERNAL', `setFeaturedTemplates failed: ${error.message}`)
   }

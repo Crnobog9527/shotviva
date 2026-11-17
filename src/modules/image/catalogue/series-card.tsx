@@ -8,7 +8,7 @@ import { cn } from '@/core/ui/cn'
 import { coverImage } from '@/core/ui/cover-image'
 
 import { LoopPlate } from './card-media'
-import { hasStills, isMotion } from './catalogue-template'
+import { hasStills, isMotion, pairedMember } from './catalogue-template'
 import type { CatalogueSeries } from './catalogue-view'
 import { COVER_SIZES } from './cover-sizes'
 import { PairMedia } from './pair-media'
@@ -62,6 +62,10 @@ function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boole
   const alt = useTranslations('app.series')('coverAlt', { name: series.name })
   const loading = eager ? 'eager' : 'lazy'
   if (series.cover) {
+    // The artwork is one member's after cover: show it as that member's Phone / AI split, so the
+    // card tells the difference at a glance, like a series without artwork (Owner 2026-11-16).
+    const paired = pairedMember(series.cover, series.members)
+    if (paired) return <PairMedia before={paired.cover.before as string} after={series.cover} alt={alt} eager={eager} contain sizes={COVER_SIZES.cardPlate} />
     // The whole artwork, never cropped to the 8:5 frame (Owner 2026-11-13: 画风迁移 lost heads and
     // hands): it is contained, and the same picture, blurred and dimmed, fills the bands a cover
     // of another shape leaves. One download: both use the same srcset.
@@ -69,12 +73,12 @@ function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boole
     return (
       <span className="hairline relative isolate block aspect-[8/5] overflow-hidden rounded-control bg-muted">
         <img {...cover} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" />
-        <img {...cover} alt={alt} loading={loading} decoding="async" className="absolute inset-0 size-full object-contain transition-transform duration-600 ease-house group-hover:scale-[1.02]" />
+        <img {...cover} alt={alt} loading={loading} decoding="async" className="absolute inset-0 size-full object-contain" />
       </span>
     )
   }
   const split = series.members.find(hasStills)
-  if (split) return <PairMedia before={split.cover.before as string} after={split.cover.after as string} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} />
+  if (split) return <PairMedia before={split.cover.before as string} after={split.cover.after as string} alt={alt} eager={eager} contain sizes={COVER_SIZES.cardPlate} />
   const loop = series.members.find(isMotion)
   if (loop) return <LoopPlate template={loop} alt={alt} sizes={COVER_SIZES.cardFrame} />
   return <span className="hairline block aspect-[8/5] rounded-control bg-muted" />

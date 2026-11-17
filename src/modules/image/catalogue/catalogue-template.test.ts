@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { batchableTemplates, cardPrice, categoriesOf, hasStills, isCompareCategory, isMotion, posterHref, toCatalogueTemplate, type CatalogueTemplate } from './catalogue-template'
+import { batchableTemplates, cardPrice, categoriesOf, hasStills, isCompareCategory, isMotion, pairedMember, posterHref, toCatalogueTemplate, type CatalogueTemplate } from './catalogue-template'
 import { isCompareSample } from './template-sample'
 
 // Category order and card style as set in 分类管理 (T75); 'art-styles' is the compare one.
@@ -56,6 +56,20 @@ describe('catalogue helpers', () => {
     expect(isCompareSample({ ...tpl('x', 'pets', stills), name: 'Art Styles' })).toBe(false)
     expect(hasStills(tpl('x', 'pets', stills))).toBe(true)
     expect(hasStills(tpl('x', 'pets', { after: 'https://a/a.webp' }))).toBe(false)
+  })
+})
+
+describe('a series artwork beside its phone photo', () => {
+  const a = tpl('a', 'x', { before: 'a-before', after: 'a-after' })
+  const b = tpl('b', 'x', { before: 'b-before', after: 'b-after' })
+  it('pairs the artwork with the member whose after cover it is', () => {
+    expect(pairedMember('b-after', [a, b])).toBe(b)
+  })
+  it('shows a collage that is no member\'s cover alone', () => {
+    expect(pairedMember('collage', [a, b])).toBeNull()
+  })
+  it('does not pair a member without a phone photo', () => {
+    expect(pairedMember('c-after', [tpl('c', 'x', { after: 'c-after' })])).toBeNull()
   })
 })
 

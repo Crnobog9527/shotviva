@@ -35,6 +35,7 @@ describe('Shotviva sitemap once indexing opens', () => {
       'https://shotviva.com/zh/ai-restaurant-menu',
       'https://shotviva.com/zh/pricing',
     ])
+    expect(zhSitemapUrls(site)).not.toContain('https://shotviva.com/zh/transparent-background')
   })
 })
 
@@ -43,6 +44,12 @@ describe('Shotviva sitemap once indexing opens', () => {
 describe('sitemaps, robots meta, canonical and hreflang agree (SEO patch v5)', () => {
   const urls = [...pageSitemapUrls(site), ...zhSitemapUrls(site)]
   const logical = (pathname: string) => (pathname === '/zh' ? '/' : pathname.replace(/^\/zh(?=\/)/, ''))
+
+  it('declares only the English page and default for transparent background', () => {
+    const url = 'https://shotviva.com/transparent-background'
+    const meta = pageMetadata(site, { path: '/transparent-background', title: 't', description: 'd' })
+    expect(meta.alternates?.languages).toEqual({ en: url, 'x-default': url })
+  })
 
   it('every listed address is index,follow with a self canonical', () => {
     for (const url of urls) {

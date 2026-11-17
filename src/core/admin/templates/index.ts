@@ -1,4 +1,4 @@
-export { FEATURED_MAX, saveTemplate, setFeaturedTemplates, setTemplateActive, setTemplateOrder, setTemplatesActive } from './commands'
+export { saveTemplate, setFeaturedTemplates, setTemplateActive, setTemplateOrder, setTemplatesActive } from './commands'
 export { listVersions, manageVersion, readVersion } from './history'
 export { listAdminTemplates } from './repository'
 export { deleteTemplate } from './delete'

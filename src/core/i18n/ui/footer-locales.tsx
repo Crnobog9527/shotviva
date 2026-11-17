@@ -9,12 +9,13 @@ import { usePathname } from '../navigation'
 import { otherLocale, switchHref } from '../switch-target'
 import { keepQuery } from './keep-query'
 
-type Props = { translatedPaths: readonly string[] }
+type Props = { translatedPaths: readonly string[]; homeOnly?: boolean }
 
 // The footer's quiet text switch (DESIGN §6.9 item 4–5): "English · 简体中文", the current one
 // plain, the other a real <a href> so it works before hydration and crawlers follow it.
-export function FooterLocales({ translatedPaths }: Props) {
-  return <Links href={switchHref(usePathname(), useCurrent(), translatedPaths)} />
+export function FooterLocales({ translatedPaths, homeOnly = false }: Props) {
+  const path = usePathname()
+  return <Links href={switchHref(homeOnly ? '/' : path, useCurrent(), translatedPaths)} />
 }
 
 // Static fallback while the pathname is request data: the other language's home.

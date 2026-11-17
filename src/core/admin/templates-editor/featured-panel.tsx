@@ -7,7 +7,6 @@ import { SortableList } from '../ui/sortable'
 import { featuredCopy as copy } from './copy'
 import { FeaturedCard, zhNameOf } from './featured-card'
 import { featuredGroups, withGroupOrder, type FeaturedGroup } from './featured-groups'
-import { FEATURED_LIMIT } from './featured-state'
 import type { Featured } from './use-featured'
 
 type Props = { featured: Featured; templates: AdminTemplate[]; pending: boolean }
@@ -28,7 +27,7 @@ export function FeaturedPanel({ featured, templates, pending }: Props) {
     <section aria-labelledby="featured-h" className="grid gap-3 rounded-md border p-4">
       <div className="flex items-baseline justify-between gap-3">
         <h2 id="featured-h" className="font-medium">{copy.title}</h2>
-        <span className="text-muted-foreground text-sm tabular-nums">{order.length} / {FEATURED_LIMIT}</span>
+        <span className="text-muted-foreground text-sm tabular-nums">{order.length} 个</span>
       </div>
       <p className="text-muted-foreground max-w-[75ch] text-sm">{copy.intro}</p>
       {order.length === 0 && !draft.dirty ? <p className="text-muted-foreground text-sm">{copy.empty}</p> : null}
