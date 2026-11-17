@@ -18,8 +18,12 @@ export function CompareSlider({ before, after, label, sizes }: Props) {
   const [x, setX] = useState(50)
   return (
     <div className="mk-compare" style={{ '--x': `${x}%` } as CSSProperties}>
+      <Image className="mk-comp-fill" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" />
       <Image className="mk-b" src={before.src} alt={before.alt} width={before.width} height={before.height} sizes={sizes} loading="lazy" />
-      <WhiteGroundImage className="mk-after" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} loading="lazy" />
+      <span className="mk-comp-result">
+        <Image className="mk-comp-fill" src={after.src} alt="" aria-hidden width={after.width} height={after.height} sizes={sizes} loading="lazy" />
+        <WhiteGroundImage className="mk-after" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} loading="lazy" fitPlate />
+      </span>
       <span className="mk-handle" aria-hidden>
         <span />
       </span>

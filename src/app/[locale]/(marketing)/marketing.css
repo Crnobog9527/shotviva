@@ -480,7 +480,10 @@
   button.mk-tpl:active { transform: scale(.97); }
   .mk-tpl .mk-pair { width: 100%; }
   /* Fill the available plate without cropping. Portrait results keep the white backing inside their edges. */
-  .mk-tpl-wrap .mk-tpl .mk-pair img { width: auto; max-width: 100%; margin: auto; object-fit: contain; }
+  .mk-tpl .mk-pair img { width: auto; max-width: 100%; margin: auto; object-fit: contain; }
+  .mk-tpl .mk-pair .mk-fill { width: 100%; max-width: none; height: 100%; object-fit: cover; filter: blur(20px) brightness(.5); transform: scale(1.1); }
+  .mk-tpl .mk-result { position: absolute; inset: 0; z-index: 1; overflow: hidden; background: var(--muted); }
+  .mk-tpl .mk-pair :is(.mk-a, .mk-sa) { width: min(100%, var(--image-width, 100%)); height: auto; max-height: 100%; }
   .mk-tpl-meta { display: block; padding: 8px 2px 2px; }
   .mk-tpl-meta b { display: block; font: 600 16px/1.25 var(--font-sans); letter-spacing: -0.015em; }
   .mk-use { display: block; margin-top: 2px; font-size: 14px; line-height: 1.35; color: var(--muted-foreground); }
@@ -491,9 +494,11 @@
   .mk-solo .mk-tpl .mk-tpl-meta { display: none; }
 
   /* the one draggable compare (Art Styles) */
-  .mk-compare { position: relative; aspect-ratio: 4 / 5; border-radius: var(--radius-media); overflow: hidden; background: var(--muted); touch-action: pan-y; user-select: none; }
-  .mk-compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-  .mk-compare .mk-after { clip-path: inset(0 0 0 calc(var(--x, 50%) + var(--nx, 0px))); }
+  .mk-compare { position: relative; container-type: size; aspect-ratio: 4 / 5; border-radius: var(--radius-media); overflow: hidden; background: var(--muted); touch-action: pan-y; user-select: none; }
+  .mk-compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+  .mk-compare .mk-comp-fill { object-fit: cover; filter: blur(20px) brightness(.5); transform: scale(1.1); }
+  .mk-comp-result { position: absolute; inset: 0; background: var(--muted); clip-path: inset(0 0 0 calc(var(--x, 50%) + var(--nx, 0px))); }
+  .mk-compare .mk-after { width: min(100%, var(--image-cqh-width, 100%)); height: auto; max-height: 100%; margin: auto; }
   .mk-handle { position: absolute; z-index: 2; top: 0; bottom: 0; left: calc(var(--x, 50%) + var(--nx, 0px)); width: 2px; margin-left: -1px; background: color-mix(in srgb, var(--foreground) 95%, transparent); pointer-events: none; }
   .mk-handle span {
     position: absolute; top: 50%; left: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%;
@@ -782,6 +787,8 @@
     /* the hover wipe (DESIGN §6.9 item 3): the right plate develops from the phone photo to the
        result, a safelight seam riding the edge; decoration only */
     .mk-tpl:hover .mk-pane .mk-a { animation: mk-wipe 2.9s infinite; }
+    .mk-tpl:hover .mk-pane .mk-result { animation: mk-wipe 2.9s infinite; }
+    .mk-tpl:hover .mk-pane .mk-result .mk-a { animation: none; }
     .mk-tpl:hover .mk-ws { animation: mk-seam 2.9s infinite; }
     .mk-compare:hover { animation: mk-nudge 1.1s var(--ease) 1; }
   }
