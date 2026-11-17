@@ -3,5 +3,6 @@ export function setImageRatio(image: HTMLImageElement) {
   if (image.naturalWidth && image.naturalHeight) {
     // A plate is 4:5, so 125% of the natural width/height ratio fills its height.
     image.style.setProperty('--image-width', `${125 * image.naturalWidth / image.naturalHeight}%`)
+    image.style.setProperty('--image-cqh-width', `${100 * image.naturalWidth / image.naturalHeight}cqh`)
   }
 }

@@ -44,9 +44,9 @@ describe('covers in the catalogue go through the optimiser', () => {
 
   it('CompareSlider: covers get the srcset (lazy when asked), a user’s own photos stay as they are', () => {
     const cover = imgs(render(createElement(CompareSlider, { before: BEFORE, after: AFTER, afterAlt: 'Result', cover: { sizes: '440px', lazy: true } })))
-    expect(cover).toHaveLength(2)
+    expect(cover).toHaveLength(4)
     expect(cover.every((tag) => tag.includes('sizes="440px"') && tag.includes('srcSet="/_next/image?') && tag.includes('loading="lazy"'))).toBe(true)
-    expect(cover[0]).toContain('alt="Phone photo"')
+    expect(cover[1]).toContain('alt="Phone photo"')
 
     const own = imgs(render(createElement(CompareSlider, { before: 'blob:https://shotviva.com/1', after: '/api/files/job-1', afterAlt: 'Result' })))
     expect(own[0]).toContain('src="blob:https://shotviva.com/1"')
