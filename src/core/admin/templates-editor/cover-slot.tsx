@@ -8,6 +8,7 @@ import { cn } from '@/core/ui/cn'
 import { coverCopy as COPY } from './copy'
 import { coverFileName, formatBytes, useFileSize } from './cover-file'
 import { PreviewThumb } from '../ui/image-preview'
+import { useFileDrop } from '../ui/use-file-drop'
 
 type CoverMedia = {
   // Current public file. A video shows with its poster and plays on demand; an animated WebP
@@ -62,12 +63,19 @@ function FileLine({ url }: { url: string }) {
   )
 }
 
+function uploadLabel(busy: boolean, preview: CoverMedia['preview']) {
+  if (busy) return '处理中…'
+  return preview && !preview.inherited ? '替换' : '上传'
+}
+
 // One cover card (ARCHITECTURE §8.3): title, the stored file at a fixed 4:5 (contained, never
 // cropped), a styled picker (Replace once a file exists), its name and size, and the limits.
 export function CoverSlot({ id, label, accept, hint, media, busy, disabled, onFile }: Props) {
   const { preview, download } = media
+  const drop = useFileDrop(onFile, disabled)
   return (
-    <section aria-labelledby={`${id}-title`} className="bg-card grid min-w-0 content-start gap-2.5 rounded-lg border p-3">
+    <section aria-labelledby={`${id}-title`} onDragOver={drop.onDragOver} onDragLeave={drop.onDragLeave} onDrop={drop.onDrop}
+      className={cn('bg-card grid min-w-0 content-start gap-2.5 rounded-lg border p-3', drop.active && 'border-primary ring-primary ring-2')}>
       <h3 id={`${id}-title`} className="text-sm font-medium">
         {label}
       </h3>
@@ -90,13 +98,15 @@ export function CoverSlot({ id, label, accept, hint, media, busy, disabled, onFi
           aria-disabled={disabled}
           className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'peer-focus-visible:ring-ring shrink-0 cursor-pointer peer-focus-visible:ring-2', disabled && 'pointer-events-none opacity-50')}
         >
-          {busy ? '处理中…' : preview && !preview.inherited ? '替换' : '上传'}
+          {uploadLabel(busy, preview)}
         </label>
         {preview ? <FileLine url={preview.url} /> : null}
       </div>
       {preview?.inherited && <p className="text-muted-foreground text-xs">{COPY.fallback}</p>}
       {download && <a href={download.href} download className={buttonVariants({ variant: 'outline', size: 'sm', className: 'justify-self-start' })}>{download.label}</a>}
       <p className="text-muted-foreground text-xs break-words">{hint}</p>
+      <p className="text-muted-foreground text-xs">可将文件拖到此处上传</p>
+      {drop.error && <p role="alert" className="text-destructive text-xs">{drop.error}</p>}
     </section>
   )
 }
