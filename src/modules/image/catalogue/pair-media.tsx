@@ -36,7 +36,7 @@ export function PairMedia({ before, after, alt, eager = false, video, size = 'ca
       <span className="relative flex items-center justify-center overflow-hidden">
         <Backdrop src={before} sizes={sizes} loading={loading} />
         <img {...coverImage(before, sizes)} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full object-contain saturate-[.85]" />
-        <span data-wipe="ai" className="absolute inset-0 z-1 flex items-center justify-center overflow-hidden">
+        <span data-wipe="ai" className="absolute inset-0 z-1 flex items-center justify-center overflow-hidden bg-muted">
           <Backdrop src={after} sizes={sizes} loading={loading} />
           {/* White behind the result: a transparent cut-out cover reads as white, not as the phone photo underneath. */}
           <GroundedImg ground="white" {...coverImage(after, sizes)} alt={alt} loading={loading} decoding="async" fitPlate={size === 'card'} style={fitImage(size)} className="relative z-1 object-contain" />

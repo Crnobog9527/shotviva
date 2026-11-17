@@ -42,11 +42,17 @@ export function CompareSlider({ before, after, afterAlt, afterGround = 'white', 
     <div
       {...(cover ? templateImageGestures : {})}
       data-vaul-no-drag=""
-      style={{ '--x': `${x}%` } as CSSProperties}
+      style={{ '--x': `${x}%`, ...(cover ? { containerType: 'size' } : {}) } as CSSProperties}
       className={cn('relative aspect-[4/5] touch-pan-y overflow-hidden rounded-media bg-muted select-none', cover && templateImageGestureClass, className)}
     >
-      <img {...media(before)} alt={t('phonePhotoAlt')} className="pointer-events-none absolute inset-0 size-full object-cover" />
-      <GroundedImg {...media(after)} alt={afterAlt} ground={afterGround} className="pointer-events-none absolute inset-0 size-full object-cover [clip-path:inset(0_0_0_var(--x))]" />
+      {cover ? <img {...media(before)} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" /> : null}
+      <img {...media(before)} alt={t('phonePhotoAlt')} className={cn('pointer-events-none absolute inset-0 size-full', cover ? 'object-contain' : 'object-cover')} />
+      {cover ? (
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden bg-muted [clip-path:inset(0_0_0_var(--x))]">
+          <img {...media(after)} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" />
+          <GroundedImg {...media(after)} alt={afterAlt} ground={afterGround} fitPlate style={{ width: 'min(100%, var(--image-cqh-width, 100%))', height: 'auto', maxHeight: '100%' }} className="relative object-contain" />
+        </span>
+      ) : <GroundedImg {...media(after)} alt={afterAlt} ground={afterGround} className="pointer-events-none absolute inset-0 size-full object-cover [clip-path:inset(0_0_0_var(--x))]" />}
       <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-[var(--x)] z-2 -ml-px w-0.5 bg-photo-ink">
         <span className="frost absolute top-1/2 left-1/2 grid size-10 -translate-1/2 place-items-center rounded-full shadow-[inset_0_0_0_1.5px_var(--photo-ink)]">
           <svg viewBox="0 0 24 24" className="size-5 text-photo-ink" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
