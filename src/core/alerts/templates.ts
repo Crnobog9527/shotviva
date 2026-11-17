@@ -75,9 +75,18 @@ export function productName(productId: string | null): string {
   return (productId && PRODUCT_NAMES[productId]) || '一笔付款'
 }
 
+// Stripe's zero-decimal currencies (Adaptive Pricing can charge in one): the minor unit is the
+// whole unit, so 3000 JPY is 3000, not 30.00. Same list as checkout-return/view-model.ts; core
+// cannot import that UI layer.
+const ZERO_DECIMAL = new Set(['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf'])
+
+function amountText(cents: number, currency: string): string {
+  return ZERO_DECIMAL.has(currency.toLowerCase()) ? String(cents) : (cents / 100).toFixed(2)
+}
+
 export function money(amount: Money): string {
-  const value = (amount.cents / 100).toFixed(2)
-  return amount.currency === 'usd' ? `$${value}` : `${value} ${amount.currency.toUpperCase()}`
+  const value = amountText(amount.cents, amount.currency)
+  return amount.currency.toLowerCase() === 'usd' ? `$${value}` : `${value} ${amount.currency.toUpperCase()}`
 }
 
 const userPath = (userId: string | null) => (userId ? `/admin/users/${userId}` : '/admin/orders')
@@ -201,7 +210,7 @@ function ticket(alert: TicketAlert, who: string): Rendered {
 }
 
 function renewalReview(alert: RenewalReviewAlert): Rendered {
-  const charged = alert.charged === null ? '未提供' : `${(alert.charged / 100).toFixed(2)} ${alert.currency?.toUpperCase() ?? '（币种缺失）'}`
+  const charged = alert.charged === null ? '未提供' : `${alert.currency ? amountText(alert.charged, alert.currency) : (alert.charged / 100).toFixed(2)} ${alert.currency?.toUpperCase() ?? '（币种缺失）'}`
   const line = `【Waffo 续费待核对】订单 ${alert.orderId} 第 ${alert.period} 期，税前报价 $${(alert.quoted / 100).toFixed(2)}，含税实收 ${charged}（税额 ${(alert.tax / 100).toFixed(2)}）。付款号 ${alert.paymentId}。${alert.duplicate ? '同一期出现不同付款号，请核对是否重复扣款。' : '请打开账单工单核对。'}`
   return { line, path: `/admin/tickets/${alert.ticketId}` }
 }
