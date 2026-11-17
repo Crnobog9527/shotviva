@@ -19,7 +19,7 @@ async function render(signedIn: boolean, locale: Locale) {
 
 // DESIGN §6.9 item 4: a signed-in visitor sees the way into the app, never Log in.
 describe('marketing top bar, account end', () => {
-  it('signed out: Log in and Start free, unchanged', async () => {
+  it('signed out: Log in and Get started', async () => {
     const html = await render(false, 'en')
     expect(html).toContain('href="/login"')
     expect(html).toContain('href="/signup"')
@@ -29,14 +29,14 @@ describe('marketing top bar, account end', () => {
 
   // Owner 2026-11-08: from 768px up the header's primary stands in for the scrolled-away
   // generator; its labels are all in the server HTML, the client only picks one.
-  it('signed out: Start free also carries the generator stand-in labels', async () => {
+  it('signed out: Get started also carries the generator stand-in labels', async () => {
     const en = await render(false, 'en')
     expect(en).toMatch(/<a [^>]*class="mk-start"[^>]*data-generator-upload=""|<a [^>]*data-generator-upload=""[^>]*class="mk-start"/)
-    expect(en).toContain('<span class="mk-start-free">Start free</span>')
+    expect(en).toContain('<span class="mk-start-free">Get started</span>')
     expect(en).toMatch(/<span class="mk-start-up"><svg[^]*?<\/svg>Upload photo<\/span>/)
     expect(en).toContain('<span class="mk-start-gen">Generate</span>')
     const zh = await render(false, 'zh')
-    expect(zh).toContain('免费开始')
+    expect(zh).toContain('开始使用')
     expect(zh).toContain('上传照片')
     expect(zh).toContain('href="/zh/signup"')
   })
