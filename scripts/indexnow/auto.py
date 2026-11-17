@@ -13,7 +13,7 @@ ORIGIN = 'https://shotviva.com'
 KEY_PATH = Path(__file__).resolve().parents[2] / 'public/indexnow-key.txt'
 STATE_PATH = Path(os.environ.get('INDEXNOW_STATE', '.indexnow-state/pages.json'))
 NS = {'s': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
-AGENT = 'Mozilla/5.0 (compatible; ShotvivaIndexMonitor/1.0; +https://shotviva.com/)'
+AGENT = 'Mozilla/5.0 (compatible; ShotvivaIndexBot/1.0; +https://shotviva.com/)'
 
 
 def read_url(url, data=None):
