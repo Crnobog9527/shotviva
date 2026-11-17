@@ -10,6 +10,7 @@
       "change": "换模板",
       "allTemplates": "全部模板",
       "yourPhoto": "你的照片",
+      "originalPhotoAlt": "你的原图，处理前",
       "photoReady": "照片已选好",
       "photoReadyHint": "已替换模板的示例原图",
       "stageAlt": "{name}模板成品示例",

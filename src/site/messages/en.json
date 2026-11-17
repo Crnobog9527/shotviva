@@ -10,6 +10,7 @@
       "change": "Change",
       "allTemplates": "All templates",
       "yourPhoto": "Your photo",
+      "originalPhotoAlt": "Your original photo before editing",
       "photoReady": "Photo ready",
       "photoReadyHint": "It now stands in for the example photo",
       "stageAlt": "{name}: an example of the finished photo",
