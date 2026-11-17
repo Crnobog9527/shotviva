@@ -28,6 +28,7 @@ import { SeriesCard } from './series-card'
 import { TemplateCard } from './template-card'
 import { useSeeAllLanding } from './use-see-all-landing'
 import { useCatalogueQuery } from './use-catalogue-query'
+import { slimBrowse } from './picker-browse'
 
 // The series panel is only fetched once a series is opened (scripts/js-budget.json).
 const SeriesCreateDialog = dynamic(() => import('../workspace/series-create-dialog').then((m) => m.SeriesCreateDialog), { ssr: false })
@@ -50,6 +51,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
   const [openId, setOpenId] = useState<string | null>(null)
   const openable = useMemo(() => openableTemplates(view.entries), [view.entries])
   const batchable = useMemo(() => batchableTemplates(openable), [openable])
+  const batchBrowse = useMemo(() => slimBrowse(view), [view])
   // A poster template's card opens its editor dialog, kept in the address (?poster=<id>, where
   // old /posters/<id> links land too); every other card opens the creation dialog.
   const open = (id: string) => (isPosterIn(openable, id) ? query.openPoster(id) : setOpenId(id))
@@ -77,7 +79,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
     return (
       <>
         <p className="px-(--gutter) pt-6 text-body text-muted-foreground">{t('empty')}</p>
-        <BatchDialogSlot templates={batchable} create={create} />
+        <BatchDialogSlot templates={batchable} browse={batchBrowse} create={create} />
       </>
     )
   }
@@ -101,7 +103,7 @@ export function TemplateCatalogue({ view, create, endCard }: Props) {
       {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
       <PosterDialogSlot id={query.posterId} templates={openable} series={posterSeriesOf(view.entries, query.posterId)} onSwitch={query.openPoster} onClose={query.closePoster} create={create} />
-      <BatchDialogSlot templates={batchable} create={create} />
+      <BatchDialogSlot templates={batchable} browse={batchBrowse} create={create} />
     </>
   )
 }

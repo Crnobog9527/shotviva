@@ -18,7 +18,10 @@ const slimFilters = (nodes: readonly FilterNode[]): FilterNode[] =>
 // null (the index read failed): the picker falls back to its flat list by category.
 export function pickerBrowse(index: CatalogueIndex | null, templates: readonly CatalogueTemplate[], zh: boolean): PickerBrowse | null {
   if (!index) return null
-  const view = buildCatalogueView(index, templates, zh)
+  return slimBrowse(buildCatalogueView(index, templates, zh))
+}
+
+export function slimBrowse(view: CatalogueView): PickerBrowse {
   const entries = view.entries.map((entry): SlimEntry => {
     if (entry.type === 'template') return { type: 'template', id: entry.template.id, path: entry.path }
     const { members, ...series } = entry.series
