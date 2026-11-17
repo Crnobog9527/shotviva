@@ -81,7 +81,7 @@ function UploadTile({ progress, onFile }: { progress: number | null; onFile: (fi
   const busy = progress !== null
   const drop = useFileDrop(onFile, busy)
   return (
-    <label onDragOver={drop.onDragOver} onDragLeave={drop.onDragLeave} onDrop={drop.onDrop}
+    <label onClickCapture={drop.clearError} onDragOver={drop.onDragOver} onDragLeave={drop.onDragLeave} onDrop={drop.onDrop}
       className={cn(buttonVariants({ variant: 'outline' }), 'aspect-square h-auto w-full flex-col gap-1 text-xs', busy && 'opacity-70', drop.active && 'border-primary ring-primary ring-2')}>
       <input
         type="file"

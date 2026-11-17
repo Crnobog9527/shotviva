@@ -74,7 +74,7 @@ export function CoverSlot({ id, label, accept, hint, media, busy, disabled, onFi
   const { preview, download } = media
   const drop = useFileDrop(onFile, disabled)
   return (
-    <section aria-labelledby={`${id}-title`} onDragOver={drop.onDragOver} onDragLeave={drop.onDragLeave} onDrop={drop.onDrop}
+    <section aria-labelledby={`${id}-title`} onClickCapture={drop.clearError} onDragOver={drop.onDragOver} onDragLeave={drop.onDragLeave} onDrop={drop.onDrop}
       className={cn('bg-card grid min-w-0 content-start gap-2.5 rounded-lg border p-3', drop.active && 'border-primary ring-primary ring-2')}>
       <h3 id={`${id}-title`} className="text-sm font-medium">
         {label}

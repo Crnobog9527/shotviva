@@ -95,7 +95,7 @@ export function StyleRefFields({ cover, templateId, refs, budget, busy, onBusy, 
 function AddRefDropZone({ disabled, pick, upload }: { disabled: boolean; pick: () => void; upload: (file: File) => void }) {
   const drop = useFileDrop(upload, disabled)
   return (
-    <div onDragOver={drop.onDragOver} onDragLeave={drop.onDragLeave} onDrop={drop.onDrop}
+    <div onClickCapture={drop.clearError} onDragOver={drop.onDragOver} onDragLeave={drop.onDragLeave} onDrop={drop.onDrop}
       className={cn('flex flex-wrap items-center gap-2 rounded-md', drop.active && 'ring-primary ring-2')}>
       <Button type="button" variant="outline" size="sm" onClick={pick} disabled={disabled}>{copy.add}</Button>
       <span className="text-xs text-muted-foreground">或拖放图片到这里</span>
@@ -109,7 +109,7 @@ function RefRow({ refKey, label, pick, upload, remove, busy }: { refKey: string;
   const url = styleRefUrl(refKey)
   const drop = useFileDrop(file => upload(file, refKey), busy)
   return (
-    <li {...item.row} onDragOver={drop.onDragOver} onDragLeave={drop.onDragLeave} onDrop={drop.onDrop}
+    <li {...item.row} onClickCapture={drop.clearError} onDragOver={drop.onDragOver} onDragLeave={drop.onDragLeave} onDrop={drop.onDrop}
       className={cn('flex flex-wrap items-center gap-2 rounded-md border p-1', sortableRowClass, drop.active && 'border-primary ring-primary ring-2')}>
       <DragHandle handle={item.handle} />
       {/* A same-origin admin gate signs the private image only when it is drawn; the large view reads the same gate. */}
