@@ -32,5 +32,5 @@ export function useFileDrop(onFile: (file: File) => void, disabled = false) {
     onFile(event.dataTransfer.files[0]!)
   }
 
-  return { active, error, onDragOver, onDragLeave, onDrop }
+  return { active, error, clearError: () => setError(''), onDragOver, onDragLeave, onDrop }
 }
