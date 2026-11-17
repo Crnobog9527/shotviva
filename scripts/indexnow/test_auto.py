@@ -14,6 +14,11 @@ class AutoIndexNowTests(unittest.TestCase):
         self.assertEqual(auto.page_hash(original), auto.page_hash(original.replace(b'build 1', b'build 2')))
         self.assertNotEqual(auto.page_hash(original), auto.page_hash(original.replace(b'Food', b'Drink')))
         self.assertNotEqual(auto.page_hash(original), auto.page_hash(original.replace(b'alt="dish"', b'alt="plate"')))
+        self.assertEqual(auto.page_hash(b'<img src="a"><img src="b">'), auto.page_hash(b'<img src="b"><img src="a">'))
+        self.assertEqual(auto.page_hash(b'<p>Food</p><p>Drink</p>'), auto.page_hash(b'<p>Drink</p><p>Food</p>'))
+        self.assertNotEqual(auto.page_hash(b'<h1>Food</h1>'), auto.page_hash(b'<p>Food</p>'))
+        self.assertEqual(auto.page_hash(b'<p>Food</p><div class="mk-generator"><img src="a"></div>'), auto.page_hash(b'<p>Food</p><div class="mk-generator"><img src="b"></div>'))
+        self.assertNotEqual(auto.page_hash(b'<p>Food</p>', '2026-11-01'), auto.page_hash(b'<p>Food</p>', '2026-11-02'))
 
     def test_only_production_urls_are_accepted(self):
         self.assertTrue(auto.production_url('https://shotviva.com/pricing'))
@@ -50,7 +55,7 @@ class AutoIndexNowTests(unittest.TestCase):
                     return 200, b'<p>new</p>'
                 raise OSError('IndexNow unavailable')
 
-            with patch.object(auto, 'STATE_PATH', state), patch.object(auto, 'sitemap_urls', return_value=[page]), patch.object(auto, 'read_url', side_effect=request):
+            with patch.object(auto, 'STATE_PATH', state), patch.object(auto, 'sitemap_urls', return_value={page: ''}), patch.object(auto, 'read_url', side_effect=request):
                 with self.assertRaises(OSError):
                     auto.main()
             self.assertEqual(json.loads(state.read_text())[page], auto.page_hash(b'<p>old</p>'))
@@ -61,7 +66,7 @@ class AutoIndexNowTests(unittest.TestCase):
                     return 202, b''
                 return request(url, data)
 
-            with patch.object(auto, 'STATE_PATH', state), patch.object(auto, 'sitemap_urls', return_value=[page]), patch.object(auto, 'read_url', side_effect=success):
+            with patch.object(auto, 'STATE_PATH', state), patch.object(auto, 'sitemap_urls', return_value={page: ''}), patch.object(auto, 'read_url', side_effect=success):
                 auto.main()
                 auto.main()
             self.assertEqual(json.loads(state.read_text())[page], auto.page_hash(b'<p>new</p>'))

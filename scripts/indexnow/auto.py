@@ -46,13 +46,17 @@ def sitemap_urls():
     maps = [item.text for item in ElementTree.fromstring(data).findall('s:sitemap/s:loc', NS)]
     if not maps or any(not item or not production_url(item) for item in maps):
         raise ValueError('Invalid production sitemap index')
-    urls = []
+    urls = {}
     for sitemap in maps:
         _, data = read_url(sitemap)
-        urls.extend(item.text for item in ElementTree.fromstring(data).findall('s:url/s:loc', NS))
-    if not urls or any(not item or not production_url(item) for item in urls):
+        for entry in ElementTree.fromstring(data).findall('s:url', NS):
+            url = entry.findtext('s:loc', namespaces=NS)
+            if not url or not production_url(url) or url in urls:
+                raise ValueError('Invalid or duplicate production sitemap URL')
+            urls[url] = entry.findtext('s:lastmod', default='', namespaces=NS)
+    if not urls:
         raise ValueError('Invalid production sitemap URLs')
-    return sorted(set(urls))
+    return dict(sorted(urls.items()))
 
 
 class Content(HTMLParser):
@@ -61,39 +65,58 @@ class Content(HTMLParser):
         self.hidden = 0
         self.parts = []
         self.noindex = False
+        self.semantic_tags = []
+        self.generator_depth = 0
 
     def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if self.generator_depth or 'mk-generator' in (attrs.get('class') or '').split():
+            if tag not in ('area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'):
+                self.generator_depth += 1
+            return
         if tag in ('script', 'style', 'svg', 'noscript'):
             self.hidden += 1
         if self.hidden:
             return
-        attrs = dict(attrs)
-        if tag == 'meta' and attrs.get('name', '').lower() in ('description', 'robots'):
-            if attrs.get('name', '').lower() == 'robots' and 'noindex' in attrs.get('content', '').lower():
+        if tag in ('title', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'):
+            self.semantic_tags.append(tag)
+        if tag == 'meta' and (attrs.get('name') or '').lower() in ('description', 'robots'):
+            if attrs.get('name', '').lower() == 'robots' and 'noindex' in (attrs.get('content') or '').lower():
                 self.noindex = True
-            self.parts.append((tag, attrs.get('name'), attrs.get('content', '')))
-        elif tag == 'link' and attrs.get('rel', '').lower() == 'canonical':
-            self.parts.append((tag, 'canonical', attrs.get('href', '')))
+            self.parts.append((tag, attrs.get('name'), attrs.get('content') or ''))
+        elif tag == 'link' and (attrs.get('rel') or '').lower() == 'canonical':
+            self.parts.append((tag, 'canonical', attrs.get('href') or ''))
         elif tag == 'img':
-            self.parts.append((tag, attrs.get('src', ''), attrs.get('alt', '')))
+            self.parts.append((tag, attrs.get('src') or '', attrs.get('alt') or ''))
         elif tag == 'a':
-            self.parts.append((tag, attrs.get('href', '').split('?')[0].split('#')[0]))
+            self.parts.append((tag, (attrs.get('href') or '').split('?')[0].split('#')[0]))
 
     def handle_endtag(self, tag):
+        if self.generator_depth:
+            self.generator_depth -= 1
+            return
         if tag in ('script', 'style', 'svg', 'noscript') and self.hidden:
             self.hidden -= 1
+        if not self.hidden and self.semantic_tags and tag == self.semantic_tags[-1]:
+            self.semantic_tags.pop()
+
+    def handle_startendtag(self, tag, attrs):
+        if self.generator_depth:
+            return
+        super().handle_startendtag(tag, attrs)
 
     def handle_data(self, text):
-        if not self.hidden and text.strip():
-            self.parts.append(('text', ' '.join(text.split())))
+        if not self.hidden and not self.generator_depth and text.strip():
+            self.parts.append(('text', self.semantic_tags[-1] if self.semantic_tags else '', ' '.join(text.split())))
 
 
-def page_hash(html):
+def page_hash(html, lastmod=''):
     content = Content()
     content.feed(html.decode('utf-8'))
     if content.noindex or not content.parts:
         raise ValueError('Page is noindex or has no visible content')
-    return hashlib.sha256(json.dumps(content.parts, ensure_ascii=False).encode()).hexdigest()
+    # Template cards can shuffle between requests; preserve their contents, not their order.
+    return hashlib.sha256(json.dumps([lastmod, sorted(content.parts)], ensure_ascii=False).encode()).hexdigest()
 
 
 def main():
@@ -102,7 +125,7 @@ def main():
     if hosted_key.decode().strip() != key:
         raise ValueError('Production IndexNow key does not match')
     previous = json.loads(STATE_PATH.read_text()) if STATE_PATH.exists() else {}
-    current = {url: page_hash(read_url(url)[1]) for url in sitemap_urls()}
+    current = {url: page_hash(read_url(url)[1], lastmod) for url, lastmod in sitemap_urls().items()}
     changed = [url for url, digest in current.items() if previous.get(url) != digest]
     if changed:
         payload = json.dumps({'host': 'shotviva.com', 'key': key, 'keyLocation': ORIGIN + '/indexnow-key.txt', 'urlList': changed}).encode()
