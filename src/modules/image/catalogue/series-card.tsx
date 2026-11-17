@@ -65,7 +65,7 @@ function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boole
     // The artwork is one member's after cover: show it as that member's Phone / AI split, so the
     // card tells the difference at a glance, like a series without artwork (Owner 2026-11-16).
     const paired = pairedMember(series.cover, series.members)
-    if (paired) return <PairMedia before={paired.cover.before as string} after={series.cover} alt={alt} eager={eager} contain sizes={COVER_SIZES.cardPlate} />
+    if (paired) return <PairMedia before={paired.cover.before as string} after={series.cover} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} />
     // The whole artwork, never cropped to the 8:5 frame (Owner 2026-11-13: 画风迁移 lost heads and
     // hands): it is contained, and the same picture, blurred and dimmed, fills the bands a cover
     // of another shape leaves. One download: both use the same srcset.
@@ -78,7 +78,7 @@ function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boole
     )
   }
   const split = series.members.find(hasStills)
-  if (split) return <PairMedia before={split.cover.before as string} after={split.cover.after as string} alt={alt} eager={eager} contain sizes={COVER_SIZES.cardPlate} />
+  if (split) return <PairMedia before={split.cover.before as string} after={split.cover.after as string} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} />
   const loop = series.members.find(isMotion)
   if (loop) return <LoopPlate template={loop} alt={alt} sizes={COVER_SIZES.cardFrame} />
   return <span className="hairline block aspect-[8/5] rounded-control bg-muted" />

@@ -23,10 +23,12 @@ function Layer({ pair, sizes }: { pair: Pair; sizes: string }) {
   return (
     <span className="mk-sl" aria-hidden>
       <span className="mk-pane">
+        <Image className="mk-fill" src={pair.before} alt="" aria-hidden {...SIZE} sizes={sizes} loading="lazy" />
         <Image className="mk-sb" src={pair.before} alt="" {...SIZE} sizes={sizes} loading="lazy" />
       </span>
       <span className="mk-pane">
-        <WhiteGroundImage className="mk-sa" src={pair.after} alt="" {...SIZE} sizes={sizes} loading="lazy" />
+        <Image className="mk-fill" src={pair.after} alt="" aria-hidden {...SIZE} sizes={sizes} loading="lazy" />
+        <WhiteGroundImage className="mk-sa" src={pair.after} alt="" {...SIZE} sizes={sizes} loading="lazy" fitPlate />
       </span>
     </span>
   )
@@ -51,10 +53,12 @@ function SeriesPairs({ card, media, size, sizes }: PairsProps) {
   return (
     <span className={cn('mk-pair mk-spair', size === 'lg' && 'mk-pair-lg')} data-series-pairs={rest.length > 0 ? '' : undefined}>
       <span className="mk-pane">
+        <Image className="mk-fill" src={first.before} alt="" aria-hidden {...SIZE} sizes={sizes} loading="lazy" />
         <Image className="mk-sb" src={first.before} alt={t('beforeAlt', { name: card.name })} {...SIZE} sizes={sizes} loading="lazy" />
       </span>
       <span className="mk-pane">
-        <WhiteGroundImage className="mk-sa" src={first.after} alt={t('afterAlt', { name: card.name, use: card.use })} {...SIZE} sizes={sizes} loading="lazy" />
+        <Image className="mk-fill" src={first.after} alt="" aria-hidden {...SIZE} sizes={sizes} loading="lazy" />
+        <WhiteGroundImage className="mk-sa" src={first.after} alt={t('afterAlt', { name: card.name, use: card.use })} {...SIZE} sizes={sizes} loading="lazy" fitPlate />
       </span>
       {rest.map((pair) => (
         <Layer key={pair.id} pair={pair} sizes={sizes} />

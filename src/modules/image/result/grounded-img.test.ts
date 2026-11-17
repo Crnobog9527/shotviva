@@ -17,7 +17,7 @@ describe('groundClass', () => {
 // component that draws one puts white behind it, or the phone photo underneath shows through and
 // the result looks broken (Owner, 2026-11-07). These are the components that draw after covers.
 const AFTER_COVERS: [file: string, uses: RegExp][] = [
-  ['src/modules/image/catalogue/pair-media.tsx', /<GroundedImg data-wipe="ai" ground="white"/],
+  ['src/modules/image/catalogue/pair-media.tsx', /data-wipe="ai"[\s\S]*<GroundedImg ground="white"/],
   ['src/modules/image/catalogue/compare-slider.tsx', /afterGround = 'white'/],
   ['src/modules/image/home/picker-body.tsx', /<GroundedImg className="mk-a" ground="white"/],
   ['src/modules/image/workspace/workspace-head.tsx', /<GroundedImg ground="white"/],

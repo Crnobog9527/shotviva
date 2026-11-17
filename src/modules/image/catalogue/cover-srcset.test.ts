@@ -32,13 +32,13 @@ describe('covers in the catalogue go through the optimiser', () => {
   it('PairMedia: every plate has the srcset and the plate width as sizes; the result keeps its alt', () => {
     const html = render(createElement(PairMedia, { before: BEFORE, after: AFTER, alt: 'Studio Product Shot example', sizes: '(min-width: 1024px) 182px, 50vw' }))
     const tags = imgs(html)
-    expect(tags).toHaveLength(3)
+    expect(tags).toHaveLength(6)
     for (const tag of tags) {
       expect(tag).toContain('sizes="(min-width: 1024px) 182px, 50vw"')
       expect(tag).toMatch(/srcSet="\/_next\/image\?url=https%3A%2F%2Fshotviva\.com%2Fassets%2Fcovers%2F[^"]+ 384w/)
       expect(tag).not.toContain(`src="${BEFORE}"`)
     }
-    expect(tags[2]).toContain('alt="Studio Product Shot example"')
+    expect(tags[5]).toContain('alt="Studio Product Shot example"')
     expect(tags.every((tag) => tag.includes('loading="lazy"'))).toBe(true)
   })
 
