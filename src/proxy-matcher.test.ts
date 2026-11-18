@@ -16,6 +16,9 @@ describe('proxy matcher', () => {
     expect(runsOn('/ingest/e/')).toBe(false)
     expect(runsOn('/fonts/misans/misans-abc.css')).toBe(false)
     expect(runsOn('/fonts/instrument-serif/instrument-serif-0a1b2c.woff2')).toBe(false)
+    expect(runsOn('/marketing-styles/content-ab17d6d99047e548.css')).toBe(false)
+    expect(runsOn('/marketing-styles/private')).toBe(true)
+    expect(runsOn('/marketing-styles-other')).toBe(true)
   })
 
   // T58: the locale router would otherwise rewrite these into the [locale] tree.
