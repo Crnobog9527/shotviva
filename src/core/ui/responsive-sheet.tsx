@@ -26,22 +26,28 @@ type Props = {
   // A walkthrough that must be seen to the end (the Wishlist tour): no close button, and
   // Escape, the scrim and the drag leave it open until the caller unlocks it.
   locked?: boolean
+  // The payment picker is a modal above the paywall. Closing returns focus to its CTA.
+  nested?: boolean
+  onCloseAutoFocus?(event: Event): void
 }
 
 // shadcn's Responsive Dialog pattern (DESIGN §8.4): one component that is a bottom Drawer
 // below md and a centred Dialog from md up. Both return focus to the opener on close.
-export function ResponsiveSheet({ open, onOpenChange, title, description, children, wide = false, tall = false, aside, footer, locked }: Props) {
+export function ResponsiveSheet({ open, onOpenChange, title, description, children, wide = false, tall = false, aside, footer, locked, nested, onCloseAutoFocus }: Props) {
   const desktop = useMediaQuery("(min-width: 768px)")
   const change = guardClose(onOpenChange, locked)
+  const layers = nested ? { overlay: "z-110", content: "z-120" } : { overlay: "z-90", content: "z-100" }
   if (desktop) {
     return (
       <DialogPrimitive.Root open={open} onOpenChange={change}>
         <DialogPrimitive.Portal>
-          <DialogPrimitive.Overlay className="scrim-motion fixed inset-0 z-90 bg-[var(--scrim)] backdrop-blur-[2px]" />
+          <DialogPrimitive.Overlay className={cn("scrim-motion fixed inset-0 bg-[var(--scrim)] backdrop-blur-[2px]", layers.overlay)} />
           <DialogPrimitive.Content
+            onCloseAutoFocus={onCloseAutoFocus}
             className={cn(
-              "dialog-motion shadow-sheet fixed top-1/2 left-1/2 z-100 flex -translate-1/2 flex-col rounded-panel bg-popover outline-none",
+              "dialog-motion shadow-sheet fixed top-1/2 left-1/2 flex -translate-1/2 flex-col rounded-panel bg-popover outline-none",
               dialogSize(wide, tall),
+              layers.content,
             )}
           >
             <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", wide ? "px-7 pt-6 pb-5" : tall ? "px-6 pt-6 [scrollbar-gutter:stable]" : "p-4 pt-6")}>
@@ -56,8 +62,12 @@ export function ResponsiveSheet({ open, onOpenChange, title, description, childr
     )
   }
   return (
-    <Drawer open={open} onOpenChange={change} dismissible={!locked}>
-      <DrawerContent className={wide || tall ? "h-[calc(100dvh-var(--sat)-12px)]" : undefined}>
+    <Drawer open={open} onOpenChange={change} dismissible={!locked} nested={nested} autoFocus={nested}>
+      <DrawerContent
+        className={cn((wide || tall) && "h-[calc(100dvh-var(--sat)-12px)]", layers.content)}
+        overlayClassName={layers.overlay}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <div className={cn("min-h-0 overflow-y-auto overscroll-contain px-4", drawerBodyPad(wide, tall, Boolean(footer)))}>
           <SheetHeading title={title} description={description} aside={aside} Title={DrawerTitle} Description={DrawerDescription} />
           {children}

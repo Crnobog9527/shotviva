@@ -1,6 +1,6 @@
 "use client"
 
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 
 import { trackPaywallSelect } from "../../analytics/browser"
 
@@ -36,14 +36,15 @@ type Props = {
 
 // The paywall (comps-v3-b paywall.html, signed off 2026-11-06): one screen, a full-height
 // bottom drawer on phones and a centred 920px dialog from md (ResponsiveSheet `wide`). Monthly /
-// Yearly beside the title; the three tiers; the three packs; the payment method; and the
-// checkout bar fixed at the bottom, which goes to the hosted checkout (Stripe or Waffo).
+// Yearly beside the title, the tiers and packs, and the checkout bar fixed at the bottom.
+// Chinese buyers pick a payment method in a second sheet before opening hosted checkout.
 export function PaywallSheet(props: Props) {
   return <DiscountProvider active={props.open}><SheetBody {...props} /></DiscountProvider>
 }
 
 function SheetBody({ open, onOpenChange, trigger, moment, needed, momentTier, products, state }: Props) {
   const t = useTranslations("paywall")
+  const chooseMethod = useLocale() === "zh"
   const offers = tierOffers(products)
   const packs = packOffers(products)
   const { choice, update } = state
@@ -78,7 +79,7 @@ function SheetBody({ open, onOpenChange, trigger, moment, needed, momentTier, pr
       <MomentLead moment={moment} needed={needed} offers={offers} packs={packs} pick={choice.pick} onPick={select} />
       <TierPicker offers={offers.filter(o => choice.period === "year" ? o.yearly : o.monthly)} state={picking} />
       <PackPicker packs={packs} state={picking} />
-      <PayMethods method={choice.method} onChange={(method) => update({ method })} kind={resolved?.kind ?? "plan"} period={choice.period} />
+      {!chooseMethod && <PayMethods method={choice.method} onChange={(method) => update({ method })} kind={resolved?.kind ?? "plan"} period={choice.period} />}
       <DiscountEntry />
     </ResponsiveSheet>
   )
