@@ -7,6 +7,7 @@ import { AppPage, BalanceChip, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { effectiveTier, limitsFor } from '@/core/billing'
 import { featureAllowed } from '@/core/features'
+import { sharedCreateFeatureAccess } from '@/core/features/read'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
 import { POSTER_FEATURE } from '@/core/poster/sets'
@@ -40,7 +41,10 @@ async function Create({ searchParams }: { searchParams: Search }) {
   const admin = createAdminSupabase()
   // Reuse the service-role tier lookup when the poster gate needs the same answer.
   const tierPromise = effectiveTier(admin, user.id)
-  const posterAllowed = featureAllowed(user.id, POSTER_FEATURE, { tierOf: () => tierPromise }).catch(() => false)
+  const posterAllowed = featureAllowed(user.id, POSTER_FEATURE, {
+    loadAccess: sharedCreateFeatureAccess,
+    tierOf: () => tierPromise,
+  }).catch(() => false)
   const [view, { balance, favoriteIds }, tier, runningIds, wishlistLive] = await Promise.all([
     currentLocale().then((locale) => loadCatalogueView(locale, posterAllowed)),
     createServerSupabase().then((db) => readCreatePersonalData(db, user.id)),
