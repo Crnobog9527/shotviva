@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 
 import type { ConditionalJsonStore, StoredJson } from '../storage/conditional-json'
-import { CatalogueCoordinationError, coordinateCatalogue, discardCatalogueFlight, preloadCatalogue } from './catalogue-flight'
+import { CatalogueCoordinationError, coordinateCatalogue, discardCatalogueFlight } from './catalogue-flight'
 
 function memoryStore() {
   let current: StoredJson | null = null
@@ -22,45 +22,6 @@ function deferred<T>() {
 }
 
 beforeEach(() => vi.restoreAllMocks())
-
-it('lets the page share the one lookup already started by the proxy', async () => {
-  const store = memoryStore()
-  const result = deferred<string>()
-  const origin = vi.fn(() => result.promise)
-  const leader = preloadCatalogue(store, 'preview-one', origin)
-  await vi.waitFor(() => expect(origin).toHaveBeenCalledTimes(1))
-  await expect(preloadCatalogue(store, 'preview-one', origin)).resolves.toBe(false)
-  const page = coordinateCatalogue(store, origin)
-  result.resolve('current catalogue')
-  await expect(leader).resolves.toBe(true)
-  await expect(page).resolves.toBe('current catalogue')
-  expect(origin).toHaveBeenCalledTimes(1)
-})
-
-it('does not refresh on a repeat preload or allow expired snapshots to seed the page', async () => {
-  const store = memoryStore()
-  const origin = vi.fn<() => Promise<string>>().mockResolvedValueOnce('old').mockResolvedValueOnce('new')
-  const now = vi.spyOn(Date, 'now').mockReturnValue(1_000)
-  await expect(preloadCatalogue(store, 'preview-one', origin)).resolves.toBe(true)
-  now.mockReturnValue(4_000)
-  await expect(coordinateCatalogue(store, origin)).resolves.toBe('old')
-  now.mockReturnValue(7_000)
-  await expect(preloadCatalogue(store, 'preview-one', origin)).resolves.toBe(false)
-  await expect(coordinateCatalogue(store, origin)).resolves.toBe('new')
-  expect(origin).toHaveBeenCalledTimes(2)
-})
-
-it('cannot publish an early result after an admin invalidation', async () => {
-  const store = memoryStore()
-  const result = deferred<string>()
-  const origin = vi.fn(() => result.promise)
-  const preload = preloadCatalogue(store, 'preview-one', origin)
-  await vi.waitFor(() => expect(origin).toHaveBeenCalledTimes(1))
-  await discardCatalogueFlight(store)
-  result.resolve('obsolete catalogue')
-  await expect(preload).resolves.toBe(false)
-  await expect(coordinateCatalogue(store, async () => 'fresh catalogue')).resolves.toBe('fresh catalogue')
-})
 
 it('shares one origin read between simultaneous instances', async () => {
   const store = memoryStore()

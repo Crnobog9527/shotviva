@@ -2,7 +2,6 @@ import createMiddleware from 'next-intl/middleware'
 import type { NextFetchEvent, NextRequest, NextResponse } from 'next/server'
 
 import { isAffiliateEnabled, requiresAffiliateProgram } from '@/core/affiliate/feature'
-import { IDENTITY_HEADER } from '@/core/auth/forwarded-identity'
 import { notFoundResponse } from '@/core/auth/proxy-gates'
 import { recordReferral } from '@/core/affiliate/referral'
 import { analyticsCookiesAllowed, withAnalyticsRegion } from '@/core/analytics/consent'
@@ -16,7 +15,6 @@ import { experimentRoute, isBotRequest, OPTION_PAGES, toOptionPage, withExperime
 import { viaImageCdn } from '@/core/storage/image-cdn-guard'
 import { routing } from '@/core/i18n/routing'
 import { logger } from '@/core/logger'
-import { publicEnv } from '@/core/public-env'
 import { canonicalRedirectResponse, withHostNoindex } from '@/core/seo'
 import { experimentRegistry } from '@/site/experiments/registry'
 import { site } from '@/site/site.config'
@@ -136,28 +134,12 @@ async function forwardSiteRequest(request: NextRequest, event: NextFetchEvent) {
     // Seals the proxy's session check for the page, so the page does not repeat it (ARCHITECTURE §7).
     identitySecret: env.SUPABASE_SERVICE_ROLE_KEY,
   })
-  if (env.VERCEL_ENV === 'preview') preloadCreatePage(request, response, event)
   timing?.gateDone()
   visitorCookies(response, request, experiment)
   await recordReferral(request, response)
   const result = withHostNoindex(response, request, hosts.canonicalHost)
   timing?.log(result.status)
   return result
-}
-
-let createPreloadStarted = false
-
-function preloadCreatePage(request: NextRequest, response: NextResponse, event: NextFetchEvent) {
-  if (createPreloadStarted || response.status !== 200 || request.method !== 'GET' ||
-      !/^\/(zh\/)?generate\/?$/.test(request.nextUrl.pathname) ||
-      request.headers.has('rsc') || request.headers.has('next-router-prefetch') || request.headers.get('purpose') === 'prefetch' ||
-      !request.headers.has(IDENTITY_HEADER)) return
-  createPreloadStarted = true
-  // The gate stripped incoming identity headers and sealed this request's verified user.
-  // Keep the preload outside the proxy response path and leave the page's checks in place.
-  event.waitUntil(import('@/core/templates/create-catalogue')
-    .then(({ preloadCreateCatalogue }) => preloadCreateCatalogue(publicEnv.NEXT_PUBLIC_APP_VERSION))
-    .catch((error: unknown) => logger.warn('create.catalogue_preload_failed', { error })))
 }
 
 // /ingest is the PostHog proxy (next.config.ts rewrites): no session work for analytics beacons.
