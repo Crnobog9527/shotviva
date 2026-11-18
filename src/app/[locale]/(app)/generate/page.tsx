@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { connection } from 'next/server'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
@@ -37,6 +38,9 @@ type Search = Promise<Record<string, string | string[] | undefined>>
 // The proxy already sends a signed-out visitor to sign-in with the full address; this is the
 // page's own fallback, and it keeps an open series (?series=) or poster editor (?poster=) too.
 async function Create({ searchParams }: { searchParams: Search }) {
+  // Keep the header in the prefetched shell. Only a navigation should compute and
+  // serialize the signed-in catalogue; the embedded runtime prefetch can skip it.
+  await connection()
   const user = await requireUser(async () => {
     const { series, poster } = await searchParams
     return createReturnPath(series, poster)
