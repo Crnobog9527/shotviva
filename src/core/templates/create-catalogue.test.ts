@@ -1,31 +1,24 @@
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const { readRows, readTree } = vi.hoisted(() => ({ readRows: vi.fn(), readTree: vi.fn() }))
-vi.mock('next/cache', () => ({
-  cacheLife: vi.fn(),
-  cacheTag: vi.fn(),
-  unstable_cache: vi.fn((read: () => Promise<unknown>) => vi.fn(read)),
+const { adminClient, rpc, readRows, readTree } = vi.hoisted(() => ({
+  adminClient: vi.fn(), rpc: vi.fn(), readRows: vi.fn(), readTree: vi.fn(),
 }))
+vi.mock('next/cache', () => ({ cacheLife: vi.fn(), cacheTag: vi.fn() }))
 vi.mock('./taxonomy-reads', () => ({ readCategoryTree: readTree }))
-vi.mock('../auth/supabase-admin', () => ({
-  createAdminSupabase: () => ({
-    rpc: vi.fn(() => {
-      const query = { select: () => query, order: () => query, limit: () => query, returns: readRows }
-      return query
-    }),
-  }),
-}))
+vi.mock('../auth/supabase-admin', () => ({ createAdminSupabase: adminClient }))
 
 const { loadCreateCatalogue } = await import('./create-catalogue')
-const { cacheTag, unstable_cache } = await import('next/cache')
-const cacheOptions = vi.mocked(unstable_cache).mock.calls[0]
-const cachedRead = vi.mocked(vi.mocked(unstable_cache).mock.results[0].value)
+const { cacheLife, cacheTag } = await import('next/cache')
 
 beforeEach(() => {
   readRows.mockReset()
   readTree.mockReset().mockResolvedValue([])
-  cachedRead.mockClear()
+  const query = { select: () => query, order: () => query, limit: () => query, returns: readRows }
+  rpc.mockReturnValue(query)
+  adminClient.mockReturnValue({ rpc })
 })
+
+afterEach(() => vi.unstubAllGlobals())
 
 it('uses one database fill for concurrent callers across languages', async () => {
   const pending = Promise.withResolvers<{ data: []; error: null }>()
@@ -51,32 +44,29 @@ it('releases a failed fill so the next request can load the catalogue', async ()
   expect(readRows).toHaveBeenCalledTimes(2)
 })
 
-it('keeps the existing invalidation tags on both cache layers', async () => {
+it('keys persistent reads by a GET request and applies the existing tags to both layers', async () => {
   readRows.mockResolvedValue({ data: [], error: null })
+  const fetch = vi.fn().mockResolvedValue(new Response())
+  vi.stubGlobal('fetch', fetch)
 
   await loadCreateCatalogue('zh', true)
+  expect(rpc).toHaveBeenCalledExactlyOnceWith('web_templates', { p_include_members: true }, { get: true })
+  const [catalogueFetch] = adminClient.mock.calls[0]
+  const url = 'https://database.example/rest/v1/rpc/web_templates'
+  await catalogueFetch(url, { method: 'GET' })
 
   expect(cacheTag).toHaveBeenCalledExactlyOnceWith('templates', 'providers')
-  expect(cacheOptions).toEqual([expect.any(Function), ['create-catalogue-v1'], {
-    tags: ['templates', 'providers'], revalidate: 3600,
-  }])
+  expect(fetch).toHaveBeenCalledExactlyOnceWith(url, {
+    method: 'GET', next: { tags: ['templates', 'providers'], revalidate: 3600 },
+  })
 })
 
-it('serves the fallback without caching an incomplete snapshot', async () => {
+it('uses the short cache lifetime when the category tree could not be read', async () => {
   readRows.mockResolvedValue({ data: [], error: null })
   readTree.mockRejectedValueOnce(new Error('category timeout'))
 
   await expect(loadCreateCatalogue('zh', true)).resolves.toEqual({ index: null, templates: [] })
-  await expect(cachedRead.mock.results[0].value).rejects.toThrow('category tree is unavailable')
+  expect(cacheLife).toHaveBeenCalledExactlyOnceWith({ revalidate: 60, expire: 600 })
   await expect(loadCreateCatalogue('zh', true)).resolves.toMatchObject({ index: expect.any(Object) })
   expect(readRows).toHaveBeenCalledTimes(2)
-})
-
-it('refreshes instead of serving a snapshot beyond the hard age limit', async () => {
-  const now = Date.now()
-  readRows.mockResolvedValue({ data: [], error: null })
-  cachedRead.mockResolvedValueOnce({ snapshot: null, filledAt: now - 86_400_000 })
-
-  await expect(loadCreateCatalogue('en', false)).resolves.toMatchObject({ templates: [] })
-  expect(readRows).toHaveBeenCalledTimes(1)
 })
