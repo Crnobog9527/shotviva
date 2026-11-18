@@ -1,10 +1,9 @@
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { cacheLife, cacheTag } from 'next/cache'
+import { unstable_cache } from 'next/cache'
 
 import { createAdminSupabase } from '../auth/supabase-admin'
-import { FAILED_READ_LIFE } from '../cache-life'
 import type { Locale } from '../i18n/locales'
 import { logger } from '../logger'
 import { PROVIDERS_CACHE_TAG } from '../providers/cache-tag'
@@ -74,15 +73,46 @@ function catalogueMember(row: TemplateWithPlacement, series: Map<string, Catalog
 type Snapshot = Awaited<ReturnType<typeof readCreateCatalogue>>
 let filling: Promise<Snapshot> | undefined
 
-// Simultaneous misses on an instance share only the in-flight read. Next owns tag invalidation
-// and expiry of completed snapshots, and the same snapshot serves both languages.
-async function cachedCreateCatalogue(): Promise<Snapshot> {
-  'use cache: remote'
-  cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
-  filling ??= readCreateCatalogue(createAdminSupabase()).finally(() => { filling = undefined })
-  const snapshot = await filling
-  cacheLife(snapshot.tree === null ? FAILED_READ_LIFE : CATALOGUE_LIFE)
+async function fillCreateCatalogue() {
+  const started = performance.now()
+  const snapshot = await readCreateCatalogue(createAdminSupabase())
+  logger.info('templates.create_catalogue_fill', { durationMs: Math.round(performance.now() - started) })
   return snapshot
+}
+
+function sharedFill(): Promise<Snapshot> {
+  filling ??= fillCreateCatalogue().finally(() => { filling = undefined })
+  return filling
+}
+
+class IncompleteCatalogue extends Error {
+  constructor(readonly snapshot: Snapshot) {
+    super('Create catalogue category tree is unavailable')
+  }
+}
+
+// The Data Cache can reuse a snapshot across deployments. Bump the key when its data shape or
+// read semantics change. Keep the existing template and provider mutation tags on the entry.
+const readCachedSnapshot = unstable_cache(async () => {
+  const snapshot = await sharedFill()
+  if (snapshot.tree === null) throw new IncompleteCatalogue(snapshot)
+  return { snapshot, filledAt: Date.now() }
+}, ['create-catalogue-v1'], {
+  tags: [TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG],
+  revalidate: CATALOGUE_LIFE.revalidate,
+})
+
+async function cachedCreateCatalogue() {
+  try {
+    const { snapshot, filledAt } = await readCachedSnapshot()
+    if (Date.now() - filledAt < CATALOGUE_LIFE.expire * 1000) return snapshot
+    // Keep the hard age limit even if a background revalidation failed.
+    return sharedFill()
+  } catch (error) {
+    // Preserve the flat-list fallback without storing a partial result in the Data Cache.
+    if (error instanceof IncompleteCatalogue) return error.snapshot
+    throw error
+  }
 }
 
 export async function loadCreateCatalogue(locale: Locale, posters: boolean | Promise<boolean>) {
