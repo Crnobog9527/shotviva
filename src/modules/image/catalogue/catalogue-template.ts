@@ -34,6 +34,9 @@ export type CatalogueTemplate = {
   imageSlots?: CatalogueImageSlot[]
   // Titled groups that fold (fields.groups), in the page's language; absent for the plain layout.
   groups?: CatalogueFieldGroup[]
+  // The Create grid has a summary until the selected workspace form is requested.
+  formDeferred?: true
+  hasDeferredSlots?: true
   cover: {
     type: CoverMediaType
     before: string | null
@@ -125,7 +128,8 @@ function toCatalogueCopy({ key, label, type, placeholder, help, example, require
 }
 
 export const slotsOfTemplate = (template: Pick<CatalogueTemplate, 'imageSlots'> | null): CatalogueImageSlot[] => template?.imageSlots ?? []
-export const isSlotTemplate = (template: Pick<CatalogueTemplate, 'imageSlots'> | null) => slotsOfTemplate(template).length > 0
+export const isSlotTemplate = (template: Pick<CatalogueTemplate, 'imageSlots' | 'hasDeferredSlots'> | null) =>
+  Boolean(template?.hasDeferredSlots) || slotsOfTemplate(template).length > 0
 
 // Where a poster template's editor opens: a dialog over Create (ARCHITECTURE §5.3), the same
 // address the old /posters/<id> pages and Photos' 改文字 lead to; null for every other template.

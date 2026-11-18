@@ -12,8 +12,9 @@ import { useFavorites } from '../favorites/favorites-provider'
 import { savedIn } from '../favorites/favorites-store'
 import { BatchDialogSlot } from '../matrix/batch-dialog-slot'
 import { CreateDialog, type CreateContext } from '../workspace/create-dialog'
-import { filterCatalogue, openableTemplates } from './catalogue-filter'
+import { filterCatalogue } from './catalogue-filter'
 import { buildSearchIndex, searchTemplates } from './catalogue-search'
+import type { CataloguePayload } from './catalogue-payload'
 import { catalogueSections, isTall, sectionsFor, type CatalogueSection } from './catalogue-sections'
 import { CatalogueSections } from './catalogue-sections-view'
 import { batchableTemplates, isMotion, type CatalogueTemplate } from './catalogue-template'
@@ -28,14 +29,14 @@ import { SeriesCard } from './series-card'
 import { TemplateCard } from './template-card'
 import { useSeeAllLanding } from './use-see-all-landing'
 import { useCatalogueQuery } from './use-catalogue-query'
-import { slimBrowse } from './picker-browse'
+import { browseView, slimBrowse } from './picker-browse'
 
 // The series panel is only fetched once a series is opened (scripts/js-budget.json).
 const SeriesCreateDialog = dynamic(() => import('../workspace/series-create-dialog').then((m) => m.SeriesCreateDialog), { ssr: false })
 
 // `endCard`: the grid's last card, after every filter's cards (the Wishlist's "Not finding it?",
 // passed in by the page while the wishlist is open).
-type Props = { view: CatalogueView; create: CreateContext; endCard?: ReactNode }
+type Props = { payload: CataloguePayload; create: CreateContext; endCard?: ReactNode }
 
 // Create's catalogue (B comp create.html): the featured card, a sticky chip bar of up to three
 // category levels (T102), the grid of side-by-side pair cards and series cards (one column on
@@ -45,11 +46,12 @@ type Props = { view: CatalogueView; create: CreateContext; endCard?: ReactNode }
 // (?batch=1, opened by the card above the catalogue or a template's batch link). The
 // chosen category and an open series live in the address (?category=, ?series=). With saved
 // templates the bar leads with Saved (T83), read from the page's FavoritesProvider.
-export function TemplateCatalogue({ view, create, endCard }: Props) {
+export function TemplateCatalogue({ payload, create, endCard }: Props) {
   const t = useTranslations('app.create')
+  const view = useMemo(() => browseView(payload.browse, payload.templates, false), [payload])
   const query = useCatalogueQuery(view.filters)
   const [openId, setOpenId] = useState<string | null>(null)
-  const openable = useMemo(() => openableTemplates(view.entries), [view.entries])
+  const openable = payload.templates
   const batchable = useMemo(() => batchableTemplates(openable), [openable])
   const batchBrowse = useMemo(() => slimBrowse(view), [view])
   // A poster template's card opens its editor dialog, kept in the address (?poster=<id>, where

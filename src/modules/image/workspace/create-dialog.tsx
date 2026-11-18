@@ -15,11 +15,13 @@ import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-t
 import { preloadBatchDialog } from '../matrix/batch-dialog-slot'
 import { openBatch } from '../matrix/batch-query'
 import { isCompareSample } from '../catalogue/template-sample'
+import { useCatalogueForms } from '../catalogue/use-catalogue-forms'
 import { ZoomableSample } from '../catalogue/zoomable-sample'
 import { ShareButton } from '../share/share-button'
 import { FavoriteButton } from '../favorites/favorite-button'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
+import { PendingCatalogueForm } from './pending-catalogue-form'
 import { useSubmitOnce } from './use-submit-once'
 import { useWarmRoute } from './use-warm-route'
 import { useWorkspaceDraft, type DraftInput } from './use-workspace-draft'
@@ -44,7 +46,13 @@ export function CreateDialog({ template, onClose, ...context }: Props) {
 
 type BodyProps = CreateContext & { template: CatalogueTemplate; open: boolean; onClose(): void }
 
-function CreateBody({ template, open, onClose, ...context }: BodyProps) {
+function CreateBody(props: BodyProps) {
+  const forms = useCatalogueForms([props.template])
+  if (!forms.ready) return <PendingCatalogueForm {...props} failed={forms.failed} retry={forms.retry} />
+  return <CreateForm {...props} template={forms.fill(props.template)} />
+}
+
+function CreateForm({ template, open, onClose, ...context }: BodyProps) {
   const t = useTranslations('app.template')
   const router = useRouter()
   const draft = useWorkspaceDraft({ template, ...context, single: true })

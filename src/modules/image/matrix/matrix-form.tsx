@@ -12,6 +12,7 @@ import { sizeLabel } from '../workspace/workspace-options'
 import { chosenAspect } from '../workspace/output-choice'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { PickerBrowse } from '../catalogue/picker-browse'
+import { CatalogueFormStatus } from '../catalogue/catalogue-form-status'
 import { batchCounts, MATRIX_TEMPLATES, type BatchCaps } from '../gated/feature-access'
 import { IntroTrigger } from '../gated/intro-trigger'
 import { TierBadge } from '../gated/tier-badge'
@@ -87,6 +88,7 @@ function TemplatesBlock({ draft, templates, browse, tier }: { draft: MatrixDraft
 // Each template's own text and options; nothing when none of them has any.
 function SettingsSection({ draft, photos }: { draft: MatrixDraft; photos: MatrixDraft['photos']['photos'] }) {
   const t = useTranslations('app.matrix')
+  if (!draft.forms.ready) return <CatalogueFormStatus failed={draft.forms.failed} retry={draft.forms.retry} />
   if (!draft.chosen.some((template) => template.copyFields.length > 0 || template.toggles.length > 0)) return null
   return (
     <Section id="set-h" title={t('settingsTitle')}>
