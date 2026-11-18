@@ -54,7 +54,7 @@ export async function cachedWebCatalogue(locale: Locale): Promise<LocalizedTempl
 // template and route itself. Unlike cachedWebCatalogue a failed read throws, so it is never
 // cached and the page shows its error state instead of an empty catalogue.
 export async function cachedWebTemplates(locale: Locale, includeSeriesMembers: boolean): Promise<LocalizedTemplate[]> {
-  'use cache'
+  'use cache: remote'
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   cacheLife(CATALOGUE_LIFE)
   return listTemplatesIn(createAdminSupabase(), locale, { includeSeriesMembers })
@@ -63,7 +63,7 @@ export async function cachedWebTemplates(locale: Locale, includeSeriesMembers: b
 // The dense-text poster templates (ARCHITECTURE §5.3), which the catalogue above leaves out:
 // Photos names and covers poster works with them. Never offered for Make again.
 export async function cachedPosterTemplates(locale: Locale): Promise<LocalizedTemplate[]> {
-  'use cache'
+  'use cache: remote'
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   cacheLife(CATALOGUE_LIFE)
   return listTemplatesIn(createAdminSupabase(), locale, { posters: true, includeSeriesMembers: true })
