@@ -13,7 +13,7 @@ import { POSTER_FEATURE } from '@/core/poster/sets'
 import { listRunningJobIds } from '@/core/jobs'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
-import { createReturnPath, FavoritesProvider, GatedFeatures, GeneratingPill, loadCatalogueView, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image'
+import { createReturnPath, FavoritesProvider, GatedFeatures, GeneratingPill, loadCataloguePayload, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image'
 import { site } from '@/site/site.config'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -42,7 +42,7 @@ async function Create({ searchParams }: { searchParams: Search }) {
     // Templates and series cards placed under up to three category levels (T102); the poster
     // templates too while this account may use the poster editor (ARCHITECTURE §5.3). Checked
     // through core, not modules/image/posters, which would ship the poster editor's JS here.
-    loadCatalogueView(await currentLocale(), featureAllowed(user.id, POSTER_FEATURE).catch(() => false)),
+    loadCataloguePayload(await currentLocale(), featureAllowed(user.id, POSTER_FEATURE).catch(() => false)),
     readBalance(supabase, user.id),
     // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
     effectiveTier(admin, user.id),
@@ -70,7 +70,7 @@ async function Create({ searchParams }: { searchParams: Search }) {
       <div id={TEMPLATES_ANCHOR} className="scroll-mt-[calc(var(--sat)+8px)] md:scroll-mt-16">
         <FavoritesProvider initialIds={favoriteIds} signedIn>
           <TemplateCatalogue
-            view={view}
+            payload={view}
             create={{ balance, tier, concurrency: { limit: limitsFor(tier).concurrency, runningIds } }}
             endCard={wishlistLive ? <WishCard /> : undefined}
           />
