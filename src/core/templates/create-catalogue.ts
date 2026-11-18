@@ -11,7 +11,7 @@ import { logger } from '../logger'
 import { r2ConditionalJson } from '../storage/r2-store'
 import { PROVIDERS_CACHE_TAG } from '../providers/cache-tag'
 import { TEMPLATES_CACHE_TAG } from './cache'
-import { CatalogueCoordinationError, coordinateCatalogue } from './catalogue-flight'
+import { CatalogueCoordinationError, coordinateCatalogue, preloadCatalogue } from './catalogue-flight'
 import { CATALOGUE_LIFE } from './cached-catalogue'
 import { toCatalogueIndex } from './catalogue-index'
 import { catalogueEntries, type CatalogueMember, type CatalogueSeriesRow } from './catalogue-index-entries'
@@ -97,6 +97,16 @@ function fetchCatalogueData(input: Parameters<typeof fetch>[0], init?: RequestIn
     ...init,
     next: { revalidate: CATALOGUE_LIFE.revalidate, tags: [TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG] },
   })
+}
+
+// A best-effort head start from Proxy. The page still performs the ordinary cached read.
+// Reuse requires the same R2 revision and normal short sharing window.
+export async function preloadCreateCatalogue(version: string) {
+  const started = performance.now()
+  const store = r2ConditionalJson()
+  if (store && await preloadCatalogue(store, version, () => fillCreateCatalogue(true))) {
+    logger.info('templates.create_catalogue_preloaded', { durationMs: Math.round(performance.now() - started) })
+  }
 }
 
 async function sharedCatalogue() {
