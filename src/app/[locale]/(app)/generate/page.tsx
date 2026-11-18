@@ -13,7 +13,7 @@ import { logger } from '@/core/logger'
 import { POSTER_FEATURE } from '@/core/poster/sets'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
-import { createReturnPath, FavoritesProvider, GatedFeatures, GeneratingPill, loadCataloguePayload, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image'
+import { createReturnPath, FavoritesProvider, GatedFeatures, GeneratingPill, loadCataloguePayload, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image/create-page'
 import { site } from '@/site/site.config'
 
 import { readCreatePersonalData } from './personal-data'
