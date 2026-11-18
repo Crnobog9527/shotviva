@@ -19,10 +19,10 @@ export async function loadFeatureAccess(db: Db): Promise<FeatureAccess[]> {
 }
 
 // Rows only, never a decision: open_to_all_at is compared with the request's own clock, so
-// a cached entry cannot keep a feature locked past its opening time. The short lifetime
-// bounds how long an instance that missed the tag expiry keeps an old gate.
+// a cached entry cannot keep a feature locked past its opening time. The remote cache shares
+// the tagged policy across instances so each new instance does not read the table again.
 export async function cachedFeatureAccess(): Promise<FeatureAccess[]> {
-  'use cache'
+  'use cache: remote'
   cacheTag(FEATURES_CACHE_TAG)
   cacheLife({ revalidate: 300, expire: 3600 })
   return loadFeatureAccess(createAdminSupabase())

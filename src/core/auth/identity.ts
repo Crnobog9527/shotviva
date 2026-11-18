@@ -1,6 +1,7 @@
 import { isAuthRetryableFetchError, isAuthSessionMissingError, type AuthError, type SupabaseClient, type User } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import { serverEnv } from '../env'
 import { logger } from '../logger'
 import { bearerClient } from './bearer-client'
 import { cookieToken, usable } from './cookie-token'
@@ -83,7 +84,12 @@ async function claimsOf(supabase: SupabaseClient, token?: string): Promise<{ sub
 }
 
 async function profileOf(supabase: SupabaseClient, sub: string): Promise<Identity> {
+  const started = performance.now()
   const { data, error, status } = await supabase.rpc('session_identity')
+  const durationMs = Math.round(performance.now() - started)
+  if (durationMs >= 750 && serverEnv().VERCEL_ENV === 'preview') {
+    logger.info('auth.session_identity_slow', { durationMs, status })
+  }
   if (error) {
     if (!dbUnavailable(status)) return SIGNED_OUT
     logger.warn('auth.identity_unavailable', { source: 'db', status, code: error.code })

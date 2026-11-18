@@ -5,18 +5,18 @@ import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveTier, limitsFor } from '@/core/billing'
 import { serverEnv } from '@/core/env'
 import { featureAllowed } from '@/core/features'
-import { listFavoriteIdsOrEmpty } from '@/core/favorites'
 import { currentLocale } from '@/core/i18n/server'
 import { logger } from '@/core/logger'
 import { POSTER_FEATURE } from '@/core/poster/sets'
-import { listRunningJobIds } from '@/core/jobs'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
 import { createReturnPath, FavoritesProvider, GatedFeatures, GeneratingPill, loadCataloguePayload, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image'
 import { site } from '@/site/site.config'
+
+import { readCreatePersonalData } from './personal-data'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.create'))('metaTitle') }
@@ -39,22 +39,18 @@ async function loadCreatePage(query: Awaited<Search>) {
   const started = performance.now()
   const user = await requireUser(createReturnPath(query.series, query.poster))
   const authenticated = performance.now()
-  // Begin the shared catalogue read as soon as this request has authenticated.
-  const viewPromise = currentLocale().then((locale) => loadCataloguePayload(locale, featureAllowed(user.id, POSTER_FEATURE).catch(() => false)))
-  const supabase = createServerSupabase()
-  const admin = createAdminSupabase()
+  // An unbanned admin counts as Max. Reuse the same server-side result for the poster gate.
+  const tierPromise = effectiveTier(createAdminSupabase(), user.id)
+  const posterAllowed = featureAllowed(user.id, POSTER_FEATURE, { tierOf: () => tierPromise }).catch(() => false)
+  const viewPromise = currentLocale().then((locale) => loadCataloguePayload(locale, posterAllowed))
   const accountReads = Promise.all([
-    supabase.then((db) => readBalance(db, user.id)),
-    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
-    effectiveTier(admin, user.id),
-    listRunningJobIds(admin, user.id, new Date()),
-    // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
-    supabase.then((db) => listFavoriteIdsOrEmpty(db, user.id)),
+    createServerSupabase().then((db) => readCreatePersonalData(db, user.id, new Date())),
+    tierPromise,
     // The grid ends on "Not finding it? Make a wish" while the wishlist is open (cached read).
     isWishlistEnabled(site),
   ])
   // The account data and catalogue are independent. On Preview, time each branch through completion.
-  const [[view, viewMs], [[balance, tier, runningIds, favoriteIds, wishlistLive], accountMs]] = await Promise.all([
+  const [[view, viewMs], [[personal, tier, wishlistLive], accountMs]] = await Promise.all([
     viewPromise.then((value) => [value, performance.now() - authenticated] as const),
     accountReads.then((value) => [value, performance.now() - authenticated] as const),
   ])
@@ -65,7 +61,7 @@ async function loadCreatePage(query: Awaited<Search>) {
       accountMs: Math.round(accountMs),
     })
   }
-  return { view, balance, tier, runningIds, favoriteIds, wishlistLive }
+  return { view, ...personal, tier, wishlistLive }
 }
 
 async function Create({ searchParams }: { searchParams: Search }) {
