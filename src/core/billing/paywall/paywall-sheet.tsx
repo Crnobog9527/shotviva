@@ -1,6 +1,6 @@
 "use client"
 
-import { useLocale, useTranslations } from "next-intl"
+import { useTranslations } from "next-intl"
 
 import { trackPaywallSelect } from "../../analytics/browser"
 
@@ -13,7 +13,6 @@ import { DiscountProvider } from "./discount-context"
 import { DiscountBanner, DiscountEntry } from "./discount-controls"
 import { BillingToggle } from "./billing-toggle"
 import { packOffers, tierOffers, yearlySavingPct } from "./offer"
-import { PayMethods } from "./pay-methods"
 import { PaywallMoment as MomentLead } from "./paywall-moment"
 import { PaywallCheckout } from "./paywall-checkout"
 import type { PaywallTrigger } from "./paywall-context"
@@ -34,17 +33,14 @@ type Props = {
   state: PaywallState
 }
 
-// The paywall (comps-v3-b paywall.html, signed off 2026-11-06): one screen, a full-height
-// bottom drawer on phones and a centred 920px dialog from md (ResponsiveSheet `wide`). Monthly /
-// Yearly beside the title, the tiers and packs, and the checkout bar fixed at the bottom.
-// Chinese buyers pick a payment method in a second sheet before opening hosted checkout.
+// Buyers choose their product in the main paywall, then choose a method in a second sheet
+// before opening hosted checkout.
 export function PaywallSheet(props: Props) {
   return <DiscountProvider active={props.open}><SheetBody {...props} /></DiscountProvider>
 }
 
 function SheetBody({ open, onOpenChange, trigger, moment, needed, momentTier, products, state }: Props) {
   const t = useTranslations("paywall")
-  const chooseMethod = useLocale() === "zh"
   const offers = tierOffers(products)
   const packs = packOffers(products)
   const { choice, update } = state
@@ -73,13 +69,12 @@ function SheetBody({ open, onOpenChange, trigger, moment, needed, momentTier, pr
           className="mt-4 md:mt-1 md:w-[400px] md:flex-none"
         />
       }
-      footer={resolved ? <PaywallCheckout resolved={resolved} choice={choice} /> : null}
+      footer={resolved ? <PaywallCheckout resolved={resolved} period={choice.period} /> : null}
     >
       <DiscountBanner singlePayment={choice.method === "alipay"} />
       <MomentLead moment={moment} needed={needed} offers={offers} packs={packs} pick={choice.pick} onPick={select} />
       <TierPicker offers={offers.filter(o => choice.period === "year" ? o.yearly : o.monthly)} state={picking} />
       <PackPicker packs={packs} state={picking} />
-      {!chooseMethod && <PayMethods method={choice.method} onChange={(method) => update({ method })} kind={resolved?.kind ?? "plan"} period={choice.period} />}
       <DiscountEntry />
     </ResponsiveSheet>
   )

@@ -16,7 +16,6 @@ import { useStanding } from "./standing-context"
 import { planStanding } from "./standing-pick"
 import { useCheckout } from "./use-checkout"
 import { useMoney } from "./use-money"
-import type { PaywallChoice } from "./use-paywall-state"
 
 type Purchase = {
   resolved: ResolvedPick
@@ -27,7 +26,7 @@ type Purchase = {
   locked: string | null
 }
 
-export function PaywallCheckout({ resolved, choice }: { resolved: ResolvedPick; choice: PaywallChoice }) {
+export function PaywallCheckout({ resolved, period }: { resolved: ResolvedPick; period: Period }) {
   const t = useTranslations("paywall")
   const locale = useLocale()
   const standing = useStanding()
@@ -35,21 +34,13 @@ export function PaywallCheckout({ resolved, choice }: { resolved: ResolvedPick; 
   const money = useMoney()
   const price = money(quote.priceUsd)
   const plan = resolved.kind === "plan" ? resolved : null
-  const member = plan ? planStanding(standing, plan.offer.tier, choice.period, plan.product.id) : { upgrade: false, lock: null }
+  const member = plan ? planStanding(standing, plan.offer.tier, period, plan.product.id) : { upgrade: false, lock: null }
   const note = member.upgrade ? t(standing.subscription ? "upgradeNoteCancels" : "upgradeNote") : null
   const label = plan
-    ? t(member.upgrade ? "ctaUpgrade" : "ctaPlan", { tier: offerLabel(plan.product, locale, t(`tiers.${plan.offer.tier}`)), price, period: choice.period })
+    ? t(member.upgrade ? "ctaUpgrade" : "ctaPlan", { tier: offerLabel(plan.product, locale, t(`tiers.${plan.offer.tier}`)), price, period })
     : t("ctaPack", { count: resolved.product.credits, price })
   const locked = member.lock === "current" ? t("lockCurrentNote") : member.lock ? t("lockLower") : null
-  const purchase = { resolved, period: choice.period, quote, label, note, locked }
-  return locale === "zh"
-    ? <PaymentMethodCheckout purchase={purchase} />
-    : <InlineCheckout purchase={purchase} method={choice.method} />
-}
-
-function InlineCheckout({ purchase, method }: { purchase: Purchase; method: CheckoutMethod }) {
-  const { bar } = usePurchaseCheckout(purchase, method)
-  return <CheckoutBar {...bar} label={purchase.label} />
+  return <PaymentMethodCheckout purchase={{ resolved, period, quote, label, note, locked }} />
 }
 
 function PaymentMethodCheckout({ purchase }: { purchase: Purchase }) {
@@ -97,7 +88,7 @@ function PaymentMethodCheckout({ purchase }: { purchase: Purchase }) {
           />
         }
       >
-        <PayMethods inSheet method={method} onChange={selectMethod} kind={purchase.resolved.kind} period={purchase.period} disabled={pending} />
+        <PayMethods method={method} onChange={selectMethod} kind={purchase.resolved.kind} period={purchase.period} disabled={pending} />
       </ResponsiveSheet>
     </>
   )
