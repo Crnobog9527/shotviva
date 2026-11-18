@@ -76,16 +76,12 @@ function catalogueMember(row: TemplateWithPlacement, series: Map<string, Catalog
 type Snapshot = Awaited<ReturnType<typeof readCreateCatalogue>>
 let filling: Promise<Snapshot> | undefined
 
-async function fillCreateCatalogue(revision?: string) {
+async function fillCreateCatalogue(live = false) {
   const started = performance.now()
   const deadline = AbortSignal.timeout(8_000)
   const read: typeof fetch = (input, init) => {
     const signal = init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline
-    const headers = new Headers(init?.headers)
-    // This revision is part of Next's fetch cache key. After an admin write the new fill
-    // cannot read an old value while the framework's tag invalidation is still propagating.
-    if (revision) headers.set('x-shotviva-catalogue-revision', revision)
-    return fetchCatalogueData(input, { ...init, headers, signal })
+    return live ? fetch(input, { ...init, signal, cache: 'no-store' }) : fetchCatalogueData(input, { ...init, signal })
   }
   const snapshot = await readCreateCatalogue(createAdminSupabase(read))
   logger.info('templates.create_catalogue_fill', { durationMs: Math.round(performance.now() - started) })
@@ -106,11 +102,11 @@ async function sharedCatalogue() {
   const store = r2ConditionalJson()
   if (!store) return fillCreateCatalogue()
   try {
-    return await coordinateCatalogue(store, fillCreateCatalogue)
+    return await coordinateCatalogue(store, () => fillCreateCatalogue(true))
   } catch (error) {
     if (!(error instanceof CatalogueCoordinationError)) throw error
     logger.error('templates.create_catalogue_coordination_failed', { error })
-    return fillCreateCatalogue()
+    return fillCreateCatalogue(true)
   }
 }
 

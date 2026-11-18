@@ -58,7 +58,7 @@ it('keys persistent reads by a GET request and applies the existing tags to both
 
   expect(cacheTag).toHaveBeenCalledExactlyOnceWith('templates', 'providers')
   expect(fetch).toHaveBeenCalledExactlyOnceWith(url, {
-    method: 'GET', headers: expect.any(Headers), signal: expect.any(AbortSignal),
+    method: 'GET', signal: expect.any(AbortSignal),
     next: { tags: ['templates', 'providers'], revalidate: 3600 },
   })
 })
