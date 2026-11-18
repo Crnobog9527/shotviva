@@ -54,7 +54,7 @@ export async function catalogueIndexOrNull(locale: Locale, read: IndexRead = rea
 
 // Create's cards depend on taxonomy and whether the current image route can sell each template.
 export async function cachedCatalogueIndex(locale: Locale): Promise<CatalogueIndex | null> {
-  'use cache'
+  'use cache: remote'
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   return catalogueIndexOrNull(locale)
 }
