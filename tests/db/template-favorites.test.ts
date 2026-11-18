@@ -120,7 +120,7 @@ it('reads Create balances, live jobs and visible favorites for the current accou
   ]) {
     await db.query(
       `insert into public.generation_jobs (id, user_id, module, template_id, source, credit_pool, visibility, credits_cost, created_at, deleted_at)
-       values ($1, $2, 'image', $3, 'web', 'free', 'private', 1, $4, $5)`,
+       values ($1, $2, 'image', $3, 'web', 'paid', 'private', 1, $4, $5)`,
       [id, owner, visible, createdAt, deletedAt],
     )
   }
