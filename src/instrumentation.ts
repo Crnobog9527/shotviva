@@ -1,4 +1,5 @@
-import { onRequestError, registerSentry } from '@/core/analytics'
+import { onRequestError, registerSentry } from '@/core/analytics/sentry-server'
+import { serverEnv } from '@/core/env'
 
 // Server start-up (Next.js instrumentation). Sentry for both runtimes; PostHog server events
 // need no SDK set-up (core/analytics/server-track.ts). On Node, the Owner's 「网站报错异常」
@@ -9,7 +10,11 @@ export async function register(): Promise<void> {
   // its instrumentation guide), so the edge bundle drops this import; it is not a setting.
   // eslint-disable-next-line no-restricted-syntax
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    const { registerOwnerErrorAlerts } = await import('@/core/alerts')
+    const { FEISHU_ALERT_WEBHOOK_URL, FEISHU_ALERT_SECRET } = serverEnv()
+    // With both unset, the listener would do nothing. Avoid loading the notifier and
+    // its storage dependencies during startup in environments without Owner alerts.
+    if (!FEISHU_ALERT_WEBHOOK_URL && !FEISHU_ALERT_SECRET) return
+    const { registerOwnerErrorAlerts } = await import('@/core/alerts/register')
     registerOwnerErrorAlerts()
   }
 }
