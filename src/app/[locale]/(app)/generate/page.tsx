@@ -37,8 +37,10 @@ type Search = Promise<Record<string, string | string[] | undefined>>
 // The proxy already sends a signed-out visitor to sign-in with the full address; this is the
 // page's own fallback, and it keeps an open series (?series=) or poster editor (?poster=) too.
 async function Create({ searchParams }: { searchParams: Search }) {
-  const query = await searchParams
-  const user = await requireUser(createReturnPath(query.series, query.poster))
+  const user = await requireUser(async () => {
+    const { series, poster } = await searchParams
+    return createReturnPath(series, poster)
+  })
   const admin = createAdminSupabase()
   // Reuse the service-role tier lookup when the poster gate needs the same answer.
   const tierPromise = effectiveTier(admin, user.id)
