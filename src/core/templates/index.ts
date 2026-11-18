@@ -134,6 +134,7 @@ export { imageCostBudget, maxCostPerCredit, modelCreditFloor, UNPRICED, type Pro
 export { cachedPosterTemplates, cachedWebTemplates, findWebTemplate } from './cached-catalogue'
 export { findOffSaleTemplate, type OffSaleTemplate } from './off-sale'
 export { cachedCatalogueIndex, cachedCategoryEntries, cachedCategoryTree, cachedSeriesMembers } from './cached-taxonomy'
+export { loadCreateCatalogue } from './create-catalogue'
 export type { CatalogueIndex, IndexEntry, IndexSeries } from './catalogue-index'
 export type { CatalogueCursor, CataloguePage, CategoryNode } from './taxonomy'
 export type { CatalogueEntry } from './taxonomy-reads'
