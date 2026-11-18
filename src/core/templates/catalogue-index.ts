@@ -23,11 +23,11 @@ export type IndexSeries = {
 }
 export type CatalogueIndex = { tree: CategoryNode[]; entries: IndexEntry[]; series: IndexSeries[] }
 
-type SeriesRow = {
+export type SeriesRow = {
   id: string; slug: string; name_en: string; name_zh: string
   description_en: string | null; description_zh: string | null; cover_url: string | null
 }
-type EntryRow = {
+export type EntryRow = {
   type: 'template' | 'series'; entry_key: string; sort_order: number; category_key: string
   template_id: string | null; series_id: string | null; entry_series: SeriesRow | null
 }

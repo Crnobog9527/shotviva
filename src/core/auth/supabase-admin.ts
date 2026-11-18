@@ -7,11 +7,11 @@ import { AppError } from '../errors'
 import { publicEnv } from '../public-env'
 
 // Service-role client: bypasses RLS. Only for SQL functions (credits) and auth admin calls.
-export function createAdminSupabase() {
+export function createAdminSupabase(readFetch?: typeof fetch) {
   const key = serverEnv().SUPABASE_SERVICE_ROLE_KEY
   if (!key) throw new AppError('INTERNAL', 'SUPABASE_SERVICE_ROLE_KEY is not configured')
   return createClient(publicEnv.NEXT_PUBLIC_SUPABASE_URL, key, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { fetch: withDbTiers() },
+    global: { fetch: withDbTiers(readFetch) },
   })
 }

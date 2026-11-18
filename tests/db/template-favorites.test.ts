@@ -1,8 +1,12 @@
+import { randomUUID } from 'node:crypto'
+
 import { publishFixture } from './helpers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { readCreatePersonalData } from '@/app/[locale]/(app)/generate/personal-data'
+import { readBalance } from '@/core/billing/balance'
 import { FAVORITES_MAX, listFavoriteIds, setFavorite } from '@/core/favorites'
 
 import { connectAdmin, createPricedTemplate, createUser } from './helpers'
@@ -97,6 +101,38 @@ describe('hidden while not live, back when republished', () => {
     await db.query('update public.templates set is_active = true where id = $1', [unpublished])
     await db.query("update public.templates set visible_in = array['web', 'partner'] where id = $1", [partnerOnly])
     expect(await listFavoriteIds(aliceClient, alice.id)).toEqual([partnerOnly, unpublished, kept])
+  })
+})
+
+it('reads Create balances, live jobs and visible favorites for the current account only', async () => {
+  await clear(alice.id)
+  const [visible, hidden] = [await createPricedTemplate(db), await createPricedTemplate(db)]
+  await setFavorite(aliceClient, alice.id, visible, true)
+  await setFavorite(aliceClient, alice.id, hidden, true)
+  await db.query("update public.templates set visible_in = array['partner'] where id = $1", [hidden])
+  const now = new Date()
+  const live = randomUUID()
+  for (const [id, owner, createdAt, deletedAt] of [
+    [live, alice.id, now, null],
+    [randomUUID(), bob.id, now, null],
+    [randomUUID(), alice.id, new Date(now.getTime() - 7 * 60 * 1000), null],
+    [randomUUID(), alice.id, now, now],
+  ]) {
+    await db.query(
+      `insert into public.generation_jobs (id, user_id, module, template_id, source, credit_pool, visibility, credits_cost, created_at, deleted_at)
+       values ($1, $2, 'image', $3, 'web', 'paid', 'private', 1, $4, $5)`,
+      [id, owner, visible, createdAt, deletedAt],
+    )
+  }
+  await expect(readCreatePersonalData(aliceClient, alice.id, now)).resolves.toEqual({
+    balance: await readBalance(aliceClient, alice.id),
+    favoriteIds: [visible],
+    runningIds: [live],
+  })
+  await expect(readCreatePersonalData(bobClient, alice.id, now)).resolves.toEqual({
+    balance: { paid: 0, free: 0 },
+    favoriteIds: [],
+    runningIds: [],
   })
 })
 
