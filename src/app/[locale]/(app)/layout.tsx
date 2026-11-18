@@ -22,7 +22,7 @@ import { appShellMetadata } from '@/core/seo'
 import { SupportTabBadge } from '@/core/support'
 import { LivingBackground } from '@/core/ui/living-background'
 import { isWishlistEnabled, WishlistTabBadge } from '@/core/wishlist'
-import { GenerationOwner, GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image'
+import { GenerationOwner, GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image/app-shell'
 import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 

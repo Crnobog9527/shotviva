@@ -53,12 +53,13 @@ const coreUpwardImport = {
   message: 'core must not import modules, site or app; use the module registry.',
 }
 
-// A module may also publish marketing.ts (and posters.ts, template-preview.ts, share-page.ts): narrow entries for marketing pages and
-// the poster pages, whose client bundles would otherwise include every client component
-// index.ts exports (performance B7).
+// Narrow public entries keep route bundles from pulling in unrelated parts of a module.
 const deepModuleImport = {
-  group: ['@/modules/*/**', '!@/modules/*/marketing', '!@/modules/*/posters', '!@/modules/*/template-preview', '!@/modules/*/share-page'],
-  message: "Import a module through its index.ts ('@/modules/<id>'), marketing.ts, posters.ts, template-preview.ts or share-page.ts, not its internals.",
+  group: [
+    '@/modules/*/**', '!@/modules/*/marketing', '!@/modules/*/posters', '!@/modules/*/template-preview', '!@/modules/*/share-page',
+    '!@/modules/image/app-shell', '!@/modules/image/create-page',
+  ],
+  message: "Import a module through its index.ts ('@/modules/<id>') or a public entry, not its internals.",
 }
 
 export default defineConfig([

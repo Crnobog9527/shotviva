@@ -13,7 +13,7 @@ import { POSTER_FEATURE } from '@/core/poster/sets'
 import { listRunningJobIds } from '@/core/jobs'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
-import { createReturnPath, FavoritesProvider, GatedFeatures, GeneratingPill, loadCatalogueView, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image'
+import { createReturnPath, FavoritesProvider, GatedFeatures, GeneratingPill, loadCatalogueView, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image/create-page'
 import { site } from '@/site/site.config'
 
 export async function generateMetadata(): Promise<Metadata> {
