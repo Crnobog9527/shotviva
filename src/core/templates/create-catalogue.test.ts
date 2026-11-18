@@ -5,6 +5,7 @@ const { adminClient, rpc, readRows, readTree } = vi.hoisted(() => ({
 }))
 vi.mock('next/cache', () => ({ cacheLife: vi.fn(), cacheTag: vi.fn() }))
 vi.mock('./taxonomy-reads', () => ({ readCategoryTree: readTree }))
+vi.mock('../storage/r2-store', () => ({ r2ConditionalJson: () => null }))
 vi.mock('../auth/supabase-admin', () => ({ createAdminSupabase: adminClient }))
 
 const { loadCreateCatalogue } = await import('./create-catalogue')
@@ -57,7 +58,8 @@ it('keys persistent reads by a GET request and applies the existing tags to both
 
   expect(cacheTag).toHaveBeenCalledExactlyOnceWith('templates', 'providers')
   expect(fetch).toHaveBeenCalledExactlyOnceWith(url, {
-    method: 'GET', next: { tags: ['templates', 'providers'], revalidate: 3600 },
+    method: 'GET', signal: expect.any(AbortSignal),
+    next: { tags: ['templates', 'providers'], revalidate: 3600 },
   })
 })
 

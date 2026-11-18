@@ -7,8 +7,10 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import type { Locale } from '../i18n/locales'
 import { logger } from '../logger'
+import { r2ConditionalJson } from '../storage/r2-store'
 import { PROVIDERS_CACHE_TAG } from '../providers/cache-tag'
 import { TEMPLATES_CACHE_TAG } from './cache'
+import { CatalogueCoordinationError, coordinateCatalogue } from './catalogue-flight'
 import { CATALOGUE_LIFE } from './cached-catalogue'
 import { toCatalogueIndex } from './catalogue-index'
 import { catalogueEntries, type CatalogueMember, type CatalogueSeriesRow } from './catalogue-index-entries'
@@ -74,9 +76,14 @@ function catalogueMember(row: TemplateWithPlacement, series: Map<string, Catalog
 type Snapshot = Awaited<ReturnType<typeof readCreateCatalogue>>
 let filling: Promise<Snapshot> | undefined
 
-async function fillCreateCatalogue() {
+async function fillCreateCatalogue(live = false) {
   const started = performance.now()
-  const snapshot = await readCreateCatalogue(createAdminSupabase(fetchCatalogueData))
+  const deadline = AbortSignal.timeout(8_000)
+  const read: typeof fetch = (input, init) => {
+    const signal = init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline
+    return live ? fetch(input, { ...init, signal, cache: 'no-store' }) : fetchCatalogueData(input, { ...init, signal })
+  }
+  const snapshot = await readCreateCatalogue(createAdminSupabase(read))
   logger.info('templates.create_catalogue_fill', { durationMs: Math.round(performance.now() - started) })
   return snapshot
 }
@@ -91,10 +98,22 @@ function fetchCatalogueData(input: Parameters<typeof fetch>[0], init?: RequestIn
   })
 }
 
+async function sharedCatalogue() {
+  const store = r2ConditionalJson()
+  if (!store) return fillCreateCatalogue()
+  try {
+    return await coordinateCatalogue(store, () => fillCreateCatalogue(true))
+  } catch (error) {
+    if (!(error instanceof CatalogueCoordinationError)) throw error
+    logger.error('templates.create_catalogue_coordination_failed', { error })
+    return fillCreateCatalogue(true)
+  }
+}
+
 async function cachedCreateCatalogue(): Promise<Snapshot> {
   'use cache: remote'
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
-  filling ??= fillCreateCatalogue().finally(() => { filling = undefined })
+  filling ??= sharedCatalogue().finally(() => { filling = undefined })
   const snapshot = await filling
   cacheLife(snapshot.tree === null ? FAILED_READ_LIFE : CATALOGUE_LIFE)
   return snapshot

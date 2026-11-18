@@ -1,7 +1,8 @@
 'use server'
 
-import { refresh, updateTag } from 'next/cache'
+import { refresh } from 'next/cache'
 
+import { updateCatalogueTag } from '@/core/templates/catalogue-invalidation'
 import { deleteTemplates, runAdminQuery, setTemplatesSale, type ActionValue, type BulkTaskOutcome } from '@/core/admin'
 import { setTemplatesSeries } from '@/core/admin/template-series'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
@@ -25,7 +26,7 @@ export async function setTemplatesSaleAction(input: unknown): Promise<ActionValu
   const admin = await requireAdmin()
   return runAdminQuery(async () => {
     const outcome = await setTemplatesSale(createAdminSupabase(), admin.id, input)
-    updateTag(TEMPLATES_CACHE_TAG)
+    await updateCatalogueTag(TEMPLATES_CACHE_TAG)
     refresh()
     return outcome
   })
@@ -36,7 +37,7 @@ export async function setTemplatesSeriesAction(input: unknown): Promise<ActionVa
   const admin = await requireAdmin()
   return runAdminQuery(async () => {
     const outcome = await setTemplatesSeries(createAdminSupabase(), admin.id, input)
-    updateTag(TEMPLATES_CACHE_TAG)
+    await updateCatalogueTag(TEMPLATES_CACHE_TAG)
     refresh()
     return outcome
   })
