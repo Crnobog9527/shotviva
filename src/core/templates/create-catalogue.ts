@@ -1,9 +1,10 @@
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { unstable_cache } from 'next/cache'
+import { cacheLife, cacheTag, unstable_cache } from 'next/cache'
 
 import { createAdminSupabase } from '../auth/supabase-admin'
+import { FAILED_READ_LIFE } from '../cache-life'
 import type { Locale } from '../i18n/locales'
 import { logger } from '../logger'
 import { PROVIDERS_CACHE_TAG } from '../providers/cache-tag'
@@ -102,17 +103,28 @@ const readCachedSnapshot = unstable_cache(async () => {
   revalidate: CATALOGUE_LIFE.revalidate,
 })
 
-async function cachedCreateCatalogue() {
+async function remoteCreateCatalogue() {
+  'use cache: remote'
+  // Keep Next's remote fill path on simultaneous requests. A new build can seed it from the
+  // durable entry. A short lifetime keeps this layer close to the durable entry's refresh.
+  cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   try {
-    const { snapshot, filledAt } = await readCachedSnapshot()
-    if (Date.now() - filledAt < CATALOGUE_LIFE.expire * 1000) return snapshot
-    // Keep the hard age limit even if a background revalidation failed.
-    return sharedFill()
+    const result = await readCachedSnapshot()
+    cacheLife({ revalidate: 300, expire: 600 })
+    return result
   } catch (error) {
     // Preserve the flat-list fallback without storing a partial result in the Data Cache.
-    if (error instanceof IncompleteCatalogue) return error.snapshot
-    throw error
+    if (!(error instanceof IncompleteCatalogue)) throw error
+    cacheLife(FAILED_READ_LIFE)
+    return { snapshot: error.snapshot, filledAt: Date.now() }
   }
+}
+
+async function cachedCreateCatalogue() {
+  const { snapshot, filledAt } = await remoteCreateCatalogue()
+  if (Date.now() - filledAt < CATALOGUE_LIFE.expire * 1000) return snapshot
+  // Keep the hard age limit even if a background revalidation failed.
+  return sharedFill()
 }
 
 export async function loadCreateCatalogue(locale: Locale, posters: boolean | Promise<boolean>) {

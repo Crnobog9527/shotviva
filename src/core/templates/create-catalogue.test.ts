@@ -2,6 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest'
 
 const { readRows, readTree } = vi.hoisted(() => ({ readRows: vi.fn(), readTree: vi.fn() }))
 vi.mock('next/cache', () => ({
+  cacheLife: vi.fn(),
+  cacheTag: vi.fn(),
   unstable_cache: vi.fn((read: () => Promise<unknown>) => vi.fn(read)),
 }))
 vi.mock('./taxonomy-reads', () => ({ readCategoryTree: readTree }))
@@ -15,7 +17,7 @@ vi.mock('../auth/supabase-admin', () => ({
 }))
 
 const { loadCreateCatalogue } = await import('./create-catalogue')
-const { unstable_cache } = await import('next/cache')
+const { cacheTag, unstable_cache } = await import('next/cache')
 const cacheOptions = vi.mocked(unstable_cache).mock.calls[0]
 const cachedRead = vi.mocked(vi.mocked(unstable_cache).mock.results[0].value)
 
@@ -49,7 +51,12 @@ it('releases a failed fill so the next request can load the catalogue', async ()
   expect(readRows).toHaveBeenCalledTimes(2)
 })
 
-it('keeps the existing invalidation tags on the persistent snapshot', () => {
+it('keeps the existing invalidation tags on both cache layers', async () => {
+  readRows.mockResolvedValue({ data: [], error: null })
+
+  await loadCreateCatalogue('zh', true)
+
+  expect(cacheTag).toHaveBeenCalledExactlyOnceWith('templates', 'providers')
   expect(cacheOptions).toEqual([expect.any(Function), ['create-catalogue-v1'], {
     tags: ['templates', 'providers'], revalidate: 3600,
   }])
