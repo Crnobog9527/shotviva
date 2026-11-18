@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { AI_CRAWLERS, PRELAUNCH_BLOCKED_CRAWLERS } from '../src/core/seo/crawlers'
+import { AI_CRAWLERS, PRELAUNCH_BLOCKED_CRAWLERS, PRIVATE_PATHS } from '../src/core/seo/crawlers'
 import { evaluate, metaRobots, parseArgs, robotsGroups, type Fetched, type Snapshot } from './seo-check-lib'
 
 const NOINDEX = 'noindex, nofollow'
@@ -16,8 +16,12 @@ const closedRobots = ['User-Agent: *', 'Allow: /', '', ...PRELAUNCH_BLOCKED_CRAW
 const openRobots = [
   'User-Agent: *',
   'Allow: /',
+  ...PRIVATE_PATHS.map((path) => `Disallow: ${path}`),
   '',
-  ...AI_CRAWLERS.flatMap((b) => [`User-Agent: ${b}`, 'Allow: /', '']),
+  ...AI_CRAWLERS.map((b) => `User-Agent: ${b}`),
+  'Allow: /',
+  ...PRIVATE_PATHS.map((path) => `Disallow: ${path}`),
+  '',
   'Host: https://shotviva.com',
   'Sitemap: https://shotviva.com/sitemap.xml',
 ].join('\n')

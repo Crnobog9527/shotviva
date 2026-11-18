@@ -18,9 +18,7 @@ describe('robots', () => {
   // allowed; Bytespider is out; Sitemap stays; no Host line.
   it('allows every named AI crawler, blocks only private routes and Bytespider, no Host line', () => {
     const rules = [robotsRules(site).rules].flat()
-    for (const bot of AI_CRAWLERS) {
-      expect(rules).toContainEqual({ userAgent: bot, allow: '/' })
-    }
+    expect(rules).toContainEqual({ userAgent: [...AI_CRAWLERS], allow: '/', disallow: [...PRIVATE_PATHS] })
     expect(rules).toContainEqual({ userAgent: '*', allow: '/', disallow: [...PRIVATE_PATHS] })
     expect(rules).toContainEqual({ userAgent: 'Bytespider', disallow: '/' })
     const everyoneElse = rules.filter((rule) => rule.userAgent !== 'Bytespider')
