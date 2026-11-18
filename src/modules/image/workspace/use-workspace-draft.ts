@@ -60,7 +60,7 @@ export function useWorkspaceDraft({ template, balance, tier, concurrency, again 
     ...photoCta(template, photos, slots, again),
     copyMissing: missingRequiredCopy(template.copyFields, values.copy),
   })
-  const state: CtaState = run.checking ? { kind: 'checking' } : !hasOutputOptions(options) ? { kind: 'no-options' } : needsRatio ? { kind: 'need-size' } : ready()
+  const state: CtaState = run.checking || template.formDeferred ? { kind: 'checking' } : !hasOutputOptions(options) ? { kind: 'no-options' } : needsRatio ? { kind: 'need-size' } : ready()
   const start = () => {
     if (state.kind !== 'generate') return Promise.resolve(null)
     // A dialog that starts here then moves to the template's workspace page, whose pending view
@@ -121,6 +121,13 @@ function useDraftStart(template: CatalogueTemplate, limit: number, again: AgainS
 
 function useOutputValues(template: CatalogueTemplate, again: AgainStart | null) {
   const [requested, setValues] = useState(() => again?.values ?? { ...DEFAULTS, copy: copyExamples(template.copyFields) })
+  const waitingFor = template.formDeferred ? template.id : null
+  const [pendingTemplate, setPendingTemplate] = useState(waitingFor)
+  if (pendingTemplate !== waitingFor) {
+    setPendingTemplate(waitingFor)
+    // Uploads and size choices can already be in progress. Initialise only the newly arrived fields.
+    if (pendingTemplate === template.id && !again) setValues((current) => ({ ...current, copy: copyExamples(template.copyFields) }))
+  }
   const options = templateOptions(template)
   const values = {
     ...requested,

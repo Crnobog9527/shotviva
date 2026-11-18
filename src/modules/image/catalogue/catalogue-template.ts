@@ -37,6 +37,7 @@ export type CatalogueTemplate = {
   // The Create grid has a summary until the selected workspace form is requested.
   formDeferred?: true
   hasDeferredSlots?: true
+  hasDeferredGroups?: true
   cover: {
     type: CoverMediaType
     before: string | null

@@ -13,11 +13,12 @@ export function catalogueForm({ copyFields, toggles, imageSlots, groups }: Catal
 
 function templateSummary(template: CatalogueTemplate): CatalogueTemplate {
   const { copyFields, toggles, imageSlots, groups, ...summary } = template
-  const defer = !template.poster && Boolean(copyFields.length || toggles.length || imageSlots?.length || groups?.length)
+  const defer = !template.poster && [copyFields, toggles, imageSlots, groups].some((fields) => Boolean(fields?.length))
   return {
     ...summary, copyFields: [], toggles: [],
     ...(defer ? { formDeferred: true } : {}),
     ...(imageSlots?.length ? { hasDeferredSlots: true } : {}),
+    ...(groups?.length ? { hasDeferredGroups: true } : {}),
   }
 }
 

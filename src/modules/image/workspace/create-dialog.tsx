@@ -11,6 +11,7 @@ import { matchesStore } from '@/core/store-profile'
 
 import { FormWeeklyTools } from '../again/form-weekly-tools'
 import { useFormWeekly } from '../again/use-form-weekly'
+import { CatalogueFormStatus } from '../catalogue/catalogue-form-status'
 import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { preloadBatchDialog } from '../matrix/batch-dialog-slot'
 import { openBatch } from '../matrix/batch-query'
@@ -48,11 +49,14 @@ type BodyProps = CreateContext & { template: CatalogueTemplate; open: boolean; o
 
 function CreateBody(props: BodyProps) {
   const forms = useCatalogueForms([props.template])
-  if (!forms.ready) return <PendingCatalogueForm {...props} failed={forms.failed} retry={forms.retry} />
-  return <CreateForm {...props} template={forms.fill(props.template)} />
+  const template = forms.fill(props.template)
+  if (template.formDeferred && (template.hasDeferredSlots || template.hasDeferredGroups)) {
+    return <PendingCatalogueForm {...props} failed={forms.failed} retry={forms.retry} />
+  }
+  return <CreateForm {...props} template={template} forms={forms} />
 }
 
-function CreateForm({ template, open, onClose, ...context }: BodyProps) {
+function CreateForm({ template, open, onClose, forms, ...context }: BodyProps & { forms: ReturnType<typeof useCatalogueForms> }) {
   const t = useTranslations('app.template')
   const router = useRouter()
   const draft = useWorkspaceDraft({ template, ...context, single: true })
@@ -89,7 +93,7 @@ function CreateForm({ template, open, onClose, ...context }: BodyProps) {
         </div>
       }
       form={<>
-        <FormWeeklyTools weekly={weekly} names={{ [template.id]: template.name }} storeFields={matchesStore(template.copyFields)} />
+        {forms.ready ? <FormWeeklyTools weekly={weekly} names={{ [template.id]: template.name }} storeFields={matchesStore(template.copyFields)} /> : null}
         <WorkspaceForm
           template={template}
           balance={context.balance}
@@ -100,6 +104,7 @@ function CreateForm({ template, open, onClose, ...context }: BodyProps) {
           onChange={draft.change}
           surface="create_dialog"
           examples={draft.fromExamples}
+          detailsStatus={!forms.ready && <CatalogueFormStatus failed={forms.failed} retry={forms.retry} />}
           photoExtra={batch ? <BatchLink templateId={template.id} onGo={onClose} /> : null}
         />
       </>}

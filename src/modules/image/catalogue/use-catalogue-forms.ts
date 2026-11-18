@@ -52,7 +52,7 @@ export function useCatalogueForms(templates: readonly CatalogueTemplate[]) {
     retry: () => setAttempt((current) => current + 1),
     fill: (template: CatalogueTemplate): CatalogueTemplate =>
       forms && Object.hasOwn(forms, template.id)
-        ? { ...template, ...forms[template.id], formDeferred: undefined, hasDeferredSlots: undefined }
+        ? { ...template, ...forms[template.id], formDeferred: undefined, hasDeferredSlots: undefined, hasDeferredGroups: undefined }
         : template,
   }
 }
