@@ -11,6 +11,7 @@ const { FAILED_READ_LIFE } = await import('../cache-life')
 const { CATALOGUE_LIFE, readCatalogue, cachedPosterTemplates } = await import('./cached-catalogue')
 const { catalogueIndexOrNull } = await import('./cached-taxonomy')
 const { toCatalogueIndex } = await import('./catalogue-index')
+const { catalogueEntries } = await import('./catalogue-index-entries')
 
 const series = (id: string, slug: string) => ({ id, slug, name_en: `${slug} en`, name_zh: `${slug} 中`, description_en: null, description_zh: '说明', cover_url: null })
 
@@ -69,4 +70,26 @@ describe('web catalogue for marketing pages', () => {
 it('reads poster series members even when their individual cards are hidden', async () => {
   await cachedPosterTemplates('zh')
   expect(listTemplatesIn).toHaveBeenCalledWith(expect.anything(), 'zh', { posters: true, includeSeriesMembers: true })
+})
+
+it('builds catalogue entries from one sale-checked member list, preserving series visibility and order', () => {
+  const rows = [
+    { id: 'b', series_id: 'shown', series_sort_order: 2, sort_order: 10, category_key: 'food', standalone: true },
+    { id: 'a', series_id: 'shown', series_sort_order: 1, sort_order: 10, category_key: 'food', standalone: false },
+    { id: 'c', series_id: null, series_sort_order: 0, sort_order: 10, category_key: 'pets', standalone: true },
+    { id: 'd', series_id: 'hidden-category', series_sort_order: 1, sort_order: 20, category_key: 'food', standalone: false },
+  ]
+  const seriesRows = [
+    { ...series('shown', 'shown'), category_key: 'food', sort_order: 10 },
+    { ...series('hidden-category', 'hidden'), category_key: 'hidden', sort_order: 1 },
+    { ...series('empty', 'empty'), category_key: 'food', sort_order: 1 },
+  ]
+  const entries = catalogueEntries(rows, seriesRows, new Set(['food', 'pets']))
+  const index = toCatalogueIndex([], entries, rows.filter((row): row is typeof row & { series_id: string } => row.series_id !== null), 'zh')
+  expect(index.entries).toEqual([
+    { type: 'series', id: 'shown', categoryKey: 'food' },
+    { type: 'template', id: 'b', categoryKey: 'food' },
+    { type: 'template', id: 'c', categoryKey: 'pets' },
+  ])
+  expect(index.series).toEqual([{ id: 'shown', slug: 'shown', name: 'shown 中', description: '说明', coverUrl: null, memberIds: ['a', 'b'] }])
 })

@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Locale } from '../i18n/locales'
 import type { CategoryNode } from './taxonomy'
+import { catalogueEntries, type CatalogueMember, type CatalogueSeriesRow } from './catalogue-index-entries'
 import { readCategoryTree } from './taxonomy-reads'
 
 // Create's whole catalogue in one light read (T102): which cards the grid shows, in the order
@@ -23,18 +24,15 @@ export type IndexSeries = {
 }
 export type CatalogueIndex = { tree: CategoryNode[]; entries: IndexEntry[]; series: IndexSeries[] }
 
-type SeriesRow = {
+export type SeriesRow = {
   id: string; slug: string; name_en: string; name_zh: string
   description_en: string | null; description_zh: string | null; cover_url: string | null
 }
-type EntryRow = {
+export type EntryRow = {
   type: 'template' | 'series'; entry_key: string; sort_order: number; category_key: string
   template_id: string | null; series_id: string | null; entry_series: SeriesRow | null
 }
 type MemberRow = { id: string; series_id: string; series_sort_order: number }
-
-const ENTRY_COLUMNS = 'type,entry_key,sort_order,category_key,template_id,series_id,' +
-  'entry_series(id,slug,name_en,name_zh,description_en,description_zh,cover_url)'
 const BATCH = 500
 
 // PostgREST caps a response; read in ranges until a short page.
@@ -72,12 +70,18 @@ function toSeries(row: SeriesRow, members: MemberRow[], locale: Locale): IndexSe
 }
 
 export async function readCatalogueIndex(db: SupabaseClient, locale: Locale): Promise<CatalogueIndex> {
-  const [tree, entryRows, memberRows] = await Promise.all([
+  const [tree, members, series, categories] = await Promise.all([
     readCategoryTree(db),
-    readAll<EntryRow>((from, to) => db.from('web_catalogue_entries').select(ENTRY_COLUMNS)
-      .order('sort_order').order('entry_key').range(from, to).returns<EntryRow[]>()),
-    readAll<MemberRow>((from, to) => db.from('web_template_members').select('id,series_id,series_sort_order')
-      .not('series_id', 'is', null).order('series_id').order('series_sort_order').order('id').range(from, to).returns<MemberRow[]>()),
+    readAll<CatalogueMember>((from, to) => db.from('web_template_members')
+      .select('id,series_id,series_sort_order,sort_order,category_key,standalone')
+      .order('id').range(from, to).returns<CatalogueMember[]>()),
+    readAll<CatalogueSeriesRow>((from, to) => db.from('template_series')
+      .select('id,slug,name_en,name_zh,description_en,description_zh,cover_url,category_key,sort_order')
+      .eq('is_active', true).order('id').range(from, to).returns<CatalogueSeriesRow[]>()),
+    readAll<{ key: string }>((from, to) => db.from('template_category_paths').select('key')
+      .eq('web_visible', true).order('key').range(from, to).returns<{ key: string }[]>()),
   ])
+  const entryRows = catalogueEntries(members, series, new Set(categories.map((category) => category.key)))
+  const memberRows = members.filter((member): member is CatalogueMember & { series_id: string } => member.series_id !== null)
   return toCatalogueIndex(tree, entryRows, memberRows, locale)
 }
