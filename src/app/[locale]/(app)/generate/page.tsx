@@ -36,19 +36,21 @@ type Search = Promise<Record<string, string | string[] | undefined>>
 async function Create({ searchParams }: { searchParams: Search }) {
   const query = await searchParams
   const user = await requireUser(createReturnPath(query.series, query.poster))
-  const supabase = await createServerSupabase()
+  // Begin the shared catalogue read as soon as this request has authenticated.
+  const viewPromise = currentLocale().then((locale) => loadCataloguePayload(locale, featureAllowed(user.id, POSTER_FEATURE).catch(() => false)))
+  const supabase = createServerSupabase()
   const admin = createAdminSupabase()
   const [view, balance, tier, runningIds, favoriteIds, wishlistLive] = await Promise.all([
     // Templates and series cards placed under up to three category levels (T102); the poster
     // templates too while this account may use the poster editor (ARCHITECTURE §5.3). Checked
     // through core, not modules/image/posters, which would ship the poster editor's JS here.
-    loadCataloguePayload(await currentLocale(), featureAllowed(user.id, POSTER_FEATURE).catch(() => false)),
-    readBalance(supabase, user.id),
+    viewPromise,
+    supabase.then((db) => readBalance(db, user.id)),
     // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
     effectiveTier(admin, user.id),
     listRunningJobIds(admin, user.id, new Date()),
     // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
-    listFavoriteIdsOrEmpty(supabase, user.id),
+    supabase.then((db) => listFavoriteIdsOrEmpty(db, user.id)),
     // The grid ends on "Not finding it? Make a wish" while the wishlist is open (cached read).
     isWishlistEnabled(site),
   ])

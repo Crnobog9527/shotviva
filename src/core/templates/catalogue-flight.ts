@@ -7,7 +7,7 @@ import type { ConditionalJsonStore, StoredJson } from '../storage/conditional-js
 
 // Share only a refill already in progress when this caller arrived. The Next tag cache
 // owns long-lived reads. A later miss goes through its own fenced fill and tagged source reads.
-export const CREATE_FLIGHT_KEY = 'ops/cache/create-catalogue/v1.json'
+export const CREATE_FLIGHT_KEY = 'ops/cache/create-catalogue/v2.json'
 const LEASE_MS = 12_000
 const WAIT_MS = 16_000
 const FAILURE_MS = 1_000
@@ -58,6 +58,12 @@ function activeFlight<T>(state: State<T> | undefined): state is Extract<State<T>
   return (state?.phase === 'filling' || state?.phase === 'failed') && state.until > Date.now()
 }
 
+async function claim<T>(store: ConditionalJsonStore, reader: Reader, revision: string, expected: string | null, fill: (revision: string) => Promise<T>) {
+  const lease = { phase: 'filling', owner: reader.owner, revision, until: Date.now() + LEASE_MS }
+  const claimed = await storeOp(store.write(CREATE_FLIGHT_KEY, lease, expected))
+  return claimed ? completeFill(store, claimed, reader.owner, revision, fill) : null
+}
+
 async function attempt<T>(store: ConditionalJsonStore, reader: Reader, fill: (revision: string) => Promise<T>) {
   const read = store.read(CREATE_FLIGHT_KEY)
   const entry = await (reader.watching ? read : storeOp(read))
@@ -68,14 +74,14 @@ async function attempt<T>(store: ConditionalJsonStore, reader: Reader, fill: (re
     await pause(120 + Math.random() * 100)
     return null
   }
-  const revision = state?.revision ?? randomUUID()
-  const lease = { phase: 'filling', owner: reader.owner, revision, until: Date.now() + LEASE_MS }
-  const claimed = await storeOp(store.write(CREATE_FLIGHT_KEY, lease, entry?.etag ?? null))
-  return claimed ? completeFill(store, claimed, reader.owner, revision, fill) : null
+  return claim(store, reader, state?.revision ?? randomUUID(), entry?.etag ?? null, fill)
 }
 
 export async function coordinateCatalogue<T>(store: ConditionalJsonStore, fill: (revision: string) => Promise<T>): Promise<T> {
   const reader: Reader = { started: Date.now(), owner: randomUUID() }
+  // A genuinely empty cache can elect its first owner without a preceding GET round trip.
+  const first = await claim(store, reader, randomUUID(), null, fill)
+  if (first) return first.snapshot
   while (Date.now() - reader.started < WAIT_MS) {
     const result = await attempt(store, reader, fill)
     if (result) return result.snapshot

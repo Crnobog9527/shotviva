@@ -72,7 +72,7 @@ describe('the shared Create catalogue fill', () => {
 
   it('signals when storage is unavailable before attempting an origin read', async () => {
     const store = memoryStore()
-    store.read.mockRejectedValue(new Error('unavailable'))
+    store.write.mockRejectedValue(new Error('unavailable'))
     const origin = vi.fn()
     await expect(coordinateCatalogue(store, origin)).rejects.toBeInstanceOf(CatalogueCoordinationError)
     expect(origin).not.toHaveBeenCalled()

@@ -21,6 +21,18 @@ describe('conditional JSON storage', () => {
     expect(commands[0]).toMatchObject({ Bucket: 'private', Key: 'cache', CacheControl: 'private, no-store' })
   })
 
+  it('compresses a completed snapshot and decodes it without changing values', async () => {
+    const send = vi.fn().mockResolvedValueOnce({ ETag: '"ready"' })
+    const store = createConditionalR2Json({ send }, 'private')
+    const snapshot = { templates: Array(100).fill({ name: 'Template', description: 'A common photography style' }) }
+    await store.write('cache', snapshot, '"lease"')
+    const put = (send.mock.calls[0][0] as PutObjectCommand).input
+    expect(put.ContentEncoding).toBe('gzip')
+    expect((put.Body as Buffer).length).toBeLessThan(JSON.stringify(snapshot).length / 4)
+    send.mockResolvedValueOnce({ ETag: '"ready"', ContentEncoding: 'gzip', Body: { transformToByteArray: async () => put.Body } })
+    await expect(store.read('cache')).resolves.toEqual({ etag: '"ready"', value: snapshot })
+  })
+
   it('treats missing reads and precondition failures distinctly from outages', async () => {
     const send = vi.fn().mockRejectedValueOnce(status(404)).mockRejectedValueOnce(status(412)).mockRejectedValueOnce(status(503))
     const store = createConditionalR2Json({ send }, 'private')
