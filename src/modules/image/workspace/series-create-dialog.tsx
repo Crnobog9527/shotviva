@@ -10,6 +10,7 @@ import { navTypesFor } from '@/core/ui/nav-motion'
 import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { CatalogueSeries } from '../catalogue/catalogue-view'
 import { isCompareSample } from '../catalogue/template-sample'
+import { useCatalogueForms } from '../catalogue/use-catalogue-forms'
 import { ZoomableSample } from '../catalogue/zoomable-sample'
 import { ShareButton } from '../share/share-button'
 import { FavoriteButton } from '../favorites/favorite-button'
@@ -21,6 +22,7 @@ import { BatchLink, type CreateContext } from './create-dialog'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
 import { MemberPicker } from './member-picker'
+import { PendingCatalogueForm } from './pending-catalogue-form'
 import { memberSwitch } from './member-switch'
 import { useSubmitOnce } from './use-submit-once'
 import { useWarmRoute } from './use-warm-route'
@@ -42,7 +44,15 @@ export function SeriesCreateDialog({ series, onClose, ...context }: Props) {
 
 type BodyProps = CreateContext & { series: CatalogueSeries; open: boolean; onClose(): void }
 
-function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
+function SeriesBody(props: BodyProps) {
+  const { series, open, onClose } = props
+  // One read when the sheet opens keeps switching between the members instant.
+  const forms = useCatalogueForms(series.members)
+  if (!forms.ready) return <PendingCatalogueForm template={series.members[0]!} open={open} onClose={onClose} failed={forms.failed} retry={forms.retry} />
+  return <SeriesForm {...props} series={{ ...series, members: series.members.map(forms.fill) }} />
+}
+
+function SeriesForm({ series, open, onClose, ...context }: BodyProps) {
   const t = useTranslations('app')
   const router = useRouter()
   const [memberId, setMemberId] = useState(series.members[0]!.id)

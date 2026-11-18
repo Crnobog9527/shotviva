@@ -57,7 +57,7 @@ const coreUpwardImport = {
 const deepModuleImport = {
   group: [
     '@/modules/*/**', '!@/modules/*/marketing', '!@/modules/*/posters', '!@/modules/*/template-preview', '!@/modules/*/share-page',
-    '!@/modules/image/app-shell', '!@/modules/image/create-page',
+    '!@/modules/image/app-shell', '!@/modules/image/create-data', '!@/modules/image/create-page',
   ],
   message: "Import a module through its index.ts ('@/modules/<id>') or a public entry, not its internals.",
 }

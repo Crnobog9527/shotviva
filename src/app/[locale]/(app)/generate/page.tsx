@@ -13,7 +13,8 @@ import { listRunningJobIds } from '@/core/jobs'
 import { POSTER_FEATURE } from '@/core/poster/sets'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
-import { createReturnPath, FavoritesProvider, GatedFeatures, GeneratingPill, loadCatalogueView, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image/create-page'
+import { loadCataloguePayload } from '@/modules/image/create-data'
+import { createReturnPath, FavoritesProvider, GatedFeatures, GeneratingPill, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image/create-page'
 import { site } from '@/site/site.config'
 
 import { readCreatePersonalData } from './personal-data'
@@ -45,8 +46,8 @@ async function Create({ searchParams }: { searchParams: Search }) {
     loadAccess: sharedCreateFeatureAccess,
     tierOf: () => tierPromise,
   }).catch(() => false)
-  const [view, { balance, favoriteIds }, tier, runningIds, wishlistLive] = await Promise.all([
-    currentLocale().then((locale) => loadCatalogueView(locale, posterAllowed)),
+  const [payload, { balance, favoriteIds }, tier, runningIds, wishlistLive] = await Promise.all([
+    currentLocale().then((locale) => loadCataloguePayload(locale, posterAllowed)),
     createServerSupabase().then((db) => readCreatePersonalData(db, user.id)),
     tierPromise,
     // RLS hides jobs with private style references. The admin read returns only IDs for this viewer.
@@ -72,7 +73,7 @@ async function Create({ searchParams }: { searchParams: Search }) {
       <div id={TEMPLATES_ANCHOR} className="scroll-mt-[calc(var(--sat)+8px)] md:scroll-mt-16">
         <FavoritesProvider initialIds={favoriteIds} signedIn>
           <TemplateCatalogue
-            view={view}
+            payload={payload}
             create={{ balance, tier, concurrency: { limit: limitsFor(tier).concurrency, runningIds } }}
             endCard={wishlistLive ? <WishCard /> : undefined}
           />

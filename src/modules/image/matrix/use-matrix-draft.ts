@@ -6,6 +6,7 @@ import type { Balance } from '@/core/billing/pools'
 
 import { preflightBatch, preflightCells, withPreflight, type PreflightError } from '../batch/preflight'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { useCatalogueForms } from '../catalogue/use-catalogue-forms'
 import type { BatchCaps } from '../gated/feature-access'
 import { enqueueJobs, setWorkspaceJobs } from '../generation/job-store'
 import { closestResolution, selectedAspect } from '../workspace/output-choice'
@@ -31,7 +32,9 @@ export function useMatrixDraft({ templates, initial, balance, limit, caps }: Inp
   const error = refusal?.photoKey === photoKey ? refusal.error : null
   const setError = (next: PreflightError | null) => setRefusal(next ? { error: next, photoKey } : null)
   const byId = new Map(templates.map((template) => [template.id, template]))
-  const chosen = requested.templateIds.flatMap((id) => byId.get(id) ?? [])
+  const selected = requested.templateIds.flatMap((id) => byId.get(id) ?? [])
+  const forms = useCatalogueForms(selected)
+  const chosen = selected.map(forms.fill)
   const options = sharedOptions(chosen)
   // A choice the current templates cannot make moves to the nearest one they share.
   const values = { ...requested, resolution: closestResolution(requested.resolution, options) ?? requested.resolution, aspect: selectedAspect(requested.aspect, options) }
@@ -39,7 +42,7 @@ export function useMatrixDraft({ templates, initial, balance, limit, caps }: Inp
   const block = matrixBlock(cells, chosen.length, { picked: photos.summary.planned, uploading: photos.summary.photo === 'uploading' }, options, caps.cells)
   const total = matrixTotal(cells)
   const count = cells.filter((cell) => !cell.removed).length
-  const cta = matrixCta(block, total, count, balance, checking)
+  const cta = matrixCta(block, total, count, balance, checking || !forms.ready)
 
   const change = (next: (current: MatrixValues) => MatrixValues) => {
     setError(null)
@@ -62,7 +65,7 @@ export function useMatrixDraft({ templates, initial, balance, limit, caps }: Inp
     return { started: true }
   }
 
-  return { caps, photos, values, change, setValues, chosen, options, cells, total, count, cta, start, error }
+  return { caps, photos, values, change, setValues, chosen, options, cells, total, count, cta, start, error, forms }
 }
 
 export type MatrixDraft = ReturnType<typeof useMatrixDraft>
