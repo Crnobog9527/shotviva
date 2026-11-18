@@ -68,7 +68,7 @@ export function useCheckout() {
     }
   }
 
-  return { status, start }
+  return { status, start, clearStatus: () => setStatus("idle") }
 }
 
 type CheckoutAttempt = { body: string; id: string; created: number }

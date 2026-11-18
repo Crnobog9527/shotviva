@@ -11,6 +11,7 @@ import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, breadcrumbListLd, faqPageLd, pageMetadata, softwareApplicationLd } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
+import { cn } from '@/core/ui/cn'
 import { creditFacts, fillCredits, freeImagesIn, homePageIn, pricingFaqIn, pricingPageIn } from '@/site/content'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { displayProducts } from '@/site/billing/display-products'
@@ -71,9 +72,9 @@ export default async function PricingPage() {
         page={path === '/zh/pricing' ? '/zh/pricing' : '/pricing'}
         actions={{ submit: submitInquiryAction, prefill: inquiryPrefillAction }}
       />
-      <div className="mt-6 grid gap-6 md:mt-8 md:grid-cols-2 md:items-start md:gap-8">
+      <div className={cn("mt-6 md:mt-8", locale === 'en' && "grid gap-6 md:grid-cols-2 md:items-start md:gap-8")}>
         <CreditBuys block={page.creditBuys} />
-        <PricingPayWith channel={channel} wechatPay={wechatPay} />
+        {locale === 'en' && <PricingPayWith channel={channel} wechatPay={wechatPay} />}
       </div>
       {/* The home page's accordion (gap audit B8); every answer stays in the server HTML. */}
       <div className="mk-pricing-faq">
