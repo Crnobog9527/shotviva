@@ -1,7 +1,7 @@
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { cacheLife, cacheTag, unstable_cache } from 'next/cache'
+import { cacheLife, cacheTag } from 'next/cache'
 
 import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
@@ -30,7 +30,7 @@ const COLUMNS = TEMPLATE_COLUMNS + ',subcategory_key,series_id,series_sort_order
 async function saleCheckedRows(db: SupabaseClient) {
   const rows: TemplateWithPlacement[] = []
   for (;;) {
-    const query = db.rpc('web_templates', { p_template_id: null, p_include_members: true }).select(COLUMNS)
+    const query = db.rpc('web_templates', { p_include_members: true }, { get: true }).select(COLUMNS)
     const last = rows.at(-1)
     if (last) query.gt('id', last.id)
     const { data, error } = await query.order('id').limit(PAGE_SIZE).returns<TemplateWithPlacement[]>()
@@ -76,55 +76,28 @@ let filling: Promise<Snapshot> | undefined
 
 async function fillCreateCatalogue() {
   const started = performance.now()
-  const snapshot = await readCreateCatalogue(createAdminSupabase())
+  const snapshot = await readCreateCatalogue(createAdminSupabase(fetchCatalogueData))
   logger.info('templates.create_catalogue_fill', { durationMs: Math.round(performance.now() - started) })
   return snapshot
 }
 
-function sharedFill(): Promise<Snapshot> {
-  filling ??= fillCreateCatalogue().finally(() => { filling = undefined })
-  return filling
+// The Data Cache keys these two read-only queries by URL and request parameters across builds.
+// Keep this fetch client confined to this catalogue so it cannot cache other privileged reads.
+function fetchCatalogueData(input: Parameters<typeof fetch>[0], init?: RequestInit) {
+  if (init?.method !== 'GET') return fetch(input, init)
+  return fetch(input, {
+    ...init,
+    next: { revalidate: CATALOGUE_LIFE.revalidate, tags: [TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG] },
+  })
 }
 
-class IncompleteCatalogue extends Error {
-  constructor(readonly snapshot: Snapshot) {
-    super('Create catalogue category tree is unavailable')
-  }
-}
-
-// The Data Cache can reuse a snapshot across deployments. Bump the key when its data shape or
-// read semantics change. Keep the existing template and provider mutation tags on the entry.
-const readCachedSnapshot = unstable_cache(async () => {
-  const snapshot = await sharedFill()
-  if (snapshot.tree === null) throw new IncompleteCatalogue(snapshot)
-  return { snapshot, filledAt: Date.now() }
-}, ['create-catalogue-v1'], {
-  tags: [TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG],
-  revalidate: CATALOGUE_LIFE.revalidate,
-})
-
-async function remoteCreateCatalogue() {
+async function cachedCreateCatalogue(): Promise<Snapshot> {
   'use cache: remote'
-  // Keep Next's remote fill path on simultaneous requests. A new build can seed it from the
-  // durable entry. A short lifetime keeps this layer close to the durable entry's refresh.
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
-  try {
-    const result = await readCachedSnapshot()
-    cacheLife({ revalidate: 300, expire: 600 })
-    return result
-  } catch (error) {
-    // Preserve the flat-list fallback without storing a partial result in the Data Cache.
-    if (!(error instanceof IncompleteCatalogue)) throw error
-    cacheLife(FAILED_READ_LIFE)
-    return { snapshot: error.snapshot, filledAt: Date.now() }
-  }
-}
-
-async function cachedCreateCatalogue() {
-  const { snapshot, filledAt } = await remoteCreateCatalogue()
-  if (Date.now() - filledAt < CATALOGUE_LIFE.expire * 1000) return snapshot
-  // Keep the hard age limit even if a background revalidation failed.
-  return sharedFill()
+  filling ??= fillCreateCatalogue().finally(() => { filling = undefined })
+  const snapshot = await filling
+  cacheLife(snapshot.tree === null ? FAILED_READ_LIFE : CATALOGUE_LIFE)
+  return snapshot
 }
 
 export async function loadCreateCatalogue(locale: Locale, posters: boolean | Promise<boolean>) {
