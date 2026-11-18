@@ -77,9 +77,9 @@ function catalogueMember(row: TemplateWithPlacement, series: Map<string, Catalog
 type Snapshot = Awaited<ReturnType<typeof readCreateCatalogue>>
 let filling: Promise<Snapshot> | undefined
 
-async function fillCreateCatalogue(live = false) {
+async function fillCreateCatalogue(live = false, timeoutMs = 8_000) {
   const started = performance.now()
-  const deadline = AbortSignal.timeout(8_000)
+  const deadline = AbortSignal.timeout(timeoutMs)
   const read: typeof fetch = (input, init) => {
     const signal = init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline
     return live ? fetch(input, { ...init, signal, cache: 'no-store' }) : fetchCatalogueData(input, { ...init, signal })
@@ -100,11 +100,11 @@ function fetchCatalogueData(input: Parameters<typeof fetch>[0], init?: RequestIn
 }
 
 // A best-effort head start from Proxy. The page still performs the ordinary cached read.
-// Reuse requires the same R2 revision and normal short sharing window.
+// Reuse requires the same R2 revision and stays limited to the short handoff window.
 export async function preloadCreateCatalogue(version: string) {
   const started = performance.now()
   const store = r2ConditionalJson()
-  if (store && await preloadCatalogue(store, version, () => fillCreateCatalogue(true))) {
+  if (store && await preloadCatalogue(store, version, () => fillCreateCatalogue(true, 6_000))) {
     logger.info('templates.create_catalogue_preloaded', { durationMs: Math.round(performance.now() - started) })
   }
 }

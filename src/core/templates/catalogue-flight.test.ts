@@ -43,6 +43,8 @@ it('does not refresh on a repeat preload or allow expired snapshots to seed the 
   const now = vi.spyOn(Date, 'now').mockReturnValue(1_000)
   await expect(preloadCatalogue(store, 'preview-one', origin)).resolves.toBe(true)
   now.mockReturnValue(4_000)
+  await expect(coordinateCatalogue(store, origin)).resolves.toBe('old')
+  now.mockReturnValue(7_000)
   await expect(preloadCatalogue(store, 'preview-one', origin)).resolves.toBe(false)
   await expect(coordinateCatalogue(store, origin)).resolves.toBe('new')
   expect(origin).toHaveBeenCalledTimes(2)

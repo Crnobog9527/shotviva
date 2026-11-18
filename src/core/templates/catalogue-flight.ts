@@ -10,16 +10,18 @@ import type { ConditionalJsonStore, StoredJson } from '../storage/conditional-js
 export const CREATE_FLIGHT_KEY = 'ops/cache/create-catalogue/v3.json'
 const LEASE_MS = 12_000
 const READY_WINDOW_MS = 2_000
+const PRELOAD_LEASE_MS = 9_000
+const PRELOAD_READY_WINDOW_MS = 5_000
 const WAIT_MS = 16_000
 const FAILURE_MS = 1_000
 
 type Revision = { revision: string; preloadedOn?: string }
-type Lease = Revision & { owner: string; until: number }
+type Lease = Revision & { owner: string; until: number; early?: true }
 
 type State<T> =
   | (Revision & { phase: 'invalidated' })
   | (Lease & { phase: 'filling' | 'failed' })
-  | (Revision & { phase: 'ready'; owner: string; finished: number; snapshot: T })
+  | (Omit<Lease, 'until'> & { phase: 'ready'; finished: number; snapshot: T })
 
 export class CatalogueCoordinationError extends Error {
   constructor(cause: unknown) {
@@ -49,8 +51,9 @@ async function completeFill<T>(store: ConditionalJsonStore, etag: string, lease:
     throw error
   }
   const finished = Date.now()
-  if (finished >= lease.until) return null
-  const ready = { phase: 'ready', owner: lease.owner, revision: lease.revision, preloadedOn: lease.preloadedOn, finished, snapshot }
+  const { until, ...identity } = lease
+  if (finished >= until) return null
+  const ready = { ...identity, phase: 'ready', finished, snapshot }
   const published = await storeOp(store.write(CREATE_FLIGHT_KEY, ready, etag))
   return published ? { snapshot } : null
 }
@@ -58,15 +61,18 @@ async function completeFill<T>(store: ConditionalJsonStore, etag: string, lease:
 type Reader = { started: number; owner: string; watching?: string }
 
 function completedFor<T>(state: State<T> | undefined, reader: Reader): state is Extract<State<T>, { phase: 'ready' }> {
-  return state?.phase === 'ready' && (state.owner === reader.watching || state.finished + READY_WINDOW_MS >= reader.started)
+  if (state?.phase !== 'ready') return false
+  const window = state.early ? PRELOAD_READY_WINDOW_MS : READY_WINDOW_MS
+  return state.owner === reader.watching || state.finished + window >= reader.started
 }
 
 function activeFlight<T>(state: State<T> | undefined): state is Extract<State<T>, { phase: 'filling' | 'failed' }> {
   return (state?.phase === 'filling' || state?.phase === 'failed') && state.until > Date.now()
 }
 
-async function claim<T>(store: ConditionalJsonStore, reader: Reader, { revision, preloadedOn }: Revision, expected: string | null, fill: () => Promise<T>) {
-  const lease = { owner: reader.owner, revision, preloadedOn, until: Date.now() + LEASE_MS }
+async function claim<T>(store: ConditionalJsonStore, reader: Reader, { revision, preloadedOn }: Revision, expected: string | null, fill: () => Promise<T>, early?: true) {
+  const until = Date.now() + (early ? PRELOAD_LEASE_MS : LEASE_MS)
+  const lease = { owner: reader.owner, revision, preloadedOn, until, early }
   const claimed = await storeOp(store.write(CREATE_FLIGHT_KEY, { ...lease, phase: 'filling' }, expected))
   return claimed ? completeFill(store, claimed, lease, fill) : null
 }
@@ -85,14 +91,14 @@ async function attempt<T>(store: ConditionalJsonStore, reader: Reader, fill: () 
 
 // Start the same fill while the page instance starts. This optional work never polls or
 // competes with an active fill. The mark prevents repeat speculative fills on the same
-// build without changing the lifetime of a reusable result.
+// build. Give its result a few more seconds to reach a starting page instance.
 export async function preloadCatalogue<T>(store: ConditionalJsonStore, version: string, fill: () => Promise<T>): Promise<boolean> {
   const reader: Reader = { started: Date.now(), owner: randomUUID() }
   const entry = await storeOp(store.read(CREATE_FLIGHT_KEY))
   const state = stateOf<T>(entry)
   if (state?.preloadedOn === version || completedFor(state, reader) || activeFlight(state)) return false
   const revision = { revision: state?.revision ?? randomUUID(), preloadedOn: version }
-  return Boolean(await claim(store, reader, revision, entry?.etag ?? null, fill))
+  return Boolean(await claim(store, reader, revision, entry?.etag ?? null, fill, true))
 }
 
 export async function coordinateCatalogue<T>(store: ConditionalJsonStore, fill: () => Promise<T>): Promise<T> {
@@ -118,5 +124,5 @@ export async function discardCatalogueFlight(store: ConditionalJsonStore) {
 // the short completed-result window before expiring the authoritative Next tags.
 // Other owners in this window fetch live data and cannot reintroduce a pre-save cache value.
 export function waitOutCatalogueFlight() {
-  return pause(LEASE_MS + READY_WINDOW_MS + 1_000)
+  return pause(Math.max(LEASE_MS + READY_WINDOW_MS, PRELOAD_LEASE_MS + PRELOAD_READY_WINDOW_MS) + 1_000)
 }
