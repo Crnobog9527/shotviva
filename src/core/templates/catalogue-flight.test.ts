@@ -64,10 +64,20 @@ it('lets concurrent cache misses use the result only within the brief sharing wi
 it('takes over an abandoned lease and preserves the cache revision', async () => {
   const store = memoryStore()
   await store.write('unused by mock', { phase: 'filling', owner: 'abandoned', revision: 'prior-revision', until: Date.now() - 60_000 })
+  store.write.mockClear()
   const origin = vi.fn(async () => 'recovered')
   expect(await coordinateCatalogue(store, origin)).toBe('recovered')
   expect(origin).toHaveBeenCalledExactlyOnceWith()
+  expect(store.write.mock.calls.map(([, , expected]) => expected)).toEqual(['revision-1', 'revision-2'])
   expect((await store.read())?.value).toMatchObject({ phase: 'ready', revision: 'prior-revision' })
+})
+
+it('gives readers of a ready snapshot no reason to write to R2', async () => {
+  const store = memoryStore()
+  await coordinateCatalogue(store, async () => 'cached')
+  store.write.mockClear()
+  expect(await coordinateCatalogue(store, async () => 'unexpected refill')).toBe('cached')
+  expect(store.write).not.toHaveBeenCalled()
 })
 
 it('classifies an R2 failure after a successful origin read as a coordination error', async () => {
