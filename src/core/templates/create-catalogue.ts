@@ -27,7 +27,6 @@ type TemplateWithPlacement = TemplateRow & {
 }
 
 const PAGE_SIZE = 500
-const ORIGIN_WINDOW_SECONDS = 600
 const COLUMNS = TEMPLATE_COLUMNS + ',subcategory_key,series_id,series_sort_order,' +
   'template_series(id,slug,name_en,name_zh,description_en,description_zh,cover_url,category_key,sort_order,show_members)'
 
@@ -78,19 +77,12 @@ function catalogueMember(row: TemplateWithPlacement, series: Map<string, Catalog
 type Snapshot = Awaited<ReturnType<typeof readCreateCatalogue>>
 let filling: Promise<Snapshot> | undefined
 
-async function fillCreateCatalogue(mode?: { revision: string } | 'live') {
+async function fillCreateCatalogue(live = false) {
   const started = performance.now()
   const deadline = AbortSignal.timeout(8_000)
-  // A save changes the revision and timed refreshes use a new window. Both are
-  // part of Next's request cache key, which is shared across deployments.
-  const originKey = typeof mode === 'object'
-    ? `create-v1:${mode.revision}:${Math.floor(Date.now() / (ORIGIN_WINDOW_SECONDS * 1000))}`
-    : undefined
   const read: typeof fetch = (input, init) => {
     const signal = init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline
-    return mode === 'live'
-      ? fetch(input, { ...init, signal, cache: 'no-store' })
-      : fetchCatalogueData(input, { ...init, signal }, originKey)
+    return live ? fetch(input, { ...init, signal, cache: 'no-store' }) : fetchCatalogueData(input, { ...init, signal })
   }
   const snapshot = await readCreateCatalogue(createAdminSupabase(read))
   logger.info('templates.create_catalogue_fill', { durationMs: Math.round(performance.now() - started) })
@@ -99,16 +91,11 @@ async function fillCreateCatalogue(mode?: { revision: string } | 'live') {
 
 // The Data Cache keys these two read-only queries by URL and request parameters across builds.
 // Keep this fetch client confined to this catalogue so it cannot cache other privileged reads.
-function fetchCatalogueData(input: Parameters<typeof fetch>[0], init: RequestInit, originKey?: string) {
-  if (init.method !== 'GET') return fetch(input, init)
-  const headers = new Headers(init.headers)
-  if (originKey) headers.set('x-shotviva-catalogue-revision', originKey)
+function fetchCatalogueData(input: Parameters<typeof fetch>[0], init?: RequestInit) {
+  if (init?.method !== 'GET') return fetch(input, init)
   return fetch(input, {
-    ...init, headers,
-    next: {
-      revalidate: originKey ? ORIGIN_WINDOW_SECONDS : CATALOGUE_LIFE.revalidate,
-      tags: [TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG],
-    },
+    ...init,
+    next: { revalidate: CATALOGUE_LIFE.revalidate, tags: [TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG] },
   })
 }
 
@@ -119,9 +106,9 @@ async function sharedCatalogue() {
   let originStarted: number | undefined
   let originFinished: number | undefined
   try {
-    const snapshot = await coordinateCatalogue(store, async (revision) => {
+    const snapshot = await coordinateCatalogue(store, async () => {
       originStarted = performance.now()
-      const result = await fillCreateCatalogue({ revision })
+      const result = await fillCreateCatalogue(true)
       originFinished = performance.now()
       return result
     })
@@ -137,7 +124,7 @@ async function sharedCatalogue() {
   } catch (error) {
     if (!(error instanceof CatalogueCoordinationError)) throw error
     logger.error('templates.create_catalogue_coordination_failed', { error })
-    return fillCreateCatalogue('live')
+    return fillCreateCatalogue(true)
   }
 }
 
@@ -146,11 +133,7 @@ async function cachedCreateCatalogue(): Promise<Snapshot> {
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   filling ??= sharedCatalogue().finally(() => { filling = undefined })
   const snapshot = await filling
-  // Keep the combined normal freshness budget at one hour.
-  const life = r2ConditionalJson()
-    ? { ...CATALOGUE_LIFE, revalidate: CATALOGUE_LIFE.revalidate - ORIGIN_WINDOW_SECONDS }
-    : CATALOGUE_LIFE
-  cacheLife(snapshot.tree === null ? FAILED_READ_LIFE : life)
+  cacheLife(snapshot.tree === null ? FAILED_READ_LIFE : CATALOGUE_LIFE)
   return snapshot
 }
 
