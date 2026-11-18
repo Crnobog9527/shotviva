@@ -13,7 +13,7 @@ export type OwnJobs = { running: Job[]; done: Job[] }
 
 const PHOTOS_LIMIT = 60
 // Far above any tier's concurrency (TIER_LIMITS): only the count matters.
-export const RUNNING_LIMIT = 30
+const RUNNING_LIMIT = 30
 
 export async function listOwnJobs(client: SupabaseClient, userId: string, now: Date): Promise<OwnJobs> {
   const { data, error } = await client

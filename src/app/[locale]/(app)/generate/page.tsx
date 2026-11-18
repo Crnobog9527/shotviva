@@ -8,6 +8,7 @@ import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/a
 import { effectiveTier, limitsFor } from '@/core/billing'
 import { featureAllowed } from '@/core/features'
 import { currentLocale } from '@/core/i18n/server'
+import { listRunningJobIds } from '@/core/jobs'
 import { POSTER_FEATURE } from '@/core/poster/sets'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
@@ -36,13 +37,16 @@ type Search = Promise<Record<string, string | string[] | undefined>>
 async function Create({ searchParams }: { searchParams: Search }) {
   const query = await searchParams
   const user = await requireUser(createReturnPath(query.series, query.poster))
+  const admin = createAdminSupabase()
   // Reuse the service-role tier lookup when the poster gate needs the same answer.
-  const tierPromise = effectiveTier(createAdminSupabase(), user.id)
+  const tierPromise = effectiveTier(admin, user.id)
   const posterAllowed = featureAllowed(user.id, POSTER_FEATURE, { tierOf: () => tierPromise }).catch(() => false)
-  const [view, { balance, runningIds, favoriteIds }, tier, wishlistLive] = await Promise.all([
+  const [view, { balance, favoriteIds }, tier, runningIds, wishlistLive] = await Promise.all([
     currentLocale().then((locale) => loadCatalogueView(locale, posterAllowed)),
-    createServerSupabase().then((db) => readCreatePersonalData(db, user.id, new Date())),
+    createServerSupabase().then((db) => readCreatePersonalData(db, user.id)),
     tierPromise,
+    // RLS hides jobs with private style references. The admin read returns only IDs for this viewer.
+    listRunningJobIds(admin, user.id, new Date()),
     // The grid ends on "Not finding it? Make a wish" while the wishlist is open (cached read).
     isWishlistEnabled(site),
   ])
