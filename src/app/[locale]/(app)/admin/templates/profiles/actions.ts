@@ -1,6 +1,7 @@
 'use server'
 
-import { revalidatePath, updateTag } from 'next/cache'
+import { revalidatePath } from 'next/cache'
+import { updateCatalogueTag } from '@/core/templates/catalogue-invalidation'
 import { z } from 'zod'
 
 import { runAdminQuery } from '@/core/admin/templates'
@@ -35,7 +36,7 @@ export async function switchProfilesAction(input: SwitchInput) {
     const rows = await switchTemplateProfiles(createAdminSupabase(), admin.id, input)
     if (!input.validateOnly && rows.some(row => row.ok && !row.unchanged)) {
       // Prices, tiers and the model of the switched templates show on every catalogue page.
-      updateTag(TEMPLATES_CACHE_TAG)
+      await updateCatalogueTag(TEMPLATES_CACHE_TAG)
       revalidatePath('/[locale]/admin/templates', 'page')
       revalidatePath('/[locale]/admin/templates/profiles', 'page')
     }

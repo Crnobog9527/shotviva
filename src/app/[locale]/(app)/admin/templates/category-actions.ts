@@ -1,7 +1,8 @@
 'use server'
 
-import { refresh, updateTag } from 'next/cache'
+import { refresh } from 'next/cache'
 
+import { updateCatalogueTag } from '@/core/templates/catalogue-invalidation'
 import { runAdminAction } from '@/core/admin'
 import { moveTemplateCategory } from '@/core/admin/template-categories'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
@@ -12,7 +13,7 @@ export async function moveTemplateCategoryAction(input: unknown) {
   return runAdminAction(async () => {
     await moveTemplateCategory(createAdminSupabase(), admin.id, input)
     // Category order groups the home and landing template sections: live on the next load.
-    updateTag(TEMPLATES_CACHE_TAG)
+    await updateCatalogueTag(TEMPLATES_CACHE_TAG)
     refresh()
   })
 }

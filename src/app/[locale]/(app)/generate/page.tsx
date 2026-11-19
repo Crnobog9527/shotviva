@@ -1,20 +1,24 @@
 import type { Metadata } from 'next'
+import { connection } from 'next/server'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveTier, limitsFor } from '@/core/billing'
 import { featureAllowed } from '@/core/features'
-import { listFavoriteIdsOrEmpty } from '@/core/favorites'
+import { sharedCreateFeatureAccess } from '@/core/features/read'
 import { currentLocale } from '@/core/i18n/server'
-import { POSTER_FEATURE } from '@/core/poster/sets'
 import { listRunningJobIds } from '@/core/jobs'
+import { POSTER_FEATURE } from '@/core/poster/sets'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
-import { createReturnPath, FavoritesProvider, GatedFeatures, GeneratingPill, loadCatalogueView, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image'
+import { loadCataloguePayload } from '@/modules/image/create-data'
+import { createReturnPath, FavoritesProvider, GatedFeatures, GeneratingPill, TEMPLATES_ANCHOR, TemplateCatalogue } from '@/modules/image/create-page'
 import { site } from '@/site/site.config'
+
+import { readCreatePersonalData } from './personal-data'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.create'))('metaTitle') }
@@ -34,21 +38,26 @@ type Search = Promise<Record<string, string | string[] | undefined>>
 // The proxy already sends a signed-out visitor to sign-in with the full address; this is the
 // page's own fallback, and it keeps an open series (?series=) or poster editor (?poster=) too.
 async function Create({ searchParams }: { searchParams: Search }) {
-  const query = await searchParams
-  const user = await requireUser(createReturnPath(query.series, query.poster))
-  const supabase = await createServerSupabase()
+  // Keep the header in the prefetched shell. Only a navigation should compute and
+  // serialize the signed-in catalogue; the embedded runtime prefetch can skip it.
+  await connection()
+  const user = await requireUser(async () => {
+    const { series, poster } = await searchParams
+    return createReturnPath(series, poster)
+  })
   const admin = createAdminSupabase()
-  const [view, balance, tier, runningIds, favoriteIds, wishlistLive] = await Promise.all([
-    // Templates and series cards placed under up to three category levels (T102); the poster
-    // templates too while this account may use the poster editor (ARCHITECTURE §5.3). Checked
-    // through core, not modules/image/posters, which would ship the poster editor's JS here.
-    loadCatalogueView(await currentLocale(), featureAllowed(user.id, POSTER_FEATURE).catch(() => false)),
-    readBalance(supabase, user.id),
-    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
-    effectiveTier(admin, user.id),
+  // Reuse the service-role tier lookup when the poster gate needs the same answer.
+  const tierPromise = effectiveTier(admin, user.id)
+  const posterAllowed = featureAllowed(user.id, POSTER_FEATURE, {
+    loadAccess: sharedCreateFeatureAccess,
+    tierOf: () => tierPromise,
+  }).catch(() => false)
+  const [payload, { balance, favoriteIds }, tier, runningIds, wishlistLive] = await Promise.all([
+    currentLocale().then((locale) => loadCataloguePayload(locale, posterAllowed)),
+    createServerSupabase().then((db) => readCreatePersonalData(db, user.id)),
+    tierPromise,
+    // RLS hides jobs with private style references. The admin read returns only IDs for this viewer.
     listRunningJobIds(admin, user.id, new Date()),
-    // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
-    listFavoriteIdsOrEmpty(supabase, user.id),
     // The grid ends on "Not finding it? Make a wish" while the wishlist is open (cached read).
     isWishlistEnabled(site),
   ])
@@ -70,7 +79,7 @@ async function Create({ searchParams }: { searchParams: Search }) {
       <div id={TEMPLATES_ANCHOR} className="scroll-mt-[calc(var(--sat)+8px)] md:scroll-mt-16">
         <FavoritesProvider initialIds={favoriteIds} signedIn>
           <TemplateCatalogue
-            view={view}
+            payload={payload}
             create={{ balance, tier, concurrency: { limit: limitsFor(tier).concurrency, runningIds } }}
             endCard={wishlistLive ? <WishCard /> : undefined}
           />
