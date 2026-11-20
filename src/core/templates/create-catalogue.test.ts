@@ -4,6 +4,7 @@ const { adminClient, rpc, readRows, readTree } = vi.hoisted(() => ({
   adminClient: vi.fn(), rpc: vi.fn(), readRows: vi.fn(), readTree: vi.fn(),
 }))
 vi.mock('next/cache', () => ({ cacheLife: vi.fn(), cacheTag: vi.fn() }))
+vi.mock('./cached-taxonomy', () => ({ cachedLocaleDisplay: async () => ({ categoryOrder: {}, featured: {} }) }))
 vi.mock('./taxonomy-reads', () => ({ readCategoryTree: readTree }))
 vi.mock('../storage/r2-store', () => ({ r2ConditionalJson: () => null }))
 vi.mock('../auth/supabase-admin', () => ({ createAdminSupabase: adminClient }))
