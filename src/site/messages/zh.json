@@ -2112,7 +2112,7 @@
     "totalCommission": "累计佣金",
     "amount": "金额（美元）",
     "statementAmount": "生成时金额（美元）",
-    "amountPaid": "实付金额（美元）",
+    "amountPaid": "实付金额（扣费前，美元）",
     "paidDate": "打款日期（UTC）",
     "recruit": "团队招募链接",
     "members": "团队成员",
@@ -2315,7 +2315,25 @@
     "recruitHint": "通过这个链接申请的人，审核通过后会加入你的团队。",
     "payoutTitle": "收款信息",
     "payoutIntro": "每月结算日，我们按这里的方式支付已确认的收入。",
-    "programName": "联盟营销"
+    "programName": "联盟营销",
+    "feeAmount": "打款扣费（美元）",
+    "netAmount": "实到金额（美元）",
+    "estimated": "约 {amount}",
+    "fees": {
+      "title": "打款扣费",
+      "intro": "每次打款前会先扣除下面的费用，每项都按扣费前的结算金额计算。{threshold} 的结算门槛按扣费前的余额判断。",
+      "none": "目前打款不扣任何费用。",
+      "allMethods": "所有收款方式",
+      "onlyMethods": "仅适用于 {methods}",
+      "min": "最低 {amount}",
+      "max": "最高 {amount}",
+      "estimateTitle": "假如现在按当前余额 {balance} 打款",
+      "totalFees": "扣费",
+      "net": "预计实到金额",
+      "estimateNote": "这是按你当前收款方式的估算。实际金额在结算单付款时确定：按结算日当时生效的扣费规则和付款时的应付金额计算。扣费最多扣到 0，不会倒欠。",
+      "estimateNoMethod": "设置收款方式后才能看到适用于它的扣费。只对部分收款方式收取的费用暂未计入这个估算。",
+      "breakdown": "扣费明细"
+    }
   },
   "gallery": {
     "meta": {

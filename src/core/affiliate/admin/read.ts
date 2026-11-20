@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { AppError } from '@/core/errors'
 import { decodeCursor, PAGE_SIZE, toPage } from '@/core/admin/cursor'
+import { feeQuote } from '../fees'
 import { endExclusive, type Filters } from './query'
 
 export function checked<T>(result: { data: T; error: { message: string } | null }): T {
@@ -50,6 +51,7 @@ const payout = z.object({
   legacy_review_required: z.boolean(),
   payable: z.number().int().safe().nonnegative().nullable(),
   paid_amount: z.number().int().safe().nonnegative().nullable(),
+  fees: feeQuote.nullable(),
   payout_snapshot: snapshot,
   paid_at: z.string().nullable(),
   paid_reference: z.string().nullable(),
@@ -88,7 +90,7 @@ export async function commissions(db: SupabaseClient, f: Filters) {
   return toPage(commission.array().parse(checked(await q)), (r) => r)
 }
 export async function payouts(db: SupabaseClient, f: Filters, includeFlags = false) {
-  const cols = 'id,created_at,affiliate_user_id,period,amount,legacy_review_required,payable:affiliate_payout_payable,paid_amount,status,payout_snapshot,paid_at,paid_reference,note'
+  const cols = 'id,created_at,affiliate_user_id,period,amount,legacy_review_required,payable:affiliate_payout_payable,fees:affiliate_payout_fees,paid_amount,status,payout_snapshot,paid_at,paid_reference,note'
   const fields = cols + ',paid_method' + (includeFlags ? ',owner:affiliates(risks:affiliate_commissions(id,flags))' : '')
   let q = withFilters(pageQuery(db, 'affiliate_payouts', fields, f.cursor), f)
   if (includeFlags)
