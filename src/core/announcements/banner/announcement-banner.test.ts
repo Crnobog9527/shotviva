@@ -1,9 +1,9 @@
-import { isValidElement, Suspense, type ReactElement } from 'react'
+import { Fragment, isValidElement, Suspense, type ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { HIDE_CLOSED_SCRIPT, HIDE_ENDED_SCRIPT } from '../rules/dismissal-scripts'
 import { AnnouncementBanner } from './announcement-banner'
-import { BannerView } from './banner-view'
+import { BannerView, PathAwareBannerView } from './banner-view'
 
 vi.mock('next-intl/server', () => ({
   getLocale: async () => 'en',
@@ -16,22 +16,22 @@ vi.mock('../banner-read', () => ({
   })),
 }))
 
-type Node = ReactElement<{ children: ReactElement[]; dangerouslySetInnerHTML?: { __html: string } }>
+type Node = ReactElement<{ children: Node | Node[]; dangerouslySetInnerHTML?: { __html: string } }>
 
 describe('AnnouncementBanner', () => {
-  // The closed-check comes first, outside the boundary, so it is in the static shell ahead of
-  // the banner even when the banner streams in later. BannerView calls usePathname, which
-  // suspends during prerender on routes with request-time params (/photos/[jobId]); without a
-  // boundary the build fails (Next 16 cacheComponents).
-  it('puts the closed-check ahead of a Suspense boundary holding the view and the ended-check', async () => {
-    const fragment = (await AnnouncementBanner()) as Node
-    const [closed, boundary] = fragment.props.children as [Node, Node]
+  it.each([
+    { checkPath: true, view: PathAwareBannerView },
+    { checkPath: false, view: BannerView },
+  ])('preserves early dismissal without streaming the marketing banner (checkPath=$checkPath)', async ({ checkPath, view }) => {
+    const fragment = (await AnnouncementBanner({ checkPath })) as Node
+    const [closed, content] = fragment.props.children as [Node, Node]
     expect(closed.type).toBe('script')
     expect(closed.props.dangerouslySetInnerHTML?.__html).toBe(HIDE_CLOSED_SCRIPT)
-    expect(isValidElement(boundary)).toBe(true)
-    expect(boundary.type).toBe(Suspense)
-    const [view, ended] = boundary.props.children as [Node, Node]
-    expect(view.type).toBe(BannerView)
+    expect(isValidElement(content)).toBe(true)
+    expect(content.type).toBe(checkPath ? Suspense : Fragment)
+    const banner = checkPath ? content.props.children as Node : content
+    const [bannerView, ended] = banner.props.children as [Node, Node]
+    expect(bannerView.type).toBe(view)
     expect(ended.props.dangerouslySetInnerHTML?.__html).toBe(HIDE_ENDED_SCRIPT)
   })
 })
