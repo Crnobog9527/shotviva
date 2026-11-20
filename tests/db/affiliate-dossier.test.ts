@@ -182,14 +182,14 @@ it('shows both sides of reassignment and ignores affiliate IDs mentioned inside 
 
 it('allows only service-role calls with a current unbanned admin as actor to read private dossier RPCs', async () => {
   const functions = [
-    ['admin_affiliate_directory', { p_query: email }], ['admin_affiliate_dossier', { p_user: owner }],
+    ['admin_affiliate_directory', { p_query: email }], ['admin_affiliate_directory_v2', { p_query: email }], ['admin_affiliate_dossier', { p_user: owner }],
     ['admin_affiliate_dossier_log', { p_user: owner }],
     ['admin_affiliate_commission_history', { p_user: owner, p_commission: reward, p_level: 2 }],
   ] as const
   const privileges = await db.query(`select proname, has_function_privilege('anon',oid,'execute') anon,
     has_function_privilege('authenticated',oid,'execute') authenticated, has_function_privilege('service_role',oid,'execute') service
     from pg_proc where pronamespace='public'::regnamespace and proname=any($1)`, [functions.map(([fn]) => fn)])
-  expect(privileges.rows).toHaveLength(4)
+  expect(privileges.rows).toHaveLength(5)
   for (const privilegesOf of privileges.rows) expect(privilegesOf).toMatchObject({ anon: false, authenticated: false, service: true })
   const privateView = await db.query(`select has_table_privilege(role_name::name,'admin.affiliate_directory_rows','select') as readable
     from unnest(array['anon','authenticated','service_role']) role_name`)

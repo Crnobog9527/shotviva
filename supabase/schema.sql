@@ -4372,7 +4372,45 @@ $$;
 ALTER FUNCTION "public"."admin_affiliate_decide"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."admin_affiliate_directory"("p_actor" "uuid", "p_query" "text" DEFAULT NULL::"text", "p_review" "text" DEFAULT NULL::"text", "p_parent" "uuid" DEFAULT NULL::"uuid", "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("user_id" "uuid", "slug" "text", "status" "text", "source" "text", "name" "text", "email" "text", "phone" "text", "team_enabled" boolean, "team_count" bigint, "created_at" timestamp with time zone, "total" bigint, "confirmed" bigint, "unwithdrawn" bigint, "paid" bigint, "admin_label" "text")
+CREATE OR REPLACE FUNCTION "public"."admin_affiliate_directory"("p_actor" "uuid", "p_query" "text" DEFAULT NULL::"text", "p_review" "text" DEFAULT NULL::"text", "p_parent" "uuid" DEFAULT NULL::"uuid", "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("user_id" "uuid", "slug" "text", "status" "text", "source" "text", "name" "text", "email" "text", "phone" "text", "team_enabled" boolean, "team_count" bigint, "created_at" timestamp with time zone, "total" bigint, "confirmed" bigint, "unwithdrawn" bigint, "paid" bigint)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare v_q text:=nullif(lower(btrim(p_query)),''); v_prefix text; v_phone text; v_user uuid;
+begin
+  perform public._affiliate_require_admin(p_actor);
+  if length(v_q)>254 or p_review not in ('pending','rejected') or (p_before_at is null)<>(p_before_id is null)
+    then raise exception 'INVALID_INPUT'; end if;
+  if v_q ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then v_user:=v_q::uuid; end if;
+  if v_q ~ '^\+?[0-9][0-9 ()-]*$' then v_phone:=regexp_replace(v_q,'[^0-9]','','g'); end if;
+  v_prefix:=replace(replace(replace(v_q,'\','\\'),'%','\%'),'_','\_')||'%';
+  return query with matches as (
+    select a.user_id from public.affiliates a where a.user_id=v_user
+    union all select a.user_id from public.affiliates a where v_prefix is not null and a.slug like v_prefix
+    union all select a.user_id from public.affiliates a
+      where v_prefix is not null and lower(left(a.application->>'name',254)) like v_prefix
+    union all select u.id from auth.users u where position('@' in v_q)>0 and u.email=v_q
+    union all select u.id from auth.users u where v_phone is not null and u.phone in (v_phone,'+'||v_phone,
+      case when v_phone ~ '^1[3-9][0-9]{9}$' then '86'||v_phone end)
+  ), page as materialized (
+    select a.user_id,a.created_at from public.affiliates a
+    where (v_q is null or a.user_id in (select m.user_id from matches m))
+      and (p_review is null or (a.status=p_review and a.application->>'source' is distinct from 'admin_invite'))
+      and (p_parent is null or a.parent_user_id=p_parent)
+      and (p_before_at is null or (a.created_at,a.user_id)<(p_before_at,p_before_id))
+    order by a.created_at desc,a.user_id desc limit 31
+  )
+  select r.user_id,r.slug,r.status,r.source,r.name,r.email,r.phone,r.team_enabled,r.team_count,r.created_at,
+    r.total,r.confirmed,r.unwithdrawn,r.paid
+  from page join admin.affiliate_directory_rows r on r.user_id=page.user_id order by page.created_at desc,page.user_id desc;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_affiliate_directory"("p_actor" "uuid", "p_query" "text", "p_review" "text", "p_parent" "uuid", "p_before_at" timestamp with time zone, "p_before_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_affiliate_directory_v2"("p_actor" "uuid", "p_query" "text" DEFAULT NULL::"text", "p_review" "text" DEFAULT NULL::"text", "p_parent" "uuid" DEFAULT NULL::"uuid", "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("user_id" "uuid", "slug" "text", "status" "text", "source" "text", "name" "text", "email" "text", "phone" "text", "team_enabled" boolean, "team_count" bigint, "created_at" timestamp with time zone, "total" bigint, "confirmed" bigint, "unwithdrawn" bigint, "paid" bigint, "admin_label" "text")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $_$
@@ -4409,7 +4447,7 @@ end;
 $_$;
 
 
-ALTER FUNCTION "public"."admin_affiliate_directory"("p_actor" "uuid", "p_query" "text", "p_review" "text", "p_parent" "uuid", "p_before_at" timestamp with time zone, "p_before_id" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."admin_affiliate_directory_v2"("p_actor" "uuid", "p_query" "text", "p_review" "text", "p_parent" "uuid", "p_before_at" timestamp with time zone, "p_before_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_affiliate_dossier"("p_actor" "uuid", "p_user" "uuid") RETURNS "jsonb"
@@ -20453,6 +20491,11 @@ GRANT ALL ON FUNCTION "public"."admin_affiliate_decide"("p_actor" "uuid", "p_inp
 
 REVOKE ALL ON FUNCTION "public"."admin_affiliate_directory"("p_actor" "uuid", "p_query" "text", "p_review" "text", "p_parent" "uuid", "p_before_at" timestamp with time zone, "p_before_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_affiliate_directory"("p_actor" "uuid", "p_query" "text", "p_review" "text", "p_parent" "uuid", "p_before_at" timestamp with time zone, "p_before_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_affiliate_directory_v2"("p_actor" "uuid", "p_query" "text", "p_review" "text", "p_parent" "uuid", "p_before_at" timestamp with time zone, "p_before_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_affiliate_directory_v2"("p_actor" "uuid", "p_query" "text", "p_review" "text", "p_parent" "uuid", "p_before_at" timestamp with time zone, "p_before_id" "uuid") TO "service_role";
 
 
 

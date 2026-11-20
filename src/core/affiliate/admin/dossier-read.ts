@@ -43,7 +43,7 @@ function before(cursor: string | undefined, uuid: boolean) {
 type DirectoryFilters = { query?: string; cursor?: string; parent?: string; review?: 'pending' | 'rejected' }
 
 export async function dossiers(db: SupabaseClient, actor: string, f: DirectoryFilters) {
-  const rows = checked(await db.rpc('admin_affiliate_directory', {
+  const rows = checked(await db.rpc('admin_affiliate_directory_v2', {
     p_actor: actor, p_query: f.query || null, p_parent: f.parent ?? null, p_review: f.review ?? null, ...before(f.cursor, true),
   }))
   return toPage(directory.array().parse(rows).map(identify), (r) => r)

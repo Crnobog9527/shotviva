@@ -19,11 +19,9 @@ select a.user_id,a.slug,a.status,a.application->>'source' as source,
 from public.affiliates a join auth.users u on u.id=a.user_id
 join public.affiliate_balances b on b.affiliate_user_id=a.user_id;
 
--- The returned row gains admin_label, which a plain "create or replace" cannot do, so the function is
--- dropped and recreated in this one transaction. The arguments are unchanged and the old code's zod
--- schema ignores the extra column, so the code still in production keeps working on the migrated database.
-drop function public.admin_affiliate_directory(uuid,text,text,uuid,timestamptz,uuid);
-create function public.admin_affiliate_directory(p_actor uuid,p_query text default null,p_review text default null,
+-- Versioned copy of admin_affiliate_directory (1047), kept alongside it because the returned row gains admin_label and
+-- a function cannot change its row type in place. The old function stays untouched for the code still in production.
+create function public.admin_affiliate_directory_v2(p_actor uuid,p_query text default null,p_review text default null,
   p_parent uuid default null,p_before_at timestamptz default null,p_before_id uuid default null)
 returns table(user_id uuid,slug text,status text,source text,name text,email text,phone text,team_enabled boolean,
   team_count bigint,created_at timestamptz,total bigint,confirmed bigint,unwithdrawn bigint,paid bigint,admin_label text)
@@ -59,8 +57,8 @@ begin
   from page join admin.affiliate_directory_rows r on r.user_id=page.user_id order by page.created_at desc,page.user_id desc;
 end;
 $$;
-revoke all on function public.admin_affiliate_directory(uuid,text,text,uuid,timestamptz,uuid) from public,anon,authenticated,service_role;
-grant execute on function public.admin_affiliate_directory(uuid,text,text,uuid,timestamptz,uuid) to service_role;
+revoke all on function public.admin_affiliate_directory_v2(uuid,text,text,uuid,timestamptz,uuid) from public,anon,authenticated,service_role;
+grant execute on function public.admin_affiliate_directory_v2(uuid,text,text,uuid,timestamptz,uuid) to service_role;
 
 -- Editing the label or the free-text note of any affiliate, whatever its status. Only keys that are
 -- present change; an empty or null value clears. Records "set" in the audit log (shown in the dossier).
