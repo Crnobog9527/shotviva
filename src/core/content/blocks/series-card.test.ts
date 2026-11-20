@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { SeriesCard } from './series-card'
+import { decodePairs } from './series-layers'
 
 // SEO 2026-11-14: a series opens Create, which needs a session and is noindex. The card is a
 // button carrying the address for the page's click handler, never a crawlable <a href>.
@@ -39,5 +40,36 @@ describe('series card', () => {
   it('keeps the name, use and size of the set in the HTML', () => {
     expect(html).toContain('Bright Daylight')
     expect(html).toContain('Western dishes in daylight')
+  })
+
+  it('draws only the first pair and carries the others as addresses for the browser', () => {
+    const three = { ...card, series: { ...card.series, members: ['a', 'b', 'c'] } }
+    const covers = {
+      ...media,
+      b: { before: 'https://shotviva.com/b-before.webp', after: 'https://shotviva.com/b-after.webp', live: true },
+      c: { before: 'https://shotviva.com/c-before.webp', after: 'https://shotviva.com/c-after.webp', live: true },
+    }
+    const markup = renderToStaticMarkup(createElement(Provider, { locale: 'en', messages }, createElement(SeriesCard, { card: three, media: covers, sizes: '50vw' })))
+    expect(markup.match(/<img /g)).toHaveLength(4)
+    expect(markup).not.toContain('mk-sl')
+    const attr = /data-series-pairs="([^"]*)"/.exec(markup)?.[1].replaceAll('&quot;', '"')
+    expect(decodePairs(attr ?? null)).toEqual([
+      ['https://shotviva.com/b-before.webp', 'https://shotviva.com/b-after.webp'],
+      ['https://shotviva.com/c-before.webp', 'https://shotviva.com/c-after.webp'],
+    ])
+    expect(markup).toContain('data-series-sizes="50vw"')
+  })
+
+  it('leaves a one-pair series still: no addresses to play through', () => {
+    expect(html).not.toContain('data-series-pairs')
+  })
+})
+
+describe('series layer addresses', () => {
+  it('ignores anything that is not a list of before/after pairs', () => {
+    expect(decodePairs(null)).toEqual([])
+    expect(decodePairs('not json')).toEqual([])
+    expect(decodePairs('{"a":1}')).toEqual([])
+    expect(decodePairs('[["a","b"],["c"],[1,2],"x"]')).toEqual([['a', 'b']])
   })
 })
