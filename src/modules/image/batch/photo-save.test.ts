@@ -17,12 +17,24 @@ describe('phoneSaveSupported', () => {
 })
 
 describe('nextChunk', () => {
-  it('walks a batch of 30 in groups of ten and ends on the remainder', () => {
+  it('walks a batch of 25 in groups of ten and ends on the remainder', () => {
     const all = links(25)
-    expect(nextChunk(all, 0)).toHaveLength(PHOTO_CHUNK)
-    expect(nextChunk(all, 10).map((l) => l.name)[0]).toBe('shop_white_11.png')
-    expect(nextChunk(all, 20)).toHaveLength(5)
-    expect(nextChunk(all, 25)).toEqual([])
+    const saved = new Set<string>()
+    const sizes: number[] = []
+    for (let group = nextChunk(all, saved); group.length; group = nextChunk(all, saved)) {
+      sizes.push(group.length)
+      group.forEach((photo) => saved.add(photo.name))
+    }
+    expect(sizes).toEqual([10, 10, 5])
+  })
+  it('resumes after the saved photos when links are fetched again, never from photo 1', () => {
+    const saved = new Set(links(10).map((l) => l.name))
+    // A fresh set of links (new URLs, same names) as after an expiry.
+    const fresh = links(25).map((l) => ({ ...l, url: `${l.url}?again` }))
+    const group = nextChunk(fresh, saved)
+    expect(group[0].name).toBe('shop_white_11.png')
+    expect(group[0].url).toContain('again')
+    expect(group).toHaveLength(10)
   })
 })
 

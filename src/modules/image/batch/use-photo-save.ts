@@ -35,7 +35,8 @@ export function usePhotoSave(batchId: string) {
   const paywall = usePaywall()
   const photos = useRef<PhotoLink[]>([])
   const files = useRef<File[]>([])
-  const saved = useRef(0)
+  // Names of photos already handed to the share sheet; kept across re-fetched links.
+  const saved = useRef(new Set<string>())
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const alive = useRef(true)
 
@@ -59,7 +60,7 @@ export function usePhotoSave(batchId: string) {
     }
     if (!canShareChunk(navigator, group)) return setState({ kind: 'unsupported' })
     files.current = group
-    setState({ kind: 'ready', count: group.length, saved: saved.current, total: photos.current.length })
+    setState({ kind: 'ready', count: group.length, saved: saved.current.size, total: photos.current.length })
   }
 
   const ask = async () => {
@@ -68,7 +69,6 @@ export function usePhotoSave(batchId: string) {
     if (!alive.current) return
     if (outcome.kind === 'ready') {
       photos.current = outcome.photos
-      saved.current = 0
       return load()
     }
     if (outcome.kind === 'upgrade') paywall.open('tier_required', { step: 'period', tier: outcome.tier })
@@ -84,9 +84,9 @@ export function usePhotoSave(batchId: string) {
     void shareChunk(navigator, group).then((result) => {
       if (!alive.current) return
       if (result === 'failed') return setState({ kind: 'unsupported' })
-      if (result === 'cancelled') return setState({ kind: 'ready', count: group.length, saved: saved.current, total: photos.current.length })
-      saved.current += group.length
-      if (saved.current >= photos.current.length) return setState({ kind: 'done', total: photos.current.length })
+      if (result === 'cancelled') return setState({ kind: 'ready', count: group.length, saved: saved.current.size, total: photos.current.length })
+      group.forEach((file) => saved.current.add(file.name))
+      if (!nextChunk(photos.current, saved.current).length) return setState({ kind: 'done', total: photos.current.length })
       void load()
     })
   }

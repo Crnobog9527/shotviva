@@ -56,8 +56,11 @@ export function phoneSaveSupported(coarsePointer: boolean, sharer: FileSharer | 
   return coarsePointer && mayShareFiles(sharer)
 }
 
-export const nextChunk = (photos: PhotoLink[], saved: number, size = PHOTO_CHUNK): PhotoLink[] =>
-  photos.slice(saved, saved + size)
+// What is left to save, matched by file name (it carries the batch position, so it is unique and
+// stable): links fetched again after a lapse or a failure resume where the user was, they do not
+// restart at photo 1.
+export const nextChunk = (photos: PhotoLink[], savedNames: ReadonlySet<string>, size = PHOTO_CHUNK): PhotoLink[] =>
+  photos.filter((photo) => !savedNames.has(photo.name)).slice(0, size)
 
 const TYPE_BY_EXTENSION: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' }
 
