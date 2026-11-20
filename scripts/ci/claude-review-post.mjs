@@ -45,7 +45,12 @@ export function commentableLines(patch) {
 
 const findingTitle = (f) => `**<sub>${f.severity ?? 'P2'}</sub> ${String(f.title ?? '').trim()}**`
 
-/** The REST payload for POST /pulls/{n}/reviews, plus the findings that could not go inline. */
+/**
+ * The REST payload for POST /pulls/{n}/reviews, plus the findings that could not go inline.
+ * @typedef {{ path: string, line: number, start_line?: number, severity?: string, title: string, body?: string }} Finding
+ * @param {{ commit: string, summary?: string, findings?: Finding[] }} input
+ * @param {{ filename: string, patch?: string }[]} files
+ */
 export function buildReview({ commit, summary, findings = [] }, files) {
   if (!/^[0-9a-f]{40}$/.test(commit ?? '')) throw new Error(`commit must be a full 40-character sha, got ${commit}`)
   const byPath = new Map(files.map((f) => [f.filename, commentableLines(f.patch)]))
