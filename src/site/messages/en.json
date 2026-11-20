@@ -1800,7 +1800,7 @@
     "billingLabel": "Billing period",
     "monthly": "Monthly",
     "yearly": "Yearly",
-    "savePct": "Save up to <b>{pct}%</b>",
+    "savePct": "{months, plural, =0 {{upTo, select, true {Save up to <b>{pct}%</b>} other {Save <b>{pct}%</b>}}} one {<b>1 month</b> free} other {<b># months</b> free}}",
     "plansLabel": "Plans",
     "tiers": {
       "starter": "Starter",
@@ -1851,7 +1851,7 @@
         "allTemplates": "Every template"
       },
       "cells": {
-        "pct": "{value}%",
+        "pct": "{value, plural, =0 {—} other {#%}}",
         "hours": "{value} h",
         "weight": "{value}×",
         "yes": "Included"
@@ -1890,7 +1890,7 @@
     "memberPrice": "Member price",
     "memberCodeKept": "Member price. Your discount code is saved for another purchase.",
     "packsNote": "Buy credits once, no subscription",
-    "packsNoteV2": "Small packs are full price. On medium and large packs, Starter saves 5%, Pro 10% and Max 15%. Each pack includes the same credits for everyone.",
+    "packsNoteV2": "Small packs are full price. {starter, plural, =0 {On medium and large packs, Pro saves {pro}% and Max {max}%.} other {On medium and large packs, Starter saves {starter}%, Pro {pro}% and Max {max}%.}} Each pack includes the same credits for everyone.",
     "buy": "Buy",
     "buyPackLabel": "Buy {count, plural, one {# credit} other {# credits}} for {price}",
     "payNoteCard": "Plans renew automatically, cancel anytime",

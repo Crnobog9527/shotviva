@@ -12,7 +12,7 @@ import { usePushBack } from "../../ui/use-push-back"
 import { DiscountProvider } from "./discount-context"
 import { DiscountBanner, DiscountEntry } from "./discount-controls"
 import { BillingToggle } from "./billing-toggle"
-import { packOffers, tierOffers, yearlySavingPct } from "./offer"
+import { packOffers, tierOffers, yearlySaving } from "./offer"
 import { PaywallMoment as MomentLead } from "./paywall-moment"
 import { PaywallCheckout } from "./paywall-checkout"
 import type { PaywallTrigger } from "./paywall-context"
@@ -65,7 +65,7 @@ function SheetBody({ open, onOpenChange, trigger, moment, needed, momentTier, pr
         <BillingToggle
           period={choice.period}
           onChange={(period) => select({ period })}
-          savePct={yearlySavingPct(offers)}
+          saving={yearlySaving(offers)}
           className="mt-4 md:mt-1 md:w-[400px] md:flex-none"
         />
       }

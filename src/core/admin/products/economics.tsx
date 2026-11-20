@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { MEMBERSHIP_TIERS, type MembershipTier } from '../../config'
 import { bestPackOffer, packMemberPercentOff } from '../../billing/pack-price'
 import { Input } from '../../ui/input'
-import type { Editor, Terms } from './model'
+import { asProduct, type Editor, type Terms } from './model'
 import { E } from './editor-copy'
 
 const C = { heading:'收款渠道毛利试算',channel:'支付渠道',payment:'支付费率（%）',fixed:'每笔固定手续费（USD）',
@@ -14,16 +14,21 @@ const C = { heading:'收款渠道毛利试算',channel:'支付渠道',payment:'�
 } as const
 type Params = { rate: string; fixed: string; use: string; cost: string; refund: number; commission: number }
 type Scenario = { name: string; member: MembershipTier | null; coupon: number }
+// Each revision has its own member rate (migration 1610): name the draft's, or the current one's.
+function memberOff(item: Editor, member: MembershipTier) {
+  const shown = [item.current, item.draft].filter((v): v is Terms => v !== null).map(v => packMemberPercentOff(asProduct(item, v), member))
+  return [...new Set(shown)].join('% → ')
+}
 function scenarios(item: Editor): Scenario[] {
   const members = ['pack_m','pack_l'].includes(item.product_id) ? [null,...MEMBERSHIP_TIERS] : [null]
   return members.flatMap(member => [{ code: '', percent: 0 }, ...item.discounts].map(({ code, percent: coupon }) => {
-    const name = [member ? C.member+' '+member+' '+packMemberPercentOff(member)+'%' : C.base, coupon ? C.code+' '+code+' ('+coupon+'%)' : ''].filter(Boolean).join(' / ')
+    const name = [member ? C.member+' '+member+' '+memberOff(item, member)+'%' : C.base, coupon ? C.code+' '+code+' ('+coupon+'%)' : ''].filter(Boolean).join(' / ')
     return {name, member, coupon}
   }))
 }
-function quote(id: Editor['product_id'], v: Terms | null, s: Scenario, input: Params) {
+function quote(item: Editor, v: Terms | null, s: Scenario, input: Params) {
   if (!v) return { paid:E.empty,unit:E.empty,margin:E.empty }
-  const paid = bestPackOffer({ id, priceUsd: v.usd_cents / 100 },s.member,s.coupon).cents / 100
+  const paid = bestPackOffer(asProduct(item, v),s.member,s.coupon).cents / 100
   const fees = (Number(input.rate) + input.refund + input.commission)/100
   const margin = (paid*(1-fees)-Number(input.fixed)-v.credits*Number(input.cost)*Number(input.use)/100)/paid
   return {paid:paid.toFixed(2),unit:(paid/v.credits).toFixed(6),margin:(margin*100).toFixed(2)+'%'}
@@ -35,8 +40,8 @@ function Estimate({ item, input }: { item: Editor; input: Params }) {
   const ready = numeric(input.rate,100) && numeric(input.fixed,1e6) && numeric(input.cost,1e6) && numeric(input.use,100)
   return <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr>{[C.scenario,C.price,C.unit,C.metrics].map(h=><th key={h}>{h}</th>)}</tr></thead>
     <tbody>{scenarios(item).map(s=>{
-      const a=quote(item.product_id,item.current,s,input)
-      const b=quote(item.product_id,item.draft,s,input)
+      const a=quote(item,item.current,s,input)
+      const b=quote(item,item.draft,s,input)
       return <tr key={s.name} className="border-t"><th>{s.name}</th><td>{a.paid} → {b.paid}</td>
         <td>{a.unit} → {b.unit}</td><td>{ready ? a.margin+' → '+b.margin : C.input}</td></tr>
     })}</tbody></table></div>

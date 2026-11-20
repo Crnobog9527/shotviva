@@ -1,8 +1,10 @@
-import { PRICE_PENDING } from '@/core/config'
+import { MEMBERSHIP_TIERS, PRICE_PENDING, type SiteProduct } from '@/core/config'
+import { memberPackOff, packNoteValues } from '@/core/billing/paywall/perks'
 import { MAX_UPLOAD_BYTES, UPLOAD_CONTENT_TYPES } from '@/core/storage/rules'
 
 import { site } from '../../site.config'
 import { type OfferFacts, baselineOffers, OUTPUT_TIERS, packFrom, planFrom, usd, yearlySaving } from '../offer'
+import type { YearlySaving } from '@/core/billing/paywall/offer'
 
 // The Chinese wording of every public number (建站规格 G3, §6.1): same figures as offer.ts,
 // read from site.config, written the way mainland e-commerce sellers say it. Prices stay in
@@ -35,8 +37,21 @@ export const zhLanguages = site.locales.enabled.map((code) => LANGUAGE_NAMES[cod
 
 export const zhPlanFrom = planFrom ? `${usd(planFrom.priceUsd)}/月起` : PRICE_PENDING
 export const zhPackFrom = packFrom ? `${usd(packFrom.priceUsd)} 起` : PRICE_PENDING
-// 「按年付最多省 40%」: offer.ts's yearlySaving is the largest saving, rounded (DESIGN §6.9).
-export const zhYearlySaving = yearlySaving ? `按年付最多省 ${yearlySaving}%` : ''
+// 「年付送 2 个月，比按月付约省 17%」(pricing O2), else 「按年付最多省 25%」: the saving each plan
+// really gets (offer.yearlySaving, DESIGN §6.9).
+export function zhYearlyClaim({ pct, upTo, freeMonths }: YearlySaving): string {
+  if (freeMonths) return `年付送 ${freeMonths} 个月，比按月付约省 ${pct}%`
+  return `按年付${upTo ? '最多' : ''}省 ${pct}%`
+}
+// 「中包和大包按当前会员等级享折扣，入门版原价、专业版 95 折、旗舰版 9 折。」 from the listed
+// M / L packs (each revision has its own member rate); empty when none is discounted.
+export function zhMemberPacksSentence(products: readonly SiteProduct[]): string {
+  const off = memberPackOff(products)
+  if (!off || MEMBERSHIP_TIERS.every(t => off[t] === 0)) return ''
+  const v = packNoteValues(off)
+  return `中包和大包按当前会员等级享折扣，入门版${v.starterZh}、专业版${v.proZh}、旗舰版${v.maxZh}。`
+}
+export const zhYearlySaving = yearlySaving ? zhYearlyClaim(yearlySaving) : ''
 
 export function planLabel(plan: OfferFacts['planFrom']) {
   if (!plan) return '月付套餐'

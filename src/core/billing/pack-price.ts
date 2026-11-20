@@ -1,20 +1,31 @@
 import { discountedPriceCents } from '../codes/discount'
 import type { MembershipTier, SiteProduct } from '../config'
 
-const PAY_PERCENT: Record<MembershipTier, number> = { starter: 95, pro: 90, max: 85 }
+type PackTerms = Pick<SiteProduct, 'id' | 'priceUsd' | 'packMemberPayPct'>
 
-// The member rate as a percentage off the list price (5 / 10 / 15), for the paywall perks.
-export const packMemberPercentOff = (tier: MembershipTier): number => 100 - PAY_PERCENT[tier]
+// What a member pays for an M / L pack, in percent of the list price. Each catalogue revision
+// stores its own rate (migration 1610): revisions saved before it, and the site.config seed that
+// mirrors revision 2, pay 95 / 90 / 85; later revisions carry theirs (pricing O2: 100 / 95 / 90).
+export const REVISION_2_PACK_MEMBER_PAY: Readonly<Record<MembershipTier, number>> = { starter: 95, pro: 90, max: 85 }
+
+const payPct = (product: Pick<SiteProduct, 'packMemberPayPct'>, tier: MembershipTier) =>
+  (product.packMemberPayPct ?? REVISION_2_PACK_MEMBER_PAY)[tier]
+
+export const hasMemberRate = (product: Pick<SiteProduct, 'id'>): boolean => product.id === 'pack_m' || product.id === 'pack_l'
+
+// The member rate as a percentage off the list price (O2: 0 / 5 / 10), for the paywall perks.
+export const packMemberPercentOff = (product: Pick<SiteProduct, 'packMemberPayPct'>, tier: MembershipTier): number =>
+  100 - payPct(product, tier)
 
 // The member rate changes the pre-tax charge only. Round once, half up, in integer cents.
-export function packPriceCents(product: Pick<SiteProduct, 'id' | 'priceUsd'>, tier: MembershipTier | null): number {
+export function packPriceCents(product: PackTerms, tier: MembershipTier | null): number {
   const listCents = Math.round(product.priceUsd * 100)
-  if (!tier || (product.id !== 'pack_m' && product.id !== 'pack_l')) return listCents
-  return Math.floor((listCents * PAY_PERCENT[tier] + 50) / 100)
+  if (!tier || !hasMemberRate(product)) return listCents
+  return Math.floor((listCents * payPct(product, tier) + 50) / 100)
 }
 
 // A campaign and a membership each discount the list price. Leave the code unused on a tie.
-export function bestPackOffer(product: Pick<SiteProduct, 'id' | 'priceUsd'>, tier: MembershipTier | null, codePercent: number | null) {
+export function bestPackOffer(product: PackTerms, tier: MembershipTier | null, codePercent: number | null) {
   const cents = packPriceCents(product, tier)
   if (!codePercent) return { cents, useCode: false }
   const list = packPriceCents(product, null)

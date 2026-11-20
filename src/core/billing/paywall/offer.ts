@@ -71,18 +71,25 @@ export function yearlySavingUsd(offer: TierOffer): number {
   return (cents(offer.monthly.priceUsd) * 12 - cents(offer.yearly.priceUsd)) / 100
 }
 
-// Largest annual saving across the current catalogue, rounded to a whole percent.
-export function yearlySavingPct(offers: readonly TierOffer[]): number | null {
-  if (offers.length === 0) return null
-  const percent = Math.max(0, ...offers.map(savingPct))
-  return percent || null
-}
+// What Yearly saves against twelve monthly payments, over the listed plans (ARCHITECTURE §6.2).
+// freeMonths: every yearly price is the same whole number of monthly prices below twelve (pricing
+// O2: ten, "2 months free"); pct is then that saving rounded, said as "about". upTo: the plans
+// save different amounts, pct is the largest, rounded. Otherwise every plan saves pct, rounded
+// down so the claim holds for each.
+export type YearlySaving = { pct: number; upTo: boolean; freeMonths: number | null }
 
-function savingPct(offer: TierOffer): number {
-  if (!offer.monthly || !offer.yearly) return 0
-  const monthlyYear = cents(offer.monthly.priceUsd) * 12
-  // Whole percent, from integer cents so float error cannot move a .5 boundary.
-  return Math.round(((monthlyYear - cents(offer.yearly.priceUsd)) * 100) / monthlyYear)
+export function yearlySaving(offers: readonly TierOffer[]): YearlySaving | null {
+  const pairs = offers.flatMap(o => o.monthly && o.yearly ? [{ month: cents(o.monthly.priceUsd), year: cents(o.yearly.priceUsd) }] : [])
+  // Ratios from integer cents so float error cannot move a .5 boundary.
+  const savings = pairs.map(({ month, year }) => ((month * 12 - year) * 100) / (month * 12))
+  const best = Math.max(0, ...savings)
+  if (best <= 0) return null
+  const months = pairs.map(({ month, year }) => year % month === 0 ? 12 - year / month : null)
+  const free = months[0] ?? null
+  const freeMonths = free !== null && free > 0 && months.every(n => n === free) ? free : null
+  const upTo = !freeMonths && savings.some(s => s !== best)
+  const pct = freeMonths || upTo ? Math.round(best) : Math.floor(best)
+  return pct > 0 ? { pct, upTo, freeMonths } : null
 }
 
 // Whole dollars without decimals ("$191"), the rest with two ("$19.90"). The plain "$" in every

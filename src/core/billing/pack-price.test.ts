@@ -13,6 +13,15 @@ describe('pre-tax pack price in cents', () => {
   ] as const)('%s, including exact half cents', (id, expected) => {
     expect(tiers.map(tier => packPriceCents(testProduct(id), tier))).toEqual(expected)
   })
+
+  // Revisions saved from migration 1610 on carry their own rate (pricing O2: 100 / 95 / 90).
+  it.each([
+    ['pack_m', [2490, 2490, 2366, 2241]],
+    ['pack_l', [4990, 4990, 4741, 4491]],
+  ] as const)('%s at the revision\'s own member rate', (id, expected) => {
+    const product = { ...testProduct(id), packMemberPayPct: { starter: 100, pro: 95, max: 90 } }
+    expect(tiers.map(tier => packPriceCents(product, tier))).toEqual(expected)
+  })
 })
 
 it('compares both offers against the original price, preserving a code on a tie', () => {

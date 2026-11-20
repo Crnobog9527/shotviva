@@ -3,15 +3,15 @@
 import { useTranslations } from "next-intl"
 
 import { cn } from "../../ui/cn"
-import type { Period } from "./offer"
+import type { Period, YearlySaving } from "./offer"
 
-type Props = { period: Period; onChange(period: Period): void; savePct: number | null; className?: string }
+type Props = { period: Period; onChange(period: Period): void; saving: YearlySaving | null; className?: string }
 
 // Monthly / Yearly segmented control (DESIGN §4.5, comps-v3-b tiers.css). The Yearly half
 // always carries "Save up to 40%", the largest yearly saving computed from the config (DESIGN
 // §6.9 item 6): tinted while Monthly is chosen, solid once Yearly is. The cards themselves show
 // no saving on Monthly. On phones the Yearly half is wider so the badge fits.
-export function BillingToggle({ period, onChange, savePct, className }: Props) {
+export function BillingToggle({ period, onChange, saving, className }: Props) {
   const t = useTranslations("paywall")
   const segments: { value: Period; label: string }[] = [
     { value: "month", label: t("monthly") },
@@ -45,7 +45,7 @@ export function BillingToggle({ period, onChange, savePct, className }: Props) {
             )}
           >
             {segment.label}
-            {segment.value === "year" && savePct !== null ? <SaveBadge pct={savePct} solid={pressed} /> : null}
+            {segment.value === "year" && saving !== null ? <SaveBadge saving={saving} solid={pressed} /> : null}
           </button>
         )
       })}
@@ -53,7 +53,7 @@ export function BillingToggle({ period, onChange, savePct, className }: Props) {
   )
 }
 
-function SaveBadge({ pct, solid }: { pct: number; solid: boolean }) {
+function SaveBadge({ saving, solid }: { saving: YearlySaving; solid: boolean }) {
   const t = useTranslations("paywall")
   return (
     <span
@@ -62,7 +62,7 @@ function SaveBadge({ pct, solid }: { pct: number; solid: boolean }) {
         solid ? "bg-primary text-primary-foreground" : "bg-[color-mix(in_srgb,var(--primary)_16%,transparent)] text-primary",
       )}
     >
-      {t.rich("savePct", { pct, b: (chunks) => <b className="font-mono font-medium">{chunks}</b> })}
+      {t.rich("savePct", { pct: saving.pct, months: saving.freeMonths ?? 0, upTo: String(saving.upTo), b: (chunks) => <b className="font-mono font-medium">{chunks}</b> })}
     </span>
   )
 }

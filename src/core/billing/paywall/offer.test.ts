@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { TEST_PRODUCTS } from '../stripe/test-products'
-import { packOffers, perCreditUsd, perMonthUsd, tierOffers, usdFormat, yearlySavingPct, yearlySavingUsd } from './offer'
+import { packOffers, perCreditUsd, perMonthUsd, tierOffers, usdFormat, yearlySaving, yearlySavingUsd } from './offer'
 
 const offers = tierOffers(TEST_PRODUCTS)
 const offer = (tier: string) => {
@@ -19,7 +19,21 @@ describe('paywall numbers (DESIGN §4.5, all from the config)', () => {
   it('saves $47.80 / $119.80 / $475 a year; "up to" is the largest saving, rounded to a whole percent', () => {
     expect(offers.map(yearlySavingUsd)).toEqual([47.8, 119.8, 475])
     // Max: 1 − 713 / 1188 = 39.98% → 40% (DESIGN §6.9: rounded to the nearest whole percent).
-    expect(yearlySavingPct(offers)).toBe(40)
+    expect(yearlySaving(offers)).toEqual({ pct: 40, upTo: true, freeMonths: null })
+  })
+
+  // Pricing O2 (Owner 2026-11-21): every yearly price is ten monthly ones, about 16.7% off.
+  it('says "2 months free, about 17%" only when every plan gets exactly that', () => {
+    const at = (yearly: Record<string, number>) => tierOffers(TEST_PRODUCTS.map(p => p.interval === 'year' ? { ...p, priceUsd: yearly[p.tier]! } : p))
+    const monthly = Object.fromEntries(offers.map(o => [o.tier, o.monthly!.priceUsd]))
+    const o2 = at(Object.fromEntries(Object.entries(monthly).map(([tier, usd]) => [tier, Math.round(usd * 1000) / 100])))
+    expect(yearlySaving(o2)).toEqual({ pct: 17, upTo: false, freeMonths: 2 })
+    // One plan still on its old yearly price: back to "up to".
+    expect(yearlySaving(at({ ...Object.fromEntries(Object.entries(monthly).map(([t, usd]) => [t, Math.round(usd * 1000) / 100])), max: 713 }))?.upTo).toBe(true)
+    // A cent above ten months: no whole months and the plans differ a little, so "up to".
+    expect(yearlySaving(at(Object.fromEntries(Object.entries(monthly).map(([t, usd]) => [t, Math.round(usd * 1000) / 100 + 0.01]))))).toMatchObject({ upTo: true })
+    // Exactly 20% off every plan: the same saving for each, no "up to".
+    expect(yearlySaving(at(Object.fromEntries(Object.entries(monthly).map(([t, usd]) => [t, Math.round(usd * 960) / 100]))))).toEqual({ pct: 20, upTo: false, freeMonths: null })
   })
 
   it('spreads the yearly price over twelve months', () => {

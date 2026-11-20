@@ -5,9 +5,10 @@ import zh from '../messages/zh.json'
 import { site } from '../site.config'
 import { fillCredits } from './credits'
 import { homePage } from './home'
-import { perHundredCredits, plansSentence, quoteUsd, usdRange, yearlySaving } from './offer'
+import { offerFacts, perHundredCredits, plansSentence, quoteUsd, usdRange, yearlySaving } from './offer'
 import { imageToImageGenerator } from './pages/image-to-image-generator'
-import { pricingPage } from './pricing'
+import { makePricingPage, pricingPage } from './pricing'
+import { makeZhPricingPage } from './zh/pricing'
 import { zhHomePage } from './zh/home'
 
 const LIVE = { from: 1, same: false }
@@ -20,8 +21,8 @@ describe('copy with the catalog in site.config', () => {
     expect(plansSentence()).toBe(
       'Plans start at $19.90 a month for 1990 credits, or buy a one-time credit pack from $9.90.',
     )
-    // Largest yearly saving, rounded: Max 39.98% → 40 (DESIGN §6.9).
-    expect(yearlySaving).toBe(25)
+    // Revision-2 seed: Starter / Pro 20%, Max 25%, so "up to" the largest (DESIGN §6.9).
+    expect(yearlySaving).toEqual({ pct: 25, upTo: true, freeMonths: null })
   })
 
   it('fills the /pricing title, lede and credit costs from config', () => {
@@ -67,5 +68,26 @@ describe('how long a photo takes', () => {
     }
     expect(en.app.workspace.leave).toContain(`about ${n} seconds`)
     expect(zh.app.workspace.leave).toContain(`${n} 秒左右`)
+  })
+})
+
+// Pricing O2 (Owner 2026-11-21): yearly = ten monthly payments on every plan.
+describe('yearly saving under pricing O2', () => {
+  const o2 = site.billing.products.map(p => p.interval === 'year'
+    ? { ...p, priceUsd: Math.round(site.billing.products.find(m => m.tier === p.tier && m.interval === 'month')!.priceUsd * 1000) / 100 } : p)
+
+  it('says 2 months free and the real saving, never "up to"', () => {
+    expect(offerFacts(o2).yearlySaving).toEqual({ pct: 17, upTo: false, freeMonths: 2 })
+    expect(makePricingPage(o2).intro).toContain('Yearly Shotviva plans come with 2 months free, about 17% less than paying monthly.')
+    expect(makeZhPricingPage(o2).intro).toContain('年付送 2 个月，比按月付约省 17%。')
+    expect(makePricingPage(o2).intro).not.toMatch(/up to/)
+  })
+
+  it('states the member pack discounts of the listed packs, Starter at list price', () => {
+    const packs = o2.map(p => p.id === 'pack_m' || p.id === 'pack_l' ? { ...p, packMemberPayPct: { starter: 100, pro: 95, max: 90 } } : p)
+    const answer = (page: { faq: readonly { question: string; answer: string }[] }, q: RegExp) => page.faq.find(f => q.test(f.question))!.answer
+    expect(answer(makePricingPage(packs), /without a subscription/)).toContain('On medium and large packs, active Pro members save 5%, and Max members 10%.')
+    expect(answer(makeZhPricingPage(packs), /不订阅/)).toContain('中包和大包按当前会员等级享折扣，入门版原价、专业版 95 折、旗舰版 9 折。')
+    expect(answer(pricingPage, /without a subscription/)).toContain('active Starter members save 5%, Pro members 10%, and Max members 15%.')
   })
 })

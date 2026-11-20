@@ -11,6 +11,7 @@ beforeEach(() => { mocks.notify.mockClear(); mocks.catalog.mockReset().mockImple
 
 async function catalogRpc(fn: string) {
   if (fn === 'resume_catalog_checkout') return { data: null, error: null }
+  if (fn === 'read_catalog_member_rates') return { data: [], error: null }
   if (fn !== 'read_product_catalog') throw new Error('Unexpected checkout RPC ' + fn)
   const { site: current } = await import('@/site/site.config')
   const data = current.billing.products.map(p => ({

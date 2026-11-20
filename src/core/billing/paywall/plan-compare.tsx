@@ -17,7 +17,7 @@ export function PlanCompare({ offers, period }: { offers: readonly TierOffer[]; 
   const locale = useLocale()
   const products = offers.map(o => productFor(o, period))
   const facts = usePerkFacts()
-  const rows = compareRows(offers, { ...facts, memberPacks: pricingV2 }, period)
+  const rows = compareRows(offers, { ...facts, memberPacks: pricingV2 ? facts.packMemberOff : null }, period)
   return (
     <details className="group hairline-lit mt-4 rounded-media bg-card md:mt-6">
       <summary className="press flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 text-label font-semibold [&::-webkit-details-marker]:hidden">

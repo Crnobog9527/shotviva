@@ -7,6 +7,8 @@ export const terms = z.object({
   revision: z.int().positive(), usd_cents: z.int().positive(), credits: z.int().positive(),
   listed: z.boolean(), sort_order: z.int(), name_en: z.string(), name_zh: z.string(),
   benefit_en: z.string(), benefit_zh: z.string(),
+  // M / L pack member rate of this revision, starter / pro / max (migration 1610).
+  pack_member_pay_pct: z.tuple([z.int(), z.int(), z.int()]).optional(),
 })
 const status = z.enum(['draft', 'superseded', 'prepared', 'published'])
 const historyRow = z.object({
@@ -35,7 +37,9 @@ export const accountId = z.string().regex(/^acct_[A-Za-z0-9]+$/)
 export const waffoId = z.string().regex(/^PROD_[A-Za-z0-9]+$/)
 
 export function asProduct(item: Editor, value: Terms): SiteProduct {
-  const common = { id: item.product_id, credits: value.credits, priceUsd: value.usd_cents / 100 }
+  const pay = value.pack_member_pay_pct
+  const common = { id: item.product_id, credits: value.credits, priceUsd: value.usd_cents / 100,
+    ...(pay ? { packMemberPayPct: { starter: pay[0], pro: pay[1], max: pay[2] } } : {}) }
   if (item.tier === 'pack') return { ...common, tier: 'pack', interval: null, paidDays: null }
   return { ...common, tier: item.tier, interval: item.kind === 'monthly' ? 'month' : 'year', paidDays: item.kind === 'monthly' ? 30 : 365 }
 }

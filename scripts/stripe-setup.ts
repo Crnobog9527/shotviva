@@ -21,7 +21,7 @@
  */
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
-import { catalog, listedProducts } from '../src/core/billing/catalog-rows'
+import { attachMemberRates, catalog, listedProducts, memberRates } from '../src/core/billing/catalog-rows'
 import { z } from 'zod'
 
 import { configuredPricing } from '../src/core/billing/checkout-price'
@@ -68,7 +68,10 @@ async function databaseCatalog() {
   if (markerError || (marker?.value ?? 'v1') !== (site.billing.pricingVersion ?? 'v1')) throw new Error('Database and configured pricing versions differ')
   const { data, error } = await db.rpc('read_product_catalog', { p_version: marker?.value ?? 'v1' })
   if (error) throw new Error('Cannot read the published product catalog')
-  return listedProducts(catalog.parse(data))
+  // Each M / L revision has its own member rate (migration 1610); a database before it has none.
+  const rates = await db.rpc('read_catalog_member_rates')
+  if (rates.error && rates.error.code !== 'PGRST202') throw new Error('Cannot read the pack member rates')
+  return listedProducts(attachMemberRates(catalog.parse(data), rates.error ? [] : memberRates.parse(rates.data)))
 }
 
 function chunks<T>(items: readonly T[], size: number): T[][] {
