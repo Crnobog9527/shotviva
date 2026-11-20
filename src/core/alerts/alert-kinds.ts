@@ -49,6 +49,21 @@ export type DisputeClosedAlert = PaymentFacts & { kind: 'dispute_closed'; disput
 
 export type PaymentFailedAlert = PaymentFacts & { kind: 'payment_failed'; channel: AlertChannel; eventId: string; step: PaymentStep }
 
+// A payment that was granted: the good-news counterpart of payment_failed. ref is what the grant
+// itself is keyed by (Stripe checkout session or invoice id, Waffo payment id), so a redelivered
+// webhook builds the same dedupe key. renewal: a subscription's automatic charge, not a purchase.
+// method is payments.method (card, cn_card, alipay, wechat_pay).
+export type PaymentReceivedAlert = {
+  kind: 'payment_received'
+  channel: AlertChannel
+  ref: string
+  userId: string
+  productId: string
+  amount: Money
+  method: string
+  renewal: boolean
+}
+
 export type GenerationSpikeAlert = { kind: 'generation_spike'; failed: number; total: number; windowMinutes: number }
 
 // A user's new ticket, or their follow-up on one (reply). The notifier fills ticketType for a
@@ -149,6 +164,7 @@ export type OwnerAlert =
   | DisputeClosedAlert
   | DisputeDueSoonAlert
   | PaymentFailedAlert
+  | PaymentReceivedAlert
   | GenerationSpikeAlert
   | TicketAlert
   | CancelFailedAlert
@@ -181,6 +197,7 @@ const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }
   dispute_due_soon: (a) => ({ key: `dispute_due_soon:${a.disputeId}`, money: true }),
   waffo_renewal_review: (a) => ({ key: `waffo_renewal:${a.paymentId}`, money: true }),
   payment_failed: (a) => ({ key: `payment_failed:${a.channel}:${a.eventId}`, money: true }),
+  payment_received: (a) => ({ key: `payment_received:${a.channel}:${a.ref}`, money: true }),
   catalog_publish_failed: a => ({ key: `catalog_publish:${a.request}:${a.step}`, requireShared: true, money: false }),
   checkout_catalog_failed: a => ({ key: `checkout_catalog_failed:${a.code}`, cooldownMs: 60 * MINUTE, requireShared: true, money: false }),
   template_fallback: a => ({ key: `template_fallback:${a.templateId}:${a.reason}:${a.rejected}`, cooldownMs: 60 * MINUTE, requireShared: true, money: false }),

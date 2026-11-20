@@ -48,7 +48,7 @@ function faqs(products: readonly SiteProduct[]) {
     { question: '积分会过期吗？', answer: '付费积分永不过期，套餐续费时没用完的积分会继续保留。' },
     {
       question: '免费图包含什么？',
-      answer: `新用户一次性获得 ${zhFreeImages}。用免费积分生成的图公开展示并带水印；用付费积分生成的图私密、无水印，可以商用。`,
+      answer: `新用户一次性获得 ${zhFreeImages}。用免费积分生成的图公开展示并带水印，海报类作品只自己可见、同样带水印；用付费积分生成的图私密、无水印，可以商用。`,
     },
     {
       question: '不订阅能单买积分吗？',

@@ -1,3 +1,6 @@
+import { TIER_LIMITS } from '@/core/billing/tier-limits'
+import { MAX_BATCH_TEMPLATES } from '@/core/jobs/batch/limits'
+
 import { baselineOffers, planLabel, plansSentence, type OfferFacts } from '../offer'
 import { defineContentPage, type CostBills, type ShootDemo } from '@/core/content'
 
@@ -156,7 +159,7 @@ export const makeAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
     },
     {
       question: 'Can it make the whole menu?',
-      answer: `${brand} makes photos, one dish at a time, and a single promo poster. Laying out a multi-dish menu or a price list is not something it does.`,
+      answer: `${brand} makes the photos for your menu, not the menu layout. Pro takes up to ${TIER_LIMITS.pro.batchMax} dish photos in one batch and Max up to ${TIER_LIMITS.max.batchMax} results from up to ${MAX_BATCH_TEMPLATES} templates, so a 40-dish menu is two batches on Max with the same template. Poster templates take your headline, dish names and prices before they generate; the result is one finished image, not an editable design file, so place the photos in your own menu layout.`,
     },
   ],
   related: [

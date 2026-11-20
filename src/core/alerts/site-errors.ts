@@ -54,6 +54,11 @@ const EVENT_LIMIT = 1000
 
 export type ErrorWindow = { record(area: ErrorArea, nowMs: number): ErrorBreach | null }
 
+export function recordServerError(window: ErrorWindow, signal: ServerErrorSignal, nowMs: number): ErrorBreach | null {
+  const area = areaOf(signal)
+  return area ? window.record(area, nowMs) : null
+}
+
 export function createErrorWindow(): ErrorWindow {
   const events: { at: number; area: ErrorArea }[] = []
   return {

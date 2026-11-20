@@ -7,9 +7,11 @@ import { limitsFor } from '@/core/billing/tier-limits'
 import { useRouter } from '@/core/i18n'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
+import { CatalogueFormStatus } from '../catalogue/catalogue-form-status'
 import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { CatalogueSeries } from '../catalogue/catalogue-view'
 import { isCompareSample } from '../catalogue/template-sample'
+import { useCatalogueForms } from '../catalogue/use-catalogue-forms'
 import { ZoomableSample } from '../catalogue/zoomable-sample'
 import { ShareButton } from '../share/share-button'
 import { FavoriteButton } from '../favorites/favorite-button'
@@ -21,6 +23,7 @@ import { BatchLink, type CreateContext } from './create-dialog'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
 import { MemberPicker } from './member-picker'
+import { PendingCatalogueForm } from './pending-catalogue-form'
 import { memberSwitch } from './member-switch'
 import { useSubmitOnce } from './use-submit-once'
 import { useWarmRoute } from './use-warm-route'
@@ -42,7 +45,18 @@ export function SeriesCreateDialog({ series, onClose, ...context }: Props) {
 
 type BodyProps = CreateContext & { series: CatalogueSeries; open: boolean; onClose(): void }
 
-function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
+function SeriesBody(props: BodyProps) {
+  const { series, open, onClose } = props
+  // One read when the sheet opens keeps switching between the members instant.
+  const forms = useCatalogueForms(series.members)
+  const members = series.members.map(forms.fill)
+  if (members.some((member) => member.formDeferred && (member.hasDeferredSlots || member.hasDeferredGroups))) {
+    return <PendingCatalogueForm template={members[0]!} open={open} onClose={onClose} failed={forms.failed} retry={forms.retry} />
+  }
+  return <SeriesForm {...props} forms={forms} series={{ ...series, members }} />
+}
+
+function SeriesForm({ series, open, onClose, forms, ...context }: BodyProps & { forms: ReturnType<typeof useCatalogueForms> }) {
   const t = useTranslations('app')
   const router = useRouter()
   const [memberId, setMemberId] = useState(series.members[0]!.id)
@@ -85,7 +99,7 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
       picker={<MemberPicker label={t('series.members', { name: series.name, count: series.members.length })} members={series.members} value={template.id} onChange={choose} />}
       sample={<Sample template={template} tall={tall} />}
       form={<>
-        <FormWeeklyTools weekly={weekly} names={Object.fromEntries(series.members.map((member) => [member.id, member.name]))} storeFields={matchesStore(template.copyFields)} />
+        {template.formDeferred ? null : <FormWeeklyTools weekly={weekly} names={Object.fromEntries(series.members.map((member) => [member.id, member.name]))} storeFields={matchesStore(template.copyFields)} />}
         <WorkspaceForm
           key={template.id}
           template={template}
@@ -97,6 +111,7 @@ function SeriesBody({ series, open, onClose, ...context }: BodyProps) {
           onChange={draft.change}
           surface="create_dialog"
           examples={draft.fromExamples}
+          detailsStatus={template.formDeferred && <CatalogueFormStatus failed={forms.failed} retry={forms.retry} />}
           photoExtra={batch ? <BatchLink templateId={template.id} onGo={onClose} /> : null}
         />
       </>}

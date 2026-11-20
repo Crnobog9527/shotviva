@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import { useState } from 'react'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import type { PickerBrowse } from '../catalogue/picker-browse'
 import { batchCaps } from '../gated/feature-access'
 import type { CreateContext } from '../workspace/create-dialog'
 import { closeBatch, useBatchQuery } from './batch-query'
@@ -17,12 +18,12 @@ const FeatureGuide = dynamic(() => import('../gated/feature-intro').then((m) => 
 
 export const preloadBatchDialog = () => void loadDialog()
 
-type Props = { templates: readonly CatalogueTemplate[]; create: CreateContext }
+type Props = { templates: readonly CatalogueTemplate[]; browse: PickerBrowse | null; create: CreateContext }
 
 // Where Batch create lives on Create: opened by ?batch=1 (the card, a template's "Use Batch
 // create", a workspace's link, a refresh with it open). Below Pro the same address opens the
 // intro that leads to the paywall on Pro instead (the card itself never sends them here).
-export function BatchDialogSlot({ templates, create }: Props) {
+export function BatchDialogSlot({ templates, browse, create }: Props) {
   const query = useBatchQuery()
   // Once opened it stays mounted, so closing plays its motion and keeps the draft.
   const [mounted, setMounted] = useState(query.open)
@@ -37,6 +38,7 @@ export function BatchDialogSlot({ templates, create }: Props) {
       onClose={closeBatch}
       requested={query.templateIds}
       templates={templates}
+      browse={browse}
       balance={create.balance}
       tier={create.tier}
       limit={create.concurrency.limit}

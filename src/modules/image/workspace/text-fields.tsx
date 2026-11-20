@@ -7,6 +7,7 @@ import { NOTE_MAX_LENGTH } from '@/core/templates/output-options'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { isExample } from './copy-examples'
 import { CopyFieldInput, fieldClass, reveal } from './copy-field-input'
+import { stripOptionalMark } from './strip-optional-mark'
 
 // "Anything to change? (optional)" (DESIGN §4.3 step 2b): never called a prompt, ≤300 chars.
 export function NoteField({ value, placeholder, onChange }: { value: string; placeholder: string; onChange(next: string): void }) {
@@ -55,7 +56,7 @@ export function CopyFields({ fields, values, onChange, idPrefix = 'copy', exampl
         return (
           <div key={field.key}>
             <label id={`${id}-label`} htmlFor={id} className="mb-2 flex items-baseline gap-2 text-label leading-[1.3] font-medium">
-              {field.label}
+              {stripOptionalMark(field.label)}
               {field.required ? null : <span className="font-normal text-muted-foreground">{t('optional')}</span>}
             </label>
             <CopyFieldInput field={field} id={id} value={value} describedBy={describedBy} example={examples && isExample(field, value)} onChange={(next) => onChange({ ...values, [field.key]: next })} />

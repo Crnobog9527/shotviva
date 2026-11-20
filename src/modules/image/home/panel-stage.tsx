@@ -49,7 +49,7 @@ export function PanelStage({ name, after, initial, inset }: Props) {
             {tags('ai')}
           </span>
         ) : null}
-        {inset ? <StageInset key={inset.url} inset={inset} alt={inset.mine ? t('yourPhoto') : tags('beforeAlt', { name })} /> : null}
+        {inset ? <StageInset key={inset.url} inset={inset} alt={inset.mine ? t('originalPhotoAlt') : tags('beforeAlt', { name })} /> : null}
       </div>
     </div>
   )
