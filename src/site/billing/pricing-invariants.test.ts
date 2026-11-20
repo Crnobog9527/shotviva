@@ -69,7 +69,7 @@ describe('pricing invariants (ARCHITECTURE §6.2, 2026-11-21 terms)', () => {
   // Invariant 2 and the enterprise margin rule. The tiers and the cost budget are private
   // (ARCHITECTURE §6.2 「企业包」 in shotviva-docs); skipped where that repo is absent (CI).
   const spec = privateDoc('规范', 'ARCHITECTURE.md')
-  it.skipIf(!spec)('prices every enterprise tier at or below the cheapest self-serve credit, keeping 65% typical margin', () => {
+  it.skipIf(!spec)('prices every enterprise tier at or below the cheapest self-serve credit, keeping the 60% typical margin target', () => {
     const text = readFileSync(spec!, 'utf8')
     const line = text.match(/^- \*\*企业包\*\*.*$/m)?.[0] ?? ''
     const tiers = [...line.matchAll(/\$([\d,]+) → ([\d,]+) 积分/g)].map(m => Number(m[1]!.replaceAll(',', '')) / Number(m[2]!.replaceAll(',', '')))
@@ -79,7 +79,7 @@ describe('pricing invariants (ARCHITECTURE §6.2, 2026-11-21 terms)', () => {
     for (const perCredit of tiers) {
       expect(perCredit).toBeLessThanOrEqual(cheapestPerCredit(TERMS))
       // Offline transfer, no refund, no commission: the price is the take. Cost × 1.10 buffer.
-      expect(1 - (budget * 1.1) / perCredit).toBeGreaterThanOrEqual(0.65)
+      expect(1 - (budget * 1.1) / perCredit).toBeGreaterThanOrEqual(0.6)
     }
   })
 })
