@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildReview, commentableLines } from './claude-review-post.mjs'
-import { claudeReviews, codexState, combineStates, judge, parseClaudeMarker, parseReviewState, tagThreads } from './codex-findings.mjs'
+import {
+  claudeReviews,
+  claudeThreadReviewIds,
+  codexState,
+  combineStates,
+  fullState,
+  judge,
+  latestCommit,
+  parseClaudeMarker,
+  parseClaudeReviewer,
+  parseReviewState,
+  tagThreads,
+} from './codex-findings.mjs'
 import { isServerAction, reviewRisk } from './review-risk.mjs'
 
 // Codex reviews by risk (.github/workflows/codex-review.yml).
@@ -133,7 +145,7 @@ describe('claude reviews in the Codex findings check', () => {
   })
 
   it("accepts a COMMENTED or APPROVED review from the owner's user account", () => {
-    expect(accept([review()])).toEqual([{ id: 7, commit: SHA_A }])
+    expect(accept([review()])).toEqual([{ id: 7, commit: SHA_A, reviewer: null }])
     expect(accept([review({ state: 'APPROVED' })])).toHaveLength(1)
   })
 
@@ -215,7 +227,7 @@ describe('claude reviews in the Codex findings check', () => {
 describe('claude-review-post', () => {
   const patch = '@@ -1,3 +1,4 @@\n line1\n-old\n+new2\n+new3\n line4\n@@ -10,2 +11,2 @@\n ctx11\n+add12'
   it('knows which lines can carry a comment', () => {
-    expect([...commentableLines(patch)]).toEqual([1, 2, 3, 4, 11, 12])
+    expect([...commentableLines(patch)]).toEqual([[1, 0], [2, 0], [3, 0], [4, 0], [11, 1], [12, 1]])
     expect(commentableLines(undefined).size).toBe(0)
   })
 
@@ -223,6 +235,7 @@ describe('claude-review-post', () => {
     const { payload, outside } = buildReview(
       {
         commit: SHA_A,
+        reviewer: 'control/reviewer-1',
         summary: 'Looks right.',
         findings: [
           { path: 'src/a.ts', line: 3, start_line: 2, severity: 'P1', title: 'Charge runs twice', body: 'No idempotency key.' },
@@ -242,7 +255,112 @@ describe('claude-review-post', () => {
   })
 
   it('refuses a short sha or a finding without a line', () => {
-    expect(() => buildReview({ commit: 'abc1234', summary: '' }, [])).toThrow('full 40-character sha')
-    expect(() => buildReview({ commit: SHA_A, summary: '', findings: [{ path: 'a', title: 't' }] as never }, [])).toThrow('path, line and title')
+    expect(() => buildReview({ commit: 'abc1234', reviewer: 'r', summary: '' }, [])).toThrow('full 40-character sha')
+    expect(() => buildReview({ commit: SHA_A, reviewer: 'r', summary: '', findings: [{ path: 'a', title: 't' }] as never }, [])).toThrow(
+      'path, line and title',
+    )
+    expect(() => buildReview({ commit: SHA_A, reviewer: '', summary: '' }, [])).toThrow('reviewer must name')
+    expect(() => buildReview({ commit: SHA_A, reviewer: 'a b -->', summary: '' }, [])).toThrow('reviewer must name')
+  })
+
+  it('records the reviewer in the marker', () => {
+    const { payload } = buildReview({ commit: SHA_A, reviewer: 'control/reviewer-1', summary: 'ok' }, [])
+    expect(parseClaudeReviewer(payload.body)).toBe('control/reviewer-1')
+    expect(parseClaudeMarker(payload.body)).toBe(SHA_A)
+  })
+
+  it('drops a start_line in another hunk instead of sending a range GitHub rejects', () => {
+    const { payload } = buildReview(
+      { commit: SHA_A, reviewer: 'r', summary: '', findings: [{ path: 'src/a.ts', line: 12, start_line: 3, title: 'Spans hunks' }] },
+      [{ filename: 'src/a.ts', patch }],
+    )
+    expect(payload.comments).toEqual([expect.objectContaining({ line: 12 })])
+    expect(payload.comments[0]).not.toHaveProperty('start_line')
+  })
+
+  it('refuses P0/P1 findings outside the diff unless allowed', () => {
+    const input = { commit: SHA_A, reviewer: 'r', summary: '', findings: [{ path: 'src/a.ts', line: 40, severity: 'P1', title: 'Refund twice' }] }
+    expect(() => buildReview(input, [{ filename: 'src/a.ts', patch }])).toThrow('would not block the check: src/a.ts:40')
+    expect(buildReview(input, [{ filename: 'src/a.ts', patch }], { allowOutside: true }).outside).toHaveLength(1)
+  })
+
+  it("places a non-head commit's lines against that commit's own diff", () => {
+    // The caller passes compare(base...commit) files for a non-head commit; line 3 exists there only.
+    const own = [{ filename: 'src/a.ts', patch: '@@ -1,1 +1,3 @@\n a\n+b\n+c' }]
+    const head = [{ filename: 'src/a.ts', patch: '@@ -1,1 +1,1 @@\n a' }]
+    const finding = { path: 'src/a.ts', line: 3, title: 'On the old commit' }
+    expect(buildReview({ commit: SHA_A, reviewer: 'r', findings: [finding] }, own).payload.comments).toHaveLength(1)
+    expect(buildReview({ commit: SHA_A, reviewer: 'r', findings: [finding] }, head).payload.comments).toHaveLength(0)
+  })
+})
+
+describe('claude review edge cases', () => {
+  it('matches the owner login case-insensitively and reads the optional reviewer', () => {
+    const body = `<!-- claude-review:v1 commit=${SHA_A} reviewer=control/r1 -->`
+    expect(accept([review({ user: { login: 'crnobog9527', type: 'User' }, body })])).toEqual([{ id: 7, commit: SHA_A, reviewer: 'control/r1' }])
+    expect(accept([review()])[0].reviewer).toBeNull()
+  })
+
+  it('keeps blocking on threads of a Claude review whose commit left the PR (force-push, 250-commit cap)', () => {
+    const gone = 'd'.repeat(40)
+    const reviews = [review({ id: 11, commit_id: gone, body: `<!-- claude-review:v1 commit=${gone} -->` }), review({ id: 12, user: { login: 'x', type: 'User' } })]
+    expect(accept(reviews)).toEqual([])
+    const ids = claudeThreadReviewIds(reviews as never, { repoOwner: 'Crnobog9527' })
+    expect([...ids]).toEqual([11])
+    const raw = [{ ...thread({}), comments: { nodes: [{ author: { login: 'Crnobog9527' }, url: 'c', body: '**<sub>P1</sub> Still open**', pullRequestReview: { databaseId: 11 } }] } }]
+    const result = judge({ risk: 'high', reviewThreads: tagThreads(raw, ids), state: claudeOn(SHA_B) })
+    expect(result.ok).toBe(false)
+    expect(result.lines[0]).toContain('Unresolved Claude finding: P1 Still open')
+  })
+
+  it('clears a failed Codex review only with a Claude review of that commit or later', () => {
+    const failedOnB = { completed: false, running: false, failed: true, failedCommit: SHA_B, commit: null }
+    expect(combineStates(failedOnB, { completed: true, commit: SHA_A }, prCommits).failed).toBe(true)
+    expect(judge({ risk: 'high', reviewThreads: [], state: combineStates(failedOnB, { completed: true, commit: SHA_A }, prCommits) }).ok).toBe(false)
+    expect(combineStates(failedOnB, { completed: true, commit: SHA_B }, prCommits).failed).toBe(false)
+    const failedOnA = { ...failedOnB, failedCommit: SHA_A }
+    expect(combineStates(failedOnA, { completed: true, commit: SHA_B }, prCommits).failed).toBe(false)
+    expect(combineStates(failedOnA, { completed: false, commit: null }, prCommits).failed).toBe(true)
+  })
+
+  it('ranks short and unknown shas in latestCommit', () => {
+    expect(latestCommit([SHA_A.slice(0, 7), SHA_B.slice(0, 8)], prCommits)).toBe(SHA_B.slice(0, 8))
+    expect(latestCommit(['e'.repeat(40), SHA_A], prCommits)).toBe(SHA_A)
+    expect(latestCommit([SHA_A, 'e'.repeat(40)], prCommits)).toBe(SHA_A)
+    expect(latestCommit([null, undefined], prCommits)).toBeNull()
+  })
+
+  it('tags by who opened the thread, not who replied', () => {
+    const claudeOpened = {
+      ...thread({}),
+      comments: { nodes: [{ author: { login: 'Crnobog9527' }, url: 'c', body: 'Claude finding', pullRequestReview: { databaseId: 7 } }] },
+    }
+    // Owner replying in a Codex thread: first comment is still Codex's.
+    const codexOpened = thread({})
+    // Owner's plain (unmarked) review comment: not tagged at all.
+    const plain = { ...thread({}), comments: { nodes: [{ author: { login: 'Crnobog9527' }, url: 'p', body: 'note', pullRequestReview: { databaseId: 99 } }] } }
+    expect(tagThreads([claudeOpened, codexOpened, plain], new Set([7])).map((t) => t.by)).toEqual(['Claude', 'Codex'])
+  })
+
+  it('wires fullState: owner from REPO, the PR commit list, Codex comments and reviews', async () => {
+    const seen: string[] = []
+    const data: Record<string, unknown[]> = {
+      '/repos/Crnobog9527/shotviva/pulls/5/reviews': [
+        review({ id: 1, commit_id: SHA_A, body: `<!-- claude-review:v1 commit=${SHA_A} reviewer=r1 -->` }),
+        review({ id: 2, user: { login: 'other', type: 'User' }, commit_id: SHA_B, body: `<!-- claude-review:v1 commit=${SHA_B} -->` }),
+      ],
+      '/repos/Crnobog9527/shotviva/pulls/5/commits': prCommits.map((sha) => ({ sha })),
+      '/repos/Crnobog9527/shotviva/issues/5/comments': [
+        { user: { login: 'chatgpt-codex-connector[bot]' }, body: `<!-- codex-review-state:v1 {"code_review":{"commit_sha":"${SHA_A}","status":"failed"}} -->` },
+      ],
+    }
+    const list = async (path: string) => {
+      seen.push(path)
+      return data[path] ?? []
+    }
+    const { state, claudeReviewIds } = await fullState({ repo: 'Crnobog9527/shotviva', pr: '5', list })
+    expect(seen.sort()).toEqual(Object.keys(data).sort())
+    expect(state).toMatchObject({ completed: true, failed: false, commit: SHA_A, reviewers: ['Claude'], claudeReviewers: ['r1'] })
+    expect([...claudeReviewIds]).toEqual([1])
   })
 })
