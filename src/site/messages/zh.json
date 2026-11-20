@@ -2387,6 +2387,20 @@
     "missingText": "它可能已经下架或改动过。去首页看看其他模板吧。",
     "missingBrowse": "去看看其他模板"
   },
+  "blog": {
+    "footerLink": "博客",
+    "listTitle": "博客",
+    "listIntro": "Shotviva 团队写的 AI 餐饮图、商品图和菜单设计指南与工具对比。",
+    "listEmpty": "还没有文章，过几天再来看看。",
+    "metaTitle": "Shotviva 博客：餐厅和商家的 AI 出图指南",
+    "metaDescription": "AI 餐饮图、商品图和菜单设计的指南与工具对比，给餐厅、酒店和网店商家看。",
+    "by": "作者",
+    "published": "发布于",
+    "updated": "更新于",
+    "contents": "本页目录",
+    "home": "首页",
+    "crumb": "博客"
+  },
   "supportEmail": {
     "subject": "Shotviva 客服回复了你的工单",
     "title": "你的工单有新回复",

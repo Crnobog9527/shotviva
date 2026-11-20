@@ -70,6 +70,11 @@ export const site = defineSite({
       '/connect/graylum/authorize',
       // The checkout return page (T43, noindex like every app page).
       '/checkout',
+      // The blog (ARCHITECTURE §12.6): each post exists in the languages it was written in; a
+      // /zh address without a Chinese post is a 404. Not in zhIndexablePaths: the blog decides
+      // its own indexing per post (core/blog/seo.ts).
+      '/blog',
+      '/blog/[slug]',
       // The public gallery (T108), noindex in Chinese like the other inner pages.
       '/gallery',
       '/g/[jobId]',

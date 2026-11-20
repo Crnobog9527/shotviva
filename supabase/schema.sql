@@ -2182,6 +2182,20 @@ $$;
 ALTER FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."require_blog_admin"("p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO ''
+    AS $$
+begin
+  if not exists (select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'ADMIN_REQUIRED' using errcode = '42501';
+  end if;
+end $$;
+
+
+ALTER FUNCTION "admin"."require_blog_admin"("p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."require_catalog_policy"() RETURNS "void"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -5182,6 +5196,71 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_blog_save"("p_actor" "uuid", "p_id" "uuid", "p_locale" "text", "p_slug" "text", "p_title" "text", "p_description" "text", "p_body_md" "text", "p_cover_url" "text", "p_cover_alt" "text", "p_author_name" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id uuid;
+  v_status text;
+begin
+  perform admin.require_blog_admin(p_actor);
+  if p_id is null then
+    insert into public.blog_posts (locale, slug, title, description, body_md, cover_url, cover_alt, author_name, created_by)
+    values (p_locale, p_slug, p_title, p_description, p_body_md, p_cover_url, p_cover_alt, p_author_name, p_actor)
+    returning id, status into v_id, v_status;
+  else
+    update public.blog_posts
+       set locale = p_locale, slug = p_slug, title = p_title, description = p_description, body_md = p_body_md,
+           cover_url = p_cover_url, cover_alt = p_cover_alt, author_name = p_author_name
+     where id = p_id and (status <> 'published' or locale = p_locale)
+    returning id, status into v_id, v_status;
+    if v_id is null then
+      -- A live post stays in its language: moving it would leave the footer link of both
+      -- languages stale. Take it down first.
+      if exists (select 1 from public.blog_posts where id = p_id) then raise exception 'BLOG_POST_LOCALE_LOCKED'; end if;
+      raise exception 'BLOG_POST_NOT_FOUND';
+    end if;
+  end if;
+  -- A published post keeps a body: the same rule as publishing, so saving cannot empty a live page.
+  if v_status = 'published' and char_length(btrim(p_body_md, E' \n\r\t')) = 0 then raise exception 'BLOG_POST_EMPTY'; end if;
+  insert into public.admin_audit_log (action, user_id, target_id, reason)
+  values ('blog_save', p_actor, v_id::text, format('%s/%s', p_locale, p_slug));
+  return jsonb_build_object('id', v_id, 'status', v_status);
+end $$;
+
+
+ALTER FUNCTION "public"."admin_blog_save"("p_actor" "uuid", "p_id" "uuid", "p_locale" "text", "p_slug" "text", "p_title" "text", "p_description" "text", "p_body_md" "text", "p_cover_url" "text", "p_cover_alt" "text", "p_author_name" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_blog_set_status"("p_actor" "uuid", "p_id" "uuid", "p_publish" boolean) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_row public.blog_posts;
+begin
+  perform admin.require_blog_admin(p_actor);
+  if p_publish is null then raise exception 'INVALID_INPUT'; end if;
+  select * into v_row from public.blog_posts where id = p_id for update;
+  if not found then raise exception 'BLOG_POST_NOT_FOUND'; end if;
+  if p_publish and char_length(btrim(v_row.body_md, E' \n\r\t')) = 0 then raise exception 'BLOG_POST_EMPTY'; end if;
+  if (v_row.status = 'published') is distinct from p_publish then
+    update public.blog_posts
+       set status = case when p_publish then 'published' else 'draft' end,
+           published_at = case when p_publish then coalesce(published_at, now()) else published_at end
+     where id = p_id;
+    insert into public.admin_audit_log (action, user_id, target_id, reason)
+    values (case when p_publish then 'blog_publish' else 'blog_unpublish' end, p_actor, p_id::text,
+            format('%s/%s', v_row.locale, v_row.slug));
+  end if;
+  return jsonb_build_object('locale', v_row.locale, 'slug', v_row.slug);
+end $$;
+
+
+ALTER FUNCTION "public"."admin_blog_set_status"("p_actor" "uuid", "p_id" "uuid", "p_publish" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_bulk_assign_templates"("p_ids" "text"[], "p_patch" "jsonb", "p_floor" "jsonb", "p_actor" "uuid", "p_locales" "text"[]) RETURNS "jsonb"
@@ -15888,7 +15967,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -16147,6 +16226,38 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_settlement_runs" (
 
 
 ALTER TABLE "public"."affiliate_settlement_runs" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."blog_posts" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "locale" "text" NOT NULL,
+    "slug" "text" NOT NULL,
+    "title" "text" NOT NULL,
+    "description" "text" NOT NULL,
+    "body_md" "text" DEFAULT ''::"text" NOT NULL,
+    "cover_url" "text",
+    "cover_alt" "text",
+    "author_name" "text" NOT NULL,
+    "status" "text" DEFAULT 'draft'::"text" NOT NULL,
+    "published_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_by" "uuid",
+    CONSTRAINT "blog_posts_author_name_check" CHECK ((("char_length"("author_name") >= 1) AND ("char_length"("author_name") <= 80))),
+    CONSTRAINT "blog_posts_body_md_check" CHECK (("char_length"("body_md") <= 200000)),
+    CONSTRAINT "blog_posts_cover_alt_check" CHECK ((("cover_alt" IS NULL) OR (("char_length"("cover_alt") >= 1) AND ("char_length"("cover_alt") <= 200)))),
+    CONSTRAINT "blog_posts_cover_alt_required" CHECK ((("cover_url" IS NULL) OR ("cover_alt" IS NOT NULL))),
+    CONSTRAINT "blog_posts_cover_url_check" CHECK ((("cover_url" IS NULL) OR (("char_length"("cover_url") <= 500) AND ("cover_url" ~ '^https://[^\s/?#@]+/\S*$'::"text")))),
+    CONSTRAINT "blog_posts_description_check" CHECK ((("char_length"("description") >= 1) AND ("char_length"("description") <= 320))),
+    CONSTRAINT "blog_posts_locale_check" CHECK (("locale" = ANY (ARRAY['en'::"text", 'zh'::"text"]))),
+    CONSTRAINT "blog_posts_published_has_date" CHECK ((("status" <> 'published'::"text") OR ("published_at" IS NOT NULL))),
+    CONSTRAINT "blog_posts_slug_check" CHECK ((("char_length"("slug") <= 100) AND ("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::"text"))),
+    CONSTRAINT "blog_posts_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'published'::"text"]))),
+    CONSTRAINT "blog_posts_title_check" CHECK ((("char_length"("title") >= 1) AND ("char_length"("title") <= 160)))
+);
+
+
+ALTER TABLE "public"."blog_posts" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."business_inquiries" (
@@ -17317,6 +17428,16 @@ ALTER TABLE ONLY "public"."ai_providers"
 
 
 
+ALTER TABLE ONLY "public"."blog_posts"
+    ADD CONSTRAINT "blog_posts_locale_slug_key" UNIQUE ("locale", "slug");
+
+
+
+ALTER TABLE ONLY "public"."blog_posts"
+    ADD CONSTRAINT "blog_posts_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."business_inquiries"
     ADD CONSTRAINT "business_inquiries_pkey" PRIMARY KEY ("id");
 
@@ -17918,6 +18039,14 @@ CREATE UNIQUE INDEX "ai_providers_one_active_per_module" ON "public"."ai_provide
 
 
 
+CREATE INDEX "blog_posts_created_idx" ON "public"."blog_posts" USING "btree" ("created_at" DESC, "id" DESC);
+
+
+
+CREATE INDEX "blog_posts_published_idx" ON "public"."blog_posts" USING "btree" ("locale", "published_at" DESC, "id" DESC) WHERE ("status" = 'published'::"text");
+
+
+
 CREATE INDEX "business_inquiries_created_at_idx" ON "public"."business_inquiries" USING "btree" ("created_at" DESC, "id" DESC);
 
 
@@ -18478,6 +18607,10 @@ CREATE OR REPLACE TRIGGER "archive_template_prompt_version" AFTER INSERT OR UPDA
 
 
 
+CREATE OR REPLACE TRIGGER "blog_posts_set_updated_at" BEFORE UPDATE ON "public"."blog_posts" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
 CREATE OR REPLACE TRIGGER "catalog_validate_discount" BEFORE INSERT OR UPDATE ON "public"."codes" FOR EACH ROW EXECUTE FUNCTION "admin"."catalog_validate_code_write"();
 
 
@@ -18920,6 +19053,11 @@ ALTER TABLE ONLY "public"."affiliates"
 
 ALTER TABLE ONLY "public"."ai_providers"
     ADD CONSTRAINT "ai_providers_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."blog_posts"
+    ADD CONSTRAINT "blog_posts_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
 
 
@@ -19545,6 +19683,13 @@ ALTER TABLE "public"."affiliates" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."ai_providers" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."blog_posts" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "blog_posts_read_published" ON "public"."blog_posts" FOR SELECT TO "authenticated", "anon" USING (("status" = 'published'::"text"));
+
 
 
 ALTER TABLE "public"."business_inquiries" ENABLE ROW LEVEL SECURITY;
@@ -20199,6 +20344,10 @@ REVOKE ALL ON FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid
 
 
 
+REVOKE ALL ON FUNCTION "admin"."require_blog_admin"("p_actor" "uuid") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "admin"."require_catalog_policy"() FROM PUBLIC;
 
 
@@ -20710,6 +20859,16 @@ GRANT ALL ON FUNCTION "public"."admin_begin_prompt_lab_reverse"("p_actor" "uuid"
 
 REVOKE ALL ON FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_begin_test_run"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text", "p_kind" "text", "p_parent_id" "uuid", "p_photo_id" "uuid", "p_batch_id" "uuid", "p_resolution" "text", "p_inputs" "jsonb", "p_prompt_version" integer, "p_provider" "text", "p_estimate_usd" numeric) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_blog_save"("p_actor" "uuid", "p_id" "uuid", "p_locale" "text", "p_slug" "text", "p_title" "text", "p_description" "text", "p_body_md" "text", "p_cover_url" "text", "p_cover_alt" "text", "p_author_name" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_blog_save"("p_actor" "uuid", "p_id" "uuid", "p_locale" "text", "p_slug" "text", "p_title" "text", "p_description" "text", "p_body_md" "text", "p_cover_url" "text", "p_cover_alt" "text", "p_author_name" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_blog_set_status"("p_actor" "uuid", "p_id" "uuid", "p_publish" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_blog_set_status"("p_actor" "uuid", "p_id" "uuid", "p_publish" boolean) TO "service_role";
 
 
 
@@ -22265,6 +22424,75 @@ GRANT SELECT ON TABLE "public"."affiliate_settings" TO "service_role";
 
 
 GRANT SELECT ON TABLE "public"."affiliate_settlement_runs" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."blog_posts" TO "service_role";
+
+
+
+GRANT SELECT("id") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("id") ON TABLE "public"."blog_posts" TO "authenticated";
+
+
+
+GRANT SELECT("locale") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("locale") ON TABLE "public"."blog_posts" TO "authenticated";
+
+
+
+GRANT SELECT("slug") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("slug") ON TABLE "public"."blog_posts" TO "authenticated";
+
+
+
+GRANT SELECT("title") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("title") ON TABLE "public"."blog_posts" TO "authenticated";
+
+
+
+GRANT SELECT("description") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("description") ON TABLE "public"."blog_posts" TO "authenticated";
+
+
+
+GRANT SELECT("body_md") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("body_md") ON TABLE "public"."blog_posts" TO "authenticated";
+
+
+
+GRANT SELECT("cover_url") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("cover_url") ON TABLE "public"."blog_posts" TO "authenticated";
+
+
+
+GRANT SELECT("cover_alt") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("cover_alt") ON TABLE "public"."blog_posts" TO "authenticated";
+
+
+
+GRANT SELECT("author_name") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("author_name") ON TABLE "public"."blog_posts" TO "authenticated";
+
+
+
+GRANT SELECT("status") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("status") ON TABLE "public"."blog_posts" TO "authenticated";
+
+
+
+GRANT SELECT("published_at") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("published_at") ON TABLE "public"."blog_posts" TO "authenticated";
+
+
+
+GRANT SELECT("created_at") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("created_at") ON TABLE "public"."blog_posts" TO "authenticated";
+
+
+
+GRANT SELECT("updated_at") ON TABLE "public"."blog_posts" TO "anon";
+GRANT SELECT("updated_at") ON TABLE "public"."blog_posts" TO "authenticated";
 
 
 
