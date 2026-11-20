@@ -80,13 +80,16 @@ describe('home FAQ, English (建站规格 G6)', () => {
     expect(planFrom).toBeDefined()
     expect(hundredCreditsFrom).toBe(perHundredCredits('max_yearly'))
     expect(byLetter(faq, 'A').answer).toContain(tierList)
-    expect(byLetter(faq, 'G').answer).toContain(`PNG in 3 sizes: ${tierPixels}`)
+    expect(byLetter(faq, 'G').answer).toContain(`3 sizes: ${tierPixels} for a square photo`)
     expect(byLetter(faq, 'I').answer).toContain(freeImagesLabel)
   })
 
-  it('promises only what exists: no JPG export, no sizes we do not make, no home-screen install', () => {
+  // Formats as job-file.ts serves them: paid full-size PNG, free watermarked JPG, cut-outs also a
+  // white-background JPG (SEO audit 2026-11-17 P0-05).
+  it('promises only what exists: the real file formats, no sizes we do not make, no home-screen install', () => {
     const text = faq.map((item) => item.answer).join(' ')
-    expect(byLetter(faq, 'G').answer).not.toMatch(/JPG|1080/)
+    expect(byLetter(faq, 'G').answer).toMatch(/full-size PNG.*watermarked JPG.*white-background JPG/)
+    expect(byLetter(faq, 'G').answer).not.toMatch(/1080|every photo as a PNG/)
     expect(text).not.toMatch(/home screen|gallery wall|showcase|portion/i)
     expect(byLetter(faq, 'E').answer).toMatch(/not private/)
   })
@@ -163,7 +166,8 @@ describe('home FAQ, Chinese (建站规格 G6, G13)', () => {
     expect(byLetter(faq, 'B').answer).toContain('生成按钮上会显示')
     expect(byLetter(faq, 'B').answer).not.toContain(zhFromCredits)
     expect(byLetter(faq, 'B').answer).toContain(`付费套餐每月 ${usd(planFrom?.priceUsd ?? 0)} 起`)
-    expect(byLetter(faq, 'G').answer).toContain(`PNG，分 3 档：${zhTierPixels}`)
+    expect(byLetter(faq, 'G').answer).toContain(`分 3 档导出，方图边长 ${zhTierPixels}`)
+    expect(byLetter(faq, 'G').answer).toMatch(/PNG.*JPG.*白底 JPG/)
     expect(byLetter(faq, 'D').table?.rows).toHaveLength(4)
     expect(byLetter(faq, 'D').link?.href).toBe('/image-to-image-generator')
     expect(byLetter(faq, 'F').link?.href).toBe('/image-to-image-generator')

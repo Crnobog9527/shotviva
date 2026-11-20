@@ -69,7 +69,7 @@ function catalogBills({ products }: OfferFacts): CostBills {
       lines: [
         { label: plan ? `Pro plan, ${plan.credits.toLocaleString('en-US')} credits a month` : 'Pro plan', value: price },
         { label: 'Photos per upload', value: `Pro up to ${pro.batchMax}, Max up to ${max.batchMax}` },
-        { label: 'Each result', value: 'Transparent PNG or white background' },
+        { label: 'Each result', value: 'Transparent PNG or white-background JPG' },
       ],
       fine: `Upload a folder of phone photos at once on Pro (${pro.batchMax}) or Max (${max.batchMax}); every product comes back cut out, no watermark, private and cleared for commercial use.`,
     },
@@ -99,11 +99,11 @@ const copy = {
     },
     {
       label: `Etsy and Shopify: ${px(etsy.minPx)} px and Up`,
-      value: `Etsy asks for photos at least ${px(etsy.minPx)} px wide and tall; Shopify says ${px(shopify.squarePx)} × ${px(shopify.squarePx)} px usually displays best for square images. ${brand} exports ${tierPixels} on the long side.`,
+      value: `Etsy asks for photos at least ${px(etsy.minPx)} px wide and tall; Shopify says ${px(shopify.squarePx)} × ${px(shopify.squarePx)} px usually displays best for square images. ${brand} exports ${tierPixels} for a square photo.`,
     },
     {
       label: 'Transparent PNG or Pure White, From One Photo',
-      value: `${brand} exports every cut-out as a PNG with a transparent background, in ${sizeCountWord} sizes; the white-background version is the same cut-out on pure white. Upload ${uploadLimits}.`,
+      value: `${brand} exports every cut-out as a PNG with a transparent background, in ${sizeCountWord} sizes; the white-background version is the same cut-out on pure white, as a JPG. Upload ${uploadLimits}.`,
     },
   ],
   headings: {
@@ -146,7 +146,7 @@ export const makeTransparentBackground = (offers: OfferFacts) => defineContentPa
     },
     {
       question: 'Can I change the background to white instead of transparent?',
-      answer: `${brand} gives every cut-out both ways: the transparent PNG, and the same cut-out on pure white for marketplace main images. One generation, two downloads.`,
+      answer: `${brand} gives every cut-out both ways: the transparent PNG, and the same cut-out on pure white as a JPG for marketplace main images. One generation, two downloads.`,
     },
     {
       question: 'Can I use the transparent PNG commercially?',
@@ -154,7 +154,7 @@ export const makeTransparentBackground = (offers: OfferFacts) => defineContentPa
     },
     {
       question: 'What sizes does the PNG come in?',
-      answer: `${brand} exports ${tierPixels} on the long side, in ${sizeCountWord} aspect ratios from a square listing to a 9:16 story. For Amazon zoom, anything over ${px(amazon.zoomPx)} px works.`,
+      answer: `${brand} exports ${tierPixels} for a square photo, in ${sizeCountWord} aspect ratios from a square listing to a 9:16 story. For Amazon zoom, anything over ${px(amazon.zoomPx)} px works.`,
     },
     {
       question: 'Does it keep fine detail like hair and fabric edges?',
