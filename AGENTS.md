@@ -14,10 +14,14 @@ task briefs say `规范/…`, `seo资料/…` or `docs/…`, read that path insi
 
 ## Review guidelines
 
-For Codex reviews on GitHub (and any reviewer). Codex reviews high-risk PRs automatically and
-others when someone comments `@codex review` (`.github/workflows/codex-review.yml`); an unresolved
-Codex thread on current code fails the "Codex findings" check until it is fixed or answered and
-resolved.
+For Codex and Claude reviews on GitHub (and any reviewer). Codex reviews high-risk PRs
+automatically and others when someone comments `@codex review` (`.github/workflows/codex-review.yml`).
+While Codex is unavailable, Claude reviews instead and publishes the result with
+`REPO=Crnobog9527/shotviva PR=<n> node scripts/ci/claude-review-post.mjs findings.json` (add
+`--dry-run` to preview); the "Codex findings" check accepts it only as a PR review by the repository
+owner's account carrying `<!-- claude-review:v1 commit=<sha> -->`. An unresolved Codex or Claude
+thread on current code fails the check until it is fixed or answered and resolved. The list below
+applies to both reviewers.
 
 - Report as P0/P1 anything that can lose or create money or credits: a charge, grant, refund or
   clawback that can run twice or not at all (missing idempotency key, retry, race between two
