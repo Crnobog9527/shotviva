@@ -2100,7 +2100,7 @@
     "totalCommission": "Total commission",
     "amount": "Amount (USD)",
     "statementAmount": "Original amount (USD)",
-    "amountPaid": "Amount paid (USD)",
+    "amountPaid": "Amount paid before fees (USD)",
     "paidDate": "Payment date (UTC)",
     "recruit": "Team invitation link",
     "members": "Team members",
@@ -2303,7 +2303,25 @@
     "recruitHint": "People who apply through this link join your team once approved.",
     "payoutTitle": "Payout details",
     "payoutIntro": "We pay confirmed earnings with this method on the monthly settlement date.",
-    "programName": "Affiliate program"
+    "programName": "Affiliate program",
+    "feeAmount": "Payout fees (USD)",
+    "netAmount": "Net payout (USD)",
+    "estimated": "{amount} (est.)",
+    "fees": {
+      "title": "Payout fees",
+      "intro": "These fees are deducted from each payout before we send it. Each fee is calculated on the payout amount before fees. The {threshold} payout threshold applies to your balance before fees.",
+      "none": "No payout fees are deducted at the moment.",
+      "allMethods": "All payout methods",
+      "onlyMethods": "Only for {methods}",
+      "min": "min {amount}",
+      "max": "max {amount}",
+      "estimateTitle": "If your current balance of {balance} were paid out today",
+      "totalFees": "Fees",
+      "net": "Estimated net payout",
+      "estimateNote": "This is an estimate for your current payout method. The final amount is set when the statement is paid, using the fees in force on its settlement date and the amount payable then. Fees never exceed the payout.",
+      "estimateNoMethod": "Add a payout method to see the fees that apply to it. Fees that only apply to some payout methods are not included in this estimate yet.",
+      "breakdown": "Fee details"
+    }
   },
   "gallery": {
     "meta": {

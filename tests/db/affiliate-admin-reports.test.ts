@@ -94,6 +94,6 @@ it('exports actual paid cents separately from the generated amount and preserves
   const api = serviceSupabase()
   const csvForPeriod = async (period: string) =>
     (await exportCsv(api, { tab: 'payouts', affiliate: owner, period })).text()
-  expect(await csvForPeriod('2001-01-01')).toContain('"16.45","","1.49","14.96","已付款"')
-  expect(await csvForPeriod('2001-02-01')).toContain('"5.47","","0.00","5.47","已付款"')
+  expect(await csvForPeriod('2001-01-01')).toContain('"16.45","","1.49","14.96","0.00","14.96","","已付款"')
+  expect(await csvForPeriod('2001-02-01')).toContain('"5.47","","0.00","5.47","0.00","5.47","","已付款"')
 })

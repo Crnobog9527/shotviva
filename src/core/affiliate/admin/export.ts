@@ -2,7 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { commissions, payouts, type Commission, type Payout } from './read'
 import { COPY, STATUS, commissionStatus } from './copy'
-import { payoutAmountHeaders, payoutAmounts } from './payout-amounts'
+import { feeLineTexts, payoutAmountHeaders, payoutAmounts } from './payout-amounts'
 import type { Filters } from './query'
 
 function cell(value: string | number) {
@@ -32,6 +32,7 @@ const payoutHeaders = [
   COPY.date,
   COPY.affiliateId,
   ...payoutAmountHeaders,
+  COPY.feeDetails,
   COPY.status,
   COPY.payoutMethod,
   COPY.payoutDetails,
@@ -66,6 +67,7 @@ function payoutCells(r: Payout) {
     r.created_at,
     r.affiliate_user_id,
     ...payoutAmounts(r, cents, ''),
+    feeLineTexts(r, cents).join('；'),
     STATUS[r.status] ?? r.status,
     STATUS[method] ?? method,
     String(s.payout_details ?? ''),
