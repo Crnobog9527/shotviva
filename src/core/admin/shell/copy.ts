@@ -25,6 +25,7 @@ export const SHELL_COPY = {
     requests: '需求审核',
     gallery: '创作库审核',
     announcements: '公告横幅',
+    blog: '博客',
     features: '功能权限',
   },
 } as const

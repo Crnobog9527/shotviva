@@ -1,4 +1,6 @@
+import { cachedPublishedPosts, postPath } from '@/core/blog'
 import { pageGate } from '@/core/content'
+import { LOCALES } from '@/core/i18n/locales'
 import { closedSeoFileResponse, llmsTxt, textResponse } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { contentPagesIn, creditFacts, fillCredits, homePageIn } from '@/site/content'
@@ -28,5 +30,6 @@ export async function GET() {
     ...(pricing ? [pricing] : []),
     { ...pageGate(zhHome), locale: 'zh' as const, title: zhHome.title, description: fillCredits(zhHome.description, creditFacts(zhTemplates)) },
   ]
-  return textResponse(llmsTxt(site, fillCredits(homePage.answerBlock, facts), [...pages, ...extra]))
+  const posts = (await Promise.all(LOCALES.map(async (locale) => (await cachedPublishedPosts(locale)).map((post) => ({ path: postPath(post.slug), title: post.title, description: post.description, locale }))))).flat()
+  return textResponse(llmsTxt(site, fillCredits(homePage.answerBlock, facts), [...pages, ...extra], posts))
 }

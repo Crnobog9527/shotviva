@@ -30,6 +30,8 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   // T108 (ARCHITECTURE §9 第 5 条): public works waiting for a person, next to the other review.
   { key: 'gallery', href: '/admin/gallery' },
   { key: 'announcements', href: '/admin/announcements' },
+  // The blog's posts (ARCHITECTURE §12.6).
+  { key: 'blog', href: '/admin/blog' },
   // T29 (ARCHITECTURE §6.2 新功能抢先用).
   { key: 'features', href: '/admin/features' },
 ]

@@ -2387,6 +2387,20 @@
     "missingText": "It may have been taken down or changed. Have a look at the other templates.",
     "missingBrowse": "See other templates"
   },
+  "blog": {
+    "footerLink": "Blog",
+    "listTitle": "Blog",
+    "listIntro": "Guides and comparisons on AI food photography, product photos and menu design, from the Shotviva team.",
+    "listEmpty": "No posts yet. Check back soon.",
+    "metaTitle": "Shotviva Blog: AI photo guides for restaurants and sellers",
+    "metaDescription": "Guides and tool comparisons on AI food photography, product photos and menu design for restaurants, hotels and online sellers.",
+    "by": "By",
+    "published": "Published",
+    "updated": "Updated",
+    "contents": "On this page",
+    "home": "Home",
+    "crumb": "Blog"
+  },
   "supportEmail": {
     "subject": "You have a reply from Shotviva support",
     "title": "Your ticket has a new reply",

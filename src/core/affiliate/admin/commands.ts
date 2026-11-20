@@ -24,6 +24,7 @@ const commands = {
     team_enabled: z.literal('on').optional().transform(Boolean),
     void_unconfirmed: z.literal('on').optional().transform(Boolean),
   }),
+  annotate: user.extend({ admin_label: z.string().trim().max(60), admin_note: z.string().trim().max(2000) }),
   adjust: user.extend({ amount: money.refine((n) => n !== 0), reason: required, request_id: uuid }),
   release: z.object({ commission_id: rowId, decision: z.enum(['release', 'void']), reason: required }),
   rebind: user.extend({ affiliate_user_id: z.union([z.literal('').transform(() => null), uuid]), reason: required }),
@@ -57,6 +58,7 @@ const rpcName = {
   approve: 'decide',
   reject: 'decide',
   set: 'set',
+  annotate: 'annotate',
   adjust: 'adjust',
   release: 'commission_release',
   rebind: 'rebind',
@@ -66,7 +68,7 @@ const rpcName = {
   voidPayout: 'payout_decide',
   settings: 'settings',
 } as const
-const actions = z.enum(['approve', 'reject', 'allowReapply', 'set', 'adjust', 'release', 'rebind', 'hold', 'paid', 'resumePayout', 'voidPayout', 'settings', 'recompute'])
+const actions = z.enum(['approve', 'reject', 'allowReapply', 'set', 'annotate', 'adjust', 'release', 'rebind', 'hold', 'paid', 'resumePayout', 'voidPayout', 'settings', 'recompute'])
 
 export async function execute(db: SupabaseClient, actor: string, form: FormData) {
   const action = actions.parse(form.get('operation'))
