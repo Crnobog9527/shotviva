@@ -1,3 +1,6 @@
+import { TIER_LIMITS } from '@/core/billing/tier-limits'
+import { MAX_BATCH_TEMPLATES } from '@/core/jobs/batch/limits'
+
 import { baselineOffers, type OfferFacts } from '../../offer'
 import { defineContentPage, type CostBills, type ShootDemo } from '@/core/content'
 
@@ -144,7 +147,7 @@ export const makeZhAiRestaurantMenu = (offers: OfferFacts) => defineContentPage(
     },
     {
       question: '能直接做整张菜单吗？',
-      answer: `${brand} 做的是照片：一次一道菜，另外可以做一张促销海报。整张多道菜的菜单或价目表排版，${brand} 不做。`,
+      answer: `${brand} 做的是菜单里的照片，不排菜单版面。专业版一批最多上传 ${TIER_LIMITS.pro.batchMax} 张菜品照，旗舰版一批最多出 ${TIER_LIMITS.max.batchMax} 张、可同时用 ${MAX_BATCH_TEMPLATES} 个模板，40 道菜的菜单用同一个模板在旗舰版分两批就能做完。海报模板可以在生成前填好标题、菜名和价格；出来的是一整张图片，不是能再改字的设计文件，菜单排版请用你自己的排版工具。`,
     },
   ],
   related: [
