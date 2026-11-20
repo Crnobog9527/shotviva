@@ -63,9 +63,7 @@ export function HeroScenes({ scenes, tags, sizes, phonePane }: Props) {
         </span>
         <span className="mk-dots" role="group" aria-label={scenes.label}>
           {items.map((scene, index) => (
-            <button key={scene.image.src} type="button" className="mk-dot" aria-label={scene.caption} aria-pressed={index === active} onClick={() => pick(index)}>
-              <span aria-hidden />
-            </button>
+            <button key={scene.image.src} type="button" className="mk-dot" aria-label={scene.caption} aria-pressed={index === active} onClick={() => pick(index)} />
           ))}
         </span>
       </span>

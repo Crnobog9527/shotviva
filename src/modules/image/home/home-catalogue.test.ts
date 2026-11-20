@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { LocalizedTemplate } from '@/core/templates'
 
-import { homePanelTemplates } from './home-catalogue'
+import { HOME_CATALOGUE_CACHE_CONTROL, homePanelTemplates } from './home-catalogue'
 
 function template(id: string, slot = false): LocalizedTemplate {
   return {
@@ -70,3 +70,11 @@ describe('homePanelTemplates', () => {
     expect(panel).not.toHaveProperty('groups')
   })
 })
+
+describe('home picker catalogue response', () => {
+  // The route test pins the header it sends; this pins the value: shared caches only, briefly.
+  it('is public for the CDN for a minute, and never fresh in the browser', () => {
+    expect(HOME_CATALOGUE_CACHE_CONTROL).toBe('public, max-age=0, s-maxage=60, stale-while-revalidate=60')
+  })
+})
+
