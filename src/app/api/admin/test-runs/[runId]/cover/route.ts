@@ -1,4 +1,5 @@
-import { revalidateTag } from 'next/cache'
+
+import { revalidateCatalogueTag } from '@/core/templates/catalogue-invalidation'
 import type { NextRequest } from 'next/server'
 
 import { errorResponse, jsonResponse } from '@/core/api-response'
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!body.success) throw new AppError('INVALID_INPUT', 'unknown language')
     const deps = { db: createAdminSupabase(), store: r2Store(), assets: r2PublicStore(), assetsBaseUrl: publicEnv.NEXT_PUBLIC_ASSETS_BASE_URL }
     const templateId = await setTestRunCover(deps, admin.id, runId, body.data.locale ?? null)
-    revalidateTag(TEMPLATES_CACHE_TAG, { expire: 0 })
+    await revalidateCatalogueTag(TEMPLATES_CACHE_TAG)
     return jsonResponse({ template_id: templateId })
   } catch (error) {
     return errorResponse(error, 'admin-test-run-cover')

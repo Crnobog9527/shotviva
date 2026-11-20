@@ -18,8 +18,9 @@ describe('robots', () => {
   // allowed; Bytespider is out; Sitemap stays; no Host line.
   it('allows every named AI crawler, blocks only private routes and Bytespider, no Host line', () => {
     const rules = [robotsRules(site).rules].flat()
+    // A named group does not inherit '*' (RFC 9309): each AI crawler carries the private paths too.
     for (const bot of AI_CRAWLERS) {
-      expect(rules).toContainEqual({ userAgent: bot, allow: '/' })
+      expect(rules).toContainEqual({ userAgent: bot, allow: '/', disallow: [...PRIVATE_PATHS] })
     }
     expect(rules).toContainEqual({ userAgent: '*', allow: '/', disallow: [...PRIVATE_PATHS] })
     expect(rules).toContainEqual({ userAgent: 'Bytespider', disallow: '/' })
@@ -82,6 +83,13 @@ describe('metadata in two languages (建站规格 §6.1, LAUNCH §7.6)', () => {
     const terms = pageMetadata(site, { ...page, path: '/terms' })
     expect(terms.alternates?.languages).toBeUndefined()
     expect(terms.alternates?.canonical).toBe('https://example.com/terms')
+  })
+
+  it('points only English and default alternates to the transparent background page', () => {
+    expect(pageMetadata(site, { ...page, path: '/transparent-background' }).alternates?.languages).toEqual({
+      en: 'https://example.com/transparent-background',
+      'x-default': 'https://example.com/transparent-background',
+    })
   })
 })
 

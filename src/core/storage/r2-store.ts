@@ -15,6 +15,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 import { serverEnv } from '../env'
 import { AppError } from '../errors'
+import { createConditionalR2Json, type ConditionalJsonStore } from './conditional-json'
 import { createR2MarkerStore, MARKER_TIMEOUT_MS, type MarkerStore } from './marker-store'
 import type { ObjectStore } from './object-store'
 
@@ -160,6 +161,19 @@ export function r2MarkerStore(): MarkerStore | null {
         )
       : null
   return cachedMarkers
+}
+
+let cachedConditionalJson: ConditionalJsonStore | null | undefined
+
+// Coordination objects live with other operational markers in the private bucket.
+export function r2ConditionalJson(): ConditionalJsonStore | null {
+  if (cachedConditionalJson !== undefined) return cachedConditionalJson
+  const credentials = r2Credentials()
+  const { R2_BUCKET } = serverEnv()
+  cachedConditionalJson = credentials && R2_BUCKET
+    ? createConditionalR2Json(createR2Client(credentials, { maxAttempts: 1 }), R2_BUCKET)
+    : null
+  return cachedConditionalJson
 }
 
 export async function signBatchZip(archive: import('./batch-zip').Archive) {

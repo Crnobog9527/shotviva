@@ -54,4 +54,19 @@ describe('homePanelTemplates', () => {
     }
     expect(homePanelTemplates([], null)).toEqual({ templates: [], opening: undefined })
   })
+
+  it('leaves the workspace form out of the page: required text fields keep only their key facts', () => {
+    const withCopy = template('copy')
+    withCopy.fields.copy = [
+      { key: 'headline', label: 'Headline', type: 'short', required: true, maxLength: 40, placeholder: 'Grand opening', help: 'Shown large', example: 'Open now', public: false },
+      { key: 'size', label: 'Size', type: 'select', required: false, maxLength: 20, options: ['S', 'M'], public: false },
+    ]
+    withCopy.fields.groups = [{ key: 'text', label: 'Text', open: true, items: ['headline', 'size'] }]
+    const [panel] = homePanelTemplates([withCopy], 'copy').templates
+    expect(panel?.copyFields).toEqual([
+      { key: 'headline', label: 'Headline', type: 'short', required: true, maxLength: 40, public: false },
+      { key: 'size', label: 'Size', type: 'select', required: false, maxLength: 20, public: false },
+    ])
+    expect(panel).not.toHaveProperty('groups')
+  })
 })

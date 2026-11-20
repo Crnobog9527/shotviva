@@ -87,13 +87,13 @@ it('lets a BYOK line sell at the official line\'s approved price and keeps that 
     values($1,'edit','{}','{}',$2,md5('https://api.openai.com/v1'))`, [batch, official])
   const approved = async () => (await db.query('select admin.template_approved_price($1,$2) a, admin.template_approved_prices($1)->$2 m',
     [routed, 'edit'])).rows[0]
-  const tariff = { quality: 'medium', costs: { '1k': 20, '2k': 37, '4k': 58 } }
+  const tariff = { quality: 'medium', costs: { '1k': 15, '2k': 20, '4k': 58 } }
   expect(await approved()).toEqual({ a: tariff, m: tariff })
   const catalog = (await db.query("select public.admin_image_pricing_catalog('x')->'providers' p")).rows[0].p as Array<Record<string, unknown>>
   expect(catalog.find(p => p.provider_id === routed)).toMatchObject({ list_priced: true, approved: { edit: tariff } })
-  await db.query("update public.templates set quality='medium', credits_cost='{\"1k\":20,\"2k\":37,\"4k\":58}' where id='edit'")
+  await db.query("update public.templates set quality='medium', credits_cost='{\"1k\":15,\"2k\":20,\"4k\":58}' where id='edit'")
   const sells = async () => (await db.query(
-    "select admin.reservation_route_allowed(t,$1,'1k',20,false,true) ok from public.templates t where id='edit'", [routedTag])).rows[0].ok
+    "select admin.reservation_route_allowed(t,$1,'1k',15,false,true) ok from public.templates t where id='edit'", [routedTag])).rows[0].ok
   expect(await sells()).toBe(true)
   await byok(false)
   expect(await approved()).toEqual({ a: null, m: null })

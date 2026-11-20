@@ -50,13 +50,14 @@ type Props = {
   // The form opened with the cover's text (useWorkspaceDraft.fromExamples): greyer until edited,
   // with 全部清空 / 恢复示例 over the fields.
   examples?: boolean
+  detailsStatus?: ReactNode
 }
 
 // One column, one scroll, no wizard (DESIGN §4.3): photo → text the template needs → its on/off
 // options (T89) → the optional note → size → resolution, then the balance line above the action bar. The one form
 // source (T38): the workspace page and the creation dialog both render it, and their frames
 // set the side padding.
-export function WorkspaceForm({ template, balance, tier, photos, slots, values, onChange, again, photoExtra, surface = 'workspace', examples = false }: Props) {
+export function WorkspaceForm({ template, balance, tier, photos, slots, values, onChange, again, photoExtra, surface = 'workspace', examples = false, detailsStatus }: Props) {
   const t = useTranslations('app')
   const balanceT = useTranslations('app.balance')
   const noteT = useTranslations('app.workspace.notePlaceholder')
@@ -68,6 +69,7 @@ export function WorkspaceForm({ template, balance, tier, photos, slots, values, 
     <>
       {again ? <AgainNote again={again} template={template} photoRatio={ratioForSize} /> : null}
       <AskedFor template={template} photos={photos} slots={slots} values={values} onChange={onChange} again={again} tier={tier} photoExtra={photoExtra} examples={examples} />
+      {detailsStatus}
       <TemplateToggles className="pt-6" template={template} values={values.toggles} onChange={(toggles) => onChange({ toggles })} surface={surface} />
       <div className="pt-6">
         <NoteField value={values.note} placeholder={notePlaceholder(template.category, noteT)} onChange={(note) => onChange({ note })} />

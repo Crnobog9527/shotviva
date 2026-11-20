@@ -13,14 +13,11 @@ async function fetchCatalogue(locale: Locale): Promise<HomeCatalogue> {
   return response.json() as Promise<HomeCatalogue>
 }
 
-export function useHomeCatalogue(templates: readonly CatalogueTemplate[], source: HomeCatalogueSource) {
-  const locale = 'locale' in source ? source.locale : null
-  const browse = 'browse' in source ? source.browse : null
+export function useHomeCatalogue(templates: readonly CatalogueTemplate[], { locale }: HomeCatalogueSource) {
   const [data, setData] = useState<HomeCatalogue | null>(null)
   const [failed, setFailed] = useState(false)
   const request = useRef<Promise<HomeCatalogue> | null>(null)
   const load = useCallback(() => {
-    if (!locale) return Promise.resolve({ templates, browse })
     request.current ??= fetchCatalogue(locale).then((catalogue) => {
       setData(catalogue)
       return catalogue
@@ -30,7 +27,7 @@ export function useHomeCatalogue(templates: readonly CatalogueTemplate[], source
       throw error
     })
     return request.current
-  }, [browse, locale, templates])
+  }, [locale])
   const open = useCallback(() => {
     setFailed(false)
     void load().catch(() => undefined)
@@ -42,5 +39,5 @@ export function useHomeCatalogue(templates: readonly CatalogueTemplate[], source
     if (known || data) return known ?? null
     return (await load()).templates.find((template) => template.id === id) ?? null
   }, [data, load, templates])
-  return { data: locale ? data : { templates, browse }, failed, open, find }
+  return { data, failed, open, find }
 }

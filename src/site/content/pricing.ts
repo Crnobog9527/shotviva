@@ -64,7 +64,7 @@ function faqs(products: readonly SiteProduct[]) {
     },
     {
       question: 'What do the free images include?',
-      answer: `New users get ${freeImagesLabel}, once. Photos made with free credits are public and carry a watermark. Photos made with paid credits are private, have no watermark and can be used commercially.`,
+      answer: `New users get ${freeImagesLabel}, once. Photos made with free credits are public and carry a watermark; free poster photos stay private, still watermarked. Photos made with paid credits are private, have no watermark and can be used commercially.`,
     },
     {
       question: 'Can I buy credits without a subscription?',

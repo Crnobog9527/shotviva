@@ -49,7 +49,7 @@ export function PanelStage({ name, after, initial, inset }: Props) {
             {tags('ai')}
           </span>
         ) : null}
-        {inset ? <StageInset key={inset.url} inset={inset} /> : null}
+        {inset ? <StageInset key={inset.url} inset={inset} alt={inset.mine ? t('originalPhotoAlt') : tags('beforeAlt', { name })} /> : null}
       </div>
     </div>
   )
@@ -57,13 +57,13 @@ export function PanelStage({ name, after, initial, inset }: Props) {
 
 // The phone photo it started from (the template's own, or the visitor's once picked), small at
 // the bottom right, contained in its own shape: the known one, else the one it shows on load.
-function StageInset({ inset }: { inset: NonNullable<Inset> }) {
+function StageInset({ inset, alt }: { inset: NonNullable<Inset>; alt: string }) {
   const [loaded, setLoaded] = useState<number | null>(null)
   const style = { '--ir': clampRatio(inset.ratio ?? loaded ?? 4 / 5) } as CSSProperties
   const image = inset.mine ? { src: inset.url, width: 120, height: 150 } : thumbImage(inset.url, 120)
   return (
     <span className="mk-inset" style={style}>
-      <img className={inset.mine ? `${REPLAY_BLOCK_CLASS} mk-inset-img` : 'mk-inset-img'} {...image} alt="" loading="lazy" decoding="async"
+      <img className={inset.mine ? `${REPLAY_BLOCK_CLASS} mk-inset-img` : 'mk-inset-img'} {...image} alt={alt} loading="lazy" decoding="async"
         onLoad={(event) => setLoaded(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
       <span className="mk-tag mk-tag-l mk-inset-tag" aria-hidden>
         {inset.label}

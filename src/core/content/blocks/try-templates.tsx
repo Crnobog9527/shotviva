@@ -53,6 +53,7 @@ export function TryTemplates({ templates }: { templates: readonly TryTemplate[] 
               before={{ src: card.before, alt: home('beforeAlt', { name: card.name }), ...SIZE }}
               after={{ src: card.after, alt: home('afterAlt', { name: card.name, use: card.use }), ...SIZE }}
               sizes={`(min-width: 768px) 17vw, ${phoneSlot(50)}`}
+              showcase
             />
             <span className="mk-tpl-meta">
               <b>{card.name}</b>

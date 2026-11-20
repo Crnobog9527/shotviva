@@ -28,11 +28,11 @@ export default async function GlobalNotFound() {
         <NextIntlClientProvider locale="en" messages={await loadMessages('en')}>
           <TranslatedPathsProvider paths={site.locales.zhPaths}>
             <AnnouncementBanner />
-            <MarketingHeader locale="en" />
+            <MarketingHeader locale="en" homeOnly />
             <main className="flex flex-1 flex-col">
               <NotFoundContent locale="en" />
             </main>
-            <MarketingFooter locale="en" />
+            <MarketingFooter locale="en" homeOnly />
           </TranslatedPathsProvider>
         </NextIntlClientProvider>
       </body>

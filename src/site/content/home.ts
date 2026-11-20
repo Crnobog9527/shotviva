@@ -225,7 +225,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: 'What sizes and formats can I export?',
-    answer: `${brand} exports every photo as a PNG in ${OUTPUT_TIERS.length} sizes: ${tierPixels}. The aspect ratio is set by the template. Photos made with paid credits download at full size with no watermark.`,
+    answer: `${brand} exports ${OUTPUT_TIERS.length} sizes: ${tierPixels} for a square photo. The aspect ratio is set by the template. Photos made with paid credits download as a full-size PNG with no watermark; free photos download as a watermarked JPG. Cut-outs also come as a white-background JPG.`,
   },
   {
     question: `Can I use ${brand} on my phone?`,
@@ -251,7 +251,7 @@ export const makeHomePage = (offers: OfferFacts, plans = homePlans(offers.produc
       },
       {
         heading: 'Free Photos Are Public and Watermarked, Paid Photos Are Private',
-        text: `A photo made with free credits is public and carries a small "Made with ${brand}" watermark; free photos are for personal, non-commercial use. A photo made with paid credits is private, has no watermark and is yours to use commercially. Buying a plan later does not change photos you already made.`,
+        text: `A photo made with free credits is public and carries a small "Made with ${brand}" watermark (a free poster photo stays private, still watermarked); free photos are for personal, non-commercial use. A photo made with paid credits is private, has no watermark and is yours to use commercially. Buying a plan later does not change photos you already made.`,
       },
     ],
     plans: plansText(offers),

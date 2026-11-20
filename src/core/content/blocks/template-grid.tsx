@@ -57,7 +57,7 @@ function Meta({ card }: { card: TemplateCard }) {
 function PairCard({ card, media, size = 'card' }: { card: TemplateCard; media: TemplateMedia; size?: 'lg' | 'card' }) {
   const t = useTranslations('marketing.home')
   const pictures = images(card, media, t)
-  const pair = pictures ? <PhotoPair {...pictures} size={size} sizes={CARD_SIZES} /> : blankPair
+  const pair = pictures ? <PhotoPair {...pictures} size={size} sizes={CARD_SIZES} showcase /> : blankPair
   if (!media.live) {
     return (
       <div className="mk-tpl">
