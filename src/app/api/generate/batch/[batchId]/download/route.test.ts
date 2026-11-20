@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ requireApiUser: vi.fn(), downloadBatchZip: vi.fn(), recordJobDownload: vi.fn() }))
+const mocks = vi.hoisted(() => ({ requireApiUser: vi.fn(), downloadBatchZip: vi.fn(), downloadBatchPhotos: vi.fn(), recordJobDownload: vi.fn() }))
 
 vi.mock('@/core/auth', () => ({ requireApiUser: mocks.requireApiUser, createAdminSupabase: () => ({}), clientIp: () => '203.0.113.7' }))
-vi.mock('@/core/jobs', () => ({ downloadBatchZip: mocks.downloadBatchZip, recordJobDownload: mocks.recordJobDownload }))
+vi.mock('@/core/jobs', () => ({ downloadBatchZip: mocks.downloadBatchZip, downloadBatchPhotos: mocks.downloadBatchPhotos, recordJobDownload: mocks.recordJobDownload }))
 // after() needs a request scope; here it runs the callback at once so the test can see it.
 vi.mock('next/server', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -55,6 +55,25 @@ describe('GET /api/generate/batch/[batchId]/download', () => {
     mocks.downloadBatchZip.mockResolvedValueOnce({ status: 'packing' }).mockResolvedValueOnce({ status: 'limited' })
     expect((await appClick()).status).toBe(202)
     expect((await appClick()).status).toBe(429)
+    expect(mocks.recordJobDownload).not.toHaveBeenCalled()
+  })
+
+  it('hands a phone one link per photo (?format=photos) under the same claim and download records', async () => {
+    mocks.downloadBatchPhotos.mockResolvedValue({
+      status: 'ready', photos: [{ jobId: 'j1', name: 'a.png', url: 'https://r2.example/a' }, { jobId: 'j2', name: 'b.png', url: 'https://r2.example/b' }],
+      files: [{ jobId: 'j1' }, { jobId: 'j2' }],
+    })
+    const response = await GET(new NextRequest(new URL(`${PATH}?format=photos&bg=transparent`, ORIGIN)), { params: Promise.resolve({ batchId: BATCH }) })
+    expect(await response.json()).toEqual({ photos: [{ url: 'https://r2.example/a', name: 'a.png' }, { url: 'https://r2.example/b', name: 'b.png' }] })
+    expect(mocks.downloadBatchZip).not.toHaveBeenCalled()
+    expect(mocks.downloadBatchPhotos.mock.calls[0][3]).toBe('transparent')
+    expect(mocks.recordJobDownload.mock.calls.map(([, row]) => row.jobId)).toEqual(['j1', 'j2'])
+  })
+
+  it('answers the photo list with the same 429 / 202 as the ZIP, recording nothing', async () => {
+    mocks.downloadBatchPhotos.mockResolvedValueOnce({ status: 'limited' })
+    const response = await GET(new NextRequest(new URL(`${PATH}?format=photos`, ORIGIN)), { params: Promise.resolve({ batchId: BATCH }) })
+    expect(response.status).toBe(429)
     expect(mocks.recordJobDownload).not.toHaveBeenCalled()
   })
 })

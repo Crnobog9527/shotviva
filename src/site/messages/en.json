@@ -507,6 +507,17 @@
       "started": "Your ZIP is downloading. Each file is named photo_template_number.",
       "limited": "That's three downloads in a minute. Try again in a minute."
     },
+    "batchSave": {
+      "cta": "Save {count, plural, one {# photo} other {# photos}} to your phone",
+      "ctaNext": "Save the next {count, plural, one {# photo} other {# photos}}",
+      "preparingCta": "Getting photos ready…",
+      "savingCta": "Opening…",
+      "doneCta": "Saved to your phone",
+      "hint": "Tap, then choose Save Image or Save to Photos in the sheet that opens.",
+      "progress": "{saved, number} of {total, number} saved. Tap to save the next group.",
+      "done": "All {total, plural, one {# photo is} other {# photos are}} saved. Check your Photos app.",
+      "unsupported": "This browser can't save straight to Photos, so here is the ZIP instead."
+    },
     "signupCodes": {
       "noInviteGift": "Valid invite. No extra signup credits are currently offered.",
       "toggle": "Have an invite or promo code?",

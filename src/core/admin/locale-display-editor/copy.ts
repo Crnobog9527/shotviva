@@ -1,0 +1,20 @@
+// 分语言展示 on /admin/templates (migration 1575). Admin is Chinese-only (DESIGN §7).
+export const LOCALE_DISPLAY_COPY = {
+  title: '分语言展示',
+  body: '英文站和中文站可以各用一套首页模板分组顺序、创作页分类顺序和首页精选。没单独设置时，两边都跟着上面「分类管理」的顺序和下面的「首页精选」，所以发布后页面不会变。改某一边的顺序只影响这一边，改完大约一分钟内生效。SEO 页面和分类网址不受影响。',
+  locales: { en: '英文站', zh: '中文站' },
+  following: '跟随默认',
+  own: '已单独设置',
+  reset: '恢复跟随默认',
+  categoriesTitle: '分类顺序（首页分组和创作页分类条）',
+  categoriesHint: '拖动或用上下箭头调整，每次调整立即保存。只有同级至少两个分类才需要排序。',
+  featuredTitle: '首页精选',
+  featuredHint: '这一边的精选单独保存：添加、移除或拖动后会成为这一边自己的列表，不再跟随默认。精选列表为空时回到跟随默认。',
+  featuredFollowing: (count: number) => `现在跟随默认精选（${count} 个）。做任何修改后，会以当前内容为起点单独保存。`,
+  featuredEmpty: '还没有精选模板。',
+  addLabel: '添加精选模板',
+  addPlaceholder: '选择一个已上架的模板…',
+  remove: (name: string) => `从精选移除 ${name}`,
+  saved: (locale: string) => `已保存${locale}的设置`,
+  restored: (locale: string) => `${locale}已恢复跟随默认`,
+} as const

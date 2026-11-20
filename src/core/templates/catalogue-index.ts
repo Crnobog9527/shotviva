@@ -3,6 +3,8 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Locale } from '../i18n/locales'
+import { orderTree } from './locale-display'
+import { readLocaleDisplay } from './locale-display-read'
 import type { CategoryNode } from './taxonomy'
 import { readCategoryTree } from './taxonomy-reads'
 
@@ -72,12 +74,14 @@ function toSeries(row: SeriesRow, members: MemberRow[], locale: Locale): IndexSe
 }
 
 export async function readCatalogueIndex(db: SupabaseClient, locale: Locale): Promise<CatalogueIndex> {
-  const [tree, entryRows, memberRows] = await Promise.all([
+  const [tree, display, entryRows, memberRows] = await Promise.all([
     readCategoryTree(db),
+    readLocaleDisplay(db),
     readAll<EntryRow>((from, to) => db.from('web_catalogue_entries').select(ENTRY_COLUMNS)
       .order('sort_order').order('entry_key').range(from, to).returns<EntryRow[]>()),
     readAll<MemberRow>((from, to) => db.from('web_template_members').select('id,series_id,series_sort_order')
       .not('series_id', 'is', null).order('series_id').order('series_sort_order').order('id').range(from, to).returns<MemberRow[]>()),
   ])
-  return toCatalogueIndex(tree, entryRows, memberRows, locale)
+  // The category tree in this language's own order (migration 1575); shared until one is saved.
+  return toCatalogueIndex(orderTree(tree, display.categoryOrder[locale]), entryRows, memberRows, locale)
 }

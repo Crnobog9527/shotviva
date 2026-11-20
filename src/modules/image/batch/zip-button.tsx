@@ -10,17 +10,17 @@ import type { Translate } from '@/core/translate'
 import { useZipDownload } from './use-zip-download'
 import type { ZipState } from './zip-download'
 
-type Props = { batchId: string; count: number; className?: string }
+type Props = { batchId: string; count: number; className?: string; notice?: string }
 
 // Download ZIP for one batch (T107, Pro and Max): a quiet ghost button, never the screen's
 // primary. The line under it says what is happening: packing (the route builds the archive,
 // up to a few minutes for 30 photos), started, or wait a minute after three tries.
-export function ZipButton({ batchId, count, className }: Props) {
+export function ZipButton({ batchId, count, className, notice }: Props) {
   const t = useTranslations('app.batchZip')
   const errors = useTranslations('app.errors')
   const { state, start } = useZipDownload(batchId)
   const packing = state.kind === 'packing'
-  const line = state.kind === 'packing' ? t('packing', { count }) : zipLine(state, t, errors)
+  const line = state.kind === 'packing' ? t('packing', { count }) : (zipLine(state, t, errors) ?? notice ?? null)
   return (
     <div className={cn('flex flex-col', className)}>
       <button
