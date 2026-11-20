@@ -52,6 +52,19 @@ export function SetMember({ member, rates, action }: { member: Member; rates: Ra
     </MutationForm>
   )
 }
+export function MembershipSwitch({ member, action }: { member: Member; action: SaveAction }) {
+  const suspend = member.status === 'active'
+  if (!suspend && member.status !== 'suspended') return null
+  return (
+    <MutationForm action={action} operation="membership" destructive={suspend}
+      label={suspend ? COPY.suspendMembership : COPY.restoreMembership}
+      confirm={suspend ? COPY.confirmSuspend(member.slug) : COPY.confirmRestore(member.slug)}>
+      <Hidden name="user_id" value={member.user_id} />
+      <Hidden name="status" value={suspend ? 'suspended' : 'active'} />
+      <p className="text-sm text-muted-foreground">{suspend ? COPY.suspendEffect : COPY.restoreEffect}</p>
+    </MutationForm>
+  )
+}
 export function Adjust({ id, action }: { id: string; action: SaveAction }) {
   return (
     <MutationForm action={action} operation="adjust" label={COPY.adjust}>

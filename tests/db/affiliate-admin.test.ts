@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import type { Client } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
-import { available, bind, promoter, refund, row, sale } from './affiliate-fixtures'
+import { available, bind, commission, promoter, refund, row, sale } from './affiliate-fixtures'
 import { connectAdmin, createUser } from './helpers'
 
 let db: Client
@@ -69,6 +69,38 @@ it('refuses payout detail changes after suspension in the database write', async
   await rejects(() => save('replacement'), 'AFFILIATE_NOT_FOUND')
   expect(await row(db, 'select status,payout_details from affiliates where user_id=$1', [partner.id]))
     .toMatchObject({ status: 'suspended', payout_details: 'original' })
+})
+
+it('suspends and restores from the status alone, keeping slug, parent, team, overrides and unconfirmed commissions', async () => {
+  const leader = await promoter(db)
+  const partner = await promoter(db, leader.id)
+  const buyer = await createUser(db)
+  await bind(db, buyer, partner.slug)
+  await db.query('update affiliates set team_enabled=true where user_id=$1', [partner.id])
+  await db.query("insert into affiliate_rate_overrides(user_id,product_kind,l1_bp,l2_bp) select $1,product_kind,1200,null from affiliate_rates limit 1", [partner.id])
+  const before = await sale(db, buyer, 'pack_m', 2490)
+  const pending = await commission(db, before.id)
+  const snapshot = () => row(db, `select a.slug,a.parent_user_id,a.team_enabled,
+    (select jsonb_agg(o order by o.product_kind) from affiliate_rate_overrides o where o.user_id=a.user_id) overrides
+    from affiliates a where a.user_id=$1`, [partner.id])
+  const kept = await snapshot()
+  const status = (value: string) => db.query('select admin_affiliate_set($1,$2)', [admin, { user_id: partner.id, status: value }])
+
+  await status('suspended')
+  expect((await row(db, 'select status from affiliates where user_id=$1', [partner.id])).status).toBe('suspended')
+  expect(await snapshot()).toEqual(kept)
+  expect(await commission(db, before.id)).toMatchObject({ id: pending.id, status: pending.status, amount: pending.amount })
+  const during = await sale(db, buyer, 'pack_m', 2490)
+  expect(await commission(db, during.id)).toMatchObject({ status: 'void', void_reason: 'affiliate_inactive', amount: 0 })
+  expect(await commission(db, during.id, 2)).toBeUndefined()
+  expect((await row(db, "select reason from admin_audit_log where action='affiliate_set' and target_id=$1 order by id desc limit 1", [partner.id])).reason)
+    .toBe('suspended')
+
+  await status('active')
+  expect(await snapshot()).toEqual(kept)
+  const after = await sale(db, buyer, 'pack_m', 2490)
+  expect((await commission(db, after.id)).status).not.toBe('void')
+  expect(await commission(db, during.id)).toMatchObject({ status: 'void', void_reason: 'affiliate_inactive' })
 })
 
 it('only maintains payout details with a dated acceptance of the current version', async () => {

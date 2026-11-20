@@ -2,7 +2,19 @@
 import { refresh } from 'next/cache'
 import { z } from 'zod'
 import { createAdminSupabase } from '@/core/auth'
+import { logger } from '@/core/logger'
 import { COPY, enrollAffiliate, enrollmentLabel, execute, requireAffiliateAdmin } from '@/core/affiliate/admin'
+
+// Admin saves used to fail silently; record why so the next report can be traced in the logs.
+function logFailure(form: FormData, error: unknown) {
+  const invalid = error instanceof z.ZodError
+  const cause = error instanceof Error && error.cause instanceof Error ? error.cause.message : undefined
+  logger.warn('affiliate_admin.save_failed', {
+    operation: String(form.get('operation')),
+    kind: invalid ? 'invalid' : 'failed',
+    reason: invalid ? error.issues.map((i) => i.path.join('.')).join(',') : cause,
+  })
+}
 
 export async function saveAffiliate(_state: string, form: FormData) {
   // Forms rendered before the new enrollment UI used this action and the email field.
@@ -19,6 +31,7 @@ export async function saveAffiliate(_state: string, form: FormData) {
       return COPY[result]
     }
   } catch (error) {
+    logFailure(form, error)
     return error instanceof z.ZodError ? COPY.invalid : COPY.failed
   }
   refresh()
