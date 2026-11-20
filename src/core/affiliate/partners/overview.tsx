@@ -5,7 +5,8 @@ import { Link } from '@/core/i18n/ui'
 import { date, money } from './format'
 import { CopyLink } from '../copy-link'
 import type { Account, Settings } from './models'
-import { readSummary } from './repository'
+import { FeePanel } from './fee-panel'
+import { readFees, readSummary } from './repository'
 
 export async function Overview({
   user,
@@ -16,7 +17,7 @@ export async function Overview({
   account: Account
   settings: Settings
 }) {
-  const [s, t, locale] = await Promise.all([readSummary(user), getTranslations('affiliate'), currentLocale()])
+  const [s, fees, t, locale] = await Promise.all([readSummary(user), readFees(user), getTranslations('affiliate'), currentLocale()])
   const gap = Math.max(0, settings.payout_min_usd - s.available)
   const eligible = gap === 0 && !!account.payout_method && account.status === 'active'
   const progress = Math.min(100, Math.round((s.available / settings.payout_min_usd) * 100))
@@ -63,6 +64,8 @@ export async function Overview({
         <CopyLink url={consumerReferralUrl(account.slug, locale)} copy={t('copy')} copied={t('copied')} />
         <p className="af-hint">{t('anyPage', { suffix: '?ref=' + account.slug })}</p>
       </section>
+
+      <FeePanel fees={fees} threshold={settings.payout_min_usd} locale={locale} t={t} />
 
       <section className="af-stats" aria-label={t('statsLabel')}>
         {[...activity, ...earnings].map(([key, value]) => (
