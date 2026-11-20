@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { canShareChunk, fetchChunk, nextChunk, phoneSaveSupported, PHOTO_CHUNK, readPhotoLinks, requestPhotoLinks, shareChunk } from './photo-save'
+import { canShareChunk, fetchChunk, nextChunk, phoneSaveSupported, readPhotoLinks, requestPhotoLinks, shareChunk } from './photo-save'
 
 const link = (n: number) => ({ url: `https://r2.example/${n}`, name: `shop_white_${n}.png` })
 const links = (n: number) => Array.from({ length: n }, (_, i) => link(i + 1))
