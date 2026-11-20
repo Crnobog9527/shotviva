@@ -42,23 +42,7 @@ async function readWithin(read: LiveRead, timeoutMs: number): Promise<LiveExperi
   }
 }
 
-async function firstAnswer(read: Promise<LiveExperiment[]>, ms: number): Promise<LiveExperiment[]> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const fallback = new Promise<LiveExperiment[]>((resolve) => {
-    timer = setTimeout(resolve, ms, [])
-  })
-  try {
-    return await Promise.race([read, fallback])
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-export type LiveConfigState = 'cold' | 'fresh' | 'stale'
-export type LiveConfigAccess = {
-  waitUntil: (promise: Promise<unknown>) => void
-  onRead?: (state: LiveConfigState) => void
-}
+const wait = <T>(ms: number, value: T) => new Promise<T>((resolve) => setTimeout(resolve, ms, value))
 
 export type LiveConfigTimes = { now?: () => number; firstWaitMs?: number; refreshTimeoutMs?: number }
 
@@ -70,9 +54,8 @@ export function createLiveConfig(read: LiveRead, times: LiveConfigTimes = {}) {
   let held: { value: LiveExperiment[]; at: number; good: number } | null = null
   let refreshing: Promise<LiveExperiment[]> | null = null
 
-  function refresh(access?: LiveConfigAccess): Promise<LiveExperiment[]> {
-    if (refreshing) return refreshing
-    refreshing = readWithin(read, refreshTimeout)
+  function refresh(): Promise<LiveExperiment[]> {
+    refreshing ??= readWithin(read, refreshTimeout)
       .then((value) => {
         held = { value, at: now(), good: now() }
         return value
@@ -86,20 +69,12 @@ export function createLiveConfig(read: LiveRead, times: LiveConfigTimes = {}) {
       .finally(() => {
         refreshing = null
       })
-    // Keep the invocation that started the read alive if it returns before the RPC.
-    // The next request to this instance can then use the held value.
-    access?.waitUntil(refreshing)
     return refreshing
   }
 
-  return async function liveExperiments(access?: LiveConfigAccess): Promise<LiveExperiment[]> {
-    if (!held) {
-      access?.onRead?.('cold')
-      return firstAnswer(refresh(access), firstWait)
-    }
-    const stale = now() - held.at >= HOLD_MS
-    access?.onRead?.(stale ? 'stale' : 'fresh')
-    if (stale) void refresh(access)
+  return async function liveExperiments(): Promise<LiveExperiment[]> {
+    if (!held) return Promise.race([refresh(), wait<LiveExperiment[]>(firstWait, [])])
+    if (now() - held.at >= HOLD_MS) void refresh()
     return held.value
   }
 }

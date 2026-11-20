@@ -54,7 +54,7 @@ export function sharedFacts(offers: OfferFacts): readonly [Fact, Fact, Fact, ...
     { label: 'Output sizes', value: tierPixels },
     { label: 'Uploads', value: uploadLimits },
     { label: 'Prices', value: paidValue(offers) },
-    { label: 'Free vs paid photos', value: 'Free photos are public with a watermark; paid photos are private and watermark-free' },
+    { label: 'Free vs paid photos', value: 'Free photos are public with a watermark (poster photos stay private); paid photos are private and watermark-free' },
     { label: 'Languages', value: languages },
   ]
 }

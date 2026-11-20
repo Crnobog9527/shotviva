@@ -5,9 +5,9 @@ import createNextIntlPlugin from 'next-intl/plugin'
 import { appVersion, parseSentryBuildEnv } from './src/core/build-env'
 import { rawPublicEnv } from './src/core/public-env'
 import { parsePublicEnv } from './src/core/public-env-schema'
+import { HTML_LIMITED_BOTS } from './src/core/seo/html-limited-bots'
 import { indexingOpen, parseIndexingEnv, xRobotsTagRules } from './src/core/seo/indexing-env'
 import { legacyUserRedirects } from './src/core/admin/users/legacy-redirects'
-import { securityHeaderRules } from './src/core/security/response-headers'
 import { legacyHelpRedirects } from './src/core/support/legacy-redirects'
 import { assetsHeaders, assetsRemotePatterns, assetsRewrites, readAssetsEnv } from './src/core/storage/assets-env'
 import { SITE_DOMAIN } from './src/site/domain'
@@ -63,19 +63,10 @@ const nextConfig: NextConfig = {
   // 2.68 -> 1.10 s, /login 2.96 -> 1.20 s (local A/B, PR #622). Global in Next 16.4 (no per-route
   // switch): a signed-in page's first full load carries the app's sheet in its HTML (~28 KB br)
   // instead of a cached file; moves inside the app are unchanged (Next uses <link> for those).
-  // Fewer initial requests on mobile. This is global: account and generator bundles can grow,
-  // and future builds should recheck both cold loads and navigation caching.
-  experimental: {
-    globalNotFound: true,
-    inlineCss: true,
-    turbopackChunking: {
-      maxChunkCountPerGroup: 2,
-      minChunkSize: 300000,
-      maxMergeChunkSize: 700000,
-      priorityRoutes: [/^\/$/, /^\/zh$/, /^\/x\/hero/, /^\/zh\/x\/hero/],
-      priorityBoost: 5,
-    },
-  },
+  experimental: { globalNotFound: true, inlineCss: true },
+  // Search crawlers and Lighthouse get the cached page like a browser; only link-preview bots
+  // keep Next's blocking-metadata render (src/core/seo/html-limited-bots.ts).
+  htmlLimitedBots: HTML_LIMITED_BOTS,
   // Off for the site as a whole: with it on, every page's HTML also embeds a runtime prefetch
   // of itself (a second copy of the page tree and of the client messages, about 40% of the
   // marketing pages' HTML) and the server renders the page twice to produce it. The signed-in
@@ -94,7 +85,6 @@ const nextConfig: NextConfig = {
   // LICENSE.pdf keep the default caching.
   async headers() {
     return [
-      ...securityHeaderRules(publicEnvAtBuild, process.env.VERCEL_ENV !== 'production' && process.env.NODE_ENV !== 'development'),
       ...xRobotsTagRules(indexingIsOpen, SITE_DOMAIN),
       ...assetsHeaders(),
       {

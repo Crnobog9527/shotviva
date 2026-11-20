@@ -30,3 +30,19 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm seo:check "$SEO_CHECK_URL" --expect="$EXPECT"
+
+  # The home and landing pages' HTML on production, with the real catalogue, against profile
+  # "live" of scripts/html-budget.json: templates and series must not grow the page again (PSI
+  # P-1, Bing "HTML too large", 2026-11-21). A plain desktop request, like a visitor's.
+  production-html-budget:
+    name: production HTML within budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm html:budget "$SEO_CHECK_URL" --profile=live

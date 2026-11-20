@@ -7,6 +7,7 @@ import { REPLAY_BLOCK_CLASS } from '../replay'
 // ARCHITECTURE §16.1. Kept as a pure object so a unit test can pin every privacy setting.
 export const INGEST_PATH = '/ingest'
 
+const URL_PROPS = new Set(['$current_url', '$referrer', '$initial_referrer', '$prev_pageview_url'])
 const SENSITIVE_PARAM = /code|token|e-?mail|key|secret|signature|x-amz|password/i
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
 
@@ -24,40 +25,19 @@ export function scrubUrl(value: string): string {
   }
 }
 
-function scrubString(value: string): string {
-  return (/^https?:\/\//i.test(value) ? scrubUrl(value) : value).replace(EMAIL, '[email]')
+function scrubProperty(key: string, value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  return URL_PROPS.has(key) ? scrubUrl(value) : value.replace(EMAIL, '[email]')
 }
 
-function scrubValue(value: unknown): unknown {
-  if (typeof value === 'string') return scrubString(value)
-  if (Array.isArray(value)) return value.map(scrubValue)
-  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) return scrubProperties(value)
-  return value
-}
-
-// Heatmap points are grouped by URL. Parameters dropped during scrubbing can make two buckets
-// equal; keep both sets of points. Other nested SDK properties include Web Vitals attribution.
-function scrubHeatmap(value: object): Record<string, unknown[]> {
-  const pages = new Map<string, unknown[]>()
-  for (const [url, points] of Object.entries(value)) {
-    if (!Array.isArray(points)) continue
-    const key = scrubString(url)
-    pages.set(key, [...(pages.get(key) ?? []), ...points.map(scrubValue)])
-  }
-  return Object.fromEntries(pages)
-}
-
-function scrubProperties(properties: object): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(properties).map(([key, value]) => {
-    return [key, key === '$heatmap_data' && value && typeof value === 'object' ? scrubHeatmap(value) : scrubValue(value)]
-  }))
-}
-
-// Autocapture can read text. PostHog can also put the same URL in session, first-touch and
-// nested performance properties, so stripping only the top-level $current_url is insufficient.
+// Autocapture reads element text, and the account page shows the user's email; every string
+// property is checked, not only the event dictionary's own properties.
 export function scrubCapture(capture: CaptureResult | null): CaptureResult | null {
   if (!capture) return capture
-  return { ...capture, properties: scrubProperties(capture.properties ?? {}) }
+  const properties = Object.fromEntries(
+    Object.entries(capture.properties ?? {}).map(([key, value]) => [key, scrubProperty(key, value)]),
+  )
+  return { ...capture, properties }
 }
 
 // Every browser event carries the language of the page it happened on (ARCHITECTURE §16.2),

@@ -35,6 +35,7 @@
     "check:app-shell": "tsx scripts/app-shell-check.ts",
     "seo:ssr": "tsx --require ./scripts/ci/ignore-css.cjs scripts/ssr-seo-audit.ts",
     "js:budget": "tsx scripts/js-budget.ts",
+    "html:budget": "tsx scripts/html-budget.ts",
     "css:sources": "tsx scripts/public-css-sources.ts",
     "css:check": "tsx scripts/public-css-check.ts",
     "images:first-frames": "tsx scripts/first-frames.ts",

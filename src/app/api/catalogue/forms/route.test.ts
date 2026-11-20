@@ -5,7 +5,7 @@ import { AppError } from '@/core/errors'
 
 const { requireApiUser, loadCatalogueForms } = vi.hoisted(() => ({ requireApiUser: vi.fn(), loadCatalogueForms: vi.fn() }))
 vi.mock('@/core/auth', () => ({ requireApiUser }))
-vi.mock('@/modules/image', () => ({ loadCatalogueForms }))
+vi.mock('@/modules/image/create-data', () => ({ loadCatalogueForms }))
 
 const { GET } = await import('./route')
 const request = (query: string) => new NextRequest(`https://example.com/api/catalogue/forms?${query}`)

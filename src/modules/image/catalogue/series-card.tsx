@@ -13,7 +13,6 @@ import type { CatalogueSeries } from './catalogue-view'
 import { COVER_SIZES } from './cover-sizes'
 import { PairMedia } from './pair-media'
 import { SeriesBadge } from './series-badge'
-import { templateImageGestureClass, templateImageGestures } from './template-image-gestures'
 
 type Props = { series: CatalogueSeries; onOpen(id: string): void; eager?: boolean }
 
@@ -72,7 +71,7 @@ function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boole
     // of another shape leaves. One download: both use the same srcset.
     const cover = coverImage(series.cover, COVER_SIZES.cardFrame)
     return (
-      <span {...templateImageGestures} className={cn('hairline relative isolate block aspect-[8/5] overflow-hidden rounded-control bg-muted', templateImageGestureClass)}>
+      <span className="hairline relative isolate block aspect-[8/5] overflow-hidden rounded-control bg-muted">
         <img {...cover} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" />
         <img {...cover} alt={alt} loading={loading} decoding="async" className="absolute inset-0 size-full object-contain" />
       </span>

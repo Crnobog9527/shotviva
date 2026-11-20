@@ -9,6 +9,7 @@
       "change": "换模板",
       "allTemplates": "全部模板",
       "yourPhoto": "你的照片",
+      "originalPhotoAlt": "你的原图，处理前",
       "photoReady": "照片已选好",
       "photoReadyHint": "已替换模板的示例原图",
       "stageAlt": "{name}模板成品示例",
@@ -506,6 +507,17 @@
       "packing": "正在打包 {count, plural, other {# 张}}，大约需要一两分钟，好了会自动开始下载。",
       "started": "压缩包开始下载了。文件名是「照片名_模板名_序号」。",
       "limited": "一分钟内已经下载了三次，请过一分钟再试。"
+    },
+    "batchSave": {
+      "cta": "保存 {count, plural, other {# 张}}到手机",
+      "ctaNext": "继续保存下一组 {count, plural, other {# 张}}",
+      "preparingCta": "正在准备照片…",
+      "savingCta": "正在打开…",
+      "doneCta": "已保存到手机",
+      "hint": "点一下，在弹出的面板里选「存储图像」或「保存到相册」。",
+      "progress": "已保存 {saved, number}/{total, number}，点按钮继续保存下一组。",
+      "done": "{total, plural, other {# 张}}都已保存，去相册里看看。",
+      "unsupported": "这个浏览器不能直接存到相册，已改为下载压缩包。"
     },
     "signupCodes": {
       "noInviteGift": "邀请码有效，当前无额外注册赠分。",

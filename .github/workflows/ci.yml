@@ -89,6 +89,12 @@ jobs:
           pnpm start > /tmp/next-start.log 2>&1 &
           for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/robots.txt && break; sleep 1; done
           pnpm seo:ssr http://localhost:3000
+      # Home and landing pages' HTML, raw and gzip, against scripts/html-budget.json. This build has
+      # no database, so profile "build" guards what does not come from the catalogue (styles,
+      # messages, layout, copy); production's catalogue is checked daily (seo-check.yml).
+      - name: HTML budget
+        if: steps.changes.outputs.code == 'true'
+        run: pnpm html:budget http://localhost:3000
       # What the Lighthouse pages send, compared with the base build's by the lighthouse jobs.
       # On any failure the output stays empty and Lighthouse runs.
       - name: Lighthouse pages fingerprint

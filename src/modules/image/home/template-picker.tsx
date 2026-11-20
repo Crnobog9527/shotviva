@@ -15,8 +15,6 @@ import type { TemplateSample } from './home-samples'
 import { PickerSample } from './picker-body'
 import { PickerBrowser } from './picker-list'
 
-import './template-picker.css'
-
 type Props = {
   // The template the dialog opens on (the bench's choice, or the card's Preview); null: closed.
   openOn: string | null

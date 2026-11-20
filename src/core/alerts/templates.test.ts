@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { OwnerAlert } from './alert-kinds'
+import { alertPolicy } from './alert-kinds'
 import { renderAlert, type RenderContext } from './templates'
 
 const USER = '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b'
@@ -127,5 +128,32 @@ describe('renderAlert: operations', () => {
     const { sentence } = renderAlert(refund(), { ...ctx, origin: 'https://validation.example', testSite: true })
     expect(sentence.startsWith('（测试站）【退款】')).toBe(true)
     expect(sentence).not.toMatch(/ch_1|pro_monthly|evt_|charge\.|[0-9a-f]{8}-/)
+  })
+})
+
+describe('renderAlert: payment received', () => {
+  it('payment received: buyer, product, USD amount, method and the orders link; a renewal says so', () => {
+    const paid = { kind: 'payment_received', channel: 'stripe', ref: 'cs_live_a1B2', userId: USER, productId: 'starter_monthly', amount: usd(1990), method: 'wechat_pay', renewal: false } as const
+    expect(text(paid)).toBe('【收到付款】j***@gmail.com 买了 Starter 月付，$19.90（微信支付）。\n去后台看：https://shotviva.com/admin/orders')
+    expect(text({ ...paid, renewal: true, method: 'card' })).toContain('【收到续费】j***@gmail.com 的 Starter 月付 自动续费 $19.90（银行卡）。')
+    expect(text({ ...paid, productId: 'unlisted', amount: { cents: 1500, currency: 'eur' } }, { who: null })).toContain('一位用户 付了 15.00 EUR（微信支付）。')
+    // No payment ref, user id or full contact in the text.
+    expect(text(paid)).not.toMatch(/cs_live|[0-9a-f]{8}-|wechat_pay/)
+  })
+
+  it('zero-decimal currencies (JPY, KRW) are not divided by 100, in every alert that shows an amount', () => {
+    const yen = { cents: 3000, currency: 'jpy' }
+    const paid = { kind: 'payment_received', channel: 'stripe', ref: 'cs_1', userId: USER, productId: 'starter_monthly', amount: yen, method: 'card', renewal: false } as const
+    expect(text(paid)).toContain('，3000 JPY（银行卡）。')
+    expect(text({ ...paid, amount: { cents: 1990, currency: 'USD' } })).toContain('$19.90')
+    expect(text(refund({ amount: yen, refunded: { cents: 1500, currency: 'krw' } }))).toContain('退款 1500 KRW（这笔共付 3000 JPY，部分退款）')
+    expect(text({ kind: 'payment_failed', channel: 'stripe', eventId: 'evt_1', step: 'purchase', userId: USER, productId: 'starter_monthly', amount: yen })).toContain('一笔 3000 JPY 的')
+  })
+
+  it('payment received: one key per payment, money-class, so a redelivery never alerts twice', () => {
+    const paid = { kind: 'payment_received', channel: 'waffo', ref: 'PAY_1', userId: USER, productId: 'pro_monthly', amount: usd(4990), method: 'card', renewal: false } as const
+    expect(alertPolicy(paid)).toEqual({ key: 'payment_received:waffo:PAY_1', money: true })
+    expect(alertPolicy({ ...paid })).toEqual(alertPolicy(paid))
+    expect(alertPolicy({ ...paid, channel: 'stripe' }).key).not.toBe(alertPolicy(paid).key)
   })
 })

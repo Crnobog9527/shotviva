@@ -84,9 +84,8 @@ async function attempt<T>(store: ConditionalJsonStore, reader: Reader, fill: () 
 
 export async function coordinateCatalogue<T>(store: ConditionalJsonStore, fill: () => Promise<T>): Promise<T> {
   const reader: Reader = { started: Date.now(), owner: randomUUID() }
-  // A genuinely empty cache can elect its first owner without a preceding GET round trip.
-  const first = await claim(store, reader, randomUUID(), null, fill)
-  if (first) return first.snapshot
+  // The object normally already exists, even after invalidation. Check for a reusable
+  // result or an active lease without submitting a write that R2 would reject.
   while (Date.now() - reader.started < WAIT_MS) {
     const result = await attempt(store, reader, fill)
     if (result) return result.snapshot

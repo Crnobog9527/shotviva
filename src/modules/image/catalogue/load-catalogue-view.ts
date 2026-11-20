@@ -1,7 +1,7 @@
 import 'server-only'
 
 import type { Locale } from '@/core/i18n/locales'
-import { loadCreateCatalogue } from '@/core/templates'
+import { loadCreateCatalogue } from '@/core/templates/create-catalogue'
 
 import { toCatalogueTemplate } from './catalogue-template'
 import { catalogueForm, toCataloguePayload, type CatalogueForms } from './catalogue-payload'

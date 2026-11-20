@@ -14,7 +14,6 @@ export const SERVER_ONLY_NAMESPACES = ['adminEntry', 'affiliate', 'affiliateAgre
 export const APP_ONLY_NAMESPACES = ['partner', 'legal'] as const
 export const APP_ONLY_APP_KEYS = [
   'gated',
-  'giftClaim',
   'matrix',
   'batchZip',
   'result',
@@ -23,7 +22,6 @@ export const APP_ONLY_APP_KEYS = [
   'support',
   'wishlist',
   'photos',
-  'poster',
   'edit',
   'checkout',
   'create',

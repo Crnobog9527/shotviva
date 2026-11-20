@@ -1,0 +1,23 @@
+{
+  "note": "HTML bytes per page, raw and gzip level 9, for a desktop browser request (scripts/html-budget.ts). Set 2026-11-21 after the home HTML diet (#706): \"build\" is CI's own build without a database, about 10% over what it measured; \"live\" is production with its real catalogue, about 15% over the production-sized estimate (preview catalogue measured, scaled to production's featured set). Raise a number only with a reason in the PR. Most of the floor is the inlined stylesheet, which is in the HTML twice (<style> and the RSC payload, ~336 KB raw on every marketing page).",
+  "profiles": {
+    "build": {
+      "/": { "raw": 610000, "gzip": 140000 },
+      "/zh": { "raw": 605000, "gzip": 146000 },
+      "/ai-restaurant-menu": { "raw": 535000, "gzip": 124000 },
+      "/zh/ai-restaurant-menu": { "raw": 530000, "gzip": 129000 },
+      "/commercial-photography": { "raw": 550000, "gzip": 130000 },
+      "/image-to-image-generator": { "raw": 552000, "gzip": 132000 },
+      "/transparent-background": { "raw": 540000, "gzip": 128000 }
+    },
+    "live": {
+      "/": { "raw": 960000, "gzip": 190000 },
+      "/zh": { "raw": 960000, "gzip": 195000 },
+      "/ai-restaurant-menu": { "raw": 740000, "gzip": 165000 },
+      "/zh/ai-restaurant-menu": { "raw": 740000, "gzip": 170000 },
+      "/commercial-photography": { "raw": 660000, "gzip": 150000 },
+      "/image-to-image-generator": { "raw": 640000, "gzip": 150000 },
+      "/transparent-background": { "raw": 650000, "gzip": 150000 }
+    }
+  }
+}

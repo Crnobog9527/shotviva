@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 
 import { useRouter } from '../../i18n/navigation'
+import { buildLayers, PAIRS_ATTR } from './series-layers'
 import { cycler, HOVER_DELAY_MS, HOVER_HOLD_MS, VIEW_HOLD_MS, type Cycler } from './series-motion'
 
 // Wires every series card on the page once (one effect, no per-card React state): with a fine
@@ -11,7 +12,15 @@ import { cycler, HOVER_DELAY_MS, HOVER_HOLD_MS, VIEW_HOLD_MS, type Cycler } from
 // before hydration (the server draws the first pair).
 function wire(frame: HTMLElement, touch: boolean, observer: IntersectionObserver | null, cards: Map<Element, Cycler>) {
   const card = frame.closest('.mk-series') ?? frame
-  const run = cycler(frame)
+  const cycle = cycler(frame)
+  // The later pairs become layers the first time the card plays, not before (series-layers.ts).
+  const run: Cycler = {
+    start(delay, hold) {
+      buildLayers(frame)
+      cycle.start(delay, hold)
+    },
+    stop: () => cycle.stop(),
+  }
   cards.set(frame, run)
   if (touch) {
     observer?.observe(frame)
@@ -52,7 +61,7 @@ export function SeriesMotion() {
   useOpenSeries()
   useEffect(() => {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const frames = [...document.querySelectorAll<HTMLElement>('[data-series-pairs]')]
+    const frames = [...document.querySelectorAll<HTMLElement>(`[${PAIRS_ATTR}]`)]
     if (!frames.length) return
     const touch = !matchMedia('(hover: hover) and (pointer: fine)').matches
     const cards = new Map<Element, Cycler>()

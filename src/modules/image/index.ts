@@ -19,7 +19,7 @@ export { UploadTestPanel, type TestTemplate } from './workspace/dev/upload-test-
 // App shell pieces (T8).
 export { TemplateCatalogue } from './catalogue/template-catalogue'
 // Create's grid (T102), server only: templates and series cards placed under the category tree.
-export { loadCatalogueForms, loadCataloguePayload, loadCatalogueView } from './catalogue/load-catalogue-view'
+export { loadCatalogueView } from './catalogue/load-catalogue-view'
 export { createReturnPath } from './catalogue/catalogue-filter'
 export type { CatalogueSeries, CatalogueView, FilterNode, GridEntry } from './catalogue/catalogue-view'
 // Saved templates (T83): the provider every page with hearts wraps its catalogue in.
@@ -94,3 +94,4 @@ export { executeLabCell } from './prompt-lab/cell'
 export { publishLabRun } from './prompt-lab/publish'
 export { reverseLabPrompt } from './prompt-lab/reverse'
 export { loadHomeCatalogue } from './home/home-catalogue.server'
+export { HOME_CATALOGUE_CACHE_CONTROL } from './home/home-catalogue'

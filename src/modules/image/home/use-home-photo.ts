@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { trackUploadError } from '@/core/analytics/browser'
 import { checkPickedFile, UploadError, uploadErrorReason, type UploadErrorCode } from '@/core/storage/upload'
@@ -26,13 +26,6 @@ export function useHomePhoto(signedIn: boolean): HomePhoto {
   const [file, setFile] = useState<File | null>(null)
   const [local, setLocal] = useState<string | null>(null)
   const [error, setError] = useState<UploadErrorCode | null>(null)
-  const sent = useRef<File | null>(null)
-
-  useEffect(() => {
-    if (!signedIn || !file || sent.current === file) return
-    sent.current = file
-    void upload(file)
-  }, [signedIn, file, upload])
 
   const pick = useCallback(
     (next: File) => {
@@ -47,10 +40,7 @@ export function useHomePhoto(signedIn: boolean): HomePhoto {
       }
       setError(null)
       setFile(next)
-      if (signedIn) {
-        sent.current = next
-        void upload(next)
-      }
+      if (signedIn) void upload(next)
       else setLocal(URL.createObjectURL(next))
     },
     [signedIn, upload],

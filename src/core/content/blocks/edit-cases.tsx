@@ -1,4 +1,4 @@
-import { StaticSiteImage as Image } from '@/core/ui/static-site-image'
+import { SiteImage as Image } from '@/core/ui/site-image'
 
 import type { EditCases } from '../page-content'
 import { phoneSlot } from './phone-sizes'

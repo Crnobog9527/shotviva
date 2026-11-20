@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { cn } from '../../ui/cn'
 import { WhiteGroundImage } from '../../ui/white-ground-image'
 import type { TemplateCard } from '../page-content'
+import { encodePairs, PAIRS_ATTR, SIZES_ATTR } from './series-layers'
 import type { TemplateLookup } from './template-grid'
 
 const SIZE = { width: 900, height: 1125 }
@@ -17,27 +18,11 @@ function pairsOf(card: TemplateCard, media: TemplateLookup): Pair[] {
   })
 }
 
-// One extra pair, stacked over the first. Hidden (display: none) until the card is armed by
-// series-motion.tsx, so its lazy images are not fetched before a visitor hovers or scrolls to it.
-function Layer({ pair, sizes }: { pair: Pair; sizes: string }) {
-  return (
-    <span className="mk-sl" aria-hidden>
-      <span className="mk-pane">
-        <Image className="mk-fill" src={pair.before} alt="" aria-hidden {...SIZE} sizes={sizes} loading="lazy" />
-        <Image className="mk-sb" src={pair.before} alt="" {...SIZE} sizes={sizes} loading="lazy" />
-      </span>
-      <span className="mk-pane">
-        <Image className="mk-fill" src={pair.after} alt="" aria-hidden {...SIZE} sizes={sizes} loading="lazy" />
-        <WhiteGroundImage className="mk-sa" src={pair.after} alt="" {...SIZE} sizes={sizes} loading="lazy" fitPlate />
-      </span>
-    </span>
-  )
-}
-
 type PairsProps = { card: TemplateCard; media: TemplateLookup; size: 'lg' | 'card'; sizes: string }
 
 // The series' frame: the same phone | AI pair as a template card, its first member drawn by the
-// server, the others layered above it. With one pair (or none) it is a still card.
+// server; the others' covers ride along as addresses and become layers above it in the browser
+// when the card first plays (series-layers.ts). With one pair (or none) it is a still card.
 function SeriesPairs({ card, media, size, sizes }: PairsProps) {
   const t = useTranslations('marketing.home')
   const [first, ...rest] = pairsOf(card, media)
@@ -51,7 +36,10 @@ function SeriesPairs({ card, media, size, sizes }: PairsProps) {
     )
   }
   return (
-    <span className={cn('mk-pair mk-spair', size === 'lg' && 'mk-pair-lg')} data-series-pairs={rest.length > 0 ? '' : undefined}>
+    <span
+      className={cn('mk-pair mk-spair', size === 'lg' && 'mk-pair-lg')}
+      {...(rest.length > 0 ? { [PAIRS_ATTR]: encodePairs(rest.map((pair) => [pair.before, pair.after])), [SIZES_ATTR]: sizes } : {})}
+    >
       <span className="mk-pane">
         <Image className="mk-fill" src={first.before} alt="" aria-hidden {...SIZE} sizes={sizes} loading="lazy" />
         <Image className="mk-sb" src={first.before} alt="" {...SIZE} sizes={sizes} loading="lazy" />
@@ -60,9 +48,6 @@ function SeriesPairs({ card, media, size, sizes }: PairsProps) {
         <Image className="mk-fill" src={first.after} alt="" aria-hidden {...SIZE} sizes={sizes} loading="lazy" />
         <WhiteGroundImage className="mk-sa" src={first.after} alt="" {...SIZE} sizes={sizes} loading="lazy" fitPlate />
       </span>
-      {rest.map((pair) => (
-        <Layer key={pair.id} pair={pair} sizes={sizes} />
-      ))}
       <span className="mk-hl" aria-hidden />
       <span className="mk-tag mk-tag-l" aria-hidden>
         {t('phone')}

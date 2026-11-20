@@ -7,54 +7,57 @@ import { onConsentChange, readConsent } from '../consent/store'
 import { categorySlug } from '../event-values'
 import type { BrowserEventName, EventProps } from '../events'
 import { sentryOptions } from '../sentry-options'
-import { watchEarlyErrors } from './capture'
 import { clearPosthogStorage, syncPosthog } from './consent-sync'
-import { reportExperiments } from './experiments'
-import { afterLoad, afterPosthog, posthogSdk, sentrySdk } from './sdk'
+import { posthogConfig } from './posthog-config'
+import { afterLoad, loadedSdks, loadSdks, withSdks } from './sdk'
 
 let started = false
 
-// Runs before hydration but leaves SDK downloads until after load and an idle turn.
+// Runs once from src/instrumentation-client.ts, before hydration, but only schedules the SDKs:
+// both are fetched and started after the page's load event (sdk.ts), so they stay off the
+// critical path. Either SDK stays off when its public key is missing (local dev, CI).
 export function initBrowserAnalytics(): void {
   if (started) return
   started = true
   const sentry = sentryOptions()
   const key = publicEnv.NEXT_PUBLIC_POSTHOG_KEY
-  const stopEarlyErrors = sentry.enabled ? watchEarlyErrors() : () => {}
-  const loadSentry = () => void sentrySdk.load(async () => {
-    const sdk = await import('./sentry-entry').finally(stopEarlyErrors)
-    sdk.init(sentry)
-    return sdk
-  })
-
-  if (!sentry.enabled) void sentrySdk.load(null)
-  if (!key) {
-    void posthogSdk.load(null)
-    if (sentry.enabled) afterLoad(loadSentry)
-    return
-  }
-
-  watchConsent()
+  if (!sentry.enabled && !key) return
   afterLoad(() => {
-    const ready = posthogSdk.load(async () => (await import('./posthog-entry')).startPosthog(key))
-    reportExperiments()
-    if (sentry.enabled) afterPosthog(ready, loadSentry)
+    void loadSdks({
+      sentry: sentry.enabled
+        ? async () => {
+            const sdk = await import('./sentry-entry')
+            sdk.init(sentry)
+            return sdk
+          }
+        : null,
+      posthog: key
+        ? async () => {
+            const { default: posthog } = await import('posthog-js')
+            posthog.init(key, posthogConfig(readConsent(), window.location.pathname))
+            // The page's A/B variants tag every event from here on (ARCHITECTURE §16.5).
+            void import('./experiments').then(({ reportExperiments }) => reportExperiments())
+            return posthog
+          }
+        : null,
+    })
   })
+  if (key) watchConsent()
 }
 
-// Before the import resolves, init reads the latest choice. Do not replay obsolete choices
-// over it, even briefly: they could write an analytics cookie after consent was withdrawn.
+// ARCHITECTURE §16.1 (T70): cookies or memory follow the visitor's region and answer; an answer
+// given on the bar applies at once, before or after PostHog is in (the queue keeps it in order).
 function watchConsent(): void {
   if (persistenceFor(readConsent()) === 'memory') clearStorage()
-  onConsentChange((consent) => {
-    try {
-      const posthog = posthogSdk.current()
-      if (posthog) syncPosthog(posthog, consent, window.location.pathname)
-    } finally {
-      // The SDK's session manager keeps a window id outside the cookie and localStorage.
+  onConsentChange((consent) =>
+    withSdks(({ posthog }) => {
+      if (!posthog) return
+      syncPosthog(posthog, consent, window.location.pathname)
+      // set_config clears the cookie and localStorage; the tab's window id in sessionStorage is
+      // kept by PostHog's session manager, outside its persistence.
       if (persistenceFor(consent) === 'memory') clearStorage()
-    }
-  })
+    }),
+  )
 }
 
 function clearStorage(): void {
@@ -83,9 +86,7 @@ export function track<E extends BrowserEventName>(event: E, props: EventProps<E>
       logger.error('analytics event refused', { event, issues: checked.issues })
       return
     }
-    posthogSdk.run((posthog) => posthog.capture(event, checked.props))
-  }).catch(() => {
-    // The validation chunk may be unavailable on an old build or a lost connection.
+    withSdks(({ posthog }) => posthog?.capture(event, checked.props))
   })
 }
 
@@ -138,21 +139,21 @@ export function trackUploadError(reason: EventProps<'upload_error'>['reason']): 
 // The Supabase user id, nothing else: no email or name as person properties (§16.1).
 export function identify(userId: string): void {
   if (!enabled()) return
-  posthogSdk.run((posthog) => {
-    if (posthog.get_distinct_id() !== userId) posthog.identify(userId)
+  withSdks(({ posthog }) => {
+    if (posthog && posthog.get_distinct_id() !== userId) posthog.identify(userId)
   })
 }
 
 // Call on sign-out before the redirect, so the next visitor on this tab is anonymous.
 export function resetIdentity(): void {
-  if (enabled()) posthogSdk.run((posthog) => posthog.reset())
+  if (enabled()) withSdks(({ posthog }) => posthog?.reset())
 }
 
 // Next calls this on every client navigation. Before Sentry is in there is nothing to record
 // (tracing is off, sentry-options.ts), so navigations are not queued.
 // PostHog's replay is held off before /admin and /checkout are shown and let go after them.
 export function onRouterTransitionStart(href: string, navigationType: string): void {
-  sentrySdk.current()?.captureRouterTransitionStart(href, navigationType)
-  const posthog = posthogSdk.current()
-  if (posthog) syncPosthog(posthog, readConsent(), href)
+  const sdks = loadedSdks()
+  sdks?.sentry?.captureRouterTransitionStart(href, navigationType)
+  if (sdks?.posthog) syncPosthog(sdks.posthog, readConsent(), href)
 }

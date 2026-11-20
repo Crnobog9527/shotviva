@@ -44,11 +44,15 @@ export function appShellMetadata(): Metadata {
 export type PageMetaInput = { path: string; title: string; description: string; module?: ModuleId }
 
 // hreflang en / zh-Hans / x-default (→ English) only where both versions exist
-// (建站规格 §6.1 rule 4); English-only pages carry no alternates at all.
+// (建站规格 §6.1 rule 4); transparent-background additionally declares its English default.
 // hreflang only between pages indexable in both languages (ARCHITECTURE §17): a noindex /zh page
 // (every SEO inner page but the generator, the app pages) gets none, though the language
 // switch still points at it.
 function languageAlternates(site: SiteConfig, input: PageMetaInput): Record<string, string> | undefined {
+  if (input.path === '/transparent-background') {
+    const english = absoluteUrl(site, input.path)
+    return { en: english, 'x-default': english }
+  }
   if (!hasTranslation(site, input.path, [input])) return undefined
   if (!site.indexing.zhIndexablePaths.includes(input.path as `/${string}`)) return undefined
   const english = absoluteUrl(site, input.path)

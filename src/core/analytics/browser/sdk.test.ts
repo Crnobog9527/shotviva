@@ -1,46 +1,61 @@
-import { describe, expect, it, vi } from 'vitest'
+import type { PostHog } from 'posthog-js'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { captureErrorWith, type SentryApi } from '../capture-scope'
-import { createSdk, MAX_QUEUED } from './sdk'
+import { captureErrorWith } from '../capture-scope'
+import { loadedSdks, loadSdks, MAX_QUEUED, resetSdksForTest, withSdks, type Sdks } from './sdk'
 
-describe('deferred browser SDKs', () => {
-  it('drains just its own jobs in order, with a bounded queue', async () => {
-    const channel = createSdk<(value: number | string) => void>()
-    const capture = vi.fn()
-    for (let i = 0; i < MAX_QUEUED + 10; i++) channel.run((sdk) => sdk(i))
-    expect(capture).not.toHaveBeenCalled()
-    await channel.load(async () => capture)
-    channel.run((sdk) => sdk('later'))
-    expect(capture.mock.calls.flat()).toEqual([...Array.from({ length: MAX_QUEUED }, (_, i) => i), 'later'])
+type SentrySdk = NonNullable<Sdks['sentry']>
+
+const fakePosthog = () => ({ capture: vi.fn() }) as unknown as PostHog & { capture: ReturnType<typeof vi.fn> }
+
+function fakeSentry() {
+  const scope = { setTag: vi.fn(), setLevel: vi.fn(), setContext: vi.fn() }
+  return {
+    scope,
+    sdk: { withScope: (fn: (s: typeof scope) => void) => fn(scope), captureException: vi.fn(), captureMessage: vi.fn() } as unknown as SentrySdk & {
+      captureException: ReturnType<typeof vi.fn>
+    },
+  }
+}
+
+afterEach(() => resetSdksForTest())
+
+describe('browser SDKs after load (performance B6)', () => {
+  it('holds jobs until the SDKs are in, then runs them in order', async () => {
+    const posthog = fakePosthog()
+    withSdks((sdks) => sdks.posthog?.capture('first'))
+    withSdks((sdks) => sdks.posthog?.capture('second'))
+    expect(loadedSdks()).toBeNull()
+    await loadSdks({ sentry: null, posthog: async () => posthog })
+    expect(posthog.capture.mock.calls.map((call) => call[0])).toEqual(['first', 'second'])
+    withSdks((sdks) => sdks.posthog?.capture('later'))
+    expect(posthog.capture).toHaveBeenLastCalledWith('later')
   })
 
-  it('keeps reporting after a failing analytics job', async () => {
-    const channel = createSdk<(value: string) => void>()
-    const capture = vi.fn()
-    channel.run(() => { throw new Error('boom') })
-    channel.run((sdk) => sdk('after'))
-    await channel.load(async () => capture)
-    channel.run(() => { throw new Error('boom again') })
-    expect(capture).toHaveBeenCalledWith('after')
+  it('keeps at most MAX_QUEUED jobs before load', async () => {
+    const posthog = fakePosthog()
+    for (let i = 0; i < MAX_QUEUED + 10; i++) withSdks((sdks) => sdks.posthog?.capture(`e${i}`))
+    await loadSdks({ sentry: null, posthog: async () => posthog })
+    expect(posthog.capture).toHaveBeenCalledTimes(MAX_QUEUED)
   })
 
-  it('reports a queued Sentry error while the other SDK is unresolved or blocked', async () => {
-    const scope = { setTag: vi.fn(), setLevel: vi.fn(), setContext: vi.fn() }
-    const captureException = vi.fn()
-    const sdk = { withScope: (fn: (s: typeof scope) => void) => fn(scope), captureException } as unknown as SentryApi
-    const sentry = createSdk<SentryApi>()
-    const posthog = createSdk<object>()
+  it('a failing job does not stop the ones after it', async () => {
+    const posthog = fakePosthog()
+    withSdks(() => {
+      throw new Error('boom')
+    })
+    withSdks((sdks) => sdks.posthog?.capture('after'))
+    await loadSdks({ sentry: null, posthog: async () => posthog })
+    expect(posthog.capture).toHaveBeenCalledWith('after')
+  })
+
+  it('an error captured before Sentry is in is sent with its alert tag once it is', async () => {
+    const { sdk, scope } = fakeSentry()
     const error = new Error('render failed')
-    let failPosthog: () => void = () => {}
-    const loading = posthog.load(() => new Promise((_, reject) => { failPosthog = () => reject(new Error('blocked')) }))
-    sentry.run((active) => captureErrorWith(active, error, { alert: 'generation_failed' }))
-    await sentry.load(async () => sdk)
-    expect(captureException).toHaveBeenCalledWith(error)
+    withSdks((sdks) => sdks.sentry && captureErrorWith(sdks.sentry, error, { alert: 'generation_failed' }))
+    expect(sdk.captureException).not.toHaveBeenCalled()
+    await loadSdks({ sentry: async () => sdk, posthog: null })
+    expect(sdk.captureException).toHaveBeenCalledWith(error)
     expect(scope.setTag).toHaveBeenCalledWith('alert', 'generation_failed')
-    failPosthog()
-    await loading
-    const job = vi.fn()
-    posthog.run(job)
-    expect(job).not.toHaveBeenCalled()
   })
 })

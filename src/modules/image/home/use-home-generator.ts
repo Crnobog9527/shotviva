@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useRouter } from '@/core/i18n'
 import type { OutputAspect } from '@/core/templates/output-options'
@@ -21,7 +21,6 @@ type Args = {
   templates: readonly CatalogueTemplate[]
   defaultId: string | null
   viewer: HomeViewer | null
-  viewerKnown: boolean
   find(id: string): Promise<CatalogueTemplate | null>
 }
 
@@ -36,28 +35,24 @@ function useRunning(serverIds: readonly string[]): number {
   return ids.size
 }
 
-type Restore = { viewerKnown: boolean; signedIn: boolean; selectedFile: RefObject<boolean>; apply(draft: HomeDraft): Promise<boolean>; pick(file: File): void }
+type Restore = { signedIn: boolean; apply(draft: HomeDraft): Promise<boolean>; pick(file: File): void }
 
 // Brings back what a signed-out visitor set up before sign-up, once. Signed in, the photo now
 // uploads and the draft is spent.
-function useRestoreDraft({ viewerKnown, signedIn, selectedFile, apply, pick }: Restore) {
+function useRestoreDraft({ signedIn, apply, pick }: Restore) {
   const done = useRef(false)
   useEffect(() => {
-    if (!viewerKnown || done.current) return
+    if (done.current) return
     done.current = true
     void loadDraft().then(async (found) => {
       if (!found) return
-      if (selectedFile.current) {
-        if (signedIn) void clearDraft()
-        return
-      }
       const acceptsPhoto = await apply(found.draft)
-      if (acceptsPhoto && found.photo && !selectedFile.current) pick(found.photo)
+      if (acceptsPhoto && found.photo) pick(found.photo)
       if (signedIn) void clearDraft()
     }).catch(() => {
       // A catalogue outage leaves the draft in this browser for the next visit.
     })
-  }, [viewerKnown, signedIn, selectedFile, apply, pick])
+  }, [signedIn, apply, pick])
 }
 
 // Starts the photo exactly as the workspace does (DESIGN §6.9 item 9): one job in the
@@ -96,7 +91,7 @@ function useStart(viewer: HomeViewer | null, template: CatalogueTemplate | null,
   )
 }
 
-function useSelectedTemplate({ templates, defaultId, find }: Omit<Args, 'viewer' | 'viewerKnown'>) {
+function useSelectedTemplate({ templates, defaultId, find }: Omit<Args, 'viewer'>) {
   const [template, setTemplate] = useState(() => templates.find((candidate) => candidate.id === defaultId) ?? templates[0] ?? null)
   const intent = useRef(0)
   const choose = useCallback(async (id: string) => {
@@ -112,17 +107,11 @@ function useSelectedTemplate({ templates, defaultId, find }: Omit<Args, 'viewer'
   return { template, choose, intent }
 }
 
-export function useHomeGenerator({ templates, defaultId, viewer, viewerKnown, find }: Args) {
+export function useHomeGenerator({ templates, defaultId, viewer, find }: Args) {
   const { template, choose, intent } = useSelectedTemplate({ templates, defaultId, find })
   const [aspect, setAspect] = useState<OutputAspect>('original')
   const [note, setNote] = useState('')
   const pickedPhoto = useHomePhoto(viewer !== null)
-  const selectedFile = useRef(false)
-  const pickPhoto = pickedPhoto.pick
-  const pick = useCallback((file: File) => {
-    selectedFile.current = true
-    pickPhoto(file)
-  }, [pickPhoto])
   const photo: HomePhoto = template?.photoInput === 'none'
     ? { ...pickedPhoto, url: null, inputKey: null, file: null, error: null, status: 'none' } : pickedPhoto
   const apply = useCallback(
@@ -135,11 +124,10 @@ export function useHomeGenerator({ templates, defaultId, viewer, viewerKnown, fi
     },
     [choose, intent],
   )
-  useRestoreDraft({ viewerKnown, signedIn: viewer !== null, selectedFile, apply, pick: pickedPhoto.pick })
+  useRestoreDraft({ signedIn: viewer !== null, apply, pick: photo.pick })
   const running = useRunning(viewer?.concurrency.runningIds ?? [])
   const { options, photoRatio, outputAspect, cost } = useHomeOutput(template, aspect, photo)
-  const resolvedCta = generatorCta(template, viewer, photo.status, running, cost, outputAspect)
-  const cta: HomeCta = !viewerKnown && resolvedCta.kind === 'sign-up' ? { kind: 'checking-viewer' } : resolvedCta
+  const cta = generatorCta(template, viewer, photo, running, cost, outputAspect)
   const start = useStart(viewer, template, photo)
   return {
     template,
@@ -150,7 +138,7 @@ export function useHomeGenerator({ templates, defaultId, viewer, viewerKnown, fi
     setAspect,
     note,
     setNote,
-    photo: { ...photo, pick },
+    photo,
     cta,
     generate: () => start(outputAspect, note.trim()),
     // Before the sign-up prompt: what to bring back afterwards.
@@ -168,10 +156,10 @@ function useHomeOutput(template: CatalogueTemplate | null, aspect: OutputAspect,
   return { options, photoRatio, outputAspect, cost }
 }
 
-function generatorCta(template: CatalogueTemplate | null, viewer: HomeViewer | null, status: HomePhoto['status'], running: number, cost: number | null, outputAspect: OutputAspect | null): HomeCta {
+function generatorCta(template: CatalogueTemplate | null, viewer: HomeViewer | null, photo: HomePhoto, running: number, cost: number | null, outputAspect: OutputAspect | null): HomeCta {
   if (template && cost === null) return { kind: 'no-options' }
-  if (status === 'ready' && !outputAspect) return { kind: 'need-size' }
-  return homeCta({ viewer, cost, photo: status, photoOptional: allowsNoPhoto(template), running, needsCopy: template?.copyFields.some((field) => field.required) ?? false })
+  if (photo.status === 'ready' && !outputAspect) return { kind: 'need-size' }
+  return homeCta({ viewer, cost, photo: photo.status, photoOptional: allowsNoPhoto(template), running, needsCopy: template?.copyFields.some((field) => field.required) ?? false })
 }
 
 export type HomeGeneratorState = ReturnType<typeof useHomeGenerator>

@@ -98,6 +98,43 @@ describe('activated template prices', () => {
     await refuses(() => db.query('select admin.rollback_template_price_catalog_v2()'),'TEMPLATE_CATALOG_HAS_NEW_JOBS')
   })
 
+  it('sells edit at the approved 15 / 20 and still refuses anything under it', async () => {
+    await activate()
+    const tariffs = (await db.query('select admin.template_catalog_minimums() m')).rows[0].m
+    expect(tariffs.edit.costs).toEqual({ '1k': 15, '2k': 20, '4k': 58 })
+    // Only the edit row moved: the other tariffs are the ones the cutover shipped with.
+    expect(tariffs.freeform.costs).toEqual(costs)
+    expect((await db.query("select credits_cost c from public.templates where id='edit'")).rows[0].c).toEqual(tariffs.edit.costs)
+    const save = (one: number, two: number) => db.query('update public.templates set credits_cost=$1 where id=$2',
+      [{ '1k': one, '2k': two, '4k': 98 }, 'edit'])
+    await save(15, 20)
+    await refuses(() => save(14, 20), 'MODEL_CREDIT_FLOOR')
+    await refuses(() => save(15, 19), 'MODEL_CREDIT_FLOOR')
+    await refuses(() => save(14, 19), 'MODEL_CREDIT_FLOOR')
+    expect((await db.query("select credits_cost c from public.templates where id='edit'")).rows[0].c).toEqual({ '1k': 15, '2k': 20, '4k': 98 })
+  })
+
+  it('saves white-background at its approved 18 / 37 / 55 on the batch route and refuses one credit less', async () => {
+    await sample('white-background')
+    await activate()
+    const tariffs = (await db.query('select admin.template_catalog_minimums() m')).rows[0].m
+    expect(tariffs['white-background'].costs).toEqual({ '1k': 18, '2k': 37, '4k': 55 })
+    expect(tariffs.edit.costs).toEqual({ '1k': 15, '2k': 20, '4k': 58 })
+    expect(tariffs.freeform.costs).toEqual(costs)
+    const others = (await db.query("select id,costs from admin.template_tariffs_v2 where id<>all('{white-background,edit,promo-poster,pet-studio,freeform}')")).rows
+    expect(others.length).toBe(4)
+    for (const row of others) expect(row.costs).toEqual({ '1k': 74, '2k': 150, '4k': 225 })
+    const save = (one: number, two: number, four: number) => db.query('update public.templates set credits_cost=$1 where id=$2',
+      [{ '1k': one, '2k': two, '4k': four }, 'white-background'])
+    const sellable = () => db.query("select admin.assert_template_sale_floor(t) from public.templates t where id='white-background'")
+    await sellable()
+    await save(18, 37, 55)
+    await sellable()
+    await refuses(() => save(17, 37, 55), 'MODEL_CREDIT_FLOOR')
+    await refuses(() => save(18, 36, 55), 'MODEL_CREDIT_FLOOR')
+    await refuses(() => save(18, 37, 54), 'MODEL_CREDIT_FLOOR')
+  })
+
   it('retains approved live tariffs and refuses an old-price non-catalogue publication at commit', async () => {
     await activate()
     await db.query('set constraints template_publish_floor, prompt_publish_floor immediate')

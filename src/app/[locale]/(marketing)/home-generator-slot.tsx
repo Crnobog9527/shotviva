@@ -11,12 +11,12 @@ import { paymentChannel } from '@/core/billing/waffo'
 import { listFavoriteIdsOrEmpty } from '@/core/favorites'
 import { listRunningJobIds } from '@/core/jobs'
 import { logger } from '@/core/logger'
-import { HomeGenerator, HomeViewerFeed, type HomeGeneratorProps, type HomeViewer } from '@/modules/image/marketing'
+import { HomeGenerator, type HomeGeneratorProps, type HomeViewer } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
 
 import { paywallPerkFacts } from '../paywall-perk-facts'
 
-type Base = Omit<HomeGeneratorProps, 'viewerSlot' | 'googleAction'>
+type Base = Omit<HomeGeneratorProps, 'viewer' | 'googleAction'>
 
 // The visitor half of the home generator: the only request-time read on the page. Everything
 // else (copy, templates, samples) is in the prerendered shell (建站规格 R5).
@@ -49,14 +49,14 @@ async function safeViewer(): Promise<HomeViewer | null> {
   }
 }
 
-async function WithViewer() {
+async function WithViewer(props: Base) {
   const viewer = await safeViewer()
-  if (!viewer) return <HomeViewerFeed viewer={null} />
+  if (!viewer) return <HomeGenerator {...props} viewer={null} googleAction={googleAction} />
   const [perkFacts, products] = await Promise.all([paywallPerkFacts(), displayProducts()])
   // "Get credits · N needed" opens the same paywall as the workspace (DESIGN §6.9 item 9).
   return (
-    <PaywallProvider products={products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={wechatPayEnabled()} deferSheet>
-      <HomeViewerFeed viewer={viewer} />
+    <PaywallProvider products={products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={wechatPayEnabled()}>
+      <HomeGenerator {...props} viewer={viewer} googleAction={googleAction} />
       {/* What the member holds, so the paywall locks lower plans (T66). */}
       <StandingSlot />
     </PaywallProvider>
@@ -66,6 +66,8 @@ async function WithViewer() {
 // While the session streams in, the generator shows as for a signed-out visitor.
 export function HomeGeneratorSlot(props: Base) {
   return (
-    <HomeGenerator {...props} googleAction={googleAction} viewerSlot={<Suspense fallback={null}><WithViewer /></Suspense>} />
+    <Suspense fallback={<HomeGenerator {...props} viewer={null} googleAction={googleAction} />}>
+      <WithViewer {...props} />
+    </Suspense>
   )
 }

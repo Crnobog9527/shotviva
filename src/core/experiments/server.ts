@@ -4,7 +4,7 @@ import { NextRequest, userAgent, type NextResponse } from 'next/server'
 
 import { createAdminSupabase } from '../auth/supabase-admin'
 import { EXPERIMENT_COOKIE, EXPERIMENT_COOKIE_MAX_AGE } from './cookie'
-import { createLiveConfig, type LiveConfigAccess } from './live-config'
+import { createLiveConfig } from './live-config'
 import { PREVIEW_PARAM, routeExperiment, surfaceAt, type RouteOutcome } from './routing'
 import type { ExperimentRegistry } from './types'
 
@@ -25,12 +25,7 @@ export function isBotRequest(request: NextRequest): boolean {
   return !ua || userAgent(request).isBot || BOT_WORDS.test(ua)
 }
 
-export async function experimentRoute(
-  request: NextRequest,
-  registry: ExperimentRegistry,
-  allowForce: boolean,
-  access: LiveConfigAccess,
-): Promise<RouteOutcome | null> {
+export async function experimentRoute(request: NextRequest, registry: ExperimentRegistry, allowForce: boolean): Promise<RouteOutcome | null> {
   if (request.method !== 'GET' && request.method !== 'HEAD') return null
   if (!surfaceAt(request.nextUrl.pathname, registry)) return null
   const input = {
@@ -42,7 +37,7 @@ export async function experimentRoute(
     allowForce,
   }
   // Crawlers and previews never need the live list; skip the read.
-  const live = input.isBot || input.params.has(PREVIEW_PARAM) ? [] : await liveExperiments(access)
+  const live = input.isBot || input.params.has(PREVIEW_PARAM) ? [] : await liveExperiments()
   return routeExperiment(input, live, registry)
 }
 
@@ -74,6 +69,5 @@ export function withExperimentCookie(response: NextResponse, outcome: RouteOutco
   return response
 }
 
-export type { LiveConfigState } from './live-config'
 export { OPTION_PAGES, type RouteOutcome } from './routing'
 export { mergeAccountRows, signupExperiments, syncExperimentsAtSignIn } from './sign-in'

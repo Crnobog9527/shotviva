@@ -5,7 +5,7 @@ import { errorResponse, jsonResponse } from '@/core/api-response'
 import { requireApiUser } from '@/core/auth'
 import { AppError } from '@/core/errors'
 import { isLocale } from '@/core/i18n/locales'
-import { loadCatalogueForms } from '@/modules/image'
+import { loadCatalogueForms } from '@/modules/image/create-data'
 
 const formIds = z.array(z.string().min(1).max(200)).min(1).max(30)
 

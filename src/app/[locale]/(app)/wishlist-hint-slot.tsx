@@ -5,7 +5,7 @@ import { getSessionUser } from '@/core/auth'
 import { logger } from '@/core/logger'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishlistHintLazy } from '@/core/wishlist/ui/wishlist-hint-lazy'
-import { AfterSuccess } from '@/modules/image'
+import { AfterSuccess } from '@/modules/image/app-shell'
 import { site } from '@/site/site.config'
 
 import { markWishlistHintSeen } from './wishlist/onboarding-actions'
