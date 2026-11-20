@@ -1,16 +1,21 @@
 name: Codex review
 
-# Codex reviews in proportion to risk, and its findings block the merge until handled
-# (scripts/ci/review-risk.mjs decides the risk from the changed paths).
+# Code review in proportion to risk, and its findings block the merge until handled
+# (scripts/ci/review-risk.mjs decides the risk from the changed paths). The reviewer is Codex or,
+# while Codex is unavailable, Claude; the check keeps its name "Codex findings" because branch
+# protection requires it by that name.
 #
 # "Codex findings" (scripts/ci/codex-findings.mjs):
-#   - fails while a Codex review thread is unresolved on current code. Fix: push the fix.
+#   - fails while a Codex or Claude review thread is unresolved on current code. Fix: push the fix.
 #     Won't fix: resolve the thread, then reply in it with the reason (the reply re-runs this).
 #   - lists unresolved threads on lines a later commit changed as warnings, without failing;
+#   - fails while the last Codex review failed (e.g. out of quota) and no Claude review exists;
 #   - fails for high-risk PRs (money, sign-in, database, providers, proxy, config, CI) until a
-#     Codex review has finished, and warns when the head is newer than the reviewed commit.
+#     review has finished, and warns when the head is newer than the reviewed commit.
 # Codex ignores "@codex review" from bots, so the review is asked for by a person or by the
 # session that opened the PR (scripts/ci/codex-request.mjs, with the Owner's gh login).
+# A Claude review counts only when it is a PR review by the repository owner's account carrying
+# <!-- claude-review:v1 commit=<sha> --> (scripts/ci/claude-review-post.mjs publishes one).
 on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize]
