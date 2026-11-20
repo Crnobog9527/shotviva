@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { SeriesCard } from './series-card'
-import { decodePairs } from './series-layers'
+import { decodePairs, pictureAttrs } from './series-layers'
 
 // SEO 2026-11-14: a series opens Create, which needs a session and is noindex. The card is a
 // button carrying the address for the page's click handler, never a crawlable <a href>.
@@ -63,6 +63,16 @@ describe('series card', () => {
   it('leaves a one-pair series still: no addresses to play through', () => {
     expect(html).not.toContain('data-series-pairs')
   })
+
+  it('gives a browser-drawn layer the srcset the server gives the first pair', () => {
+    const server = /<img[^>]*class="mk-sb"[^>]*>/.exec(html)?.[0] ?? ''
+    const attr = (name: string) => new RegExp(`${name}="([^"]*)"`).exec(server)?.[1].replaceAll('&amp;', '&')
+    const built = pictureAttrs('https://shotviva.com/a-before.webp', '50vw')
+    expect(built.srcSet).toContain('/_next/image?url=')
+    expect(built.srcSet).toBe(attr('srcSet') ?? attr('srcset'))
+    expect(built.src).toBe(attr('src'))
+    expect(built.sizes).toBe(attr('sizes'))
+  })
 })
 
 describe('series layer addresses', () => {
@@ -72,4 +82,5 @@ describe('series layer addresses', () => {
     expect(decodePairs('{"a":1}')).toEqual([])
     expect(decodePairs('[["a","b"],["c"],[1,2],"x"]')).toEqual([['a', 'b']])
   })
+
 })

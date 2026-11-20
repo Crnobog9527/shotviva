@@ -1,5 +1,8 @@
-import { coverImage } from '../../ui/cover-image'
+import { getImageProps } from 'next/image'
+
+import { coverLoaderFor } from '../../ui/cover-image'
 import { setImageRatio } from '../../ui/image-ratio'
+import { capSrcSet } from '../../ui/srcset-cap'
 
 // A series card's later pairs, drawn in the browser the first time the card plays instead of by
 // the server: every member's four pictures used to be in the page as hidden layers, 53 of them on
@@ -11,7 +14,7 @@ export type LayerPair = readonly [before: string, after: string]
 export const PAIRS_ATTR = 'data-series-pairs'
 export const SIZES_ATTR = 'data-series-sizes'
 const BUILT_ATTR = 'data-series-built'
-const SIZE = { width: '900', height: '1125' }
+const SIZE = { width: 900, height: 1125 }
 
 export function encodePairs(pairs: readonly LayerPair[]): string {
   return JSON.stringify(pairs)
@@ -28,17 +31,24 @@ export function decodePairs(value: string | null): LayerPair[] {
   }
 }
 
-// The <img> SiteImage would render for a cover: the image optimiser's srcset for the slot, lazy.
-// The after plate gets white behind it once loaded, and its ratio for the plate (WhiteGroundImage).
+// The <img> SiteImage renders for a lazy cover (site-image.tsx: next/image's attributes, its
+// loader, the srcset capped to the slot). The after plate gets white behind it once loaded, and
+// its ratio for the plate, as WhiteGroundImage does.
+export function pictureAttrs(url: string, sizes: string) {
+  const loader = coverLoaderFor(url)
+  const { props } = getImageProps({ src: url, alt: '', ...SIZE, sizes, loading: 'lazy', ...(loader ? { loader } : {}) })
+  return capSrcSet({ sizes: props.sizes, srcSet: props.srcSet, src: props.src }, sizes)
+}
+
 function picture(doc: Document, url: string, sizes: string, className: string, after: boolean): HTMLImageElement {
   const img = doc.createElement('img')
-  const cover = coverImage(url, sizes)
+  const attrs = pictureAttrs(url, sizes)
   img.className = className
   img.alt = ''
   img.loading = 'lazy'
   img.decoding = 'async'
-  img.width = Number(SIZE.width)
-  img.height = Number(SIZE.height)
+  img.width = SIZE.width
+  img.height = SIZE.height
   if (className === 'mk-fill') img.setAttribute('aria-hidden', 'true')
   if (after && className !== 'mk-fill') {
     img.addEventListener('load', () => {
@@ -46,10 +56,10 @@ function picture(doc: Document, url: string, sizes: string, className: string, a
       img.classList.add('bg-photo-white')
     }, { once: true })
   }
-  // srcset before src, as next/image orders them, so the browser never fetches the full file.
-  if (cover.sizes) img.sizes = cover.sizes
-  if (cover.srcSet) img.srcset = cover.srcSet
-  img.src = cover.src
+  // sizes and srcset before src, as next/image orders them, so the full file is never fetched.
+  if (attrs.sizes) img.sizes = attrs.sizes
+  if (attrs.srcSet) img.srcset = attrs.srcSet
+  img.src = attrs.src
   return img
 }
 
