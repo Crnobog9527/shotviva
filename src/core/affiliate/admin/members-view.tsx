@@ -12,7 +12,7 @@ import { DossierSections } from './dossier-sections'
 import { enrollmentLabel } from './enrollment'
 import type { SaveAction } from './form'
 import { AnnotateMember } from './member-annotate'
-import { DecideMember, ReopenApplication, SetMember } from './member-forms'
+import { DecideMember, MembershipSwitch, ReopenApplication, SetMember } from './member-forms'
 import { Field, FiltersForm, LinkTo, NextPage, Select } from './parts'
 import { href, type Filters } from './query'
 
@@ -59,6 +59,7 @@ async function MemberView(props: DossierProps) {
       <AnnotateMember member={member} action={action} />
       {member.status === 'pending' && <DecideMember member={member} action={action} />}
       {member.status === 'rejected' && <ReopenApplication member={member} action={action} />}
+      <MembershipSwitch member={member} action={action} />
       {['active', 'suspended', 'banned'].includes(member.status) && (
         <details className="rounded-md border bg-card p-4">
           <summary className="cursor-pointer font-medium">{DOSSIER.manage}</summary>
