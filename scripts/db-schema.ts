@@ -36,7 +36,8 @@ const FOREIGN_TRIGGERS_SQL = `
    order by n.nspname, c.relname, t.tgname`
 
 function cli(args: string[], stderr: 'inherit' | 'ignore' = 'inherit'): string {
-  return execFileSync('supabase', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', stderr] })
+  // The public+admin dump passed Node's 1 MiB default buffer (ENOBUFS); leave ample headroom.
+  return execFileSync('supabase', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', stderr], maxBuffer: 64 * 1024 * 1024 })
 }
 
 // Same stack `db dump --local` reads (this directory's config, or SUPABASE_WORKDIR).
