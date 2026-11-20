@@ -42,11 +42,11 @@ function SeriesPairs({ card, media, size, sizes }: PairsProps) {
     >
       <span className="mk-pane">
         <Image className="mk-fill" src={first.before} alt="" aria-hidden {...SIZE} sizes={sizes} loading="lazy" />
-        <Image className="mk-sb" src={first.before} alt={t('beforeAlt', { name: card.name })} {...SIZE} sizes={sizes} loading="lazy" />
+        <Image className="mk-sb" src={first.before} alt="" {...SIZE} sizes={sizes} loading="lazy" />
       </span>
       <span className="mk-pane">
         <Image className="mk-fill" src={first.after} alt="" aria-hidden {...SIZE} sizes={sizes} loading="lazy" />
-        <WhiteGroundImage className="mk-sa" src={first.after} alt={t('afterAlt', { name: card.name, use: card.use })} {...SIZE} sizes={sizes} loading="lazy" fitPlate />
+        <WhiteGroundImage className="mk-sa" src={first.after} alt="" {...SIZE} sizes={sizes} loading="lazy" fitPlate />
       </span>
       <span className="mk-hl" aria-hidden />
       <span className="mk-tag mk-tag-l" aria-hidden>
@@ -95,12 +95,11 @@ type Props = { card: TemplateCard; media: TemplateLookup; sizes: string; size?: 
 // and is noindex, so a crawlable <a> to it only spent this page's link equity on the sign-in
 // redirect (SEO 2026-11-14). Name, use and size of the set are in the HTML (建站规格 R5).
 export function SeriesCard({ card, media, sizes, size = 'card' }: Props) {
-  const t = useTranslations('marketing.home')
   if (!card.series) return null
   return (
-    <button type="button" data-open-series={card.series.href} className="mk-tpl mk-series" aria-label={t('seriesAria', { name: card.name, use: card.use, count: card.series.count })}>
+    <button type="button" data-open-series={card.series.href} className="mk-tpl mk-series">
       {/* Two prints stacked behind the frame, their corners showing past it (as in Create). */}
-      <span className={size === 'lg' ? 'mk-sstack mk-sstack-lg' : 'mk-sstack'}>
+      <span className={size === 'lg' ? 'mk-sstack mk-sstack-lg' : 'mk-sstack'} aria-hidden>
         <span className="mk-sprint mk-sprint-back" aria-hidden />
         <span className="mk-sprint mk-sprint-mid" aria-hidden />
         <span className="mk-sframe">
@@ -108,7 +107,7 @@ export function SeriesCard({ card, media, sizes, size = 'card' }: Props) {
           <SeriesBadge />
         </span>
       </span>
-      <SeriesMeta card={card} />
+      {size === 'lg' ? <span className="sr-only">{card.name}</span> : <SeriesMeta card={card} />}
     </button>
   )
 }
