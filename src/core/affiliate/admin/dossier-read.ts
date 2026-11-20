@@ -8,7 +8,7 @@ const cents = z.number().int().safe()
 const id = z.union([z.number().int().safe().positive(), z.string().regex(/^[1-9]\d*$/)]).transform(String)
 const directory = z.object({
   user_id: z.uuid(), slug: z.string(), status: z.string(), created_at: z.string(),
-  name: z.string().nullable(), email: z.string().nullable(), phone: z.string().nullable(), source: z.string().nullable(),
+  name: z.string().nullable(), admin_label: z.string().nullable(), email: z.string().nullable(), phone: z.string().nullable(), source: z.string().nullable(),
   team_enabled: z.boolean(), team_count: cents.nonnegative().nullable(),
   total: cents, confirmed: cents, unwithdrawn: cents, paid: cents,
 })

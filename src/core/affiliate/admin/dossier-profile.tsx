@@ -33,7 +33,7 @@ export function ProfileFacts({ member: m }: { member: DossierDetail }) {
   return (
     <div className="grid gap-3 md:grid-cols-3">
       <Facts title={DOSSIER.accountProfile} rows={[
-        [COPY.name, m.name], [DOSSIER.email, m.email], [DOSSIER.phone, m.phone], [COPY.account, m.user_id],
+        [COPY.name, m.name], [DOSSIER.adminLabel, m.admin_label], [DOSSIER.email, m.email], [DOSSIER.phone, m.phone], [COPY.account, m.user_id],
         [DOSSIER.registered, formatBeijing(m.registered_at)], [DOSSIER.enrolled, formatBeijing(m.created_at)],
         [DOSSIER.approved, formatBeijing(m.approved_at)], [DOSSIER.approvedBy, m.approved_by],
         [DOSSIER.parent, m.parent_user_id && <LinkTo filters={{ tab: 'affiliates', id: m.parent_user_id }}>{m.parent_user_id}</LinkTo>],
