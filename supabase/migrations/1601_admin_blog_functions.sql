@@ -34,6 +34,8 @@ begin
     returning id, status into v_id, v_status;
     if v_id is null then raise exception 'BLOG_POST_NOT_FOUND'; end if;
   end if;
+  -- A published post keeps a body: the same rule as publishing, so saving cannot empty a live page.
+  if v_status = 'published' and char_length(btrim(p_body_md, E' \n\r\t')) = 0 then raise exception 'BLOG_POST_EMPTY'; end if;
   insert into public.admin_audit_log (action, user_id, target_id, reason)
   values ('blog_save', p_actor, v_id::text, format('%s/%s', p_locale, p_slug));
   return jsonb_build_object('id', v_id, 'status', v_status);

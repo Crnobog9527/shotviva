@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 
-import { articleLd, cachedPublishedPost, cachedPublishedPosts, postCrumbs, postMetadata } from '@/core/blog'
+import { SLUG_PATTERN, articleLd, cachedPublishedPost, cachedPublishedPosts, postCrumbs, postMetadata } from '@/core/blog'
 import { ArticleView } from '@/core/blog/ui'
 import { isLocale, type Locale } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
@@ -25,6 +25,8 @@ export async function generateStaticParams({ params }: { params: { locale: strin
 async function load(params: Promise<{ slug: string }>) {
   const locale = await currentLocale()
   const { slug } = await params
+  // Anything that cannot be a post's address is a 404 before any cache entry or query.
+  if (slug.length > 100 || !SLUG_PATTERN.test(slug)) notFound()
   const post = await cachedPublishedPost(locale, slug)
   if (!post) notFound()
   const otherExists = (await cachedPublishedPost(locale === 'en' ? 'zh' : 'en', slug)) !== null

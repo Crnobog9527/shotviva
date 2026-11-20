@@ -8,7 +8,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import { LOCALES, type Locale } from '../i18n/locales'
 import { logger } from '../logger'
-import { BLOG_CACHE_TAG, type Post, type PostSummary } from './rules'
+import { BLOG_CACHE_TAG, BLOG_FOOTER_TAG, type Post, type PostSummary } from './rules'
 
 // The public blog's reads (AGENTS §5.1 items 5 and 6): published rows only, the columns a page
 // needs, cached under the blog tag that every admin write expires. No cookies in a cache, so
@@ -114,6 +114,13 @@ export async function cachedPublishedPost(locale: Locale, slug: string): Promise
   'use cache'
   cacheTag(BLOG_CACHE_TAG)
   return orFallback(() => readPublishedPost(createAdminSupabase(), locale, slug), null)
+}
+
+// For the footer link on every marketing page: only whether the language has a published post.
+export async function cachedHasPublishedPosts(locale: Locale): Promise<boolean> {
+  'use cache'
+  cacheTag(BLOG_FOOTER_TAG)
+  return orFallback(async () => (await readPublishedPosts(createAdminSupabase(), locale, 1)).length > 0, false)
 }
 
 export async function cachedSitemapPosts(): Promise<Pick<PostSummary, 'locale' | 'slug' | 'updatedAt'>[]> {

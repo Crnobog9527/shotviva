@@ -95,6 +95,7 @@ export async function savePost(db: SupabaseClient, actorId: string, input: unkno
   })
   if (error?.code === '23505') throw new AppError('CONFLICT', BLOG_ERRORS.slugTaken)
   if (error?.message === 'BLOG_POST_NOT_FOUND') throw new AppError('NOT_FOUND', BLOG_ERRORS.notFound)
+  if (error?.message === 'BLOG_POST_EMPTY') throw new AppError('INVALID_INPUT', BLOG_ERRORS.empty)
   if (error) fail('save', error)
   const saved = z.object({ id: z.string(), status: z.enum(['draft', 'published']) }).parse(data)
   return { ...saved, locale: post.locale, slug: post.slug }

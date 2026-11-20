@@ -14,6 +14,9 @@ export const MAX_BODY_CHARS = 200_000
 
 // Cache tag every blog read carries; every admin write expires it.
 export const BLOG_CACHE_TAG = 'blog'
+// The footer's "has this language a post" read: expires only when a post is published or taken
+// down, so saving text does not re-render every marketing page.
+export const BLOG_FOOTER_TAG = 'blog-footer'
 
 // What the admin form sends. The cover is an https address in our public assets bucket with its
 // alt text; the text fields are trimmed here so the database never stores padding.

@@ -119,6 +119,15 @@ describe('admin_blog_save', () => {
     await expect(savePost(service, admin, input({ id: crypto.randomUUID(), slug: slug('ghost') }))).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 
+  it('refuses to empty a published post, and still lets a draft be empty', async () => {
+    const saved = await savePost(service, admin, input({ slug: slug('keep-body') }))
+    await setPostStatus(service, admin, { id: saved.id, publish: true })
+    await expect(savePost(service, admin, input({ id: saved.id, slug: slug('keep-body'), bodyMd: ' \n ' }))).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    expect((await getAdminPost(service, saved.id))?.body_md).toContain('Text.')
+    await setPostStatus(service, admin, { id: saved.id, publish: false })
+    await expect(savePost(service, admin, input({ id: saved.id, slug: slug('keep-body'), bodyMd: '' }))).resolves.toMatchObject({ status: 'draft' })
+  })
+
   it('refuses bad input before the database', async () => {
     await expect(savePost(service, admin, input({ slug: 'Bad Slug' }))).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     await expect(savePost(service, admin, input({ coverUrl: 'https://example.com/a.webp', coverAlt: null }))).rejects.toMatchObject({ code: 'INVALID_INPUT' })
