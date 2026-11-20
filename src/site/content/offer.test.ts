@@ -72,7 +72,7 @@ describe('how long a photo takes', () => {
   })
 })
 
-// The 2026-11-21 plan: credits change (5,500 / 11,500 monthly, × 12 yearly), prices stay.
+// The 2026-11-21 plan: credits change (5,500 / 11,500 monthly, × 12 yearly).
 describe('copy under the credits-only plan', () => {
   const credits: Record<string, number> = { pro_monthly: 5500, pro_yearly: 66000, max_monthly: 11500, max_yearly: 138000 }
   const o2 = site.billing.products.map(p => credits[p.id] ? { ...p, credits: credits[p.id]! } : p)
@@ -80,6 +80,13 @@ describe('copy under the credits-only plan', () => {
   it('states each plan\'s yearly saving in both languages', () => {
     expect(makePricingPage(o2).intro).toContain('Yearly Shotviva plans save 20% compared with paying monthly (Max saves 25%).')
     expect(makeZhPricingPage(o2).intro).toContain('按年付省 20%（旗舰版省 25%）。')
+  })
+
+  // Owner 「用 b」: Max yearly $950.40, so every plan saves 20%.
+  it('says one saving when every plan saves the same', () => {
+    const b = o2.map(p => p.id === 'max_yearly' ? { ...p, priceUsd: 950.4 } : p)
+    expect(makePricingPage(b).intro).toContain('Yearly Shotviva plans save 20% compared with paying monthly.')
+    expect(makeZhPricingPage(b).intro).toContain('按年付省 20%。')
   })
 
   it('states the member pack discounts of the listed packs, Starter at list price', () => {

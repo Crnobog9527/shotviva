@@ -9,7 +9,7 @@ import { privateDoc } from '../../../tests/support/private-docs'
 
 // The 2026-11-21 terms (Owner: 「用只改积分的版本」, ARCHITECTURE §6.2), published as new
 // /admin/products revisions: every price stays; Pro / Max get 5,500 / 11,500 credits a month and
-// yearly 12 × that; M / L packs: members pay 100 / 95 / 90%. site.config keeps the revision-2 seed
+// yearly 12 × that at 20% off on every plan (Max yearly $891 → $950.40, Owner: 「用 b」); M / L packs: members pay 100 / 95 / 90%. site.config keeps the revision-2 seed
 // the database was created with (tests/db/product-catalog.test.ts), so the terms are written here.
 const PACK_PAY = { starter: 100, pro: 95, max: 90 }
 const TERMS: readonly SiteProduct[] = [
@@ -18,7 +18,7 @@ const TERMS: readonly SiteProduct[] = [
   { id: 'pro_monthly', tier: 'pro', interval: 'month', credits: 5500, paidDays: 30, priceUsd: 49.9 },
   { id: 'pro_yearly', tier: 'pro', interval: 'year', credits: 66000, paidDays: 365, priceUsd: 479.04 },
   { id: 'max_monthly', tier: 'max', interval: 'month', credits: 11500, paidDays: 30, priceUsd: 99 },
-  { id: 'max_yearly', tier: 'max', interval: 'year', credits: 138000, paidDays: 365, priceUsd: 891 },
+  { id: 'max_yearly', tier: 'max', interval: 'year', credits: 138000, paidDays: 365, priceUsd: 950.4 },
   { id: 'pack_s', tier: 'pack', interval: null, credits: 990, paidDays: null, priceUsd: 9.9 },
   { id: 'pack_m', tier: 'pack', interval: null, credits: 2490, paidDays: null, priceUsd: 24.9, packMemberPayPct: PACK_PAY },
   { id: 'pack_l', tier: 'pack', interval: null, credits: 4990, paidDays: null, priceUsd: 49.9, packMemberPayPct: PACK_PAY },
@@ -63,16 +63,23 @@ describe('pricing invariants (ARCHITECTURE §6.2, 2026-11-21 terms)', () => {
       expect(year.credits).toBe(plan.credits * 12)
       return (1 - cents(year) / (cents(plan) * 12)) * 100
     })
-    expect(saving.map(s => Math.round(s * 1e6) / 1e6)).toEqual([20, 20, 25])
+    expect(saving.map(s => Math.round(s * 1e6) / 1e6)).toEqual([20, 20, 20])
   })
 
-  // Invariant 2: the enterprise package per credit is at or below the cheapest self-serve credit. Its terms are private
+  // Invariant 2 and the enterprise margin rule. The tiers and the cost budget are private
   // (ARCHITECTURE §6.2 「企业包」 in shotviva-docs); skipped where that repo is absent (CI).
   const spec = privateDoc('规范', 'ARCHITECTURE.md')
-  it.skipIf(!spec)('keeps the enterprise package at or below the cheapest self-serve credit', () => {
-    const line = readFileSync(spec!, 'utf8').match(/企业包\*\*[^¥\n]*¥([\d,]+)，锁定汇率 ([\d.]+)[^\n，]*，([\d,]+) 积分/)
-    expect(line, 'ARCHITECTURE §6.2 states the enterprise package').not.toBeNull()
-    const [cny, fx, credits] = line!.slice(1).map(n => Number(n.replaceAll(',', '')))
-    expect(cny! / fx! / credits!).toBeLessThanOrEqual(cheapestPerCredit(TERMS))
+  it.skipIf(!spec)('prices every enterprise tier at or below the cheapest self-serve credit, keeping 65% typical margin', () => {
+    const text = readFileSync(spec!, 'utf8')
+    const line = text.match(/^- \*\*企业包\*\*.*$/m)?.[0] ?? ''
+    const tiers = [...line.matchAll(/\$([\d,]+) → ([\d,]+) 积分/g)].map(m => Number(m[1]!.replaceAll(',', '')) / Number(m[2]!.replaceAll(',', '')))
+    expect(tiers.length, 'ARCHITECTURE §6.2 states the enterprise tiers').toBeGreaterThan(0)
+    const budget = Number(text.match(/C_max = \$([\d.]+)\/积分/)?.[1])
+    expect(budget).toBeGreaterThan(0)
+    for (const perCredit of tiers) {
+      expect(perCredit).toBeLessThanOrEqual(cheapestPerCredit(TERMS))
+      // Offline transfer, no refund, no commission: the price is the take. Cost × 1.10 buffer.
+      expect(1 - (budget * 1.1) / perCredit).toBeGreaterThanOrEqual(0.65)
+    }
   })
 })
