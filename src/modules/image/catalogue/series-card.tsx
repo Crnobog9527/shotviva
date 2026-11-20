@@ -73,7 +73,7 @@ function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boole
     return (
       <span className="hairline relative isolate block aspect-[8/5] overflow-hidden rounded-control bg-muted">
         <img {...cover} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" />
-        <img {...cover} alt={alt} loading={loading} decoding="async" className="absolute inset-0 size-full object-contain transition-transform duration-600 ease-house group-hover:scale-[1.02]" />
+        <img {...cover} alt={alt} loading={loading} decoding="async" className="absolute inset-0 size-full object-contain" />
       </span>
     )
   }

@@ -2,6 +2,7 @@ import 'server-only'
 
 import { z } from 'zod'
 
+import { notifyOwner } from '../../alerts'
 import { trackPurchase } from '../../analytics/funnel'
 import type { ProductId, SiteProduct } from '../../config'
 import { AppError } from '../../errors'
@@ -81,6 +82,12 @@ function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, fact
   }, meta.locale)
 }
 
+// After a grant (never a replay): the Owner hears of the payment. Keyed by the payment id.
+function alertReceived(userId: string, product: SiteProduct, paymentId: string, facts: WaffoPaymentFacts, renewal: boolean): void {
+  notifyOwner({ kind: 'payment_received', channel: 'waffo', ref: paymentId, userId, productId: product.id,
+    amount: { cents: facts.amountTotal, currency: facts.currency }, method: facts.method, renewal })
+}
+
 // Every successful Waffo charge grants once: a one-time order, a subscription's first payment and
 // each renewal (T50) alike, keyed by the payment id (the eventId of both events). A failed
 // renewal sends no payment event, so it grants nothing and paid_until stays.
@@ -112,12 +119,19 @@ async function settleCharge(deps: WaffoFulfilDeps, order: WaffoOrder, product: S
   const quote = readQuote(order.orderMetadata, product)
   if (quote && isQuotedRenewal(order, form)) {
     const outcome = await settleQuotedRenewal(deps.db, order, paymentId, quote.cents)
-    if (outcome === 'applied') track(deps, userId, product, paymentFacts(order, product), { locale, form, credits: quote.credits })
+    if (outcome === 'applied') {
+      const facts = paymentFacts(order, product)
+      track(deps, userId, product, facts, { locale, form, credits: quote.credits })
+      alertReceived(userId, product, paymentId, facts, true)
+    }
     return outcome
   }
   const facts = paymentFacts(order, product, quote)
   const change = await settleWaffoOrder(deps.db, { userId, productId: product.id, paymentId, facts, version: quote && 'v2' })
-  if (change.applied) track(deps, userId, product, facts, { locale, form, credits: quote?.credits })
+  if (change.applied) {
+    track(deps, userId, product, facts, { locale, form, credits: quote?.credits })
+    alertReceived(userId, product, paymentId, facts, form === 'subscription' && (order.periodNumber ?? 1) > 1)
+  }
   return change.applied ? 'applied' : 'replayed'
 }
 

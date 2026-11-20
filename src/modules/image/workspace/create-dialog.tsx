@@ -11,15 +11,18 @@ import { matchesStore } from '@/core/store-profile'
 
 import { FormWeeklyTools } from '../again/form-weekly-tools'
 import { useFormWeekly } from '../again/use-form-weekly'
+import { CatalogueFormStatus } from '../catalogue/catalogue-form-status'
 import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { preloadBatchDialog } from '../matrix/batch-dialog-slot'
 import { openBatch } from '../matrix/batch-query'
 import { isCompareSample } from '../catalogue/template-sample'
+import { useCatalogueForms } from '../catalogue/use-catalogue-forms'
 import { ZoomableSample } from '../catalogue/zoomable-sample'
 import { ShareButton } from '../share/share-button'
 import { FavoriteButton } from '../favorites/favorite-button'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
+import { PendingCatalogueForm } from './pending-catalogue-form'
 import { useSubmitOnce } from './use-submit-once'
 import { useWarmRoute } from './use-warm-route'
 import { useWorkspaceDraft, type DraftInput } from './use-workspace-draft'
@@ -44,7 +47,16 @@ export function CreateDialog({ template, onClose, ...context }: Props) {
 
 type BodyProps = CreateContext & { template: CatalogueTemplate; open: boolean; onClose(): void }
 
-function CreateBody({ template, open, onClose, ...context }: BodyProps) {
+function CreateBody(props: BodyProps) {
+  const forms = useCatalogueForms([props.template])
+  const template = forms.fill(props.template)
+  if (template.formDeferred && (template.hasDeferredSlots || template.hasDeferredGroups)) {
+    return <PendingCatalogueForm {...props} failed={forms.failed} retry={forms.retry} />
+  }
+  return <CreateForm {...props} template={template} forms={forms} />
+}
+
+function CreateForm({ template, open, onClose, forms, ...context }: BodyProps & { forms: ReturnType<typeof useCatalogueForms> }) {
   const t = useTranslations('app.template')
   const router = useRouter()
   const draft = useWorkspaceDraft({ template, ...context, single: true })
@@ -81,7 +93,7 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
         </div>
       }
       form={<>
-        <FormWeeklyTools weekly={weekly} names={{ [template.id]: template.name }} storeFields={matchesStore(template.copyFields)} />
+        {forms.ready ? <FormWeeklyTools weekly={weekly} names={{ [template.id]: template.name }} storeFields={matchesStore(template.copyFields)} /> : null}
         <WorkspaceForm
           template={template}
           balance={context.balance}
@@ -92,6 +104,7 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
           onChange={draft.change}
           surface="create_dialog"
           examples={draft.fromExamples}
+          detailsStatus={!forms.ready && <CatalogueFormStatus failed={forms.failed} retry={forms.retry} />}
           photoExtra={batch ? <BatchLink templateId={template.id} onGo={onClose} /> : null}
         />
       </>}

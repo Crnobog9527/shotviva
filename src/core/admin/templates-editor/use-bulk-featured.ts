@@ -33,7 +33,7 @@ export function useBulkFeatured(setFeaturedMany: TemplateAdminActions['setFeatur
       if (!result.ok) {
         setAsking(null)
         setError(result.message)
-      } else if (result.value.failures.length > 0 || result.value.over > 0) {
+      } else if (result.value.failures.length > 0) {
         setRefused(result.value)
       } else {
         setAsking(null)

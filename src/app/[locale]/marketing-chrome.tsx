@@ -19,7 +19,7 @@ const zhPaths = site.locales.zhPaths
 // Log in · Start free (signed in: Open app · account), phones keep the globe and Log in (or
 // Open app · account). Shared by the marketing layout and
 // the 404 pages, which render outside it. `locale` is explicit for the global 404.
-export async function MarketingHeader({ locale }: { locale: Locale }) {
+export async function MarketingHeader({ locale, homeOnly = false }: { locale: Locale; homeOnly?: boolean }) {
   const t = await getTranslations({ locale, namespace: 'marketing.nav' })
   return (
     <header className="mk-appbar">
@@ -59,7 +59,7 @@ export async function MarketingHeader({ locale }: { locale: Locale }) {
           </Suspense>
           {/* usePathname() is request data on dynamic routes; nothing shows until it resolves. */}
           <Suspense fallback={<span className="size-11" />}>
-            <LocaleMenu translatedPaths={zhPaths} />
+            <LocaleMenu translatedPaths={zhPaths} homeOnly={homeOnly} />
           </Suspense>
           <NavAccountSlot />
         </nav>
@@ -69,7 +69,7 @@ export async function MarketingHeader({ locale }: { locale: Locale }) {
 }
 
 // Footer: contact, copyright, legal links and the text language switch (ARCHITECTURE §17).
-export async function MarketingFooter({ locale }: { locale: Locale }) {
+export async function MarketingFooter({ locale, homeOnly = false }: { locale: Locale; homeOnly?: boolean }) {
   const [t, galleryText, galleryOpen] = await Promise.all([
     getTranslations({ locale, namespace: 'affiliate' }),
     getTranslations({ locale, namespace: 'gallery' }),
@@ -84,7 +84,7 @@ export async function MarketingFooter({ locale }: { locale: Locale }) {
       programLink={{ href: '/partners/join', label: t('programName') }}
       languageSwitch={
         <Suspense fallback={<FooterLocalesFallback />}>
-          <FooterLocales translatedPaths={zhPaths} />
+          <FooterLocales translatedPaths={zhPaths} homeOnly={homeOnly} />
         </Suspense>
       }
     />

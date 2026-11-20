@@ -19,6 +19,7 @@ type Props = {
   sizes: string
   className?: string
   decorative?: boolean
+  showcase?: boolean
 }
 
 // The side-by-side pair (DESIGN §6.9 item 1): the phone photo on the left, the AI result on the
@@ -36,9 +37,10 @@ const afterLoading = (preload: boolean) => (preload ? ({ loading: 'eager', fetch
 // later, and the full picture covers it as soon as it has loaded (same crop, same filter). A
 // plain <img> with `decoding="sync"`, so the frame is decoded for the very first paint; as a CSS
 // background it was decoded off-thread and appeared a few frames late, behind hydration.
-export function BeforePane({ image, preload, sizes }: { image: ImageRef; preload: boolean; sizes: string }) {
+export function BeforePane({ image, preload, sizes, showcase = false }: { image: ImageRef; preload: boolean; sizes: string; showcase?: boolean }) {
   return (
     <span className="mk-pane">
+      {showcase ? <Image className="mk-fill" src={image.src} alt="" aria-hidden width={image.width} height={image.height} sizes={sizes} loading="lazy" /> : null}
       {/* eslint-disable-next-line @next/next/no-img-element -- a data: URI, nothing for next/image to resize */}
       {preload && image.firstFrame ? <img className="mk-ff" src={image.firstFrame} width={image.width} height={image.height} alt="" aria-hidden decoding="sync" /> : null}
       <Image className="mk-b" src={image.src} alt={image.alt} width={image.width} height={image.height} sizes={sizes} preload={preload} loading={preload ? undefined : 'lazy'} />
@@ -46,14 +48,20 @@ export function BeforePane({ image, preload, sizes }: { image: ImageRef; preload
   )
 }
 
-export function PhotoPair({ before, after, size = 'card', preload = false, sizes, className, decorative }: Props) {
+export function PhotoPair({ before, after, size = 'card', preload = false, sizes, className, decorative, showcase = false }: Props) {
   const t = useTranslations('marketing.home')
   return (
     <span className={cn('mk-pair', size === 'lg' && 'mk-pair-lg', className)} aria-hidden={decorative || undefined}>
-      <BeforePane image={decorative ? { ...before, alt: '' } : before} preload={preload} sizes={sizes} />
+      <BeforePane image={decorative ? { ...before, alt: '' } : before} preload={preload} sizes={sizes} showcase={showcase} />
       <span className="mk-pane">
+        {showcase ? <Image className="mk-fill" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" /> : null}
         <Image className="mk-ph" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" />
-        <WhiteGroundImage className="mk-a" src={after.src} alt={decorative ? '' : after.alt} width={after.width} height={after.height} sizes={sizes} {...afterLoading(preload)} />
+        {showcase ? (
+          <span className="mk-result">
+            <Image className="mk-fill" src={after.src} alt="" aria-hidden width={after.width} height={after.height} sizes={sizes} loading="lazy" />
+            <WhiteGroundImage className="mk-a" src={after.src} alt={decorative ? '' : after.alt} width={after.width} height={after.height} sizes={sizes} fitPlate {...afterLoading(preload)} />
+          </span>
+        ) : <WhiteGroundImage className="mk-a" src={after.src} alt={decorative ? '' : after.alt} width={after.width} height={after.height} sizes={sizes} {...afterLoading(preload)} />}
         <span className="mk-ws" aria-hidden />
       </span>
       <span className="mk-hl" aria-hidden />

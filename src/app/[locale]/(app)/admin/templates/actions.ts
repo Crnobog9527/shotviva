@@ -1,7 +1,8 @@
 'use server'
 
-import { refresh, updateTag } from 'next/cache'
+import { refresh } from 'next/cache'
 
+import { updateCatalogueTag } from '@/core/templates/catalogue-invalidation'
 import {
   applyCover,
   bulkEditTemplates,
@@ -43,8 +44,8 @@ import { readTemplateFloors } from '@/site/template-pricing'
 // the fresh page. Admin saves are rare, so the one slower render per page is the cheaper side.
 // The tag covers every page that reads the catalogue, '/' and '/zh' included. The admin's own
 // lists read the database directly, and refresh() re-renders them now. Charges never read this cache.
-function catalogueChanged() {
-  updateTag(TEMPLATES_CACHE_TAG)
+async function catalogueChanged() {
+  await updateCatalogueTag(TEMPLATES_CACHE_TAG)
   refresh()
 }
 
@@ -53,7 +54,7 @@ export async function saveTemplateAction(payload: SaveTemplatePayload): Promise<
   const result = await runAdminQuery(async () => {
     const db = createAdminSupabase()
     const version = await saveTemplate(db, admin.id, payload, await readTemplateFloors(db))
-    catalogueChanged()
+    await catalogueChanged()
     return version
   })
   return result.ok ? { ok: true, version: result.value } : result
@@ -64,7 +65,7 @@ export async function setTemplateActiveAction(input: unknown): Promise<ActionRes
   return runAdminAction(async () => {
     const db = createAdminSupabase()
     await setTemplateActive(db, admin.id, input, await readTemplateFloors(db))
-    catalogueChanged()
+    await catalogueChanged()
   })
 }
 
@@ -74,7 +75,7 @@ export async function setTemplatesActiveAction(input: unknown): Promise<ActionVa
   return runAdminQuery(async () => {
     const db = createAdminSupabase()
     const outcome = await setTemplatesActive(db, admin.id, input, await readTemplateFloors(db))
-    if (outcome.changed.length > 0) catalogueChanged()
+    if (outcome.changed.length > 0) await catalogueChanged()
     return outcome
   })
 }
@@ -86,7 +87,7 @@ export async function bulkEditTemplatesAction(input: unknown): Promise<ActionVal
   return runAdminQuery(async () => {
     const db = createAdminSupabase()
     const outcome = await bulkEditTemplates(db, admin.id, input, await readTemplateFloors(db))
-    if (outcome.changed > 0) catalogueChanged()
+    if (outcome.changed > 0) await catalogueChanged()
     return outcome
   })
 }
@@ -96,7 +97,7 @@ export async function setFeaturedTemplatesAction(ids: unknown): Promise<ActionRe
   const admin = await requireAdmin()
   return runAdminAction(async () => {
     await setFeaturedTemplates(createAdminSupabase(), admin.id, ids)
-    catalogueChanged()
+    await catalogueChanged()
   })
 }
 
@@ -105,7 +106,7 @@ export async function setTemplatesFeaturedAction(input: unknown): Promise<Action
   const admin = await requireAdmin()
   return runAdminQuery(async () => {
     const plan = await setTemplatesFeatured(createAdminSupabase(), admin.id, input)
-    if (plan.changed.length > 0 && plan.failures.length === 0 && plan.over === 0) catalogueChanged()
+    if (plan.changed.length > 0 && plan.failures.length === 0) await catalogueChanged()
     return plan
   })
 }
@@ -115,7 +116,7 @@ export async function setTemplateOrderAction(input: unknown): Promise<ActionResu
   const admin = await requireAdmin()
   return runAdminAction(async () => {
     await setTemplateOrder(createAdminSupabase(), admin.id, input)
-    catalogueChanged()
+    await catalogueChanged()
   })
 }
 
@@ -125,7 +126,7 @@ export async function saveTemplateCategoryAction(payload: unknown): Promise<Acti
   const admin = await requireAdmin()
   return runAdminAction(async () => {
     await saveTemplateCategory(createAdminSupabase(), admin.id, payload)
-    catalogueChanged()
+    await catalogueChanged()
   })
 }
 
@@ -133,7 +134,7 @@ export async function reorderTemplateCategoriesAction(keys: unknown): Promise<Ac
   const admin = await requireAdmin()
   return runAdminAction(async () => {
     await reorderTemplateCategories(createAdminSupabase(), admin.id, keys)
-    catalogueChanged()
+    await catalogueChanged()
   })
 }
 
@@ -141,7 +142,7 @@ export async function deleteTemplateCategoryAction(payload: unknown): Promise<Ac
   const admin = await requireAdmin()
   return runAdminQuery(async () => {
     const outcome = await deleteTemplateCategory(createAdminSupabase(), admin.id, payload)
-    catalogueChanged()
+    await catalogueChanged()
     return outcome
   })
 }
@@ -164,7 +165,7 @@ export async function applyCoverAction(input: ApplyCoverRequest): Promise<Action
       assetsBaseUrl: publicEnv.NEXT_PUBLIC_ASSETS_BASE_URL,
     }
     await applyCover(deps, input)
-    catalogueChanged()
+    await catalogueChanged()
   })
 }
 

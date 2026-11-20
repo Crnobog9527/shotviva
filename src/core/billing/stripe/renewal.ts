@@ -3,6 +3,7 @@ import 'server-only'
 import type Stripe from 'stripe'
 import { z } from 'zod'
 
+import { notifyOwner } from '../../alerts'
 import { trackPurchase } from '../../analytics/funnel'
 import { AppError } from '../../errors'
 import { readQuote } from '../read-quote'
@@ -118,6 +119,8 @@ export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Pro
     creditChangeSchema,
   )
   if (!change.applied) return 'replayed'
+  notifyOwner({ kind: 'payment_received', channel: 'stripe', ref: invoice.id, userId, productId: product.id,
+    amount: { cents: facts.amountTotal, currency: facts.currency }, method: facts.method, renewal: true })
   ;(deps.trackBuy ?? trackPurchase)(userId, {
     product_id: product.id,
     tier: product.tier,

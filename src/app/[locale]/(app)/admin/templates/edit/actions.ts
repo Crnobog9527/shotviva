@@ -1,7 +1,8 @@
 'use server'
 
-import { refresh, updateTag } from 'next/cache'
+import { refresh } from 'next/cache'
 
+import { updateCatalogueTag } from '@/core/templates/catalogue-invalidation'
 import { runAdminAction, saveEditTemplate, type ActionResult } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { TEMPLATES_CACHE_TAG } from '@/core/templates'
@@ -14,7 +15,7 @@ export async function saveEditTemplateAction(input: unknown): Promise<ActionResu
     const db = createAdminSupabase()
     await saveEditTemplate(db, admin.id, input, await readTemplateFloors(db))
     // The photo page reads whether editing is on and what it costs.
-    updateTag(TEMPLATES_CACHE_TAG)
+    await updateCatalogueTag(TEMPLATES_CACHE_TAG)
     refresh()
   })
 }

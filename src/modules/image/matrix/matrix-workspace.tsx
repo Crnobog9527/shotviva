@@ -5,6 +5,7 @@ import type { MembershipTier } from '@/core/config'
 import { useReveal } from '@/core/ui/reveal'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import type { PickerBrowse } from '../catalogue/picker-browse'
 import { batchCaps, type BatchCaps } from '../gated/feature-access'
 import { MatrixAction } from './matrix-action'
 import { MatrixForm, MatrixHead, MatrixStage } from './matrix-form'
@@ -14,6 +15,7 @@ import { useBatchSession } from './use-batch-session'
 
 export type MatrixWorkspaceProps = {
   templates: CatalogueTemplate[]
+  browse: PickerBrowse | null
   initial: string[]
   balance: Balance
   tier: MembershipTier | null
@@ -31,7 +33,7 @@ export function MatrixWorkspace(props: MatrixWorkspaceProps) {
   return <BatchForm {...props} caps={caps} />
 }
 
-function BatchForm({ templates, initial, balance, tier, limit, caps }: MatrixWorkspaceProps & { caps: BatchCaps }) {
+function BatchForm({ templates, browse, initial, balance, tier, limit, caps }: MatrixWorkspaceProps & { caps: BatchCaps }) {
   const session = useBatchSession({ templates, initial, balance, limit, caps, onStarted: () => window.scrollTo({ top: 0 }) })
   const { draft, refusal } = session
   const reveal = useReveal<HTMLDivElement>()
@@ -42,7 +44,7 @@ function BatchForm({ templates, initial, balance, tier, limit, caps }: MatrixWor
     <div className="lg:grid lg:grid-cols-[minmax(380px,440px)_minmax(0,1fr)] lg:items-start lg:gap-x-12 lg:px-(--gutter)">
       <div ref={reveal} className="min-w-0 px-(--gutter) lg:px-0">
         <MatrixHead caps={caps} />
-        <MatrixForm draft={draft} templates={templates} balancePaid={balance.paid} tier={tier} />
+        <MatrixForm draft={draft} templates={templates} browse={browse} balancePaid={balance.paid} tier={tier} />
         <MatrixAction cta={draft.cta} max={caps.cells} error={refusal.message(draft.error)} onGenerate={session.generate} />
       </div>
       <MatrixStage draft={draft} />

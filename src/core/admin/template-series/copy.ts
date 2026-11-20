@@ -21,7 +21,8 @@ export const seriesCopy = {
   seriesSearch: '按系列中文名搜索', noSeriesMatch: '没有匹配的系列', saved: '系列已保存', selectStatus: '展示方式', separate: '系列及独立成员', onlySeries: '仅系列',
   // 系列管理 list tools (Owner 2026-11-12).
   cover: '封面', coverCustom: '自定义', coverAuto: '自动', noCover: '无封面', drag: '排序',
-  dragFiltered: '搜索时不能拖动排序，请先清空搜索。', orderSaved: '顺序已保存', orderFailed: '顺序没保存，已退回原来的顺序。',
+  dragFiltered: '搜索时不能拖动排序，请先清空搜索。', editOrder: '编辑排序', editOrderHint: '点击编辑排序后调整顺序。',
+  saveOrder: '保存排序', orderDraft: '调整完成后点击保存排序。', orderSaved: '顺序已保存', orderFailed: '顺序未保存，请重试。',
   listChanged: '系列列表已被修改，请刷新页面后重试。', batchInvalid: '批量操作的参数不对，请重新选择。',
   selectAll: '全选', selectRow: (name: string) => `选择 ${name}`, selected: (n: number) => `已选 ${n} 个系列`, clear: '取消选择',
   batchPublish: '上架', batchUnpublish: '下架', batchShowOn: '开启成员单独展示', batchShowOff: '关闭成员单独展示',

@@ -5,7 +5,7 @@ import type { LocalizedTemplate } from '@/core/templates'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { loadBatchCatalogue } from './batch-catalogue'
 
-vi.mock('@/core/templates', () => ({ cachedWebTemplates: vi.fn() }))
+vi.mock('@/core/templates', () => ({ cachedWebTemplates: vi.fn(), cachedCatalogueIndex: vi.fn() }))
 
 // Stand-ins: the read's rows carry just what the loader looks at once turned into cards.
 type Row = { id: string; photoInput: CatalogueTemplate['photoInput'] }

@@ -23,7 +23,7 @@ function thumbImages(thumb: SeriesThumb) {
 }
 
 // One series: dragged by its handle (or long-pressed on touch); the name opens its editor dialog.
-type Props = { item: SeriesListItem; checked: boolean; pending: boolean; onSelect: (on: boolean) => void; onDelete: () => void }
+type Props = { item: SeriesListItem; checked: boolean; pending: boolean; editing: boolean; onSelect: (on: boolean) => void; onDelete: () => void }
 
 // 删除 only for an unpublished series (1500); on a published one the button stays visible but off,
 // and says why on hover and to screen readers.
@@ -38,11 +38,11 @@ function DeleteCell({ item, pending, onDelete }: Pick<Props, 'item' | 'pending' 
   )
 }
 
-export function SeriesRow({ item, checked, pending, onSelect, onDelete }: Props) {
+export function SeriesRow({ item, checked, pending, editing, onSelect, onDelete }: Props) {
   const sortable = useSortableItem(item.id)
   return (
     <TableRow {...sortable.row} className={sortableRowClass} data-state={checked ? 'selected' : undefined}>
-      <TableCell><Checkbox aria-label={copy.selectRow(item.name_zh)} checked={checked} onCheckedChange={on => onSelect(on === true)} /></TableCell>
+      <TableCell><Checkbox aria-label={copy.selectRow(item.name_zh)} disabled={editing} checked={checked} onCheckedChange={on => onSelect(on === true)} /></TableCell>
       <TableCell>
         <div className="flex items-center"><DragHandle handle={sortable.handle} /><MoveButtons item={sortable} /></div>
         <span className="text-muted-foreground block text-xs tabular-nums" title={copy.orderNumberHint}>{copy.orderNumber(item.sort_order)}</span>
@@ -58,17 +58,17 @@ export function SeriesRow({ item, checked, pending, onSelect, onDelete }: Props)
             : <span className="bg-muted text-muted-foreground grid h-12 w-10 place-items-center rounded text-[10px]">{copy.noCover}</span>}
           <div className="grid justify-items-start gap-1">
             {item.thumb && <Badge variant="outline">{item.thumb.kind === 'custom' ? copy.coverCustom : copy.coverAuto}</Badge>}
-            <Link href={`${SERIES_PATH}?cover=${item.id}`} scroll={false} className="text-xs underline underline-offset-2">{copy.changeCover}</Link>
+            {!editing && <Link href={`${SERIES_PATH}?cover=${item.id}`} scroll={false} className="text-xs underline underline-offset-2">{copy.changeCover}</Link>}
           </div>
         </div>
       </TableCell>
       <TableCell>
-        <Link href={`${SERIES_PATH}?id=${item.id}`} scroll={false} className="font-medium underline">{item.name_zh}</Link>
+        {editing ? <span className="font-medium">{item.name_zh}</span> : <Link href={`${SERIES_PATH}?id=${item.id}`} scroll={false} className="font-medium underline">{item.name_zh}</Link>}
         <span className="text-muted-foreground block text-xs">{item.slug} · {copy.memberCount(item.memberCount)}</span>
       </TableCell>
       <TableCell>{item.is_active ? copy.published : copy.unpublished}</TableCell>
       <TableCell>{item.show_members ? copy.separate : copy.onlySeries}</TableCell>
-      <DeleteCell item={item} pending={pending} onDelete={onDelete} />
+      <DeleteCell item={item} pending={pending || editing} onDelete={onDelete} />
     </TableRow>
   )
 }
