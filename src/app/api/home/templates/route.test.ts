@@ -31,10 +31,17 @@ describe('public home picker catalogue', () => {
   })
 
   it('lets the CDN share the public catalogue briefly, never the browser past its freshness', async () => {
-    vi.mocked(loadHomeCatalogue).mockResolvedValue({ templates: [], browse: null })
+    vi.mocked(loadHomeCatalogue).mockResolvedValue({ templates: [], browse: { filters: [], entries: [] } })
     const response = await GET(request('?locale=en'))
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=60, stale-while-revalidate=60')
     expect(response.headers.get('Set-Cookie')).toBeNull()
+  })
+
+  it('never shares the flat stand-in served while the category index is down', async () => {
+    vi.mocked(loadHomeCatalogue).mockResolvedValue({ templates: [], browse: null })
+    const response = await GET(request('?locale=en'))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
   })
 
   it('never lets a failure be cached', async () => {
