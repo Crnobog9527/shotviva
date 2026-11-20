@@ -4,7 +4,6 @@
     "generator": {
       "label": "Try it on your photo",
       "replace": "Replace",
-      "replaceAria": "Your photo. Replace it",
       "template": "Template",
       "size": "Size",
       "change": "Change",

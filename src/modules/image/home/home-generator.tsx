@@ -39,17 +39,15 @@ export type HomeGeneratorProps = {
   initialCovers: InitialCovers
 }
 
-// The picker and the sign-up sheet are closed on arrival and carry the dialog, drawer and
-// sign-in code (radix, vaul, hCaptcha): they load once the page is idle, not before the first
-// paint. Both render nothing until then, which is what a closed one shows anyway.
+// Keep the template picker warm for browsing, but defer the signup sheet to the first attempt
+// to generate while signed out.
 const loadPicker = () => import('./template-picker')
-const loadSignup = () => import('./signup-sheet')
 const TemplatePicker = dynamic(() => loadPicker().then((m) => m.TemplatePicker), { ssr: false })
-const SignupSheet = dynamic(() => loadSignup().then((m) => m.SignupSheet), { ssr: false })
+const SignupSheet = dynamic(() => import('./signup-sheet').then((m) => m.SignupSheet), { ssr: false })
 
-function usePrefetchDialogs() {
+function usePrefetchPicker() {
   useEffect(() => {
-    const start = () => void Promise.all([loadPicker(), loadSignup()])
+    const start = () => void loadPicker()
     if (typeof window.requestIdleCallback !== 'function') return void window.setTimeout(start, 1500)
     const id = window.requestIdleCallback(start, { timeout: 4000 })
     return () => window.cancelIdleCallback(id)
@@ -70,7 +68,8 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, go
   const picker = useHomeCatalogue(templates, catalogue)
   const state = useHomeGenerator({ templates, defaultId, viewer, find: picker.find })
   const [pickerOn, setPickerOn] = useState<string | null>(null)
-  const [signUp, setSignUp] = useState(false)
+  // Null means it has never opened. Afterwards the sheet owns its exit animation and focus.
+  const [signUp, setSignUp] = useState<boolean | null>(null)
   const file = useRef<HTMLInputElement>(null)
   const fileId = useId()
   const panel = useRef<HTMLElement>(null)
@@ -101,7 +100,7 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, go
     }).catch(() => setPickerOn(id))
   }, [choose, bring])
   usePickEvents(onPick, onPreview)
-  usePrefetchDialogs()
+  usePrefetchPicker()
   useOpenFromQuery(onPreview)
   const pickPhoto = () => file.current?.click()
   const askToSignUp = () => {
@@ -146,7 +145,7 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, go
         sampleOf={sampleFor}
         thumbOf={thumbFor}
       />
-      {viewer ? null : <SignupSheet open={signUp} onOpenChange={setSignUp} googleAction={googleAction} next={homePath} gift={freeImages} />}
+      {!viewer && signUp !== null && <SignupSheet open={signUp} onOpenChange={setSignUp} googleAction={googleAction} next={homePath} gift={freeImages} />}
       <HomeDock show={away && !footer} canStartWithoutPicking={canStartWithoutPicking} onClick={bring} />
     </div>
     </FavoritesProvider>
