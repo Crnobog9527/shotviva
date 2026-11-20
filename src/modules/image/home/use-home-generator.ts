@@ -17,7 +17,12 @@ import { homeCta, type HomeCta, type HomeViewer } from './home-cta'
 import { clearDraft, loadDraft, saveDraft, type HomeDraft } from './home-draft'
 import { useHomePhoto, type HomePhoto } from './use-home-photo'
 
-type Args = { templates: readonly CatalogueTemplate[]; defaultId: string | null; viewer: HomeViewer | null }
+type Args = {
+  templates: readonly CatalogueTemplate[]
+  defaultId: string | null
+  viewer: HomeViewer | null
+  find(id: string): Promise<CatalogueTemplate | null>
+}
 
 // Running photos for the concurrency check: the server's list at render plus this tab's own
 // (the workspace counts the same way).
@@ -30,7 +35,7 @@ function useRunning(serverIds: readonly string[]): number {
   return ids.size
 }
 
-type Restore = { signedIn: boolean; apply(draft: HomeDraft): boolean; pick(file: File): void }
+type Restore = { signedIn: boolean; apply(draft: HomeDraft): Promise<boolean>; pick(file: File): void }
 
 // Brings back what a signed-out visitor set up before sign-up, once. Signed in, the photo now
 // uploads and the draft is spent.
@@ -39,11 +44,13 @@ function useRestoreDraft({ signedIn, apply, pick }: Restore) {
   useEffect(() => {
     if (done.current) return
     done.current = true
-    void loadDraft().then((found) => {
+    void loadDraft().then(async (found) => {
       if (!found) return
-      const acceptsPhoto = apply(found.draft)
+      const acceptsPhoto = await apply(found.draft)
       if (acceptsPhoto && found.photo) pick(found.photo)
       if (signedIn) void clearDraft()
+    }).catch(() => {
+      // A catalogue outage leaves the draft in this browser for the next visit.
     })
   }, [signedIn, apply, pick])
 }
@@ -84,23 +91,38 @@ function useStart(viewer: HomeViewer | null, template: CatalogueTemplate | null,
   )
 }
 
-export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
-  const [templateId, setTemplateId] = useState(defaultId)
-  const template = templates.find((candidate) => candidate.id === templateId) ?? templates[0] ?? null
+function useSelectedTemplate({ templates, defaultId, find }: Omit<Args, 'viewer'>) {
+  const [template, setTemplate] = useState(() => templates.find((candidate) => candidate.id === defaultId) ?? templates[0] ?? null)
+  const intent = useRef(0)
+  const choose = useCallback(async (id: string) => {
+    const current = ++intent.current
+    const picked = await find(id).catch((error: unknown) => {
+      if (current === intent.current) throw error
+      return null
+    })
+    if (current !== intent.current || !picked) return null
+    setTemplate(picked)
+    return picked
+  }, [find])
+  return { template, choose, intent }
+}
+
+export function useHomeGenerator({ templates, defaultId, viewer, find }: Args) {
+  const { template, choose, intent } = useSelectedTemplate({ templates, defaultId, find })
   const [aspect, setAspect] = useState<OutputAspect>('original')
   const [note, setNote] = useState('')
   const pickedPhoto = useHomePhoto(viewer !== null)
   const photo: HomePhoto = template?.photoInput === 'none'
     ? { ...pickedPhoto, url: null, inputKey: null, file: null, error: null, status: 'none' } : pickedPhoto
   const apply = useCallback(
-    (draft: HomeDraft) => {
-      const saved = templates.find((candidate) => candidate.id === draft.templateId)
-      if (saved) setTemplateId(saved.id)
+    async (draft: HomeDraft) => {
+      if (intent.current) return false
       setAspect(draft.aspect)
       setNote(draft.note)
-      return saved !== undefined && saved.photoInput !== 'none'
+      const saved = await choose(draft.templateId)
+      return saved !== null && saved.photoInput !== 'none'
     },
-    [templates],
+    [choose, intent],
   )
   useRestoreDraft({ signedIn: viewer !== null, apply, pick: photo.pick })
   const running = useRunning(viewer?.concurrency.runningIds ?? [])
@@ -110,7 +132,7 @@ export function useHomeGenerator({ templates, defaultId, viewer }: Args) {
   return {
     template,
     templates,
-    choose: setTemplateId,
+    choose,
     options, photoRatio, cost,
     aspect: selectedAspect(aspect, options),
     setAspect,

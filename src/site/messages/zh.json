@@ -23,6 +23,8 @@
       "noTemplates": "模板即将上线",
       "gift": "{images}，新用户专享",
       "pickerTitle": "选一个模板",
+      "pickerLoading": "正在加载模板…",
+      "pickerLoadFailed": "模板加载失败。",
       "pickerText": "每个模板都保留你拍的主体，只换光线、场景或画风。",
       "pickTemplate": "选用{name}",
       "pickerSearch": "搜索模板：名称、用途、分类",

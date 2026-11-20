@@ -9,23 +9,23 @@ import type { FormAction } from '@/core/auth/ui'
 import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 
 import { allowsNoPhoto, isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
-import type { PickerBrowse } from '../catalogue/picker-browse'
 import { FavoritesProvider } from '../favorites/favorites-provider'
 import { FavoriteReturn } from '../favorites/favorite-return-effect'
 import type { HomeViewer } from './home-cta'
+import type { HomeCatalogueSource } from './home-catalogue'
 import { HomeDock } from './home-dock'
 import { HomePanel, type InitialCovers } from './home-panel'
 import { sampleFor, thumbFor } from './home-samples'
 import { useGeneratorAway } from './use-generator-away'
 import { useHeaderUpload } from './use-header-upload'
+import { useHomeCatalogue } from './use-home-catalogue'
 import { useHomeGenerator } from './use-home-generator'
 import { useOpenFromQuery, usePickEvents } from './use-pick-events'
 
 export type HomeGeneratorProps = {
-  // The live web catalogue (cached).
+  // On home this is only the opening template and the rail. Landing pages supply their catalogue.
   templates: CatalogueTemplate[]
-  // The picker's categories, series and card order (Create's cached index); null: flat list.
-  browse: PickerBrowse | null
+  catalogue: HomeCatalogueSource
   defaultId: string | null
   // null: signed out (or not known yet while the page streams).
   viewer: HomeViewer | null
@@ -62,13 +62,14 @@ const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matc
 // stacked on phones and two columns from 1024px (home-panel.tsx). Signed in it starts the photo through the workspace's own
 // pipeline and moves to that template's workspace; signed out it keeps the setup in this
 // browser and asks for an account.
-export function HomeGenerator({ templates: all, browse, defaultId, viewer, googleAction, homePath, freeImages, initialCovers }: HomeGeneratorProps) {
+export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, googleAction, homePath, freeImages, initialCovers }: HomeGeneratorProps) {
   // The panel has one upload card: a template with named image slots (§5.1e) opens in its own
   // workspace instead, never here.
   const templates = useMemo(() => all.filter((template) => !isSlotTemplate(template)), [all])
   const t = useTranslations('home.generator')
-  const state = useHomeGenerator({ templates, defaultId, viewer })
-  const [pickerOn, setPickerOn] = useState<CatalogueTemplate | null>(null)
+  const picker = useHomeCatalogue(templates, catalogue)
+  const state = useHomeGenerator({ templates, defaultId, viewer, find: picker.find })
+  const [pickerOn, setPickerOn] = useState<string | null>(null)
   const [signUp, setSignUp] = useState(false)
   const file = useRef<HTMLInputElement>(null)
   const fileId = useId()
@@ -89,15 +90,16 @@ export function HomeGenerator({ templates: all, browse, defaultId, viewer, googl
   )
   useHeaderUpload(past ? (canStartWithoutPicking ? 'generate' : 'upload') : null, fromHeader)
   const { choose } = state
-  const onPick = useCallback(
-    (id: string) => {
-      if (!templates.some((template) => template.id === id)) return
-      choose(id)
-      bring()
-    },
-    [templates, choose, bring],
-  )
-  const onPreview = useCallback((id: string) => setPickerOn(templates.find((template) => template.id === id) ?? null), [templates])
+  const openCatalogue = picker.open
+  const onPreview = useCallback((id: string) => {
+    setPickerOn(id)
+    openCatalogue()
+  }, [openCatalogue])
+  const onPick = useCallback((id: string) => {
+    void choose(id).then((picked) => {
+      if (picked) bring()
+    }).catch(() => setPickerOn(id))
+  }, [choose, bring])
   usePickEvents(onPick, onPreview)
   usePrefetchDialogs()
   useOpenFromQuery(onPreview)
@@ -106,13 +108,13 @@ export function HomeGenerator({ templates: all, browse, defaultId, viewer, googl
     void state.keepDraft()
     setSignUp(true)
   }
-  const shared = { state, gift: t('gift', { images: freeImages }), onPickPhoto: pickPhoto, fileInputId: fileId, onOpenPicker: () => setPickerOn(state.template), onSignUp: askToSignUp }
+  const shared = { state, gift: t('gift', { images: freeImages }), onPickPhoto: pickPhoto, fileInputId: fileId, onOpenPicker: () => { if (state.template) onPreview(state.template.id) }, onSignUp: askToSignUp }
   // Signed in, the picker's hearts save on the visitor's account; signed out a heart goes to
   // sign-in and comes back here to save it (T83).
   return (
     <FavoritesProvider initialIds={viewer?.favoriteIds ?? []} signedIn={viewer !== null} returnTo={homePath}>
     <div className="mk-generator">
-      <FavoriteReturn signedIn={viewer !== null} templates={templates} onSaved={onPreview} />
+      <FavoriteReturn signedIn={viewer !== null} find={picker.find} onSaved={onPreview} />
       <HomePanel ref={panel} initialCovers={initialCovers} thumbOf={thumbFor} {...shared} />
       {/* Visually hidden, not display:none: the primary is a <label for> it, which some phone
           browsers (Huawei, older iOS) ignore when the input is display:none or clicked from JS. */}
@@ -132,14 +134,14 @@ export function HomeGenerator({ templates: all, browse, defaultId, viewer, googl
       />
       <TemplatePicker
         openOn={pickerOn}
-        templates={templates}
-        browse={browse}
+        catalogue={picker.data}
+        failed={picker.failed}
+        onRetry={picker.open}
         onClose={() => setPickerOn(null)}
-        onPick={(id) => {
+        onPick={(picked) => {
           setPickerOn(null)
-          const picked = templates.find((template) => template.id === id)
-          if (picked) trackTemplateView(picked, 'home_picker')
-          onPick(id)
+          trackTemplateView(picked, 'home_picker')
+          onPick(picked.id)
         }}
         sampleOf={sampleFor}
         thumbOf={thumbFor}

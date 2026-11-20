@@ -39,7 +39,8 @@ export function cycler(
   schedule: Schedule = (run, ms) => window.setTimeout(run, ms),
   cancel: Cancel = (id) => window.clearTimeout(id),
 ): Cycler {
-  const layers = [...frame.querySelectorAll<HTMLElement>('.mk-sl')]
+  // Read when the card starts: its layers are drawn in the browser just before (series-layers.ts).
+  let layers: HTMLElement[] = []
   // A layer joins the layout (still transparent) only just before its turn, so its lazy images
   // load then: one pair ahead, not the whole series the moment the card is armed. From mainland
   // China, where the site moves a few KB/s, arming every layer at once queued all of a series'
@@ -76,7 +77,9 @@ export function cycler(
 
   return {
     start(delay, hold) {
-      if (!layers.length || timer !== undefined) return
+      if (timer !== undefined) return
+      layers = [...frame.querySelectorAll<HTMLElement>('.mk-sl')]
+      if (!layers.length) return
       const token = ++run
       // Armed: the first layer starts loading now; each later one a turn ahead (arm above).
       frame.classList.add('mk-armed')
