@@ -4,5 +4,6 @@ export const BLOG_ERRORS = {
   slugTaken: '这个语言下已经有同样网址的文章，换一个网址。',
   notFound: '文章不存在，可能已被删除，请刷新页面。',
   empty: '正文是空的，写点内容再发布。',
+  localeLocked: '已发布的文章不能改语言：先撤回为草稿，改完再发布。',
   cover: '封面文件不对：只收 JPEG、PNG 或 WebP，不超过 20MB。',
 } as const

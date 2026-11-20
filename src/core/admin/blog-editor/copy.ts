@@ -13,7 +13,7 @@ export const BLOG_COPY = {
   edit: '编辑',
   form: {
     locale: '语言',
-    localeHint: '发布后不要再改语言和网址，否则旧网址会变成 404。',
+    localeHint: '已发布的文章不能改语言，先撤回为草稿。发布后也不要改网址，否则旧网址会变成 404。',
     slug: '网址',
     slugHint: '小写英文、数字和连字符，例如 best-ai-food-photography-tools。中英文版本用同一个网址，才会互相标出对应语言。',
     title: '标题',

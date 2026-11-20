@@ -128,6 +128,16 @@ describe('admin_blog_save', () => {
     await expect(savePost(service, admin, input({ id: saved.id, slug: slug('keep-body'), bodyMd: '' }))).resolves.toMatchObject({ status: 'draft' })
   })
 
+  it('keeps a published post in its language, and lets a draft move', async () => {
+    const saved = await savePost(service, admin, input({ slug: slug('stay') }))
+    await expect(savePost(service, admin, input({ id: saved.id, slug: slug('stay'), locale: 'zh' }))).resolves.toMatchObject({ status: 'draft' })
+    await setPostStatus(service, admin, { id: saved.id, publish: true })
+    await expect(savePost(service, admin, input({ id: saved.id, slug: slug('stay'), locale: 'en' }))).rejects.toMatchObject({ code: 'CONFLICT' })
+    expect((await getAdminPost(service, saved.id))?.locale).toBe('zh')
+    await expect(savePost(service, admin, input({ id: saved.id, slug: slug('stay'), locale: 'zh', title: 'Same language is fine' }))).resolves.toMatchObject({ status: 'published' })
+    await setPostStatus(service, admin, { id: saved.id, publish: false })
+  })
+
   it('refuses bad input before the database', async () => {
     await expect(savePost(service, admin, input({ slug: 'Bad Slug' }))).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     await expect(savePost(service, admin, input({ coverUrl: 'https://example.com/a.webp', coverAlt: null }))).rejects.toMatchObject({ code: 'INVALID_INPUT' })

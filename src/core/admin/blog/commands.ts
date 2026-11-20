@@ -74,6 +74,20 @@ export async function getAdminPost(db: SupabaseClient, id: string): Promise<Admi
   return data ? postSchema.parse(data) : null
 }
 
+// What a refused save means to the admin; anything else is a fault.
+const SAVE_REFUSALS: Record<string, [ConstructorParameters<typeof AppError>[0], string]> = {
+  BLOG_POST_NOT_FOUND: ['NOT_FOUND', BLOG_ERRORS.notFound],
+  BLOG_POST_LOCALE_LOCKED: ['CONFLICT', BLOG_ERRORS.localeLocked],
+  BLOG_POST_EMPTY: ['INVALID_INPUT', BLOG_ERRORS.empty],
+}
+
+function saveFailed(error: { code?: string; message: string }): never {
+  if (error.code === '23505') throw new AppError('CONFLICT', BLOG_ERRORS.slugTaken)
+  const refusal = SAVE_REFUSALS[error.message]
+  if (refusal) throw new AppError(refusal[0], refusal[1])
+  return fail('save', error)
+}
+
 export type SaveOutcome = { id: string; status: BlogStatus; locale: string; slug: string }
 
 // Create (id null) or rewrite a post's text; the status is left as it is.
@@ -93,10 +107,7 @@ export async function savePost(db: SupabaseClient, actorId: string, input: unkno
     p_cover_alt: post.coverUrl === null ? null : post.coverAlt,
     p_author_name: post.authorName,
   })
-  if (error?.code === '23505') throw new AppError('CONFLICT', BLOG_ERRORS.slugTaken)
-  if (error?.message === 'BLOG_POST_NOT_FOUND') throw new AppError('NOT_FOUND', BLOG_ERRORS.notFound)
-  if (error?.message === 'BLOG_POST_EMPTY') throw new AppError('INVALID_INPUT', BLOG_ERRORS.empty)
-  if (error) fail('save', error)
+  if (error) saveFailed(error)
   const saved = z.object({ id: z.string(), status: z.enum(['draft', 'published']) }).parse(data)
   return { ...saved, locale: post.locale, slug: post.slug }
 }

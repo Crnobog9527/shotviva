@@ -5153,9 +5153,14 @@ begin
     update public.blog_posts
        set locale = p_locale, slug = p_slug, title = p_title, description = p_description, body_md = p_body_md,
            cover_url = p_cover_url, cover_alt = p_cover_alt, author_name = p_author_name
-     where id = p_id
+     where id = p_id and (status <> 'published' or locale = p_locale)
     returning id, status into v_id, v_status;
-    if v_id is null then raise exception 'BLOG_POST_NOT_FOUND'; end if;
+    if v_id is null then
+      -- A live post stays in its language: moving it would leave the footer link of both
+      -- languages stale. Take it down first.
+      if exists (select 1 from public.blog_posts where id = p_id) then raise exception 'BLOG_POST_LOCALE_LOCKED'; end if;
+      raise exception 'BLOG_POST_NOT_FOUND';
+    end if;
   end if;
   -- A published post keeps a body: the same rule as publishing, so saving cannot empty a live page.
   if v_status = 'published' and char_length(btrim(p_body_md, E' \n\r\t')) = 0 then raise exception 'BLOG_POST_EMPTY'; end if;

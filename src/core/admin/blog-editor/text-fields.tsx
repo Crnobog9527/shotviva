@@ -29,7 +29,7 @@ export function TextFields({ form, locked, disabled, onChange }: Props) {
         <select
           id={`${id}-locale`}
           value={form.locale}
-          disabled={disabled}
+          disabled={disabled || locked}
           onChange={(event) => onChange({ locale: event.target.value as PostForm['locale'] })}
           className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
         >
