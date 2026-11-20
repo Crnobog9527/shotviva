@@ -8704,6 +8704,43 @@ $$;
 ALTER FUNCTION "public"."admin_series_candidates"("p_search" "text", "p_after" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_category_locale_order"("p_locale" "text", "p_parent" "text", "p_keys" "text"[], "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_keys text[] := coalesce(p_keys, '{}');
+  v_siblings text[];
+begin
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin' and p.banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_locale is null or p_locale not in ('en', 'zh') then
+    raise exception 'INVALID_INPUT' using detail = 'unknown language';
+  end if;
+  if cardinality(v_keys) <> (select count(distinct k) from unnest(v_keys) as u(k)) then
+    raise exception 'INVALID_INPUT' using detail = 'keys must not repeat';
+  end if;
+  -- The same lock as tree moves, so the siblings checked below are the siblings written.
+  perform pg_advisory_xact_lock(hashtextextended('shotviva.category_tree', 0));
+  select coalesce(array_agg(c.key), '{}') into v_siblings
+  from public.template_categories c
+  where c.kind = 'template' and not c.is_system and c.parent_id is not distinct from p_parent;
+
+  delete from public.template_category_locale_order o
+  where o.locale = p_locale and o.category_key = any (v_siblings);
+  if cardinality(v_keys) = 0 then return; end if;
+  if cardinality(v_keys) <> cardinality(v_siblings) or not (v_siblings @> v_keys) then
+    raise exception 'CATEGORY_CHANGED';
+  end if;
+  insert into public.template_category_locale_order (locale, category_key, sort_order)
+  select p_locale, o.key, o.position * 10 from unnest(v_keys) with ordinality as o(key, position);
+end $$;
+
+
+ALTER FUNCTION "public"."admin_set_category_locale_order"("p_locale" "text", "p_parent" "text", "p_keys" "text"[], "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_set_code_active"("p_actor" "uuid", "p_code_id" "uuid", "p_active" boolean) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -8789,6 +8826,38 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_key" "text", "p_account" "text", "p_granted" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_featured_locale"("p_locale" "text", "p_ids" "text"[], "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_ids text[] := coalesce(p_ids, '{}');
+begin
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin' and p.banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_locale is null or p_locale not in ('en', 'zh') then
+    raise exception 'INVALID_INPUT' using detail = 'unknown language';
+  end if;
+  if cardinality(v_ids) <> (select count(distinct id) from unnest(v_ids) as u(id)) then
+    raise exception 'INVALID_INPUT' using detail = 'ids must not repeat';
+  end if;
+  lock table public.templates in share row exclusive mode;
+  if exists (
+    select 1 from unnest(v_ids) as u(id)
+    where not exists (select 1 from public.templates t where t.id = u.id and t.is_active and 'web' = any (t.visible_in))
+  ) then
+    raise exception 'INVALID_INPUT' using detail = 'only published web templates can be featured';
+  end if;
+  delete from public.template_featured_locale where locale = p_locale;
+  insert into public.template_featured_locale (locale, template_id, rank)
+  select p_locale, o.id, o.position::int from unnest(v_ids) with ordinality as o(id, position);
+end $$;
+
+
+ALTER FUNCTION "public"."admin_set_featured_locale"("p_locale" "text", "p_ids" "text"[], "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) RETURNS "void"
@@ -16780,6 +16849,17 @@ CREATE TABLE IF NOT EXISTS "public"."system_settings" (
 ALTER TABLE "public"."system_settings" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_category_locale_order" (
+    "locale" "text" NOT NULL,
+    "category_key" "text" NOT NULL,
+    "sort_order" integer NOT NULL,
+    CONSTRAINT "template_category_locale_order_locale_check" CHECK (("locale" = ANY (ARRAY['en'::"text", 'zh'::"text"])))
+);
+
+
+ALTER TABLE "public"."template_category_locale_order" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_favorites" (
     "user_id" "uuid" DEFAULT "auth"."uid"() NOT NULL,
     "template_id" "text" NOT NULL,
@@ -16788,6 +16868,18 @@ CREATE TABLE IF NOT EXISTS "public"."template_favorites" (
 
 
 ALTER TABLE "public"."template_favorites" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."template_featured_locale" (
+    "locale" "text" NOT NULL,
+    "template_id" "text" NOT NULL,
+    "rank" integer NOT NULL,
+    CONSTRAINT "template_featured_locale_locale_check" CHECK (("locale" = ANY (ARRAY['en'::"text", 'zh'::"text"]))),
+    CONSTRAINT "template_featured_locale_rank_check" CHECK (("rank" >= 1))
+);
+
+
+ALTER TABLE "public"."template_featured_locale" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."template_profiles" (
@@ -17480,8 +17572,23 @@ ALTER TABLE ONLY "public"."template_categories"
 
 
 
+ALTER TABLE ONLY "public"."template_category_locale_order"
+    ADD CONSTRAINT "template_category_locale_order_pkey" PRIMARY KEY ("locale", "category_key");
+
+
+
 ALTER TABLE ONLY "public"."template_favorites"
     ADD CONSTRAINT "template_favorites_pkey" PRIMARY KEY ("user_id", "template_id");
+
+
+
+ALTER TABLE ONLY "public"."template_featured_locale"
+    ADD CONSTRAINT "template_featured_locale_pkey" PRIMARY KEY ("locale", "template_id");
+
+
+
+ALTER TABLE ONLY "public"."template_featured_locale"
+    ADD CONSTRAINT "template_featured_locale_rank_key" UNIQUE ("locale", "rank");
 
 
 
@@ -19127,6 +19234,11 @@ ALTER TABLE ONLY "public"."template_categories"
 
 
 
+ALTER TABLE ONLY "public"."template_category_locale_order"
+    ADD CONSTRAINT "template_category_locale_order_category_key_fkey" FOREIGN KEY ("category_key") REFERENCES "public"."template_categories"("key") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."template_favorites"
     ADD CONSTRAINT "template_favorites_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
@@ -19134,6 +19246,11 @@ ALTER TABLE ONLY "public"."template_favorites"
 
 ALTER TABLE ONLY "public"."template_favorites"
     ADD CONSTRAINT "template_favorites_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."template_featured_locale"
+    ADD CONSTRAINT "template_featured_locale_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 
@@ -19548,6 +19665,9 @@ CREATE POLICY "template_categories_select_all" ON "public"."template_categories"
 
 
 
+ALTER TABLE "public"."template_category_locale_order" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."template_favorites" ENABLE ROW LEVEL SECURITY;
 
 
@@ -19561,6 +19681,9 @@ CREATE POLICY "template_favorites_insert_own" ON "public"."template_favorites" F
 
 CREATE POLICY "template_favorites_select_own" ON "public"."template_favorites" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
 
+
+
+ALTER TABLE "public"."template_featured_locale" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."template_profiles" ENABLE ROW LEVEL SECURITY;
@@ -20971,6 +21094,11 @@ GRANT ALL ON FUNCTION "public"."admin_series_candidates"("p_search" "text", "p_a
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_set_category_locale_order"("p_locale" "text", "p_parent" "text", "p_keys" "text"[], "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_category_locale_order"("p_locale" "text", "p_parent" "text", "p_keys" "text"[], "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_set_code_active"("p_actor" "uuid", "p_code_id" "uuid", "p_active" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_code_active"("p_actor" "uuid", "p_code_id" "uuid", "p_active" boolean) TO "service_role";
 
@@ -20983,6 +21111,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_feature_access"("p_key" "text", "p_min
 
 REVOKE ALL ON FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_key" "text", "p_account" "text", "p_granted" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_key" "text", "p_account" "text", "p_granted" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_featured_locale"("p_locale" "text", "p_ids" "text"[], "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_featured_locale"("p_locale" "text", "p_ids" "text"[], "p_actor" "uuid") TO "service_role";
 
 
 
@@ -22268,8 +22401,16 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 
 
 
+GRANT ALL ON TABLE "public"."template_category_locale_order" TO "service_role";
+
+
+
 GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."template_favorites" TO "service_role";
 GRANT SELECT,INSERT,DELETE ON TABLE "public"."template_favorites" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."template_featured_locale" TO "service_role";
 
 
 
