@@ -14,9 +14,22 @@ type FeaturedRow = { locale: string; template_id: string; rank: number }
 const MISSING = new Set(['42P01', 'PGRST205'])
 
 type Failure = { code: string; message: string }
+type Page<T> = { data: T[] | null; error: Failure | null }
+
+// PostgREST caps a response (max_rows), so read in ranges, in a fixed order, until a short page.
+const PAGE = 500
+async function readAll<T>(page: (from: number, to: number) => PromiseLike<Page<T>>): Promise<Page<T>> {
+  const rows: T[] = []
+  for (;;) {
+    const { data, error } = await page(rows.length, rows.length + PAGE - 1)
+    if (error || !data) return { data: null, error: error ?? { code: '', message: 'no data' } }
+    rows.push(...data)
+    if (data.length < PAGE) return { data: rows, error: null }
+  }
+}
 
 // The first failed read of the two, if any.
-const failure = (...results: { error: Failure | null }[]) => results.find((result) => result.error)?.error ?? null
+const failure = (...results: Page<unknown>[]) => results.find((result) => result.error)?.error ?? null
 
 export function toLocaleDisplay(order: readonly OrderRow[], featured: readonly FeaturedRow[]): LocaleDisplay {
   const display: LocaleDisplay = { categoryOrder: {}, featured: {} }
@@ -31,8 +44,10 @@ export function toLocaleDisplay(order: readonly OrderRow[], featured: readonly F
 
 export async function readLocaleDisplay(db: SupabaseClient): Promise<LocaleDisplay> {
   const [order, featured] = await Promise.all([
-    db.from('template_category_locale_order').select('locale,category_key,sort_order').returns<OrderRow[]>(),
-    db.from('template_featured_locale').select('locale,template_id,rank').order('rank').returns<FeaturedRow[]>(),
+    readAll<OrderRow>((from, to) => db.from('template_category_locale_order').select('locale,category_key,sort_order')
+      .order('locale').order('category_key').range(from, to).returns<OrderRow[]>()),
+    readAll<FeaturedRow>((from, to) => db.from('template_featured_locale').select('locale,template_id,rank')
+      .order('locale').order('rank').range(from, to).returns<FeaturedRow[]>()),
   ])
   const error = failure(order, featured)
   if (error && MISSING.has(error.code)) {
