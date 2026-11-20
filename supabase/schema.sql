@@ -818,18 +818,21 @@ declare
   coupon_cents integer;
   discount jsonb;
   product_tier text;
+  pay_pct smallint[];
   plan_rank integer := admin.catalog_membership_rank(p_product);
   tiers text[] := array['starter','pro','max'];
 begin
   perform 1 from public.profiles where id=p_user and banned_at is null for share;
   if not found then raise exception 'USER_BANNED'; end if;
   tier := public.current_tier(p_user);
-  select c.tier into strict product_tier from admin.catalog_products c where c.product_id=p_product;
+  select c.tier,v.pack_member_pay_pct into strict product_tier,pay_pct from admin.catalog_products c
+    join admin.catalog_product_versions v on (v.product_id,v.revision)=(c.product_id,c.published_revision)
+    where c.product_id=p_product;
   if plan_rank>0 and (array_position(tiers,tier)>array_position(tiers,product_tier)
       or exists(select from public.subscriptions where user_id=p_user and status in ('active','trialing','past_due','unpaid','paused')
         and admin.catalog_membership_rank(product_id)>=plan_rank)) then raise exception 'DOWNGRADE_NOT_ALLOWED'; end if;
-  if p_product in ('pack_m','pack_l') then
-    member_cents := ((p_list::bigint * case tier when 'starter' then 95 when 'pro' then 90 when 'max' then 85 else 100 end +50)/100)::integer;
+  if p_product in ('pack_m','pack_l') and array_position(tiers,tier) is not null then
+    member_cents := ((p_list::bigint * pay_pct[array_position(tiers,tier)] +50)/100)::integer;
   end if;
   if p_channel='stripe' then discount := public.checkout_discount(p_user,p_product); end if;
   coupon_cents := p_list-((p_list::bigint*(discount->>'percent')::int+50)/100)::integer;
@@ -994,9 +997,9 @@ CREATE OR REPLACE FUNCTION "admin"."catalog_price_forms"("p_product" "text", "p_
     from admin.catalog_products p join admin.catalog_product_versions v using(product_id)
     cross join lateral (
       select '_v2',100 union all select '_recurring_v2',100 where p.kind<>'pack'
-      union all select '_v2_starter',95 where p.product_id in ('pack_m','pack_l')
-      union all select '_v2_pro',90 where p.product_id in ('pack_m','pack_l')
-      union all select '_v2_max',85 where p.product_id in ('pack_m','pack_l')
+      union all select '_v2_starter',v.pack_member_pay_pct[1] where p.product_id in ('pack_m','pack_l')
+      union all select '_v2_pro',v.pack_member_pay_pct[2] where p.product_id in ('pack_m','pack_l')
+      union all select '_v2_max',v.pack_member_pay_pct[3] where p.product_id in ('pack_m','pack_l')
     ) f(suffix,percentage) where p.product_id=p_product and v.revision=p_revision
 $$;
 
@@ -12486,6 +12489,19 @@ $$;
 ALTER FUNCTION "public"."purge_identity_refusals"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."read_catalog_member_rates"() RETURNS TABLE("product_id" "text", "revision" integer, "starter_pct" integer, "pro_pct" integer, "max_pct" integer)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select v.product_id,v.revision,v.pack_member_pay_pct[1]::integer,v.pack_member_pay_pct[2]::integer,v.pack_member_pay_pct[3]::integer
+    from admin.catalog_product_versions v where v.product_id in ('pack_m','pack_l')
+   order by v.product_id,v.revision
+$$;
+
+
+ALTER FUNCTION "public"."read_catalog_member_rates"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."read_catalog_offers"("p_version" "text") RETURNS TABLE("product_id" "text", "tier" "text", "kind" "text", "revision" integer, "usd_cents" integer, "credits" integer, "paid_days" integer, "listed" boolean, "name_en" "text", "name_zh" "text", "benefit_en" "text", "benefit_zh" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -15456,10 +15472,12 @@ CREATE TABLE IF NOT EXISTS "admin"."catalog_product_versions" (
     "name_zh" "text" NOT NULL,
     "benefit_en" "text" DEFAULT ''::"text" NOT NULL,
     "benefit_zh" "text" DEFAULT ''::"text" NOT NULL,
+    "pack_member_pay_pct" smallint[] DEFAULT '{100,95,90}'::smallint[] NOT NULL,
     CONSTRAINT "catalog_product_versions_credits_check" CHECK (("credits" > 0)),
     CONSTRAINT "catalog_product_versions_paid_days_check" CHECK (("paid_days" > 0)),
     CONSTRAINT "catalog_product_versions_revision_check" CHECK (("revision" > 0)),
-    CONSTRAINT "catalog_product_versions_usd_cents_check" CHECK (("usd_cents" > 0))
+    CONSTRAINT "catalog_product_versions_usd_cents_check" CHECK (("usd_cents" > 0)),
+    CONSTRAINT "catalog_versions_pack_member_pay_pct_check" CHECK ((("cardinality"("pack_member_pay_pct") = 3) AND (50 <= ALL ("pack_member_pay_pct")) AND (100 >= ALL ("pack_member_pay_pct"))))
 );
 
 
@@ -21681,6 +21699,11 @@ GRANT ALL ON FUNCTION "public"."provider_api_key"("p_id" "uuid") TO "service_rol
 
 REVOKE ALL ON FUNCTION "public"."purge_identity_refusals"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."purge_identity_refusals"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."read_catalog_member_rates"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."read_catalog_member_rates"() TO "service_role";
 
 
 
