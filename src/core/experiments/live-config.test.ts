@@ -10,30 +10,42 @@ describe('createLiveConfig', () => {
     let now = 0
     const read = vi.fn().mockResolvedValue([experiment])
     const live = createLiveConfig(read, { now: () => now })
-    expect(await live()).toHaveLength(1)
-    expect(await live()).toHaveLength(1)
+    const waitUntil = vi.fn<(promise: Promise<unknown>) => void>()
+    const onRead = vi.fn()
+    const access = { waitUntil, onRead }
+    expect(await live(access)).toHaveLength(1)
+    expect(await live(access)).toHaveLength(1)
     expect(read).toHaveBeenCalledTimes(1)
+    expect(waitUntil).toHaveBeenCalledTimes(1)
     now = HOLD_MS + 1
     read.mockResolvedValue([])
-    expect(await live()).toHaveLength(1)
-    await settle()
+    expect(await live(access)).toHaveLength(1)
+    expect(waitUntil).toHaveBeenCalledTimes(2)
+    await waitUntil.mock.calls[1]?.[0]
     expect(read).toHaveBeenCalledTimes(2)
-    expect(await live()).toHaveLength(0)
+    expect(await live(access)).toHaveLength(0)
+    expect(onRead.mock.calls.flat()).toEqual(['cold', 'fresh', 'stale', 'fresh'])
   })
 
   it('answers the first request after the short wait, and the slow read still fills the hold', async () => {
     let finish: (value: unknown) => void = () => {}
     const read = vi.fn(() => new Promise((resolve) => (finish = resolve)))
     const live = createLiveConfig(read, { firstWaitMs: 20 })
-    const started = Date.now()
-    expect(await live()).toEqual([])
-    expect(Date.now() - started).toBeLessThan(500)
+    const waitUntil = vi.fn<(promise: Promise<unknown>) => void>()
+    const secondWaitUntil = vi.fn()
+    const request = live({ waitUntil })
+    const concurrent = live({ waitUntil: secondWaitUntil })
+    expect(await Promise.all([request, concurrent])).toEqual([[], []])
+    expect(waitUntil).toHaveBeenCalledTimes(1)
+    expect(secondWaitUntil).not.toHaveBeenCalled()
     finish([experiment])
-    await settle()
-    expect(await live()).toHaveLength(1)
+    await waitUntil.mock.calls[0]?.[0]
+    expect(await live({ waitUntil })).toHaveLength(1)
     expect(read).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('createLiveConfig failures', () => {
   it('keeps the last good answer through failed refreshes, for a limited time', async () => {
     let now = 0
     const read = vi.fn().mockResolvedValue([experiment])

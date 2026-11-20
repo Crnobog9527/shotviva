@@ -1,19 +1,20 @@
 import createMiddleware from 'next-intl/middleware'
-import type { NextRequest, NextResponse } from 'next/server'
+import type { NextFetchEvent, NextRequest, NextResponse } from 'next/server'
 
 import { isAffiliateEnabled, requiresAffiliateProgram } from '@/core/affiliate/feature'
 import { notFoundResponse } from '@/core/auth/proxy-gates'
 import { recordReferral } from '@/core/affiliate/referral'
 import { analyticsCookiesAllowed, withAnalyticsRegion } from '@/core/analytics/consent'
-import { withFirstTouch } from '@/core/attribution/proxy'
-import { proxyGate, type Forward } from '@/core/auth/proxy'
+import { isLandingRequest, withFirstTouch } from '@/core/attribution/proxy'
+import { hasSessionCookie, proxyGate, type Forward } from '@/core/auth/proxy'
 import { captureCodeLink } from '@/core/codes/link'
 import { isBadGalleryPage } from '@/core/gallery/page-number'
 import { galleryWorkIdOf, liveGalleryGate } from '@/core/gallery/proxy-gate'
 import { serverEnv } from '@/core/env'
-import { experimentRoute, isBotRequest, OPTION_PAGES, toOptionPage, withExperimentCookie, type RouteOutcome } from '@/core/experiments/server'
+import { experimentRoute, isBotRequest, OPTION_PAGES, toOptionPage, withExperimentCookie, type LiveConfigState, type RouteOutcome } from '@/core/experiments/server'
 import { viaImageCdn } from '@/core/storage/image-cdn-guard'
 import { routing } from '@/core/i18n/routing'
+import { logger } from '@/core/logger'
 import { canonicalRedirectResponse, withHostNoindex } from '@/core/seo'
 import { experimentRegistry } from '@/site/experiments/registry'
 import { site } from '@/site/site.config'
@@ -66,7 +67,37 @@ function visitorCookies(response: NextResponse, request: NextRequest, experiment
   }
 }
 
-export async function proxy(request: NextRequest) {
+// A fixed sample of homepage navigations, logged only on the server. The response can carry
+// user-specific cookies, so keep request details and timing metadata off the response.
+function homeProxyTiming(request: NextRequest) {
+  const { pathname } = request.nextUrl
+  if ((pathname !== '/' && pathname !== '/zh') || !isLandingRequest(request) || Math.random() >= 0.05) return
+  const started = performance.now()
+  const hasSession = hasSessionCookie(request)
+  let experimentDone = started
+  let gateDone = started
+  let configState: LiveConfigState | 'skipped' = 'skipped'
+  return {
+    onRead: (state: LiveConfigState) => { configState = state },
+    experimentDone: () => { experimentDone = performance.now() },
+    gateDone: () => { gateDone = performance.now() },
+    log(proxyStatus: number) {
+      const finished = performance.now()
+      logger.info('home.proxy_timing', {
+        locale: pathname === '/zh' ? 'zh' : 'en',
+        hasSession,
+        configState,
+        proxyStatus,
+        experimentMs: Math.round(experimentDone - started),
+        gateMs: Math.round(gateDone - experimentDone),
+        visitorMs: Math.round(finished - gateDone),
+        totalMs: Math.round(finished - started),
+      })
+    },
+  }
+}
+
+export async function proxy(request: NextRequest, event: NextFetchEvent) {
   const early = earlyResponse(request)
   if (early) return early
   if (/^\/admin-media\/(references|prompt-lab)\//.test(request.nextUrl.pathname)) {
@@ -80,10 +111,19 @@ export async function proxy(request: NextRequest) {
   // /g/<id> (T108): a real 404 unless the gallery is open and shows the work.
   const workId = galleryWorkIdOf(request.nextUrl.pathname)
   if (workId !== null && !(workId && (await isShownWork(workId)))) return notFoundResponse()
+  return forwardSiteRequest(request, event)
+}
+
+async function forwardSiteRequest(request: NextRequest, event: NextFetchEvent) {
   const env = serverEnv()
   // A/B experiments (ARCHITECTURE §16.5): on a surface's address, which option page answers. The
   // page itself stays prerendered; only this rewrite and the cookie differ per visitor.
-  const experiment = await experimentRoute(request, experimentRegistry, env.VERCEL_ENV !== 'production')
+  const timing = homeProxyTiming(request)
+  const experiment = await experimentRoute(request, experimentRegistry, env.VERCEL_ENV !== 'production', {
+    waitUntil: (promise) => event.waitUntil(promise),
+    onRead: timing?.onRead,
+  })
+  timing?.experimentDone()
   const response = captureCodeLink(request) ?? await proxyGate(request, {
     translatedPaths: site.locales.zhPaths,
     forward: experimentForward(experiment),
@@ -94,9 +134,12 @@ export async function proxy(request: NextRequest) {
     // Seals the proxy's session check for the page, so the page does not repeat it (ARCHITECTURE §7).
     identitySecret: env.SUPABASE_SERVICE_ROLE_KEY,
   })
+  timing?.gateDone()
   visitorCookies(response, request, experiment)
   await recordReferral(request, response)
-  return withHostNoindex(response, request, hosts.canonicalHost)
+  const result = withHostNoindex(response, request, hosts.canonicalHost)
+  timing?.log(result.status)
+  return result
 }
 
 // /ingest is the PostHog proxy (next.config.ts rewrites): no session work for analytics beacons.
