@@ -6,7 +6,7 @@ import { tierOffers } from './offer'
 import { memberPackOff, tierPerks, type PerkOptions } from './perks'
 import { compareRows } from './plan-compare-rows'
 
-// Revision-2 packs (95 / 90 / 85) and pricing O2 packs (100 / 95 / 90), from the listed products.
+// Revision-2 packs (95 / 90 / 85) and 2026-11-21 packs (100 / 95 / 90), from the listed products.
 const V2 = memberPackOff(TEST_PRODUCTS)!
 const O2 = memberPackOff(TEST_PRODUCTS.map(p => ({ ...p, packMemberPayPct: { starter: 100, pro: 95, max: 90 } })))!
 const keys = (tier: 'starter' | 'pro' | 'max', options: PerkOptions = { wishlistLive: false, memberPacks: null }) => tierPerks(tier, options).live.map((p) => p.key)

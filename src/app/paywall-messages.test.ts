@@ -61,7 +61,10 @@ describe('paywall messages (en)', () => {
     expect(text).not.toMatch(/queue/i)
   })
 
-  // Pricing O2 member packs (Starter full price) and the revision-2 rate, both locales.
+})
+
+describe('paywall messages: pack note and yearly saving', () => {
+  // The new member pack rate (Starter full price) and the revision-2 rate, both locales.
   it('words the pack note from the listed member discounts', () => {
     const zh = createTranslator({ locale: 'zh', messages: zhMessages, namespace: 'paywall' }) as unknown as typeof t
     const o2 = { starter: 0, pro: 5, max: 10 }
@@ -71,10 +74,11 @@ describe('paywall messages (en)', () => {
     const markup = (locale: 'en' | 'zh', values: Record<string, unknown>) =>
       createTranslator({ locale, messages: locale === 'en' ? messages : zhMessages, namespace: 'paywall' })
         .markup('savePct', { ...values, b: (chunks: string) => chunks } as never)
-    expect(markup('en', { pct: 17, months: 2, upTo: 'false' })).toBe('2 months free')
-    expect(markup('zh', { pct: 17, months: 2, upTo: 'false' })).toBe('送 2 个月')
-    expect(markup('en', { pct: 25, months: 0, upTo: 'true' })).toBe('Save up to 25%')
-    expect(markup('zh', { pct: 20, months: 0, upTo: 'false' })).toBe('省 20%')
+    expect(markup('en', { pct: 25, same: 'false' })).toBe('Save up to 25%')
+    expect(markup('zh', { pct: 25, same: 'false' })).toBe('最多省 25%')
+    expect(markup('en', { pct: 20, same: 'true' })).toBe('Save 20%')
+    expect(markup('zh', { pct: 20, same: 'true' })).toBe('省 20%')
+    expect(t('savingAmount', { amount: '$297', pct: 25 })).toBe('$297 a year · 25% off')
     expect(zh('compare.cells.pct', { value: 0 })).toBe('—')
     expect(zh('compare.cells.pct', { value: 10 })).toBe('10%')
   })

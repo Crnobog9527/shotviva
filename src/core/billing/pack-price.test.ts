@@ -14,7 +14,7 @@ describe('pre-tax pack price in cents', () => {
     expect(tiers.map(tier => packPriceCents(testProduct(id), tier))).toEqual(expected)
   })
 
-  // Revisions saved from migration 1610 on carry their own rate (pricing O2: 100 / 95 / 90).
+  // Revisions saved from migration 1610 on carry their own rate (2026-11-21: 100 / 95 / 90).
   it.each([
     ['pack_m', [2490, 2490, 2366, 2241]],
     ['pack_l', [4990, 4990, 4741, 4491]],

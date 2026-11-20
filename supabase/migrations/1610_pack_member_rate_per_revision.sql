@@ -1,5 +1,5 @@
 -- 1610: the M / L pack member rate belongs to the catalogue revision (ARCHITECTURE §6.2, Owner
--- 2026-11-21 pricing O2: Starter full price, Pro 95%, Max 90%; was 95 / 90 / 85).
+-- 2026-11-21 pricing: Starter full price, Pro 95%, Max 90%; was 95 / 90 / 85).
 --
 -- The rate was a constant in catalog_price_forms (1125), catalog_buyer_terms (1130) and the app.
 -- Bound Stripe member Prices and checkout attempts belong to a revision, so changing the
@@ -14,7 +14,7 @@
 -- quoting 95 / 90 / 85, which is still the rate of every published revision.
 --
 -- validate_catalog_terms (1127) and the floor budget (1568-1570) keep their conservative 85%
--- (the deepest member discount any revision has had): neither binds under O2, Max yearly does.
+-- (the deepest member discount any revision has had): neither binds, Max yearly does.
 
 alter table admin.catalog_product_versions
   add column pack_member_pay_pct smallint[] not null default '{95,90,85}'

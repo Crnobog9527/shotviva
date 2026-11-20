@@ -4,7 +4,7 @@ import { connectAdmin, createUser } from './helpers'
 import { seedCatalogPolicy } from './catalog-policy'
 
 // Migration 1610: the M / L pack member rate belongs to the catalogue revision. Revisions that
-// existed before it keep 95 / 90 / 85; drafts saved later get pricing O2's 100 / 95 / 90, and the
+// existed before it keep 95 / 90 / 85; drafts saved later get the 2026-11-21 rate 100 / 95 / 90, and the
 // revision on sale decides what checkout accepts.
 let sql: Client
 let actor: string
@@ -41,7 +41,7 @@ async function becomeMember(tier: 'starter' | 'pro') {
 
 async function publishO2Draft() {
   const data = { name_en: 'M pack', name_zh: '中包', benefit_en: '', benefit_zh: '', usd_cents: 2490, credits: 2490, sort_order: 8, listed: true }
-  const id = (await sql.query<{ id: string }>("select public.admin_catalog_save($1,'pack_m',$2,null,$3,'O2 会员价') id",
+  const id = (await sql.query<{ id: string }>("select public.admin_catalog_save($1,'pack_m',$2,null,$3,'新会员价') id",
     [actor, await published(), data])).rows[0]!.id
   const prices = (prefix: string) => Object.fromEntries(['', '_starter', '_pro', '_max'].map((s, i) => ['pack_m_v2' + s, 'price_' + prefix + i]))
   await sql.query("select public.admin_catalog_prepare($1,$2,'acct_test',false,$3)", [actor, id, prices('Old')])
@@ -81,4 +81,24 @@ it('serves the member rates to the server only and rejects an out-of-range rate'
   expect((await sql.query("select has_function_privilege('service_role','public.read_catalog_member_rates()','execute') ok")).rows[0].ok).toBe(true)
   await rejected(() => sql.query("update admin.catalog_product_versions set pack_member_pay_pct='{100,95}' where product_id='pack_m'"), 'catalog_versions_pack_member_pay_pct_check')
   await rejected(() => sql.query("update admin.catalog_product_versions set pack_member_pay_pct='{100,95,40}' where product_id='pack_m'"), 'catalog_versions_pack_member_pay_pct_check')
+})
+
+// The 2026-11-21 plan changes credits only: a new plan revision at the same price binds the Prices
+// already in Stripe, and checkout grants the new revision's credits (they belong to the revision).
+it('publishes a credits-only plan revision on the same Stripe Prices and grants its credits', async () => {
+  const sku = 'pro_monthly'
+  const base = (await sql.query<{ r: number }>('select published_revision r from admin.catalog_products where product_id=$1', [sku])).rows[0]!.r
+  const data = { name_en: 'Pro', name_zh: '专业版', benefit_en: '', benefit_zh: '', usd_cents: 4990, credits: 5500, sort_order: 3, listed: true }
+  const id = (await sql.query<{ id: string }>("select public.admin_catalog_save($1,$2,$3,null,$4,'只改积分') id", [actor, sku, base, data])).rows[0]!.id
+  const same = { pro_monthly_v2: 'price_ProOnce', pro_monthly_recurring_v2: 'price_ProCycle' }
+  await sql.query("select public.admin_catalog_prepare($1,$2,'acct_test',false,$3)", [actor, id, same])
+  await sql.query("select public.admin_catalog_publish($1,$2,'acct_test',false,$3)", [actor, id, same])
+  const offer = (await sql.query("select revision,usd_cents,credits from public.read_catalog_offers('v2') where product_id=$1", [sku])).rows[0]
+  expect(offer).toEqual({ revision: base + 1, usd_cents: 4990, credits: 5500 })
+  expect((await sql.query('select revision,price_id from admin.catalog_stripe_prices where product_id=$1 and lookup_key=$2 order by revision', [sku, 'pro_monthly_recurring_v2'])).rows)
+    .toEqual([{ revision: base, price_id: 'price_ProCycle' }, { revision: base + 1, price_id: 'price_ProCycle' }])
+  await sql.query(`select public.lock_catalog_checkout($1,gen_random_uuid(),'test',$2,$3,'stripe','pro_monthly_recurring_v2','price_ProCycle',4990,4990,null,'card','subscription',
+    jsonb_build_object('expires_at',extract(epoch from now()+interval '1 hour')::int))`, [buyer, sku, base + 1])
+  expect((await sql.query('select revision,credits,price_id from admin.catalog_checkout_attempts where user_id=$1', [buyer])).rows)
+    .toEqual([{ revision: base + 1, credits: 5500, price_id: 'price_ProCycle' }])
 })

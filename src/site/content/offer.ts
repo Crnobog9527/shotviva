@@ -97,11 +97,11 @@ export type OfferFacts = ReturnType<typeof offerFacts>
 export const baselineOffers = offerFacts(site.billing.products)
 export const { planFrom, packFrom, yearlySaving, hundredCreditsFrom } = baselineOffers
 
-// "come with 2 months free, about 17% less than paying monthly" (pricing O2), else "save up to
-// 25% compared with paying monthly": the saving each plan really gets (offer.yearlySaving).
-export function yearlyClaim({ pct, upTo, freeMonths }: YearlySaving): string {
-  if (freeMonths) return `come with ${freeMonths === 1 ? '1 month' : `${freeMonths} months`} free, about ${pct}% less than paying monthly`
-  return `save ${upTo ? 'up to ' : ''}${pct}% compared with paying monthly`
+// "save 20% compared with paying monthly (Max saves 25%)": each plan's own saving, rounded down
+// (offer.yearlySaving; Owner 2026-11-21: state it per plan).
+export function yearlyClaim({ pct, byTier }: YearlySaving): string {
+  const more = byTier.filter(t => t.pct > pct).map(t => `${TIER_NAMES[t.tier]} saves ${t.pct}%`)
+  return `save ${pct}% compared with paying monthly${more.length ? ` (${more.join(', ')})` : ''}`
 }
 
 // " On medium and large packs, active Pro members save 5%, and Max members 10%." from the

@@ -5,7 +5,7 @@ import type { ReactNode } from "react"
 
 import { cn } from "../../ui/cn"
 import type { BlockReason } from "../subscription/upgrade-rule"
-import { offerLabel, perMonthUsd, productFor, yearlySavingUsd, type Period, type TierOffer } from "./offer"
+import { offerLabel, perMonthUsd, planSavingPct, productFor, yearlySavingUsd, type Period, type TierOffer } from "./offer"
 import { useTierPerks } from "./perk-facts"
 import { PerkList } from "./perk-list"
 import { PhotoEstimateLine } from "./photo-estimate-line"
@@ -116,7 +116,7 @@ function Facts({ offer, period }: { offer: TierOffer; period: Period }) {
         <p className="tier-plate mt-2 flex items-center justify-between gap-2 rounded-inner bg-[var(--tier-plate)] py-2 pr-2 pl-3 text-caption text-[var(--tier-plate-ink)]">
           {/* The label may wrap and the amount may not: at 320px the Max plate is wider than its card. */}
           <span className="min-w-0">{t.rich("savingLabel", { vs: (chunks) => <span className="tier-saving-vs">{chunks}</span> })}</span>
-          <b className="font-mono font-semibold whitespace-nowrap">{t("savingAmount", { amount: money(yearlySavingUsd(offer)) })}</b>
+          <b className="font-mono font-semibold whitespace-nowrap">{t("savingAmount", { amount: money(yearlySavingUsd(offer)), pct: planSavingPct(offer) })}</b>
         </p>
       ) : null}
     </>

@@ -36,7 +36,7 @@ export function tierPerks(tier: MembershipTier, options: PerkOptions): TierPerks
     { key: 'concurrency', values: { count: limits.concurrency } },
     { key: 'batch', values: { count: limits.batchMax } },
   ]
-  // A tier that pays full price for packs (Starter since pricing O2) has nothing to list.
+  // A tier that pays full price for packs (Starter since 2026-11-21) has nothing to list.
   const packOff = options.memberPacks?.[tier] ?? 0
   if (packOff > 0) live.push({ key: 'memberPacks', values: { pct: packOff } })
   // Max answers faster than everyone else (48 / 48 / 24 hours).

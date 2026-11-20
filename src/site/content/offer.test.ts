@@ -5,7 +5,7 @@ import zh from '../messages/zh.json'
 import { site } from '../site.config'
 import { fillCredits } from './credits'
 import { homePage } from './home'
-import { offerFacts, perHundredCredits, plansSentence, quoteUsd, usdRange, yearlySaving } from './offer'
+import { perHundredCredits, plansSentence, quoteUsd, usdRange, yearlySaving } from './offer'
 import { imageToImageGenerator } from './pages/image-to-image-generator'
 import { makePricingPage, pricingPage } from './pricing'
 import { makeZhPricingPage } from './zh/pricing'
@@ -21,14 +21,15 @@ describe('copy with the catalog in site.config', () => {
     expect(plansSentence()).toBe(
       'Plans start at $19.90 a month for 1990 credits, or buy a one-time credit pack from $9.90.',
     )
-    // Revision-2 seed: Starter / Pro 20%, Max 25%, so "up to" the largest (DESIGN §6.9).
-    expect(yearlySaving).toEqual({ pct: 25, upTo: true, freeMonths: null })
+    // Revision-2 seed (prices unchanged by the 2026-11-21 plan): Starter / Pro 20%, Max 25%.
+    expect(yearlySaving).toMatchObject({ pct: 20, upTo: 25 })
   })
 
   it('fills the /pricing title, lede and credit costs from config', () => {
     expect(pricingPage.title).toBe('Shotviva Pricing: Plans From $19.90 a Month')
     expect(fillCredits(pricingPage.intro, LIVE)).not.toContain('A photo costs')
-    expect(pricingPage.intro).toContain('Yearly Shotviva plans save up to 25% compared with paying monthly.')
+    expect(pricingPage.intro).toContain('Yearly Shotviva plans save 20% compared with paying monthly (Max saves 25%).')
+    expect(pricingPage.intro).not.toMatch(/up to/)
     expect(pricingPage.intro).toContain('one-time credit pack from $9.90.')
     expect(fillCredits(pricingPage.gift, LIVE)).toBe('New users get 100 free credits. No card needed.')
     expect(pricingPage.creditBuys.note).toContain('template and resolution')
@@ -71,16 +72,14 @@ describe('how long a photo takes', () => {
   })
 })
 
-// Pricing O2 (Owner 2026-11-21): yearly = ten monthly payments on every plan.
-describe('yearly saving under pricing O2', () => {
-  const o2 = site.billing.products.map(p => p.interval === 'year'
-    ? { ...p, priceUsd: Math.round(site.billing.products.find(m => m.tier === p.tier && m.interval === 'month')!.priceUsd * 1000) / 100 } : p)
+// The 2026-11-21 plan: credits change (5,500 / 11,500 monthly, × 12 yearly), prices stay.
+describe('copy under the credits-only plan', () => {
+  const credits: Record<string, number> = { pro_monthly: 5500, pro_yearly: 66000, max_monthly: 11500, max_yearly: 138000 }
+  const o2 = site.billing.products.map(p => credits[p.id] ? { ...p, credits: credits[p.id]! } : p)
 
-  it('says 2 months free and the real saving, never "up to"', () => {
-    expect(offerFacts(o2).yearlySaving).toEqual({ pct: 17, upTo: false, freeMonths: 2 })
-    expect(makePricingPage(o2).intro).toContain('Yearly Shotviva plans come with 2 months free, about 17% less than paying monthly.')
-    expect(makeZhPricingPage(o2).intro).toContain('年付送 2 个月，比按月付约省 17%。')
-    expect(makePricingPage(o2).intro).not.toMatch(/up to/)
+  it('states each plan\'s yearly saving in both languages', () => {
+    expect(makePricingPage(o2).intro).toContain('Yearly Shotviva plans save 20% compared with paying monthly (Max saves 25%).')
+    expect(makeZhPricingPage(o2).intro).toContain('按年付省 20%（旗舰版省 25%）。')
   })
 
   it('states the member pack discounts of the listed packs, Starter at list price', () => {

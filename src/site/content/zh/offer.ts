@@ -37,11 +37,12 @@ export const zhLanguages = site.locales.enabled.map((code) => LANGUAGE_NAMES[cod
 
 export const zhPlanFrom = planFrom ? `${usd(planFrom.priceUsd)}/月起` : PRICE_PENDING
 export const zhPackFrom = packFrom ? `${usd(packFrom.priceUsd)} 起` : PRICE_PENDING
-// 「年付送 2 个月，比按月付约省 17%」(pricing O2), else 「按年付最多省 25%」: the saving each plan
-// really gets (offer.yearlySaving, DESIGN §6.9).
-export function zhYearlyClaim({ pct, upTo, freeMonths }: YearlySaving): string {
-  if (freeMonths) return `年付送 ${freeMonths} 个月，比按月付约省 ${pct}%`
-  return `按年付${upTo ? '最多' : ''}省 ${pct}%`
+// 「按年付省 20%（旗舰版省 25%）」: each plan's own saving, rounded down (offer.yearlySaving,
+// DESIGN §6.9; Owner 2026-11-21: state it per plan).
+const ZH_TIER_NAMES = { starter: '入门版', pro: '专业版', max: '旗舰版' } as const
+export function zhYearlyClaim({ pct, byTier }: YearlySaving): string {
+  const more = byTier.filter(t => t.pct > pct).map(t => `${ZH_TIER_NAMES[t.tier]}省 ${t.pct}%`)
+  return `按年付省 ${pct}%${more.length ? `（${more.join('，')}）` : ''}`
 }
 // 「中包和大包按当前会员等级享折扣，入门版原价、专业版 95 折、旗舰版 9 折。」 from the listed
 // M / L packs (each revision has its own member rate); empty when none is discounted.

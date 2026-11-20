@@ -4,7 +4,7 @@ export { discountTerm, methodLabel, methodNote, planFinePrint, pricingMethodNote
 export { PaywallButton } from './paywall-button'
 export { PricingPlans } from './pricing-plans'
 export { PaywallProvider, usePaywall, type PaywallTrigger } from './paywall-context'
-export { packOffers, perCreditUsd, perMonthUsd, tierOffers, yearlySaving, yearlySavingUsd, type Period, type TierOffer, type YearlySaving } from './offer'
+export { packOffers, perCreditUsd, perMonthUsd, tierOffers, planSavingPct, yearlySaving, yearlySavingUsd, type Period, type TierOffer, type YearlySaving } from './offer'
 export { PricingPayWith } from './pricing-pay-with'
 export { tierPerks } from './perks'
 export { NO_PERK_FACTS, type PerkFacts } from './perk-facts'

@@ -1800,7 +1800,7 @@
     "billingLabel": "Billing period",
     "monthly": "Monthly",
     "yearly": "Yearly",
-    "savePct": "{months, plural, =0 {{upTo, select, true {Save up to <b>{pct}%</b>} other {Save <b>{pct}%</b>}}} one {<b>1 month</b> free} other {<b># months</b> free}}",
+    "savePct": "{same, select, true {Save <b>{pct}%</b>} other {Save up to <b>{pct}%</b>}}",
     "plansLabel": "Plans",
     "tiers": {
       "starter": "Starter",
@@ -1885,7 +1885,7 @@
     "choose": "Choose {tier}",
     "upgradeTo": "Upgrade to {tier}",
     "savingLabel": "You save<vs> vs monthly</vs>",
-    "savingAmount": "{amount} a year",
+    "savingAmount": "{amount} a year · {pct}% off",
     "mostPopular": "Most popular",
     "memberPrice": "Member price",
     "memberCodeKept": "Member price. Your discount code is saved for another purchase.",
