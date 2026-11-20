@@ -194,7 +194,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: '导出的图片是什么尺寸、什么格式？',
-    answer: `${brand} 每张图都导出为 PNG，分 ${ZH_TIERS.length} 档：${zhTierPixels}。画面比例由模板决定。用付费积分生成的图可以下载完整尺寸、无水印的版本。`,
+    answer: `${brand} 分 ${ZH_TIERS.length} 档导出，方图边长 ${zhTierPixels}。画面比例由模板决定。用付费积分生成的图下载完整尺寸、无水印的 PNG；免费积分生成的图下载带水印的 JPG。抠图类结果还可以下载白底 JPG。`,
   },
   {
     question: '手机上能用吗？要下载软件吗？',
@@ -207,7 +207,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: '白底图能不能直接生成？',
-    answer: `${brand} 可以直接生成白底图：上传一张商品照片，选「纯白底图」模板，背景换成纯白，商品本身保持原样，可以直接做电商主图。导出 PNG，分 ${ZH_TIERS.length} 档：${zhTierPixels}。`,
+    answer: `${brand} 可以直接生成白底图：上传一张商品照片，选「纯白底图」模板，背景换成纯白，商品本身保持原样，可以直接做电商主图。可以下载透明底 PNG，也可以下载白底 JPG，方图边长分 ${ZH_TIERS.length} 档：${zhTierPixels}。`,
   },
 ]
 
@@ -224,7 +224,7 @@ export const makeZhHomePage = (offers: OfferFacts, plans = zhHomePlans(offers.pr
       },
       {
         heading: '免费图公开带水印，付费图私密无水印',
-        text: `用免费积分生成的图会公开展示，并带一个小小的 ${brand} 水印，仅限个人非商业用途。用付费积分生成的图私密、无水印，可以商用。之后再买套餐，不会改变已经生成的图。`,
+        text: `用免费积分生成的图会公开展示，并带一个小小的 ${brand} 水印（海报类作品只自己可见，同样带水印），仅限个人非商业用途。用付费积分生成的图私密、无水印，可以商用。之后再买套餐，不会改变已经生成的图。`,
       },
     ],
     plans: plansText(offers),
