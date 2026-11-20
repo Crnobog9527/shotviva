@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { errorResponse, jsonResponse } from '@/core/api-response'
 import { clientIp, createAdminSupabase, requireApiUser } from '@/core/auth'
 import { AppError } from '@/core/errors'
-import { downloadBatchZip, recordJobDownload } from '@/core/jobs'
+import { downloadBatchPhotos, downloadBatchZip, recordJobDownload } from '@/core/jobs'
 import { DEFAULT_DOWNLOAD_BACKGROUND, isDownloadBackground } from '@/core/storage/rules/download-background'
 
 export const maxDuration = 300
@@ -22,7 +22,13 @@ export async function GET(request: NextRequest, context: RouteContext<'/api/gene
     if (!z.uuid().safeParse(batchId).success) throw new AppError('NOT_FOUND', 'Batch not found')
     const db = createAdminSupabase()
     const bg = request.nextUrl.searchParams.get('bg')
-    const result = await downloadBatchZip(db, user.id, batchId, isDownloadBackground(bg) ? bg : DEFAULT_DOWNLOAD_BACKGROUND)
+    const background = isDownloadBackground(bg) ? bg : DEFAULT_DOWNLOAD_BACKGROUND
+    // ?format=photos: a phone saving to its photo library asks for one link per photo instead of the
+    // ZIP; the same claim, limit and per-photo download record apply.
+    const photos = request.nextUrl.searchParams.get('format') === 'photos'
+    const result = photos
+      ? await downloadBatchPhotos(db, user.id, batchId, background)
+      : await downloadBatchZip(db, user.id, batchId, background)
     if (result.status !== 'ready') {
       const limited = result.status === 'limited'
       const response = limited
@@ -35,11 +41,17 @@ export async function GET(request: NextRequest, context: RouteContext<'/api/gene
     after(() => Promise.all(result.files.map(file => recordJobDownload(db, {
       userId: user.id, jobId: file.jobId, ip,
     }))).then(() => undefined))
-    if (wantsJson(request)) return jsonResponse({ url: result.url })
-    return new Response(null, { status: 302, headers: { Location: result.url, 'Cache-Control': 'private, no-store' } })
+    return readyResponse(request, result)
   } catch (error) {
     return errorResponse(error, 'generate.batch.download')
   }
+}
+
+// The photos list and the JSON { url } go to the app; a plain GET follows the ZIP link.
+function readyResponse(request: NextRequest, result: { url: string } | { photos: { url: string; name: string }[] }) {
+  if ('photos' in result) return jsonResponse({ photos: result.photos.map(({ url, name }) => ({ url, name })) })
+  if (wantsJson(request)) return jsonResponse({ url: result.url })
+  return new Response(null, { status: 302, headers: { Location: result.url, 'Cache-Control': 'private, no-store' } })
 }
 
 const wantsJson = (request: NextRequest) => (request.headers.get('accept') ?? '').includes('application/json')

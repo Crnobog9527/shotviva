@@ -36,7 +36,8 @@ const FOREIGN_TRIGGERS_SQL = `
    order by n.nspname, c.relname, t.tgname`
 
 function cli(args: string[], stderr: 'inherit' | 'ignore' = 'inherit'): string {
-  // The public+admin dump passed Node's 1 MiB default buffer (ENOBUFS); leave ample headroom.
+  // The dump passed Node's 1 MiB default output limit (schema.sql is ~1 MB after trimming; the raw
+  // dump is larger), which CI reported as ENOBUFS.
   return execFileSync('supabase', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', stderr], maxBuffer: 64 * 1024 * 1024 })
 }
 

@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 
+import { cachedHasPublishedPosts } from '@/core/blog'
 import { SiteFooter } from '@/core/content'
 import { NavMenu } from '@/core/content/blocks/nav-menu'
 import { isGalleryEnabled } from '@/core/gallery'
@@ -70,13 +71,17 @@ export async function MarketingHeader({ locale, homeOnly = false }: { locale: Lo
 
 // Footer: contact, copyright, legal links and the text language switch (ARCHITECTURE §17).
 export async function MarketingFooter({ locale, homeOnly = false }: { locale: Locale; homeOnly?: boolean }) {
-  const [t, galleryText, galleryOpen] = await Promise.all([
+  const [t, galleryText, galleryOpen, blogText, hasBlogPosts] = await Promise.all([
     getTranslations({ locale, namespace: 'affiliate' }),
     getTranslations({ locale, namespace: 'gallery' }),
     isGalleryEnabled(site),
+    getTranslations({ locale, namespace: 'blog' }),
+    cachedHasPublishedPosts(locale),
   ])
   // The public gallery's one site-wide entry (ARCHITECTURE §9 第 1 条): only while it is open.
-  const links = galleryOpen ? [{ href: '/gallery' as const, label: galleryText('footerLink') }, ...footerLinksIn(locale)] : footerLinksIn(locale)
+  const legal = galleryOpen ? [{ href: '/gallery' as const, label: galleryText('footerLink') }, ...footerLinksIn(locale)] : footerLinksIn(locale)
+  // The blog's one entry (ARCHITECTURE §12.6): only once this language has a published post.
+  const links = hasBlogPosts ? [{ href: '/blog' as const, label: blogText('footerLink') }, ...legal] : legal
   return (
     <SiteFooter
       brand={site.brand}

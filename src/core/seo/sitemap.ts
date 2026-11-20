@@ -3,8 +3,9 @@ import { indexablePaths, zhIndexablePaths, type PageGate } from './indexing'
 import { absoluteUrl, siteOrigin } from './site-url'
 
 // Sitemap index + child sitemaps (建站规格 R6): English pages, and one sitemap per extra
-// language (§6). Templates and blog sitemaps are added here when those pages exist.
-export const SITEMAP_NAMES = ['sitemap-pages', 'sitemap-zh'] as const
+// language (§6), and the blog's (core/blog/sitemap.ts). A templates sitemap is added here when
+// those pages exist.
+export const SITEMAP_NAMES = ['sitemap-pages', 'sitemap-zh', 'sitemap-blog'] as const
 
 function escapeXml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

@@ -39,7 +39,7 @@ export function DirectoryTable({ items, filters }: { items: Dossier[]; filters: 
               <TableCell>
                 <Link prefetch={false} className="block font-medium text-primary hover:underline"
                   href={href({ tab: filters.tab, review: filters.review, id: r.user_id })}>
-                  {r.name || DOSSIER.unnamed}
+                  {r.admin_label || r.name || DOSSIER.unnamed}
                   <span className="block font-mono text-xs text-muted-foreground">{r.slug}</span>
                 </Link>
               </TableCell>

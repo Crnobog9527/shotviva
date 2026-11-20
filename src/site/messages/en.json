@@ -4,7 +4,6 @@
     "generator": {
       "label": "Try it on your photo",
       "replace": "Replace",
-      "replaceAria": "Your photo. Replace it",
       "template": "Template",
       "size": "Size",
       "change": "Change",
@@ -23,6 +22,8 @@
       "noTemplates": "Templates are on the way",
       "gift": "{images} for new users",
       "pickerTitle": "Pick a template",
+      "pickerLoading": "Loading templates…",
+      "pickerLoadFailed": "Couldn’t load templates.",
       "pickerText": "Each one keeps your subject as shot and changes the light, the scene or the style.",
       "pickTemplate": "Pick {name}",
       "pickerSearch": "Search by name, use or category",
@@ -506,6 +507,17 @@
       "packing": "Packing {count, plural, one {# photo} other {# photos}}. This can take a minute or two; the download starts on its own.",
       "started": "Your ZIP is downloading. Each file is named photo_template_number.",
       "limited": "That's three downloads in a minute. Try again in a minute."
+    },
+    "batchSave": {
+      "cta": "Save {count, plural, one {# photo} other {# photos}} to your phone",
+      "ctaNext": "Save the next {count, plural, one {# photo} other {# photos}}",
+      "preparingCta": "Getting photos ready…",
+      "savingCta": "Opening…",
+      "doneCta": "Saved to your phone",
+      "hint": "Tap, then choose Save Image or Save to Photos in the sheet that opens.",
+      "progress": "{saved, number} of {total, number} saved. Tap to save the next group.",
+      "done": "All {total, plural, one {# photo is} other {# photos are}} saved. Check your Photos app.",
+      "unsupported": "This browser can't save straight to Photos, so here is the ZIP instead."
     },
     "signupCodes": {
       "noInviteGift": "Valid invite. No extra signup credits are currently offered.",
@@ -2392,6 +2404,20 @@
     "missingTitle": "This template isn’t available",
     "missingText": "It may have been taken down or changed. Have a look at the other templates.",
     "missingBrowse": "See other templates"
+  },
+  "blog": {
+    "footerLink": "Blog",
+    "listTitle": "Blog",
+    "listIntro": "Guides and comparisons on AI food photography, product photos and menu design, from the Shotviva team.",
+    "listEmpty": "No posts yet. Check back soon.",
+    "metaTitle": "Shotviva Blog: AI photo guides for restaurants and sellers",
+    "metaDescription": "Guides and tool comparisons on AI food photography, product photos and menu design for restaurants, hotels and online sellers.",
+    "by": "By",
+    "published": "Published",
+    "updated": "Updated",
+    "contents": "On this page",
+    "home": "Home",
+    "crumb": "Blog"
   },
   "supportEmail": {
     "subject": "You have a reply from Shotviva support",

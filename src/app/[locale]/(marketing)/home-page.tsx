@@ -7,10 +7,9 @@ import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, faqPageLd, organizationLd, pageMetadata, softwareApplicationLd } from '@/core/seo'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
-import { cachedCatalogueIndex } from '@/core/templates/cached-taxonomy'
 import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
-import { pickerBrowse, toCatalogueTemplate } from '@/modules/image/marketing'
+import { homePanelTemplates } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
 import { creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
 import { heroOptionContent } from '@/site/experiments'
@@ -26,13 +25,13 @@ import { HomeWishCtaSlot } from './home-wish-cta-slot'
 // The copy with "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4).
 async function load() {
   const locale = await currentLocale()
-  const [live, series, index, wishlistOpen, products] = await Promise.all([
-    cachedWebCatalogue(locale), cachedPublicSeries(locale), cachedCatalogueIndex(locale), isWishlistEnabled(site), displayProducts(),
+  const [live, series, wishlistOpen, products] = await Promise.all([
+    cachedWebCatalogue(locale), cachedPublicSeries(locale), isWishlistEnabled(site), displayProducts(),
   ])
   const facts = creditFacts(live)
   const page = fillCredits(homePageIn(locale, products), facts)
   const meta = { path: '/', title: page.title, description: page.description }
-  return { locale, live, series, index, products, page, wishlistOpen, free: fillCredits(freeImagesIn(locale), facts), meta }
+  return { locale, live, series, products, page, wishlistOpen, free: fillCredits(freeImagesIn(locale), facts), meta }
 }
 
 export async function homeMetadata(): Promise<Metadata> {
@@ -43,14 +42,14 @@ export async function homeMetadata(): Promise<Metadata> {
 // The live catalogue is a cached read (expired by every admin save, featured list included);
 // only the generator's visitor half waits for the request.
 export async function HomeContent({ heroOption }: { heroOption?: string }) {
-  const { locale, live, series, index, products, page, wishlistOpen, free, meta } = await load()
+  const { locale, live, series, products, page, wishlistOpen, free, meta } = await load()
   const option = heroOption ? heroOptionContent(heroOption, locale) : null
   const ldMeta = { ...meta, path: localizePath(meta.path, locale) }
-  const catalogue = live.map(toCatalogueTemplate)
   // Series show as one card each, in the admin's order (T102, Owner 2026-11-12).
   const { defaultId: featuredId, ...sections } = featuredSections(live, undefined, series)
   const defaultId = option && live.some((template) => template.id === option.generatorTemplate) ? option.generatorTemplate : featuredId
-  const initialCovers = await openingCovers(live.find((template) => template.id === defaultId))
+  const { templates, opening } = homePanelTemplates(live, defaultId)
+  const initialCovers = await openingCovers(opening)
   const shown = option ? { ...page, hero: { ...page.hero, ...option.hero } } : page
   return (
     <>
@@ -66,7 +65,7 @@ export async function HomeContent({ heroOption }: { heroOption?: string }) {
         heroTagline={option?.tagline}
         heroStrip={option?.strip}
         generator={
-          <HomeGeneratorSlot templates={catalogue} browse={pickerBrowse(index, catalogue, locale === 'zh')} defaultId={defaultId} homePath={localizePath('/', locale)} freeImages={free} initialCovers={initialCovers} />
+          <HomeGeneratorSlot templates={templates} catalogue={{ locale }} defaultId={opening?.id ?? null} homePath={localizePath('/', locale)} freeImages={free} initialCovers={initialCovers} />
         }
         // Gone with the wishlist switch (cached read); signed out, sign-up returns to the wall.
         wishlistCta={wishlistOpen ? <HomeWishCtaSlot cta={page.wishlist.cta} next={localizePath('/wishlist', locale)} /> : null}

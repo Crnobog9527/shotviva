@@ -5,6 +5,7 @@ import createNextIntlPlugin from 'next-intl/plugin'
 import { appVersion, parseSentryBuildEnv } from './src/core/build-env'
 import { rawPublicEnv } from './src/core/public-env'
 import { parsePublicEnv } from './src/core/public-env-schema'
+import { HTML_LIMITED_BOTS } from './src/core/seo/html-limited-bots'
 import { indexingOpen, parseIndexingEnv, xRobotsTagRules } from './src/core/seo/indexing-env'
 import { legacyUserRedirects } from './src/core/admin/users/legacy-redirects'
 import { legacyHelpRedirects } from './src/core/support/legacy-redirects'
@@ -63,6 +64,9 @@ const nextConfig: NextConfig = {
   // switch): a signed-in page's first full load carries the app's sheet in its HTML (~28 KB br)
   // instead of a cached file; moves inside the app are unchanged (Next uses <link> for those).
   experimental: { globalNotFound: true, inlineCss: true },
+  // Search crawlers and Lighthouse get the cached page like a browser; only link-preview bots
+  // keep Next's blocking-metadata render (src/core/seo/html-limited-bots.ts).
+  htmlLimitedBots: HTML_LIMITED_BOTS,
   // Off for the site as a whole: with it on, every page's HTML also embeds a runtime prefetch
   // of itself (a second copy of the page tree and of the client messages, about 40% of the
   // marketing pages' HTML) and the server renders the page twice to produce it. The signed-in

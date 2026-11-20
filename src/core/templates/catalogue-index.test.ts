@@ -5,6 +5,8 @@ vi.mock('next/cache', () => ({ cacheLife, cacheTag: () => undefined }))
 vi.mock('../auth/supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
 const listTemplatesIn = vi.fn(async () => [])
 vi.mock('./list-templates', () => ({ listTemplatesIn }))
+const readLocaleDisplay = vi.fn(async () => ({ categoryOrder: {}, featured: {} }))
+vi.mock('./locale-display-read', () => ({ readLocaleDisplay }))
 
 const { logger } = await import('../logger')
 const { FAILED_READ_LIFE } = await import('../cache-life')
@@ -63,6 +65,16 @@ describe('web catalogue for marketing pages', () => {
   it('reads every live web template, series members included', async () => {
     await readCatalogue('zh')
     expect(listTemplatesIn).toHaveBeenCalledWith(expect.anything(), 'zh', { includeSeriesMembers: true })
+  })
+
+  it("applies the language's own featured list and category order (migration 1575)", async () => {
+    const row = (id: string, category: string, featuredRank: number | null) =>
+      ({ id, category, categoryView: { sortOrder: 0 }, featuredRank })
+    listTemplatesIn.mockResolvedValueOnce([row('a', 'chinese', 1), row('b', 'western', null)] as never)
+    readLocaleDisplay.mockResolvedValueOnce({ categoryOrder: { en: { western: 10, chinese: 20 } }, featured: { en: ['b'] } })
+    const live = await readCatalogue('en') as unknown as { id: string; featuredRank: number | null; categoryView: { sortOrder: number } }[]
+    expect(live.map((t) => [t.id, t.featuredRank])).toEqual([['a', null], ['b', 1]])
+    expect(live[1].categoryView.sortOrder).toBeLessThan(live[0].categoryView.sortOrder)
   })
 })
 

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { UserLink } from '@/core/admin/users-ui'
 import { Badge } from '@/core/ui/badge'
 import { ConsumerReferral } from './consumer-referral'
 import { COPY, DOSSIER } from './copy'
@@ -10,6 +11,7 @@ import { ProfileFacts } from './dossier-profile'
 import { DossierSections } from './dossier-sections'
 import { enrollmentLabel } from './enrollment'
 import type { SaveAction } from './form'
+import { AnnotateMember } from './member-annotate'
 import { DecideMember, ReopenApplication, SetMember } from './member-forms'
 import { Field, FiltersForm, LinkTo, NextPage, Select } from './parts'
 import { href, type Filters } from './query'
@@ -45,12 +47,16 @@ async function MemberView(props: DossierProps) {
     <>
       <LinkTo filters={{ tab: filters.tab, review: filters.review }}>{COPY.previous}</LinkTo>
       <header className="flex flex-wrap items-center gap-3">
-        <h2 className="text-xl font-semibold">{member.name || DOSSIER.unnamed}</h2>
+        <h2 className="text-xl font-semibold">{member.admin_label || member.name || DOSSIER.unnamed}</h2>
         <span className="font-mono text-sm text-muted-foreground">{member.slug}</span>
         <Badge variant="outline">{enrollmentLabel(member)}</Badge>
+        <UserLink userId={member.user_id} className="ml-auto rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
+          {DOSSIER.manageAccount}
+        </UserLink>
       </header>
       <DossierMetrics row={member} />
       <ProfileFacts member={member} />
+      <AnnotateMember member={member} action={action} />
       {member.status === 'pending' && <DecideMember member={member} action={action} />}
       {member.status === 'rejected' && <ReopenApplication member={member} action={action} />}
       {['active', 'suspended', 'banned'].includes(member.status) && (

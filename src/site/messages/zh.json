@@ -4,7 +4,6 @@
     "generator": {
       "label": "用你的照片试一下",
       "replace": "更换",
-      "replaceAria": "你的照片，点击更换",
       "template": "模板",
       "size": "尺寸",
       "change": "换模板",
@@ -23,6 +22,8 @@
       "noTemplates": "模板即将上线",
       "gift": "{images}，新用户专享",
       "pickerTitle": "选一个模板",
+      "pickerLoading": "正在加载模板…",
+      "pickerLoadFailed": "模板加载失败。",
       "pickerText": "每个模板都保留你拍的主体，只换光线、场景或画风。",
       "pickTemplate": "选用{name}",
       "pickerSearch": "搜索模板：名称、用途、分类",
@@ -506,6 +507,17 @@
       "packing": "正在打包 {count, plural, other {# 张}}，大约需要一两分钟，好了会自动开始下载。",
       "started": "压缩包开始下载了。文件名是「照片名_模板名_序号」。",
       "limited": "一分钟内已经下载了三次，请过一分钟再试。"
+    },
+    "batchSave": {
+      "cta": "保存 {count, plural, other {# 张}}到手机",
+      "ctaNext": "继续保存下一组 {count, plural, other {# 张}}",
+      "preparingCta": "正在准备照片…",
+      "savingCta": "正在打开…",
+      "doneCta": "已保存到手机",
+      "hint": "点一下，在弹出的面板里选「存储图像」或「保存到相册」。",
+      "progress": "已保存 {saved, number}/{total, number}，点按钮继续保存下一组。",
+      "done": "{total, plural, other {# 张}}都已保存，去相册里看看。",
+      "unsupported": "这个浏览器不能直接存到相册，已改为下载压缩包。"
     },
     "signupCodes": {
       "noInviteGift": "邀请码有效，当前无额外注册赠分。",
@@ -2392,6 +2404,20 @@
     "missingTitle": "这个模板暂时看不到了",
     "missingText": "它可能已经下架或改动过。去首页看看其他模板吧。",
     "missingBrowse": "去看看其他模板"
+  },
+  "blog": {
+    "footerLink": "博客",
+    "listTitle": "博客",
+    "listIntro": "Shotviva 团队写的 AI 餐饮图、商品图和菜单设计指南与工具对比。",
+    "listEmpty": "还没有文章，过几天再来看看。",
+    "metaTitle": "Shotviva 博客：餐厅和商家的 AI 出图指南",
+    "metaDescription": "AI 餐饮图、商品图和菜单设计的指南与工具对比，给餐厅、酒店和网店商家看。",
+    "by": "作者",
+    "published": "发布于",
+    "updated": "更新于",
+    "contents": "本页目录",
+    "home": "首页",
+    "crumb": "博客"
   },
   "supportEmail": {
     "subject": "Shotviva 客服回复了你的工单",

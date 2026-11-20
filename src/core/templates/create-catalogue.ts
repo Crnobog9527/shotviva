@@ -15,7 +15,9 @@ import { CatalogueCoordinationError, coordinateCatalogue } from './catalogue-fli
 import { CATALOGUE_LIFE } from './cached-catalogue'
 import { toCatalogueIndex } from './catalogue-index'
 import { catalogueEntries, type CatalogueMember, type CatalogueSeriesRow } from './catalogue-index-entries'
+import { cachedLocaleDisplay } from './cached-taxonomy'
 import { localizeTemplate } from './localize'
+import { NO_LOCALE_DISPLAY, orderTree } from './locale-display'
 import { readCategoryTree } from './taxonomy-reads'
 import { TEMPLATE_COLUMNS, toTemplate, type TemplateRow } from './types'
 
@@ -138,10 +140,15 @@ async function cachedCreateCatalogue(): Promise<Snapshot> {
 }
 
 export async function loadCreateCatalogue(locale: Locale, posters: boolean | Promise<boolean>) {
-  const [snapshot, allowed] = await Promise.all([cachedCreateCatalogue(), posters])
+  // Ordering must never take Create down: without this language's order the shared one stands.
+  const display = cachedLocaleDisplay().catch((error: unknown) => {
+    logger.error('templates.locale_display_failed', { error })
+    return NO_LOCALE_DISPLAY
+  })
+  const [snapshot, allowed, order] = await Promise.all([cachedCreateCatalogue(), posters, display])
   const members = snapshot.members.filter((member): member is CatalogueMember & { series_id: string } => member.series_id !== null)
   return {
-    index: snapshot.tree === null ? null : toCatalogueIndex(snapshot.tree, snapshot.entries, members, locale),
+    index: snapshot.tree === null ? null : toCatalogueIndex(orderTree(snapshot.tree, order.categoryOrder[locale]), snapshot.entries, members, locale),
     templates: snapshot.templates.filter((template) => allowed || !template.fields.poster)
       .map((template) => localizeTemplate(template, locale)),
   }

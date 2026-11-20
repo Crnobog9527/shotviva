@@ -10,6 +10,8 @@ import { logger } from '../logger'
 import { PROVIDERS_CACHE_TAG } from '../providers/cache-tag'
 import { TEMPLATES_CACHE_TAG } from './cache'
 import { listTemplatesIn } from './list-templates'
+import { applyLocaleDisplay } from './locale-display'
+import { readLocaleDisplay } from './locale-display-read'
 import type { LocalizedTemplate } from './localize'
 
 export const CATALOGUE_LIFE = { revalidate: 3600, expire: 86_400 } as const
@@ -18,7 +20,12 @@ type Read = (locale: Locale) => Promise<LocalizedTemplate[]>
 // Every live web template, series members included (T102): these pages look templates up by id
 // (featured picks, ?open=, the home picker's saved templates) and price the catalogue (credit
 // facts, the paywall's photo estimate); a member is as live and as priced as any other template.
-export const readCatalogue: Read = (locale) => listTemplatesIn(createAdminSupabase(), locale, { includeSeriesMembers: true })
+export const readCatalogue: Read = async (locale) => {
+  const db = createAdminSupabase()
+  const [live, display] = await Promise.all([listTemplatesIn(db, locale, { includeSeriesMembers: true }), readLocaleDisplay(db)])
+  // This language's category order and featured list (migration 1575); the shared ones until set.
+  return applyLocaleDisplay(live, display, locale)
+}
 
 // The cached body, apart for tests: the live list with the normal lifetime, or, when the read
 // fails (a build without a database, an outage, a column the database does not have yet), an
