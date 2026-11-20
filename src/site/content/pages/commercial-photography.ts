@@ -48,7 +48,8 @@ const shoot: ShootDemo = {
 
 // 电商白底图, three cases from easy to hard (Owner 2026-11-12): the live template's speaker, a
 // dress on a door, and flyaway hair against a busy street. Cut-outs with an alpha channel sit on
-// a checkerboard. The dress and the model are AI examples; every brand in them is made up.
+// a checkerboard. All three "before" pictures are real phone photos (Owner 2026-11-21), so their
+// alt text says so.
 const whiteCases: EditCases = {
   heading: 'White Background Main Images, From Easy to Hard',
   intro: 'Marketplace main images want the product alone on white, and the cut-out is where cheap tools show. Three phone photos, the last one the hardest kind there is: fine flyaway hair against a busy, backlit street.',

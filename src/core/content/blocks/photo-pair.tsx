@@ -18,6 +18,7 @@ type Props = {
   // here made every plate download at twice the pixels it shows.
   sizes: string
   className?: string
+  decorative?: boolean
   showcase?: boolean
 }
 
@@ -47,20 +48,29 @@ export function BeforePane({ image, preload, sizes, showcase = false }: { image:
   )
 }
 
-export function PhotoPair({ before, after, size = 'card', preload = false, sizes, className, showcase = false }: Props) {
+type AfterProps = { after: ImageRef; sizes: string; preload: boolean; showcase: boolean; alt: string }
+
+// The AI result. In a showcase the plate is fitted to its frame over a blurred fill of itself.
+function AfterImage({ after, sizes, preload, showcase, alt }: AfterProps) {
+  const plate = <WhiteGroundImage className="mk-a" src={after.src} alt={alt} width={after.width} height={after.height} sizes={sizes} fitPlate={showcase || undefined} {...afterLoading(preload)} />
+  if (!showcase) return plate
+  return (
+    <span className="mk-result">
+      <Image className="mk-fill" src={after.src} alt="" aria-hidden width={after.width} height={after.height} sizes={sizes} loading="lazy" />
+      {plate}
+    </span>
+  )
+}
+
+export function PhotoPair({ before, after, size = 'card', preload = false, sizes, className, decorative, showcase = false }: Props) {
   const t = useTranslations('marketing.home')
   return (
-    <span className={cn('mk-pair', size === 'lg' && 'mk-pair-lg', className)}>
-      <BeforePane image={before} preload={preload} sizes={sizes} showcase={showcase} />
+    <span className={cn('mk-pair', size === 'lg' && 'mk-pair-lg', className)} aria-hidden={decorative || undefined}>
+      <BeforePane image={decorative ? { ...before, alt: '' } : before} preload={preload} sizes={sizes} showcase={showcase} />
       <span className="mk-pane">
         {showcase ? <Image className="mk-fill" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" /> : null}
         <Image className="mk-ph" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" />
-        {showcase ? (
-          <span className="mk-result">
-            <Image className="mk-fill" src={after.src} alt="" aria-hidden width={after.width} height={after.height} sizes={sizes} loading="lazy" />
-            <WhiteGroundImage className="mk-a" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} fitPlate {...afterLoading(preload)} />
-          </span>
-        ) : <WhiteGroundImage className="mk-a" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} {...afterLoading(preload)} />}
+        <AfterImage after={after} sizes={sizes} preload={preload} showcase={showcase} alt={decorative ? '' : after.alt} />
         <span className="mk-ws" aria-hidden />
       </span>
       <span className="mk-hl" aria-hidden />

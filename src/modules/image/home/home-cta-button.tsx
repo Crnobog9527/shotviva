@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 
 import { PaywallButton } from '@/core/billing/paywall/provider'
 import { Link } from '@/core/i18n/ui'
+import { UPLOAD_ACCEPT } from '@/core/storage/rules'
 import { cn } from '@/core/ui/cn'
 
 import type { HomeCta } from './home-cta'
@@ -13,9 +14,7 @@ import { CameraIcon } from './home-icons'
 type Props = {
   cta: HomeCta
   templateId: string | null
-  // The page's hidden file input: "Upload photo" is a <label> for it, so the phone's picker opens
-  // natively from the tap, with no script in between (Owner 2026-11-13: the button did nothing).
-  fileInputId: string
+  onPhotoPicked(file: File): void
   onSignUp(): void
   onGenerate(): void
 }
@@ -28,26 +27,26 @@ const PRIMARY = 'mk-cta'
 // The generator's one primary (DESIGN §6.9 item 9), with the workspace's own labels:
 // "Generate · 2 credits", "Get credits · N needed" (neutral, opens the paywall), or a disabled
 // state while the photo uploads or a slot is busy.
-export function HomeCtaButton({ cta, templateId, fileInputId, onSignUp, onGenerate }: Props) {
+export function HomeCtaButton({ cta, templateId, onPhotoPicked, onSignUp, onGenerate }: Props) {
   const t = useTranslations('app.workspace')
   const home = useTranslations('home.generator')
   const generate = (count: number) => t.rich('generateCta', { cost: costTag, count })
   switch (cta.kind) {
     case 'pick-photo':
       return (
-        <label
-          htmlFor={fileInputId}
-          className={PRIMARY}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') return
-            event.preventDefault()
-            document.getElementById(fileInputId)?.click()
-          }}
-        >
+        <label className={cn(PRIMARY, 'mk-upload-cta')}>
+          {/* The native label opens the picker on touch; the input handles Tab, Enter and Space. */}
+          <input
+            type="file"
+            accept={UPLOAD_ACCEPT}
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0]
+              if (file) onPhotoPicked(file)
+              event.currentTarget.value = ''
+            }}
+          />
           <CameraIcon />
-          {/* Says what the click does: it opens the photo picker (review of #523, F6). */}
           <span>{home('uploadPhoto')}</span>
         </label>
       )

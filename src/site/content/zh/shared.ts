@@ -31,7 +31,7 @@ export function zhSharedFacts(offers: OfferFacts): readonly [Fact, Fact, Fact, .
     { label: '出图尺寸', value: zhTierPixels },
     { label: '上传要求', value: zhUploadLimits },
     { label: '价格', value: paidValue(offers) },
-    { label: '免费图和付费图', value: '免费图公开展示并带水印；付费图私密、无水印' },
+    { label: '免费图和付费图', value: '免费图公开展示并带水印（海报类作品只自己可见）；付费图私密、无水印' },
     { label: '界面语言', value: zhLanguages },
   ]
 }
