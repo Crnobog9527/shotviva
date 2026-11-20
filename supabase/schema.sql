@@ -3424,6 +3424,55 @@ $$;
 ALTER FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" integer, "p_refunded" integer, "p_rate" integer) OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."affiliate_payout_fee_rules" (
+    "id" bigint NOT NULL,
+    "program" "text" DEFAULT 'standard'::"text" NOT NULL,
+    "label_zh" "text" NOT NULL,
+    "label_en" "text" NOT NULL,
+    "kind" "text" NOT NULL,
+    "percent_bp" integer DEFAULT 0 NOT NULL,
+    "fixed_cents" bigint DEFAULT 0 NOT NULL,
+    "min_cents" bigint,
+    "max_cents" bigint,
+    "payout_methods" "text"[],
+    "active" boolean DEFAULT true NOT NULL,
+    "effective_from" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_by" "uuid" NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid" NOT NULL,
+    CONSTRAINT "affiliate_payout_fee_rules_bounds" CHECK ((("min_cents" IS NULL) OR ("max_cents" IS NULL) OR ("min_cents" <= "max_cents"))),
+    CONSTRAINT "affiliate_payout_fee_rules_fixed_cents_check" CHECK ((("fixed_cents" >= 0) AND ("fixed_cents" <= 10000000))),
+    CONSTRAINT "affiliate_payout_fee_rules_kind_check" CHECK (("kind" = ANY (ARRAY['percent'::"text", 'fixed'::"text", 'percent_fixed'::"text"]))),
+    CONSTRAINT "affiliate_payout_fee_rules_label_en_check" CHECK ((("length"(TRIM(BOTH FROM "label_en")) >= 1) AND ("length"(TRIM(BOTH FROM "label_en")) <= 80))),
+    CONSTRAINT "affiliate_payout_fee_rules_label_zh_check" CHECK ((("length"(TRIM(BOTH FROM "label_zh")) >= 1) AND ("length"(TRIM(BOTH FROM "label_zh")) <= 80))),
+    CONSTRAINT "affiliate_payout_fee_rules_max_cents_check" CHECK ((("max_cents" >= 0) AND ("max_cents" <= 10000000))),
+    CONSTRAINT "affiliate_payout_fee_rules_min_cents_check" CHECK ((("min_cents" >= 0) AND ("min_cents" <= 10000000))),
+    CONSTRAINT "affiliate_payout_fee_rules_payout_methods_check" CHECK ((("payout_methods" IS NULL) OR (("cardinality"("payout_methods") > 0) AND ("payout_methods" <@ ARRAY['paypal'::"text", 'wise'::"text", 'bank'::"text", 'alipay'::"text", 'other'::"text"])))),
+    CONSTRAINT "affiliate_payout_fee_rules_percent_bp_check" CHECK ((("percent_bp" >= 0) AND ("percent_bp" <= 10000))),
+    CONSTRAINT "affiliate_payout_fee_rules_program_check" CHECK (("program" ~ '^[a-z][a-z0-9_]{0,39}$'::"text")),
+    CONSTRAINT "affiliate_payout_fee_rules_shape" CHECK (((("kind" = 'percent'::"text") AND ("percent_bp" > 0) AND ("fixed_cents" = 0)) OR (("kind" = 'fixed'::"text") AND ("percent_bp" = 0) AND ("fixed_cents" > 0)) OR (("kind" = 'percent_fixed'::"text") AND ("percent_bp" > 0) AND ("fixed_cents" > 0)))),
+    CONSTRAINT "affiliate_payout_fee_rules_sort_order_check" CHECK ((("sort_order" >= 0) AND ("sort_order" <= 1000)))
+);
+
+
+ALTER TABLE "public"."affiliate_payout_fee_rules" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_affiliate_fee_rule_json"("r" "public"."affiliate_payout_fee_rules") RETURNS "jsonb"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object('id',r.id,'label_zh',r.label_zh,'label_en',r.label_en,'kind',r.kind,
+    'percent_bp',r.percent_bp,'fixed_cents',r.fixed_cents,'min_cents',r.min_cents,'max_cents',r.max_cents,
+    'payout_methods',to_jsonb(r.payout_methods),'effective_from',r.effective_from);
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_fee_rule_json"("r" "public"."affiliate_payout_fee_rules") OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."affiliate_payouts" (
     "id" bigint NOT NULL,
     "affiliate_user_id" "uuid" NOT NULL,
@@ -3439,7 +3488,13 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_payouts" (
     "note" "text",
     "paid_amount" bigint,
     "legacy_review_required" boolean DEFAULT false NOT NULL,
+    "fee_rules" "jsonb",
+    "fee_amount" bigint,
+    "fee_lines" "jsonb",
     CONSTRAINT "affiliate_payouts_amount_check" CHECK (("amount" > 0)),
+    CONSTRAINT "affiliate_payouts_fee_amount_check" CHECK (("fee_amount" >= 0)),
+    CONSTRAINT "affiliate_payouts_fee_lines_check" CHECK ((("fee_lines" IS NULL) OR ("jsonb_typeof"("fee_lines") = 'array'::"text"))),
+    CONSTRAINT "affiliate_payouts_fee_rules_check" CHECK ((("fee_rules" IS NULL) OR ("jsonb_typeof"("fee_rules") = 'array'::"text"))),
     CONSTRAINT "affiliate_payouts_paid_amount_check" CHECK (("paid_amount" >= 0)),
     CONSTRAINT "affiliate_payouts_status_check" CHECK (("status" = ANY (ARRAY['due'::"text", 'held'::"text", 'paid'::"text", 'void'::"text"])))
 );
@@ -4519,6 +4574,55 @@ $$;
 ALTER FUNCTION "public"."admin_affiliate_dossier_log"("p_actor" "uuid", "p_user" "uuid", "p_before_at" timestamp with time zone, "p_before_id" bigint) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_affiliate_fee_rule_save"("p_actor" "uuid", "p_input" "jsonb") RETURNS bigint
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_id bigint:=(p_input->>'id')::bigint; v_old public.affiliate_payout_fee_rules; v_new public.affiliate_payout_fee_rules;
+  v_methods text[]; v_from timestamptz:=(p_input->>'effective_from')::timestamptz;
+begin
+  perform public._affiliate_require_admin(p_actor);
+  if jsonb_typeof(p_input->'payout_methods') not in ('array','null') then raise exception 'INVALID_INPUT'; end if;
+  if jsonb_typeof(p_input->'payout_methods')='array' and jsonb_array_length(p_input->'payout_methods')>0 then
+    v_methods:=array(select jsonb_array_elements_text(p_input->'payout_methods'));
+  end if;
+  if v_id is null then
+    insert into public.affiliate_payout_fee_rules(label_zh,label_en,kind,percent_bp,fixed_cents,min_cents,max_cents,
+        payout_methods,active,effective_from,sort_order,created_by,updated_by)
+      values(trim(p_input->>'label_zh'),trim(p_input->>'label_en'),p_input->>'kind',coalesce((p_input->>'percent_bp')::integer,0),
+        coalesce((p_input->>'fixed_cents')::bigint,0),(p_input->>'min_cents')::bigint,(p_input->>'max_cents')::bigint,
+        v_methods,coalesce((p_input->>'active')::boolean,true),coalesce(v_from,now()),coalesce((p_input->>'sort_order')::integer,0),
+        p_actor,p_actor)
+      returning * into v_new;
+  else
+    select * into v_old from public.affiliate_payout_fee_rules where id=v_id for update;
+    if not found then raise exception 'NOT_FOUND'; end if;
+    if p_input ? 'expected_updated_at' and (p_input->>'expected_updated_at')::timestamptz is distinct from v_old.updated_at then
+      raise exception 'AFFILIATE_FEE_RULE_CHANGED'; end if;
+    -- A rule already in force cannot be pushed into the future: it would stop applying until then
+    -- and statements issued meanwhile would take no fee. A future change is a new rule plus
+    -- disabling this one on that date.
+    if v_old.effective_from<=now() and coalesce(v_from,v_old.effective_from)>now() then
+      raise exception 'AFFILIATE_FEE_RULE_IN_FORCE'; end if;
+    update public.affiliate_payout_fee_rules set label_zh=trim(p_input->>'label_zh'),label_en=trim(p_input->>'label_en'),
+        kind=p_input->>'kind',percent_bp=coalesce((p_input->>'percent_bp')::integer,0),fixed_cents=coalesce((p_input->>'fixed_cents')::bigint,0),
+        min_cents=(p_input->>'min_cents')::bigint,max_cents=(p_input->>'max_cents')::bigint,payout_methods=v_methods,
+        active=coalesce((p_input->>'active')::boolean,v_old.active),effective_from=coalesce(v_from,v_old.effective_from),
+        sort_order=coalesce((p_input->>'sort_order')::integer,v_old.sort_order),updated_at=now(),updated_by=p_actor
+      where id=v_id returning * into v_new;
+  end if;
+  perform public._affiliate_audit(p_actor,'settings','fee_rule:'||v_new.id,
+    jsonb_build_object('fee_rule',v_new.id,'before',case when v_old.id is not null then
+        public._affiliate_fee_rule_json(v_old)||jsonb_build_object('active',v_old.active) end,
+      'after',public._affiliate_fee_rule_json(v_new)||jsonb_build_object('active',v_new.active))::text);
+  return v_new.id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_affiliate_fee_rule_save"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_affiliate_find_user"("p_actor" "uuid", "p_query" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -4576,7 +4680,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_affiliate_payout_decide"("p_actor" "u
 declare v public.affiliate_payouts; v_status text:=p_input->>'status'; v_note text:=nullif(trim(p_input->>'note'),'');
   v_mode text:=p_input->>'void_mode'; v_method text:=nullif(trim(p_input->>'method'),'');
   v_ref text:=nullif(trim(p_input->>'paid_reference'),''); v_time timestamptz:=(p_input->>'paid_at')::timestamptz;
-  v_expected bigint:=(p_input->>'expected_amount')::bigint; v_actual bigint;
+  v_expected bigint:=(p_input->>'expected_amount')::bigint; v_actual bigint; v_quote jsonb; v_fees bigint;
 begin
   perform public._affiliate_require_admin(p_actor);
   perform pg_advisory_xact_lock(hashtextextended('affiliate_settlement',0));
@@ -4602,6 +4706,17 @@ begin
       v_actual:=public.affiliate_payout_payable(v);
       if (v_expected is not null or v_actual<>v.amount) and v_expected is distinct from v_actual then
         raise exception 'AFFILIATE_PAYOUT_AMOUNT_CHANGED'; end if;
+      if v.fee_rules is not null then
+        v_quote:=public.affiliate_payout_fee_quote(v.fee_rules,v_actual);
+        v_fees:=(v_quote->>'fees')::bigint;
+        -- Fees ate the whole payout: nothing would be sent, so do not consume the balance.
+        if v_fees>0 and (v_quote->>'net')::bigint=0 then raise exception 'AFFILIATE_PAYOUT_NET_ZERO'; end if;
+        -- The admin confirms the net they sent. A form without expected_net (rendered before
+        -- fees existed) may only pay statements that carry no fee.
+        if (p_input ? 'expected_net' or v_fees>0)
+          and (p_input->>'expected_net')::bigint is distinct from (v_quote->>'net')::bigint then
+          raise exception 'AFFILIATE_PAYOUT_AMOUNT_CHANGED'; end if;
+      end if;
       with backed as (
         select i.commission_id,i.prior_amount,greatest(0,least(i.issue_amount,
           case when c.status='confirmed' and c.payout_retained is null then c.amount else 0 end)-i.prior_amount) cents
@@ -4617,9 +4732,12 @@ begin
   end if;
   update public.affiliate_payouts set status=v_status,paid_amount=v_actual,decided_by=p_actor,note=v_note,
     paid_at=case when v_status='paid' then v_time end,paid_method=case when v_status='paid' then v_method end,
-    paid_reference=case when v_status='paid' then v_ref end where id=v.id;
+    paid_reference=case when v_status='paid' then v_ref end,
+    fee_amount=case when v_status='paid' and v_quote is not null then v_fees end,
+    fee_lines=case when v_status='paid' and v_quote is not null then v_quote->'lines' end where id=v.id;
   perform public._affiliate_audit(p_actor,'payout_decide',v.id::text,
-    concat_ws(': ',v.status||' -> '||v_status,case when v_status='void' then v_mode end,v_actual::text,v_note));
+    concat_ws(': ',v.status||' -> '||v_status,case when v_status='void' then v_mode end,v_actual::text,
+      case when v_quote is not null then 'fees '||v_fees||' net '||(v_quote->>'net') end,v_note));
 end;
 $$;
 
@@ -10396,9 +10514,10 @@ begin
   -- One MVCC snapshot for the balance and its commission backing. Refunds that
   -- commit after this statement are measured against these exact amounts at payment.
   with issued as (
-    insert into public.affiliate_payouts(affiliate_user_id,period,amount,payout_snapshot)
+    insert into public.affiliate_payouts(affiliate_user_id,period,amount,payout_snapshot,fee_rules)
       select a.user_id,date_trunc('month',p_today)::date,b.available,
-        jsonb_build_object('payout_method',a.payout_method,'payout_details',a.payout_details)
+        jsonb_build_object('payout_method',a.payout_method,'payout_details',a.payout_details),
+        public.affiliate_payout_fee_rules_for('standard',a.payout_method,v_cutoff)
         from public.affiliates a join public.affiliate_balances b on b.affiliate_user_id=a.user_id
        where a.status='active' and a.payout_method is not null and b.available>0 and b.available>=v_settings.payout_min_usd
       on conflict(affiliate_user_id,period) do nothing returning id,affiliate_user_id,amount)
@@ -10410,6 +10529,23 @@ $$;
 
 
 ALTER FUNCTION "public"."affiliate_daily"("p_today" "date") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."affiliate_partner_fees"("p_user" "uuid") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object('method',a.payout_method,
+    'rules',(select coalesce(jsonb_agg(public._affiliate_fee_rule_json(r) order by r.sort_order,r.id),'[]'::jsonb)
+      from public.affiliate_payout_fee_rules r where r.program='standard' and r.active and r.effective_from<=now()),
+    'estimate',public.affiliate_payout_fee_quote(
+      public.affiliate_payout_fee_rules_for('standard',a.payout_method,now()),greatest(b.available,0)))
+  from public.affiliates a join public.affiliate_balances b on b.affiliate_user_id=a.user_id
+  where a.user_id=p_user;
+$$;
+
+
+ALTER FUNCTION "public"."affiliate_partner_fees"("p_user" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."affiliate_partner_referrals"("p_user" "uuid", "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "text" DEFAULT NULL::"text") RETURNS TABLE("masked_hash" "text", "referred_at" timestamp with time zone, "payment_count" bigint, "commission_amount" bigint)
@@ -10456,6 +10592,61 @@ $$;
 
 
 ALTER FUNCTION "public"."affiliate_partner_summary"("p_user" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."affiliate_payout_fee_quote"("p_rules" "jsonb", "p_gross" bigint) RETURNS "jsonb"
+    LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+declare r jsonb; v_left bigint:=p_gross; v_fee bigint; v_lines jsonb:='[]'::jsonb;
+begin
+  if p_gross is null or p_gross<0 or (p_rules is not null and jsonb_typeof(p_rules)<>'array') then
+    raise exception 'INVALID_INPUT'; end if;
+  for r in select e.value from jsonb_array_elements(coalesce(p_rules,'[]'::jsonb)) with ordinality e(value,n) order by e.n loop
+    v_fee:=div(p_gross::numeric*coalesce((r->>'percent_bp')::integer,0)+5000,10000)::bigint
+      +coalesce((r->>'fixed_cents')::bigint,0);
+    if r->>'min_cents' is not null then v_fee:=greatest(v_fee,(r->>'min_cents')::bigint); end if;
+    if r->>'max_cents' is not null then v_fee:=least(v_fee,(r->>'max_cents')::bigint); end if;
+    v_fee:=least(greatest(v_fee,0),v_left);
+    v_left:=v_left-v_fee;
+    v_lines:=v_lines||jsonb_build_array(r||jsonb_build_object('amount',v_fee));
+  end loop;
+  return jsonb_build_object('gross',p_gross,'fees',p_gross-v_left,'net',v_left,'lines',v_lines);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."affiliate_payout_fee_quote"("p_rules" "jsonb", "p_gross" bigint) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."affiliate_payout_fee_rules_for"("p_program" "text", "p_method" "text", "p_at" timestamp with time zone) RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select coalesce(jsonb_agg(public._affiliate_fee_rule_json(r) order by r.sort_order,r.id),'[]'::jsonb)
+    from public.affiliate_payout_fee_rules r
+   where r.program=p_program and r.active and r.effective_from<=p_at
+     and (r.payout_methods is null or p_method=any(r.payout_methods));
+$$;
+
+
+ALTER FUNCTION "public"."affiliate_payout_fee_rules_for"("p_program" "text", "p_method" "text", "p_at" timestamp with time zone) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."affiliate_payout_fees"("p" "public"."affiliate_payouts") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select case
+    when p.status='paid' then jsonb_build_object('gross',coalesce(p.paid_amount,p.amount),'fees',coalesce(p.fee_amount,0),
+      'net',coalesce(p.paid_amount,p.amount)-coalesce(p.fee_amount,0),'lines',coalesce(p.fee_lines,'[]'::jsonb))
+    when p.status in ('due','held') then
+      public.affiliate_payout_fee_quote(p.fee_rules,coalesce(public.affiliate_payout_payable(p),p.amount))
+  end;
+$$;
+
+
+ALTER FUNCTION "public"."affiliate_payout_fees"("p" "public"."affiliate_payouts") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."affiliate_payout_payable"("p" "public"."affiliate_payouts") RETURNS bigint
@@ -16123,6 +16314,17 @@ ALTER TABLE "public"."affiliate_commissions" ALTER COLUMN "id" ADD GENERATED ALW
 
 
 
+ALTER TABLE "public"."affiliate_payout_fee_rules" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."affiliate_payout_fee_rules_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."affiliate_payout_items" (
     "payout_id" bigint NOT NULL,
     "commission_id" bigint NOT NULL,
@@ -17370,6 +17572,11 @@ ALTER TABLE ONLY "public"."affiliate_commissions"
 
 ALTER TABLE ONLY "public"."affiliate_commissions"
     ADD CONSTRAINT "affiliate_commissions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."affiliate_payout_fee_rules"
+    ADD CONSTRAINT "affiliate_payout_fee_rules_pkey" PRIMARY KEY ("id");
 
 
 
@@ -19006,6 +19213,16 @@ ALTER TABLE ONLY "public"."affiliate_commissions"
 
 
 
+ALTER TABLE ONLY "public"."affiliate_payout_fee_rules"
+    ADD CONSTRAINT "affiliate_payout_fee_rules_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."affiliate_payout_fee_rules"
+    ADD CONSTRAINT "affiliate_payout_fee_rules_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id");
+
+
+
 ALTER TABLE ONLY "public"."affiliate_payout_items"
     ADD CONSTRAINT "affiliate_payout_items_commission_id_fkey" FOREIGN KEY ("commission_id") REFERENCES "public"."affiliate_commissions"("id") ON DELETE CASCADE;
 
@@ -19656,6 +19873,9 @@ ALTER TABLE "public"."affiliate_commission_changes" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."affiliate_commissions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."affiliate_payout_fee_rules" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."affiliate_payout_items" ENABLE ROW LEVEL SECURITY;
@@ -20619,6 +20839,14 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" inte
 
 
 
+GRANT SELECT ON TABLE "public"."affiliate_payout_fee_rules" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_fee_rule_json"("r" "public"."affiliate_payout_fee_rules") FROM PUBLIC;
+
+
+
 GRANT SELECT ON TABLE "public"."affiliate_payouts" TO "service_role";
 
 
@@ -20778,6 +21006,11 @@ GRANT ALL ON FUNCTION "public"."admin_affiliate_dossier"("p_actor" "uuid", "p_us
 
 REVOKE ALL ON FUNCTION "public"."admin_affiliate_dossier_log"("p_actor" "uuid", "p_user" "uuid", "p_before_at" timestamp with time zone, "p_before_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_affiliate_dossier_log"("p_actor" "uuid", "p_user" "uuid", "p_before_at" timestamp with time zone, "p_before_id" bigint) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_affiliate_fee_rule_save"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_affiliate_fee_rule_save"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
 
 
@@ -21542,6 +21775,11 @@ GRANT ALL ON FUNCTION "public"."affiliate_daily"("p_today" "date") TO "service_r
 
 
 
+REVOKE ALL ON FUNCTION "public"."affiliate_partner_fees"("p_user" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."affiliate_partner_fees"("p_user" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."affiliate_partner_referrals"("p_user" "uuid", "p_before_at" timestamp with time zone, "p_before_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."affiliate_partner_referrals"("p_user" "uuid", "p_before_at" timestamp with time zone, "p_before_id" "text") TO "service_role";
 
@@ -21549,6 +21787,21 @@ GRANT ALL ON FUNCTION "public"."affiliate_partner_referrals"("p_user" "uuid", "p
 
 REVOKE ALL ON FUNCTION "public"."affiliate_partner_summary"("p_user" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."affiliate_partner_summary"("p_user" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."affiliate_payout_fee_quote"("p_rules" "jsonb", "p_gross" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."affiliate_payout_fee_quote"("p_rules" "jsonb", "p_gross" bigint) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."affiliate_payout_fee_rules_for"("p_program" "text", "p_method" "text", "p_at" timestamp with time zone) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."affiliate_payout_fee_rules_for"("p_program" "text", "p_method" "text", "p_at" timestamp with time zone) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."affiliate_payout_fees"("p" "public"."affiliate_payouts") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."affiliate_payout_fees"("p" "public"."affiliate_payouts") TO "service_role";
 
 
 

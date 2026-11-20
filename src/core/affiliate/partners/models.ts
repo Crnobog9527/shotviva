@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { affiliateStatus, slugSchema } from '../enrollment'
+import { feeQuote, feeRuleSnapshot } from '../fees'
 import { audienceRanges, channelTypes, countryCodes } from './application-options'
 
 export { affiliateStatus, slugSchema }
@@ -77,6 +78,12 @@ export const payoutSchema = z.object({
   paid_amount: cents.nullable(),
   status: z.enum(['due', 'paid', 'held', 'void']),
   paid_at: z.string().nullable(),
+  fees: feeQuote.nullable(),
+})
+export const partnerFeesSchema = z.object({
+  method: z.enum(payoutMethods).nullable(),
+  rules: z.array(feeRuleSnapshot),
+  estimate: feeQuote,
 })
 export const memberSchema = z.object({ slug: slugSchema, created_at: z.string(), status: affiliateStatus })
 export const referralSchema = z.object({
@@ -89,6 +96,7 @@ export type Account = z.infer<typeof accountSchema>
 export type Settings = z.infer<typeof settingsSchema>
 export type EnrollmentSettings = Pick<Settings, 'apply_min_level' | 'terms_version'>
 export type Commission = z.infer<typeof commissionSchema>
+export type PartnerFees = z.infer<typeof partnerFeesSchema>
 export type View = (typeof dashboardViews)[number]
 export type SearchParams = Record<string, string | string[] | undefined>
 export const searchSchema = z.object({

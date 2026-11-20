@@ -292,7 +292,7 @@
   .af-overview { display: grid; gap: 16px; }
   @media (min-width: 760px) {
     .af-overview { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
-    .af-stats { grid-column: 1 / -1; }
+    .af-stats, .af-fees { grid-column: 1 / -1; }
   }
   .af-balance-figure {
     font: 400 clamp(3rem, 9vw, 4rem) / 0.95 var(--font-display);
@@ -307,6 +307,9 @@
   .af-balance-facts dt { color: var(--muted-foreground); font-size: 14px; }
   .af-balance-facts dd { font-weight: 600; }
   .af-linkbox h2 { margin-bottom: 2px; }
+  .af-fee-list { display: grid; gap: 8px; }
+  .af-fee-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding-top: 8px; box-shadow: inset 0 1px 0 var(--hairline); }
+  .af-fee-lines { display: grid; gap: 6px; margin-top: 12px; font-size: 14px; }
   .af-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   @media (min-width: 760px) {
     .af-stats { grid-template-columns: repeat(5, minmax(0, 1fr)); }

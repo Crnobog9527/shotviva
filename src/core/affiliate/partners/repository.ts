@@ -13,6 +13,7 @@ import {
   changeSchema,
   payoutSchema,
   memberSchema,
+  partnerFeesSchema,
 } from './models'
 
 function parse<T>(schema: z.ZodType<T>, response: { data: unknown; error: unknown }): T {
@@ -62,6 +63,10 @@ export async function readSummary(user: string) {
   return parse(summarySchema, await createAdminSupabase().rpc('affiliate_partner_summary', { p_user: user }))
 }
 
+export async function readFees(user: string) {
+  return parse(partnerFeesSchema, await createAdminSupabase().rpc('affiliate_partner_fees', { p_user: user }))
+}
+
 export async function readCommissions(user: string, cursor?: string | null, teamOnly = false) {
   let q = createAdminSupabase()
     .from('affiliate_commissions')
@@ -100,7 +105,7 @@ export async function readChanges(user: string, id: string, cursor?: string) {
 export async function readPayouts(user: string, cursor?: string) {
   let q = createAdminSupabase()
     .from('affiliate_payouts')
-    .select('id,created_at,period,amount,paid_amount,status,paid_at')
+    .select('id,created_at,period,amount,paid_amount,status,paid_at,fees:affiliate_payout_fees')
     .eq('affiliate_user_id', user)
   const after = decodeCursor(cursor)
   if (after) q = q.or(afterCursor(after))

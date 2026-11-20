@@ -2,6 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { writableSlug as slug } from './enrollment'
+import { feeRuleInput } from './fee-rule-input'
 import { rateInputs } from './rate-inputs'
 import { checked } from './read'
 
@@ -39,6 +40,7 @@ const commands = {
     .object({
       payout_id: rowId,
       expected_amount: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().safe()).optional(),
+      expected_net: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().safe()).optional(),
       paid_at: z.iso.date(),
       method: required,
       paid_reference: z.string().trim().max(250),
@@ -72,7 +74,7 @@ const rpcName = {
   voidPayout: 'payout_decide',
   settings: 'settings',
 } as const
-const actions = z.enum(['approve', 'reject', 'allowReapply', 'set', 'membership', 'annotate', 'adjust', 'release', 'rebind', 'hold', 'paid', 'resumePayout', 'voidPayout', 'settings', 'recompute'])
+const actions = z.enum(['approve', 'reject', 'allowReapply', 'set', 'membership', 'annotate', 'adjust', 'release', 'rebind', 'hold', 'paid', 'resumePayout', 'voidPayout', 'settings', 'recompute', 'feeRule'])
 
 export async function execute(db: SupabaseClient, actor: string, form: FormData) {
   const action = actions.parse(form.get('operation'))
@@ -82,12 +84,26 @@ export async function execute(db: SupabaseClient, actor: string, form: FormData)
     checked(await db.rpc('admin_affiliate_recompute', { p_actor: actor, p_payment_id: payment_id }))
     return
   }
+  if (action === 'feeRule') return outcome(await db.rpc('admin_affiliate_fee_rule_save', { p_actor: actor, p_input: feeRuleInput(form) }))
   const input = commands[action].parse(fields)
   const rates = action === 'set' ? { overrides: rateInputs(form, true) } : {}
   const settings = action === 'settings' ? { rates: rateInputs(form, false) } : {}
   const result = await db.rpc('admin_affiliate_' + rpcName[action], { p_actor: actor, p_input: { ...input, ...rates, ...settings } })
-  if (result.error?.message === 'AFFILIATE_PAYOUT_AMOUNT_CHANGED') return 'amountChanged'
-  if (result.error?.message === 'AFFILIATE_PAYOUT_RECOMPUTE_PENDING') return 'recomputePending'
+  const answer = outcome(result)
+  if (answer || action !== 'membership') return answer
+  return fields.status === 'suspended' ? 'membershipSuspended' : 'membershipRestored'
+}
+
+// Database refusals the operator can act on; anything else is a failure.
+const answers = {
+  AFFILIATE_PAYOUT_AMOUNT_CHANGED: 'amountChanged',
+  AFFILIATE_PAYOUT_RECOMPUTE_PENDING: 'recomputePending',
+  AFFILIATE_PAYOUT_NET_ZERO: 'netZero',
+  AFFILIATE_FEE_RULE_CHANGED: 'feeRuleChanged',
+  AFFILIATE_FEE_RULE_IN_FORCE: 'feeRuleInForce',
+} as const
+function outcome(result: { data: unknown; error: { message: string } | null }) {
+  const message = result.error?.message
+  if (message && message in answers) return answers[message as keyof typeof answers]
   checked(result)
-  if (action === 'membership') return fields.status === 'suspended' ? 'membershipSuspended' : 'membershipRestored'
 }
