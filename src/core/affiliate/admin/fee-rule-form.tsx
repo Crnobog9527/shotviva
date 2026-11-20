@@ -64,6 +64,7 @@ export function FeeRuleForm({ rule, action }: { rule?: AdminFeeRule; action: Sav
         </label>
         <MethodBoxes initial={v.methods} />
       </div>
+      {rule && <p className="text-sm text-muted-foreground">{COPY.feeEditHint}</p>}
     </MutationForm>
   )
 }

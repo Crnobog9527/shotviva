@@ -131,6 +131,8 @@ export const COPY = {
   feeOrder: '扣费顺序（小的先扣）',
   feeFormula: '计费',
   feeRuleChanged: '这条规则刚被别人改过，请刷新后再改。',
+  feeRuleInForce: '已生效的规则不能把生效日期改到以后。要从某天起换费率，请新增一条从那天生效的规则，并在那天停用这条。',
+  feeEditHint: '修改已生效的规则会立刻影响之后生成的结算单；要从以后某天起改费率，请新增规则，到那天再停用旧规则。',
   feeMinWord: '最低',
   feeMaxWord: '最高',
   feeKinds: { percent: '按百分比', fixed: '固定金额', percent_fixed: '百分比 + 固定金额' } as Record<string, string>,

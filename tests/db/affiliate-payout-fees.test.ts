@@ -135,6 +135,12 @@ it('only an unbanned admin saves rules; every save is audited; a stale edit is r
   const audit = await row(db, "select user_id,reason from admin_audit_log where action='affiliate_settings' and target_id=$1", ['fee_rule:' + id])
   expect(audit.user_id).toBe(f.actor)
   expect(JSON.parse(audit.reason)).toMatchObject({ fee_rule: id, before: null, after: { percent_bp: 350, active: true } })
+  // A rule in force cannot be pushed into the future; a future change is a new rule, and the old
+  // one is disabled on that date. A rule not yet in force may still be rescheduled.
+  await refused(() => saveRule({ ...percentFixed, id, effective_from: '2099-01-01T00:00:00Z' }), 'AFFILIATE_FEE_RULE_IN_FORCE')
+  const later = await saveRule({ ...percentFixed, percent_bp: 500, effective_from: '2099-01-01T00:00:00Z' })
+  await saveRule({ ...percentFixed, id: later, percent_bp: 600, effective_from: '2098-01-01T00:00:00Z' })
+  await saveRule({ ...percentFixed, id, active: false })
 })
 
 it('clients cannot read the rules or call any fee function; only the service role can', async () => {

@@ -100,6 +100,11 @@ begin
     if not found then raise exception 'NOT_FOUND'; end if;
     if p_input ? 'expected_updated_at' and (p_input->>'expected_updated_at')::timestamptz is distinct from v_old.updated_at then
       raise exception 'AFFILIATE_FEE_RULE_CHANGED'; end if;
+    -- A rule already in force cannot be pushed into the future: it would stop applying until then
+    -- and statements issued meanwhile would take no fee. A future change is a new rule plus
+    -- disabling this one on that date.
+    if v_old.effective_from<=now() and coalesce(v_from,v_old.effective_from)>now() then
+      raise exception 'AFFILIATE_FEE_RULE_IN_FORCE'; end if;
     update public.affiliate_payout_fee_rules set label_zh=trim(p_input->>'label_zh'),label_en=trim(p_input->>'label_en'),
         kind=p_input->>'kind',percent_bp=coalesce((p_input->>'percent_bp')::integer,0),fixed_cents=coalesce((p_input->>'fixed_cents')::bigint,0),
         min_cents=(p_input->>'min_cents')::bigint,max_cents=(p_input->>'max_cents')::bigint,payout_methods=v_methods,

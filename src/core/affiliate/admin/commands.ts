@@ -92,6 +92,7 @@ const answers = {
   AFFILIATE_PAYOUT_RECOMPUTE_PENDING: 'recomputePending',
   AFFILIATE_PAYOUT_NET_ZERO: 'netZero',
   AFFILIATE_FEE_RULE_CHANGED: 'feeRuleChanged',
+  AFFILIATE_FEE_RULE_IN_FORCE: 'feeRuleInForce',
 } as const
 function outcome(result: { data: unknown; error: { message: string } | null }) {
   const message = result.error?.message
