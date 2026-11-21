@@ -5,6 +5,7 @@ import { bearerAuthorized } from '@/core/cron/authorized'
 import { serverEnv } from '@/core/env'
 import { logger } from '@/core/logger'
 import { TEMPLATES_CACHE_TAG } from '@/core/templates'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 // Called by the T93 sync workflow, never by a browser, so there is no user session: it is open to
 // any caller holding TEMPLATE_SYNC_REVALIDATE_SECRET (Bearer, constant-time compare) and to no one
@@ -14,6 +15,7 @@ import { TEMPLATES_CACHE_TAG } from '@/core/templates'
 export async function POST(request: Request) {
   if (!bearerAuthorized(request, serverEnv().TEMPLATE_SYNC_REVALIDATE_SECRET)) return new Response(null, { status: 401 })
   await revalidateCatalogueTag(TEMPLATES_CACHE_TAG)
+  warmPublicPagesSoon()
   logger.info('templates.sync_revalidated')
   return Response.json({ revalidated: TEMPLATES_CACHE_TAG })
 }
