@@ -67,7 +67,7 @@ const shoot: ShootDemo = {
   phone: {
     image: caseImage('menu-frog-phone', 'Real phone photo: fresh chili bullfrog in a steel basin on a kitchen counter, fluorescent light, tickets and bowls behind'),
     file: 'IMG_2706.jpg',
-    caption: 'As shot on a phone. Fluorescent light, a steel basin, order tickets behind.',
+    caption: 'Real phone photo. Fluorescent light, a steel basin, order tickets behind.',
   },
   arrow: 'Three looks, same dish',
   results: [

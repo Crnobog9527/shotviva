@@ -23,7 +23,7 @@ const catAnime = caseImage('pet-anime', '真实案例：同一只猫、同样的
 const catStyles: ShootDemo = {
   heading: { lead: '一张猫咪照片 → ', emphasis: '三种画风' },
   intro: '在沙发扶手上用手机随手拍了一张。做出三种画风，每张里都是同一只猫：虎斑花纹、鼻梁上的白条、绿眼睛和趴着的姿势都没变。',
-  phone: { image: catPhone, file: 'IMG_0921.jpg', caption: '手机原图：晚上的台灯光，毯子和遥控器都入镜了。' },
+  phone: { image: catPhone, file: 'IMG_0921.jpg', caption: '真实手机照：晚上的台灯光，毯子和遥控器都入镜了。' },
   arrow: '三种画风，同一只猫',
   results: [
     { image: catAnime, title: '动漫风', template: '粗线条，平涂阴影' },
