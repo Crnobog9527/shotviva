@@ -97,7 +97,9 @@ begin
       select a.parent_user_id from public.affiliates a join ancestors on ancestors.id=a.user_id)
       select from ancestors where id=v_user) then raise exception 'AFFILIATE_PARENT_CYCLE'; end if;
   end if;
+  -- An admin status change takes over from the org switch (1643 restores only switch suspensions).
   update public.affiliates set status=coalesce(v_status,status),slug=coalesce(p_input->>'slug',slug),
+    suspended_by_org_switch=case when v_status is not null then false else suspended_by_org_switch end,
     team_enabled=coalesce((p_input->>'team_enabled')::boolean,team_enabled),
     parent_user_id=case when p_input ? 'parent_user_id' then v_parent else parent_user_id end,
     admin_note=case when p_input ? 'admin_note' then p_input->>'admin_note' else admin_note end

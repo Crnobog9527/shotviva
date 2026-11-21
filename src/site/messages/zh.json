@@ -2171,6 +2171,7 @@
       "dispute_won": "争议胜诉",
       "same_ip": "注册网络相同",
       "affiliate_inactive": "付款时推广员未启用",
+      "org_member": "客户是本企业成员",
       "confirmed": "确认期已满",
       "admin_release": "审核后已放行",
       "admin_void": "审核后已作废",

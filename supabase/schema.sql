@@ -3627,7 +3627,9 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."
     'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,r.l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
     'bonus',coalesce(po.l2_bp,r.l2_bp),
     'same_ip',coalesce(customer.signup_ip=referrer.signup_ip,false),
-    'confirm_after',p_payment.created_at+make_interval(days=>s.hold_days))
+    'confirm_after',p_payment.created_at+make_interval(days=>s.hold_days),
+    'void',case when a.org_id is not null and exists(select from public.org_members m
+      where m.org_id=a.org_id and m.user_id=customer.id and m.status='active') then 'org_member' end)
     from public.profiles customer join public.affiliates a on a.user_id=customer.referred_by
     join public.profiles referrer on referrer.id=a.user_id
     cross join public.affiliate_settings s
@@ -3664,10 +3666,11 @@ begin
     v_rate:=(p_snapshot->>case p_level when 1 then 'rate' else 'bonus' end)::integer;
     v_confirm:=(p_snapshot->>'confirm_after')::timestamptz;
     v_flags:=case when (p_snapshot->>'same_ip')::boolean then array['same_ip'] else '{}' end;
-    if p_level=1 and (p_snapshot->>'inactive')::boolean then v_void:='affiliate_inactive'; end if;
+    if p_level=1 and (p_snapshot->>'inactive')::boolean then v_void:='affiliate_inactive';
+    elsif p_level=1 and p_snapshot->>'void'='org_member' then v_void:='org_member'; end if;
   else
     v_owner:=v_old.affiliate_user_id; v_rate:=v_old.rate_bp; v_confirm:=v_old.confirm_after; v_flags:=v_old.flags;
-    if v_old.void_reason in ('affiliate_inactive','admin_void') then v_void:=v_old.void_reason; end if;
+    if v_old.void_reason in ('affiliate_inactive','admin_void','org_member') then v_void:=v_old.void_reason; end if;
   end if;
   v_amount:=public._affiliate_due(p_payment.amount_total,p_payment.amount_tax,p_payment.amount_refunded,v_rate);
   if v_old.payout_retained is not null then
@@ -3982,7 +3985,8 @@ declare a public.affiliates; b public.affiliate_balances;
 begin
   if tg_op='UPDATE' and old.affiliate_enabled is not distinct from new.affiliate_enabled then return null; end if;
   if not new.affiliate_enabled then
-    update public.affiliates set status='suspended' where user_id=new.owner_user_id and org_id=new.id and status='active';
+    update public.affiliates set status='suspended',suspended_by_org_switch=true
+      where user_id=new.owner_user_id and org_id=new.id and status='active';
     return null;
   end if;
   select * into a from public.affiliates where user_id=new.owner_user_id for update;
@@ -3991,7 +3995,8 @@ begin
       values(new.owner_user_id,'sv-' || substr(replace(gen_random_uuid()::text,'-',''),1,20),'active',new.id,
              '{"source":"org"}',now(),new.created_by);
   elsif a.org_id=new.id then
-    update public.affiliates set status='active' where user_id=a.user_id and status='suspended';
+    update public.affiliates set status='active',suspended_by_org_switch=false
+      where user_id=a.user_id and status='suspended' and suspended_by_org_switch;
   elsif a.org_id is not null or a.status not in ('rejected','suspended') then
     raise exception 'ORG_PERSONAL_AFFILIATE';
   else
@@ -4004,6 +4009,7 @@ begin
     update public.affiliates set org_id=new.id,status='active',parent_user_id=null,team_enabled=false,
       reject_reason=null,reapply_allowed=false,approved_at=now(),approved_by=null
       where user_id=a.user_id;
+    delete from public.affiliate_rate_overrides where user_id=a.user_id;
   end if;
   return null;
 end;
@@ -5175,7 +5181,9 @@ begin
       select a.parent_user_id from public.affiliates a join ancestors on ancestors.id=a.user_id)
       select from ancestors where id=v_user) then raise exception 'AFFILIATE_PARENT_CYCLE'; end if;
   end if;
+  -- An admin status change takes over from the org switch (1643 restores only switch suspensions).
   update public.affiliates set status=coalesce(v_status,status),slug=coalesce(p_input->>'slug',slug),
+    suspended_by_org_switch=case when v_status is not null then false else suspended_by_org_switch end,
     team_enabled=coalesce((p_input->>'team_enabled')::boolean,team_enabled),
     parent_user_id=case when p_input ? 'parent_user_id' then v_parent else parent_user_id end,
     admin_note=case when p_input ? 'admin_note' then p_input->>'admin_note' else admin_note end
@@ -16505,6 +16513,7 @@ CREATE TABLE IF NOT EXISTS "public"."affiliates" (
     "reapply_allowed" boolean DEFAULT false NOT NULL,
     "admin_label" "text",
     "org_id" "uuid",
+    "suspended_by_org_switch" boolean DEFAULT false NOT NULL,
     CONSTRAINT "affiliates_admin_label_check" CHECK ((("admin_label" IS NULL) OR (("char_length"("admin_label") >= 1) AND ("char_length"("admin_label") <= 60)))),
     CONSTRAINT "affiliates_check" CHECK (("parent_user_id" <> "user_id")),
     CONSTRAINT "affiliates_payout_method_check" CHECK (("payout_method" = ANY (ARRAY['paypal'::"text", 'wise'::"text", 'bank'::"text", 'alipay'::"text", 'other'::"text"]))),

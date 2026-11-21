@@ -71,6 +71,12 @@ it('creates the owner\'s org account when the switch is on, suspends it when off
   expect((await account(owner)).status).toBe('suspended')
   await setOrg(orgId, { affiliate_enabled: true })
   expect((await account(owner)).status).toBe('active')
+
+  // An admin's suspension (e.g. risk review) survives turning the switch off and on again.
+  await db.query('select admin_affiliate_set($1,$2)', [actor, { user_id: owner, status: 'suspended' }])
+  await setOrg(orgId, { affiliate_enabled: false })
+  await setOrg(orgId, { affiliate_enabled: true })
+  expect((await account(owner)).status).toBe('suspended')
 })
 
 it('binds a staff member\'s invitee to the org at level 1; their payment earns the org\'s level-1 rate and refunds claw back', async () => {
@@ -173,8 +179,11 @@ it('keeps open personal affiliates out of orgs and converts a closed, settled on
 
   const closed = await promoter(db)
   await db.query("update affiliates set status='suspended',team_enabled=true where user_id=$1", [closed.id])
+  await db.query("insert into affiliate_rate_overrides(user_id,product_kind,l1_bp,l2_bp) values($1,'pack',3000,900)", [closed.id])
   const converted = await createOrg(closed.id)
   expect(await account(closed.id)).toEqual({ status: 'active', org_id: converted, parent_user_id: null, team_enabled: false })
+  // A personal special rate never becomes the org's rate: the org starts on the defaults.
+  expect(await row(db, 'select count(*)::int n from affiliate_rate_overrides where user_id=$1', [closed.id])).toEqual({ n: 0 })
 })
 
 it('requires the day rate and the CNY sent to mark an enterprise statement paid, and refuses them on a personal one', async () => {
@@ -212,4 +221,21 @@ it('clears the org member and level-1 customer when an admin rebinds the custome
   const other = await promoter(db)
   await db.query('select admin_affiliate_rebind($1,$2)', [actor, { user_id: customer, affiliate_user_id: other.id, reason: 'fixture' }])
   expect(await referral(customer)).toEqual({ referred_by: other.id, referred_source: 'admin', referred_member: null, referred_via: null })
+})
+
+it('voids the commission when the bound customer has since joined the same org', async () => {
+  const { owner, orgId, staff } = await orgTeam()
+  const { customer } = await invitedBy(staff)
+  await joinOrg(customer, orgId)
+  const p = await sale(db, customer, 'pack_m', 2490)
+  expect(await commission(db, p.id)).toMatchObject({ amount: 0, status: 'void', void_reason: 'org_member' })
+  expect(await row(db, 'select reason from affiliate_commission_changes h join affiliate_commissions c on c.id=h.commission_id where c.payment_id=$1', [p.id]))
+    .toEqual({ reason: 'org_member' })
+  await refund(db, p.charge, 1245)
+  expect(await commission(db, p.id)).toMatchObject({ amount: 0, void_reason: 'org_member' })
+  // Once they leave the org, their next payment earns the org again.
+  await db.query("select org_leave($1,'e2-leave-'||gen_random_uuid())", [customer])
+  const later = await sale(db, customer, 'pack_m', 2490)
+  expect(await commission(db, later.id)).toMatchObject({ amount: 373, status: 'pending' })
+  expect(await row(db, 'select affiliate_user_id from affiliate_commissions where payment_id=$1', [later.id])).toEqual({ affiliate_user_id: owner })
 })

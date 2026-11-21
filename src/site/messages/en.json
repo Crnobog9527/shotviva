@@ -2171,6 +2171,7 @@
       "dispute_won": "Dispute won",
       "same_ip": "Matching signup network",
       "affiliate_inactive": "Affiliate inactive at purchase",
+      "org_member": "Customer is a member of this company",
       "confirmed": "Confirmation period completed",
       "admin_release": "Released after review",
       "admin_void": "Voided after review",

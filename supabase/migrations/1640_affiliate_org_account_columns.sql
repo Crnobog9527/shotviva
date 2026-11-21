@@ -4,6 +4,9 @@
 -- owner's own affiliates row (user_id = orgs.owner_user_id), so commissions, holds, statements and
 -- payout fees run through the existing program unchanged. One account per org.
 alter table public.affiliates add column org_id uuid references public.orgs(id);
+-- True only while an org account is suspended because its org's affiliate switch is off: turning
+-- the switch on again restores exactly those, never an account an admin suspended (1643).
+alter table public.affiliates add column suspended_by_org_switch boolean not null default false;
 create unique index affiliates_org_id_idx on public.affiliates(org_id) where org_id is not null;
 
 -- referred_by keeps pointing at the account that earns (the org account for org customers).
