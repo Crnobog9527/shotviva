@@ -8,7 +8,7 @@ import { AppError } from '../errors'
 import { logger } from '../logger'
 import { modelFromTag } from './provider-tag'
 
-// Site-wide generation lanes (queue-fairness plan Q3; SQL 1700). A request takes a slot in its
+// Site-wide generation lanes (queue-fairness plan Q3; SQL 1740). A request takes a slot in its
 // route's lane before it reserves credits and gives it back once its job settles; a full lane is
 // RATE_LIMITED with nothing reserved, which the browser treats as "queued" and resends (Q1).
 export type GenerationLane = 'gpt' | 'seedream' | 'other'
