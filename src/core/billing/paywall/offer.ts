@@ -71,23 +71,26 @@ export function yearlySavingUsd(offer: TierOffer): number {
   return (cents(offer.monthly.priceUsd) * 12 - cents(offer.yearly.priceUsd)) / 100
 }
 
-// What Yearly saves against twelve monthly payments on one plan, as a whole percent rounded
-// down so the claim holds (ratios from integer cents: float error cannot move a boundary).
-export function planSavingPct(offer: TierOffer): number {
-  if (!offer.monthly || !offer.yearly) return 0
+// What Yearly saves against twelve monthly payments on one plan, as a whole percent, and whether
+// that is exact: whole-dollar yearly prices save 19.6% / 19.8% / 20.03%, said as "about 20%"
+// (Owner 2026-11-21: 「约省 20%」). Ratios from integer cents, so float error cannot move a boundary.
+export type PlanSaving = { pct: number; about: boolean }
+export function planSaving(offer: TierOffer): PlanSaving {
+  if (!offer.monthly || !offer.yearly) return { pct: 0, about: false }
   const monthYear = cents(offer.monthly.priceUsd) * 12
-  return Math.max(0, Math.floor(((monthYear - cents(offer.yearly.priceUsd)) * 100) / monthYear))
+  const saved = (monthYear - cents(offer.yearly.priceUsd)) * 100
+  return { pct: Math.max(0, Math.round(saved / monthYear)), about: saved % monthYear !== 0 }
 }
 
-// Over the listed plans (ARCHITECTURE §6.2): pct is the smallest saving, upTo the largest, and
-// byTier each plan's own (Owner 2026-11-21: 20% / 20% / 25%, said per plan, "Max saves 25%").
-export type YearlySaving = { pct: number; upTo: number; byTier: readonly { tier: MembershipTier; pct: number }[] }
+// Over the listed plans (ARCHITECTURE §6.2): pct is the smallest rounded saving, upTo the largest,
+// about whether any of them is approximate, byTier each plan's own.
+export type YearlySaving = { pct: number; upTo: number; about: boolean; byTier: readonly ({ tier: MembershipTier } & PlanSaving)[] }
 
 export function yearlySaving(offers: readonly TierOffer[]): YearlySaving | null {
-  const byTier = offers.filter(o => o.monthly && o.yearly).map(o => ({ tier: o.tier, pct: planSavingPct(o) }))
+  const byTier = offers.filter(o => o.monthly && o.yearly).map(o => ({ tier: o.tier, ...planSaving(o) }))
   const values = byTier.map(t => t.pct)
   if (values.length === 0 || Math.max(...values) <= 0) return null
-  return { pct: Math.min(...values), upTo: Math.max(...values), byTier }
+  return { pct: Math.min(...values), upTo: Math.max(...values), about: byTier.some(t => t.about), byTier }
 }
 
 // Whole dollars without decimals ("$191"), the rest with two ("$19.90"). The plain "$" in every

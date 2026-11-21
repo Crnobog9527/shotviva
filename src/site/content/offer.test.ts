@@ -82,12 +82,12 @@ describe('copy under the credits-only plan', () => {
     expect(makeZhPricingPage(o2).intro).toContain('按年付省 20%（旗舰版省 25%）。')
   })
 
-  // Final terms: yearly $192 / $480 / $950 (19.6% / 19.8% / 20.03%), said rounded down.
-  it('says each plan\'s rounded-down saving', () => {
+  // Final terms: yearly $192 / $480 / $950 (19.6% / 19.8% / 20.03%): 「约省 20%」 (Owner 2026-11-21).
+  it('says about 20% for every plan', () => {
     const yearly: Record<string, number> = { starter_yearly: 192, pro_yearly: 480, max_yearly: 950 }
     const b = o2.map(p => yearly[p.id] ? { ...p, priceUsd: yearly[p.id]! } : p)
-    expect(makePricingPage(b).intro).toContain('Yearly Shotviva plans save 19% compared with paying monthly (Max saves 20%).')
-    expect(makeZhPricingPage(b).intro).toContain('按年付省 19%（旗舰版省 20%）。')
+    expect(makePricingPage(b).intro).toContain('Yearly Shotviva plans save about 20% compared with paying monthly.')
+    expect(makeZhPricingPage(b).intro).toContain('按年付约省 20%。')
   })
 
   it('states the member pack discounts of the listed packs, Starter at list price', () => {

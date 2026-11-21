@@ -1800,7 +1800,7 @@
     "billingLabel": "付费周期",
     "monthly": "按月",
     "yearly": "按年",
-    "savePct": "{same, select, true {省 <b>{pct}%</b>} other {最多省 <b>{pct}%</b>}}",
+    "savePct": "{same, select, true {{about, select, true {约省 <b>{pct}%</b>} other {省 <b>{pct}%</b>}}} other {最多省 <b>{pct}%</b>}}",
     "plansLabel": "套餐",
     "tiers": {
       "starter": "入门版",
@@ -1885,7 +1885,7 @@
     "choose": "选择{tier}",
     "upgradeTo": "升级到{tier}",
     "savingLabel": "<vs>比按月付</vs>每年省",
-    "savingAmount": "{amount} · 省 {pct}%",
+    "savingAmount": "{amount} · {about, select, true {约省} other {省}} {pct}%",
     "mostPopular": "最受欢迎",
     "memberPrice": "会员价",
     "memberCodeKept": "已选会员价，优惠码留待下次使用。",

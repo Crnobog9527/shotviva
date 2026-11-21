@@ -65,8 +65,8 @@ describe('pricing invariants (ARCHITECTURE §6.2, 2026-11-21 terms)', () => {
       expect(cents(year) % 100).toBe(0)
       return (1 - cents(year) / (cents(plan) * 12)) * 100
     })
-    // 19.6% / 19.8% / 20.03%: the copy says 19% (Max 20%), rounded down.
-    expect(saving.map(s => Math.floor(s))).toEqual([19, 19, 20])
+    // 19.6% / 19.8% / 20.03%: the copy says 「约省 20%」 (Owner 2026-11-21).
+    expect(saving.map(s => Math.round(s))).toEqual([20, 20, 20])
   })
 
   // Invariant 2 and the enterprise margin rule. The tiers and the cost budget are private
