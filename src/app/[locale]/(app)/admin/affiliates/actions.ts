@@ -3,7 +3,8 @@ import { refresh } from 'next/cache'
 import { z } from 'zod'
 import { createAdminSupabase } from '@/core/auth'
 import { logger } from '@/core/logger'
-import { COPY, FEE_COPY, isFeeAnswer, enrollAffiliate, enrollmentLabel, execute, requireAffiliateAdmin } from '@/core/affiliate/admin'
+import { COPY, FEE_COPY, START_COPY, isFeeAnswer, enrollAffiliate, enrollmentLabel, execute, requireAffiliateAdmin, startPaymentFees } from '@/core/affiliate/admin'
+import { latestAffiliateTermsVersion } from '@/site/content/affiliate-terms'
 
 // Admin saves used to fail silently; record why so the next report can be traced in the logs.
 function logFailure(form: FormData, error: unknown) {
@@ -24,6 +25,17 @@ export async function saveAffiliate(_state: string, form: FormData) {
     return [result.existing ? COPY.existing : COPY.saved, enrollmentLabel(result.member), result.member.slug].join(' · ')
   }
   const admin = await requireAffiliateAdmin()
+  // Fee go-live: one-way, sets record_from and the newest terms together (admin only, as above).
+  if (form.get('operation') === 'feesStart') {
+    try {
+      const answer = await startPaymentFees(createAdminSupabase(), admin.id, form, latestAffiliateTermsVersion())
+      refresh()
+      return START_COPY.answers[answer]
+    } catch (error) {
+      logFailure(form, error)
+      return COPY.failed
+    }
+  }
   try {
     const result = await execute(createAdminSupabase(), admin.id, form)
     if (result) {
