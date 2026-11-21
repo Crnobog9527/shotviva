@@ -1,6 +1,7 @@
 import 'server-only'
 
 export { COPY } from './copy'
+export { FEE_COPY, isFeeAnswer } from './payment-fees-copy'
 export { execute } from './commands'
 export { requireAffiliateAdmin } from './access'
 export { AffiliateAdminView } from './admin-view'
