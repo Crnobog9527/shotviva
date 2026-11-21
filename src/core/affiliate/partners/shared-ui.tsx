@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { getTranslations } from 'next-intl/server'
 import { Link } from '@/core/i18n/ui'
 import type { Translate } from '@/core/translate'
@@ -6,11 +6,23 @@ import { viewHref } from './format'
 import type { Query } from './models'
 
 // A table on desktop; on a phone each row becomes a stacked card that labels its own cells.
-export function Table({ headers, rows, empty }: { headers: string[]; rows: ReactNode[][]; empty: string }) {
+// `details` (one entry per row, null for none) adds a full-width line under that row, inside the same card.
+export function Table({
+  headers,
+  rows,
+  empty,
+  details,
+}: {
+  headers: string[]
+  rows: ReactNode[][]
+  empty: string
+  details?: (ReactNode | null)[]
+}) {
   if (!rows.length) return <p className="af-empty">{empty}</p>
+  const Group = details ? 'tbody' : Fragment
   return (
     <div className="af-table-wrap" role="region" aria-label={headers.join(' · ')} tabIndex={0}>
-      <table className="af-table">
+      <table className={'af-table' + (details ? ' af-table-grouped' : '')}>
         <thead>
           <tr>
             {headers.map((label) => (
@@ -20,17 +32,29 @@ export function Table({ headers, rows, empty }: { headers: string[]; rows: React
             ))}
           </tr>
         </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i}>
-              {row.map((cell, j) => (
-                <td key={j} data-label={headers[j]}>{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
+        {details ? null : <tbody>{rows.map((row, i) => <Row key={i} row={row} headers={headers} />)}</tbody>}
+        {details && rows.map((row, i) => (
+          <Group key={i}>
+            <Row row={row} headers={headers} />
+            {details[i] && (
+              <tr className="af-detail-row">
+                <td colSpan={headers.length}>{details[i]}</td>
+              </tr>
+            )}
+          </Group>
+        ))}
       </table>
     </div>
+  )
+}
+
+function Row({ row, headers }: { row: ReactNode[]; headers: string[] }) {
+  return (
+    <tr>
+      {row.map((cell, j) => (
+        <td key={j} data-label={headers[j]}>{cell}</td>
+      ))}
+    </tr>
   )
 }
 

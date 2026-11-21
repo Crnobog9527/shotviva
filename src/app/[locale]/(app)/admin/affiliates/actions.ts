@@ -3,7 +3,7 @@ import { refresh } from 'next/cache'
 import { z } from 'zod'
 import { createAdminSupabase } from '@/core/auth'
 import { logger } from '@/core/logger'
-import { COPY, enrollAffiliate, enrollmentLabel, execute, requireAffiliateAdmin } from '@/core/affiliate/admin'
+import { COPY, FEE_COPY, isFeeAnswer, enrollAffiliate, enrollmentLabel, execute, requireAffiliateAdmin } from '@/core/affiliate/admin'
 
 // Admin saves used to fail silently; record why so the next report can be traced in the logs.
 function logFailure(form: FormData, error: unknown) {
@@ -28,7 +28,7 @@ export async function saveAffiliate(_state: string, form: FormData) {
     const result = await execute(createAdminSupabase(), admin.id, form)
     if (result) {
       refresh()
-      return COPY[result]
+      return isFeeAnswer(result) ? FEE_COPY[result] : COPY[result]
     }
   } catch (error) {
     logFailure(form, error)

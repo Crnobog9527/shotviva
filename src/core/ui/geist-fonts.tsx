@@ -1,4 +1,7 @@
+import { preconnect } from 'react-dom'
+
 import { publicEnv } from '../public-env'
+import { INSTRUMENT_SERIF_FILES } from './instrument-serif'
 
 // Geist (UI) and Geist Mono (measurements), DESIGN §3.2: self-hosted under content-hashed names in
 // public/fonts/geist (public/fonts/README.md). They used to go through next/font, but with the
@@ -28,7 +31,11 @@ export function geistCss(host: string): string {
     `@font-face{font-family:geistMono;src:url(${host}${GEIST_MONO_FILE}) format("woff2");font-display:swap;font-weight:400 500;unicode-range:${MONO_REMAINING_RANGE}}`,
     `@font-face{font-family:geistMono;src:url(${host}${GEIST_MONO_UI_FILE}) format("woff2");font-display:swap;font-weight:400 500;unicode-range:${MONO_UI_RANGE}}`,
     '@font-face{font-family:"geistMono Fallback";src:local(Arial),local(Arimo),local("Liberation Sans");ascent-override:76.43%;descent-override:22.43%;line-gap-override:0%;size-adjust:131.49%}',
-    // Instrument Serif's (globals-body.css declares the face itself), kept with the other two.
+    // Instrument Serif, the English display face, on the same host as Geist (PSI 2026-11-21 found
+    // it on this site while Geist came from the static-file CDN: two font origins on the critical
+    // chain). Only headings that use it fetch it, so Chinese pages still download neither file.
+    `@font-face{font-family:"Instrument Serif";font-style:normal;font-weight:400;font-display:swap;src:url(${host}${INSTRUMENT_SERIF_FILES[0]}) format("woff2")}`,
+    `@font-face{font-family:"Instrument Serif";font-style:italic;font-weight:400;font-display:swap;src:url(${host}${INSTRUMENT_SERIF_FILES[1]}) format("woff2")}`,
     '@font-face{font-family:"Instrument Serif Fallback";src:local(Arial),local(Arimo),local("Liberation Sans");ascent-override:128.92%;descent-override:40.37%;line-gap-override:0%;size-adjust:76.79%}',
     ':root{--font-geist:geist,"geist Fallback";--font-geist-mono:geistMono,"geistMono Fallback"}',
   ].join('')
@@ -38,7 +45,13 @@ export function geistCss(host: string): string {
 // holds the first paint for a preloaded font (or until a timeout), and the metric-matched fallback
 // keeps the layout still while Geist arrives. Measured on production HTML, 2026-11-14: the first
 // paint 40 ms sooner on a desktop and ~290 ms sooner on a throttled phone, CLS unchanged.
+//
+// Fonts are fetched in CORS mode without credentials, so they cannot use the connection the
+// scripts and pictures open to the static-file CDN (the Link: rel=preconnect Next sends has no
+// crossorigin; PSI reported it unused for the fonts). A second, anonymous preconnect opens their
+// connection while the HTML is still arriving. React hoists it into <head> and the Link header.
 export function GeistFonts() {
   const host = publicEnv.NEXT_PUBLIC_ASSET_CDN_URL ?? ''
+  if (host) preconnect(host, { crossOrigin: 'anonymous' })
   return <style dangerouslySetInnerHTML={{ __html: geistCss(host) }} />
 }

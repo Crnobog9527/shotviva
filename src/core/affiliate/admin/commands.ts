@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { writableSlug as slug } from './enrollment'
 import { feeRuleInput } from './fee-rule-input'
+import { feeAnswerFor } from './payment-fees-copy'
+import { feeScheduleInput } from './payment-fee-input'
 import { rateInputs } from './rate-inputs'
 import { checked } from './read'
 
@@ -77,7 +79,7 @@ const rpcName = {
   voidPayout: 'payout_decide',
   settings: 'settings',
 } as const
-const actions = z.enum(['approve', 'reject', 'allowReapply', 'set', 'membership', 'annotate', 'adjust', 'release', 'rebind', 'hold', 'paid', 'resumePayout', 'voidPayout', 'settings', 'recompute', 'feeRule'])
+const actions = z.enum(['approve', 'reject', 'allowReapply', 'set', 'membership', 'annotate', 'adjust', 'release', 'rebind', 'hold', 'paid', 'resumePayout', 'voidPayout', 'settings', 'recompute', 'feeRule', 'feeSchedule'])
 
 export async function execute(db: SupabaseClient, actor: string, form: FormData) {
   const action = actions.parse(form.get('operation'))
@@ -88,6 +90,7 @@ export async function execute(db: SupabaseClient, actor: string, form: FormData)
     return
   }
   if (action === 'feeRule') return outcome(await db.rpc('admin_affiliate_fee_rule_save', { p_actor: actor, p_input: feeRuleInput(form) }))
+  if (action === 'feeSchedule') return scheduleOutcome(await db.rpc('admin_payment_fee_schedule_save', { p_actor: actor, p_input: feeScheduleInput(form) }))
   const input = commands[action].parse(fields)
   const rates = action === 'set' ? { overrides: rateInputs(form, true) } : {}
   const settings = action === 'settings' ? { rates: rateInputs(form, false) } : {}
@@ -107,6 +110,11 @@ const answers = {
   AFFILIATE_ORG_MEMBER: 'orgMember',
   AFFILIATE_ORG_ACCOUNT: 'orgAccount',
 } as const
+function scheduleOutcome(result: { data: unknown; error: { message: string } | null }) {
+  const answer = result.error ? feeAnswerFor(result.error.message) : undefined
+  if (answer) return answer
+  checked(result)
+}
 function outcome(result: { data: unknown; error: { message: string } | null }) {
   const message = result.error?.message
   if (message && message in answers) return answers[message as keyof typeof answers]
