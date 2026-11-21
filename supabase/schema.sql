@@ -3624,7 +3624,7 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."
     AS $$
   select jsonb_build_object('owner',a.user_id,'inactive',a.status<>'active',
     'parent',case when a.status='active' and parent.team_enabled and parent.status='active' then parent.user_id end,
-    'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,r.l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
+    'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,s.org_l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
     'bonus',coalesce(po.l2_bp,r.l2_bp),
     'same_ip',coalesce(customer.signup_ip=referrer.signup_ip,false),
     'confirm_after',p_payment.created_at+make_interval(days=>s.hold_days),
@@ -4086,7 +4086,7 @@ CREATE OR REPLACE FUNCTION "public"."_org_attribute_invite"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare v_org uuid; v_account uuid;
+declare v_org uuid; v_account uuid; v_member uuid; v_via uuid; v_source text;
 begin
   begin
     select o.id,a.user_id into v_org,v_account from public.org_members m
@@ -4094,12 +4094,23 @@ begin
       join public.affiliates a on a.org_id=o.id
       where m.user_id=new.inviter_user_id and m.status='active' and o.status='active' and o.affiliate_enabled
         and a.status='active';
-    if not found or v_account=new.user_id then return null; end if;
+    if found then
+      v_source:='org_l1'; v_member:=new.inviter_user_id; v_via:=null;
+    else
+      select o.id,a.user_id,inviter.referred_member into v_org,v_account,v_member from public.profiles inviter
+        join public.affiliates a on a.user_id=inviter.referred_by and a.org_id is not null
+        join public.orgs o on o.id=a.org_id
+        where inviter.id=new.inviter_user_id and inviter.referred_source='org_l1'
+          and o.status='active' and o.affiliate_enabled and o.affiliate_levels=2 and a.status='active';
+      if not found then return null; end if;
+      v_source:='org_l2'; v_via:=new.inviter_user_id;
+    end if;
+    if v_account=new.user_id then return null; end if;
     if exists(select from public.org_members m where m.org_id=v_org and m.user_id=new.user_id and m.status='active') then
       return null;
     end if;
-    update public.profiles set referred_by=v_account,referred_at=now(),referred_source='org_l1',
-      referred_member=new.inviter_user_id,referred_via=null
+    update public.profiles set referred_by=v_account,referred_at=now(),referred_source=v_source,
+      referred_member=v_member,referred_via=v_via
       where id=new.user_id and referred_by is null;
   exception when others or query_canceled or assert_failure then
     -- Keep no exception DETAIL/CONTEXT (it can contain a whole row).
@@ -17369,9 +17380,11 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_settings" (
     "apply_min_level" "text" DEFAULT 'none'::"text" NOT NULL,
     "terms_version" "text" DEFAULT '1'::"text" NOT NULL,
     "commission_months" integer,
+    "org_l2_bp" integer DEFAULT 500 NOT NULL,
     CONSTRAINT "affiliate_settings_apply_min_level_check" CHECK (("apply_min_level" = ANY (ARRAY['none'::"text", 'any_paid'::"text", 'starter'::"text", 'pro'::"text", 'max'::"text"]))),
     CONSTRAINT "affiliate_settings_commission_months_check" CHECK (("commission_months" > 0)),
     CONSTRAINT "affiliate_settings_hold_days_check" CHECK (("hold_days" >= 0)),
+    CONSTRAINT "affiliate_settings_org_l2_bp_check" CHECK ((("org_l2_bp" >= 0) AND ("org_l2_bp" <= 10000))),
     CONSTRAINT "affiliate_settings_payout_min_usd_check" CHECK (("payout_min_usd" > 0)),
     CONSTRAINT "affiliate_settings_settlement_day_check" CHECK ((("settlement_day" >= 1) AND ("settlement_day" <= 28))),
     CONSTRAINT "affiliate_settings_singleton_check" CHECK ("singleton"),
