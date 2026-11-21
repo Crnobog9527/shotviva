@@ -74,7 +74,7 @@ it('computes new payments net of their fees, recomputing when the estimate becom
   expect(await commission(taxed.id)).toMatchObject({ base_usd: 4990, net_base_usd: 4790, amount: 718 })
 })
 
-it('confirms after the hold only once fees are final; an estimate confirms after the grace period; no fee data never confirms', async () => {
+it('confirms after the hold only once fees are final; an estimate confirms after the grace period', async () => {
   await db.query('update affiliate_settings set hold_days=0')
   const p = await sale(db, f.buyer, 'pack_m', 2490)
   expect(await commission(p.id)).toMatchObject({ status: 'pending' })
@@ -98,14 +98,44 @@ it('confirms after the hold only once fees are final; an estimate confirms after
   expect(await commission(q.id)).toMatchObject({ status: 'confirmed', amount: 357, fee_cents: 110 })
   expect(await lastReason(q.id)).toBe('fee_final')
 
-  const missing = await sale(db, f.buyer, 'pack_m', 2490)
-  await daily(400)
-  expect(await commission(missing.id)).toMatchObject({ status: 'pending', fee_cents: null })
-  await db.query('update affiliate_settings set fee_final_grace_days=0')
+  // With no grace a pending estimate confirms on the next recompute.
   const r = await sale(db, f.buyer, 'pack_m', 2490)
   await estimate(r.id, 102)
-  expect(await commission(r.id)).toMatchObject({ status: 'confirmed' })
+  await db.query('update affiliate_settings set fee_final_grace_days=0')
+  expect(await commission(r.id)).toMatchObject({ status: 'pending' })
+  await refund(db, r.charge, 100)
+  expect(await commission(r.id)).toMatchObject({ status: 'confirmed', fee_cents: 102 })
   expect(await lastReason(r.id)).toBe('confirmed_fee_estimate')
+})
+
+it('confirms a fee-era payment with no fee data after the grace period on the published acquiring rate, and alerts until fees arrive', async () => {
+  await db.query('update affiliate_settings set hold_days=0')
+  const alert = (payment: string) => row(db, 'select kind,fee_cents,resolved_at is null as open from affiliate_fee_alerts where payment_id=$1', [payment])
+  const p = await sale(db, f.buyer, 'pack_m', 2490)
+  await daily(0)
+  expect(await commission(p.id)).toMatchObject({ status: 'pending', fee_cents: null })
+  expect(await alert(p.id)).toBeUndefined()
+  // The daily run picks it up once the grace period is over (recomputes use the clock: shorten it).
+  await db.query('update affiliate_settings set fee_final_grace_days=0')
+  await daily(0)
+  // Stripe card acquiring 2.9% + $0.30 on $24.90 = 102 cents.
+  expect(await commission(p.id)).toMatchObject({ status: 'confirmed', fee_cents: 102, net_base_usd: 2388, amount: 358 })
+  expect(await lastReason(p.id)).toBe('confirmed_fee_estimate')
+  expect(await alert(p.id)).toEqual({ kind: 'fees_missing', fee_cents: 102, open: true })
+  // It does not block payouts: no open recompute error.
+  expect(await row(db, 'select count(*)::int n from affiliate_recompute_errors where payment_id=$1 and resolved_at is null', [p.id])).toEqual({ n: 0 })
+  await daily(1)
+  expect(await alert(p.id)).toEqual({ kind: 'fees_missing', fee_cents: 102, open: true })
+  // F4 backfills the real fee: the commission follows and the alert closes.
+  await real(p.id, 110)
+  expect(await commission(p.id)).toMatchObject({ status: 'confirmed', fee_cents: 110, amount: 357 })
+  expect(await lastReason(p.id)).toBe('fee_final')
+  expect(await alert(p.id)).toMatchObject({ open: false })
+  // A legacy payment never takes the fallback.
+  await db.query("update payment_fee_settings set record_from=now()+interval '1 day'")
+  const old = await sale(db, f.buyer, 'pack_m', 2490)
+  expect(await commission(old.id)).toMatchObject({ status: 'confirmed', amount: 373, fee_cents: null })
+  expect(await alert(old.id)).toBeUndefined()
 })
 
 it('partial refunds deduct the original fee in full from the unrefunded part, floor 0; refund fees count on that payment', async () => {
@@ -210,9 +240,13 @@ it('never lets a commission problem undo the fee write', async () => {
     .toMatchObject({ error: expect.stringContaining('AFFILIATE_NON_USD_PAYMENT') })
 })
 
-it('keeps the internal functions private', async () => {
+it('keeps the internal functions and the alert table private', async () => {
+  expect(await row(db, `select has_table_privilege('anon','affiliate_fee_alerts','select') a,
+    has_table_privilege('authenticated','affiliate_fee_alerts','select') u,has_table_privilege('service_role','affiliate_fee_alerts','select') s,
+    has_table_privilege('service_role','affiliate_fee_alerts','insert') i`)).toEqual({ a: false, u: false, s: true, i: false })
   for (const fn of ['_affiliate_due(integer,integer,integer,integer,integer)', '_affiliate_net_base(integer,integer,integer,integer)',
-    '_affiliate_fee_era(payments)', '_affiliate_fee_ready(payments,timestamptz,timestamptz)']) {
+    '_affiliate_fee_era(payments)', '_affiliate_fee_ready(payments,timestamptz,timestamptz)', '_affiliate_fee_fallback(payments)',
+    '_affiliate_fee_missing(payments)']) {
     expect(await row(db, `select has_function_privilege('anon',$1,'execute') a,has_function_privilege('authenticated',$1,'execute') u,
       has_function_privilege('service_role',$1,'execute') s`, [fn])).toEqual({ a: false, u: false, s: false })
   }

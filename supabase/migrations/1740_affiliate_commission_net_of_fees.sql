@@ -15,7 +15,11 @@
 -- Confirmation after the hold also needs the fees settled: a payment of the fee era (fee data, or
 -- created at/after record_from) confirms when fee_status = 'final', or, when F4 never finalises
 -- it, on the estimate once affiliate_settings.fee_final_grace_days have passed after the hold.
--- With no fee data at all it never confirms by itself (F4 backfills, or the admin records it).
+-- With no fee data at all (F3 missed it), it waits the same grace period, then confirms on the
+-- published acquiring rate in force at payment (_affiliate_fee_fallback: a lower bound, never
+-- above the real fee) and opens a row in affiliate_fee_alerts until fee data arrives (the fee
+-- write's recompute resolves it). Not affiliate_recompute_errors: an open error there blocks
+-- marking that affiliate's payouts paid (AFFILIATE_PAYOUT_RECOMPUTE_PENDING).
 -- A commission already confirmed stays confirmed when a later refund-fee estimate reopens the
 -- payment's fee status; a fee correction after confirmation changes the amount like a refund
 -- does (balance may go negative, offset by future commissions).
@@ -32,6 +36,20 @@ alter table public.affiliate_settings
   add column fee_final_grace_days integer not null default 14 check (fee_final_grace_days between 0 and 365);
 comment on column public.affiliate_settings.fee_final_grace_days is
   'Days after confirm_after a fee-era commission waits for final fees before it confirms on the estimate.';
+
+-- One row per fee-era payment whose commission confirmed with no fee data (kind fees_missing),
+-- with the fallback fee used. Open while resolved_at is NULL; reopened if it happens again.
+create table public.affiliate_fee_alerts (
+  payment_id bigint primary key references public.payments(id) on delete cascade,
+  kind text not null check (kind in ('fees_missing')),
+  fee_cents integer not null check (fee_cents >= 0),
+  opened_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+create index affiliate_fee_alerts_open_idx on public.affiliate_fee_alerts(opened_at desc) where resolved_at is null;
+alter table public.affiliate_fee_alerts enable row level security;
+revoke all on public.affiliate_fee_alerts from public,anon,authenticated,service_role;
+grant select on public.affiliate_fee_alerts to service_role;
 
 -- B: the unrefunded pre-tax paid minus the fee, floor 0. NULL fee gives NULL (strict).
 create function public._affiliate_net_base(p_total integer, p_tax integer, p_refunded integer, p_fee integer)
@@ -57,6 +75,23 @@ returns boolean language sql stable security definer set search_path='' as $$
 $$;
 revoke all on function public._affiliate_fee_era(public.payments) from public,anon,authenticated,service_role;
 
+-- The fee assumed for a fee-era payment that never got fee data: the published acquiring rate
+-- for its channel and method in force at payment, on the tax-inclusive amount; 0 without one.
+create function public._affiliate_fee_fallback(p_payment public.payments)
+returns integer language sql stable security definer set search_path='' as $$
+  select coalesce((select public.payment_fee_amount(p_payment.amount_total, s.rate_bp, s.fixed_cents, s.rounding)
+    from public.payment_fee_schedule_for(p_payment.channel, p_payment.method, 'acquiring', p_payment.created_at) s
+   where s.id is not null), 0);
+$$;
+revoke all on function public._affiliate_fee_fallback(public.payments) from public,anon,authenticated,service_role;
+
+-- A fee-era payment without any fee data.
+create function public._affiliate_fee_missing(p_payment public.payments)
+returns boolean language sql stable security definer set search_path='' as $$
+  select p_payment.fee_status is null and public._affiliate_fee_era(p_payment);
+$$;
+revoke all on function public._affiliate_fee_missing(public.payments) from public,anon,authenticated,service_role;
+
 -- May a commission of this payment, due at p_confirm, confirm at p_at as far as fees go.
 create function public._affiliate_fee_ready(p_payment public.payments, p_confirm timestamptz, p_at timestamptz)
 returns boolean language sql stable security definer set search_path='' as $$
@@ -69,7 +104,8 @@ revoke all on function public._affiliate_fee_ready(public.payments,timestamptz,t
 -- Same as 1645 except: the fee-aware due and the stored fee_cents / net_base_usd; confirmation
 -- also waits for _affiliate_fee_ready unless the commission is already confirmed; fee changes
 -- are recorded as fee_final / fee_adjusted, and a confirmation on the estimate as
--- confirmed_fee_estimate.
+-- confirmed_fee_estimate. A fee-era payment with no fee data takes _affiliate_fee_fallback as its
+-- fee once the grace period after confirm_after has passed, and may then confirm.
 create or replace function public._affiliate_write_commission(p_payment public.payments,p_snapshot jsonb,p_level smallint,
   p_open boolean,p_lost boolean,p_release boolean default false) returns void
 language plpgsql security definer set search_path='' as $$
@@ -77,7 +113,7 @@ declare
   v_old public.affiliate_commissions; v_id bigint; v_amount bigint; v_status text; v_reason text;
   v_owner uuid; v_rate integer; v_confirm timestamptz; v_flags text[]; v_void text;
   v_fee integer := case when p_payment.fee_status is not null then p_payment.fee_cents end;
-  v_net bigint;
+  v_net bigint; v_fallback boolean := false;
 begin
   select c.* into v_old from public.affiliate_commissions c where c.payment_id=p_payment.id and c.level=p_level for update;
   if not found then
@@ -92,6 +128,10 @@ begin
     v_owner:=v_old.affiliate_user_id; v_rate:=v_old.rate_bp; v_confirm:=v_old.confirm_after; v_flags:=v_old.flags;
     if v_old.void_reason in ('affiliate_inactive','admin_void','org_member') then v_void:=v_old.void_reason; end if;
   end if;
+  if public._affiliate_fee_missing(p_payment) and now() >= v_confirm
+     + make_interval(days => (select s.fee_final_grace_days from public.affiliate_settings s where s.singleton)) then
+    v_fallback:=true; v_fee:=public._affiliate_fee_fallback(p_payment);
+  end if;
   v_net:=public._affiliate_net_base(p_payment.amount_total,p_payment.amount_tax,p_payment.amount_refunded,v_fee);
   v_amount:=public._affiliate_due(p_payment.amount_total,p_payment.amount_tax,p_payment.amount_refunded,v_rate,v_fee);
   if v_old.payout_retained is not null then
@@ -103,7 +143,7 @@ begin
     v_void:=case when p_payment.amount_refunded=p_payment.amount_total then 'refunded' else 'zero' end;
   end if;
   v_status:=case when v_amount=0 then 'void' when p_open or (cardinality(v_flags)>0 and v_old.released_by is null and not p_release)
-    then 'on_hold' when now()>=v_confirm and (v_old.status='confirmed' or public._affiliate_fee_ready(p_payment,v_confirm,now()))
+    then 'on_hold' when now()>=v_confirm and (v_old.status='confirmed' or v_fallback or public._affiliate_fee_ready(p_payment,v_confirm,now()))
     then 'confirmed' else 'pending' end;
   if not p_release and v_old.id is not null and (v_amount,v_status,v_void,v_fee::bigint,v_net)
     is not distinct from (v_old.amount,v_old.status,v_old.void_reason,v_old.fee_cents,v_old.net_base_usd) then return; end if;
@@ -152,6 +192,13 @@ begin
   end if;
   if not v_settings.enabled then return; end if;
   v_cutoff:=case when p_today=(now() at time zone 'UTC')::date then now() else p_today::timestamp at time zone 'UTC' end;
+  -- Fee-era payments still without fee data once the grace period is over: the recompute applies
+  -- _affiliate_fee_fallback, confirms and opens an affiliate_fee_alerts row.
+  for v_payment in select distinct c.payment_id from public.affiliate_commissions c join public.payments p on p.id=c.payment_id
+     where c.status='pending' and c.confirm_after+make_interval(days=>v_settings.fee_final_grace_days)<=v_cutoff
+       and public._affiliate_fee_missing(p) order by c.payment_id loop
+    perform public.affiliate_recompute_payment(v_payment);
+  end loop;
   -- A refund/dispute updates and locks this same commission. EvalPlanQual rechecks pending after waiting.
   with changed as (
     update public.affiliate_commissions c set status='confirmed',confirmed_at=v_cutoff,updated_at=now()
@@ -178,6 +225,58 @@ begin
   insert into public.affiliate_payout_items(payout_id,commission_id,prior_amount,issue_amount)
     select n.id,a.* from issued n
       cross join lateral public._affiliate_allocate_payout(n.affiliate_user_id,n.amount) a;
+end;
+$$;
+
+-- Same as 0906 except the end of a successful recompute: when a commission of a fee-era payment
+-- with no fee data is confirmed (on _affiliate_fee_fallback), an affiliate_fee_alerts row is
+-- opened; once the payment has fee data, its open alert is resolved.
+create or replace function public.affiliate_recompute_payment(p_payment_id bigint,p_new_payment boolean default false) returns void
+language plpgsql security definer set search_path='' as $$
+declare
+  v_payment public.payments; v_enabled boolean; v_open boolean; v_lost boolean; v_snapshot jsonb;
+  v_exists boolean; v_retry boolean; v_missing boolean;
+begin
+  if p_payment_id is null then return; end if;
+  select enabled into strict v_enabled from public.affiliate_settings where singleton;
+  if p_new_payment and not v_enabled then return; end if;
+  select exists(select from public.affiliate_commissions c where c.payment_id=p_payment_id) into v_exists;
+  select e.snapshot into v_snapshot from public.affiliate_recompute_errors e where e.payment_id=p_payment_id and e.resolved_at is null;
+  v_retry:=found;
+  if not (v_exists or v_retry or (p_new_payment and v_enabled)) then return; end if;
+  -- Serializes manual/cron retries with the existing billing transaction on this payment.
+  select p.* into strict v_payment from public.payments p where p.id=p_payment_id for update;
+  if v_payment.amount_total=0 then return; end if;
+  if not v_exists and v_snapshot is null then v_snapshot:=public._affiliate_snapshot(v_payment); end if;
+  if not v_exists and v_snapshot is null then
+    if v_retry then update public.affiliate_recompute_errors set resolved_at=now() where payment_id=p_payment_id and resolved_at is null; end if;
+    return;
+  end if;
+  if v_payment.currency <> 'usd' then raise exception 'AFFILIATE_NON_USD_PAYMENT'; end if;
+  select is_open,is_lost into strict v_open,v_lost from public._affiliate_dispute_state(v_payment);
+  perform public._affiliate_write_commission(v_payment,v_snapshot,1::smallint,v_open,v_lost);
+  perform public._affiliate_write_commission(v_payment,v_snapshot,2::smallint,v_open,v_lost);
+  update public.affiliate_recompute_errors set resolved_at=now() where payment_id=p_payment_id and resolved_at is null;
+  v_missing:=public._affiliate_fee_missing(v_payment);
+  if v_missing and exists(select from public.affiliate_commissions c where c.payment_id=p_payment_id and c.status='confirmed') then
+    insert into public.affiliate_fee_alerts(payment_id,kind,fee_cents)
+      values(p_payment_id,'fees_missing',public._affiliate_fee_fallback(v_payment))
+      on conflict(payment_id) do update set fee_cents=excluded.fee_cents,opened_at=now(),resolved_at=null
+      where affiliate_fee_alerts.resolved_at is not null;
+  elsif not v_missing then
+    update public.affiliate_fee_alerts set resolved_at=now() where payment_id=p_payment_id and resolved_at is null;
+  end if;
+exception when others or query_canceled or assert_failure then
+  -- Retain no sensitive exception DETAIL/CONTEXT (it can contain an entire failed row).
+  begin
+    insert into public.affiliate_recompute_errors(payment_id,error,snapshot)
+      values(p_payment_id,sqlstate || ': ' || left(sqlerrm,300),v_snapshot)
+      on conflict(payment_id) where resolved_at is null do update set error=excluded.error,
+        snapshot=coalesce(affiliate_recompute_errors.snapshot,excluded.snapshot);
+  exception when others or query_canceled or assert_failure then
+    -- Even an unavailable error sink must never undo a successful payment/credit write.
+    return;
+  end;
 end;
 $$;
 
