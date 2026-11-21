@@ -244,6 +244,7 @@ export const commissionStatus = (value: string) => (value === 'pending' ? '待�
 export const money = (cents: number) => new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'USD' }).format(cents / 100)
 
 export const DOSSIER = {
+  orgTag: '企业',
   person: '联盟会员',
   unnamed: '未填写姓名',
   email: '注册邮箱',

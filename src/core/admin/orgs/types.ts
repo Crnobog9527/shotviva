@@ -66,9 +66,19 @@ export type OrgDetail = {
   ledger: LedgerRow[]
   packages: OrgPackage[]
   caps: LimitCaps
+  affiliate: OrgAffiliate | null
 }
 
 // Serialisable answer of an org server action; the page shows `message`.
 export type OrgActionResult<T = undefined> =
   | { ok: true; message: string; value?: T }
   | { ok: false; message: string }
+
+// The org's enterprise affiliate account (E2): status plus the rate per product, the override
+// when one is set, otherwise the program default.
+export type OrgAffiliate = {
+  userId: string
+  slug: string
+  status: string
+  rates: { productKind: string; l1Bp: number; l2Bp: number; overridden: boolean }[]
+}
