@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { withPostHogSwitch } from './public-env-switch'
+
 // The zod contract of the client-safe variables (core/public-env.ts reads them). It runs where
 // the values are fixed: next.config.ts parses them at build, when Next.js inlines every
 // NEXT_PUBLIC_* into the bundles, so an invalid value fails the build. Browser code never
@@ -57,12 +59,6 @@ const publicEnvShape = z.object({
   // This build's version (T90): set by next.config.ts from the deployment id; `dev` locally.
   NEXT_PUBLIC_APP_VERSION: z.string().min(1).default('dev'),
 })
-
-// Shared by the schema and core/public-env.ts's hand-written defaults, so they cannot differ.
-export const POSTHOG_ENABLED_VALUE = 'true'
-export function withPostHogSwitch<T extends { NEXT_PUBLIC_POSTHOG_KEY: string; NEXT_PUBLIC_POSTHOG_ENABLED?: string | undefined }>(env: T): T {
-  return env.NEXT_PUBLIC_POSTHOG_ENABLED === POSTHOG_ENABLED_VALUE ? env : { ...env, NEXT_PUBLIC_POSTHOG_KEY: '' }
-}
 
 export const publicEnvSchema = publicEnvShape.transform(withPostHogSwitch)
 

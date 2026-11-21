@@ -1,4 +1,5 @@
-import { withPostHogSwitch, type PublicEnv, type RawPublicEnv } from './public-env-schema'
+import type { PublicEnv, RawPublicEnv } from './public-env-schema'
+import { withPostHogSwitch } from './public-env-switch'
 
 export type { PublicEnv } from './public-env-schema'
 
