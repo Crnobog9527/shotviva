@@ -1,10 +1,10 @@
 import { getTranslations } from 'next-intl/server'
 import { currentLocale } from '@/core/i18n/server'
-import { Link } from '@/core/i18n/ui'
-import { date, money, percent, productLabel, viewHref } from './format'
+import { date, money } from './format'
 import type { Query } from './models'
-import { readChanges, readCommissions } from './repository'
-import { More, StatusPill, Table } from './shared-ui'
+import { CommissionTable } from './commission-table'
+import { readChanges, readCommissions, readOrderFees } from './repository'
+import { More, Table } from './shared-ui'
 
 async function ChangeList({ user, query }: { user: string; query: Query }) {
   if (!query.entry) return null
@@ -49,6 +49,7 @@ export async function CommissionList({
     getTranslations('affiliate'),
     currentLocale(),
   ])
+  const orders = await readOrderFees(page.items)
   return (
     <section className="af-section">
       <div className="af-heading">
@@ -59,28 +60,7 @@ export async function CommissionList({
           </a>
         )}
       </div>
-      <Table
-        headers={['date', 'item', 'base', 'rate', 'commission', 'state', 'confirms', 'changes'].map((key) =>
-          t(key),
-        )}
-        empty={t('empty')}
-        rows={page.items.map((row) => [
-          date(locale, row.created_at),
-          productLabel(row.product_id, t),
-          money(locale, row.base_usd),
-          percent(locale, row.rate_bp),
-          <strong key="a" className="af-num">{money(locale, row.amount)}</strong>,
-          <StatusPill key="s" status={row.status} t={t} />,
-          date(locale, row.confirm_after),
-          <Link
-            key={row.id}
-            className="af-link"
-            href={viewHref({ ...query, entry: String(row.id), changes: undefined })}
-          >
-            {t('detailsLink')}
-          </Link>,
-        ])}
-      />
+      <CommissionTable rows={page.items} orders={orders} query={query} locale={locale} t={t} />
       <More
         query={{ ...query, entry: undefined, changes: undefined }}
         next={page.nextCursor}
