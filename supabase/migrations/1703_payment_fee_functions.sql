@@ -149,10 +149,15 @@ revoke all on function public._payment_fee_split(jsonb,bigint,bigint) from publi
 -- p_input: payment_id, idempotency_key, refund_id (refund scope only), basis_cents (tax-
 -- inclusive USD cents, for priced lines), actual_cents (the provider's real fee, exactly when
 -- the set has stripe_bt / waffo_settlement lines), lines[1..20] of {kind, source, status?,
--- schedule_id?, amount_cents?, source_ref?, note?}.
+-- schedule_id?, amount_cents?, source_ref?, note?}, and expected_revision (optional: the
+-- scope's revision the caller built this set from; 0 = none yet).
+-- A caller that rebuilds a scope from lines it read earlier (F4 allocations, corrections) must
+-- pass expected_revision: if another writer added a revision in between, the write is refused
+-- with PAYMENT_FEE_REVISION_CONFLICT and the caller rereads and retries, so a stale set never
+-- replaces a newer real figure.
 -- Returns {applied, reason?, revision, fee_cents, fee_status, lines?}. Not applied, nothing
 -- written: 'replayed' (this key was already written), 'legacy' (payment before record_from),
--- 'final' (an estimate never replaces a final revision).
+-- 'final' (a set made only of estimated lines never replaces a final revision).
 create function public.payment_fee_record(p_input jsonb) returns jsonb
 language plpgsql security definer set search_path='' as $$
 declare
@@ -160,6 +165,7 @@ declare
   v_refund text := nullif(p_input->>'refund_id','');
   v_basis bigint := (p_input->>'basis_cents')::bigint;
   v_actual bigint := (p_input->>'actual_cents')::bigint;
+  v_expected integer := (p_input->>'expected_revision')::integer;
   v_payment public.payments;
   v_seen public.payment_fee_lines;
   v_from timestamptz;
@@ -170,7 +176,7 @@ declare
   v_no integer;
 begin
   if jsonb_typeof(p_input) is distinct from 'object' or v_key is null or length(v_key) not between 1 and 200
-     or p_input->>'payment_id' is null or v_basis < 0 or v_actual < 0
+     or p_input->>'payment_id' is null or v_basis < 0 or v_actual < 0 or v_expected < 0
      or length(v_refund) > 200 or jsonb_typeof(p_input->'lines') is distinct from 'array'
      or jsonb_array_length(p_input->'lines') not between 1 and 20 then
     raise exception 'INVALID_INPUT' using detail = 'payment_fee_record: bad input';
@@ -205,7 +211,12 @@ begin
    where payment_id = v_payment.id and coalesce(refund_id,'') = coalesce(v_refund,'');
   select bool_and(status = 'final') into v_final from public.payment_fee_lines
    where payment_id = v_payment.id and coalesce(refund_id,'') = coalesce(v_refund,'') and revision = v_rev;
-  if v_final and exists(select from jsonb_array_elements(v_lines) e where e->>'status' = 'estimated') then
+  if v_expected is not null and v_expected <> v_rev then
+    raise exception 'PAYMENT_FEE_REVISION_CONFLICT' using detail = 'expected revision ' || v_expected || ', current ' || v_rev;
+  end if;
+  -- A late estimate (e.g. a webhook retry under its own key) must not undo a final figure; a
+  -- set that carries any final line (a real-bill correction, a reconciled allocation) may.
+  if v_final and not exists(select from jsonb_array_elements(v_lines) e where e->>'status' = 'final') then
     return jsonb_build_object('applied', false, 'reason', 'final', 'revision', v_rev,
       'fee_cents', v_payment.fee_cents, 'fee_status', v_payment.fee_status);
   end if;

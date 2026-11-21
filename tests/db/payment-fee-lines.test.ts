@@ -124,6 +124,44 @@ it('splits a real Stripe fee into its items so they add up to the charged fee; a
   expect(sum).toEqual({ s: 88 })
 })
 
+it('refuses a set built from a stale revision: a late allocation cannot overwrite the real Stripe fee', async () => {
+  const id = await stripeSale(2490, 'card')
+  const s = async (kind: string) => schedule('stripe', 'card', kind)
+  const mp = { kind: 'mp', source: 'formula', schedule_id: await s('mp') }
+  await record({ payment_id: id, idempotency_key: `estimate:${id}`, basis_cents: 2490, expected_revision: 0,
+    lines: [{ kind: 'acquiring', source: 'estimate', schedule_id: await s('acquiring') }, mp] })
+  // F4 reads revision 1 here; meanwhile F3 writes the real fee as revision 2 (it passes no expectation).
+  await record({ payment_id: id, idempotency_key: 'stripe_bt:txn_z', basis_cents: 2490, actual_cents: 103,
+    lines: [{ kind: 'acquiring', source: 'stripe_bt', schedule_id: await s('acquiring'), source_ref: 'txn_z' }, mp] })
+  const batch = { payment_id: id, idempotency_key: `mp_batch:txn_b:${id}`, basis_cents: 2490,
+    lines: [{ kind: 'acquiring', source: 'estimate', schedule_id: await s('acquiring') }, { ...mp, amount_cents: 87, status: 'final' }] }
+  await refused(async () => record({ ...batch, expected_revision: 1 }), 'PAYMENT_FEE_REVISION_CONFLICT')
+  expect(await fees(id)).toEqual({ fee_cents: 190, fee_status: 'estimated' })
+  // Reread and retry on top of revision 2, carrying its real line forward.
+  const retry = await record({ ...batch, expected_revision: 2, actual_cents: 103, lines: [
+    { kind: 'acquiring', source: 'stripe_bt', schedule_id: await s('acquiring'), source_ref: 'txn_z' }, { ...mp, amount_cents: 87, status: 'final' }] })
+  expect(retry).toMatchObject({ applied: true, revision: 3, fee_cents: 190, fee_status: 'final' })
+  expect(await record({ ...batch, expected_revision: 1 })).toMatchObject({ applied: false, reason: 'replayed', revision: 3 })
+})
+
+it('lets a final revision be corrected by a set with real lines, even when it carries estimated formula lines', async () => {
+  const id = await stripeSale(990)
+  const s = async (kind: string) => schedule('stripe', 'cn_card', kind)
+  const real = (key: string, actual: number, extra: Line[] = []) => record({ payment_id: id, idempotency_key: key, basis_cents: 990,
+    actual_cents: actual, lines: [{ kind: 'acquiring', source: 'stripe_bt', schedule_id: 0 }, ...extra].map((l) =>
+      l.kind === 'acquiring' ? { ...l, schedule_id: acq } : l) })
+  const acq = await s('acquiring')
+  expect(await real('stripe_bt:a', 74)).toMatchObject({ revision: 1, fee_cents: 74, fee_status: 'final' })
+  const radar = { kind: 'radar', source: 'formula', schedule_id: await s('radar') }
+  expect(await real('stripe_bt:b', 75, [radar])).toMatchObject({ applied: true, revision: 2, fee_cents: 80, fee_status: 'estimated' })
+  expect(await record({ payment_id: id, idempotency_key: 'radar-only', basis_cents: 990, lines: [radar] }))
+    .toMatchObject({ applied: true, revision: 3 })
+  await record({ payment_id: id, idempotency_key: 'stripe_bt:c', basis_cents: 990, actual_cents: 75, lines: [
+    { kind: 'acquiring', source: 'stripe_bt', schedule_id: acq }, { ...radar, status: 'final' }] })
+  expect(await record({ payment_id: id, idempotency_key: 'radar-late', basis_cents: 990, lines: [radar] }))
+    .toMatchObject({ applied: false, reason: 'final', revision: 4 })
+})
+
 it('refuses inconsistent sets', async () => {
   const id = await stripeSale(990)
   const acq = await schedule('stripe', 'cn_card', 'acquiring')
