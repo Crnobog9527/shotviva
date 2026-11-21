@@ -24,7 +24,8 @@ export default async function OrgPage({ params }: PageProps<'/[locale]/admin/org
   return (
     <AdminPage title={org.name} actions={<OrgStatusBadge status={org.status} />}>
       <Link href="/admin/orgs" className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 hover:underline">← {COPY.back}</Link>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard title={COPY.refCode} value={org.refCode} />
         <StatCard title={COPY.pool} value={num(org.poolCredits)} />
         <StatCard title={COPY.owner} value={detail.ownerAccount ?? '—'} />
       </div>

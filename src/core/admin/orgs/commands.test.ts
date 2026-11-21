@@ -24,7 +24,7 @@ const PKG = '22222222-2222-4222-8222-222222222222'
 
 function org(over: Record<string, unknown> = {}) {
   return {
-    id: ORG, name: 'Acme Test', ownerUserId: 'u', status: 'active', concurrency: null, perWindow: null, batchMax: 10, multiTemplateMax: null,
+    id: ORG, name: 'Acme Test', refCode: 'SV-K7M2PX', ownerUserId: 'u', status: 'active', concurrency: null, perWindow: null, batchMax: 10, multiTemplateMax: null,
     batchZip: false, earlyFeatures: false, affiliateEnabled: false, affiliateLevels: 1, signupBonusCredits: 0, poolCredits: 0, adminNote: null, createdAt: 'x',
     updatedAt: '2026-01-01T00:00:00Z', ...over,
   }

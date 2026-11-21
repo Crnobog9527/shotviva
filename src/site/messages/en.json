@@ -1925,9 +1925,14 @@
       },
       "payment": {
         "title": "Pay by bank transfer",
-        "hint": "Transfer to one of the accounts below and put “{org}” in the payment note.",
+        "hint": "Transfer to one of the accounts below and put your enterprise number in the payment reference.",
         "pending": "Our collecting account details aren't available here right now. Contact us and we'll send them to you.",
-        "after": "After you transfer, contact us. We confirm the payment and then add the credits to your pool."
+        "after": "After you transfer, contact us. We confirm the payment and then add the credits to your pool.",
+        "refLabel": "Your enterprise number",
+        "refHint": "Put this number in your payment reference.",
+        "refCopy": "Copy number",
+        "copied": "Copied.",
+        "copyFailed": "Select and copy the number above."
       },
       "report": {
         "member": "Member",

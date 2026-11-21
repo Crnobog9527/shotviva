@@ -36,7 +36,7 @@ function fakeDb(tables: Rows, rpc: Record<string, unknown> = {}) {
   return { db: { from, auth, rpc: rpcFn } as never, calls }
 }
 
-const org = { id: ORG, name: 'Acme Studio', owner_user_id: OWNER, status: 'active', pool_credits: 1200, invite_token: 'a'.repeat(32), affiliate_enabled: true, affiliate_levels: 1 }
+const org = { id: ORG, name: 'Acme Studio', owner_user_id: OWNER, status: 'active', pool_credits: 1200, invite_token: 'a'.repeat(32), ref_code: 'SV-K7M2PX', affiliate_enabled: true, affiliate_levels: 1 }
 
 describe('readOrgView', () => {
   it('is none for an account in no org', async () => {
@@ -57,7 +57,7 @@ describe('readOrgView', () => {
     const view = await readOrgView(OWNER, { db, maskPhone: (phone) => phone.slice(0, 3) + '****' })
     expect(view.kind).toBe('owner')
     if (view.kind !== 'owner') return
-    expect(view.org).toMatchObject({ name: 'Acme Studio', poolCredits: 1200, status: 'active' })
+    expect(view.org).toMatchObject({ name: 'Acme Studio', refCode: 'SV-K7M2PX', poolCredits: 1200, status: 'active' })
     expect(view.inviteToken).toBe('a'.repeat(32))
     expect(view.members.map((m) => [m.account, m.customers])).toEqual([['owner@acme.test', 0], ['+86****', 2]])
     expect(view.packages).toEqual([{ id: ORG, name: 'Starter', priceUsdCents: 123400, credits: 98765 }])

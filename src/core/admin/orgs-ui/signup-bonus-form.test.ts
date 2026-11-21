@@ -5,7 +5,7 @@ import { expect, it, vi } from 'vitest'
 import { SignupBonusForm } from './signup-bonus-form'
 
 const org = {
-  id: '11111111-1111-4111-8111-111111111111', name: 'Acme Test', ownerUserId: 'u', status: 'active' as const, concurrency: null, perWindow: null,
+  id: '11111111-1111-4111-8111-111111111111', name: 'Acme Test', refCode: 'SV-K7M2PX', ownerUserId: 'u', status: 'active' as const, concurrency: null, perWindow: null,
   batchZip: false, batchMax: null, multiTemplateMax: null, earlyFeatures: false, affiliateEnabled: true, affiliateLevels: 1 as const,
   signupBonusCredits: 300, poolCredits: 0, adminNote: null, createdAt: 'x', updatedAt: '2026-01-01T00:00:00Z',
 }

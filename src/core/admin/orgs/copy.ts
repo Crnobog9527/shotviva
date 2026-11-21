@@ -9,6 +9,13 @@ export const ORGS_COPY = {
   emptyHint: '在上方新建第一家企业，并指定它的主管理员账号。',
   // 列表
   colName: '企业',
+  colNumber: '企业编号',
+  searchLabel: '搜索企业',
+  searchPlaceholder: '企业编号（SV-XXXXXX）或企业名称',
+  searchButton: '搜索',
+  searchClear: '清除搜索',
+  searchNone: '没有匹配的企业',
+  refCode: '企业编号',
   colOwner: '主管理员',
   colStatus: '状态',
   colPool: '积分池',
