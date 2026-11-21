@@ -46,6 +46,8 @@ export const viewSchema = z.object({
   scopes: z.array(scopeSchema),
   refunds: z.array(z.object({ refund_ref: z.string(), amount: z.number().int(), created_at: z.string() })),
   alerted: z.array(z.string()),
+  // Looks so far (payment_fee_reconcile_state.attempts): a payment that keeps failing backs off.
+  attempts: z.number().int(),
 })
 export type PaymentView = z.infer<typeof viewSchema>
 const recordSchema = z.object({ applied: z.boolean(), reason: z.string().optional(), revision: z.number().int().optional() })

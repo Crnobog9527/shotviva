@@ -204,6 +204,25 @@ describe('Waffo', () => {
   })
 })
 
+describe('a look that keeps failing', () => {
+  it('backs off and, past the window, is told to the Owner once like any unreconciled payment', async () => {
+    const sale = await waffoSale(990, at(-15))
+    await waffoEstimate(sale.id, 990)
+    settlements.set(sale.pay, async () => { throw new Error('Waffo graphql failed') })
+    const before = alerts.length
+    expect(await run()).toMatchObject({ looked: 1, failed: 1 })
+    expect(issuesOf(before)).toEqual([`unreconciled ${sale.id}`])
+    const state = async () => (await db.query('select next_check_at, attempts, last_error from payment_fee_reconcile_state where payment_id=$1', [sale.id])).rows[0]
+    expect(await state()).toMatchObject({ attempts: 1, last_error: 'Error' })
+    expect(new Date((await state()).next_check_at).getTime()).toBe(at(0).getTime() + 3_600_000)
+    clock = new Date(clock.getTime() + 3_600_000)
+    await run()
+    // Second failure: two hours; still one alert.
+    expect(new Date((await state()).next_check_at).getTime()).toBe(clock.getTime() + 2 * 3_600_000)
+    expect(alerts.length).toBe(before + 1)
+  })
+})
+
 describe('Stripe', () => {
   it("a payment whose webhook wrote nothing: the charge's bill is read again (only stripe_fee rows)", async () => {
     const sale = await stripeSale(990, at(-1))
@@ -231,6 +250,42 @@ describe('Stripe', () => {
     expect(await feesOf(a.id)).toMatchObject({ lines: ['acquiring 59 stripe_bt/final', 'mp 35 formula/final'], fee_cents: 94, fee_status: 'final' })
     expect(await feesOf(b.id)).toMatchObject({ lines: ['acquiring 88 stripe_bt/final', 'mp 69 formula/final'], fee_status: 'final' })
     expect(await run({ waffo: null })).toMatchObject({ batches: 0, shares: 0, written: 0 })
+    feeTxns = []
+  })
+
+  it('two MP batches the same day, the first unmatched: the second still finds its payments', async () => {
+    const base = at(-3)
+    const sales = []
+    for (const [i, cents, fee] of [[0, 4990, 175], [1, 990, 59], [2, 1990, 88]] as const) {
+      const sale = await stripeSale(cents, new Date(base.getTime() + (i + 1) * 60_000), 'card')
+      charges.set(sale.charge, billedCharge(sale.charge, cents, [{ type: 'withheld_tax', amount: 0 }, { type: 'stripe_fee', amount: fee }]))
+      sales.push(sale)
+    }
+    const day = base.toISOString().slice(0, 10)
+    const first = feeTxn(999, new Date(base.getTime() + 2 * 3_600_000), `Managed Payments Transaction Fee (${day})`)
+    const second = feeTxn(104, new Date(base.getTime() + 3 * 3_600_000), `Managed Payments Transaction Fee (${day})`)
+    feeTxns = [first, second]
+    const before = alerts.length
+    expect(await run({ waffo: null })).toMatchObject({ batches: 2, shares: 2 })
+    expect(issuesOf(before)).toEqual([`batch_mismatch ${first.id} mp`])
+    expect((await feesOf(sales[0].id)).lines).toContain('mp 175 formula/estimated')
+    expect((await feesOf(sales[1].id)).lines).toContain('mp 35 formula/final')
+    expect((await feesOf(sales[2].id)).lines).toContain('mp 69 formula/final')
+    feeTxns = []
+  })
+
+  it('a batch whose payments cross UTC midnight takes the next-day payment too', async () => {
+    const midnight = at(-5)
+    const late = await stripeSale(990, new Date(midnight.getTime() - 30 * 60_000), 'card')
+    const early = await stripeSale(1990, new Date(midnight.getTime() + 30 * 60_000), 'card')
+    for (const [sale, cents, fee] of [[late, 990, 59], [early, 1990, 88]] as const) {
+      charges.set(sale.charge, billedCharge(sale.charge, cents, [{ type: 'withheld_tax', amount: 0 }, { type: 'stripe_fee', amount: fee }]))
+    }
+    const day = new Date(midnight.getTime() - DAY).toISOString().slice(0, 10)
+    feeTxns = [feeTxn(104, new Date(midnight.getTime() + 3 * 3_600_000), `Managed Payments Transaction Fee (${day})`)]
+    expect(await run({ waffo: null })).toMatchObject({ batches: 1, shares: 2 })
+    expect((await feesOf(late.id)).fee_status).toBe('final')
+    expect((await feesOf(early.id)).fee_status).toBe('final')
     feeTxns = []
   })
 

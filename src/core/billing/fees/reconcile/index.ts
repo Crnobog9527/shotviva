@@ -7,9 +7,11 @@ import { z } from 'zod'
 import { logger } from '../../../logger'
 import { callRpc } from '../../rpc'
 import { recordBatches, writeShares } from './batches-run'
-import { lookStripe } from './stripe'
-import { codeOf, HOUR, viewSchema, type Issue, type Look, type PaymentView, type ReconcileDeps, type ReconcileSummary } from './view'
-import { lookWaffo } from './waffo'
+import { lookStripe, STRIPE_WINDOW_DAYS } from './stripe'
+import {
+  ageDays, codeOf, HOUR, unreconciledIssue, viewSchema, type Issue, type Look, type PaymentView, type ReconcileDeps, type ReconcileSummary,
+} from './view'
+import { lookWaffo, WAFFO_WINDOW_DAYS } from './waffo'
 
 // F4 (ARCHITECTURE §6.2 联盟返佣 · 订单手续费 · 对账): the job behind /api/cron/payment-fees, hourly.
 // The webhooks (F3) write each payment's fees when it settles, mostly estimates; this turns them
@@ -26,13 +28,28 @@ export type { ReconcileDeps, ReconcileStripe, ReconcileSummary } from './view'
 
 const dueSchema = z.object({ live: z.boolean(), payments: z.array(viewSchema) })
 
+const MAX_BACKOFF_MS = 24 * HOUR
+
+// A look that failed (the provider errored, a fee came back unusable, a reference is missing):
+// retried after 1, 2, 4 … hours (at most a day), and past the channel's window the Owner is told
+// it is not reconciled, exactly as when the provider simply has no figure yet.
+function failedLook(deps: ReconcileDeps, view: PaymentView, error: string, issues: Issue[]): Look {
+  const now = deps.now()
+  const wait = Math.min(MAX_BACKOFF_MS, HOUR * 2 ** Math.min(view.attempts, 5))
+  const days = ageDays(now, view.created_at)
+  const window = view.channel === 'waffo' ? WAFFO_WINDOW_DAYS : STRIPE_WINDOW_DAYS
+  const late = days >= window && !issues.some(i => i.key === 'unreconciled')
+  return { next: new Date(now.getTime() + wait), error, issues: late ? [...issues, unreconciledIssue(view, 'unreconciled', null, days)] : issues }
+}
+
 async function look(deps: ReconcileDeps, summary: ReconcileSummary, view: PaymentView): Promise<Look> {
   try {
-    return view.channel === 'waffo' ? await lookWaffo(deps, summary, view) : await lookStripe(deps, summary, view)
+    const result = view.channel === 'waffo' ? await lookWaffo(deps, summary, view) : await lookStripe(deps, summary, view)
+    return result.error ? failedLook(deps, view, result.error, result.issues) : result
   } catch (error) {
     summary.failed += 1
     logger.warn('payment fees not reconciled', { channel: view.channel, payment_row: view.payment_id, error: codeOf(error) })
-    return { next: new Date(deps.now().getTime() + HOUR), error: codeOf(error), issues: [] }
+    return failedLook(deps, view, codeOf(error), [])
   }
 }
 

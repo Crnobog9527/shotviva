@@ -35,7 +35,14 @@ describe('matchBatch', () => {
     expect(shares(matchBatch('mp', 106, pay(990, 1990)))).toEqual(['1:35', '2:71'])
     expect(matchBatch('mp', 140, pay(990, 1990))).toMatchObject({ status: 'mismatch', formula_cents: 104 })
     expect(matchBatch('mp', 35, [])).toMatchObject({ status: 'mismatch' })
-    expect(matchBatch('mp', 35, pay(null))).toMatchObject({ status: 'mismatch', note: 'a payment is not in USD' })
+    expect(matchBatch('mp', 35, pay(null))).toMatchObject({ status: 'mismatch', formula_cents: null })
+  })
+  it('MP: payments an earlier batch left unexplained, or a non-USD one, never block the next batch', () => {
+    // #1 ($49.90) belonged to a batch nothing explained; the next batch is #2 + #3.
+    expect(shares(matchBatch('mp', 104, pay(4990, 990, 1990)))).toEqual(['2:35', '3:69'])
+    expect(shares(matchBatch('mp', 104, pay(990, null, 990, 1990)))).toEqual(['3:35', '4:69'])
+    // A run never spans the non-USD payment.
+    expect(matchBatch('mp', 140, pay(990, null, 3010))).toMatchObject({ status: 'mismatch' })
   })
   it('Billing 0.7% the same way', () => {
     expect(shares(matchBatch('billing', 35, pay(4990)))).toEqual(['1:35'])
@@ -45,6 +52,7 @@ describe('matchBatch', () => {
     expect(shares(matchBatch('radar', 15, pay(990, 1990)))).toEqual(['1:5', '2:5'])
     expect(shares(matchBatch('radar', 5, pay(990, 1990)))).toEqual(['1:5'])
     expect(matchBatch('radar', 7, pay(990, 1990))).toMatchObject({ status: 'mismatch' })
+    expect(shares(matchBatch('radar', 10, pay(null, 990)))).toEqual(['1:5', '2:5'])
   })
 })
 

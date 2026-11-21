@@ -82,7 +82,8 @@ language sql stable security definer set search_path='' as $$
       select jsonb_agg(jsonb_build_object('refund_ref', r.refund_ref, 'amount', r.amount, 'created_at', r.created_at)
                        order by r.created_at, r.refund_ref)
         from public.payment_refunds r where r.payment_id = p.id), '[]'::jsonb),
-    'alerted', coalesce((select to_jsonb(s.alerted) from public.payment_fee_reconcile_state s where s.payment_id = p.id), '[]'::jsonb));
+    'alerted', coalesce((select to_jsonb(s.alerted) from public.payment_fee_reconcile_state s where s.payment_id = p.id), '[]'::jsonb),
+    'attempts', coalesce((select s.attempts from public.payment_fee_reconcile_state s where s.payment_id = p.id), 0));
 $$;
 revoke all on function public._payment_fee_reconcile_view(public.payments) from public,anon,authenticated,service_role;
 
@@ -162,7 +163,8 @@ revoke all on function public.payment_fee_stripe_batches_known(text[]) from publ
 grant execute on function public.payment_fee_stripe_batches_known(text[]) to service_role;
 
 -- The Stripe payments a batch of p_kind booked at p_before for UTC day p_day may cover, oldest
--- first: created that day, no later than the batch, not in another batch of that kind, and of
+-- first: created from that day's start until the batch was booked (at most two days, so a run of
+-- payments that crosses midnight is still there), not in another batch of that kind, and of
 -- that kind — a Managed Payments card (mp), a subscription invoice (billing) or a non-MP charge
 -- (radar), judged by its fee lines when it has some, else by method / product. Payments from
 -- before record_from are included (they are in Stripe's total too) and marked not recordable.
@@ -180,7 +182,7 @@ begin
         'currency', p.currency, 'recordable', v_from is not null and p.created_at >= v_from) order by p.created_at, p.id)
       from public.payments p
      where p.channel = 'stripe'
-       and p.created_at >= p_day::timestamp at time zone 'UTC' and p.created_at < (p_day + 1)::timestamp at time zone 'UTC'
+       and p.created_at >= p_day::timestamp at time zone 'UTC' and p.created_at < (p_day + 2)::timestamp at time zone 'UTC'
        and p.created_at <= p_before
        and not exists(select from public.payment_fee_stripe_batch_items i where i.payment_id = p.id and i.kind = p_kind)
        and case when exists(select from public.payment_fee_lines l where l.payment_id = p.id and l.refund_id is null)
