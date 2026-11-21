@@ -28,7 +28,7 @@ const dressWhite = caseImage('white-dress-after', 'Real example: the same embroi
 const cutOuts: EditCases = {
   heading: 'Change Background to White',
   intro: `${brand} cuts the product out of the photo you already have. Each result downloads as a transparent PNG or as a white-background version, so one cut-out covers both.`,
-  labels: { before: 'Phone photo', after: 'Cut-out', reference: 'Reference' },
+  labels: { before: 'Real phone photo', after: 'Cut-out', reference: 'Reference' },
   items: [
     {
       title: 'A speaker on a cluttered desk',
