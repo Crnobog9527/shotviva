@@ -8,6 +8,8 @@ import { AppError } from '@/core/errors'
 import type { ObjectStore } from '@/core/storage'
 import { storedSlotOrder } from '@/core/templates/image-slots'
 
+import { EMPTY_USER_INPUT, readUserInput, sourceWorkLink, type WorkUserInput } from './view-work-input'
+
 // Admin "查看作品" (ARCHITECTURE §10, T25). admin_view_work writes the view_work audit row and
 // returns the job's keys in the same call, so no view goes unrecorded. The output is the clean
 // original (no watermark, whatever the pool). The input is the copy kept with the work (T40,
@@ -21,7 +23,17 @@ export const INPUT_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000
 // deleted: the user deleted the work (T41); its files are gone, so nothing is signed.
 // slotCount: images a slot template's work was made from (§5.1e); v1 shows only the first
 // (admin_view_work returns one key), and the dialog says so. 0 for every other work.
-export type WorkLinks = { output: string | null; input: string | null; inputExpired: boolean; deleted: boolean; slotCount: number }
+// userInput: what the user typed and chose (view-work-input.ts). sourceWork: for an edit, a signed
+// link to the work it started from, when that is still there.
+export type WorkLinks = {
+  output: string | null
+  input: string | null
+  inputExpired: boolean
+  deleted: boolean
+  slotCount: number
+  userInput: WorkUserInput
+  sourceWork: string | null
+}
 
 // A set-returning function: PostgREST answers with its one row in an array.
 const viewSchema = z
@@ -65,11 +77,13 @@ export async function viewWork({ db, store, now = new Date() }: Deps, jobId: unk
   if (!id.success) throw new AppError('INVALID_INPUT', '任务 id 不对。')
   const job = await callRpc(db, 'admin_view_work', { p_job_id: id.data }, viewSchema)
   // The view is still logged by admin_view_work; a deleted work only says so.
-  if (job.deleted_at) return { output: null, input: null, inputExpired: false, deleted: true, slotCount: 0 }
-  const [output, input, slotCount] = await Promise.all([
+  if (job.deleted_at) return { output: null, input: null, inputExpired: false, deleted: true, slotCount: 0, userInput: EMPTY_USER_INPUT, sourceWork: null }
+  const [output, input, slotCount, typed] = await Promise.all([
     job.status === 'succeeded' && job.output_key ? store.presignGet(job.output_key, { expiresInSeconds: VIEW_LINK_SECONDS }) : null,
     inputLink(store, job.input_key, job.created_at, now),
     countSlots(db, id.data),
+    readUserInput(db, id.data),
   ])
-  return { output, ...input, deleted: false, slotCount }
+  const sourceWork = await sourceWorkLink(db, store, job.user_id, typed.parentJobId, VIEW_LINK_SECONDS)
+  return { output, ...input, deleted: false, slotCount, userInput: typed.input, sourceWork }
 }
