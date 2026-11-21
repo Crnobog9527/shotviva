@@ -37,6 +37,21 @@ function FeeBreakdown({ r }: { r: Payout }) {
   )
 }
 
+function OrgPaidFields() {
+  return (
+    <>
+      <p className="text-sm">{COPY.orgPayout}</p>
+      <Field name="paid_fx_cny_per_usd" label={COPY.cnyRate} required inputMode="decimal" pattern="\d{1,3}(\.\d{1,6})?" />
+      <Field name="paid_amount_cny_fen" label={COPY.cnyPaid} required inputMode="decimal" pattern="\d{1,10}(\.\d{1,2})?" />
+    </>
+  )
+}
+
+function cnyText(r: Payout) {
+  if (r.paid_amount_cny_fen === null || r.paid_fx_cny_per_usd === null) return null
+  return '¥' + (r.paid_amount_cny_fen / 100).toFixed(2) + ' @ ' + r.paid_fx_cny_per_usd
+}
+
 function PayForm({ r, action }: Props) {
   if (r.payable === null || !r.fees) return <p>{COPY.missingPayable}</p>
   if (r.fees.fees > 0 && r.fees.net === 0) return <p>{COPY.netZero}</p>
@@ -47,6 +62,7 @@ function PayForm({ r, action }: Props) {
       <Hidden name="expected_net" value={String(r.fees.net)} />
       <Field name="paid_at" label={COPY.paidAt} type="date" required />
       <Field name="method" label={COPY.actualMethod} required maxLength={120} />
+      {r.account?.org_id && <OrgPaidFields />}
       <Field name="paid_reference" label={COPY.reference} maxLength={250} />
       <Field name="note" label={COPY.note} maxLength={2000} />
       <p className="text-sm">{COPY.referenceOrNote}</p>
@@ -70,7 +86,7 @@ export function DecidePayout({ r, action }: Props) {
     return (
       <div>
         {r.status === 'paid' && <FeeBreakdown r={r} />}
-        <span>{[r.paid_at?.slice(0, 10), r.paid_method, r.paid_reference, r.note].filter(Boolean).join(' · ')}</span>
+        <span>{[r.paid_at?.slice(0, 10), r.paid_method, cnyText(r), r.paid_reference, r.note].filter(Boolean).join(' · ')}</span>
       </div>
     )
   return (

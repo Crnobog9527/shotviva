@@ -71,6 +71,10 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   ORG_CHANGED: 'CONFLICT',
   ORG_POOL_INSUFFICIENT: 'CONFLICT',
   ORG_LIMIT_ABOVE_CAP: 'INVALID_INPUT',
+  // Enterprise affiliate (1642–1643): personal and org affiliate accounts exclude each other.
+  ORG_PERSONAL_AFFILIATE: 'CONFLICT',
+  ORG_PERSONAL_AFFILIATE_UNSETTLED: 'CONFLICT',
+  AFFILIATE_ORG_MEMBER: 'FORBIDDEN',
 }
 
 export function toRpcError(fn: string, error: { message: string; code?: string }): AppError {

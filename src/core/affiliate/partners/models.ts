@@ -33,6 +33,8 @@ export const accountSchema = z.object({
   us_person: z.boolean().nullable(),
   terms_version: z.string().nullable(),
   terms_accepted_at: z.string().nullable(),
+  // Set on an org's enterprise affiliate account (ARCHITECTURE §6.5).
+  org_id: z.uuid().nullable(),
 })
 export const settingsSchema = z.object({
   settlement_day: z.number().int(),

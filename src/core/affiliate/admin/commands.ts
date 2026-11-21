@@ -45,6 +45,9 @@ const commands = {
       method: required,
       paid_reference: z.string().trim().max(250),
       note: z.string().trim().max(2000),
+      // Only enterprise statements send these; the database requires them there and refuses them elsewhere.
+      paid_fx_cny_per_usd: z.string().regex(/^\d{1,3}(?:\.\d{1,6})?$/).optional(),
+      paid_amount_cny_fen: money.refine((n) => n > 0).optional(),
     })
     .refine((i) => Boolean(i.paid_reference || i.note))
     .transform((i) => ({ ...i, status: 'paid' })),
@@ -101,6 +104,8 @@ const answers = {
   AFFILIATE_PAYOUT_NET_ZERO: 'netZero',
   AFFILIATE_FEE_RULE_CHANGED: 'feeRuleChanged',
   AFFILIATE_FEE_RULE_IN_FORCE: 'feeRuleInForce',
+  AFFILIATE_ORG_MEMBER: 'orgMember',
+  AFFILIATE_ORG_ACCOUNT: 'orgAccount',
 } as const
 function outcome(result: { data: unknown; error: { message: string } | null }) {
   const message = result.error?.message

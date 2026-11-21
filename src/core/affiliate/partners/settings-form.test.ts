@@ -16,6 +16,7 @@ const settings: Settings = { terms_version: 'v2', hold_days: 30, payout_min_usd:
 const account: Account = {
   status: 'active', slug: 'qa-member', team_enabled: false, reapply_allowed: false, reject_reason: null, payout_method: 'wise',
   payout_details: 'Saved payout account', us_person: false, terms_version: 'v2', terms_accepted_at: '2026-01-01T00:00:00Z',
+  org_id: null,
 }
 async function html(overrides: Partial<Account> = {}) {
   return renderToStaticMarkup(await SettingsForm({ account: { ...account, ...overrides }, settings }))
