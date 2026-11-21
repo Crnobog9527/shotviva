@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import {
-  adminCreateOrg, adminGrantOrg, adminSaveOrgPackage, adminSavePaymentAccount, adminSetOrgSignupBonus, adminUpdateOrg,
+  adminAddOrgMember, adminCreateOrg, adminGrantOrg, adminSaveOrgPackage, adminSavePaymentAccount, adminSetOrgSignupBonus, adminUpdateOrg,
   ORG_SIGNUP_BONUS_MAX, PAYMENT_FIELDS, PAYMENT_KINDS,
 } from '@/core/org'
 import { EnrollmentError, phoneUser } from '@/core/affiliate/admin/create-account'
@@ -68,6 +68,15 @@ export async function createOrg(deps: OrgDeps, input: unknown): Promise<OrgActio
     ...(parsed.note.trim() ? { admin_note: parsed.note } : {}),
   })
   return { ok: true, message: COPY.created, value: { id } }
+}
+
+const addMemberSchema = z.object({ orgId: idSchema, userId: idSchema })
+
+// 添加成员: an existing account joins the org directly (1800). Never creates an account.
+export async function addOrgMember(deps: OrgDeps, input: unknown): Promise<OrgActionResult<{ applied: boolean }>> {
+  const form = addMemberSchema.parse(input)
+  const { applied } = await adminAddOrgMember(deps.db, deps.actor, form.orgId, form.userId)
+  return { ok: true, message: applied ? COPY.memberAdded : COPY.memberAlready, value: { applied } }
 }
 
 const saveSchema = z.object({
@@ -235,6 +244,9 @@ export async function savePaymentAccount(deps: OrgDeps, input: unknown): Promise
 const KNOWN: Record<string, string> = {
   ORG_CHANGED: COPY.changed,
   ORG_MEMBER_EXISTS: COPY.exists,
+  ORG_SUSPENDED: COPY.orgSuspended,
+  USER_BANNED: COPY.userBanned,
+  ORG_PERSONAL_AFFILIATE: COPY.personalAffiliate,
   ORG_NOT_FOUND: COPY.notFound,
   ORG_PACKAGE_NOT_FOUND: COPY.packageMissing,
   ORG_POOL_INSUFFICIENT: COPY.poolShort,

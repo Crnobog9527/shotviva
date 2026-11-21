@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const spies = vi.hoisted(() => ({
-  savePay: vi.fn(), create: vi.fn(), update: vi.fn(), grant: vi.fn(), savePkg: vi.fn(), bonus: vi.fn(), detail: vi.fn(), findUser: vi.fn(), phone: vi.fn(),
+  savePay: vi.fn(), addMember: vi.fn(), create: vi.fn(), update: vi.fn(), grant: vi.fn(), savePkg: vi.fn(), bonus: vi.fn(), detail: vi.fn(), findUser: vi.fn(), phone: vi.fn(),
 }))
 vi.mock('@/core/org', () => ({
-  adminCreateOrg: spies.create, adminUpdateOrg: spies.update, adminGrantOrg: spies.grant, adminSaveOrgPackage: spies.savePkg, adminSavePaymentAccount: spies.savePay,
+  adminAddOrgMember: spies.addMember, adminCreateOrg: spies.create, adminUpdateOrg: spies.update, adminGrantOrg: spies.grant, adminSaveOrgPackage: spies.savePkg, adminSavePaymentAccount: spies.savePay,
   adminSetOrgSignupBonus: spies.bonus, ORG_SIGNUP_BONUS_MAX: 1000,
   PAYMENT_KINDS: ['overseas_us', 'mainland_agent'],
   PAYMENT_FIELDS: { overseas_us: ['account_name', 'bank_name', 'account_number', 'routing_aba', 'notes'], mainland_agent: ['account_name', 'bank_name', 'branch', 'account_number', 'notes'] },
@@ -14,7 +14,7 @@ vi.mock('@/core/affiliate/admin/summary', () => ({ findUser: spies.findUser }))
 vi.mock('@/core/affiliate/admin/create-account', () => ({ phoneUser: spies.phone, EnrollmentError: class EnrollmentError extends Error {} }))
 vi.mock('@/core/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn() } }))
 
-const { createOrg, grantOrg, moneyToMinor, orgFailure, runOrgAction, saveOrg, savePackage, savePaymentAccount, saveSignupBonus } = await import('./commands')
+const { addOrgMember, createOrg, grantOrg, moneyToMinor, orgFailure, runOrgAction, saveOrg, savePackage, savePaymentAccount, saveSignupBonus } = await import('./commands')
 const { AppError } = await import('@/core/errors')
 
 const db = {} as never
@@ -221,5 +221,29 @@ describe('saveSignupBonus', () => {
     spies.bonus.mockRejectedValue(new AppError('CONFLICT', 'ORG_CHANGED'))
     const result = await runOrgAction(() => saveSignupBonus(deps, bonus('500')))
     expect(result).toMatchObject({ ok: false, message: expect.stringContaining('被别人改过') })
+  })
+})
+
+describe('addOrgMember', () => {
+  const USER = '33333333-3333-4333-8333-333333333333'
+  it('adds an existing account by id and says whether it joined', async () => {
+    spies.addMember.mockResolvedValueOnce({ applied: true }).mockResolvedValueOnce({ applied: false })
+    expect(await addOrgMember(deps, { orgId: ORG, userId: USER })).toMatchObject({ ok: true, value: { applied: true } })
+    expect(spies.addMember).toHaveBeenCalledWith(db, deps.actor, ORG, USER)
+    expect(await addOrgMember(deps, { orgId: ORG, userId: USER })).toMatchObject({ ok: true, value: { applied: false } })
+  })
+  it('refuses anything that is not two ids before calling the database', async () => {
+    for (const bad of [{}, { orgId: ORG }, { orgId: ORG, userId: 'a@b.co' }, { orgId: 'x', userId: USER }]) {
+      expect(await runOrgAction(() => addOrgMember(deps, bad))).toMatchObject({ ok: false })
+    }
+    expect(spies.addMember).not.toHaveBeenCalled()
+  })
+  it.each([
+    ['ORG_MEMBER_EXISTS', 'FORBIDDEN'], ['ORG_SUSPENDED', 'FORBIDDEN'], ['USER_BANNED', 'FORBIDDEN'], ['ORG_PERSONAL_AFFILIATE', 'CONFLICT'],
+  ])('shows a specific message for %s', async (reason, code) => {
+    spies.addMember.mockRejectedValue(new AppError(code as never, reason))
+    const result = await runOrgAction(() => addOrgMember(deps, { orgId: ORG, userId: USER }))
+    expect(result.ok).toBe(false)
+    expect(result.message).not.toMatch(/失败|没有权限/)
   })
 })

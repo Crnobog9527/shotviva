@@ -9,6 +9,7 @@ export {
   type PoolMove,
 } from './actions'
 export {
+  adminAddOrgMember,
   adminCreateOrg,
   adminGrantOrg,
   adminSaveOrgPackage,

@@ -8586,6 +8586,47 @@ $$;
 ALTER FUNCTION "public"."admin_openai_admin_key_status"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_org_id uuid;
+  v_user uuid;
+  o public.orgs;
+  v_banned timestamptz;
+  v_current uuid;
+begin
+  perform public._org_require_admin(p_actor);
+  if p_input is null or jsonb_typeof(p_input) <> 'object'
+     or coalesce(p_input->>'org_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     or coalesce(p_input->>'user_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    raise exception 'INVALID_INPUT';
+  end if;
+  v_org_id := (p_input->>'org_id')::uuid;
+  v_user := (p_input->>'user_id')::uuid;
+  select * into o from public.orgs where id = v_org_id for no key update;
+  if not found then raise exception 'ORG_NOT_FOUND'; end if;
+  if o.status <> 'active' then raise exception 'ORG_SUSPENDED'; end if;
+  select banned_at into v_banned from public.profiles where id = v_user for no key update;
+  if not found then raise exception 'PROFILE_NOT_FOUND'; end if;
+  if v_banned is not null then raise exception 'USER_BANNED'; end if;
+  select org_id into v_current from public.org_members where user_id = v_user and status = 'active';
+  if v_current = o.id then return jsonb_build_object('applied', false); end if;
+  if v_current is not null then raise exception 'ORG_MEMBER_EXISTS'; end if;
+  if public._affiliate_personal_open(v_user) then raise exception 'ORG_PERSONAL_AFFILIATE'; end if;
+  insert into public.org_members(org_id, user_id, role) values (o.id, v_user, 'member')
+    on conflict (org_id, user_id) do update set status = 'active', removed_at = null, joined_at = now(),
+      monthly_allowance = 0, held_credits = 0;
+  perform public._org_audit(p_actor, 'org_add_member', o.id::text, 'member:' || v_user::text);
+  return jsonb_build_object('applied', true);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_org_create"("p_actor" "uuid", "p_input" "jsonb") RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -17935,7 +17976,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -23903,6 +23944,11 @@ GRANT ALL ON FUNCTION "public"."admin_open_prompt_lab"("p_actor" "uuid", "p_asse
 
 REVOKE ALL ON FUNCTION "public"."admin_openai_admin_key_status"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_openai_admin_key_status"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
 
 

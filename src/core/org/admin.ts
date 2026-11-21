@@ -90,3 +90,10 @@ export async function adminGrantOrg(client: RpcClient, actor: string, input: z.i
 export async function adminSaveOrgPackage(client: RpcClient, actor: string, input: z.input<typeof orgPackageSchema>): Promise<string> {
   return callRpc(client, 'admin_org_package_save', { p_actor: uuid.parse(actor), p_input: orgPackageSchema.parse(input) }, uuid)
 }
+
+// Adds an existing registered account to the org without its invite link (1800). Same rules as
+// joining by the link; `applied` is false when the account was already an active member.
+export async function adminAddOrgMember(client: RpcClient, actor: string, orgId: string, userId: string): Promise<{ applied: boolean }> {
+  const args = { p_actor: uuid.parse(actor), p_input: { org_id: uuid.parse(orgId), user_id: uuid.parse(userId) } }
+  return callRpc(client, 'admin_org_add_member', args, z.object({ applied: z.boolean() }))
+}

@@ -3,12 +3,12 @@ import type { Metadata } from 'next'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AdminPage } from '@/core/admin'
-import { listOrgs, listPackages, listPaymentAccounts, ORGS_COPY as COPY } from '@/core/admin/orgs'
+import { listOrgs, listPackages, listPaymentAccounts, loadPickerUser, ORGS_COPY as COPY } from '@/core/admin/orgs'
 import { CreateOrgForm, OrgTable, PackageEditor, PaymentAccounts } from '@/core/admin/orgs-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { cn } from '@/core/ui/cn'
 
-import { createOrgAction, savePackageAction, savePaymentAccountAction } from './actions'
+import { createOrgAction, savePackageAction, savePaymentAccountAction, searchUsersAction } from './actions'
 
 export const instant = false
 export const metadata: Metadata = { title: COPY.title }
@@ -20,12 +20,14 @@ const TABS = [
   { key: 'payment', href: '/admin/orgs?tab=payment', label: COPY.tabPayment },
 ] as const
 
-async function TabBody({ tab, db }: { tab: string; db: SupabaseClient }) {
+async function TabBody({ tab, db, owner }: { tab: string; db: SupabaseClient; owner: string | undefined }) {
   if (tab === 'payment') return <PaymentAccounts accounts={await listPaymentAccounts(db)} save={savePaymentAccountAction} />
   if (tab === 'packages') return <PackageEditor packages={await listPackages(db)} save={savePackageAction} />
+  // ?owner=<user id>: opened from a user's dossier with that account filled in as the owner.
+  const initialOwner = owner ? await loadPickerUser(db, owner) : null
   return (
     <>
-      <CreateOrgForm create={createOrgAction} />
+      <CreateOrgForm key={initialOwner?.id ?? 'new'} create={createOrgAction} search={searchUsersAction} initialOwner={initialOwner} ownerMissing={Boolean(owner) && !initialOwner} />
       <OrgTable orgs={await listOrgs(db)} />
     </>
   )
@@ -34,7 +36,7 @@ async function TabBody({ tab, db }: { tab: string; db: SupabaseClient }) {
 // 企业客户 (ARCHITECTURE §6.5, card E3): the list and creation, the 「套餐」tab and the 「收款账户」tab.
 export default async function OrgsPage({ searchParams }: PageProps<'/[locale]/admin/orgs'>) {
   await requireAdmin()
-  const { tab } = await searchParams
+  const { tab, owner } = await searchParams
   const current = TABS.find((t) => t.key === tab)?.key ?? 'orgs'
   return (
     <AdminPage title={COPY.title}>
@@ -43,7 +45,7 @@ export default async function OrgsPage({ searchParams }: PageProps<'/[locale]/ad
           <Link key={t.key} href={t.href} aria-current={t.key === current ? 'page' : undefined} className={cn(TAB, t.key === current ? 'bg-accent' : 'text-muted-foreground')}>{t.label}</Link>
         ))}
       </nav>
-      <TabBody tab={current} db={createAdminSupabase()} />
+      <TabBody tab={current} db={createAdminSupabase()} owner={typeof owner === 'string' ? owner : undefined} />
     </AdminPage>
   )
 }
