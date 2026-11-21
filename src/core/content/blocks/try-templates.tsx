@@ -1,9 +1,10 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 
 import { Link } from '../../i18n/ui'
+import { fillCovers } from './cover-fills'
 import { PhotoPair } from './photo-pair'
 import { phoneSlot } from './phone-sizes'
 
@@ -39,10 +40,14 @@ export function TryTemplates({ templates }: { templates: readonly TryTemplate[] 
   const t = useTranslations('notFound')
   const home = useTranslations('marketing.home')
   const picked = pickThree(templates, useSeed())
+  const section = useRef<HTMLElement>(null)
+  const shown = picked.map((card) => card.id).join(' ')
+  // The cards' blurred fills, painted from their pictures (cover-fill.tsx), again after the shuffle.
+  useEffect(() => (section.current && shown ? fillCovers(section.current) : undefined), [shown])
   // No featured template with covers yet: the 404 keeps just its message and the way home.
   if (picked.length === 0) return null
   return (
-    <section className="mt-12" aria-labelledby="try-h">
+    <section ref={section} className="mt-12" aria-labelledby="try-h">
       <h2 id="try-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">
         {t('tryTitle')}
       </h2>

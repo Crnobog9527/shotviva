@@ -1,25 +1,40 @@
 'use client'
 
+import { useLocale } from 'next-intl'
 import { useEffect } from 'react'
 
 import { useRouter } from '../../i18n/navigation'
-import { buildLayers, PAIRS_ATTR } from './series-layers'
+import { buildLayers, MORE_ATTR } from './series-layers'
+import { seriesLayers } from './series-layers-source'
 import { cycler, HOVER_DELAY_MS, HOVER_HOLD_MS, VIEW_HOLD_MS, type Cycler } from './series-motion'
 
 // Wires every series card on the page once (one effect, no per-card React state): with a fine
 // pointer a card plays while the pointer rests on it or it has keyboard focus; on a touch screen
 // it plays on its own while most of it is in view. Static under prefers-reduced-motion, and
 // before hydration (the server draws the first pair).
-function wire(frame: HTMLElement, touch: boolean, observer: IntersectionObserver | null, cards: Map<Element, Cycler>) {
+function wire(frame: HTMLElement, locale: string, touch: boolean, observer: IntersectionObserver | null, cards: Map<Element, Cycler>) {
   const card = frame.closest('.mk-series') ?? frame
   const cycle = cycler(frame)
-  // The later pairs become layers the first time the card plays, not before (series-layers.ts).
+  const key = frame.getAttribute(MORE_ATTR) ?? ''
+  // The later pairs become layers the first time the card plays, not before (series-layers.ts):
+  // their addresses arrive with the first play, so the card starts once they are in, unless the
+  // pointer has left (or the card scrolled away) meanwhile.
+  let wanted = false
   const run: Cycler = {
     start(delay, hold) {
-      buildLayers(frame)
-      cycle.start(delay, hold)
+      wanted = true
+      seriesLayers(locale).then(
+        (layers) => {
+          buildLayers(frame, layers.get(key) ?? [])
+          if (wanted) cycle.start(delay, hold)
+        },
+        () => undefined,
+      )
     },
-    stop: () => cycle.stop(),
+    stop() {
+      wanted = false
+      cycle.stop()
+    },
   }
   cards.set(frame, run)
   if (touch) {
@@ -59,9 +74,10 @@ function useOpenSeries() {
 
 export function SeriesMotion() {
   useOpenSeries()
+  const locale = useLocale()
   useEffect(() => {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const frames = [...document.querySelectorAll<HTMLElement>(`[${PAIRS_ATTR}]`)]
+    const frames = [...document.querySelectorAll<HTMLElement>(`[${MORE_ATTR}]`)]
     if (!frames.length) return
     const touch = !matchMedia('(hover: hover) and (pointer: fine)').matches
     const cards = new Map<Element, Cycler>()
@@ -77,12 +93,12 @@ export function SeriesMotion() {
           { threshold: 0.6 },
         )
       : null
-    const unwire = frames.map((frame) => wire(frame, touch, observer, cards))
+    const unwire = frames.map((frame) => wire(frame, locale, touch, observer, cards))
     return () => {
       observer?.disconnect()
       for (const off of unwire) off()
       for (const run of cards.values()) run.stop()
     }
-  }, [])
+  }, [locale])
   return null
 }
