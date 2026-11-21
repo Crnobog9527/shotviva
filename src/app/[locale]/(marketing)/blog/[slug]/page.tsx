@@ -2,11 +2,12 @@ import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 
-import { SLUG_PATTERN, articleLd, cachedPublishedPost, cachedPublishedPosts, postCrumbs, postMetadata } from '@/core/blog'
+import { SLUG_PATTERN, articleLd, authorByName, cachedPublishedPost, cachedPublishedPosts, postCrumbs, postMetadata } from '@/core/blog'
 import { ArticleView } from '@/core/blog/ui'
 import { isLocale, type Locale } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, breadcrumbListLd } from '@/core/seo'
+import { BLOG_AUTHORS } from '@/site/content/blog-authors'
 import { site } from '@/site/site.config'
 
 // One blog post (ARCHITECTURE §12.6). Posts published after the build render on their first
@@ -35,7 +36,7 @@ async function load(params: Promise<{ slug: string }>) {
 
 export async function generateMetadata({ params }: PageProps<'/[locale]/blog/[slug]'>): Promise<Metadata> {
   const { post, otherExists } = await load(params)
-  return postMetadata(site, post, otherExists)
+  return postMetadata(site, post, otherExists, BLOG_AUTHORS)
 }
 
 export default async function BlogPostRoute({ params }: PageProps<'/[locale]/blog/[slug]'>) {
@@ -44,8 +45,12 @@ export default async function BlogPostRoute({ params }: PageProps<'/[locale]/blo
   const labels = { home: t('home'), blog: t('crumb') }
   return (
     <>
-      <JsonLdScript data={[articleLd(site, post), breadcrumbListLd(site, postCrumbs(post, labels))]} />
-      <ArticleView post={post} text={{ ...labels, by: t('by'), published: t('published'), updated: t('updated'), contents: t('contents') }} />
+      <JsonLdScript data={[articleLd(site, post, BLOG_AUTHORS), breadcrumbListLd(site, postCrumbs(post, labels))]} />
+      <ArticleView
+        post={post}
+        author={authorByName(BLOG_AUTHORS, post.authorName)}
+        text={{ ...labels, by: t('by'), published: t('published'), updated: t('updated'), contents: t('contents'), aboutAuthor: t('aboutAuthor') }}
+      />
     </>
   )
 }
