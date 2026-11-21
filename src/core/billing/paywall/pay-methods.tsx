@@ -20,7 +20,7 @@ export function PayMethods({ method, onChange, kind, period, cents = null, disab
   const wechatPay = useWechatPay()
   const methods = offeredMethods(channel, useLocale())
   const label = (m: CheckoutMethod) => {
-    const msg = methodLabel(channel, m, wechatPay)
+    const msg = methodLabel(channel, m, wechatPay, kind === "pack")
     return t(msg.key, msg.values)
   }
   const note = (m: CheckoutMethod) => {

@@ -4,7 +4,7 @@ import { type SiteProduct } from '../../config'
 import { productIdSchema } from '../../config/product-id'
 import { AppError } from '../../errors'
 import type { CheckoutPrice } from '../checkout-price'
-import type { CheckoutMethod } from '../stripe/catalog'
+import type { RecordedMethod } from '../stripe/catalog'
 
 // What a signed order.completed says was bought and paid (docs.waffo.ai "Webhooks", data
 // fields). Who and what come from the order metadata our checkout set with the API key; the
@@ -53,7 +53,7 @@ export type WaffoPaymentFacts = {
   amountTotal: number
   amountTax: number
   currency: string
-  method: CheckoutMethod
+  method: RecordedMethod
   // Before tax, for the PostHog purchase event (same basis as Stripe's).
   subtotalUsd: number
 }
@@ -70,10 +70,16 @@ export function toCents(amount: string): number {
   return Number(whole) * 100 + Number(fraction.padEnd(2, '0'))
 }
 
-// The method Waffo actually charged, not the one picked on the paywall.
-export function chargedMethod(order: Pick<WaffoOrder, 'paymentMethod' | 'paymentMethodBrand'>): CheckoutMethod {
-  const brand = `${order.paymentMethod ?? ''} ${order.paymentMethodBrand ?? ''}`.toLowerCase()
-  return brand.includes('alipay') ? 'alipay' : 'card'
+// The method Waffo actually charged, not the one picked on the paywall (docs.waffo.ai "Webhooks":
+// `paymentMethod` "card" | "ewallet" ..., `paymentMethodBrand` an open string such as "wechatpay",
+// "alipay", "alipayhk", "visa"). WeChat Pay and Alipay are told apart by the brand, since both
+// arrive as an ewallet; cards, Apple Pay and Google Pay all record as card. This is the field the
+// processing fee is worked out from (card 3.9% + $0.50, wallets 3.9%), so it never touches amounts.
+export function chargedMethod(order: Pick<WaffoOrder, 'paymentMethod' | 'paymentMethodBrand'>): RecordedMethod {
+  const seen = `${order.paymentMethod ?? ''} ${order.paymentMethodBrand ?? ''}`.toLowerCase().replace(/[\s_-]/g, '')
+  if (seen.includes('wechat') || seen.includes('weixin')) return 'wechat_pay'
+  if (seen.includes('alipay')) return 'alipay'
+  return 'card'
 }
 
 const legacyAnnualCents: Partial<Record<SiteProduct['id'], number>> = { starter_yearly: 19100, pro_yearly: 47900, max_yearly: 71300 }
