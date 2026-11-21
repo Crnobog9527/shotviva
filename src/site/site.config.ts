@@ -48,6 +48,7 @@ export const site = defineSite({
       '/partners',
       '/partners/apply',
       '/partners/join',
+      '/partners/enterprise',
       '/partners/terms',
       '/signup',
       '/login',

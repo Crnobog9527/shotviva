@@ -57,6 +57,10 @@ const payout = z.object({
   paid_reference: z.string().nullable(),
   note: z.string().nullable(),
   paid_method: z.string().nullable(),
+  // Enterprise statements (org account) are marked paid with the CNY rate and amount (§6.5).
+  account: z.object({ org_id: z.uuid().nullable() }).nullable(),
+  paid_fx_cny_per_usd: z.number().nullable(),
+  paid_amount_cny_fen: z.number().int().safe().nullable(),
   owner: z.object({ risks: z.array(z.object({ id, flags: z.array(z.string()) })) }).optional(),
 })
 export type Commission = z.infer<typeof commission>
@@ -91,7 +95,7 @@ export async function commissions(db: SupabaseClient, f: Filters) {
 }
 export async function payouts(db: SupabaseClient, f: Filters, includeFlags = false) {
   const cols = 'id,created_at,affiliate_user_id,period,amount,legacy_review_required,payable:affiliate_payout_payable,fees:affiliate_payout_fees,paid_amount,status,payout_snapshot,paid_at,paid_reference,note'
-  const fields = cols + ',paid_method' + (includeFlags ? ',owner:affiliates(risks:affiliate_commissions(id,flags))' : '')
+  const fields = cols + ',paid_method,paid_fx_cny_per_usd,paid_amount_cny_fen,account:affiliates(org_id)' + (includeFlags ? ',owner:affiliates(risks:affiliate_commissions(id,flags))' : '')
   let q = withFilters(pageQuery(db, 'affiliate_payouts', fields, f.cursor), f)
   if (includeFlags)
     q = q

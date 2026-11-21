@@ -41,6 +41,7 @@ export async function PartnerScreen({ search }: { search: Promise<SearchParams> 
   const [user, t, raw] = await Promise.all([getSessionUser(), getTranslations('affiliate'), search])
   const query = searchSchema.parse(raw)
   const account = user?.verified ? await readAccount(user.id) : null
+  if (account?.org_id) redirect(await localized('/partners/enterprise'))
   if (!user?.verified || account?.status !== 'active') redirect(await localized('/partners/join'))
   return (
     <div className="af-dash">
