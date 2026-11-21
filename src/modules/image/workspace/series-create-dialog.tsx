@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
-import { limitsFor } from '@/core/billing/tier-limits'
+import { batchMaxFor } from '@/core/billing/tier-limits'
 import { useRouter } from '@/core/i18n'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
@@ -73,7 +73,7 @@ function SeriesForm({ series, open, onClose, forms, ...context }: BodyProps & { 
   }
   // 用上一期 reads any style of the series (§5.3「每周复用」).
   const weekly = useFormWeekly(template, draft, series.members.map((member) => member.id))
-  const batch = limitsFor(context.tier).batchMax > 1 && template.photoInput !== 'none' && !isSlotTemplate(template) && draft.photos.photos.length === 0
+  const batch = batchMaxFor(context.tier, context.batch) > 1 && template.photoInput !== 'none' && !isSlotTemplate(template) && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
   const workspace = `/generate/${template.id}`
   // Generate moves to the chosen member's workspace page, kept prefetched while the dialog is open.

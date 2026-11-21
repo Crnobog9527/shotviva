@@ -59,6 +59,18 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   PRICE_UNSET: 'NOT_FOUND',
   // The vessel library (1563): an admin edit or delete of a vessel that is gone.
   DISHWARE_NOT_FOUND: 'NOT_FOUND',
+  // Enterprise orgs (1626–1628, ARCHITECTURE §6.5). The message keeps the exact reason.
+  NOT_ORG_OWNER: 'FORBIDDEN',
+  ORG_SUSPENDED: 'FORBIDDEN',
+  ORG_OWNER_CANNOT_LEAVE: 'FORBIDDEN',
+  ORG_NOT_FOUND: 'NOT_FOUND',
+  ORG_PACKAGE_NOT_FOUND: 'NOT_FOUND',
+  ORG_MEMBER_NOT_FOUND: 'NOT_FOUND',
+  ORG_INVITE_INVALID: 'NOT_FOUND',
+  ORG_MEMBER_EXISTS: 'CONFLICT',
+  ORG_CHANGED: 'CONFLICT',
+  ORG_POOL_INSUFFICIENT: 'CONFLICT',
+  ORG_LIMIT_ABOVE_CAP: 'INVALID_INPUT',
 }
 
 export function toRpcError(fn: string, error: { message: string; code?: string }): AppError {

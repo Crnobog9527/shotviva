@@ -10,13 +10,19 @@ export { readBalance } from './balance'
 export { callRpc, toRpcError, type RpcClient, type RpcResult } from './rpc'
 export {
   BASE_SUPPORT_REPLY_HOURS,
+  BATCH_SIZE_CEILING,
   MAX_BATCH_SIZE,
   TIER_LIMITS,
+  batchLimitsOf,
   batchUpgrade,
   currentTier,
+  effectiveLimits,
   effectiveTier,
+  featureTierOf,
   limitsFor,
   tierForBatch,
+  type BatchLimits,
+  type EffectiveLimits,
   type TierLimits,
 } from './tier'
 export { paymentCodeEffects } from './payment-code-effects'

@@ -29,7 +29,7 @@ export function BatchDialogSlot({ templates, browse, create }: Props) {
   const [mounted, setMounted] = useState(query.open)
   if (query.open && !mounted) setMounted(true)
   if (!mounted) return null
-  if (!batchCaps(create.tier)) {
+  if (!batchCaps(create.tier, create.batch)) {
     return <FeatureGuide tab="batch" tier={create.tier} upgrade="pro" open={query.open} onOpenChange={(open) => !open && closeBatch()} />
   }
   return (
@@ -41,6 +41,7 @@ export function BatchDialogSlot({ templates, browse, create }: Props) {
       browse={browse}
       balance={create.balance}
       tier={create.tier}
+      batch={create.batch}
       limit={create.concurrency.limit}
     />
   )

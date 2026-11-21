@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { effectiveTier, MAX_BATCH_SIZE, readBalance } from '../../billing'
+import { MAX_BATCH_SIZE, readBalance } from '../../billing'
+import { accountLimits } from '../account-limits'
 import { AppError } from '../../errors'
 import { isOwnInputKey } from '../../storage'
 import { allowedWebAspects, assertPricedTier, hasSlots, assertTemplateQuote, loadGenerationTemplate, validateGenerationInputs, type Template } from '../../templates'
@@ -48,7 +49,7 @@ function quote(userId: string, selected: Selected, template: Template, position:
 
 export async function preflightBatch(db: SupabaseClient, userId: string, cells: Selected[], provider: TemplateProvider) {
   const ids = [...new Set(cells.map(c => c.template_id))]
-  assertBatchAllowed(await effectiveTier(db, userId), cells.length, ids.length)
+  assertBatchAllowed(await accountLimits(db, userId), cells.length, ids.length)
   checkGrid(userId, cells)
   const batch = { batch_id: randomUUID(), batch_size: cells.length, batch_templates: ids.length }
   const selections = cells.map((selected, i) => ({ selected, position: i + 1 }))

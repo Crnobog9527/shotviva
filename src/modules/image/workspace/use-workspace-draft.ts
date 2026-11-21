@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 
 import type { Balance } from '@/core/billing/pools'
-import { limitsFor } from '@/core/billing/tier-limits'
+import { batchMaxFor, type BatchLimits } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 
 import type { AgainStart } from '../again/again-start'
@@ -27,6 +27,9 @@ export type DraftInput = {
   balance: Balance
   // effective_tier() from the server (an unbanned admin counts as Max): decides batchMax (TIER_LIMITS); null is Starter.
   tier: MembershipTier | null
+  // From the server: effective_limits()' batch part (an org can lift a member past their tier,
+  // ARCHITECTURE §6.5). Absent: the tier table decides.
+  batch?: BatchLimits | null
   // From the server: the account's concurrency (TIER_LIMITS) and the jobs running at render
   // time, so photos started in another tab count too.
   concurrency: { limit: number; runningIds: string[] }
@@ -44,8 +47,8 @@ const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', c
 // dialog Create opens and the workspace page. Photos upload as they are picked; start() queues
 // one job per ready photo in the generation store and makes them this template's workspace
 // jobs, so the workspace page shows them developing (and after a refresh).
-export function useWorkspaceDraft({ template, balance, tier, concurrency, again = null, single = false }: DraftInput) {
-  const { photos, slots, slotted } = useDraftPhotos(template, tier, single, again)
+export function useWorkspaceDraft({ template, balance, tier, batch, concurrency, again = null, single = false }: DraftInput) {
+  const { photos, slots, slotted } = useDraftPhotos(template, batchMaxFor(tier, batch), single, again)
   const { options, values, change } = useOutputValues(template, again)
   useAgainOpensForm(template.id, again?.jobId)
   const running = useRunningCount(concurrency.runningIds)
@@ -138,8 +141,8 @@ function useOutputValues(template: CatalogueTemplate, again: AgainStart | null) 
   return { options, values, change }
 }
 
-const draftBatchMax = (template: CatalogueTemplate, tier: MembershipTier | null, single: boolean) =>
-  template.photoInput === 'none' ? 0 : single ? 1 : limitsFor(tier).batchMax
+const draftBatchMax = (template: CatalogueTemplate, batchMax: number, single: boolean) =>
+  template.photoInput === 'none' ? 0 : single ? 1 : batchMax
 
 function draftPhotoStatus(template: CatalogueTemplate, photos: PhotoBatch, again: AgainStart | null) {
   if (allowsNoPhoto(template) && photos.photos.length === 0 && !again?.missing) return 'ready'
@@ -147,10 +150,10 @@ function draftPhotoStatus(template: CatalogueTemplate, photos: PhotoBatch, again
 }
 
 // A slot template (§5.1e) takes its images by slot, one job at a time; the photo list stays empty.
-function useDraftPhotos(template: CatalogueTemplate, tier: MembershipTier | null, single: boolean, again: AgainStart | null) {
+function useDraftPhotos(template: CatalogueTemplate, batchMax: number, single: boolean, again: AgainStart | null) {
   const slotted = isSlotTemplate(template)
   const kept = again ? { photos: again.photos, madeAt: again.madeAt } : undefined
-  const photos = usePhotoBatch(slotted ? 0 : draftBatchMax(template, tier, single), slotted ? undefined : kept)
+  const photos = usePhotoBatch(slotted ? 0 : draftBatchMax(template, batchMax, single), slotted ? undefined : kept)
   const slots = useSlotPhotos(slotsOfTemplate(template), slotted ? kept : undefined)
   return { photos, slots, slotted }
 }

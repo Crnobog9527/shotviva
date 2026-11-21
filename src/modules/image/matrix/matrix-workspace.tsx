@@ -1,6 +1,7 @@
 'use client'
 
 import type { Balance } from '@/core/billing/pools'
+import type { BatchLimits } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 import { useReveal } from '@/core/ui/reveal'
 
@@ -19,6 +20,8 @@ export type MatrixWorkspaceProps = {
   initial: string[]
   balance: Balance
   tier: MembershipTier | null
+  // effective_limits()' batch part from the server (an org can lift past the tier).
+  batch?: BatchLimits | null
   limit: number
 }
 
@@ -28,7 +31,7 @@ export type MatrixWorkspaceProps = {
 // Below Pro the page shows what it does and the plan that unlocks it. After Generate: the
 // batch's results, by template or by photo, and its ZIP.
 export function MatrixWorkspace(props: MatrixWorkspaceProps) {
-  const caps = batchCaps(props.tier)
+  const caps = batchCaps(props.tier, props.batch)
   if (!caps) return <MatrixLocked tier={props.tier} />
   return <BatchForm {...props} caps={caps} />
 }

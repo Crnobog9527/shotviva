@@ -5,6 +5,7 @@ import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useEffect, useEffectEvent, useRef, type ReactNode, type RefObject } from 'react'
 
 import type { Balance } from '@/core/billing/pools'
+import type { BatchLimits } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 import { cn } from '@/core/ui/cn'
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle } from '@/core/ui/drawer'
@@ -31,6 +32,8 @@ export type BatchDialogProps = {
   browse: PickerBrowse | null
   balance: Balance
   tier: MembershipTier | null
+  // effective_limits()' batch part from the server (an org can lift past the tier).
+  batch?: BatchLimits | null
   limit: number
 }
 
@@ -40,7 +43,7 @@ export type BatchDialogProps = {
 // It stays mounted once opened, so closing keeps the draft (photos included) for the next opening
 // on this page; the batch's jobs live in the generation store either way.
 export function BatchDialog(props: BatchDialogProps) {
-  const caps = batchCaps(props.tier)
+  const caps = batchCaps(props.tier, props.batch)
   return caps ? <BatchDialogBody {...props} caps={caps} /> : null
 }
 

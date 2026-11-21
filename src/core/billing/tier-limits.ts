@@ -26,8 +26,36 @@ export const TIER_LIMITS = {
 
 export const limitsFor = (tier: MembershipTier | null): TierLimits => TIER_LIMITS[tier ?? 'starter']
 
-// The largest batch any tier allows: the request schema's upper bound.
-export const MAX_BATCH_SIZE = Math.max(...MEMBERSHIP_TIERS.map((tier) => TIER_LIMITS[tier].batchMax))
+// The request schema's upper bound on photos in one batch. It is no longer the largest tier
+// batch: an org can lift a member past Max (ARCHITECTURE §6.5), up to the site-wide hard cap
+// system_settings.org_limit_caps.batch_max, which effective_limits() keeps under this same
+// ceiling. The account's real limit is EffectiveLimits.batchMax, checked by assertBatchAllowed.
+export const BATCH_SIZE_CEILING = 200
+export const MAX_BATCH_SIZE = BATCH_SIZE_CEILING
+
+// What effective_limits() returns (ARCHITECTURE §6.5): the account's tier limits, each item
+// lifted to its org's value when it is an active member of an active org. multiTemplateMax is the
+// most templates one batch may hold (1: no multi-template batches); batchZip is the batch ZIP
+// download; earlyFeatures opens tier-gated features as on Max. No server-only import: the
+// workspace receives these from its server page.
+export type EffectiveLimits = TierLimits & {
+  tier: MembershipTier | null
+  multiTemplateMax: number
+  batchZip: boolean
+  earlyFeatures: boolean
+  orgId: string | null
+}
+
+// The batch part the workspace and the batch dialog need from EffectiveLimits.
+export type BatchLimits = Pick<EffectiveLimits, 'batchMax' | 'multiTemplateMax'>
+
+// The batch part alone, for a server page to hand the client (nothing else of the account's).
+export const batchLimitsOf = ({ batchMax, multiTemplateMax }: BatchLimits): BatchLimits => ({ batchMax, multiTemplateMax })
+
+// Photos one batch may hold: the server's effective limits when the page passed them (an org
+// can lift a member past their tier), else the tier table.
+export const batchMaxFor = (tier: MembershipTier | null, batch?: BatchLimits | null): number =>
+  batch?.batchMax ?? limitsFor(tier).batchMax
 
 // The lowest tier whose batch holds `size` photos, for TIER_REQUIRED and the paywall preselect;
 // null when no tier does.

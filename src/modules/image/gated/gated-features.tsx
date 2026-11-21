@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 
+import type { BatchLimits } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 
 import { preloadBatchDialog } from '../matrix/batch-dialog-slot'
@@ -23,7 +24,7 @@ const ENTRY = "text-left after:absolute after:inset-0 after:rounded-tile after:c
 // both plans with what each brings, lit or locked for this account. With Pro or Max it opens the
 // dialog; below Pro it opens the intro first, then the paywall on Pro. "See how it works" is a
 // labelled button on the card, for everyone, and only plays the demo.
-export function GatedFeatures({ tier }: { tier: MembershipTier | null }) {
+export function GatedFeatures({ tier, batch }: { tier: MembershipTier | null; batch?: BatchLimits | null }) {
   const t = useTranslations('app.gated')
   return (
     <section aria-label={t('heading')} className="pt-2">
@@ -31,7 +32,7 @@ export function GatedFeatures({ tier }: { tier: MembershipTier | null }) {
         <CardIcon />
         <div className="min-w-0 flex-1 md:flex md:items-center md:gap-4">
           <div className="min-w-0 md:flex-1">
-            <Entry tier={tier} />
+            <Entry tier={tier} batch={batch} />
             <span className="mt-1 block text-caption leading-[1.35] text-pretty text-muted-foreground">{t('create.line')}</span>
           </div>
           <PlanMarks tier={tier} />
@@ -42,10 +43,10 @@ export function GatedFeatures({ tier }: { tier: MembershipTier | null }) {
   )
 }
 
-function Entry({ tier }: { tier: MembershipTier | null }) {
+function Entry({ tier, batch }: { tier: MembershipTier | null; batch?: BatchLimits | null }) {
   const t = useTranslations('app.gated.create')
   const title = <b className="block text-body leading-[1.25] font-semibold">{t('title')}</b>
-  if (batchCaps(tier)) {
+  if (batchCaps(tier, batch)) {
     return (
       <button type="button" data-batch-entry onClick={() => openBatch()} onPointerEnter={preloadBatchDialog} onFocus={preloadBatchDialog} className={ENTRY}>
         {title}
