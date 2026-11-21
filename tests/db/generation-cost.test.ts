@@ -85,7 +85,8 @@ async function costRow(jobId: string) {
   return row ? { ...row, cost_usd: row.cost_usd === null ? null : Number(row.cost_usd) } : null
 }
 
-// What the pipeline did after the credits were reserved.
+// What the pipeline did after the credits were reserved: settling the job, then giving its lane
+// slot back (queue-fairness Q3).
 const afterReserve = (log: string[]) => log.slice(log.indexOf('rpc:reserve_credits') + 1)
 
 describe('settlement records usage and cost (T33)', () => {
@@ -93,7 +94,7 @@ describe('settlement records usage and cost (T33)', () => {
     const { deps, request, log, args } = await setup('ok')
     const view = await runGeneration(deps, request)
     expect(await costRow(view.id)).toEqual({ status: 'succeeded', provider_usage: USAGE, cost_usd: COST })
-    expect(afterReserve(log)).toEqual(['rpc:confirm_job'])
+    expect(afterReserve(log)).toEqual(['rpc:confirm_job', 'rpc:release_generation_slot'])
     expect(args[log.indexOf('rpc:confirm_job')]).toMatchObject({ p_provider_usage: USAGE, p_cost_usd: COST })
   })
 
@@ -114,7 +115,7 @@ describe('settlement records usage and cost (T33)', () => {
     const failure = (await runGeneration(deps, request).catch((e: unknown) => e)) as GenerationFailure
     expect(failure).toBeInstanceOf(GenerationFailure)
     expect(await costRow(failure.jobId)).toEqual({ status: 'failed', provider_usage: USAGE, cost_usd: COST })
-    expect(afterReserve(log)).toEqual(['rpc:refund_job'])
+    expect(afterReserve(log)).toEqual(['rpc:refund_job', 'rpc:release_generation_slot'])
     expect((await profileOf(db, userId)).credits).toBe(3)
   })
 

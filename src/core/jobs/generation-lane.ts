@@ -40,7 +40,7 @@ export async function acquireSlot(db: RpcClient, slot: { attemptId: string; prov
 // Never throws: a slot that could not be released lapses at its expires_at (slot_ttl_seconds).
 export async function releaseSlot(db: RpcClient, attemptId: string): Promise<void> {
   try {
-    await callRpc(db, 'release_generation_slot', { p_attempt_id: attemptId }, z.unknown())
+    await callRpc(db, 'release_generation_slot', { p_attempt_id: attemptId }, z.boolean())
   } catch (error) {
     logger.warn('generation.lane.release_failed', { attemptId, error })
   }

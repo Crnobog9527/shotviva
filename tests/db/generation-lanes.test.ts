@@ -26,7 +26,7 @@ const SMALL = {
 const grant = z.object({ granted: z.boolean(), reason: z.string().optional() })
 const acquire = (userId: string, kind: 'single' | 'batch' = 'single', attemptId = randomUUID(), lane = 'other') =>
   callRpc(service, 'acquire_generation_slot', { p_attempt_id: attemptId, p_lane: lane, p_user_id: userId, p_kind: kind }, grant)
-const release = (attemptId: string) => callRpc(service, 'release_generation_slot', { p_attempt_id: attemptId }, z.unknown())
+const release = (attemptId: string) => callRpc(service, 'release_generation_slot', { p_attempt_id: attemptId }, z.boolean())
 const setLanes = (value: unknown) =>
   db.query("insert into public.system_settings (key, value) values ('generation_lanes', $1) on conflict (key) do update set value = excluded.value", [JSON.stringify(value)])
 

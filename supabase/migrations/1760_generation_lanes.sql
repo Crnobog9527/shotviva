@@ -163,9 +163,15 @@ begin
 end;
 $$;
 
+-- true when this call released the slot (false: unknown or already released). A value, not void,
+-- so every client reads a JSON answer.
 create function public.release_generation_slot(p_attempt_id uuid)
-returns void language sql security definer set search_path = '' as $$
-  update public.generation_slots set released_at = now() where attempt_id = p_attempt_id and released_at is null;
+returns boolean language sql security definer set search_path = '' as $$
+  with released as (
+    update public.generation_slots set released_at = now() where attempt_id = p_attempt_id and released_at is null
+    returning 1
+  )
+  select exists (select 1 from released);
 $$;
 
 -- The every-minute sweep (/api/cron/generation-sweep): jobs still 'running' p_older_than after
