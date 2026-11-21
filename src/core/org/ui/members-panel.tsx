@@ -133,14 +133,3 @@ export function MembersPanel({ data, actions }: { data: OwnerConsole; actions: O
     </Panel>
   )
 }
-
-// E5 ships the read function behind the monthly table and its CSV; until it is on main this is
-// the marked place for it (card E4: no SQL of its own).
-export function PerformanceSlot() {
-  const t = useTranslations('app.org.performance')
-  return (
-    <Panel title={t('title')} hint={t('hint')}>
-      <p data-slot="org-performance-pending" className="text-label text-muted-foreground">{t('pending')}</p>
-    </Panel>
-  )
-}

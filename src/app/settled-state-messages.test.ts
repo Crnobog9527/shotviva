@@ -32,8 +32,8 @@ describe('settled states (en)', () => {
     expect(edit('failKept')).toBe('Your request is kept. Try again, or change what you asked for.')
     expect(edit('metaFailed', { size: 'Post 4:5', tier: 'Standard', refund: 'refunded', count: 2 })).toBe('Just now · Post 4:5 · Standard · 2 credits refunded · edit')
     expect(edit('metaFailed', { size: 'Post 4:5', tier: 'Standard', refund: 'none', count: 2 })).toBe('Just now · Post 4:5 · Standard · nothing charged · edit')
-    // Spec #156: about 60 seconds, not the comp's 20–40.
-    expect(edit('leave')).toMatch(/about 60 seconds/)
+    // Spec #156, Owner 2026-11-21: about 30 seconds (was 60).
+    expect(edit('leave')).toMatch(/about 30 seconds/)
   })
 
   it('puts the size on Download (photo.html #download)', () => {

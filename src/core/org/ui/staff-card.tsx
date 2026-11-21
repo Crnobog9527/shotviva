@@ -9,7 +9,7 @@ import { localizePath } from '@/core/i18n/paths'
 import type { Locale } from '@/core/i18n/locales'
 import { Button } from '@/core/ui/button'
 
-import type { StaffCard } from '../console/types'
+import type { StaffCard, StaffLevel } from '../console/types'
 import type { StaffActions } from './actions'
 import { Confirm } from './confirm'
 import { Panel, Result, Stat } from './parts'
@@ -17,9 +17,42 @@ import { useConsoleAction } from './use-console-action'
 
 const InviteLink = dynamic(() => import('@/core/account/ui/invite-link').then((m) => m.InviteLink), { ssr: false })
 
+// One level of the member's own customers: how many in all, and this month's new, paying and spend.
+function LevelStats({ title, hint, level, unavailable }: { title: string; hint: string; level: StaffLevel | null; unavailable: string }) {
+  const t = useTranslations('app.org.staff')
+  const format = useFormatter()
+  return (
+    <div className="space-y-2">
+      <div>
+        <p className="font-medium">{title}</p>
+        <p className="text-caption text-muted-foreground">{hint}</p>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <Stat label={t('customers')} value={level ? format.number(level.customers) : '—'} note={level ? t('newThisMonth', { count: level.signups }) : undefined} />
+        <Stat label={t('paying')} value={level ? format.number(level.paying) : '—'} />
+        <Stat label={t('spend')} value={level ? format.number(level.paidCents / 100, { style: 'currency', currency: 'USD' }) : '—'} />
+      </div>
+      {level ? null : <p className="text-caption text-muted-foreground">{unavailable}</p>}
+    </div>
+  )
+}
+
+// Level 1, and level 2 when the org has it, each with this month's numbers.
+function Levels({ data }: { data: StaffCard }) {
+  const t = useTranslations('app.org.staff')
+  const { performance, period } = data
+  return (
+    <div className="space-y-4 border-t border-hairline pt-3">
+      <LevelStats title={t('level1')} hint={t('level1Hint', { month: period })} level={performance?.l1 ?? null} unavailable={t('statsUnavailable')} />
+      {data.withLevel2 ? <LevelStats title={t('level2')} hint={t('level2Hint', { month: period })} level={performance?.l2 ?? null} unavailable={t('statsUnavailable')} /> : null}
+    </div>
+  )
+}
+
 // 「我的企业」 on /account for a member of an org (ARCHITECTURE §6.5, card E4): this month's
-// share, the promo link (the member's own invite link, T94), level-1 customers, and leaving.
-// Spend of those customers and level 2 wait for E5 / E6 read functions, so they are marked slots.
+// share, the promo link (the member's own invite link, T94), their level-1 / level-2 customers with
+// this month's spend (card E5, from the staff variant of org_member_stats: only their own row,
+// never a commission), and leaving.
 export function StaffCardView({ data, actions, loadInvite }: { data: StaffCard; actions: StaffActions; loadInvite: LoadInvites }) {
   const t = useTranslations('app.org.staff')
   const format = useFormatter()
@@ -54,11 +87,7 @@ export function StaffCardView({ data, actions, loadInvite }: { data: StaffCard; 
         )}
         {failed ? <p role="alert" className="text-label text-destructive">{t('linkFailed')}</p> : null}
       </div>
-      <div className="grid grid-cols-2 gap-3 border-t border-hairline pt-3">
-        <Stat label={t('customers')} value={format.number(data.customers)} note={t('customersNote')} />
-        {/* Spend and level 2 come from E5 (monthly report functions) and E6; no SQL of this card's own. */}
-        <Stat label={t('spend')} value="—" note={t('spendPending')} />
-      </div>
+      <Levels data={data} />
       <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-3">
         <Button type="button" size="touch" variant="glass" disabled={pending} onClick={() => setLeaving(true)}>{t('leave')}</Button>
         <Result outcome={outcome} />

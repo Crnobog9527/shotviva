@@ -66,7 +66,7 @@ const heroScenes = [
 export const shoot: ShootDemo = {
   heading: { lead: 'One phone photo → ', emphasis: 'a full shoot' },
   intro: 'Shot on a phone on a kitchen counter. Three deliverables, and the same tote in every one: the weave, the stitching, the chain.',
-  phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: 'As shot on a phone. Window light, a busy counter, keys and a mug in frame.' },
+  phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: 'Real phone photo. Window light, a busy counter, keys and a mug in frame.' },
   arrow: 'Three templates, same tote',
   results: [
     { image: tote.listing, title: 'Marketplace listing', template: 'White Background template' },

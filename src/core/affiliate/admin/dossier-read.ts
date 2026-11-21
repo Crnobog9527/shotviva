@@ -18,6 +18,8 @@ const detail = memberDetail.extend({
   ...directory.shape,
   registered_at: z.string().nullable(), approved_at: z.string().nullable(), approved_by: z.uuid().nullable(),
   admin_note: z.string().nullable(), rates: z.array(rateRow),
+  // Not returned by admin_affiliate_dossier: the org level-2 default, for enterprise accounts only.
+  org_l2_default_bp: z.number().nullable().default(null),
 })
 const audit = z.object({
   id, created_at: z.string(), action: z.string(), user_id: z.uuid(), target_id: z.string(), reason: z.string(),
@@ -63,7 +65,12 @@ export async function dossier(db: SupabaseClient, actor: string, userId: string)
   const result = checked(await db.rpc('admin_affiliate_dossier', { p_actor: actor, p_user: userId }))
   const data = detail.nullable().parse(result)
   if (!data) return null
-  return identify({ ...data, is_org: (await orgAccountIds(db, [data.user_id])).has(data.user_id) })
+  const isOrg = (await orgAccountIds(db, [data.user_id])).has(data.user_id)
+  // An enterprise account's blank level-2 rate means the org default (migration 1681).
+  const orgL2 = isOrg
+    ? z.object({ org_l2_bp: z.number() }).parse(checked(await db.from('affiliate_settings').select('org_l2_bp').single())).org_l2_bp
+    : null
+  return identify({ ...data, is_org: isOrg, org_l2_default_bp: orgL2 })
 }
 export async function dossierAudit(db: SupabaseClient, actor: string, userId: string, cursor?: string) {
   const rows = checked(await db.rpc('admin_affiliate_dossier_log', { p_actor: actor, p_user: userId, ...before(cursor, false) }))

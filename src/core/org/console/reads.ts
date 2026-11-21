@@ -7,8 +7,9 @@ import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 
 import { getOrgPaymentAccounts } from '../payment-accounts'
+import { currentPeriod, readCustomerCounts, readMemberStats } from '../stats'
 
-import type { ConsoleMember, ConsolePackage, OrgView, OwnerConsole, PaymentAccountGroup, StaffCard } from './types'
+import type { ConsoleMember, ConsolePackage, OrgView, OwnerConsole, PaymentAccountGroup, StaffCard, StaffLevel } from './types'
 
 // Read side of the account centre's enterprise block. The org tables have no client grant and the
 // service role may select (same as the admin page); every write goes through core/org. Everything
@@ -47,18 +48,7 @@ function ok<T>(result: { data: T; error: { message: string } | null }, what: str
 // `YYYY-MM-01T00:00:00.000Z` of the month `now` is in: the month the monthly top-up counts in.
 export const monthStart = (now: Date) => `${now.toISOString().slice(0, 7)}-01T00:00:00.000Z`
 
-// How many level-1 customers each of these members brought (kept after a member leaves).
-async function customerCounts(db: SupabaseClient, ids: readonly string[]): Promise<Map<string, number>> {
-  const counts = new Map<string, number>()
-  if (ids.length === 0) return counts
-  const rows = z.array(z.object({ referred_member: z.uuid() })).parse(
-    ok(await db.from('profiles').select('referred_member').in('referred_member', [...ids]).eq('referred_source', 'org_l1').limit(50000), 'customers'),
-  )
-  for (const row of rows) counts.set(row.referred_member, (counts.get(row.referred_member) ?? 0) + 1)
-  return counts
-}
-
-async function accountLabels(db: SupabaseClient, ids: readonly string[], mask: (phone: string) => string): Promise<Map<string, string | null>> {
+export async function accountLabels(db: SupabaseClient, ids: readonly string[], mask: (phone: string) => string): Promise<Map<string, string | null>> {
   const labels = await Promise.all([...new Set(ids)].map(async (id) => {
     const { data } = await db.auth.admin.getUserById(id)
     const user = data.user
@@ -100,7 +90,7 @@ async function ownerConsole({ db, mask }: { db: SupabaseClient; mask: (phone: st
   const members = z.array(memberSchema).parse(ok(memberRows, 'members'))
   const credits = z.object({ credits: z.number() }).nullable().parse(ok(owner, 'owner balance'))?.credits ?? 0
   const seat = members.find((m) => m.user_id === org.owner_user_id)
-  const [counts, labels] = await Promise.all([customerCounts(db, members.map((m) => m.user_id)), accountLabels(db, members.map((m) => m.user_id), mask)])
+  const [counts, labels] = await Promise.all([readCustomerCounts(db, org.owner_user_id, org.id), accountLabels(db, members.map((m) => m.user_id), mask)])
   const paymentAccounts = await readPaymentAccounts(db, org.owner_user_id)
   return {
     kind: 'owner',
@@ -108,7 +98,7 @@ async function ownerConsole({ db, mask }: { db: SupabaseClient; mask: (phone: st
     inviteToken: org.invite_token,
     members: members.map((m): ConsoleMember => ({
       userId: m.user_id, account: labels.get(m.user_id) ?? null, role: m.role, monthlyAllowance: m.monthly_allowance,
-      heldCredits: m.held_credits, customers: counts.get(m.user_id) ?? 0, joinedAt: m.joined_at,
+      heldCredits: m.held_credits, customers: counts.get(m.user_id)?.l1 ?? 0, joinedAt: m.joined_at,
     })),
     memberTotal: total.count ?? members.length,
     packages,
@@ -118,15 +108,35 @@ async function ownerConsole({ db, mask }: { db: SupabaseClient; mask: (phone: st
   }
 }
 
+// This month's customers and their spend for one member, from the staff variant of the report
+// function (only the caller's own row). A failed read must not take the card down: null, and the
+// card says the numbers are unavailable.
+async function staffLevel(db: SupabaseClient, user: string, orgId: string, period: string, totals: Map<string, number>): Promise<{ l1: StaffLevel; l2: StaffLevel } | null> {
+  try {
+    const row = (await readMemberStats(db, user, orgId, period)).find((r) => r.userId === user)
+    const level = (stats: { signups: number; paying: number; paidCents: number } | undefined, customers: number): StaffLevel => ({
+      customers, signups: stats?.signups ?? 0, paying: stats?.paying ?? 0, paidCents: stats?.paidCents ?? 0,
+    })
+    return { l1: level(row?.l1, totals.get('org_l1') ?? 0), l2: level(row?.l2, totals.get('org_l2') ?? 0) }
+  } catch (error) {
+    logger.warn('org staff stats unavailable', { code: error instanceof AppError ? error.code : 'UNKNOWN' })
+    return null
+  }
+}
+
 async function staffCard(db: SupabaseClient, now: Date, org: z.infer<typeof orgSchema>, seat: z.infer<typeof seatSchema>, user: string): Promise<StaffCard> {
+  const withLevel2 = org.affiliate_enabled && org.affiliate_levels === 2
+  const period = currentPeriod(now)
   const [ledger, counts] = await Promise.all([
     db.from('org_credit_ledger').select('delta').eq('org_id', org.id).eq('member_user_id', user).eq('kind', 'allocate').gte('created_at', monthStart(now)).limit(1000),
-    customerCounts(db, [user]),
+    readCustomerCounts(db, user, org.id),
   ])
   const given = z.array(z.object({ delta: z.number() })).parse(ok(ledger, 'allocations')).reduce((sum, row) => sum - row.delta, 0)
+  const performance = await staffLevel(db, user, org.id, period, new Map([['org_l1', counts.get(user)?.l1 ?? 0], ['org_l2', counts.get(user)?.l2 ?? 0]]))
   return {
     kind: 'member', orgName: org.name, status: org.status, monthlyAllowance: seat.monthly_allowance,
-    allocatedThisMonth: given, heldCredits: seat.held_credits, customers: counts.get(user) ?? 0,
+    allocatedThisMonth: given, heldCredits: seat.held_credits, customers: counts.get(user)?.l1 ?? 0,
+    withLevel2, period, performance,
   }
 }
 

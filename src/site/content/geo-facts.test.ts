@@ -61,11 +61,11 @@ describe('GEO facts (SEO launch handbook 03-S3)', () => {
   })
 
   it('a quotable fact has a number, a real subject and enough words', () => {
-    expect(isQuotableFact('Shotviva makes each photo in about 60 seconds.')).toBe(true)
-    expect(isQuotableFact('It makes each photo in about 60 seconds.')).toBe(false)
+    expect(isQuotableFact('Shotviva makes each photo in about 30 seconds.')).toBe(true)
+    expect(isQuotableFact('It makes each photo in about 30 seconds.')).toBe(false)
     expect(isQuotableFact('Yes. Credit packs start at $9.90 and never expire.')).toBe(false)
     expect(isQuotableFact('Shotviva makes each photo quickly and well.')).toBe(false)
-    expect(isQuotableFact('About 60 seconds.')).toBe(false)
-    expect(isQuotableFact('Shotviva 每张图大约 60 秒出图。')).toBe(true)
+    expect(isQuotableFact('About 30 seconds.')).toBe(false)
+    expect(isQuotableFact('Shotviva 每张图大约 30 秒出图。')).toBe(true)
   })
 })
