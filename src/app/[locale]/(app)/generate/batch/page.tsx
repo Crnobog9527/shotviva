@@ -5,7 +5,7 @@ import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
+import { batchLimitsOf, effectiveLimits, readBalance } from '@/core/billing'
 import { currentLocale } from '@/core/i18n/server'
 import { GuideButton, loadBatchCatalogue, MatrixWorkspace } from '@/modules/image'
 
@@ -28,13 +28,14 @@ async function Matrix({ searchParams }: { searchParams: Promise<Record<string, s
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
   const query = await searchParams
-  const [{ templates, initial, browse }, balance, tier] = await Promise.all([
+  const [{ templates, initial, browse }, balance, limits] = await Promise.all([
     // Series members included: a series dialog's link arrives with a member's id (?t=).
     loadBatchCatalogue(await currentLocale(), query.t),
     readBalance(supabase, user.id),
-    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
-    effectiveTier(admin, user.id),
+    // effective_limits() (tier, an unbanned admin as Max, plus the org lift) is service-role only; the user's own id comes from the session.
+    effectiveLimits(admin, user.id),
   ])
+  const { tier } = limits
   return (
     <>
       <Nav
@@ -45,7 +46,7 @@ async function Matrix({ searchParams }: { searchParams: Promise<Record<string, s
           </>
         }
       />
-      <MatrixWorkspace templates={templates} browse={browse} initial={initial} balance={balance} tier={tier} limit={limitsFor(tier).concurrency} />
+      <MatrixWorkspace templates={templates} browse={browse} initial={initial} balance={balance} tier={tier} batch={batchLimitsOf(limits)} limit={limits.concurrency} />
     </>
   )
 }

@@ -6,7 +6,7 @@ import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { effectiveTier, limitsFor } from '@/core/billing'
+import { batchLimitsOf, effectiveLimits, featureTierOf } from '@/core/billing'
 import { featureAllowed } from '@/core/features'
 import { sharedCreateFeatureAccess } from '@/core/features/read'
 import { currentLocale } from '@/core/i18n/server'
@@ -46,21 +46,24 @@ async function Create({ searchParams }: { searchParams: Search }) {
     return createReturnPath(series, poster)
   })
   const admin = createAdminSupabase()
-  // Reuse the service-role tier lookup when the poster gate needs the same answer.
-  const tierPromise = effectiveTier(admin, user.id)
+  // Reuse the service-role limits lookup (effective_limits(): tier plus org lift, §6.5) when the
+  // poster gate needs the same answer.
+  const limitsPromise = effectiveLimits(admin, user.id)
   const posterAllowed = featureAllowed(user.id, POSTER_FEATURE, {
     loadAccess: sharedCreateFeatureAccess,
-    tierOf: () => tierPromise,
+    tierOf: () => limitsPromise.then(featureTierOf),
   }).catch(() => false)
-  const [payload, { balance, favoriteIds }, tier, runningIds, wishlistLive] = await Promise.all([
+  const [payload, { balance, favoriteIds }, limits, runningIds, wishlistLive] = await Promise.all([
     currentLocale().then((locale) => loadCataloguePayload(locale, posterAllowed)),
     createServerSupabase().then((db) => readCreatePersonalData(db, user.id)),
-    tierPromise,
+    limitsPromise,
     // RLS hides jobs with private style references. The admin read returns only IDs for this viewer.
     listRunningJobIds(admin, user.id, new Date()),
     // The grid ends on "Not finding it? Make a wish" while the wishlist is open (cached read).
     isWishlistEnabled(site),
   ])
+  const { tier } = limits
+  const batch = batchLimitsOf(limits)
   return (
     <>
       <Header
@@ -74,13 +77,13 @@ async function Create({ searchParams }: { searchParams: Search }) {
       {/* Batch photos (Pro/Max) and several templates (Max): open for members who have them,
           locked below with an intro first (Owner 2026-11-12). */}
       <div className="px-(--gutter) pb-2 md:max-w-[880px]">
-        <GatedFeatures tier={tier} />
+        <GatedFeatures tier={tier} batch={batch} />
       </div>
       <div id={TEMPLATES_ANCHOR} className="scroll-mt-[calc(var(--sat)+8px)] md:scroll-mt-16">
         <FavoritesProvider initialIds={favoriteIds} signedIn>
           <TemplateCatalogue
             payload={payload}
-            create={{ balance, tier, concurrency: { limit: limitsFor(tier).concurrency, runningIds } }}
+            create={{ balance, tier, batch, concurrency: { limit: limits.concurrency, runningIds } }}
             endCard={wishlistLive ? <WishCard /> : undefined}
           />
         </FavoritesProvider>

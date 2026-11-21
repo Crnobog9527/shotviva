@@ -3,6 +3,7 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { applyPurchase } from '@/core/billing'
+import { adminCreateOrg, adminUpdateOrg, joinOrg } from '@/core/org'
 import { batchArchive, preflightBatch, reserveJob, runGeneration, toGenerationRequest } from '@/core/jobs'
 import { newInputKey } from '@/core/storage'
 import { jpeg } from '../fakes/images'
@@ -80,6 +81,24 @@ describe('T107 preflight and independent jobs', () => {
       expect(await reserve).toMatchObject({ creditPool: 'paid', creditsCost: cost })
       expect((await profileOf(sql, userId)).credits).toBe(before.credits - cost)
     }
+  })
+
+  // ARCHITECTURE §6.5: an active org's usage lifts a Starter member to multi-template batches on
+  // both entry points and in reserve_batch_cell; a suspended org lifts nothing.
+  it('lets an org lift a Starter member to a multi-template batch until it is suspended', async () => {
+    const { db, deps, userId, cells } = await setup('starter_monthly')
+    const actor = await createUser(sql)
+    await sql.query(`update public.profiles set role='admin' where id=$1`, [actor])
+    const orgId = await adminCreateOrg(serviceClient(), actor, { owner_user_id: await createUser(sql), name: 'Batch org', batch_max: 10, multi_template_max: 2 })
+    const { rows } = await sql.query('select invite_token from public.orgs where id=$1', [orgId])
+    await joinOrg(serviceClient(), userId, rows[0].invite_token)
+    const quote = await preflightBatch(db, userId, cells, deps.provider)
+    const job = await runGeneration(deps, toGenerationRequest(userId, { ...cells[0], ...quote, ...quote.cells[0] }))
+    expect([job.status, job.credit_pool]).toEqual(['succeeded', 'paid'])
+    await adminUpdateOrg(serviceClient(), actor, orgId, { status: 'suspended' })
+    await expect(preflightBatch(db, userId, cells, deps.provider)).rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
+    await expect(runGeneration(deps, toGenerationRequest(userId, { ...cells[1], ...quote, ...quote.cells[1] })))
+      .rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
   })
 
   it('rejects an unsold resolution for any selected template during preflight', async () => {

@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
-import { limitsFor } from '@/core/billing/tier-limits'
+import { batchMaxFor } from '@/core/billing/tier-limits'
 import { useRouter } from '@/core/i18n'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
@@ -65,7 +65,7 @@ function CreateForm({ template, open, onClose, forms, ...context }: BodyProps & 
   // Generate moves to the template's workspace page, kept prefetched while the dialog is open.
   useWarmRoute(workspace, open)
   // A slot template is single-run only (§5.1e): no way to a batch.
-  const batch = limitsFor(context.tier).batchMax > 1 && template.photoInput !== 'none' && !isSlotTemplate(template) && draft.photos.photos.length === 0
+  const batch = batchMaxFor(context.tier, context.batch) > 1 && template.photoInput !== 'none' && !isSlotTemplate(template) && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
   const submitOnce = useSubmitOnce(open)
   const generate = () => {
