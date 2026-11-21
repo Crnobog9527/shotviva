@@ -18,7 +18,11 @@ import {
   setOrgAllowance,
 } from '@/core/org'
 
+import { reserveJob } from '@/core/jobs'
+
+import { seedTemplate } from './generation-fixtures'
 import { connectAdmin, ledgerOf, serviceClient } from './helpers'
+import { serviceSupabase } from './supabase-env'
 import { account, adminAccount, creditsOf, member, memberRow, orgLedger, orgWith, poolOf } from './org-fixtures'
 
 // Pool movements (ARCHITECTURE §6.5): request_id idempotency, no overdraft under concurrency,
@@ -286,5 +290,60 @@ describe('refunds and org transfers', () => {
     expect(rows[0].r).toMatchObject({ taken: 0, written_off: credits })
     expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 70 })
     expect(await creditsOf(db, userId)).toBe(70)
+  })
+})
+
+// Re-review of #777: a refund gives back the org share its reserve took, so failed jobs leave the
+// split as it was and cannot be repeated to move org credits to the member.
+describe('refunds give the org share back', () => {
+  let template: string
+  let cost: number
+  beforeAll(async () => {
+    template = await seedTemplate(db)
+    cost = (await db.query(`select (credits_cost->>'1k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
+  })
+
+  const reserve = (userId: string) => {
+    const jobId = randomUUID()
+    return reserveJob(serviceSupabase(), { jobId, userId, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
+      inputs: { resolution: '1k', attempt_id: randomUUID() } }).then(() => jobId)
+  }
+  const fail = (jobId: string) => db.query("select public.refund_job($1, 'TEST_FAILED')", [jobId])
+
+  it('reserve, failed refund, then leave: all 100 go back to the pool', async () => {
+    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: 100 })
+    const userId = await member(db, service, token)
+    await allocateOrgCredits(service, owner, userId, 100, randomUUID())
+    const jobId = await reserve(userId)
+    expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 100 - cost })
+    await fail(jobId)
+    await fail(jobId)
+    expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 100 })
+    expect(await leaveOrg(service, userId, randomUUID())).toBe(100)
+    expect(await creditsOf(db, userId)).toBe(0)
+    expect(await poolOf(db, orgId)).toBe(100)
+  })
+
+  it('repeated failures never grow the member’s own share', async () => {
+    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: 100 })
+    const userId = await member(db, service, token, { credits: 10 })
+    await allocateOrgCredits(service, owner, userId, 100, randomUUID())
+    for (let i = 0; i < 4; i++) await fail(await reserve(userId))
+    expect(await creditsOf(db, userId)).toBe(110)
+    expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 100 })
+    // A succeeded job keeps its draw: own 10 first, then the org's.
+    await reserve(userId)
+    expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: Math.min(100, 110 - cost) })
+  })
+
+  it('maps a poster photo refund to its reserve', async () => {
+    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: 50 })
+    const userId = await member(db, service, token)
+    await allocateOrgCredits(service, owner, userId, 50, randomUUID())
+    const id = randomUUID()
+    await db.query("select public._apply_credit_change($1, 'paid', 'reserve', -5, 'poster photo', $2)", [userId, `poster_photo:${id}:reserve`])
+    expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 45 })
+    await db.query("select public._apply_credit_change($1, 'paid', 'refund', 5, 'poster photo refund', $2)", [userId, `poster_photo:${id}:refund`])
+    expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 50 })
   })
 })

@@ -134,7 +134,7 @@ describe('admin functions', () => {
 describe('grants', () => {
   it('keep every org table and function away from the client roles', async () => {
     for (const role of ['anon', 'authenticated']) {
-      for (const table of ['orgs', 'org_members', 'org_credit_ledger', 'org_packages', 'org_member_topups']) {
+      for (const table of ['orgs', 'org_members', 'org_credit_ledger', 'org_packages', 'org_member_topups', 'org_held_draws']) {
         const { rows } = await db.query('select has_table_privilege($1, $2, $3) as ok', [role, `public.${table}`, 'select'])
         expect(rows[0].ok, `${role} ${table}`).toBe(false)
       }

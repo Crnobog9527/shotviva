@@ -4046,19 +4046,39 @@ $$;
 ALTER FUNCTION "public"."_org_check_limits"("p_input" "jsonb") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."_org_held_follows_spend"() RETURNS "trigger"
+CREATE OR REPLACE FUNCTION "public"."_org_held_follows_ledger"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
-    AS $$
+    AS $_$
+declare
+  m public.org_members;
+  d public.org_held_draws;
+  back integer;
 begin
-  update public.org_members set held_credits = new.credits
-   where user_id = new.id and status = 'active' and held_credits > new.credits;
+  if new.delta < 0 then
+    select * into m from public.org_members where user_id = new.user_id and status = 'active' for update;
+    if found and m.held_credits > new.balance_after then
+      update public.org_members set held_credits = new.balance_after where org_id = m.org_id and user_id = m.user_id;
+      insert into public.org_held_draws(debit_key, org_id, user_id, drawn)
+        values (new.idempotency_key, m.org_id, m.user_id, m.held_credits - new.balance_after);
+    end if;
+  elsif new.kind = 'refund' then
+    select * into d from public.org_held_draws
+     where debit_key = regexp_replace(new.idempotency_key, ':[^:]+$', ':reserve') and user_id = new.user_id for update;
+    if not found or d.restored >= d.drawn then return new; end if;
+    select * into m from public.org_members where org_id = d.org_id and user_id = d.user_id and status = 'active' for update;
+    if not found then return new; end if;
+    back := least(new.delta, d.drawn - d.restored);
+    update public.org_members set held_credits = least(held_credits + back, new.balance_after)
+     where org_id = m.org_id and user_id = m.user_id;
+    update public.org_held_draws set restored = restored + back where debit_key = d.debit_key;
+  end if;
   return new;
 end;
-$$;
+$_$;
 
 
-ALTER FUNCTION "public"."_org_held_follows_spend"() OWNER TO "postgres";
+ALTER FUNCTION "public"."_org_held_follows_ledger"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_org_lock_owned"("p_owner" "uuid", "p_allow_suspended" boolean) RETURNS "public"."orgs"
@@ -17439,6 +17459,21 @@ ALTER TABLE "public"."org_credit_ledger" ALTER COLUMN "id" ADD GENERATED ALWAYS 
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."org_held_draws" (
+    "debit_key" "text" NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "drawn" integer NOT NULL,
+    "restored" integer DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "org_held_draws_check" CHECK ((("restored" >= 0) AND ("restored" <= "drawn"))),
+    CONSTRAINT "org_held_draws_drawn_check" CHECK (("drawn" > 0))
+);
+
+
+ALTER TABLE "public"."org_held_draws" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."org_member_topups" (
     "org_id" "uuid" NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -18465,6 +18500,11 @@ ALTER TABLE ONLY "public"."org_credit_ledger"
 
 ALTER TABLE ONLY "public"."org_credit_ledger"
     ADD CONSTRAINT "org_credit_ledger_request_id_key" UNIQUE ("request_id");
+
+
+
+ALTER TABLE ONLY "public"."org_held_draws"
+    ADD CONSTRAINT "org_held_draws_pkey" PRIMARY KEY ("debit_key");
 
 
 
@@ -19618,6 +19658,10 @@ CREATE OR REPLACE TRIGGER "codes_enforce_gift_policy" BEFORE INSERT OR UPDATE OF
 
 
 
+CREATE OR REPLACE TRIGGER "credit_ledger_org_held" AFTER INSERT ON "public"."credit_ledger" FOR EACH ROW WHEN ((("new"."pool" = 'paid'::"text") AND ("new"."kind" <> ALL (ARRAY['org_allocate'::"text", 'org_reclaim'::"text", 'org_deposit'::"text"])))) EXECUTE FUNCTION "public"."_org_held_follows_ledger"();
+
+
+
 CREATE OR REPLACE TRIGGER "dishware_library_set_updated_at" BEFORE UPDATE ON "public"."dishware_library" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
@@ -19643,10 +19687,6 @@ CREATE OR REPLACE TRIGGER "link_disputes_payment_insert" AFTER INSERT ON "public
 
 
 CREATE OR REPLACE TRIGGER "match_unlinked_dispute" BEFORE INSERT ON "public"."payment_disputes" FOR EACH ROW WHEN (("new"."payment_id" IS NULL)) EXECUTE FUNCTION "public"."_match_dispute_before_insert"();
-
-
-
-CREATE OR REPLACE TRIGGER "profiles_org_held_follows_spend" AFTER UPDATE OF "credits" ON "public"."profiles" FOR EACH ROW WHEN (("new"."credits" < "old"."credits")) EXECUTE FUNCTION "public"."_org_held_follows_spend"();
 
 
 
@@ -20219,6 +20259,16 @@ ALTER TABLE ONLY "public"."org_credit_ledger"
 
 ALTER TABLE ONLY "public"."org_credit_ledger"
     ADD CONSTRAINT "org_credit_ledger_package_id_fkey" FOREIGN KEY ("package_id") REFERENCES "public"."org_packages"("id");
+
+
+
+ALTER TABLE ONLY "public"."org_held_draws"
+    ADD CONSTRAINT "org_held_draws_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
+
+
+
+ALTER TABLE ONLY "public"."org_held_draws"
+    ADD CONSTRAINT "org_held_draws_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -20803,6 +20853,9 @@ ALTER TABLE "public"."identity_refusals" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_credit_ledger" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."org_held_draws" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_member_topups" ENABLE ROW LEVEL SECURITY;
@@ -21777,7 +21830,7 @@ REVOKE ALL ON FUNCTION "public"."_org_check_limits"("p_input" "jsonb") FROM PUBL
 
 
 
-REVOKE ALL ON FUNCTION "public"."_org_held_follows_spend"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."_org_held_follows_ledger"() FROM PUBLIC;
 
 
 
@@ -23774,6 +23827,10 @@ GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "service_role";
 
 
 GRANT SELECT ON TABLE "public"."org_credit_ledger" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."org_held_draws" TO "service_role";
 
 
 
