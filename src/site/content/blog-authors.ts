@@ -1,7 +1,7 @@
 import type { BlogAuthor } from '@/core/blog/authors'
 
 // Shotviva's blog authors (core/blog/authors.ts). A post whose 作者名 is exactly one of these
-// names links to that author's page. Facts from the Owner's own profile (2026-11-21); keep
+// names links to that author's page. Facts and portrait from the Owner (2026-11-21); keep
 // them to what the Owner has confirmed.
 
 export const BLOG_AUTHORS: readonly BlogAuthor[] = [
