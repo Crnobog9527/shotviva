@@ -13496,6 +13496,141 @@ $$;
 ALTER FUNCTION "public"."org_leave"("p_user" "uuid", "p_request_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."org_member_customers"("p_owner" "uuid", "p_period" "text") RETURNS TABLE("member_user_id" "uuid", "level" smallint, "contact" "text", "signed_up_at" timestamp with time zone, "paid_in_period_cents" bigint, "paid_total_cents" bigint)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    SET "TimeZone" TO 'UTC'
+    AS $_$
+#variable_conflict use_column
+declare
+  v_org uuid;
+  v_start timestamptz;
+  v_end timestamptz;
+  v_account uuid;
+begin
+  if p_period is null or p_period !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' then raise exception 'INVALID_INPUT'; end if;
+  select o.id into v_org from public.orgs o where o.owner_user_id = p_owner;
+  if v_org is null then raise exception 'NOT_ORG_OWNER'; end if;
+  v_start := ((p_period || '-01')::timestamp) at time zone 'UTC';
+  v_end := v_start + interval '1 month';
+  select a.user_id into v_account from public.affiliates a where a.org_id = v_org;
+  if v_account is null then return; end if;
+
+  return query
+  with cust as (
+    select c.id, c.referred_member as uid, c.referred_source as src, c.referred_at, c.created_at from public.profiles c
+     where c.referred_by = v_account and c.referred_member is not null and c.referred_source in ('org_l1', 'org_l2')
+       and not exists(select from public.org_members x where x.org_id = v_org and x.user_id = c.id and x.status = 'active')
+  ),
+  paid as (
+    select cu.id,
+           coalesce(sum(case when p.amount_total = 0 then 0 else
+             div((p.amount_total - p.amount_tax)::numeric * (p.amount_total - p.amount_refunded), p.amount_total::numeric) end)
+             filter (where p.created_at >= v_start and p.created_at < v_end), 0)::bigint as in_period,
+           coalesce(sum(case when p.amount_total = 0 then 0 else
+             div((p.amount_total - p.amount_tax)::numeric * (p.amount_total - p.amount_refunded), p.amount_total::numeric) end), 0)::bigint as total
+      from cust cu left join public.payments p on p.user_id = cu.id and p.currency = 'usd' and p.created_at >= cu.referred_at
+     group by cu.id
+  )
+  select cu.uid, case cu.src when 'org_l1' then 1::smallint else 2::smallint end,
+         case
+           when u.email is not null and u.email like '_%@%' then left(u.email, 1) || '***' || substring(u.email from '@[^@]*$')
+           when u.phone ~ '^\+?86[0-9]{11}$' then left(right(u.phone, 11), 3) || '****' || right(u.phone, 4)
+           when u.phone is not null and u.phone <> '' then '***' || right(u.phone, 4)
+           else ''
+         end,
+         cu.created_at, pd.in_period, pd.total
+    from cust cu join paid pd on pd.id = cu.id left join auth.users u on u.id = cu.id
+   where (cu.referred_at >= v_start and cu.referred_at < v_end) or pd.in_period > 0
+   order by cu.uid, cu.src, cu.referred_at, cu.id
+   limit 5000;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."org_member_customers"("p_owner" "uuid", "p_period" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") RETURNS TABLE("member_user_id" "uuid", "member_role" "text", "member_status" "text", "allocated" bigint, "used" bigint, "l1_signups" integer, "l1_paying" integer, "l1_paid_cents" bigint, "l2_signups" integer, "l2_paying" integer, "l2_paid_cents" bigint)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    SET "TimeZone" TO 'UTC'
+    AS $_$
+#variable_conflict use_column
+declare
+  v_start timestamptz;
+  v_end timestamptz;
+  v_owner boolean;
+  v_account uuid;
+begin
+  if p_period is null or p_period !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' then raise exception 'INVALID_INPUT'; end if;
+  select o.owner_user_id = p_caller into v_owner from public.orgs o where o.id = p_org_id;
+  if v_owner is distinct from true and not exists(
+    select from public.org_members m where m.org_id = p_org_id and m.user_id = p_caller and m.status = 'active'
+  ) then raise exception 'NOT_ORG_MEMBER'; end if;
+  v_start := ((p_period || '-01')::timestamp) at time zone 'UTC';
+  v_end := v_start + interval '1 month';
+  select a.user_id into v_account from public.affiliates a where a.org_id = p_org_id;
+
+  return query
+  with seats as (
+    select m.user_id, m.role, m.status, m.joined_at from public.org_members m
+     where m.org_id = p_org_id and (coalesce(v_owner, false) or m.user_id = p_caller)
+  ),
+  alloc as (
+    select l.member_user_id as uid, -sum(l.delta) as amount from public.org_credit_ledger l
+     where l.org_id = p_org_id and l.kind = 'allocate' and l.created_at >= v_start and l.created_at < v_end
+     group by l.member_user_id
+  ),
+  spent as (
+    select d.user_id as uid, sum(d.drawn - d.restored) as amount from public.org_held_draws d
+     where d.org_id = p_org_id and d.created_at >= v_start and d.created_at < v_end
+     group by d.user_id
+  ),
+  cust as (
+    select c.id, c.referred_member as uid, c.referred_source as src, c.referred_at from public.profiles c
+     where v_account is not null and c.referred_by = v_account and c.referred_member is not null
+       and c.referred_source in ('org_l1', 'org_l2')
+       and not exists(select from public.org_members x where x.org_id = p_org_id and x.user_id = c.id and x.status = 'active')
+  ),
+  signed as (
+    select cu.uid, cu.src, count(*)::integer as n from cust cu
+     where cu.referred_at >= v_start and cu.referred_at < v_end group by cu.uid, cu.src
+  ),
+  net as (
+    select cu.uid, cu.src, cu.id,
+           sum(case when p.amount_total = 0 then 0 else
+             div((p.amount_total - p.amount_tax)::numeric * (p.amount_total - p.amount_refunded), p.amount_total::numeric) end)::bigint as cents
+      from cust cu join public.payments p on p.user_id = cu.id
+     where p.currency = 'usd' and p.created_at >= cu.referred_at and p.created_at >= v_start and p.created_at < v_end
+     group by cu.uid, cu.src, cu.id
+  ),
+  paid as (
+    select n.uid, n.src, count(*) filter (where n.cents > 0)::integer as paying, sum(n.cents)::bigint as cents
+      from net n group by n.uid, n.src
+  )
+  select s.user_id, s.role, s.status,
+         coalesce(a.amount, 0)::bigint, coalesce(sp.amount, 0)::bigint,
+         coalesce(s1.n, 0), coalesce(p1.paying, 0), coalesce(p1.cents, 0)::bigint,
+         coalesce(s2.n, 0), coalesce(p2.paying, 0), coalesce(p2.cents, 0)::bigint
+    from seats s
+    left join alloc a on a.uid = s.user_id
+    left join spent sp on sp.uid = s.user_id
+    left join signed s1 on s1.uid = s.user_id and s1.src = 'org_l1'
+    left join signed s2 on s2.uid = s.user_id and s2.src = 'org_l2'
+    left join paid p1 on p1.uid = s.user_id and p1.src = 'org_l1'
+    left join paid p2 on p2.uid = s.user_id and p2.src = 'org_l2'
+   where s.status = 'active'
+      or coalesce(a.amount, 0) <> 0 or coalesce(sp.amount, 0) <> 0
+      or coalesce(s1.n, 0) <> 0 or coalesce(p1.cents, 0) <> 0 or coalesce(s2.n, 0) <> 0 or coalesce(p2.cents, 0) <> 0
+   order by (s.role = 'owner') desc, s.joined_at, s.user_id;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."org_monthly_topup"("p_period" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -23590,6 +23725,16 @@ GRANT ALL ON FUNCTION "public"."org_join"("p_user" "uuid", "p_token" "text") TO 
 
 REVOKE ALL ON FUNCTION "public"."org_leave"("p_user" "uuid", "p_request_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_leave"("p_user" "uuid", "p_request_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_member_customers"("p_owner" "uuid", "p_period" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_member_customers"("p_owner" "uuid", "p_period" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") TO "service_role";
 
 
 

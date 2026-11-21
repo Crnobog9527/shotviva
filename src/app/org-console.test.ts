@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import en from '@/site/messages/en.json'
 import zh from '@/site/messages/zh.json'
 
-import { CONSOLE_ERRORS, type OwnerConsole, type PaymentAccountGroup, type StaffCard } from '@/core/org/console/types'
+import { CONSOLE_ERRORS, type OwnerConsole, type OwnerReport, type PaymentAccountGroup, type StaffCard } from '@/core/org/console/types'
 
 vi.mock('@/core/i18n/ui', () => ({ Link: ({ href, children, ...rest }: { href: string; children: unknown }) => createElement('a', { href, ...rest }, children as never) }))
 vi.mock('@/core/analytics/replay', () => ({ REPLAY_BLOCK_CLASS: 'sv-replay-block' }))
@@ -32,7 +32,9 @@ const owner = (over: Partial<OwnerConsole['org']> = {}, extra: Partial<OwnerCons
   paymentAccounts: null,
   ...extra,
 })
-const staff: StaffCard = { kind: 'member', orgName: 'Acme Studio', status: 'active', monthlyAllowance: 500, allocatedThisMonth: 600, heldCredits: 80, customers: 3 }
+const staff: StaffCard = { kind: 'member', orgName: 'Acme Studio', status: 'active', monthlyAllowance: 500, allocatedThisMonth: 600, heldCredits: 80, customers: 3,
+  withLevel2: false, period: '2026-11', performance: { l1: { customers: 3, signups: 1, paying: 2, paidCents: 12345 }, l2: { customers: 0, signups: 0, paying: 0, paidCents: 0 } },
+}
 
 const ownerActions = {
   deposit: async () => ({ ok: true as const, pool: 1 }), allocate: async () => ({ ok: true as const, pool: 1 }),
@@ -48,9 +50,44 @@ function render(locale: 'en' | 'zh', element: ReactElement) {
   return { html, errors, text: html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ') }
 }
 
+const report = (over: Partial<OwnerReport> = {}): OwnerReport => ({
+  period: '2026-11', previous: '2026-10', next: null, withAffiliate: true, withLevel2: true,
+  rows: [
+    { userId: '00000000-0000-4000-8000-0000000000a1', account: 'owner@acme.test', role: 'owner', status: 'active', allocated: 0, used: 0, l1: { signups: 0, paying: 0, paidCents: 0 }, l2: { signups: 0, paying: 0, paidCents: 0 } },
+    { userId: MEMBER, account: 'ann@acme.test', role: 'member', status: 'active', allocated: 500, used: 120, l1: { signups: 3, paying: 2, paidCents: 12345 }, l2: { signups: 1, paying: 1, paidCents: 999 } },
+    { userId: '00000000-0000-4000-8000-0000000000d4', account: 'gone@acme.test', role: 'member', status: 'removed', allocated: 0, used: 0, l1: { signups: 1, paying: 0, paidCents: 0 }, l2: { signups: 0, paying: 0, paidCents: 0 } },
+  ],
+  totals: { allocated: 500, used: 120, l1: { signups: 4, paying: 2, paidCents: 12345 }, l2: { signups: 1, paying: 1, paidCents: 999 } },
+  ...over,
+})
+
+describe.each(['en', 'zh'] as const)('monthly table (%s)', (locale) => {
+  it('shows the monthly table with totals, a month picker and the CSV downloads, and no commission', () => {
+    const { html, text, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: report() }))
+    expect(errors).toEqual([])
+    expect(text).toContain('$123.45')
+    expect(text).toContain('$9.99')
+    expect(text).toContain('2026-11')
+    expect(html).toContain('/account/enterprise?month=2026-10')
+    // It is the current month: nothing later to go to.
+    expect(html).not.toContain('month=2026-12')
+    expect(html).toContain('/api/account/enterprise/report?month=2026-11&amp;kind=members')
+    expect(html).toContain('kind=customers')
+    expect(text).toMatch(/Left|已离开/)
+    expect(text).not.toMatch(/commission|佣金/i)
+    // Level 2 columns only for an org that has level 2.
+    const one = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: report({ withLevel2: false }) }))
+    expect(one.html.match(/<th /g)?.length).toBeLessThan(html.match(/<th /g)?.length ?? 0)
+    // No affiliate: no customer columns and no customer download.
+    const none = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: report({ withAffiliate: false, withLevel2: false }) }))
+    expect(none.html).not.toContain('kind=customers')
+  })
+})
+
 describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
+
   it("shows the owner's pool, USD packages with the transfer note, the invite link and the members", () => {
-    const { text, html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions }))
+    const { text, html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null }))
     expect(errors).toEqual([])
     expect(text).toContain('120,000')
     expect(text).toContain('$1,234')
@@ -60,8 +97,8 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
     expect(html).toContain('/account?help=new')
     // Packages are USD only: no yuan sign anywhere.
     expect(text).not.toMatch(/[¥￥]|CNY|RMB/)
-    // The monthly report waits on E5: a marked slot, not a table.
-    expect(html).toContain('data-slot="org-performance-pending"')
+    // No report read: the table says so instead of a made-up number.
+    expect(text).toMatch(/be loaded|加载失败/)
   })
 
   it('shows the collecting accounts by group with the org name in the note, or a marked placeholder', () => {
@@ -69,38 +106,40 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
       { kind: 'overseas_us', details: { account_name: 'Sample Holdings', bank_name: 'Example Bank', account_number: '0000 0000', empty: '' } },
       { kind: 'mainland_agent', details: { account_name: 'Example Agent', currency: 'CNY' } },
     ]
-    const shown = render(locale, createElement(OwnerConsoleView, { data: owner({}, { paymentAccounts: groups }), actions: ownerActions }))
+    const shown = render(locale, createElement(OwnerConsoleView, { data: owner({}, { paymentAccounts: groups }), actions: ownerActions, report: null }))
     expect(shown.errors).toEqual([])
     expect(shown.text).toContain(locale === 'en' ? 'US company business account' : '海外美国公司对公账户')
     expect(shown.text).toContain(locale === 'en' ? 'Account number / IBAN' : '账号 / IBAN')
     expect(shown.text).toContain('Example Agent')
     expect(shown.text).toContain('Acme Studio')
     expect(shown.html).not.toContain('org-payment-accounts-pending')
-    const pending = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions }))
+    const pending = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null }))
     expect(pending.html).toContain('data-slot="org-payment-accounts-pending"')
   })
 
   it('offers no remove button for the owner row and one for each member', () => {
-    const { html } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions }))
+    const { html } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null }))
     const removes = html.match(/<button[^>]*>(Remove|移除)<\/button>/g) ?? []
     expect(removes).toHaveLength(1)
   })
 
   it('says the account is paused and disables pool actions for a suspended org', () => {
-    const { html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner({ status: 'suspended' }), actions: ownerActions }))
+    const { html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner({ status: 'suspended' }), actions: ownerActions, report: null }))
     expect(errors).toEqual([])
     expect(html).toMatch(/paused|暂停/)
     expect((html.match(/disabled=""/g) ?? []).length).toBeGreaterThanOrEqual(5)
   })
 
-  it("shows a member's card with this month's numbers, a leave button and the marked spend slot", () => {
+  it("shows a member's card with this month's numbers, a leave button and the customers' spend", () => {
     const { text, errors } = render(locale, createElement(StaffCardView, { data: staff, actions: { leave: async () => ({ ok: true as const, reclaimed: 0 }) }, loadInvite: (async () => ({})) as never }))
     expect(errors).toEqual([])
     expect(text).toContain('Acme Studio')
     expect(text).toMatch(/600/)
     expect(text).toMatch(/80/)
     expect(text).toMatch(/Leave company|退出企业/)
-    expect(text).toMatch(/Coming soon|即将上线/)
+    // Level-1 customers, how many pay and what they spent this month (fake data: $123.45).
+    expect(text).toContain('$123.45')
+    expect(text).not.toMatch(/Coming soon|即将上线|commission|佣金/i)
   })
 
   it('renders the account row and the join confirmation', () => {
