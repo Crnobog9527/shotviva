@@ -17,7 +17,8 @@ function toUploadError(body: Failure | null): UploadError {
   return new UploadError(code, body?.message || 'Upload failed')
 }
 
-export type TicketOptions = { wait?: (ms: number) => Promise<void>; now?: () => number; random?: () => number }
+// signal: the photo was cancelled; the wait between retries stops at once (AbortError).
+export type TicketOptions = { signal?: AbortSignal; endpoint?: string; wait?: (ms: number, signal?: AbortSignal) => Promise<void>; now?: () => number; random?: () => number }
 
 function post(endpoint: string, contentType: UploadContentType, size: number) {
   return fetch(endpoint, {
@@ -28,9 +29,8 @@ function post(endpoint: string, contentType: UploadContentType, size: number) {
 }
 
 // POST /api/uploads: the server picks the key and signs a 60-second PUT.
-export async function requestTicket(
-  contentType: UploadContentType, size: number, endpoint = '/api/uploads', options: TicketOptions = {},
-): Promise<Ticket> {
+export async function requestTicket(contentType: UploadContentType, size: number, options: TicketOptions = {}): Promise<Ticket> {
+  const endpoint = options.endpoint ?? '/api/uploads'
   const wait = options.wait ?? sleep
   const now = options.now ?? Date.now
   const random = options.random ?? Math.random
@@ -39,7 +39,7 @@ export async function requestTicket(
   while (response.status === 429) {
     const delay = retryDelayMs(response.headers.get('Retry-After'), random, now())
     if (now() + delay - started > TICKET_WAIT_LIMIT_MS) break
-    await wait(delay)
+    await wait(delay, options.signal)
     response = await post(endpoint, contentType, size)
   }
   return readTicket(response)
