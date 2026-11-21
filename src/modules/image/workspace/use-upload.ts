@@ -5,7 +5,8 @@ import { useCallback, useState } from 'react'
 import { track, trackUploadError } from '@/core/analytics/browser'
 import { useUpdateHold } from '@/core/app-update'
 
-import { compressImage, putWithProgress, requestTicket, UploadError, uploadPhoto, type UploadDeps, type UploadErrorCode, type UploadPhase } from '@/core/storage/upload'
+import { getStoreOwner } from '../generation/job-store'
+import { compressImage, createTicketPool, putWithProgress, requestTicket, UploadError, uploadPhoto, type UploadDeps, type UploadErrorCode, type UploadPhase } from '@/core/storage/upload'
 
 export type UploadState =
   | { phase: 'idle' }
@@ -20,6 +21,11 @@ export const uploadDeps: UploadDeps = {
   track: (props) => track('upload', props),
   trackError: trackUploadError,
 }
+
+// A batch's photos share tickets from POST /api/uploads/batch, ten per request (ticket-pool).
+// Keyed on the signed-in account (job-store's owner, set by the app layout), so another account
+// signing in on this tab never gets the previous one's tickets.
+export const batchUploadDeps: UploadDeps = { ...uploadDeps, requestTicket: createTicketPool({ owner: getStoreOwner }) }
 
 // Upload half of DESIGN §4.4 (Compressing → Uploading with progress); the Generating phase
 // belongs to the generation hook. A failed upload restarts from scratch (§8.2: no resume).
