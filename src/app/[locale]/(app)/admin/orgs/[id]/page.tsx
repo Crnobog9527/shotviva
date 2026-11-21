@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 
 import { AdminPage, StatCard } from '@/core/admin'
 import { loadOrgDetail, ORGS_COPY as COPY } from '@/core/admin/orgs'
-import { GrantForm, LedgerTable, MemberTable, num, OrgEditForm, OrgStatusBadge } from '@/core/admin/orgs-ui'
+import { AffiliateCard, GrantForm, LedgerTable, MemberTable, num, OrgEditForm, OrgStatusBadge } from '@/core/admin/orgs-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 
 import { grantOrgAction, saveOrgAction } from '../actions'
@@ -29,6 +29,7 @@ export default async function OrgPage({ params }: PageProps<'/[locale]/admin/org
       </div>
       <GrantForm orgId={org.id} packages={packages} grant={grantOrgAction} />
       <OrgEditForm key={org.updatedAt} org={org} caps={caps} save={saveOrgAction} />
+      <AffiliateCard affiliate={detail.affiliate} levels={org.affiliateLevels} />
       <LedgerTable rows={detail.ledger} />
       <MemberTable rows={detail.members} total={detail.memberTotal} />
     </AdminPage>

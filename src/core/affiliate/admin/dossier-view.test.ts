@@ -16,7 +16,7 @@ const profile: DossierDetail = {
   created_at: '2026-05-03T12:00:00Z', approved_at: null, approved_by: null, parent_user_id: null,
   country: 'CN', payout_method: 'wise', payout_details: 'QA', us_person: false, terms_version: 'v2',
   terms_accepted_at: null, reject_reason: null, reapply_allowed: false, rates: [], admin_note: null, admin_label: null,
-  application: { channel_type: 'xiaohongshu', audience: '1k_10k' },
+  application: { channel_type: 'xiaohongshu', audience: '1k_10k' }, is_org: false,
 }
 
 it('renders searchable identities and all four amounts, including a negative unwithdrawn balance', () => {
@@ -26,6 +26,13 @@ it('renders searchable identities and all four amounts, including a negative unw
   }
   expect(html).toMatch(/>-[^<]*1\.49</)
   expect(html).toContain('id=' + profile.user_id)
+})
+it('tags enterprise accounts with 企业 in the directory and the profile, and personal ones not', () => {
+  const personal = renderToStaticMarkup(createElement(DirectoryTable, { items: [profile], filters: { tab: 'affiliates' } }))
+  expect(personal).not.toContain('>企业<')
+  const org = { ...profile, is_org: true }
+  expect(renderToStaticMarkup(createElement(DirectoryTable, { items: [org], filters: { tab: 'affiliates' } }))).toContain('>企业<')
+  expect(renderToStaticMarkup(createElement(ProfileFacts, { member: org }))).toContain('· 企业')
 })
 it('shows the account registration time separately from joining the program; #419 and older answers both display', () => {
   const html = renderToStaticMarkup(createElement(ProfileFacts, { member: profile }))
