@@ -3,6 +3,7 @@ import { COPY, money } from './copy'
 import { FEE_COPY as F } from './payment-fees-copy'
 import { feeOverview, paymentFees, type PaymentLine } from './payment-fees-read'
 import { PaymentFeeSchedules } from './payment-fee-schedules'
+import { PaymentFeesStart } from './payment-fees-start-view'
 import type { ViewProps } from './members-view'
 import { Field, FiltersForm, GridTable, LinkTo, Section } from './parts'
 
@@ -99,9 +100,10 @@ async function Overview({ db }: { db: ViewProps['db'] }) {
   )
 }
 
-export async function FeesView({ db, filters, action }: ViewProps) {
+export async function FeesView({ db, filters, action, latestTerms }: ViewProps) {
   return (
     <>
+      {latestTerms && <PaymentFeesStart db={db} action={action} latestTerms={latestTerms} />}
       <Section title={F.lookupTitle}>
         <p className="text-sm text-muted-foreground">{F.lookupHint}</p>
         <FiltersForm tab="fees">

@@ -166,6 +166,7 @@ export const COPY = {
   day: '每月结算日（UTC，1–28）',
   applyLevel: '申请购买门槛',
   termsVersion: '条款版本',
+  termsVersionFixed: '这里不能改条款版本；开始记录手续费时会切到最新版（「手续费」页）。',
   recompute: '重算',
   payment: '付款编号',
   description: '错误信息',

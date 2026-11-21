@@ -19,3 +19,10 @@ export function affiliateAgreement(locale: Locale) {
   const earlier = Object.fromEntries(published.slice(0, -1).map((item) => [item.version, item[locale]]))
   return { affiliateAgreement: { version: latest.version, body: latest[locale], earlier } }
 }
+
+// The newest published version: what going live with fees switches the terms to.
+export function latestAffiliateTermsVersion(): string {
+  const latest = published.at(-1)
+  if (!latest) throw new Error('no published affiliate terms')
+  return latest.version
+}

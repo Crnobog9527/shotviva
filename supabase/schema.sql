@@ -5702,12 +5702,11 @@ begin
     hold_days=coalesce((p_input->>'hold_days')::integer,hold_days),
     payout_min_usd=coalesce((p_input->>'payout_min_usd')::bigint,payout_min_usd),
     settlement_day=coalesce((p_input->>'settlement_day')::integer,settlement_day),
-    apply_min_level=coalesce(p_input->>'apply_min_level',apply_min_level),
-    terms_version=coalesce(p_input->>'terms_version',terms_version) where singleton;
+    apply_min_level=coalesce(p_input->>'apply_min_level',apply_min_level) where singleton;
   insert into public.affiliate_rates(product_kind,l1_bp,l2_bp)
     select r.product_kind,r.l1_bp,r.l2_bp from jsonb_to_recordset(p_input->'rates') r(product_kind text,l1_bp integer,l2_bp integer)
     on conflict(product_kind) do update set l1_bp=excluded.l1_bp,l2_bp=excluded.l2_bp;
-  perform public._affiliate_audit(p_actor,'settings','settings',p_input::text);
+  perform public._affiliate_audit(p_actor,'settings','settings',(p_input - 'terms_version')::text);
 end;
 $$;
 
@@ -9110,6 +9109,48 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_payment_fee_schedule_save"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_payment_fees_start"("p_actor" "uuid", "p_input" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_terms text := trim(p_input->>'terms_version');
+  v_expected_terms text := p_input->>'expected_terms_version';
+  v_expected_from timestamptz := nullif(p_input->>'expected_record_from', '')::timestamptz;
+  v_from timestamptz;
+  v_old_terms text;
+  v_now timestamptz := now();
+begin
+  perform public._affiliate_require_admin(p_actor);
+  if jsonb_typeof(p_input) is distinct from 'object' or v_terms is null or v_terms !~ '^\d{4}-\d{2}-\d{2}$'
+     or v_expected_terms is null then
+    raise exception 'INVALID_INPUT' using detail = 'admin_payment_fees_start: terms_version and expected values';
+  end if;
+  select record_from into v_from from public.payment_fee_settings where singleton for update;
+  select terms_version into v_old_terms from public.affiliate_settings where singleton for update;
+  if v_from is not null then
+    if v_old_terms = v_terms then
+      return jsonb_build_object('applied', false, 'reason', 'already', 'record_from', v_from, 'terms_version', v_old_terms);
+    end if;
+    raise exception 'PAYMENT_FEES_ALREADY_STARTED';
+  end if;
+  if v_expected_from is not null or v_expected_terms is distinct from v_old_terms then
+    raise exception 'PAYMENT_FEES_START_CHANGED';
+  end if;
+  update public.payment_fee_settings set record_from = v_now, updated_at = v_now where singleton;
+  update public.affiliate_settings set terms_version = v_terms where singleton;
+  insert into public.admin_audit_log (action, user_id, target_id, reason)
+    values ('payment_fees_start', p_actor, 'payment_fee_settings',
+      jsonb_build_object('record_from', jsonb_build_object('before', null, 'after', v_now),
+                         'terms_version', jsonb_build_object('before', v_old_terms, 'after', v_terms))::text);
+  return jsonb_build_object('applied', true, 'record_from', v_now, 'terms_version', v_terms);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_payment_fees_start"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_prompt_lab_publish_source"("p_actor" "uuid", "p_run_id" "uuid", "p_template_id" "text") RETURNS "jsonb"
@@ -18421,7 +18462,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -24615,6 +24656,11 @@ GRANT ALL ON FUNCTION "public"."admin_org_update"("p_actor" "uuid", "p_org_id" "
 
 REVOKE ALL ON FUNCTION "public"."admin_payment_fee_schedule_save"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_payment_fee_schedule_save"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_payment_fees_start"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_payment_fees_start"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
 
 

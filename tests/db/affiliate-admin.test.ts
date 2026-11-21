@@ -26,6 +26,8 @@ async function rejects(operation: () => Promise<unknown>, reason: string) {
 }
 
 const settings = (input: object) => db.query('select admin_affiliate_settings($1,$2)', [admin, input])
+// The settings form no longer moves the terms (1820); tests set the version directly.
+const terms = (version: string) => db.query('update affiliate_settings set terms_version=$1', [version])
 const eligible = async () => (await row(db, 'select affiliate_can_apply($1) ok', [user])).ok
 const profile = () => row(db, 'select status,approved_at,approved_by,parent_user_id,terms_version,payout_method from affiliates where user_id=$1', [user])
 
@@ -33,7 +35,8 @@ it('checks membership purchase tier and refunds, captures the accepted version, 
   const form = { name: 'QA', country: 'US', channel: 'https://example.test', audience: '100', plan: 'Reviews' }
   const leader = await promoter(db)
   const apply = (version: string) => db.query('select affiliate_apply($1,$2,$3,$4)', [user, form, leader.slug, version])
-  await settings({ apply_min_level: 'any_paid', terms_version: '2026-11' })
+  await settings({ apply_min_level: 'any_paid' })
+  await terms('2026-11')
   await sale(db, user, 'pack_m', 2490)
   expect(await eligible()).toBe(false)
   await rejects(() => apply('2026-11'), 'AFFILIATE_INELIGIBLE')
@@ -49,7 +52,8 @@ it('checks membership purchase tier and refunds, captures the accepted version, 
   await apply('2026-11')
   expect(await profile()).toMatchObject({ status: 'pending', parent_user_id: null, terms_version: '2026-11' })
   await db.query('select admin_affiliate_decide($1,$2)', [admin, { user_id: user, status: 'active', slug: 'qa-accepted' }])
-  await settings({ terms_version: '2027-01', apply_min_level: 'none' })
+  await settings({ apply_min_level: 'none' })
+  await terms('2027-01')
   const save = (v: string) => db.query("select affiliate_save_profile($1,'paypal','QA',false,$2)", [user, v])
   await rejects(() => save('2026-11'), 'AFFILIATE_TERMS_CHANGED')
   await save('2027-01')
@@ -62,7 +66,7 @@ it('checks membership purchase tier and refunds, captures the accepted version, 
 
 it('refuses payout detail changes after suspension in the database write', async () => {
   const partner = await promoter(db)
-  await settings({ terms_version: 'qa' })
+  await terms('qa')
   const save = (details: string) => db.query("select affiliate_save_profile($1,'paypal',$2,false,'qa')", [partner.id, details])
   await save('original')
   await db.query('select admin_affiliate_set($1,$2)', [admin, { user_id: partner.id, status: 'suspended', reason: 'QA' }])
@@ -105,7 +109,7 @@ it('suspends and restores from the status alone, keeping slug, parent, team, ove
 
 it('only maintains payout details with a dated acceptance of the current version', async () => {
   const partner = await promoter(db)
-  await settings({ terms_version: 'v1' })
+  await terms('v1')
   const save = (details: string) => db.query("select affiliate_save_profile($1,'wise',$2,false,null)", [partner.id, details])
   const read = () => row(db, 'select payout_details,terms_version,terms_accepted_at::text from affiliates where user_id=$1', [partner.id])
   await rejects(() => save('new account'), 'AFFILIATE_NOT_FOUND')
@@ -119,7 +123,7 @@ it('only maintains payout details with a dated acceptance of the current version
   await save('changed')
   expect(await read()).toEqual({ ...before, payout_details: 'changed' })
 
-  await settings({ terms_version: 'v2' })
+  await terms('v2')
   await rejects(() => save('stale consent'), 'AFFILIATE_NOT_FOUND')
   expect(await read()).toEqual({ ...before, payout_details: 'changed' })
 })
@@ -166,7 +170,8 @@ it('dates an immediately active admin enrollment at creation', async () => {
 })
 
 it('consumes a one-time admin grant only after a valid reapplication and retains the rejection audit', async () => {
-  await settings({ terms_version: 'qa-v1', apply_min_level: 'none' })
+  await settings({ apply_min_level: 'none' })
+  await terms('qa-v1')
   const team = await promoter(db)
   await db.query('update affiliates set team_enabled=true where user_id=$1', [team.id])
   const form = { name: 'Original', country: 'US', channel: 'blog', audience: '100', plan: 'Reviews' }
@@ -182,7 +187,7 @@ it('consumes a one-time admin grant only after a valid reapplication and retains
   await rejects(() => apply({ ...revised, reapply_allowed: true }), 'APPLICATION_EXISTS')
   await rejects(() => grant(user), 'NOT_ADMIN')
   await grant(admin)
-  await settings({ terms_version: 'qa-v2' })
+  await terms('qa-v2')
   await rejects(() => apply(revised), 'TERMS_CHANGED')
   expect(await state()).toMatchObject({ status: 'rejected', application: form, reject_reason: 'Missing channel URL', reapply_allowed: true })
   await apply({ ...revised, source: 'admin_invite' }, null, 'qa-v2')

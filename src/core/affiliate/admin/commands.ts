@@ -59,7 +59,7 @@ const commands = {
     payout_min_usd: money.refine((n) => n > 0),
     settlement_day: z.coerce.number().int().min(1).max(28),
     apply_min_level: z.enum(['none', 'any_paid', 'starter', 'pro', 'max']),
-    terms_version: required,
+    // terms_version is not set here: it moves only with 「开始记录手续费」 (1820).
   }),
   recompute: z.object({ payment_id: z.string().regex(/^[1-9]\d{0,17}$/) }),
 }
