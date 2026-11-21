@@ -63,6 +63,48 @@ export function scrubPvuvBody(body: string, roots: readonly string[]): string | 
   }
 }
 
+const FIRST_TOUCH = '_pv_ft'
+const FIRST_TOUCH_MAX_AGE = 396 * 86_400
+
+type CookieDoc = Pick<Document, 'cookie'> & { location: Pick<Location, 'hostname' | 'protocol'> }
+
+// The cookie domain f.js uses: the shortest parent of the host that accepts a cookie (none on an
+// IP or a single label).
+function cookieDomain(doc: CookieDoc): string {
+  const host = doc.location.hostname
+  if (/^[\d.]+$/.test(host) || !host.includes('.')) return ''
+  const labels = host.split('.')
+  for (let i = labels.length - 2; i >= 0; i--) {
+    const domain = labels.slice(i).join('.')
+    doc.cookie = `_pv_t=1; Path=/; Domain=.${domain}; Max-Age=60; SameSite=Lax`
+    if (/(?:^|;\s*)_pv_t=/.test(doc.cookie)) {
+      doc.cookie = `_pv_t=; Path=/; Domain=.${domain}; Max-Age=0`
+      return domain
+    }
+  }
+  return ''
+}
+
+// f.js keeps the first visit's raw referrer in the _pv_ft cookie (396 days, the whole site's
+// domain, sent with every request to it): a full invite or ?code= address after a full-page
+// navigation. Rewritten with the referrer scrubbed, same name, path and domain. Only when it
+// changes, so a clean cookie is not touched.
+export function scrubFirstTouchCookie(doc: CookieDoc, roots: readonly string[]): void {
+  try {
+    const match = doc.cookie.match(new RegExp(`(?:^|;\\s*)${FIRST_TOUCH}=([^;]*)`))
+    if (!match?.[1]) return
+    const touch = JSON.parse(decodeURIComponent(match[1])) as Beat
+    if (typeof touch.r !== 'string') return
+    const clean = scrubPvuvUrl(touch.r, roots)
+    if (clean === touch.r) return
+    const domain = cookieDomain(doc)
+    const secure = doc.location.protocol === 'https:' ? '; Secure' : ''
+    doc.cookie = `${FIRST_TOUCH}=${encodeURIComponent(JSON.stringify({ ...touch, r: clean }))}; Path=/; Max-Age=${FIRST_TOUCH_MAX_AGE}; SameSite=Lax${domain ? `; Domain=.${domain}` : ''}${secure}`
+  } catch {
+    // An unreadable cookie is left to the script.
+  }
+}
+
 type Scrubbable = {
   fetch?: typeof fetch
   navigator?: { sendBeacon?: (url: string | URL, data?: BodyInit | null) => boolean }

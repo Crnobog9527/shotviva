@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PRIVATE_ROOTS, PVUV_API } from './pvuv'
-import { installPvuvScrub, resetPvuvScrubForTest, scrubPvuvBody, scrubPvuvUrl } from './pvuv-scrub'
+import { installPvuvScrub, resetPvuvScrubForTest, scrubFirstTouchCookie, scrubPvuvBody, scrubPvuvUrl } from './pvuv-scrub'
 
 const scrub = (url: string) => scrubPvuvUrl(url, PRIVATE_ROOTS)
 
@@ -65,5 +65,42 @@ describe('installPvuvScrub', () => {
     expect(sent[1]?.[1]).toBe(sent[0]?.[1])
     expect(sent[2]).toEqual(['https://shotviva.com/api/x', dirty])
     expect(sent).toHaveLength(3)
+  })
+})
+
+describe('scrubFirstTouchCookie', () => {
+  function fakeDoc(initial: string, host = 'www.shotviva.com') {
+    const writes: string[] = []
+    let jar = initial ? initial.split('; ') : []
+    const doc = {
+      location: { hostname: host, protocol: 'https:' },
+      get cookie() { return jar.join('; ') },
+      set cookie(value: string) {
+        writes.push(value)
+        const [pair = ''] = value.split(';')
+        const name = pair.split('=')[0]
+        jar = jar.filter((c) => c.split('=')[0] !== name)
+        if (!/Max-Age=0/.test(value)) jar.push(pair)
+      },
+    }
+    return { doc, writes }
+  }
+  const cookieOf = (touch: object) => `_pv_ft=${encodeURIComponent(JSON.stringify(touch))}`
+
+  it('rewrites the stored referrer scrubbed, keeping name, path, domain, expiry and the other fields', () => {
+    const { doc, writes } = fakeDoc(cookieOf({ s: 'google', r: 'https://shotviva.com/join/org/TOKEN?code=1#x' }))
+    scrubFirstTouchCookie(doc, PRIVATE_ROOTS)
+    const written = writes.find((w) => w.startsWith('_pv_ft='))
+    expect(written).toBeDefined()
+    const [pair, ...attrs] = (written ?? '').split('; ')
+    expect(JSON.parse(decodeURIComponent((pair ?? '').slice('_pv_ft='.length)))).toEqual({ s: 'google', r: 'https://shotviva.com/join' })
+    expect(attrs).toEqual(['Path=/', `Max-Age=${396 * 86400}`, 'SameSite=Lax', 'Domain=.shotviva.com', 'Secure'])
+  })
+  it('leaves a clean cookie, a missing one and a broken one alone', () => {
+    for (const jar of [cookieOf({ r: 'https://chatgpt.com/' }), cookieOf({ s: 'x' }), '_pv_ft=%7Bbroken', '']) {
+      const { doc, writes } = fakeDoc(jar)
+      scrubFirstTouchCookie(doc, PRIVATE_ROOTS)
+      expect(writes.filter((w) => w.startsWith('_pv_ft='))).toEqual([])
+    }
   })
 })

@@ -50,16 +50,16 @@ describe('pvuvEvent / pvuvIdentify queue', () => {
     const { pvuvEvent, pvuvIdentify, loadPvuv, resetPvuvForTest } = await import('./pvuv')
     resetPvuvForTest()
     const calls: unknown[][] = []
-    const listeners: Record<string, () => void> = {}
-    const win: Record<string, unknown> = {}
+    const listeners: Record<string, Array<() => void>> = {}
+    const win: Record<string, unknown> = { addEventListener() {} }
     vi.stubGlobal('window', win)
-    const doc = { createElement: () => ({ setAttribute() {}, addEventListener: (n: string, f: () => void) => (listeners[n] = f) }), head: { appendChild() {} } }
+    const doc = { createElement: () => ({ setAttribute() {}, addEventListener: (n: string, f: () => void) => ((listeners[n] ??= []).push(f)) }), head: { appendChild() {} } }
     pvuvEvent('paywall_view', { trigger: 'account', skip: null })
     pvuvIdentify('u1')
     loadPvuv('site1', doc as unknown as Document)
     expect(calls).toHaveLength(0)
     win.pvuv = (...args: unknown[]) => calls.push(args)
-    listeners.load?.()
+    listeners.load?.forEach((f) => f())
     expect(calls).toEqual([['identify', 'u1'], ['event', 'paywall_view', { trigger: 'account' }]])
     pvuvEvent('upload', { compressed: true })
     expect(calls.at(-1)).toEqual(['event', 'upload', { compressed: true }])

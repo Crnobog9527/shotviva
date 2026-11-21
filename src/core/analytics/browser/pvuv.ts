@@ -6,7 +6,7 @@
 
 import { splitLocale } from '../../i18n/paths'
 import { pvuvProps, type PvuvProps } from '../pvuv/props'
-import { installPvuvScrub } from './pvuv-scrub'
+import { installPvuvScrub, scrubFirstTouchCookie } from './pvuv-scrub'
 
 export const PVUV_SCRIPT_SRC = 'https://www.pvuv.ai/f.js'
 export const PVUV_API = 'https://in.pvuv.ai'
@@ -58,6 +58,11 @@ export function loadPvuv(site: string, doc: Document = document): void {
   const script = doc.createElement('script')
   for (const [name, value] of Object.entries(pvuvAttributes(site))) script.setAttribute(name, value)
   script.addEventListener('load', flushPending, { once: true })
+  // The script's first-touch cookie holds the raw referrer: cleaned once it has written it, and
+  // again when the page closes (a later visit's script run may write it first).
+  const cleanFirstTouch = () => scrubFirstTouchCookie(doc, PRIVATE_ROOTS)
+  script.addEventListener('load', cleanFirstTouch, { once: true })
+  window.addEventListener('pagehide', cleanFirstTouch, { once: true })
   doc.head.appendChild(script)
 }
 
