@@ -47,10 +47,10 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
   return (
     <html lang={htmlLang(lang)} className="h-full antialiased">
       <body className="flex min-h-full flex-col">
-        {/* Geist faces and preload on one host (core/ui/geist-fonts.tsx). */}
+        {/* Geist and Instrument Serif faces on one host, with its preconnect (core/ui/geist-fonts.tsx). */}
         <GeistFonts />
         {/* Chinese pages fetch MiSans right after the first paint (misans-stylesheet.tsx); English
-            headings fetch Instrument Serif when they are laid out (globals-body.css). */}
+            headings fetch Instrument Serif when they are laid out (core/ui/geist-fonts.tsx). */}
         {lang === 'zh' ? <MiSansStylesheet /> : null}
         <NextIntlClientProvider messages={messages}>
           <TranslatedPathsProvider paths={site.locales.zhPaths}>

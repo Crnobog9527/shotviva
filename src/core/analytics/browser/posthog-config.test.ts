@@ -42,6 +42,8 @@ describe('posthogConfig (ARCHITECTURE §16.1, T70)', () => {
 
   it('sends through the same-origin /ingest proxy', () => {
     expect(posthogConfig(outsideEurope, '/')).toMatchObject({ api_host: '/ingest', ui_host: 'https://us.posthog.com' })
+    // Web vitals without attribution (the smaller bundle); on or off stays with the project.
+    expect(posthogConfig(outsideEurope, '/').capture_performance).toEqual({ web_vitals_attribution: false })
   })
 })
 

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { geistCss } from './geist-fonts'
 import { INSTRUMENT_SERIF_FILES } from './instrument-serif'
 
 const root = process.cwd()
@@ -18,10 +19,11 @@ describe('Instrument Serif files', () => {
     }
   })
 
-  it('are the files globals-body.css declares, and the only ones', () => {
-    const css = readFileSync(join(root, 'src/app/globals-body.css'), 'utf8')
-    const declared = [...css.matchAll(/url\("(\/fonts\/instrument-serif\/[^"]+)"\)/g)].map((match) => match[1])
+  it('are declared with Geist on the fonts host, and nowhere else', () => {
+    const css = geistCss('https://cdn.example')
+    const declared = [...css.matchAll(/url\(https:\/\/cdn\.example(\/fonts\/instrument-serif\/[^)]+)\)/g)].map((match) => match[1])
     expect(declared.sort()).toEqual([...INSTRUMENT_SERIF_FILES].sort())
+    expect(readFileSync(join(root, 'src/app/globals-body.css'), 'utf8')).not.toContain('/fonts/instrument-serif/')
   })
 
   it('ship with their license', () => {
