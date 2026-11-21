@@ -5,7 +5,7 @@ import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
+import { batchLimitsOf, effectiveLimits, readBalance } from '@/core/billing'
 import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
@@ -52,10 +52,10 @@ async function Workspace({ params, searchParams }: RouteProps) {
   const againId = typeof query.again === 'string' ? query.again : undefined
   const reuseId = !againId && typeof query.reuse === 'string' ? query.reuse : undefined
   const admin = createAdminSupabase()
-  const [balance, tier, runningIds, again, reuse, editOffer] = await Promise.all([
+  const [balance, limits, runningIds, again, reuse, editOffer] = await Promise.all([
     readBalance(supabase, user.id),
-    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
-    effectiveTier(admin, user.id),
+    // effective_limits() (tier, an unbanned admin as Max, plus the org lift) is service-role only; the user's own id comes from the session.
+    effectiveLimits(admin, user.id),
     listRunningJobIds(admin, user.id, new Date()),
     loadAgain({ db: admin, store: r2Store }, { userId: user.id, jobId: againId, template }),
     loadReuse(site, { jobId: reuseId, template }),
@@ -70,8 +70,9 @@ async function Workspace({ params, searchParams }: RouteProps) {
       <ImageWorkspace
         template={template}
         balance={balance}
-        tier={tier}
-        concurrency={{ limit: limitsFor(tier).concurrency, runningIds }}
+        tier={limits.tier}
+        batch={batchLimitsOf(limits)}
+        concurrency={{ limit: limits.concurrency, runningIds }}
         again={again ?? reuse}
         editable={editOffer !== null}
         shareText={t('shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}

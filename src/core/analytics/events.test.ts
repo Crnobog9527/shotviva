@@ -135,8 +135,8 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     // Phone sign-ups (T63) report as phone.
     expect(validateEvent('signup', { method: 'phone' }).ok).toBe(true)
     expect(validateEvent('generate', { ...generate, duration_ms: undefined }).ok).toBe(false)
-    expect(validateEvent('generate', { ...generate, batch_size: 30 }).ok).toBe(true)
-    expect(validateEvent('generate', { ...generate, batch_size: 31 }).ok).toBe(false)
+    expect(validateEvent('generate', { ...generate, batch_size: 200 }).ok).toBe(true)
+    expect(validateEvent('generate', { ...generate, batch_size: 201 }).ok).toBe(false)
     expect(validateEvent('paywall_view', { trigger: 'tier_required' }).ok).toBe(true)
     expect(validateEvent('purchase', checkout).ok).toBe(false)
     expect(validateEvent('contact_sales_click', { page: '/pricing' }).ok).toBe(true)

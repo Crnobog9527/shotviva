@@ -1,4 +1,4 @@
-import { limitsFor } from '@/core/billing/tier-limits'
+import { batchMaxFor, limitsFor, type BatchLimits } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 import { MAX_BATCH_TEMPLATES } from '@/core/jobs/batch/limits'
 
@@ -19,14 +19,16 @@ export const FEATURE_TIER: Record<GatedFeature, PaidTier> = { batch: 'pro', temp
 // Null below Pro, where a batch is one photo and the page shows the plan that unlocks it.
 export type BatchCaps = { templates: number; cells: number }
 
-export function batchCaps(tier: MembershipTier | null): BatchCaps | null {
-  const cells = limitsFor(tier).batchMax
+// `batch`: the account's effective limits from the server (ARCHITECTURE §6.5: an org can lift a
+// member past their tier); without them, the tier table.
+export function batchCaps(tier: MembershipTier | null, batch?: BatchLimits | null): BatchCaps | null {
+  const cells = batchMaxFor(tier, batch)
   if (cells <= 1) return null
-  return { templates: tier === 'max' ? MAX_BATCH_TEMPLATES : 1, cells }
+  return { templates: batch ? batch.multiTemplateMax : tier === 'max' ? MAX_BATCH_TEMPLATES : 1, cells }
 }
 
-export function isLocked(feature: GatedFeature, tier: MembershipTier | null): boolean {
-  const caps = batchCaps(tier)
+export function isLocked(feature: GatedFeature, tier: MembershipTier | null, batch?: BatchLimits | null): boolean {
+  const caps = batchCaps(tier, batch)
   return feature === 'batch' ? caps === null : (caps?.templates ?? 1) <= 1
 }
 

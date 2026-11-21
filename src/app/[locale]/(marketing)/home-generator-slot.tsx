@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 
 import { googleAction } from '@/app/auth/actions'
 import { createAdminSupabase, createServerSupabase, getSessionUser } from '@/core/auth'
-import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveLimits, readBalance } from '@/core/billing'
 import { PaywallProvider } from '@/core/billing/paywall/provider'
 import { wechatPayEnabled } from '@/core/billing/stripe'
 import { StandingSlot } from '@/core/billing/standing'
@@ -25,15 +25,15 @@ async function viewerOf(): Promise<HomeViewer | null> {
   if (!user?.verified) return null
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
-  const [balance, tier, runningIds, favoriteIds] = await Promise.all([
+  const [balance, limits, runningIds, favoriteIds] = await Promise.all([
     readBalance(supabase, user.id),
-    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
-    effectiveTier(admin, user.id),
+    // effective_limits() (tier, an unbanned admin as Max, plus the org lift) is service-role only; the user's own id comes from the session.
+    effectiveLimits(admin, user.id),
     listRunningJobIds(admin, user.id, new Date()),
     // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
     listFavoriteIdsOrEmpty(supabase, user.id),
   ])
-  return { balance, concurrency: { limit: limitsFor(tier).concurrency, runningIds }, favoriteIds }
+  return { balance, concurrency: { limit: limits.concurrency, runningIds }, favoriteIds }
 }
 
 // The home page is everyone's first page: an auth or database hiccup shows the signed-out
