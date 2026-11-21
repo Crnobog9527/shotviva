@@ -4,7 +4,7 @@ import { authorizedCron } from '@/core/cron/authorized'
 import { logger } from '@/core/logger'
 import { z } from 'zod'
 
-// Vercel cron every minute (queue-fairness Q3, SQL 1740): refunds generation jobs still 'running'
+// Vercel cron every minute (queue-fairness Q3, SQL 1760): refunds generation jobs still 'running'
 // 15 minutes after they started, when no function can still be settling them (the longest
 // generation function lives 300 s), and drops lane slot rows nobody counts any more. Before this a
 // job whose function died kept its credits reserved for good. Bearer CRON_SECRET only.

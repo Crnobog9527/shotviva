@@ -10,7 +10,7 @@ import { reserveJob } from '@/core/jobs'
 import { anonClient, connectAdmin, createPricedTemplate, createUser, profileOf, serviceClient } from './helpers'
 import { adminAccount, member, orgWith } from './org-fixtures'
 
-// Site-wide generation lanes and the stale-job sweep (queue-fairness Q3, SQL 1740). The lane
+// Site-wide generation lanes and the stale-job sweep (queue-fairness Q3, SQL 1760). The lane
 // numbers are shrunk for the test so a handful of slots fills a lane; the real row is put back.
 
 const service = serviceClient()
