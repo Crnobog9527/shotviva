@@ -3959,6 +3959,21 @@ $$;
 ALTER FUNCTION "public"."_enforce_code_gift_policy"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" integer, "p_inflight" integer) RETURNS "jsonb"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object(
+    'per_minute', case when jsonb_typeof(p->'per_minute') = 'number' and (p->>'per_minute')::numeric between 1 and 10000
+      then floor((p->>'per_minute')::numeric)::int else p_per_minute end,
+    'inflight', case when jsonb_typeof(p->'inflight') = 'number' and (p->>'inflight')::numeric between 1 and 10000
+      then floor((p->>'inflight')::numeric)::int else p_inflight end)
+$$;
+
+
+ALTER FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" integer, "p_inflight" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_link_early_payment_disputes"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -4834,6 +4849,84 @@ $$;
 
 
 ALTER FUNCTION "public"."_validate_code_discount"("p_products" "text"[], "p_percent" integer, "p_catalog" "jsonb", "p_floor_product_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."acquire_generation_slot"("p_attempt_id" "uuid", "p_lane" "text", "p_user_id" "uuid", "p_kind" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  cfg jsonb := public.generation_lane_settings();
+  lane jsonb;
+  reserve int := (cfg->>'single_reserve_pct')::int;
+  cap int;
+  per_minute int;
+  v_org uuid;
+  live int;
+  recent int;
+  org_live int;
+  orgs_live int;
+  reason text;
+begin
+  if p_lane not in ('gpt', 'seedream', 'other') or p_kind not in ('single', 'batch') then
+    raise exception 'INVALID_INPUT';
+  end if;
+  lane := cfg->'lanes'->p_lane;
+  cap := (lane->>'inflight')::int;
+  per_minute := (lane->>'per_minute')::int;
+  if p_kind = 'batch' then
+    cap := greatest(1, floor(cap * (100 - reserve) / 100.0)::int);
+    per_minute := greatest(1, floor(per_minute * (100 - reserve) / 100.0)::int);
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext('generation_lane:' || p_lane));
+  if exists (select 1 from public.generation_slots s where s.attempt_id = p_attempt_id) then
+    return jsonb_build_object('granted', true);
+  end if;
+
+  select o.id into v_org
+    from public.org_members m join public.orgs o on o.id = m.org_id
+   where m.user_id = p_user_id and m.status = 'active' and o.status = 'active';
+  -- The org cap spans lanes, so two of one org's requests in different lanes must not both pass
+  -- it: a second lock per org, always taken after the lane lock (one lane lock, then at most one
+  -- org lock, in that order: no cycle, no deadlock).
+  if v_org is not null then
+    perform pg_advisory_xact_lock(hashtext('generation_org:' || v_org::text));
+  end if;
+
+  select count(*) filter (where s.released_at is null and s.expires_at > now()),
+         count(*) filter (where s.acquired_at > now() - interval '60 seconds'),
+         count(*) filter (where s.released_at is null and s.expires_at > now() and s.org_id is not null)
+    into live, recent, orgs_live
+    from public.generation_slots s
+   where s.lane = p_lane and (s.acquired_at > now() - interval '60 seconds' or (s.released_at is null and s.expires_at > now()));
+
+  if live >= cap then reason := 'lane_full';
+  elsif recent >= per_minute then reason := 'lane_rate';
+  end if;
+
+  if reason is null and v_org is not null then
+    -- The org cap spans every lane: it is the org's share of the site, not of one provider.
+    select count(*) into org_live from public.generation_slots s
+     where s.org_id = v_org and s.released_at is null and s.expires_at > now();
+    if org_live >= (cfg->>'org_inflight_max')::int then reason := 'org_full';
+    elsif p_kind = 'batch' and orgs_live >= greatest(1, floor(cap * (cfg->>'orgs_share_pct')::int / 100.0)::int) then
+      reason := 'orgs_share';
+    end if;
+  end if;
+
+  if reason is not null then
+    return jsonb_build_object('granted', false, 'reason', reason);
+  end if;
+
+  insert into public.generation_slots (attempt_id, lane, user_id, org_id, kind, expires_at)
+  values (p_attempt_id, p_lane, p_user_id, v_org, p_kind, now() + make_interval(secs => (cfg->>'slot_ttl_seconds')::int));
+  return jsonb_build_object('granted', true);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."acquire_generation_slot"("p_attempt_id" "uuid", "p_lane" "text", "p_user_id" "uuid", "p_kind" "text") OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."support_ticket_messages" (
@@ -13360,6 +13453,36 @@ $$;
 ALTER FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."generation_lane_settings"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  with raw as (
+    select coalesce((select s.value from public.system_settings s where s.key = 'generation_lanes'), '{}'::jsonb) as v
+  ), num as (
+    select v,
+      (case when jsonb_typeof(v->'single_reserve_pct') = 'number' then (v->>'single_reserve_pct')::numeric end) as reserve,
+      (case when jsonb_typeof(v->'org_inflight_max') = 'number' then (v->>'org_inflight_max')::numeric end) as org_max,
+      (case when jsonb_typeof(v->'orgs_share_pct') = 'number' then (v->>'orgs_share_pct')::numeric end) as share,
+      (case when jsonb_typeof(v->'slot_ttl_seconds') = 'number' then (v->>'slot_ttl_seconds')::numeric end) as ttl
+    from raw
+  )
+  select jsonb_build_object(
+    'single_reserve_pct', case when reserve between 0 and 90 then floor(reserve)::int else 20 end,
+    'org_inflight_max', case when org_max between 1 and 1000 then floor(org_max)::int else 24 end,
+    'orgs_share_pct', case when share between 1 and 100 then floor(share)::int else 60 end,
+    'slot_ttl_seconds', case when ttl between 60 and 1800 then floor(ttl)::int else 360 end,
+    'lanes', jsonb_build_object(
+      'gpt', public._generation_lane(v->'lanes'->'gpt', 120, 100),
+      'seedream', public._generation_lane(v->'lanes'->'seedream', 300, 120),
+      'other', public._generation_lane(v->'lanes'->'other', 120, 20)))
+  from num
+$$;
+
+
+ALTER FUNCTION "public"."generation_lane_settings"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."get_or_create_invite_code"("p_user" "uuid") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -15676,6 +15799,21 @@ $$;
 ALTER FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."release_generation_slot"("p_attempt_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  with released as (
+    update public.generation_slots set released_at = now() where attempt_id = p_attempt_id and released_at is null
+    returning 1
+  )
+  select exists (select 1 from released);
+$$;
+
+
+ALTER FUNCTION "public"."release_generation_slot"("p_attempt_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."report_work"("p_job_id" "uuid", "p_reporter" "uuid", "p_reason" "text", "p_note" "text") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -16512,6 +16650,44 @@ $$;
 
 
 ALTER FUNCTION "public"."support_reply_hours"("p_tier" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sweep_stale_generation_jobs"("p_older_than" interval, "p_limit" integer DEFAULT 50) RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id uuid;
+  refunded integer := 0;
+  since timestamptz;
+begin
+  if p_older_than < interval '10 minutes' then raise exception 'INVALID_INPUT'; end if;
+  select (s.value #>> '{}')::timestamptz into since from public.system_settings s where s.key = 'generation_sweep_since';
+  if since is not null then
+    for v_id in
+      select j.id from public.generation_jobs j
+       where j.status = 'running' and j.created_at < now() - p_older_than
+         and j.created_at >= greatest(since, now() - interval '24 hours')
+       order by j.created_at
+       limit least(greatest(p_limit, 1), 200)
+    loop
+      begin
+        perform public.refund_job(v_id, 'STALE_TIMEOUT', null, null);
+        refunded := refunded + 1;
+      exception when others then
+        -- Settled meanwhile (JOB_ALREADY_SETTLED) or any other refusal: leave it for the next pass.
+        null;
+      end;
+    end loop;
+  end if;
+  delete from public.generation_slots s
+   where s.acquired_at < now() - interval '10 minutes' and (s.released_at is not null or s.expires_at < now());
+  return refunded;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."sweep_stale_generation_jobs"("p_older_than" interval, "p_limit" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."sync_image_capabilities"() RETURNS "trigger"
@@ -18734,6 +18910,23 @@ CREATE TABLE IF NOT EXISTS "public"."feature_user_grants" (
 ALTER TABLE "public"."feature_user_grants" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."generation_slots" (
+    "attempt_id" "uuid" NOT NULL,
+    "lane" "text" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "org_id" "uuid",
+    "kind" "text" NOT NULL,
+    "acquired_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "expires_at" timestamp with time zone NOT NULL,
+    "released_at" timestamp with time zone,
+    CONSTRAINT "generation_slots_kind_check" CHECK (("kind" = ANY (ARRAY['single'::"text", 'batch'::"text"]))),
+    CONSTRAINT "generation_slots_lane_check" CHECK (("lane" = ANY (ARRAY['gpt'::"text", 'seedream'::"text", 'other'::"text"])))
+);
+
+
+ALTER TABLE "public"."generation_slots" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."identity_judge_calls" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -20008,6 +20201,11 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 
 
+ALTER TABLE ONLY "public"."generation_slots"
+    ADD CONSTRAINT "generation_slots_pkey" PRIMARY KEY ("attempt_id");
+
+
+
 ALTER TABLE ONLY "public"."identity_judge_calls"
     ADD CONSTRAINT "identity_judge_calls_pkey" PRIMARY KEY ("id");
 
@@ -20804,6 +21002,10 @@ CREATE INDEX "generation_jobs_route_quality_p95_idx" ON "public"."generation_job
 
 
 
+CREATE INDEX "generation_jobs_running_created" ON "public"."generation_jobs" USING "btree" ("created_at") WHERE ("status" = 'running'::"text");
+
+
+
 CREATE INDEX "generation_jobs_running_created_at_idx" ON "public"."generation_jobs" USING "btree" ("created_at") WHERE ("status" = 'running'::"text");
 
 
@@ -20821,6 +21023,18 @@ CREATE INDEX "generation_jobs_user_id_created_at_idx" ON "public"."generation_jo
 
 
 CREATE UNIQUE INDEX "generation_jobs_user_idempotency_key_idx" ON "public"."generation_jobs" USING "btree" ("user_id", "idempotency_key") WHERE ("idempotency_key" IS NOT NULL);
+
+
+
+CREATE INDEX "generation_slots_lane_acquired" ON "public"."generation_slots" USING "btree" ("lane", "acquired_at");
+
+
+
+CREATE INDEX "generation_slots_lane_live" ON "public"."generation_slots" USING "btree" ("lane", "expires_at") WHERE ("released_at" IS NULL);
+
+
+
+CREATE INDEX "generation_slots_org_live" ON "public"."generation_slots" USING "btree" ("org_id", "expires_at") WHERE (("released_at" IS NULL) AND ("org_id" IS NOT NULL));
 
 
 
@@ -21901,6 +22115,16 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 
 
+ALTER TABLE ONLY "public"."generation_slots"
+    ADD CONSTRAINT "generation_slots_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."generation_slots"
+    ADD CONSTRAINT "generation_slots_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."identity_judge_calls"
     ADD CONSTRAINT "identity_judge_calls_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
@@ -22596,6 +22820,9 @@ CREATE POLICY "generation_jobs_hide_style_refs" ON "public"."generation_jobs" AS
 
 CREATE POLICY "generation_jobs_select_own" ON "public"."generation_jobs" FOR SELECT TO "authenticated" USING (((( SELECT "auth"."uid"() AS "uid") = "user_id") AND ("deleted_at" IS NULL)));
 
+
+
+ALTER TABLE "public"."generation_slots" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."identity_judge_calls" ENABLE ROW LEVEL SECURITY;
@@ -23619,6 +23846,11 @@ REVOKE ALL ON FUNCTION "public"."_enforce_code_gift_policy"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" integer, "p_inflight" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" integer, "p_inflight" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."_link_early_payment_disputes"() FROM PUBLIC;
 
 
@@ -23729,6 +23961,11 @@ GRANT ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p
 
 
 REVOKE ALL ON FUNCTION "public"."_validate_code_discount"("p_products" "text"[], "p_percent" integer, "p_catalog" "jsonb", "p_floor_product_id" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."acquire_generation_slot"("p_attempt_id" "uuid", "p_lane" "text", "p_user_id" "uuid", "p_kind" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."acquire_generation_slot"("p_attempt_id" "uuid", "p_lane" "text", "p_user_id" "uuid", "p_kind" "text") TO "service_role";
 
 
 
@@ -24927,6 +25164,11 @@ GRANT ALL ON FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identit
 
 
 
+REVOKE ALL ON FUNCTION "public"."generation_lane_settings"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."generation_lane_settings"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."get_or_create_invite_code"("p_user" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_or_create_invite_code"("p_user" "uuid") TO "service_role";
 
@@ -25301,6 +25543,11 @@ GRANT ALL ON FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_t
 
 
 
+REVOKE ALL ON FUNCTION "public"."release_generation_slot"("p_attempt_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."release_generation_slot"("p_attempt_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."report_work"("p_job_id" "uuid", "p_reporter" "uuid", "p_reason" "text", "p_note" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."report_work"("p_job_id" "uuid", "p_reporter" "uuid", "p_reason" "text", "p_note" "text") TO "service_role";
 
@@ -25438,6 +25685,11 @@ GRANT ALL ON FUNCTION "public"."submit_business_inquiry"("p_inquiry" "jsonb", "p
 
 REVOKE ALL ON FUNCTION "public"."support_reply_hours"("p_tier" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."support_reply_hours"("p_tier" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sweep_stale_generation_jobs"("p_older_than" interval, "p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sweep_stale_generation_jobs"("p_older_than" interval, "p_limit" integer) TO "service_role";
 
 
 
@@ -25785,6 +26037,10 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 
 
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."feature_user_grants" TO "service_role";
+
+
+
+GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_slots" TO "service_role";
 
 
 
