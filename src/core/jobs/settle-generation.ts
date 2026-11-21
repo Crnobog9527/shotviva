@@ -18,11 +18,43 @@ import { confirmJob, refundJob, type JobCost } from './settlement'
 // timeout still leaves time to refund; a killed function would strand the reservation.
 export const PROVIDER_TIMEOUT_MS = 240_000
 
+// Failures that stay out of the failure-rate alert: a declined photo or text is the user's input,
+// and a provider still at its per-minute limit is load, not an outage (the photo is queued again).
+const QUIET_FAILURES = new Set(['CONTENT_REJECTED', 'PROVIDER_RATE_LIMITED'])
+
+// A provider 429 (rate_limited) is retried inside the same deadline after these waits: a
+// per-minute limit usually clears within seconds, and a 429 is not billed.
+export const RATE_LIMIT_RETRY_WAITS_MS = [5_000, 10_000] as const
+
+const abortableWait = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
+  if (signal.aborted) return reject(new ProviderError('timeout', 'aborted while waiting to retry'))
+  const timer = setTimeout(resolve, ms)
+  signal.addEventListener('abort', () => {
+    clearTimeout(timer)
+    reject(new ProviderError('timeout', 'aborted while waiting to retry'))
+  }, { once: true })
+})
+
+async function generateRetrying(provider: GenerationProvider, input: ProviderInput, waits: readonly number[]): Promise<ProviderOutput> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await provider.generate(input)
+    } catch (error) {
+      const wait = waits[attempt]
+      if (!(error instanceof ProviderError && error.kind === 'rate_limited') || wait === undefined) throw error
+      logger.warn('generation.provider.rate_limited', { provider: provider.id, attempt: attempt + 1 })
+      await abortableWait(wait, input.signal)
+    }
+  }
+}
+
 export type SettleDeps = {
   db: SupabaseClient
   store: ObjectStore
   provider: GenerationProvider
   providerTimeoutMs?: number
+  // Tests pass [] or short waits; default RATE_LIMIT_RETRY_WAITS_MS.
+  rateLimitRetryWaitsMs?: readonly number[]
 }
 
 // Races the call against a timer as well as aborting it, so an adapter that ignores the
@@ -133,7 +165,7 @@ export async function settleProviderCall<T>(
   let usage: ProviderUsage | null = null
   try {
     const output = await withDeadline(
-      (signal) => deps.provider.generate({ ...call, signal, noteUsage: receipt => { usage = receipt } }),
+      (signal) => generateRetrying(deps.provider, { ...call, signal, noteUsage: receipt => { usage = receipt } }, deps.rateLimitRetryWaitsMs ?? RATE_LIMIT_RETRY_WAITS_MS),
       deps.providerTimeoutMs ?? PROVIDER_TIMEOUT_MS,
     )
     usage = await verifiedUsage(deps.provider, output.usage ?? null)
@@ -148,7 +180,7 @@ export async function settleProviderCall<T>(
     logger.error('generation failed', { jobId: ledger.id, stage, jobCode: failure.jobCode, error })
     // A declined photo or text is the user's input, not an outage; it stays out of the
     // failure-rate alert and is still counted in the `generate` event's error_code.
-    const alert = ledger.alerts && failure.jobCode !== 'CONTENT_REJECTED'
+    const alert = ledger.alerts && !QUIET_FAILURES.has(failure.jobCode)
     if (alert) captureError(error, { alert: 'generation_failed', fields: { jobId: ledger.id, stage, jobCode: failure.jobCode, source: ledger.source } })
     const refunded = await ledger.fail(failure.jobCode, costOf(deps.provider, usage, decision))
     // After the refund, so this job counts as failed in the Owner's failure-rate check (T72); the

@@ -34,7 +34,9 @@ const isEdit = (body: JobBody): body is EditBody => 'source_job_id' in body
 export type SubmitOutcome =
   | { kind: 'view'; view: JobView }
   | { kind: 'error'; body: ErrorBodyLike }
-  | { kind: 'limited'; retryAfterMs: number }
+  // settled: the job was created and refunded (the provider stayed at its limit, Q3), so its id is
+  // spent and the photo goes out again under a new one.
+  | { kind: 'limited'; retryAfterMs: number; settled?: boolean }
   | { kind: 'lost' }
 
 // POST /api/generate with a client-made job id, so a retried or backgrounded request finds the
@@ -47,7 +49,10 @@ export async function submitJob(jobId: string, body: JobBody): Promise<SubmitOut
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...body, job_id: jobId }),
     })
-    if (response.status === 429) return { kind: 'limited', retryAfterMs: retryDelayMs(response.headers.get('Retry-After')) }
+    if (response.status === 429) {
+      const limited = (await response.json().catch(() => ({}))) as { job_id?: unknown }
+      return { kind: 'limited', retryAfterMs: retryDelayMs(response.headers.get('Retry-After')), ...(typeof limited.job_id === 'string' ? { settled: true } : {}) }
+    }
     const json: unknown = await response.json().catch(() => ({}))
     if (response.ok) return { kind: 'view', view: json as JobView }
     return { kind: 'error', body: json as ErrorBodyLike }

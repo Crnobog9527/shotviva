@@ -129,7 +129,8 @@ describe('Ark responses and cost', () => {
   })
 
   it.each([
-    [429, 'ModelAccountIpmRateLimitExceeded', 'failed'],
+    [429, 'ModelAccountIpmRateLimitExceeded', 'rate_limited'],
+    [429, 'AccountQuotaExceeded', 'failed'],
     [403, 'AccountOverdueError', 'failed'],
     [500, 'InternalServiceError', 'failed'],
     [504, 'GatewayTimeout', 'timeout'],
