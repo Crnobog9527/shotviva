@@ -80,6 +80,11 @@ export function posthogConfig(consent: Consent, pathname: string): Partial<PostH
     // without cookie consent and on /admin and /checkout.
     disable_session_recording: !replayAllowed(consent, pathname),
     session_recording: REPLAY_MASKING,
+    // Web vitals stay switched on or off by the project (remote config). /admin/analytics reads
+    // only their values (admin/analytics/problems.ts), never the attribution, so PostHog loads
+    // its plain web-vitals bundle (4 KB gzip) instead of the attribution one (7 KB, flagged by
+    // PSI as legacy JavaScript, 2026-11-21). network_timing is left to the project too.
+    capture_performance: { web_vitals_attribution: false },
     // These features keep their own state in localStorage; none is used in v1.
     disable_surveys: true,
     disable_product_tours: true,
