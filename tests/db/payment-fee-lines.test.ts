@@ -220,14 +220,14 @@ it('admins add rate versions and switch them off; rates never change in place; e
     ['payment_fee_schedule:' + id])).toEqual({ n: 2 })
 })
 
-it('does not touch commissions: writing fees leaves the existing affiliate formula unchanged', async () => {
+it('recomputes the commission when fees are written (F5, migration 1740: net of fees)', async () => {
   const f = await setupAffiliate(db)
   const payment = await sale(db, f.buyer, 'pack_m', 2490)
-  const before = await commission(db, payment.id)
+  expect(await commission(db, payment.id)).toMatchObject({ amount: 373 })
   await record({ payment_id: payment.id, idempotency_key: 'k', basis_cents: 2490,
     lines: [{ kind: 'acquiring', source: 'estimate', schedule_id: await schedule('stripe', 'card', 'acquiring') }] })
   expect(await fees(payment.id)).toEqual({ fee_cents: 102, fee_status: 'estimated' })
-  expect(await commission(db, payment.id)).toEqual(before)
+  expect(await commission(db, payment.id)).toMatchObject({ amount: 358, status: 'pending' })
 })
 
 it('is service-role only: no client role reads the tables or runs the functions', async () => {

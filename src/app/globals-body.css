@@ -222,26 +222,10 @@
   unicode-range: U+2E80-2FDF, U+3000-303F, U+3100-312F, U+31A0-31BF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
 }
 
-/* Instrument Serif, the English display face (DESIGN §3.2). Declared here instead of through
-   next/font so that only English headings fetch it (core/ui/instrument-serif.tsx): Chinese pages
-   set headings in Geist + MiSans and would download both files for nothing. The files are the
-   ones next/font served, byte for byte, under content-hashed names (public/fonts/instrument-serif,
-   cached for a year, next.config.ts); its metric-matched fallback face is declared with Geist's
-   (core/ui/geist-fonts.tsx), so a heading keeps its box while the font arrives. */
-@font-face {
-  font-family: "Instrument Serif";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("/fonts/instrument-serif/instrument-serif-60c06664b5a95c7d.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Instrument Serif";
-  font-style: italic;
-  font-weight: 400;
-  font-display: swap;
-  src: url("/fonts/instrument-serif/instrument-serif-italic-6ee678c33f388dd7.woff2") format("woff2");
-}
+/* Instrument Serif, the English display face (DESIGN §3.2). Its two faces and metric-matched
+   fallback are declared with Geist's, on the same host (core/ui/geist-fonts.tsx): the static-file
+   CDN when it is set. Only headings that use it fetch it, so Chinese pages download neither file
+   (core/ui/instrument-serif.tsx). */
 :root {
   --font-instrument-serif: "Instrument Serif", "Instrument Serif Fallback";
 }

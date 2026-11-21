@@ -1,5 +1,6 @@
 import { AdminPage } from '@/core/admin'
 import { COPY } from './copy'
+import { FeesView } from './payment-fees-view'
 import { CommissionsView, PayoutsView } from './financial-view'
 import { MembersView, type ViewProps } from './members-view'
 import { OverviewView, ErrorsView, AttributionView, SettingsView } from './overview-view'
@@ -22,6 +23,8 @@ function Content(props: Props) {
       return <AttributionView {...props} />
     case 'settings':
       return <SettingsView {...props} />
+    case 'fees':
+      return <FeesView {...props} />
     case 'errors':
       return <ErrorsView {...props} />
   }

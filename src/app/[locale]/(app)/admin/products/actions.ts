@@ -7,6 +7,7 @@ import { saveDraft } from '@/core/admin/products/editor-data'
 import { productIdSchema } from '@/core/config/product-id'
 import { bindSeededWaffo } from '@/core/admin/products/waffo-seeded'
 import { currentProducts } from '@/site/billing/display-products'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 export async function catalogAction(form: FormData) {
   const actor = await requireAdmin()
@@ -21,7 +22,10 @@ export async function catalogAction(form: FormData) {
       const phase = phases.parse(form.get('op'))
       if (phase === 'prepare' && form.get('confirmed') !== 'on') throw new Error('Confirmation required')
       await review(db,actor.id,sku.data,phase,form)
-      if (phase === 'publish' || phase === 'waffo') updateTag('billing-products')
+      if (phase === 'publish' || phase === 'waffo') {
+        updateTag('billing-products')
+        warmPublicPagesSoon()
+      }
     }
     revalidatePath('/[locale]/admin/products','page')
     query.set('done','1')
@@ -40,7 +44,10 @@ export async function waffoSeededAction(form: FormData) {
     if (actor.banned || form.get('waffo_period') !== 'on') throw new Error('Confirmation required')
     const db = createAdminSupabase()
     const outcomes = await bindSeededWaffo(db, actor.id, await currentProducts(db))
-    if (outcomes.some(o => o.status === 'bound')) updateTag('billing-products')
+    if (outcomes.some(o => o.status === 'bound')) {
+      updateTag('billing-products')
+      warmPublicPagesSoon()
+    }
     revalidatePath('/[locale]/admin/products','page')
     query.set('waffo', outcomes.map(o => `${o.sku}:${o.status}`).join(','))
   } catch (error) {

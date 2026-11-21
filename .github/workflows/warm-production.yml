@@ -1,0 +1,65 @@
+name: Warm production cache
+
+# A new production deployment starts with an empty CDN cache: the first visitor or PageSpeed run
+# waits about a second for the page (PSI 2026-11-21, TTFB 1.04 s; 0.12-0.28 s on a HIT). Right
+# after each deploy, ask once for every page in scripts/html-budget.json with a browser and a
+# Lighthouse user agent, one request at a time (scripts/warm-cache.mts, ~50 requests).
+#
+# Triggers: Vercel's repository_dispatch for a production deployment (waits until that deployment
+# serves shotviva.com); a 20-minute check of /api/version that warms only when the deployment
+# changed (deploys that send no event); and by hand. GitHub's runners reach Vercel's US edge, so
+# this warms the US cache and the shared origin cache; a check from Asia or Europe may still see
+# one PRERENDER miss per page on its own edge.
+on:
+  repository_dispatch:
+    types: [vercel.deployment.promoted, vercel.deployment.success]
+  schedule:
+    - cron: '7-59/20 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: warm-production
+  cancel-in-progress: false
+
+env:
+  SITE_URL: ${{ vars.SEO_CHECK_URL || 'https://shotviva.com' }}
+
+jobs:
+  warm:
+    if: github.event_name != 'repository_dispatch' || (github.event.client_payload.environment || 'production') == 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          sparse-checkout: |
+            scripts/warm-cache.mts
+            scripts/html-budget.json
+            .nvmrc
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .warm-state
+          key: warm-production-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: warm-production-v1-
+      - name: Warm the public pages
+        env:
+          # The deployment that sent the event; empty on the schedule and by hand.
+          EXPECT: ${{ github.event.client_payload.id || '' }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+        run: |
+          args=("$SITE_URL" --state=.warm-state)
+          if [ -n "$EXPECT" ]; then args+=("--expect=$EXPECT"); fi
+          if [ -n "$FORCE" ]; then args+=(--force); fi
+          node scripts/warm-cache.mts "${args[@]}"
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: always()
+        with:
+          path: .warm-state
+          key: warm-production-v1-${{ github.run_id }}-${{ github.run_attempt }}
