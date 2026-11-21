@@ -38,3 +38,8 @@ it('splits more than 50 ids and fails the pass as a whole on an error', async ()
   vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 500 })))
   expect(await readJobs(['a'])).toBeNull()
 })
+
+it('marks a 429 that carries a refunded job as settled', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ code: 'RATE_LIMITED', job_id: 'j1', refunded: true }), { status: 429, headers: { 'Retry-After': '15' } })))
+  expect(await submitJob('00000000-0000-4000-8000-000000000001', body)).toMatchObject({ kind: 'limited', settled: true })
+})

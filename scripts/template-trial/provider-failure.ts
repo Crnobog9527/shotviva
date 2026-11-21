@@ -1,4 +1,4 @@
-import { ProviderError, type GenerationProvider, type TemplateProvider } from '../../src/core/jobs'
+import { ProviderError, type GenerationProvider, type ProviderFailureKind, type TemplateProvider } from '../../src/core/jobs'
 import { resolveTemplateProvider } from '../../src/core/jobs/provider'
 
 // Why a provider call failed, as far as a retry is concerned. admin_test_runs only keeps
@@ -7,7 +7,7 @@ import { resolveTemplateProvider } from '../../src/core/jobs/provider'
 // openai "openai 402 code=insufficient_quota …", OpenRouter "… (HTTP 400)",
 // Ark "… (HTTP 429 code=AccountQuotaExceeded)".
 
-export type Failure = { kind: 'timeout' | 'failed' | 'content_rejected'; status: number | null; code: string | null }
+export type Failure = { kind: ProviderFailureKind; status: number | null; code: string | null }
 
 export function readFailure(error: unknown): Failure | null {
   if (!(error instanceof ProviderError)) return null

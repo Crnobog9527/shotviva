@@ -3959,6 +3959,21 @@ $$;
 ALTER FUNCTION "public"."_enforce_code_gift_policy"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" integer, "p_inflight" integer) RETURNS "jsonb"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object(
+    'per_minute', case when jsonb_typeof(p->'per_minute') = 'number' and (p->>'per_minute')::numeric between 1 and 10000
+      then floor((p->>'per_minute')::numeric)::int else p_per_minute end,
+    'inflight', case when jsonb_typeof(p->'inflight') = 'number' and (p->>'inflight')::numeric between 1 and 10000
+      then floor((p->>'inflight')::numeric)::int else p_inflight end)
+$$;
+
+
+ALTER FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" integer, "p_inflight" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_link_early_payment_disputes"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -4147,6 +4162,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "created_by" "uuid" NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "signup_bonus_credits" integer DEFAULT 0 NOT NULL,
+    "ref_code" "text",
     CONSTRAINT "orgs_admin_note_check" CHECK (("length"("admin_note") <= 2000)),
     CONSTRAINT "orgs_affiliate_levels_check" CHECK (("affiliate_levels" = ANY (ARRAY[1, 2]))),
     CONSTRAINT "orgs_batch_max_check" CHECK (("batch_max" >= 1)),
@@ -4156,6 +4172,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     CONSTRAINT "orgs_name_check" CHECK ((("length"(TRIM(BOTH FROM "name")) >= 1) AND ("length"(TRIM(BOTH FROM "name")) <= 120))),
     CONSTRAINT "orgs_per_window_check" CHECK (("per_window" >= 1)),
     CONSTRAINT "orgs_pool_credits_check" CHECK (("pool_credits" >= 0)),
+    CONSTRAINT "orgs_ref_code_format" CHECK (("ref_code" ~ '^SV-[2-9A-HJKMNP-Z]{6}$'::"text")),
     CONSTRAINT "orgs_signup_bonus_credits_check" CHECK ((("signup_bonus_credits" >= 0) AND ("signup_bonus_credits" <= 1000))),
     CONSTRAINT "orgs_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'suspended'::"text"])))
 );
@@ -4353,6 +4370,32 @@ $$;
 ALTER FUNCTION "public"."_org_payment_fields"("p_kind" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_ref_code_new"() RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  alphabet constant text := '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  bytes bytea;
+  code text;
+  i int;
+begin
+  loop
+    bytes := uuid_send(gen_random_uuid());
+    code := 'SV-';
+    for i in 0..5 loop
+      code := code || substr(alphabet, 1 + (get_byte(bytes, i) % 31), 1);
+    end loop;
+    exit when not exists(select from public.orgs where ref_code = code);
+  end loop;
+  return code;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_org_ref_code_new"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_release"("p_org" "public"."orgs", "p_member" "uuid", "p_request" "text", "p_actor" "uuid") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -4478,6 +4521,24 @@ $$;
 
 
 ALTER FUNCTION "public"."_org_signup_bonus"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_orgs_ref_code_guard"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if tg_op = 'INSERT' then
+    if new.ref_code is null then new.ref_code := public._org_ref_code_new(); end if;
+  elsif new.ref_code is distinct from old.ref_code then
+    raise exception 'ORG_REF_CODE_IMMUTABLE';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_orgs_ref_code_guard"() OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."payment_disputes" (
@@ -4834,6 +4895,84 @@ $$;
 
 
 ALTER FUNCTION "public"."_validate_code_discount"("p_products" "text"[], "p_percent" integer, "p_catalog" "jsonb", "p_floor_product_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."acquire_generation_slot"("p_attempt_id" "uuid", "p_lane" "text", "p_user_id" "uuid", "p_kind" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  cfg jsonb := public.generation_lane_settings();
+  lane jsonb;
+  reserve int := (cfg->>'single_reserve_pct')::int;
+  cap int;
+  per_minute int;
+  v_org uuid;
+  live int;
+  recent int;
+  org_live int;
+  orgs_live int;
+  reason text;
+begin
+  if p_lane not in ('gpt', 'seedream', 'other') or p_kind not in ('single', 'batch') then
+    raise exception 'INVALID_INPUT';
+  end if;
+  lane := cfg->'lanes'->p_lane;
+  cap := (lane->>'inflight')::int;
+  per_minute := (lane->>'per_minute')::int;
+  if p_kind = 'batch' then
+    cap := greatest(1, floor(cap * (100 - reserve) / 100.0)::int);
+    per_minute := greatest(1, floor(per_minute * (100 - reserve) / 100.0)::int);
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext('generation_lane:' || p_lane));
+  if exists (select 1 from public.generation_slots s where s.attempt_id = p_attempt_id) then
+    return jsonb_build_object('granted', true);
+  end if;
+
+  select o.id into v_org
+    from public.org_members m join public.orgs o on o.id = m.org_id
+   where m.user_id = p_user_id and m.status = 'active' and o.status = 'active';
+  -- The org cap spans lanes, so two of one org's requests in different lanes must not both pass
+  -- it: a second lock per org, always taken after the lane lock (one lane lock, then at most one
+  -- org lock, in that order: no cycle, no deadlock).
+  if v_org is not null then
+    perform pg_advisory_xact_lock(hashtext('generation_org:' || v_org::text));
+  end if;
+
+  select count(*) filter (where s.released_at is null and s.expires_at > now()),
+         count(*) filter (where s.acquired_at > now() - interval '60 seconds'),
+         count(*) filter (where s.released_at is null and s.expires_at > now() and s.org_id is not null)
+    into live, recent, orgs_live
+    from public.generation_slots s
+   where s.lane = p_lane and (s.acquired_at > now() - interval '60 seconds' or (s.released_at is null and s.expires_at > now()));
+
+  if live >= cap then reason := 'lane_full';
+  elsif recent >= per_minute then reason := 'lane_rate';
+  end if;
+
+  if reason is null and v_org is not null then
+    -- The org cap spans every lane: it is the org's share of the site, not of one provider.
+    select count(*) into org_live from public.generation_slots s
+     where s.org_id = v_org and s.released_at is null and s.expires_at > now();
+    if org_live >= (cfg->>'org_inflight_max')::int then reason := 'org_full';
+    elsif p_kind = 'batch' and orgs_live >= greatest(1, floor(cap * (cfg->>'orgs_share_pct')::int / 100.0)::int) then
+      reason := 'orgs_share';
+    end if;
+  end if;
+
+  if reason is not null then
+    return jsonb_build_object('granted', false, 'reason', reason);
+  end if;
+
+  insert into public.generation_slots (attempt_id, lane, user_id, org_id, kind, expires_at)
+  values (p_attempt_id, p_lane, p_user_id, v_org, p_kind, now() + make_interval(secs => (cfg->>'slot_ttl_seconds')::int));
+  return jsonb_build_object('granted', true);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."acquire_generation_slot"("p_attempt_id" "uuid", "p_lane" "text", "p_user_id" "uuid", "p_kind" "text") OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."support_ticket_messages" (
@@ -8615,6 +8754,47 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_openai_admin_key_status"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_org_id uuid;
+  v_user uuid;
+  o public.orgs;
+  v_banned timestamptz;
+  v_current uuid;
+begin
+  perform public._org_require_admin(p_actor);
+  if p_input is null or jsonb_typeof(p_input) <> 'object'
+     or coalesce(p_input->>'org_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     or coalesce(p_input->>'user_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    raise exception 'INVALID_INPUT';
+  end if;
+  v_org_id := (p_input->>'org_id')::uuid;
+  v_user := (p_input->>'user_id')::uuid;
+  select * into o from public.orgs where id = v_org_id for no key update;
+  if not found then raise exception 'ORG_NOT_FOUND'; end if;
+  if o.status <> 'active' then raise exception 'ORG_SUSPENDED'; end if;
+  select banned_at into v_banned from public.profiles where id = v_user for no key update;
+  if not found then raise exception 'PROFILE_NOT_FOUND'; end if;
+  if v_banned is not null then raise exception 'USER_BANNED'; end if;
+  select org_id into v_current from public.org_members where user_id = v_user and status = 'active';
+  if v_current = o.id then return jsonb_build_object('applied', false); end if;
+  if v_current is not null then raise exception 'ORG_MEMBER_EXISTS'; end if;
+  if public._affiliate_personal_open(v_user) then raise exception 'ORG_PERSONAL_AFFILIATE'; end if;
+  insert into public.org_members(org_id, user_id, role) values (o.id, v_user, 'member')
+    on conflict (org_id, user_id) do update set status = 'active', removed_at = null, joined_at = now(),
+      monthly_allowance = 0, held_credits = 0;
+  perform public._org_audit(p_actor, 'org_add_member', o.id::text, 'member:' || v_user::text);
+  return jsonb_build_object('applied', true);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_org_create"("p_actor" "uuid", "p_input" "jsonb") RETURNS "uuid"
@@ -13360,6 +13540,36 @@ $$;
 ALTER FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identity_swap" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."generation_lane_settings"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  with raw as (
+    select coalesce((select s.value from public.system_settings s where s.key = 'generation_lanes'), '{}'::jsonb) as v
+  ), num as (
+    select v,
+      (case when jsonb_typeof(v->'single_reserve_pct') = 'number' then (v->>'single_reserve_pct')::numeric end) as reserve,
+      (case when jsonb_typeof(v->'org_inflight_max') = 'number' then (v->>'org_inflight_max')::numeric end) as org_max,
+      (case when jsonb_typeof(v->'orgs_share_pct') = 'number' then (v->>'orgs_share_pct')::numeric end) as share,
+      (case when jsonb_typeof(v->'slot_ttl_seconds') = 'number' then (v->>'slot_ttl_seconds')::numeric end) as ttl
+    from raw
+  )
+  select jsonb_build_object(
+    'single_reserve_pct', case when reserve between 0 and 90 then floor(reserve)::int else 20 end,
+    'org_inflight_max', case when org_max between 1 and 1000 then floor(org_max)::int else 24 end,
+    'orgs_share_pct', case when share between 1 and 100 then floor(share)::int else 60 end,
+    'slot_ttl_seconds', case when ttl between 60 and 1800 then floor(ttl)::int else 360 end,
+    'lanes', jsonb_build_object(
+      'gpt', public._generation_lane(v->'lanes'->'gpt', 120, 100),
+      'seedream', public._generation_lane(v->'lanes'->'seedream', 300, 120),
+      'other', public._generation_lane(v->'lanes'->'other', 120, 20)))
+  from num
+$$;
+
+
+ALTER FUNCTION "public"."generation_lane_settings"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."get_or_create_invite_code"("p_user" "uuid") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -15676,6 +15886,21 @@ $$;
 ALTER FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."release_generation_slot"("p_attempt_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  with released as (
+    update public.generation_slots set released_at = now() where attempt_id = p_attempt_id and released_at is null
+    returning 1
+  )
+  select exists (select 1 from released);
+$$;
+
+
+ALTER FUNCTION "public"."release_generation_slot"("p_attempt_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."report_work"("p_job_id" "uuid", "p_reporter" "uuid", "p_reason" "text", "p_note" "text") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -16512,6 +16737,44 @@ $$;
 
 
 ALTER FUNCTION "public"."support_reply_hours"("p_tier" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sweep_stale_generation_jobs"("p_older_than" interval, "p_limit" integer DEFAULT 50) RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id uuid;
+  refunded integer := 0;
+  since timestamptz;
+begin
+  if p_older_than < interval '10 minutes' then raise exception 'INVALID_INPUT'; end if;
+  select (s.value #>> '{}')::timestamptz into since from public.system_settings s where s.key = 'generation_sweep_since';
+  if since is not null then
+    for v_id in
+      select j.id from public.generation_jobs j
+       where j.status = 'running' and j.created_at < now() - p_older_than
+         and j.created_at >= greatest(since, now() - interval '24 hours')
+       order by j.created_at
+       limit least(greatest(p_limit, 1), 200)
+    loop
+      begin
+        perform public.refund_job(v_id, 'STALE_TIMEOUT', null, null);
+        refunded := refunded + 1;
+      exception when others then
+        -- Settled meanwhile (JOB_ALREADY_SETTLED) or any other refusal: leave it for the next pass.
+        null;
+      end;
+    end loop;
+  end if;
+  delete from public.generation_slots s
+   where s.acquired_at < now() - interval '10 minutes' and (s.released_at is not null or s.expires_at < now());
+  return refunded;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."sweep_stale_generation_jobs"("p_older_than" interval, "p_limit" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."sync_image_capabilities"() RETURNS "trigger"
@@ -18158,7 +18421,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -18732,6 +18995,23 @@ CREATE TABLE IF NOT EXISTS "public"."feature_user_grants" (
 
 
 ALTER TABLE "public"."feature_user_grants" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."generation_slots" (
+    "attempt_id" "uuid" NOT NULL,
+    "lane" "text" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "org_id" "uuid",
+    "kind" "text" NOT NULL,
+    "acquired_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "expires_at" timestamp with time zone NOT NULL,
+    "released_at" timestamp with time zone,
+    CONSTRAINT "generation_slots_kind_check" CHECK (("kind" = ANY (ARRAY['single'::"text", 'batch'::"text"]))),
+    CONSTRAINT "generation_slots_lane_check" CHECK (("lane" = ANY (ARRAY['gpt'::"text", 'seedream'::"text", 'other'::"text"])))
+);
+
+
+ALTER TABLE "public"."generation_slots" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."identity_judge_calls" (
@@ -20008,6 +20288,11 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 
 
+ALTER TABLE ONLY "public"."generation_slots"
+    ADD CONSTRAINT "generation_slots_pkey" PRIMARY KEY ("attempt_id");
+
+
+
 ALTER TABLE ONLY "public"."identity_judge_calls"
     ADD CONSTRAINT "identity_judge_calls_pkey" PRIMARY KEY ("id");
 
@@ -20804,6 +21089,10 @@ CREATE INDEX "generation_jobs_route_quality_p95_idx" ON "public"."generation_job
 
 
 
+CREATE INDEX "generation_jobs_running_created" ON "public"."generation_jobs" USING "btree" ("created_at") WHERE ("status" = 'running'::"text");
+
+
+
 CREATE INDEX "generation_jobs_running_created_at_idx" ON "public"."generation_jobs" USING "btree" ("created_at") WHERE ("status" = 'running'::"text");
 
 
@@ -20821,6 +21110,18 @@ CREATE INDEX "generation_jobs_user_id_created_at_idx" ON "public"."generation_jo
 
 
 CREATE UNIQUE INDEX "generation_jobs_user_idempotency_key_idx" ON "public"."generation_jobs" USING "btree" ("user_id", "idempotency_key") WHERE ("idempotency_key" IS NOT NULL);
+
+
+
+CREATE INDEX "generation_slots_lane_acquired" ON "public"."generation_slots" USING "btree" ("lane", "acquired_at");
+
+
+
+CREATE INDEX "generation_slots_lane_live" ON "public"."generation_slots" USING "btree" ("lane", "expires_at") WHERE ("released_at" IS NULL);
+
+
+
+CREATE INDEX "generation_slots_org_live" ON "public"."generation_slots" USING "btree" ("org_id", "expires_at") WHERE (("released_at" IS NULL) AND ("org_id" IS NOT NULL));
 
 
 
@@ -20857,6 +21158,10 @@ CREATE INDEX "org_pool_returns_open_idx" ON "public"."org_pool_returns" USING "b
 
 
 CREATE INDEX "org_signup_bonuses_org_idx" ON "public"."org_signup_bonuses" USING "btree" ("org_id", "created_at");
+
+
+
+CREATE UNIQUE INDEX "orgs_ref_code_key" ON "public"."orgs" USING "btree" ("ref_code");
 
 
 
@@ -21333,6 +21638,10 @@ CREATE OR REPLACE TRIGGER "org_invite_attribution" AFTER INSERT ON "public"."cod
 
 
 CREATE OR REPLACE TRIGGER "org_signup_bonus" AFTER UPDATE OF "referred_source" ON "public"."profiles" FOR EACH ROW WHEN ((("new"."referred_source" = 'org_l1'::"text") AND ("old"."referred_source" IS NULL) AND ("old"."referred_by" IS NULL) AND ("new"."referred_by" IS NOT NULL))) EXECUTE FUNCTION "public"."_org_signup_bonus"();
+
+
+
+CREATE OR REPLACE TRIGGER "orgs_ref_code_guard" BEFORE INSERT OR UPDATE ON "public"."orgs" FOR EACH ROW EXECUTE FUNCTION "public"."_orgs_ref_code_guard"();
 
 
 
@@ -21898,6 +22207,16 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 ALTER TABLE ONLY "public"."generation_jobs"
     ADD CONSTRAINT "generation_jobs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."generation_slots"
+    ADD CONSTRAINT "generation_slots_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."generation_slots"
+    ADD CONSTRAINT "generation_slots_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -22596,6 +22915,9 @@ CREATE POLICY "generation_jobs_hide_style_refs" ON "public"."generation_jobs" AS
 
 CREATE POLICY "generation_jobs_select_own" ON "public"."generation_jobs" FOR SELECT TO "authenticated" USING (((( SELECT "auth"."uid"() AS "uid") = "user_id") AND ("deleted_at" IS NULL)));
 
+
+
+ALTER TABLE "public"."generation_slots" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."identity_judge_calls" ENABLE ROW LEVEL SECURITY;
@@ -23619,6 +23941,11 @@ REVOKE ALL ON FUNCTION "public"."_enforce_code_gift_policy"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" integer, "p_inflight" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" integer, "p_inflight" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."_link_early_payment_disputes"() FROM PUBLIC;
 
 
@@ -23671,6 +23998,10 @@ REVOKE ALL ON FUNCTION "public"."_org_payment_fields"("p_kind" "text") FROM PUBL
 
 
 
+REVOKE ALL ON FUNCTION "public"."_org_ref_code_new"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_org_release"("p_org" "public"."orgs", "p_member" "uuid", "p_request" "text", "p_actor" "uuid") FROM PUBLIC;
 
 
@@ -23688,6 +24019,10 @@ REVOKE ALL ON FUNCTION "public"."_org_settle_returns"("p_org" "uuid") FROM PUBLI
 
 
 REVOKE ALL ON FUNCTION "public"."_org_signup_bonus"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_orgs_ref_code_guard"() FROM PUBLIC;
 
 
 
@@ -23729,6 +24064,11 @@ GRANT ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p
 
 
 REVOKE ALL ON FUNCTION "public"."_validate_code_discount"("p_products" "text"[], "p_percent" integer, "p_catalog" "jsonb", "p_floor_product_id" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."acquire_generation_slot"("p_attempt_id" "uuid", "p_lane" "text", "p_user_id" "uuid", "p_kind" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."acquire_generation_slot"("p_attempt_id" "uuid", "p_lane" "text", "p_user_id" "uuid", "p_kind" "text") TO "service_role";
 
 
 
@@ -24235,6 +24575,11 @@ GRANT ALL ON FUNCTION "public"."admin_open_prompt_lab"("p_actor" "uuid", "p_asse
 
 REVOKE ALL ON FUNCTION "public"."admin_openai_admin_key_status"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_openai_admin_key_status"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
 
 
@@ -24927,6 +25272,11 @@ GRANT ALL ON FUNCTION "public"."finish_identity_judge"("p_id" bigint, "p_identit
 
 
 
+REVOKE ALL ON FUNCTION "public"."generation_lane_settings"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."generation_lane_settings"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."get_or_create_invite_code"("p_user" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_or_create_invite_code"("p_user" "uuid") TO "service_role";
 
@@ -25301,6 +25651,11 @@ GRANT ALL ON FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_t
 
 
 
+REVOKE ALL ON FUNCTION "public"."release_generation_slot"("p_attempt_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."release_generation_slot"("p_attempt_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."report_work"("p_job_id" "uuid", "p_reporter" "uuid", "p_reason" "text", "p_note" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."report_work"("p_job_id" "uuid", "p_reporter" "uuid", "p_reason" "text", "p_note" "text") TO "service_role";
 
@@ -25438,6 +25793,11 @@ GRANT ALL ON FUNCTION "public"."submit_business_inquiry"("p_inquiry" "jsonb", "p
 
 REVOKE ALL ON FUNCTION "public"."support_reply_hours"("p_tier" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."support_reply_hours"("p_tier" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sweep_stale_generation_jobs"("p_older_than" interval, "p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sweep_stale_generation_jobs"("p_older_than" interval, "p_limit" integer) TO "service_role";
 
 
 
@@ -25785,6 +26145,10 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 
 
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."feature_user_grants" TO "service_role";
+
+
+
+GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_slots" TO "service_role";
 
 
 

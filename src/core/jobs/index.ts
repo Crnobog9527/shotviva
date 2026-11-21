@@ -54,3 +54,4 @@ export { JOB_REF_LENGTH, JOB_REF_MIN, jobRef, jobRefRange, normalizeJobRef } fro
 export { preflightBatch, preflightSchema } from './batch/preflight'
 export { batchArchive } from './batch/archive'
 export { downloadBatchPhotos, downloadBatchZip } from './batch/download'
+export { acquireSlot, laneOf, releaseSlot, slotKind, withSlot, type GenerationLane, type SlotKind } from './generation-lane'

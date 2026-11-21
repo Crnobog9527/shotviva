@@ -190,7 +190,7 @@ describe('OpenRouter image responses', () => {
   it.each([
     [403, { error: { code: 403, metadata: { reasons: ['SENSITIVE'] } } }, 'content_rejected'],
     [403, { error: { code: 403, metadata: { limit_source: 'budget' } } }, 'failed'],
-    [429, { error: { code: 429, message: 'SENSITIVE' } }, 'failed'],
+    [429, { error: { code: 429, message: 'SENSITIVE' } }, 'rate_limited'],
     [503, { error: { code: 503 } }, 'failed'],
     [408, { error: { code: 408 } }, 'timeout'],
     [200, { error: { code: 504 } }, 'timeout'],

@@ -7,6 +7,8 @@ import { Input } from '@/core/ui/input'
 
 import { ORGS_COPY as COPY } from '../orgs/copy'
 import type { OrgActionResult, OrgPackage } from '../orgs/types'
+import { unitPricePer100Credits } from '@/core/org/unit-price'
+
 import { Card, Check, Field, Outcome } from './fields'
 import { useOrgAction } from './use-org-action'
 
@@ -45,6 +47,7 @@ function PackageForm({ pkg, save }: { pkg: OrgPackage | null; save: SavePackageA
     >
       <Field label={COPY.packageName}><Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} /></Field>
       <Field label={COPY.priceUsd}><Input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
+      {pkg ? <UnitPrice pkg={pkg} /> : null}
       <Field label={COPY.packageCredits}><Input inputMode="numeric" value={credits} onChange={(e) => setCredits(e.target.value)} /></Field>
       <Field label={COPY.sort}><Input inputMode="numeric" value={sort} onChange={(e) => setSort(e.target.value)} /></Field>
       <div className="flex items-end"><Check label={COPY.active} checked={active} onChange={(e) => setActive(e.target.checked)} /></div>
@@ -52,6 +55,12 @@ function PackageForm({ pkg, save }: { pkg: OrgPackage | null; save: SavePackageA
       <div className="sm:col-span-2 lg:col-span-6"><Outcome outcome={outcome} /></div>
     </form>
   )
+}
+
+// Computed from the saved price and credits.
+function UnitPrice({ pkg }: { pkg: OrgPackage }) {
+  const unit = unitPricePer100Credits(pkg.priceUsdCents, pkg.credits)
+  return unit === null ? null : <p className="text-xs text-muted-foreground sm:col-span-full">{COPY.unitPrice(unit)}</p>
 }
 
 export function PackageEditor({ packages, save }: { packages: OrgPackage[]; save: SavePackageAction }) {

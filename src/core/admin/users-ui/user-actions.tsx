@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 
 import { Button } from '@/core/ui/button'
@@ -53,6 +54,8 @@ export function UserActions({ userId, banned, balances, actions }: Props) {
         <Button variant="outline" onClick={() => show(banned ? 'unban' : 'ban')}>
           {banned ? COPY.unban : COPY.ban}
         </Button>
+        {/* Opens the new-org form on /admin/orgs with this account filled in as the owner. */}
+        {banned ? null : <Button variant="outline" asChild><Link href={`/admin/orgs?owner=${encodeURIComponent(userId)}`}>{COPY.setOrgOwner}</Link></Button>}
       </div>
       {notice ? <p className="text-sm text-success">{notice}</p> : null}
       {open === 'ban' || open === 'unban' ? (
