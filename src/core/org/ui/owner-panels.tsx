@@ -8,6 +8,7 @@ import { Link } from '@/core/i18n/ui'
 import { Button } from '@/core/ui/button'
 
 import type { ConsolePackage, OwnerConsole, PaymentAccountGroup } from '../console/types'
+import { unitPricePer100Credits } from '../unit-price'
 import { PAYMENT_FIELD_LABELS, PAYMENT_FIELDS, PAYMENT_KIND_LABELS } from '../payment-labels'
 import type { OwnerActions } from './actions'
 import { Confirm } from './confirm'
@@ -58,6 +59,11 @@ export function PoolPanel({ data, actions }: { data: OwnerConsole; actions: Owne
   )
 }
 
+function Unit({ t, cents, credits }: { t: ReturnType<typeof useTranslations>; cents: number; credits: number }) {
+  const unit = unitPricePer100Credits(cents, credits)
+  return unit === null ? null : <span className="block text-caption text-muted-foreground">{t('unitPrice', { price: unit })}</span>
+}
+
 function price(format: ReturnType<typeof useFormatter>, cents: number) {
   return format.number(cents / 100, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: cents % 100 === 0 ? 0 : 2 })
 }
@@ -76,6 +82,7 @@ export function PackagesPanel({ packages }: { packages: readonly ConsolePackage[
               <span className="shrink-0 text-right tabular-nums">
                 <span className="font-semibold">{price(format, p.priceUsdCents)}</span>
                 <span className="block text-caption text-muted-foreground">{t('credits', { count: p.credits })}</span>
+                <Unit t={t} cents={p.priceUsdCents} credits={p.credits} />
               </span>
             </li>
           ))}

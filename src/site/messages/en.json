@@ -1810,6 +1810,7 @@
         "hint": "Prices are in US dollars. Orders are placed offline.",
         "none": "No packages are listed right now.",
         "credits": "{count, plural, one {# credit} other {# credits}}",
+        "unitPrice": "${price} per 100 credits",
         "contact": "To top up the pool, contact us and pay by bank transfer. We add the credits to your pool once the payment arrives.",
         "contactLink": "Contact us to arrange a transfer"
       },

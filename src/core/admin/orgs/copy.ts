@@ -145,6 +145,7 @@ export const ORGS_COPY = {
   packagesTitle: '企业套餐',
   packagesHint: '以美元标价、积分数直接填写，不做汇率换算（汇率线下定）。套餐不能删除，下架即可。',
   packageNew: '新增套餐',
+  unitPrice: (price: string) => `每 100 积分 $${price}`,
   packageName: '套餐名称',
   priceUsd: '价格（美元）',
   packageCredits: '积分数',
