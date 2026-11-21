@@ -64,7 +64,7 @@ it('repairs Stripe effects through admin replay, preserves a second paid session
   const deliver = (id: string) => handleStripeWebhook(h.deps, signed(eventFor('checkout.session.completed', id)))
   try {
     expect((await deliver(first)).status).toBe(500)
-    expect(h.trackBuy).toHaveBeenCalledWith(buyer, expect.objectContaining({ code: offer.code, amount_discount_usd: Math.round(pack.priceUsd * 20) / 100 }), 'en')
+    expect(h.trackBuy).toHaveBeenCalledWith(buyer, expect.objectContaining({ code: offer.code, amount_discount_usd: Math.round(pack.priceUsd * 20) / 100 }), 'en', expect.any(String))
     expect((await applyReplay(h.deps, first)).outcome).toBe('replayed')
     expect((await deliver(first)).status).toBe(200)
     const second = stage()

@@ -52,7 +52,7 @@ describe('中国银行卡 (cn_card)', () => {
     expect(await paymentsOf(db, userId)).toEqual([
       expect.objectContaining({ product_id: 'pack_m', stripe_charge_id: charge.id, method: 'cn_card', amount_tax: 0, status: 'paid' }),
     ])
-    expect(h.trackBuy).toHaveBeenCalledWith(userId, expect.objectContaining({ form: 'one_time', method: 'cn_card' }), 'en')
+    expect(h.trackBuy).toHaveBeenCalledWith(userId, expect.objectContaining({ form: 'one_time', method: 'cn_card' }), 'en', expect.any(String))
   })
 
   it('a Starter monthly subscription, then its renewal, both recorded as cn_card', async () => {
@@ -76,7 +76,7 @@ describe('中国银行卡 (cn_card)', () => {
       [first.id, 'cn_card'],
       [renewal.id, 'cn_card'],
     ])
-    expect(h.trackBuy).toHaveBeenLastCalledWith(userId, expect.objectContaining({ form: 'subscription', method: 'cn_card' }), 'en')
+    expect(h.trackBuy).toHaveBeenLastCalledWith(userId, expect.objectContaining({ form: 'subscription', method: 'cn_card' }), 'en', expect.any(String))
   })
 
   it('the Managed Payments card still records card', async () => {

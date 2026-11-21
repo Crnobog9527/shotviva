@@ -45,7 +45,7 @@ describe('支付宝 / 微信支付 wallet line', () => {
     expect(await paymentsOf(db, userId)).toEqual([
       expect.objectContaining({ product_id: 'pack_s', stripe_charge_id: charge.id, method: 'wechat_pay', status: 'paid' }),
     ])
-    expect(h.trackBuy).toHaveBeenCalledWith(userId, expect.objectContaining({ form: 'one_time', method: 'wechat_pay' }), 'en')
+    expect(h.trackBuy).toHaveBeenCalledWith(userId, expect.objectContaining({ form: 'one_time', method: 'wechat_pay' }), 'en', expect.any(String))
   })
 
   it('a Starter period paid with WeChat Pay is one payment, recorded as wechat_pay', async () => {
@@ -58,7 +58,7 @@ describe('支付宝 / 微信支付 wallet line', () => {
   it('the same wallet line paid with Alipay still records alipay', async () => {
     const { userId } = await payWithWallet('pack_s', 'alipay', 990)
     expect(await paymentsOf(db, userId)).toEqual([expect.objectContaining({ method: 'alipay' })])
-    expect(h.trackBuy).toHaveBeenCalledWith(userId, expect.objectContaining({ method: 'alipay' }), 'en')
+    expect(h.trackBuy).toHaveBeenCalledWith(userId, expect.objectContaining({ method: 'alipay' }), 'en', expect.any(String))
   })
 })
 
