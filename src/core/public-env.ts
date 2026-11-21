@@ -1,4 +1,4 @@
-import type { PublicEnv, RawPublicEnv } from './public-env-schema'
+import { withPostHogSwitch, type PublicEnv, type RawPublicEnv } from './public-env-schema'
 
 export type { PublicEnv } from './public-env-schema'
 
@@ -15,6 +15,8 @@ export const rawPublicEnv: RawPublicEnv = {
   NEXT_PUBLIC_HCAPTCHA_SITEKEY: process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY,
   NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
   NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST || undefined,
+  NEXT_PUBLIC_POSTHOG_ENABLED: process.env.NEXT_PUBLIC_POSTHOG_ENABLED || undefined,
+  NEXT_PUBLIC_PVUV_SITE: process.env.NEXT_PUBLIC_PVUV_SITE || undefined,
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN || undefined,
   NEXT_PUBLIC_ASSETS_BASE_URL: process.env.NEXT_PUBLIC_ASSETS_BASE_URL || undefined,
   NEXT_PUBLIC_IMAGE_CDN_URL: process.env.NEXT_PUBLIC_IMAGE_CDN_URL || undefined,
@@ -27,7 +29,7 @@ export const rawPublicEnv: RawPublicEnv = {
 // 2026-11-11). The values are validated by publicEnvSchema at build (next.config.ts), when they
 // are inlined; public-env.test.ts keeps this function equal to the schema's parse.
 export function withPublicDefaults(raw: RawPublicEnv): PublicEnv {
-  return {
+  return withPostHogSwitch({
     ...raw,
     NEXT_PUBLIC_PRICING_CATALOG_VERSION: raw.NEXT_PUBLIC_PRICING_CATALOG_VERSION as PublicEnv['NEXT_PUBLIC_PRICING_CATALOG_VERSION'],
     NEXT_PUBLIC_VERCEL_ENV: raw.NEXT_PUBLIC_VERCEL_ENV as PublicEnv['NEXT_PUBLIC_VERCEL_ENV'],
@@ -40,7 +42,7 @@ export function withPublicDefaults(raw: RawPublicEnv): PublicEnv {
     NEXT_PUBLIC_IMAGE_CDN_URL: raw.NEXT_PUBLIC_IMAGE_CDN_URL?.replace(/\/+$/, ''),
     NEXT_PUBLIC_ASSET_CDN_URL: raw.NEXT_PUBLIC_ASSET_CDN_URL?.replace(/\/+$/, ''),
     NEXT_PUBLIC_APP_VERSION: raw.NEXT_PUBLIC_APP_VERSION ?? 'dev',
-  }
+  })
 }
 
 export const publicEnv: PublicEnv = withPublicDefaults(rawPublicEnv)

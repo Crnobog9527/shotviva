@@ -2,13 +2,14 @@
 
 import { logger } from '../../logger'
 import { publicEnv } from '../../public-env'
-import { persistenceFor } from '../consent/decision'
+import { cookiesAllowed, persistenceFor } from '../consent/decision'
 import { onConsentChange, readConsent } from '../consent/store'
 import { categorySlug } from '../event-values'
 import type { BrowserEventName, EventProps } from '../events'
 import { sentryOptions } from '../sentry-options'
 import { clearPosthogStorage, syncPosthog } from './consent-sync'
 import { posthogConfig } from './posthog-config'
+import { clearPvuvStorage, loadPvuv, pvuvIdentify, pvuvLoaded } from './pvuv'
 import { afterLoad, loadedSdks, loadSdks, withSdks } from './sdk'
 
 let started = false
@@ -21,8 +22,11 @@ export function initBrowserAnalytics(): void {
   started = true
   const sentry = sentryOptions()
   const key = publicEnv.NEXT_PUBLIC_POSTHOG_KEY
-  if (!sentry.enabled && !key) return
+  const pvuvSite = publicEnv.NEXT_PUBLIC_PVUV_SITE
+  if (!sentry.enabled && !key && !pvuvSite) return
   afterLoad(() => {
+    // PVUV.ai: its own script tag, only where cookies are allowed (watchPvuvConsent for the rest).
+    if (pvuvSite && cookiesAllowed(readConsent())) loadPvuv(pvuvSite)
     void loadSdks({
       sentry: sentry.enabled
         ? async () => {
@@ -43,6 +47,24 @@ export function initBrowserAnalytics(): void {
     })
   })
   if (key) watchConsent()
+  if (pvuvSite) watchPvuvConsent(pvuvSite)
+}
+
+// The same answer rule as PostHog's persistence (ARCHITECTURE §16.1): "Accept" (or an open region)
+// lets the script in, even on a page opened before the answer. "Necessary only" removes what it
+// left; a script already running cannot be unloaded, so it is gone from the next page load.
+function watchPvuvConsent(site: string): void {
+  onConsentChange((consent) => {
+    if (cookiesAllowed(consent)) {
+      if (document.readyState === 'complete') loadPvuv(site)
+      return
+    }
+    try {
+      clearPvuvStorage(document, [window.localStorage, window.sessionStorage])
+    } catch {
+      // Storage blocked: there is nothing of ours in it either.
+    }
+  })
 }
 
 // ARCHITECTURE §16.1 (T70): cookies or memory follow the visitor's region and answer; an answer
@@ -138,6 +160,7 @@ export function trackUploadError(reason: EventProps<'upload_error'>['reason']): 
 
 // The Supabase user id, nothing else: no email or name as person properties (§16.1).
 export function identify(userId: string): void {
+  if (started) pvuvIdentify(userId)
   if (!enabled()) return
   withSdks(({ posthog }) => {
     if (posthog && posthog.get_distinct_id() !== userId) posthog.identify(userId)
@@ -146,6 +169,13 @@ export function identify(userId: string): void {
 
 // Call on sign-out before the redirect, so the next visitor on this tab is anonymous.
 export function resetIdentity(): void {
+  if (started && pvuvLoaded()) {
+    try {
+      clearPvuvStorage(document, [window.localStorage, window.sessionStorage])
+    } catch {
+      // Storage blocked: there is nothing of ours in it either.
+    }
+  }
   if (enabled()) withSdks(({ posthog }) => posthog?.reset())
 }
 

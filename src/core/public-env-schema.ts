@@ -4,7 +4,7 @@ import { z } from 'zod'
 // the values are fixed: next.config.ts parses them at build, when Next.js inlines every
 // NEXT_PUBLIC_* into the bundles, so an invalid value fails the build. Browser code never
 // imports this file, which keeps zod out of every page's first-load JavaScript.
-export const publicEnvSchema = z.object({
+const publicEnvShape = z.object({
   // Optional override of the deployment origin; see core/site-url.ts for the fallback order.
   NEXT_PUBLIC_SITE_URL: z.url().optional(),
   NEXT_PUBLIC_PRICING_CATALOG_VERSION: z.enum(['v1', 'v2']).optional(),
@@ -21,6 +21,14 @@ export const publicEnvSchema = z.object({
   // is off (local dev, CI); the host is the US ingestion host the /ingest rewrite targets.
   NEXT_PUBLIC_POSTHOG_KEY: z.string().default(''),
   NEXT_PUBLIC_POSTHOG_HOST: z.url().default('https://us.i.posthog.com'),
+  // PostHog's one switch (withPostHogSwitch): the key above counts only when this is 'true'.
+  // Unset or anything else: PostHog is off in the browser, on the server and in the /ingest
+  // rewrite, while the key stays in the environment. Turning it back on is this variable alone.
+  NEXT_PUBLIC_POSTHOG_ENABLED: z.string().optional(),
+  // PVUV.ai site id (https://pvuv.ai): public by design, it is printed in the tracking snippet.
+  // Unset means PVUV's browser script is off. The server-side crawler reporting has its own
+  // server-only variables (PVUV_SITE, PVUV_INGEST_TOKEN; core/env.ts).
+  NEXT_PUBLIC_PVUV_SITE: z.string().min(1).optional(),
   // Sentry DSN, public by design. Unset means Sentry stays off in browser, server and edge.
   NEXT_PUBLIC_SENTRY_DSN: z.url().optional(),
   // Where covers are read from, no trailing slash. Cover URLs are this + '/covers/…'
@@ -49,6 +57,14 @@ export const publicEnvSchema = z.object({
   // This build's version (T90): set by next.config.ts from the deployment id; `dev` locally.
   NEXT_PUBLIC_APP_VERSION: z.string().min(1).default('dev'),
 })
+
+// Shared by the schema and core/public-env.ts's hand-written defaults, so they cannot differ.
+export const POSTHOG_ENABLED_VALUE = 'true'
+export function withPostHogSwitch<T extends { NEXT_PUBLIC_POSTHOG_KEY: string; NEXT_PUBLIC_POSTHOG_ENABLED?: string | undefined }>(env: T): T {
+  return env.NEXT_PUBLIC_POSTHOG_ENABLED === POSTHOG_ENABLED_VALUE ? env : { ...env, NEXT_PUBLIC_POSTHOG_KEY: '' }
+}
+
+export const publicEnvSchema = publicEnvShape.transform(withPostHogSwitch)
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>
 export type RawPublicEnv = { [K in keyof PublicEnv]: string | undefined }
