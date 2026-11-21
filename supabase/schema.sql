@@ -3455,6 +3455,30 @@ $$;
 ALTER FUNCTION "public"."_affiliate_fee_era"("p_payment" "public"."payments") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_fee_fallback"("p_payment" "public"."payments") RETURNS integer
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select coalesce((select public.payment_fee_amount(p_payment.amount_total, s.rate_bp, s.fixed_cents, s.rounding)
+    from public.payment_fee_schedule_for(p_payment.channel, p_payment.method, 'acquiring', p_payment.created_at) s
+   where s.id is not null), 0);
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_fee_fallback"("p_payment" "public"."payments") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_affiliate_fee_missing"("p_payment" "public"."payments") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select p_payment.fee_status is null and public._affiliate_fee_era(p_payment);
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_fee_missing"("p_payment" "public"."payments") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_fee_ready"("p_payment" "public"."payments", "p_confirm" timestamp with time zone, "p_at" timestamp with time zone) RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -3712,7 +3736,7 @@ declare
   v_old public.affiliate_commissions; v_id bigint; v_amount bigint; v_status text; v_reason text;
   v_owner uuid; v_rate integer; v_confirm timestamptz; v_flags text[]; v_void text;
   v_fee integer := case when p_payment.fee_status is not null then p_payment.fee_cents end;
-  v_net bigint;
+  v_net bigint; v_fallback boolean := false;
 begin
   select c.* into v_old from public.affiliate_commissions c where c.payment_id=p_payment.id and c.level=p_level for update;
   if not found then
@@ -3727,6 +3751,10 @@ begin
     v_owner:=v_old.affiliate_user_id; v_rate:=v_old.rate_bp; v_confirm:=v_old.confirm_after; v_flags:=v_old.flags;
     if v_old.void_reason in ('affiliate_inactive','admin_void','org_member') then v_void:=v_old.void_reason; end if;
   end if;
+  if public._affiliate_fee_missing(p_payment) and now() >= v_confirm
+     + make_interval(days => (select s.fee_final_grace_days from public.affiliate_settings s where s.singleton)) then
+    v_fallback:=true; v_fee:=public._affiliate_fee_fallback(p_payment);
+  end if;
   v_net:=public._affiliate_net_base(p_payment.amount_total,p_payment.amount_tax,p_payment.amount_refunded,v_fee);
   v_amount:=public._affiliate_due(p_payment.amount_total,p_payment.amount_tax,p_payment.amount_refunded,v_rate,v_fee);
   if v_old.payout_retained is not null then
@@ -3738,7 +3766,7 @@ begin
     v_void:=case when p_payment.amount_refunded=p_payment.amount_total then 'refunded' else 'zero' end;
   end if;
   v_status:=case when v_amount=0 then 'void' when p_open or (cardinality(v_flags)>0 and v_old.released_by is null and not p_release)
-    then 'on_hold' when now()>=v_confirm and (v_old.status='confirmed' or public._affiliate_fee_ready(p_payment,v_confirm,now()))
+    then 'on_hold' when now()>=v_confirm and (v_old.status='confirmed' or v_fallback or public._affiliate_fee_ready(p_payment,v_confirm,now()))
     then 'confirmed' else 'pending' end;
   if not p_release and v_old.id is not null and (v_amount,v_status,v_void,v_fee::bigint,v_net)
     is not distinct from (v_old.amount,v_old.status,v_old.void_reason,v_old.fee_cents,v_old.net_base_usd) then return; end if;
@@ -11478,6 +11506,13 @@ begin
   end if;
   if not v_settings.enabled then return; end if;
   v_cutoff:=case when p_today=(now() at time zone 'UTC')::date then now() else p_today::timestamp at time zone 'UTC' end;
+  -- Fee-era payments still without fee data once the grace period is over: the recompute applies
+  -- _affiliate_fee_fallback, confirms and opens an affiliate_fee_alerts row.
+  for v_payment in select distinct c.payment_id from public.affiliate_commissions c join public.payments p on p.id=c.payment_id
+     where c.status='pending' and c.confirm_after+make_interval(days=>v_settings.fee_final_grace_days)<=v_cutoff
+       and public._affiliate_fee_missing(p) order by c.payment_id loop
+    perform public.affiliate_recompute_payment(v_payment);
+  end loop;
   -- A refund/dispute updates and locks this same commission. EvalPlanQual rechecks pending after waiting.
   with changed as (
     update public.affiliate_commissions c set status='confirmed',confirmed_at=v_cutoff,updated_at=now()
@@ -11651,7 +11686,7 @@ CREATE OR REPLACE FUNCTION "public"."affiliate_recompute_payment"("p_payment_id"
     AS $$
 declare
   v_payment public.payments; v_enabled boolean; v_open boolean; v_lost boolean; v_snapshot jsonb;
-  v_exists boolean; v_retry boolean;
+  v_exists boolean; v_retry boolean; v_missing boolean;
 begin
   if p_payment_id is null then return; end if;
   select enabled into strict v_enabled from public.affiliate_settings where singleton;
@@ -11673,6 +11708,15 @@ begin
   perform public._affiliate_write_commission(v_payment,v_snapshot,1::smallint,v_open,v_lost);
   perform public._affiliate_write_commission(v_payment,v_snapshot,2::smallint,v_open,v_lost);
   update public.affiliate_recompute_errors set resolved_at=now() where payment_id=p_payment_id and resolved_at is null;
+  v_missing:=public._affiliate_fee_missing(v_payment);
+  if v_missing and exists(select from public.affiliate_commissions c where c.payment_id=p_payment_id and c.status='confirmed') then
+    insert into public.affiliate_fee_alerts(payment_id,kind,fee_cents)
+      values(p_payment_id,'fees_missing',public._affiliate_fee_fallback(v_payment))
+      on conflict(payment_id) do update set fee_cents=excluded.fee_cents,opened_at=now(),resolved_at=null
+      where affiliate_fee_alerts.resolved_at is not null;
+  elsif not v_missing then
+    update public.affiliate_fee_alerts set resolved_at=now() where payment_id=p_payment_id and resolved_at is null;
+  end if;
 exception when others or query_canceled or assert_failure then
   -- Retain no sensitive exception DETAIL/CONTEXT (it can contain an entire failed row).
   begin
@@ -17989,6 +18033,20 @@ ALTER TABLE "public"."affiliate_commissions" ALTER COLUMN "id" ADD GENERATED ALW
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."affiliate_fee_alerts" (
+    "payment_id" bigint NOT NULL,
+    "kind" "text" NOT NULL,
+    "fee_cents" integer NOT NULL,
+    "opened_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "resolved_at" timestamp with time zone,
+    CONSTRAINT "affiliate_fee_alerts_fee_cents_check" CHECK (("fee_cents" >= 0)),
+    CONSTRAINT "affiliate_fee_alerts_kind_check" CHECK (("kind" = 'fees_missing'::"text"))
+);
+
+
+ALTER TABLE "public"."affiliate_fee_alerts" OWNER TO "postgres";
+
+
 ALTER TABLE "public"."affiliate_payout_fee_rules" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "public"."affiliate_payout_fee_rules_id_seq"
     START WITH 1
@@ -19462,6 +19520,11 @@ ALTER TABLE ONLY "public"."affiliate_commissions"
 
 
 
+ALTER TABLE ONLY "public"."affiliate_fee_alerts"
+    ADD CONSTRAINT "affiliate_fee_alerts_pkey" PRIMARY KEY ("payment_id");
+
+
+
 ALTER TABLE ONLY "public"."affiliate_payout_fee_rules"
     ADD CONSTRAINT "affiliate_payout_fee_rules_pkey" PRIMARY KEY ("id");
 
@@ -20168,6 +20231,10 @@ CREATE UNIQUE INDEX "affiliate_errors_open_payment_idx" ON "public"."affiliate_r
 
 
 CREATE INDEX "affiliate_errors_queue_idx" ON "public"."affiliate_recompute_errors" USING "btree" ("at" DESC, "id" DESC) WHERE ("resolved_at" IS NULL);
+
+
+
+CREATE INDEX "affiliate_fee_alerts_open_idx" ON "public"."affiliate_fee_alerts" USING "btree" ("opened_at" DESC) WHERE ("resolved_at" IS NULL);
 
 
 
@@ -21262,6 +21329,11 @@ ALTER TABLE ONLY "public"."affiliate_commissions"
 
 
 
+ALTER TABLE ONLY "public"."affiliate_fee_alerts"
+    ADD CONSTRAINT "affiliate_fee_alerts_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "public"."payments"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."affiliate_payout_fee_rules"
     ADD CONSTRAINT "affiliate_payout_fee_rules_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
 
@@ -22062,6 +22134,9 @@ ALTER TABLE "public"."affiliate_commission_changes" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."affiliate_commissions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."affiliate_fee_alerts" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."affiliate_payout_fee_rules" ENABLE ROW LEVEL SECURITY;
@@ -23075,6 +23150,14 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" inte
 
 
 REVOKE ALL ON FUNCTION "public"."_affiliate_fee_era"("p_payment" "public"."payments") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_fee_fallback"("p_payment" "public"."payments") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_fee_missing"("p_payment" "public"."payments") FROM PUBLIC;
 
 
 
@@ -25117,6 +25200,10 @@ GRANT SELECT ON TABLE "public"."affiliate_click_days" TO "service_role";
 
 
 GRANT SELECT ON TABLE "public"."affiliate_commission_changes" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."affiliate_fee_alerts" TO "service_role";
 
 
 
