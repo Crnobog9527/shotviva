@@ -7,28 +7,23 @@ import { capSrcSet } from '../../ui/srcset-cap'
 // A series card's later pairs, drawn in the browser the first time the card plays instead of by
 // the server: every member's four pictures used to be in the page as hidden layers, 53 of them on
 // the home page, about 260 KB of HTML and RSC payload no visitor sees before a hover (PSI P-1,
-// 2026-11-21). The server writes only the covers' addresses on the frame (series-card.tsx).
+// 2026-11-21). Their addresses then rode on the frame, still about 55 KB of the home page (in the
+// HTML and again in the RSC payload); now the frame carries only the card's key, and the
+// addresses come from /api/home/series, one cached request, when a card first plays
+// (series-layers-source.ts).
 
 export type LayerPair = readonly [before: string, after: string]
 
-export const PAIRS_ATTR = 'data-series-pairs'
+// On a frame with later pairs: the card's key in /api/home/series (TemplateCard.id).
+export const MORE_ATTR = 'data-series-more'
 export const SIZES_ATTR = 'data-series-sizes'
 const BUILT_ATTR = 'data-series-built'
 const SIZE = { width: 900, height: 1125 }
 
-export function encodePairs(pairs: readonly LayerPair[]): string {
-  return JSON.stringify(pairs)
-}
-
-export function decodePairs(value: string | null): LayerPair[] {
-  if (!value) return []
-  try {
-    const parsed: unknown = JSON.parse(value)
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter((pair): pair is LayerPair => Array.isArray(pair) && pair.length === 2 && pair.every((url) => typeof url === 'string'))
-  } catch {
-    return []
-  }
+// Only well-formed before/after pairs from what the API sent.
+export function pairsIn(value: unknown): LayerPair[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((pair): pair is LayerPair => Array.isArray(pair) && pair.length === 2 && pair.every((url) => typeof url === 'string'))
 }
 
 // The <img> SiteImage renders for a lazy cover (site-image.tsx: next/image's attributes, its
@@ -81,10 +76,10 @@ export function layerOf(doc: Document, [before, after]: LayerPair, sizes: string
 }
 
 // Adds the frame's layers once, under the highlight and the tags as the server used to draw them.
-export function buildLayers(frame: HTMLElement): void {
+export function buildLayers(frame: HTMLElement, pairs: readonly LayerPair[]): void {
   if (frame.hasAttribute(BUILT_ATTR)) return
   frame.setAttribute(BUILT_ATTR, '')
   const sizes = frame.getAttribute(SIZES_ATTR) ?? '100vw'
   const anchor = frame.querySelector(':scope > .mk-hl')
-  for (const pair of decodePairs(frame.getAttribute(PAIRS_ATTR))) frame.insertBefore(layerOf(frame.ownerDocument, pair, sizes), anchor)
+  for (const pair of pairs) frame.insertBefore(layerOf(frame.ownerDocument, pair, sizes), anchor)
 }

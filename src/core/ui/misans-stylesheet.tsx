@@ -12,21 +12,26 @@ const MISANS_HREF = `${publicEnv.NEXT_PUBLIC_ASSET_CDN_URL ?? ''}${MISANS_STYLES
 const LINK_ID = 'misans-font'
 
 // Chinese pages only (T65/T67, ARCHITECTURE §17「加载」). A script in the server HTML, at the top
-// of <body>, attaches the stylesheet as soon as the page's first contentful paint has happened
-// (PerformanceObserver 'paint', with a 1 s fallback): long before hydration, which the old
-// inserter waited for, but never ahead of the first paint. Measured, both earlier variants cost
-// the first paint: a render-blocking <link> in <head> (+0.15 s FCP on Vercel, up to 0.9 s in CI's
-// Lighthouse), and heading subsets requested before the first paint, which Lighthouse charges to
-// FCP (2.6 s instead of 1.4 s). On a repeat visit the stylesheet and subsets come from the cache,
-// so headings turn MiSans a frame or two after the first paint; a first visit paints them in the
-// metric-matched "MiSans Fallback" (globals.css) and swaps once they arrive. Body and UI text are
-// in the system fonts and never change. English pages never load MiSans. The language switch is
-// a full page load (a real <a href>), so this always runs on arriving at a Chinese page.
+// of <body>, attaches the stylesheet once the page has loaded (its first-screen pictures in) and
+// the main thread is idle, with a 4 s fallback: long before hydration on a fast line, which the
+// old inserter waited for, but never ahead of the first screen. Measured, every earlier variant
+// cost a paint metric: a render-blocking <link> in <head> (+0.15 s FCP on Vercel, up to 0.9 s in
+// CI's Lighthouse); heading subsets requested before the first paint, which Lighthouse charges to
+// FCP (2.6 s instead of 1.4 s); and the stylesheet attached at the first contentful paint, which
+// on /zh comes before the LCP (the hero's inline first frame, painted a frame or more after the
+// text): PSI charged its 13 subsets, about 430 KB, to the LCP (3.0 s against FCP 1.4 s, English
+// 1.7 s; 2026-11-21). On a repeat visit the stylesheet and subsets come from the cache, so
+// headings turn MiSans soon after load; a first visit paints them in the metric-matched "MiSans
+// Fallback" (globals.css) and swaps once they arrive. Body and UI text are in the system fonts
+// and never change. English pages never load MiSans. The language switch is a full page load (a
+// real <a href>), so this always runs on arriving at a Chinese page.
+const FALLBACK_MS = 4000
 const INSERT = [
-  '(function(){var d=document,done=0;',
+  '(function(){var d=document,w=window,done=0;',
   `function go(){if(done||d.getElementById('${LINK_ID}'))return;done=1;var l=d.createElement('link');l.id='${LINK_ID}';l.rel='stylesheet';l.href='${MISANS_HREF}';d.head.appendChild(l)}`,
-  "try{new PerformanceObserver(function(p){if(p.getEntriesByName('first-contentful-paint').length)go()}).observe({type:'paint',buffered:true})}catch(e){}",
-  'setTimeout(go,1000)})()',
+  'function idle(){if(w.requestIdleCallback)w.requestIdleCallback(go,{timeout:1000});else setTimeout(go,0)}',
+  "if(d.readyState==='complete')idle();else w.addEventListener('load',idle);",
+  `setTimeout(go,${FALLBACK_MS})})()`,
 ].join('')
 
 export function MiSansStylesheet() {

@@ -34,6 +34,8 @@ export const APP_ONLY_APP_KEYS = [
   'weekly',
   // 企业 (§6.5): the owner's console, the member card and the join page.
   'org',
+  // A gift's claim page is in the app; public pages only link to it.
+  'giftClaim',
 ] as const
 
 type Messages = Record<string, unknown>

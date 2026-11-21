@@ -486,6 +486,8 @@
   /* Fill the available plate without cropping. Portrait results keep the white backing inside their edges. */
   .mk-tpl .mk-pair img { width: auto; max-width: 100%; margin: auto; object-fit: contain; }
   .mk-tpl .mk-pair .mk-fill { width: 100%; max-width: none; height: 100%; object-fit: cover; filter: blur(20px) brightness(.5); transform: scale(1.1); }
+  /* A fill drawn as an empty span (cover-fill.tsx): its picture arrives as a background once the plate's own has loaded. */
+  .mk-pair span.mk-fill { position: absolute; inset: 0; display: block; background: center / cover no-repeat; }
   .mk-tpl .mk-result { position: absolute; inset: 0; z-index: 1; overflow: hidden; background: var(--muted); }
   .mk-tpl .mk-pair :is(.mk-a, .mk-sa) { width: min(100%, var(--image-width, 100%)); height: auto; max-height: 100%; }
   .mk-tpl-meta { display: block; padding: 8px 2px 2px; }
