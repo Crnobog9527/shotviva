@@ -137,6 +137,12 @@ const nextConfig: NextConfig = {
       { source: '/ingest/:path*', destination: `${POSTHOG_INGEST}/:path*` },
     ]
   },
+  // Sentry's "bundle size optimizations" (excludeTracing, excludeDebugStatements), which its
+  // config wrapper only applies under webpack: the site sends errors only (tracesSampleRate 0,
+  // core/analytics/sentry-options.ts), so the tracing integration and the SDK's debug logging are
+  // dead code. Sentry's own option sets the same two flags for server and client alike.
+  // Browser SDK loaded after the page: 57 -> 32 KB gzip (PSI "unused JavaScript", 2026-11-21).
+  compiler: { define: { __SENTRY_TRACING__: false, __SENTRY_DEBUG__: false } },
   turbopack: {
     rules: {
       '*.css': {
