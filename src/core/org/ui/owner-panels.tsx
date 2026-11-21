@@ -8,10 +8,12 @@ import { Link } from '@/core/i18n/ui'
 import { Button } from '@/core/ui/button'
 
 import type { ConsolePackage, OwnerConsole, PaymentAccountGroup } from '../console/types'
+import { unitPricePer100Credits } from '../unit-price'
 import { PAYMENT_FIELD_LABELS, PAYMENT_FIELDS, PAYMENT_KIND_LABELS } from '../payment-labels'
 import type { OwnerActions } from './actions'
 import { Confirm } from './confirm'
 import { InviteLinkBox } from './invite-link-box'
+import { RefCodeBox } from './ref-code-box'
 import { FIELD, Panel, Result, Stat } from './parts'
 import { useConsoleAction } from './use-console-action'
 import type { Locale } from '@/core/i18n/locales'
@@ -58,6 +60,11 @@ export function PoolPanel({ data, actions }: { data: OwnerConsole; actions: Owne
   )
 }
 
+function Unit({ t, cents, credits }: { t: ReturnType<typeof useTranslations>; cents: number; credits: number }) {
+  const unit = unitPricePer100Credits(cents, credits)
+  return unit === null ? null : <span className="block text-caption text-muted-foreground">{t('unitPrice', { price: unit })}</span>
+}
+
 function price(format: ReturnType<typeof useFormatter>, cents: number) {
   return format.number(cents / 100, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: cents % 100 === 0 ? 0 : 2 })
 }
@@ -76,6 +83,7 @@ export function PackagesPanel({ packages }: { packages: readonly ConsolePackage[
               <span className="shrink-0 text-right tabular-nums">
                 <span className="font-semibold">{price(format, p.priceUsdCents)}</span>
                 <span className="block text-caption text-muted-foreground">{t('credits', { count: p.credits })}</span>
+                <Unit t={t} cents={p.priceUsdCents} credits={p.credits} />
               </span>
             </li>
           ))}
@@ -121,12 +129,13 @@ export function InvitePanel({ data, actions }: { data: OwnerConsole; actions: Ow
 // How to pay: bank transfer to one of the enabled accounts (never a card). Labels come from the
 // shared tables (PAYMENT_*), in the page's language; empty values are skipped. With no groups (or a
 // failed read) the panel says to contact us for the details.
-export function PaymentAccountsPanel({ groups, orgName }: { groups: readonly PaymentAccountGroup[] | null; orgName: string }) {
+export function PaymentAccountsPanel({ groups, orgName, refCode }: { groups: readonly PaymentAccountGroup[] | null; orgName: string; refCode: string }) {
   const t = useTranslations('app.org.payment')
   const lang = useLocale() === 'zh' ? 'zh' : 'en'
   const shown = groups?.filter((group) => group.details && Object.keys(group.details).length > 0) ?? []
   return (
     <Panel title={t('title')} hint={t('hint', { org: orgName })}>
+      <RefCodeBox code={refCode} />
       {shown.length === 0 ? <p data-slot="org-payment-accounts-pending" className="text-label text-muted-foreground">{t('pending')}</p> : null}
       {shown.map((group) => (
         <div key={group.kind} className="space-y-2">

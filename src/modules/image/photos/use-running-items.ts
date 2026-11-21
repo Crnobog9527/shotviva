@@ -78,7 +78,8 @@ function settledNews(server: PhotoItem[], ids: string[], views: (JobView | 'miss
   const news: Settled = { ready: [], failed: [] }
   ids.forEach((id, index) => {
     const view = views[index]
-    if (!view || view === 'missing' || view.status === 'running') return
+    // Refunded for the provider's per-minute limit: not a failure to announce (queue-fairness Q3).
+    if (!view || view === 'missing' || view.status === 'running' || view.error_code === 'PROVIDER_RATE_LIMITED') return
     const item = { id, templateName: names.get(id) ?? '', failure: null }
     if (view.status === 'succeeded') news.ready.push(item)
     else news.failed.push({ ...item, failure: { code: view.error_code ?? 'GENERATION_FAILED', message: '', refunded: true } })

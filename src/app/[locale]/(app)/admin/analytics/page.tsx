@@ -12,6 +12,8 @@ import {
   parsePageSort,
   parseRange,
   parseView,
+  posthogOn,
+  PostHogOff,
   posthogProjectId,
   RangeTabs,
   Unconfigured,
@@ -33,13 +35,16 @@ export default async function AdminAnalyticsPage({ searchParams }: PageProps<'/[
   const query = { view: parseView(params.view), range: parseRange(params.range), dim: parseFunnelDim(params.dim), sort: parsePageSort(params.sort) }
   const projectId = posthogProjectId()
   const insights = query.view === 'funnel' || query.view === 'templates'
+  // Switched off (2026-11-21, PVUV.ai instead): a notice and a link, not panels that cannot fill.
+  const off = !posthogOn()
   return (
     <AdminPage title={ANALYTICS_COPY.title} actions={insights ? undefined : <RangeTabs query={query} />}>
       <div className="grid min-w-0 gap-6">
         <ViewTabs query={query} />
+        {off ? <PostHogOff /> : null}
         {query.view === 'overview' ? (
           <GrowthView range={query.range} />
-        ) : query.view === 'funnel' || query.view === 'templates' ? (
+        ) : off ? null : query.view === 'funnel' || query.view === 'templates' ? (
           <InsightsPanel view={query.view} params={params} creditUsd={cheapestCreditUsd(site.billing.products)} />
         ) : (
           <>

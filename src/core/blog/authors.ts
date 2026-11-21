@@ -9,8 +9,11 @@ import type { Locale } from '../i18n/locales'
 export type BlogAuthorText = {
   // One line under the name, and schema.org jobTitle.
   jobTitle: string
-  // The profile's opening; also its meta description (≤155 characters) and schema.org description.
+  // The profile page's meta description (≤155 characters) and schema.org description.
   intro: string
+  // Who they are and why they can judge the subject, in a few sentences: the author card under a
+  // post and the profile's opening. It does not repeat the job title shown above it.
+  bio: string
   roles: readonly string[]
   awards: readonly string[]
   brands: readonly string[]

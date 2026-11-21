@@ -27,7 +27,7 @@ export type PaymentAccountGroup = { kind: PaymentKind; details: Record<string, s
 
 export type OwnerConsole = {
   kind: 'owner'
-  org: { id: string; name: string; status: OrgStatus; poolCredits: number; affiliateEnabled: boolean; affiliateLevels: 1 | 2 }
+  org: { id: string; name: string; refCode: string; status: OrgStatus; poolCredits: number; affiliateEnabled: boolean; affiliateLevels: 1 | 2 }
   inviteToken: string
   members: ConsoleMember[]
   memberTotal: number

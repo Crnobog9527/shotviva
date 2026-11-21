@@ -14,6 +14,8 @@ const unset: RawPublicEnv = {
   NEXT_PUBLIC_HCAPTCHA_SITEKEY: undefined,
   NEXT_PUBLIC_POSTHOG_KEY: undefined,
   NEXT_PUBLIC_POSTHOG_HOST: undefined,
+  NEXT_PUBLIC_POSTHOG_ENABLED: undefined,
+  NEXT_PUBLIC_PVUV_SITE: undefined,
   NEXT_PUBLIC_SENTRY_DSN: undefined,
   NEXT_PUBLIC_ASSETS_BASE_URL: undefined,
   NEXT_PUBLIC_IMAGE_CDN_URL: undefined,
@@ -32,6 +34,8 @@ const configured: RawPublicEnv = {
   NEXT_PUBLIC_HCAPTCHA_SITEKEY: 'site-key',
   NEXT_PUBLIC_POSTHOG_KEY: 'phc_key',
   NEXT_PUBLIC_POSTHOG_HOST: 'https://eu.i.posthog.com',
+  NEXT_PUBLIC_POSTHOG_ENABLED: 'true',
+  NEXT_PUBLIC_PVUV_SITE: 'site_abc',
   NEXT_PUBLIC_SENTRY_DSN: 'https://key@o1.ingest.sentry.io/1',
   NEXT_PUBLIC_ASSETS_BASE_URL: 'https://shotviva.com/assets//',
   NEXT_PUBLIC_IMAGE_CDN_URL: 'https://img-eo.shotviva.com/',
@@ -44,8 +48,17 @@ describe('withPublicDefaults', () => {
   it.each([
     ['nothing set', unset],
     ['everything set', configured],
+    ['key set but PostHog switched off', { ...configured, NEXT_PUBLIC_POSTHOG_ENABLED: undefined }],
   ])('matches the schema with %s', (_, raw) => {
     expect(withPublicDefaults(raw)).toEqual(parsePublicEnv(raw))
+  })
+})
+
+describe('the PostHog switch', () => {
+  it('blanks the key unless NEXT_PUBLIC_POSTHOG_ENABLED is true', () => {
+    expect(withPublicDefaults(configured).NEXT_PUBLIC_POSTHOG_KEY).toBe('phc_key')
+    expect(withPublicDefaults({ ...configured, NEXT_PUBLIC_POSTHOG_ENABLED: undefined }).NEXT_PUBLIC_POSTHOG_KEY).toBe('')
+    expect(withPublicDefaults({ ...configured, NEXT_PUBLIC_POSTHOG_ENABLED: 'false' }).NEXT_PUBLIC_POSTHOG_KEY).toBe('')
   })
 })
 

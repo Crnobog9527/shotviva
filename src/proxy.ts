@@ -1,10 +1,11 @@
 import createMiddleware from 'next-intl/middleware'
-import type { NextRequest, NextResponse } from 'next/server'
+import type { NextFetchEvent, NextRequest, NextResponse } from 'next/server'
 
 import { isAffiliateEnabled, requiresAffiliateProgram } from '@/core/affiliate/feature'
 import { notFoundResponse } from '@/core/auth/proxy-gates'
 import { recordReferral } from '@/core/affiliate/referral'
 import { analyticsCookiesAllowed, withAnalyticsRegion } from '@/core/analytics/consent'
+import { reportCrawlerHit } from '@/core/analytics/pvuv/crawler'
 import { withFirstTouch } from '@/core/attribution/proxy'
 import { proxyGate, type Forward } from '@/core/auth/proxy'
 import { captureCodeLink } from '@/core/codes/link'
@@ -66,7 +67,9 @@ function visitorCookies(response: NextResponse, request: NextRequest, experiment
   }
 }
 
-export async function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest, event?: NextFetchEvent) {
+  // AI and search crawlers, reported to PVUV.ai after the response (never delays or changes it).
+  reportCrawlerHit(request, event, serverEnv)
   const early = earlyResponse(request)
   if (early) return early
   if (/^\/admin-media\/(references|prompt-lab)\//.test(request.nextUrl.pathname)) {
@@ -99,7 +102,7 @@ export async function proxy(request: NextRequest) {
   return withHostNoindex(response, request, hosts.canonicalHost)
 }
 
-// /ingest is the PostHog proxy (next.config.ts rewrites): no session work for analytics beacons.
+// /ingest is the PostHog proxy (next.config.ts rewrites, only while PostHog is on): no session work for analytics beacons.
 // fonts/ holds public, content-addressed font files only (MiSans, ARCHITECTURE §17; Instrument Serif).
 // assets/ is the template-cover rewrite to the public bucket (ARCHITECTURE §8.3, T51).
 // api/version is the open tabs' version check (T90): no session work, no locale routing.

@@ -109,12 +109,13 @@ export async function createWaffoCheckout(
 ): Promise<{ url: string }> {
   const product = deps.products.find((p) => p.id === input.body.product_id)
   if (!product || product.priceUsd <= 0) throw new AppError('NOT_FOUND', 'Unknown product')
+  const orderRef = input.bound?.attempt.token ?? (deps.newOrderRef ?? randomUUID)()
   const request = waffoSessionRequest(deps, {
     userId: input.userId,
     product,
     body: input.body,
     quote: input.quote,
-    orderRef: input.bound?.attempt.token ?? (deps.newOrderRef ?? randomUUID)(),
+    orderRef,
   })
   const url = input.bound ? await openBound(deps.waffo, input.userId, input.bound, request, isRecurring(product, input.body.method))
     : checkoutUrl(await deps.waffo.createCheckoutSession(request))
@@ -125,7 +126,7 @@ export async function createWaffoCheckout(
     form: isRecurring(product, input.body.method) ? 'subscription' : 'one_time',
     channel: 'waffo',
     method: input.body.method,
-  }, input.body.locale)
+  }, input.body.locale, orderRef)
   return { url }
 }
 

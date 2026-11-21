@@ -70,7 +70,7 @@ export async function settleWaffoOrder(
 export type WaffoChargeForm = 'one_time' | 'subscription'
 
 // The page language the checkout was opened in, carried in the order metadata.
-function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, facts: WaffoPaymentFacts, meta: { locale: 'en' | 'zh'; form: WaffoChargeForm; credits?: number }): void {
+function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, facts: WaffoPaymentFacts, meta: { locale: 'en' | 'zh'; form: WaffoChargeForm; credits?: number; paymentId: string }): void {
   ;(deps.trackBuy ?? trackPurchase)(userId, {
     product_id: product.id,
     tier: product.tier,
@@ -80,7 +80,7 @@ function track(deps: WaffoFulfilDeps, userId: string, product: SiteProduct, fact
     method: facts.method,
     amount_usd: facts.subtotalUsd,
     ...(meta.credits !== undefined && { credits: meta.credits }),
-  }, meta.locale)
+  }, meta.locale, meta.paymentId)
 }
 
 // After a grant (never a replay): the Owner hears of the payment. Keyed by the payment id.
@@ -124,7 +124,7 @@ async function settleCharge(deps: WaffoFulfilDeps, order: WaffoOrder, product: S
     const outcome = await settleQuotedRenewal(deps.db, order, paymentId, quote.cents)
     if (outcome === 'applied') {
       const facts = paymentFacts(order, product)
-      track(deps, userId, product, facts, { locale, form, credits: quote.credits })
+      track(deps, userId, product, facts, { locale, form, credits: quote.credits, paymentId })
       alertReceived(userId, product, paymentId, facts, true)
     }
     return outcome
@@ -132,7 +132,7 @@ async function settleCharge(deps: WaffoFulfilDeps, order: WaffoOrder, product: S
   const facts = paymentFacts(order, product, quote)
   const change = await settleWaffoOrder(deps.db, { userId, productId: product.id, paymentId, facts, version: quote && 'v2' })
   if (change.applied) {
-    track(deps, userId, product, facts, { locale, form, credits: quote?.credits })
+    track(deps, userId, product, facts, { locale, form, credits: quote?.credits, paymentId })
     alertReceived(userId, product, paymentId, facts, form === 'subscription' && (order.periodNumber ?? 1) > 1)
   }
   return change.applied ? 'applied' : 'replayed'
