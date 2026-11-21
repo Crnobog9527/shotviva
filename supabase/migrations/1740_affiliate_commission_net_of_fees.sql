@@ -92,6 +92,16 @@ returns boolean language sql stable security definer set search_path='' as $$
 $$;
 revoke all on function public._affiliate_fee_missing(public.payments) from public,anon,authenticated,service_role;
 
+-- Opens (or reopens) the fees_missing alert of a payment confirmed on _affiliate_fee_fallback.
+create function public._affiliate_fee_alert_open(p_payment public.payments) returns void
+language sql security definer set search_path='' as $$
+  insert into public.affiliate_fee_alerts(payment_id,kind,fee_cents)
+    values(p_payment.id,'fees_missing',public._affiliate_fee_fallback(p_payment))
+    on conflict(payment_id) do update set fee_cents=excluded.fee_cents,opened_at=now(),resolved_at=null
+    where affiliate_fee_alerts.resolved_at is not null;
+$$;
+revoke all on function public._affiliate_fee_alert_open(public.payments) from public,anon,authenticated,service_role;
+
 -- May a commission of this payment, due at p_confirm, confirm at p_at as far as fees go.
 create function public._affiliate_fee_ready(p_payment public.payments, p_confirm timestamptz, p_at timestamptz)
 returns boolean language sql stable security definer set search_path='' as $$
@@ -105,7 +115,8 @@ revoke all on function public._affiliate_fee_ready(public.payments,timestamptz,t
 -- also waits for _affiliate_fee_ready unless the commission is already confirmed; fee changes
 -- are recorded as fee_final / fee_adjusted, and a confirmation on the estimate as
 -- confirmed_fee_estimate. A fee-era payment with no fee data takes _affiliate_fee_fallback as its
--- fee once the grace period after confirm_after has passed, and may then confirm.
+-- fee once the grace period after confirm_after has passed, and may then confirm; confirming on
+-- it opens the payment's affiliate_fee_alerts row, whichever caller (incl. admin release) it is.
 create or replace function public._affiliate_write_commission(p_payment public.payments,p_snapshot jsonb,p_level smallint,
   p_open boolean,p_lost boolean,p_release boolean default false) returns void
 language plpgsql security definer set search_path='' as $$
@@ -167,6 +178,8 @@ begin
     updated_at=now() returning id into v_id;
   insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
     values(v_id,v_old.amount,v_amount,v_old.status,v_status,v_reason);
+  -- Every path that confirms on the fallback (recompute, daily run, admin release) leaves the alert.
+  if v_fallback and v_status='confirmed' then perform public._affiliate_fee_alert_open(p_payment); end if;
 end;
 $$;
 
@@ -259,10 +272,7 @@ begin
   update public.affiliate_recompute_errors set resolved_at=now() where payment_id=p_payment_id and resolved_at is null;
   v_missing:=public._affiliate_fee_missing(v_payment);
   if v_missing and exists(select from public.affiliate_commissions c where c.payment_id=p_payment_id and c.status='confirmed') then
-    insert into public.affiliate_fee_alerts(payment_id,kind,fee_cents)
-      values(p_payment_id,'fees_missing',public._affiliate_fee_fallback(v_payment))
-      on conflict(payment_id) do update set fee_cents=excluded.fee_cents,opened_at=now(),resolved_at=null
-      where affiliate_fee_alerts.resolved_at is not null;
+    perform public._affiliate_fee_alert_open(v_payment);
   elsif not v_missing then
     update public.affiliate_fee_alerts set resolved_at=now() where payment_id=p_payment_id and resolved_at is null;
   end if;

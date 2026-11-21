@@ -138,6 +138,19 @@ it('confirms a fee-era payment with no fee data after the grace period on the pu
   expect(await alert(old.id)).toBeUndefined()
 })
 
+it('opens the fees_missing alert when an admin releases a held commission onto the fallback', async () => {
+  await db.query("update profiles set signup_ip='203.0.113.9' where id in ($1,$2)", [f.buyer, f.owner.id])
+  await db.query('update affiliate_settings set hold_days=0,fee_final_grace_days=0')
+  const p = await sale(db, f.buyer, 'pack_m', 2490)
+  const c = await row(db, 'select id,status,flags from affiliate_commissions where payment_id=$1 and level=1', [p.id])
+  expect(c).toMatchObject({ status: 'on_hold', flags: ['same_ip'] })
+  expect(await row(db, 'select count(*)::int n from affiliate_fee_alerts where payment_id=$1', [p.id])).toEqual({ n: 0 })
+  await db.query("select admin_affiliate_commission_release($1,$2)", [f.actor, { commission_id: c.id, decision: 'release', reason: 'QA' }])
+  expect(await commission(p.id)).toMatchObject({ status: 'confirmed', fee_cents: 102, amount: 358 })
+  expect(await row(db, 'select kind,fee_cents,resolved_at is null as open from affiliate_fee_alerts where payment_id=$1', [p.id]))
+    .toEqual({ kind: 'fees_missing', fee_cents: 102, open: true })
+})
+
 it('partial refunds deduct the original fee in full from the unrefunded part, floor 0; refund fees count on that payment', async () => {
   const p = await sale(db, f.buyer, 'max_monthly', 9900)
   await real(p.id, 420)
@@ -246,7 +259,7 @@ it('keeps the internal functions and the alert table private', async () => {
     has_table_privilege('service_role','affiliate_fee_alerts','insert') i`)).toEqual({ a: false, u: false, s: true, i: false })
   for (const fn of ['_affiliate_due(integer,integer,integer,integer,integer)', '_affiliate_net_base(integer,integer,integer,integer)',
     '_affiliate_fee_era(payments)', '_affiliate_fee_ready(payments,timestamptz,timestamptz)', '_affiliate_fee_fallback(payments)',
-    '_affiliate_fee_missing(payments)']) {
+    '_affiliate_fee_missing(payments)', '_affiliate_fee_alert_open(payments)']) {
     expect(await row(db, `select has_function_privilege('anon',$1,'execute') a,has_function_privilege('authenticated',$1,'execute') u,
       has_function_privilege('service_role',$1,'execute') s`, [fn])).toEqual({ a: false, u: false, s: false })
   }
