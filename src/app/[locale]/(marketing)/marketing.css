@@ -727,11 +727,13 @@
   .mk-pk-side { display: flex; flex-direction: column; min-height: 0; }
   .mk-pk-title { font: 400 32px/1.05 var(--font-display); letter-spacing: -0.02em; margin-bottom: 4px; }
   .mk-pk-text { font-size: 14px; color: var(--muted-foreground); }
-  .mk-pk-list { margin-top: 12px; display: grid; gap: 4px; }
+  /* A flex column, not a grid: a grid track sized a flex button at one line (56px) while its wrapped
+     description needed more, so rows overlapped. Rows keep their own height (flex: none). */
+  .mk-pk-list { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
   .mk-pk-cat { padding: 12px 2px 4px; font: 600 14px/1.3 var(--font-sans); color: var(--muted-foreground); }
   .mk-pk-row {
     display: flex; width: 100%; align-items: center; gap: 12px; min-height: 56px; padding: 6px 10px 6px 6px; border: 0; border-radius: var(--radius-button);
-    background: none; color: var(--foreground); text-align: left; cursor: pointer; box-shadow: inset 0 0 0 1px transparent; transition: background-color .18s, box-shadow .18s;
+    flex: none; background: none; color: var(--foreground); text-align: left; cursor: pointer; box-shadow: inset 0 0 0 1px transparent; transition: background-color .18s, box-shadow .18s;
   }
   .mk-pk-th { flex: none; width: 44px; height: 44px; border-radius: 12px; object-fit: cover; background: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }
   .mk-pk-t { flex: 1; min-width: 0; }
@@ -742,7 +744,7 @@
   /* search and chips over the list (Owner 2026-11-13); a series row opens its members in place */
   .mk-pk-tools { display: grid; gap: 10px; margin-top: 16px; }
   .mk-pk-none { padding: 24px 4px; font-size: 14px; color: var(--muted-foreground); }
-  .mk-pk-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px 0 4px; border-radius: var(--radius-button); font: 500 14px/1 var(--font-sans); color: var(--bone-dim); justify-self: start; }
+  .mk-pk-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px 0 4px; border-radius: var(--radius-button); font: 500 14px/1 var(--font-sans); color: var(--bone-dim); align-self: flex-start; }
   .mk-pk-stack { position: relative; flex: none; border-radius: 12px; box-shadow: 3px -3px 0 -1px var(--accent), 6px -6px 0 -2px var(--secondary); margin: 6px 6px 0 0; }
   .mk-pk-stack .mk-pk-th { display: block; }
   @media (max-width: 767.98px) { .mk-pk-body[data-searching] .mk-pk-sample { display: none; } }
