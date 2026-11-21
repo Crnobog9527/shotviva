@@ -26,7 +26,7 @@ function matchesPhone(phone: string | null, digits: string, search: string) {
 }
 
 const candidates = z.object({ total: z.int().nonnegative(), rows: z.array(z.object({ id: z.uuid(), phone: z.string().nullable() })) })
-async function phoneUser(db: SupabaseClient, input: string) {
+export async function phoneUser(db: SupabaseClient, input: string) {
   const { digits, search } = phoneQuery(input)
   const ids = new Set<string>()
   let count = 0
