@@ -82,3 +82,5 @@ export type OrgAffiliate = {
   status: string
   rates: { productKind: string; l1Bp: number; l2Bp: number; overridden: boolean }[]
 }
+
+export type PaymentAccountRow = { enabled: boolean; details: Record<string, string>; updatedAt: string }

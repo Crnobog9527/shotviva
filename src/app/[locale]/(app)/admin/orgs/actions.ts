@@ -2,7 +2,7 @@
 
 import { refresh } from 'next/cache'
 
-import { createOrg, grantOrg, runOrgAction, saveOrg, savePackage } from '@/core/admin/orgs'
+import { createOrg, grantOrg, runOrgAction, saveOrg, savePackage, savePaymentAccount } from '@/core/admin/orgs'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 
 // Server actions are public endpoints, so each re-checks the admin role itself (the layout gate
@@ -36,6 +36,13 @@ export async function grantOrgAction(input: unknown) {
 export async function savePackageAction(input: unknown) {
   const d = await deps()
   const result = await runOrgAction(() => savePackage(d, input))
+  if (result.ok) refresh()
+  return result
+}
+
+export async function savePaymentAccountAction(input: unknown) {
+  const d = await deps()
+  const result = await runOrgAction(() => savePaymentAccount(d, input))
   if (result.ok) refresh()
   return result
 }
