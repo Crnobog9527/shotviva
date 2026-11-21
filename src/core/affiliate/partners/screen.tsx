@@ -14,11 +14,21 @@ import { Overview } from './overview'
 import { PayoutList, ReferralList, TeamReport } from './reports'
 import { readAccount, readSettings } from './repository'
 
+// `?a=1&b=2` of the search params as received (first value of a repeated key), or ''.
+function queryString(raw: SearchParams): string {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(raw)) {
+    const first = Array.isArray(value) ? value[0] : value
+    if (first) params.set(key, first)
+  }
+  return params.size ? '?' + params.toString() : ''
+}
+
 async function guard() {
   await connection()
   if (!(await isAffiliateEnabled())) notFound()
 }
-async function Dashboard({ user, account, query }: { user: string; account: Account; query: Query }) {
+export async function Dashboard({ user, account, query }: { user: string; account: Account; query: Query }) {
   switch (query.view) {
     case 'commissions':
       return <CommissionList user={user} query={query} />
@@ -41,7 +51,8 @@ export async function PartnerScreen({ search }: { search: Promise<SearchParams> 
   const [user, t, raw] = await Promise.all([getSessionUser(), getTranslations('affiliate'), search])
   const query = searchSchema.parse(raw)
   const account = user?.verified ? await readAccount(user.id) : null
-  if (account?.org_id) redirect(await localized('/partners/enterprise'))
+  // An org's account lives on the enterprise dashboard (card E4); its links keep the same query.
+  if (account?.org_id) redirect(await localized('/partners/enterprise' + queryString(await search)))
   if (!user?.verified || account?.status !== 'active') redirect(await localized('/partners/join'))
   return (
     <div className="af-dash">

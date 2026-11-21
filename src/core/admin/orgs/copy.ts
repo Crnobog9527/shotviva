@@ -3,6 +3,7 @@ export const ORGS_COPY = {
   title: '企业客户',
   tabOrgs: '企业',
   tabPackages: '套餐',
+  tabPayment: '收款账户',
   back: '返回企业列表',
   empty: '还没有企业客户',
   emptyHint: '在上方新建第一家企业，并指定它的主管理员账号。',
@@ -119,6 +120,15 @@ export const ORGS_COPY = {
   packageSaved: '已保存套餐',
   packagesEmpty: '还没有套餐',
   inactive: '已下架',
+  // 收款账户
+  payTitle: '收款账户',
+  payHint: '企业套餐一律线下对公转账，不走 Stripe。这里填我们的两套收款账户，启用后会显示在企业主管理员的套餐区块里；停用或没填的不会显示。账户信息只保存在本环境数据库，不要写进代码或文档。',
+  payEnabled: '启用（对企业主管理员显示）',
+  payNever: '尚未保存',
+  payUpdated: (when: string) => `上次保存：${when}`,
+  paySave: '保存账户',
+  paySaved: '已保存收款账户',
+  payRequired: '启用前请填写账户名称、银行名称和账号',
   // 错误
   notFound: '未找到这个企业',
   noAccount: '未找到这个账号',

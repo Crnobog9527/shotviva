@@ -3,7 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { adminCreateOrg, adminGrantOrg, adminSaveOrgPackage, adminUpdateOrg } from '@/core/org'
+import { adminCreateOrg, adminGrantOrg, adminSaveOrgPackage, adminSavePaymentAccount, adminUpdateOrg, PAYMENT_FIELDS, PAYMENT_KINDS } from '@/core/org'
 import { EnrollmentError, phoneUser } from '@/core/affiliate/admin/create-account'
 import { findUser } from '@/core/affiliate/admin/summary'
 import { toAppError } from '@/core/errors'
@@ -196,6 +196,26 @@ export async function savePackage(deps: OrgDeps, input: unknown): Promise<OrgAct
     name: form.name, price_usd_cents: price, credits, sort, active: form.active,
   })
   return { ok: true, message: COPY.packageSaved }
+}
+
+const paymentSchema = z.object({
+  kind: z.enum(PAYMENT_KINDS),
+  enabled: z.boolean(),
+  expectedUpdatedAt: text(40),
+  fields: z.record(z.string(), text(1000)),
+})
+
+// Only the fields of the chosen group are sent; the SQL refuses anything else.
+export async function savePaymentAccount(deps: OrgDeps, input: unknown): Promise<OrgActionResult<{ updatedAt: string }>> {
+  const form = paymentSchema.parse(input)
+  const details = Object.fromEntries(PAYMENT_FIELDS[form.kind].map((key) => [key, form.fields[key] ?? '']))
+  const filled = (key: string) => (details[key] ?? '').trim() !== ''
+  if (form.enabled && !['account_name', 'bank_name', 'account_number'].every(filled)) throw new OrgInputError(COPY.payRequired)
+  const updatedAt = await adminSavePaymentAccount(deps.db, deps.actor, {
+    kind: form.kind, enabled: form.enabled, details,
+    ...(form.expectedUpdatedAt ? { expected_updated_at: form.expectedUpdatedAt } : {}),
+  })
+  return { ok: true, message: COPY.paySaved, value: { updatedAt } }
 }
 
 const KNOWN: Record<string, string> = {

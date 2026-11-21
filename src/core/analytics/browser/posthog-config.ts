@@ -1,6 +1,7 @@
 import type { CaptureResult, PostHogConfig } from 'posthog-js'
 
 import { localeOfPath } from '../../i18n/paths'
+import { redactInvitePath } from '../../invite-path'
 import { persistenceFor, replayAllowed, type Consent } from '../consent/decision'
 import { REPLAY_BLOCK_CLASS } from '../replay'
 
@@ -19,15 +20,16 @@ export function scrubUrl(value: string): string {
     for (const name of [...url.searchParams.keys()]) {
       if (SENSITIVE_PARAM.test(name)) url.searchParams.delete(name)
     }
-    return url.toString()
+    return redactInvitePath(url.toString())
   } catch {
-    return value.replace(EMAIL, '[email]')
+    return redactInvitePath(value).replace(EMAIL, '[email]')
   }
 }
 
 function scrubProperty(key: string, value: unknown): unknown {
   if (typeof value !== 'string') return value
-  return URL_PROPS.has(key) ? scrubUrl(value) : value.replace(EMAIL, '[email]')
+  // $pathname and any other string may hold an invite path too.
+  return URL_PROPS.has(key) ? scrubUrl(value) : redactInvitePath(value).replace(EMAIL, '[email]')
 }
 
 // Autocapture reads element text, and the account page shows the user's email; every string

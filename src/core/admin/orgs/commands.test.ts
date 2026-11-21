@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const spies = vi.hoisted(() => ({
-  create: vi.fn(), update: vi.fn(), grant: vi.fn(), savePkg: vi.fn(), detail: vi.fn(), findUser: vi.fn(), phone: vi.fn(),
+  savePay: vi.fn(), create: vi.fn(), update: vi.fn(), grant: vi.fn(), savePkg: vi.fn(), detail: vi.fn(), findUser: vi.fn(), phone: vi.fn(),
 }))
 vi.mock('@/core/org', () => ({
-  adminCreateOrg: spies.create, adminUpdateOrg: spies.update, adminGrantOrg: spies.grant, adminSaveOrgPackage: spies.savePkg,
+  adminCreateOrg: spies.create, adminUpdateOrg: spies.update, adminGrantOrg: spies.grant, adminSaveOrgPackage: spies.savePkg, adminSavePaymentAccount: spies.savePay,
+  PAYMENT_KINDS: ['overseas_us', 'mainland_agent'],
+  PAYMENT_FIELDS: { overseas_us: ['account_name', 'bank_name', 'account_number', 'routing_aba', 'notes'], mainland_agent: ['account_name', 'bank_name', 'branch', 'account_number', 'notes'] },
 }))
 vi.mock('./reads', () => ({ loadOrgDetail: spies.detail }))
 vi.mock('@/core/affiliate/admin/summary', () => ({ findUser: spies.findUser }))
 vi.mock('@/core/affiliate/admin/create-account', () => ({ phoneUser: spies.phone, EnrollmentError: class EnrollmentError extends Error {} }))
 vi.mock('@/core/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn() } }))
 
-const { createOrg, grantOrg, moneyToMinor, orgFailure, runOrgAction, saveOrg, savePackage } = await import('./commands')
+const { createOrg, grantOrg, moneyToMinor, orgFailure, runOrgAction, saveOrg, savePackage, savePaymentAccount } = await import('./commands')
 const { AppError } = await import('@/core/errors')
 
 const db = {} as never
@@ -164,5 +166,28 @@ describe('orgFailure', () => {
     expect(orgFailure(new AppError('CONFLICT', 'IDEMPOTENCY_CONFLICT')).message).toContain('请求号')
     expect(orgFailure(new AppError('INTERNAL', 'rpc admin_org_grant failed: secret detail'))).toEqual({ ok: false, message: '操作失败，请稍后重试' })
     expect(orgFailure(new AppError('FORBIDDEN', 'NOT_ADMIN')).message).toBe('没有权限')
+  })
+})
+
+describe('savePaymentAccount', () => {
+  const fake = { account_name: 'Fake Co LLC', bank_name: 'Fake Bank', account_number: '000-FAKE-0000', routing_aba: '000000000', extra: 'dropped' }
+  it('sends only the fields of the chosen group and the stale-form guard when saved before', async () => {
+    spies.savePay.mockResolvedValue('2026-03-03T00:00:00Z')
+    const result = await savePaymentAccount(deps, { kind: 'overseas_us', enabled: true, expectedUpdatedAt: '2026-01-01T00:00:00Z', fields: fake })
+    expect(spies.savePay).toHaveBeenCalledWith(db, deps.actor, {
+      kind: 'overseas_us', enabled: true, expected_updated_at: '2026-01-01T00:00:00Z',
+      details: { account_name: 'Fake Co LLC', bank_name: 'Fake Bank', account_number: '000-FAKE-0000', routing_aba: '000000000', notes: '' },
+    })
+    expect(result).toMatchObject({ ok: true, value: { updatedAt: '2026-03-03T00:00:00Z' } })
+  })
+  it('omits expected_updated_at on a first save', async () => {
+    spies.savePay.mockResolvedValue('x')
+    await savePaymentAccount(deps, { kind: 'mainland_agent', enabled: false, expectedUpdatedAt: '', fields: {} })
+    expect(spies.savePay.mock.calls[0][2]).not.toHaveProperty('expected_updated_at')
+  })
+  it('refuses to enable a group without account name, bank and number', async () => {
+    const result = await runOrgAction(() => savePaymentAccount(deps, { kind: 'overseas_us', enabled: true, expectedUpdatedAt: '', fields: { account_name: 'Fake Co' } }))
+    expect(result).toEqual({ ok: false, message: '启用前请填写账户名称、银行名称和账号' })
+    expect(spies.savePay).not.toHaveBeenCalled()
   })
 })

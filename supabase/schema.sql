@@ -4218,6 +4218,20 @@ $$;
 ALTER FUNCTION "public"."_org_lock_owned"("p_owner" "uuid", "p_allow_suspended" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_payment_fields"("p_kind" "text") RETURNS "text"[]
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select case p_kind
+    when 'overseas_us' then array['account_name','bank_name','account_number','routing_aba','swift','bank_address','beneficiary_address','currency','notes']
+    when 'mainland_agent' then array['account_name','bank_name','branch','account_number','swift','address','currency','remittance_note','notes']
+  end;
+$$;
+
+
+ALTER FUNCTION "public"."_org_payment_fields"("p_kind" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_release"("p_org" "public"."orgs", "p_member" "uuid", "p_request" "text", "p_actor" "uuid") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -8409,6 +8423,60 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_org_package_save"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_org_payment_account_save"("p_actor" "uuid", "p_input" "jsonb") RETURNS timestamp with time zone
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_kind text := p_input->>'kind';
+  v_allowed text[] := public._org_payment_fields(p_input->>'kind');
+  v_enabled boolean;
+  v_details jsonb := '{}'::jsonb;
+  v_old public.org_payment_accounts;
+  v_new public.org_payment_accounts;
+  k text;
+  v text;
+begin
+  perform public._org_require_admin(p_actor);
+  if v_allowed is null or jsonb_typeof(p_input->'enabled') is distinct from 'boolean'
+     or jsonb_typeof(p_input->'details') is distinct from 'object' then
+    raise exception 'INVALID_INPUT';
+  end if;
+  v_enabled := (p_input->>'enabled')::boolean;
+  for k in select jsonb_object_keys(p_input->'details') loop
+    if not (k = any(v_allowed)) or jsonb_typeof(p_input->'details'->k) <> 'string' then
+      raise exception 'INVALID_INPUT' using detail = k;
+    end if;
+    v := trim(p_input->'details'->>k);
+    if length(v) > 1000 then raise exception 'INVALID_INPUT' using detail = k; end if;
+    if v <> '' then v_details := v_details || jsonb_build_object(k, v); end if;
+  end loop;
+  if v_enabled and not (v_details ? 'account_name' and v_details ? 'bank_name' and v_details ? 'account_number') then
+    raise exception 'INVALID_INPUT' using detail = 'required';
+  end if;
+  select * into v_old from public.org_payment_accounts where kind = v_kind for update;
+  if found then
+    if (p_input->>'expected_updated_at') is null
+       or (p_input->>'expected_updated_at')::timestamptz is distinct from v_old.updated_at then
+      raise exception 'ORG_CHANGED';
+    end if;
+    update public.org_payment_accounts set enabled = v_enabled, details = v_details, updated_at = now(), updated_by = p_actor
+      where kind = v_kind returning * into v_new;
+  else
+    if (p_input->>'expected_updated_at') is not null then raise exception 'ORG_CHANGED'; end if;
+    insert into public.org_payment_accounts(kind, enabled, details, updated_by) values (v_kind, v_enabled, v_details, p_actor)
+      on conflict (kind) do nothing returning * into v_new;
+    if not found then raise exception 'ORG_CHANGED'; end if;
+  end if;
+  perform public._org_audit(p_actor, 'org_update', 'payment_account:' || v_kind, 'payment_account enabled:' || v_enabled::text);
+  return v_new.updated_at;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_org_payment_account_save"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_org_update"("p_actor" "uuid", "p_org_id" "uuid", "p_input" "jsonb") RETURNS timestamp with time zone
@@ -13491,6 +13559,25 @@ $_$;
 ALTER FUNCTION "public"."org_monthly_topup"("p_period" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_owner is null or not exists(select from public.orgs where owner_user_id = p_owner) then
+    raise exception 'NOT_ORG_OWNER';
+  end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('kind', a.kind, 'details', a.details, 'updated_at', a.updated_at) order by a.kind)
+    from public.org_payment_accounts a where a.enabled
+  ), '[]'::jsonb);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."org_remove_member"("p_owner" "uuid", "p_member" "uuid", "p_request_id" "text") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -13510,6 +13597,24 @@ $$;
 
 
 ALTER FUNCTION "public"."org_remove_member"("p_owner" "uuid", "p_member" "uuid", "p_request_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_rotate_invite"("p_owner" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  o public.orgs;
+  token text := replace(gen_random_uuid()::text, '-', '');
+begin
+  o := public._org_lock_owned(p_owner, true);
+  update public.orgs set invite_token = token, updated_at = now() where id = o.id;
+  return token;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."org_rotate_invite"("p_owner" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."org_set_allowance"("p_owner" "uuid", "p_member" "uuid", "p_allowance" integer) RETURNS integer
@@ -17743,6 +17848,20 @@ CREATE TABLE IF NOT EXISTS "public"."org_packages" (
 ALTER TABLE "public"."org_packages" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."org_payment_accounts" (
+    "kind" "text" NOT NULL,
+    "enabled" boolean DEFAULT false NOT NULL,
+    "details" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid" NOT NULL,
+    CONSTRAINT "org_payment_accounts_details_check" CHECK (("jsonb_typeof"("details") = 'object'::"text")),
+    CONSTRAINT "org_payment_accounts_kind_check" CHECK (("kind" = ANY (ARRAY['overseas_us'::"text", 'mainland_agent'::"text"])))
+);
+
+
+ALTER TABLE "public"."org_payment_accounts" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."org_pool_returns" (
     "refund_key" "text" NOT NULL,
     "org_id" "uuid" NOT NULL,
@@ -18751,6 +18870,11 @@ ALTER TABLE ONLY "public"."org_members"
 
 ALTER TABLE ONLY "public"."org_packages"
     ADD CONSTRAINT "org_packages_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."org_payment_accounts"
+    ADD CONSTRAINT "org_payment_accounts_pkey" PRIMARY KEY ("kind");
 
 
 
@@ -20572,6 +20696,11 @@ ALTER TABLE ONLY "public"."org_packages"
 
 
 
+ALTER TABLE ONLY "public"."org_payment_accounts"
+    ADD CONSTRAINT "org_payment_accounts_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id");
+
+
+
 ALTER TABLE ONLY "public"."org_pool_returns"
     ADD CONSTRAINT "org_pool_returns_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
 
@@ -21158,6 +21287,9 @@ ALTER TABLE "public"."org_members" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_packages" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."org_payment_accounts" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_pool_returns" ENABLE ROW LEVEL SECURITY;
@@ -22150,6 +22282,10 @@ REVOKE ALL ON FUNCTION "public"."_org_lock_owned"("p_owner" "uuid", "p_allow_sus
 
 
 
+REVOKE ALL ON FUNCTION "public"."_org_payment_fields"("p_kind" "text") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_org_release"("p_org" "public"."orgs", "p_member" "uuid", "p_request" "text", "p_actor" "uuid") FROM PUBLIC;
 
 
@@ -22701,6 +22837,11 @@ GRANT ALL ON FUNCTION "public"."admin_org_grant"("p_actor" "uuid", "p_input" "js
 
 REVOKE ALL ON FUNCTION "public"."admin_org_package_save"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_org_package_save"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_org_payment_account_save"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_org_payment_account_save"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
 
 
@@ -23457,8 +23598,18 @@ GRANT ALL ON FUNCTION "public"."org_monthly_topup"("p_period" "text") TO "servic
 
 
 
+REVOKE ALL ON FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."org_remove_member"("p_owner" "uuid", "p_member" "uuid", "p_request_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_remove_member"("p_owner" "uuid", "p_member" "uuid", "p_request_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_rotate_invite"("p_owner" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_rotate_invite"("p_owner" "uuid") TO "service_role";
 
 
 
@@ -24168,6 +24319,10 @@ GRANT SELECT ON TABLE "public"."org_members" TO "service_role";
 
 
 GRANT SELECT ON TABLE "public"."org_packages" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."org_payment_accounts" TO "service_role";
 
 
 

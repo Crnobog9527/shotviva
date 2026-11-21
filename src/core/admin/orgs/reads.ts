@@ -4,8 +4,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
+import { PAYMENT_KINDS, type PaymentKind } from '@/core/org'
 
-import type { LedgerRow, LimitCaps, MemberRow, OrgAffiliate, OrgDetail, OrgListItem, OrgPackage, OrgRow } from './types'
+import type { PaymentAccountRow, LedgerRow, LimitCaps, MemberRow, OrgAffiliate, OrgDetail, OrgListItem, OrgPackage, OrgRow } from './types'
 
 // Read side of the enterprise admin (ARCHITECTURE §6.5). The org tables have no client grant and
 // the service role may select; every write goes through the E1 functions in core/org.
@@ -191,4 +192,11 @@ export async function loadOrgDetail(db: SupabaseClient, id: string): Promise<Org
     caps,
     affiliate,
   }
+}
+
+// Admin only (the caller checked the role): the saved receiving accounts, a group never saved is absent.
+export async function listPaymentAccounts(db: SupabaseClient): Promise<Partial<Record<PaymentKind, PaymentAccountRow>>> {
+  const schema = z.object({ kind: z.enum(PAYMENT_KINDS), enabled: z.boolean(), details: z.record(z.string(), z.string()), updated_at: z.string() })
+  const rows = z.array(schema).parse(ok(await db.from('org_payment_accounts').select('kind,enabled,details,updated_at'), 'payment accounts'))
+  return Object.fromEntries(rows.map((r) => [r.kind, { enabled: r.enabled, details: r.details, updatedAt: r.updated_at }]))
 }
