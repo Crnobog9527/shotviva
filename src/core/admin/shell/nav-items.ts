@@ -18,6 +18,8 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   { key: 'products', href: '/admin/products' },
   { key: 'codes', href: '/admin/codes' },
   { key: 'affiliates', href: '/admin/affiliates' },
+  // Enterprise customers (ARCHITECTURE §6.5, E3): packages bought offline, credit pool, usage lifts.
+  { key: 'orgs', href: '/admin/orgs' },
   // T82 (ARCHITECTURE §6.3 「后台拒付页」), next to the payments it is about.
   { key: 'disputes', href: '/admin/disputes' },
   { key: 'jobs', href: '/admin/jobs' },

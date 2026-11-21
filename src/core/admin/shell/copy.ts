@@ -16,6 +16,7 @@ export const SHELL_COPY = {
     products: '商品目录',
     codes: '邀请码与活动码',
     affiliates: '联盟营销',
+    orgs: '企业客户',
     disputes: '拒付',
     jobs: '出图记录',
     costs: '成本对账',
