@@ -4,17 +4,17 @@ import { useLocale, useTranslations } from "next-intl"
 
 import { cn } from "../../ui/cn"
 import { offeredMethods, type CheckoutMethod } from "../stripe/catalog"
-import { methodLabel, methodNote } from "./copy"
+import { methodLabel, methodNote, wechatCapNote, type PaywallMessage } from "./copy"
 import type { Period } from "./offer"
 import { usePaymentChannel, useWechatPay } from "./channel-context"
 
-type Props = { method: CheckoutMethod | null; onChange(method: CheckoutMethod): void; kind: "plan" | "pack"; period: Period; disabled?: boolean }
+type Props = { method: CheckoutMethod | null; onChange(method: CheckoutMethod): void; kind: "plan" | "pack"; period: Period; cents?: number | null; disabled?: boolean }
 
 // The payment groups (DESIGN §4.5): card with Apple Pay and Google Pay, and the wallets (支付宝 /
 // 微信支付 on Stripe while STRIPE_WECHAT_PAY is on, T73; otherwise Alipay alone); zh pages on Stripe lead with 中国银行卡
 // (ARCHITECTURE §6.3, T64). For a plan a card renews and a wallet buys one period; for a pack
 // all are one-time (copy.ts).
-export function PayMethods({ method, onChange, kind, period, disabled }: Props) {
+export function PayMethods({ method, onChange, kind, period, cents = null, disabled }: Props) {
   const t = useTranslations("paywall")
   const channel = usePaymentChannel()
   const wechatPay = useWechatPay()
@@ -27,7 +27,9 @@ export function PayMethods({ method, onChange, kind, period, disabled }: Props) 
     const msg = methodNote(channel, { kind, method: m, period })
     return t(msg.key, msg.values)
   }
+  const cap = wechatCapNote(channel, wechatPay, cents)
   return (
+    <>
     <div role="radiogroup" aria-label={t("payLabel")} className="mt-4 grid gap-2">
       {methods.map((m) => (
         <label
@@ -56,6 +58,25 @@ export function PayMethods({ method, onChange, kind, period, disabled }: Props) 
         </label>
       ))}
     </div>
+    {cap && <WechatCap note={cap} text={t(cap.key)} />}
+    </>
+  )
+}
+
+// Waffo's WeChat Pay cap, before the buyer leaves for Waffo's page (copy.ts wechatCapNote).
+export function WechatCap({ note, text }: { note: PaywallMessage & { over: boolean }; text: string }) {
+  return (
+    <p
+      role="note"
+      className={cn(
+        "mt-3 text-caption",
+        note.over
+          ? "rounded-control px-3 py-2 font-medium text-foreground shadow-[inset_0_0_0_1px_var(--bone-dim)]"
+          : "px-0.5 text-muted-foreground",
+      )}
+    >
+      {text}
+    </p>
   )
 }
 

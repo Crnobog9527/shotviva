@@ -6,6 +6,7 @@ export {
   normalizePem,
   paymentChannel,
   waffoConfig,
+  waffoWechatPayEnabled,
   waffoWebhookConfig,
   type WaffoConfig,
   type WaffoMode,

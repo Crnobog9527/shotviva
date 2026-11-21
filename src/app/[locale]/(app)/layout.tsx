@@ -14,7 +14,7 @@ import { AdminLink, adminEntryFor, AppFrame, BrandProvider, TabBar, TabBarSlot, 
 import { getSessionUser } from '@/core/auth'
 import { clientMessages } from '@/core/i18n'
 import { PaywallProvider } from '@/core/billing/paywall'
-import { wechatPayEnabled } from '@/core/billing/stripe'
+import { walletOffersWechat } from '@/core/billing/wallet'
 import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
 import { isModuleEnabled } from '@/core/config'
@@ -83,7 +83,7 @@ async function Tabs({ items }: { items: TabItem[] }) {
 async function Paywall({ children }: { children: ReactNode }) {
   const [perkFacts, products] = await Promise.all([paywallPerkFacts(), displayProducts()])
   return (
-    <PaywallProvider products={products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={wechatPayEnabled()}>
+    <PaywallProvider products={products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={walletOffersWechat()}>
       {children}
       <StandingSlot />
     </PaywallProvider>

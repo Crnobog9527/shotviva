@@ -1,7 +1,7 @@
 import { createTranslator } from 'next-intl'
 import { describe, expect, it } from 'vitest'
 
-import { methodLabel, methodNote, planFinePrint, pricingMethodNote, type PaywallMessage } from '@/core/billing/paywall'
+import { methodLabel, methodNote, planFinePrint, pricingMethodNote, wechatCapNote, type PaywallMessage } from '@/core/billing/paywall'
 import { CHECKOUT_METHODS } from '@/core/billing/stripe'
 import type { PaymentChannel } from '@/core/config'
 import { pricingFaq } from '@/site/content'
@@ -30,6 +30,28 @@ function paywallLines(channel: PaymentChannel): string[] {
   return lines
 }
 
+describe('WeChat Pay cap note', () => {
+  // Owner 2026-11-21: Waffo's WeChat Pay cap (CN¥1,000 a payment and a month) before leaving for
+  // Waffo; Alipay has no cap. Only on Waffo with WeChat Pay on; over the cap the stronger line.
+  it('Waffo with WeChat Pay on states the ¥1,000 cap, stronger over it; never on Stripe or with it off', () => {
+    const zh = createTranslator({ locale: 'zh', messages: zhMessages, namespace: 'paywall' }) as unknown as typeof t
+    expect(wechatCapNote('stripe', true, 95000)).toBeNull()
+    expect(wechatCapNote('waffo', false, 95000)).toBeNull()
+    const general = wechatCapNote('waffo', true, null)!
+    expect(general.over).toBe(false)
+    expect(say(general)).toBe('WeChat\u00a0Pay takes up to ¥1,000 per payment and per month. Above that, use Alipay (no limit) or a card.')
+    expect(zh(general.key)).toBe('微信支付单笔和每月累计最多 ¥1,000，超出请用支付宝（不限额）或银行卡。')
+    for (const cents of [990, 2241, 4990, 9900]) expect(wechatCapNote('waffo', true, cents)!.over).toBe(false)
+    for (const cents of [19200, 48000, 95000]) {
+      const over = wechatCapNote('waffo', true, cents)!
+      expect(over.over).toBe(true)
+      expect(say(over)).toBe("This purchase is over WeChat\u00a0Pay's ¥1,000 limit. Pay with Alipay or a card.")
+      expect(zh(over.key)).toBe('这笔金额超过微信支付 ¥1,000 的限额，请用支付宝或银行卡付款。')
+    }
+  })
+
+})
+
 describe('payment copy by channel', () => {
   it('Waffo: the card plan auto-renews and can be cancelled, Alipay does not renew, no WeChat (T50)', () => {
     for (const line of paywallLines('waffo')) {
@@ -56,15 +78,16 @@ describe('payment copy by channel', () => {
     expect(t('payNotePacks')).toBe('Credit packs are always a one-time payment.')
   })
 
-  // T73: STRIPE_WECHAT_PAY on names both wallets on Stripe; Waffo stays Alipay; the note is the same.
-  it('Stripe with STRIPE_WECHAT_PAY on: the wallet line reads Alipay / WeChat Pay, Waffo stays Alipay', () => {
+  // T73 / 2026-11-21: the channel's WeChat Pay switch (STRIPE_WECHAT_PAY, WAFFO_WECHAT_PAY) names both wallets.
+  it('with WeChat Pay on, the wallet line reads Alipay / WeChat Pay on either channel', () => {
     const zh = createTranslator({ locale: 'zh', messages: zhMessages, namespace: 'paywall' }) as unknown as typeof t
     const sayZh = (msg: PaywallMessage) => zh(msg.key, msg.values)
     // No-break space keeps "WeChat Pay" whole on narrow phones.
     expect(say(methodLabel('stripe', 'alipay', true))).toBe('Alipay / WeChat\u00a0Pay')
     expect(sayZh(methodLabel('stripe', 'alipay', true))).toBe('支付宝 / 微信支付')
-    expect(say(methodLabel('waffo', 'alipay', true))).toBe('Alipay')
-    expect(sayZh(methodLabel('waffo', 'alipay', true))).toBe('支付宝')
+    expect(say(methodLabel('waffo', 'alipay', true))).toBe('Alipay / WeChat\u00a0Pay')
+    expect(sayZh(methodLabel('waffo', 'alipay', true))).toBe('支付宝 / 微信支付')
+    expect(say(methodLabel('waffo', 'alipay', false))).toBe('Alipay')
     expect(say(methodLabel('stripe', 'alipay', false))).toBe('Alipay')
     expect(say(methodLabel('stripe', 'card', true))).toBe('Card · Apple Pay · Google Pay')
     expect(sayZh(methodNote('stripe', { kind: 'plan', method: 'alipay', period: 'month' }))).toBe('一次性付款，30 天，不自动续费')

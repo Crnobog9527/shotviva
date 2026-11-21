@@ -5,7 +5,7 @@ import { googleAction } from '@/app/auth/actions'
 import { createAdminSupabase, createServerSupabase, getSessionUser } from '@/core/auth'
 import { effectiveLimits, readBalance } from '@/core/billing'
 import { PaywallProvider } from '@/core/billing/paywall/provider'
-import { wechatPayEnabled } from '@/core/billing/stripe'
+import { walletOffersWechat } from '@/core/billing/wallet'
 import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
 import { listFavoriteIdsOrEmpty } from '@/core/favorites'
@@ -55,7 +55,7 @@ async function WithViewer(props: Base) {
   const [perkFacts, products] = await Promise.all([paywallPerkFacts(), displayProducts()])
   // "Get credits · N needed" opens the same paywall as the workspace (DESIGN §6.9 item 9).
   return (
-    <PaywallProvider products={products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={wechatPayEnabled()}>
+    <PaywallProvider products={products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={walletOffersWechat()}>
       <HomeGenerator {...props} viewer={viewer} googleAction={googleAction} />
       {/* What the member holds, so the paywall locks lower plans (T66). */}
       <StandingSlot />

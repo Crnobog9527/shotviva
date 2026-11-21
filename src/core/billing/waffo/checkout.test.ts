@@ -46,6 +46,26 @@ describe('createWaffoCheckout without an email (T63)', () => {
   })
 })
 
+describe('WeChat Pay cap on Waffo', () => {
+  // Owner 2026-11-21: Waffo's WeChat Pay takes at most CN¥1,000; over it the one-time page leaves
+  // WeChat Pay out. Never on a subscription (cards only) and never while WAFFO_WECHAT_PAY is off.
+  it('with WAFFO_WECHAT_PAY on, a one-time price over the WeChat Pay cap excludes WeChat Pay', async () => {
+    const { deps, create } = harness()
+    const on = { ...deps, wechatPay: true }
+    await createWaffoCheckout(on, { userId: USER, body: body('max_yearly', 'alipay') })
+    await createWaffoCheckout(on, { userId: USER, body: body('max_monthly', 'alipay') })
+    await createWaffoCheckout(on, { userId: USER, body: body('max_yearly') })
+    await createWaffoCheckout(deps, { userId: USER, body: body('max_yearly', 'alipay') })
+    const [over, under, subscription, off] = create.mock.calls.map((call) => call[0] as unknown as Record<string, unknown>)
+    expect(over).toMatchObject({ excludePaymentMethods: ['wechat'] })
+    expect(over).not.toHaveProperty('includePaymentMethods')
+    for (const request of [under, off]) expect(request).not.toHaveProperty('excludePaymentMethods')
+    expect(subscription).toMatchObject({ includePaymentMethods: ['card'] })
+    expect(subscription).not.toHaveProperty('excludePaymentMethods')
+  })
+
+})
+
 describe('createWaffoCheckout', () => {
   it('a membership by card is the Waffo subscription product, cards only, priced from site.config (T50)', async () => {
     const { deps, create, trackStart } = harness()

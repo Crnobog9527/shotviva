@@ -2,8 +2,8 @@ import { useLocale, useTranslations } from "next-intl"
 
 import type { PaymentChannel } from "../../config"
 import { offeredMethods } from "../stripe/catalog"
-import { methodLabel, pricingMethodNote } from "./copy"
-import { MethodMark } from "./pay-methods"
+import { methodLabel, pricingMethodNote, wechatCapNote } from "./copy"
+import { MethodMark, WechatCap } from "./pay-methods"
 
 // /pricing's "Pay with" (comps-v3-b pricing.html): the payment groups as plain rows, in the
 // paywall's order (catalog offeredMethods; zh pages on Stripe add 中国银行卡 first), not
@@ -13,6 +13,7 @@ import { MethodMark } from "./pay-methods"
 export function PricingPayWith({ channel, wechatPay }: { channel: PaymentChannel; wechatPay: boolean }) {
   const t = useTranslations("paywall")
   const methods = offeredMethods(channel, useLocale())
+  const cap = wechatCapNote(channel, wechatPay, null)
   return (
     <section aria-labelledby="pay-with-h" className="grid gap-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 px-0.5">
@@ -37,6 +38,7 @@ export function PricingPayWith({ channel, wechatPay }: { channel: PaymentChannel
         })}
       </ul>
       <p className="px-0.5 text-caption text-muted-foreground">{t("payNotePacks")}</p>
+      {cap && <WechatCap note={cap} text={t(cap.key)} />}
     </section>
   )
 }
