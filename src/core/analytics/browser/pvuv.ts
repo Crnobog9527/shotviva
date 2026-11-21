@@ -4,7 +4,9 @@
 // (consent/decision.ts cookiesAllowed, the rule PostHog follows): the script keeps a visitor id
 // in first-party cookies and localStorage, which PostHog's memory mode would not.
 
+import { splitLocale } from '../../i18n/paths'
 import { pvuvProps, type PvuvProps } from '../pvuv/props'
+import { installPvuvScrub } from './pvuv-scrub'
 
 export const PVUV_SCRIPT_SRC = 'https://www.pvuv.ai/f.js'
 export const PVUV_API = 'https://in.pvuv.ai'
@@ -12,7 +14,7 @@ export const PVUV_API = 'https://in.pvuv.ai'
 // Pages the script must not measure: /admin and the signed-in app (proxy-gates.ts SIGNED_IN,
 // ARCHITECTURE §7), in English and under /zh; /join holds org invite links, whose path is a
 // credential (core/invite-path.ts). Patterns are PVUV's own globs, comma-separated.
-const PRIVATE_ROOTS = ['/admin', '/account', '/checkout', '/generate', '/photos', '/posters', '/wishlist', '/reset/update', '/connect', '/join']
+export const PRIVATE_ROOTS = ['/admin', '/account', '/checkout', '/generate', '/photos', '/posters', '/wishlist', '/reset/update', '/connect', '/join']
 export const PVUV_EXCLUDE = PRIVATE_ROOTS.flatMap((root) => [root, `${root}/*`, `/zh${root}`, `/zh${root}/*`]).join(',')
 
 export const PVUV_SCRIPT_ID = 'pvuv-script'
@@ -26,6 +28,12 @@ const MAX_QUEUED = 50
 let loaded = false
 let pendingUserId: string | null = null
 let pendingEvents: Array<[string, PvuvProps]> = []
+
+// Whether the page is one the script must not measure (the data-exclude list, as a path test).
+export function isPvuvExcluded(pathname: string): boolean {
+  const { path } = splitLocale(pathname)
+  return PRIVATE_ROOTS.some((root) => path === root || path.startsWith(`${root}/`))
+}
 
 export function pvuvAttributes(site: string): Record<string, string> {
   return {
@@ -46,6 +54,7 @@ export const pvuvLoaded = (): boolean => loaded
 export function loadPvuv(site: string, doc: Document = document): void {
   if (loaded || !site) return
   loaded = true
+  installPvuvScrub(window, PVUV_API, PRIVATE_ROOTS)
   const script = doc.createElement('script')
   for (const [name, value] of Object.entries(pvuvAttributes(site))) script.setAttribute(name, value)
   script.addEventListener('load', flushPending, { once: true })

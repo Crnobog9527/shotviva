@@ -35,7 +35,8 @@ export type ServerTrackerDeps = {
 
 // `locale` rides on every event (ARCHITECTURE §16.2): the page's language for request-driven
 // events, the buyer's checkout language for webhooks.
-export type TrackContext = { distinctId: string; locale: Locale }
+// `eventId`: an id unique to the real-world event (payment, checkout), for PVUV's dedupe.
+export type TrackContext = { distinctId: string; locale: Locale; eventId?: string | undefined }
 
 export type ServerTrack = <E extends ServerEventName>(event: E, props: EventProps<E>, ctx: TrackContext) => void
 
@@ -105,7 +106,7 @@ export function createServerTracker(deps: ServerTrackerDeps): ServerTrack {
       if (pvuv) {
         const visitorId = await (deps.visitorId ?? requestVisitorId)().catch(() => undefined)
         const when = (deps.now?.() ?? new Date()).getTime()
-        await sendPvuvEvent(pvuv, pvuvServerEvent(event, checked.props, { userId: ctx.distinctId, locale: ctx.locale, visitorId }, when), deps.fetch)
+        await sendPvuvEvent(pvuv, pvuvServerEvent(event, checked.props, { userId: ctx.distinctId, locale: ctx.locale, visitorId, eventId: ctx.eventId }, when), deps.fetch)
       }
     })
   }

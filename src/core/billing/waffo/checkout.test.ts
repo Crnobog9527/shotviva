@@ -109,7 +109,7 @@ describe('createWaffoCheckout', () => {
       form: 'subscription',
       channel: 'waffo',
       method: 'card',
-    }, 'en')
+    }, 'en', expect.any(String))
   })
 
   it('Alipay and packs stay one-time products: no trial', async () => {

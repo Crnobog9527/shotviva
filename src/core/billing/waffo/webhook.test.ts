@@ -95,7 +95,7 @@ describe('handleWaffoWebhook', () => {
       p_amount_tax: 159,
       p_method: 'alipay',
     })
-    expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ channel: 'waffo', form: 'one_time', method: 'alipay', amount_usd: 19.9 }), 'en')
+    expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ channel: 'waffo', form: 'one_time', method: 'alipay', amount_usd: 19.9 }), 'en', expect.any(String))
   })
 
   it('ignores events this site never starts', async () => {
@@ -172,7 +172,7 @@ describe('handleWaffoWebhook, card subscriptions (T50)', () => {
     const result = await deliver(event)
     expect(result).toMatchObject({ status: 200, body: { outcome: 'applied' } })
     expect(rpc).toHaveBeenCalledWith('settle_waffo_order', expect.objectContaining({ p_user_id: USER, p_product_id: 'pro_monthly', p_payment_id: event.eventId, p_order_id: 'ORD_sub1', p_method: 'card' }))
-    expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'subscription', channel: 'waffo', product_id: 'pro_monthly' }), 'en')
+    expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'subscription', channel: 'waffo', product_id: 'pro_monthly' }), 'en', expect.any(String))
   })
 
   it('a failed charge (past_due) grants nothing and only updates the mirror', async () => {

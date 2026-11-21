@@ -79,6 +79,6 @@ it('settles the paid Stripe pack in cents, including tax, and tracks its snapped
   await expect(fulfilCheckoutSession(dependencies, session.id)).resolves.toBe('applied')
   await expect(fulfilCheckoutSession(dependencies, session.id)).resolves.toBe('replayed')
   expect(rpc).toHaveBeenCalledWith('settle_checkout_v2', expect.objectContaining({ p_session_id: 'cs_purchase', p_amount_total: 2400, p_amount_tax: 159 }))
-  expect(dependencies.trackBuy).toHaveBeenCalledExactlyOnceWith(USER, expect.objectContaining({ credits: 2490, amount_usd: 22.41 }), 'en')
+  expect(dependencies.trackBuy).toHaveBeenCalledExactlyOnceWith(USER, expect.objectContaining({ credits: 2490, amount_usd: 22.41 }), 'en', expect.any(String))
   expect(dependencies.applyCodes).toHaveBeenCalledWith(expect.objectContaining({ codeId: null, amountDiscount: 0 }))
 })

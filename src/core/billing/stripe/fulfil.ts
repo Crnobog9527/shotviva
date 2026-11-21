@@ -110,7 +110,7 @@ function track(deps: FulfilDeps, session: Stripe.Checkout.Session, purchase: Ses
     amount_usd: discount.amountUsd,
     ...discount.props,
     ...(purchase.quote && { credits: purchase.quote.credits }),
-  }, session.locale === 'zh' ? 'zh' : 'en')
+  }, session.locale === 'zh' ? 'zh' : 'en', session.id)
 }
 
 function pricingVersionOf(quote?: CheckoutPrice) {

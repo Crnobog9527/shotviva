@@ -256,7 +256,7 @@ export async function createCheckout(deps: CheckoutDeps, input: CheckoutInput): 
   ;(deps.trackStart ?? trackCheckoutStart)(input.userId, {
     product_id: product.id, tier: product.tier, interval: product.interval, form: route.form, channel: 'stripe',
     method: startedMethod(body.method, route), ...(code && { code: code.code, discount_percent: code.percent }),
-  }, body.locale)
+  }, body.locale, token)
   return result
 }
 

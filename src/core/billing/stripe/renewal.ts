@@ -134,6 +134,6 @@ export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Pro
     method: facts.method,
     ...renewalAmounts(invoice, metadata, price, product),
     ...(quote && { credits: quote.credits }),
-  }, metadata.locale === 'zh' ? 'zh' : 'en')
+  }, metadata.locale === 'zh' ? 'zh' : 'en', invoice.id)
   return 'applied'
 }

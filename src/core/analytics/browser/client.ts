@@ -10,7 +10,7 @@ import type { BrowserEventName, EventProps } from '../events'
 import { sentryOptions } from '../sentry-options'
 import { clearPosthogStorage, syncPosthog } from './consent-sync'
 import { posthogConfig } from './posthog-config'
-import { clearPvuvStorage, loadPvuv, pvuvEvent, pvuvIdentify, pvuvLoaded } from './pvuv'
+import { clearPvuvStorage, isPvuvExcluded, loadPvuv, pvuvEvent, pvuvIdentify, pvuvLoaded } from './pvuv'
 import { afterLoad, loadedSdks, loadSdks, withSdks } from './sdk'
 
 let started = false
@@ -53,19 +53,30 @@ export function initBrowserAnalytics(): void {
 
 // The same answer rule as PostHog's persistence (ARCHITECTURE §16.1): "Accept" (or an open region)
 // lets the script in, even on a page opened before the answer. "Necessary only" removes what it
-// left; a script already running cannot be unloaded, so it is gone from the next page load.
+// left and, if the script is running, reloads the page without it.
 function watchPvuvConsent(site: string): void {
+  // A visitor who answered "Necessary only" (or an EU visitor not yet asked) keeps nothing of PVUV's,
+  // also what a script wrote while the page was closing.
+  if (!cookiesAllowed(readConsent())) clearPvuvStorageSafely()
   onConsentChange((consent) => {
     if (cookiesAllowed(consent)) {
       if (document.readyState === 'complete') loadPvuv(site)
       return
     }
-    try {
-      clearPvuvStorage(document, [window.localStorage, window.sessionStorage])
-    } catch {
-      // Storage blocked: there is nothing of ours in it either.
-    }
+    const running = pvuvLoaded()
+    clearPvuvStorageSafely()
+    // A script that is already running cannot be unloaded and would write its cookies again on
+    // the next navigation: reload, and the page comes back without it (consent rule: not allowed).
+    if (running) window.location.reload()
   })
+}
+
+function clearPvuvStorageSafely(): void {
+  try {
+    clearPvuvStorage(document, [window.localStorage, window.sessionStorage])
+  } catch {
+    // Storage blocked: there is nothing of ours in it either.
+  }
 }
 
 // ARCHITECTURE §16.1 (T70): cookies or memory follow the visitor's region and answer; an answer
@@ -114,7 +125,8 @@ export function track<E extends BrowserEventName>(event: E, props: EventProps<E>
       return
     }
     withSdks(({ posthog }) => posthog?.capture(event, checked.props))
-    if (pvuvOn()) pvuvEvent(event, { ...checked.props, locale: localeOfPath(window.location.pathname) })
+    // Not on the pages the script must not measure (/admin, the signed-in app, invite links).
+    if (pvuvOn() && !isPvuvExcluded(window.location.pathname)) pvuvEvent(event, { ...checked.props, locale: localeOfPath(window.location.pathname) })
   })
 }
 
@@ -175,13 +187,7 @@ export function identify(userId: string): void {
 
 // Call on sign-out before the redirect, so the next visitor on this tab is anonymous.
 export function resetIdentity(): void {
-  if (started && pvuvLoaded()) {
-    try {
-      clearPvuvStorage(document, [window.localStorage, window.sessionStorage])
-    } catch {
-      // Storage blocked: there is nothing of ours in it either.
-    }
-  }
+  if (started && pvuvLoaded()) clearPvuvStorageSafely()
   if (posthogOn()) withSdks(({ posthog }) => posthog?.reset())
 }
 

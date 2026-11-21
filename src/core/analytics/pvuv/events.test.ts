@@ -77,3 +77,13 @@ describe('server tracker → PVUV', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('dedupe id', () => {
+  it('derives a PVUV id from the event name and the payment or checkout id, only when there is one', () => {
+    const base = { userId: 'u1', locale: 'en' }
+    expect(pvuvServerEvent('purchase', {}, { ...base, eventId: 'cs_live_a1B2c3' }, 1).id).toBe('purchase-cs_live_a1B2c3')
+    expect(pvuvServerEvent('checkout_start', {}, { ...base, eventId: 'attempt token:1' }, 1).id).toBe('checkout_start-attempt_token_1')
+    expect('id' in pvuvServerEvent('signup', {}, base, 1)).toBe(false)
+    expect(pvuvServerEvent('purchase', {}, { ...base, eventId: 'x'.repeat(100) }, 1).id).toHaveLength(64)
+  })
+})

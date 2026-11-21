@@ -17,6 +17,7 @@ export type PvuvServerEvent = {
   revenue?: number
   currency?: string
   props: PvuvProps
+  id?: string
   ts: number
 }
 
@@ -26,11 +27,14 @@ export type PvuvServerEvent = {
 export function pvuvServerEvent(
   name: string,
   props: Record<string, unknown>,
-  ctx: { userId: string; locale: string; visitorId?: string | undefined },
+  ctx: { userId: string; locale: string; visitorId?: string | undefined; eventId?: string | undefined },
   now: number,
 ): PvuvServerEvent {
   const event: PvuvServerEvent = { name, user_id: ctx.userId, props: pvuvProps(props, { locale: ctx.locale }), ts: now }
   if (ctx.visitorId) event.visitor_id = ctx.visitorId
+  // PVUV ignores a repeated id (8–64 chars of [A-Za-z0-9_-]): revenue cannot count twice on a retry.
+  const id = ctx.eventId ? `${name}-${ctx.eventId}`.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64) : ''
+  if (id.length >= 8) event.id = id
   // Revenue is the amount alone; amount_usd and the discount stay out of props.
   if (name === 'purchase' && typeof props.amount_usd === 'number') {
     event.revenue = props.amount_usd

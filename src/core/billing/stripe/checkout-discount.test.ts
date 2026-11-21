@@ -49,7 +49,7 @@ describe('Stripe checkout with a reserved campaign discount', () => {
       cancel_url: expect.stringContaining('c=' + token) })
     expect(params).not.toHaveProperty('allow_promotion_codes')
     if (params.mode === 'subscription') expect(params.subscription_data?.metadata).toMatchObject({ code: 'QA20', code_id: codeId })
-    expect(c.d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ code: 'QA20', discount_percent: 20 }), 'zh')
+    expect(c.d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ code: 'QA20', discount_percent: 20 }), 'zh', expect.any(String))
     await c.start(body)
     expect(c.create.mock.calls[1]).toEqual(c.create.mock.calls[0])
   })
