@@ -2373,7 +2373,10 @@
       "confirmed": "确认期已满",
       "admin_release": "审核后已放行",
       "admin_void": "审核后已作废",
-      "zero": "应得佣金为零"
+      "zero": "应得佣金为零",
+      "fee_adjusted": "手续费已更新（预估）",
+      "fee_final": "手续费已确定",
+      "confirmed_fee_estimate": "按预估手续费确认"
     },
     "product": {
       "starter_monthly": "Starter 月付",

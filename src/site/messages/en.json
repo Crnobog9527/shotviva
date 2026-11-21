@@ -2373,7 +2373,10 @@
       "confirmed": "Confirmation period completed",
       "admin_release": "Released after review",
       "admin_void": "Voided after review",
-      "zero": "No commission due"
+      "zero": "No commission due",
+      "fee_adjusted": "Fees updated (estimated)",
+      "fee_final": "Fees settled",
+      "confirmed_fee_estimate": "Confirmed on estimated fees"
     },
     "product": {
       "starter_monthly": "Starter monthly",
