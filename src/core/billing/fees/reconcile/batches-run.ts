@@ -24,7 +24,7 @@ const PAGES = 5
 // A batch nothing explains may only be missing a payment whose webhook is late: wait a day.
 const MISMATCH_AFTER_MS = DAY
 
-const candidatesSchema = z.array(z.object({ payment_id: z.number().int(), amount_total: z.number().int(), currency: z.string() }))
+const candidatesSchema = z.array(z.object({ payment_id: z.number().int(), created_at: z.string(), amount_total: z.number().int(), currency: z.string() }))
 const pendingSchema = z.array(z.object({ txn_id: z.string(), kind: z.enum(['mp', 'billing', 'radar']), share_cents: z.number().int(), payment: viewSchema }))
 type Pending = z.infer<typeof pendingSchema>[number]
 
@@ -60,7 +60,11 @@ async function plan(deps: ReconcileDeps, txn: Stripe.BalanceTransaction): Promis
   }
   const candidates = await callRpc(deps.db, 'payment_fee_stripe_batch_candidates',
     { p_kind: kind, p_day: base.label_date, p_before: base.booked_at }, candidatesSchema)
-  const match = matchBatch(kind, amount, candidates.map(c => ({ payment_id: c.payment_id, basis_cents: c.currency === 'usd' ? c.amount_total : null })))
+  const match = matchBatch(kind, amount, candidates.map(c => ({
+    payment_id: c.payment_id,
+    basis_cents: c.currency === 'usd' ? c.amount_total : null,
+    onDay: new Date(c.created_at).toISOString().slice(0, 10) === base.label_date,
+  })))
   if (match.status === 'allocated') {
     return { input: { ...base, kind, amount_cents: amount, status: 'allocated', formula_cents: match.formula_cents, note: match.note, items: match.items }, issue: null }
   }

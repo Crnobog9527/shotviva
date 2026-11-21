@@ -223,6 +223,21 @@ describe('a look that keeps failing', () => {
   })
 })
 
+describe('a refund that keeps failing', () => {
+  it('on a final charge is alerted for the refund, by the refund date', async () => {
+    const sale = await waffoSale(990, at(-40))
+    await record({ payment_id: sale.id, idempotency_key: `waffo_settlement:${sale.pay}`, basis_cents: 990, actual_cents: 89,
+      lines: [{ kind: 'acquiring', source: 'waffo_settlement', source_ref: sale.pay }] })
+    const ref = 'REF_' + randomUUID().replaceAll('-', '').slice(0, 22)
+    await db.query('select record_waffo_refund($1,$2,$3)', [sale.pay, ref, 500])
+    await db.query('update payment_refunds set created_at = $2 where refund_ref = $1', [ref, at(-15)])
+    settlements.set(ref, async () => { throw new Error('Waffo graphql failed') })
+    const before = alerts.length
+    expect(await run()).toMatchObject({ failed: 1 })
+    expect(alerts.slice(before).flatMap(a => a.issues)).toEqual([expect.objectContaining({ issue: 'unreconciled', ref: sale.id, fee: 'refund_fee', days: 15 })])
+  })
+})
+
 describe('Stripe', () => {
   it("a payment whose webhook wrote nothing: the charge's bill is read again (only stripe_fee rows)", async () => {
     const sale = await stripeSale(990, at(-1))

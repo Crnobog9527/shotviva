@@ -44,6 +44,16 @@ describe('matchBatch', () => {
     // A run never spans the non-USD payment.
     expect(matchBatch('mp', 140, pay(990, null, 3010))).toMatchObject({ status: 'mismatch' })
   })
+  it('a run starts on the label day; only its tail may cross midnight', () => {
+    const day = (onDay: boolean, basis: number, id: number) => ({ payment_id: id, basis_cents: basis, onDay })
+    // Crossing midnight: #1 on the day, #2 the next day.
+    expect(shares(matchBatch('mp', 104, [day(true, 990, 1), day(false, 1990, 2)]))).toEqual(['1:35', '2:69'])
+    // The only exact run lies entirely on the next day: a mismatch, not the next day's payment.
+    expect(matchBatch('mp', 35, [day(true, 4990, 1), day(false, 990, 2)])).toMatchObject({ status: 'mismatch' })
+    expect(matchBatch('mp', 35, [day(false, 990, 2)])).toMatchObject({ status: 'mismatch', note: 'no payments that day' })
+    // Radar counts the label day's orders only.
+    expect(shares(matchBatch('radar', 15, [day(true, 990, 1), day(false, 990, 2)]))).toEqual(['1:5'])
+  })
   it('Billing 0.7% the same way', () => {
     expect(shares(matchBatch('billing', 35, pay(4990)))).toEqual(['1:35'])
   })

@@ -9,7 +9,7 @@ import { callRpc } from '../../rpc'
 import { recordBatches, writeShares } from './batches-run'
 import { lookStripe, STRIPE_WINDOW_DAYS } from './stripe'
 import {
-  ageDays, codeOf, HOUR, unreconciledIssue, viewSchema, type Issue, type Look, type PaymentView, type ReconcileDeps, type ReconcileSummary,
+  ageDays, codeOf, HOUR, isFinal, scopeOf, unreconciledIssue, viewSchema, type Issue, type Look, type PaymentView, type ReconcileDeps, type ReconcileSummary,
 } from './view'
 import { lookWaffo, WAFFO_WINDOW_DAYS } from './waffo'
 
@@ -36,10 +36,19 @@ const MAX_BACKOFF_MS = 24 * HOUR
 function failedLook(deps: ReconcileDeps, view: PaymentView, error: string, issues: Issue[]): Look {
   const now = deps.now()
   const wait = Math.min(MAX_BACKOFF_MS, HOUR * 2 ** Math.min(view.attempts, 5))
-  const days = ageDays(now, view.created_at)
   const window = view.channel === 'waffo' ? WAFFO_WINDOW_DAYS : STRIPE_WINDOW_DAYS
-  const late = days >= window && !issues.some(i => i.key === 'unreconciled')
-  return { next: new Date(now.getTime() + wait), error, issues: late ? [...issues, unreconciledIssue(view, 'unreconciled', null, days)] : issues }
+  const pending = pendingItem(view)
+  const days = ageDays(now, pending.since)
+  const late = days >= window && !issues.some(i => i.key === pending.key)
+  return { next: new Date(now.getTime() + wait), error, issues: late ? [...issues, unreconciledIssue(view, pending.key, pending.fee, days)] : issues }
+}
+
+// What a failed look was waiting for: the charge, or (its fee already final) the oldest Waffo
+// refund still without a final fee, dated and keyed as the success path would.
+function pendingItem(view: PaymentView): { key: string; fee: string | null; since: string } {
+  if (view.channel !== 'waffo' || !isFinal(scopeOf(view, null))) return { key: 'unreconciled', fee: null, since: view.created_at }
+  const refund = view.refunds.find(r => !isFinal(scopeOf(view, r.refund_ref)))
+  return refund ? { key: `unreconciled:${refund.refund_ref}`, fee: 'refund_fee', since: refund.created_at } : { key: 'unreconciled', fee: null, since: view.created_at }
 }
 
 async function look(deps: ReconcileDeps, summary: ReconcileSummary, view: PaymentView): Promise<Look> {

@@ -24,7 +24,10 @@ export function batchDay(description: string | null | undefined, bookedAt: Date)
   return match ? match[1] : bookedAt.toISOString().slice(0, 10)
 }
 
-export type Candidate = { payment_id: number; basis_cents: number | null }
+// onDay: created on the batch's label day. A batch's label is its first charge's UTC day (F1), so
+// a run starts on that day; only its tail may cross midnight into the next.
+export type Candidate = { payment_id: number; basis_cents: number | null; onDay?: boolean }
+const startsHere = (c: Candidate) => c.onDay !== false
 export type Share = { payment_id: number; basis_cents: number; share_cents: number }
 export type BatchMatch =
   | { status: 'allocated'; formula_cents: number; items: Share[]; note: string }
@@ -65,13 +68,15 @@ export function shareOut(total: number, items: readonly { payment_id: number; ba
 //   order 5¢ (the rest is failed attempts, the platform's); a smaller multiple of 5¢ covers the
 //   oldest orders.
 export function matchBatch(kind: BatchKind, amount: number, candidates: readonly Candidate[]): BatchMatch {
-  if (candidates.length === 0) return { status: 'mismatch', formula_cents: null, note: 'no payments that day' }
-  if (kind === 'radar') return matchRadar(amount, candidates.map(c => ({ payment_id: c.payment_id, basis_cents: c.basis_cents ?? 0 })))
+  const sameDay = candidates.filter(startsHere)
+  if (sameDay.length === 0) return { status: 'mismatch', formula_cents: null, note: 'no payments that day' }
+  if (kind === 'radar') return matchRadar(amount, sameDay.map(c => ({ payment_id: c.payment_id, basis_cents: c.basis_cents ?? 0 })))
   const bp = RATE_BP[kind]
   const run = exactRun(amount, bp, candidates)
   if (run) return { status: 'allocated', formula_cents: amount, items: shareOut(amount, run.items), note: `exact, ${run.note}` }
-  if (candidates.some(c => c.basis_cents === null)) return { status: 'mismatch', formula_cents: null, note: 'no run matches; a payment is not in USD' }
-  const known = candidates as readonly { payment_id: number; basis_cents: number }[]
+  // The rounding fallback stays within the label day: it cannot tell where a run ends.
+  if (sameDay.some(c => c.basis_cents === null)) return { status: 'mismatch', formula_cents: null, note: 'no run matches; a payment is not in USD' }
+  const known = sameDay as readonly { payment_id: number; basis_cents: number }[]
   const formula = percentOf(known.reduce((sum, c) => sum + c.basis_cents, 0), bp)
   if (Math.abs(formula - amount) <= known.length) {
     return { status: 'allocated', formula_cents: formula, items: shareOut(amount, known), note: `within rounding, ${known.length} payments` }
@@ -85,6 +90,7 @@ type Known = { payment_id: number; basis_cents: number }
 // exactly `amount`. Totals only grow along a run, so a run stops once it is past the amount.
 function exactRun(amount: number, bp: number, candidates: readonly Candidate[]): { items: Known[]; note: string } | null {
   for (let start = 0; start < candidates.length; start += 1) {
+    if (!startsHere(candidates[start])) continue
     let total = 0
     for (let end = start; end < candidates.length; end += 1) {
       const basis = candidates[end].basis_cents
