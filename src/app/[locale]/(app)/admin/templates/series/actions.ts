@@ -6,6 +6,7 @@ import { runAdminQuery } from '@/core/admin/templates'
 import { deleteAdminSeries, reorderAdminSeries, saveAdminSeries, searchSeriesCandidates, setAdminSeriesFlag, type SaveSeriesInput } from '@/core/admin/template-series'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { TEMPLATES_CACHE_TAG } from '@/core/templates'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 export async function saveSeriesAction(input: SaveSeriesInput) {
   const admin = await requireAdmin()
@@ -13,6 +14,7 @@ export async function saveSeriesAction(input: SaveSeriesInput) {
     const id = await saveAdminSeries(createAdminSupabase(), admin.id, input)
     // A series and its member order show on the public template sections: live on the next load.
     await updateCatalogueTag(TEMPLATES_CACHE_TAG)
+    warmPublicPagesSoon()
     revalidatePath('/[locale]/admin/templates/series', 'page')
     revalidatePath('/[locale]/admin/templates', 'page')
     return id
@@ -26,6 +28,7 @@ export async function searchMembersAction(search: string, after: string | null) 
 
 async function refreshSeries() {
   await updateCatalogueTag(TEMPLATES_CACHE_TAG)
+  warmPublicPagesSoon()
   revalidatePath('/[locale]/admin/templates/series', 'page')
 }
 

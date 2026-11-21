@@ -56,8 +56,12 @@ export const summarySchema = z.object({
 export const commissionSchema = z.object({
   id: idSchema,
   created_at: z.string(),
+  payment_id: idSchema.transform(String),
   product_id: z.string(),
   base_usd: cents,
+  // NULL on a commission worked out by the old formula, before fees were deducted (migration 1740).
+  fee_cents: cents.nullable(),
+  net_base_usd: cents.nullable(),
   rate_bp: z.number().int(),
   amount: cents,
   status: commissionStatus,

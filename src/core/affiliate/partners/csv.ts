@@ -32,12 +32,14 @@ export async function exportCommissions(locale: Locale) {
   const account = await readAccount(user.id)
   if (account?.status !== 'active') throw new AppError('NOT_FOUND', 'Not found')
   const t = await getTranslations({ locale, namespace: 'affiliate' })
-  const header = line(['date', 'item', 'base', 'rate', 'commission', 'state', 'confirms'].map((key) => t(key)))
+  const header = line(['date', 'item', 'base', 'orderFees.fees', 'orderFees.netBase', 'rate', 'commission', 'state', 'confirms'].map((key) => t(key)))
   const row = (r: Commission) =>
     line([
       r.created_at,
       productLabel(r.product_id, t),
       (r.base_usd / 100).toFixed(2),
+      r.fee_cents === null ? '' : (r.fee_cents / 100).toFixed(2),
+      r.net_base_usd === null ? '' : (r.net_base_usd / 100).toFixed(2),
       r.rate_bp / 100 + '%',
       (r.amount / 100).toFixed(2),
       t('status.' + r.status),

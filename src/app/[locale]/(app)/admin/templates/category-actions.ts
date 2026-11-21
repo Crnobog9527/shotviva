@@ -8,6 +8,7 @@ import { setLocaleCategoryOrder, setLocaleFeatured } from '@/core/admin/locale-d
 import { moveTemplateCategory } from '@/core/admin/template-categories'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { TEMPLATES_CACHE_TAG } from '@/core/templates'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 export async function moveTemplateCategoryAction(input: unknown) {
   const admin = await requireAdmin()
@@ -15,6 +16,7 @@ export async function moveTemplateCategoryAction(input: unknown) {
     await moveTemplateCategory(createAdminSupabase(), admin.id, input)
     // Category order groups the home and landing template sections: live on the next load.
     await updateCatalogueTag(TEMPLATES_CACHE_TAG)
+    warmPublicPagesSoon()
     refresh()
   })
 }
@@ -26,6 +28,7 @@ export async function setLocaleCategoryOrderAction(input: unknown) {
   return runAdminAction(async () => {
     await setLocaleCategoryOrder(createAdminSupabase(), admin.id, input)
     await updateCatalogueTag(TEMPLATES_CACHE_TAG)
+    warmPublicPagesSoon()
     refresh()
   })
 }
@@ -35,6 +38,7 @@ export async function setLocaleFeaturedAction(input: unknown) {
   return runAdminAction(async () => {
     await setLocaleFeatured(createAdminSupabase(), admin.id, input)
     await updateCatalogueTag(TEMPLATES_CACHE_TAG)
+    warmPublicPagesSoon()
     refresh()
   })
 }
