@@ -3,10 +3,11 @@ import { notFound } from 'next/navigation'
 
 import { AdminPage, StatCard } from '@/core/admin'
 import { loadOrgDetail, ORGS_COPY as COPY } from '@/core/admin/orgs'
-import { AffiliateCard, GrantForm, LedgerTable, MemberTable, num, OrgEditForm, OrgStatusBadge } from '@/core/admin/orgs-ui'
+import { AffiliateCard, GrantForm, LedgerTable, MemberTable, num, OrgEditForm, OrgStatusBadge, SignupBonusForm } from '@/core/admin/orgs-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
+import { ORG_SIGNUP_BONUS_MAX } from '@/core/org'
 
-import { grantOrgAction, saveOrgAction } from '../actions'
+import { grantOrgAction, saveOrgAction, saveSignupBonusAction } from '../actions'
 
 export const instant = false
 
@@ -29,6 +30,7 @@ export default async function OrgPage({ params }: PageProps<'/[locale]/admin/org
       </div>
       <GrantForm orgId={org.id} packages={packages} grant={grantOrgAction} />
       <OrgEditForm key={org.updatedAt} org={org} caps={caps} save={saveOrgAction} />
+      <SignupBonusForm key={`bonus-${org.updatedAt}`} org={org} max={ORG_SIGNUP_BONUS_MAX} given={detail.signupBonusUsers} save={saveSignupBonusAction} />
       <AffiliateCard affiliate={detail.affiliate} levels={org.affiliateLevels} />
       <LedgerTable rows={detail.ledger} />
       <MemberTable rows={detail.members} total={detail.memberTotal} />

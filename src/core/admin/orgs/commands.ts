@@ -3,7 +3,10 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { adminCreateOrg, adminGrantOrg, adminSaveOrgPackage, adminSavePaymentAccount, adminUpdateOrg, PAYMENT_FIELDS, PAYMENT_KINDS } from '@/core/org'
+import {
+  adminCreateOrg, adminGrantOrg, adminSaveOrgPackage, adminSavePaymentAccount, adminSetOrgSignupBonus, adminUpdateOrg,
+  ORG_SIGNUP_BONUS_MAX, PAYMENT_FIELDS, PAYMENT_KINDS,
+} from '@/core/org'
 import { EnrollmentError, phoneUser } from '@/core/affiliate/admin/create-account'
 import { findUser } from '@/core/affiliate/admin/summary'
 import { toAppError } from '@/core/errors'
@@ -122,6 +125,17 @@ export async function saveOrg(deps: OrgDeps, input: unknown): Promise<OrgActionR
     ...changedUsage(form, detail.org, detail.caps),
   })
   return { ok: true, message: COPY.saved, value: { updatedAt } }
+}
+
+const bonusSchema = z.object({ id: idSchema, expectedUpdatedAt: z.string().min(1), credits: text(20) })
+
+// Extra free credits for the org's new level-1 customers (1690). Empty means 0 (off).
+export async function saveSignupBonus(deps: OrgDeps, input: unknown): Promise<OrgActionResult<{ updatedAt: string }>> {
+  const form = bonusSchema.parse(input)
+  const credits = form.credits.trim() === '' ? 0 : wholeNumber(form.credits, COPY.bonusLabel)
+  if (credits > ORG_SIGNUP_BONUS_MAX) throw new OrgInputError(COPY.bonusAbove(ORG_SIGNUP_BONUS_MAX))
+  const updatedAt = await adminSetOrgSignupBonus(deps.db, deps.actor, form.id, credits, form.expectedUpdatedAt)
+  return { ok: true, message: COPY.bonusSaved, value: { updatedAt } }
 }
 
 const grantSchema = z.object({
