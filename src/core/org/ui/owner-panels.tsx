@@ -8,6 +8,7 @@ import { Link } from '@/core/i18n/ui'
 import { Button } from '@/core/ui/button'
 
 import type { ConsolePackage, OwnerConsole, PaymentAccountGroup } from '../console/types'
+import { PAYMENT_FIELD_LABELS, PAYMENT_FIELDS, PAYMENT_KIND_LABELS } from '../payment-labels'
 import type { OwnerActions } from './actions'
 import { Confirm } from './confirm'
 import { InviteLinkBox } from './invite-link-box'
@@ -117,21 +118,24 @@ export function InvitePanel({ data, actions }: { data: OwnerConsole; actions: Ow
   )
 }
 
-// How to pay: bank transfer to one of the configured accounts (never a card). The groups come
-// from the admin configuration; until that read exists `groups` is null and a marked note stands in.
+// How to pay: bank transfer to one of the enabled accounts (never a card). Labels come from the
+// shared tables (PAYMENT_*), in the page's language; empty values are skipped. With no groups (or a
+// failed read) the panel says to contact us for the details.
 export function PaymentAccountsPanel({ groups, orgName }: { groups: readonly PaymentAccountGroup[] | null; orgName: string }) {
   const t = useTranslations('app.org.payment')
+  const lang = useLocale() === 'zh' ? 'zh' : 'en'
+  const shown = groups?.filter((group) => group.details && Object.keys(group.details).length > 0) ?? []
   return (
     <Panel title={t('title')} hint={t('hint', { org: orgName })}>
-      {groups === null ? <p data-slot="org-payment-accounts-pending" className="text-label text-muted-foreground">{t('pending')}</p> : null}
-      {groups?.map((group) => (
-        <div key={group.title} className="space-y-2">
-          <h3 className="font-medium">{group.title}</h3>
+      {shown.length === 0 ? <p data-slot="org-payment-accounts-pending" className="text-label text-muted-foreground">{t('pending')}</p> : null}
+      {shown.map((group) => (
+        <div key={group.kind} className="space-y-2">
+          <h3 className="font-medium">{PAYMENT_KIND_LABELS[group.kind][lang]}</h3>
           <dl className="grid gap-x-3 gap-y-1 sm:grid-cols-[max-content_1fr]">
-            {group.fields.map((field) => (
-              <div key={field.label} className="contents">
-                <dt className="text-label text-muted-foreground">{field.label}</dt>
-                <dd className="break-all text-label select-all">{field.value}</dd>
+            {PAYMENT_FIELDS[group.kind].filter((field) => group.details[field]).map((field) => (
+              <div key={field} className="contents">
+                <dt className="text-label text-muted-foreground">{PAYMENT_FIELD_LABELS[field]?.[lang] ?? field}</dt>
+                <dd className="break-all text-label select-all">{group.details[field]}</dd>
               </div>
             ))}
           </dl>

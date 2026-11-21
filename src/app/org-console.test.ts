@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import en from '@/site/messages/en.json'
 import zh from '@/site/messages/zh.json'
 
-import { CONSOLE_ERRORS, type OwnerConsole, type StaffCard } from '@/core/org/console/types'
+import { CONSOLE_ERRORS, type OwnerConsole, type PaymentAccountGroup, type StaffCard } from '@/core/org/console/types'
 
 vi.mock('@/core/i18n/ui', () => ({ Link: ({ href, children, ...rest }: { href: string; children: unknown }) => createElement('a', { href, ...rest }, children as never) }))
 vi.mock('@/core/analytics/replay', () => ({ REPLAY_BLOCK_CLASS: 'sv-replay-block' }))
@@ -27,7 +27,7 @@ const owner = (over: Partial<OwnerConsole['org']> = {}, extra: Partial<OwnerCons
     { userId: MEMBER, account: 'ann@acme.test', role: 'member', monthlyAllowance: 500, heldCredits: 320, customers: 3, joinedAt: '2026-11-02T00:00:00Z' },
   ],
   memberTotal: 2,
-  packages: [{ id: ORG, name: 'Starter', priceUsdCents: 500000, credits: 833333 }],
+  packages: [{ id: ORG, name: 'Starter', priceUsdCents: 123400, credits: 98765 }],
   depositable: 700,
   paymentAccounts: null,
   ...extra,
@@ -53,8 +53,8 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
     const { text, html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions }))
     expect(errors).toEqual([])
     expect(text).toContain('120,000')
-    expect(text).toContain('$5,000')
-    expect(text).toContain('833,333')
+    expect(text).toContain('$1,234')
+    expect(text).toContain('98,765')
     expect(text).toContain('/join/org/' + 'a'.repeat(32))
     expect(text).toContain('ann@acme.test')
     expect(html).toContain('/account?help=new')
@@ -65,10 +65,14 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
   })
 
   it('shows the collecting accounts by group with the org name in the note, or a marked placeholder', () => {
-    const groups = [{ title: 'Group A', fields: [{ label: 'Bank', value: 'Example Bank' }, { label: 'Account', value: '0000 0000' }] }, { title: 'Group B', fields: [{ label: 'Payee', value: 'Example Agent' }] }]
+    const groups: PaymentAccountGroup[] = [
+      { kind: 'overseas_us', details: { account_name: 'Sample Holdings', bank_name: 'Example Bank', account_number: '0000 0000', empty: '' } },
+      { kind: 'mainland_agent', details: { account_name: 'Example Agent', currency: 'CNY' } },
+    ]
     const shown = render(locale, createElement(OwnerConsoleView, { data: owner({}, { paymentAccounts: groups }), actions: ownerActions }))
     expect(shown.errors).toEqual([])
-    expect(shown.text).toContain('Group A')
+    expect(shown.text).toContain(locale === 'en' ? 'US company business account' : '海外美国公司对公账户')
+    expect(shown.text).toContain(locale === 'en' ? 'Account number / IBAN' : '账号 / IBAN')
     expect(shown.text).toContain('Example Agent')
     expect(shown.text).toContain('Acme Studio')
     expect(shown.html).not.toContain('org-payment-accounts-pending')

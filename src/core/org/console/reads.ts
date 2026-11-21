@@ -4,6 +4,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
+import { logger } from '@/core/logger'
+
+import { getOrgPaymentAccounts } from '../payment-accounts'
 
 import type { ConsoleMember, ConsolePackage, OrgView, OwnerConsole, PaymentAccountGroup, StaffCard } from './types'
 
@@ -71,12 +74,17 @@ async function activePackages(db: SupabaseClient): Promise<ConsolePackage[]> {
   return rows.map((p) => ({ id: p.id, name: p.name, priceUsdCents: p.price_usd_cents, credits: p.credits }))
 }
 
-// PLACEHOLDER: the collecting accounts are configured in the admin and read by a function E3 adds
-// in its own PR. Until that is on main this answers null and the console shows a marked
-// "coming soon" note; then call the function here and map its enabled groups to
-// PaymentAccountGroup[] (title + labelled values). No account details live in this repo.
-export async function readPaymentAccounts(): Promise<PaymentAccountGroup[] | null> {
-  return null
+// The enabled collecting-account groups for the owner (E3's org_payment_accounts_for_owner). A
+// suspended org's owner still sees them, to be able to pay and resume. A failed read must not
+// take the console down: null, and the panel says to contact us.
+export async function readPaymentAccounts(db: SupabaseClient, owner: string): Promise<PaymentAccountGroup[] | null> {
+  try {
+    const rows = await getOrgPaymentAccounts(db, owner)
+    return rows.map((row) => ({ kind: row.kind, details: row.details }))
+  } catch (error) {
+    logger.warn('org payment accounts unavailable', { code: error instanceof AppError ? error.code : 'UNKNOWN' })
+    return null
+  }
 }
 
 type Deps = { db: SupabaseClient; now?: Date; maskPhone?: (phone: string) => string }
@@ -93,7 +101,7 @@ async function ownerConsole({ db, mask }: { db: SupabaseClient; mask: (phone: st
   const credits = z.object({ credits: z.number() }).nullable().parse(ok(owner, 'owner balance'))?.credits ?? 0
   const seat = members.find((m) => m.user_id === org.owner_user_id)
   const [counts, labels] = await Promise.all([customerCounts(db, members.map((m) => m.user_id)), accountLabels(db, members.map((m) => m.user_id), mask)])
-  const paymentAccounts = await readPaymentAccounts()
+  const paymentAccounts = await readPaymentAccounts(db, org.owner_user_id)
   return {
     kind: 'owner',
     org: { id: org.id, name: org.name, status: org.status, poolCredits: org.pool_credits, affiliateEnabled: org.affiliate_enabled, affiliateLevels: org.affiliate_levels },

@@ -1,3 +1,5 @@
+import type { PaymentKind } from '../payment-labels'
+
 // What the account centre shows about an enterprise org (ARCHITECTURE §6.5, card E4). Plain data:
 // the pages read it on the server and hand it to the client components.
 
@@ -17,10 +19,10 @@ export type ConsoleMember = {
   joinedAt: string
 }
 
-// Where an enterprise pays (offline bank transfer): groups such as "overseas company account" and
-// "mainland collecting agent", each a title with labelled values. Read from the admin-managed
-// configuration (E3's read function); null while that function is not on main.
-export type PaymentAccountGroup = { title: string; fields: { label: string; value: string }[] }
+// Where an enterprise pays (offline bank transfer): the enabled groups from the admin-managed
+// configuration (getOrgPaymentAccounts). Labels are picked by the page from the shared label
+// tables, so only the group kind and its values travel. null: the read failed.
+export type PaymentAccountGroup = { kind: PaymentKind; details: Record<string, string> }
 
 export type OwnerConsole = {
   kind: 'owner'

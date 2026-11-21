@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { monthStart, readInviteOrg, readOrgView, readSeatOrgId } from './reads'
+import { monthStart, readInviteOrg, readOrgView, readPaymentAccounts, readSeatOrgId } from './reads'
 
 const ORG = '11111111-1111-4111-8111-111111111111'
 const OWNER = '00000000-0000-4000-8000-0000000000a1'
@@ -47,7 +47,7 @@ describe('readOrgView', () => {
         { user_id: STAFF, role: 'member', monthly_allowance: 500, held_credits: 120, joined_at: '2026-11-02T00:00:00Z', org_id: ORG },
       ],
       orgs: org,
-      org_packages: [{ id: ORG, name: 'Starter', price_usd_cents: 500000, credits: 833333 }],
+      org_packages: [{ id: ORG, name: 'Starter', price_usd_cents: 123400, credits: 98765 }],
       profiles: [{ referred_member: STAFF, credits: 100 }, { referred_member: STAFF, credits: 100 }],
     })
     const view = await readOrgView(OWNER, { db, maskPhone: (phone) => phone.slice(0, 3) + '****' })
@@ -56,7 +56,7 @@ describe('readOrgView', () => {
     expect(view.org).toMatchObject({ name: 'Acme Studio', poolCredits: 1200, status: 'active' })
     expect(view.inviteToken).toBe('a'.repeat(32))
     expect(view.members.map((m) => [m.account, m.customers])).toEqual([['owner@acme.test', 0], ['+86****', 2]])
-    expect(view.packages).toEqual([{ id: ORG, name: 'Starter', priceUsdCents: 500000, credits: 833333 }])
+    expect(view.packages).toEqual([{ id: ORG, name: 'Starter', priceUsdCents: 123400, credits: 98765 }])
     // credits 100 minus min(held 30, 100): the org's share is not the owner's to deposit.
     expect(view.depositable).toBe(70)
   })
@@ -103,5 +103,15 @@ describe('invite reads', () => {
 describe('monthStart', () => {
   it('is the first of the UTC month', () => {
     expect(monthStart(new Date('2026-12-31T23:59:59Z'))).toBe('2026-12-01T00:00:00.000Z')
+  })
+})
+
+describe('readPaymentAccounts', () => {
+  it('maps the enabled groups, and answers null (not a crash) when the read fails', async () => {
+    const rows = [{ kind: 'overseas_us', details: { account_name: 'Sample Holdings' }, updated_at: '2026-01-01T00:00:00Z' }]
+    const ok = { rpc: async (fn: string, args: Record<string, unknown>) => ({ data: fn === 'org_payment_accounts_for_owner' && args.p_owner === OWNER ? rows : null, error: null }) }
+    expect(await readPaymentAccounts(ok as never, OWNER)).toEqual([{ kind: 'overseas_us', details: { account_name: 'Sample Holdings' } }])
+    const broken = { rpc: async () => ({ data: null, error: { message: 'NOT_ORG_OWNER' } }) }
+    expect(await readPaymentAccounts(broken as never, OWNER)).toBeNull()
   })
 })
