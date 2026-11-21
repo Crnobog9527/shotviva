@@ -4597,6 +4597,37 @@ $$;
 ALTER FUNCTION "public"."_payment_fee_lines_append_only"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_payment_fee_reconcile_view"("p" "public"."payments") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object(
+    'payment_id', p.id, 'channel', p.channel, 'method', p.method, 'currency', p.currency,
+    'product_id', p.product_id, 'amount_total', p.amount_total, 'created_at', p.created_at,
+    'fee_status', p.fee_status, 'fee_cents', p.fee_cents,
+    'stripe_session_id', p.stripe_session_id, 'stripe_invoice_id', p.stripe_invoice_id,
+    'stripe_charge_id', p.stripe_charge_id, 'waffo_payment_id', p.waffo_payment_id,
+    'scopes', coalesce((
+      select jsonb_agg(jsonb_build_object('refund_id', s.refund_id, 'revision', s.revision, 'lines', s.lines)
+                       order by s.refund_id nulls first)
+        from (select l.refund_id, max(l.revision) as revision,
+                     jsonb_agg(jsonb_build_object('kind', l.kind, 'source', l.source, 'status', l.status,
+                       'amount_cents', l.amount_cents, 'schedule_id', l.schedule_id, 'source_ref', l.source_ref,
+                       'note', l.note) order by l.line_no) as lines
+                from public.payment_fee_lines_current(p.id) l
+               group by l.refund_id) s), '[]'::jsonb),
+    'refunds', coalesce((
+      select jsonb_agg(jsonb_build_object('refund_ref', r.refund_ref, 'amount', r.amount, 'created_at', r.created_at)
+                       order by r.created_at, r.refund_ref)
+        from public.payment_refunds r where r.payment_id = p.id), '[]'::jsonb),
+    'alerted', coalesce((select to_jsonb(s.alerted) from public.payment_fee_reconcile_state s where s.payment_id = p.id), '[]'::jsonb),
+    'attempts', coalesce((select s.attempts from public.payment_fee_reconcile_state s where s.payment_id = p.id), 0));
+$$;
+
+
+ALTER FUNCTION "public"."_payment_fee_reconcile_view"("p" "public"."payments") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_payment_fee_refresh"("p_payment_id" bigint) RETURNS "void"
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -14315,6 +14346,78 @@ $$;
 ALTER FUNCTION "public"."payment_fee_lines_current"("p_payment_id" bigint) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."payment_fee_reconcile_due"("p_now" timestamp with time zone, "p_limit" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_from timestamptz;
+begin
+  if p_now is null or p_limit is null or p_limit not between 1 and 200 then
+    raise exception 'INVALID_INPUT' using detail = 'payment_fee_reconcile_due: now and a limit of 1-200';
+  end if;
+  select record_from into v_from from public.payment_fee_settings where singleton;
+  if v_from is null then return jsonb_build_object('live', false, 'payments', '[]'::jsonb); end if;
+  return jsonb_build_object('live', true, 'record_from', v_from, 'payments', coalesce((
+    select jsonb_agg(public._payment_fee_reconcile_view(d.p) order by d.seen nulls first, (d.p).created_at, (d.p).id)
+      from (select p, s.last_checked_at as seen
+              from public.payments p
+              left join public.payment_fee_reconcile_state s on s.payment_id = p.id
+             where p.created_at >= v_from and p.created_at >= p_now - interval '60 days'
+               and (s.next_check_at is null or s.next_check_at <= p_now)
+               and (p.fee_status is distinct from 'final'
+                    or (p.channel = 'waffo' and exists(
+                          select from public.payment_refunds r
+                           where r.payment_id = p.id
+                             and not exists(select from public.payment_fee_lines_current(p.id) l
+                                             where l.refund_id = r.refund_ref and l.status = 'final'))))
+             order by s.last_checked_at nulls first, p.created_at, p.id
+             limit p_limit) d), '[]'::jsonb));
+end;
+$$;
+
+
+ALTER FUNCTION "public"."payment_fee_reconcile_due"("p_now" timestamp with time zone, "p_limit" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."payment_fee_reconcile_mark"("p_payment_id" bigint, "p_next" timestamp with time zone, "p_error" "text", "p_alerts" "text"[]) RETURNS "text"[]
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_old text[];
+  v_new text[];
+begin
+  if p_payment_id is null or p_next is null then
+    raise exception 'INVALID_INPUT' using detail = 'payment_fee_reconcile_mark: payment and next check';
+  end if;
+  insert into public.payment_fee_reconcile_state (payment_id) values (p_payment_id) on conflict do nothing;
+  select alerted into v_old from public.payment_fee_reconcile_state where payment_id = p_payment_id for update;
+  select coalesce(array_agg(distinct a order by a), '{}') into v_new
+    from unnest(coalesce(p_alerts, '{}')) a where a is not null and length(a) <= 200 and not (a = any(v_old));
+  update public.payment_fee_reconcile_state
+     set attempts = attempts + 1, last_checked_at = now(), next_check_at = p_next,
+         last_error = left(nullif(p_error, ''), 300), alerted = v_old || v_new, updated_at = now()
+   where payment_id = p_payment_id;
+  return v_new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."payment_fee_reconcile_mark"("p_payment_id" bigint, "p_next" timestamp with time zone, "p_error" "text", "p_alerts" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."payment_fee_reconcile_payment"("p_payment_id" bigint) RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select public._payment_fee_reconcile_view(p) from public.payments p where p.id = p_payment_id;
+$$;
+
+
+ALTER FUNCTION "public"."payment_fee_reconcile_payment"("p_payment_id" bigint) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."payment_fee_record"("p_input" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -14439,6 +14542,126 @@ $$;
 
 
 ALTER FUNCTION "public"."payment_fee_schedule_for"("p_channel" "text", "p_method" "text", "p_kind" "text", "p_at" timestamp with time zone) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."payment_fee_stripe_batch_candidates"("p_kind" "text", "p_day" "date", "p_before" timestamp with time zone) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_from timestamptz;
+begin
+  if p_kind is null or p_kind not in ('mp','billing','radar') or p_day is null or p_before is null then
+    raise exception 'INVALID_INPUT' using detail = 'payment_fee_stripe_batch_candidates';
+  end if;
+  select record_from into v_from from public.payment_fee_settings where singleton;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('payment_id', p.id, 'created_at', p.created_at, 'amount_total', p.amount_total,
+        'currency', p.currency, 'recordable', v_from is not null and p.created_at >= v_from) order by p.created_at, p.id)
+      from public.payments p
+     where p.channel = 'stripe'
+       and p.created_at >= p_day::timestamp at time zone 'UTC' and p.created_at < (p_day + 2)::timestamp at time zone 'UTC'
+       and p.created_at <= p_before
+       and not exists(select from public.payment_fee_stripe_batch_items i where i.payment_id = p.id and i.kind = p_kind)
+       and case when exists(select from public.payment_fee_lines l where l.payment_id = p.id and l.refund_id is null)
+                then exists(select from public.payment_fee_lines_current(p.id) l where l.refund_id is null and l.kind = p_kind)
+                else case p_kind when 'mp' then p.method = 'card'
+                                 when 'radar' then p.method <> 'card'
+                                 else p.product_id not like 'pack\_%' end
+           end), '[]'::jsonb);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."payment_fee_stripe_batch_candidates"("p_kind" "text", "p_day" "date", "p_before" timestamp with time zone) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."payment_fee_stripe_batch_pending"("p_limit" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_from timestamptz;
+begin
+  if p_limit is null or p_limit not between 1 and 200 then raise exception 'INVALID_INPUT'; end if;
+  select record_from into v_from from public.payment_fee_settings where singleton;
+  if v_from is null then return '[]'::jsonb; end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('txn_id', x.txn_id, 'kind', x.kind, 'share_cents', x.share_cents,
+        'payment', public._payment_fee_reconcile_view(x.p)))
+      from (select i.txn_id, i.kind, i.share_cents, p
+              from public.payment_fee_stripe_batch_items i
+              join public.payment_fee_stripe_batches b on b.txn_id = i.txn_id and b.status = 'allocated'
+              join public.payments p on p.id = i.payment_id
+             where p.created_at >= v_from
+               and exists(select from public.payment_fee_lines l where l.payment_id = p.id and l.refund_id is null)
+               and not exists(select from public.payment_fee_lines_current(p.id) l
+                               where l.refund_id is null and l.kind = i.kind and l.status = 'final' and l.source_ref = i.txn_id)
+             order by b.booked_at, i.payment_id
+             limit p_limit) x), '[]'::jsonb);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."payment_fee_stripe_batch_pending"("p_limit" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."payment_fee_stripe_batch_record"("p_input" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_txn text := p_input->>'txn_id';
+  v_kind text := p_input->>'kind';
+  v_status text := p_input->>'status';
+  v_amount bigint := (p_input->>'amount_cents')::bigint;
+  v_items jsonb := coalesce(p_input->'items', '[]'::jsonb);
+  v_sum bigint;
+  v_count integer;
+begin
+  if jsonb_typeof(p_input) is distinct from 'object' or v_txn is null or v_kind is null or v_status is null
+     or v_amount is null or v_amount < 0 or jsonb_typeof(v_items) <> 'array'
+     or (v_status = 'allocated') <> (jsonb_array_length(v_items) > 0)
+     or (v_kind = 'other' and v_status <> 'ignored') then
+    raise exception 'INVALID_INPUT' using detail = 'payment_fee_stripe_batch_record: bad input';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('payment_fee_stripe_batch', 0));
+  if exists(select from public.payment_fee_stripe_batches where txn_id = v_txn) then
+    return jsonb_build_object('applied', false, 'reason', 'replayed');
+  end if;
+  select coalesce(sum((e->>'share_cents')::bigint), 0), count(*) into v_sum, v_count from jsonb_array_elements(v_items) e;
+  if v_status = 'allocated' and ((v_kind in ('mp','billing') and v_sum <> v_amount) or v_sum > v_amount) then
+    raise exception 'INVALID_INPUT' using detail = 'payment_fee_stripe_batch_record: shares do not add up';
+  end if;
+  insert into public.payment_fee_stripe_batches (txn_id, kind, amount_cents, booked_at, label_date, description, status,
+      formula_cents, payment_count, note)
+    values (v_txn, v_kind, v_amount, (p_input->>'booked_at')::timestamptz, (p_input->>'label_date')::date,
+      left(p_input->>'description', 300), v_status, (p_input->>'formula_cents')::integer, v_count, left(p_input->>'note', 300));
+  begin
+    insert into public.payment_fee_stripe_batch_items (txn_id, payment_id, kind, basis_cents, share_cents)
+      select v_txn, (e->>'payment_id')::bigint, v_kind, (e->>'basis_cents')::integer, (e->>'share_cents')::integer
+        from jsonb_array_elements(v_items) e;
+  exception when unique_violation then
+    raise exception 'PAYMENT_FEE_BATCH_TAKEN' using detail = v_txn;
+  end;
+  return jsonb_build_object('applied', true);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."payment_fee_stripe_batch_record"("p_input" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."payment_fee_stripe_batches_known"("p_ids" "text"[]) RETURNS "text"[]
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select coalesce(array_agg(b.txn_id order by b.txn_id), '{}') from public.payment_fee_stripe_batches b
+   where b.txn_id = any(coalesce(p_ids, '{}'));
+$$;
+
+
+ALTER FUNCTION "public"."payment_fee_stripe_batches_known"("p_ids" "text"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."payment_fee_target"("p_payment_id" bigint, "p_ref" "text") RETURNS "jsonb"
@@ -18777,6 +19000,22 @@ ALTER TABLE "public"."payment_fee_lines" ALTER COLUMN "id" ADD GENERATED ALWAYS 
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."payment_fee_reconcile_state" (
+    "payment_id" bigint NOT NULL,
+    "attempts" integer DEFAULT 0 NOT NULL,
+    "last_checked_at" timestamp with time zone,
+    "next_check_at" timestamp with time zone,
+    "last_error" "text",
+    "alerted" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "payment_fee_reconcile_state_attempts_check" CHECK (("attempts" >= 0)),
+    CONSTRAINT "payment_fee_reconcile_state_last_error_check" CHECK ((("last_error" IS NULL) OR ("length"("last_error") <= 300)))
+);
+
+
+ALTER TABLE "public"."payment_fee_reconcile_state" OWNER TO "postgres";
+
+
 ALTER TABLE "public"."payment_fee_schedules" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "public"."payment_fee_schedules_id_seq"
     START WITH 1
@@ -18797,6 +19036,47 @@ CREATE TABLE IF NOT EXISTS "public"."payment_fee_settings" (
 
 
 ALTER TABLE "public"."payment_fee_settings" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."payment_fee_stripe_batch_items" (
+    "txn_id" "text" NOT NULL,
+    "payment_id" bigint NOT NULL,
+    "kind" "text" NOT NULL,
+    "basis_cents" integer NOT NULL,
+    "share_cents" integer NOT NULL,
+    CONSTRAINT "payment_fee_stripe_batch_items_basis_cents_check" CHECK (("basis_cents" >= 0)),
+    CONSTRAINT "payment_fee_stripe_batch_items_kind_check" CHECK (("kind" = ANY (ARRAY['mp'::"text", 'billing'::"text", 'radar'::"text"]))),
+    CONSTRAINT "payment_fee_stripe_batch_items_share_cents_check" CHECK (("share_cents" >= 0))
+);
+
+
+ALTER TABLE "public"."payment_fee_stripe_batch_items" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."payment_fee_stripe_batches" (
+    "txn_id" "text" NOT NULL,
+    "kind" "text" NOT NULL,
+    "amount_cents" integer NOT NULL,
+    "booked_at" timestamp with time zone NOT NULL,
+    "label_date" "date" NOT NULL,
+    "description" "text",
+    "status" "text" NOT NULL,
+    "formula_cents" integer,
+    "payment_count" integer DEFAULT 0 NOT NULL,
+    "note" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "payment_fee_stripe_batches_amount_cents_check" CHECK (("amount_cents" >= 0)),
+    CONSTRAINT "payment_fee_stripe_batches_description_check" CHECK ((("description" IS NULL) OR ("length"("description") <= 300))),
+    CONSTRAINT "payment_fee_stripe_batches_formula_cents_check" CHECK (("formula_cents" >= 0)),
+    CONSTRAINT "payment_fee_stripe_batches_kind_check" CHECK (("kind" = ANY (ARRAY['mp'::"text", 'billing'::"text", 'radar'::"text", 'other'::"text"]))),
+    CONSTRAINT "payment_fee_stripe_batches_note_check" CHECK ((("note" IS NULL) OR ("length"("note") <= 300))),
+    CONSTRAINT "payment_fee_stripe_batches_payment_count_check" CHECK (("payment_count" >= 0)),
+    CONSTRAINT "payment_fee_stripe_batches_status_check" CHECK (("status" = ANY (ARRAY['allocated'::"text", 'mismatch'::"text", 'ignored'::"text"]))),
+    CONSTRAINT "payment_fee_stripe_batches_txn_id_check" CHECK (("txn_id" ~ '^txn_[A-Za-z0-9]+$'::"text"))
+);
+
+
+ALTER TABLE "public"."payment_fee_stripe_batches" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."payment_refunds" (
@@ -19833,6 +20113,11 @@ ALTER TABLE ONLY "public"."payment_fee_lines"
 
 
 
+ALTER TABLE ONLY "public"."payment_fee_reconcile_state"
+    ADD CONSTRAINT "payment_fee_reconcile_state_pkey" PRIMARY KEY ("payment_id");
+
+
+
 ALTER TABLE ONLY "public"."payment_fee_schedules"
     ADD CONSTRAINT "payment_fee_schedules_pkey" PRIMARY KEY ("id");
 
@@ -19840,6 +20125,21 @@ ALTER TABLE ONLY "public"."payment_fee_schedules"
 
 ALTER TABLE ONLY "public"."payment_fee_settings"
     ADD CONSTRAINT "payment_fee_settings_pkey" PRIMARY KEY ("singleton");
+
+
+
+ALTER TABLE ONLY "public"."payment_fee_stripe_batch_items"
+    ADD CONSTRAINT "payment_fee_stripe_batch_items_once" UNIQUE ("payment_id", "kind");
+
+
+
+ALTER TABLE ONLY "public"."payment_fee_stripe_batch_items"
+    ADD CONSTRAINT "payment_fee_stripe_batch_items_pkey" PRIMARY KEY ("txn_id", "payment_id");
+
+
+
+ALTER TABLE ONLY "public"."payment_fee_stripe_batches"
+    ADD CONSTRAINT "payment_fee_stripe_batches_pkey" PRIMARY KEY ("txn_id");
 
 
 
@@ -20585,6 +20885,10 @@ CREATE UNIQUE INDEX "payment_fee_lines_revision_key" ON "public"."payment_fee_li
 
 
 CREATE INDEX "payment_fee_lines_schedule_idx" ON "public"."payment_fee_lines" USING "btree" ("schedule_id") WHERE ("schedule_id" IS NOT NULL);
+
+
+
+CREATE INDEX "payment_fee_reconcile_state_next_idx" ON "public"."payment_fee_reconcile_state" USING "btree" ("next_check_at");
 
 
 
@@ -21747,6 +22051,11 @@ ALTER TABLE ONLY "public"."payment_fee_lines"
 
 
 
+ALTER TABLE ONLY "public"."payment_fee_reconcile_state"
+    ADD CONSTRAINT "payment_fee_reconcile_state_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "public"."payments"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."payment_fee_schedules"
     ADD CONSTRAINT "payment_fee_schedules_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -21754,6 +22063,16 @@ ALTER TABLE ONLY "public"."payment_fee_schedules"
 
 ALTER TABLE ONLY "public"."payment_fee_schedules"
     ADD CONSTRAINT "payment_fee_schedules_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."payment_fee_stripe_batch_items"
+    ADD CONSTRAINT "payment_fee_stripe_batch_items_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "public"."payments"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."payment_fee_stripe_batch_items"
+    ADD CONSTRAINT "payment_fee_stripe_batch_items_txn_id_fkey" FOREIGN KEY ("txn_id") REFERENCES "public"."payment_fee_stripe_batches"("txn_id") ON DELETE CASCADE;
 
 
 
@@ -22334,10 +22653,19 @@ ALTER TABLE "public"."payment_disputes" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."payment_fee_lines" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."payment_fee_reconcile_state" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."payment_fee_schedules" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."payment_fee_settings" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."payment_fee_stripe_batch_items" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."payment_fee_stripe_batches" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."payment_refunds" ENABLE ROW LEVEL SECURITY;
@@ -23372,6 +23700,10 @@ REVOKE ALL ON FUNCTION "public"."_payment_fee_line"("p_payment" "public"."paymen
 
 
 REVOKE ALL ON FUNCTION "public"."_payment_fee_lines_append_only"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_payment_fee_reconcile_view"("p" "public"."payments") FROM PUBLIC;
 
 
 
@@ -24750,6 +25082,21 @@ GRANT ALL ON FUNCTION "public"."payment_fee_lines_current"("p_payment_id" bigint
 
 
 
+REVOKE ALL ON FUNCTION "public"."payment_fee_reconcile_due"("p_now" timestamp with time zone, "p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."payment_fee_reconcile_due"("p_now" timestamp with time zone, "p_limit" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."payment_fee_reconcile_mark"("p_payment_id" bigint, "p_next" timestamp with time zone, "p_error" "text", "p_alerts" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."payment_fee_reconcile_mark"("p_payment_id" bigint, "p_next" timestamp with time zone, "p_error" "text", "p_alerts" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."payment_fee_reconcile_payment"("p_payment_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."payment_fee_reconcile_payment"("p_payment_id" bigint) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."payment_fee_record"("p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."payment_fee_record"("p_input" "jsonb") TO "service_role";
 
@@ -24761,6 +25108,26 @@ GRANT SELECT ON TABLE "public"."payment_fee_schedules" TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."payment_fee_schedule_for"("p_channel" "text", "p_method" "text", "p_kind" "text", "p_at" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."payment_fee_schedule_for"("p_channel" "text", "p_method" "text", "p_kind" "text", "p_at" timestamp with time zone) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."payment_fee_stripe_batch_candidates"("p_kind" "text", "p_day" "date", "p_before" timestamp with time zone) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."payment_fee_stripe_batch_candidates"("p_kind" "text", "p_day" "date", "p_before" timestamp with time zone) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."payment_fee_stripe_batch_pending"("p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."payment_fee_stripe_batch_pending"("p_limit" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."payment_fee_stripe_batch_record"("p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."payment_fee_stripe_batch_record"("p_input" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."payment_fee_stripe_batches_known"("p_ids" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."payment_fee_stripe_batches_known"("p_ids" "text"[]) TO "service_role";
 
 
 
@@ -25509,7 +25876,19 @@ GRANT SELECT ON TABLE "public"."payment_dispute_link_errors" TO "service_role";
 
 
 
+GRANT SELECT ON TABLE "public"."payment_fee_reconcile_state" TO "service_role";
+
+
+
 GRANT SELECT ON TABLE "public"."payment_fee_settings" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."payment_fee_stripe_batch_items" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."payment_fee_stripe_batches" TO "service_role";
 
 
 
