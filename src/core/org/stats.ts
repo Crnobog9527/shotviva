@@ -122,3 +122,12 @@ export async function readOrgCustomers(client: RpcClient, owner: string, period:
     paidInPeriodCents: r.paid_in_period_cents, paidTotalCents: r.paid_total_cents,
   }))
 }
+
+const countRow = z.object({ member_user_id: uuid, l1_customers: count, l2_customers: count })
+
+// All-time customers per member (org_customer_counts, same customer set as the monthly report):
+// the owner gets every member, staff only themselves. Members with none are absent.
+export async function readCustomerCounts(client: RpcClient, caller: string, orgId: string): Promise<Map<string, { l1: number; l2: number }>> {
+  const rows = await callRpc(client, 'org_customer_counts', { p_caller: uuid.parse(caller), p_org_id: uuid.parse(orgId) }, z.array(countRow))
+  return new Map(rows.map((r) => [r.member_user_id, { l1: r.l1_customers, l2: r.l2_customers }]))
+}

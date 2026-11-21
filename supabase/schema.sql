@@ -13411,6 +13411,37 @@ $$;
 ALTER FUNCTION "public"."org_allocate"("p_owner" "uuid", "p_member" "uuid", "p_amount" integer, "p_request_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."org_customer_counts"("p_caller" "uuid", "p_org_id" "uuid") RETURNS TABLE("member_user_id" "uuid", "l1_customers" integer, "l2_customers" integer)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+#variable_conflict use_column
+declare
+  v_owner boolean;
+  v_account uuid;
+begin
+  select o.owner_user_id = p_caller into v_owner from public.orgs o where o.id = p_org_id;
+  if v_owner is distinct from true and not exists(
+    select from public.org_members m where m.org_id = p_org_id and m.user_id = p_caller and m.status = 'active'
+  ) then raise exception 'NOT_ORG_MEMBER'; end if;
+  select a.user_id into v_account from public.affiliates a where a.org_id = p_org_id;
+  if v_account is null then return; end if;
+  return query
+  select c.referred_member,
+         (count(*) filter (where c.referred_source = 'org_l1'))::integer,
+         (count(*) filter (where c.referred_source = 'org_l2'))::integer
+    from public.profiles c
+   where c.referred_by = v_account and c.referred_member is not null and c.referred_source in ('org_l1', 'org_l2')
+     and (coalesce(v_owner, false) or c.referred_member = p_caller)
+     and not exists(select from public.org_members x where x.org_id = p_org_id and x.user_id = c.id and x.status = 'active')
+   group by c.referred_member;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."org_customer_counts"("p_caller" "uuid", "p_org_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."org_deposit"("p_owner" "uuid", "p_amount" integer, "p_request_id" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -13524,12 +13555,13 @@ begin
   ),
   paid as (
     select cu.id,
-           coalesce(sum(case when p.amount_total = 0 then 0 else
+           coalesce(sum(case when p.amount_total = 0 or coalesce(ds.is_lost, false) then 0 else
              div((p.amount_total - p.amount_tax)::numeric * (p.amount_total - p.amount_refunded), p.amount_total::numeric) end)
              filter (where p.created_at >= v_start and p.created_at < v_end), 0)::bigint as in_period,
-           coalesce(sum(case when p.amount_total = 0 then 0 else
+           coalesce(sum(case when p.amount_total = 0 or coalesce(ds.is_lost, false) then 0 else
              div((p.amount_total - p.amount_tax)::numeric * (p.amount_total - p.amount_refunded), p.amount_total::numeric) end), 0)::bigint as total
       from cust cu left join public.payments p on p.user_id = cu.id and p.currency = 'usd' and p.created_at >= cu.referred_at
+      left join lateral public._affiliate_dispute_state(p) ds on p.id is not null
      group by cu.id
   )
   select cu.uid, case cu.src when 'org_l1' then 1::smallint else 2::smallint end,
@@ -13599,9 +13631,10 @@ begin
   ),
   net as (
     select cu.uid, cu.src, cu.id,
-           sum(case when p.amount_total = 0 then 0 else
+           sum(case when p.amount_total = 0 or ds.is_lost then 0 else
              div((p.amount_total - p.amount_tax)::numeric * (p.amount_total - p.amount_refunded), p.amount_total::numeric) end)::bigint as cents
       from cust cu join public.payments p on p.user_id = cu.id
+      cross join lateral public._affiliate_dispute_state(p) ds
      where p.currency = 'usd' and p.created_at >= cu.referred_at and p.created_at >= v_start and p.created_at < v_end
      group by cu.uid, cu.src, cu.id
   ),
@@ -23710,6 +23743,11 @@ GRANT ALL ON FUNCTION "public"."openai_admin_key"() TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."org_allocate"("p_owner" "uuid", "p_member" "uuid", "p_amount" integer, "p_request_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_allocate"("p_owner" "uuid", "p_member" "uuid", "p_amount" integer, "p_request_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_customer_counts"("p_caller" "uuid", "p_org_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_customer_counts"("p_caller" "uuid", "p_org_id" "uuid") TO "service_role";
 
 
 

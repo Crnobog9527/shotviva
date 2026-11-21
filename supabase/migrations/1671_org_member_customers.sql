@@ -4,7 +4,7 @@
 -- A customer is listed for a UTC month ('YYYY-MM') when their binding (referred_at) falls in it or
 -- they paid in it. Paid is pre-tax, USD cents, net of refunds, as in org_member_stats: the month's
 -- figure and the cumulative one (every USD payment since the binding). Customers who have since
--- joined the org as staff are left out. At most 5000 rows; the owner gets NOT_ORG_OWNER otherwise.
+-- joined the org as staff are left out. A payment whose dispute was lost counts as 0, like its commission. At most 5000 rows; the owner gets NOT_ORG_OWNER otherwise.
 create or replace function public.org_member_customers(p_owner uuid, p_period text)
 returns table(
   member_user_id uuid, level smallint, contact text, signed_up_at timestamptz,
@@ -34,12 +34,13 @@ begin
   ),
   paid as (
     select cu.id,
-           coalesce(sum(case when p.amount_total = 0 then 0 else
+           coalesce(sum(case when p.amount_total = 0 or coalesce(ds.is_lost, false) then 0 else
              div((p.amount_total - p.amount_tax)::numeric * (p.amount_total - p.amount_refunded), p.amount_total::numeric) end)
              filter (where p.created_at >= v_start and p.created_at < v_end), 0)::bigint as in_period,
-           coalesce(sum(case when p.amount_total = 0 then 0 else
+           coalesce(sum(case when p.amount_total = 0 or coalesce(ds.is_lost, false) then 0 else
              div((p.amount_total - p.amount_tax)::numeric * (p.amount_total - p.amount_refunded), p.amount_total::numeric) end), 0)::bigint as total
       from cust cu left join public.payments p on p.user_id = cu.id and p.currency = 'usd' and p.created_at >= cu.referred_at
+      left join lateral public._affiliate_dispute_state(p) ds on p.id is not null
      group by cu.id
   )
   select cu.uid, case cu.src when 'org_l1' then 1::smallint else 2::smallint end,

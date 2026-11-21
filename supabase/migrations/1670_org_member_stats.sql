@@ -15,6 +15,8 @@
 --                 per payment (amount_total - amount_tax) * (amount_total - amount_refunded) /
 --                 amount_total, truncated like commissions are (_affiliate_due). Only USD
 --                 payments (commissions are USD only), only payments made after the binding.
+--                 A payment whose dispute was lost counts as 0 (its commission is void,
+--                 dispute_lost); an open dispute does not change it.
 -- A customer who has since joined the org as staff is not the org's customer (his commissions
 -- are void, org_member) and is left out. A member who left keeps his rows for the months he
 -- has activity in (referred_member is kept as history), shown with status 'removed'.
@@ -68,9 +70,10 @@ begin
   ),
   net as (
     select cu.uid, cu.src, cu.id,
-           sum(case when p.amount_total = 0 then 0 else
+           sum(case when p.amount_total = 0 or ds.is_lost then 0 else
              div((p.amount_total - p.amount_tax)::numeric * (p.amount_total - p.amount_refunded), p.amount_total::numeric) end)::bigint as cents
       from cust cu join public.payments p on p.user_id = cu.id
+      cross join lateral public._affiliate_dispute_state(p) ds
      where p.currency = 'usd' and p.created_at >= cu.referred_at and p.created_at >= v_start and p.created_at < v_end
      group by cu.uid, cu.src, cu.id
   ),

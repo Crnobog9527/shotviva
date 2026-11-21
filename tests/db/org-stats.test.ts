@@ -1,7 +1,7 @@
 import type { Client } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
-import { refund, row, sale } from './affiliate-fixtures'
+import { dispute, refund, row, sale } from './affiliate-fixtures'
 import { connectAdmin, createUser } from './helpers'
 
 // Monthly performance of an enterprise org, card E5 (ARCHITECTURE §6.5): org_member_stats (owner:
@@ -150,6 +150,19 @@ describe('the numbers', () => {
     expect(await statOf(owner, orgId, staff)).toMatchObject({ l1_signups: 2, l1_paying: 1, l1_paid_cents: '1245' })
   })
 
+  it('counts a payment whose dispute was lost as nothing, like its commission, and keeps counting an open or won one', async () => {
+    const { owner, orgId, staff } = await team()
+    const [lost, open, won] = [await customerOf(orgId, owner, staff, '2026-11-02T00:00:00Z'), await customerOf(orgId, owner, staff, '2026-11-02T00:00:00Z'), await customerOf(orgId, owner, staff, '2026-11-02T00:00:00Z')]
+    const pl = await paid(lost, 2490, '2026-11-10T00:00:00Z')
+    await paid(open, 2490, '2026-11-10T00:00:00Z').then((p) => dispute(db, p.charge, 2490))
+    const pw = await paid(won, 2490, '2026-11-10T00:00:00Z')
+    await db.query("select close_payment_dispute($1,'lost')", [await dispute(db, pl.charge, 2490)])
+    await db.query("select close_payment_dispute($1,'won')", [await dispute(db, pw.charge, 2490)])
+    expect(await statOf(owner, orgId, staff)).toMatchObject({ l1_signups: 3, l1_paying: 2, l1_paid_cents: '4980' })
+    const rows = await customers(owner)
+    expect(rows.filter((r) => r.paid_total_cents === '0')).toHaveLength(1)
+  })
+
   it('cuts months at UTC midnight, both for sign-ups and for payments', async () => {
     const { owner, orgId, staff } = await team()
     const early = await customerOf(orgId, owner, staff, '2026-10-31T23:59:59.999Z')
@@ -230,5 +243,40 @@ describe('the customer list', () => {
     const a = await customerOf(orgId, owner, staff, '2026-11-03T08:00:00Z')
     await customerOf(orgId, owner, staff, '2026-11-04T08:00:00Z', a)
     expect((await customers(owner)).map((r) => r.level).sort()).toEqual([1, 2])
+  })
+})
+
+describe('customer counts', () => {
+  const counts = async (caller: string, orgId: string) =>
+    (await db.query('select * from org_customer_counts($1,$2)', [caller, orgId])).rows as Array<Record<string, string | number>>
+
+  it('counts this org\'s customers per member and level, for the owner all members and for staff only themselves', async () => {
+    const { owner, orgId, staff, other } = await team()
+    const a = await customerOf(orgId, owner, staff, '2026-11-03T00:00:00Z')
+    await customerOf(orgId, owner, staff, '2026-10-03T00:00:00Z')
+    await customerOf(orgId, owner, staff, '2026-11-05T00:00:00Z', a)
+    await customerOf(orgId, owner, other, '2026-11-06T00:00:00Z')
+    expect((await counts(owner, orgId)).map((r) => [r.member_user_id, r.l1_customers, r.l2_customers]).sort())
+      .toEqual([[staff, 2, 1], [other, 1, 0]].sort())
+    expect(await counts(staff, orgId)).toEqual([{ member_user_id: staff, l1_customers: 2, l2_customers: 1 }])
+    const outsider = await createUser(db)
+    await refused(() => db.query('select * from org_customer_counts($1,$2)', [outsider, orgId]), 'NOT_ORG_MEMBER')
+  })
+
+  it('does not carry the customers of a previous org along, and skips colleagues', async () => {
+    const first = await team()
+    const second = await team()
+    await customerOf(first.orgId, first.owner, first.staff, '2026-11-03T00:00:00Z')
+    const colleague = await customerOf(first.orgId, first.owner, first.staff, '2026-11-03T00:00:00Z')
+    // The member moves from the first org to the second.
+    await db.query("select org_remove_member($1,$2,'mv-1')", [first.owner, first.staff])
+    const { invite_token } = await row(db, 'select invite_token from orgs where id=$1', [second.orgId])
+    await db.query('select org_join($1,$2)', [first.staff, invite_token])
+    expect(await counts(second.owner, second.orgId)).toEqual([])
+    expect(await counts(first.staff, second.orgId)).toEqual([])
+    expect(await counts(first.owner, first.orgId)).toEqual([{ member_user_id: first.staff, l1_customers: 2, l2_customers: 0 }])
+    const { invite_token: back } = await row(db, 'select invite_token from orgs where id=$1', [first.orgId])
+    await db.query('select org_join($1,$2)', [colleague, back])
+    expect(await counts(first.owner, first.orgId)).toEqual([{ member_user_id: first.staff, l1_customers: 1, l2_customers: 0 }])
   })
 })

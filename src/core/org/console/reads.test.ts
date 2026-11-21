@@ -52,8 +52,8 @@ describe('readOrgView', () => {
       ],
       orgs: org,
       org_packages: [{ id: ORG, name: 'Starter', price_usd_cents: 123400, credits: 98765 }],
-      profiles: [{ referred_member: STAFF, credits: 100 }, { referred_member: STAFF, credits: 100 }],
-    })
+      profiles: [{ credits: 100 }],
+    }, { org_customer_counts: [{ member_user_id: STAFF, l1_customers: 2, l2_customers: 0 }] })
     const view = await readOrgView(OWNER, { db, maskPhone: (phone) => phone.slice(0, 3) + '****' })
     expect(view.kind).toBe('owner')
     if (view.kind !== 'owner') return
@@ -68,8 +68,8 @@ describe('readOrgView', () => {
   it('never lets a deposit exceed the owner\'s own credits when the held share is larger', async () => {
     const { db } = fakeDb({
       org_members: [{ user_id: OWNER, role: 'owner', monthly_allowance: 0, held_credits: 900, joined_at: '2026-11-01T00:00:00Z', org_id: ORG }],
-      orgs: org, org_packages: [], profiles: [{ credits: 100, referred_member: OTHER }],
-    })
+      orgs: org, org_packages: [], profiles: [{ credits: 100 }],
+    }, { org_customer_counts: [] })
     const view = await readOrgView(OWNER, { db })
     expect(view.kind === 'owner' && view.depositable).toBe(0)
   })
@@ -86,8 +86,7 @@ describe('readOrgView for a member', () => {
       org_members: { org_id: ORG, role: 'member', monthly_allowance: 500, held_credits: 80 },
       orgs: org,
       org_credit_ledger: [{ delta: -500 }, { delta: -100 }],
-      profiles: [{ referred_member: STAFF }],
-    }, { org_member_stats: [statsRow] })
+    }, { org_member_stats: [statsRow], org_customer_counts: [{ member_user_id: STAFF, l1_customers: 1, l2_customers: 0 }] })
     const now = new Date('2026-11-21T10:00:00Z')
     const view = await readOrgView(STAFF, { db, now })
     expect(view).toEqual({
@@ -97,6 +96,7 @@ describe('readOrgView for a member', () => {
     })
     expect(calls).toContain(`org_credit_ledger.gte(created_at,${monthStart(now)})`)
     // The staff variant is asked for the caller's own id: the function returns only their row.
+    expect(calls).toContain(`rpc.org_customer_counts(${JSON.stringify({ p_caller: STAFF, p_org_id: ORG })})`)
     expect(calls).toContain(`rpc.org_member_stats(${JSON.stringify({ p_caller: STAFF, p_org_id: ORG, p_period: '2026-11' })})`)
     // A member's read never lists the org's members or its invite token.
     expect(JSON.stringify(view)).not.toContain('a'.repeat(32))
@@ -108,8 +108,7 @@ describe('readOrgView for a member', () => {
       org_members: { org_id: ORG, role: 'member', monthly_allowance: 500, held_credits: 80 },
       orgs: { ...org, affiliate_levels: 2 },
       org_credit_ledger: [],
-      profiles: [{ referred_member: STAFF }],
-    })
+    }, { org_customer_counts: [{ member_user_id: STAFF, l1_customers: 1, l2_customers: 0 }] })
     const view = await readOrgView(STAFF, { db, now: new Date('2026-11-21T10:00:00Z') })
     expect(view).toMatchObject({ kind: 'member', withLevel2: true, performance: null, customers: 1 })
   })
