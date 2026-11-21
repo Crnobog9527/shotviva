@@ -79,9 +79,15 @@ describe('paywall messages: pack note and yearly saving', () => {
     expect(markup('en', { pct: 20, same: 'true', about: 'true' })).toBe('Save about 20%')
     expect(markup('zh', { pct: 20, same: 'true', about: 'true' })).toBe('约省 20%')
     expect(markup('zh', { pct: 20, same: 'true', about: 'false' })).toBe('省 20%')
-    expect(t('savingAmount', { amount: '$297', pct: 25, about: 'false' })).toBe('$297 a year · 25% off')
-    expect(t('savingAmount', { amount: '$46.80', pct: 20, about: 'true' })).toBe('$46.80 a year · about 20% off')
-    expect(zh('savingAmount', { amount: '$46.80', pct: 20, about: 'true' })).toBe('$46.80 · 约省 20%')
+    expect(t('savingAmount', { amount: '$297', pct: 25, about: 'false' })).toBe('$297\u00a0a\u00a0year · 25%\u00a0off')
+    expect(t('savingAmount', { amount: '$46.80', pct: 20, about: 'true' })).toBe('$46.80\u00a0a\u00a0year · about\u00a020%\u00a0off')
+    expect(zh('savingAmount', { amount: '$46.80', pct: 20, about: 'true' })).toBe('$46.80 · 约省\u00a020%')
+    // The yearly plate wraps only at " · ", so a 320-375px card never widens to fit it (2026-11-21).
+    for (const render of [t, zh]) for (const about of ['true', 'false']) {
+      const halves = render('savingAmount', { amount: '$118.80', pct: 20, about }).split(' · ')
+      expect(halves).toHaveLength(2)
+      for (const half of halves) expect(half).not.toContain(' ')
+    }
     expect(zh('compare.cells.pct', { value: 0 })).toBe('—')
     expect(zh('compare.cells.pct', { value: 10 })).toBe('10%')
   })

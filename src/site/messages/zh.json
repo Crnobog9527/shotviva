@@ -2031,7 +2031,7 @@
     "choose": "选择{tier}",
     "upgradeTo": "升级到{tier}",
     "savingLabel": "<vs>比按月付</vs>每年省",
-    "savingAmount": "{amount} · {about, select, true {约省} other {省}} {pct}%",
+    "savingAmount": "{amount} · {about, select, true {约省} other {省}}\u00a0{pct}%",
     "mostPopular": "最受欢迎",
     "memberPrice": "会员价",
     "memberCodeKept": "已选会员价，优惠码留待下次使用。",
