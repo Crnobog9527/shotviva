@@ -82,3 +82,22 @@ it('polls a single photo on a 3 s tick that fires a little early', async () => {
     vi.useRealTimers()
   }
 })
+
+it('reads a job refunded for the provider limit as queued when polling sees it first', async () => {
+  vi.mocked(submitJob).mockReturnValueOnce(new Promise(() => {}))
+  vi.mocked(readJobs).mockImplementation(async (ids) => new Map(ids.map((id) => [id, { id, status: 'failed', error_code: 'PROVIDER_RATE_LIMITED' } as never])))
+  vi.useFakeTimers()
+  try {
+    const id = startJob({
+      templateId: 'food', templateName: 'Food', resolution: '1k', aspect: 'original',
+      credits: 2, inputKey: 'inputs/qa/food5.jpg',
+      body: { template_id: 'food', input_key: 'inputs/qa/food5.jpg', inputs: { copy: {}, aspect_ratio: 'original', resolution: '1k' } },
+    }, 5)
+    vi.advanceTimersByTime(31_000)
+    await pollRunning(true)
+    expect(getJobs().some((job) => job.id === id)).toBe(false)
+    expect(getJobs().find((job) => job.inputKey === 'inputs/qa/food5.jpg')).toMatchObject({ status: 'queued', failure: null })
+  } finally {
+    vi.useRealTimers()
+  }
+})
