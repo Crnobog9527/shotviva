@@ -2067,6 +2067,7 @@
     "wechatCapOver": "This purchase is over WeChat\u00a0Pay's ¥1,000 limit. Pay with Alipay or a card.",
     "cnCard": "China-issued card",
     "cardOnly": "Card",
+    "cardWallets": "Card · Apple Pay · Google Pay",
     "cardRenews": "Renews automatically, cancel anytime",
     "walletOnce": "One-time payment, {period, select, year {1 year} other {30 days}}, no auto-renew",
     "oneTime": "One-time payment",

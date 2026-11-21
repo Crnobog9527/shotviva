@@ -65,10 +65,12 @@ export function isRecurring(product: SiteProduct, method: CheckoutBody['method']
 // Which methods the hosted page shows, by an allow-list only (Waffo takes include or exclude,
 // never both). The paywall's card row is cards (a subscription renews, a pack is one payment); its
 // wallet row is Alipay, plus WeChat Pay while the store offers it (WAFFO_WECHAT_PAY) and the price
-// is under the cap (wechat-limit.ts). Subscriptions are card-only. Apple Pay and Google Pay are
-// left off: the Waffo card row promises cards (paywall/copy.ts), so the page matches it.
+// is under the cap (wechat-limit.ts). Subscriptions are card-only (Waffo: wallets are one-time
+// only); a one-time card payment also takes Apple Pay and Google Pay, which are card payments at
+// the same rate and which the card row's wording names (paywall/copy.ts).
 export function waffoMethods(method: CheckoutBody['method'], recurring: boolean, wechat: boolean): readonly string[] {
-  if (recurring || method !== 'alipay') return ['card']
+  if (recurring) return ['card']
+  if (method !== 'alipay') return ['card', 'applepay', 'googlepay']
   return wechat ? ['alipay', 'wechat'] : ['alipay']
 }
 

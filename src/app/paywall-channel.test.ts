@@ -59,6 +59,7 @@ describe('payment copy by channel', () => {
       expect(line).not.toMatch(/wechat/i)
     }
     expect(say(methodLabel('waffo', 'card'))).toBe('Card')
+    expect(say(methodLabel('waffo', 'card', false, true))).toBe('Card · Apple Pay · Google Pay')
     expect(say(methodNote('waffo', { kind: 'plan', method: 'card', period: 'year' }))).toBe('Renews automatically, cancel anytime')
     expect(say(methodNote('waffo', { kind: 'plan', method: 'alipay', period: 'month' }))).toBe('One-time payment, 30 days, no auto-renew')
     expect(say(methodNote('waffo', { kind: 'pack', method: 'card', period: 'month' }))).toBe('One-time payment')
@@ -88,6 +89,8 @@ describe('payment copy by channel', () => {
     expect(say(methodLabel('waffo', 'alipay', true))).toBe('Alipay / WeChat\u00a0Pay')
     expect(sayZh(methodLabel('waffo', 'alipay', true))).toBe('支付宝 / 微信支付')
     expect(say(methodLabel('waffo', 'alipay', false))).toBe('Alipay')
+    expect(sayZh(methodLabel('waffo', 'card', false, true))).toBe('银行卡 · Apple Pay · Google Pay')
+    expect(sayZh(methodLabel('waffo', 'card'))).toBe('银行卡')
     expect(say(methodLabel('stripe', 'alipay', false))).toBe('Alipay')
     expect(say(methodLabel('stripe', 'card', true))).toBe('Card · Apple Pay · Google Pay')
     expect(sayZh(methodNote('stripe', { kind: 'plan', method: 'alipay', period: 'month' }))).toBe('一次性付款，30 天，不自动续费')

@@ -7,7 +7,7 @@ import type { Period } from "./offer"
 // Which paywall message each payment line uses (DESIGN §4.5, ARCHITECTURE §6.3). On both
 // channels a card plan renews and can be cancelled anytime, the wallet line buys one period that
 // does not renew, and packs are one-time (Waffo card subscriptions since T50). The channel
-// changes two labels: Waffo's subscription page takes cards, not Apple Pay or Google Pay, and
+// changes two labels: Waffo's subscription page takes cards, not Apple Pay or Google Pay (a pack's page does), and
 // the wallet line names WeChat Pay beside Alipay when the channel's checkout offers it
 // (`wechatPay`: STRIPE_WECHAT_PAY on Stripe, T73; WAFFO_WECHAT_PAY on Waffo); off, it reads Alipay. 中国银行卡
 // (zh pages on Stripe, T64) reads like a card: plans renew, packs are one-time. On zh pages the
@@ -16,8 +16,10 @@ import type { Period } from "./offer"
 
 export type PaywallMessage = { key: string; values?: Record<string, string> }
 
-export function methodLabel(channel: PaymentChannel, method: CheckoutMethod, wechatPay = false): PaywallMessage {
-  if (method === "card") return { key: channel === "waffo" ? "cardOnly" : "card" }
+// `oneTime`: a pack. Waffo's one-time card page also offers Apple Pay and Google Pay, its
+// subscription page cards only, so only a pack's card row on Waffo carries the full wording.
+export function methodLabel(channel: PaymentChannel, method: CheckoutMethod, wechatPay = false, oneTime = false): PaywallMessage {
+  if (method === "card") return { key: channel !== "waffo" ? "card" : oneTime ? "cardWallets" : "cardOnly" }
   if (method === "cn_card") return { key: "cnCard" }
   return { key: wechatPay ? "wallet" : "alipay" }
 }

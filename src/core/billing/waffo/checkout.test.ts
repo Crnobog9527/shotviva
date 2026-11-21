@@ -64,13 +64,15 @@ describe('methods on the Waffo page match the paywall rows', () => {
     expect(off).toMatchObject({ includePaymentMethods: ['alipay'] })
   })
 
-  it('the card row is cards on a subscription and on a pack, with or without the WeChat flag', async () => {
+  it('the card row: a subscription is card-only, a pack adds Apple Pay and Google Pay', async () => {
     const { deps, create } = harness()
     const on = { ...deps, wechatPay: true }
     await createWaffoCheckout(on, { userId: USER, body: body('max_yearly') })
     await createWaffoCheckout(on, { userId: USER, body: body('pack_m') })
     await createWaffoCheckout(deps, { userId: USER, body: body('pack_m') })
-    for (const [request] of create.mock.calls) expect(request).toMatchObject({ includePaymentMethods: ['card'] })
+    const [sub, pack, packOff] = create.mock.calls.map((call) => call[0] as unknown as Record<string, unknown>)
+    expect(sub).toMatchObject({ includePaymentMethods: ['card'] })
+    for (const request of [pack, packOff]) expect(request).toMatchObject({ includePaymentMethods: ['card', 'applepay', 'googlepay'] })
   })
 
   it('never sends a blacklist beside the allow-list', async () => {
