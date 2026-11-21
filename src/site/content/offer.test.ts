@@ -74,7 +74,7 @@ describe('how long a photo takes', () => {
 
 // The 2026-11-21 plan: credits change (5,500 / 11,500 monthly, × 12 yearly).
 describe('copy under the credits-only plan', () => {
-  const credits: Record<string, number> = { pro_monthly: 5500, pro_yearly: 66000, max_monthly: 11500, max_yearly: 138000 }
+  const credits: Record<string, number> = { starter_monthly: 2000, starter_yearly: 24000, pro_monthly: 5500, pro_yearly: 66000, max_monthly: 11500, max_yearly: 138000 }
   const o2 = site.billing.products.map(p => credits[p.id] ? { ...p, credits: credits[p.id]! } : p)
 
   it('states each plan\'s yearly saving in both languages', () => {
@@ -82,11 +82,12 @@ describe('copy under the credits-only plan', () => {
     expect(makeZhPricingPage(o2).intro).toContain('按年付省 20%（旗舰版省 25%）。')
   })
 
-  // Owner 「用 b」: Max yearly $950.40, so every plan saves 20%.
-  it('says one saving when every plan saves the same', () => {
-    const b = o2.map(p => p.id === 'max_yearly' ? { ...p, priceUsd: 950.4 } : p)
-    expect(makePricingPage(b).intro).toContain('Yearly Shotviva plans save 20% compared with paying monthly.')
-    expect(makeZhPricingPage(b).intro).toContain('按年付省 20%。')
+  // Final terms: yearly $192 / $480 / $950 (19.6% / 19.8% / 20.03%), said rounded down.
+  it('says each plan\'s rounded-down saving', () => {
+    const yearly: Record<string, number> = { starter_yearly: 192, pro_yearly: 480, max_yearly: 950 }
+    const b = o2.map(p => yearly[p.id] ? { ...p, priceUsd: yearly[p.id]! } : p)
+    expect(makePricingPage(b).intro).toContain('Yearly Shotviva plans save 19% compared with paying monthly (Max saves 20%).')
+    expect(makeZhPricingPage(b).intro).toContain('按年付省 19%（旗舰版省 20%）。')
   })
 
   it('states the member pack discounts of the listed packs, Starter at list price', () => {

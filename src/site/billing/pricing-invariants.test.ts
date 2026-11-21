@@ -7,18 +7,19 @@ import { MEMBERSHIP_TIERS, type MembershipProduct, type SiteProduct } from '@/co
 
 import { privateDoc } from '../../../tests/support/private-docs'
 
-// The 2026-11-21 terms (Owner: 「用只改积分的版本」, ARCHITECTURE §6.2), published as new
-// /admin/products revisions: every price stays; Pro / Max get 5,500 / 11,500 credits a month and
-// yearly 12 × that at 20% off on every plan (Max yearly $891 → $950.40, Owner: 「用 b」); M / L packs: members pay 100 / 95 / 90%. site.config keeps the revision-2 seed
-// the database was created with (tests/db/product-catalog.test.ts), so the terms are written here.
+// The 2026-11-21 terms (ARCHITECTURE §6.2), published as new /admin/products revisions. Monthly
+// prices stay ($19.90 / $49.90 / $99) with 2,000 / 5,500 / 11,500 credits; yearly is 12 × those
+// credits at whole-dollar prices, about 20% off ($192 / $480 / $950); M / L packs: members pay
+// 100 / 95 / 90%. site.config keeps the revision-2 seed the database was created with
+// (tests/db/product-catalog.test.ts), so the terms are written here.
 const PACK_PAY = { starter: 100, pro: 95, max: 90 }
 const TERMS: readonly SiteProduct[] = [
-  { id: 'starter_monthly', tier: 'starter', interval: 'month', credits: 1990, paidDays: 30, priceUsd: 19.9 },
-  { id: 'starter_yearly', tier: 'starter', interval: 'year', credits: 23880, paidDays: 365, priceUsd: 191.04 },
+  { id: 'starter_monthly', tier: 'starter', interval: 'month', credits: 2000, paidDays: 30, priceUsd: 19.9 },
+  { id: 'starter_yearly', tier: 'starter', interval: 'year', credits: 24000, paidDays: 365, priceUsd: 192 },
   { id: 'pro_monthly', tier: 'pro', interval: 'month', credits: 5500, paidDays: 30, priceUsd: 49.9 },
-  { id: 'pro_yearly', tier: 'pro', interval: 'year', credits: 66000, paidDays: 365, priceUsd: 479.04 },
+  { id: 'pro_yearly', tier: 'pro', interval: 'year', credits: 66000, paidDays: 365, priceUsd: 480 },
   { id: 'max_monthly', tier: 'max', interval: 'month', credits: 11500, paidDays: 30, priceUsd: 99 },
-  { id: 'max_yearly', tier: 'max', interval: 'year', credits: 138000, paidDays: 365, priceUsd: 950.4 },
+  { id: 'max_yearly', tier: 'max', interval: 'year', credits: 138000, paidDays: 365, priceUsd: 950 },
   { id: 'pack_s', tier: 'pack', interval: null, credits: 990, paidDays: null, priceUsd: 9.9 },
   { id: 'pack_m', tier: 'pack', interval: null, credits: 2490, paidDays: null, priceUsd: 24.9, packMemberPayPct: PACK_PAY },
   { id: 'pack_l', tier: 'pack', interval: null, credits: 4990, paidDays: null, priceUsd: 49.9, packMemberPayPct: PACK_PAY },
@@ -56,14 +57,16 @@ describe('pricing invariants (ARCHITECTURE §6.2, 2026-11-21 terms)', () => {
     expect(memberPackBelowPlan(site.billing.products)).toEqual(['pack_m:starter', 'pack_l:starter'])
   })
 
-  it('gives yearly twelve months of credits, saving the same share of price and of each credit', () => {
+  it('gives yearly twelve months of credits at whole dollars, saving about 20% on price and on each credit', () => {
     const saving = MEMBERSHIP_TIERS.map(tier => {
       const plan = monthly(TERMS, tier)
       const year = TERMS.find(p => p.tier === tier && p.interval === 'year')!
       expect(year.credits).toBe(plan.credits * 12)
+      expect(cents(year) % 100).toBe(0)
       return (1 - cents(year) / (cents(plan) * 12)) * 100
     })
-    expect(saving.map(s => Math.round(s * 1e6) / 1e6)).toEqual([20, 20, 20])
+    // 19.6% / 19.8% / 20.03%: the copy says 19% (Max 20%), rounded down.
+    expect(saving.map(s => Math.floor(s))).toEqual([19, 19, 20])
   })
 
   // Invariant 2 and the enterprise margin rule. The tiers and the cost budget are private
