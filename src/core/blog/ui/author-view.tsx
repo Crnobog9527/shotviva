@@ -29,7 +29,7 @@ export function AuthorView({ author, locale, posts, text }: { author: BlogAuthor
         </div>
       </header>
       <div className="mk-blog-text">
-        <p>{about.intro}</p>
+        <p>{about.bio}</p>
         <h2>{text.roles}</h2>
         <ul>{about.roles.map((line) => <li key={line}>{line}</li>)}</ul>
         <h2>{text.awards}</h2>
