@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import { blogListMetadata, cachedPublishedPosts } from '@/core/blog'
 import { BlogListView } from '@/core/blog/ui'
 import { currentLocale } from '@/core/i18n/server'
+import { BLOG_AUTHORS } from '@/site/content/blog-authors'
 import { site } from '@/site/site.config'
 
 // The blog list (ARCHITECTURE §12.6): published posts of this language from the cached read,
@@ -22,5 +23,5 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function BlogIndexRoute() {
   const { locale, posts, t } = await load()
-  return <BlogListView posts={posts} locale={locale} text={{ title: t('listTitle'), intro: t('listIntro'), empty: t('listEmpty'), by: t('by') }} />
+  return <BlogListView posts={posts} locale={locale} authors={BLOG_AUTHORS} text={{ title: t('listTitle'), intro: t('listIntro'), empty: t('listEmpty'), by: t('by') }} />
 }

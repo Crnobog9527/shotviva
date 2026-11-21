@@ -16,6 +16,7 @@ export {
   type PostSummary,
 } from './rules'
 export { cachedHasPublishedPosts, cachedPublishedPost, cachedPublishedPosts, cachedSitemapPosts, readPublishedPost, readPublishedPosts, readSitemapPosts } from './read'
-export { articleLd, blogListMetadata, postCrumbs, postMetadata } from './seo'
+export { articleLd, authorCrumbs, authorLd, authorMetadata, blogListMetadata, personLd, postCrumbs, postMetadata, profilePageLd } from './seo'
+export { AUTHOR_PATH, authorByName, authorBySlug, authorPath, type BlogAuthor, type BlogAuthorText } from './authors'
 export { blogSitemapXml } from './sitemap'
 export { parseMarkdown, plainText, type Block, type TocEntry } from './markdown'
