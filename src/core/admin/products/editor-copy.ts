@@ -13,7 +13,7 @@ export const E = {
   archived: '可在 Stripe 归档的旧 Price', confirmArchived: '读回归档状态', archiveWait: '旧会话安全期结束并且不再引用旧价后，此处会列出可归档的 Price。',
   request: '发布号', mode: '账户环境', test: '测试', live: '正式', type: '商品类型', rule: '会员积分包价',
   memberRule: '会员价按各版本自己的比例算，整数分四舍五入', memberPay: '会员实付（入门 / 专业 / 旗舰）', listRule: '使用商品标价',
-  waffo: 'Waffo 人工核对', waffoOff: 'Waffo 后台需要手动改。当前未启用该通道。',
+  waffo: 'Waffo 人工核对', waffoOff: '本环境未配置 Waffo，无法核对。',
   waffoOnce: '单笔商品 ID', waffoSub: '订阅商品 ID', waffoCheck: '登记已核对的 Waffo 映射',
   waffoPeriod: '已在 Waffo 后台核对新订阅商品的周期', waffoHelp: '在 Waffo 后台核对本商品、USD 售价、周期、发放积分。订阅改价须使用新远端订阅商品，以保留旧合同原价。',
   unit: '每积分实收（USD）', budget: '固定生成成本预算（USD/积分）', margin: '按预算预计毛利',
