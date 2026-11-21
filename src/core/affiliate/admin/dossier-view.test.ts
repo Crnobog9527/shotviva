@@ -16,7 +16,7 @@ const profile: DossierDetail = {
   created_at: '2026-05-03T12:00:00Z', approved_at: null, approved_by: null, parent_user_id: null,
   country: 'CN', payout_method: 'wise', payout_details: 'QA', us_person: false, terms_version: 'v2',
   terms_accepted_at: null, reject_reason: null, reapply_allowed: false, rates: [], admin_note: null, admin_label: null,
-  application: { channel_type: 'xiaohongshu', audience: '1k_10k' }, is_org: false,
+  application: { channel_type: 'xiaohongshu', audience: '1k_10k' }, is_org: false, org_l2_default_bp: null,
 }
 
 it('renders searchable identities and all four amounts, including a negative unwithdrawn balance', () => {

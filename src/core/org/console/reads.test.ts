@@ -10,7 +10,7 @@ const OTHER = '00000000-0000-4000-8000-0000000000c3'
 type Rows = Record<string, unknown>
 // A PostgREST stand-in: every filter is ignored, each table answers with the rows it was given
 // (fake data). `calls` records which tables and filters were asked for.
-function fakeDb(tables: Rows) {
+function fakeDb(tables: Rows, rpc: Record<string, unknown> = {}) {
   const calls: string[] = []
   const users: Record<string, { email?: string; phone?: string }> = {
     [OWNER]: { email: 'owner@acme.test' }, [STAFF]: { phone: '+8613800001111' }, [OTHER]: { email: 'ann@acme.test' },
@@ -29,7 +29,11 @@ function fakeDb(tables: Rows) {
     return chain
   }
   const auth = { admin: { getUserById: async (id: string) => ({ data: { user: users[id] ?? null } }) } }
-  return { db: { from, auth } as never, calls }
+  const rpcFn = async (fn: string, args: Record<string, unknown>) => {
+    calls.push(`rpc.${fn}(${JSON.stringify(args)})`)
+    return fn in rpc ? { data: rpc[fn], error: null } : { data: null, error: { message: 'boom' } }
+  }
+  return { db: { from, auth, rpc: rpcFn } as never, calls }
 }
 
 const org = { id: ORG, name: 'Acme Studio', owner_user_id: OWNER, status: 'active', pool_credits: 1200, invite_token: 'a'.repeat(32), affiliate_enabled: true, affiliate_levels: 1 }
@@ -48,8 +52,8 @@ describe('readOrgView', () => {
       ],
       orgs: org,
       org_packages: [{ id: ORG, name: 'Starter', price_usd_cents: 123400, credits: 98765 }],
-      profiles: [{ referred_member: STAFF, credits: 100 }, { referred_member: STAFF, credits: 100 }],
-    })
+      profiles: [{ credits: 100 }],
+    }, { org_customer_counts: [{ member_user_id: STAFF, l1_customers: 2, l2_customers: 0 }] })
     const view = await readOrgView(OWNER, { db, maskPhone: (phone) => phone.slice(0, 3) + '****' })
     expect(view.kind).toBe('owner')
     if (view.kind !== 'owner') return
@@ -64,25 +68,49 @@ describe('readOrgView', () => {
   it('never lets a deposit exceed the owner\'s own credits when the held share is larger', async () => {
     const { db } = fakeDb({
       org_members: [{ user_id: OWNER, role: 'owner', monthly_allowance: 0, held_credits: 900, joined_at: '2026-11-01T00:00:00Z', org_id: ORG }],
-      orgs: org, org_packages: [], profiles: [{ credits: 100, referred_member: OTHER }],
-    })
+      orgs: org, org_packages: [], profiles: [{ credits: 100 }],
+    }, { org_customer_counts: [] })
     const view = await readOrgView(OWNER, { db })
     expect(view.kind === 'owner' && view.depositable).toBe(0)
   })
 
-  it("gives a member only their own card: this month's allocations, what is left, their customers", async () => {
+})
+
+describe('readOrgView for a member', () => {
+  it("gives a member only their own card: this month's allocations, what is left, their customers and spend", async () => {
+    const statsRow = {
+      member_user_id: STAFF, member_role: 'member', member_status: 'active', allocated: 600, used: 40,
+      l1_signups: 2, l1_paying: 1, l1_paid_cents: 4900, l2_signups: 0, l2_paying: 0, l2_paid_cents: 0,
+    }
     const { db, calls } = fakeDb({
       org_members: { org_id: ORG, role: 'member', monthly_allowance: 500, held_credits: 80 },
       orgs: org,
       org_credit_ledger: [{ delta: -500 }, { delta: -100 }],
-      profiles: [{ referred_member: STAFF }],
+    }, { org_member_stats: [statsRow], org_customer_counts: [{ member_user_id: STAFF, l1_customers: 1, l2_customers: 0 }] })
+    const now = new Date('2026-11-21T10:00:00Z')
+    const view = await readOrgView(STAFF, { db, now })
+    expect(view).toEqual({
+      kind: 'member', orgName: 'Acme Studio', status: 'active', monthlyAllowance: 500, allocatedThisMonth: 600, heldCredits: 80, customers: 1,
+      withLevel2: false, period: '2026-11',
+      performance: { l1: { customers: 1, signups: 2, paying: 1, paidCents: 4900 }, l2: { customers: 0, signups: 0, paying: 0, paidCents: 0 } },
     })
-    const view = await readOrgView(STAFF, { db, now: new Date('2026-11-21T10:00:00Z') })
-    expect(view).toEqual({ kind: 'member', orgName: 'Acme Studio', status: 'active', monthlyAllowance: 500, allocatedThisMonth: 600, heldCredits: 80, customers: 1 })
-    expect(calls).toContain(`org_credit_ledger.gte(created_at,${monthStart(new Date('2026-11-21T10:00:00Z'))})`)
+    expect(calls).toContain(`org_credit_ledger.gte(created_at,${monthStart(now)})`)
+    // The staff variant is asked for the caller's own id: the function returns only their row.
+    expect(calls).toContain(`rpc.org_customer_counts(${JSON.stringify({ p_caller: STAFF, p_org_id: ORG })})`)
+    expect(calls).toContain(`rpc.org_member_stats(${JSON.stringify({ p_caller: STAFF, p_org_id: ORG, p_period: '2026-11' })})`)
     // A member's read never lists the org's members or its invite token.
     expect(JSON.stringify(view)).not.toContain('a'.repeat(32))
     expect(calls.some((c) => c.startsWith('org_packages'))).toBe(false)
+  })
+
+  it('still shows the card when the spend numbers cannot be read, and level 2 only when the org has it', async () => {
+    const { db } = fakeDb({
+      org_members: { org_id: ORG, role: 'member', monthly_allowance: 500, held_credits: 80 },
+      orgs: { ...org, affiliate_levels: 2 },
+      org_credit_ledger: [],
+    }, { org_customer_counts: [{ member_user_id: STAFF, l1_customers: 1, l2_customers: 0 }] })
+    const view = await readOrgView(STAFF, { db, now: new Date('2026-11-21T10:00:00Z') })
+    expect(view).toMatchObject({ kind: 'member', withLevel2: true, performance: null, customers: 1 })
   })
 })
 

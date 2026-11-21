@@ -22,7 +22,7 @@ const catAnime = caseImage('pet-anime', 'Real example: the same cat, pose and ro
 const catStyles: ShootDemo = {
   heading: { lead: 'One cat photo → ', emphasis: 'three art styles' },
   intro: 'Shot on a phone on the arm of the sofa. Three styles, and the same cat in every one: the tabby stripes, the white blaze, the green eyes, the pose.',
-  phone: { image: catPhone, file: 'IMG_0921.jpg', caption: 'As shot on a phone. Evening lamp light, a blanket and the remote in frame.' },
+  phone: { image: catPhone, file: 'IMG_0921.jpg', caption: 'Real phone photo. Evening lamp light, a blanket and the remote in frame.' },
   arrow: 'Three styles, same cat',
   results: [
     { image: catAnime, title: 'Anime', template: 'Bold lines, flat cel shading' },

@@ -56,7 +56,7 @@ const shoot: ShootDemo = {
   phone: {
     image: caseImage('menu-frog-phone', '真实手机照：不锈钢盆装的鲜椒牛蛙放在后厨台面上，日光灯，后面是单据和碗'),
     file: 'IMG_2706.jpg',
-    caption: '手机原图。日光灯、不锈钢盆，后面还挂着单据。',
+    caption: '真实手机照。日光灯、不锈钢盆，后面还挂着单据。',
   },
   arrow: '三种出图，同一道菜',
   results: [

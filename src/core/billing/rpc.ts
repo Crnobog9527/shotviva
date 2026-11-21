@@ -63,6 +63,8 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   NOT_ORG_OWNER: 'FORBIDDEN',
   ORG_SUSPENDED: 'FORBIDDEN',
   ORG_OWNER_CANNOT_LEAVE: 'FORBIDDEN',
+  // The monthly report (1670–1671): the caller is neither the org's owner nor one of its members.
+  NOT_ORG_MEMBER: 'FORBIDDEN',
   ORG_NOT_FOUND: 'NOT_FOUND',
   ORG_PACKAGE_NOT_FOUND: 'NOT_FOUND',
   ORG_MEMBER_NOT_FOUND: 'NOT_FOUND',

@@ -3,16 +3,17 @@ import { useTranslations } from 'next-intl'
 
 import { Link } from '@/core/i18n/ui'
 
-import type { OwnerConsole } from '../console/types'
+import type { OwnerConsole, OwnerReport } from '../console/types'
 import type { OwnerActions } from './actions'
-import { MembersPanel, PerformanceSlot } from './members-panel'
+import { MembersPanel } from './members-panel'
+import { PerformancePanel } from './performance-panel'
 import { InvitePanel, PackagesPanel, PaymentAccountsPanel, PoolPanel } from './owner-panels'
 
 // /account/enterprise, 「企业」 tab (ARCHITECTURE §6.5, card E4): pool, packages, invite link,
 // members. The server page reads `data` and passes the server actions; everything below is the
 // owner's own org, read from their session.
 
-export function OwnerConsoleView({ data, actions }: { data: OwnerConsole; actions: OwnerActions }) {
+export function OwnerConsoleView({ data, actions, report }: { data: OwnerConsole; actions: OwnerActions; report: OwnerReport | null }) {
   const t = useTranslations('app.org')
   return (
     <div className="space-y-4">
@@ -24,7 +25,7 @@ export function OwnerConsoleView({ data, actions }: { data: OwnerConsole; action
       <PaymentAccountsPanel groups={data.paymentAccounts} orgName={data.org.name} />
       <InvitePanel data={data} actions={actions} />
       <MembersPanel data={data} actions={actions} />
-      <PerformanceSlot />
+      <PerformancePanel report={report} />
     </div>
   )
 }

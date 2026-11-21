@@ -140,16 +140,19 @@ export async function loadOrgAffiliate(db: SupabaseClient, orgId: string): Promi
   const account = ok(await db.from('affiliates').select('user_id,slug,status').eq('org_id', orgId).maybeSingle(), 'affiliate account')
   if (!account) return null
   const row = accountSchema.parse(account)
-  const [defaults, overrides] = await Promise.all([
+  const [defaults, overrides, settings] = await Promise.all([
     db.from('affiliate_rates').select('product_kind,l1_bp,l2_bp').order('product_kind'),
     db.from('affiliate_rate_overrides').select('product_kind,l1_bp,l2_bp').eq('user_id', row.user_id),
+    db.from('affiliate_settings').select('org_l2_bp').single(),
   ])
+  // Level 2 of an org falls back to the org default, not the personal team bonus (migration 1681).
+  const orgL2 = z.object({ org_l2_bp: z.number() }).parse(ok(settings, 'affiliate settings')).org_l2_bp
   const over = new Map(z.array(overrideSchema).parse(ok(overrides, 'rate overrides')).map((o) => [o.product_kind, o]))
   return {
     userId: row.user_id, slug: row.slug, status: row.status,
     rates: z.array(rateSchema).parse(ok(defaults, 'rates')).map((d) => {
       const o = over.get(d.product_kind)
-      return { productKind: d.product_kind, l1Bp: o?.l1_bp ?? d.l1_bp, l2Bp: o?.l2_bp ?? d.l2_bp, overridden: Boolean(o && (o.l1_bp !== null || o.l2_bp !== null)) }
+      return { productKind: d.product_kind, l1Bp: o?.l1_bp ?? d.l1_bp, l2Bp: o?.l2_bp ?? orgL2, overridden: Boolean(o && (o.l1_bp !== null || o.l2_bp !== null)) }
     }),
   }
 }

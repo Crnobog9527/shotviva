@@ -114,9 +114,10 @@ function Facts({ offer, period }: { offer: TierOffer; period: Period }) {
       <PhotoEstimateLine offer={offer} period={period} />
       {!discount && period === "year" && offer.monthly && yearlySavingUsd(offer) > 0 ? (
         <p className="tier-plate mt-2 flex items-center justify-between gap-2 rounded-inner bg-[var(--tier-plate)] py-2 pr-2 pl-3 text-caption text-[var(--tier-plate-ink)]">
-          {/* The label may wrap and the amount may not: at 320px the Max plate is wider than its card. */}
+          {/* Both may wrap; the amount only at " · " (no-break spaces inside each half, en/zh messages):
+              unbroken, "$46.80 a year · about 20% off" made the yearly cards wider than a 375px screen. */}
           <span className="min-w-0">{t.rich("savingLabel", { vs: (chunks) => <span className="tier-saving-vs">{chunks}</span> })}</span>
-          <b className="font-mono font-semibold whitespace-nowrap">{t("savingAmount", { amount: money(yearlySavingUsd(offer)), pct: planSaving(offer).pct, about: String(planSaving(offer).about) })}</b>
+          <b className="font-mono font-semibold text-right">{t("savingAmount", { amount: money(yearlySavingUsd(offer)), pct: planSaving(offer).pct, about: String(planSaving(offer).about) })}</b>
         </p>
       ) : null}
     </>

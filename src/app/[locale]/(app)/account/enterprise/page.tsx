@@ -8,7 +8,7 @@ import { AppPage } from '@/core/app-shell'
 import { createAdminSupabase, requireUser } from '@/core/auth'
 import { maskPhone } from '@/core/auth/phone'
 import { Link } from '@/core/i18n/ui'
-import { readOrgView } from '@/core/org/console'
+import { readOrgView, readOwnerReport } from '@/core/org/console'
 import { OrgTabs, OwnerConsoleView, type OwnerActions } from '@/core/org/ui'
 
 import { allocateAction, depositAction, removeMemberAction, resetInviteAction, setAllowanceAction } from '../org-actions'
@@ -27,10 +27,12 @@ const actions: OwnerActions = {
 
 // /account/enterprise: the org owner's console (ARCHITECTURE §6.5, card E4). Only the account
 // that owns an org sees it; a member or anyone else gets the plain 404 (their card is on /account).
-async function Enterprise() {
+async function Enterprise({ searchParams }: { searchParams: Promise<{ month?: string | string[] }> }) {
   const user = await requireUser('/account/enterprise')
-  const [view, t, affiliateOn] = await Promise.all([readOrgView(user.id, { db: createAdminSupabase(), maskPhone }), getTranslations('app.org'), isAffiliateEnabled()])
+  const db = createAdminSupabase()
+  const [view, t, affiliateOn, { month }] = await Promise.all([readOrgView(user.id, { db, maskPhone }), getTranslations('app.org'), isAffiliateEnabled(), searchParams])
   if (view.kind !== 'owner') notFound()
+  const report = await readOwnerReport({ db, user: user.id, console: view, month: Array.isArray(month) ? month[0] : month, maskPhone })
   return (
     <>
       <header className="mx-(--gutter) mt-6 space-y-1">
@@ -39,17 +41,17 @@ async function Enterprise() {
       </header>
       <div className="mx-(--gutter) mt-4 space-y-4 md:max-w-[720px]">
         <OrgTabs current="console" affiliate={view.org.affiliateEnabled && affiliateOn} />
-        <OwnerConsoleView data={view} actions={actions} />
+        <OwnerConsoleView data={view} actions={actions} report={report} />
       </div>
     </>
   )
 }
 
-export default function EnterprisePage() {
+export default function EnterprisePage({ searchParams }: { searchParams: Promise<{ month?: string | string[] }> }) {
   return (
     <AppPage wide>
       <Suspense fallback={null}>
-        <Enterprise />
+        <Enterprise searchParams={searchParams} />
       </Suspense>
     </AppPage>
   )
