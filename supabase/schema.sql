@@ -4752,6 +4752,12 @@ begin
   select o.id into v_org
     from public.org_members m join public.orgs o on o.id = m.org_id
    where m.user_id = p_user_id and m.status = 'active' and o.status = 'active';
+  -- The org cap spans lanes, so two of one org's requests in different lanes must not both pass
+  -- it: a second lock per org, always taken after the lane lock (one lane lock, then at most one
+  -- org lock, in that order: no cycle, no deadlock).
+  if v_org is not null then
+    perform pg_advisory_xact_lock(hashtext('generation_org:' || v_org::text));
+  end if;
 
   select count(*) filter (where s.released_at is null and s.expires_at > now()),
          count(*) filter (where s.acquired_at > now() - interval '60 seconds'),
@@ -16307,22 +16313,27 @@ CREATE OR REPLACE FUNCTION "public"."sweep_stale_generation_jobs"("p_older_than"
 declare
   v_id uuid;
   refunded integer := 0;
+  since timestamptz;
 begin
   if p_older_than < interval '10 minutes' then raise exception 'INVALID_INPUT'; end if;
-  for v_id in
-    select j.id from public.generation_jobs j
-     where j.status = 'running' and j.created_at < now() - p_older_than
-     order by j.created_at
-     limit least(greatest(p_limit, 1), 200)
-  loop
-    begin
-      perform public.refund_job(v_id, 'STALE_TIMEOUT', null, null);
-      refunded := refunded + 1;
-    exception when others then
-      -- Settled meanwhile (JOB_ALREADY_SETTLED) or any other refusal: leave it for the next pass.
-      null;
-    end;
-  end loop;
+  select (s.value #>> '{}')::timestamptz into since from public.system_settings s where s.key = 'generation_sweep_since';
+  if since is not null then
+    for v_id in
+      select j.id from public.generation_jobs j
+       where j.status = 'running' and j.created_at < now() - p_older_than
+         and j.created_at >= greatest(since, now() - interval '24 hours')
+       order by j.created_at
+       limit least(greatest(p_limit, 1), 200)
+    loop
+      begin
+        perform public.refund_job(v_id, 'STALE_TIMEOUT', null, null);
+        refunded := refunded + 1;
+      exception when others then
+        -- Settled meanwhile (JOB_ALREADY_SETTLED) or any other refusal: leave it for the next pass.
+        null;
+      end;
+    end loop;
+  end if;
   delete from public.generation_slots s
    where s.acquired_at < now() - interval '10 minutes' and (s.released_at is not null or s.expires_at < now());
   return refunded;
