@@ -4516,7 +4516,8 @@ CREATE OR REPLACE FUNCTION "public"."_payment_fee_reconcile_view"("p" "public"."
       select jsonb_agg(jsonb_build_object('refund_ref', r.refund_ref, 'amount', r.amount, 'created_at', r.created_at)
                        order by r.created_at, r.refund_ref)
         from public.payment_refunds r where r.payment_id = p.id), '[]'::jsonb),
-    'alerted', coalesce((select to_jsonb(s.alerted) from public.payment_fee_reconcile_state s where s.payment_id = p.id), '[]'::jsonb));
+    'alerted', coalesce((select to_jsonb(s.alerted) from public.payment_fee_reconcile_state s where s.payment_id = p.id), '[]'::jsonb),
+    'attempts', coalesce((select s.attempts from public.payment_fee_reconcile_state s where s.payment_id = p.id), 0));
 $$;
 
 
@@ -14440,7 +14441,7 @@ begin
         'currency', p.currency, 'recordable', v_from is not null and p.created_at >= v_from) order by p.created_at, p.id)
       from public.payments p
      where p.channel = 'stripe'
-       and p.created_at >= p_day::timestamp at time zone 'UTC' and p.created_at < (p_day + 1)::timestamp at time zone 'UTC'
+       and p.created_at >= p_day::timestamp at time zone 'UTC' and p.created_at < (p_day + 2)::timestamp at time zone 'UTC'
        and p.created_at <= p_before
        and not exists(select from public.payment_fee_stripe_batch_items i where i.payment_id = p.id and i.kind = p_kind)
        and case when exists(select from public.payment_fee_lines l where l.payment_id = p.id and l.refund_id is null)
