@@ -16,9 +16,11 @@ const data = { orderId: 'ORD_1', orderMerchantExternalId: 'v2_ref', paymentStatu
 
 function deps(outcomes: ('applied' | 'replayed')[]) {
   const settled = { applied: true, paid_until: null, free_credits: 0, credits: 1 }
-  const rpc = vi.fn()
-  for (const outcome of outcomes) rpc.mockResolvedValueOnce({ data: { ...settled, applied: outcome === 'applied' }, error: null })
-  return { products: [{ ...testProduct('pack_l'), credits: 4990 }], db: { rpc }, applyCodes: vi.fn(), trackBuy: vi.fn() }
+  const grant = vi.fn()
+  for (const outcome of outcomes) grant.mockResolvedValueOnce({ data: { ...settled, applied: outcome === 'applied' }, error: null })
+  // F3's fee step asks payment_fee_target first; no payments row here, so it writes nothing.
+  const rpc = vi.fn((fn: string, args: unknown) => fn === 'payment_fee_target' ? Promise.resolve({ data: null, error: null }) : grant(fn, args))
+  return { products: [{ ...testProduct('pack_l'), credits: 4990 }], db: { rpc }, grant, applyCodes: vi.fn(), trackBuy: vi.fn() }
 }
 
 it('alerts the Owner once for a purchase, however often Waffo redelivers it', async () => {
@@ -31,14 +33,14 @@ it('alerts the Owner once for a purchase, however often Waffo redelivers it', as
 it('alerts after the grant is written, and not at all when the order is unpaid or the grant fails', async () => {
   const order: string[] = []
   const d = deps([])
-  d.db.rpc.mockImplementationOnce(async () => { order.push('grant'); return { data: { applied: true, paid_until: null, free_credits: 0, credits: 1 }, error: null } })
+  d.grant.mockImplementationOnce(async () => { order.push('grant'); return { data: { applied: true, paid_until: null, free_credits: 0, credits: 1 }, error: null } })
   vi.mocked(notifyOwner).mockImplementationOnce(() => { order.push('alert') })
   await fulfilWaffoOrder(d, { eventId: 'PAY_2', data })
   expect(order).toEqual(['grant', 'alert'])
 
   await fulfilWaffoOrder(deps([]), { eventId: 'PAY_3', data: { ...data, paymentStatus: 'pending' } })
   const failing = deps([])
-  failing.db.rpc.mockRejectedValue(new Error('db down'))
+  failing.grant.mockRejectedValue(new Error('db down'))
   await expect(fulfilWaffoOrder(failing, { eventId: 'PAY_4', data })).rejects.toThrow()
   expect(notifyOwner).toHaveBeenCalledTimes(1)
 })
