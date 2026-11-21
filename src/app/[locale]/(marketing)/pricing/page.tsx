@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 import { photoPrices } from '@/core/billing'
 import { CheckoutCancelToast, PaywallProvider, PricingPayWith, PricingPlans } from '@/core/billing/paywall'
-import { wechatPayEnabled } from '@/core/billing/stripe'
+import { walletOffersWechat } from '@/core/billing/wallet'
 import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
 import { CreditBuys, FaqSection, PricingHero } from '@/core/content'
@@ -43,7 +43,7 @@ export default async function PricingPage() {
   const credits = creditFacts(catalogue)
   const page = fillCredits(pricingPageIn(locale, products), credits)
   const channel = paymentChannel()
-  const wechatPay = wechatPayEnabled()
+  const wechatPay = walletOffersWechat()
   const faq = fillCredits(pricingFaqIn(locale, channel, wechatPay, page), credits)
   const path = localizePath(page.path, locale)
   const crumbs = [

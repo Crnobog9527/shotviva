@@ -90,8 +90,15 @@ describe('/pricing "Pay with"', () => {
     const html = render('stripe', true)
     expect(html).toContain('Alipay / WeChat\u00a0Pay')
     expect(html).toContain('One-time payment for 30 days or 1 year, no auto-renew')
-    // Waffo has no WeChat Pay, switch or not.
-    expect(render('waffo', true)).not.toMatch(/wechat/i)
+    expect(html).not.toContain('¥1,000')
+  })
+
+  // Owner 2026-11-21: with WAFFO_WECHAT_PAY on, Waffo names WeChat Pay and states its CN¥1,000 cap.
+  it('Waffo with WeChat Pay on: "Alipay / WeChat Pay" and the ¥1,000 cap; off, no WeChat at all', () => {
+    const html = render('waffo', true)
+    expect(html).toContain('Alipay / WeChat\u00a0Pay')
+    expect(html).toContain('WeChat\u00a0Pay takes up to ¥1,000 per payment and per month. Above that, use Alipay (no limit) or a card.')
+    expect(render('waffo', false)).not.toMatch(/wechat/i)
   })
 
   it('Waffo: the same terms (card plans renew since T50), the card group labelled "Card"', () => {

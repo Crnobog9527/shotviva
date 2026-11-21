@@ -31,6 +31,8 @@ export type WaffoSessionRequest = {
   language: 'en' | 'zh-Hans'
   // A card subscription offers cards only (T50); one-time sessions offer what the currency has.
   includePaymentMethods?: readonly string[]
+  // A blacklist (mutually exclusive with the whitelist); methods the currency lacks are ignored.
+  excludePaymentMethods?: readonly string[]
   withTrial?: false
   allowPromotionCodes?: false
 }

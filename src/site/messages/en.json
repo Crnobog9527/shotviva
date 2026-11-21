@@ -2063,6 +2063,8 @@
     "card": "Card · Apple Pay · Google Pay",
     "alipay": "Alipay",
     "wallet": "Alipay / WeChat Pay",
+    "wechatCap": "WeChat\u00a0Pay takes up to ¥1,000 per payment and per month. Above that, use Alipay (no limit) or a card.",
+    "wechatCapOver": "This purchase is over WeChat\u00a0Pay's ¥1,000 limit. Pay with Alipay or a card.",
     "cnCard": "China-issued card",
     "cardOnly": "Card",
     "cardRenews": "Renews automatically, cancel anytime",
