@@ -10,8 +10,8 @@ import { callRpc, type RpcClient } from '../billing/rpc'
 // repeat does nothing, another request under the same id is CONFLICT.
 
 const uuid = z.uuid()
-// `org_topup:` ids belong to the monthly top-up; the SQL refuses them too.
-const requestId = z.string().trim().min(1).max(200).refine((id) => !id.startsWith('org_topup:'))
+// `org_topup:` / `org_return:` ids are reserved (monthly top-up, refunds after leaving); the SQL refuses them too.
+const requestId = z.string().trim().min(1).max(200).refine((id) => !/^org_(topup|return):/.test(id))
 const amount = z.number().int().positive().max(1_000_000_000)
 const moved = z.object({ applied: z.boolean(), pool_credits: z.number().int(), held_credits: z.number().int().optional() })
 

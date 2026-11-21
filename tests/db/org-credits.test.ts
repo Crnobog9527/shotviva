@@ -229,13 +229,13 @@ describe('monthly top-up isolation', () => {
     const userId = await member(db, service, token)
     const id = `org_topup:2097-03:${orgId}:${userId}`
     const calls = [
-      callRpc(service, 'org_allocate', { p_owner: owner, p_member: userId, p_amount: 10, p_request_id: id }, z.unknown()),
-      callRpc(service, 'org_deposit', { p_owner: owner, p_amount: 10, p_request_id: id }, z.unknown()),
-      callRpc(service, 'org_leave', { p_user: userId, p_request_id: id }, z.unknown()),
-      callRpc(service, 'org_remove_member', { p_owner: owner, p_member: userId, p_request_id: id }, z.unknown()),
-      callRpc(service, 'admin_org_grant', { p_actor: actor, p_input: { org_id: orgId, request_id: id, credits: 10 } }, z.unknown()),
+      () => callRpc(service, 'org_allocate', { p_owner: owner, p_member: userId, p_amount: 10, p_request_id: id }, z.unknown()),
+      () => callRpc(service, 'org_deposit', { p_owner: owner, p_amount: 10, p_request_id: id }, z.unknown()),
+      () => callRpc(service, 'org_leave', { p_user: userId, p_request_id: id }, z.unknown()),
+      () => callRpc(service, 'org_remove_member', { p_owner: owner, p_member: userId, p_request_id: id }, z.unknown()),
+      () => callRpc(service, 'admin_org_grant', { p_actor: actor, p_input: { org_id: orgId, request_id: id, credits: 10 } }, z.unknown()),
     ]
-    for (const call of calls) await expect(call).rejects.toMatchObject({ message: 'INVALID_INPUT' })
+    for (const call of calls) await expect(call()).rejects.toMatchObject({ message: 'INVALID_INPUT' })
     expect(await poolOf(db, orgId)).toBe(100)
   })
 
@@ -345,5 +345,79 @@ describe('refunds give the org share back', () => {
     expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 45 })
     await db.query("select public._apply_credit_change($1, 'paid', 'refund', 5, 'poster photo refund', $2)", [userId, `poster_photo:${id}:refund`])
     expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 50 })
+  })
+})
+
+// Third review of #777: a refund that arrives after the member left belongs to the org.
+describe('refunds after leaving', () => {
+  let template: string
+  let cost: number
+  beforeAll(async () => {
+    template = await seedTemplate(db)
+    cost = (await db.query(`select (credits_cost->>'1k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
+  })
+  const reserve = async (userId: string) => {
+    const jobId = randomUUID()
+    await reserveJob(serviceSupabase(), { jobId, userId, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
+      inputs: { resolution: '1k', attempt_id: randomUUID() } })
+    return jobId
+  }
+  const fail = (jobId: string) => db.query("select public.refund_job($1, 'TEST_FAILED')", [jobId])
+
+  it.each(['leave', 'removed'] as const)('allocate, reserve, %s, then the refund goes to the org pool', async (how) => {
+    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: cost })
+    const userId = await member(db, service, token)
+    await allocateOrgCredits(service, owner, userId, cost, randomUUID())
+    const jobId = await reserve(userId)
+    const back = how === 'leave' ? await leaveOrg(service, userId, randomUUID()) : await removeOrgMember(service, owner, userId, randomUUID())
+    expect(back).toBe(0)
+    await fail(jobId)
+    await fail(jobId)
+    expect(await creditsOf(db, userId)).toBe(0)
+    // Queued until the org row is next locked; any owner action settles it.
+    await setOrgAllowance(service, owner, owner, 0)
+    expect(await poolOf(db, orgId)).toBe(cost)
+    expect((await orgLedger(db, orgId)).filter((row) => row.request_id.startsWith('org_return:'))).toEqual([
+      expect.objectContaining({ kind: 'reclaim', delta: cost, pool_after: cost }),
+    ])
+  })
+
+  it('keeps the member’s own part of a refund when their own credits paid first', async () => {
+    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: cost })
+    const userId = await member(db, service, token, { credits: 5 })
+    await allocateOrgCredits(service, owner, userId, cost, randomUUID())
+    const jobId = await reserve(userId)
+    await leaveOrg(service, userId, randomUUID())
+    await fail(jobId)
+    await runMonthlyTopup(service, '2097-07')
+    expect(await creditsOf(db, userId)).toBe(5)
+    expect(await poolOf(db, orgId)).toBe(cost)
+  })
+
+  it('refuses the org_return: prefix from callers', async () => {
+    const { orgId, owner } = await orgWith(db, service, actor, { pool: 10 })
+    await expect(callRpc(service, 'org_deposit', { p_owner: owner, p_amount: 1, p_request_id: 'org_return:x' }, z.unknown()))
+      .rejects.toMatchObject({ message: 'INVALID_INPUT' })
+    await expect(callRpc(service, 'admin_org_grant', { p_actor: actor, p_input: { org_id: orgId, request_id: 'org_return:x', credits: 1 } }, z.unknown()))
+      .rejects.toMatchObject({ message: 'INVALID_INPUT' })
+  })
+})
+
+describe('admin clawback', () => {
+  it('previews and takes only the member’s own credits', async () => {
+    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: 100 })
+    const userId = await member(db, service, token)
+    await allocateOrgCredits(service, owner, userId, 100, randomUUID())
+    const session = `cs_${randomUUID()}`
+    await db.query("select * from public.settle_checkout($1,'pack_s',$2,990,'usd',0,'card')", [userId, session])
+    const paymentId = (await db.query('select id from public.payments where stripe_session_id = $1', [session])).rows[0].id
+    const granted = (await creditsOf(db, userId)) - 100
+    await adminAdjustCredits(service, { userId, amount: -(granted - 10), reason: 'spent', pool: 'paid' })
+    const preview = (await db.query('select public.payment_clawback_preview($1) as p', [paymentId])).rows[0].p
+    expect(preview).toMatchObject({ balance: 110, org_held: 100, available: 10 })
+    const taken = (await db.query('select public.admin_clawback_payment($1, $2) as r', [paymentId, actor])).rows[0].r
+    expect(taken).toMatchObject({ taken: 10 })
+    expect(await creditsOf(db, userId)).toBe(100)
+    expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 100 })
   })
 })

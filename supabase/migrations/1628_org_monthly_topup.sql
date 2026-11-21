@@ -30,6 +30,7 @@ begin
   begin
     select * into o from public.orgs where id = o.id and status = 'active' for update;
     continue when not found;
+    if public._org_settle_returns(o.id) > 0 then select * into o from public.orgs where id = o.id; end if;
     org_short := false;
     n_members := 0;
     org_granted := 0;

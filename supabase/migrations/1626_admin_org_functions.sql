@@ -146,8 +146,8 @@ declare
   prior public.org_credit_ledger;
 begin
   perform public._org_require_admin(p_actor);
-  -- `org_topup:` ids belong to org_monthly_topup.
-  if v_kind not in ('bank_grant','admin_adjust') or v_org is null or v_request is null or starts_with(v_request, 'org_topup:') then
+  -- `org_topup:` / `org_return:` ids are reserved (the monthly top-up, refunds after leaving).
+  if v_kind not in ('bank_grant','admin_adjust') or v_org is null or v_request is null or starts_with(v_request, 'org_topup:') or starts_with(v_request, 'org_return:') then
     raise exception 'INVALID_INPUT';
   end if;
   if p_input ? 'package_id' and jsonb_typeof(p_input->'package_id') <> 'null' then
@@ -162,6 +162,7 @@ begin
   end if;
   select * into o from public.orgs where id = v_org for update;
   if not found then raise exception 'ORG_NOT_FOUND'; end if;
+  if public._org_settle_returns(o.id) > 0 then select * into o from public.orgs where id = v_org; end if;
   select * into prior from public.org_credit_ledger where request_id = v_request;
   if found then
     if prior.org_id <> v_org or prior.kind <> v_kind or prior.delta <> v_credits

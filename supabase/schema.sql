@@ -4066,9 +4066,16 @@ begin
     select * into d from public.org_held_draws
      where debit_key = regexp_replace(new.idempotency_key, ':[^:]+$', ':reserve') and user_id = new.user_id for update;
     if not found or d.restored >= d.drawn then return new; end if;
-    select * into m from public.org_members where org_id = d.org_id and user_id = d.user_id and status = 'active' for update;
-    if not found then return new; end if;
     back := least(new.delta, d.drawn - d.restored);
+    select * into m from public.org_members where org_id = d.org_id and user_id = d.user_id and status = 'active' for update;
+    if not found then
+      -- Left before the refund: the org's part goes back to the org, not to the member.
+      update public.org_held_draws set restored = restored + back where debit_key = d.debit_key;
+      perform public._apply_credit_change(new.user_id, 'paid', 'org_reclaim', -back, 'org:' || d.org_id::text,
+        'org_return:' || new.idempotency_key);
+      insert into public.org_pool_returns(refund_key, org_id, user_id, credits) values (new.idempotency_key, d.org_id, d.user_id, back);
+      return new;
+    end if;
     update public.org_members set held_credits = least(held_credits + back, new.balance_after)
      where org_id = m.org_id and user_id = m.user_id;
     update public.org_held_draws set restored = restored + back where debit_key = d.debit_key;
@@ -4089,6 +4096,7 @@ declare o public.orgs;
 begin
   select * into o from public.orgs where owner_user_id = p_owner for update;
   if not found then raise exception 'NOT_ORG_OWNER'; end if;
+  if public._org_settle_returns(o.id) > 0 then select * into o from public.orgs where id = o.id; end if;
   if o.status <> 'active' and not p_allow_suspended then raise exception 'ORG_SUSPENDED'; end if;
   return o;
 end;
@@ -4135,7 +4143,7 @@ CREATE OR REPLACE FUNCTION "public"."_org_replayed"("p_request" "text", "p_org" 
     AS $$
 declare prior public.org_credit_ledger;
 begin
-  if p_request is null or length(p_request) not between 1 and 200 or starts_with(p_request, 'org_topup:') then
+  if p_request is null or length(p_request) not between 1 and 200 or starts_with(p_request, 'org_topup:') or starts_with(p_request, 'org_return:') then
     raise exception 'INVALID_INPUT';
   end if;
   select * into prior from public.org_credit_ledger where request_id = p_request;
@@ -4164,6 +4172,30 @@ $$;
 
 
 ALTER FUNCTION "public"."_org_require_admin"("p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_settle_returns"("p_org" "uuid") RETURNS bigint
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  r record;
+  pool bigint;
+  total bigint := 0;
+begin
+  for r in update public.org_pool_returns set settled_at = now() where org_id = p_org and settled_at is null
+      returning refund_key, user_id, credits loop
+    update public.orgs set pool_credits = pool_credits + r.credits, updated_at = now() where id = p_org returning pool_credits into pool;
+    insert into public.org_credit_ledger(org_id, kind, delta, pool_after, member_user_id, request_id, note)
+      values (p_org, 'reclaim', r.credits, pool, r.user_id, 'org_return:' || r.refund_key, 'refunded after the member left');
+    total := total + r.credits;
+  end loop;
+  return total;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_org_settle_returns"("p_org" "uuid") OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."payment_disputes" (
@@ -6249,6 +6281,9 @@ begin
 
   v_granted := public._payment_granted_credits(v_payment);
   select credits into v_balance from public.profiles where id = v_payment.user_id for update;
+  -- Only the member's own credits: the org-held share is the org's (1629 keeps it at most credits).
+  v_balance := coalesce(v_balance, 0) - coalesce((select m.held_credits from public.org_members m
+      where m.user_id = v_payment.user_id and m.status = 'active'), 0);
   v_take := greatest(0, least(coalesce(v_balance, 0), v_granted - v_payment.credits_clawed_back - v_payment.clawback_shortfall));
 
   if v_take > 0 then
@@ -8158,8 +8193,8 @@ declare
   prior public.org_credit_ledger;
 begin
   perform public._org_require_admin(p_actor);
-  -- `org_topup:` ids belong to org_monthly_topup.
-  if v_kind not in ('bank_grant','admin_adjust') or v_org is null or v_request is null or starts_with(v_request, 'org_topup:') then
+  -- `org_topup:` / `org_return:` ids are reserved (the monthly top-up, refunds after leaving).
+  if v_kind not in ('bank_grant','admin_adjust') or v_org is null or v_request is null or starts_with(v_request, 'org_topup:') or starts_with(v_request, 'org_return:') then
     raise exception 'INVALID_INPUT';
   end if;
   if p_input ? 'package_id' and jsonb_typeof(p_input->'package_id') <> 'null' then
@@ -8174,6 +8209,7 @@ begin
   end if;
   select * into o from public.orgs where id = v_org for update;
   if not found then raise exception 'ORG_NOT_FOUND'; end if;
+  if public._org_settle_returns(o.id) > 0 then select * into o from public.orgs where id = v_org; end if;
   select * into prior from public.org_credit_ledger where request_id = v_request;
   if found then
     if prior.org_id <> v_org or prior.kind <> v_kind or prior.delta <> v_credits
@@ -13238,6 +13274,7 @@ begin
   select m.org_id into v_org from public.org_members m where m.user_id = p_user and m.status = 'active';
   if v_org is null then return 0; end if;
   select * into o from public.orgs where id = v_org for update;
+  perform public._org_settle_returns(o.id);
   if not exists(select from public.org_members m where m.org_id = o.id and m.user_id = p_user and m.status = 'active') then
     return 0;
   end if;
@@ -13273,6 +13310,7 @@ begin
   begin
     select * into o from public.orgs where id = o.id and status = 'active' for update;
     continue when not found;
+    if public._org_settle_returns(o.id) > 0 then select * into o from public.orgs where id = o.id; end if;
     org_short := false;
     n_members := 0;
     org_granted := 0;
@@ -13369,6 +13407,7 @@ declare
   v_payment public.payments;
   v_granted integer;
   v_balance integer;
+  v_held integer;
 begin
   select * into v_payment from public.payments where id = p_payment_id;
   if not found then
@@ -13376,6 +13415,8 @@ begin
   end if;
   v_granted := public._payment_granted_credits(v_payment);
   select credits into v_balance from public.profiles where id = v_payment.user_id;
+  v_held := coalesce((select m.held_credits from public.org_members m
+      where m.user_id = v_payment.user_id and m.status = 'active'), 0);
   return jsonb_build_object(
     'payment_id', v_payment.id,
     'user_id', v_payment.user_id,
@@ -13384,7 +13425,8 @@ begin
     'credits_clawed_back', v_payment.credits_clawed_back,
     'clawback_shortfall', v_payment.clawback_shortfall,
     'balance', coalesce(v_balance, 0),
-    'available', greatest(0, least(coalesce(v_balance, 0), v_granted - v_payment.credits_clawed_back - v_payment.clawback_shortfall))
+    'org_held', v_held,
+    'available', greatest(0, least(coalesce(v_balance, 0) - v_held, v_granted - v_payment.credits_clawed_back - v_payment.clawback_shortfall))
   );
 end;
 $$;
@@ -17531,6 +17573,20 @@ CREATE TABLE IF NOT EXISTS "public"."org_packages" (
 ALTER TABLE "public"."org_packages" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."org_pool_returns" (
+    "refund_key" "text" NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "user_id" "uuid",
+    "credits" integer NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "settled_at" timestamp with time zone,
+    CONSTRAINT "org_pool_returns_credits_check" CHECK (("credits" > 0))
+);
+
+
+ALTER TABLE "public"."org_pool_returns" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."partner_links" (
     "user_id" "uuid" NOT NULL,
     "partner" "text" NOT NULL,
@@ -18523,6 +18579,11 @@ ALTER TABLE ONLY "public"."org_packages"
 
 
 
+ALTER TABLE ONLY "public"."org_pool_returns"
+    ADD CONSTRAINT "org_pool_returns_pkey" PRIMARY KEY ("refund_key");
+
+
+
 ALTER TABLE ONLY "public"."orgs"
     ADD CONSTRAINT "orgs_invite_token_key" UNIQUE ("invite_token");
 
@@ -19251,6 +19312,10 @@ CREATE UNIQUE INDEX "org_members_one_active_idx" ON "public"."org_members" USING
 
 
 CREATE INDEX "org_members_org_active_idx" ON "public"."org_members" USING "btree" ("org_id", "joined_at", "user_id") WHERE ("status" = 'active'::"text");
+
+
+
+CREATE INDEX "org_pool_returns_open_idx" ON "public"."org_pool_returns" USING "btree" ("org_id") WHERE ("settled_at" IS NULL);
 
 
 
@@ -20302,6 +20367,16 @@ ALTER TABLE ONLY "public"."org_packages"
 
 
 
+ALTER TABLE ONLY "public"."org_pool_returns"
+    ADD CONSTRAINT "org_pool_returns_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
+
+
+
+ALTER TABLE ONLY "public"."org_pool_returns"
+    ADD CONSTRAINT "org_pool_returns_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
 ALTER TABLE ONLY "public"."orgs"
     ADD CONSTRAINT "orgs_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
 
@@ -20865,6 +20940,9 @@ ALTER TABLE "public"."org_members" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_packages" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."org_pool_returns" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."orgs" ENABLE ROW LEVEL SECURITY;
@@ -21847,6 +21925,10 @@ REVOKE ALL ON FUNCTION "public"."_org_replayed"("p_request" "text", "p_org" "uui
 
 
 REVOKE ALL ON FUNCTION "public"."_org_require_admin"("p_actor" "uuid") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_settle_returns"("p_org" "uuid") FROM PUBLIC;
 
 
 
@@ -23843,6 +23925,10 @@ GRANT SELECT ON TABLE "public"."org_members" TO "service_role";
 
 
 GRANT SELECT ON TABLE "public"."org_packages" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."org_pool_returns" TO "service_role";
 
 
 
