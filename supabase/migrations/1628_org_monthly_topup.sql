@@ -28,7 +28,7 @@ begin
   if p_period is null or p_period !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' then raise exception 'INVALID_INPUT'; end if;
   for o in select * from public.orgs where status = 'active' order by created_at, id loop
   begin
-    select * into o from public.orgs where id = o.id and status = 'active' for update;
+    select * into o from public.orgs where id = o.id and status = 'active' for no key update;
     continue when not found;
     if public._org_settle_returns(o.id) > 0 then select * into o from public.orgs where id = o.id; end if;
     org_short := false;

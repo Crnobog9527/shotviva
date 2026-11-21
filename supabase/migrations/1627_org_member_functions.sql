@@ -3,7 +3,10 @@
 -- call them. Lock order everywhere: the org row, then the profile row, then the member row. A
 -- debit of the paid pool (reserve_credits, a clawback, an admin adjustment) locks the profile and
 -- then, through the 1629 trigger, the member row: the same order, so the two never wait on each
--- other in a cycle. Every pool movement carries a request_id: a repeat does nothing, a different
+-- other in a cycle. The org row is always locked FOR NO KEY UPDATE (no org function changes
+-- orgs.id): the trigger's inserts into org_held_draws / org_pool_returns take FOR KEY SHARE on
+-- the org row through their foreign key while holding the profile, and KEY SHARE does not wait
+-- on NO KEY UPDATE, so that is not a profile → org wait. Every pool movement carries a request_id: a repeat does nothing, a different
 -- request under the same id is IDEMPOTENCY_CONFLICT. Ids starting with `org_topup:` (the monthly
 -- top-up) or `org_return:` (refunds after leaving, 1629) are reserved and refused here. Every
 -- function that locks the org row first settles its queued returns (_org_settle_returns, 1629).
@@ -14,7 +17,7 @@ create or replace function public._org_lock_owned(p_owner uuid, p_allow_suspende
 language plpgsql security definer set search_path = '' as $$
 declare o public.orgs;
 begin
-  select * into o from public.orgs where owner_user_id = p_owner for update;
+  select * into o from public.orgs where owner_user_id = p_owner for no key update;
   if not found then raise exception 'NOT_ORG_OWNER'; end if;
   if public._org_settle_returns(o.id) > 0 then select * into o from public.orgs where id = o.id; end if;
   if o.status <> 'active' and not p_allow_suspended then raise exception 'ORG_SUSPENDED'; end if;
@@ -106,7 +109,7 @@ declare
   current_org uuid;
 begin
   if p_user is null or p_token is null or p_token !~ '^[0-9a-f]{32}$' then raise exception 'ORG_INVITE_INVALID'; end if;
-  select * into o from public.orgs where invite_token = p_token for update;
+  select * into o from public.orgs where invite_token = p_token for no key update;
   if not found then raise exception 'ORG_INVITE_INVALID'; end if;
   if o.status <> 'active' then raise exception 'ORG_SUSPENDED'; end if;
   perform 1 from public.profiles where id = p_user and banned_at is null;
@@ -133,7 +136,7 @@ declare
 begin
   select m.org_id into v_org from public.org_members m where m.user_id = p_user and m.status = 'active';
   if v_org is null then return 0; end if;
-  select * into o from public.orgs where id = v_org for update;
+  select * into o from public.orgs where id = v_org for no key update;
   perform public._org_settle_returns(o.id);
   if not exists(select from public.org_members m where m.org_id = o.id and m.user_id = p_user and m.status = 'active') then
     return 0;

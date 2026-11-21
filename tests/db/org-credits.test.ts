@@ -421,3 +421,39 @@ describe('admin clawback', () => {
     expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 100 })
   })
 })
+
+// Fourth review of #777: a member's debit holds the profile and its trigger then references the
+// org row (FOR KEY SHARE via org_held_draws' foreign key), while an org function holds the org row
+// and waits for that profile. With the org row locked FOR NO KEY UPDATE the two do not deadlock.
+describe('allocation racing a debit', () => {
+  it('completes both, in either order of arrival', async () => {
+    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: 200 })
+    const userId = await member(db, service, token)
+    await allocateOrgCredits(service, owner, userId, 100, randomUUID())
+    const debit = await connectAdmin()
+    const allocate = await connectAdmin()
+    try {
+      await debit.query('begin')
+      await debit.query("set local lock_timeout = '10s'")
+      await debit.query('select 1 from public.profiles where id = $1 for update', [userId])
+      const pid = (await allocate.query('select pg_backend_pid() as pid')).rows[0].pid
+      const allocated = allocate.query("select public.org_allocate($1, $2, 50, $3) as r", [owner, userId, randomUUID()])
+      // Wait until the allocation holds the org row and is blocked on the profile.
+      for (let i = 0; i < 100; i++) {
+        const { rows } = await db.query('select wait_event_type from pg_stat_activity where pid = $1', [pid])
+        if (rows[0]?.wait_event_type === 'Lock') break
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+      // A reserve below held_credits writes a draw row: KEY SHARE on the org row the allocation holds.
+      await debit.query("select public._apply_credit_change($1, 'paid', 'reserve', -60, 'race', $2)", [userId, `job:${randomUUID()}:reserve`])
+      await debit.query('commit')
+      expect((await allocated).rows[0].r).toMatchObject({ applied: true, pool_credits: 50 })
+    } finally {
+      await debit.end()
+      await allocate.end()
+    }
+    expect(await creditsOf(db, userId)).toBe(90)
+    expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 90 })
+    expect(await poolOf(db, orgId)).toBe(50)
+  })
+})

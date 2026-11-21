@@ -92,7 +92,9 @@ declare
 begin
   perform public._org_require_admin(p_actor);
   perform public._org_check_limits(p_input);
-  select * into o from public.orgs where id = p_org_id for update;
+  -- NO KEY UPDATE like every org function (1627). Rotating invite_token (a unique key) makes the
+  -- update itself take FOR UPDATE; this function locks nothing after it, so it only waits.
+  select * into o from public.orgs where id = p_org_id for no key update;
   if not found then raise exception 'ORG_NOT_FOUND'; end if;
   if p_input ? 'expected_updated_at' and (p_input->>'expected_updated_at')::timestamptz is distinct from o.updated_at then
     raise exception 'ORG_CHANGED';
@@ -160,7 +162,7 @@ begin
   elsif v_credits is null or v_credits = 0 or v_note is null or v_cny is not null then
     raise exception 'INVALID_INPUT';
   end if;
-  select * into o from public.orgs where id = v_org for update;
+  select * into o from public.orgs where id = v_org for no key update;
   if not found then raise exception 'ORG_NOT_FOUND'; end if;
   if public._org_settle_returns(o.id) > 0 then select * into o from public.orgs where id = v_org; end if;
   select * into prior from public.org_credit_ledger where request_id = v_request;

@@ -4094,7 +4094,7 @@ CREATE OR REPLACE FUNCTION "public"."_org_lock_owned"("p_owner" "uuid", "p_allow
     AS $$
 declare o public.orgs;
 begin
-  select * into o from public.orgs where owner_user_id = p_owner for update;
+  select * into o from public.orgs where owner_user_id = p_owner for no key update;
   if not found then raise exception 'NOT_ORG_OWNER'; end if;
   if public._org_settle_returns(o.id) > 0 then select * into o from public.orgs where id = o.id; end if;
   if o.status <> 'active' and not p_allow_suspended then raise exception 'ORG_SUSPENDED'; end if;
@@ -8207,7 +8207,7 @@ begin
   elsif v_credits is null or v_credits = 0 or v_note is null or v_cny is not null then
     raise exception 'INVALID_INPUT';
   end if;
-  select * into o from public.orgs where id = v_org for update;
+  select * into o from public.orgs where id = v_org for no key update;
   if not found then raise exception 'ORG_NOT_FOUND'; end if;
   if public._org_settle_returns(o.id) > 0 then select * into o from public.orgs where id = v_org; end if;
   select * into prior from public.org_credit_ledger where request_id = v_request;
@@ -8285,7 +8285,9 @@ declare
 begin
   perform public._org_require_admin(p_actor);
   perform public._org_check_limits(p_input);
-  select * into o from public.orgs where id = p_org_id for update;
+  -- NO KEY UPDATE like every org function (1627). Rotating invite_token (a unique key) makes the
+  -- update itself take FOR UPDATE; this function locks nothing after it, so it only waits.
+  select * into o from public.orgs where id = p_org_id for no key update;
   if not found then raise exception 'ORG_NOT_FOUND'; end if;
   if p_input ? 'expected_updated_at' and (p_input->>'expected_updated_at')::timestamptz is distinct from o.updated_at then
     raise exception 'ORG_CHANGED';
@@ -13244,7 +13246,7 @@ declare
   current_org uuid;
 begin
   if p_user is null or p_token is null or p_token !~ '^[0-9a-f]{32}$' then raise exception 'ORG_INVITE_INVALID'; end if;
-  select * into o from public.orgs where invite_token = p_token for update;
+  select * into o from public.orgs where invite_token = p_token for no key update;
   if not found then raise exception 'ORG_INVITE_INVALID'; end if;
   if o.status <> 'active' then raise exception 'ORG_SUSPENDED'; end if;
   perform 1 from public.profiles where id = p_user and banned_at is null;
@@ -13273,7 +13275,7 @@ declare
 begin
   select m.org_id into v_org from public.org_members m where m.user_id = p_user and m.status = 'active';
   if v_org is null then return 0; end if;
-  select * into o from public.orgs where id = v_org for update;
+  select * into o from public.orgs where id = v_org for no key update;
   perform public._org_settle_returns(o.id);
   if not exists(select from public.org_members m where m.org_id = o.id and m.user_id = p_user and m.status = 'active') then
     return 0;
@@ -13308,7 +13310,7 @@ begin
   if p_period is null or p_period !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' then raise exception 'INVALID_INPUT'; end if;
   for o in select * from public.orgs where status = 'active' order by created_at, id loop
   begin
-    select * into o from public.orgs where id = o.id and status = 'active' for update;
+    select * into o from public.orgs where id = o.id and status = 'active' for no key update;
     continue when not found;
     if public._org_settle_returns(o.id) > 0 then select * into o from public.orgs where id = o.id; end if;
     org_short := false;
