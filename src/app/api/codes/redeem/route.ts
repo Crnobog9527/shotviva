@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { z } from 'zod'
 
+import { bindReferral } from '@/core/affiliate/referral'
 import { errorResponse } from '@/core/api-response'
 import { assertSameOrigin, createAdminSupabase, requireApiBuyer } from '@/core/auth'
 import { normalizeCode } from '@/core/codes'
@@ -32,6 +33,10 @@ export async function POST(request: NextRequest) {
     }
     const locale = localeOfReferer(request.headers.get('referer')) ?? user.locale ?? 'en'
     const { replace, context } = body.data
+    // A partner's link (sv_ref) binds before the code: an org member's invite code may bind the
+    // customer to the org only when nobody else already has (ARCHITECTURE §6.5). This is the same
+    // late binding checkout does; affiliate_bind refuses once the account has paid.
+    await bindReferral(user.id, request.cookies.get('sv_ref')?.value, 'first_checkout')
     const result = await redeemCode(admin, { userId: user.id, code, context, replace, invite, locale })
     return redemptionResponse(result)
   } catch (error) {
