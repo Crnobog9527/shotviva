@@ -153,8 +153,8 @@ export const site = defineSite({
   // The home page's two bills (DESIGN §6.9 item 6), Owner 2026-11-06: styled product photos
   // $50–$350 per image (Shopify, "Product photography pricing", Jan 2026); white-background
   // packshots $15–$90 (ProShot Media, ProductPhotography.com, soona, Lars Miller Media price
-  // pages, read 2026-11-06). Develop time is one round figure, "about 60 seconds", for every
-  // quality (Owner 2026-11-06; preview measured 19–48 s across qualities). T44, sources read
+  // pages, read 2026-11-06). Develop time is one round figure, "about 30 seconds", for every
+  // quality (Owner 2026-11-21, was 60 from 2026-11-06; real runs are about 30 s). T44, sources read
   // 2026-11-06 (side-session-notes landing-fact-sources): a studio day $500–$3,000 (Shopify,
   // Jan 2026); a US half-day food shoot $400–$2,500 (PricingLink Apr 2025, Jobbers, FoodShot
   // Mar 2026), food stylist extra.
@@ -165,7 +165,7 @@ export const site = defineSite({
       dayRateUsd: { low: 500, high: 3000 },
       foodHalfDayUsd: { low: 400, high: 2500 },
     },
-    photoSecondsApprox: 60,
+    photoSecondsApprox: 30,
     examplePhotoCredits: { product: 74, menu: 74, poster: 45 },
   },
 })
