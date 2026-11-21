@@ -60,6 +60,7 @@ it('sends a photo the provider refused at its limit again under a new id', async
   const next = getJobs().find((job) => job.inputKey === 'inputs/qa/food3.jpg')
   expect(next).toMatchObject({ status: 'queued', failure: null })
   expect(next?.id).not.toBe(id)
+})
 
 it('polls a single photo on a 3 s tick that fires a little early', async () => {
   vi.mocked(submitJob).mockReturnValueOnce(new Promise(() => {}))
