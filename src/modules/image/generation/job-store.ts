@@ -180,6 +180,9 @@ export function pump() {
 // back into view).
 let lastPollAt = 0
 let quietPolls = 0
+// The runner ticks every 3 s, the same as the single-photo interval: a tick a few ms early must
+// still count as due, or a single photo would be read every 6 s.
+const POLL_SLACK_MS = 500
 
 // Whether this pass changed the job (settled it, or gave up on one the server never saw).
 function applyPolled(job: TrackedJob, view: JobView | 'missing' | undefined): boolean {
@@ -198,7 +201,7 @@ export async function pollRunning(force = false): Promise<void> {
   const now = Date.now()
   const running = getJobs().filter((job) => job.status === 'running' &&
     (!pendingPosts.has(job.id) || now - (job.sentAt ?? job.startedAt) >= MISSING_GRACE_MS))
-  if (running.length === 0 || (!force && now - lastPollAt < pollIntervalMs(running, quietPolls))) {
+  if (running.length === 0 || (!force && now - lastPollAt < pollIntervalMs(running, quietPolls) - POLL_SLACK_MS)) {
     pump()
     return
   }
