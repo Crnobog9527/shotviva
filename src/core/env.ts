@@ -97,6 +97,11 @@ const serverEnvSchema = z.object({
   // Query Read permission, and the project it reads. Both unset → the page asks to configure them.
   POSTHOG_PERSONAL_API_KEY: optionalSecret,
   POSTHOG_PROJECT_ID: z.preprocess(blankAsUnset, z.string().regex(/^\d+$/).optional()),
+  // PVUV.ai crawler reporting (core/analytics/pvuv/crawler.ts, called from the proxy): the site id
+  // and an ingest-only token ("Server reporting" scope: it can write crawler hits and read nothing).
+  // Either unset → nothing is reported. Never NEXT_PUBLIC_: the token stays on the server.
+  PVUV_SITE: z.preprocess(blankAsUnset, z.string().regex(/^[A-Za-z0-9_-]{1,64}$/).optional()),
+  PVUV_INGEST_TOKEN: optionalSecret,
   // Optional server-only Observability query access. The offline snapshot contains aggregates only.
   VERCEL_OBSERVABILITY_TOKEN: optionalSecret,
   VERCEL_OBSERVABILITY_PROJECT_ID: optionalSecret,

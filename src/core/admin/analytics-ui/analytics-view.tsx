@@ -28,6 +28,23 @@ export function RangeTabs({ query }: { query: AnalyticsQuery }) {
   return <LinkTabs label={COPY.rangeLabel} tabs={tabs} current={query.range} preserveDim />
 }
 
+// PostHog is off by choice, not by a missing key: say where the numbers are now.
+export function PostHogOff() {
+  const off = COPY.off
+  return (
+    <div role="status" className="grid gap-3 rounded-lg border border-dashed border-border p-6">
+      <h2 className="font-semibold">{off.title}</h2>
+      <p className="text-sm text-muted-foreground">{off.body}</p>
+      <p>
+        <a href={off.href} target="_blank" rel="noreferrer" className="text-sm font-medium underline underline-offset-4">
+          {off.link}
+        </a>
+      </p>
+      <p className="text-xs text-muted-foreground">{off.back}</p>
+    </div>
+  )
+}
+
 export function Unconfigured({ range }: { range: Range }) {
   return (
     <div className="grid min-w-0 gap-6">

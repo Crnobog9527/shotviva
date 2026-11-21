@@ -40,7 +40,7 @@ describe('createCheckout 中国银行卡 session params', () => {
     expect(params).not.toHaveProperty('automatic_tax')
     // Local-currency display stays as the Dashboard sets it (Owner 2026-11-08).
     expect(params).not.toHaveProperty('adaptive_pricing')
-    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'subscription', method: 'cn_card' }), 'zh')
+    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'subscription', method: 'cn_card' }), 'zh', expect.any(String))
   })
 
   it('sells a pack the same way, as a one-time payment', async () => {

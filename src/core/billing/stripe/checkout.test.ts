@@ -51,7 +51,7 @@ describe('createCheckout routing', () => {
       form: 'subscription',
       channel: 'stripe',
       method: 'card',
-    }, 'zh')
+    }, 'zh', expect.any(String))
   })
 
   it('opens Alipay as a one-time payment for one period, Shotviva as seller', async () => {
@@ -68,7 +68,7 @@ describe('createCheckout routing', () => {
     // Said out loud: the Dashboard's "Managed Payments by default" must not pull Alipay into MP.
     expect(params).toMatchObject({ managed_payments: { enabled: false } })
     expect(params).not.toHaveProperty('payment_method_types')
-    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'one_time', method: 'alipay', interval: 'year' }), 'en')
+    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'one_time', method: 'alipay', interval: 'year' }), 'en', expect.any(String))
   })
 
   it('sells a pack by card as a Managed Payments one-time payment', async () => {
