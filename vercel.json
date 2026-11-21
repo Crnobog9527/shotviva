@@ -29,6 +29,10 @@
       "schedule": "0 14 * * *"
     },
     {
+      "path": "/api/cron/generation-sweep",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/org-topup",
       "schedule": "20 0 1 * *"
     }

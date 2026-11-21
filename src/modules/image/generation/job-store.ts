@@ -153,6 +153,18 @@ function applyOutcome(job: TrackedJob, outcome: SubmitOutcome): TrackedJob {
 }
 
 function settle(id: string, outcome: SubmitOutcome) {
+  // A job the server created and refunded for the provider's limit keeps its place in line under a
+  // new id: resending the spent id would only return the refunded job.
+  if (outcome.kind === 'limited' && outcome.settled) {
+    const current = getJobs().find((job) => job.id === id)
+    if (current?.status === 'running') {
+      const next = { ...requeue(current, Date.now(), outcome.retryAfterMs), id: crypto.randomUUID() }
+      const swapped = Object.fromEntries(Object.entries(views).map(([key, ids]) => [key, ids.map((value) => (value === id ? next.id : value))]))
+      set(getJobs().map((job) => (job.id === id ? next : job)), swapped)
+    }
+    pump()
+    return
+  }
   update(id, (current) => applyOutcome(current, outcome))
   pump()
 }

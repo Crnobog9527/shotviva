@@ -6,9 +6,11 @@ import type { ServerTrack } from '@/core/analytics'
 import { AppError } from '@/core/errors'
 import {
   accountLimits,
+  acquireSlot,
   assertWithinRateLimit,
   findOwnJob,
   recordJobClientIp,
+  releaseSlot,
   reserveJob,
   routeFallbackReason,
   settleGeneration,
@@ -98,28 +100,35 @@ export async function runEdit(deps: EditDeps, req: EditRequest): Promise<JobView
     if (existing) return toJobView(existing)
   }
   const prepared = await prepare(deps, req)
-  const decision = await decideEdit(deps, { userId: req.userId, pipeline: prepared.pipeline, image: prepared.image, instruction: prepared.instruction })
-  const resolution = req.resolution ?? sourceResolution(prepared.source)
   const attemptId = randomUUID()
   const { route, pipeline } = prepared
-  const fallback = routeFallbackReason(route, pipeline.prompt.providerId, 'web')
-  const job = await withFallbackNotice(pipeline.template.id, async (selected) => { selected(fallback); return reserveJob(deps.db, {
-    jobId: req.jobId ?? randomUUID(),
-    userId: req.userId,
-    module: prepared.pipeline.template.module,
-    templateId: prepared.pipeline.template.id,
-    expectedCredits: req.expectedCredits,
-    source: 'web',
-    provider: route.id,
-    parentJobId: prepared.source.id,
-    inputs: { ...jobInputs(prepared, decision, resolution, attemptId), ...(fallback ? { fallback_route: true } : {}) },
-  }) })
-  // Two concurrent requests with one job id: only the one that created the row calls the model.
-  if (job.inputs.attempt_id !== attemptId) return toJobView(job)
-  // Dispute evidence (T82): the IP that started this edit.
-  await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })
+  // The route's lane slot before the decision call and before any credit is held (queue-fairness
+  // Q3): a full lane costs nothing. An edit is a single photo.
+  await acquireSlot(deps.db, { attemptId, providerId: route.id, userId: req.userId, kind: 'single' })
+  try {
+    const decision = await decideEdit(deps, { userId: req.userId, pipeline: prepared.pipeline, image: prepared.image, instruction: prepared.instruction })
+    const resolution = req.resolution ?? sourceResolution(prepared.source)
+    const fallback = routeFallbackReason(route, pipeline.prompt.providerId, 'web')
+    const job = await withFallbackNotice(pipeline.template.id, async (selected) => { selected(fallback); return reserveJob(deps.db, {
+      jobId: req.jobId ?? randomUUID(),
+      userId: req.userId,
+      module: prepared.pipeline.template.module,
+      templateId: prepared.pipeline.template.id,
+      expectedCredits: req.expectedCredits,
+      source: 'web',
+      provider: route.id,
+      parentJobId: prepared.source.id,
+      inputs: { ...jobInputs(prepared, decision, resolution, attemptId), ...(fallback ? { fallback_route: true } : {}) },
+    }) })
+    // Two concurrent requests with one job id: only the one that created the row calls the model.
+    if (job.inputs.attempt_id !== attemptId) return toJobView(job)
+    // Dispute evidence (T82): the IP that started this edit.
+    await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })
 
-  const call = editProviderCall(prepared.pipeline, decision, { image: prepared.image, instruction: prepared.instruction, aspect: prepared.aspect, reframed: prepared.reframed, resolution })
-  const settle = () => settleGeneration({ ...deps, provider: route }, job, call, outputKeyFor(req.userId, job.id), { decision: editDecisionCost(deps.classifier, decision) })
-  return toJobView(await settleTracked(job, prepared.pipeline.template.category, settle, { track: deps.track }))
+    const call = editProviderCall(prepared.pipeline, decision, { image: prepared.image, instruction: prepared.instruction, aspect: prepared.aspect, reframed: prepared.reframed, resolution })
+    const settle = () => settleGeneration({ ...deps, provider: route }, job, call, outputKeyFor(req.userId, job.id), { decision: editDecisionCost(deps.classifier, decision) })
+    return toJobView(await settleTracked(job, prepared.pipeline.template.category, settle, { track: deps.track }))
+  } finally {
+    await releaseSlot(deps.db, attemptId)
+  }
 }

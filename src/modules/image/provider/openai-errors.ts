@@ -19,5 +19,8 @@ export function failureToProviderError({ status, code, type }: OpenAIFailure): P
   if (status === 400 && code !== null && REJECTION_CODES.has(code)) {
     return new ProviderError('content_rejected', detail)
   }
+  // A 429 is the per-minute limit, except insufficient_quota (the money ran out), which waiting
+  // does not fix.
+  if (status === 429 && code !== 'insufficient_quota') return new ProviderError('rate_limited', detail)
   return new ProviderError('failed', detail)
 }

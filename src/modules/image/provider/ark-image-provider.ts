@@ -115,7 +115,10 @@ function failure(status: number, code: string | undefined, usage: ProviderUsage 
   const detail = `ark image request failed (HTTP ${status} code=${code ?? '-'})`
   if (code && REFUSAL.test(code)) return new ProviderError('content_rejected', detail, { usage })
   const timeout = status === 408 || status === 504
-  return new ProviderError(timeout ? 'timeout' : 'failed', detail, { usage })
+  // Ark answers 429 both for its per-minute limit and for AccountQuotaExceeded; only the first
+  // clears by waiting.
+  const limited = status === 429 && !(code && /quota|billing|credit|balance/i.test(code))
+  return new ProviderError(limited ? 'rate_limited' : timeout ? 'timeout' : 'failed', detail, { usage })
 }
 
 // Which network failure a thrown fetch was (undici puts it on `cause.code`, e.g. ECONNRESET or
