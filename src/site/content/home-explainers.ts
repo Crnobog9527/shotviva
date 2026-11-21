@@ -6,17 +6,17 @@ import { OUTPUT_TIERS, tierList, uploadLimits } from './offer'
 // The home page's how-to blocks, each point led by a picture (Owner 2026-11-12): the steps and
 // the use cases. The words name the point in a line; the picture shows it.
 
-// The illustrative tote set (design/assets/img/hero-set-*.webp, ARCHITECTURE §13 item 2): one
-// phone snapshot and three results from it, shared with the hero and the shoot demo.
+// The tote set (design/assets/img/hero-set-*.webp, ARCHITECTURE §13 item 2): one real phone
+// photo and three results from it (Owner 2026-11-21: every example's before is a real phone photo), shared with the hero and the shoot demo.
 export const tote = {
-  phone: homeImage('hero-set-phone', 'Phone snapshot of a woven leather tote on a busy kitchen counter, window light (real example)'),
+  phone: homeImage('hero-set-phone', 'Real phone photo: a woven leather tote on a busy kitchen counter, window light'),
   listing: homeImage('hero-set-listing', 'The same woven leather tote as a white-background listing photo, soft studio light (real example)'),
   lifestyle: homeImage('hero-set-lifestyle', 'The same tote on a café chair by a window, warm morning light (real example)'),
   promo: homeImage('hero-set-promo', 'The same tote on a promo poster headed New Season Tote, bright studio light (real example)'),
 } as const satisfies Record<string, ImageRef>
 
 const [standard, hd, max] = OUTPUT_TIERS
-const phoneTag = 'Phone photo'
+const phoneTag = 'Real phone photo'
 
 export const steps = {
   heading: 'How Image to Image AI Works in 3 Steps',

@@ -65,7 +65,9 @@ export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ sta
   const tags = useTranslations('marketing.home')
   const { template, photo } = state
   const { after, initial } = stageOf(state, initialCovers)
-  const inset = insetOf(state, initialCovers, { mine: t('yourPhoto'), example: tags('phone') })
+  // The inset is under 100 px wide, so its tag keeps the short word; the full-size pairs say
+  // "Real phone photo" (Owner 2026-11-21).
+  const inset = insetOf(state, initialCovers, { mine: t('yourPhoto'), example: tags('phoneShort') })
   const templateId = template?.id ?? null
   return (
     // A template without a photo (photoInput 'none') has no upload card: its column closes up.

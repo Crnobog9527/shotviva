@@ -43,7 +43,7 @@ const shoot: ShootDemo = {
 const whiteCases: EditCases = {
   heading: '电商白底主图：从易到难三个例子',
   intro: '平台主图要求商品单独放在白底上，抠图最见功夫。下面三张手机照片从易到难，最后一张最难：逆光下被风吹散的细碎发丝，背后还是一条杂乱的街。',
-  labels: { before: '手机原图', after: '主图', reference: '参考图' },
+  labels: { before: '真实手机照', after: '主图', reference: '参考图' },
   items: [
     {
       title: '桌上的音箱',

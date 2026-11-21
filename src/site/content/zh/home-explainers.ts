@@ -6,10 +6,10 @@ import { ZH_TIERS, zhTierList, zhUploadLimits } from './offer'
 // /zh 首页的两个「怎么做」区块，每一点先给图、再用一行字说明（Owner 2026-11-12：看图比读大段文字快）：
 // 三步和「白底图、电商主图怎么做」。
 
-// The same illustrative tote set as the English home (public/home/hero-set-*.webp), shared with
+// The same tote set as the English home (public/home/hero-set-*.webp), shared with
 // the hero and the shoot demo.
 export const zhTote = {
-  phone: homeImage('hero-set-phone', '手机随手拍：厨房台面上的一只编织皮托特包，窗边自然光（真实案例）'),
+  phone: homeImage('hero-set-phone', '真实手机照：厨房台面上的一只编织皮托特包，窗边自然光'),
   listing: homeImage('hero-set-listing', '同一只编织皮托特包的白底商品图，柔和影棚光（真实案例）'),
   lifestyle: homeImage('hero-set-lifestyle', '同一只包放在窗边的咖啡馆椅子上，早晨暖光（真实案例）'),
   promo: homeImage('hero-set-promo', '同一只包做成新品促销海报，明亮影棚光（真实案例）'),
@@ -81,7 +81,7 @@ export const whiteBackgroundGuide = {
     {
       heading: '商品主体保持原样',
       text: '形状、颜色、标签和文字按你拍的样子保留，只换背景和光线。',
-      visual: { kind: 'pair', before: sneaker.phone, after: sneaker.listing, tags: { before: '手机实拍', after: '纯白底图' } },
+      visual: { kind: 'pair', before: sneaker.phone, after: sneaker.listing, tags: { before: '真实手机照', after: '纯白底图' } },
     },
     {
       heading: `${ZH_TIERS.length} 档导出尺寸`,
