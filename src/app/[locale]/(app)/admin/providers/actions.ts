@@ -20,6 +20,7 @@ import {
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { PROVIDERS_CACHE_TAG, type ConnectionResult } from '@/core/providers'
 import { identityJudge } from '@/modules/image'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 // Server actions are public endpoints, so each one re-checks the admin role itself. None of
 // them returns a key: save answers with the row id, test with the HTTP outcome only.
@@ -29,6 +30,7 @@ const deps = (): ProviderCommandDeps => ({ db: createAdminSupabase() })
 // The next generation must see the change without a redeploy (ARCHITECTURE §3.3).
 async function providersChanged() {
   await updateCatalogueTag(PROVIDERS_CACHE_TAG)
+  warmPublicPagesSoon()
   refresh()
 }
 
