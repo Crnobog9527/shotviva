@@ -4,8 +4,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
+import { PAYMENT_KINDS, type PaymentKind } from '@/core/org'
 
-import type { LedgerRow, LimitCaps, MemberRow, OrgDetail, OrgListItem, OrgPackage, OrgRow } from './types'
+import type { PaymentAccountRow, LedgerRow, LimitCaps, MemberRow, OrgAffiliate, OrgDetail, OrgListItem, OrgPackage, OrgRow } from './types'
 
 // Read side of the enterprise admin (ARCHITECTURE §6.5). The org tables have no client grant and
 // the service role may select; every write goes through the E1 functions in core/org.
@@ -130,12 +131,35 @@ export async function listOrgs(db: SupabaseClient): Promise<OrgListItem[]> {
   return rows.map((row) => ({ ...toOrg(row), ownerAccount: accounts.get(row.owner_user_id) ?? null, memberCount: counts.get(row.id) ?? 0 }))
 }
 
+const accountSchema = z.object({ user_id: z.uuid(), slug: z.string(), status: z.string() })
+const rateSchema = z.object({ product_kind: z.string(), l1_bp: z.number(), l2_bp: z.number() })
+const overrideSchema = z.object({ product_kind: z.string(), l1_bp: z.number().nullable(), l2_bp: z.number().nullable() })
+
+// No account row until the affiliate switch was turned on (E2 creates it then).
+export async function loadOrgAffiliate(db: SupabaseClient, orgId: string): Promise<OrgAffiliate | null> {
+  const account = ok(await db.from('affiliates').select('user_id,slug,status').eq('org_id', orgId).maybeSingle(), 'affiliate account')
+  if (!account) return null
+  const row = accountSchema.parse(account)
+  const [defaults, overrides] = await Promise.all([
+    db.from('affiliate_rates').select('product_kind,l1_bp,l2_bp').order('product_kind'),
+    db.from('affiliate_rate_overrides').select('product_kind,l1_bp,l2_bp').eq('user_id', row.user_id),
+  ])
+  const over = new Map(z.array(overrideSchema).parse(ok(overrides, 'rate overrides')).map((o) => [o.product_kind, o]))
+  return {
+    userId: row.user_id, slug: row.slug, status: row.status,
+    rates: z.array(rateSchema).parse(ok(defaults, 'rates')).map((d) => {
+      const o = over.get(d.product_kind)
+      return { productKind: d.product_kind, l1Bp: o?.l1_bp ?? d.l1_bp, l2Bp: o?.l2_bp ?? d.l2_bp, overridden: Boolean(o && (o.l1_bp !== null || o.l2_bp !== null)) }
+    }),
+  }
+}
+
 export async function loadOrgDetail(db: SupabaseClient, id: string): Promise<OrgDetail | null> {
   if (!z.uuid().safeParse(id).success) return null
   const found = ok(await db.from('orgs').select(ORG_FIELDS).eq('id', id).maybeSingle(), 'org')
   if (!found) return null
   const org = toOrg(orgSchema.parse(found))
-  const [ledgerRows, memberRows, memberCount, packages, caps] = await Promise.all([
+  const [ledgerRows, memberRows, memberCount, packages, caps, affiliate] = await Promise.all([
     db.from('org_credit_ledger').select('id,kind,delta,pool_after,member_user_id,package_id,amount_cny_fen,reference,note,created_at')
       .eq('org_id', id).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(LEDGER_LIMIT),
     db.from('org_members').select('user_id,role,monthly_allowance,held_credits,status,joined_at')
@@ -143,6 +167,7 @@ export async function loadOrgDetail(db: SupabaseClient, id: string): Promise<Org
     db.from('org_members').select('user_id', { count: 'exact' }).eq('org_id', id).limit(1),
     listPackages(db),
     loadLimitCaps(db),
+    loadOrgAffiliate(db, id),
   ])
   const ledger = z.array(ledgerSchema).parse(ok(ledgerRows, 'ledger'))
   const members = z.array(memberSchema).parse(ok(memberRows, 'members'))
@@ -165,5 +190,13 @@ export async function loadOrgDetail(db: SupabaseClient, id: string): Promise<Org
     })),
     packages,
     caps,
+    affiliate,
   }
+}
+
+// Admin only (the caller checked the role): the saved receiving accounts, a group never saved is absent.
+export async function listPaymentAccounts(db: SupabaseClient): Promise<Partial<Record<PaymentKind, PaymentAccountRow>>> {
+  const schema = z.object({ kind: z.enum(PAYMENT_KINDS), enabled: z.boolean(), details: z.record(z.string(), z.string()), updated_at: z.string() })
+  const rows = z.array(schema).parse(ok(await db.from('org_payment_accounts').select('kind,enabled,details,updated_at'), 'payment accounts'))
+  return Object.fromEntries(rows.map((r) => [r.kind, { enabled: r.enabled, details: r.details, updatedAt: r.updated_at }]))
 }

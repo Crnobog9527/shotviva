@@ -6,7 +6,7 @@ vi.mock('@/core/auth', () => ({ createAdminSupabase: spies.db, requireAdmin: spi
 vi.mock('next/cache', () => ({ refresh: vi.fn() }))
 const { default: listPage } = await import('./page')
 const { default: detailPage } = await import('./[id]/page')
-const { createOrgAction, grantOrgAction, saveOrgAction, savePackageAction } = await import('./actions')
+const { createOrgAction, grantOrgAction, saveOrgAction, savePackageAction, savePaymentAccountAction } = await import('./actions')
 
 const ID = '11111111-1111-4111-8111-111111111111'
 const endpoints = [
@@ -16,6 +16,7 @@ const endpoints = [
   () => saveOrgAction({}),
   () => grantOrgAction({}),
   () => savePackageAction({}),
+  () => savePaymentAccountAction({}),
 ]
 
 describe('enterprise admin endpoints', () => {
