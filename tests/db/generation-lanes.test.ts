@@ -188,7 +188,9 @@ describe('sweep_stale_generation_jobs', () => {
     expect(await sweep()).toBe(0)
     expect(await statusOf(inWindow)).toBe('running')
     // Not left for the other tests: they would sweep them.
-    await db.query("update public.generation_jobs set status = 'failed', error_code = 'TEST' where id = any($1)", [[ancient, beforeShip, inWindow]])
+    for (const jobId of [ancient, beforeShip, inWindow]) {
+      await callRpc(service, 'refund_job', { p_job_id: jobId, p_error_code: 'TEST' }, z.unknown())
+    }
   })
 
   it('refunds a job left running past the limit exactly once and leaves recent ones', async () => {
