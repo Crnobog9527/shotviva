@@ -9,17 +9,20 @@ import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { FEATURES_CACHE_TAG } from '@/core/features'
 import { GALLERY_SWITCH_TAG } from '@/core/gallery'
 import { SYSTEM_SETTINGS_CACHE_TAG } from '@/core/system-settings'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 // Server actions are public endpoints, so each re-checks the admin role itself. A save expires
 // its cache at once, so the change shows on the next request without a deploy (ARCHITECTURE
 // §6.2, §15.6).
 function featuresChanged() {
   updateTag(FEATURES_CACHE_TAG)
+  warmPublicPagesSoon()
   refresh()
 }
 
 function settingsChanged() {
   updateTag(SYSTEM_SETTINGS_CACHE_TAG)
+  warmPublicPagesSoon()
   refresh()
 }
 
