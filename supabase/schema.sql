@@ -14439,6 +14439,51 @@ $$;
 ALTER FUNCTION "public"."payment_fee_schedule_for"("p_channel" "text", "p_method" "text", "p_kind" "text", "p_at" timestamp with time zone) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."payment_fee_target"("p_payment_id" bigint, "p_ref" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_payment public.payments;
+  v_from timestamptz;
+begin
+  if (p_payment_id is null) = (p_ref is null) then
+    raise exception 'INVALID_INPUT' using detail = 'payment_fee_target: give a payment id or a reference';
+  end if;
+  if p_payment_id is not null then
+    select * into v_payment from public.payments where id = p_payment_id;
+  elsif p_ref like 'cs\_%' then
+    select * into v_payment from public.payments where stripe_session_id = p_ref;
+  elsif p_ref like 'in\_%' then
+    select * into v_payment from public.payments where stripe_invoice_id = p_ref;
+  elsif p_ref like 'PAY\_%' then
+    select * into v_payment from public.payments where waffo_payment_id = p_ref;
+  else
+    raise exception 'INVALID_INPUT' using detail = 'payment_fee_target: unknown reference';
+  end if;
+  if not found then return null; end if;
+  select record_from into v_from from public.payment_fee_settings where singleton;
+  return jsonb_build_object(
+    'payment_id', v_payment.id,
+    'channel', v_payment.channel,
+    'method', v_payment.method,
+    'currency', v_payment.currency,
+    'amount_total', v_payment.amount_total,
+    'recordable', v_from is not null and v_payment.created_at >= v_from,
+    -- Same choice as payment_fee_schedule_for: the latest active version in force at created_at.
+    'schedules', coalesce((
+      select jsonb_object_agg(s.kind, jsonb_build_object('id', s.id, 'rate_bp', s.rate_bp, 'fixed_cents', s.fixed_cents))
+        from (select distinct on (kind) * from public.payment_fee_schedules
+               where channel = v_payment.channel and method = v_payment.method and active
+                 and effective_from <= v_payment.created_at
+               order by kind, effective_from desc, id desc) s), '{}'::jsonb));
+end;
+$$;
+
+
+ALTER FUNCTION "public"."payment_fee_target"("p_payment_id" bigint, "p_ref" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."prepare_checkout_discount"("p_user" "uuid", "p_token" "uuid", "p_expires_at" bigint) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -24743,6 +24788,11 @@ GRANT SELECT ON TABLE "public"."payment_fee_schedules" TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."payment_fee_schedule_for"("p_channel" "text", "p_method" "text", "p_kind" "text", "p_at" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."payment_fee_schedule_for"("p_channel" "text", "p_method" "text", "p_kind" "text", "p_at" timestamp with time zone) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."payment_fee_target"("p_payment_id" bigint, "p_ref" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."payment_fee_target"("p_payment_id" bigint, "p_ref" "text") TO "service_role";
 
 
 
