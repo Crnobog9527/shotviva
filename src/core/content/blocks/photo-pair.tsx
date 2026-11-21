@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { cn } from '../../ui/cn'
 import { WhiteGroundImage } from '../../ui/white-ground-image'
 import type { ImageRef } from '../page-content'
+import { CoverFill } from './cover-fill'
 
 type Props = {
   before: ImageRef
@@ -40,7 +41,7 @@ const afterLoading = (preload: boolean) => (preload ? ({ loading: 'eager', fetch
 export function BeforePane({ image, preload, sizes, showcase = false }: { image: ImageRef; preload: boolean; sizes: string; showcase?: boolean }) {
   return (
     <span className="mk-pane">
-      {showcase ? <Image className="mk-fill" src={image.src} alt="" aria-hidden width={image.width} height={image.height} sizes={sizes} loading="lazy" /> : null}
+      {showcase ? <CoverFill /> : null}
       {/* eslint-disable-next-line @next/next/no-img-element -- a data: URI, nothing for next/image to resize */}
       {preload && image.firstFrame ? <img className="mk-ff" src={image.firstFrame} width={image.width} height={image.height} alt="" aria-hidden decoding="sync" /> : null}
       <Image className="mk-b" src={image.src} alt={image.alt} width={image.width} height={image.height} sizes={sizes} preload={preload} loading={preload ? undefined : 'lazy'} />
@@ -56,7 +57,7 @@ function AfterImage({ after, sizes, preload, showcase, alt }: AfterProps) {
   if (!showcase) return plate
   return (
     <span className="mk-result">
-      <Image className="mk-fill" src={after.src} alt="" aria-hidden width={after.width} height={after.height} sizes={sizes} loading="lazy" />
+      <CoverFill />
       {plate}
     </span>
   )
@@ -68,7 +69,7 @@ export function PhotoPair({ before, after, size = 'card', preload = false, sizes
     <span className={cn('mk-pair', size === 'lg' && 'mk-pair-lg', className)} aria-hidden={decorative || undefined}>
       <BeforePane image={decorative ? { ...before, alt: '' } : before} preload={preload} sizes={sizes} showcase={showcase} />
       <span className="mk-pane">
-        {showcase ? <Image className="mk-fill" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" /> : null}
+        {showcase ? <CoverFill /> : null}
         <Image className="mk-ph" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" />
         <AfterImage after={after} sizes={sizes} preload={preload} showcase={showcase} alt={decorative ? '' : after.alt} />
         <span className="mk-ws" aria-hidden />

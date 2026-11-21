@@ -3,6 +3,7 @@ import { useTranslations } from 'next-intl'
 import { Link } from '../../i18n/ui'
 import type { HomePage, ImageRef, TemplateCard, TemplateCategory } from '../page-content'
 import { CompareSlider } from './compare-slider'
+import { CoverFills } from './cover-fills'
 import { PhotoPair } from './photo-pair'
 import { SeriesCard } from './series-card'
 import { SeriesMotion } from './series-motion-mount'
@@ -176,6 +177,8 @@ export function TemplateGrid({ grid, sections, isLinkEnabled }: Props) {
       {grid.note ? <p className="mk-note">{grid.note}</p> : null}
       {/* Any series card: its click handler (and the crossfade, for a series with more than one pair). */}
       {categories.some((category) => category.templates.some((card) => card.series)) ? <SeriesMotion /> : null}
+      {/* The cards' blurred fills, painted from their pictures (cover-fill.tsx). */}
+      <CoverFills />
     </section>
   )
 }

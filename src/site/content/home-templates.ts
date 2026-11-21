@@ -103,6 +103,20 @@ export function featuredSections(live: readonly Live[], keys?: readonly string[]
   return { categories: grouped(entries).map((group) => toCategory(group, byId)), media, defaultId: featured[0]?.id ?? live[0]?.id ?? null }
 }
 
+// The later pairs of every live series card, by the card's key (its TemplateCard id): what a
+// series card plays after the first pair the server drew (/api/home/series, the browser's
+// series-layers-source.ts). The same members, order and limit as the card's own, for any page:
+// the home page and the landing pages draw their series from these same two cached reads.
+export function seriesLayerPairs(live: readonly Live[], series: readonly Series[]): Record<string, [before: string, after: string][]> {
+  const byId = new Map(live.map((template) => [template.id, template]))
+  return Object.fromEntries(
+    series.flatMap((one) => {
+      const later = pairMembers(one, byId).slice(1)
+      return later.length > 0 ? [[`series-${one.id}`, later.map((member) => [member.coverBeforeUrl ?? '', member.coverAfterUrl ?? ''])]] : []
+    }),
+  )
+}
+
 // The 404's "three templates to try instead": featured entries with both covers, never a
 // drag-compare category (画风). A series is one pick, pictured by its first member with covers,
 // and opens the series.

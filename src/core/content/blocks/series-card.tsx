@@ -4,7 +4,8 @@ import { useTranslations } from 'next-intl'
 import { cn } from '../../ui/cn'
 import { WhiteGroundImage } from '../../ui/white-ground-image'
 import type { TemplateCard } from '../page-content'
-import { encodePairs, PAIRS_ATTR, SIZES_ATTR } from './series-layers'
+import { CoverFill } from './cover-fill'
+import { MORE_ATTR, SIZES_ATTR } from './series-layers'
 import type { TemplateLookup } from './template-grid'
 
 const SIZE = { width: 900, height: 1125 }
@@ -21,8 +22,9 @@ function pairsOf(card: TemplateCard, media: TemplateLookup): Pair[] {
 type PairsProps = { card: TemplateCard; media: TemplateLookup; size: 'lg' | 'card'; sizes: string }
 
 // The series' frame: the same phone | AI pair as a template card, its first member drawn by the
-// server; the others' covers ride along as addresses and become layers above it in the browser
-// when the card first plays (series-layers.ts). With one pair (or none) it is a still card.
+// server; the others' covers become layers above it in the browser when the card first plays,
+// their addresses fetched then under the card's key (series-layers.ts). With one pair (or none)
+// it is a still card.
 function SeriesPairs({ card, media, size, sizes }: PairsProps) {
   const t = useTranslations('marketing.home')
   const [first, ...rest] = pairsOf(card, media)
@@ -38,14 +40,14 @@ function SeriesPairs({ card, media, size, sizes }: PairsProps) {
   return (
     <span
       className={cn('mk-pair mk-spair', size === 'lg' && 'mk-pair-lg')}
-      {...(rest.length > 0 ? { [PAIRS_ATTR]: encodePairs(rest.map((pair) => [pair.before, pair.after])), [SIZES_ATTR]: sizes } : {})}
+      {...(rest.length > 0 ? { [MORE_ATTR]: card.id, [SIZES_ATTR]: sizes } : {})}
     >
       <span className="mk-pane">
-        <Image className="mk-fill" src={first.before} alt="" aria-hidden {...SIZE} sizes={sizes} loading="lazy" />
+        <CoverFill />
         <Image className="mk-sb" src={first.before} alt="" {...SIZE} sizes={sizes} loading="lazy" />
       </span>
       <span className="mk-pane">
-        <Image className="mk-fill" src={first.after} alt="" aria-hidden {...SIZE} sizes={sizes} loading="lazy" />
+        <CoverFill />
         <WhiteGroundImage className="mk-sa" src={first.after} alt="" {...SIZE} sizes={sizes} loading="lazy" fitPlate />
       </span>
       <span className="mk-hl" aria-hidden />

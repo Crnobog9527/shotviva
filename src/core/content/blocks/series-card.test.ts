@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { SeriesCard } from './series-card'
-import { decodePairs, pictureAttrs } from './series-layers'
+import { pairsIn, pictureAttrs } from './series-layers'
 
 // SEO 2026-11-14: a series opens Create, which needs a session and is noindex. The card is a
 // button carrying the address for the page's click handler, never a crawlable <a href>.
@@ -42,7 +42,7 @@ describe('series card', () => {
     expect(html).toContain('Western dishes in daylight')
   })
 
-  it('draws only the first pair and carries the others as addresses for the browser', () => {
+  it('draws only the first pair and carries the card key, not the later covers, for the browser', () => {
     const three = { ...card, series: { ...card.series, members: ['a', 'b', 'c'] } }
     const covers = {
       ...media,
@@ -50,18 +50,18 @@ describe('series card', () => {
       c: { before: 'https://shotviva.com/c-before.webp', after: 'https://shotviva.com/c-after.webp', live: true },
     }
     const markup = renderToStaticMarkup(createElement(Provider, { locale: 'en', messages }, createElement(SeriesCard, { card: three, media: covers, sizes: '50vw' })))
-    expect(markup.match(/<img /g)).toHaveLength(4)
+    // The first pair's two pictures; their blurred fills are empty spans painted in the browser.
+    expect(markup.match(/<img /g)).toHaveLength(2)
+    expect(markup.match(/data-cover-fill/g)).toHaveLength(2)
     expect(markup).not.toContain('mk-sl')
-    const attr = /data-series-pairs="([^"]*)"/.exec(markup)?.[1].replaceAll('&quot;', '"')
-    expect(decodePairs(attr ?? null)).toEqual([
-      ['https://shotviva.com/b-before.webp', 'https://shotviva.com/b-after.webp'],
-      ['https://shotviva.com/c-before.webp', 'https://shotviva.com/c-after.webp'],
-    ])
+    expect(markup).not.toContain('b-before')
+    expect(markup).not.toContain('c-after')
+    expect(markup).toContain('data-series-more="series-1"')
     expect(markup).toContain('data-series-sizes="50vw"')
   })
 
   it('leaves a one-pair series still: no addresses to play through', () => {
-    expect(html).not.toContain('data-series-pairs')
+    expect(html).not.toContain('data-series-more')
   })
 
   it('gives a browser-drawn layer the srcset the server gives the first pair', () => {
@@ -77,10 +77,10 @@ describe('series card', () => {
 
 describe('series layer addresses', () => {
   it('ignores anything that is not a list of before/after pairs', () => {
-    expect(decodePairs(null)).toEqual([])
-    expect(decodePairs('not json')).toEqual([])
-    expect(decodePairs('{"a":1}')).toEqual([])
-    expect(decodePairs('[["a","b"],["c"],[1,2],"x"]')).toEqual([['a', 'b']])
+    expect(pairsIn(null)).toEqual([])
+    expect(pairsIn('not a list')).toEqual([])
+    expect(pairsIn({ a: 1 })).toEqual([])
+    expect(pairsIn([['a', 'b'], ['c'], [1, 2], 'x'])).toEqual([['a', 'b']])
   })
 
 })
