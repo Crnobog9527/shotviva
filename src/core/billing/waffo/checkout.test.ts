@@ -46,24 +46,43 @@ describe('createWaffoCheckout without an email (T63)', () => {
   })
 })
 
-describe('WeChat Pay cap on Waffo', () => {
-  // Owner 2026-11-21: Waffo's WeChat Pay takes at most CN¥1,000; over it the one-time page leaves
-  // WeChat Pay out. Never on a subscription (cards only) and never while WAFFO_WECHAT_PAY is off.
-  it('with WAFFO_WECHAT_PAY on, a one-time price over the WeChat Pay cap excludes WeChat Pay', async () => {
+describe('methods on the Waffo page match the paywall rows', () => {
+  // Owner 2026-11-21: methods come from the session's allow-list, never the dashboard. Card row =
+  // cards; wallet row = Alipay, plus WeChat Pay when WAFFO_WECHAT_PAY is on and the price is under
+  // its CN¥1,000 cap; subscriptions card-only. Waffo takes include or exclude, never both.
+  it('the wallet row offers Alipay and WeChat Pay only while the flag is on and the price is under the cap', async () => {
     const { deps, create } = harness()
     const on = { ...deps, wechatPay: true }
     await createWaffoCheckout(on, { userId: USER, body: body('max_yearly', 'alipay') })
     await createWaffoCheckout(on, { userId: USER, body: body('max_monthly', 'alipay') })
-    await createWaffoCheckout(on, { userId: USER, body: body('max_yearly') })
-    await createWaffoCheckout(deps, { userId: USER, body: body('max_yearly', 'alipay') })
-    const [over, under, subscription, off] = create.mock.calls.map((call) => call[0] as unknown as Record<string, unknown>)
-    expect(over).toMatchObject({ excludePaymentMethods: ['wechat'] })
-    expect(over).not.toHaveProperty('includePaymentMethods')
-    for (const request of [under, off]) expect(request).not.toHaveProperty('excludePaymentMethods')
-    expect(subscription).toMatchObject({ includePaymentMethods: ['card'] })
-    expect(subscription).not.toHaveProperty('excludePaymentMethods')
+    await createWaffoCheckout(on, { userId: USER, body: body('pack_l', 'alipay') })
+    await createWaffoCheckout(deps, { userId: USER, body: body('max_monthly', 'alipay') })
+    const [over, under, pack, off] = create.mock.calls.map((call) => call[0] as unknown as Record<string, unknown>)
+    expect(over).toMatchObject({ includePaymentMethods: ['alipay'] })
+    expect(under).toMatchObject({ includePaymentMethods: ['alipay', 'wechat'] })
+    expect(pack).toMatchObject({ includePaymentMethods: ['alipay', 'wechat'] })
+    expect(off).toMatchObject({ includePaymentMethods: ['alipay'] })
   })
 
+  it('the card row: a subscription is card-only, a pack adds Apple Pay and Google Pay', async () => {
+    const { deps, create } = harness()
+    const on = { ...deps, wechatPay: true }
+    await createWaffoCheckout(on, { userId: USER, body: body('max_yearly') })
+    await createWaffoCheckout(on, { userId: USER, body: body('pack_m') })
+    await createWaffoCheckout(deps, { userId: USER, body: body('pack_m') })
+    const [sub, pack, packOff] = create.mock.calls.map((call) => call[0] as unknown as Record<string, unknown>)
+    expect(sub).toMatchObject({ includePaymentMethods: ['card'] })
+    for (const request of [pack, packOff]) expect(request).toMatchObject({ includePaymentMethods: ['card', 'applepay', 'googlepay'] })
+  })
+
+  it('never sends a blacklist beside the allow-list', async () => {
+    const { deps, create } = harness()
+    const on = { ...deps, wechatPay: true }
+    for (const method of ['card', 'alipay'] as const) {
+      for (const id of ['max_yearly', 'max_monthly', 'pack_s'] as const) await createWaffoCheckout(on, { userId: USER, body: body(id, method) })
+    }
+    for (const [request] of create.mock.calls) expect(request).not.toHaveProperty('excludePaymentMethods')
+  })
 })
 
 describe('createWaffoCheckout', () => {
@@ -93,14 +112,13 @@ describe('createWaffoCheckout', () => {
     }, 'en')
   })
 
-  it('Alipay and packs stay one-time products: no trial, no payment-method list', async () => {
+  it('Alipay and packs stay one-time products: no trial', async () => {
     const { deps, create, trackStart } = harness()
     await createWaffoCheckout(deps, { userId: USER, body: { ...body('max_yearly', 'alipay'), locale: 'zh' } })
     await createWaffoCheckout(deps, { userId: USER, body: body('pack_l') })
     const [alipay, pack] = create.mock.calls.map((call) => call[0] as unknown as Record<string, unknown>)
     for (const request of [alipay, pack]) {
       expect(request).not.toHaveProperty('withTrial')
-      expect(request).not.toHaveProperty('includePaymentMethods')
     }
     expect(alipay).toMatchObject({ productId: 'PROD_maxyearly', priceSnapshot: { amount: '713.00' }, language: 'zh-Hans' })
     expect(pack).toMatchObject({ productId: 'PROD_packl' })

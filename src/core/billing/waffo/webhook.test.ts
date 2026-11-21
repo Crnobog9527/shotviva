@@ -309,9 +309,26 @@ describe('paymentFacts', () => {
     expect(paymentFacts(order({}), pack)).toMatchObject({ amountTotal: 990, amountTax: 0, currency: 'usd' })
   })
 
-  it('reads the wallet from the brand: Alipay is alipay, cards and anything else are card', () => {
-    expect(chargedMethod({ paymentMethod: 'ewallet', paymentMethodBrand: 'alipayhk' })).toBe('alipay')
-    expect(chargedMethod({ paymentMethod: 'card', paymentMethodBrand: 'visa' })).toBe('card')
+  it('reads the recorded method from the payload: WeChat Pay, Alipay, and card for cards and card wallets', () => {
+    const method = (paymentMethod?: string, paymentMethodBrand?: string) => chargedMethod({ paymentMethod, paymentMethodBrand })
+    // Real shape (docs.waffo.ai "Webhooks"): both wallets arrive as paymentMethod "ewallet".
+    expect(method('ewallet', 'wechatpay')).toBe('wechat_pay')
+    expect(method('EWALLET', 'WeChatPay')).toBe('wechat_pay')
+    expect(method('wechat', undefined)).toBe('wechat_pay')
+    expect(method('ewallet', 'alipay')).toBe('alipay')
+    expect(method('ewallet', 'alipayhk')).toBe('alipay')
+    expect(method('ALIPAY', undefined)).toBe('alipay')
+    for (const brand of ['visa', 'mastercard', 'amex', 'applepay', 'googlepay']) expect(method('card', brand)).toBe('card')
+    expect(method('applepay', undefined)).toBe('card')
+    expect(method('googlepay', undefined)).toBe('card')
+    expect(method(undefined, undefined)).toBe('card')
     expect(toCents('1234.5')).toBe(123450)
+  })
+
+  it('records the method without touching the amounts', () => {
+    const base = { chargedAmount: '10.79', currency: 'USD', listPrice: { total: '10.79', subtotal: '9.90', taxAmount: '0.89' } }
+    const wechat = paymentFacts(order({ ...base, paymentMethod: 'ewallet', paymentMethodBrand: 'wechatpay' }), pack)
+    const card = paymentFacts(order({ ...base, paymentMethod: 'card', paymentMethodBrand: 'visa' }), pack)
+    expect(wechat).toEqual({ ...card, method: 'wechat_pay' })
   })
 })
