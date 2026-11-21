@@ -13599,6 +13599,24 @@ $$;
 ALTER FUNCTION "public"."org_remove_member"("p_owner" "uuid", "p_member" "uuid", "p_request_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."org_rotate_invite"("p_owner" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  o public.orgs;
+  token text := replace(gen_random_uuid()::text, '-', '');
+begin
+  o := public._org_lock_owned(p_owner, true);
+  update public.orgs set invite_token = token, updated_at = now() where id = o.id;
+  return token;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."org_rotate_invite"("p_owner" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."org_set_allowance"("p_owner" "uuid", "p_member" "uuid", "p_allowance" integer) RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -23587,6 +23605,11 @@ GRANT ALL ON FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid"
 
 REVOKE ALL ON FUNCTION "public"."org_remove_member"("p_owner" "uuid", "p_member" "uuid", "p_request_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_remove_member"("p_owner" "uuid", "p_member" "uuid", "p_request_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_rotate_invite"("p_owner" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_rotate_invite"("p_owner" "uuid") TO "service_role";
 
 
 

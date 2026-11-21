@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
+import { useFormatter, useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 
 import { hasAffiliateDashboard } from '@/core/affiliate/feature'
 import { AppPage } from '@/core/app-shell'
 import { AccountHeader, AccountView, GiftClaimCard, InviteCard, RedeemCard, STRIP_FRAMES } from '@/core/account/ui'
+import { Group, RowsPanel, groupClass } from '@/core/account/ui/rows'
 import { createAdminSupabase, createServerSupabase, readClaimOptions, readSignupGift, requireUser } from '@/core/auth'
 import { maskPhone } from '@/core/auth/phone'
 import { readPendingDiscount } from '@/core/codes/server'
@@ -13,6 +15,8 @@ import { purchaseLines } from '@/core/billing/documents'
 import { lastMembership, readMemberSince, readSubscriptionSummary } from '@/core/billing/subscription'
 import { listMonthWorks } from '@/core/jobs'
 import { serverEnv } from '@/core/env'
+import { readOrgView } from '@/core/org/console'
+import { OwnerEntryRow, StaffCardView } from '@/core/org/ui'
 import { readLinkStatus } from '@/core/partner'
 import { graylumIntroLinks } from '@/core/partner/ui'
 import { formatMoney, hasUnreadReply, listPaymentOptions, paymentChoices, PICKER_LIMIT, ReplyTime } from '@/core/support'
@@ -26,6 +30,7 @@ import { site } from '@/site/site.config'
 import { actions, helpActions } from './account-actions'
 import { claimGoogleAction, claimPhoneSendAction, claimPhoneVerifyAction } from './claim-actions'
 import { loadMyInvites } from './invite-action'
+import { leaveOrgAction } from './org-actions'
 import { loadStoreProfile, saveStoreProfileAction } from './store-actions'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -39,7 +44,7 @@ async function Account() {
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
   const history = contractProducts(admin)
-  const [graylum, balance, subscription, signupGift, helpUnread, payments, since, works, t, locale, discount, affiliate, offers, identities] = await Promise.all([
+  const [graylum, balance, subscription, signupGift, helpUnread, payments, since, works, t, locale, discount, affiliate, offers, identities, org] = await Promise.all([
     readLinkStatus(supabase, user.id),
     readBalance(supabase, user.id),
     history.then(products => readSubscriptionSummary(admin, user.id, products)),
@@ -54,6 +59,7 @@ async function Account() {
     hasAffiliateDashboard(user.id),
     displayProducts(),
     history,
+    readOrgView(user.id, { db: admin, maskPhone }),
   ])
   // 1480: an account over the per-network allowance can still claim its signup gift.
   const claimOptions = signupGift.reason === 'same_ip_pending' ? await readClaimOptions(admin) : null
@@ -68,6 +74,7 @@ async function Account() {
     <>
       <AccountView data={data} actions={actions} site={{ brand: site.brand.name, products: offers, freeCredits: signupGift.granted }}>
         {claimOptions ? <GiftClaimCard credits={site.billing.freeCredits} options={claimOptions} actions={claimActions} /> : null}
+        <OrgBlock view={org} />
         <StoreCard actions={storeActions} />
         <InviteCard load={loadMyInvites} />
         <RedeemCard pending={discount} />
@@ -77,6 +84,32 @@ async function Account() {
   )
 }
 
+// The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a
+// member gets their card; everyone else sees nothing.
+function OrgBlock({ view }: { view: Awaited<ReturnType<typeof readOrgView>> }) {
+  const t = useTranslations('app.org.entry')
+  const format = useFormatter()
+  if (view.kind === 'owner') {
+    const pool = format.number(view.org.poolCredits)
+    return (
+      <Group title={t('title')}>
+        <RowsPanel>
+          <OwnerEntryRow name={view.org.name} pool={pool} suspended={view.org.status === 'suspended'} />
+        </RowsPanel>
+      </Group>
+    )
+  }
+  if (view.kind === 'member') {
+    return (
+      <div className={groupClass}>
+        <StaffCardView data={view} actions={staffActions} loadInvite={loadMyInvites} />
+      </div>
+    )
+  }
+  return null
+}
+
+const staffActions = { leave: leaveOrgAction }
 const storeActions = { load: loadStoreProfile, save: saveStoreProfileAction }
 const claimActions = { sendCode: claimPhoneSendAction, verifyCode: claimPhoneVerifyAction, google: claimGoogleAction }
 

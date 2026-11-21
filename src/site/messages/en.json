@@ -1758,6 +1758,152 @@
         "failed": "Couldn't save. Please try again."
       },
       "photosGone": "The photos from that issue are gone: {boxes}. Please upload them again."
+    },
+    "org": {
+      "metaTitle": "Company",
+      "back": "Back to account",
+      "suspendedBanner": "This company account is paused. Members keep their credits, but pool actions are off until it's reactivated. Contact us to resume.",
+      "errors": {
+        "NOT_OWNER": "Only the company's main admin can do this.",
+        "SUSPENDED": "This company account is paused, so credits can't be moved right now. Contact us to reactivate it.",
+        "POOL_INSUFFICIENT": "The company pool doesn't have enough credits for that.",
+        "CREDITS_INSUFFICIENT": "You don't have that many credits of your own to put in. Credits the company gave you can't be deposited back.",
+        "MEMBER_NOT_FOUND": "That person is no longer in the company.",
+        "OWNER_CANNOT_LEAVE": "The main admin can't leave the company.",
+        "INVITE_INVALID": "This invite link is no longer valid. Ask your company admin for a new one.",
+        "ALREADY_IN_ORG": "Your account already belongs to a company. Leave it first to join another.",
+        "PERSONAL_AFFILIATE": "Your account has a personal affiliate program, which can't be combined with a company. Contact us and we'll help you switch.",
+        "PERSONAL_AFFILIATE_UNSETTLED": "Your personal affiliate account still has unsettled earnings. Contact us to settle it first.",
+        "BANNED": "This account can't join a company.",
+        "INVALID": "Check the number you entered and try again.",
+        "CONFLICT": "That request was already used for something different. Refresh the page and try again.",
+        "FAILED": "Something went wrong. Please try again."
+      },
+      "tabs": {
+        "label": "Company sections",
+        "console": "Company",
+        "affiliate": "Company affiliate"
+      },
+      "entry": {
+        "title": "Company",
+        "pool": "Pool {pool} credits",
+        "suspended": "Account paused",
+        "open": "Manage"
+      },
+      "pool": {
+        "title": "Credit pool",
+        "hint": "Credits your company holds. Give them to members, who spend them on their own generations.",
+        "balance": "In the pool",
+        "unit": "credits",
+        "yours": "Yours to deposit",
+        "yoursNote": "your own paid credits",
+        "suspended": "The company is paused: deposits are off.",
+        "depositLabel": "Deposit your own credits",
+        "depositPlaceholder": "Number of credits",
+        "depositHint": "Moves credits you bought into the pool. Pool credits can't be refunded or moved back.",
+        "deposit": "Deposit",
+        "depositing": "Depositing…",
+        "deposited": "Deposited into the pool."
+      },
+      "packages": {
+        "title": "Company packages",
+        "hint": "Prices are in US dollars. Orders are placed offline.",
+        "none": "No packages are listed right now.",
+        "credits": "{count, plural, one {# credit} other {# credits}}",
+        "contact": "To top up the pool, contact us and pay by bank transfer. We add the credits to your pool once the payment arrives.",
+        "contactLink": "Contact us to arrange a transfer"
+      },
+      "invite": {
+        "title": "Invite link",
+        "hint": "Send this link to your team. Anyone signed in who opens it can join the company.",
+        "suspended": "The company is paused, so nobody can join with this link for now.",
+        "copy": "Copy link",
+        "copied": "Link copied.",
+        "copyFailed": "Select and copy the link above.",
+        "reset": "Reset link",
+        "resetTitle": "Reset the invite link?",
+        "resetBody": "The current link stops working right away. People already in the company stay.",
+        "resetConfirm": "Reset link",
+        "resetDone": "New link ready.",
+        "cancel": "Cancel"
+      },
+      "members": {
+        "title": "Members",
+        "hint": "Monthly allowance tops each person up to that number of credits on the 1st (UTC). Give now moves credits from the pool straight away.",
+        "unknown": "Account",
+        "owner": "Main admin",
+        "held": "{count, plural, one {# company credit left} other {# company credits left}}",
+        "customers": "{count, plural, one {# customer} other {# customers}}",
+        "allowance": "Monthly allowance",
+        "allowanceFor": "Monthly allowance for {who}",
+        "allowanceSaved": "Allowance saved.",
+        "save": "Save",
+        "giveNow": "Give now",
+        "giveFor": "Credits to give {who}",
+        "given": "Gave {count, plural, one {# credit} other {# credits}}.",
+        "give": "Give",
+        "giving": "Giving…",
+        "remove": "Remove",
+        "removeTitle": "Remove {who}?",
+        "removeBody": "The company's unspent credits go back to the pool. Credits they bought themselves stay with them. Customers they brought stay with the company.",
+        "removeConfirm": "Remove",
+        "removed": "Removed.",
+        "cancel": "Cancel",
+        "truncated": "Showing {shown} of {total} members.",
+        "inviteEmpty": "No one has joined yet. Send them the invite link above."
+      },
+      "performance": {
+        "title": "Monthly performance",
+        "hint": "Credits given and used, and customers each member brought, by month.",
+        "pending": "The monthly report and CSV export are coming soon."
+      },
+      "staff": {
+        "title": "My company: {org}",
+        "hint": "Credits your company gives you each month, and your promo link.",
+        "suspended": "Your company account is paused. Your own credits are unaffected.",
+        "allowance": "Monthly allowance",
+        "allocated": "Given this month",
+        "remaining": "Company credits left",
+        "promoTitle": "My promo link",
+        "promoHint": "Customers who sign up with your link count for your company.",
+        "showLink": "Show my link",
+        "loading": "Loading…",
+        "retry": "Try again",
+        "linkFailed": "Couldn't load your link.",
+        "customers": "My customers",
+        "customersNote": "signed up with your link",
+        "spend": "Customer spend",
+        "spendPending": "Coming soon",
+        "leave": "Leave company",
+        "leaveTitle": "Leave {org}?",
+        "leaveBody": "The company's unspent credits go back to its pool. Credits you bought yourself stay with you, and customers you brought stay with the company.",
+        "leaveConfirm": "Leave",
+        "left": "You left the company.",
+        "cancel": "Cancel"
+      },
+      "join": {
+        "metaTitle": "Join a company",
+        "invalidTitle": "This link doesn't work",
+        "invalidBody": "The invite link is wrong or has been reset. Ask your company admin for a new one.",
+        "suspendedTitle": "Company paused",
+        "suspendedBody": "{org} isn't accepting new members right now.",
+        "alreadyTitle": "You're already in {org}",
+        "alreadyBody": "Your account is already a member of this company.",
+        "otherTitle": "You're in another company",
+        "otherBody": "An account belongs to one company at a time. Leave your current company on the account page first.",
+        "title": "Join {org}",
+        "body": "Joining lets your company give you credits and counts customers you bring toward your company. You can leave at any time.",
+        "confirm": "Join {org}",
+        "joining": "Joining…",
+        "done": "You joined {org}.",
+        "toAccount": "Go to my account"
+      },
+      "payment": {
+        "title": "Pay by bank transfer",
+        "hint": "Transfer to one of the accounts below and put “{org}” in the payment note.",
+        "pending": "Our collecting account details aren't available here right now. Contact us and we'll send them to you.",
+        "after": "After you transfer, contact us. We confirm the payment and then add the credits to your pool."
+      }
     }
   },
   "paywall": {
@@ -2337,8 +2483,7 @@
     },
     "enterprise": {
       "pill": "Company account",
-      "title": "Your company's partner dashboard",
-      "body": "Your account belongs to a company on Shotviva, so it can't join the personal partner program. Customers who sign up with your invite link or code count for your company. The company dashboard is coming soon."
+      "title": "Company partner dashboard"
     }
   },
   "gallery": {

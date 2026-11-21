@@ -32,6 +32,8 @@ export const APP_ONLY_APP_KEYS = [
   'notify',
   // 每周复用 (§5.3): the poster editor, the creation dialogs and the account card only.
   'weekly',
+  // 企业 (§6.5): the owner's console, the member card and the join page.
+  'org',
 ] as const
 
 type Messages = Record<string, unknown>
