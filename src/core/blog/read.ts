@@ -80,15 +80,19 @@ export async function readPublishedPost(db: Db, locale: Locale, slug: string): P
 }
 
 // Every published post's address and last edit, both languages, for the sitemap.
-export async function readSitemapPosts(db: Db): Promise<Pick<PostSummary, 'locale' | 'slug' | 'updatedAt'>[]> {
+export async function readSitemapPosts(db: Db): Promise<Pick<PostSummary, 'locale' | 'slug' | 'updatedAt' | 'authorName'>[]> {
   const { data, error } = await db
     .from('blog_posts')
-    .select('locale, slug, updated_at')
+    .select('locale, slug, updated_at, author_name')
     .eq('status', 'published')
     .order('published_at', { ascending: false })
     .limit(SITEMAP_LIMIT)
   if (error) throw new Error(`blog_posts sitemap read failed: ${error.message}`)
-  return z.object({ locale: z.enum(LOCALES), slug: z.string(), updated_at: z.string() }).array().parse(data).map((row) => ({ locale: row.locale, slug: row.slug, updatedAt: row.updated_at }))
+  return z
+    .object({ locale: z.enum(LOCALES), slug: z.string(), updated_at: z.string(), author_name: z.string() })
+    .array()
+    .parse(data)
+    .map((row) => ({ locale: row.locale, slug: row.slug, updatedAt: row.updated_at, authorName: row.author_name }))
 }
 
 // A failed read (a build without the table, an outage) is kept only a minute, so pages heal.
@@ -123,7 +127,7 @@ export async function cachedHasPublishedPosts(locale: Locale): Promise<boolean> 
   return orFallback(async () => (await readPublishedPosts(createAdminSupabase(), locale, 1)).length > 0, false)
 }
 
-export async function cachedSitemapPosts(): Promise<Pick<PostSummary, 'locale' | 'slug' | 'updatedAt'>[]> {
+export async function cachedSitemapPosts(): Promise<Pick<PostSummary, 'locale' | 'slug' | 'updatedAt' | 'authorName'>[]> {
   'use cache'
   cacheTag(BLOG_CACHE_TAG)
   return orFallback(() => readSitemapPosts(createAdminSupabase()), [])

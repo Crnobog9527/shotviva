@@ -21,6 +21,7 @@ export const BLOG_COPY = {
     description: '简介（meta description）',
     descriptionHint: '搜索结果里显示的一句话，最多 320 字，建议 150 字内。',
     author: '作者名',
+    authorHint: '和已登记作者的名字完全一致（目前是 Simon Lee）时，署名会链接到作者页；其他名字只显示文字。',
     cover: '封面图',
     coverHint: '会转成 WebP，最长边 1600。建议 1200×630。',
     coverAlt: '封面图替代文字',
@@ -44,7 +45,7 @@ export const BLOG_COPY = {
   unpublished: '已撤回，前台已不再显示。',
   unsavedFirst: '先保存，再发布。',
   dirty: '有未保存的修改：先保存，再发布；已发布的文章要保存后前台才会更新。',
-  invalid: '标题、网址、简介、作者必填，网址只能用小写英文、数字和连字符，有封面就要填替代文字。',
+  invalid: '标题、网址、简介、作者必填，网址只能用小写英文、数字和连字符（不能用 author），有封面就要填替代文字。',
   viewLive: '查看前台页面',
   statusLabel: '当前状态',
 } as const
