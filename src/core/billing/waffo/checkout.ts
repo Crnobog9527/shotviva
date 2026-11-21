@@ -62,11 +62,14 @@ export function isRecurring(product: SiteProduct, method: CheckoutBody['method']
   return product.tier !== 'pack' && method === 'card'
 }
 
-// The recurring session takes cards only, so a subscription is never paid by a one-off method.
-// Over WeChat Pay's cap a one-time page leaves it out rather than offer a payment that fails.
-function methodFilter(recurring: boolean, overWechat: boolean): Pick<WaffoSessionRequest, 'includePaymentMethods' | 'excludePaymentMethods'> {
-  if (recurring) return { includePaymentMethods: ['card'] }
-  return overWechat ? { excludePaymentMethods: ['wechat'] } : {}
+// Which methods the hosted page shows, by an allow-list only (Waffo takes include or exclude,
+// never both). The paywall's card row is cards (a subscription renews, a pack is one payment); its
+// wallet row is Alipay, plus WeChat Pay while the store offers it (WAFFO_WECHAT_PAY) and the price
+// is under the cap (wechat-limit.ts). Subscriptions are card-only. Apple Pay and Google Pay are
+// left off: the Waffo card row promises cards (paywall/copy.ts), so the page matches it.
+export function waffoMethods(method: CheckoutBody['method'], recurring: boolean, wechat: boolean): readonly string[] {
+  if (recurring || method !== 'alipay') return ['card']
+  return wechat ? ['alipay', 'wechat'] : ['alipay']
 }
 
 export function waffoSessionRequest(
@@ -89,7 +92,7 @@ export function waffoSessionRequest(
     metadata: { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale, ...quoteMetadata(input.quote) },
     orderMerchantExternalId: input.quote ? `v2_${input.orderRef}` : input.orderRef,
     language: body.locale === 'zh' ? 'zh-Hans' : 'en',
-    ...methodFilter(recurring, deps.wechatPay === true && overWechatLimit(cents)),
+    includePaymentMethods: waffoMethods(body.method, recurring, deps.wechatPay === true && !overWechatLimit(cents)),
     // The default can expose merchant dashboard codes; v2 offers exactly the quoted pack/plan.
     ...(input.quote && { allowPromotionCodes: false }),
     ...(input.quote && recurring ? { withTrial: false } : {}),
@@ -111,7 +114,7 @@ export async function createWaffoCheckout(
     quote: input.quote,
     orderRef: input.bound?.attempt.token ?? (deps.newOrderRef ?? randomUUID)(),
   })
-  const url = input.bound ? await openBound(deps.waffo, input.userId, input.bound, request)
+  const url = input.bound ? await openBound(deps.waffo, input.userId, input.bound, request, isRecurring(product, input.body.method))
     : checkoutUrl(await deps.waffo.createCheckoutSession(request))
   ;(deps.trackStart ?? trackCheckoutStart)(input.userId, {
     product_id: product.id,
@@ -124,9 +127,8 @@ export async function createWaffoCheckout(
   return { url }
 }
 
-async function openBound(waffo: WaffoCheckoutDeps['waffo'], user: string, bound: BoundCheckout, request: WaffoSessionRequest) {
+async function openBound(waffo: WaffoCheckoutDeps['waffo'], user: string, bound: BoundCheckout, request: WaffoSessionRequest, recurring: boolean) {
   const { db, attempt, store } = bound
-  const recurring = Boolean(request.includePaymentMethods)
   const key = recurring ? 'subscription' : 'one_time'
   request.productId = await channelPrice(db, attempt, 'waffo', key, recurring, store) ?? request.productId
   Object.assign(request.metadata, {
