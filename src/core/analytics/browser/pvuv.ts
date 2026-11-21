@@ -4,6 +4,8 @@
 // (consent/decision.ts cookiesAllowed, the rule PostHog follows): the script keeps a visitor id
 // in first-party cookies and localStorage, which PostHog's memory mode would not.
 
+import { pvuvProps, type PvuvProps } from '../pvuv/props'
+
 export const PVUV_SCRIPT_SRC = 'https://www.pvuv.ai/f.js'
 export const PVUV_API = 'https://in.pvuv.ai'
 
@@ -19,8 +21,11 @@ const STORAGE_KEY = /^_pv/
 type Pvuv = (command: string, ...args: unknown[]) => void
 type PvuvWindow = Window & { pvuv?: Pvuv }
 
+// Events and the sign-in id of the first seconds, before the script is in (kept in order).
+const MAX_QUEUED = 50
 let loaded = false
 let pendingUserId: string | null = null
+let pendingEvents: Array<[string, PvuvProps]> = []
 
 export function pvuvAttributes(site: string): Record<string, string> {
   return {
@@ -43,7 +48,7 @@ export function loadPvuv(site: string, doc: Document = document): void {
   loaded = true
   const script = doc.createElement('script')
   for (const [name, value] of Object.entries(pvuvAttributes(site))) script.setAttribute(name, value)
-  script.addEventListener('load', flushIdentity, { once: true })
+  script.addEventListener('load', flushPending, { once: true })
   doc.head.appendChild(script)
 }
 
@@ -51,19 +56,30 @@ function pvuvOf(win: Window): Pvuv | undefined {
   return (win as PvuvWindow).pvuv
 }
 
-function flushIdentity(): void {
-  if (pendingUserId === null) return
+function flushPending(): void {
   const call = pvuvOf(window)
-  if (call) call('identify', pendingUserId)
+  if (!call) return
+  if (pendingUserId !== null) call('identify', pendingUserId)
   pendingUserId = null
+  const events = pendingEvents
+  pendingEvents = []
+  for (const [name, props] of events) call('event', name, props)
 }
 
 // The Supabase user id, an opaque id and never an email (same rule as PostHog's identify, §16.1).
-// Before the script is in, it is kept and sent when it loads; with the script off, dropped.
+// The caller has checked consent. Before the script is in it is kept and sent when it loads.
 export function pvuvIdentify(userId: string): void {
-  if (!loaded) return
   pendingUserId = userId
-  if (pvuvOf(window)) flushIdentity()
+  flushPending()
+}
+
+// A dictionary event (already validated, events.ts) as a PVUV goal. The caller has checked
+// consent. Sent at once when the script is in, else queued for when it loads.
+export function pvuvEvent(name: string, props: Record<string, unknown>): void {
+  const flat = pvuvProps(props)
+  const call = pvuvOf(window)
+  if (call) call('event', name, flat)
+  else if (pendingEvents.length < MAX_QUEUED) pendingEvents.push([name, flat])
 }
 
 // What PVUV keeps in this browser: the _pv_* cookies (host and parent domains) and storage keys.
@@ -86,4 +102,5 @@ export function clearPvuvStorage(doc: Document, storages: Storage[]): void {
 export function resetPvuvForTest(): void {
   loaded = false
   pendingUserId = null
+  pendingEvents = []
 }

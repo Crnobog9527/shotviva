@@ -1,5 +1,6 @@
 'use client'
 
+import { localeOfPath } from '../../i18n/paths'
 import { logger } from '../../logger'
 import { publicEnv } from '../../public-env'
 import { cookiesAllowed, persistenceFor } from '../consent/decision'
@@ -9,7 +10,7 @@ import type { BrowserEventName, EventProps } from '../events'
 import { sentryOptions } from '../sentry-options'
 import { clearPosthogStorage, syncPosthog } from './consent-sync'
 import { posthogConfig } from './posthog-config'
-import { clearPvuvStorage, loadPvuv, pvuvIdentify, pvuvLoaded } from './pvuv'
+import { clearPvuvStorage, loadPvuv, pvuvEvent, pvuvIdentify, pvuvLoaded } from './pvuv'
 import { afterLoad, loadedSdks, loadSdks, withSdks } from './sdk'
 
 let started = false
@@ -90,7 +91,11 @@ function clearStorage(): void {
   }
 }
 
-const enabled = () => started && Boolean(publicEnv.NEXT_PUBLIC_POSTHOG_KEY)
+const posthogOn = () => started && Boolean(publicEnv.NEXT_PUBLIC_POSTHOG_KEY)
+// PVUV gets events and the sign-in id only where its script may run (cookies allowed, the same rule
+// as loading it); otherwise they are dropped, as PostHog's memory mode keeps nothing either.
+const pvuvOn = () => started && Boolean(publicEnv.NEXT_PUBLIC_PVUV_SITE) && cookiesAllowed(readConsent())
+const enabled = () => posthogOn() || pvuvOn()
 
 // The dictionary's zod schemas (about 30 KB gzip with zod) load with the first event, not with
 // the page: every marketing page used to carry them in its first-load JavaScript (mobile
@@ -109,6 +114,7 @@ export function track<E extends BrowserEventName>(event: E, props: EventProps<E>
       return
     }
     withSdks(({ posthog }) => posthog?.capture(event, checked.props))
+    if (pvuvOn()) pvuvEvent(event, { ...checked.props, locale: localeOfPath(window.location.pathname) })
   })
 }
 
@@ -160,8 +166,8 @@ export function trackUploadError(reason: EventProps<'upload_error'>['reason']): 
 
 // The Supabase user id, nothing else: no email or name as person properties (§16.1).
 export function identify(userId: string): void {
-  if (started) pvuvIdentify(userId)
-  if (!enabled()) return
+  if (pvuvOn()) pvuvIdentify(userId)
+  if (!posthogOn()) return
   withSdks(({ posthog }) => {
     if (posthog && posthog.get_distinct_id() !== userId) posthog.identify(userId)
   })
@@ -176,7 +182,7 @@ export function resetIdentity(): void {
       // Storage blocked: there is nothing of ours in it either.
     }
   }
-  if (enabled()) withSdks(({ posthog }) => posthog?.reset())
+  if (posthogOn()) withSdks(({ posthog }) => posthog?.reset())
 }
 
 // Next calls this on every client navigation. Before Sentry is in there is nothing to record

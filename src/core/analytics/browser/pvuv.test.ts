@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { clearPvuvStorage, PVUV_EXCLUDE, pvuvAttributes } from './pvuv'
 
@@ -42,5 +42,28 @@ describe('clearPvuvStorage', () => {
     expect(written.some((c) => c.startsWith('sv_analytics_consent'))).toBe(false)
     expect('_pv_v' in store).toBe(false)
     expect(store.sv_analytics_consent).toBe('accepted')
+  })
+})
+
+describe('pvuvEvent / pvuvIdentify queue', () => {
+  it('keeps events and the sign-in id until the script defines window.pvuv, then sends them in order', async () => {
+    const { pvuvEvent, pvuvIdentify, loadPvuv, resetPvuvForTest } = await import('./pvuv')
+    resetPvuvForTest()
+    const calls: unknown[][] = []
+    const listeners: Record<string, () => void> = {}
+    const win: Record<string, unknown> = {}
+    vi.stubGlobal('window', win)
+    const doc = { createElement: () => ({ setAttribute() {}, addEventListener: (n: string, f: () => void) => (listeners[n] = f) }), head: { appendChild() {} } }
+    pvuvEvent('paywall_view', { trigger: 'account', skip: null })
+    pvuvIdentify('u1')
+    loadPvuv('site1', doc as unknown as Document)
+    expect(calls).toHaveLength(0)
+    win.pvuv = (...args: unknown[]) => calls.push(args)
+    listeners.load?.()
+    expect(calls).toEqual([['identify', 'u1'], ['event', 'paywall_view', { trigger: 'account' }]])
+    pvuvEvent('upload', { compressed: true })
+    expect(calls.at(-1)).toEqual(['event', 'upload', { compressed: true }])
+    vi.unstubAllGlobals()
+    resetPvuvForTest()
   })
 })
