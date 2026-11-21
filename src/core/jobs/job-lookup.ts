@@ -24,6 +24,24 @@ export async function findOwnJob(client: SupabaseClient, userId: string, jobId: 
   return data === null ? null : jobRowSchema.parse(data)
 }
 
+// The batch status read (GET /api/generate/status): the same owner and deleted_at rule as
+// findOwnJob, for up to STATUS_IDS_MAX ids at once by primary key. Ids that are not uuids, not the
+// caller's or deleted are simply absent.
+export const STATUS_IDS_MAX = 50
+
+export async function findOwnJobs(client: SupabaseClient, userId: string, jobIds: readonly string[]): Promise<Job[]> {
+  const ids = [...new Set(jobIds.filter(isUuid))].slice(0, STATUS_IDS_MAX)
+  if (ids.length === 0) return []
+  const { data, error } = await client
+    .from('generation_jobs')
+    .select(JOB_COLUMNS)
+    .in('id', ids)
+    .eq('user_id', userId)
+    .is('deleted_at', null)
+  if (error) throw new AppError('INTERNAL', `findOwnJobs failed: ${error.message}`)
+  return (data ?? []).map((row) => jobRowSchema.parse(row))
+}
+
 // Partner replays (ARCHITECTURE §14.4): the caller's callId finds the job it already started.
 // Scoped by owner like the unique index, so one account's key never reaches another's job.
 export async function findJobByIdempotencyKey(client: SupabaseClient, userId: string, key: string): Promise<Job | null> {

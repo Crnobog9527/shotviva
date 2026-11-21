@@ -36,6 +36,7 @@
     "seo:ssr": "tsx --require ./scripts/ci/ignore-css.cjs scripts/ssr-seo-audit.ts",
     "js:budget": "tsx scripts/js-budget.ts",
     "html:budget": "tsx scripts/html-budget.ts",
+    "warm:prod": "node scripts/warm-cache.mts https://shotviva.com --force",
     "css:sources": "tsx scripts/public-css-sources.ts",
     "css:check": "tsx scripts/public-css-check.ts",
     "images:first-frames": "tsx scripts/first-frames.ts",

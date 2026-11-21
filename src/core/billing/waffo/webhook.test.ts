@@ -17,7 +17,8 @@ let rpc: ReturnType<typeof vi.fn>
 let deps: WaffoWebhookDeps
 
 beforeEach(() => {
-  rpc = vi.fn(async () => ({ data: { applied: true, credits: 20, free_credits: 0, paid_until: null }, error: null }))
+  // payment_fee_target (F3's fee step) finds no payments row in these tests, so no fee is written.
+  rpc = vi.fn(async (fn: string) => fn === 'payment_fee_target' ? { data: null, error: null } : { data: { applied: true, credits: 20, free_credits: 0, paid_until: null }, error: null })
   deps = {
     db: { rpc } as unknown as WaffoWebhookDeps['db'],
     products: TEST_PRODUCTS,
@@ -232,7 +233,8 @@ describe('handleWaffoWebhook, upgrades (T66)', () => {
 
   it('a replayed charge still runs the step, and it runs after the grant', async () => {
     const order: string[] = []
-    rpc.mockImplementation(async () => {
+    rpc.mockImplementation(async (fn: string) => {
+      if (fn === 'payment_fee_target') return { data: null, error: null }
       order.push('settle')
       return { data: { applied: false, credits: 20, free_credits: 0, paid_until: null }, error: null }
     })
