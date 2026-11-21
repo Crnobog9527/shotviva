@@ -2031,7 +2031,7 @@
     "choose": "Choose {tier}",
     "upgradeTo": "Upgrade to {tier}",
     "savingLabel": "You save<vs> vs monthly</vs>",
-    "savingAmount": "{amount} a year · {about, select, true {about } other {}}{pct}% off",
+    "savingAmount": "{amount}\u00a0a\u00a0year · {about, select, true {about\u00a0} other {}}{pct}%\u00a0off",
     "mostPopular": "Most popular",
     "memberPrice": "Member price",
     "memberCodeKept": "Member price. Your discount code is saved for another purchase.",
