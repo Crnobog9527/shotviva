@@ -22,7 +22,7 @@ export function OwnerConsoleView({ data, actions, report }: { data: OwnerConsole
       ) : null}
       <PoolPanel data={data} actions={actions} />
       <PackagesPanel packages={data.packages} />
-      <PaymentAccountsPanel groups={data.paymentAccounts} orgName={data.org.name} />
+      <PaymentAccountsPanel groups={data.paymentAccounts} orgName={data.org.name} refCode={data.org.refCode} />
       <InvitePanel data={data} actions={actions} />
       <MembersPanel data={data} actions={actions} />
       <PerformancePanel report={report} />

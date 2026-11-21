@@ -5,19 +5,21 @@ import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 import { PAYMENT_KINDS, type PaymentKind } from '@/core/org'
+import { parseRefCode } from '@/core/org/ref-code'
 
 import type { PaymentAccountRow, LedgerRow, LimitCaps, MemberRow, OrgAffiliate, OrgDetail, OrgListItem, OrgPackage, OrgRow } from './types'
 
 // Read side of the enterprise admin (ARCHITECTURE §6.5). The org tables have no client grant and
 // the service role may select; every write goes through the E1 functions in core/org.
 
-const ORG_FIELDS = 'id,name,owner_user_id,status,concurrency,per_window,batch_max,multi_template_max,batch_zip,early_features,affiliate_enabled,affiliate_levels,signup_bonus_credits,pool_credits,admin_note,created_at,updated_at'
+const ORG_FIELDS = 'id,name,ref_code,owner_user_id,status,concurrency,per_window,batch_max,multi_template_max,batch_zip,early_features,affiliate_enabled,affiliate_levels,signup_bonus_credits,pool_credits,admin_note,created_at,updated_at'
 const LEDGER_LIMIT = 100
 const MEMBER_LIMIT = 100
 
 const orgSchema = z.object({
   id: z.uuid(),
   name: z.string(),
+  ref_code: z.string(),
   owner_user_id: z.uuid(),
   status: z.enum(['active', 'suspended']),
   concurrency: z.number().nullable(),
@@ -76,6 +78,7 @@ function toOrg(row: z.infer<typeof orgSchema>): OrgRow {
   return {
     id: row.id,
     name: row.name,
+    refCode: row.ref_code,
     ownerUserId: row.owner_user_id,
     status: row.status,
     concurrency: row.concurrency,
@@ -121,8 +124,13 @@ export async function listPackages(db: SupabaseClient): Promise<OrgPackage[]> {
   return z.array(packageSchema).parse(rows).map(toPackage)
 }
 
-export async function listOrgs(db: SupabaseClient): Promise<OrgListItem[]> {
-  const rows = z.array(orgSchema).parse(ok(await db.from('orgs').select(ORG_FIELDS).order('created_at', { ascending: false }).limit(500), 'orgs'))
+// `query`: an enterprise number (exact, any case) or part of an org's name; empty lists the newest 500.
+export async function listOrgs(db: SupabaseClient, query = ''): Promise<OrgListItem[]> {
+  const base = db.from('orgs').select(ORG_FIELDS)
+  const q = query.trim().slice(0, 120)
+  const code = parseRefCode(q)
+  const filtered = code ? base.eq('ref_code', code) : q ? base.ilike('name', '%' + q.replace(/[\\%_]/g, (c) => '\\' + c) + '%') : base
+  const rows = z.array(orgSchema).parse(ok(await filtered.order('created_at', { ascending: false }).limit(500), 'orgs'))
   if (rows.length === 0) return []
   const members = z.array(z.object({ org_id: z.uuid() })).parse(
     ok(await db.from('org_members').select('org_id').eq('status', 'active').limit(20000), 'member counts'),

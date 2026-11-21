@@ -23,6 +23,7 @@ const orgSchema = z.object({
   status: z.enum(['active', 'suspended']),
   pool_credits: z.number(),
   invite_token: z.string(),
+  ref_code: z.string(),
   affiliate_enabled: z.boolean(),
   affiliate_levels: z.union([z.literal(1), z.literal(2)]),
 })
@@ -94,7 +95,7 @@ async function ownerConsole({ db, mask }: { db: SupabaseClient; mask: (phone: st
   const paymentAccounts = await readPaymentAccounts(db, org.owner_user_id)
   return {
     kind: 'owner',
-    org: { id: org.id, name: org.name, status: org.status, poolCredits: org.pool_credits, affiliateEnabled: org.affiliate_enabled, affiliateLevels: org.affiliate_levels },
+    org: { id: org.id, name: org.name, refCode: org.ref_code, status: org.status, poolCredits: org.pool_credits, affiliateEnabled: org.affiliate_enabled, affiliateLevels: org.affiliate_levels },
     inviteToken: org.invite_token,
     members: members.map((m): ConsoleMember => ({
       userId: m.user_id, account: labels.get(m.user_id) ?? null, role: m.role, monthlyAllowance: m.monthly_allowance,
@@ -145,7 +146,7 @@ export async function readOrgView(user: string, { db, now = new Date(), maskPhon
   const seatRow = ok(await db.from('org_members').select('org_id,role,monthly_allowance,held_credits').eq('user_id', user).eq('status', 'active').maybeSingle(), 'seat')
   if (!seatRow) return { kind: 'none' }
   const seat = seatSchema.parse(seatRow)
-  const found = ok(await db.from('orgs').select('id,name,owner_user_id,status,pool_credits,invite_token,affiliate_enabled,affiliate_levels').eq('id', seat.org_id).maybeSingle(), 'org')
+  const found = ok(await db.from('orgs').select('id,name,owner_user_id,status,pool_credits,invite_token,ref_code,affiliate_enabled,affiliate_levels').eq('id', seat.org_id).maybeSingle(), 'org')
   if (!found) return { kind: 'none' }
   const org = orgSchema.parse(found)
   // The owner is the org's owner_user_id; a member row says role = 'member' for everyone else.

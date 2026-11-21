@@ -5,6 +5,8 @@ export type OrgStatus = 'active' | 'suspended'
 export type OrgRow = {
   id: string
   name: string
+  // Enterprise number for bank-transfer references (SV-XXXXXX); fixed at creation.
+  refCode: string
   ownerUserId: string
   status: OrgStatus
   concurrency: number | null

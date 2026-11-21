@@ -1,6 +1,8 @@
 import Link from 'next/link'
 
 import { Badge } from '@/core/ui/badge'
+import { Button } from '@/core/ui/button'
+import { Input } from '@/core/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
 import { formatBeijing } from '../shell/format'
@@ -16,7 +18,22 @@ export function OrgStatusBadge({ status }: { status: 'active' | 'suspended' }) {
   return <Badge variant={status === 'active' ? 'secondary' : 'destructive'}>{status === 'active' ? COPY.statusActive : COPY.statusSuspended}</Badge>
 }
 
-export function OrgTable({ orgs }: { orgs: OrgListItem[] }) {
+// A plain GET form: ?q= is an enterprise number (exact, any case) or part of an org's name.
+export function OrgSearch({ q }: { q: string }) {
+  return (
+    <form method="get" action="/admin/orgs" role="search" className="flex flex-wrap items-end gap-2">
+      <label className="grid gap-1 text-sm">
+        <span className="font-medium">{COPY.searchLabel}</span>
+        <Input name="q" defaultValue={q} maxLength={120} placeholder={COPY.searchPlaceholder} autoComplete="off" className="w-72 max-w-full" />
+      </label>
+      <Button type="submit">{COPY.searchButton}</Button>
+      {q ? <Link href="/admin/orgs" className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 hover:underline">{COPY.searchClear}</Link> : null}
+    </form>
+  )
+}
+
+export function OrgTable({ orgs, searching = false }: { orgs: OrgListItem[]; searching?: boolean }) {
+  if (orgs.length === 0 && searching) return <p className="text-sm text-muted-foreground">{COPY.searchNone}</p>
   if (orgs.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border px-6 py-12 text-center">
@@ -31,6 +48,7 @@ export function OrgTable({ orgs }: { orgs: OrgListItem[] }) {
         <TableHeader>
           <TableRow>
             <TableHead>{COPY.colName}</TableHead>
+            <TableHead>{COPY.colNumber}</TableHead>
             <TableHead>{COPY.colOwner}</TableHead>
             <TableHead>{COPY.colStatus}</TableHead>
             <TableHead className="text-right">{COPY.colPool}</TableHead>
@@ -44,6 +62,7 @@ export function OrgTable({ orgs }: { orgs: OrgListItem[] }) {
               <TableCell className="min-w-40 font-medium">
                 <Link className="underline-offset-4 hover:underline" href={`/admin/orgs/${org.id}`}>{org.name}</Link>
               </TableCell>
+              <TableCell className="font-mono whitespace-nowrap select-all">{org.refCode}</TableCell>
               <TableCell className="[overflow-wrap:anywhere]">{org.ownerAccount ?? '—'}</TableCell>
               <TableCell><OrgStatusBadge status={org.status} /></TableCell>
               <TableCell className="text-right font-mono tabular-nums">{num(org.poolCredits)}</TableCell>
