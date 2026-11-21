@@ -220,6 +220,12 @@ export async function checkSaleFloor(): Promise<number | null> {
   return deps?.config ? checkSaleFloorWith(deps, { force: true }) : null
 }
 
+// A cron's own alert (F4 fee reconciliation): awaited, so the function stays up until it is sent.
+export async function notifyOwnerNow(alert: OwnerAlert): Promise<void> {
+  const deps = defaultDeps()
+  if (deps?.config) await notifyOwnerWith(deps, alert)
+}
+
 export function getSiteErrorDelivery() {
   const deps = defaultDeps()
   return deps?.config ? {

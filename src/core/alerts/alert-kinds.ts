@@ -154,6 +154,24 @@ export type SaleFloorHiddenAlert = {
 // day is the Beijing date the cap counts; one message per day and level.
 export type SignupGiftCapAlert = { kind: 'signup_gift_cap'; day: string; level: 'half' | 'full'; granted: number; cap: number }
 
+// F4 (ARCHITECTURE §6.2 订单手续费 · 对账): what one reconciliation run found, in one message.
+// unreconciled: a payment (or refund) whose real fee was still not read after the window;
+// mismatch: the real fee differs from the estimate by more than the threshold; batch_mismatch:
+// a Stripe batch fee no set of that day's payments explains; batch_unknown: a Stripe fee entry of
+// a kind we do not know. ref: our payments row id, or the Stripe balance transaction. Each issue
+// is reported once (the job remembers); fingerprint names the set.
+export type FeeReconcileIssue = {
+  issue: 'unreconciled' | 'mismatch' | 'batch_mismatch' | 'batch_unknown'
+  channel: AlertChannel
+  ref: string
+  // The fee item (acquiring, mp, refund_fee…), when there is one.
+  fee: string | null
+  estimateCents: number | null
+  actualCents: number | null
+  days: number | null
+}
+export type PaymentFeeReconcileAlert = { kind: 'payment_fee_reconcile'; fingerprint: string; issues: FeeReconcileIssue[] }
+
 export type OwnerAlert =
   | { kind: 'template_fallback'; templateId: string; reason: string; rejected: boolean }
   | { kind: 'checkout_catalog_failed'; code: string }
@@ -172,6 +190,7 @@ export type OwnerAlert =
   | BusinessInquiryAlert
   | SaleFloorHiddenAlert
   | SignupGiftCapAlert
+  | PaymentFeeReconcileAlert
   // T108 (ARCHITECTURE §9 第 8 条): a visitor reported a work shown in the public gallery.
   | { kind: 'work_reported'; jobId: string; reason: string }
 
@@ -215,6 +234,8 @@ const POLICIES: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K }
   sale_floor_hidden: (a) => ({ key: `sale_floor_hidden:${a.fingerprint}`, cooldownMs: 24 * 60 * MINUTE, requireShared: true, money: false }),
   work_reported: (a) => ({ key: `work_reported:${a.jobId}`, cooldownMs: 60 * MINUTE, budget: 'reports', money: false }),
   signup_gift_cap: (a) => ({ key: `signup_gift_cap:${a.day}:${a.level}`, money: false }),
+  // Not a payment that failed: commissions wait (F5) rather than lose money. Once per set.
+  payment_fee_reconcile: (a) => ({ key: `payment_fee_reconcile:${a.fingerprint}`, money: false }),
 }
 
 // A redelivered webhook, a retried handler or a second instance builds the same key.
