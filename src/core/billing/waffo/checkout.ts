@@ -13,12 +13,14 @@ import { channelPrice, lockAttempt, finishWaffo, type Attempt } from '../catalog
 import type { RpcClient } from '../rpc'
 import { quoteMetadata, type CheckoutPrice } from '../checkout-price'
 import { CHECKOUT_RETURN, successPath, type CheckoutBody } from '../stripe/checkout'
+import { overWechatLimit } from '../wechat-limit'
 import type { WaffoApi, WaffoSessionRequest } from './client'
 
 // Waffo hosted checkout for one product (ARCHITECTURE §6.3, T50). A membership paid by card is a
 // Waffo subscription product that renews every month or year (cards only on the page); paid by
 // Alipay it buys one period (+30 / +365 days, same credits) as a one-time product; a pack is
-// always one-time. Waffo never offers WeChat Pay for these products.
+// always one-time. WeChat Pay appears on one-time pages only, where the store offers it
+// (WAFFO_WECHAT_PAY); a price over its CN¥1,000 cap leaves it out (wechat-limit.ts).
 // The webhook trusts nothing from the browser: it reads user and product from the order
 // metadata set here with the API key (Waffo ignores metadata from public, slug-auth sessions).
 
@@ -35,6 +37,8 @@ export type WaffoCheckoutDeps = {
   returnToHosts: readonly string[]
   trackStart?: typeof trackCheckoutStart
   newOrderRef?: () => string
+  // WAFFO_WECHAT_PAY: the store offers WeChat Pay on one-time pages.
+  wechatPay?: boolean
 }
 
 const sessionSchema = z.object({
@@ -58,12 +62,20 @@ export function isRecurring(product: SiteProduct, method: CheckoutBody['method']
   return product.tier !== 'pack' && method === 'card'
 }
 
+// The recurring session takes cards only, so a subscription is never paid by a one-off method.
+// Over WeChat Pay's cap a one-time page leaves it out rather than offer a payment that fails.
+function methodFilter(recurring: boolean, overWechat: boolean): Pick<WaffoSessionRequest, 'includePaymentMethods' | 'excludePaymentMethods'> {
+  if (recurring) return { includePaymentMethods: ['card'] }
+  return overWechat ? { excludePaymentMethods: ['wechat'] } : {}
+}
+
 export function waffoSessionRequest(
-  deps: Pick<WaffoCheckoutDeps, 'productIds' | 'subscriptionProductIds' | 'origin' | 'returnToHosts'>,
+  deps: Pick<WaffoCheckoutDeps, 'productIds' | 'subscriptionProductIds' | 'origin' | 'returnToHosts' | 'wechatPay'>,
   input: { userId: string; product: SiteProduct; body: CheckoutBody; orderRef: string; quote?: CheckoutPrice },
 ): WaffoSessionRequest {
   const { product, body } = input
   const recurring = isRecurring(product, body.method)
+  const cents = input.quote ? input.quote.cents : Math.round(product.priceUsd * 100)
   return {
     productId: recurring ? deps.subscriptionProductIds[product.id as MembershipProductId] : deps.productIds[product.id],
     currency: 'USD',
@@ -77,8 +89,7 @@ export function waffoSessionRequest(
     metadata: { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale, ...quoteMetadata(input.quote) },
     orderMerchantExternalId: input.quote ? `v2_${input.orderRef}` : input.orderRef,
     language: body.locale === 'zh' ? 'zh-Hans' : 'en',
-    // The recurring session takes cards only, so a subscription is never paid by a one-off method.
-    ...(recurring ? { includePaymentMethods: ['card'] } : {}),
+    ...methodFilter(recurring, deps.wechatPay === true && overWechatLimit(cents)),
     // The default can expose merchant dashboard codes; v2 offers exactly the quoted pack/plan.
     ...(input.quote && { allowPromotionCodes: false }),
     ...(input.quote && recurring ? { withTrial: false } : {}),

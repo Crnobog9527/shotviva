@@ -88,7 +88,7 @@ function PaymentMethodCheckout({ purchase }: { purchase: Purchase }) {
           />
         }
       >
-        <PayMethods method={method} onChange={selectMethod} kind={purchase.resolved.kind} period={purchase.period} disabled={pending} />
+        <PayMethods method={method} onChange={selectMethod} kind={purchase.resolved.kind} period={purchase.period} cents={purchase.quote.cents} disabled={pending} />
       </ResponsiveSheet>
     </>
   )

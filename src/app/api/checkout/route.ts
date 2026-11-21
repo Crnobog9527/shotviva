@@ -22,7 +22,7 @@ import { readActivePricing } from '@/core/billing/active-pricing'
 import { assertPricingVersions, buyerQuote, type BuyerQuote } from '@/core/billing/buyer-quote'
 import { configuredPricing } from '@/core/billing/checkout-price'
 import { assertCanBuy } from '@/core/billing/subscription'
-import { createWaffoCheckout, paymentChannel, waffoClient, waffoConfig } from '@/core/billing/waffo'
+import { createWaffoCheckout, paymentChannel, waffoClient, waffoConfig, waffoWechatPayEnabled } from '@/core/billing/waffo'
 import { AppError } from '@/core/errors'
 import { requestOrigin } from '@/core/request-origin'
 import { site } from '@/site/site.config'
@@ -96,6 +96,6 @@ function startStripe(origin: string, products: SiteProduct[], user: Buyer, body:
 function startWaffo(origin: string, products: SiteProduct[], userId: string, body: CheckoutBody, quote?: BuyerQuote, attempt?: Attempt) {
   if (body.expected_code) throw new AppError('CODE_CHECKOUT_OFFER_CHANGED', 'Discount is unavailable on this payment channel')
   const config = waffoConfig()
-  const deps = { origin, returnToHosts, products, waffo: waffoClient(), productIds: config.productIds, subscriptionProductIds: config.subscriptionProductIds }
+  const deps = { origin, returnToHosts, products, waffo: waffoClient(), productIds: config.productIds, subscriptionProductIds: config.subscriptionProductIds, wechatPay: waffoWechatPayEnabled() }
   return createWaffoCheckout(deps, { bound:attempt ? {attempt,db:createAdminSupabase(),store:config} : undefined, userId, body, quote: quote?.price })
 }

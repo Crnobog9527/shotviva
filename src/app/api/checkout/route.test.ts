@@ -41,6 +41,7 @@ vi.mock('@/core/billing/waffo', () => ({
   paymentChannel: mocks.channel,
   waffoClient: () => ({}),
   waffoConfig: () => ({ productIds: {}, subscriptionProductIds: {} }),
+  waffoWechatPayEnabled: () => false,
   createWaffoCheckout: mocks.createWaffoCheckout,
 }))
 
