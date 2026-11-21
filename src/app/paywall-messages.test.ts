@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { tierPerks } from '@/core/billing/paywall'
 import messages from '@/site/messages/en.json'
+import zhMessages from '@/site/messages/zh.json'
 
 // The paywall's English copy (DESIGN §4.5), checked against the keys core/billing/paywall uses.
 const t = createTranslator({ locale: 'en', messages, namespace: 'paywall' }) as unknown as (
@@ -14,7 +15,7 @@ describe('paywall messages (en)', () => {
   it('has a message for every perk on every tier, live or coming soon', () => {
     for (const wishlistLive of [true, false]) {
       for (const tier of ['starter', 'pro', 'max'] as const) {
-        const perks = tierPerks(tier, { wishlistLive, memberPacks: true })
+        const perks = tierPerks(tier, { wishlistLive, memberPacks: { starter: 5, pro: 10, max: 15 } })
         expect(t(`perkHeadings.${perks.heading}`)).not.toMatch(/paywall\./)
         expect(t(`positioning.${tier}`)).not.toMatch(/paywall\./)
         for (const perk of [...perks.live, ...perks.soon]) expect(t(`perks.${perk.key}`, perk.values)).not.toMatch(/paywall\./)
@@ -59,4 +60,30 @@ describe('paywall messages (en)', () => {
     expect(text).not.toMatch(/[一-鿿]/)
     expect(text).not.toMatch(/queue/i)
   })
+
 })
+
+describe('paywall messages: pack note and yearly saving', () => {
+  // The new member pack rate (Starter full price) and the revision-2 rate, both locales.
+  it('words the pack note from the listed member discounts', () => {
+    const zh = createTranslator({ locale: 'zh', messages: zhMessages, namespace: 'paywall' }) as unknown as typeof t
+    const o2 = { starter: 0, pro: 5, max: 10 }
+    expect(t('packsNoteV2', o2)).toBe('Small packs are full price. On medium and large packs, Pro saves 5% and Max 10%. Each pack includes the same credits for everyone.')
+    expect(t('packsNoteV2', { starter: 5, pro: 10, max: 15 })).toContain('Starter saves 5%, Pro 10% and Max 15%.')
+    expect(zh('packsNoteV2', o2)).toBe('小包不打折。中包和大包按当前会员等级计价：入门版原价、专业版省 5%、旗舰版省 10%，各档收到的包内积分相同。')
+    const markup = (locale: 'en' | 'zh', values: Record<string, unknown>) =>
+      createTranslator({ locale, messages: locale === 'en' ? messages : zhMessages, namespace: 'paywall' })
+        .markup('savePct', { ...values, b: (chunks: string) => chunks } as never)
+    expect(markup('en', { pct: 25, same: 'false', about: 'false' })).toBe('Save up to 25%')
+    expect(markup('zh', { pct: 25, same: 'false', about: 'false' })).toBe('最多省 25%')
+    expect(markup('en', { pct: 20, same: 'true', about: 'true' })).toBe('Save about 20%')
+    expect(markup('zh', { pct: 20, same: 'true', about: 'true' })).toBe('约省 20%')
+    expect(markup('zh', { pct: 20, same: 'true', about: 'false' })).toBe('省 20%')
+    expect(t('savingAmount', { amount: '$297', pct: 25, about: 'false' })).toBe('$297 a year · 25% off')
+    expect(t('savingAmount', { amount: '$46.80', pct: 20, about: 'true' })).toBe('$46.80 a year · about 20% off')
+    expect(zh('savingAmount', { amount: '$46.80', pct: 20, about: 'true' })).toBe('$46.80 · 约省 20%')
+    expect(zh('compare.cells.pct', { value: 0 })).toBe('—')
+    expect(zh('compare.cells.pct', { value: 10 })).toBe('10%')
+  })
+})
+

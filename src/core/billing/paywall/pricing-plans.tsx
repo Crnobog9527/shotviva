@@ -3,14 +3,13 @@
 import { useLocale, useTranslations } from "next-intl"
 import { useState } from "react"
 
-import { pricingV2 } from '../../public-env'
 import type { PackProduct, SiteProduct } from "../../config"
 import { buttonVariants } from "../../ui/button"
 import { cn } from "../../ui/cn"
 import { DiscountProvider, useProductQuote } from "./discount-context"
 import { DiscountBanner, DiscountEntry } from "./discount-controls"
 import { BillingToggle } from "./billing-toggle"
-import { offerLabel, packLooks, packOffers, productFor, tierOffers, yearlySavingPct, type Period, type TierOffer } from "./offer"
+import { offerLabel, packLooks, packOffers, productFor, tierOffers, yearlySaving, type Period, type TierOffer } from "./offer"
 import { PackCard } from "./pack-card"
 import { usePaywall, type PaywallTrigger } from "./paywall-context"
 import { PhotoEstimateNote } from "./photo-estimate-line"
@@ -20,6 +19,7 @@ import { usePlanReader, useStanding } from "./standing-context"
 import type { PlanStanding } from "./standing-pick"
 import { TierCard } from "./tier-card"
 import { useMoney } from "./use-money"
+import { packNote } from "./pack-note"
 
 const ghost = "w-full min-h-12 rounded-control"
 
@@ -49,7 +49,7 @@ function Plans({ products }: PricingProps) {
   return (
     <section aria-label={t("plansLabel")}>
       <DiscountBanner />
-      <BillingToggle period={period} onChange={setPeriod} savePct={yearlySavingPct(offers)} className="mt-6 md:mt-8 md:w-[400px]" />
+      <BillingToggle period={period} onChange={setPeriod} saving={yearlySaving(offers)} className="mt-6 md:mt-8 md:w-[400px]" />
       <div className="mt-3 grid gap-2 md:mt-8 md:grid-cols-3 md:gap-4">
         {offers.map((offer) => {
           const product = productFor(offer, period)
@@ -115,7 +115,7 @@ function PackRow({ packs, onPick }: { packs: PackProduct[]; onPick(id: PackProdu
     <>
       <div className="mt-6 mb-2 flex flex-wrap items-baseline justify-between gap-x-3 px-0.5 md:mt-8">
         <h2 className="text-headline font-semibold">{t("packsTitle")}</h2>
-        <span className="text-caption text-muted-foreground">{t(pricingV2 ? "packsNoteV2" : "packsNote")}</span>
+        <span className="text-caption text-muted-foreground">{packNote(t, packs)}</span>
       </div>
       <div className="grid gap-2 md:grid-cols-3 md:gap-4">
         {packs.map((pack, i) => (

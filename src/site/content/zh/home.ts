@@ -19,6 +19,7 @@ import {
   zhPlansSentence,
   zhTierList,
   zhTierPixels,
+  zhYearlyClaim,
 } from './offer'
 import { withFirstFrame } from '../landing-shared'
 import { whiteBackgroundGuide, zhSteps, zhTote } from './home-explainers'
@@ -36,7 +37,7 @@ const brand = site.brand.name
 function plansText(offers: OfferFacts): HeadedText {
   const { planFrom, yearlySaving } = offers
   const heading = planFrom ? `套餐每月 ${usd(planFrom.priceUsd)} 起` : '套餐和积分包'
-  const yearly = yearlySaving ? `按年付最多省 ${yearlySaving}%。` : ''
+  const yearly = yearlySaving ? `${zhYearlyClaim(yearlySaving)}。` : ''
   return {
     heading,
     text: `${zhPlansSentence(offers)}${yearly}付费积分永不过期，用它生成的每张图都私密、无水印。下面和请摄影师、自己拍对比一下。`,

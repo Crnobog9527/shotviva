@@ -1,5 +1,6 @@
-import { tierOffers, yearlySavingPct } from '@/core/billing/paywall/offer'
-import { PRICE_PENDING, usdPerHundredCredits, type MembershipProduct, type SiteProduct, type UsdRange } from '@/core/config'
+import { tierOffers, yearlySaving as yearlySavingOf, type YearlySaving } from '@/core/billing/paywall/offer'
+import { memberPackOff } from '@/core/billing/paywall/perks'
+import { MEMBERSHIP_TIERS, PRICE_PENDING, usdPerHundredCredits, type MembershipProduct, type SiteProduct, type UsdRange } from '@/core/config'
 import { MAX_UPLOAD_BYTES, UPLOAD_CONTENT_TYPES } from '@/core/storage/rules'
 
 import { site } from '../site.config'
@@ -88,13 +89,33 @@ export function offerFacts(products: readonly SiteProduct[]) {
     planFrom: priced.find((p): p is MembershipProduct => p.interval === 'month'),
     packFrom: priced.find(p => p.tier === 'pack'),
     hundredCreditsFrom: units.length ? formatHundredCredits(Math.min(...units)) : undefined,
-    yearlySaving: yearlySavingPct(tierOffers(products)) ?? undefined,
+    yearlySaving: yearlySavingOf(tierOffers(products)) ?? undefined,
   }
 }
 
 export type OfferFacts = ReturnType<typeof offerFacts>
 export const baselineOffers = offerFacts(site.billing.products)
 export const { planFrom, packFrom, yearlySaving, hundredCreditsFrom } = baselineOffers
+
+// "save about 20% compared with paying monthly" (whole-dollar yearly prices, Owner 2026-11-21:
+// 「约省 20%」); while plans differ, per plan: "save 20% … (Max saves 25%)" (offer.yearlySaving).
+const about = (approx: boolean) => (approx ? 'about ' : '')
+export function yearlyClaim({ pct, byTier }: YearlySaving): string {
+  const base = byTier.filter(t => t.pct === pct)
+  const more = byTier.filter(t => t.pct > pct).map(t => `${TIER_NAMES[t.tier]} saves ${about(t.about)}${t.pct}%`)
+  return `save ${about(base.some(t => t.about))}${pct}% compared with paying monthly${more.length ? ` (${more.join(', ')})` : ''}`
+}
+
+// " On medium and large packs, active Pro members save 5%, and Max members 10%." from the
+// listed M / L packs (each revision has its own member rate); empty when none is discounted.
+const TIER_NAMES = { starter: 'Starter', pro: 'Pro', max: 'Max' } as const
+export function memberPacksSentence(products: readonly SiteProduct[]): string {
+  const off = memberPackOff(products)
+  const parts = off ? MEMBERSHIP_TIERS.filter(t => off[t] > 0)
+    .map((t, i) => i === 0 ? `active ${TIER_NAMES[t]} members save ${off[t]}%` : `${TIER_NAMES[t]} members ${off[t]}%`) : []
+  if (parts.length === 0) return ''
+  return ` On medium and large packs, ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')}, and ${parts.at(-1)}` : parts[0]}.`
+}
 
 export function planLabel(plan: OfferFacts['planFrom']) {
   if (!plan) return 'Monthly plan'
