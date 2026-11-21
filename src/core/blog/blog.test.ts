@@ -28,13 +28,13 @@ const post: Post = {
   bodyMd: '## One',
 }
 
-const text = { jobTitle: 'Director', intro: 'Jane Doe directs.', roles: ['Lecturer'], awards: ['2021: A prize'], brands: ['Acme'] }
+const text = { jobTitle: 'Director', intro: 'Jane Doe directs.', bio: 'Jane Doe has directed since 2010.', roles: ['Lecturer'], awards: ['2021: A prize'], brands: ['Acme'] }
 const jane: BlogAuthor = {
   slug: 'jane-doe',
   name: 'Jane Doe',
   photo: { src: '/blog/authors/jane.webp', width: 480, height: 600 },
   knowsAbout: ['Photography'],
-  text: { en: text, zh: { ...text, jobTitle: '导演', intro: 'Jane Doe，导演。' } },
+  text: { en: text, zh: { ...text, jobTitle: '导演', intro: 'Jane Doe，导演。', bio: 'Jane Doe 2010 年起做导演。' } },
 }
 
 describe('postInputSchema', () => {
