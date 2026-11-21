@@ -18,10 +18,14 @@ export type ArticleText = {
   aboutAuthor: string
 }
 
+// A contents line is the heading up to its first ": " ("2. FoodShot AI: 200+ food styles" lists as
+// "2. FoodShot AI"), so a list of named items stays one short line each.
+const tocLabel = (text: string) => text.split(/[:：]\s*/)[0] || text
+
 function Contents({ toc, title, side }: { toc: readonly TocEntry[]; title: string; side: boolean }) {
   const items = toc.map((entry) => (
     <li key={entry.id} className={entry.level === 3 ? 'sub' : undefined}>
-      <a href={`#${entry.id}`}>{entry.text}</a>
+      <a href={`#${entry.id}`}>{tocLabel(entry.text)}</a>
     </li>
   ))
   if (side) {
@@ -76,7 +80,7 @@ function AuthorCard({ author, locale, title }: { author: BlogAuthor; locale: Loc
           <Link href={authorPath(author.slug)}>{author.name}</Link>
         </p>
         <p className="mk-blog-author-card-job">{text.jobTitle}</p>
-        <p>{text.intro}</p>
+        <p>{text.bio}</p>
       </div>
     </aside>
   )
