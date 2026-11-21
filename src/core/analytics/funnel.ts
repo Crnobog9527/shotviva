@@ -8,8 +8,9 @@ import { track } from './server-track'
 // ad blocker cannot drop them (ARCHITECTURE §16.2); both are fire-and-forget.
 
 // When the Checkout Session (Stripe) or hosted checkout (Waffo) has been created.
-export function trackCheckoutStart(userId: string, props: EventProps<'checkout_start'>, locale: Locale): void {
-  track('checkout_start', props, { distinctId: userId, locale })
+// `eventId`: the checkout's own id (PVUV's dedupe key, so a retried send is ignored).
+export function trackCheckoutStart(userId: string, props: EventProps<'checkout_start'>, locale: Locale, eventId?: string): void {
+  track('checkout_start', props, { distinctId: userId, locale, eventId })
 }
 
 // Back from the hosted checkout without paying (Stripe's cancel_url, T74).
@@ -18,8 +19,9 @@ export function trackCheckoutCancel(userId: string, props: EventProps<'checkout_
 }
 
 // After the webhook has credited the purchase (apply_purchase applied: true), never on a replay.
-export function trackPurchase(userId: string, props: EventProps<'purchase'>, locale: Locale): void {
-  track('purchase', props, { distinctId: userId, locale })
+// `eventId`: the payment's own id (Stripe session or invoice, Waffo payment), PVUV's dedupe key.
+export function trackPurchase(userId: string, props: EventProps<'purchase'>, locale: Locale, eventId?: string): void {
+  track('purchase', props, { distinctId: userId, locale, eventId })
 }
 
 export function trackInviteReward(inviterId: string, props: EventProps<'invite_reward'>, locale: Locale): void {

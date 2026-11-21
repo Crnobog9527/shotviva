@@ -31,6 +31,14 @@ export const ANALYTICS_COPY = {
     body: '这一页要用一个只读的 PostHog 个人 API 密钥。请在 Vercel 的环境变量里加上下面两项，重新部署后这里就会出数：',
     vars: ['POSTHOG_PERSONAL_API_KEY：PostHog 个人 API 密钥（只给 Query Read 权限）', 'POSTHOG_PROJECT_ID：712352'],
   },
+  // PostHog is switched off (NEXT_PUBLIC_POSTHOG_ENABLED); visitors are counted in PVUV.ai instead.
+  off: {
+    title: 'PostHog 已关闭，访客数据在 PVUV.ai',
+    body: '2026-11-21 起网站不再向 PostHog 发数据，这一页读 PostHog 的部分因此不显示。访客、来源（含 AI 爬虫和 AI 引荐）、热门页面请到 PVUV.ai 的看板看；注册、出图和付款仍来自数据库，在「总览」里。',
+    link: '打开 PVUV.ai 看板',
+    href: 'https://pvuv.ai/sites',
+    back: '想重新打开 PostHog：把环境变量 NEXT_PUBLIC_POSTHOG_ENABLED 设为 true 并重新部署即可，密钥都还在。',
+  },
   previousTimes: (n: string) => `上期 ${n} 次`,
   previousCount: (n: string) => `上期 ${n}`,
   delta: { up: '比上期多', down: '比上期少', same: '和上期持平', none: '上期没有数' },

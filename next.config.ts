@@ -132,9 +132,14 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       ...assetsRewrites(assets.R2_PUBLIC_ORIGIN),
-      { source: '/ingest/static/:path*', destination: `${POSTHOG_ASSETS}/static/:path*` },
-      { source: '/ingest/array/:path*', destination: `${POSTHOG_ASSETS}/array/:path*` },
-      { source: '/ingest/:path*', destination: `${POSTHOG_INGEST}/:path*` },
+      // Only while PostHog is switched on (NEXT_PUBLIC_POSTHOG_ENABLED); off, nothing proxies to it.
+      ...(publicEnvAtBuild.NEXT_PUBLIC_POSTHOG_KEY
+        ? [
+            { source: '/ingest/static/:path*', destination: `${POSTHOG_ASSETS}/static/:path*` },
+            { source: '/ingest/array/:path*', destination: `${POSTHOG_ASSETS}/array/:path*` },
+            { source: '/ingest/:path*', destination: `${POSTHOG_INGEST}/:path*` },
+          ]
+        : []),
     ]
   },
   // Sentry's "bundle size optimizations" (excludeTracing, excludeDebugStatements), which its

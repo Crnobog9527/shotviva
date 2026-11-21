@@ -26,5 +26,5 @@ it('settles the immutable annual invoice using its original contract even after 
   await expect(renewFromInvoice(deps, invoice.id)).resolves.toBe('replayed')
   expect(stripe.prices.retrieve).toHaveBeenCalledWith('price_v2_contract')
   expect(rpc).toHaveBeenCalledWith('apply_subscription_renewal_v2', expect.objectContaining({ p_product_id: 'max_yearly', p_invoice_id: invoice.id, p_amount_total: 89700, p_amount_tax: 600 }))
-  expect(deps.trackBuy).toHaveBeenCalledExactlyOnceWith(USER, expect.objectContaining({ amount_usd: 891, credits: 168000 }), 'en')
+  expect(deps.trackBuy).toHaveBeenCalledExactlyOnceWith(USER, expect.objectContaining({ amount_usd: 891, credits: 168000 }), 'en', expect.any(String))
 })

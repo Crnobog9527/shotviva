@@ -38,7 +38,7 @@ it('tracks a matching renewal once and preserves replay post-settlement effects'
   const event = { eventId: 'PAY_ok', data: { ...order, chargedAmount: '193.04', listPrice: { taxAmount: '2.00', subtotal: '191.04' } } }
   expect(await fulfilWaffoOrder(deps, event, 'subscription')).toBe('applied')
   expect(await fulfilWaffoOrder(deps, event, 'subscription')).toBe('replayed')
-  expect(deps.trackBuy).toHaveBeenCalledExactlyOnceWith(USER, expect.objectContaining({ credits: 23880, amount_usd: 191.04 }), 'en')
+  expect(deps.trackBuy).toHaveBeenCalledExactlyOnceWith(USER, expect.objectContaining({ credits: 23880, amount_usd: 191.04 }), 'en', expect.any(String))
   expect(deps.cancelOthers).toHaveBeenCalledTimes(2)
   await expect(fulfilWaffoOrder(deps, { ...event, data: { ...event.data, periodNumber: undefined } }, 'subscription')).rejects.toThrow('period')
 })

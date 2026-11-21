@@ -131,5 +131,5 @@ export const GROWTH_COPY = {
   },
   unavailable: '暂时读不到',
   unavailableBody: '这一块的数据没有读出来，其他块不受影响。稍后刷新再看。',
-  unconfigured: 'PostHog 还没连上，访客、上传、付费墙和结账暂时没有数。',
+  unconfigured: 'PostHog 没有开启或还没连上，访客、上传、付费墙和结账在这里暂时没有数（访客数据看 PVUV.ai）。',
 } as const
