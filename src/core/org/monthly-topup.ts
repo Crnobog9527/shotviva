@@ -4,7 +4,15 @@ import { z } from 'zod'
 
 import { callRpc, type RpcClient } from '../billing/rpc'
 
-const summary = z.object({ period: z.string(), members: z.number().int(), granted: z.number().int(), short_orgs: z.number().int() })
+// failed_orgs: orgs whose top-up was rolled back on its own (the others went through); a re-run of
+// the period tops up whoever was missed.
+const summary = z.object({
+  period: z.string(),
+  members: z.number().int(),
+  granted: z.number().int(),
+  short_orgs: z.number().int(),
+  failed_orgs: z.array(z.object({ org_id: z.uuid(), error: z.string() })),
+})
 
 export type TopupSummary = z.infer<typeof summary>
 

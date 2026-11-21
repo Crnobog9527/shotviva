@@ -1,9 +1,11 @@
 -- Org owner and member functions (ARCHITECTURE §6.5). p_owner / p_user is always the signed-in
 -- account from the server session, never an id from the request body. Only the service role may
--- call them. Lock order everywhere: the org row, then the member row, then the profile row
--- (inside _apply_credit_change); reserve_credits only ever locks the profile, so the two never
--- wait on each other in a cycle. Every pool movement carries a request_id: a repeat does nothing,
--- a different request under the same id is IDEMPOTENCY_CONFLICT.
+-- call them. Lock order everywhere: the org row, then the profile row, then the member row. A
+-- debit of the paid pool (reserve_credits, a clawback, an admin adjustment) locks the profile and
+-- then, through the 1629 trigger, the member row: the same order, so the two never wait on each
+-- other in a cycle. Every pool movement carries a request_id: a repeat does nothing, a different
+-- request under the same id is IDEMPOTENCY_CONFLICT. Ids starting with `org_topup:` belong to
+-- org_monthly_topup and are refused here.
 
 -- The org p_owner owns, locked. Anyone else (a member, a stranger) is NOT_ORG_OWNER. A
 -- suspended org refuses pool actions; removing a member still works (it only gives credits back).
@@ -25,7 +27,9 @@ create or replace function public._org_replayed(p_request text, p_org uuid, p_ki
 returns boolean language plpgsql stable security definer set search_path = '' as $$
 declare prior public.org_credit_ledger;
 begin
-  if p_request is null or length(p_request) not between 1 and 200 then raise exception 'INVALID_INPUT'; end if;
+  if p_request is null or length(p_request) not between 1 and 200 or starts_with(p_request, 'org_topup:') then
+    raise exception 'INVALID_INPUT';
+  end if;
   select * into prior from public.org_credit_ledger where request_id = p_request;
   if not found then return false; end if;
   if prior.org_id <> p_org or prior.kind <> p_kind or prior.delta <> coalesce(p_delta, prior.delta) or prior.member_user_id is distinct from p_member then
@@ -37,8 +41,8 @@ $$;
 revoke all on function public._org_replayed(text, uuid, text, bigint, uuid) from public, anon, authenticated, service_role;
 
 -- Move p_amount from the (locked) org's pool into an active member's paid pool. held_credits is
--- first brought down to what is really left (min(held, credits): the member's own credits are
--- spent last), then raised by the amount. Shared by org_allocate and org_monthly_topup.
+-- kept at most credits by the 1629 trigger (the org's credits are spent first); least() here is
+-- only a guard. Then it is raised by the amount. Shared by org_allocate and org_monthly_topup.
 create or replace function public._org_allocate(p_org public.orgs, p_member uuid, p_amount integer, p_request text, p_actor uuid)
 returns integer language plpgsql security definer set search_path = '' as $$
 declare
@@ -47,6 +51,7 @@ declare
   pool bigint;
 begin
   if p_amount is null or p_amount <= 0 then raise exception 'INVALID_INPUT'; end if;
+  perform 1 from public.profiles where id = p_member for update;
   select * into m from public.org_members where org_id = p_org.id and user_id = p_member and status = 'active' for update;
   if not found then raise exception 'ORG_MEMBER_NOT_FOUND'; end if;
   if p_org.pool_credits < p_amount then raise exception 'ORG_POOL_INSUFFICIENT'; end if;
@@ -62,7 +67,7 @@ $$;
 revoke all on function public._org_allocate(public.orgs, uuid, integer, text, uuid) from public, anon, authenticated, service_role;
 
 -- Take an active member out of the (locked) org: the org's share of their credits,
--- min(held_credits, credits), goes back to the pool and the row is marked removed. The member's
+-- held_credits (never above credits, see 1629), goes back to the pool and the row is marked removed. The member's
 -- own purchases stay with them. Returns what was taken back.
 create or replace function public._org_release(p_org public.orgs, p_member uuid, p_request text, p_actor uuid)
 returns integer language plpgsql security definer set search_path = '' as $$
@@ -72,10 +77,10 @@ declare
   back integer;
   pool bigint;
 begin
+  select p.credits into credits from public.profiles p where p.id = p_member for update;
   select * into m from public.org_members where org_id = p_org.id and user_id = p_member and status = 'active' for update;
   if not found then raise exception 'ORG_MEMBER_NOT_FOUND'; end if;
   if m.role = 'owner' then raise exception 'ORG_OWNER_CANNOT_LEAVE'; end if;
-  select p.credits into credits from public.profiles p where p.id = p_member for update;
   back := least(m.held_credits, coalesce(credits, 0));
   if back > 0 then
     perform public._apply_credit_change(p_member, 'paid', 'org_reclaim', -back, 'org:' || p_org.id::text, 'org:' || p_request);
@@ -207,8 +212,8 @@ begin
   if public._org_replayed(p_request_id, o.id, 'owner_deposit', p_amount, p_owner) then
     return jsonb_build_object('applied', false, 'pool_credits', o.pool_credits);
   end if;
-  select * into m from public.org_members where org_id = o.id and user_id = p_owner and status = 'active' for update;
   select p.credits into credits from public.profiles p where p.id = p_owner for update;
+  select * into m from public.org_members where org_id = o.id and user_id = p_owner and status = 'active' for update;
   if coalesce(credits, 0) - least(coalesce(m.held_credits, 0), coalesce(credits, 0)) < p_amount then
     raise exception 'CREDITS_INSUFFICIENT';
   end if;

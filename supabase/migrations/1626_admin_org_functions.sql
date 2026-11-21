@@ -146,7 +146,10 @@ declare
   prior public.org_credit_ledger;
 begin
   perform public._org_require_admin(p_actor);
-  if v_kind not in ('bank_grant','admin_adjust') or v_org is null or v_request is null then raise exception 'INVALID_INPUT'; end if;
+  -- `org_topup:` ids belong to org_monthly_topup.
+  if v_kind not in ('bank_grant','admin_adjust') or v_org is null or v_request is null or starts_with(v_request, 'org_topup:') then
+    raise exception 'INVALID_INPUT';
+  end if;
   if p_input ? 'package_id' and jsonb_typeof(p_input->'package_id') <> 'null' then
     select * into v_package from public.org_packages where id = (p_input->>'package_id')::uuid;
     if not found then raise exception 'ORG_PACKAGE_NOT_FOUND'; end if;

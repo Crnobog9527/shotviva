@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { adminAdjustCredits } from '@/core/billing'
+import { z } from 'zod'
+
+import { adminAdjustCredits, callRpc } from '@/core/billing'
 import {
   adminGrantOrg,
   adminUpdateOrg,
@@ -177,5 +179,112 @@ describe('org_monthly_topup', () => {
     await runMonthlyTopup(service, '2099-11')
     expect(await creditsOf(db, userId)).toBe(0)
     expect(await poolOf(db, orgId)).toBe(100)
+  })
+})
+
+// Review of #777: held_credits must follow spending, so a member's later purchases are never
+// counted as the org's.
+describe('held credits follow spending', () => {
+  it('spend, then buy, then leave: only what is left of the org credits goes back', async () => {
+    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: 100 })
+    const userId = await member(db, service, token)
+    await allocateOrgCredits(service, owner, userId, 100, randomUUID())
+    await adminAdjustCredits(service, { userId, amount: -80, reason: 'spent', pool: 'paid' })
+    expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 20 })
+    await adminAdjustCredits(service, { userId, amount: 500, reason: 'bought', pool: 'paid' })
+    expect(await leaveOrg(service, userId, randomUUID())).toBe(20)
+    expect(await creditsOf(db, userId)).toBe(500)
+    expect(await poolOf(db, orgId)).toBe(20)
+  })
+
+  it('tops a member who spent and then bought back up to the allowance', async () => {
+    const { owner, token } = await orgWith(db, service, actor, { pool: 300 })
+    const userId = await member(db, service, token)
+    await setOrgAllowance(service, owner, userId, 100)
+    await runMonthlyTopup(service, '2097-01')
+    await adminAdjustCredits(service, { userId, amount: -80, reason: 'spent', pool: 'paid' })
+    await adminAdjustCredits(service, { userId, amount: 500, reason: 'bought', pool: 'paid' })
+    await runMonthlyTopup(service, '2097-02')
+    expect(await creditsOf(db, userId)).toBe(600)
+  })
+
+  it('lets the owner deposit credits bought after spending the org share', async () => {
+    const { orgId, owner } = await orgWith(db, service, actor, { pool: 100 })
+    await allocateOrgCredits(service, owner, owner, 100, randomUUID())
+    await adminAdjustCredits(service, { userId: owner, amount: -80, reason: 'spent', pool: 'paid' })
+    await adminAdjustCredits(service, { userId: owner, amount: 500, reason: 'bought', pool: 'paid' })
+    await expect(depositOrgCredits(service, owner, 501, randomUUID())).rejects.toMatchObject({ code: 'CREDITS_INSUFFICIENT' })
+    expect(await depositOrgCredits(service, owner, 500, randomUUID())).toEqual({ applied: true, pool_credits: 500 })
+    expect(await memberRow(db, orgId, owner)).toMatchObject({ held_credits: 20 })
+  })
+})
+
+describe('monthly top-up isolation', () => {
+  it('refuses the top-up id prefix from every caller', async () => {
+    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: 100 })
+    const userId = await member(db, service, token)
+    const id = `org_topup:2097-03:${orgId}:${userId}`
+    const calls = [
+      callRpc(service, 'org_allocate', { p_owner: owner, p_member: userId, p_amount: 10, p_request_id: id }, z.unknown()),
+      callRpc(service, 'org_deposit', { p_owner: owner, p_amount: 10, p_request_id: id }, z.unknown()),
+      callRpc(service, 'org_leave', { p_user: userId, p_request_id: id }, z.unknown()),
+      callRpc(service, 'org_remove_member', { p_owner: owner, p_member: userId, p_request_id: id }, z.unknown()),
+      callRpc(service, 'admin_org_grant', { p_actor: actor, p_input: { org_id: orgId, request_id: id, credits: 10 } }, z.unknown()),
+    ]
+    for (const call of calls) await expect(call).rejects.toMatchObject({ message: 'INVALID_INPUT' })
+    expect(await poolOf(db, orgId)).toBe(100)
+  })
+
+  it('rolls back only the failing org, and a re-run tops up whoever was missed', async () => {
+    const good = await orgWith(db, service, actor, { pool: 100 })
+    const bad = await orgWith(db, service, actor, { pool: 100 })
+    const fine = await member(db, service, good.token)
+    const broken = await member(db, service, bad.token)
+    await setOrgAllowance(service, good.owner, fine, 50)
+    await setOrgAllowance(service, bad.owner, broken, 50)
+    // A balance the grant would overflow: that org's top-up fails on its own.
+    await db.query('update public.profiles set credits = 2147483600 where id = $1', [broken])
+    const first = await runMonthlyTopup(service, '2097-05')
+    expect(first.failed_orgs.map((f) => f.org_id)).toContain(bad.orgId)
+    expect(first.failed_orgs.map((f) => f.org_id)).not.toContain(good.orgId)
+    expect(await creditsOf(db, fine)).toBe(50)
+    expect(await poolOf(db, bad.orgId)).toBe(100)
+    await db.query('update public.profiles set credits = 0 where id = $1', [broken])
+    const again = await runMonthlyTopup(service, '2097-05')
+    expect(again.failed_orgs.map((f) => f.org_id)).not.toContain(bad.orgId)
+    expect([await creditsOf(db, fine), await creditsOf(db, broken)]).toEqual([50, 50])
+  })
+})
+
+describe('refunds and org transfers', () => {
+  async function buyPack(userId: string) {
+    const session = `cs_${randomUUID()}`
+    const before = await creditsOf(db, userId)
+    await db.query("select * from public.settle_checkout($1,'pack_s',$2,990,'usd',0,'card')", [userId, session])
+    const payment = (await db.query('select id from public.payments where stripe_session_id = $1', [session])).rows[0]
+    return { credits: (await creditsOf(db, userId)) - before, paymentId: payment.id as string }
+  }
+
+  it('counts a deposit into the org pool as using the credits', async () => {
+    const { owner } = await orgWith(db, service, actor)
+    const { paymentId, credits } = await buyPack(owner)
+    await depositOrgCredits(service, owner, credits, randomUUID())
+    const { rows } = await db.query('select no_credits_used from public.refund_eligibility($1, now())', [paymentId])
+    expect(rows[0].no_credits_used).toBe(false)
+  })
+
+  it('claws back only the member’s own credits, never the org-held share', async () => {
+    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: 100 })
+    const userId = await member(db, service, token)
+    await allocateOrgCredits(service, owner, userId, 100, randomUUID())
+    const { paymentId, credits } = await buyPack(userId)
+    await adminAdjustCredits(service, { userId, amount: -(credits + 30), reason: 'spent', pool: 'paid' })
+    await db.query("update public.payments set status = 'refunded', amount_refunded = amount_total where id = $1", [paymentId])
+    const { rows } = await db.query("select public.clawback_payment_credits($1, 'org_test', 'refund') as r", [paymentId])
+    // Own credits went first: all of the pack was spent, so nothing of it is left to take, and
+    // the 70 org credits left stay with the org.
+    expect(rows[0].r).toMatchObject({ taken: 0, written_off: credits })
+    expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 70 })
+    expect(await creditsOf(db, userId)).toBe(70)
   })
 })

@@ -3989,6 +3989,7 @@ declare
   pool bigint;
 begin
   if p_amount is null or p_amount <= 0 then raise exception 'INVALID_INPUT'; end if;
+  perform 1 from public.profiles where id = p_member for update;
   select * into m from public.org_members where org_id = p_org.id and user_id = p_member and status = 'active' for update;
   if not found then raise exception 'ORG_MEMBER_NOT_FOUND'; end if;
   if p_org.pool_credits < p_amount then raise exception 'ORG_POOL_INSUFFICIENT'; end if;
@@ -4045,6 +4046,21 @@ $$;
 ALTER FUNCTION "public"."_org_check_limits"("p_input" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_held_follows_spend"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  update public.org_members set held_credits = new.credits
+   where user_id = new.id and status = 'active' and held_credits > new.credits;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_org_held_follows_spend"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_lock_owned"("p_owner" "uuid", "p_allow_suspended" boolean) RETURNS "public"."orgs"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -4072,10 +4088,10 @@ declare
   back integer;
   pool bigint;
 begin
+  select p.credits into credits from public.profiles p where p.id = p_member for update;
   select * into m from public.org_members where org_id = p_org.id and user_id = p_member and status = 'active' for update;
   if not found then raise exception 'ORG_MEMBER_NOT_FOUND'; end if;
   if m.role = 'owner' then raise exception 'ORG_OWNER_CANNOT_LEAVE'; end if;
-  select p.credits into credits from public.profiles p where p.id = p_member for update;
   back := least(m.held_credits, coalesce(credits, 0));
   if back > 0 then
     perform public._apply_credit_change(p_member, 'paid', 'org_reclaim', -back, 'org:' || p_org.id::text, 'org:' || p_request);
@@ -4099,7 +4115,9 @@ CREATE OR REPLACE FUNCTION "public"."_org_replayed"("p_request" "text", "p_org" 
     AS $$
 declare prior public.org_credit_ledger;
 begin
-  if p_request is null or length(p_request) not between 1 and 200 then raise exception 'INVALID_INPUT'; end if;
+  if p_request is null or length(p_request) not between 1 and 200 or starts_with(p_request, 'org_topup:') then
+    raise exception 'INVALID_INPUT';
+  end if;
   select * into prior from public.org_credit_ledger where request_id = p_request;
   if not found then return false; end if;
   if prior.org_id <> p_org or prior.kind <> p_kind or prior.delta <> coalesce(p_delta, prior.delta) or prior.member_user_id is distinct from p_member then
@@ -8120,7 +8138,10 @@ declare
   prior public.org_credit_ledger;
 begin
   perform public._org_require_admin(p_actor);
-  if v_kind not in ('bank_grant','admin_adjust') or v_org is null or v_request is null then raise exception 'INVALID_INPUT'; end if;
+  -- `org_topup:` ids belong to org_monthly_topup.
+  if v_kind not in ('bank_grant','admin_adjust') or v_org is null or v_request is null or starts_with(v_request, 'org_topup:') then
+    raise exception 'INVALID_INPUT';
+  end if;
   if p_input ? 'package_id' and jsonb_typeof(p_input->'package_id') <> 'null' then
     select * into v_package from public.org_packages where id = (p_input->>'package_id')::uuid;
     if not found then raise exception 'ORG_PACKAGE_NOT_FOUND'; end if;
@@ -11851,7 +11872,10 @@ begin
 
   if v_owed > 0 then
     select credits into v_balance from public.profiles where id = v_payment.user_id for update;
-    v_take := least(v_owed, greatest(coalesce(v_balance, 0), 0));
+    -- Only the member's own credits: the org-held share (1629 keeps it at most credits) is the org's.
+    v_balance := coalesce(v_balance, 0) - coalesce((select m.held_credits from public.org_members m
+      where m.user_id = v_payment.user_id and m.status = 'active'), 0);
+    v_take := least(v_owed, greatest(v_balance, 0));
     if v_take > 0 then
       v_key := 'clawback:' || p_payment_id || ':' || p_ref;
       if not (public._apply_credit_change(v_payment.user_id, 'paid', 'clawback', -v_take, p_reason, v_key)).applied then
@@ -13138,8 +13162,8 @@ begin
   if public._org_replayed(p_request_id, o.id, 'owner_deposit', p_amount, p_owner) then
     return jsonb_build_object('applied', false, 'pool_credits', o.pool_credits);
   end if;
-  select * into m from public.org_members where org_id = o.id and user_id = p_owner and status = 'active' for update;
   select p.credits into credits from public.profiles p where p.id = p_owner for update;
+  select * into m from public.org_members where org_id = o.id and user_id = p_owner and status = 'active' for update;
   if coalesce(credits, 0) - least(coalesce(m.held_credits, 0), coalesce(credits, 0)) < p_amount then
     raise exception 'CREDITS_INSUFFICIENT';
   end if;
@@ -13220,12 +13244,18 @@ declare
   granted bigint := 0;
   short_orgs integer := 0;
   org_short boolean;
+  n_members integer;
+  org_granted bigint;
+  failed jsonb := '[]'::jsonb;
 begin
   if p_period is null or p_period !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' then raise exception 'INVALID_INPUT'; end if;
   for o in select * from public.orgs where status = 'active' order by created_at, id loop
+  begin
     select * into o from public.orgs where id = o.id and status = 'active' for update;
     continue when not found;
     org_short := false;
+    n_members := 0;
+    org_granted := 0;
     for m in
       select mm.user_id, mm.monthly_allowance, mm.held_credits, p.credits
         from public.org_members mm join public.profiles p on p.id = mm.user_id
@@ -13239,16 +13269,22 @@ begin
       if give > 0 then
         perform public._org_allocate(o, m.user_id, give, 'org_topup:' || p_period || ':' || o.id::text || ':' || m.user_id::text, null);
         o.pool_credits := o.pool_credits - give;
-        granted := granted + give;
+        org_granted := org_granted + give;
       end if;
       insert into public.org_member_topups(org_id, user_id, period, granted, short)
         values (o.id, m.user_id, p_period, give, need - give);
-      members := members + 1;
+      n_members := n_members + 1;
       org_short := org_short or need > give;
     end loop;
+    members := members + n_members;
+    granted := granted + org_granted;
     if org_short then short_orgs := short_orgs + 1; end if;
+  exception when others then
+    failed := failed || jsonb_build_array(jsonb_build_object('org_id', o.id, 'error', sqlerrm));
+  end;
   end loop;
-  return jsonb_build_object('period', p_period, 'members', members, 'granted', granted, 'short_orgs', short_orgs);
+  return jsonb_build_object('period', p_period, 'members', members, 'granted', granted, 'short_orgs', short_orgs,
+    'failed_orgs', failed);
 end;
 $_$;
 
@@ -14142,7 +14178,7 @@ begin
   within_7_days := coalesce(p_asked_at, now()) - v_payment.created_at <= interval '7 days';
   no_credits_used := not exists (
     select 1 from public.credit_ledger l
-     where l.user_id = v_payment.user_id and l.kind = 'reserve' and l.created_at > v_payment.created_at
+     where l.user_id = v_payment.user_id and l.kind in ('reserve','org_deposit') and l.created_at > v_payment.created_at
   );
   suggested_cents := greatest(0, least(
     round((v_payment.amount_total - v_payment.amount_tax) * 0.94)::integer + v_payment.amount_tax,
@@ -19610,6 +19646,10 @@ CREATE OR REPLACE TRIGGER "match_unlinked_dispute" BEFORE INSERT ON "public"."pa
 
 
 
+CREATE OR REPLACE TRIGGER "profiles_org_held_follows_spend" AFTER UPDATE OF "credits" ON "public"."profiles" FOR EACH ROW WHEN (("new"."credits" < "old"."credits")) EXECUTE FUNCTION "public"."_org_held_follows_spend"();
+
+
+
 CREATE OR REPLACE TRIGGER "prompt_lab_output_removal" BEFORE DELETE ON "public"."prompt_lab_runs" FOR EACH ROW EXECUTE FUNCTION "admin"."queue_prompt_lab_output"();
 
 
@@ -21734,6 +21774,10 @@ REVOKE ALL ON FUNCTION "public"."_org_audit"("p_actor" "uuid", "p_action" "text"
 
 
 REVOKE ALL ON FUNCTION "public"."_org_check_limits"("p_input" "jsonb") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_held_follows_spend"() FROM PUBLIC;
 
 
 

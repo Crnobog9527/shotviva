@@ -9,9 +9,12 @@ import { runMonthlyTopup, topupPeriod } from '@/core/org'
 export async function GET(request: Request) {
   if (!authorizedCron(request)) return new Response(null, { status: 401 })
   try {
-    const summary = await runMonthlyTopup(createAdminSupabase(), topupPeriod(new Date()))
+    const { failed_orgs: failed, ...summary } = await runMonthlyTopup(createAdminSupabase(), topupPeriod(new Date()))
     logger.info('org monthly topup', summary)
-    return new Response(null, { status: 204 })
+    // One org's failure leaves the others topped up; a 500 flags it so the month is re-run.
+    if (failed.length === 0) return new Response(null, { status: 204 })
+    logger.error('org monthly topup failed for some orgs', { failed })
+    return new Response(null, { status: 500 })
   } catch (error) {
     logger.error('org monthly topup failed', { error })
     return new Response(null, { status: 500 })
