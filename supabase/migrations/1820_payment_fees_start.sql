@@ -69,3 +69,24 @@ end;
 $$;
 revoke all on function public.admin_payment_fees_start(uuid,jsonb) from public,anon,authenticated,service_role;
 grant execute on function public.admin_payment_fees_start(uuid,jsonb) to service_role;
+
+-- The affiliate settings form no longer moves the terms: it used to write terms_version back on
+-- every save, so a settings page opened before the go-live and saved after it put the old terms
+-- back (and took any string). Terms now move only through admin_payment_fees_start (or a future
+-- path of their own). Same signature as 1045; a terms_version still sent by a form rendered before
+-- this deploy is ignored rather than refused, so that code keeps working. Otherwise as 1045.
+create or replace function public.admin_affiliate_settings(p_actor uuid,p_input jsonb) returns void language plpgsql security definer set search_path='' as $$
+begin
+  perform public._affiliate_require_admin(p_actor);
+  update public.affiliate_settings set enabled=coalesce((p_input->>'enabled')::boolean,enabled),
+    commission_months=case when p_input ? 'commission_months' then (p_input->>'commission_months')::integer else commission_months end,
+    hold_days=coalesce((p_input->>'hold_days')::integer,hold_days),
+    payout_min_usd=coalesce((p_input->>'payout_min_usd')::bigint,payout_min_usd),
+    settlement_day=coalesce((p_input->>'settlement_day')::integer,settlement_day),
+    apply_min_level=coalesce(p_input->>'apply_min_level',apply_min_level) where singleton;
+  insert into public.affiliate_rates(product_kind,l1_bp,l2_bp)
+    select r.product_kind,r.l1_bp,r.l2_bp from jsonb_to_recordset(p_input->'rates') r(product_kind text,l1_bp integer,l2_bp integer)
+    on conflict(product_kind) do update set l1_bp=excluded.l1_bp,l2_bp=excluded.l2_bp;
+  perform public._affiliate_audit(p_actor,'settings','settings',(p_input - 'terms_version')::text);
+end;
+$$;

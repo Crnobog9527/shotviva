@@ -62,3 +62,13 @@ it('keeps every audit action allowed before, and is service-role only', async ()
     has_function_privilege('authenticated','admin_payment_fees_start(uuid,jsonb)','execute') u,
     has_function_privilege('service_role','admin_payment_fees_start(uuid,jsonb)','execute') s`)).toEqual({ a: false, u: false, s: true })
 })
+
+it('a settings page opened before the start and saved after it never puts the old terms back', async () => {
+  await start(go)
+  // What a settings form rendered before go-live (or before this deploy) still sends.
+  await db.query('select admin_affiliate_settings($1,$2)', [actor, { hold_days: 30, terms_version: '2026-11-10' }])
+  expect(await state()).toMatchObject({ terms_version: '2026-11-21' })
+  // Any other string is ignored too; the rest of the form still saves.
+  await db.query('select admin_affiliate_settings($1,$2)', [actor, { hold_days: 31, terms_version: 'anything' }])
+  expect(await row(db, 'select terms_version, hold_days from affiliate_settings')).toEqual({ terms_version: '2026-11-21', hold_days: 31 })
+})
