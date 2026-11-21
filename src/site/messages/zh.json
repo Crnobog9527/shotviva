@@ -1800,7 +1800,7 @@
     "billingLabel": "付费周期",
     "monthly": "按月",
     "yearly": "按年",
-    "savePct": "最多省 <b>{pct}%</b>",
+    "savePct": "{same, select, true {{about, select, true {约省 <b>{pct}%</b>} other {省 <b>{pct}%</b>}}} other {最多省 <b>{pct}%</b>}}",
     "plansLabel": "套餐",
     "tiers": {
       "starter": "入门版",
@@ -1851,7 +1851,7 @@
         "allTemplates": "全部模板"
       },
       "cells": {
-        "pct": "{value}%",
+        "pct": "{value, plural, =0 {—} other {#%}}",
         "hours": "{value} 小时",
         "weight": "{value} 票",
         "yes": "包含"
@@ -1885,12 +1885,12 @@
     "choose": "选择{tier}",
     "upgradeTo": "升级到{tier}",
     "savingLabel": "<vs>比按月付</vs>每年省",
-    "savingAmount": "{amount}",
+    "savingAmount": "{amount} · {about, select, true {约省} other {省}} {pct}%",
     "mostPopular": "最受欢迎",
     "memberPrice": "会员价",
     "memberCodeKept": "已选会员价，优惠码留待下次使用。",
     "packsNote": "一次性买积分，不用订阅",
-    "packsNoteV2": "小包不打折。中包和大包按当前会员等级计价：入门版 95 折、专业版 9 折、旗舰版 85 折，各档收到的包内积分相同。",
+    "packsNoteV2": "小包不打折。中包和大包按当前会员等级计价：{starter, plural, =0 {入门版原价} other {入门版省 {starter}%}}、专业版省 {pro}%、旗舰版省 {max}%，各档收到的包内积分相同。",
     "buy": "购买",
     "buyPackLabel": "用 {price} 购买 {count} 积分",
     "payNoteCard": "套餐自动续费，随时可取消",

@@ -58,10 +58,12 @@ describe('campaign discount floor', () => {
 describe('campaign save entry point', () => {
   it('authenticates the actor and sends only server-configured catalog data to the five-argument RPC', async () => {
     requireAdmin.mockResolvedValue({ id: adminId })
-    rpc.mockResolvedValueOnce({ data: [{
+    const offers = [{
       product_id: 'pro_monthly', tier: 'pro', kind: 'monthly', usd_cents: 3712, credits: 4567,
       paid_days: 30, listed: true, revision: 3, name_en: 'Pro', name_zh: '专业版',
-    }], error: null }).mockResolvedValue({ data: codeId, error: null })
+    }]
+    rpc.mockImplementation(async (fn: string) => ({
+      data: fn === 'read_catalog_offers' ? offers : fn === 'read_catalog_member_rates' ? [] : codeId, error: null }))
     const { catalog, floor } = campaignCatalog([product('pro_monthly', 37.12, 4567, 'pro')])
     const fields = { note: '运营备注' }
     expect(await saveCampaignCode(codeId, fields)).toBe(codeId)

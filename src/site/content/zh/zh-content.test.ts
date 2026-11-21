@@ -95,7 +95,7 @@ describe('yearly saving wording', () => {
   it('quotes offer.ts\'s largest yearly saving as 「最多省」, never a typed number', async () => {
     const { zhYearlySaving } = await import('./offer')
     const { yearlySaving } = await import('../offer')
-    expect(zhYearlySaving).toBe(`按年付最多省 ${yearlySaving}%`)
+    expect(zhYearlySaving).toBe(`按年付省 ${yearlySaving!.pct}%（旗舰版省 ${yearlySaving!.upTo}%）`)
   })
 })
 

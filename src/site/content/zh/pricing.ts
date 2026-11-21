@@ -6,7 +6,7 @@ import { offerFacts, perHundredCredits, usd } from '../offer'
 import { site } from '../../site.config'
 import type { PricingContent } from '../pricing'
 import { zhBusinessForm } from './business-form'
-import { zhFreeImages } from './offer'
+import { zhFreeImages, zhMemberPacksSentence, zhYearlyClaim } from './offer'
 
 // /zh/pricing (T21, laid out as comps-v3-b pricing.html in T37). Keyword 「Shotviva 价格」;
 // every figure from site.config through offer.ts, in US dollars only, never converted to RMB
@@ -52,7 +52,7 @@ function faqs(products: readonly SiteProduct[]) {
     },
     {
       question: '不订阅能单买积分吗？',
-      answer: site.billing.pricingVersion ? `积分包是一次性付款，所有人都能买，得到的付费积分和套餐里的一样。积分包按标价折算，每 100 积分约 ${perHundredCredits('pack_s', products)}。小包按原价购买。中包和大包按当前会员等级享折扣，入门版 95 折、专业版 9 折、旗舰版 85 折。会员折扣只影响价格，各积分包的积分数量固定。`
+      answer: site.billing.pricingVersion ? `积分包是一次性付款，所有人都能买，得到的付费积分和套餐里的一样。积分包按标价折算，每 100 积分约 ${perHundredCredits('pack_s', products)}。小包按原价购买。${zhMemberPacksSentence(products)}会员折扣只影响价格，各积分包的积分数量固定。`
         : '积分包是一次性付款，所有人都能买，得到的付费积分和套餐里的一样。',
     },
     {
@@ -77,7 +77,7 @@ function faqs(products: readonly SiteProduct[]) {
 
 export function makeZhPricingPage(products: readonly SiteProduct[]): PricingContent {
   const { yearlySaving, packFrom } = offerFacts(products)
-  const yearly = yearlySaving ? `按年付最多省 ${yearlySaving}%。` : ''
+  const yearly = yearlySaving ? `${zhYearlyClaim(yearlySaving)}。` : ''
   const zhPackFrom = packFrom ? `${usd(packFrom.priceUsd)} 起` : PRICE_PENDING
 
   return {

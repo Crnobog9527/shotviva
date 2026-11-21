@@ -33,6 +33,9 @@ type ProductBase = {
   revision?: number
   names?: { en: string; zh: string }
   benefits?: { en: string; zh: string }
+  // M / L packs: what a member pays, in percent of the list price, per tier. Stored per catalogue
+  // revision (migration 1610); absent means the revision-2 rate (pack-price.ts).
+  packMemberPayPct?: Readonly<Record<MembershipTier, number>>
   // Paid credits granted per purchase (yearly: all twelve months at once).
   credits: number
   // 0 means "not decided yet"; pages must show a placeholder, never "$0".

@@ -1,4 +1,4 @@
-import { baselineOffers, planLabel, type OfferFacts } from './offer'
+import { baselineOffers, planLabel, yearlyClaim, type OfferFacts } from './offer'
 import { defineHomePage, type CostBills, type HeadedText, type HomePage, type ImageRef, type ShootDemo } from '@/core/content'
 
 import { site } from '../site.config'
@@ -34,7 +34,7 @@ const brand = site.brand.name
 function plansText(offers: OfferFacts): HeadedText {
   const { planFrom, yearlySaving } = offers
   const heading = planFrom ? `Plans From ${usd(planFrom.priceUsd)} a Month` : 'Plans and Credit Packs'
-  const yearly = yearlySaving ? ` Yearly plans save up to ${yearlySaving}%.` : ''
+  const yearly = yearlySaving ? ` Yearly plans ${yearlyClaim(yearlySaving)}.` : ''
   return {
     heading,
     text: `${plansSentence(offers)}${yearly} Paid credits never expire, and every photo you make with them is private and watermark-free. Here is how that compares with a photographer or doing it yourself.`,
