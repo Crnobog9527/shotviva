@@ -71,7 +71,7 @@ it('gives a staff member\'s new invitee the org\'s bonus once, in the free pool,
   expect(await row(db, "select count(*)::int n from credit_ledger where user_id=$1 and kind='code_grant'", [customer])).toEqual({ n: 1 })
 
   // Nothing re-fires it: another profile update, a rebind and back, or a replayed binding.
-  await db.query('update profiles set display_name=$2 where id=$1', [customer, 'QA Test'])
+  await db.query('update profiles set free_credits=free_credits where id=$1', [customer])
   await db.query("update profiles set referred_by=null,referred_source=null,referred_member=null where id=$1", [customer])
   await db.query("update profiles set referred_by=(select owner_user_id from orgs where id=$2),referred_source='org_l1',referred_member=$3 where id=$1", [customer, orgId, staff])
   expect(await bonusLedger(customer)).toHaveLength(1)
@@ -198,7 +198,8 @@ it('lets only an admin set the bonus, within 0..5000, against the current form, 
   const next = await setBonus(orgId, 5000)
   expect(Date.parse(next)).toBeGreaterThanOrEqual(Date.parse(at))
   expect(await row(db, 'select signup_bonus_credits from orgs where id=$1', [orgId])).toEqual({ signup_bonus_credits: 5000 })
-  // The old form is now stale.
+  // Someone else saves the org (now() is fixed inside this test's transaction, so move it on).
+  await db.query("update orgs set updated_at=updated_at+interval '1 second' where id=$1", [orgId])
   await refused(() => db.query('select admin_org_set_signup_bonus($1,$2,300,$3)', [actor, orgId, at]), 'ORG_CHANGED')
   expect(await row(db, "select reason::jsonb r from admin_audit_log where action='org_update' and target_id=$1 and user_id=$2 order by created_at desc limit 1", [orgId, actor]))
     .toEqual({ r: { signup_bonus_credits: { before: 0, after: 5000 } } })
