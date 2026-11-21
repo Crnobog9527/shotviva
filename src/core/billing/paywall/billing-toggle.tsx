@@ -62,7 +62,7 @@ function SaveBadge({ saving, solid }: { saving: YearlySaving; solid: boolean }) 
         solid ? "bg-primary text-primary-foreground" : "bg-[color-mix(in_srgb,var(--primary)_16%,transparent)] text-primary",
       )}
     >
-      {t.rich("savePct", { pct: saving.upTo, same: String(saving.pct === saving.upTo), about: String(saving.about), b: (chunks) => <b className="font-mono font-medium">{chunks}</b> })}
+      {t.rich("savePct", { pct: saving.upTo, same: String(saving.byTier.every(t => t.pct === saving.pct)), about: String(saving.about), b: (chunks) => <b className="font-mono font-medium">{chunks}</b> })}
     </span>
   )
 }

@@ -69,20 +69,22 @@ describe('pricing invariants (ARCHITECTURE §6.2, 2026-11-21 terms)', () => {
     expect(saving.map(s => Math.round(s))).toEqual([20, 20, 20])
   })
 
-  // Invariant 2 and the enterprise margin rule. The tiers and the cost budget are private
-  // (ARCHITECTURE §6.2 「企业包」 in shotviva-docs); skipped where that repo is absent (CI).
+  // Invariant 2 and the enterprise margin rule. The tiers, the cost budget, the cost buffer and the
+  // margin target are private (ARCHITECTURE in shotviva-docs); skipped where that repo is absent (CI).
   const spec = privateDoc('规范', 'ARCHITECTURE.md')
-  it.skipIf(!spec)('prices every enterprise tier at or below the cheapest self-serve credit, keeping the 60% typical margin target', () => {
+  it.skipIf(!spec)('prices every enterprise tier at or below the cheapest self-serve credit, keeping the policy margin target', () => {
     const text = readFileSync(spec!, 'utf8')
     const line = text.match(/^- \*\*企业包\*\*.*$/m)?.[0] ?? ''
     const tiers = [...line.matchAll(/\$([\d,]+) → ([\d,]+) 积分/g)].map(m => Number(m[1]!.replaceAll(',', '')) / Number(m[2]!.replaceAll(',', '')))
     expect(tiers.length, 'ARCHITECTURE §6.2 states the enterprise tiers').toBeGreaterThan(0)
     const budget = Number(text.match(/C_max = \$([\d.]+)\/积分/)?.[1])
-    expect(budget).toBeGreaterThan(0)
+    const buffer = Number(text.match(/成本 × ([\d.]+) ÷ 每积分实收/)?.[1])
+    const target = Number(text.match(/"margin_bp":(\d+)/)?.[1]) / 10000
+    expect([budget, buffer, target].every(n => n > 0), 'ARCHITECTURE states the cost budget, buffer and margin target').toBe(true)
     for (const perCredit of tiers) {
       expect(perCredit).toBeLessThanOrEqual(cheapestPerCredit(TERMS))
-      // Offline transfer, no refund, no commission: the price is the take. Cost × 1.10 buffer.
-      expect(1 - (budget * 1.1) / perCredit).toBeGreaterThanOrEqual(0.6)
+      // Offline transfer, no refund, no commission: the price is the take.
+      expect(1 - (budget * buffer) / perCredit).toBeGreaterThanOrEqual(target)
     }
   })
 })

@@ -18,9 +18,9 @@ describe('paywall numbers (DESIGN §4.5, all from the config)', () => {
 
   it('saves $47.80 / $119.80 / $475 a year; an inexact percent is rounded and marked "about"', () => {
     expect(offers.map(yearlySavingUsd)).toEqual([47.8, 119.8, 475])
-    // Max: 1 − 713 / 1188 = 39.98% → about 40%.
-    expect(offers.map(planSaving)).toEqual([{ pct: 20, about: true }, { pct: 20, about: true }, { pct: 40, about: true }])
-    expect(yearlySaving(offers)).toMatchObject({ pct: 20, upTo: 40, about: true })
+    // Max: 1 − 713 / 1188 = 39.98% → about 40%; "up to" never rounds up, so 39.
+    expect(offers.map(planSaving)).toEqual([{ pct: 20, about: true, floor: 20 }, { pct: 20, about: true, floor: 20 }, { pct: 40, about: true, floor: 39 }])
+    expect(yearlySaving(offers)).toMatchObject({ pct: 20, upTo: 39, about: true })
   })
 
   // Final terms (Owner 2026-11-21): whole-dollar $192 / $480 / $950 save 19.6% / 19.8% / 20.03%.
@@ -35,7 +35,7 @@ describe('paywall numbers (DESIGN §4.5, all from the config)', () => {
     const live = { starter: 191.04, pro: 479.04, max: 891 } as Record<string, number>
     const v2 = tierOffers(TEST_PRODUCTS.map(p => p.interval === 'year' ? { ...p, priceUsd: live[p.tier]! } : p))
     expect(yearlySaving(v2)).toEqual({ pct: 20, upTo: 25, about: false, byTier: [
-      { tier: 'starter', pct: 20, about: false }, { tier: 'pro', pct: 20, about: false }, { tier: 'max', pct: 25, about: false }] })
+      { tier: 'starter', pct: 20, about: false, floor: 20 }, { tier: 'pro', pct: 20, about: false, floor: 20 }, { tier: 'max', pct: 25, about: false, floor: 25 }] })
     expect(yearlySaving(tierOffers(TEST_PRODUCTS.filter(p => p.interval !== 'year')))).toBeNull()
   })
 
