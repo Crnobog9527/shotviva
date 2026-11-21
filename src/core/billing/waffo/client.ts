@@ -97,3 +97,8 @@ export function waffoClient(request: typeof fetch = fetch): WaffoApi {
 export function readWaffoCatalog(query: string, variables: Record<string, unknown>) {
   return post(fetch, '/v1/graphql', { query, variables }, 'catalog')
 }
+
+// F4: a read-only GraphQL query (settlement figures). Same signing as every other call.
+export function readWaffoGraphql(query: string, variables: Record<string, unknown>, request: typeof fetch = fetch) {
+  return post(request, '/v1/graphql', { query, variables }, 'graphql')
+}

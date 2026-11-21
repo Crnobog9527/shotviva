@@ -33,6 +33,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/payment-fees",
+      "schedule": "25 * * * *"
+    },
+    {
       "path": "/api/cron/org-topup",
       "schedule": "20 0 1 * *"
     }
