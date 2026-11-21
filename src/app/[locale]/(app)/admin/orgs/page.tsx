@@ -1,39 +1,49 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AdminPage } from '@/core/admin'
-import { listOrgs, listPackages, ORGS_COPY as COPY } from '@/core/admin/orgs'
-import { CreateOrgForm, OrgTable, PackageEditor } from '@/core/admin/orgs-ui'
+import { listOrgs, listPackages, listPaymentAccounts, ORGS_COPY as COPY } from '@/core/admin/orgs'
+import { CreateOrgForm, OrgTable, PackageEditor, PaymentAccounts } from '@/core/admin/orgs-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { cn } from '@/core/ui/cn'
 
-import { createOrgAction, savePackageAction } from './actions'
+import { createOrgAction, savePackageAction, savePaymentAccountAction } from './actions'
 
 export const instant = false
 export const metadata: Metadata = { title: COPY.title }
 
 const TAB = 'inline-flex min-h-11 items-center rounded-md px-4 text-sm font-medium'
+const TABS = [
+  { key: 'orgs', href: '/admin/orgs', label: COPY.tabOrgs },
+  { key: 'packages', href: '/admin/orgs?tab=packages', label: COPY.tabPackages },
+  { key: 'payment', href: '/admin/orgs?tab=payment', label: COPY.tabPayment },
+] as const
 
-// 企业客户 (ARCHITECTURE §6.5, card E3): the list and creation, and the 「套餐」tab.
+async function TabBody({ tab, db }: { tab: string; db: SupabaseClient }) {
+  if (tab === 'payment') return <PaymentAccounts accounts={await listPaymentAccounts(db)} save={savePaymentAccountAction} />
+  if (tab === 'packages') return <PackageEditor packages={await listPackages(db)} save={savePackageAction} />
+  return (
+    <>
+      <CreateOrgForm create={createOrgAction} />
+      <OrgTable orgs={await listOrgs(db)} />
+    </>
+  )
+}
+
+// 企业客户 (ARCHITECTURE §6.5, card E3): the list and creation, the 「套餐」tab and the 「收款账户」tab.
 export default async function OrgsPage({ searchParams }: PageProps<'/[locale]/admin/orgs'>) {
   await requireAdmin()
   const { tab } = await searchParams
-  const packages = tab === 'packages'
-  const db = createAdminSupabase()
+  const current = TABS.find((t) => t.key === tab)?.key ?? 'orgs'
   return (
     <AdminPage title={COPY.title}>
       <nav className="flex gap-1 border-b border-border" aria-label={COPY.title}>
-        <Link href="/admin/orgs" aria-current={packages ? undefined : 'page'} className={cn(TAB, packages ? 'text-muted-foreground' : 'bg-accent')}>{COPY.tabOrgs}</Link>
-        <Link href="/admin/orgs?tab=packages" aria-current={packages ? 'page' : undefined} className={cn(TAB, packages ? 'bg-accent' : 'text-muted-foreground')}>{COPY.tabPackages}</Link>
+        {TABS.map((t) => (
+          <Link key={t.key} href={t.href} aria-current={t.key === current ? 'page' : undefined} className={cn(TAB, t.key === current ? 'bg-accent' : 'text-muted-foreground')}>{t.label}</Link>
+        ))}
       </nav>
-      {packages ? (
-        <PackageEditor packages={await listPackages(db)} save={savePackageAction} />
-      ) : (
-        <>
-          <CreateOrgForm create={createOrgAction} />
-          <OrgTable orgs={await listOrgs(db)} />
-        </>
-      )}
+      <TabBody tab={current} db={createAdminSupabase()} />
     </AdminPage>
   )
 }
