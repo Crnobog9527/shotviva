@@ -50,7 +50,7 @@ export function TextFields({ form, locked, disabled, onChange }: Props) {
           <Input id={`${id}-description`} value={form.description} maxLength={320} disabled={disabled} onChange={(event) => onChange({ description: event.target.value })} />
         </Field>
       </div>
-      <Field label={COPY.form.author} htmlFor={`${id}-author`}>
+      <Field label={COPY.form.author} hint={COPY.form.authorHint} htmlFor={`${id}-author`}>
         <Input id={`${id}-author`} value={form.authorName} maxLength={80} disabled={disabled} onChange={(event) => onChange({ authorName: event.target.value })} />
       </Field>
     </div>

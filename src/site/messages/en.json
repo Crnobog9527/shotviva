@@ -2620,7 +2620,13 @@
     "updated": "Updated",
     "contents": "On this page",
     "home": "Home",
-    "crumb": "Blog"
+    "crumb": "Blog",
+    "aboutAuthor": "About the author",
+    "authorRoles": "Roles",
+    "authorAwards": "Awards",
+    "authorBrands": "Brands worked with",
+    "authorPosts": "Articles by {name}",
+    "authorNoPosts": "No articles in English yet."
   },
   "supportEmail": {
     "subject": "You have a reply from Shotviva support",
