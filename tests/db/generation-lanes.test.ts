@@ -150,6 +150,46 @@ describe('acquire_generation_slot', () => {
 
 describe('sweep_stale_generation_jobs', () => {
   const sweep = (olderThan = '15 minutes') => callRpc(service, 'sweep_stale_generation_jobs', { p_older_than: olderThan, p_limit: 200 }, z.number())
+  const sweepSince = (sql: string) =>
+    db.query(`insert into public.system_settings (key, value) values ('generation_sweep_since', to_jsonb(${sql}))
+      on conflict (key) do update set value = excluded.value`)
+  let savedSince: unknown
+
+  beforeAll(async () => {
+    savedSince = (await db.query("select value from public.system_settings where key = 'generation_sweep_since'")).rows[0]?.value
+  })
+  afterAll(async () => {
+    if (savedSince) await db.query("update public.system_settings set value = $1 where key = 'generation_sweep_since'", [JSON.stringify(savedSince)])
+  })
+  // As if the feature had shipped two days ago; each test narrows it where it needs to.
+  beforeEach(() => sweepSince("now() - interval '2 days'"))
+
+  const runningJob = async (user: string, templateId: string, age: string) => {
+    const jobId = randomUUID()
+    await reserveJob(service, { jobId, userId: user, module: 'image', templateId, source: 'web', inputs: { resolution: '1k' } })
+    await db.query(`update public.generation_jobs set created_at = now() - interval '${age}' where id = $1`, [jobId])
+    return jobId
+  }
+  const statusOf = async (jobId: string) =>
+    (await db.query<{ status: string }>('select status from public.generation_jobs where id = $1', [jobId])).rows[0]?.status
+
+  it('never refunds jobs older than 24 hours or started before the feature shipped', async () => {
+    const user = await createUser(db, { credits: 30 })
+    const templateId = await createPricedTemplate(db, { '1k': 3, '2k': 4, '4k': 5 })
+    const ancient = await runningJob(user, templateId, '30 hours')
+    const beforeShip = await runningJob(user, templateId, '3 hours')
+    await sweepSince("now() - interval '2 hours'")
+    await sweep()
+    expect(await statusOf(ancient)).toBe('running')
+    expect(await statusOf(beforeShip)).toBe('running')
+    // Without the row nothing is swept at all.
+    const inWindow = await runningJob(user, templateId, '1 hour')
+    await db.query("delete from public.system_settings where key = 'generation_sweep_since'")
+    expect(await sweep()).toBe(0)
+    expect(await statusOf(inWindow)).toBe('running')
+    // Not left for the other tests: they would sweep them.
+    await db.query("update public.generation_jobs set status = 'failed', error_code = 'TEST' where id = any($1)", [[ancient, beforeShip, inWindow]])
+  })
 
   it('refunds a job left running past the limit exactly once and leaves recent ones', async () => {
     const user = await createUser(db, { credits: 10 })

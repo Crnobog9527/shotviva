@@ -14,8 +14,9 @@
 -- migration changes them for now (admin editing is Q6).
 --
 -- Also: sweep_stale_generation_jobs refunds jobs still 'running' long after any function that
--- could settle them has ended (v1 had no sweeper: their credits stayed reserved).
--- Expand-only: one new table, one new settings row, new functions, one new index.
+-- could settle them has ended (v1 had no sweeper: their credits stayed reserved), only for jobs
+-- started after this migration and within 24 hours.
+-- Expand-only: one new table, two new settings rows, new functions, new indexes.
 
 insert into public.system_settings (key, value)
 values ('generation_lanes', '{
@@ -171,6 +172,14 @@ $$;
 -- they were created, when no function can still be settling them, are failed and refunded through
 -- refund_job (which refunds at most once: a failed job is returned as it is). Also drops slot rows
 -- nobody counts any more. Returns how many jobs it refunded.
+-- Only jobs created after this migration ran (system_settings.generation_sweep_since) and within
+-- the last 24 hours: jobs stuck before this feature may already have been made good by support,
+-- so they are never refunded automatically (the control window reviews them by hand). Without the
+-- row nothing is swept.
+insert into public.system_settings (key, value)
+values ('generation_sweep_since', to_jsonb(now()))
+on conflict (key) do nothing;
+
 create index generation_jobs_running_created on public.generation_jobs (created_at) where status = 'running';
 
 create function public.sweep_stale_generation_jobs(p_older_than interval, p_limit integer default 50)
@@ -178,22 +187,27 @@ returns integer language plpgsql security definer set search_path = '' as $$
 declare
   v_id uuid;
   refunded integer := 0;
+  since timestamptz;
 begin
   if p_older_than < interval '10 minutes' then raise exception 'INVALID_INPUT'; end if;
-  for v_id in
-    select j.id from public.generation_jobs j
-     where j.status = 'running' and j.created_at < now() - p_older_than
-     order by j.created_at
-     limit least(greatest(p_limit, 1), 200)
-  loop
-    begin
-      perform public.refund_job(v_id, 'STALE_TIMEOUT', null, null);
-      refunded := refunded + 1;
-    exception when others then
-      -- Settled meanwhile (JOB_ALREADY_SETTLED) or any other refusal: leave it for the next pass.
-      null;
-    end;
-  end loop;
+  select (s.value #>> '{}')::timestamptz into since from public.system_settings s where s.key = 'generation_sweep_since';
+  if since is not null then
+    for v_id in
+      select j.id from public.generation_jobs j
+       where j.status = 'running' and j.created_at < now() - p_older_than
+         and j.created_at >= greatest(since, now() - interval '24 hours')
+       order by j.created_at
+       limit least(greatest(p_limit, 1), 200)
+    loop
+      begin
+        perform public.refund_job(v_id, 'STALE_TIMEOUT', null, null);
+        refunded := refunded + 1;
+      exception when others then
+        -- Settled meanwhile (JOB_ALREADY_SETTLED) or any other refusal: leave it for the next pass.
+        null;
+      end;
+    end loop;
+  end if;
   delete from public.generation_slots s
    where s.acquired_at < now() - interval '10 minutes' and (s.released_at is not null or s.expires_at < now());
   return refunded;
