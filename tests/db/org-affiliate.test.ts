@@ -91,7 +91,7 @@ it('binds a staff member\'s invitee to the org at level 1; their payment earns t
   expect(await commission(db, first.id, 2)).toBeUndefined()
 
   // The org's own rate is an override on its account; the owner's invitee counts too.
-  await db.query("insert into affiliate_rate_overrides(user_id,product_kind,l1_bp,l2_bp) values($1,'pack',2000,700)", [owner])
+  await db.query("update affiliate_rate_overrides set l1_bp=2000,l2_bp=700 where user_id=$1 and product_kind='pack'", [owner])
   const second = await sale(db, customer, 'pack_m', 2490)
   expect(await commission(db, second.id)).toMatchObject({ rate_bp: 2000, amount: 498 })
   const fromOwner = (await invitedBy(owner)).customer
@@ -102,10 +102,9 @@ it('binds a staff member\'s invitee to the org at level 1; their payment earns t
 })
 
 it('pays an org_l2 customer the org\'s l2_bp and leaves every other source on l1_bp', async () => {
-  const { owner, staff } = await orgTeam()
+  const { staff } = await orgTeam()
   const { customer } = await invitedBy(staff)
-  await db.query("insert into affiliate_rate_overrides(user_id,product_kind,l1_bp,l2_bp) values($1,'pack',1500,500)", [owner])
-  // Level-2 binding is card E6; the commission branch is already in place.
+  // Level-2 binding itself is covered in org-affiliate-l2.test.ts (E6); the org account's l2 default is 5%.
   await db.query("update profiles set referred_source='org_l2',referred_via=$2 where id=$1", [customer, staff])
   const p = await sale(db, customer, 'pack_m', 2490)
   expect(await commission(db, p.id)).toMatchObject({ rate_bp: 500, amount: 124 })
@@ -182,8 +181,9 @@ it('keeps open personal affiliates out of orgs and converts a closed, settled on
   await db.query("insert into affiliate_rate_overrides(user_id,product_kind,l1_bp,l2_bp) values($1,'pack',3000,900)", [closed.id])
   const converted = await createOrg(closed.id)
   expect(await account(closed.id)).toEqual({ status: 'active', org_id: converted, parent_user_id: null, team_enabled: false })
-  // A personal special rate never becomes the org's rate: the org starts on the defaults.
-  expect(await row(db, 'select count(*)::int n from affiliate_rate_overrides where user_id=$1', [closed.id])).toEqual({ n: 0 })
+  // A personal special rate never becomes the org's rate: the org starts on the defaults (level 2 at 5%, 1681).
+  expect((await db.query('select l1_bp,l2_bp from affiliate_rate_overrides where user_id=$1', [closed.id])).rows)
+    .toEqual([{ l1_bp: null, l2_bp: 500 }, { l1_bp: null, l2_bp: 500 }, { l1_bp: null, l2_bp: 500 }])
 })
 
 it('requires the day rate and the CNY sent to mark an enterprise statement paid, and refuses them on a personal one', async () => {

@@ -134,6 +134,9 @@ export async function listOrgs(db: SupabaseClient): Promise<OrgListItem[]> {
 const accountSchema = z.object({ user_id: z.uuid(), slug: z.string(), status: z.string() })
 const rateSchema = z.object({ product_kind: z.string(), l1_bp: z.number(), l2_bp: z.number() })
 const overrideSchema = z.object({ product_kind: z.string(), l1_bp: z.number().nullable(), l2_bp: z.number().nullable() })
+// Every org account carries l2_bp = 500 on each kind as its level-2 default (migration 1681), so
+// only a different value counts as set by the admin.
+const ORG_L2_DEFAULT_BP = 500
 
 // No account row until the affiliate switch was turned on (E2 creates it then).
 export async function loadOrgAffiliate(db: SupabaseClient, orgId: string): Promise<OrgAffiliate | null> {
@@ -149,7 +152,7 @@ export async function loadOrgAffiliate(db: SupabaseClient, orgId: string): Promi
     userId: row.user_id, slug: row.slug, status: row.status,
     rates: z.array(rateSchema).parse(ok(defaults, 'rates')).map((d) => {
       const o = over.get(d.product_kind)
-      return { productKind: d.product_kind, l1Bp: o?.l1_bp ?? d.l1_bp, l2Bp: o?.l2_bp ?? d.l2_bp, overridden: Boolean(o && (o.l1_bp !== null || o.l2_bp !== null)) }
+      return { productKind: d.product_kind, l1Bp: o?.l1_bp ?? d.l1_bp, l2Bp: o?.l2_bp ?? d.l2_bp, overridden: Boolean(o && (o.l1_bp !== null || (o.l2_bp !== null && o.l2_bp !== ORG_L2_DEFAULT_BP))) }
     }),
   }
 }
