@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { notifyOwner } from '../../alerts'
 import { trackPurchase } from '../../analytics/funnel'
 import { AppError } from '../../errors'
+import { recordStripeFees } from '../fees/stripe'
 import { readQuote } from '../read-quote'
 import { creditChangeSchema } from '../credits'
 import { callRpc } from '../rpc'
@@ -118,6 +119,8 @@ export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Pro
     },
     creditChangeSchema,
   )
+  // F3: the renewal's processing fees, also on a replay (keyed, writes once; never throws).
+  await recordStripeFees(deps, { ref: invoice.id, chargeId: facts.chargeId, subscription: true, managedPayments: null })
   if (!change.applied) return 'replayed'
   notifyOwner({ kind: 'payment_received', channel: 'stripe', ref: invoice.id, userId, productId: product.id,
     amount: { cents: facts.amountTotal, currency: facts.currency }, method: facts.method, renewal: true })
