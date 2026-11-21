@@ -14,9 +14,12 @@ describe('blog authors', () => {
     expect(existsSync(join(process.cwd(), 'public', author.photo.src))).toBe(true)
     for (const locale of LOCALES) {
       const text = author.text[locale]
-      // The intro is the page's meta description (建站规格 R3).
+      // The intro is the page's meta description (建站规格 R3); the bio does not repeat the job title.
       expect(text.intro.length).toBeLessThanOrEqual(155)
       expect(text.intro).toContain(author.name)
+      expect(text.bio).toContain(author.name)
+      expect(text.bio.toLowerCase()).not.toContain('founder')
+      expect(text.bio).not.toContain('创始人')
       // The page title (authorMetadata): the brand is added only when the job title lacks it.
       const title = `${author.name}, ${text.jobTitle}`
       expect((title.includes('Shotviva') ? title : `${title} | Shotviva`).length).toBeLessThanOrEqual(60)
