@@ -15457,11 +15457,15 @@ $$;
 ALTER FUNCTION "public"."release_checkout_discount"("p_user" "uuid", "p_token" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."release_generation_slot"("p_attempt_id" "uuid") RETURNS "void"
+CREATE OR REPLACE FUNCTION "public"."release_generation_slot"("p_attempt_id" "uuid") RETURNS boolean
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  update public.generation_slots set released_at = now() where attempt_id = p_attempt_id and released_at is null;
+  with released as (
+    update public.generation_slots set released_at = now() where attempt_id = p_attempt_id and released_at is null
+    returning 1
+  )
+  select exists (select 1 from released);
 $$;
 
 
