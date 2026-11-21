@@ -147,6 +147,17 @@ it('keeps the invite anti-abuse rules: a blocked same-IP invite and a second inv
   expect((await bonusLedger(twice))[0].delta).toBe(300)
 })
 
+it('gives nothing to a level-2 customer bound by the real E6 path (a level-1 customer\'s invitee)', async () => {
+  const { orgId, staff, owner } = await orgTeam(300)
+  await setOrg(orgId, { affiliate_levels: 2 })
+  const first = (await invitedBy(staff)).customer
+  const second = (await invitedBy(first)).customer
+  expect(await row(db, 'select referred_by,referred_source,referred_via from profiles where id=$1', [second]))
+    .toEqual({ referred_by: owner, referred_source: 'org_l2', referred_via: first })
+  expect((await bonusLedger(first))[0].delta).toBe(300)
+  expect(await bonusLedger(second)).toEqual([])
+})
+
 it('gives nothing to a level-2 binding, a personal affiliate\'s customer or a plain personal invite', async () => {
   const { orgId, staff, owner } = await orgTeam(300)
   // Level 2 (card E6) binds org_l2: no bonus, whoever writes it.
