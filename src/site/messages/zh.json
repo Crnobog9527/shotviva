@@ -667,7 +667,7 @@
       "seeAll": "查看全部",
       "seeAllWhich": "「{name}」",
       "seeAllCount": "共 {count} 个",
-      "illustrative": "每张卡片左边是手机原图，右边是 AI 出图。模板图片都是用这些模板真实生成的。"
+      "illustrative": "每张卡片左边是真实手机照，右边是 AI 出图。模板图片都是用这些模板真实生成的。"
     },
     "series": {
       "count": "{count} 个模板",

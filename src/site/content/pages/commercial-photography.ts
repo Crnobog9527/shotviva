@@ -24,7 +24,7 @@ const sneakerLifestyle = caseImage('sneaker-lifestyle', 'Real example: the same 
 const shoot: ShootDemo = {
   heading: { lead: 'One phone photo → ', emphasis: 'a full shoot' },
   intro: 'Shot on a phone on a hallway floor. Three deliverables, and the same sneaker in every one: the perforated toe, the green heel tab, the gum sole.',
-  phone: { image: sneakerPhone, file: 'IMG_3184.jpg', caption: 'As shot on a phone. Hard morning sun, a doormat, keys and the shoe box in frame.' },
+  phone: { image: sneakerPhone, file: 'IMG_3184.jpg', caption: 'Real phone photo. Hard morning sun, a doormat, keys and the shoe box in frame.' },
   arrow: 'Three looks, same sneaker',
   results: [
     {

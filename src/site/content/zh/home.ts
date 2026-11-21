@@ -59,7 +59,7 @@ const heroScenes = [
 export const shoot: ShootDemo = {
   heading: { lead: '一张手机照片 → ', emphasis: '一整套图' },
   intro: '在厨房台面上用手机随手拍了一张。做出三张成品图，每张里都是同一只包：编织纹路、缝线、链条都没变。',
-  phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: '手机原图：窗边光线，台面很乱，钥匙和杯子都入镜了。' },
+  phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: '真实手机照：窗边光线，台面很乱，钥匙和杯子都入镜了。' },
   arrow: '三个模板，同一只包',
   results: [
     { image: zhTote.listing, title: '电商主图', template: '纯白底图模板' },

@@ -24,7 +24,7 @@ const sneakerLifestyle = caseImage('sneaker-lifestyle', '真实案例：同一�
 const shoot: ShootDemo = {
   heading: { lead: '一张手机照片 → ', emphasis: '一整套图' },
   intro: '在玄关地板上用手机随手拍了一张。做出三张成品图，每张里都是同一只鞋：鞋头的透气孔、绿色后跟、生胶底都没变。',
-  phone: { image: sneakerPhone, file: 'IMG_3184.jpg', caption: '手机原图：早晨阳光很硬，门垫、钥匙和鞋盒都入镜了。' },
+  phone: { image: sneakerPhone, file: 'IMG_3184.jpg', caption: '真实手机照：早晨阳光很硬，门垫、钥匙和鞋盒都入镜了。' },
   arrow: '三种用途，同一只鞋',
   results: [
     { image: caseImage('sneaker-listing', '真实案例：同一只鞋的纯白底商品主图，柔和影棚光'), title: '电商主图', template: '万物皆可变主图' },
