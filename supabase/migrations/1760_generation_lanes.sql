@@ -88,7 +88,7 @@ $$;
 
 
 
--- { granted, reason?, retry_after }. Serialised per lane (advisory lock), so two requests cannot
+-- { granted, reason? }. Serialised per lane, and per org for org members (advisory locks), so two requests cannot
 -- both take the last slot. A repeat with the same attempt_id is granted without a second slot.
 create function public.acquire_generation_slot(p_attempt_id uuid, p_lane text, p_user_id uuid, p_kind text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -124,6 +124,12 @@ begin
   select o.id into v_org
     from public.org_members m join public.orgs o on o.id = m.org_id
    where m.user_id = p_user_id and m.status = 'active' and o.status = 'active';
+  -- The org cap spans lanes, so two of one org's requests in different lanes must not both pass
+  -- it: a second lock per org, always taken after the lane lock (one lane lock, then at most one
+  -- org lock, in that order: no cycle, no deadlock).
+  if v_org is not null then
+    perform pg_advisory_xact_lock(hashtext('generation_org:' || v_org::text));
+  end if;
 
   select count(*) filter (where s.released_at is null and s.expires_at > now()),
          count(*) filter (where s.acquired_at > now() - interval '60 seconds'),

@@ -109,6 +109,16 @@ describe('acquire_generation_slot', () => {
     expect((await acquire(outsider)).granted).toBe(true)
   })
 
+  it('never lets one org pass its cap with requests racing in different lanes', async () => {
+    await setLanes({ ...SMALL, org_inflight_max: 3, lanes: { gpt: { per_minute: 1000, inflight: 100 }, seedream: { per_minute: 1000, inflight: 100 }, other: { per_minute: 1000, inflight: 100 } } })
+    const { token } = await orgWith(db, service, actor)
+    const staff = await Promise.all([member(db, service, token), member(db, service, token), member(db, service, token)])
+    const lanes = ['gpt', 'seedream', 'other'] as const
+    const results = await Promise.all(Array.from({ length: 12 }, (_, i) => acquire(staff[i % 3]!, 'single', randomUUID(), lanes[i % 3])))
+    expect(results.filter((result) => result.granted)).toHaveLength(3)
+    expect(results.filter((result) => !result.granted).every((result) => result.reason === 'org_full')).toBe(true)
+  })
+
   it('keeps all orgs together under orgs_share_pct of a lane’s batch slots', async () => {
     await setLanes({ ...SMALL, org_inflight_max: 10, lanes: { ...SMALL.lanes, other: { per_minute: 100, inflight: 8 } } })
     // Batch cap 4 (50% reserve), orgs' share 50% of it = 2.
