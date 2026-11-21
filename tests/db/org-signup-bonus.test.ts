@@ -29,9 +29,10 @@ async function refused(run: () => Promise<unknown>, message: string) {
   await db.query('rollback to savepoint refused')
 }
 
-const updatedAt = async (orgId: string) => (await row(db, 'select updated_at from orgs where id=$1', [orgId])).updated_at as Date
+// As text: a JS Date drops the microseconds and the stale-form check would refuse it.
+const updatedAt = async (orgId: string) => (await row(db, 'select updated_at::text as at from orgs where id=$1', [orgId])).at as string
 async function setBonus(orgId: string, credits: number) {
-  return (await row(db, 'select admin_org_set_signup_bonus($1,$2,$3,$4) as at', [actor, orgId, credits, await updatedAt(orgId)])).at as Date
+  return (await row(db, 'select admin_org_set_signup_bonus($1,$2,$3,$4)::text as at', [actor, orgId, credits, await updatedAt(orgId)])).at as string
 }
 const setOrg = (orgId: string, input: object) => db.query('select admin_org_update($1,$2,$3)', [actor, orgId, input])
 
@@ -195,7 +196,7 @@ it('lets only an admin set the bonus, within 0..5000, against the current form, 
   await refused(() => db.query('select admin_org_set_signup_bonus($1,gen_random_uuid(),300,$2)', [actor, at]), 'ORG_NOT_FOUND')
 
   const next = await setBonus(orgId, 5000)
-  expect(next.getTime()).toBeGreaterThanOrEqual(at.getTime())
+  expect(Date.parse(next)).toBeGreaterThanOrEqual(Date.parse(at))
   expect(await row(db, 'select signup_bonus_credits from orgs where id=$1', [orgId])).toEqual({ signup_bonus_credits: 5000 })
   // The old form is now stale.
   await refused(() => db.query('select admin_org_set_signup_bonus($1,$2,300,$3)', [actor, orgId, at]), 'ORG_CHANGED')
