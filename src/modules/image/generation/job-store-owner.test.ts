@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { TrackedJob } from './job-model'
 import { encodeState } from './store-persistence'
 
-vi.mock('./job-api', () => ({ readJob: vi.fn(), submitJob: vi.fn(() => new Promise(() => {})) }))
+vi.mock('./job-api', () => ({ readJobs: vi.fn(), submitJob: vi.fn(() => new Promise(() => {})) }))
 
 // T107 validation (2026-11-11): qa-creator's finished batch showed in qa-free's workspace after a
 // magic-link sign-in in the same tab. The store now belongs to the signed-in account.
