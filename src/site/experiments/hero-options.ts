@@ -29,7 +29,7 @@ const art = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp
 const artStyle: Record<Locale, HeroOptionContent> = {
   en: {
     hero: {
-      before: withFirstFrame(art('hero-art-photo', 'Phone photo: a tabby cat with white paws lying on a grey sofa arm, a lamp and bookshelf behind')),
+      before: withFirstFrame(art('hero-art-photo', 'Real phone photo: a tabby cat with white paws lying on a grey sofa arm, a lamp and bookshelf behind')),
       after: art('hero-art-anime', 'Real example: the same tabby cat on the sofa arm, redrawn in a flat anime style'),
       caption: 'Same cat, flat anime style',
       scenes: {
@@ -46,7 +46,7 @@ const artStyle: Record<Locale, HeroOptionContent> = {
   },
   zh: {
     hero: {
-      before: withFirstFrame(art('hero-art-photo', '手机照片：一只白爪子的虎斑猫趴在灰色沙发扶手上，身后是台灯和书架')),
+      before: withFirstFrame(art('hero-art-photo', '真实手机照：一只白爪子的虎斑猫趴在灰色沙发扶手上，身后是台灯和书架')),
       after: art('hero-art-anime', '真实案例：同一只虎斑猫趴在沙发扶手上，变成平涂动漫风'),
       caption: '同一只猫，变成动漫风',
       scenes: {

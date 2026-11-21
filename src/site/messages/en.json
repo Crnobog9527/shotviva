@@ -667,7 +667,7 @@
       "seeAll": "See all",
       "seeAllWhich": "in {name}",
       "seeAllCount": "{count} in all",
-      "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are real results made with these templates."
+      "illustrative": "Every card shows the real phone photo on the left and the AI result on the right. Template images are real results made with these templates."
     },
     "series": {
       "count": "{count, plural, one {# template} other {# templates}}",
@@ -679,24 +679,24 @@
     "template": {
       "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
       "fromCreditsSet": "from {count, plural, one {# credit} other {# credits}} · set of {images}",
-      "cardAlt": "{name} template, real example: phone photo on the left, AI result on the right",
+      "cardAlt": "{name} template, real example: real phone photo on the left, AI result on the right",
       "phone": "Phone",
       "ai": "AI",
       "example": "Real example",
       "featureAria": "{name}, video template, {category}. Make one",
       "featureMeta": "{category} · video",
-      "compareAria": "Compare phone photo and AI result",
-      "phonePhotoAlt": "Phone photo",
+      "compareAria": "Compare the real phone photo and the AI result",
+      "phonePhotoAlt": "Real phone photo",
       "resultAlt": "{name} result",
-      "loopAria": "{name} example: phone photo changing into the AI result",
+      "loopAria": "{name} example: real phone photo changing into the AI result",
       "hintCompare": "Drag across the photo to compare.",
       "makeOne": "Make one",
       "animatedMeta": "{category} · animated",
-      "hintPair": "Phone photo on the left, the AI result on the right.",
+      "hintPair": "Real phone photo on the left, the AI result on the right.",
       "viewerOpen": "View {name} full screen",
       "viewerTitle": "{name}, full screen",
       "viewerClose": "Close the large view",
-      "viewerSwitch": "Switch between the phone photo and the AI result",
+      "viewerSwitch": "Switch between the real phone photo and the AI result",
       "viewerHint": "Tap the image to zoom. Swipe to switch between Phone and AI.",
       "viewerHintZoomed": "Drag to look around. Tap again to zoom out."
     },
@@ -992,7 +992,7 @@
       "stageLabel": "Preview",
       "stageYours": "Your photo",
       "stageYoursCaption": "Your photo, as shot. The template keeps it and changes the light and background.",
-      "stageSampleCaption": "Template example: the phone photo on the left, the AI result on the right.",
+      "stageSampleCaption": "Template example: the real phone photo on the left, the AI result on the right.",
       "again": {
         "optionsChanged": "The options for this template have changed. Review the current size and resolution.",
         "note": "<b>Making again:</b> {summary}, from <day></day>.",
@@ -1917,7 +1917,7 @@
         "photos": "Example: one template on a phone photo. A batch makes one of these for each photo.",
         "templates": "Example: one phone photo, two templates, made in one batch."
       },
-      "photoAlt": "Example: the phone photo",
+      "photoAlt": "Example: the real phone photo",
       "resultAlt": "Example: result {index, number}"
     },
     "packOrPlan": {
@@ -2149,12 +2149,13 @@
     "faq": "Frequently asked questions",
     "related": "Related",
     "home": {
-      "phone": "Phone",
+      "phone": "Real phone photo",
+      "phoneShort": "Phone",
       "ai": "AI",
-      "beforeAlt": "{name} template, real example: the phone photo before",
+      "beforeAlt": "{name} template, real example: the real phone photo before",
       "afterAlt": "{name} template, real example: the AI result, {use}",
       "pickAria": "{name}. {use} Pick this template",
-      "compareLabel": "Compare the phone photo and the {name} result",
+      "compareLabel": "Compare the real phone photo and the {name} result",
       "withDragHint": "{use} Drag the handle to compare.",
       "preview": "Preview",
       "seriesCount": "{count, plural, one {# look} other {# looks}}",
@@ -2545,7 +2546,7 @@
     "metaDescription": "Turn a phone photo into a polished image with the {name} template on Shotviva.",
     "ogAlt": "An AI result made with the {name} template",
     "kicker": "Shotviva template · {category}",
-    "hint": "Left: the phone photo. Right: the AI result. Tap the image to zoom.",
+    "hint": "Left: the real phone photo. Right: the AI result. Tap the image to zoom.",
     "series": "Series · {name} · {count, plural, one {# template} other {# templates}}",
     "make": "Make one with this template",
     "browse": "Browse all templates",

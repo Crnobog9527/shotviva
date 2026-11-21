@@ -53,7 +53,7 @@ const shoot: ShootDemo = {
 const whiteCases: EditCases = {
   heading: 'White Background Main Images, From Easy to Hard',
   intro: 'Marketplace main images want the product alone on white, and the cut-out is where cheap tools show. Three phone photos, the last one the hardest kind there is: fine flyaway hair against a busy, backlit street.',
-  labels: { before: 'Phone photo', after: 'Main image', reference: 'Reference' },
+  labels: { before: 'Real phone photo', after: 'Main image', reference: 'Reference' },
   items: [
     {
       title: 'A speaker on a cluttered desk',
