@@ -33,6 +33,7 @@ import type { Job, JobSource } from './job-schema'
 import { toJobView, type JobView } from './job-view'
 import { accountLimits } from './account-limits'
 import { assertWithinRateLimit } from './rate-limit'
+import { acquireSlot, releaseSlot, slotKind } from './generation-lane'
 import { settleGeneration, type SettleDeps } from './settle-generation'
 import { backgroundInput } from './job-background'
 import { recordJobClientIp } from './job-download'
@@ -248,14 +249,33 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
       onRoute: actual => selected(routeFallbackReason(actual, prompt.providerId, req.source)),
     })
     const reason = routeFallbackReason(route.provider, prompt.providerId, req.source)
-    const job = await reserveJob(deps.db, {
-      ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: route.provider.id,
-      expectedCredits: expectedPrice(req, template, resolution),
-      inputs: { ...jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()),
-        quality: route.call.quality, ...backgroundInput(route.call.params, route.provider), style_ref_keys: route.styleRefKeys, ...(reason ? { fallback_route: true } : {}) },
-    })
-    return { job, ...route }
+    // The route's lane slot, before any credit is held (queue-fairness Q3): a full lane is
+    // RATE_LIMITED with nothing reserved. Given back in finally below, or on a failed reserve.
+    await acquireSlot(deps.db, { attemptId, providerId: route.provider.id, userId: req.userId, kind: slotKind(req.batchSize) })
+    try {
+      const job = await reserveJob(deps.db, {
+        ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: route.provider.id,
+        expectedCredits: expectedPrice(req, template, resolution),
+        inputs: { ...jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()),
+          quality: route.call.quality, ...backgroundInput(route.call.params, route.provider), style_ref_keys: route.styleRefKeys, ...(reason ? { fallback_route: true } : {}) },
+      })
+      return { job, ...route }
+    } catch (error) {
+      await releaseSlot(deps.db, attemptId)
+      throw error
+    }
   })
+  try {
+    return await settleOwnJob(deps, req, prepared, { job, call, provider, attemptId, food })
+  } finally {
+    await releaseSlot(deps.db, attemptId)
+  }
+}
+
+type Started = { job: Job; call: Awaited<ReturnType<typeof templateCall>>['call']; provider: Awaited<ReturnType<typeof templateCall>>['provider']; attemptId: string; food: ReturnType<typeof foodPlanOf> }
+
+async function settleOwnJob(deps: GenerationDeps, req: GenerationRequest, prepared: Prepared, { job, call, provider, attemptId, food }: Started): Promise<JobView> {
+  const { template, inputs, images } = prepared
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
   // Dispute evidence (T82): the IP that started this paid or free work.
   await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })

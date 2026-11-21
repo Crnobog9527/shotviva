@@ -152,7 +152,26 @@ function applyOutcome(job: TrackedJob, outcome: SubmitOutcome): TrackedJob {
   return job
 }
 
+// A job the server created and then refunded because the provider stayed at its per-minute limit
+// (error_code PROVIDER_RATE_LIMITED, queue-fairness Q3) is not a failure: it keeps its place in
+// line under a new id (resending the spent id would only return the refunded job). Reached from
+// the POST's 429 and, when that answer was lost (a backgrounded phone), from polling.
+export const PROVIDER_LIMITED_CODE = 'PROVIDER_RATE_LIMITED'
+
+function requeueAsNew(id: string, delayMs?: number) {
+  const current = getJobs().find((job) => job.id === id)
+  if (current?.status !== 'running') return
+  const next = { ...requeue(current, Date.now(), delayMs), id: crypto.randomUUID() }
+  const swapped = Object.fromEntries(Object.entries(views).map(([key, ids]) => [key, ids.map((value) => (value === id ? next.id : value))]))
+  set(getJobs().map((job) => (job.id === id ? next : job)), swapped)
+}
+
 function settle(id: string, outcome: SubmitOutcome) {
+  if (outcome.kind === 'limited' && outcome.settled) {
+    requeueAsNew(id, outcome.retryAfterMs)
+    pump()
+    return
+  }
   update(id, (current) => applyOutcome(current, outcome))
   pump()
 }
@@ -193,6 +212,10 @@ function applyPolled(job: TrackedJob, view: JobView | 'missing' | undefined): bo
     return true
   }
   if (!view || view.status === 'running') return false
+  if (view.status === 'failed' && view.error_code === PROVIDER_LIMITED_CODE) {
+    requeueAsNew(job.id)
+    return true
+  }
   update(job.id, (current) => (current.status === 'running' ? applyView(current, view) : current))
   return true
 }

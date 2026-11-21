@@ -32,6 +32,11 @@ export function classifyFailure(stage: FailureStage, error: unknown): { jobCode:
     if (error.kind === 'content_rejected') {
       return { jobCode: 'CONTENT_REJECTED', error: new AppError('CONTENT_REJECTED', 'This photo or text was declined by the image model') }
     }
+    // Still 429 after settlement's retries: the credits come back and the browser queues the
+    // photo again (RATE_LIMITED is never shown as a failure, queue-fairness Q1/Q3).
+    if (error.kind === 'rate_limited') {
+      return { jobCode: 'PROVIDER_RATE_LIMITED', error: new AppError('RATE_LIMITED', 'Many photos are being made right now; yours is queued') }
+    }
     const jobCode = error.kind === 'timeout' ? 'PROVIDER_TIMEOUT' : 'PROVIDER_FAILED'
     return { jobCode, error: new AppError('GENERATION_FAILED', 'Generation failed') }
   }
