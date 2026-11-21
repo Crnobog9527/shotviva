@@ -1,6 +1,6 @@
 // Server-side entry. Client code imports the shared limits from '@/core/storage/rules'.
 export { accountStorage } from './account-storage'
-export { createUpload, uploadRequestSchema, type UploadTicket } from './create-upload'
+export { createUpload, createUploads, uploadRequestSchema, type UploadTicket } from './create-upload'
 export { loadInputImage, loadOutputImage, normalizeInputImage, type InputImage } from './input-image'
 export { writeInputPreview } from './input-preview'
 export { copyBackKeptInputs, keepJobInputs, type RestoredInput } from './kept-inputs'

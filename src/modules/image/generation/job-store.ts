@@ -228,6 +228,10 @@ export function claimStore(userId: string) {
   pump()
 }
 
+// The signed-in account claimStore was given, or undefined while unknown ('' for restored jobs of
+// an unknown account). The batch upload ticket pool keys its tickets on it.
+export const getStoreOwner = (): string | undefined => owner || undefined
+
 export function forgetJob(id: string) {
   set(getJobs().filter((job) => job.id !== id))
 }
