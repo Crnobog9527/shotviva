@@ -5,7 +5,7 @@ const spies = vi.hoisted(() => ({
 }))
 vi.mock('@/core/org', () => ({
   adminCreateOrg: spies.create, adminUpdateOrg: spies.update, adminGrantOrg: spies.grant, adminSaveOrgPackage: spies.savePkg, adminSavePaymentAccount: spies.savePay,
-  adminSetOrgSignupBonus: spies.bonus, ORG_SIGNUP_BONUS_MAX: 5000,
+  adminSetOrgSignupBonus: spies.bonus, ORG_SIGNUP_BONUS_MAX: 1000,
   PAYMENT_KINDS: ['overseas_us', 'mainland_agent'],
   PAYMENT_FIELDS: { overseas_us: ['account_name', 'bank_name', 'account_number', 'routing_aba', 'notes'], mainland_agent: ['account_name', 'bank_name', 'branch', 'account_number', 'notes'] },
 }))
@@ -201,13 +201,19 @@ describe('saveSignupBonus', () => {
     expect(spies.bonus).toHaveBeenCalledWith(db, deps.actor, ORG, 300, '2026-01-01T00:00:00Z')
     expect(result).toEqual({ ok: true, message: '邀请注册福利已保存', value: { updatedAt: '2026-03-03T00:00:00Z' } })
   })
+  it('accepts exactly the cap of 1000', async () => {
+    spies.bonus.mockResolvedValue('2026-03-03T00:00:00Z')
+    expect((await saveSignupBonus(deps, bonus('1000'))).ok).toBe(true)
+    expect(spies.bonus).toHaveBeenCalledWith(db, deps.actor, ORG, 1000, '2026-01-01T00:00:00Z')
+  })
   it('treats an empty field as 0 (off)', async () => {
     spies.bonus.mockResolvedValue('2026-03-03T00:00:00Z')
     await saveSignupBonus(deps, bonus(''))
     expect(spies.bonus).toHaveBeenCalledWith(db, deps.actor, ORG, 0, '2026-01-01T00:00:00Z')
   })
   it('refuses a typo above the hard cap, negatives and decimals without calling the database', async () => {
-    expect(await runOrgAction(() => saveSignupBonus(deps, bonus('50000')))).toEqual({ ok: false, message: '赠送积分最多 5000' })
+    expect(await runOrgAction(() => saveSignupBonus(deps, bonus('1001')))).toEqual({ ok: false, message: '赠送积分最多 1000' })
+    expect(await runOrgAction(() => saveSignupBonus(deps, bonus('5000')))).toEqual({ ok: false, message: '赠送积分最多 1000' })
     for (const bad of ['-1', '1.5', 'abc']) expect((await runOrgAction(() => saveSignupBonus(deps, bonus(bad)))).ok).toBe(false)
     expect(spies.bonus).not.toHaveBeenCalled()
   })

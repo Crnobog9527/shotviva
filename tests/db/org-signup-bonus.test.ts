@@ -196,25 +196,25 @@ it('lets the redemption and the binding succeed and records the error when the g
     .toEqual({ error: expect.stringContaining('bonus forced failure') })
 })
 
-it('lets only an admin set the bonus, within 0..5000, against the current form, and audits it', async () => {
+it('lets only an admin set the bonus, within 0..1000, against the current form, and audits it', async () => {
   const { orgId } = await orgTeam(0)
   const stranger = await createUser(db)
   const at = await updatedAt(orgId)
   await refused(() => db.query('select admin_org_set_signup_bonus($1,$2,300,$3)', [stranger, orgId, at]), 'NOT_ADMIN')
-  await refused(() => db.query('select admin_org_set_signup_bonus($1,$2,5001,$3)', [actor, orgId, at]), 'INVALID_INPUT')
+  await refused(() => db.query('select admin_org_set_signup_bonus($1,$2,1001,$3)', [actor, orgId, at]), 'INVALID_INPUT')
   await refused(() => db.query('select admin_org_set_signup_bonus($1,$2,-1,$3)', [actor, orgId, at]), 'INVALID_INPUT')
   await refused(() => db.query("select admin_org_set_signup_bonus($1,$2,300,'2020-01-01')", [actor, orgId]), 'ORG_CHANGED')
   await refused(() => db.query('select admin_org_set_signup_bonus($1,gen_random_uuid(),300,$2)', [actor, at]), 'ORG_NOT_FOUND')
 
-  const next = await setBonus(orgId, 5000)
+  const next = await setBonus(orgId, 1000)
   expect(Date.parse(next)).toBeGreaterThanOrEqual(Date.parse(at))
-  expect(await row(db, 'select signup_bonus_credits from orgs where id=$1', [orgId])).toEqual({ signup_bonus_credits: 5000 })
+  expect(await row(db, 'select signup_bonus_credits from orgs where id=$1', [orgId])).toEqual({ signup_bonus_credits: 1000 })
   // Someone else saves the org (now() is fixed inside this test's transaction, so move it on).
   await db.query("update orgs set updated_at=updated_at+interval '1 second' where id=$1", [orgId])
   await refused(() => db.query('select admin_org_set_signup_bonus($1,$2,300,$3)', [actor, orgId, at]), 'ORG_CHANGED')
   expect(await row(db, "select reason::jsonb r from admin_audit_log where action='org_update' and target_id=$1 and user_id=$2 order by created_at desc limit 1", [orgId, actor]))
-    .toEqual({ r: { signup_bonus_credits: { before: 0, after: 5000 } } })
-  await refused(() => db.query('update orgs set signup_bonus_credits=5001 where id=$1', [orgId]), 'signup_bonus_credits_check')
+    .toEqual({ r: { signup_bonus_credits: { before: 0, after: 1000 } } })
+  await refused(() => db.query('update orgs set signup_bonus_credits=1001 where id=$1', [orgId]), 'signup_bonus_credits_check')
 })
 
 it('keeps the new tables and the admin function away from clients', async () => {

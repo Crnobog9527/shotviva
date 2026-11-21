@@ -4048,7 +4048,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     CONSTRAINT "orgs_name_check" CHECK ((("length"(TRIM(BOTH FROM "name")) >= 1) AND ("length"(TRIM(BOTH FROM "name")) <= 120))),
     CONSTRAINT "orgs_per_window_check" CHECK (("per_window" >= 1)),
     CONSTRAINT "orgs_pool_credits_check" CHECK (("pool_credits" >= 0)),
-    CONSTRAINT "orgs_signup_bonus_credits_check" CHECK ((("signup_bonus_credits" >= 0) AND ("signup_bonus_credits" <= 5000))),
+    CONSTRAINT "orgs_signup_bonus_credits_check" CHECK ((("signup_bonus_credits" >= 0) AND ("signup_bonus_credits" <= 1000))),
     CONSTRAINT "orgs_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'suspended'::"text"])))
 );
 
@@ -8534,7 +8534,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid
 declare o public.orgs; v_before integer;
 begin
   perform public._org_require_admin(p_actor);
-  if p_credits is null or p_credits < 0 or p_credits > 5000 or p_expected_updated_at is null then
+  if p_credits is null or p_credits < 0 or p_credits > 1000 or p_expected_updated_at is null then
     raise exception 'INVALID_INPUT';
   end if;
   select * into o from public.orgs where id=p_org_id for no key update;

@@ -72,7 +72,7 @@ export async function adminUpdateOrg(client: RpcClient, actor: string, orgId: st
 
 // Hard cap of the enterprise signup bonus; the column check and admin_org_set_signup_bonus (1690)
 // refuse anything above it.
-export const ORG_SIGNUP_BONUS_MAX = 5000
+export const ORG_SIGNUP_BONUS_MAX = 1000
 
 export async function adminSetOrgSignupBonus(client: RpcClient, actor: string, orgId: string, credits: number, expectedUpdatedAt: string): Promise<string> {
   const args = {

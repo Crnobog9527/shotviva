@@ -9,9 +9,9 @@
 -- grant, one invite per user, the 7-day window, no payment yet) has already passed in redeem_code
 -- before E2 binds anyone, so nothing here can be reached without them.
 
--- 0 = off. The hard cap stops a typo (e.g. 50000 for 500); raising it later only widens.
+-- 0 = off. The hard cap stops a typo (e.g. 5000 for 500); raising it later only widens.
 alter table public.orgs add column signup_bonus_credits integer not null default 0
-  check (signup_bonus_credits between 0 and 5000);
+  check (signup_bonus_credits between 0 and 1000);
 
 -- Widen only: every existing kind plus the enterprise signup bonus.
 alter table public.credit_ledger
@@ -90,7 +90,7 @@ language plpgsql security definer set search_path='' as $$
 declare o public.orgs; v_before integer;
 begin
   perform public._org_require_admin(p_actor);
-  if p_credits is null or p_credits < 0 or p_credits > 5000 or p_expected_updated_at is null then
+  if p_credits is null or p_credits < 0 or p_credits > 1000 or p_expected_updated_at is null then
     raise exception 'INVALID_INPUT';
   end if;
   select * into o from public.orgs where id=p_org_id for no key update;
