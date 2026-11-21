@@ -25,11 +25,22 @@ export async function readAccount(user: string) {
   const result = await createAdminSupabase()
     .from('affiliates')
     .select(
-      'slug,status,team_enabled,reject_reason,reapply_allowed,payout_method,payout_details,us_person,terms_version,terms_accepted_at',
+      'slug,status,team_enabled,reject_reason,reapply_allowed,payout_method,payout_details,us_person,terms_version,terms_accepted_at,org_id',
     )
     .eq('user_id', user)
     .maybeSingle()
   return parse(accountSchema.nullable(), result)
+}
+
+// Org owners and members never use the personal program (§6.5): they see the enterprise view.
+export async function isOrgMember(user: string) {
+  const result = await createAdminSupabase()
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', user)
+    .eq('status', 'active')
+    .maybeSingle()
+  return parse(z.object({ org_id: z.uuid() }).nullable(), result) !== null
 }
 
 export async function readSettings() {

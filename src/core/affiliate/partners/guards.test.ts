@@ -1,11 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { AppError } from '@/core/errors'
 
-const deps = vi.hoisted(() => ({ enabled: vi.fn(), user: vi.fn(), account: vi.fn(), terms: vi.fn(), settings: vi.fn(), openSettings: vi.fn(), canApply: vi.fn() }))
+const deps = vi.hoisted(() => ({ enabled: vi.fn(), user: vi.fn(), account: vi.fn(), terms: vi.fn(), settings: vi.fn(), openSettings: vi.fn(), canApply: vi.fn(), orgMember: vi.fn() }))
 vi.mock('./terms', () => ({ publishedTerms: deps.terms }))
 vi.mock('../feature', () => ({ isAffiliateEnabled: deps.enabled }))
 vi.mock('@/core/auth', () => ({ getSessionUser: deps.user, requireApiUser: deps.user, loginPath: (next: string) => '/login?next=' + encodeURIComponent(next) }))
-vi.mock('./repository', () => ({ readAccount: deps.account, readSettings: deps.settings, readOpenEnrollmentSettings: deps.openSettings, canApply: deps.canApply }))
+vi.mock('./repository', () => ({ readAccount: deps.account, readSettings: deps.settings, readOpenEnrollmentSettings: deps.openSettings, canApply: deps.canApply, isOrgMember: deps.orgMember }))
 vi.mock('next/server', async (original) => ({
   ...(await original<typeof import('next/server')>()),
   connection: async () => {},
@@ -15,12 +15,14 @@ vi.mock('next-intl/server', () => ({
   getTranslations: async () => Object.assign((key: string) => key, { has: () => true }),
 }))
 import { EnrollmentScreen } from './enrollment'
+import { EnterpriseScreen } from './enterprise'
 import { PartnerScreen, TermsScreen } from './screen'
 import { exportCommissions } from './csv'
 
 beforeEach(() => {
   vi.resetAllMocks()
   deps.openSettings.mockResolvedValue({ terms_version: '1', apply_min_level: 'none' })
+  deps.orgMember.mockResolvedValue(false)
 })
 it('keeps the intro public while guarding application, portal and export with operations off', async () => {
   deps.enabled.mockResolvedValue(false)
@@ -102,4 +104,21 @@ it.each([
   })
   expect(deps.canApply).toHaveBeenCalledTimes(needsHistory ? 1 : 0)
   expect(form.type === ApplicationFields).toBe(!needsHistory)
+})
+
+it('sends an org affiliate account and any org member to the enterprise view, never the personal program', async () => {
+  deps.enabled.mockResolvedValue(true)
+  deps.user.mockResolvedValue({ id: 'owner', verified: true })
+  deps.account.mockResolvedValue({ status: 'active', org_id: '00000000-0000-4000-8000-000000000001' })
+  const props = { search: Promise.resolve({}) }
+  const enterprise = { digest: expect.stringContaining('/zh/partners/enterprise;') }
+  await expect(PartnerScreen(props)).rejects.toMatchObject(enterprise)
+  await expect(EnrollmentScreen({ ...props, mode: 'apply' })).rejects.toMatchObject(enterprise)
+  deps.account.mockResolvedValue(null)
+  deps.orgMember.mockResolvedValue(true)
+  await expect(EnrollmentScreen({ ...props, mode: 'apply' })).rejects.toMatchObject(enterprise)
+  await expect(EnrollmentScreen(props)).rejects.toMatchObject(enterprise)
+  expect((await EnterpriseScreen()).props.className).toBe('af-apply')
+  deps.orgMember.mockResolvedValue(false)
+  await expect(EnterpriseScreen()).rejects.toMatchObject({ digest: expect.stringContaining('/zh/partners/join;') })
 })

@@ -35,6 +35,11 @@ function signupMarks(shareCookie: string | undefined, experiments: Parameters<ty
 // Local dev runs on http; everywhere else the cookie is Secure.
 const isSecure = (head: Headers) => head.get('x-forwarded-proto') !== 'http'
 
+// Only a first sign-in (a new account) binds a partner's link.
+async function bindSignupReferral(userId: string, first: boolean, cookie: string | undefined) {
+  if (first) await bindReferral(userId, cookie, 'signup')
+}
+
 export async function onVerifiedSignIn(
   userId: string,
   benefits: SignupBenefits,
@@ -50,8 +55,11 @@ export async function onVerifiedSignIn(
   const claimed = !granted && benefits.freeCredits > 0 && (await claimQuietly(admin, userId))
   const first = address ? ipStored : granted
   if (claimed && !first) noteSignupGift()
-  const kind = await consumeSignupCode(admin, userId, first, benefits.invite, locale)
   const jar = await cookies()
+  // A personal partner's link (sv_ref) binds before the signup code is redeemed: an org member's
+  // invite code binds the customer to the org only when nobody else already has (§6.5).
+  await bindSignupReferral(userId, first, jar.get('sv_ref')?.value)
+  const kind = await consumeSignupCode(admin, userId, first, benefits.invite, locale)
   // A/B variants onto the account, and the account's back into the cookie (ARCHITECTURE §16.5).
   const experiments = await syncExperimentsAtSignIn(admin, userId, first, jar, isSecure(await headers()))
   // Where this browser first landed, onto the account once (ARCHITECTURE §16.6).
@@ -60,6 +68,5 @@ export async function onVerifiedSignIn(
     // 1350: tell the Owner when half, then all, of today's signup gifts are gone (after()).
     noteSignupGift()
     track('signup', { method, code_kind: kind, ...signupMarks(jar.get(SHARE_COOKIE)?.value, experiments) }, { distinctId: userId, locale })
-    await bindReferral(userId, jar.get('sv_ref')?.value, 'signup')
   }
 }

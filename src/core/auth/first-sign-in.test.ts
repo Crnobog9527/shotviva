@@ -59,6 +59,8 @@ describe('onVerifiedSignIn', () => {
     mocks.claim.mockResolvedValueOnce('invite')
     await onVerifiedSignIn('u1', benefits, 'google', 'en')
     expect(mocks.bind).toHaveBeenCalledWith('u1', 'partner', 'signup')
+    // The partner link binds first, so an org member's invite code cannot take the customer (§6.5).
+    expect(mocks.bind.mock.invocationCallOrder[0]).toBeLessThan(mocks.claim.mock.invocationCallOrder[0])
     expect(mocks.track).toHaveBeenCalledWith('signup', { method: 'google', code_kind: 'invite' }, { distinctId: 'u1', locale: 'en' })
   })
 

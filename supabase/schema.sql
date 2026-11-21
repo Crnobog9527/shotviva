@@ -3494,11 +3494,15 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_payouts" (
     "fee_rules" "jsonb",
     "fee_amount" bigint,
     "fee_lines" "jsonb",
+    "paid_fx_cny_per_usd" numeric(12,6),
+    "paid_amount_cny_fen" bigint,
     CONSTRAINT "affiliate_payouts_amount_check" CHECK (("amount" > 0)),
     CONSTRAINT "affiliate_payouts_fee_amount_check" CHECK (("fee_amount" >= 0)),
     CONSTRAINT "affiliate_payouts_fee_lines_check" CHECK ((("fee_lines" IS NULL) OR ("jsonb_typeof"("fee_lines") = 'array'::"text"))),
     CONSTRAINT "affiliate_payouts_fee_rules_check" CHECK ((("fee_rules" IS NULL) OR ("jsonb_typeof"("fee_rules") = 'array'::"text"))),
     CONSTRAINT "affiliate_payouts_paid_amount_check" CHECK (("paid_amount" >= 0)),
+    CONSTRAINT "affiliate_payouts_paid_amount_cny_fen_check" CHECK (("paid_amount_cny_fen" > 0)),
+    CONSTRAINT "affiliate_payouts_paid_fx_cny_per_usd_check" CHECK ((("paid_fx_cny_per_usd" > (0)::numeric) AND ("paid_fx_cny_per_usd" < (1000)::numeric))),
     CONSTRAINT "affiliate_payouts_status_check" CHECK (("status" = ANY (ARRAY['due'::"text", 'held'::"text", 'paid'::"text", 'void'::"text"])))
 );
 
@@ -3575,6 +3579,17 @@ $$;
 ALTER FUNCTION "public"."_affiliate_payout_forfeit"("p" "public"."affiliate_payouts", "p_note" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_personal_open"("p_user" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select exists(select from public.affiliates a where a.user_id=p_user and a.org_id is null and a.status in ('pending','active'));
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_personal_open"("p_user" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_require_admin"("p_actor" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -3609,9 +3624,12 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."
     AS $$
   select jsonb_build_object('owner',a.user_id,'inactive',a.status<>'active',
     'parent',case when a.status='active' and parent.team_enabled and parent.status='active' then parent.user_id end,
-    'rate',coalesce(o.l1_bp,r.l1_bp),'bonus',coalesce(po.l2_bp,r.l2_bp),
+    'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,r.l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
+    'bonus',coalesce(po.l2_bp,r.l2_bp),
     'same_ip',coalesce(customer.signup_ip=referrer.signup_ip,false),
-    'confirm_after',p_payment.created_at+make_interval(days=>s.hold_days))
+    'confirm_after',p_payment.created_at+make_interval(days=>s.hold_days),
+    'void',case when a.org_id is not null and exists(select from public.org_members m
+      where m.org_id=a.org_id and m.user_id=customer.id and m.status='active') then 'org_member' end)
     from public.profiles customer join public.affiliates a on a.user_id=customer.referred_by
     join public.profiles referrer on referrer.id=a.user_id
     cross join public.affiliate_settings s
@@ -3648,10 +3666,11 @@ begin
     v_rate:=(p_snapshot->>case p_level when 1 then 'rate' else 'bonus' end)::integer;
     v_confirm:=(p_snapshot->>'confirm_after')::timestamptz;
     v_flags:=case when (p_snapshot->>'same_ip')::boolean then array['same_ip'] else '{}' end;
-    if p_level=1 and (p_snapshot->>'inactive')::boolean then v_void:='affiliate_inactive'; end if;
+    if p_level=1 and (p_snapshot->>'inactive')::boolean then v_void:='affiliate_inactive';
+    elsif p_level=1 and p_snapshot->>'void'='org_member' then v_void:='org_member'; end if;
   else
     v_owner:=v_old.affiliate_user_id; v_rate:=v_old.rate_bp; v_confirm:=v_old.confirm_after; v_flags:=v_old.flags;
-    if v_old.void_reason in ('affiliate_inactive','admin_void') then v_void:=v_old.void_reason; end if;
+    if v_old.void_reason in ('affiliate_inactive','admin_void','org_member') then v_void:=v_old.void_reason; end if;
   end if;
   v_amount:=public._affiliate_due(p_payment.amount_total,p_payment.amount_tax,p_payment.amount_refunded,v_rate);
   if v_old.payout_retained is not null then
@@ -3947,6 +3966,59 @@ $$;
 ALTER FUNCTION "public"."_membership_end_without_refunded"("p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_active_member"("p_user" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select exists(select from public.org_members m where m.user_id=p_user and m.status='active');
+$$;
+
+
+ALTER FUNCTION "public"."_org_active_member"("p_user" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_affiliate_account"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare a public.affiliates; b public.affiliate_balances;
+begin
+  if tg_op='UPDATE' and old.affiliate_enabled is not distinct from new.affiliate_enabled then return null; end if;
+  if not new.affiliate_enabled then
+    update public.affiliates set status='suspended',suspended_by_org_switch=true
+      where user_id=new.owner_user_id and org_id=new.id and status='active';
+    return null;
+  end if;
+  select * into a from public.affiliates where user_id=new.owner_user_id for update;
+  if not found then
+    insert into public.affiliates(user_id,slug,status,org_id,application,approved_at,approved_by)
+      values(new.owner_user_id,'sv-' || substr(replace(gen_random_uuid()::text,'-',''),1,20),'active',new.id,
+             '{"source":"org"}',now(),new.created_by);
+  elsif a.org_id=new.id then
+    update public.affiliates set status='active',suspended_by_org_switch=false
+      where user_id=a.user_id and status='suspended' and suspended_by_org_switch;
+  elsif a.org_id is not null or a.status not in ('rejected','suspended') then
+    raise exception 'ORG_PERSONAL_AFFILIATE';
+  else
+    select * into b from public.affiliate_balances where affiliate_user_id=a.user_id;
+    if b.available<>0 or b.pending<>0
+       or exists(select from public.affiliate_commissions c where c.affiliate_user_id=a.user_id and c.status='on_hold')
+       or exists(select from public.affiliate_payouts p where p.affiliate_user_id=a.user_id and p.status in ('due','held')) then
+      raise exception 'ORG_PERSONAL_AFFILIATE_UNSETTLED';
+    end if;
+    update public.affiliates set org_id=new.id,status='active',parent_user_id=null,team_enabled=false,
+      reject_reason=null,reapply_allowed=false,approved_at=now(),approved_by=null
+      where user_id=a.user_id;
+    delete from public.affiliate_rate_overrides where user_id=a.user_id;
+  end if;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_org_affiliate_account"() OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "name" "text" NOT NULL,
@@ -4008,6 +4080,43 @@ $$;
 
 
 ALTER FUNCTION "public"."_org_allocate"("p_org" "public"."orgs", "p_member" "uuid", "p_amount" integer, "p_request" "text", "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_attribute_invite"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_org uuid; v_account uuid;
+begin
+  begin
+    select o.id,a.user_id into v_org,v_account from public.org_members m
+      join public.orgs o on o.id=m.org_id
+      join public.affiliates a on a.org_id=o.id
+      where m.user_id=new.inviter_user_id and m.status='active' and o.status='active' and o.affiliate_enabled
+        and a.status='active';
+    if not found or v_account=new.user_id then return null; end if;
+    if exists(select from public.org_members m where m.org_id=v_org and m.user_id=new.user_id and m.status='active') then
+      return null;
+    end if;
+    update public.profiles set referred_by=v_account,referred_at=now(),referred_source='org_l1',
+      referred_member=new.inviter_user_id,referred_via=null
+      where id=new.user_id and referred_by is null;
+  exception when others or query_canceled or assert_failure then
+    -- Keep no exception DETAIL/CONTEXT (it can contain a whole row).
+    begin
+      insert into public.org_attribution_errors(redemption_id,error)
+        values(new.id,sqlstate || ': ' || left(sqlerrm,300)) on conflict(redemption_id) do nothing;
+    exception when others or query_canceled or assert_failure then
+      -- Even an unavailable error sink must never undo a successful redemption.
+      return null;
+    end;
+  end;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_org_attribute_invite"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_org_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") RETURNS "void"
@@ -4665,6 +4774,8 @@ begin
   perform public._affiliate_require_admin(p_actor);
   select u.invited_at is not null and u.email_confirmed_at is null into strict v_invited
     from auth.users u where id=v_user for update;
+  perform 1 from public.profiles where id=v_user for no key update;
+  if public._org_active_member(v_user) then raise exception 'AFFILIATE_ORG_MEMBER'; end if;
   insert into public.affiliates(user_id,slug,status,application,approved_at,approved_by,admin_label)
     values(v_user,p_input->>'slug',case when v_invited then 'pending' else 'active' end,
       case when v_invited then '{"source":"admin_invite"}'::jsonb else '{}' end,
@@ -4938,6 +5049,8 @@ declare v public.affiliate_payouts; v_status text:=p_input->>'status'; v_note te
   v_mode text:=p_input->>'void_mode'; v_method text:=nullif(trim(p_input->>'method'),'');
   v_ref text:=nullif(trim(p_input->>'paid_reference'),''); v_time timestamptz:=(p_input->>'paid_at')::timestamptz;
   v_expected bigint:=(p_input->>'expected_amount')::bigint; v_actual bigint; v_quote jsonb; v_fees bigint;
+  v_fx numeric:=(p_input->>'paid_fx_cny_per_usd')::numeric; v_cny bigint:=(p_input->>'paid_amount_cny_fen')::bigint;
+  v_org boolean;
 begin
   perform public._affiliate_require_admin(p_actor);
   perform pg_advisory_xact_lock(hashtextextended('affiliate_settlement',0));
@@ -4946,6 +5059,11 @@ begin
     or v_status is null then raise exception 'AFFILIATE_INVALID_PAYOUT_TRANSITION'; end if;
   if (v_status in ('held','void') and v_note is null) or (v_status='void' and (v_mode is null or v_mode not in ('return','forfeit')))
     or (v_status='paid' and (v_method is null or v_time is null or coalesce(v_ref,v_note) is null)) then raise exception 'INVALID_INPUT'; end if;
+  select a.org_id is not null into strict v_org from public.affiliates a where a.user_id=v.affiliate_user_id;
+  if (v_status='paid' and v_org and (v_fx is null or v_fx<=0 or v_fx>=1000 or v_cny is null or v_cny<=0))
+    or ((v_fx is not null or v_cny is not null) and not (v_status='paid' and v_org)) then
+    raise exception 'INVALID_INPUT';
+  end if;
   if v_status='paid' or (v_status='void' and v_mode='forfeit') then
     if v.legacy_review_required then raise exception 'AFFILIATE_PAYOUT_LEGACY_REVIEW'; end if;
     -- Refunds/retries lock payment then commission. The quote now depends on
@@ -4991,10 +5109,12 @@ begin
     paid_at=case when v_status='paid' then v_time end,paid_method=case when v_status='paid' then v_method end,
     paid_reference=case when v_status='paid' then v_ref end,
     fee_amount=case when v_status='paid' and v_quote is not null then v_fees end,
-    fee_lines=case when v_status='paid' and v_quote is not null then v_quote->'lines' end where id=v.id;
+    fee_lines=case when v_status='paid' and v_quote is not null then v_quote->'lines' end,
+    paid_fx_cny_per_usd=v_fx,paid_amount_cny_fen=v_cny where id=v.id;
   perform public._affiliate_audit(p_actor,'payout_decide',v.id::text,
     concat_ws(': ',v.status||' -> '||v_status,case when v_status='void' then v_mode end,v_actual::text,
-      case when v_quote is not null then 'fees '||v_fees||' net '||(v_quote->>'net') end,v_note));
+      case when v_quote is not null then 'fees '||v_fees||' net '||(v_quote->>'net') end,
+      case when v_cny is not null then 'cny_fen '||v_cny||' fx '||v_fx end,v_note));
 end;
 $$;
 
@@ -5013,7 +5133,7 @@ begin
   if v_reason is null or not(p_input ? 'affiliate_user_id') or v_user=v_owner then raise exception 'INVALID_INPUT'; end if;
   select referred_by into strict v_old from public.profiles where id=v_user for update;
   update public.profiles set referred_by=v_owner,referred_source=case when v_owner is not null then 'admin' end,
-    referred_at=case when v_owner is not null then now() end where id=v_user;
+    referred_at=case when v_owner is not null then now() end,referred_member=null,referred_via=null where id=v_user;
   perform public._affiliate_audit(p_actor,'rebind',v_user::text,
     concat(coalesce(v_old::text,'∅'),' → ',coalesce(v_owner::text,'∅'),' ',v_reason));
 end;
@@ -5043,9 +5163,17 @@ CREATE OR REPLACE FUNCTION "public"."admin_affiliate_set"("p_actor" "uuid", "p_i
     SET "search_path" TO ''
     AS $$
 declare v_user uuid:=(p_input->>'user_id')::uuid; v_parent uuid:=(p_input->>'parent_user_id')::uuid; v_status text:=p_input->>'status';
+  v_org uuid;
 begin
   perform public._affiliate_require_admin(p_actor);
   if v_status is not null and v_status not in ('active','suspended','banned') then raise exception 'INVALID_INPUT'; end if;
+  perform 1 from public.profiles where id=v_user for no key update;
+  select org_id into v_org from public.affiliates where user_id=v_user;
+  if v_org is null and v_status='active' and public._org_active_member(v_user) then raise exception 'AFFILIATE_ORG_MEMBER'; end if;
+  if v_org is not null and (coalesce((p_input->>'team_enabled')::boolean,false) or v_parent is not null
+     or (v_status='active' and not exists(select from public.orgs o where o.id=v_org and o.affiliate_enabled))) then
+    raise exception 'AFFILIATE_ORG_ACCOUNT';
+  end if;
   if p_input ? 'parent_user_id' then
     -- Serialize only rare admin hierarchy edits; concurrent A->B and B->A cannot race.
     perform pg_advisory_xact_lock(hashtextextended('affiliate_parent_edit',0));
@@ -5053,7 +5181,9 @@ begin
       select a.parent_user_id from public.affiliates a join ancestors on ancestors.id=a.user_id)
       select from ancestors where id=v_user) then raise exception 'AFFILIATE_PARENT_CYCLE'; end if;
   end if;
+  -- An admin status change takes over from the org switch (1643 restores only switch suspensions).
   update public.affiliates set status=coalesce(v_status,status),slug=coalesce(p_input->>'slug',slug),
+    suspended_by_org_switch=case when v_status is not null then false else suspended_by_org_switch end,
     team_enabled=coalesce((p_input->>'team_enabled')::boolean,team_enabled),
     parent_user_id=case when p_input ? 'parent_user_id' then v_parent else parent_user_id end,
     admin_note=case when p_input ? 'admin_note' then p_input->>'admin_note' else admin_note end
@@ -8162,6 +8292,8 @@ begin
      or exists(select from public.orgs where owner_user_id = v_owner) then
     raise exception 'ORG_MEMBER_EXISTS';
   end if;
+  if public._affiliate_personal_open(v_owner) then raise exception 'ORG_PERSONAL_AFFILIATE'; end if;
+  -- With the affiliate switch on, the insert also creates the owner's org account (1643).
   insert into public.orgs(name, owner_user_id, concurrency, per_window, batch_max, multi_template_max,
       batch_zip, early_features, affiliate_enabled, affiliate_levels, admin_note, created_by)
     values (trim(p_input->>'name'), v_owner, (p_input->>'concurrency')::integer, (p_input->>'per_window')::integer,
@@ -10848,6 +10980,9 @@ declare v_parent uuid; v_version text;
 begin
   select terms_version into strict v_version from public.affiliate_settings where singleton and enabled for share;
   if p_terms_version is distinct from v_version then raise exception 'AFFILIATE_TERMS_CHANGED'; end if;
+  -- Serializes with org_join / admin_org_create on the same account.
+  perform 1 from public.profiles where id=p_user for no key update;
+  if public._org_active_member(p_user) then raise exception 'AFFILIATE_ORG_MEMBER'; end if;
   if not public.affiliate_can_apply(p_user) then raise exception 'AFFILIATE_INELIGIBLE'; end if;
   if p_application is null or jsonb_typeof(p_application)<>'object' or
      exists(select from unnest(array['name','country','channel','audience','plan']) k
@@ -10860,7 +10995,7 @@ begin
     on conflict(user_id) do update
       set application=excluded.application,country=excluded.country,terms_version=excluded.terms_version,
           terms_accepted_at=excluded.terms_accepted_at,status='pending',reject_reason=null,reapply_allowed=false
-      where a.status='rejected' and a.reapply_allowed;
+      where a.status='rejected' and a.reapply_allowed and a.org_id is null;
   if not found then raise exception 'AFFILIATE_APPLICATION_EXISTS'; end if;
 end;
 $$;
@@ -10896,7 +11031,7 @@ CREATE OR REPLACE FUNCTION "public"."affiliate_can_apply"("p_user" "uuid") RETUR
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select s.enabled and case s.apply_min_level when 'none' then true else exists (
+  select s.enabled and not public._org_active_member(p_user) and case s.apply_min_level when 'none' then true else exists (
     select 1 from public.payments p join admin.catalog_products c on c.product_id=p.product_id
      where p.user_id=p_user and p.amount_total>p.amount_refunded and c.kind<>'pack'
        and array_position(array['starter','pro','max'],c.tier) >=
@@ -13252,11 +13387,12 @@ begin
   select * into o from public.orgs where invite_token = p_token for no key update;
   if not found then raise exception 'ORG_INVITE_INVALID'; end if;
   if o.status <> 'active' then raise exception 'ORG_SUSPENDED'; end if;
-  perform 1 from public.profiles where id = p_user and banned_at is null;
+  perform 1 from public.profiles where id = p_user and banned_at is null for no key update;
   if not found then raise exception 'USER_BANNED'; end if;
   select org_id into current_org from public.org_members where user_id = p_user and status = 'active';
   if current_org = o.id then return o.id; end if;
   if current_org is not null then raise exception 'ORG_MEMBER_EXISTS'; end if;
+  if public._affiliate_personal_open(p_user) then raise exception 'ORG_PERSONAL_AFFILIATE'; end if;
   insert into public.org_members(org_id, user_id, role) values (o.id, p_user, 'member')
     on conflict (org_id, user_id) do update set status = 'active', removed_at = null, joined_at = now(),
       monthly_allowance = 0, held_credits = 0;
@@ -16376,6 +16512,8 @@ CREATE TABLE IF NOT EXISTS "public"."affiliates" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "reapply_allowed" boolean DEFAULT false NOT NULL,
     "admin_label" "text",
+    "org_id" "uuid",
+    "suspended_by_org_switch" boolean DEFAULT false NOT NULL,
     CONSTRAINT "affiliates_admin_label_check" CHECK ((("admin_label" IS NULL) OR (("char_length"("admin_label") >= 1) AND ("char_length"("admin_label") <= 60)))),
     CONSTRAINT "affiliates_check" CHECK (("parent_user_id" <> "user_id")),
     CONSTRAINT "affiliates_payout_method_check" CHECK (("payout_method" = ANY (ARRAY['paypal'::"text", 'wise'::"text", 'bank'::"text", 'alipay'::"text", 'other'::"text"]))),
@@ -16769,9 +16907,11 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "referred_at" timestamp with time zone,
     "referred_source" "text",
     "signup_gift_refusal" "text",
+    "referred_member" "uuid",
+    "referred_via" "uuid",
     CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
     CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
-    CONSTRAINT "profiles_referred_source_check" CHECK (("referred_source" = ANY (ARRAY['signup'::"text", 'first_checkout'::"text", 'admin'::"text"]))),
+    CONSTRAINT "profiles_referred_source_check" CHECK (("referred_source" = ANY (ARRAY['signup'::"text", 'first_checkout'::"text", 'admin'::"text", 'org_l1'::"text", 'org_l2'::"text"]))),
     CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"]))),
     CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'same_ip_pending'::"text", 'daily_cap'::"text", 'paused'::"text"])))
 );
@@ -17481,6 +17621,16 @@ ALTER TABLE "public"."identity_refusals" ALTER COLUMN "id" ADD GENERATED ALWAYS 
     CACHE 1
 );
 
+
+
+CREATE TABLE IF NOT EXISTS "public"."org_attribution_errors" (
+    "redemption_id" "uuid" NOT NULL,
+    "error" "text" NOT NULL,
+    "at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."org_attribution_errors" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."org_credit_ledger" (
@@ -18569,6 +18719,11 @@ ALTER TABLE ONLY "public"."identity_refusals"
 
 
 
+ALTER TABLE ONLY "public"."org_attribution_errors"
+    ADD CONSTRAINT "org_attribution_errors_pkey" PRIMARY KEY ("redemption_id");
+
+
+
 ALTER TABLE ONLY "public"."org_credit_ledger"
     ADD CONSTRAINT "org_credit_ledger_pkey" PRIMARY KEY ("id");
 
@@ -19115,6 +19270,10 @@ CREATE INDEX "affiliates_created_idx" ON "public"."affiliates" USING "btree" ("c
 
 
 
+CREATE UNIQUE INDEX "affiliates_org_id_idx" ON "public"."affiliates" USING "btree" ("org_id") WHERE ("org_id" IS NOT NULL);
+
+
+
 CREATE INDEX "affiliates_parent_created_idx" ON "public"."affiliates" USING "btree" ("parent_user_id", "created_at" DESC, "slug" DESC) WHERE ("parent_user_id" IS NOT NULL);
 
 
@@ -19412,6 +19571,14 @@ CREATE INDEX "profiles_paid_until_idx" ON "public"."profiles" USING "btree" ("pa
 
 
 CREATE INDEX "profiles_referred_by_idx" ON "public"."profiles" USING "btree" ("referred_by", "referred_at" DESC, "id" DESC) WHERE ("referred_by" IS NOT NULL);
+
+
+
+CREATE INDEX "profiles_referred_member_idx" ON "public"."profiles" USING "btree" ("referred_member") WHERE ("referred_member" IS NOT NULL);
+
+
+
+CREATE INDEX "profiles_referred_via_idx" ON "public"."profiles" USING "btree" ("referred_via") WHERE ("referred_via" IS NOT NULL);
 
 
 
@@ -19772,6 +19939,14 @@ CREATE OR REPLACE TRIGGER "link_disputes_payment_insert" AFTER INSERT ON "public
 
 
 CREATE OR REPLACE TRIGGER "match_unlinked_dispute" BEFORE INSERT ON "public"."payment_disputes" FOR EACH ROW WHEN (("new"."payment_id" IS NULL)) EXECUTE FUNCTION "public"."_match_dispute_before_insert"();
+
+
+
+CREATE OR REPLACE TRIGGER "org_affiliate_account" AFTER INSERT OR UPDATE OF "affiliate_enabled" ON "public"."orgs" FOR EACH ROW EXECUTE FUNCTION "public"."_org_affiliate_account"();
+
+
+
+CREATE OR REPLACE TRIGGER "org_invite_attribution" AFTER INSERT ON "public"."code_redemptions" FOR EACH ROW WHEN ((("new"."kind" = 'invite'::"text") AND ("new"."status" = 'ok'::"text") AND ("new"."inviter_user_id" IS NOT NULL))) EXECUTE FUNCTION "public"."_org_attribute_invite"();
 
 
 
@@ -20168,6 +20343,11 @@ ALTER TABLE ONLY "public"."affiliates"
 
 
 ALTER TABLE ONLY "public"."affiliates"
+    ADD CONSTRAINT "affiliates_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
+
+
+
+ALTER TABLE ONLY "public"."affiliates"
     ADD CONSTRAINT "affiliates_parent_user_id_fkey" FOREIGN KEY ("parent_user_id") REFERENCES "public"."affiliates"("user_id") ON DELETE SET NULL;
 
 
@@ -20329,6 +20509,11 @@ ALTER TABLE ONLY "public"."identity_judge_calls"
 
 ALTER TABLE ONLY "public"."identity_refusals"
     ADD CONSTRAINT "identity_refusals_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."org_attribution_errors"
+    ADD CONSTRAINT "org_attribution_errors_redemption_id_fkey" FOREIGN KEY ("redemption_id") REFERENCES "public"."code_redemptions"("id") ON DELETE CASCADE;
 
 
 
@@ -20499,6 +20684,16 @@ ALTER TABLE ONLY "public"."profiles"
 
 ALTER TABLE ONLY "public"."profiles"
     ADD CONSTRAINT "profiles_referred_by_fkey" FOREIGN KEY ("referred_by") REFERENCES "public"."affiliates"("user_id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."profiles"
+    ADD CONSTRAINT "profiles_referred_member_fkey" FOREIGN KEY ("referred_member") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."profiles"
+    ADD CONSTRAINT "profiles_referred_via_fkey" FOREIGN KEY ("referred_via") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
 
 
@@ -20945,6 +21140,9 @@ ALTER TABLE "public"."identity_judge_calls" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."identity_refusals" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."org_attribution_errors" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_credit_ledger" ENABLE ROW LEVEL SECURITY;
@@ -21872,6 +22070,10 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_payout_forfeit"("p" "public"."affili
 
 
 
+REVOKE ALL ON FUNCTION "public"."_affiliate_personal_open"("p_user" "uuid") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_affiliate_require_admin"("p_actor" "uuid") FROM PUBLIC;
 
 
@@ -21912,11 +22114,23 @@ REVOKE ALL ON FUNCTION "public"."_membership_end_without_refunded"("p_user_id" "
 
 
 
+REVOKE ALL ON FUNCTION "public"."_org_active_member"("p_user" "uuid") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_affiliate_account"() FROM PUBLIC;
+
+
+
 GRANT SELECT ON TABLE "public"."orgs" TO "service_role";
 
 
 
 REVOKE ALL ON FUNCTION "public"."_org_allocate"("p_org" "public"."orgs", "p_member" "uuid", "p_amount" integer, "p_request" "text", "p_actor" "uuid") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_attribute_invite"() FROM PUBLIC;
 
 
 
@@ -23930,6 +24144,10 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public
 GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."org_attribution_errors" TO "service_role";
 
 
 

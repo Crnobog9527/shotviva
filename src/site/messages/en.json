@@ -2171,6 +2171,7 @@
       "dispute_won": "Dispute won",
       "same_ip": "Matching signup network",
       "affiliate_inactive": "Affiliate inactive at purchase",
+      "org_member": "Customer is a member of this company",
       "confirmed": "Confirmation period completed",
       "admin_release": "Released after review",
       "admin_void": "Voided after review",
@@ -2333,6 +2334,11 @@
       "estimateNote": "This is an estimate for your current payout method. The final amount is set when the statement is paid, using the fees in force on its settlement date and the amount payable then. Fees never exceed the payout.",
       "estimateNoMethod": "Add a payout method to see the fees that apply to it. Fees that only apply to some payout methods are not included in this estimate yet.",
       "breakdown": "Fee details"
+    },
+    "enterprise": {
+      "pill": "Company account",
+      "title": "Your company's partner dashboard",
+      "body": "Your account belongs to a company on Shotviva, so it can't join the personal partner program. Customers who sign up with your invite link or code count for your company. The company dashboard is coming soon."
     }
   },
   "gallery": {
