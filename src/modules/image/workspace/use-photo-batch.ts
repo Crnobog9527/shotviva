@@ -8,7 +8,7 @@ import { getJobs } from '../generation/job-store'
 import { previewsToRevoke, summarize, takeBatch, uploadsToStart, type BatchPhoto } from './photo-batch'
 import { naturalSize, nearestRatio } from './photo-ratio'
 import { isAbort, UploadError, uploadPhoto } from '@/core/storage/upload'
-import { uploadDeps, type UploadState } from './use-upload'
+import { batchUploadDeps, type UploadState } from './use-upload'
 
 // file is null for a kept photo (Make again, T40): it is already in R2, so nothing uploads.
 type Entry = BatchPhoto & { file: File | null }
@@ -41,7 +41,7 @@ function useBatchUploads(entries: Entry[], patch: (id: string, change: Partial<E
       const controller = new AbortController()
       running.set(id, controller)
       patch(id, { upload: { phase: 'compressing', progress: 0 } })
-      uploadPhoto(entry.file, uploadDeps, {
+      uploadPhoto(entry.file, batchUploadDeps, {
         signal: controller.signal,
         onPhase: (phase) => patch(id, { upload: { phase, progress: 0 } }),
         onProgress: (progress) => patch(id, { upload: { phase: 'uploading', progress } }),
