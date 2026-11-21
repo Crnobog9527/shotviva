@@ -4038,6 +4038,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "created_by" "uuid" NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "signup_bonus_credits" integer DEFAULT 0 NOT NULL,
     CONSTRAINT "orgs_admin_note_check" CHECK (("length"("admin_note") <= 2000)),
     CONSTRAINT "orgs_affiliate_levels_check" CHECK (("affiliate_levels" = ANY (ARRAY[1, 2]))),
     CONSTRAINT "orgs_batch_max_check" CHECK (("batch_max" >= 1)),
@@ -4047,6 +4048,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     CONSTRAINT "orgs_name_check" CHECK ((("length"(TRIM(BOTH FROM "name")) >= 1) AND ("length"(TRIM(BOTH FROM "name")) <= 120))),
     CONSTRAINT "orgs_per_window_check" CHECK (("per_window" >= 1)),
     CONSTRAINT "orgs_pool_credits_check" CHECK (("pool_credits" >= 0)),
+    CONSTRAINT "orgs_signup_bonus_credits_check" CHECK ((("signup_bonus_credits" >= 0) AND ("signup_bonus_credits" <= 1000))),
     CONSTRAINT "orgs_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'suspended'::"text"])))
 );
 
@@ -4333,6 +4335,41 @@ $$;
 
 
 ALTER FUNCTION "public"."_org_settle_returns"("p_org" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_signup_bonus"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_org uuid; v_credits integer;
+begin
+  begin
+    select o.id,o.signup_bonus_credits into v_org,v_credits from public.affiliates a
+      join public.orgs o on o.id=a.org_id
+      where a.user_id=new.referred_by and a.status='active' and o.status='active' and o.affiliate_enabled;
+    if not found or v_credits is null or v_credits <= 0 then return null; end if;
+    -- A paid account is never a new user (redeem_code refuses it too; this is belt and braces).
+    if exists(select from public.payments where user_id=new.id) then return null; end if;
+    insert into public.org_signup_bonuses(user_id,org_id,member_user_id,credits)
+      values(new.id,v_org,new.referred_member,v_credits) on conflict(user_id) do nothing;
+    if not found then return null; end if;
+    perform public._apply_credit_change(new.id,'free','org_signup_bonus',v_credits,
+      'Enterprise invite signup bonus','org_signup_bonus:' || new.id);
+  exception when others or query_canceled or assert_failure then
+    -- Keep no exception DETAIL/CONTEXT (it can contain a whole row).
+    begin
+      insert into public.org_signup_bonus_errors(user_id,error)
+        values(new.id,sqlstate || ': ' || left(sqlerrm,300)) on conflict(user_id) do nothing;
+    exception when others or query_canceled or assert_failure then
+      return null;
+    end;
+  end;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_org_signup_bonus"() OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."payment_disputes" (
@@ -8488,6 +8525,31 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_org_payment_account_save"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) RETURNS timestamp with time zone
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare o public.orgs; v_before integer;
+begin
+  perform public._org_require_admin(p_actor);
+  if p_credits is null or p_credits < 0 or p_credits > 1000 or p_expected_updated_at is null then
+    raise exception 'INVALID_INPUT';
+  end if;
+  select * into o from public.orgs where id=p_org_id for no key update;
+  if not found then raise exception 'ORG_NOT_FOUND'; end if;
+  if o.updated_at is distinct from p_expected_updated_at then raise exception 'ORG_CHANGED'; end if;
+  v_before := o.signup_bonus_credits;
+  update public.orgs set signup_bonus_credits=p_credits,updated_at=now() where id=p_org_id returning * into o;
+  perform public._org_audit(p_actor,'org_update',p_org_id::text,
+    jsonb_build_object('signup_bonus_credits',jsonb_build_object('before',v_before,'after',p_credits))::text);
+  return o.updated_at;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_org_update"("p_actor" "uuid", "p_org_id" "uuid", "p_input" "jsonb") RETURNS timestamp with time zone
@@ -17699,7 +17761,7 @@ CREATE TABLE IF NOT EXISTS "public"."credit_ledger" (
     "payment_id" bigint,
     CONSTRAINT "credit_ledger_balance_after_check" CHECK (("balance_after" >= 0)),
     CONSTRAINT "credit_ledger_delta_check" CHECK (("delta" <> 0)),
-    CONSTRAINT "credit_ledger_kind_check" CHECK (("kind" = ANY (ARRAY['grant'::"text", 'reserve'::"text", 'refund'::"text", 'purchase'::"text", 'admin_adjust'::"text", 'clawback'::"text", 'clawback_restore'::"text", 'code_grant'::"text", 'invite_reward'::"text", 'org_allocate'::"text", 'org_reclaim'::"text", 'org_deposit'::"text"]))),
+    CONSTRAINT "credit_ledger_kind_check" CHECK (("kind" = ANY (ARRAY['grant'::"text", 'reserve'::"text", 'refund'::"text", 'purchase'::"text", 'admin_adjust'::"text", 'clawback'::"text", 'clawback_restore'::"text", 'code_grant'::"text", 'invite_reward'::"text", 'org_allocate'::"text", 'org_reclaim'::"text", 'org_deposit'::"text", 'org_signup_bonus'::"text"]))),
     CONSTRAINT "credit_ledger_pool_check" CHECK (("pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
     CONSTRAINT "credit_ledger_reason_check" CHECK (("length"("reason") > 0))
 );
@@ -18055,6 +18117,29 @@ CREATE TABLE IF NOT EXISTS "public"."org_pool_returns" (
 
 
 ALTER TABLE "public"."org_pool_returns" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."org_signup_bonus_errors" (
+    "user_id" "uuid" NOT NULL,
+    "error" "text" NOT NULL,
+    "at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."org_signup_bonus_errors" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."org_signup_bonuses" (
+    "user_id" "uuid" NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "member_user_id" "uuid",
+    "credits" integer NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "org_signup_bonuses_credits_check" CHECK (("credits" > 0))
+);
+
+
+ALTER TABLE "public"."org_signup_bonuses" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."partner_links" (
@@ -19064,6 +19149,16 @@ ALTER TABLE ONLY "public"."org_pool_returns"
 
 
 
+ALTER TABLE ONLY "public"."org_signup_bonus_errors"
+    ADD CONSTRAINT "org_signup_bonus_errors_pkey" PRIMARY KEY ("user_id");
+
+
+
+ALTER TABLE ONLY "public"."org_signup_bonuses"
+    ADD CONSTRAINT "org_signup_bonuses_pkey" PRIMARY KEY ("user_id");
+
+
+
 ALTER TABLE ONLY "public"."orgs"
     ADD CONSTRAINT "orgs_invite_token_key" UNIQUE ("invite_token");
 
@@ -19803,6 +19898,10 @@ CREATE INDEX "org_pool_returns_open_idx" ON "public"."org_pool_returns" USING "b
 
 
 
+CREATE INDEX "org_signup_bonuses_org_idx" ON "public"."org_signup_bonuses" USING "btree" ("org_id", "created_at");
+
+
+
 CREATE UNIQUE INDEX "partner_links_partner_link_code_idx" ON "public"."partner_links" USING "btree" ("partner", "link_code") WHERE ("link_code" IS NOT NULL);
 
 
@@ -20252,6 +20351,10 @@ CREATE OR REPLACE TRIGGER "org_affiliate_account" AFTER INSERT OR UPDATE OF "aff
 
 
 CREATE OR REPLACE TRIGGER "org_invite_attribution" AFTER INSERT ON "public"."code_redemptions" FOR EACH ROW WHEN ((("new"."kind" = 'invite'::"text") AND ("new"."status" = 'ok'::"text") AND ("new"."inviter_user_id" IS NOT NULL))) EXECUTE FUNCTION "public"."_org_attribute_invite"();
+
+
+
+CREATE OR REPLACE TRIGGER "org_signup_bonus" AFTER UPDATE OF "referred_source" ON "public"."profiles" FOR EACH ROW WHEN ((("new"."referred_source" = 'org_l1'::"text") AND ("old"."referred_source" IS NULL) AND ("old"."referred_by" IS NULL) AND ("new"."referred_by" IS NOT NULL))) EXECUTE FUNCTION "public"."_org_signup_bonus"();
 
 
 
@@ -20892,6 +20995,26 @@ ALTER TABLE ONLY "public"."org_pool_returns"
 
 
 
+ALTER TABLE ONLY "public"."org_signup_bonus_errors"
+    ADD CONSTRAINT "org_signup_bonus_errors_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."org_signup_bonuses"
+    ADD CONSTRAINT "org_signup_bonuses_member_user_id_fkey" FOREIGN KEY ("member_user_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."org_signup_bonuses"
+    ADD CONSTRAINT "org_signup_bonuses_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
+
+
+
+ALTER TABLE ONLY "public"."org_signup_bonuses"
+    ADD CONSTRAINT "org_signup_bonuses_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."orgs"
     ADD CONSTRAINT "orgs_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
 
@@ -21474,6 +21597,12 @@ ALTER TABLE "public"."org_payment_accounts" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_pool_returns" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."org_signup_bonus_errors" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."org_signup_bonuses" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."orgs" ENABLE ROW LEVEL SECURITY;
@@ -22483,6 +22612,10 @@ REVOKE ALL ON FUNCTION "public"."_org_settle_returns"("p_org" "uuid") FROM PUBLI
 
 
 
+REVOKE ALL ON FUNCTION "public"."_org_signup_bonus"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_payment_dispute_answer"("p_row" "public"."payment_disputes", "p_created" boolean) FROM PUBLIC;
 
 
@@ -23023,6 +23156,11 @@ GRANT ALL ON FUNCTION "public"."admin_org_package_save"("p_actor" "uuid", "p_inp
 
 REVOKE ALL ON FUNCTION "public"."admin_org_payment_account_save"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_org_payment_account_save"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) TO "service_role";
 
 
 
@@ -24523,6 +24661,14 @@ GRANT SELECT ON TABLE "public"."org_payment_accounts" TO "service_role";
 
 
 GRANT SELECT ON TABLE "public"."org_pool_returns" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."org_signup_bonus_errors" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."org_signup_bonuses" TO "service_role";
 
 
 

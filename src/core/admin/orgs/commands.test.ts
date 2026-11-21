@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const spies = vi.hoisted(() => ({
-  savePay: vi.fn(), create: vi.fn(), update: vi.fn(), grant: vi.fn(), savePkg: vi.fn(), detail: vi.fn(), findUser: vi.fn(), phone: vi.fn(),
+  savePay: vi.fn(), create: vi.fn(), update: vi.fn(), grant: vi.fn(), savePkg: vi.fn(), bonus: vi.fn(), detail: vi.fn(), findUser: vi.fn(), phone: vi.fn(),
 }))
 vi.mock('@/core/org', () => ({
   adminCreateOrg: spies.create, adminUpdateOrg: spies.update, adminGrantOrg: spies.grant, adminSaveOrgPackage: spies.savePkg, adminSavePaymentAccount: spies.savePay,
+  adminSetOrgSignupBonus: spies.bonus, ORG_SIGNUP_BONUS_MAX: 1000,
   PAYMENT_KINDS: ['overseas_us', 'mainland_agent'],
   PAYMENT_FIELDS: { overseas_us: ['account_name', 'bank_name', 'account_number', 'routing_aba', 'notes'], mainland_agent: ['account_name', 'bank_name', 'branch', 'account_number', 'notes'] },
 }))
@@ -13,7 +14,7 @@ vi.mock('@/core/affiliate/admin/summary', () => ({ findUser: spies.findUser }))
 vi.mock('@/core/affiliate/admin/create-account', () => ({ phoneUser: spies.phone, EnrollmentError: class EnrollmentError extends Error {} }))
 vi.mock('@/core/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn() } }))
 
-const { createOrg, grantOrg, moneyToMinor, orgFailure, runOrgAction, saveOrg, savePackage, savePaymentAccount } = await import('./commands')
+const { createOrg, grantOrg, moneyToMinor, orgFailure, runOrgAction, saveOrg, savePackage, savePaymentAccount, saveSignupBonus } = await import('./commands')
 const { AppError } = await import('@/core/errors')
 
 const db = {} as never
@@ -24,7 +25,7 @@ const PKG = '22222222-2222-4222-8222-222222222222'
 function org(over: Record<string, unknown> = {}) {
   return {
     id: ORG, name: 'Acme Test', ownerUserId: 'u', status: 'active', concurrency: null, perWindow: null, batchMax: 10, multiTemplateMax: null,
-    batchZip: false, earlyFeatures: false, affiliateEnabled: false, affiliateLevels: 1, poolCredits: 0, adminNote: null, createdAt: 'x',
+    batchZip: false, earlyFeatures: false, affiliateEnabled: false, affiliateLevels: 1, signupBonusCredits: 0, poolCredits: 0, adminNote: null, createdAt: 'x',
     updatedAt: '2026-01-01T00:00:00Z', ...over,
   }
 }
@@ -189,5 +190,36 @@ describe('savePaymentAccount', () => {
     const result = await runOrgAction(() => savePaymentAccount(deps, { kind: 'overseas_us', enabled: true, expectedUpdatedAt: '', fields: { account_name: 'Fake Co' } }))
     expect(result).toEqual({ ok: false, message: '启用前请填写账户名称、银行名称和账号' })
     expect(spies.savePay).not.toHaveBeenCalled()
+  })
+})
+
+describe('saveSignupBonus', () => {
+  const bonus = (credits: string) => ({ id: ORG, expectedUpdatedAt: '2026-01-01T00:00:00Z', credits })
+  it('sends whole credits with the form\'s updated_at and returns the new one', async () => {
+    spies.bonus.mockResolvedValue('2026-03-03T00:00:00Z')
+    const result = await saveSignupBonus(deps, bonus(' 300 '))
+    expect(spies.bonus).toHaveBeenCalledWith(db, deps.actor, ORG, 300, '2026-01-01T00:00:00Z')
+    expect(result).toEqual({ ok: true, message: '邀请注册福利已保存', value: { updatedAt: '2026-03-03T00:00:00Z' } })
+  })
+  it('accepts exactly the cap of 1000', async () => {
+    spies.bonus.mockResolvedValue('2026-03-03T00:00:00Z')
+    expect((await saveSignupBonus(deps, bonus('1000'))).ok).toBe(true)
+    expect(spies.bonus).toHaveBeenCalledWith(db, deps.actor, ORG, 1000, '2026-01-01T00:00:00Z')
+  })
+  it('treats an empty field as 0 (off)', async () => {
+    spies.bonus.mockResolvedValue('2026-03-03T00:00:00Z')
+    await saveSignupBonus(deps, bonus(''))
+    expect(spies.bonus).toHaveBeenCalledWith(db, deps.actor, ORG, 0, '2026-01-01T00:00:00Z')
+  })
+  it('refuses a typo above the hard cap, negatives and decimals without calling the database', async () => {
+    expect(await runOrgAction(() => saveSignupBonus(deps, bonus('1001')))).toEqual({ ok: false, message: '赠送积分最多 1000' })
+    expect(await runOrgAction(() => saveSignupBonus(deps, bonus('5000')))).toEqual({ ok: false, message: '赠送积分最多 1000' })
+    for (const bad of ['-1', '1.5', 'abc']) expect((await runOrgAction(() => saveSignupBonus(deps, bonus(bad)))).ok).toBe(false)
+    expect(spies.bonus).not.toHaveBeenCalled()
+  })
+  it('shows the stale-form message when someone else saved the org first', async () => {
+    spies.bonus.mockRejectedValue(new AppError('CONFLICT', 'ORG_CHANGED'))
+    const result = await runOrgAction(() => saveSignupBonus(deps, bonus('500')))
+    expect(result).toMatchObject({ ok: false, message: expect.stringContaining('被别人改过') })
   })
 })

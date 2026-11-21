@@ -15,6 +15,8 @@ export type OrgRow = {
   earlyFeatures: boolean
   affiliateEnabled: boolean
   affiliateLevels: 1 | 2
+  // Extra free credits for a new level-1 customer of the org (0 = off).
+  signupBonusCredits: number
   poolCredits: number
   adminNote: string | null
   createdAt: string
@@ -67,6 +69,8 @@ export type OrgDetail = {
   packages: OrgPackage[]
   caps: LimitCaps
   affiliate: OrgAffiliate | null
+  // Users who have received the org's signup bonus so far.
+  signupBonusUsers: number
 }
 
 // Serialisable answer of an org server action; the page shows `message`.
