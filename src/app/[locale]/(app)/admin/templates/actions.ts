@@ -34,6 +34,7 @@ import { publicEnv } from '@/core/public-env'
 import { r2PublicStore, r2Store } from '@/core/storage'
 import { TEMPLATES_CACHE_TAG } from '@/core/templates'
 import { readTemplateFloors } from '@/site/template-pricing'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 // Server actions are public endpoints, so each one re-checks the admin role itself.
 
@@ -46,6 +47,7 @@ import { readTemplateFloors } from '@/site/template-pricing'
 // lists read the database directly, and refresh() re-renders them now. Charges never read this cache.
 async function catalogueChanged() {
   await updateCatalogueTag(TEMPLATES_CACHE_TAG)
+  warmPublicPagesSoon()
   refresh()
 }
 

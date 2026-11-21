@@ -1,4 +1,5 @@
 import { INQUIRIES_COPY } from '../admin/inquiries-ui/copy'
+import { paymentFeeReconcile } from './fee-reconcile-template'
 import { visitorText } from './visitor-text'
 import type {
   BusinessInquiryAlert,
@@ -324,6 +325,7 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   business_inquiry: businessInquiry,
   sale_floor_hidden: saleFloorHidden,
   signup_gift_cap: signupGiftCap,
+  payment_fee_reconcile: paymentFeeReconcile,
   work_reported: (a) => ({
     line: `【创作库作品被举报】原因：${REPORT_REASON_NAMES[a.reason] ?? a.reason}。作品仍在展示，请到「创作库审核」页决定是否下架。`,
     path: '/admin/gallery?tab=reported',

@@ -2063,8 +2063,8 @@
     "card": "Card · Apple Pay · Google Pay",
     "alipay": "Alipay",
     "wallet": "Alipay / WeChat Pay",
-    "wechatCap": "WeChat\u00a0Pay takes up to ¥1,000 per payment and per month. Above that, use Alipay (no limit) or a card.",
-    "wechatCapOver": "This purchase is over WeChat\u00a0Pay's ¥1,000 limit. Pay with Alipay or a card.",
+    "wechatCap": "WeChat Pay takes up to ¥1,000 per payment and per month. Above that, use Alipay (no limit) or a card.",
+    "wechatCapOver": "This purchase is over WeChat Pay's ¥1,000 limit. Pay with Alipay or a card.",
     "cnCard": "China-issued card",
     "cardOnly": "Card",
     "cardWallets": "Card · Apple Pay · Google Pay",
@@ -2082,7 +2082,7 @@
     "choose": "Choose {tier}",
     "upgradeTo": "Upgrade to {tier}",
     "savingLabel": "You save<vs> vs monthly</vs>",
-    "savingAmount": "{amount}\u00a0a\u00a0year · {about, select, true {about\u00a0} other {}}{pct}%\u00a0off",
+    "savingAmount": "{amount} a year · {about, select, true {about } other {}}{pct}% off",
     "mostPopular": "Most popular",
     "memberPrice": "Member price",
     "memberCodeKept": "Member price. Your discount code is saved for another purchase.",
@@ -2373,7 +2373,10 @@
       "confirmed": "Confirmation period completed",
       "admin_release": "Released after review",
       "admin_void": "Voided after review",
-      "zero": "No commission due"
+      "zero": "No commission due",
+      "fee_adjusted": "Fees updated (estimated)",
+      "fee_final": "Fees settled",
+      "confirmed_fee_estimate": "Confirmed on estimated fees"
     },
     "product": {
       "starter_monthly": "Starter monthly",
@@ -2536,6 +2539,51 @@
     "enterprise": {
       "pill": "Company account",
       "title": "Company partner dashboard"
+    },
+    "orderFees": {
+      "paid": "Paid (USD)",
+      "tax": "Tax",
+      "fees": "Payment fees",
+      "netBase": "Commission base",
+      "channel": "Payment channel",
+      "fee": "Fee",
+      "rate": "Rate",
+      "feeAmount": "Amount",
+      "source": "Source",
+      "feeState": "Status",
+      "refunded": "Refunded share",
+      "show": "Fee breakdown ({count, plural, one {# line} other {# lines}})",
+      "legacy": "Calculated by the previous rule (payment fees not deducted).",
+      "noLines": "No fee lines recorded yet.",
+      "sourceReal": "Provider bill",
+      "sourceEstimate": "Estimated from published rates",
+      "state": {
+        "estimated": "Estimated",
+        "final": "Final"
+      },
+      "noteFinal": "Commission base = paid − tax − refunded share − payment fees. These fees are final.",
+      "noteEstimate": "Commission base = paid − tax − refunded share − payment fees. Estimated fees are replaced by the provider’s real amounts once known, and your commission is recalculated.",
+      "channels": {
+        "stripe_card": "Stripe card",
+        "stripe_cn_card": "Stripe China card",
+        "stripe_alipay": "Stripe Alipay",
+        "stripe_wechat_pay": "Stripe WeChat Pay",
+        "waffo_card": "Waffo card",
+        "waffo_cn_card": "Waffo card",
+        "waffo_alipay": "Waffo Alipay",
+        "waffo_wechat_pay": "Waffo WeChat Pay"
+      },
+      "kinds": {
+        "acquiring": "Processing fee",
+        "intl_card": "International card surcharge",
+        "fx": "Currency conversion",
+        "mp": "Managed Payments",
+        "billing": "Subscription billing",
+        "radar": "Fraud screening",
+        "refund_fee": "Refund fee",
+        "other": "Other"
+      },
+      "confirmsOn": "Confirms {date}"
     }
   },
   "gallery": {

@@ -15,6 +15,7 @@ import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { BLOG_CACHE_TAG, BLOG_FOOTER_TAG } from '@/core/blog'
 import { publicEnv } from '@/core/public-env'
 import { r2PublicStore, r2Store } from '@/core/storage'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 // Server actions are public endpoints, so each one re-checks the admin role itself. What the
 // public sees changes only for a published post, so a draft save expires nothing (the admin
@@ -25,6 +26,7 @@ import { r2PublicStore, r2Store } from '@/core/storage'
 function blogChanged(scope: 'text' | 'status') {
   updateTag(BLOG_CACHE_TAG)
   if (scope === 'status') updateTag(BLOG_FOOTER_TAG)
+  warmPublicPagesSoon()
   refresh()
 }
 
