@@ -3443,6 +3443,20 @@ $$;
 ALTER FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" integer, "p_refunded" integer, "p_rate" integer, "p_fee" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_fee_alert_open"("p_payment" "public"."payments") RETURNS "void"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  insert into public.affiliate_fee_alerts(payment_id,kind,fee_cents)
+    values(p_payment.id,'fees_missing',public._affiliate_fee_fallback(p_payment))
+    on conflict(payment_id) do update set fee_cents=excluded.fee_cents,opened_at=now(),resolved_at=null
+    where affiliate_fee_alerts.resolved_at is not null;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_fee_alert_open"("p_payment" "public"."payments") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_fee_era"("p_payment" "public"."payments") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -3790,6 +3804,8 @@ begin
     updated_at=now() returning id into v_id;
   insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
     values(v_id,v_old.amount,v_amount,v_old.status,v_status,v_reason);
+  -- Every path that confirms on the fallback (recompute, daily run, admin release) leaves the alert.
+  if v_fallback and v_status='confirmed' then perform public._affiliate_fee_alert_open(p_payment); end if;
 end;
 $$;
 
@@ -11710,10 +11726,7 @@ begin
   update public.affiliate_recompute_errors set resolved_at=now() where payment_id=p_payment_id and resolved_at is null;
   v_missing:=public._affiliate_fee_missing(v_payment);
   if v_missing and exists(select from public.affiliate_commissions c where c.payment_id=p_payment_id and c.status='confirmed') then
-    insert into public.affiliate_fee_alerts(payment_id,kind,fee_cents)
-      values(p_payment_id,'fees_missing',public._affiliate_fee_fallback(v_payment))
-      on conflict(payment_id) do update set fee_cents=excluded.fee_cents,opened_at=now(),resolved_at=null
-      where affiliate_fee_alerts.resolved_at is not null;
+    perform public._affiliate_fee_alert_open(v_payment);
   elsif not v_missing then
     update public.affiliate_fee_alerts set resolved_at=now() where payment_id=p_payment_id and resolved_at is null;
   end if;
@@ -23146,6 +23159,10 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" inte
 
 
 REVOKE ALL ON FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" integer, "p_refunded" integer, "p_rate" integer, "p_fee" integer) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_fee_alert_open"("p_payment" "public"."payments") FROM PUBLIC;
 
 
 
