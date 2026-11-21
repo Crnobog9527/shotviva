@@ -71,7 +71,7 @@ export function WechatCap({ note, text }: { note: PaywallMessage & { over: boole
       className={cn(
         "mt-3 text-caption",
         note.over
-          ? "rounded-control px-3 py-2 font-medium text-foreground shadow-[inset_0_0_0_1px_var(--bone-dim)]"
+          ? "rounded-control px-3 py-2 font-medium text-foreground shadow-[inset_0_0_0_1.5px_var(--bone-dim)]"
           : "px-0.5 text-muted-foreground",
       )}
     >
