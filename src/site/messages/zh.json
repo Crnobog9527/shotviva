@@ -2620,7 +2620,13 @@
     "updated": "更新于",
     "contents": "本页目录",
     "home": "首页",
-    "crumb": "博客"
+    "crumb": "博客",
+    "aboutAuthor": "关于作者",
+    "authorRoles": "身份",
+    "authorAwards": "获奖",
+    "authorBrands": "合作品牌",
+    "authorPosts": "{name} 的文章",
+    "authorNoPosts": "还没有中文文章。"
   },
   "supportEmail": {
     "subject": "Shotviva 客服回复了你的工单",

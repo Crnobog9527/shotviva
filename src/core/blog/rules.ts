@@ -11,6 +11,7 @@ export type BlogStatus = (typeof BLOG_STATUSES)[number]
 
 export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
 export const MAX_BODY_CHARS = 200_000
+export const RESERVED_SLUGS: readonly string[] = ['author']
 
 // Cache tag every blog read carries; every admin write expires it.
 export const BLOG_CACHE_TAG = 'blog'
@@ -33,6 +34,8 @@ export const postInputSchema = z
     authorName: z.string().trim().min(1).max(80),
   })
   .refine((post) => post.coverUrl === null || (post.coverAlt ?? '').length > 0, { message: 'cover_alt', path: ['coverAlt'] })
+  // /blog/author/<slug> is the authors' pages (authors.ts): a post there would be unreachable.
+  .refine((post) => !RESERVED_SLUGS.includes(post.slug), { message: 'slug_reserved', path: ['slug'] })
 
 export type PostInput = z.infer<typeof postInputSchema>
 

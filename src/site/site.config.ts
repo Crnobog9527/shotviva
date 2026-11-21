@@ -76,6 +76,8 @@ export const site = defineSite({
       // its own indexing per post (core/blog/seo.ts).
       '/blog',
       '/blog/[slug]',
+      // A registered blog author's page (core/blog/authors.ts), indexed by the same rule.
+      '/blog/author/[slug]',
       // The public gallery (T108), noindex in Chinese like the other inner pages.
       '/gallery',
       '/g/[jobId]',
