@@ -1,7 +1,9 @@
 import { Link } from '../../i18n/ui'
 import type { Locale } from '../../i18n/locales'
+import { authorPath, type BlogAuthor } from '../authors'
 import { parseMarkdown, type TocEntry } from '../markdown'
 import type { Post } from '../rules'
+import { AuthorName } from './byline'
 import { isoDay, longDate } from './dates'
 import { BlocksView } from './markdown-view'
 import './blog.css'
@@ -13,6 +15,7 @@ export type ArticleText = {
   published: string
   updated: string
   contents: string
+  aboutAuthor: string
 }
 
 function Contents({ toc, title, side }: { toc: readonly TocEntry[]; title: string; side: boolean }) {
@@ -42,12 +45,12 @@ function Contents({ toc, title, side }: { toc: readonly TocEntry[]; title: strin
   )
 }
 
-function Meta({ post, locale, text }: { post: Post; locale: Locale; text: ArticleText }) {
+function Meta({ post, locale, text, author }: { post: Post; locale: Locale; text: ArticleText; author: BlogAuthor | null }) {
   const edited = isoDay(post.updatedAt) !== isoDay(post.publishedAt)
   return (
     <p className="mk-blog-meta">
       <span>
-        {text.by} <b>{post.authorName}</b>
+        {text.by} <AuthorName name={post.authorName} author={author} />
       </span>
       <span>
         {text.published} <time dateTime={post.publishedAt}>{longDate(post.publishedAt, locale)}</time>
@@ -61,9 +64,28 @@ function Meta({ post, locale, text }: { post: Post; locale: Locale; text: Articl
   )
 }
 
+function AuthorCard({ author, locale, title }: { author: BlogAuthor; locale: Locale; title: string }) {
+  const text = author.text[locale]
+  return (
+    <aside className="mk-blog-author-card" aria-label={title}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- a small /public portrait */}
+      <img src={author.photo.src} alt={author.name} width={author.photo.width} height={author.photo.height} loading="lazy" decoding="async" />
+      <div>
+        <p className="mk-blog-author-card-title">{title}</p>
+        <p className="mk-blog-author-card-name">
+          <Link href={authorPath(author.slug)}>{author.name}</Link>
+        </p>
+        <p className="mk-blog-author-card-job">{text.jobTitle}</p>
+        <p>{text.intro}</p>
+      </div>
+    </aside>
+  )
+}
+
 // The reading page: the post's title is the page's one H1 (the body's own # headings are h2),
-// then who and when, the cover, a contents list from the h2 / h3 headings, and the text.
-export function ArticleView({ post, text }: { post: Post; text: ArticleText }) {
+// then who and when, the cover, a contents list from the h2 / h3 headings, the text, and a
+// short card on a registered author with a link to their page.
+export function ArticleView({ post, text, author = null }: { post: Post; text: ArticleText; author?: BlogAuthor | null }) {
   const { blocks, toc } = parseMarkdown(post.bodyMd)
   const showToc = toc.length >= 2
   return (
@@ -78,7 +100,7 @@ export function ArticleView({ post, text }: { post: Post; text: ArticleText }) {
       <header className="mk-blog-head">
         <h1>{post.title}</h1>
         <p className="mk-blog-lede">{post.description}</p>
-        <Meta post={post} locale={post.locale} text={text} />
+        <Meta post={post} locale={post.locale} text={text} author={author} />
       </header>
       {post.coverUrl ? (
         <figure className="mk-blog-cover">
@@ -91,6 +113,7 @@ export function ArticleView({ post, text }: { post: Post; text: ArticleText }) {
       <div className="mk-blog-text">
         <BlocksView blocks={blocks} />
       </div>
+      {author ? <AuthorCard author={author} locale={post.locale} title={text.aboutAuthor} /> : null}
     </article>
   )
 }
