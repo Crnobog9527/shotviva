@@ -167,6 +167,7 @@ export const USERS_COPY = {
     adjust: '调整积分',
     ban: '封禁',
     unban: '解封',
+    setOrgOwner: '设为企业主管理员',
     reason: '原因（必填）',
     cancel: '取消',
     pool: '积分池',

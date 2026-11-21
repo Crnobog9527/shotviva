@@ -20,7 +20,7 @@ const ORG = '11111111-1111-4111-8111-111111111111'
 const MEMBER = '00000000-0000-4000-8000-0000000000b2'
 const owner = (over: Partial<OwnerConsole['org']> = {}, extra: Partial<OwnerConsole> = {}): OwnerConsole => ({
   kind: 'owner',
-  org: { id: ORG, name: 'Acme Studio', status: 'active', poolCredits: 120000, affiliateEnabled: true, affiliateLevels: 1, ...over },
+  org: { id: ORG, name: 'Acme Studio', refCode: 'SV-K7M2PX', status: 'active', poolCredits: 120000, affiliateEnabled: true, affiliateLevels: 1, ...over },
   inviteToken: 'a'.repeat(32),
   members: [
     { userId: '00000000-0000-4000-8000-0000000000a1', account: 'owner@acme.test', role: 'owner', monthlyAllowance: 0, heldCredits: 0, customers: 0, joinedAt: '2026-11-01T00:00:00Z' },
@@ -101,7 +101,7 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
     expect(text).toMatch(/be loaded|加载失败/)
   })
 
-  it('shows the collecting accounts by group with the org name in the note, or a marked placeholder', () => {
+  it('shows the collecting accounts by group with the enterprise number to quote, or a marked placeholder', () => {
     const groups: PaymentAccountGroup[] = [
       { kind: 'overseas_us', details: { account_name: 'Sample Holdings', bank_name: 'Example Bank', account_number: '0000 0000', empty: '' } },
       { kind: 'mainland_agent', details: { account_name: 'Example Agent', currency: 'CNY' } },
@@ -111,7 +111,9 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
     expect(shown.text).toContain(locale === 'en' ? 'US company business account' : '海外美国公司对公账户')
     expect(shown.text).toContain(locale === 'en' ? 'Account number / IBAN' : '账号 / IBAN')
     expect(shown.text).toContain('Example Agent')
-    expect(shown.text).toContain('Acme Studio')
+    expect(shown.text).toContain('SV-K7M2PX')
+    expect(shown.text).toContain(locale === 'en' ? 'Put this number in your payment reference' : '汇款时请在附言中填写企业编号')
+    expect(shown.html).toContain('data-slot="org-ref-code"')
     expect(shown.html).not.toContain('org-payment-accounts-pending')
     const pending = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null }))
     expect(pending.html).toContain('data-slot="org-payment-accounts-pending"')

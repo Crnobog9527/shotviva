@@ -4147,6 +4147,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "created_by" "uuid" NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "signup_bonus_credits" integer DEFAULT 0 NOT NULL,
+    "ref_code" "text",
     CONSTRAINT "orgs_admin_note_check" CHECK (("length"("admin_note") <= 2000)),
     CONSTRAINT "orgs_affiliate_levels_check" CHECK (("affiliate_levels" = ANY (ARRAY[1, 2]))),
     CONSTRAINT "orgs_batch_max_check" CHECK (("batch_max" >= 1)),
@@ -4156,6 +4157,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     CONSTRAINT "orgs_name_check" CHECK ((("length"(TRIM(BOTH FROM "name")) >= 1) AND ("length"(TRIM(BOTH FROM "name")) <= 120))),
     CONSTRAINT "orgs_per_window_check" CHECK (("per_window" >= 1)),
     CONSTRAINT "orgs_pool_credits_check" CHECK (("pool_credits" >= 0)),
+    CONSTRAINT "orgs_ref_code_format" CHECK (("ref_code" ~ '^SV-[2-9A-HJKMNP-Z]{6}$'::"text")),
     CONSTRAINT "orgs_signup_bonus_credits_check" CHECK ((("signup_bonus_credits" >= 0) AND ("signup_bonus_credits" <= 1000))),
     CONSTRAINT "orgs_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'suspended'::"text"])))
 );
@@ -4353,6 +4355,32 @@ $$;
 ALTER FUNCTION "public"."_org_payment_fields"("p_kind" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_ref_code_new"() RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  alphabet constant text := '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  bytes bytea;
+  code text;
+  i int;
+begin
+  loop
+    bytes := uuid_send(gen_random_uuid());
+    code := 'SV-';
+    for i in 0..5 loop
+      code := code || substr(alphabet, 1 + (get_byte(bytes, i) % 31), 1);
+    end loop;
+    exit when not exists(select from public.orgs where ref_code = code);
+  end loop;
+  return code;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_org_ref_code_new"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_release"("p_org" "public"."orgs", "p_member" "uuid", "p_request" "text", "p_actor" "uuid") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -4478,6 +4506,24 @@ $$;
 
 
 ALTER FUNCTION "public"."_org_signup_bonus"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_orgs_ref_code_guard"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if tg_op = 'INSERT' then
+    if new.ref_code is null then new.ref_code := public._org_ref_code_new(); end if;
+  elsif new.ref_code is distinct from old.ref_code then
+    raise exception 'ORG_REF_CODE_IMMUTABLE';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_orgs_ref_code_guard"() OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."payment_disputes" (
@@ -8615,6 +8661,47 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_openai_admin_key_status"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_org_id uuid;
+  v_user uuid;
+  o public.orgs;
+  v_banned timestamptz;
+  v_current uuid;
+begin
+  perform public._org_require_admin(p_actor);
+  if p_input is null or jsonb_typeof(p_input) <> 'object'
+     or coalesce(p_input->>'org_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     or coalesce(p_input->>'user_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    raise exception 'INVALID_INPUT';
+  end if;
+  v_org_id := (p_input->>'org_id')::uuid;
+  v_user := (p_input->>'user_id')::uuid;
+  select * into o from public.orgs where id = v_org_id for no key update;
+  if not found then raise exception 'ORG_NOT_FOUND'; end if;
+  if o.status <> 'active' then raise exception 'ORG_SUSPENDED'; end if;
+  select banned_at into v_banned from public.profiles where id = v_user for no key update;
+  if not found then raise exception 'PROFILE_NOT_FOUND'; end if;
+  if v_banned is not null then raise exception 'USER_BANNED'; end if;
+  select org_id into v_current from public.org_members where user_id = v_user and status = 'active';
+  if v_current = o.id then return jsonb_build_object('applied', false); end if;
+  if v_current is not null then raise exception 'ORG_MEMBER_EXISTS'; end if;
+  if public._affiliate_personal_open(v_user) then raise exception 'ORG_PERSONAL_AFFILIATE'; end if;
+  insert into public.org_members(org_id, user_id, role) values (o.id, v_user, 'member')
+    on conflict (org_id, user_id) do update set status = 'active', removed_at = null, joined_at = now(),
+      monthly_allowance = 0, held_credits = 0;
+  perform public._org_audit(p_actor, 'org_add_member', o.id::text, 'member:' || v_user::text);
+  return jsonb_build_object('applied', true);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_org_create"("p_actor" "uuid", "p_input" "jsonb") RETURNS "uuid"
@@ -18158,7 +18245,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -20860,6 +20947,10 @@ CREATE INDEX "org_signup_bonuses_org_idx" ON "public"."org_signup_bonuses" USING
 
 
 
+CREATE UNIQUE INDEX "orgs_ref_code_key" ON "public"."orgs" USING "btree" ("ref_code");
+
+
+
 CREATE UNIQUE INDEX "partner_links_partner_link_code_idx" ON "public"."partner_links" USING "btree" ("partner", "link_code") WHERE ("link_code" IS NOT NULL);
 
 
@@ -21333,6 +21424,10 @@ CREATE OR REPLACE TRIGGER "org_invite_attribution" AFTER INSERT ON "public"."cod
 
 
 CREATE OR REPLACE TRIGGER "org_signup_bonus" AFTER UPDATE OF "referred_source" ON "public"."profiles" FOR EACH ROW WHEN ((("new"."referred_source" = 'org_l1'::"text") AND ("old"."referred_source" IS NULL) AND ("old"."referred_by" IS NULL) AND ("new"."referred_by" IS NOT NULL))) EXECUTE FUNCTION "public"."_org_signup_bonus"();
+
+
+
+CREATE OR REPLACE TRIGGER "orgs_ref_code_guard" BEFORE INSERT OR UPDATE ON "public"."orgs" FOR EACH ROW EXECUTE FUNCTION "public"."_orgs_ref_code_guard"();
 
 
 
@@ -23671,6 +23766,10 @@ REVOKE ALL ON FUNCTION "public"."_org_payment_fields"("p_kind" "text") FROM PUBL
 
 
 
+REVOKE ALL ON FUNCTION "public"."_org_ref_code_new"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_org_release"("p_org" "public"."orgs", "p_member" "uuid", "p_request" "text", "p_actor" "uuid") FROM PUBLIC;
 
 
@@ -23688,6 +23787,10 @@ REVOKE ALL ON FUNCTION "public"."_org_settle_returns"("p_org" "uuid") FROM PUBLI
 
 
 REVOKE ALL ON FUNCTION "public"."_org_signup_bonus"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_orgs_ref_code_guard"() FROM PUBLIC;
 
 
 
@@ -24235,6 +24338,11 @@ GRANT ALL ON FUNCTION "public"."admin_open_prompt_lab"("p_actor" "uuid", "p_asse
 
 REVOKE ALL ON FUNCTION "public"."admin_openai_admin_key_status"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_openai_admin_key_status"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
 
 
