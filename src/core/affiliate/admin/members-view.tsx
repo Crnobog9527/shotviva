@@ -16,7 +16,8 @@ import { DecideMember, MembershipSwitch, ReopenApplication, SetMember } from './
 import { Field, FiltersForm, LinkTo, NextPage, Select } from './parts'
 import { href, type Filters } from './query'
 
-export type ViewProps = { db: SupabaseClient; filters: Filters; action: SaveAction }
+// latestTerms: the newest published affiliate terms version (site content), for the fee go-live card.
+export type ViewProps = { db: SupabaseClient; filters: Filters; action: SaveAction; latestTerms?: string }
 export type DossierProps = ViewProps & { actor: string; id: string }
 
 export async function MembersView(props: ViewProps & { actor: string }) {

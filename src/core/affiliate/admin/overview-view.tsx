@@ -81,7 +81,10 @@ export async function SettingsView({ db, action }: Omit<ViewProps, 'filters'>) {
             values={['none', 'any_paid', 'starter', 'pro', 'max']}
             initial={s.apply_min_level}
           />
-          <Field name="terms_version" label={COPY.termsVersion} required defaultValue={s.terms_version} />
+          <p className="text-sm">
+            {COPY.termsVersion}：{s.terms_version}
+            <span className="block text-muted-foreground">{COPY.termsVersionFixed}</span>
+          </p>
         </div>
       </MutationForm>
       <FeeRulesSection db={db} action={action} />

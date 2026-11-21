@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { AffiliateAdminView, COPY, parseFilters, requireAffiliateAdmin } from '@/core/affiliate/admin'
 import { createAdminSupabase } from '@/core/auth'
+import { latestAffiliateTermsVersion } from '@/site/content/affiliate-terms'
 import { saveAffiliate } from './actions'
 
 export const instant = false
@@ -9,5 +10,5 @@ export default async function AffiliatesPage({ searchParams }: PageProps<'/[loca
   const admin = await requireAffiliateAdmin()
   const parsed = parseFilters(await searchParams)
   if (!parsed.success) notFound()
-  return <AffiliateAdminView db={createAdminSupabase()} filters={parsed.data} action={saveAffiliate} actor={admin.id} />
+  return <AffiliateAdminView db={createAdminSupabase()} filters={parsed.data} action={saveAffiliate} actor={admin.id} latestTerms={latestAffiliateTermsVersion()} />
 }
