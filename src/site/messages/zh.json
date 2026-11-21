@@ -2082,7 +2082,7 @@
     "choose": "选择{tier}",
     "upgradeTo": "升级到{tier}",
     "savingLabel": "<vs>比按月付</vs>每年省",
-    "savingAmount": "{amount} · {about, select, true {约省} other {省}}\u00a0{pct}%",
+    "savingAmount": "{amount} · {about, select, true {约省} other {省}} {pct}%",
     "mostPopular": "最受欢迎",
     "memberPrice": "会员价",
     "memberCodeKept": "已选会员价，优惠码留待下次使用。",
@@ -2539,6 +2539,51 @@
     "enterprise": {
       "pill": "企业账号",
       "title": "企业联盟后台"
+    },
+    "orderFees": {
+      "paid": "实付（美元）",
+      "tax": "税费",
+      "fees": "支付手续费",
+      "netBase": "计佣基数",
+      "channel": "支付渠道",
+      "fee": "费用名称",
+      "rate": "费率",
+      "feeAmount": "金额",
+      "source": "来源",
+      "feeState": "状态",
+      "refunded": "已退款部分",
+      "show": "手续费明细（{count} 项）",
+      "legacy": "按旧规则计算（未扣手续费）。",
+      "noLines": "暂无手续费明细。",
+      "sourceReal": "服务商真实账单",
+      "sourceEstimate": "按公开费率估算",
+      "state": {
+        "estimated": "预估",
+        "final": "已确定"
+      },
+      "noteFinal": "计佣基数 = 实付 − 税费 − 已退款部分 − 支付手续费。这些手续费已确定。",
+      "noteEstimate": "计佣基数 = 实付 − 税费 − 已退款部分 − 支付手续费。预估的手续费拿到服务商真实金额后会被替换，佣金随之重算。",
+      "channels": {
+        "stripe_card": "Stripe 银行卡",
+        "stripe_cn_card": "Stripe 中国银行卡",
+        "stripe_alipay": "Stripe 支付宝",
+        "stripe_wechat_pay": "Stripe 微信支付",
+        "waffo_card": "Waffo 银行卡",
+        "waffo_cn_card": "Waffo 银行卡",
+        "waffo_alipay": "Waffo 支付宝",
+        "waffo_wechat_pay": "Waffo 微信支付"
+      },
+      "kinds": {
+        "acquiring": "收单手续费",
+        "intl_card": "国际卡附加费",
+        "fx": "换汇费",
+        "mp": "Managed Payments 服务费",
+        "billing": "订阅账单费",
+        "radar": "风控费",
+        "refund_fee": "退款手续费",
+        "other": "其他"
+      },
+      "confirmsOn": "预计确认 {date}"
     }
   },
   "gallery": {

@@ -14,7 +14,16 @@ import {
   payoutSchema,
   memberSchema,
   partnerFeesSchema,
+  type Commission,
 } from './models'
+import {
+  feeLineColumns,
+  feeLineSchema,
+  groupOrderFees,
+  orderPaymentSchema,
+  paymentColumns,
+  type OrderFees,
+} from './order-fees'
 
 function parse<T>(schema: z.ZodType<T>, response: { data: unknown; error: unknown }): T {
   if (response.error) throw new AppError('INTERNAL', 'Could not read affiliate records')
@@ -81,7 +90,7 @@ export async function readFees(user: string) {
 export async function readCommissions(user: string, cursor?: string | null, teamOnly = false) {
   let q = createAdminSupabase()
     .from('affiliate_commissions')
-    .select('id,created_at,product_id,base_usd,rate_bp,amount,status,confirm_after')
+    .select('id,created_at,payment_id,product_id,base_usd,fee_cents,net_base_usd,rate_bp,amount,status,confirm_after')
     .eq('affiliate_user_id', user)
   if (teamOnly) q = q.eq('level', 2)
   const after = decodeCursor(cursor)
@@ -91,6 +100,19 @@ export async function readCommissions(user: string, cursor?: string | null, team
     .order('id', { ascending: false })
     .limit(PAGE_SIZE + 1)
   return toPage(parse(commissionSchema.array(), result), (row) => row)
+}
+
+// Fee lines of the payments behind a page of this partner's own commissions. The payment ids come
+// from rows already filtered by affiliate_user_id; nothing else is looked up, and no buyer data is read.
+export async function readOrderFees(rows: Commission[]) {
+  const ids = [...new Set(rows.map((row) => row.payment_id))]
+  if (!ids.length) return new Map<string, OrderFees>()
+  const db = createAdminSupabase()
+  const [payments, lines] = await Promise.all([
+    db.from('payments').select(paymentColumns).in('id', ids),
+    db.from('payment_fee_lines').select(feeLineColumns).in('payment_id', ids).limit(2000),
+  ])
+  return groupOrderFees(parse(orderPaymentSchema.array(), payments), parse(feeLineSchema.array(), lines))
 }
 
 export async function readChanges(user: string, id: string, cursor?: string) {

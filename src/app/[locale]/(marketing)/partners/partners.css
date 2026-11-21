@@ -373,6 +373,37 @@
   }
   .af-history { margin-top: 4px; }
 
+  /* Rows with a detail line (fee breakdown) under them. */
+  .af-table-grouped > tbody + tbody > tr:first-child > td { box-shadow: inset 0 1px 0 var(--hairline); }
+  .af-table-grouped th { white-space: normal; vertical-align: bottom; }
+  .af-table-grouped > tbody > tr > td { padding-inline: 12px; }
+  /* max-width 0 keeps the wide detail line from stretching the table beyond its container. */
+  .af-table-grouped > tbody > .af-detail-row > td { max-width: 0; padding-top: 0; white-space: normal; box-shadow: none !important; }
+  .af-fee-detail > summary { cursor: pointer; color: var(--primary); font: 500 14px / 1.4 var(--font-sans); padding-block: 4px; }
+  .af-fee-detail[open] { display: grid; gap: 12px; padding-bottom: 6px; }
+  .af-fee-note { margin: 0; }
+  .af-state { display: inline-grid; gap: 4px; justify-items: start; }
+  .af-row-extra { display: grid; gap: 8px; justify-items: start; }
+  .af-fee-detail { justify-self: stretch; min-width: 0; }
+  .af-fee-detail .af-table th, .af-fee-detail .af-table td { white-space: normal; }
+  .af-fee-sum { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 0; }
+  .af-fee-sum > div { display: grid; gap: 2px; }
+  .af-fee-sum dt { color: var(--muted-foreground); font-size: 14px; }
+  .af-fee-sum dd { margin: 0; font-size: 16px; }
+  .af-fee-detail .af-table-wrap { background: var(--wash-faint); }
+  @media (max-width: 639px) {
+    .af-table-grouped, .af-table-grouped > tbody { display: grid; gap: 0; min-width: 0; }
+    .af-table-grouped { gap: 10px; }
+    .af-table-grouped > tbody { border-radius: 18px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); padding: 6px 16px; }
+    .af-table-grouped > tbody > tr { background: none; box-shadow: none; padding: 0; border-radius: 0; }
+    .af-table-grouped > tbody > .af-detail-row { display: block; padding: 4px 0 8px; }
+    .af-table-grouped > tbody > .af-detail-row > td { display: block; text-align: start; padding: 4px 0 0; min-width: 0; max-width: none; }
+    .af-table-grouped > tbody > .af-detail-row > td::before { content: none; }
+    .af-state { justify-items: end; }
+    .af-fee-detail .af-table-wrap { background: none; }
+    .af-fee-detail .af-table tr { background: var(--wash-faint); }
+  }
+
   /* Terms */
   .af-doc { display: grid; gap: 16px; max-width: 72ch; }
   .af-doc-body {
