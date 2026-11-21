@@ -1,10 +1,11 @@
 'use client'
 
+import type { JobView } from '@/core/jobs'
 import { addHold } from '@/core/app-update'
 
-import { readJob, submitJob, type JobBody, type SubmitOutcome } from './job-api'
+import { readJobs, submitJob, type JobBody, type SubmitOutcome } from './job-api'
 import { applyError, applyView, type TrackedJob } from './job-model'
-import { isActive, markSent, nextToSend, requeue } from './scheduler'
+import { isActive, markSent, nextToSend, pollIntervalMs, requeue } from './scheduler'
 import { loadState, saveState, type WorkspaceViews } from './store-persistence'
 
 // Module-level store, so a generation outlives the page that started it: navigating from the
@@ -144,6 +145,7 @@ function applyOutcome(job: TrackedJob, outcome: SubmitOutcome): TrackedJob {
   // Polling may have settled it first; the first answer stands.
   if (job.status !== 'running') return job
   if (outcome.kind === 'view') return applyView(job, outcome.view)
+  if (outcome.kind === 'limited') return requeue(job, Date.now(), outcome.retryAfterMs)
   if (outcome.kind === 'error' && outcome.body.code === 'RATE_LIMITED') return requeue(job, Date.now())
   if (outcome.kind === 'error') return applyError(job, outcome.body)
   // 'lost': the server job may well carry on; polling picks it up.
@@ -172,25 +174,38 @@ export function pump() {
   }
 }
 
-// One polling pass over every running job (GenerationRunner calls it every few seconds), then
-// a pump for queued jobs whose rate-limit wait is over.
-export async function pollRunning(): Promise<void> {
+// One polling pass over every running job (GenerationRunner ticks every few seconds; this
+// decides whether a pass is due, pollIntervalMs), then a pump for queued jobs whose rate-limit
+// wait is over. One GET answers for all of them (readJobs). `force` polls at once (the tab came
+// back into view).
+let lastPollAt = 0
+let quietPolls = 0
+
+// Whether this pass changed the job (settled it, or gave up on one the server never saw).
+function applyPolled(job: TrackedJob, view: JobView | 'missing' | undefined): boolean {
+  if (view === 'missing') {
+    if (pendingPosts.has(job.id) || Date.now() - (job.sentAt ?? job.startedAt) <= MISSING_GRACE_MS) return false
+    update(job.id, (current) => current.status === 'running' && current.sentAt === job.sentAt
+      ? applyError(current, { code: 'INTERNAL' }) : current)
+    return true
+  }
+  if (!view || view.status === 'running') return false
+  update(job.id, (current) => (current.status === 'running' ? applyView(current, view) : current))
+  return true
+}
+
+export async function pollRunning(force = false): Promise<void> {
   const now = Date.now()
   const running = getJobs().filter((job) => job.status === 'running' &&
     (!pendingPosts.has(job.id) || now - (job.sentAt ?? job.startedAt) >= MISSING_GRACE_MS))
-  await Promise.all(
-    running.map(async (job) => {
-      const view = await readJob(job.id)
-      if (view === 'missing') {
-        if (!pendingPosts.has(job.id) && Date.now() - (job.sentAt ?? job.startedAt) > MISSING_GRACE_MS) {
-          update(job.id, (current) => current.status === 'running' && current.sentAt === job.sentAt
-            ? applyError(current, { code: 'INTERNAL' }) : current)
-        }
-      } else if (view) {
-        update(job.id, (current) => (current.status === 'running' ? applyView(current, view) : current))
-      }
-    }),
-  )
+  if (running.length === 0 || (!force && now - lastPollAt < pollIntervalMs(running, quietPolls))) {
+    pump()
+    return
+  }
+  lastPollAt = now
+  const views = await readJobs(running.map((job) => job.id))
+  const changed = running.map((job) => applyPolled(job, views?.get(job.id))).some(Boolean)
+  quietPolls = changed ? 0 : quietPolls + 1
   pump()
 }
 

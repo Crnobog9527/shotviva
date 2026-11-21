@@ -9,6 +9,7 @@ import { SettleToast } from './settle-toast'
 import { useDocTitle } from './use-doc-title'
 import { useJobs } from './use-jobs'
 
+// The tick; job-store decides whether a status request is due (pollIntervalMs).
 const POLL_MS = 3000
 
 // Mounted once in the app layout: polls running jobs (the POST may have died with a
@@ -36,7 +37,7 @@ export function GenerationRunner() {
     // when it answers, and coming back polls at once for one the browser dropped. Queued photos
     // whose wait is over still go out (pump sends nothing that is not due).
     const timer = setInterval(() => (document.visibilityState === 'visible' ? void pollRunning() : pump()), POLL_MS)
-    const onVisible = () => document.visibilityState === 'visible' && void pollRunning()
+    const onVisible = () => document.visibilityState === 'visible' && void pollRunning(true)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
       clearInterval(timer)
