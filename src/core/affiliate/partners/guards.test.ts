@@ -118,7 +118,19 @@ it('sends an org affiliate account and any org member to the enterprise view, ne
   deps.orgMember.mockResolvedValue(true)
   await expect(EnrollmentScreen({ ...props, mode: 'apply' })).rejects.toMatchObject(enterprise)
   await expect(EnrollmentScreen(props)).rejects.toMatchObject(enterprise)
-  expect((await EnterpriseScreen()).props.className).toBe('af-apply')
+  // The org's owner account gets the dashboard (card E4); a plain member goes to their card on /account.
+  const search = Promise.resolve({})
+  await expect(EnterpriseScreen({ search })).rejects.toMatchObject({ digest: expect.stringContaining('/zh/account;') })
   deps.orgMember.mockResolvedValue(false)
-  await expect(EnterpriseScreen()).rejects.toMatchObject({ digest: expect.stringContaining('/zh/partners/join;') })
+  await expect(EnterpriseScreen({ search })).rejects.toMatchObject({ digest: expect.stringContaining('/zh/partners/join;') })
+})
+it('shows the personal-style dashboard to an org account and keeps the view when /partners hands over', async () => {
+  deps.enabled.mockResolvedValue(true)
+  deps.user.mockResolvedValue({ id: 'owner', verified: true })
+  deps.account.mockResolvedValue({ status: 'active', org_id: '00000000-0000-4000-8000-000000000001', slug: 'acme', team_enabled: false })
+  const screen = await EnterpriseScreen({ search: Promise.resolve({ view: 'payouts' }) })
+  expect(screen.props.className).toBe('af-dash')
+  await expect(PartnerScreen({ search: Promise.resolve({ view: 'payouts', cursor: 'abc' }) })).rejects.toMatchObject({
+    digest: expect.stringContaining('/zh/partners/enterprise?view=payouts&cursor=abc;'),
+  })
 })

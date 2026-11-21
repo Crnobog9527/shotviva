@@ -1,0 +1,143 @@
+'use client'
+
+import { useState } from 'react'
+import { useFormatter, useLocale, useTranslations } from 'next-intl'
+import { Coins } from 'lucide-react'
+
+import { Link } from '@/core/i18n/ui'
+import { Button } from '@/core/ui/button'
+
+import type { ConsolePackage, OwnerConsole, PaymentAccountGroup } from '../console/types'
+import type { OwnerActions } from './actions'
+import { Confirm } from './confirm'
+import { InviteLinkBox } from './invite-link-box'
+import { FIELD, Panel, Result, Stat } from './parts'
+import { useConsoleAction } from './use-console-action'
+import type { Locale } from '@/core/i18n/locales'
+import { localizePath } from '@/core/i18n/paths'
+
+// The owner's console, panel by panel (ARCHITECTURE §6.5): pool and deposit, packages, invite
+// link. The members table is in members-panel.tsx.
+
+export function PoolPanel({ data, actions }: { data: OwnerConsole; actions: OwnerActions }) {
+  const t = useTranslations('app.org.pool')
+  const format = useFormatter()
+  const [requestId, setRequestId] = useState(() => crypto.randomUUID())
+  const [amount, setAmount] = useState('')
+  const { pending, outcome, run } = useConsoleAction()
+  const value = Number(amount)
+  const valid = Number.isInteger(value) && value > 0 && value <= data.depositable
+  const suspended = data.org.status === 'suspended'
+  return (
+    <Panel title={t('title')} hint={t('hint')}>
+      <div className="grid grid-cols-2 gap-4">
+        <Stat label={t('balance')} value={format.number(data.org.poolCredits)} note={t('unit')} />
+        <Stat label={t('yours')} value={format.number(data.depositable)} note={t('yoursNote')} />
+      </div>
+      {suspended ? <p role="status" className="text-label text-destructive">{t('suspended')}</p> : null}
+      <form
+        className="grid gap-2"
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (pending || !valid || suspended) return
+          run(() => actions.deposit({ requestId, credits: value }), t('deposited'), () => { setRequestId(crypto.randomUUID()); setAmount('') })
+        }}
+      >
+        <label className="grid gap-1 text-label">
+          <span className="font-medium">{t('depositLabel')}</span>
+          <input className={FIELD} inputMode="numeric" value={amount} placeholder={t('depositPlaceholder')} onChange={(e) => setAmount(e.target.value.replace(/\D/g, '').slice(0, 10))} />
+        </label>
+        <p className="text-caption text-muted-foreground">{t('depositHint')}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" size="touch" variant="glass" disabled={pending || !valid || suspended}><Coins />{pending ? t('depositing') : t('deposit')}</Button>
+          <Result outcome={outcome} />
+        </div>
+      </form>
+    </Panel>
+  )
+}
+
+function price(format: ReturnType<typeof useFormatter>, cents: number) {
+  return format.number(cents / 100, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: cents % 100 === 0 ? 0 : 2 })
+}
+
+// Prices are in US dollars, shown only: the order goes through us offline (wire transfer).
+export function PackagesPanel({ packages }: { packages: readonly ConsolePackage[] }) {
+  const t = useTranslations('app.org.packages')
+  const format = useFormatter()
+  return (
+    <Panel title={t('title')} hint={t('hint')}>
+      {packages.length === 0 ? <p className="text-label text-muted-foreground">{t('none')}</p> : (
+        <ul className="divide-y divide-hairline">
+          {packages.map((p) => (
+            <li key={p.id} className="flex items-baseline justify-between gap-3 py-3">
+              <span className="min-w-0 font-medium">{p.name}</span>
+              <span className="shrink-0 text-right tabular-nums">
+                <span className="font-semibold">{price(format, p.priceUsdCents)}</span>
+                <span className="block text-caption text-muted-foreground">{t('credits', { count: p.credits })}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-label text-muted-foreground">{t('contact')}</p>
+      <Link href="/account?help=new" className="inline-flex min-h-11 items-center text-label font-medium text-primary underline underline-offset-4">{t('contactLink')}</Link>
+    </Panel>
+  )
+}
+
+export function InvitePanel({ data, actions }: { data: OwnerConsole; actions: OwnerActions }) {
+  const t = useTranslations('app.org.invite')
+  const locale = useLocale() as Locale
+  const [token, setToken] = useState(data.inviteToken)
+  const [confirming, setConfirming] = useState(false)
+  const { pending, outcome, run } = useConsoleAction()
+  const suspended = data.org.status === 'suspended'
+  // The origin is read in the browser, after hydration; the server render shows the path only.
+  const path = localizePath(`/join/org/${token}`, locale)
+  return (
+    <Panel title={t('title')} hint={t('hint')}>
+      <InviteLinkBox path={path} />
+      {suspended ? <p role="status" className="text-label text-muted-foreground">{t('suspended')}</p> : null}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" size="touch" variant="glass" disabled={pending} onClick={() => setConfirming(true)}>{t('reset')}</Button>
+        <Result outcome={outcome} />
+      </div>
+      <Confirm
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={t('resetTitle')}
+        description={t('resetBody')}
+        confirm={t('resetConfirm')}
+        cancel={t('cancel')}
+        busy={pending}
+        onConfirm={() => run(() => actions.resetInvite(), t('resetDone'), (result) => { setToken(result.token); setConfirming(false) })}
+      />
+    </Panel>
+  )
+}
+
+// How to pay: bank transfer to one of the configured accounts (never a card). The groups come
+// from the admin configuration; until that read exists `groups` is null and a marked note stands in.
+export function PaymentAccountsPanel({ groups, orgName }: { groups: readonly PaymentAccountGroup[] | null; orgName: string }) {
+  const t = useTranslations('app.org.payment')
+  return (
+    <Panel title={t('title')} hint={t('hint', { org: orgName })}>
+      {groups === null ? <p data-slot="org-payment-accounts-pending" className="text-label text-muted-foreground">{t('pending')}</p> : null}
+      {groups?.map((group) => (
+        <div key={group.title} className="space-y-2">
+          <h3 className="font-medium">{group.title}</h3>
+          <dl className="grid gap-x-3 gap-y-1 sm:grid-cols-[max-content_1fr]">
+            {group.fields.map((field) => (
+              <div key={field.label} className="contents">
+                <dt className="text-label text-muted-foreground">{field.label}</dt>
+                <dd className="break-all text-label select-all">{field.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ))}
+      <p className="text-label text-muted-foreground">{t('after')}</p>
+    </Panel>
+  )
+}

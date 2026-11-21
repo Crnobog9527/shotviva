@@ -4,6 +4,7 @@ export {
   joinOrg,
   leaveOrg,
   removeOrgMember,
+  rotateOrgInvite,
   setOrgAllowance,
   type PoolMove,
 } from './actions'

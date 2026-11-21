@@ -48,3 +48,8 @@ export async function depositOrgCredits(client: RpcClient, owner: string, credit
   const args = { p_owner: uuid.parse(owner), p_amount: amount.parse(credits), p_request_id: requestId.parse(id) }
   return callRpc(client, 'org_deposit', args, moved)
 }
+
+// The owner resets the invite link: the old link stops working, members stay. Returns the new token.
+export async function rotateOrgInvite(client: RpcClient, owner: string): Promise<string> {
+  return callRpc(client, 'org_rotate_invite', { p_owner: uuid.parse(owner) }, z.string().regex(/^[0-9a-f]{32}$/))
+}

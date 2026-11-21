@@ -1758,6 +1758,152 @@
         "failed": "没保存成功，请再试一次。"
       },
       "photosGone": "上一期的图片找不到了：{boxes}。请重新上传。"
+    },
+    "org": {
+      "metaTitle": "企业",
+      "back": "返回账号",
+      "suspendedBanner": "企业账号已暂停：成员的积分不受影响，但积分池相关操作暂时关闭。请联系我们恢复。",
+      "errors": {
+        "NOT_OWNER": "只有企业主管理员可以执行这个操作。",
+        "SUSPENDED": "企业账号已暂停，暂时不能划拨积分。请联系我们恢复。",
+        "POOL_INSUFFICIENT": "企业积分池里的积分不够。",
+        "CREDITS_INSUFFICIENT": "你自己的积分不够。企业划给你的积分不能再存回池里。",
+        "MEMBER_NOT_FOUND": "这位成员已经不在企业里了。",
+        "OWNER_CANNOT_LEAVE": "主管理员不能退出企业。",
+        "INVITE_INVALID": "这个邀请链接已失效，请向企业管理员要新的链接。",
+        "ALREADY_IN_ORG": "你的账号已经属于一家企业，需要先退出才能加入新的企业。",
+        "PERSONAL_AFFILIATE": "你的账号开通了个人联盟，不能同时加入企业。请联系我们，我们帮你切换。",
+        "PERSONAL_AFFILIATE_UNSETTLED": "你的个人联盟账号还有未结清的佣金，请联系我们先结清。",
+        "BANNED": "这个账号不能加入企业。",
+        "INVALID": "请检查输入的数字后重试。",
+        "CONFLICT": "这个请求编号已经用在另一个操作上。请刷新页面后重试。",
+        "FAILED": "出了点问题，请重试。"
+      },
+      "tabs": {
+        "label": "企业分区",
+        "console": "企业",
+        "affiliate": "企业联盟"
+      },
+      "entry": {
+        "title": "企业",
+        "pool": "积分池 {pool} 积分",
+        "suspended": "账号已暂停",
+        "open": "管理"
+      },
+      "pool": {
+        "title": "积分池",
+        "hint": "企业持有的积分。划给成员后，由成员用于自己的出图。",
+        "balance": "池里余额",
+        "unit": "积分",
+        "yours": "你可存入",
+        "yoursNote": "你自己购买的积分",
+        "suspended": "企业已暂停，暂时不能存入。",
+        "depositLabel": "存入自己的积分",
+        "depositPlaceholder": "积分数量",
+        "depositHint": "把你自己购买的积分存入积分池。池里的积分不能退款，也不能再取回。",
+        "deposit": "存入",
+        "depositing": "存入中…",
+        "deposited": "已存入积分池。"
+      },
+      "packages": {
+        "title": "企业套餐",
+        "hint": "价格以美元计，订单线下办理。",
+        "none": "暂时没有可选套餐。",
+        "credits": "{count, number} 积分",
+        "contact": "需要给积分池充值时，请联系我们，通过银行转账付款。款项到账后，我们把积分发放到你的积分池。",
+        "contactLink": "联系我们转账"
+      },
+      "invite": {
+        "title": "邀请链接",
+        "hint": "把这个链接发给你的团队。已登录的人打开后即可加入企业。",
+        "suspended": "企业已暂停，暂时不能通过链接加入。",
+        "copy": "复制链接",
+        "copied": "链接已复制。",
+        "copyFailed": "请选中上面的链接手动复制。",
+        "reset": "重置链接",
+        "resetTitle": "重置邀请链接？",
+        "resetBody": "现有链接会立即失效。已经加入的成员不受影响。",
+        "resetConfirm": "重置",
+        "resetDone": "新链接已生成。",
+        "cancel": "取消"
+      },
+      "members": {
+        "title": "成员",
+        "hint": "月额度：每月 1 日（UTC）把成员补到这个积分数。立即划拨：马上从积分池划给成员。",
+        "unknown": "账号",
+        "owner": "主管理员",
+        "held": "企业积分剩 {count, number}",
+        "customers": "客户 {count, number}",
+        "allowance": "月额度",
+        "allowanceFor": "{who} 的月额度",
+        "allowanceSaved": "月额度已保存。",
+        "save": "保存",
+        "giveNow": "立即划拨",
+        "giveFor": "划给 {who} 的积分",
+        "given": "已划拨 {count, number} 积分。",
+        "give": "划拨",
+        "giving": "划拨中…",
+        "remove": "移除",
+        "removeTitle": "移除 {who}？",
+        "removeBody": "企业没用完的积分会回到积分池；他自己购买的积分仍归他；他带来的客户仍归企业。",
+        "removeConfirm": "移除",
+        "removed": "已移除。",
+        "cancel": "取消",
+        "truncated": "显示 {shown} / {total} 位成员。",
+        "inviteEmpty": "还没有人加入，把上面的邀请链接发给他们。"
+      },
+      "performance": {
+        "title": "月度业绩",
+        "hint": "每位成员每月分到、用掉的积分，以及带来的客户。",
+        "pending": "月度报表和 CSV 导出即将上线。"
+      },
+      "staff": {
+        "title": "我的企业：{org}",
+        "hint": "企业每月分给你的积分，以及你的推广链接。",
+        "suspended": "企业账号已暂停，你自己的积分不受影响。",
+        "allowance": "月额度",
+        "allocated": "本月已分到",
+        "remaining": "企业积分剩余",
+        "promoTitle": "我的推广链接",
+        "promoHint": "用你的链接注册的客户，都算作企业的客户。",
+        "showLink": "显示我的链接",
+        "loading": "加载中…",
+        "retry": "重试",
+        "linkFailed": "链接加载失败。",
+        "customers": "我的客户",
+        "customersNote": "通过你的链接注册",
+        "spend": "客户消费",
+        "spendPending": "即将上线",
+        "leave": "退出企业",
+        "leaveTitle": "退出 {org}？",
+        "leaveBody": "企业没用完的积分会回到积分池；你自己购买的积分仍归你；你带来的客户仍归企业。",
+        "leaveConfirm": "退出",
+        "left": "你已退出企业。",
+        "cancel": "取消"
+      },
+      "join": {
+        "metaTitle": "加入企业",
+        "invalidTitle": "链接无效",
+        "invalidBody": "邀请链接有误，或已被重置。请向企业管理员要新的链接。",
+        "suspendedTitle": "企业已暂停",
+        "suspendedBody": "{org} 暂时不接受新成员。",
+        "alreadyTitle": "你已经在 {org} 里了",
+        "alreadyBody": "你的账号已经是这家企业的成员。",
+        "otherTitle": "你已属于另一家企业",
+        "otherBody": "一个账号同时只能属于一家企业。请先在账号页退出当前企业。",
+        "title": "加入 {org}",
+        "body": "加入后，企业可以给你划拨积分，你带来的客户也会算作企业的客户。你随时可以退出。",
+        "confirm": "加入 {org}",
+        "joining": "加入中…",
+        "done": "你已加入 {org}。",
+        "toAccount": "前往我的账号"
+      },
+      "payment": {
+        "title": "对公转账",
+        "hint": "请转入下面的账户，并在备注里填写企业名「{org}」。",
+        "pending": "收款账户信息即将在这里展示。现在可以联系我们，我们把账户发给你。",
+        "after": "转账后请联系我们，我们确认到账后发放积分到你的积分池。"
+      }
     }
   },
   "paywall": {
@@ -2337,8 +2483,7 @@
     },
     "enterprise": {
       "pill": "企业账号",
-      "title": "企业联盟后台",
-      "body": "你的账号属于 Shotviva 上的一家企业，不能再开通个人联盟。客户用你的邀请链接或邀请码注册，都会算作企业的客户。企业联盟后台即将上线。"
+      "title": "企业联盟后台"
     }
   },
   "gallery": {
