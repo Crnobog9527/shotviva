@@ -12,6 +12,7 @@ import { creditChangeSchema, type CreditChange } from '../credits'
 import type { ApplyPaymentCodes } from '../payment-code-effects'
 import type { CancelOthers, CancelRefunded } from '../subscription/cancel-others'
 import type { RefuseEnded } from '../subscription/ended-order'
+import { recordWaffoFees } from '../fees/waffo'
 import { callRpc, type RpcClient } from '../rpc'
 import { paymentFacts, readWaffoOrder, type WaffoOrder, type WaffoPaymentFacts } from './payment-facts'
 import { settleQuotedRenewal } from './renewal'
@@ -105,6 +106,8 @@ export async function fulfilWaffoOrder(
   if (!product) throw new AppError('INVALID_INPUT', `waffo order ${event.eventId}: unknown product`)
   const outcome = await settleCharge(deps, order, product, event.eventId, form)
   if (outcome !== 'review') await afterSettlement(deps, order, product, event.eventId, form)
+  // F3: the charge's estimated processing fee (also on a replay: keyed, writes once; never throws).
+  if (outcome === 'applied' || outcome === 'replayed') await recordWaffoFees(deps.db, event.eventId)
   return outcome
 }
 
