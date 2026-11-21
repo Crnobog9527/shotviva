@@ -4147,6 +4147,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "created_by" "uuid" NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "signup_bonus_credits" integer DEFAULT 0 NOT NULL,
+    "ref_code" "text",
     CONSTRAINT "orgs_admin_note_check" CHECK (("length"("admin_note") <= 2000)),
     CONSTRAINT "orgs_affiliate_levels_check" CHECK (("affiliate_levels" = ANY (ARRAY[1, 2]))),
     CONSTRAINT "orgs_batch_max_check" CHECK (("batch_max" >= 1)),
@@ -4156,6 +4157,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     CONSTRAINT "orgs_name_check" CHECK ((("length"(TRIM(BOTH FROM "name")) >= 1) AND ("length"(TRIM(BOTH FROM "name")) <= 120))),
     CONSTRAINT "orgs_per_window_check" CHECK (("per_window" >= 1)),
     CONSTRAINT "orgs_pool_credits_check" CHECK (("pool_credits" >= 0)),
+    CONSTRAINT "orgs_ref_code_format" CHECK (("ref_code" ~ '^SV-[2-9A-HJKMNP-Z]{6}$'::"text")),
     CONSTRAINT "orgs_signup_bonus_credits_check" CHECK ((("signup_bonus_credits" >= 0) AND ("signup_bonus_credits" <= 1000))),
     CONSTRAINT "orgs_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'suspended'::"text"])))
 );
@@ -4353,6 +4355,32 @@ $$;
 ALTER FUNCTION "public"."_org_payment_fields"("p_kind" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_ref_code_new"() RETURNS "text"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  alphabet constant text := '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  bytes bytea;
+  code text;
+  i int;
+begin
+  loop
+    bytes := uuid_send(gen_random_uuid());
+    code := 'SV-';
+    for i in 0..5 loop
+      code := code || substr(alphabet, 1 + (get_byte(bytes, i) % 31), 1);
+    end loop;
+    exit when not exists(select from public.orgs where ref_code = code);
+  end loop;
+  return code;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_org_ref_code_new"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_release"("p_org" "public"."orgs", "p_member" "uuid", "p_request" "text", "p_actor" "uuid") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -4478,6 +4506,24 @@ $$;
 
 
 ALTER FUNCTION "public"."_org_signup_bonus"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_orgs_ref_code_guard"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if tg_op = 'INSERT' then
+    if new.ref_code is null then new.ref_code := public._org_ref_code_new(); end if;
+  elsif new.ref_code is distinct from old.ref_code then
+    raise exception 'ORG_REF_CODE_IMMUTABLE';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_orgs_ref_code_guard"() OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."payment_disputes" (
@@ -20601,6 +20647,10 @@ CREATE INDEX "org_signup_bonuses_org_idx" ON "public"."org_signup_bonuses" USING
 
 
 
+CREATE UNIQUE INDEX "orgs_ref_code_key" ON "public"."orgs" USING "btree" ("ref_code");
+
+
+
 CREATE UNIQUE INDEX "partner_links_partner_link_code_idx" ON "public"."partner_links" USING "btree" ("partner", "link_code") WHERE ("link_code" IS NOT NULL);
 
 
@@ -21070,6 +21120,10 @@ CREATE OR REPLACE TRIGGER "org_invite_attribution" AFTER INSERT ON "public"."cod
 
 
 CREATE OR REPLACE TRIGGER "org_signup_bonus" AFTER UPDATE OF "referred_source" ON "public"."profiles" FOR EACH ROW WHEN ((("new"."referred_source" = 'org_l1'::"text") AND ("old"."referred_source" IS NULL) AND ("old"."referred_by" IS NULL) AND ("new"."referred_by" IS NOT NULL))) EXECUTE FUNCTION "public"."_org_signup_bonus"();
+
+
+
+CREATE OR REPLACE TRIGGER "orgs_ref_code_guard" BEFORE INSERT OR UPDATE ON "public"."orgs" FOR EACH ROW EXECUTE FUNCTION "public"."_orgs_ref_code_guard"();
 
 
 
@@ -23384,6 +23438,10 @@ REVOKE ALL ON FUNCTION "public"."_org_payment_fields"("p_kind" "text") FROM PUBL
 
 
 
+REVOKE ALL ON FUNCTION "public"."_org_ref_code_new"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_org_release"("p_org" "public"."orgs", "p_member" "uuid", "p_request" "text", "p_actor" "uuid") FROM PUBLIC;
 
 
@@ -23401,6 +23459,10 @@ REVOKE ALL ON FUNCTION "public"."_org_settle_returns"("p_org" "uuid") FROM PUBLI
 
 
 REVOKE ALL ON FUNCTION "public"."_org_signup_bonus"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_orgs_ref_code_guard"() FROM PUBLIC;
 
 
 

@@ -114,7 +114,10 @@ describe('privileges', () => {
         expect(rows[0].ok).toBe(false)
       }
     }
-    const read = await service.select(`orgs?select=ref_code&id=eq.${orgId}`)
-    expect(await read.json()).toEqual([{ ref_code: await codeOf(orgId) }])
+    await db.query('begin')
+    await db.query('set local role service_role')
+    const { rows } = await db.query('select ref_code from public.orgs where id = $1', [orgId])
+    await db.query('rollback')
+    expect(rows).toEqual([{ ref_code: await codeOf(orgId) }])
   })
 })
