@@ -82,6 +82,8 @@ export const COPY = {
   pct: '比例（%）',
   selfRate: '本人佣金（%）',
   teamRate: '团队奖励（%）',
+  orgL2Rate: '企业二级（%）',
+  orgL2Default: (pct: string) => `企业二级留空时按企业默认 ${pct}%（全站一处设置），不是个人团队奖励比例。`,
   product: '商品',
   rates: '佣金比例',
   overrides: '单独佣金比例（留空沿用默认）',

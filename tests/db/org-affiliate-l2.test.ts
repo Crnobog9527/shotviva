@@ -175,12 +175,29 @@ it('leaves personal affiliates unchanged: their customer\'s invitee is not bound
   expect(await row(db, 'select count(*)::int n from affiliate_rate_overrides where user_id=$1', [personal.id])).toEqual({ n: 0 })
 })
 
-it('gives every org account a 5% level-2 default on each kind, keeping level 1 on the program defaults', async () => {
-  const { owner } = await chain()
-  expect((await db.query('select product_kind,l1_bp,l2_bp from affiliate_rate_overrides where user_id=$1 order by product_kind', [owner])).rows)
-    .toEqual([
-      { product_kind: 'monthly', l1_bp: null, l2_bp: 500 },
-      { product_kind: 'pack', l1_bp: null, l2_bp: 500 },
-      { product_kind: 'yearly', l1_bp: null, l2_bp: 500 },
-    ])
+it('falls back to the org level-2 default, not the personal team bonus, when the org has no level-2 rate', async () => {
+  const { owner, a } = await chain()
+  const { customer: b } = await invitedBy(a)
+  expect(await row(db, 'select count(*)::int n from affiliate_rate_overrides where user_id=$1', [owner])).toEqual({ n: 0 })
+  // An admin sets, then clears, the org's yearly level-2 rate (a blank field saves null).
+  const yearly = (l2: number | null) => db.query('select admin_affiliate_set($1,$2)', [actor, { user_id: owner, overrides: [{ product_kind: 'yearly', l1_bp: null, l2_bp: l2 }] }])
+  await yearly(900)
+  expect(await commission(db, (await sale(db, b, 'pro_yearly', 47900)).id)).toMatchObject({ rate_bp: 900 })
+  await yearly(null)
+  expect(await commission(db, (await sale(db, b, 'pro_yearly', 47900)).id)).toMatchObject({ rate_bp: 500, amount: 2395 })
+  // The default lives in one setting.
+  await db.query('update affiliate_settings set org_l2_bp=600')
+  expect(await commission(db, (await sale(db, b, 'pack_m', 2490)).id)).toMatchObject({ rate_bp: 600, amount: 149 })
+})
+
+it('keeps the personal team bonus on the program defaults', async () => {
+  await db.query('update affiliate_settings set org_l2_bp=900')
+  const parent = await promoter(db)
+  await db.query('update affiliates set team_enabled=true where user_id=$1', [parent.id])
+  const child = await promoter(db, parent.id)
+  const buyer = await createUser(db)
+  expect(await bind(db, buyer, child.slug)).toBe(true)
+  const p = await sale(db, buyer, 'pro_yearly', 47900)
+  expect(await commission(db, p.id)).toMatchObject({ rate_bp: 1000, amount: 4790 })
+  expect(await commission(db, p.id, 2)).toMatchObject({ rate_bp: 300, amount: 1437 })
 })

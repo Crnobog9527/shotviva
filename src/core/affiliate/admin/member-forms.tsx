@@ -31,7 +31,7 @@ export function ReopenApplication({ member, action }: { member: Member; action: 
     </MutationForm>
   )
 }
-export function SetMember({ member, rates, action }: { member: Member; rates: Rate[]; action: SaveAction }) {
+export function SetMember({ member, rates, action, orgL2DefaultBp }: { member: Member; rates: Rate[]; action: SaveAction; orgL2DefaultBp?: number }) {
   return (
     <MutationForm action={action} operation="set" label={COPY.save}>
       <Hidden name="user_id" value={member.user_id} />
@@ -48,7 +48,7 @@ export function SetMember({ member, rates, action }: { member: Member; rates: Ra
         <input type="checkbox" name="void_unconfirmed" />
         {COPY.voidUnconfirmed}
       </label>
-      <Rates values={rates} optional />
+      <Rates values={rates} optional orgL2DefaultBp={orgL2DefaultBp} />
     </MutationForm>
   )
 }
