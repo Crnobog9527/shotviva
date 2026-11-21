@@ -11,7 +11,7 @@ import type { PaymentAccountRow, LedgerRow, LimitCaps, MemberRow, OrgAffiliate, 
 // Read side of the enterprise admin (ARCHITECTURE §6.5). The org tables have no client grant and
 // the service role may select; every write goes through the E1 functions in core/org.
 
-const ORG_FIELDS = 'id,name,owner_user_id,status,concurrency,per_window,batch_max,multi_template_max,batch_zip,early_features,affiliate_enabled,affiliate_levels,pool_credits,admin_note,created_at,updated_at'
+const ORG_FIELDS = 'id,name,owner_user_id,status,concurrency,per_window,batch_max,multi_template_max,batch_zip,early_features,affiliate_enabled,affiliate_levels,signup_bonus_credits,pool_credits,admin_note,created_at,updated_at'
 const LEDGER_LIMIT = 100
 const MEMBER_LIMIT = 100
 
@@ -28,6 +28,7 @@ const orgSchema = z.object({
   early_features: z.boolean(),
   affiliate_enabled: z.boolean(),
   affiliate_levels: z.union([z.literal(1), z.literal(2)]),
+  signup_bonus_credits: z.number(),
   pool_credits: z.number(),
   admin_note: z.string().nullable(),
   created_at: z.string(),
@@ -85,6 +86,7 @@ function toOrg(row: z.infer<typeof orgSchema>): OrgRow {
     earlyFeatures: row.early_features,
     affiliateEnabled: row.affiliate_enabled,
     affiliateLevels: row.affiliate_levels,
+    signupBonusCredits: row.signup_bonus_credits,
     poolCredits: row.pool_credits,
     adminNote: row.admin_note,
     createdAt: row.created_at,
@@ -159,7 +161,7 @@ export async function loadOrgDetail(db: SupabaseClient, id: string): Promise<Org
   const found = ok(await db.from('orgs').select(ORG_FIELDS).eq('id', id).maybeSingle(), 'org')
   if (!found) return null
   const org = toOrg(orgSchema.parse(found))
-  const [ledgerRows, memberRows, memberCount, packages, caps, affiliate] = await Promise.all([
+  const [ledgerRows, memberRows, memberCount, packages, caps, affiliate, bonusCount] = await Promise.all([
     db.from('org_credit_ledger').select('id,kind,delta,pool_after,member_user_id,package_id,amount_cny_fen,reference,note,created_at')
       .eq('org_id', id).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(LEDGER_LIMIT),
     db.from('org_members').select('user_id,role,monthly_allowance,held_credits,status,joined_at')
@@ -168,10 +170,12 @@ export async function loadOrgDetail(db: SupabaseClient, id: string): Promise<Org
     listPackages(db),
     loadLimitCaps(db),
     loadOrgAffiliate(db, id),
+    db.from('org_signup_bonuses').select('user_id', { count: 'exact' }).eq('org_id', id).limit(1),
   ])
   const ledger = z.array(ledgerSchema).parse(ok(ledgerRows, 'ledger'))
   const members = z.array(memberSchema).parse(ok(memberRows, 'members'))
   const total = memberCount.count ?? members.length
+  ok(bonusCount, 'signup bonuses')
   const accounts = await accountLabels(db, [org.ownerUserId, ...members.map((m) => m.user_id), ...ledger.flatMap((l) => (l.member_user_id ? [l.member_user_id] : []))])
   const packageNames = new Map(packages.map((p) => [p.id, p.name]))
   return {
@@ -191,6 +195,7 @@ export async function loadOrgDetail(db: SupabaseClient, id: string): Promise<Org
     packages,
     caps,
     affiliate,
+    signupBonusUsers: bonusCount.count ?? 0,
   }
 }
 

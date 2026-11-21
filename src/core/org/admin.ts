@@ -70,6 +70,18 @@ export async function adminUpdateOrg(client: RpcClient, actor: string, orgId: st
   return callRpc(client, 'admin_org_update', args, z.string())
 }
 
+// Hard cap of the enterprise signup bonus; the column check and admin_org_set_signup_bonus (1690)
+// refuse anything above it.
+export const ORG_SIGNUP_BONUS_MAX = 5000
+
+export async function adminSetOrgSignupBonus(client: RpcClient, actor: string, orgId: string, credits: number, expectedUpdatedAt: string): Promise<string> {
+  const args = {
+    p_actor: uuid.parse(actor), p_org_id: uuid.parse(orgId),
+    p_credits: count.min(0).max(ORG_SIGNUP_BONUS_MAX).parse(credits), p_expected_updated_at: z.string().min(1).parse(expectedUpdatedAt),
+  }
+  return callRpc(client, 'admin_org_set_signup_bonus', args, z.string())
+}
+
 export async function adminGrantOrg(client: RpcClient, actor: string, input: z.input<typeof orgGrantSchema>) {
   const result = z.object({ applied: z.boolean(), pool_credits: count })
   return callRpc(client, 'admin_org_grant', { p_actor: uuid.parse(actor), p_input: orgGrantSchema.parse(input) }, result)
