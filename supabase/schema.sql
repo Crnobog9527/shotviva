@@ -3431,6 +3431,43 @@ $$;
 ALTER FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" integer, "p_refunded" integer, "p_rate" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" integer, "p_refunded" integer, "p_rate" integer, "p_fee" integer) RETURNS bigint
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select case when p_fee is null then public._affiliate_due(p_total, p_tax, p_refunded, p_rate)
+    else div(public._affiliate_net_base(p_total, p_tax, p_refunded, p_fee)::numeric * p_rate, 10000)::bigint end;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" integer, "p_refunded" integer, "p_rate" integer, "p_fee" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_affiliate_fee_era"("p_payment" "public"."payments") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select p_payment.fee_status is not null or coalesce(
+    (select p_payment.created_at >= s.record_from from public.payment_fee_settings s where s.singleton), false);
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_fee_era"("p_payment" "public"."payments") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_affiliate_fee_ready"("p_payment" "public"."payments", "p_confirm" timestamp with time zone, "p_at" timestamp with time zone) RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select not public._affiliate_fee_era(p_payment) or p_payment.fee_status = 'final'
+      or (p_payment.fee_status = 'estimated'
+          and p_at >= p_confirm + make_interval(days => (select s.fee_final_grace_days from public.affiliate_settings s where s.singleton)));
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_fee_ready"("p_payment" "public"."payments", "p_confirm" timestamp with time zone, "p_at" timestamp with time zone) OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."affiliate_payout_fee_rules" (
     "id" bigint NOT NULL,
     "program" "text" DEFAULT 'standard'::"text" NOT NULL,
@@ -3526,6 +3563,18 @@ $$;
 
 
 ALTER FUNCTION "public"."_affiliate_linked_payable"("p" "public"."affiliate_payouts") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_affiliate_net_base"("p_total" integer, "p_tax" integer, "p_refunded" integer, "p_fee" integer) RETURNS bigint
+    LANGUAGE "sql" IMMUTABLE STRICT
+    SET "search_path" TO ''
+    AS $$
+  select case when p_total = 0 then 0 else
+    greatest(0, div((p_total - p_tax)::numeric * (p_total - p_refunded), p_total::numeric) - p_fee)::bigint end;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_net_base"("p_total" integer, "p_tax" integer, "p_refunded" integer, "p_fee" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_affiliate_overrides"("p_user" "uuid", "p_values" "jsonb") RETURNS "void"
@@ -3662,6 +3711,8 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_write_commission"("p_payment" "p
 declare
   v_old public.affiliate_commissions; v_id bigint; v_amount bigint; v_status text; v_reason text;
   v_owner uuid; v_rate integer; v_confirm timestamptz; v_flags text[]; v_void text;
+  v_fee integer := case when p_payment.fee_status is not null then p_payment.fee_cents end;
+  v_net bigint;
 begin
   select c.* into v_old from public.affiliate_commissions c where c.payment_id=p_payment.id and c.level=p_level for update;
   if not found then
@@ -3676,7 +3727,8 @@ begin
     v_owner:=v_old.affiliate_user_id; v_rate:=v_old.rate_bp; v_confirm:=v_old.confirm_after; v_flags:=v_old.flags;
     if v_old.void_reason in ('affiliate_inactive','admin_void','org_member') then v_void:=v_old.void_reason; end if;
   end if;
-  v_amount:=public._affiliate_due(p_payment.amount_total,p_payment.amount_tax,p_payment.amount_refunded,v_rate);
+  v_net:=public._affiliate_net_base(p_payment.amount_total,p_payment.amount_tax,p_payment.amount_refunded,v_fee);
+  v_amount:=public._affiliate_due(p_payment.amount_total,p_payment.amount_tax,p_payment.amount_refunded,v_rate,v_fee);
   if v_old.payout_retained is not null then
     v_amount:=public._affiliate_retained_cents(v_old.payout_retained,v_amount);
   end if;
@@ -3686,20 +3738,28 @@ begin
     v_void:=case when p_payment.amount_refunded=p_payment.amount_total then 'refunded' else 'zero' end;
   end if;
   v_status:=case when v_amount=0 then 'void' when p_open or (cardinality(v_flags)>0 and v_old.released_by is null and not p_release)
-    then 'on_hold' when now()>=v_confirm then 'confirmed' else 'pending' end;
-  if not p_release and v_old.id is not null and (v_amount,v_status,v_void) is not distinct from (v_old.amount,v_old.status,v_old.void_reason) then return; end if;
+    then 'on_hold' when now()>=v_confirm and (v_old.status='confirmed' or public._affiliate_fee_ready(p_payment,v_confirm,now()))
+    then 'confirmed' else 'pending' end;
+  if not p_release and v_old.id is not null and (v_amount,v_status,v_void,v_fee::bigint,v_net)
+    is not distinct from (v_old.amount,v_old.status,v_old.void_reason,v_old.fee_cents,v_old.net_base_usd) then return; end if;
   v_reason:=case when p_release then 'admin_release' when v_void is not null then v_void
     when p_open then 'dispute_open' when v_status='on_hold' then 'same_ip'
     when v_old.status='on_hold' then 'dispute_won'
-    when v_amount<v_old.amount then 'partial_refund' when v_status='confirmed' and v_old.id is not null then 'confirmed'
+    when v_status='confirmed' and v_old.status<>'confirmed' and public._affiliate_fee_era(p_payment)
+      and p_payment.fee_status is distinct from 'final' then 'confirmed_fee_estimate'
+    when v_old.id is not null and v_fee::bigint is distinct from v_old.fee_cents
+      then case when p_payment.fee_status='final' then 'fee_final' else 'fee_adjusted' end
+    when v_amount<v_old.amount then 'partial_refund'
+    when v_status='confirmed' and v_old.id is not null then 'confirmed'
     else 'payment' end;
   insert into public.affiliate_commissions(payment_id,affiliate_user_id,level,product_id,rate_bp,base_usd,amount,status,
-    confirm_after,confirmed_at,void_reason,flags,created_at)
+    confirm_after,confirmed_at,void_reason,flags,created_at,fee_cents,net_base_usd)
   values(p_payment.id,v_owner,p_level,p_payment.product_id,v_rate,p_payment.amount_total-p_payment.amount_tax,v_amount,v_status,
-    v_confirm,case when v_status='confirmed' then now() end,v_void,v_flags,p_payment.created_at)
+    v_confirm,case when v_status='confirmed' then now() end,v_void,v_flags,p_payment.created_at,v_fee,v_net)
   on conflict(payment_id,level) do update set amount=excluded.amount,status=excluded.status,
     confirmed_at=case when excluded.status='confirmed' then coalesce(affiliate_commissions.confirmed_at,now()) end,
-    void_reason=excluded.void_reason,updated_at=now() returning id into v_id;
+    void_reason=excluded.void_reason,fee_cents=excluded.fee_cents,net_base_usd=excluded.net_base_usd,
+    updated_at=now() returning id into v_id;
   insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
     values(v_id,v_old.amount,v_amount,v_old.status,v_status,v_reason);
 end;
@@ -11425,9 +11485,11 @@ begin
       and not exists(select from public.payment_disputes d where d.payment_id=c.payment_id and
         (d.closed_at is null or d.closed_status not in ('won','warning_closed')))
       and not exists(select from public.affiliate_recompute_errors e where e.payment_id=c.payment_id and e.resolved_at is null)
-    returning c.id,c.amount)
+      and exists(select from public.payments p where p.id=c.payment_id and public._affiliate_fee_ready(p,c.confirm_after,v_cutoff))
+    returning c.id,c.amount,
+      (select public._affiliate_fee_era(p) and p.fee_status is distinct from 'final' from public.payments p where p.id=c.payment_id) as on_estimate)
   insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
-    select id,amount,amount,'pending','confirmed','confirmed' from changed;
+    select id,amount,amount,'pending','confirmed',case when on_estimate then 'confirmed_fee_estimate' else 'confirmed' end from changed;
   if not v_issue then return; end if;
   -- One MVCC snapshot for the balance and its commission backing. Refunds that
   -- commit after this statement are measured against these exact amounts at payment.
@@ -17227,15 +17289,27 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_commissions" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "payout_retained" "int8multirange",
+    "fee_cents" bigint,
+    "net_base_usd" bigint,
     CONSTRAINT "affiliate_commissions_amount_check" CHECK (("amount" >= 0)),
     CONSTRAINT "affiliate_commissions_base_usd_check" CHECK (("base_usd" >= 0)),
+    CONSTRAINT "affiliate_commissions_fee_cents_check" CHECK (("fee_cents" >= 0)),
     CONSTRAINT "affiliate_commissions_level_check" CHECK (("level" = ANY (ARRAY[1, 2]))),
+    CONSTRAINT "affiliate_commissions_net_base_usd_check" CHECK (("net_base_usd" >= 0)),
     CONSTRAINT "affiliate_commissions_rate_bp_check" CHECK ((("rate_bp" >= 0) AND ("rate_bp" <= 10000))),
     CONSTRAINT "affiliate_commissions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'on_hold'::"text", 'confirmed'::"text", 'void'::"text"])))
 );
 
 
 ALTER TABLE "public"."affiliate_commissions" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."affiliate_commissions"."fee_cents" IS 'Payment fees deducted for this commission (payments.fee_cents at the last recompute). NULL = old formula, no fee deducted.';
+
+
+
+COMMENT ON COLUMN "public"."affiliate_commissions"."net_base_usd" IS 'Commission base after tax, refunds and fees: max(0, unrefunded pre-tax paid − fee_cents). NULL = old formula.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."affiliates" (
@@ -18011,8 +18085,10 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_settings" (
     "terms_version" "text" DEFAULT '1'::"text" NOT NULL,
     "commission_months" integer,
     "org_l2_bp" integer DEFAULT 500 NOT NULL,
+    "fee_final_grace_days" integer DEFAULT 14 NOT NULL,
     CONSTRAINT "affiliate_settings_apply_min_level_check" CHECK (("apply_min_level" = ANY (ARRAY['none'::"text", 'any_paid'::"text", 'starter'::"text", 'pro'::"text", 'max'::"text"]))),
     CONSTRAINT "affiliate_settings_commission_months_check" CHECK (("commission_months" > 0)),
+    CONSTRAINT "affiliate_settings_fee_final_grace_days_check" CHECK ((("fee_final_grace_days" >= 0) AND ("fee_final_grace_days" <= 365))),
     CONSTRAINT "affiliate_settings_hold_days_check" CHECK (("hold_days" >= 0)),
     CONSTRAINT "affiliate_settings_org_l2_bp_check" CHECK ((("org_l2_bp" >= 0) AND ("org_l2_bp" <= 10000))),
     CONSTRAINT "affiliate_settings_payout_min_usd_check" CHECK (("payout_min_usd" > 0)),
@@ -18023,6 +18099,10 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_settings" (
 
 
 ALTER TABLE "public"."affiliate_settings" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."affiliate_settings"."fee_final_grace_days" IS 'Days after confirm_after a fee-era commission waits for final fees before it confirms on the estimate.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."affiliate_settlement_runs" (
@@ -20727,6 +20807,10 @@ CREATE OR REPLACE TRIGGER "affiliate_dispute_update" AFTER UPDATE OF "closed_at"
 
 
 
+CREATE OR REPLACE TRIGGER "affiliate_payment_fee_update" AFTER UPDATE OF "fee_cents", "fee_status" ON "public"."payments" FOR EACH ROW WHEN ((("old"."fee_cents" IS DISTINCT FROM "new"."fee_cents") OR ("old"."fee_status" IS DISTINCT FROM "new"."fee_status"))) EXECUTE FUNCTION "public"."_affiliate_payment_event"();
+
+
+
 CREATE OR REPLACE TRIGGER "affiliate_payment_insert" AFTER INSERT ON "public"."payments" FOR EACH ROW EXECUTE FUNCTION "public"."_affiliate_payment_event"();
 
 
@@ -22986,6 +23070,18 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" inte
 
 
 
+REVOKE ALL ON FUNCTION "public"."_affiliate_due"("p_total" integer, "p_tax" integer, "p_refunded" integer, "p_rate" integer, "p_fee" integer) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_fee_era"("p_payment" "public"."payments") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_fee_ready"("p_payment" "public"."payments", "p_confirm" timestamp with time zone, "p_at" timestamp with time zone) FROM PUBLIC;
+
+
+
 GRANT SELECT ON TABLE "public"."affiliate_payout_fee_rules" TO "service_role";
 
 
@@ -22999,6 +23095,10 @@ GRANT SELECT ON TABLE "public"."affiliate_payouts" TO "service_role";
 
 
 REVOKE ALL ON FUNCTION "public"."_affiliate_linked_payable"("p" "public"."affiliate_payouts") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_net_base"("p_total" integer, "p_tax" integer, "p_refunded" integer, "p_fee" integer) FROM PUBLIC;
 
 
 
