@@ -18,8 +18,9 @@ const detail = memberDetail.extend({
   ...directory.shape,
   registered_at: z.string().nullable(), approved_at: z.string().nullable(), approved_by: z.uuid().nullable(),
   admin_note: z.string().nullable(), rates: z.array(rateRow),
-  // Not returned by admin_affiliate_dossier: the org level-2 default, for enterprise accounts only.
-  org_l2_default_bp: z.number().nullable().default(null),
+  // Not returned by admin_affiliate_dossier: the org level-2 default of each product kind, for
+  // enterprise accounts only (affiliate_rates.org_l2_bp, migration 1900).
+  org_l2_defaults: z.record(z.string(), z.number()).nullable().default(null),
 })
 const audit = z.object({
   id, created_at: z.string(), action: z.string(), user_id: z.uuid(), target_id: z.string(), reason: z.string(),
@@ -66,11 +67,14 @@ export async function dossier(db: SupabaseClient, actor: string, userId: string)
   const data = detail.nullable().parse(result)
   if (!data) return null
   const isOrg = (await orgAccountIds(db, [data.user_id])).has(data.user_id)
-  // An enterprise account's blank level-2 rate means the org default (migration 1681).
-  const orgL2 = isOrg
-    ? z.object({ org_l2_bp: z.number() }).parse(checked(await db.from('affiliate_settings').select('org_l2_bp').single())).org_l2_bp
-    : null
-  return identify({ ...data, is_org: isOrg, org_l2_default_bp: orgL2 })
+  // An enterprise account's blank level-2 rate means that kind's org default (migration 1900).
+  const orgL2 = isOrg ? await orgL2Defaults(db) : null
+  return identify({ ...data, is_org: isOrg, org_l2_defaults: orgL2 })
+}
+async function orgL2Defaults(db: SupabaseClient) {
+  const rows = z.array(z.object({ product_kind: z.string(), org_l2_bp: z.number() }))
+    .parse(checked(await db.from('affiliate_rates').select('product_kind,org_l2_bp')))
+  return Object.fromEntries(rows.map((r) => [r.product_kind, r.org_l2_bp]))
 }
 export async function dossierAudit(db: SupabaseClient, actor: string, userId: string, cursor?: string) {
   const rows = checked(await db.rpc('admin_affiliate_dossier_log', { p_actor: actor, p_user: userId, ...before(cursor, false) }))

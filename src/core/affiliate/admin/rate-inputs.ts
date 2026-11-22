@@ -12,3 +12,6 @@ export const rateInputs = (form: FormData, optional: boolean) =>
     const field = optional ? optionalRate : percent
     return { product_kind, l1_bp: field.parse(form.get(product_kind + '_l1')), l2_bp: field.parse(form.get(product_kind + '_l2')) }
   })
+// The settings form: the program rates plus each kind's enterprise level-2 default (migration 1900).
+export const settingsRateInputs = (form: FormData) =>
+  rateInputs(form, false).map((r) => ({ ...r, org_l2_bp: percent.parse(form.get(r.product_kind + '_org_l2')) }))

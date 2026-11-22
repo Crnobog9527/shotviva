@@ -5,7 +5,7 @@ import { writableSlug as slug } from './enrollment'
 import { feeRuleInput } from './fee-rule-input'
 import { feeAnswerFor } from './payment-fees-copy'
 import { feeScheduleInput } from './payment-fee-input'
-import { rateInputs } from './rate-inputs'
+import { rateInputs, settingsRateInputs } from './rate-inputs'
 import { checked } from './read'
 
 const uuid = z.uuid()
@@ -94,7 +94,7 @@ export async function execute(db: SupabaseClient, actor: string, form: FormData)
   if (action === 'feeSchedule') return scheduleOutcome(await db.rpc('admin_payment_fee_schedule_save', { p_actor: actor, p_input: feeScheduleInput(form) }))
   const input = commands[action].parse(fields)
   const rates = action === 'set' ? { overrides: rateInputs(form, true) } : {}
-  const settings = action === 'settings' ? { rates: rateInputs(form, false) } : {}
+  const settings = action === 'settings' ? { rates: settingsRateInputs(form) } : {}
   const result = await db.rpc('admin_affiliate_' + rpcName[action], { p_actor: actor, p_input: { ...input, ...rates, ...settings } })
   const answer = outcome(result)
   if (answer || action !== 'membership') return answer
