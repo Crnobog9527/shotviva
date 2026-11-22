@@ -46,6 +46,8 @@ it('checks only the requested template on a one-template lookup, as anon', async
   const { rows, checks } = await saleChecks('select id from public.web_templates(p_template_id=>$1)', [ids[0]])
   expect(rows).toEqual([{ id: ids[0] }])
   expect(checks).toBe(1)
+  // 1980 leaves web_template_members as it was: a lookup by id (template_share_create) checks one.
+  expect(await saleChecks('select id from public.web_template_members where id=$1', [ids[0]])).toEqual({ rows: [{ id: ids[0] }], checks: 1 })
 })
 
 it('checks each published template once for the catalogue entries', async () => {
@@ -54,6 +56,27 @@ it('checks each published template once for the catalogue entries', async () => 
   expect(rows.map(r => r.entry_key)).toEqual(expect.arrayContaining(ids.map(id => 'template-' + id)))
   expect(checks).toBe(published)
 })
+
+// 1980: once per template whatever plan Postgres picks. Before 1980 some plans put the templates
+// scan, and with it the sale check, inside a nested loop over the categories, checking every
+// template once per category (CI: 232 checks for 29 templates; enable_seqscan off on a small
+// catalogue does the same). The defaults, each planner switch off alone, every pair off and all
+// off must each check once (128 combinations took too long on a full catalogue).
+const PLANNER = ['enable_seqscan', 'enable_hashjoin', 'enable_mergejoin', 'enable_indexscan', 'enable_bitmapscan', 'enable_material', 'enable_memoize']
+
+it('checks each published template once for the catalogue entries under any plan (1980)', async () => {
+  const published = Number((await db.query('select count(*) n from admin.published_web_members')).rows[0].n)
+  const expected = (await saleChecks('select entry_key from public.web_catalogue_entries order by 1')).rows
+  const plans = [[], ...PLANNER.map((a) => [a]), ...PLANNER.flatMap((a, i) => PLANNER.slice(i + 1).map((b) => [a, b])), PLANNER]
+  for (const off of plans) {
+    await db.query('savepoint plan')
+    for (const name of PLANNER) await db.query(`set local ${name} = ${off.includes(name) ? 'off' : 'on'}`)
+    const { rows, checks } = await saleChecks('select entry_key from public.web_catalogue_entries order by 1')
+    expect(checks, off.join(',') || 'defaults').toBe(published)
+    expect(rows, off.join(',') || 'defaults').toEqual(expected)
+    await db.query('rollback to savepoint plan')
+  }
+}, 60_000)
 
 it('returns whole template rows, so a column added later still comes back', async () => {
   await db.query('set constraints all immediate') // run the deferred publish checks before the alter
