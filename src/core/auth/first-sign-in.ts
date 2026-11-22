@@ -14,7 +14,7 @@ import { billingGrant, grantSignupCredits } from './free-credits'
 import { consumeSignupCode, type SignupBenefits } from './signup-code'
 import { claimQuietly } from './signup-gift-claim'
 import { clientIp, recordSignupIp } from './signup-ip'
-import { isStaffSignup } from './staff-signup'
+import { signupGiftFor } from './staff-signup'
 import { createAdminSupabase } from './supabase-admin'
 
 export type SignInMethod = 'email' | 'google' | 'phone'
@@ -59,8 +59,9 @@ export async function onVerifiedSignIn(
   const admin = createAdminSupabase()
   const address = clientIp(await headers())
   const ipStored = await recordSignupIp(admin, userId, address)
-  // An org's staff link (next = /join/org/<token>) signs up a staff account: no free credits.
-  const gift = (await isStaffSignup(admin, next)) ? 0 : benefits.freeCredits
+  // An org's staff link (next = /join/org/<token>) signs up a staff account: no free credits, now
+  // or later (the stored refusal 'staff' stops every retry and claim, 1940).
+  const gift = await signupGiftFor(admin, userId, next, benefits.freeCredits)
   const granted = await grantSignupCredits(billingGrant(admin), userId, gift)
   // 1480: an account over the per-network allowance is pending; a confirmed phone or a linked
   // Google account pays it now (a phone or Google sign-up, or a Google account just linked).

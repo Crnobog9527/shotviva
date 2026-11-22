@@ -31,3 +31,17 @@ export async function isStaffSignup(admin: SupabaseClient, next: string | null |
   }
   return data !== null
 }
+
+// Stores the refusal 'staff' on the account (1940), so no later sign-in, claim or removal from the
+// org pays the gift. A failure is logged; the first attempt is still skipped by the caller.
+export async function markStaffSignup(admin: SupabaseClient, userId: string): Promise<void> {
+  const { error } = await admin.rpc('mark_staff_signup', { p_user_id: userId })
+  if (error) logger.error('staff signup mark failed', { userId, code: error.code })
+}
+
+// The signup gift this sign-in may pay: 0 for a staff-link signup (marked so it stays 0).
+export async function signupGiftFor(admin: SupabaseClient, userId: string, next: string | null | undefined, credits: number): Promise<number> {
+  if (!(await isStaffSignup(admin, next))) return credits
+  await markStaffSignup(admin, userId)
+  return 0
+}

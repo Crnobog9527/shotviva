@@ -14718,6 +14718,25 @@ $$;
 ALTER FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."mark_staff_signup"("p_user_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_user_id is null then raise exception 'INVALID_INPUT'; end if;
+  perform 1 from public.profiles where id = p_user_id for update;
+  if not found or exists (select 1 from public.credit_ledger where idempotency_key = 'signup:' || p_user_id::text) then
+    return false;
+  end if;
+  update public.profiles set signup_gift_refusal = 'staff' where id = p_user_id;
+  return true;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."mark_staff_signup"("p_user_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."mark_ticket_seen"("p_ticket_id" "uuid", "p_user_id" "uuid") RETURNS "void"
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -19434,7 +19453,7 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
     CONSTRAINT "profiles_referred_source_check" CHECK (("referred_source" = ANY (ARRAY['signup'::"text", 'first_checkout'::"text", 'admin'::"text", 'org_l1'::"text", 'org_l2'::"text"]))),
     CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"]))),
-    CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'same_ip_pending'::"text", 'daily_cap'::"text", 'paused'::"text"])))
+    CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'same_ip_pending'::"text", 'daily_cap'::"text", 'paused'::"text", 'staff'::"text"])))
 );
 
 
@@ -26831,6 +26850,11 @@ GRANT ALL ON FUNCTION "public"."lock_catalog_checkout"("p_user" "uuid", "p_token
 
 REVOKE ALL ON FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."mark_staff_signup"("p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."mark_staff_signup"("p_user_id" "uuid") TO "service_role";
 
 
 

@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   recordSignupIp: vi.fn(),
   grantSignupCredits: vi.fn(),
   noteSignupGift: vi.fn(),
-  staff: vi.fn().mockResolvedValue(false),
+  gift: vi.fn(async (_admin: unknown, _user: string, _next: unknown, credits: number) => credits),
 }))
 
 vi.mock('../affiliate/referral', () => ({ bindReferral: mocks.bind }))
@@ -21,7 +21,7 @@ vi.mock('next/headers', () => ({ headers: mocks.headers, cookies: async () => ne
 vi.mock('../analytics', () => ({ track: mocks.track }))
 vi.mock('../alerts', () => ({ noteSignupGift: mocks.noteSignupGift }))
 vi.mock('./supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
-vi.mock('./staff-signup', () => ({ isStaffSignup: mocks.staff }))
+vi.mock('./staff-signup', () => ({ signupGiftFor: mocks.gift }))
 vi.mock('./free-credits', () => ({ billingGrant: () => vi.fn(), grantSignupCredits: mocks.grantSignupCredits }))
 vi.mock('./signup-ip', async (original) => ({
   ...(await original<typeof import('./signup-ip')>()),
@@ -45,16 +45,6 @@ describe('onVerifiedSignIn', () => {
     expect(mocks.track).toHaveBeenCalledExactlyOnceWith('signup', { method: 'email', code_kind: null }, { distinctId: 'u1', locale: 'zh' })
     // 1350: a new account checks the day's gift count for the Owner alert.
     expect(mocks.noteSignupGift).toHaveBeenCalledOnce()
-  })
-
-  it('gives a staff-link signup no free credits and asks for no pending gift', async () => {
-    mocks.recordSignupIp.mockResolvedValue(true)
-    mocks.grantSignupCredits.mockResolvedValue(false)
-    mocks.staff.mockResolvedValueOnce(true)
-    await onVerifiedSignIn('u1', benefits, 'email', 'zh', '/zh/join/org/' + 'a'.repeat(32))
-    expect(mocks.staff).toHaveBeenCalledWith({}, '/zh/join/org/' + 'a'.repeat(32))
-    expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', 0)
-    expect(mocks.claimQuietly).not.toHaveBeenCalled()
   })
 
   it('does not track a later sign-in, even when a failed gift is retried then', async () => {
@@ -109,5 +99,19 @@ describe('signupMarks', () => {
       share_template_id: 'ramen', share_id: 'k3x9m2pa', share_collection_id: 'a2p138a5lj0w',
     })
     expect(signupMarks(new Map([['sv_tshare', { value: 'bad' }]]), new Map())).toEqual({})
+  })
+})
+
+describe('onVerifiedSignIn: staff-link signups', () => {
+  it('pays the gift the staff rule allows and asks for no pending gift when it is 0', async () => {
+    mocks.headers.mockResolvedValue(new Headers({ 'x-forwarded-for': '203.0.113.7' }))
+    mocks.recordSignupIp.mockResolvedValue(true)
+    mocks.grantSignupCredits.mockResolvedValue(false)
+    mocks.gift.mockResolvedValueOnce(0)
+    const next = '/zh/join/org/' + 'a'.repeat(32)
+    await onVerifiedSignIn('u1', benefits, 'email', 'zh', next)
+    expect(mocks.gift).toHaveBeenCalledWith({}, 'u1', next, benefits.freeCredits)
+    expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', 0)
+    expect(mocks.claimQuietly).not.toHaveBeenCalled()
   })
 })

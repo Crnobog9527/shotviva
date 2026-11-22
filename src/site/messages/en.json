@@ -646,7 +646,8 @@
       "panelTitle": "Credits",
       "signupGiftRefused": "No signup credits yet: this network already used today's allowance. Verify a phone number or a Google account below to claim them.",
       "signupGiftRefusedCap": "No sign-up credits for this account: that day's sign-up gifts had all been given out.",
-      "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up."
+      "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up.",
+      "signupGiftRefusedStaff": "No sign-up credits for this account: it was created through an organisation's staff link."
     },
     "create": {
       "title": "Create",

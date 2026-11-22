@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('../logger', () => ({ logger: { warn: vi.fn() } }))
+vi.mock('../logger', () => ({ logger: { warn: vi.fn(), error: vi.fn() } }))
 
-const { isStaffSignup, staffJoinToken } = await import('./staff-signup')
+const { isStaffSignup, markStaffSignup, signupGiftFor, staffJoinToken } = await import('./staff-signup')
 
 const TOKEN = '0123456789abcdef0123456789abcdef'
 
@@ -39,5 +39,25 @@ describe('isStaffSignup', () => {
   it('keeps the gift when the lookup fails or there is no staff link', async () => {
     expect(await isStaffSignup(client({ data: null, error: { code: 'x' } }).db, `/join/org/${TOKEN}`)).toBe(false)
     expect(await isStaffSignup(client({ data: { id: 'o' }, error: null }).db, '/account')).toBe(false)
+  })
+})
+
+describe('markStaffSignup', () => {
+  it('stores the staff refusal through the SQL function and never throws', async () => {
+    const rpc = vi.fn().mockResolvedValueOnce({ data: true, error: null }).mockResolvedValueOnce({ data: null, error: { code: 'x' } })
+    await markStaffSignup({ rpc } as never, 'u1')
+    await expect(markStaffSignup({ rpc } as never, 'u1')).resolves.toBeUndefined()
+    expect(rpc).toHaveBeenCalledWith('mark_staff_signup', { p_user_id: 'u1' })
+  })
+})
+
+describe('signupGiftFor', () => {
+  it('is the normal gift without a staff link, 0 and marked with one', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null })
+    const none = client({ data: null, error: null })
+    expect(await signupGiftFor({ ...(none.db as object), rpc } as never, 'u1', '/account', 100)).toBe(100)
+    const hit = client({ data: { id: 'o' }, error: null })
+    expect(await signupGiftFor({ ...(hit.db as object), rpc } as never, 'u1', `/join/org/${TOKEN}`, 100)).toBe(0)
+    expect(rpc).toHaveBeenCalledOnce()
   })
 })
