@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import type { Client } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 
@@ -267,7 +269,7 @@ it("moves this month's unspent old grants from the owner's own pool into the org
   expect(await freeOf(db, owner)).toBe(7800)
 
   const preview = (await row(db, 'select admin_partner_promo_move_preview($1,$2) p', [actor, orgId])).p
-  expect(preview).toMatchObject({ period: m.current, recipient: owner, credits: 7500, moved: 0 })
+  expect(preview).toMatchObject({ period: m.current, credits: 7500, moved: 0, recipients: [{ user: owner, credits: 7500 }] })
   expect((await row(db, 'select admin_partner_promo_move($1,$2) r', [actor, { org_id: orgId, credits: 7000 }])).r)
     .toEqual({ applied: false, reason: 'changed', credits: 7500 })
   expect((await row(db, 'select admin_partner_promo_move($1,$2) r', [actor, { org_id: orgId, credits: 7500 }])).r).toEqual({ applied: true, credits: 7500 })
@@ -333,4 +335,56 @@ it('moves nothing for a voided legacy grant (its credits were taken back by hand
   expect((await row(db, 'select admin_partner_promo_move($1,$2) r', [actor, { org_id: orgId, credits: 0 }])).r).toEqual({ applied: false, reason: 'nothing', credits: 0 })
   expect(await freeOf(db, owner)).toBe(500)
   expect(await promoPoolOf(db, orgId)).toBe(0)
+})
+
+it('takes a moved grant from the account it was granted to, not from a new owner', async () => {
+  const { orgId, owner } = await partner(db, actor)
+  await run(db, m.current)
+  const s = await sheet(db, orgId, m.current)
+  await confirm(db, actor, s)
+  await asLegacy(db, 'partner_promo_grants', s.id)
+  // The owner changes mid-month (as an owner transfer would); the new owner has free credits of their own.
+  const next = await createUser(db, { freeCredits: 4000 })
+  await db.query('select org_join($1,(select invite_token from orgs where id=$2))', [next, orgId])
+  await db.query("update org_members set role=case when user_id=$2 then 'owner' else 'member' end where org_id=$1 and user_id in ($2,$3)", [orgId, next, owner])
+  await db.query('update orgs set owner_user_id=$2 where id=$1', [orgId, next])
+  expect((await row(db, 'select admin_partner_promo_move_preview($1,$2) p', [actor, orgId])).p).toMatchObject({ credits: 10000, recipients: [{ user: owner, credits: 10000 }] })
+  expect((await row(db, 'select admin_partner_promo_move($1,$2) r', [actor, { org_id: orgId, credits: 10000 }])).r).toEqual({ applied: true, credits: 10000 })
+  expect(await freeOf(db, owner)).toBe(0)
+  expect(await freeOf(db, next)).toBe(4000)
+  expect(await promoPoolOf(db, orgId)).toBe(10000)
+})
+
+it('ends with the 1921 definitions: the org pool and the voided-sheet filter of 1920 together', async () => {
+  const def = async (sig: string) => (await row(db, `select pg_get_functiondef('public.${sig}'::regprocedure) d`)).d as string
+  const bucket = await def('_partner_promo_bucket_left(uuid,timestamptz)')
+  expect(bucket).toContain('voided_at is null')
+  expect(bucket).toContain("destination = 'owner'")
+  expect(bucket).toContain('org_promo_draws')
+  const expire = await def('_partner_promo_expire()')
+  expect(expire).toContain('voided_at is null')
+  expect(expire).toContain('_org_promo_expire_due')
+  const month = await def('org_promo_month(uuid,timestamptz)')
+  expect(month).toContain('voided_at is null')
+  expect(month).toContain('promo_pool_credits')
+  const move = await def('_partner_promo_moveable(uuid)')
+  expect(move).toContain('voided_at is null')
+  expect(move).toContain('recipients')
+})
+
+it('ends with the 1921 definitions on production too, where 1920 ran before 1890–1894', async () => {
+  // Production order with --include-all: 1920 (already applied), then this PR's 1890–1894, 1921 and 1922.
+  // Re-run 1920's function bodies, then 1921: the final bodies must be 1921's again.
+  const dir = path.join(process.cwd(), 'supabase/migrations')
+  const replaced = readFileSync(path.join(dir, '1920_partner_promo_void.sql'), 'utf8')
+    .split(/\n(?=create or replace function )/).slice(1).map((chunk) => chunk.slice(0, chunk.indexOf('\n$$;') + 4))
+  expect(replaced).toHaveLength(3)
+  for (const sql of replaced) await db.query(sql)
+  expect((await row(db, "select pg_get_functiondef('public._partner_promo_expire()'::regprocedure) d")).d).not.toContain('_org_promo_expire_due')
+  await db.query(readFileSync(path.join(dir, '1921_org_promo_pool_reads.sql'), 'utf8'))
+  for (const [sig, mark] of [['_partner_promo_bucket_left(uuid,timestamptz)', 'org_promo_draws'], ['_partner_promo_expire()', '_org_promo_expire_due'], ['org_promo_month(uuid,timestamptz)', 'promo_pool_credits']]) {
+    const d = (await row(db, `select pg_get_functiondef('public.${sig}'::regprocedure) d`)).d as string
+    expect(d).toContain(mark)
+    expect(d).toContain('voided_at is null')
+  }
 })
