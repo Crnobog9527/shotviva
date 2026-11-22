@@ -1,3 +1,4 @@
+import { logger } from '../../logger'
 import { pvuvProps, type PvuvProps } from './props'
 
 // Server events to PVUV.ai (https://api.pvuv.ai/docs/server-events.md): the dictionary's
@@ -8,7 +9,7 @@ import { pvuvProps, type PvuvProps } from './props'
 const SEND_TIMEOUT_MS = 3_000
 
 export type PvuvEventConfig = { site: string; token: string }
-type Fetch = (input: string, init: RequestInit) => Promise<unknown>
+type Fetch = (input: string, init: RequestInit) => Promise<{ ok: boolean; status: number; json?: () => Promise<unknown> }>
 
 export type PvuvServerEvent = {
   name: string
@@ -45,16 +46,30 @@ export function pvuvServerEvent(
   return event
 }
 
-// Never throws.
+// What PVUV answered for an event it did not take: its HTTP status and the reasons it gives
+// (`rejected: [{index, error}]`). Reasons are PVUV's own short error codes, never our payload.
+async function rejectionReasons(response: Awaited<ReturnType<Fetch>>): Promise<string[]> {
+  try {
+    const body = (await response.json?.()) as { rejected?: { error?: unknown }[] } | null | undefined
+    return (body?.rejected ?? []).map((r) => String(r?.error ?? 'unknown').slice(0, 100)).slice(0, 5)
+  } catch {
+    return []
+  }
+}
+
+// Never throws. A refusal by PVUV (a bad token, a wrong site, an event it will not store) used to
+// vanish; it is now one warn line with the event name, status and reasons (no token, user id or props).
 export async function sendPvuvEvent(config: PvuvEventConfig, event: PvuvServerEvent, doFetch: Fetch = fetch): Promise<void> {
   try {
-    await doFetch(`https://api.pvuv.ai/v1/sites/${config.site}/events`, {
+    const response = await doFetch(`https://api.pvuv.ai/v1/sites/${config.site}/events`, {
       method: 'POST',
       headers: { authorization: `Bearer ${config.token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ events: [event] }),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     })
-  } catch {
-    // Analytics must never fail the request.
+    const reasons = response.ok ? await rejectionReasons(response) : []
+    if (!response.ok || reasons.length > 0) logger.warn('pvuv event rejected', { event: event.name, status: response.status, reasons })
+  } catch (error) {
+    logger.warn('pvuv event not sent', { event: event.name, error })
   }
 }

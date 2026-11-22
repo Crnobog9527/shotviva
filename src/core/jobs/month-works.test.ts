@@ -34,6 +34,8 @@ describe('listMonthWorks', () => {
       ['eq', 'user_id', 'u1'],
       ['eq', 'status', 'succeeded'],
       ['is', 'deleted_at', null],
+      // 企业作品: an org work its maker has left is not theirs to count (1941).
+      ['is', 'org_access_ended_at', null],
       ['gte', 'created_at', '2026-11-01T00:00:00.000Z'],
       ['order', 'created_at', { ascending: false }],
       ['limit', 7],

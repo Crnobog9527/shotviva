@@ -281,6 +281,8 @@
         "connect": "Connect in Graylum"
       },
       "what": "What it does",
+      "whatNote": "From positioning to a 30-day action plan, six steps to find your direction.",
+      "heroAlt": "Graylum 6-step account positioning animation",
       "when": "When it helps",
       "after": {
         "title": "Once connected",
@@ -292,45 +294,41 @@
       "newTab": "(opens in a new tab)",
       "zoom": "View larger: {name}",
       "lightbox": {
-        "label": "Graylum screenshot",
+        "label": "Graylum animation",
         "prev": "Previous",
         "next": "Next",
         "count": "{n} / {total}"
       },
       "shots": {
-        "roadmap": {
-          "name": "Roadmap home",
-          "note": "From positioning to a 30-day action plan, six steps to find your direction."
+        "voiceover": {
+          "label": "Voiceover Script",
+          "note": "When you have an idea but don't know how to start talking",
+          "alt": "Voiceover Script: Graylum drafts a short-video voiceover"
         },
-        "script": {
-          "name": "Voiceover draft",
-          "label": "Voiceovers",
-          "note": "When you have an idea but don't know how to start talking"
-        },
-        "xhsPost": {
-          "name": "Xiaohongshu post draft",
-          "label": "Image posts",
-          "note": "When you want to post but can't write a draft that's ready to go"
+        "post": {
+          "label": "Posts & Articles",
+          "note": "When you want to post but can't write a draft that's ready to go",
+          "alt": "Posts & Articles: Graylum builds an image post step by step"
         },
         "storyboard": {
-          "name": "Video storyboard",
-          "label": "Video",
-          "note": "When the script is set but you're not sure how to shoot each shot"
+          "label": "Video Storyboard",
+          "note": "When the script is set but you're not sure how to shoot each shot",
+          "alt": "Video Storyboard: Graylum turns the voiceover into shot-by-shot scenes"
         },
-        "storeVisit": {
-          "name": "Store visit post draft",
-          "label": "One draft, many platforms",
-          "note": "When you want to post the same story on different platforms"
+        "repurpose": {
+          "label": "Repurpose",
+          "note": "When you want to post the same story on different platforms",
+          "alt": "Repurpose: Graylum rewrites one final draft as a voiceover, an image post and an article"
         },
-        "shotvivaImage": {
-          "name": "Shotviva images in the chat",
-          "label": "Images right after writing",
-          "note": "When the post is written but still needs a decent image"
+        "imageWithShotviva": {
+          "label": "Image with Shotviva",
+          "note": "When the post is written but still needs a decent image",
+          "alt": "Image with Shotviva: making an image with Shotviva inside a Graylum chat"
         },
-        "tools": {
-          "name": "Tools",
-          "label": "More tools",
-          "note": "Positioning, reviews, editing tips and more, all here."
+        "moreTools": {
+          "label": "Tools",
+          "note": "Positioning, reviews, editing tips and more, all here.",
+          "alt": "Tools: the tools in Graylum's tool square"
         }
       }
     }
@@ -1215,6 +1213,7 @@
         "deleting": "Deleting…",
         "cancel": "Cancel",
         "running": "This photo is still developing. Delete it once it's done.",
+        "org": "Company photos can only be deleted by the company admin.",
         "failed": "Couldn't delete the photo. Please try again."
       }
     },
@@ -1786,11 +1785,13 @@
       "tabs": {
         "label": "Company sections",
         "console": "Company workspace",
+        "works": "Company works",
         "affiliate": "Company affiliate",
         "purchasing": "Bulk purchasing",
         "short": {
           "affiliate": "Affiliate",
           "console": "Workspace",
+          "works": "Works",
           "purchasing": "Purchasing"
         }
       },
@@ -1993,7 +1994,8 @@
       "area": {
         "workspaceIntro": "Where you run Shotviva as a production tool: manage the credit pool, your staff and what they make each month, for image work at scale.",
         "purchasingIntro": "Company package prices and bank transfer details. Top up the credit pool offline, the way described here.",
-        "affiliateIntro": "Bring in customers and follow commissions and payouts. Sign-ups and purchases through your referral link count toward the company."
+        "affiliateIntro": "Bring in customers and follow commissions and payouts. Sign-ups and purchases through your referral link count toward the company.",
+        "worksIntro": "Everything staff make with company credits belongs to the company. It shows only here and is never public. When someone leaves, their company works stay here and leave their own account."
       },
       "contact": {
         "open": "Contact us to arrange a transfer",
@@ -2005,6 +2007,31 @@
         "copy": "Copy",
         "copied": "Copied",
         "copyFailed": "Select and copy it"
+      },
+      "works": {
+        "title": "Company works",
+        "all": "All staff",
+        "filterLabel": "Filter by staff member",
+        "removed": "Left",
+        "owner": "Main admin",
+        "count": "{count, plural, one {# photo} other {# photos}}",
+        "empty": "No photos made with company credits yet.",
+        "emptyMember": "This person has not made photos with company credits yet.",
+        "more": "Older works",
+        "open": "View full size",
+        "download": "Download original",
+        "madeBy": "{who} · {date}",
+        "unknown": "Account",
+        "delete": {
+          "open": "Delete {name}",
+          "title": "Delete this company photo?",
+          "body": "This cannot be undone, and it also disappears for the staff member who made it. The deletion is recorded for the company.",
+          "confirm": "Delete photo",
+          "deleting": "Deleting…",
+          "cancel": "Cancel",
+          "running": "This photo is still developing. Delete it once it is done.",
+          "error": "The photo could not be deleted. Please try again later."
+        }
       },
       "poolMonth": {
         "title": "This month's credits ({month})",

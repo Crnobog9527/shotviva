@@ -1,6 +1,6 @@
 import { getImageProps } from 'next/image'
 
-import { coverLoaderFor } from '../../ui/cover-image'
+import { coverAvif, coverLoaderFor } from '../../ui/cover-image'
 import { setImageRatio } from '../../ui/image-ratio'
 import { capSrcSet } from '../../ui/srcset-cap'
 
@@ -35,7 +35,22 @@ export function pictureAttrs(url: string, sizes: string) {
   return capSrcSet({ sizes: props.sizes, srcSet: props.srcSet, src: props.src }, sizes)
 }
 
-function picture(doc: Document, url: string, sizes: string, className: string, after: boolean): HTMLImageElement {
+// With stored AVIF copies (core/presized) the <img> goes inside a <picture> whose source lists them,
+// display: contents as picture.tsx draws it, so the layer's layout is unchanged.
+function withAvif(doc: Document, img: HTMLImageElement, url: string, sizes: string): HTMLElement {
+  const avif = coverAvif(url, sizes)
+  if (!avif) return img
+  const wrap = doc.createElement('picture')
+  wrap.style.display = 'contents'
+  const source = doc.createElement('source')
+  source.type = 'image/avif'
+  if (avif.sizes) source.sizes = avif.sizes
+  source.srcset = avif.srcSet
+  wrap.append(source, img)
+  return wrap
+}
+
+function picture(doc: Document, url: string, sizes: string, className: string, after: boolean): HTMLElement {
   const img = doc.createElement('img')
   const attrs = pictureAttrs(url, sizes)
   img.className = className
@@ -55,7 +70,7 @@ function picture(doc: Document, url: string, sizes: string, className: string, a
   if (attrs.sizes) img.sizes = attrs.sizes
   if (attrs.srcSet) img.srcset = attrs.srcSet
   img.src = attrs.src
-  return img
+  return withAvif(doc, img, url, sizes)
 }
 
 function pane(doc: Document, url: string, sizes: string, after: boolean): HTMLElement {

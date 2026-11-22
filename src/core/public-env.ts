@@ -22,7 +22,14 @@ export const rawPublicEnv: RawPublicEnv = {
   NEXT_PUBLIC_ASSETS_BASE_URL: process.env.NEXT_PUBLIC_ASSETS_BASE_URL || undefined,
   NEXT_PUBLIC_IMAGE_CDN_URL: process.env.NEXT_PUBLIC_IMAGE_CDN_URL || undefined,
   NEXT_PUBLIC_ASSET_CDN_URL: process.env.NEXT_PUBLIC_ASSET_CDN_URL || undefined,
+  NEXT_PUBLIC_PRESIZED_IMAGES_URL: process.env.NEXT_PUBLIC_PRESIZED_IMAGES_URL || undefined,
   NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || undefined,
+}
+
+// The base URLs without a trailing slash, as the schema's transform leaves them.
+const URL_KEYS = ['NEXT_PUBLIC_ASSETS_BASE_URL', 'NEXT_PUBLIC_IMAGE_CDN_URL', 'NEXT_PUBLIC_ASSET_CDN_URL', 'NEXT_PUBLIC_PRESIZED_IMAGES_URL'] as const
+function trimmedUrls(raw: RawPublicEnv): Pick<PublicEnv, (typeof URL_KEYS)[number]> {
+  return Object.fromEntries(URL_KEYS.map((key) => [key, raw[key]?.replace(/\/+$/, '')])) as Pick<PublicEnv, (typeof URL_KEYS)[number]>
 }
 
 // The schema's defaults and trailing-slash trim, without zod: this module is in every page's
@@ -39,9 +46,7 @@ export function withPublicDefaults(raw: RawPublicEnv): PublicEnv {
     NEXT_PUBLIC_HCAPTCHA_SITEKEY: raw.NEXT_PUBLIC_HCAPTCHA_SITEKEY ?? '',
     NEXT_PUBLIC_POSTHOG_KEY: raw.NEXT_PUBLIC_POSTHOG_KEY ?? '',
     NEXT_PUBLIC_POSTHOG_HOST: raw.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com',
-    NEXT_PUBLIC_ASSETS_BASE_URL: raw.NEXT_PUBLIC_ASSETS_BASE_URL?.replace(/\/+$/, ''),
-    NEXT_PUBLIC_IMAGE_CDN_URL: raw.NEXT_PUBLIC_IMAGE_CDN_URL?.replace(/\/+$/, ''),
-    NEXT_PUBLIC_ASSET_CDN_URL: raw.NEXT_PUBLIC_ASSET_CDN_URL?.replace(/\/+$/, ''),
+    ...trimmedUrls(raw),
     NEXT_PUBLIC_APP_VERSION: raw.NEXT_PUBLIC_APP_VERSION ?? 'dev',
   })
 }

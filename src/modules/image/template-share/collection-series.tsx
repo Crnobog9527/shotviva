@@ -4,7 +4,8 @@
 import { ChevronDown } from 'lucide-react'
 import { useId, useState } from 'react'
 
-import { coverImage } from '@/core/ui/cover-image'
+import { coverAvif, coverImage } from '@/core/ui/cover-image'
+import { Picture } from '@/core/ui/picture'
 
 import { COVER_SIZES } from '../catalogue/cover-sizes'
 import { PairMedia } from '../catalogue/pair-media'
@@ -51,10 +52,11 @@ function SeriesCover({ series, eager, alt }: { series: Series; eager?: boolean; 
   const first = series.members.find((member) => member.cover.before && member.cover.after)
   if (series.cover) {
     const cover = coverImage(series.cover, COVER_SIZES.cardFrame)
+    const avif = coverAvif(series.cover, COVER_SIZES.cardFrame)
     return (
       <span className="tc-cover">
-        <img {...cover} alt="" aria-hidden="true" loading={eager ? 'eager' : 'lazy'} decoding="async" className="tc-cover-bg" />
-        <img {...cover} alt={alt} loading={eager ? 'eager' : 'lazy'} decoding="async" className="tc-cover-img" />
+        <Picture avif={avif}><img {...cover} alt="" aria-hidden="true" loading={eager ? 'eager' : 'lazy'} decoding="async" className="tc-cover-bg" /></Picture>
+        <Picture avif={avif}><img {...cover} alt={alt} loading={eager ? 'eager' : 'lazy'} decoding="async" className="tc-cover-img" /></Picture>
       </span>
     )
   }
