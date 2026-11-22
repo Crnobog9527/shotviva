@@ -55,7 +55,7 @@ export async function isOrgMember(user: string) {
 export async function readSettings() {
   const result = await createAdminSupabase()
     .from('affiliate_settings')
-    .select('hold_days,payout_min_usd,settlement_day,apply_min_level,terms_version')
+    .select('hold_days,payout_min_usd,org_payout_min_usd,settlement_day,apply_min_level,terms_version')
     .single()
   return parse(settingsSchema, result)
 }
