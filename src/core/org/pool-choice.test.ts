@@ -4,25 +4,29 @@ vi.mock('server-only', () => ({}))
 vi.mock('@/core/logger', () => ({ logger: { warn: vi.fn() } }))
 
 const { offerOf } = await import('./pool-choice')
-const { chosenBalance } = await import('@/core/billing/pools')
+const { bothKinds, chosenBalance, orgBalance } = await import('@/core/billing/pools')
 const { choiceInput } = await import('@/core/jobs/run-generation')
 const { generateBodySchema, toGenerationRequest } = await import('@/core/jobs/generation-request')
 
 const now = new Date('2026-11-21T10:00:00Z')
 const live = { orgs: { promo_expires_at: '2026-12-01T00:00:00Z' } }
 
-// 出图时让员工自选 (ARCHITECTURE §6.5): the picker shows only when both kinds are held, mirroring _reserve_pool.
+// 在职成员只用企业积分、出图时自选 (ARCHITECTURE §6.5), mirroring _reserve_pool.
 describe('offerOf', () => {
-  it('offers both pools with their balances and the remembered choice', () => {
+  it("gives an active member the org's shares only, and the remembered choice", () => {
     expect(offerOf({ held_credits: 100, held_promo_credits: 40, ...live }, { credits: 120, free_credits: 60, org_pool_choice: 'promo' }, now))
-      .toEqual({ paid: 120, promo: 60, last: 'promo' })
+      .toEqual({ paid: 100, promo: 40, last: 'promo' })
     expect(offerOf({ held_credits: 1, held_promo_credits: 1, ...live }, { credits: 1, free_credits: 1, org_pool_choice: null }, now)).toMatchObject({ last: 'paid' })
   })
-  it('offers nothing with one kind only, a spent share, or the month over', () => {
-    expect(offerOf({ held_credits: 0, held_promo_credits: 40, ...live }, { credits: 500, free_credits: 60, org_pool_choice: null }, now)).toBeNull()
-    expect(offerOf({ held_credits: 100, held_promo_credits: 40, ...live }, { credits: 100, free_credits: 0, org_pool_choice: null }, now)).toBeNull()
-    expect(offerOf({ held_credits: 100, held_promo_credits: 40, orgs: { promo_expires_at: '2026-11-01T00:00:00Z' } }, { credits: 100, free_credits: 40, org_pool_choice: null }, now)).toBeNull()
-    expect(offerOf({ held_credits: 100, held_promo_credits: 40, orgs: { promo_expires_at: null } }, { credits: 100, free_credits: 40, org_pool_choice: null }, now)).toBeNull()
+  it('counts no promotion share once the month is over, and caps each share at the balance', () => {
+    expect(offerOf({ held_credits: 100, held_promo_credits: 40, orgs: { promo_expires_at: '2026-11-01T00:00:00Z' } }, { credits: 100, free_credits: 40, org_pool_choice: null }, now)).toMatchObject({ promo: 0 })
+    expect(offerOf({ held_credits: 100, held_promo_credits: 40, orgs: { promo_expires_at: null } }, { credits: 100, free_credits: 40, org_pool_choice: null }, now)).toMatchObject({ promo: 0 })
+    expect(offerOf({ held_credits: 100, held_promo_credits: 40, ...live }, { credits: 30, free_credits: 10, org_pool_choice: null }, now)).toMatchObject({ paid: 30, promo: 10 })
+  })
+  it('shows the picker only with both kinds', () => {
+    expect(bothKinds({ paid: 1, promo: 1, last: 'paid' })).toBe(true)
+    expect(bothKinds({ paid: 0, promo: 9, last: 'paid' })).toBe(false)
+    expect(orgBalance({ paid: 3, promo: 4, last: 'paid' })).toEqual({ paid: 3, free: 4 })
   })
 })
 

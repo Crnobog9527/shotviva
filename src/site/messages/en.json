@@ -1060,7 +1060,9 @@
         "clearGroup": "Clear this group",
         "left": "{fields} still show the sample’s text. Use it anyway?",
         "joiner": ", "
-      }
+      },
+      "orgNeedsCredits": "Your company's credits don't cover this one. Ask your company admin for more; your own credits can't be used while you're a member.",
+      "orgShortCta": "Not enough company credits"
     },
     "errors": {
       "NETWORK": "Couldn't reach Shotviva. Check your connection and try again.",

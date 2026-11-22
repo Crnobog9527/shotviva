@@ -189,6 +189,15 @@ describe.each(['en', 'zh'] as const)('pool choice picker (%s)', (locale) => {
     expect(html.match(/checked=""/g)).toHaveLength(1)
     expect(render(locale, createElement(PoolChoiceSlot, { choice: null })).html).toBe('')
   })
+
+  it('asks an org member to go to the admin instead of opening the paywall when the org credits are short', async () => {
+    const { FormAction } = await import('@/modules/image/workspace/form-action')
+    const state = { kind: 'get-credits' as const, cost: 20, needed: 10, count: 1 }
+    const member = render(locale, createElement(FormAction, { state, resolution: '1k', batch: false, onGenerate: () => {}, orgOnly: true }))
+    expect(member.errors).toEqual([])
+    expect(member.text).toContain(locale === 'en' ? 'Ask your company admin' : '请联系企业管理员分配')
+    expect(member.html).toContain('disabled')
+  })
 })
 
 describe.each(['en', 'zh'] as const)('join confirmation (%s)', (locale) => {

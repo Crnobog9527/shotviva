@@ -31,7 +31,7 @@ export type WorkspaceProps = DraftInput & { shareText: string; editable: boolean
 // refresh, or Generate in the dialog, lands on the developing view or result, not the form.
 // From lg up the form is the left column and the stage the right (B comp workspace.html).
 export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps) {
-  const { template, tier, balance, concurrency } = input
+  const { template, tier, concurrency } = input
   const draft = useWorkspaceDraft(input)
   const jobIds = useWorkspaceJobs(template.id)
   const single = useJob(jobIds.length === 1 ? (jobIds[0] ?? null) : null)
@@ -64,7 +64,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
       <div ref={reveal} className="min-w-0 px-(--gutter) lg:px-0">
         <WorkspaceForm
           template={template}
-          balance={balance}
+          balance={draft.choice.balance}
           tier={tier}
           photos={draft.photos}
           slots={draft.slots}
@@ -85,6 +85,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
           privateOnly={template.privateOnly}
           examplesLeft={draft.examplesLeft}
           onGenerate={generate}
+          orgOnly={draft.choice.orgOnly}
         />
       </div>
       <WorkspaceStage template={template} photo={draft.photos.photos[0] ?? null} />

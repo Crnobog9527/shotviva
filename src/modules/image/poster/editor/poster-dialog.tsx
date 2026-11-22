@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
 import { ActionBar } from '@/core/app-shell/action-bar'
-import { chosenBalance, type Balance, type PoolChoice, type PoolChoiceOffer } from '@/core/billing/pools'
+import { bothKinds, chosenBalance, orgBalance, type Balance, type PoolChoice, type PoolChoiceOffer } from '@/core/billing/pools'
 import { useRouter } from '@/core/i18n'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
@@ -82,9 +82,11 @@ function PosterSheet({ template, summary, open, series, onSwitch, onClose, balan
   )
 }
 
-// Every poster of the set is paid with the chosen kind; the bar checks that kind's balance only.
+// Every poster of the set is paid with the chosen kind; an org member spends only the org's shares
+// (their own credits are frozen), so the bar checks those.
 function usePosterChoice(offer: PoolChoiceOffer | null, held: Balance) {
   const [value, set] = useState<PoolChoice>(offer?.last ?? 'paid')
   if (!offer) return { picker: null, balance: held, value: undefined }
-  return { picker: { offer, value, set }, balance: chosenBalance(held, value), value }
+  if (!bothKinds(offer)) return { picker: null, balance: orgBalance(offer), value: undefined }
+  return { picker: { offer, value, set }, balance: chosenBalance(orgBalance(offer), value), value }
 }

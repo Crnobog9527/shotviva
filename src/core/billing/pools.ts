@@ -21,12 +21,17 @@ export function creditsNeeded(balance: Balance, cost: number): number {
   return chargePool(balance, cost) === null ? cost - balance.paid : 0
 }
 
-// 出图时让员工自选 (ARCHITECTURE §6.5): a member of an org who holds both kinds of org credits
-// chooses which kind pays. 'promo' charges the free pool (a free work), 'paid' the paid pool.
+// 在职成员只用企业积分 (ARCHITECTURE §6.5): an active org member pays only with the org's shares,
+// and chooses which kind when holding both. 'promo' charges the free pool (a free work), 'paid' the
+// paid pool.
 export type PoolChoice = 'paid' | 'promo'
-// Offered only when the member holds both; the amounts are each pool's whole balance (the org's
-// share is spent first in the free pool, last in the paid pool), last is the remembered choice.
+// For an active member: the org's paid and promotion shares they can spend, and the remembered
+// choice. The picker shows only when both are above 0.
 export type PoolChoiceOffer = { paid: number; promo: number; last: PoolChoice }
+
+// What a member may spend: the org's shares only, as a balance.
+export const orgBalance = (offer: PoolChoiceOffer): Balance => ({ paid: offer.paid, free: offer.promo })
+export const bothKinds = (offer: PoolChoiceOffer) => offer.paid > 0 && offer.promo > 0
 
 // The balance a chosen kind may pay from: never the other pool (reserve_credits refuses).
 export function chosenBalance(balance: Balance, choice: PoolChoice): Balance {
