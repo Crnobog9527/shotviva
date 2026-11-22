@@ -63,6 +63,7 @@ describe('voidPromo', () => {
     expect(rpc).not.toHaveBeenCalled()
     expect(await voidPromo(dbAnswering({ data: null, error: { message: 'PROMO_GRANT_NOT_GRANTED' } }).db, 'a', form(voiding))).toBe(P.answers.notGranted)
     expect(await voidPromo(dbAnswering({ data: null, error: { message: 'PROMO_GRANT_EXPIRED' } }).db, 'a', form(voiding))).toBe(P.answers.voidExpired)
+    expect(await voidPromo(dbAnswering({ data: null, error: { message: 'PROMO_GRANT_CLAWED' } }).db, 'a', form(voiding))).toBe(P.answers.voidClawed)
     await expect(voidPromo(dbAnswering({ data: null, error: { message: 'NOT_ADMIN' } }).db, 'a', form(voiding))).rejects.toThrow()
   })
 })

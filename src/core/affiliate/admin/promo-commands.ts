@@ -44,6 +44,7 @@ const voiding = z.object({ grant_id: z.string().regex(/^[1-9]\d{0,17}$/), reason
 const voidRefusals: Record<string, string> = {
   PROMO_GRANT_NOT_GRANTED: P.answers.notGranted,
   PROMO_GRANT_EXPIRED: P.answers.voidExpired,
+  PROMO_GRANT_CLAWED: P.answers.voidClawed,
   PROMO_GRANT_NOT_FOUND: P.answers.invalid,
   INVALID_INPUT: P.answers.invalid,
 }

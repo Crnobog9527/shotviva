@@ -116,7 +116,7 @@ function Decisions({ s, action }: { s: PromoSheet; action: SaveAction }) {
 // month-end expiry from taking them a second time (migration 1920). Gone once the expiry ran.
 function VoidForm({ s, action }: { s: PromoSheet; action: SaveAction }) {
   return (
-    <MutationForm action={action} operation="promoVoid" label={P.void} confirm={P.voidAsk} destructive>
+    <MutationForm action={action} operation="promoVoid" label={P.void} confirm={P.voidAsk(s.total)} destructive>
       <Hidden name="grant_id" value={s.id} />
       <Input name="reason" required maxLength={500} aria-label={P.voidReason} placeholder={P.voidReason} />
     </MutationForm>
