@@ -13,7 +13,7 @@ vi.mock('../bulk-actions', () => ({ bulkGrantOrgCredits: bulk.grant, bulkSetOrgA
 vi.mock('../promo-actions', () => ({ allocateOrgPromoCredits: promo.allocate, setOrgPromoAllowance: promo.allowance }))
 vi.mock('@/core/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn() } }))
 
-const { allocate, allocatePromo, bulkGrant, bulkSetAllowance, setDefaults, deposit, join, leave, removeMember, resetInvite, setAllowance, setPromoAllowance } = await import('./commands')
+const { allocate, allocatePromo, bulkGrant, pools, bulkSetAllowance, setDefaults, deposit, join, leave, removeMember, resetInvite, setAllowance, setPromoAllowance } = await import('./commands')
 const { AppError } = await import('@/core/errors')
 
 const USER = '00000000-0000-4000-8000-0000000000a1'
@@ -30,6 +30,21 @@ const owner = () => ({ db: db(ORG), user: USER })
 const sqlError = (message: string) => new AppError('CONFLICT', message, { cause: new Error(message) })
 
 beforeEach(() => vi.resetAllMocks())
+
+describe('pools', () => {
+  const read = (data: object | null) => {
+    const chain = { select: () => chain, eq: () => chain, maybeSingle: async () => ({ data, error: null }) }
+    return { db: { from: vi.fn(() => chain) } as never, user: USER }
+  }
+  it('reads both pools now, promotion 0 outside its month, and refuses a non-owner', async () => {
+    const live = new Date(Date.now() + 86_400_000).toISOString()
+    const past = new Date(Date.now() - 1000).toISOString()
+    expect(await pools(read({ pool_credits: 40, promo_pool_credits: 0, promo_expires_at: live }))).toEqual({ ok: true, pool: 40, promoPool: 0 })
+    expect(await pools(read({ pool_credits: 40, promo_pool_credits: 200, promo_expires_at: live }))).toEqual({ ok: true, pool: 40, promoPool: 200 })
+    expect(await pools(read({ pool_credits: 40, promo_pool_credits: 200, promo_expires_at: past }))).toEqual({ ok: true, pool: 40, promoPool: 0 })
+    expect(await pools(read(null))).toEqual({ ok: false, error: 'NOT_OWNER' })
+  })
+})
 
 describe('owner commands', () => {
   it('refuse an account that owns no org before calling any SQL function', async () => {

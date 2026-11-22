@@ -46,6 +46,7 @@ const ownerActions = {
   allocatePromo: async () => ({ ok: true as const, pool: 1 }), setPromoAllowance: async () => ({ ok: true as const, allowance: 1 }),
   setDefaults: async () => ({ ok: true as const, paid: 1, promo: 1 }), bulkSetAllowance: async () => ({ ok: true as const, members: 1 }),
   bulkGrant: async () => ({ ok: true as const, members: 1, total: 1, pool: 1 }),
+  pools: async () => ({ ok: true as const, pool: 0, promoPool: 0 }),
 }
 
 type Messages = typeof en

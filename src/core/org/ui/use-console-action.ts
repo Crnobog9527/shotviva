@@ -16,7 +16,7 @@ export function useConsoleAction() {
   const [pending, startTransition] = useTransition()
   const [outcome, setOutcome] = useState<Outcome>(null)
 
-  function run<T extends object>(work: () => Promise<ConsoleResult<T>>, success: string, onOk?: (result: Extract<ConsoleResult<T>, { ok: true }>) => void) {
+  function run<T extends object>(work: () => Promise<ConsoleResult<T>>, success: string, onOk?: (result: Extract<ConsoleResult<T>, { ok: true }>) => void, onFail?: () => void) {
     setOutcome(null)
     startTransition(async () => {
       const result = await work().catch((): ConsoleResult<T> => ({ ok: false, error: 'FAILED' }))
@@ -25,6 +25,7 @@ export function useConsoleAction() {
         onOk?.(result)
       } else {
         setOutcome({ ok: false, text: t(`errors.${result.error}`) })
+        onFail?.()
       }
     })
   }

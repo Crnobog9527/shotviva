@@ -20,6 +20,9 @@ type Props = { open: boolean; onOpenChange(open: boolean): void; members: string
 
 const digits = (raw: string) => raw.replace(/\D/g, '').slice(0, 10)
 const allowanceOf = (s: Setting) => (s.mode === 'keep' ? undefined : s.mode === 'default' ? ('default' as const) : Number(s.value))
+const poolOf = (kind: 'paid' | 'promo', paid: number, promo: number) => (kind === 'paid' ? paid : promo)
+// The pool to show (the fresh read once there is one) and whether that read says it is short.
+const poolView = (fresh: number | null, page: number, total: number) => ({ pool: fresh ?? page, short: fresh !== null && total > fresh })
 const settingValid = (s: Setting) => s.mode !== 'set' || (s.value !== '' && Number.isInteger(Number(s.value)))
 
 export function BulkSheet({ open, onOpenChange, members, data, actions, onDone }: Props) {
@@ -90,21 +93,36 @@ function GrantForm({ members, data, actions, onDone }: Omit<Props, 'open' | 'onO
   const [kind, setKindValue] = useState<'paid' | 'promo'>('promo')
   const [each, setEachValue] = useState('')
   const [confirming, setConfirming] = useState(false)
+  // The pool as read just now (null until "Give" reads it): the page's number may be stale either
+  // way (a promotion top-up is handed out at once to members on the default; deposits and grants
+  // raise it), so only this read decides whether the confirm opens or the short warning shows.
+  const [fresh, setFresh] = useState<number | null>(null)
   const [requestId, setRequestId] = useState(() => crypto.randomUUID())
-  // A changed kind or amount is a new request: only a repeat of the same one may be answered 'already'.
-  const setKind = (next: 'paid' | 'promo') => { setKindValue(next); setRequestId(crypto.randomUUID()) }
-  const setEach = (next: string) => { setEachValue(next); setRequestId(crypto.randomUUID()) }
+  // A changed kind or amount is a new request, and needs a new read before it can be confirmed.
+  const reset = () => { setRequestId(crypto.randomUUID()); setConfirming(false); setFresh(null) }
+  const setKind = (next: 'paid' | 'promo') => { setKindValue(next); reset() }
+  const setEach = (next: string) => { setEachValue(next); reset() }
   const { pending, outcome, run } = useConsoleAction()
+  const check = useConsoleAction()
   const amount = Number(each)
   const total = amount * members.length
-  const pool = kind === 'paid' ? data.org.poolCredits : data.org.promoPoolCredits
-  const valid = Number.isInteger(amount) && amount > 0 && total <= pool
+  const { pool, short } = poolView(fresh, poolOf(kind, data.org.poolCredits, data.org.promoPoolCredits), total)
+  const valid = Number.isInteger(amount) && amount > 0
   const summary = t('total', { count: members.length, each: format.number(amount || 0), total: format.number(total), pool: format.number(pool), kind: t(`kind.${kind}`) })
+  const review = () => check.run(() => actions.pools(), '', (now) => {
+    check.clear()
+    const left = poolOf(kind, now.pool, now.promoPool)
+    setFresh(left)
+    setConfirming(total <= left)
+  })
+  // A refused give (the pool shrank meanwhile) closes the confirm; the next "Give" reads again.
   const send = () => run(
     () => actions.bulkGrant({ requestId, members, kind, each: amount }),
     t('given', { count: members.length, total: format.number(total) }),
-    () => { setRequestId(crypto.randomUUID()); setConfirming(false); setEachValue(''); onDone() },
+    () => { reset(); setEachValue(''); onDone() },
+    () => { setConfirming(false); setFresh(null) },
   )
+  const busy = pending || check.pending
   return (
     <div className="grid gap-4">
       <div className="grid grid-cols-2 gap-2">
@@ -117,10 +135,10 @@ function GrantForm({ members, data, actions, onDone }: Omit<Props, 'open' | 'onO
         <input className={FIELD} inputMode="numeric" value={each} onChange={(e) => setEach(digits(e.target.value))} />
       </label>
       <p className="text-label tabular-nums">{summary}</p>
-      {total > pool ? <p role="alert" className="text-label text-destructive">{t('short')}</p> : null}
-      <Button type="button" size="touch" disabled={!valid || pending} onClick={() => setConfirming(true)}>{t('give')}</Button>
-      <Result outcome={outcome} />
-      {confirming ? <InlineConfirm title={t('confirmTitle', { count: members.length })} description={summary}
+      {short ? <p role="alert" className="text-label text-destructive">{t('short', { pool: format.number(pool), kind: t(`kind.${kind}`) })}</p> : null}
+      <Button type="button" size="touch" disabled={!valid || busy} onClick={review}>{t('give')}</Button>
+      <Result outcome={check.outcome ?? outcome} />
+      {confirming && !short ? <InlineConfirm title={t('confirmTitle', { count: members.length })} description={summary}
         confirm={t('give')} cancel={t('cancel')} busy={pending} onConfirm={send} onCancel={() => setConfirming(false)} /> : null}
     </div>
   )
