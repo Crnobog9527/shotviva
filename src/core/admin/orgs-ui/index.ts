@@ -8,3 +8,4 @@ export { LedgerTable, MemberTable, num, OrgSearch, OrgStatusBadge, OrgTable } fr
 export { PaymentAccounts, type SavePaymentAction } from './payment-accounts'
 export { SignupBonusForm, type SaveSignupBonusAction } from './signup-bonus-form'
 export type { SearchUsers } from './user-picker'
+export { TransferOwnerForm, type TransferOwnerAction } from './transfer-owner-form'
