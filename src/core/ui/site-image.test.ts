@@ -11,14 +11,23 @@ const CDN = 'https://img-eo.shotviva.com'
 const render = (props: Record<string, unknown>) => renderToString(createElement(SiteImage, { src: '/home/hero-set-phone.webp', alt: 'Phone photo', width: 1080, height: 1350, ...props }))
 
 describe('SiteImage with pre-sized copies (NEXT_PUBLIC_PRESIZED_IMAGES_URL)', () => {
-  it('draws a <picture>: AVIF source, WebP <img>, same widths, laid out as before', () => {
-    const html = render({ sizes: '(min-width: 1024px) 268px, 50vw', loading: 'lazy' })
+  it('draws a <picture> for a first-screen picture: AVIF source, WebP <img>, same widths, laid out as before', () => {
+    const html = render({ sizes: '(min-width: 1024px) 268px, 50vw', loading: 'eager' })
     expect(html).toContain('<picture style="display:contents">')
     expect(html).toMatch(new RegExp(`<source type="image/avif" srcSet="${CDN}/presized/v1/w384/home/hero-set-phone\\.avif 384w`))
     expect(html).toMatch(new RegExp(`<img[^>]*srcSet="${CDN}/presized/v1/w384/home/hero-set-phone\\.webp 384w`))
     expect(html).toContain('width="1080" height="1350"')
-    expect(html).toContain('loading="lazy"')
+    expect(html).toContain('loading="eager"')
     expect(html).not.toContain('/_next/image')
+  })
+
+  it('gives a lazy picture (below the fold) only its WebP <img>, so the HTML stays small', () => {
+    for (const props of [{ sizes: '50vw', loading: 'lazy' }, { sizes: '50vw' }]) {
+      const html = render(props)
+      expect(html).not.toContain('<picture')
+      expect(html).not.toContain('.avif')
+      expect(html).toMatch(new RegExp(`<img[^>]*loading="lazy"[^>]*srcSet="${CDN}/presized/v1/w\\d+/home/hero-set-phone\\.webp|<img[^>]*srcSet="${CDN}/presized/v1/w\\d+/home/hero-set-phone\\.webp[^>]*loading="lazy"`))
+    }
   })
 
   it('preloads the hero’s AVIF srcset with its type and keeps the <img> high priority', () => {
@@ -37,6 +46,14 @@ describe('SiteImage with pre-sized copies (NEXT_PUBLIC_PRESIZED_IMAGES_URL)', ()
 })
 
 describe('Picture', () => {
+  it('drops the AVIF source in front of a lazy <img>', () => {
+    const avif = { srcSet: '/a.avif 384w', sizes: '50vw' }
+    const lazy = renderToString(Picture({ avif, children: createElement('img', { src: '/a.webp', alt: '', loading: 'lazy' }) }) as ReactElement)
+    const eager = renderToString(Picture({ avif, children: createElement('img', { src: '/a.webp', alt: '' }) }) as ReactElement)
+    expect(lazy).not.toContain('<picture')
+    expect(eager).toContain('<source type="image/avif" srcSet="/a.avif 384w" sizes="50vw"/>')
+  })
+
   it('renders the <img> alone when there is no AVIF source', () => {
     const html = renderToString(Picture({ avif: undefined, children: createElement('img', { src: '/a.webp', alt: '' }) }) as ReactElement)
     expect(html).toContain('<img src="/a.webp" alt=""/>')
