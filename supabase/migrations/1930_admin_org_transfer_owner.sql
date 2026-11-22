@@ -66,6 +66,10 @@
 --      the right org, and the remap reads its current account.
 -- Snapshots without 'org' were stored before this migration, before any transfer was possible:
 -- case 2 covers them.
+--   7. the partner terms consent is the previous owner's own: the moved row's terms_version and
+--      terms_accepted_at are cleared, so the new owner goes through the existing re-accept gate.
+--      The payout account stays (the company's own details; the Owner checks every enterprise
+--      payout by hand before paying, 2026-11-23).
 --   6. a binding racing the transfer (affiliate_bind by slug, _org_attribute_invite by org):
 --      both now lock the resolved account FOR KEY SHARE and, if it was moved away meanwhile,
 --      resolve once more, so the customer is bound to the new owner instead of failing the
@@ -357,6 +361,9 @@ begin
     update public.affiliates set slug = 'mv-' || substr(md5(gen_random_uuid()::text), 1, 20), org_id = null
       where user_id = a.user_id;
     a.user_id := v_new;
+    -- The terms consent was the previous owner's own (case 7): the new owner re-accepts.
+    a.terms_version := null;
+    a.terms_accepted_at := null;
     insert into public.affiliates select (a).*;
     update public.affiliate_commissions set affiliate_user_id = v_new where affiliate_user_id = v_old;
     get diagnostics n_comm = row_count;

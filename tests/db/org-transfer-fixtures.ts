@@ -45,7 +45,7 @@ export function transferKit(conn: () => Client, admin: () => string) {
     await joinOrg(staff, orgId)
     const customer = await invitedBy(staff)
     const ownersCustomer = await invitedBy(owner)
-    await conn().query("update affiliates set payout_method='bank',payout_details='company account',admin_note='kept' where user_id=$1", [owner])
+    await conn().query("update affiliates set payout_method='bank',payout_details='company account',admin_note='kept',terms_version=(select terms_version from affiliate_settings),terms_accepted_at=now() where user_id=$1", [owner])
     await conn().query("insert into affiliate_rate_overrides(user_id,product_kind,l1_bp,l2_bp) values($1,'pack',2000,700)", [owner])
     const paid = await sale(conn(), customer, 'pack_m', 2490)
     await conn().query("insert into affiliate_adjustments(request_id,affiliate_user_id,amount,reason) values(gen_random_uuid(),$1,500,'fixture')", [owner])

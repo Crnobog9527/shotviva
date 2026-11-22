@@ -51,6 +51,8 @@ describe('moving the org to a new primary admin', () => {
 
     // The same account (slug = referral link, payout account, notes) now under the new owner.
     expect(await account(staff)).toEqual(before.account)
+    // The partner terms consent was the previous owner's own: the new owner re-accepts.
+    expect(await row(db, 'select terms_version, terms_accepted_at from affiliates where user_id=$1', [staff])).toEqual({ terms_version: null, terms_accepted_at: null })
     expect(await account(owner)).toBeUndefined()
     expect(await balance(staff)).toEqual(before.balance)
     expect(await commission(db, paid.id)).toEqual(before.commission)
