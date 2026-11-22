@@ -14,18 +14,18 @@ export function TemplateTile({ template, text, eager }: Props) {
   const { before, after, type, motion } = template.cover
   const alt = `${template.name} · ${text.alt}`
   return (
-    <article className="grid content-start gap-3">
+    <article className="tc-tile">
       {before && after ? (
         <PairMedia before={before} after={after} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} video={type === 'video' && motion ? motion : undefined} />
       ) : motion ? (
         <LoopPlate template={template} alt={alt} sizes={COVER_SIZES.cardFrame} />
       ) : (
-        <span className="hairline block aspect-[8/5] rounded-control bg-muted" />
+        <span className="tc-blank" />
       )}
-      <div className="grid gap-1">
-        <h3 className="text-body leading-[1.25] font-semibold tracking-[-0.015em]">{template.name}</h3>
-        <p className="text-caption leading-[1.35] text-muted-foreground">{template.categoryName}</p>
-        {template.description ? <p className="text-caption text-pretty text-bone-dim">{template.description}</p> : null}
+      <div className="tc-text">
+        <h3 className="tc-name">{template.name}</h3>
+        <p className="tc-meta">{template.categoryName}</p>
+        {template.description ? <p className="tc-desc">{template.description}</p> : null}
       </div>
       <UseTemplateLink templateId={template.id} label={text.use} />
     </article>

@@ -22,19 +22,19 @@ type Props = { collection: TemplateCollection; text: CollectionPageText; viewer:
 
 // /s/t/<id>, a template collection share page (ARCHITECTURE §5.1g, Owner 2026-11-22): the
 // sharer's title and note, then only the picked templates and series in the order picked, each
-// with its own way in. Always noindex, never in the sitemap. `viewer` streams the visitor's
+// with its own way in, styled by the route's collection.css (no Tailwind utilities). Always noindex, never in the sitemap. `viewer` streams the visitor's
 // session in (collection-viewer.tsx).
 export function TemplateCollectionPage({ collection, text, viewer }: Props) {
   const tile = { use: text.use, alt: text.alt }
   return (
-    <article className="mk-w px-(--gutter) py-6 md:py-12">
-      <header className="grid max-w-[640px] gap-3">
-        <p className="text-caption font-medium text-muted-foreground">{text.kicker}</p>
-        <h1 className="font-display text-h1 leading-[1.05] tracking-[-0.02em] text-balance">{collection.title ?? text.title}</h1>
-        {collection.note ? <p className="text-body whitespace-pre-line text-pretty text-bone-dim">{collection.note}</p> : null}
-        <p className="text-caption text-muted-foreground">{text.hint}</p>
+    <article className="mk-w tc-page">
+      <header className="tc-head">
+        <p className="tc-kicker">{text.kicker}</p>
+        <h1 className="tc-title">{collection.title ?? text.title}</h1>
+        {collection.note ? <p className="tc-note">{collection.note}</p> : null}
+        <p className="tc-hint">{text.hint}</p>
       </header>
-      <ul className="mt-8 grid grid-cols-1 gap-x-4 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
+      <ul className="tc-grid">
         {collection.entries.map((entry, index) =>
           entry.type === 'series' ? (
             <CollectionSeries key={`series-${entry.series.id}`} series={entry.series} eager={index < 2}
@@ -44,7 +44,7 @@ export function TemplateCollectionPage({ collection, text, viewer }: Props) {
           ),
         )}
       </ul>
-      <p className="pt-8 text-caption text-muted-foreground">{text.illustrative}</p>
+      <p className="tc-hint tc-foot">{text.illustrative}</p>
       {viewer}
     </article>
   )

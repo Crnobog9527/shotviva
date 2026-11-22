@@ -24,7 +24,7 @@ export function UseTemplateLink({ templateId, label, className }: Props) {
       prefetch={false}
       onClick={onClick}
       // Ghost, not the safelight primary: a collection has one per template (The One Primary Rule).
-      className={buttonVariants({ variant: 'glass', size: 'touch', className: `w-full ${className ?? ''}` })}
+      className={buttonVariants({ variant: 'glass', size: 'touch', className: `w-full${className ? ` ${className}` : ''}` })}
     >
       {label}
     </Link>

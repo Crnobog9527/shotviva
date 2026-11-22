@@ -10,6 +10,8 @@ import { SharedTemplateMissing } from '@/modules/image/share-page'
 import { CollectionViewer, CollectionViewerStatus, loadTemplateCollection, TemplateCollectionPage } from '@/modules/image/template-collection-page'
 import { site } from '@/site/site.config'
 
+import './collection.css'
+
 import { giftOf, signedIn } from '../../../t/[templateId]/share-cta-slot'
 import { collectionText, firstCover } from './collection-text'
 
