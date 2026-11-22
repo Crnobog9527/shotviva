@@ -1,4 +1,5 @@
 import 'server-only'
+import { readPoolChoiceOffer } from '@/core/org/pool-choice'
 
 import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -74,9 +75,11 @@ export async function preflightBatch(db: SupabaseClient, userId: string, cells: 
     })),
     readBalance(db, userId),
   ])
+  // An org member pays a batch from the org's paid share only (§6.5, 1897), never their own credits.
+  const offer = await readPoolChoiceOffer(db, userId)
   await assertBatchRoutes(db, groups.map(group => group.route))
   const prices = groups.flatMap(group => group.quotes.map(q => q.price)).sort((a, b) => a.batch_cell.position - b.batch_cell.position)
   const total_credits = prices.reduce((sum, c) => sum + c.expected_credits, 0)
-  if (total_credits > balance.paid) throw new AppError('CREDITS_INSUFFICIENT', 'Paid credits do not cover this batch')
+  if (total_credits > (offer ? offer.paid : balance.paid)) throw new AppError('CREDITS_INSUFFICIENT', 'Paid credits do not cover this batch')
   return { ...batch, total_credits, cells: prices }
 }
