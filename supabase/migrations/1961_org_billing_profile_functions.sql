@@ -47,9 +47,14 @@ declare
   result jsonb;
 begin
   o := public._org_lock_owned(p_owner, true);
-  if v_country = 'CN' and v_tax !~ '^[0-9A-HJ-NPQRTUWXY]{2}[0-9]{6}[0-9A-HJ-NPQRTUWXY]{10}$' then
+  -- Only the places the form offers; Waffo wants a state code (CA, NY, NSW, ON) where the
+  -- country needs one, so those three require it.
+  if v_country not in ('CN','HK','MO','TW','SG','MY','JP','KR','US','GB','AU','CA','DE','FR')
+     or (v_country = 'CN' and v_tax !~ '^[0-9A-HJ-NPQRTUWXY]{2}[0-9]{6}[0-9A-HJ-NPQRTUWXY]{10}$')
+     or (v_country in ('US','CA','AU') and coalesce(upper(v_state), '') !~ '^[A-Z]{2,3}$') then
     raise exception 'INVALID_INPUT';
   end if;
+  if v_country in ('US','CA','AU') then v_state := upper(v_state); end if;
   begin
     insert into public.org_billing_profiles as b (org_id, legal_name, tax_id, country, postcode, state, invoice_email, updated_at, updated_by)
     values (o.id, v_name, v_tax, v_country, v_post, v_state, v_email, now(), p_owner)

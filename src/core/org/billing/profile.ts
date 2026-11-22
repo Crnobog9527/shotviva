@@ -12,6 +12,11 @@ import { callRpc, type RpcClient } from '../../billing/rpc'
 // Mainland China's 统一社会信用代码: 18 characters, no I, O, S, V or Z.
 export const CN_TAX_ID = /^[0-9A-HJ-NPQRTUWXY]{2}[0-9]{6}[0-9A-HJ-NPQRTUWXY]{10}$/
 const OTHER_TAX_ID = /^[0-9A-Z][0-9A-Z./-]{2,39}$/
+// The places the form offers (the SQL function holds the same list). Waffo needs a state code
+// (CA, NY, NSW, ON) for the US, Canada and Australia.
+export const BILLING_COUNTRIES = ['CN', 'HK', 'MO', 'TW', 'SG', 'MY', 'JP', 'KR', 'US', 'GB', 'AU', 'CA', 'DE', 'FR'] as const
+export const STATE_CODE_COUNTRIES: readonly string[] = ['US', 'CA', 'AU']
+const STATE_CODE = /^[A-Z]{2,3}$/
 const NO_CONTROL = /^[^\p{Cc}]*$/u
 
 const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value)
@@ -21,12 +26,14 @@ export const billingProfileInput = z
   .object({
     legalName: z.string().transform((s) => s.trim().replace(/\s+/g, ' ')).pipe(z.string().min(2).max(200).regex(NO_CONTROL)),
     taxId: z.string().transform((s) => s.replace(/\s/g, '').toUpperCase()),
-    country: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/).default('CN'),
+    country: z.string().trim().toUpperCase().pipe(z.enum(BILLING_COUNTRIES)).default('CN'),
     postcode: optional(z.string().trim().regex(/^[0-9A-Za-z][0-9A-Za-z -]{0,15}$/)),
     state: optional(z.string().trim().min(1).max(80).regex(NO_CONTROL)),
     invoiceEmail: optional(z.string().trim().toLowerCase().max(254).pipe(z.email())),
   })
   .refine((p) => (p.country === 'CN' ? CN_TAX_ID : OTHER_TAX_ID).test(p.taxId), { path: ['taxId'] })
+  .refine((p) => !STATE_CODE_COUNTRIES.includes(p.country) || STATE_CODE.test((p.state ?? '').toUpperCase()), { path: ['state'] })
+  .transform((p) => (STATE_CODE_COUNTRIES.includes(p.country) ? { ...p, state: p.state?.toUpperCase() } : p))
 
 export type BillingProfileInput = z.input<typeof billingProfileInput>
 

@@ -30,3 +30,16 @@ describe('billingProfileInput', () => {
     expect(billingProfileInput.safeParse({ ...base, country: 'CHN' }).success).toBe(false)
   })
 })
+
+describe('countries and state codes', () => {
+  const base = { legalName: 'Acme Inc', taxId: '12-3456789', country: 'US' }
+  it('US, Canada and Australia need a 2–3 letter state code, upper-cased', () => {
+    expect(billingProfileInput.safeParse(base).success).toBe(false)
+    expect(billingProfileInput.safeParse({ ...base, state: 'California' }).success).toBe(false)
+    expect(billingProfileInput.parse({ ...base, state: 'ca' }).state).toBe('CA')
+    expect(billingProfileInput.parse({ ...base, country: 'AU', state: 'nsw' }).state).toBe('NSW')
+  })
+  it('only the offered countries', () => {
+    expect(billingProfileInput.safeParse({ ...base, country: 'ZZ', state: 'CA' }).success).toBe(false)
+  })
+})

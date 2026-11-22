@@ -2016,7 +2016,9 @@
           "INVALID": "Something doesn't look right: the company name needs 2–200 characters, a mainland China tax ID is the 18-character unified social credit code, and the email must be complete.",
           "NOT_OWNER": "Only your organisation's primary admin can see and change invoice details.",
           "FAILED": "Something went wrong. Try again."
-        }
+        },
+        "stateCode": "State / province code",
+        "stateCodeHint": "Required for the US, Canada and Australia: the 2–3 letter code, e.g. CA, ON, NSW."
       }
     },
     "templateShare": {

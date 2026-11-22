@@ -10,7 +10,9 @@ import { FIELD } from './parts'
 export type BillingDraft = { legalName: string; taxId: string; country: string; postcode: string; state: string; invoiceEmail: string }
 
 // Mainland China first (most enterprise customers), then the places they most often bill from.
+// Same list as the server's (core/org/billing/profile.ts BILLING_COUNTRIES and the SQL function).
 const COUNTRIES = ['CN', 'HK', 'MO', 'TW', 'SG', 'MY', 'JP', 'KR', 'US', 'GB', 'AU', 'CA', 'DE', 'FR'] as const
+const STATE_CODE = ['US', 'CA', 'AU']
 
 function regionName(locale: string, code: string) {
   try {
@@ -35,8 +37,8 @@ function Field({ label, hint, value, onChange, maxLength, autoComplete, type = '
 export function BillingFields({ draft, set }: { draft: BillingDraft; set: (patch: Partial<BillingDraft>) => void }) {
   const t = useTranslations('app.org.billing')
   const locale = useLocale()
-  const countries = COUNTRIES.includes(draft.country as (typeof COUNTRIES)[number]) ? COUNTRIES : [draft.country, ...COUNTRIES]
   const cn = draft.country === 'CN'
+  const stateCode = STATE_CODE.includes(draft.country)
   return (
     <div className="grid gap-3 md:grid-cols-2">
       <div className="md:col-span-2">
@@ -45,11 +47,11 @@ export function BillingFields({ draft, set }: { draft: BillingDraft; set: (patch
       <label className="grid gap-1 text-label">
         <span className="font-medium">{t('country')}</span>
         <select className={FIELD} value={draft.country} autoComplete="country" onChange={(e) => set({ country: e.target.value })}>
-          {countries.map((code) => <option key={code} value={code}>{regionName(locale, code)}</option>)}
+          {COUNTRIES.map((code) => <option key={code} value={code}>{regionName(locale, code)}</option>)}
         </select>
       </label>
       <Field label={t(cn ? 'taxIdCn' : 'taxId')} hint={t(cn ? 'taxIdCnHint' : 'taxIdHint')} value={draft.taxId} maxLength={40} onChange={(taxId) => set({ taxId: taxId.toUpperCase() })} />
-      <Field label={t('state')} value={draft.state} maxLength={80} autoComplete="address-level1" onChange={(state) => set({ state })} />
+      <Field label={t(stateCode ? 'stateCode' : 'state')} hint={stateCode ? t('stateCodeHint') : undefined} value={draft.state} maxLength={stateCode ? 3 : 80} autoComplete="address-level1" onChange={(state) => set({ state: stateCode ? state.toUpperCase() : state })} />
       <Field label={t('postcode')} value={draft.postcode} maxLength={16} autoComplete="postal-code" onChange={(postcode) => set({ postcode })} />
       <div className="md:col-span-2">
         <Field label={t('invoiceEmail')} hint={t('invoiceEmailHint')} type="email" inputMode="email" value={draft.invoiceEmail} maxLength={254} autoComplete="email" onChange={(invoiceEmail) => set({ invoiceEmail })} />

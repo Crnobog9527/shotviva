@@ -12,7 +12,8 @@ create table public.org_billing_profiles (
   state text check (length(state) between 1 and 80 and state = btrim(state) and state !~ '[[:cntrl:]]'),
   invoice_email text check (length(invoice_email) <= 254 and invoice_email ~ '^[^@[:space:][:cntrl:]]+@[^@[:space:][:cntrl:]]+\.[^@[:space:][:cntrl:]]+$'),
   updated_at timestamptz not null default now(),
-  updated_by uuid not null references public.profiles(id)
+  -- set null, so deleting a former owner's account never fails on this row.
+  updated_by uuid references public.profiles(id) on delete set null
 );
 alter table public.org_billing_profiles enable row level security;
 revoke all on public.org_billing_profiles from public, anon, authenticated, service_role;
@@ -23,7 +24,7 @@ grant select on public.org_billing_profiles to service_role;
 create table public.org_billing_profile_events (
   id bigint generated always as identity primary key,
   org_id uuid not null references public.orgs(id),
-  actor uuid not null references public.profiles(id),
+  actor uuid references public.profiles(id) on delete set null,
   action text not null check (action in ('save', 'clear')),
   profile jsonb,
   created_at timestamptz not null default now(),
