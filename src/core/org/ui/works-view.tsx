@@ -21,7 +21,7 @@ export type DeleteOrgWorkById = (jobId: string) => Promise<{ failed: 'running' |
 function WorkTile({ work, remove }: { work: Work; remove: DeleteOrgWorkById }) {
   const t = useTranslations('app.org.works')
   const format = useFormatter()
-  const who = work.label ?? t('unknown')
+  const who = work.userId ? (work.label ?? t('unknown')) : t('deletedAccounts')
   return (
     <li className="min-w-0">
       <a href={fileHref(work.id)} target="_blank" rel="noopener" aria-label={t('open')} className="block overflow-hidden rounded-inner bg-wash shadow-[inset_0_0_0_1px_var(--border)]">
@@ -34,7 +34,7 @@ function WorkTile({ work, remove }: { work: Work; remove: DeleteOrgWorkById }) {
           <p className="truncate text-label font-medium">{work.templateName ?? work.templateId}</p>
           <p className="truncate text-caption text-muted-foreground">
             {t('madeBy', { who, date: format.dateTime(new Date(work.createdAt), { dateStyle: 'medium' }) })}
-            {work.memberActive ? null : ` · ${t('removed')}`}
+            {work.memberActive || !work.userId ? null : ` · ${t('removed')}`}
           </p>
         </div>
         <DeleteOrgWork action={remove.bind(null, work.id)} name={work.templateName ?? work.templateId} />

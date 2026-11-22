@@ -8,7 +8,7 @@ import { currentOrigin } from '../../request-origin'
 import { nextIn } from '../redirect-target'
 import { clientIp } from '../signup-ip'
 import { requestSignup } from '../signup-request'
-import { STAFF_INVITE_KEY, staffJoinToken } from '../staff-signup'
+import { staffSignupData } from '../staff-signup'
 import { createAdminSupabase } from '../supabase-admin'
 import { createSessionSupabase } from '../supabase-server'
 import { classifyAuthError } from './classify-auth-error'
@@ -35,10 +35,10 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   const locale = await currentLocale()
   // user_metadata.locale picks the language of every auth email this account gets
   // (ARCHITECTURE §7: `{{ if eq .Data.locale "zh" }}` in supabase/templates/*.html).
-  // A sign-up through an org's staff link remembers its token, so a confirmation resent from the
-  // ordinary login page (next = /account) is still a staff sign-up (no signup gift, 1940/1950).
-  const staffInvite = staffJoinToken(next)
-  const data = staffInvite ? { locale, [STAFF_INVITE_KEY]: staffInvite } : { locale }
+  // A sign-up through an org's staff link remembers it (token and org), so a confirmation resent
+  // from the ordinary login page, or one after the org reset its link, is still a staff sign-up
+  // (no signup gift, 1940/1950).
+  const data = { locale, ...(await staffSignupData(createAdminSupabase(), next)) }
   const { error } = await supabase.auth.signUp({
     email,
     password,

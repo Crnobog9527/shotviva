@@ -19,7 +19,9 @@ vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'x-forwarded
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
 vi.mock('../../i18n/server', () => ({ currentLocale: async () => 'zh' }))
 vi.mock('../supabase-server', () => ({ createSessionSupabase: async () => ({ auth: { signInWithOtp: mocks.signInWithOtp, verifyOtp: mocks.verifyOtp } }) }))
-vi.mock('../supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc }) }))
+// orgs lookups for the staff link (core/auth/staff-signup): an active org.
+const orgChain = { select: () => orgChain, eq: () => orgChain, maybeSingle: async () => ({ data: { id: '11111111-2222-4333-8444-555555555555' }, error: null }) }
+vi.mock('../supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc, from: () => orgChain }) }))
 vi.mock('../first-sign-in', () => ({ onVerifiedSignIn: mocks.onVerifiedSignIn }))
 
 const { sendPhoneCode, verifyPhoneCode } = await import('./phone')
@@ -52,7 +54,7 @@ describe('sendPhoneCode', () => {
   it('stores the staff link token on a new account only when the code is asked from a staff link', async () => {
     const token = 'd'.repeat(32)
     await sendPhoneCode(form({ ...ok, next: `/zh/join/org/${token}` }))
-    expect(mocks.signInWithOtp.mock.calls[0]![0].options.data).toMatchObject({ locale: 'zh', staff_invite: token })
+    expect(mocks.signInWithOtp.mock.calls[0]![0].options.data).toMatchObject({ locale: 'zh', staff_invite: token, staff_org: '11111111-2222-4333-8444-555555555555' })
     await sendPhoneCode(form({ ...ok, next: '/zh/account' }))
     expect(mocks.signInWithOtp.mock.calls[1]![0].options.data).not.toHaveProperty('staff_invite')
   })
