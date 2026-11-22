@@ -100,11 +100,14 @@ it('never charges an active member’s own credits: refuses when the org shares 
   expect(await balances(staff)).toMatchObject({ credits: 490 })
 })
 
-it('leaves the org owner on their own credits', async () => {
+it('holds the org owner to the same rule: org shares only, own credits frozen', async () => {
   await seed()
   const { owner } = await member(0, 0)
-  await db.query('update profiles set credits=100 where id=$1', [owner])
-  expect(await generate(owner)).toMatchObject({ credit_pool: 'paid' })
+  await db.query('update profiles set credits=100, free_credits=100 where id=$1', [owner])
+  await refused(db, () => generate(owner), 'ORG_CREDITS_INSUFFICIENT')
+  await db.query("select org_allocate_promo($1,$1,40,'self-promo')", [owner])
+  expect(await generate(owner)).toMatchObject({ credit_pool: 'free' })
+  expect((await db.query('select credits, free_credits from profiles where id=$1', [owner])).rows[0]).toEqual({ credits: 100, free_credits: 130 })
 })
 
 it('charges poster photo extraction from the org shares too', async () => {

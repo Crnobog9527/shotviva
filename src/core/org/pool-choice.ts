@@ -28,7 +28,7 @@ export function offerOf(s: z.infer<typeof seat>, b: z.infer<typeof profile>, now
 export async function readPoolChoiceOffer(db: SupabaseClient, user: string, now = new Date()): Promise<PoolChoiceOffer | null> {
   try {
     const [m, p] = await Promise.all([
-      db.from('org_members').select('held_credits,held_promo_credits,orgs!inner(promo_expires_at)').eq('user_id', user).eq('status', 'active').eq('role', 'member').maybeSingle(),
+      db.from('org_members').select('held_credits,held_promo_credits,orgs!inner(promo_expires_at)').eq('user_id', user).eq('status', 'active').maybeSingle(),
       db.from('profiles').select('credits,free_credits,org_pool_choice').eq('id', user).maybeSingle(),
     ])
     if (m.error || p.error || !m.data || !p.data) return null
