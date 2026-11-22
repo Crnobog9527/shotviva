@@ -1062,7 +1062,9 @@
         "clearGroup": "Clear this group",
         "left": "{fields} still show the sample’s text. Use it anyway?",
         "joiner": ", "
-      }
+      },
+      "orgNeedsCredits": "Your company's credits don't cover this one. Ask your admin to allocate more; your own credits can't be used while you're a member.",
+      "orgShortCta": "Not enough company credits"
     },
     "errors": {
       "NETWORK": "Couldn't reach Shotviva. Check your connection and try again.",
@@ -2172,6 +2174,14 @@
       "revokeYes": "Turn off",
       "revokeFailed": "Could not turn the link off. Try again.",
       "more": "Show more"
+    },
+    "poolChoice": {
+      "title": "Which company credits to use",
+      "promo": "Promotion credits (watermarked, demo only)",
+      "paid": "Paid credits (no watermark, commercial use)",
+      "left": "{count, number} left",
+      "hint": "If the chosen kind runs short, the other kind is never used instead.",
+      "short": "{count, number} left, not enough for this one"
     }
   },
   "paywall": {

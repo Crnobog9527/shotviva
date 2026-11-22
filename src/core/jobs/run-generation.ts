@@ -212,7 +212,14 @@ function jobInputs(req: GenerationRequest, prepared: Prepared, resolution: Resol
     ...(prepared.poster ? { poster: prepared.poster } : {}),
     // Moved into generation_jobs.again_of by the insert trigger, or dropped (1513).
     ...(req.againOf ? { again_of: req.againOf } : {}),
+    ...choiceInput(req),
   }
+}
+
+// 出图时让员工自选 (§6.5): a batch is paid only (§6.2), so a choice goes along with a single web job only.
+export function choiceInput(req: Pick<GenerationRequest, 'poolChoice' | 'source' | 'batchId' | 'batchSize'>) {
+  const single = !req.batchId && (req.batchSize ?? 1) <= 1
+  return req.poolChoice && req.source === 'web' && single ? { pool_choice: req.poolChoice } : {}
 }
 
 // What reserve_credits takes straight from the request.

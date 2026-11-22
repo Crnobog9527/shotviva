@@ -177,6 +177,33 @@ describe.each(['en', 'zh'] as const)('promotion pool (%s)', (locale) => {
   })
 })
 
+describe.each(['en', 'zh'] as const)('pool choice picker (%s)', (locale) => {
+  it('shows both kinds with what is left of each, and nothing when there is no choice', async () => {
+    const { PoolChoicePicker, PoolChoiceSlot } = await import('@/modules/image/workspace/pool-choice-picker')
+    const { text, html, errors } = render(locale, createElement(PoolChoicePicker, { offer: { paid: 1200, promo: 3400, last: 'promo' }, value: 'promo', onChange: () => {} }))
+    expect(errors).toEqual([])
+    expect(text).toContain(locale === 'en' ? 'Promotion credits (watermarked, demo only)' : '推广积分（带水印，仅供演示）')
+    expect(text).toContain(locale === 'en' ? 'Paid credits (no watermark, commercial use)' : '付费积分（无水印，可商用）')
+    expect(text).toContain('3,400')
+    expect(text).toContain('1,200')
+    expect(html.match(/checked=""/g)).toHaveLength(1)
+    expect(render(locale, createElement(PoolChoiceSlot, { choice: null })).html).toBe('')
+    // A kind that cannot cover this job is shown but cannot be picked.
+    const short = render(locale, createElement(PoolChoicePicker, { offer: { paid: 5, promo: 3400, last: 'paid' }, value: 'promo', onChange: () => {}, cost: 20 }))
+    expect(short.html.match(/disabled=""/g)).toHaveLength(1)
+    expect(short.text).toContain(locale === 'en' ? 'not enough for this one' : '不够这一张')
+  })
+
+  it('asks an org member to go to the admin instead of opening the paywall when the org credits are short', async () => {
+    const { FormAction } = await import('@/modules/image/workspace/form-action')
+    const state = { kind: 'get-credits' as const, cost: 20, needed: 10, count: 1 }
+    const member = render(locale, createElement(FormAction, { state, resolution: '1k', batch: false, onGenerate: () => {}, orgOnly: true }))
+    expect(member.errors).toEqual([])
+    expect(member.text).toContain(locale === 'en' ? 'Ask your admin to allocate more' : '请找管理员分配额度')
+    expect(member.html).toContain('disabled')
+  })
+})
+
 describe.each(['en', 'zh'] as const)('join confirmation (%s)', (locale) => {
   it('asks for the click and never joins on its own', () => {
     // Joining always takes the click (review of #829): rendering the form never joins.

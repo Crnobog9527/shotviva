@@ -16,6 +16,10 @@ export type RpcClient = {
 // SQL functions raise these exception messages (supabase/migrations/0023–0026, 0141–0142).
 const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   CREDITS_INSUFFICIENT: 'CREDITS_INSUFFICIENT',
+  // The member chose a kind of org credits that cannot cover the price (1897); never the other kind.
+  POOL_CHOICE_INSUFFICIENT: 'CREDITS_INSUFFICIENT',
+  // An org member whose org credits cannot cover the job (1897); their own credits are never used.
+  ORG_CREDITS_INSUFFICIENT: 'CREDITS_INSUFFICIENT',
   INVALID_INPUT: 'INVALID_INPUT',
   PROFILE_NOT_FOUND: 'NOT_FOUND',
   JOB_NOT_FOUND: 'NOT_FOUND',

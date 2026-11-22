@@ -13,7 +13,7 @@ import { createMemoryStore } from '../fakes/memory-store'
 import { seedTemplate } from './generation-fixtures'
 import { connectAdmin, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
-import { account, adminAccount, member, orgWith } from './org-fixtures'
+import { account, creditsOf, adminAccount, member, orgWith } from './org-fixtures'
 
 // 企业作品 (migrations 1941–1943, Owner 2026-11-22): a work an active member pays for with org
 // credits belongs to the org. It is stamped at reserve, never public, listed for the org's owner
@@ -75,16 +75,16 @@ describe('stamping', () => {
     expect(await job(id)).toMatchObject({ org_id: orgId, org_access_ended_at: null, visibility: 'private', gallery_excluded: true })
   })
 
-  it('leaves a work paid with the person’s own credits personal', async () => {
+  it('charges an active member only from the org, never their own credits; outsiders stay personal (§6.5, #838)', async () => {
     const { orgId, owner, token } = await orgWith(db, service, actor, { pool: cost * 2 })
     const staff = await member(db, service, token, { credits: cost * 3 })
     await allocateOrgCredits(service, owner, staff, cost, randomUUID())
-    // Own credits are spent first (held credits sit under them): the first two are personal.
-    const own = await made(staff, { visibility: 'public' })
-    expect(await job(own)).toMatchObject({ org_id: null, visibility: 'public', gallery_excluded: false })
+    // An active member's own credits are frozen: the job is the org's, their own 3 × cost stay.
+    const id = await made(staff, { visibility: 'public' })
+    expect(await job(id)).toMatchObject({ org_id: orgId, visibility: 'private', gallery_excluded: true })
+    expect(await creditsOf(db, staff)).toBe(cost * 3)
     const outsider = await account(db, service, { credits: cost })
     expect(await job(await made(outsider))).toMatchObject({ org_id: null })
-    void orgId
   })
 
   it('never takes org_id from the caller and never changes it afterwards', async () => {
@@ -223,10 +223,12 @@ describe('leaving the org', () => {
   })
 
   it('leaves links without the org’s works alone', async () => {
-    const { owner, staff } = await staffed()
-    await db.query('update public.profiles set credits = credits + $2 where id = $1', [staff, cost * 10])
+    // A personal work made before joining (an active member only spends org credits, §6.5).
+    const { owner, token } = await orgWith(db, service, actor, { pool: cost * 2 })
+    const staff = await account(db, service, { credits: cost * 10 })
     const own = await made(staff)
     expect((await job(own)).org_id).toBeNull()
+    await joinOrg(service, staff, token)
     const shareId = await createWorkShare(service, staff, { jobIds: [own] })
     await removeOrgMember(service, owner, staff, randomUUID())
     expect((await readWorkShare(service, shareId))?.items).toHaveLength(1)

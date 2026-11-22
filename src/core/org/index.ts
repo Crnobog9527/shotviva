@@ -41,3 +41,4 @@ export {
   type PoolMonth,
   type PromoMove,
 } from './promo-actions'
+export { readPoolChoiceOffer, spendableBalance } from './pool-choice'

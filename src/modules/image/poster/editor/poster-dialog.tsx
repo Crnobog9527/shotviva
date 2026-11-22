@@ -1,11 +1,13 @@
 'use client'
 
+
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { ActionBar } from '@/core/app-shell/action-bar'
-import type { Balance } from '@/core/billing/pools'
+import { bothKinds, chosenBalance, coveringChoice, orgBalance, type Balance, type PoolChoice, type PoolChoiceOffer } from '@/core/billing/pools'
 import { useRouter } from '@/core/i18n'
+import { setCredits } from '@/core/templates/set-price'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
 import type { CatalogueTemplate } from '../../catalogue/catalogue-template'
@@ -18,8 +20,11 @@ import { usePosterWeekly } from '../use-poster-weekly'
 import { studioFor, useStudioTemplate } from '../use-studio-template'
 import { PosterSample } from './poster-sample'
 import { StudioBar, StudioForm } from './poster-studio'
+import { PoolChoiceMount } from '../../workspace/pool-choice-mount'
 
-type Context = { balance: Balance; concurrency: number }
+
+// poolChoice: 出图时让员工自选 (§6.5), only when the member holds both kinds of org credits.
+type Context = { balance: Balance; concurrency: number; poolChoice?: PoolChoiceOffer | null }
 type Switcher = { series: PosterSeries | null; onSwitch(id: string): void }
 type Props = Context & Switcher & { id: string | null; summary: CatalogueTemplate | null; onClose(): void }
 
@@ -41,15 +46,20 @@ export function PosterDialog({ id, summary, series, onSwitch, onClose, ...contex
 
 type SheetProps = Context & Switcher & { template: StudioTemplate; summary: CatalogueTemplate | null; open: boolean; onClose(): void }
 
-function PosterSheet({ template, summary, open, series, onSwitch, onClose, balance, concurrency }: SheetProps) {
+function PosterSheet({ template, summary, open, series, onSwitch, onClose, balance: held, concurrency, poolChoice = null }: SheetProps) {
   const t = useTranslations('app.poster')
   const tApp = useTranslations('app')
   const router = useRouter()
+  // The studio reads the kind at Generate time; it depends on the set's total, known only from the studio.
+  const chosen = useRef<PoolChoice | undefined>(undefined)
   // Generate queues every poster of the set and moves to Photos, where they develop.
   const studio = usePosterStudio(template, concurrency, () => {
     onClose()
     router.push('/photos', { transitionTypes: navTypesFor('/photos') })
-  })
+  }, () => chosen.current)
+  const choice = usePosterChoice(poolChoice, held, setCredits(template.creditsCost[studio.resolution], studio.parts.length))
+  useEffect(() => { chosen.current = choice.value }, [choice.value])
+  const balance = choice.balance
   // 用上一期 reads this style and the series' others; their names say where it came from.
   const members = series?.members ?? []
   const weekly = usePosterWeekly(template, studio, members.map((member) => member.id).filter((id) => id !== template.id))
@@ -69,8 +79,22 @@ function PosterSheet({ template, summary, open, series, onSwitch, onClose, balan
           onChange={(next) => { carryDraft(template.id, next); onSwitch(next) }} />
       ) : undefined}
       sample={<PosterSample cover={summary?.cover ?? null} name={template.name} />}
-      form={<StudioForm studio={studio} template={template} balance={balance} reuse={{ weekly, names, photo }} />}
+      form={<>
+        <StudioForm studio={studio} template={template} balance={balance} photoBalance={poolChoice ? orgBalance(poolChoice) : held} reuse={{ weekly, names, photo }} />
+        <PoolChoiceMount choice={choice.picker} />
+      </>}
       bar={<ActionBar inline><StudioBar studio={studio} template={template} balance={balance} /></ActionBar>}
     />
   )
+}
+
+// Every poster of the set is paid with the chosen kind; an org member spends only the org's shares
+// (their own credits are frozen), so the bar checks those.
+// The pick (or the remembered one) when it covers the whole set, else the kind that does.
+function usePosterChoice(offer: PoolChoiceOffer | null, held: Balance, cost: number) {
+  const [picked, set] = useState<PoolChoice>(offer?.last ?? 'paid')
+  if (!offer) return { picker: null, balance: held, value: undefined }
+  if (!bothKinds(offer)) return { picker: null, balance: orgBalance(offer), value: undefined }
+  const value = coveringChoice(offer, picked, cost)
+  return { picker: { offer, value, set, cost }, balance: chosenBalance(orgBalance(offer), value), value }
 }

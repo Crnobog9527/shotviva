@@ -1,5 +1,6 @@
 'use client'
 
+import { orgBalance } from '@/core/billing/pools'
 import dynamic from 'next/dynamic'
 import { useState } from 'react'
 
@@ -39,7 +40,8 @@ export function BatchDialogSlot({ templates, browse, create }: Props) {
       requested={query.templateIds}
       templates={templates}
       browse={browse}
-      balance={create.balance}
+      // An org member pays a batch from the org's paid share only (§6.5).
+      balance={create.poolChoice ? orgBalance(create.poolChoice) : create.balance}
       tier={create.tier}
       batch={create.batch}
       limit={create.concurrency.limit}
