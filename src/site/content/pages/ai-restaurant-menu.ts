@@ -8,7 +8,7 @@ import { site } from '../../site.config'
 import { caseImage, CATEGORY, sizeCountWord, withFirstFrame } from '../landing-shared'
 import { pricingRelated } from '../shared'
 import {
-  foodHalfDayUsd,
+  foodShootUsd,
   freeImagesLabel,
   FreeImagesShort,
   MENU_DISHES,
@@ -36,13 +36,13 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
     intro: `${MENU_DISHES} dishes for a menu and a delivery app. The same job, two bills.`,
     photographer: {
       title: "A food photographer's quote",
-      total: { amount: usdRange(foodHalfDayUsd), when: 'a half-day shoot, plus edits' },
+      total: { amount: usdRange(foodShootUsd), when: 'one shoot, plus edits' },
       lines: [
-        { label: 'Half-day food shoot', value: usdRange(foodHalfDayUsd) },
-        { label: 'Food stylist', value: 'usually extra' },
+        { label: 'Food photography session', value: usdRange(foodShootUsd) },
+        { label: 'Styling, props, licensing', value: 'often extra' },
         { label: 'Booking, shoot, edits', value: 'days' },
       ],
-      fine: `Published US half-day food photography rates, 2025–2026 (PricingLink, Jobbers, FoodShot): about ${usdRange(foodHalfDayUsd)}; food stylists are usually billed separately. Your quotes will vary.`,
+      fine: `Published US food photography rates, 2025–2026 (PricingLink, FoodShot): about ${usdRange(foodShootUsd)} a session; styling, props and licensing often cost extra. Your quotes will vary.`,
     },
     site: {
       title: brand,
@@ -150,7 +150,7 @@ export const makeAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
     },
     {
       question: 'How much does a food photographer cost?',
-      answer: `Published US rates are about ${usdRange(foodHalfDayUsd)} for a half day, with a food stylist usually billed separately. ${brand} makes a menu photo from your phone shot in about ${photoSeconds} seconds. ${plansSentence(offers)}`,
+      answer: `Published US rates are about ${usdRange(foodShootUsd)} a session, with styling, props and licensing often billed on top. ${brand} makes a menu photo from your phone shot in about ${photoSeconds} seconds. ${plansSentence(offers)}`,
     },
     {
       question: 'Do I need to write prompts?',

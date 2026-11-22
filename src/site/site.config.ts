@@ -158,14 +158,16 @@ export const site = defineSite({
   // pages, read 2026-11-06). Develop time is one round figure, "about 30 seconds", for every
   // quality (Owner 2026-11-21, was 60 from 2026-11-06; real runs are about 30 s). T44, sources read
   // 2026-11-06 (side-session-notes landing-fact-sources): a studio day $500–$3,000 (Shopify,
-  // Jan 2026); a US half-day food shoot $400–$2,500 (PricingLink Apr 2025, Jobbers, FoodShot
-  // Mar 2026), food stylist extra.
+  // Jan 2026). A US food photography session $300–$2,500 (Owner 2026-11-22, same figure as the
+  // blog): FoodShot's guide, Mar 2026, $300–$2,500 a session with styling, props and licensing
+  // often 40–60% extra; PricingLink, Apr 2025, a half day $800–$2,500+. Jobbers was dropped: its
+  // figure could not be verified.
   marketing: {
     photographer: {
       styledShotUsd: { low: 50, high: 350 },
       packshotUsd: { low: 15, high: 90 },
       dayRateUsd: { low: 500, high: 3000 },
-      foodHalfDayUsd: { low: 400, high: 2500 },
+      foodShootUsd: { low: 300, high: 2500 },
     },
     photoSecondsApprox: 30,
     examplePhotoCredits: { product: 74, menu: 74, poster: 45 },

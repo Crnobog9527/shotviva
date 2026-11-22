@@ -7,7 +7,7 @@ import { defineContentPage, type CostBills, type ShootDemo } from '@/core/conten
 import { site } from '../../../site.config'
 import { caseImage, CATEGORY, SIZE_COUNT, withFirstFrame } from '../../landing-shared'
 import { zhPricingRelated } from '../shared'
-import { foodHalfDayUsd, MENU_DISHES, photoSeconds, usd, usdRange } from '../../offer'
+import { foodShootUsd, MENU_DISHES, photoSeconds, usd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
 import { planLabel, ZH_TIERS, zhFreeImages, zhPlansSentence, zhTierList } from '../offer'
 
@@ -25,13 +25,13 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
     intro: `${MENU_DISHES} 道菜，做菜单和外卖平台用。同样的活，两张账单。`,
     photographer: {
       title: '美食摄影师报价',
-      total: { amount: usdRange(foodHalfDayUsd), when: '拍半天，另加修图' },
+      total: { amount: usdRange(foodShootUsd), when: '拍一次，另加修图' },
       lines: [
-        { label: '半天美食拍摄', value: usdRange(foodHalfDayUsd) },
-        { label: '食物造型师', value: '通常另算' },
+        { label: '一次美食拍摄', value: usdRange(foodShootUsd) },
+        { label: '造型、道具、授权', value: '常常另算' },
         { label: '预约、拍摄、修图', value: '几天' },
       ],
-      fine: `美国 2025～2026 年公开的半天美食拍摄价格（PricingLink、Jobbers、FoodShot）：大约 ${usdRange(foodHalfDayUsd)}；食物造型师通常另外收费。实际报价因人而异。`,
+      fine: `美国 2025～2026 年公开的美食拍摄价格（PricingLink、FoodShot）：每次大约 ${usdRange(foodShootUsd)}；造型、道具和图片授权常常另外收费。实际报价因人而异。`,
     },
     site: {
       title: brand,
@@ -138,7 +138,7 @@ export const makeZhAiRestaurantMenu = (offers: OfferFacts) => defineContentPage(
     },
     {
       question: '请美食摄影师要多少钱？',
-      answer: `按美国的公开报价，拍半天大约 ${usdRange(foodHalfDayUsd)}，食物造型师通常另外收费。${brand} 用你的手机照片，大约 ${photoSeconds} 秒做好一张菜单图。${zhPlansSentence(offers)}`,
+      answer: `按美国的公开报价，拍一次大约 ${usdRange(foodShootUsd)}，造型、道具和授权常常另外收费。${brand} 用你的手机照片，大约 ${photoSeconds} 秒做好一张菜单图。${zhPlansSentence(offers)}`,
     },
     {
       question: '要自己写提示词吗？',
