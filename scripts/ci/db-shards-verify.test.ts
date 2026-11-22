@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -91,5 +91,29 @@ describe('db-shards-verify', () => {
     mkdirSync(join(db, 'sub'), { recursive: true })
     for (const name of ['b.test.ts', 'a.test.ts', 'helpers.ts', 'sub/d.test.ts']) writeFileSync(join(db, name), '')
     expect(expectedFiles(db)).toEqual(['tests/db/a.test.ts', 'tests/db/b.test.ts', 'tests/db/sub/d.test.ts'])
+  })
+})
+
+// The [auto] schema.sql commit (scripts/ci/schema-commit.sh) carries this run's "supabase db tests"
+// result although the shards tested the branch's out-of-date schema.sql. That holds only while
+// the local database is built from the migrations alone and no DB test reads schema.sql.
+describe('DB test results carry onto the regenerated schema.sql commit', () => {
+  const root = join(import.meta.dirname, '..', '..')
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)])
+
+  it('builds the local database from the migrations only (no declarative schema)', () => {
+    const config = readFileSync(join(root, 'supabase', 'config.toml'), 'utf8')
+    const section = config.split(/^\[/m).find((part) => part.startsWith('db.migrations]'))
+    expect(section, '[db.migrations] in supabase/config.toml').toBeDefined()
+    expect(section).toMatch(/^schema_paths\s*=\s*\[\s*\]\s*$/m)
+  })
+
+  it('has no DB or release test that reads schema.sql', () => {
+    const readers = ['db', 'release']
+      .flatMap((dir) => walk(join(root, 'tests', dir)))
+      .filter((path) => readFileSync(path, 'utf8').includes('schema.sql'))
+    expect(readers).toEqual([])
   })
 })
