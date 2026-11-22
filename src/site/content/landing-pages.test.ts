@@ -78,9 +78,10 @@ describe('landing pages', () => {
     for (const page of [commercialPhotography, aiRestaurantMenu]) expect(page.landing.factsNote).toMatch(/November 2026/)
   })
 
-  it('bills the menu from config: a half day $400–$2,500 against 10 dishes at Standard', () => {
+  it('bills the menu from config: a $300–$2,500 shoot against 10 dishes at Standard', () => {
     const { photographer, site: us } = aiRestaurantMenu.costBills
-    expect(photographer.total.amount).toBe('$400–$2,500')
+    expect(photographer.total.amount).toBe('$300–$2,500')
+    expect(photographer.fine).not.toMatch(/Jobbers|half.day/i)
     expect(photographer.lines.map((line) => line.label).join(' ')).not.toMatch(/retouch/i)
     expect(us.lines.map((line) => line.value)).toEqual(['$19.90', 'One phone photo per dish', 'Menu photos, delivery listings and promo posters'])
     expect(us.total.when).toBe(`about ${site.marketing.photoSecondsApprox} seconds a photo`)
