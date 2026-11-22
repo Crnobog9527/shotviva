@@ -82,7 +82,7 @@ describe('verifyPhoneCode', () => {
     mocks.verifyOtp.mockResolvedValueOnce({ data: { user: { id: 'u1', user_metadata: { locale: 'zh' } } }, error: null })
     await expect(verifyPhoneCode(form({ phone: '+8614000000001', code: '402913', next: '/zh/generate' }), benefits)).rejects.toThrow('redirect:/zh/generate')
     expect(mocks.verifyOtp).toHaveBeenCalledWith({ phone: '+8614000000001', token: '402913', type: 'sms' })
-    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('u1', benefits, 'phone', 'zh')
+    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('u1', benefits, 'phone', 'zh', '/zh/generate')
   })
 
   it('says a wrong or expired code plainly and signs nobody in', async () => {

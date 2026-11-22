@@ -22,14 +22,14 @@ describe('landOnSession: account language (ARCHITECTURE §7)', () => {
     const { supabase, updateUser } = client(GOOGLE)
     await landOnSession(supabase, 'oauth', benefits, '/zh/account')
     expect(updateUser).toHaveBeenCalledExactlyOnceWith({ data: { locale: 'zh' } })
-    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('g1', benefits, 'google', 'zh')
+    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('g1', benefits, 'google', 'zh', '/zh/account')
   })
 
   it('never overwrites a language the account already has', async () => {
     const { supabase, updateUser } = client({ ...GOOGLE, user_metadata: { locale: 'en' } })
     await landOnSession(supabase, 'oauth', benefits, '/zh/account')
     expect(updateUser).not.toHaveBeenCalled()
-    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('g1', benefits, 'google', 'en')
+    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('g1', benefits, 'google', 'en', '/zh/account')
   })
 
   it('leaves email links alone: sign-up wrote the language already', async () => {

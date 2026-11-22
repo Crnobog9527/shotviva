@@ -72,7 +72,7 @@ export async function verifyPhoneCode(form: FormData, options: PhoneSignInOption
   const supabase = await createSessionSupabase()
   const { data, error } = await supabase.auth.verifyOtp({ phone: phone.e164, token: parsed.data.code, type: 'sms' })
   if (error || !data.user) return failed(verifyError(error))
-  await onVerifiedSignIn(data.user.id, options, 'phone', metadataLocale(data.user) ?? (await currentLocale()))
+  await onVerifiedSignIn(data.user.id, options, 'phone', metadataLocale(data.user) ?? (await currentLocale()), parsed.data.next)
   redirect(sanitizeNext(parsed.data.next))
 }
 

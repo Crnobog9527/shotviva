@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   recordSignupIp: vi.fn(),
   grantSignupCredits: vi.fn(),
   noteSignupGift: vi.fn(),
+  staff: vi.fn().mockResolvedValue(false),
 }))
 
 vi.mock('../affiliate/referral', () => ({ bindReferral: mocks.bind }))
@@ -20,6 +21,7 @@ vi.mock('next/headers', () => ({ headers: mocks.headers, cookies: async () => ne
 vi.mock('../analytics', () => ({ track: mocks.track }))
 vi.mock('../alerts', () => ({ noteSignupGift: mocks.noteSignupGift }))
 vi.mock('./supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
+vi.mock('./staff-signup', () => ({ isStaffSignup: mocks.staff }))
 vi.mock('./free-credits', () => ({ billingGrant: () => vi.fn(), grantSignupCredits: mocks.grantSignupCredits }))
 vi.mock('./signup-ip', async (original) => ({
   ...(await original<typeof import('./signup-ip')>()),
@@ -43,6 +45,16 @@ describe('onVerifiedSignIn', () => {
     expect(mocks.track).toHaveBeenCalledExactlyOnceWith('signup', { method: 'email', code_kind: null }, { distinctId: 'u1', locale: 'zh' })
     // 1350: a new account checks the day's gift count for the Owner alert.
     expect(mocks.noteSignupGift).toHaveBeenCalledOnce()
+  })
+
+  it('gives a staff-link signup no free credits and asks for no pending gift', async () => {
+    mocks.recordSignupIp.mockResolvedValue(true)
+    mocks.grantSignupCredits.mockResolvedValue(false)
+    mocks.staff.mockResolvedValueOnce(true)
+    await onVerifiedSignIn('u1', benefits, 'email', 'zh', '/zh/join/org/' + 'a'.repeat(32))
+    expect(mocks.staff).toHaveBeenCalledWith({}, '/zh/join/org/' + 'a'.repeat(32))
+    expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', 0)
+    expect(mocks.claimQuietly).not.toHaveBeenCalled()
   })
 
   it('does not track a later sign-in, even when a failed gift is retried then', async () => {

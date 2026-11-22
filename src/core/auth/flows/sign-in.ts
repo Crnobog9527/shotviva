@@ -34,7 +34,7 @@ export async function signInWithPassword(form: FormData, options: SignInOptions)
     await supabase.auth.signOut({ scope: 'local' })
     return failed('AUTH_EMAIL_NOT_CONFIRMED')
   }
-  await onVerifiedSignIn(data.user.id, options, 'email', metadataLocale(data.user) ?? (await currentLocale()))
+  await onVerifiedSignIn(data.user.id, options, 'email', metadataLocale(data.user) ?? (await currentLocale()), fields.next)
   redirect(sanitizeNext(fields.next))
 }
 

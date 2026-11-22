@@ -2241,6 +2241,7 @@
     "codeMonths": "前 {months} 个月",
     "codeEvery": "每期",
     "codeCheckoutFloor": "按当前价格，这个商品不能使用此优惠。请选择其他适用商品。",
+    "orgMemberCheckout": "你的账号属于企业，出图用企业积分，不能自己购买。需要更多积分请联系企业主管理员。",
     "codeCheckoutChanged": "价格或优惠已更新，请确认最新价格后重试。",
     "codeCheckoutInUse": "这份优惠正在另一个结账页面使用。请返回原页面完成或取消付款，再重试。",
     "fineDiscount": "{term} {price}，之后每{period, select, year {年} other {月}} {original} · 可随时取消 · 美元"

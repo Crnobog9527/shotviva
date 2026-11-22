@@ -14,6 +14,7 @@ import { billingGrant, grantSignupCredits } from './free-credits'
 import { consumeSignupCode, type SignupBenefits } from './signup-code'
 import { claimQuietly } from './signup-gift-claim'
 import { clientIp, recordSignupIp } from './signup-ip'
+import { isStaffSignup } from './staff-signup'
 import { createAdminSupabase } from './supabase-admin'
 
 export type SignInMethod = 'email' | 'google' | 'phone'
@@ -53,14 +54,17 @@ export async function onVerifiedSignIn(
   benefits: SignupBenefits,
   method: SignInMethod,
   locale: Locale,
+  next?: string | null,
 ): Promise<void> {
   const admin = createAdminSupabase()
   const address = clientIp(await headers())
   const ipStored = await recordSignupIp(admin, userId, address)
-  const granted = await grantSignupCredits(billingGrant(admin), userId, benefits.freeCredits)
+  // An org's staff link (next = /join/org/<token>) signs up a staff account: no free credits.
+  const gift = (await isStaffSignup(admin, next)) ? 0 : benefits.freeCredits
+  const granted = await grantSignupCredits(billingGrant(admin), userId, gift)
   // 1480: an account over the per-network allowance is pending; a confirmed phone or a linked
   // Google account pays it now (a phone or Google sign-up, or a Google account just linked).
-  const claimed = !granted && benefits.freeCredits > 0 && (await claimQuietly(admin, userId))
+  const claimed = !granted && gift > 0 && (await claimQuietly(admin, userId))
   const first = address ? ipStored : granted
   if (claimed && !first) noteSignupGift()
   const jar = await cookies()
