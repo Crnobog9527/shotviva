@@ -57,8 +57,9 @@ async function EnterpriseHeader({ account }: { account: Account }) {
 // The two areas of an org owner (console and affiliate), then the dashboard's own views.
 async function EnterpriseNav({ view, teamEnabled }: { view: View; teamEnabled: boolean }) {
   const [t, org] = await Promise.all([getTranslations('affiliate'), getTranslations('app.org')])
+  // One column wrapper, so the area switch and the views share the side column on desktop.
   return (
-    <>
+    <div className="af-side">
       <nav className="af-nav" aria-label={org('tabs.label')}>
         <Link href="/account/enterprise">{org('tabs.console')}</Link>
         <Link href="/partners/enterprise" aria-current="page">{org('tabs.affiliate')}</Link>
@@ -68,6 +69,6 @@ async function EnterpriseNav({ view, teamEnabled }: { view: View; teamEnabled: b
           <Link key={v} href={viewHref({ view: v })} aria-current={view === v ? 'page' : undefined}>{t('nav.' + v)}</Link>
         ))}
       </nav>
-    </>
+    </div>
   )
 }

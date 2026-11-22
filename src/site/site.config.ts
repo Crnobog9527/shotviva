@@ -64,6 +64,8 @@ export const site = defineSite({
       '/account',
       // The Purchases list's receipt / invoice redirect (T80), so /zh links reach it.
       '/account/purchases/[paymentId]/[document]',
+      // The enterprise owner's console (ARCHITECTURE §6.5, card E4), so Chinese owners reach it.
+      '/account/enterprise',
       '/wishlist',
       '/wishlist/new',
       '/wishlist/mine',

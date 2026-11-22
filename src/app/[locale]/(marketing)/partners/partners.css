@@ -272,9 +272,14 @@
   }
   .af-nav a[aria-current='page'] { background: var(--foreground); color: var(--background); box-shadow: none; }
   .af-dash-body { display: grid; gap: 20px; min-width: 0; }
+  /* The enterprise dashboard's two navs (area switch, then views) as one grid item. */
+  .af-side { display: grid; gap: 20px; min-width: 0; }
   @media (min-width: 960px) {
     .af-dash { grid-template-columns: 208px minmax(0, 1fr); column-gap: 40px; row-gap: 28px; }
     .af-dash-head { grid-column: 1 / -1; }
+    .af-side { position: sticky; top: 88px; align-self: start; gap: 16px; }
+    .af-side .af-nav { position: static; }
+    .af-side .af-nav + .af-nav { padding-top: 16px; border-top: 1px solid var(--border); }
     .af-nav { flex-direction: column; margin: 0; padding: 0; overflow: visible; position: sticky; top: 88px; align-self: start; gap: 2px; }
     .af-nav a { min-height: 44px; padding: 0 14px; border-radius: 12px; background: none; box-shadow: none; }
     .af-nav a:hover { background: var(--wash); color: var(--foreground); }
