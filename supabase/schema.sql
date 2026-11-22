@@ -4546,6 +4546,102 @@ $$;
 ALTER FUNCTION "public"."_org_signup_bonus"() OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
+    "id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "module" "text" NOT NULL,
+    "template_id" "text" NOT NULL,
+    "inputs" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "provider" "text",
+    "source" "text" NOT NULL,
+    "idempotency_key" "text",
+    "status" "text" DEFAULT 'running'::"text" NOT NULL,
+    "visibility" "text" NOT NULL,
+    "credits_cost" integer NOT NULL,
+    "output_key" "text",
+    "error_code" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "finished_at" timestamp with time zone,
+    "credit_pool" "text" NOT NULL,
+    "parent_job_id" "uuid",
+    "provider_usage" "jsonb",
+    "cost_usd" numeric(10,6),
+    "deleted_at" timestamp with time zone,
+    "client_ip" "inet",
+    "downloaded_at" timestamp with time zone,
+    "download_ip" "inet",
+    "download_count" integer DEFAULT 0 NOT NULL,
+    "batch_id" "uuid",
+    "moderation_status" "text" DEFAULT 'pending'::"text" NOT NULL,
+    "moderation_reason" "text",
+    "moderation_categories" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "auto_moderated_at" timestamp with time zone,
+    "moderated_at" timestamp with time zone,
+    "moderated_by" "uuid",
+    "screen_attempts" integer DEFAULT 0 NOT NULL,
+    "last_screen_at" timestamp with time zone,
+    "gallery_excluded" boolean DEFAULT false NOT NULL,
+    "again_of" "uuid",
+    "org_id" "uuid",
+    "org_access_ended_at" timestamp with time zone,
+    CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
+    CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
+    CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
+    CONSTRAINT "generation_jobs_credit_pool_check" CHECK (("credit_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
+    CONSTRAINT "generation_jobs_credits_cost_check" CHECK (("credits_cost" > 0)),
+    CONSTRAINT "generation_jobs_download_count_check" CHECK (("download_count" >= 0)),
+    CONSTRAINT "generation_jobs_free_work_public" CHECK ((("credit_pool" = 'paid'::"text") OR ("visibility" = 'public'::"text") OR "gallery_excluded")),
+    CONSTRAINT "generation_jobs_moderation_reason_check" CHECK (("moderation_reason" = ANY (ARRAY['auto'::"text", 'sexual'::"text", 'violence'::"text", 'hate'::"text", 'minor'::"text", 'privacy'::"text", 'ip'::"text", 'spam'::"text", 'quality'::"text", 'other'::"text"]))),
+    CONSTRAINT "generation_jobs_moderation_status_check" CHECK (("moderation_status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text"]))),
+    CONSTRAINT "generation_jobs_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
+    CONSTRAINT "generation_jobs_provider_usage_object" CHECK ((("provider_usage" IS NULL) OR ("jsonb_typeof"("provider_usage") = 'object'::"text"))),
+    CONSTRAINT "generation_jobs_screen_attempts_check" CHECK (("screen_attempts" >= 0)),
+    CONSTRAINT "generation_jobs_source_check" CHECK (("source" = ANY (ARRAY['web'::"text", 'graylum'::"text"]))),
+    CONSTRAINT "generation_jobs_status_check" CHECK (("status" = ANY (ARRAY['running'::"text", 'succeeded'::"text", 'failed'::"text"]))),
+    CONSTRAINT "generation_jobs_visibility_check" CHECK (("visibility" = ANY (ARRAY['public'::"text", 'private'::"text"])))
+);
+
+
+ALTER TABLE "public"."generation_jobs" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."generation_jobs"."deleted_at" IS 'When the owner deleted this work (T41). Set only by delete_own_job; user-facing reads skip it.';
+
+
+
+COMMENT ON COLUMN "public"."generation_jobs"."again_of" IS 'Make again: the caller''s own succeeded work, same template, this job was made again from (1513). Null otherwise.';
+
+
+
+COMMENT ON COLUMN "public"."generation_jobs"."org_id" IS 'The org whose credits paid for this work (企业作品, 1941). Set once at insert from org_held_draws; never public.';
+
+
+
+COMMENT ON COLUMN "public"."generation_jobs"."org_access_ended_at" IS 'When the maker left org_id (1941). Non-null: the work is hidden from the maker, their shares and files.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_work_mark_deleted"("p_job" "public"."generation_jobs", "p_actor" "uuid") RETURNS "public"."generation_jobs"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_job public.generation_jobs;
+begin
+  update public.generation_jobs
+     set deleted_at = now(), inputs = inputs - 'note' - 'copy' - 'instruction'
+   where id = p_job.id
+  returning * into v_job;
+  insert into public.org_work_deletions (job_id, org_id, maker_user_id, deleted_by)
+  values (p_job.id, p_job.org_id, p_job.user_id, p_actor)
+  on conflict (job_id) do nothing;
+  return v_job;
+end $$;
+
+
+ALTER FUNCTION "public"."_org_work_mark_deleted"("p_job" "public"."generation_jobs", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_work_stamp"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -4574,6 +4670,12 @@ begin
     if new.again_of is not null and exists (
       select 1 from public.generation_jobs a where a.id = new.again_of and a.org_access_ended_at is not null) then
       new.again_of := null;
+    end if;
+    -- Nor claim a free poster redraw (a refund, grant_poster_free_redraw) against one.
+    if new.inputs -> 'poster' ->> 'redraw_of' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' and exists (
+      select 1 from public.generation_jobs r
+       where r.id = (new.inputs -> 'poster' ->> 'redraw_of')::uuid and r.org_access_ended_at is not null) then
+      new.inputs := new.inputs #- '{poster,redraw_of}';
     end if;
   elsif old.org_id is not null and new.org_id is distinct from old.org_id then
     raise exception 'ORG_WORK_IMMUTABLE';
@@ -13794,81 +13896,6 @@ $$;
 ALTER FUNCTION "public"."code_preview_credits"("offer" "public"."codes") OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
-    "id" "uuid" NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "module" "text" NOT NULL,
-    "template_id" "text" NOT NULL,
-    "inputs" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "provider" "text",
-    "source" "text" NOT NULL,
-    "idempotency_key" "text",
-    "status" "text" DEFAULT 'running'::"text" NOT NULL,
-    "visibility" "text" NOT NULL,
-    "credits_cost" integer NOT NULL,
-    "output_key" "text",
-    "error_code" "text",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "finished_at" timestamp with time zone,
-    "credit_pool" "text" NOT NULL,
-    "parent_job_id" "uuid",
-    "provider_usage" "jsonb",
-    "cost_usd" numeric(10,6),
-    "deleted_at" timestamp with time zone,
-    "client_ip" "inet",
-    "downloaded_at" timestamp with time zone,
-    "download_ip" "inet",
-    "download_count" integer DEFAULT 0 NOT NULL,
-    "batch_id" "uuid",
-    "moderation_status" "text" DEFAULT 'pending'::"text" NOT NULL,
-    "moderation_reason" "text",
-    "moderation_categories" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
-    "auto_moderated_at" timestamp with time zone,
-    "moderated_at" timestamp with time zone,
-    "moderated_by" "uuid",
-    "screen_attempts" integer DEFAULT 0 NOT NULL,
-    "last_screen_at" timestamp with time zone,
-    "gallery_excluded" boolean DEFAULT false NOT NULL,
-    "again_of" "uuid",
-    "org_id" "uuid",
-    "org_access_ended_at" timestamp with time zone,
-    CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
-    CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
-    CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
-    CONSTRAINT "generation_jobs_credit_pool_check" CHECK (("credit_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
-    CONSTRAINT "generation_jobs_credits_cost_check" CHECK (("credits_cost" > 0)),
-    CONSTRAINT "generation_jobs_download_count_check" CHECK (("download_count" >= 0)),
-    CONSTRAINT "generation_jobs_free_work_public" CHECK ((("credit_pool" = 'paid'::"text") OR ("visibility" = 'public'::"text") OR "gallery_excluded")),
-    CONSTRAINT "generation_jobs_moderation_reason_check" CHECK (("moderation_reason" = ANY (ARRAY['auto'::"text", 'sexual'::"text", 'violence'::"text", 'hate'::"text", 'minor'::"text", 'privacy'::"text", 'ip'::"text", 'spam'::"text", 'quality'::"text", 'other'::"text"]))),
-    CONSTRAINT "generation_jobs_moderation_status_check" CHECK (("moderation_status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text"]))),
-    CONSTRAINT "generation_jobs_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
-    CONSTRAINT "generation_jobs_provider_usage_object" CHECK ((("provider_usage" IS NULL) OR ("jsonb_typeof"("provider_usage") = 'object'::"text"))),
-    CONSTRAINT "generation_jobs_screen_attempts_check" CHECK (("screen_attempts" >= 0)),
-    CONSTRAINT "generation_jobs_source_check" CHECK (("source" = ANY (ARRAY['web'::"text", 'graylum'::"text"]))),
-    CONSTRAINT "generation_jobs_status_check" CHECK (("status" = ANY (ARRAY['running'::"text", 'succeeded'::"text", 'failed'::"text"]))),
-    CONSTRAINT "generation_jobs_visibility_check" CHECK (("visibility" = ANY (ARRAY['public'::"text", 'private'::"text"])))
-);
-
-
-ALTER TABLE "public"."generation_jobs" OWNER TO "postgres";
-
-
-COMMENT ON COLUMN "public"."generation_jobs"."deleted_at" IS 'When the owner deleted this work (T41). Set only by delete_own_job; user-facing reads skip it.';
-
-
-
-COMMENT ON COLUMN "public"."generation_jobs"."again_of" IS 'Make again: the caller''s own succeeded work, same template, this job was made again from (1513). Null otherwise.';
-
-
-
-COMMENT ON COLUMN "public"."generation_jobs"."org_id" IS 'The org whose credits paid for this work (企业作品, 1941). Set once at insert from org_held_draws; never public.';
-
-
-
-COMMENT ON COLUMN "public"."generation_jobs"."org_access_ended_at" IS 'When the maker left org_id (1941). Non-null: the work is hidden from the maker, their shares and files.';
-
-
-
 CREATE OR REPLACE FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb" DEFAULT NULL::"jsonb", "p_cost_usd" numeric DEFAULT NULL::numeric, "p_kept_inputs" "text"[] DEFAULT NULL::"text"[]) RETURNS "public"."generation_jobs"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -14183,9 +14210,11 @@ begin
   if v_job.status = 'running' then
     raise exception 'JOB_RUNNING';
   end if;
-  if v_job.org_id is not null
-     and not exists (select 1 from public.orgs o where o.id = v_job.org_id and o.owner_user_id = p_user_id) then
-    raise exception 'ORG_WORK_DELETE_FORBIDDEN';
+  if v_job.org_id is not null then
+    if not exists (select 1 from public.orgs o where o.id = v_job.org_id and o.owner_user_id = p_user_id) then
+      raise exception 'ORG_WORK_DELETE_FORBIDDEN';
+    end if;
+    return public._org_work_mark_deleted(v_job, p_user_id);
   end if;
 
   update public.generation_jobs
@@ -15300,6 +15329,34 @@ $_$;
 
 
 ALTER FUNCTION "public"."org_monthly_topup"("p_period" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_owner_delete_work"("p_owner" "uuid", "p_job_id" "uuid") RETURNS "public"."generation_jobs"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_job public.generation_jobs;
+begin
+  select j.* into v_job from public.generation_jobs j
+    join public.orgs o on o.id = j.org_id
+   where j.id = p_job_id and o.owner_user_id = p_owner
+     for update of j;
+  if not found then
+    raise exception 'JOB_NOT_FOUND';
+  end if;
+  if v_job.deleted_at is not null then
+    return v_job;
+  end if;
+  if v_job.status = 'running' then
+    raise exception 'JOB_RUNNING';
+  end if;
+  return public._org_work_mark_deleted(v_job, p_owner);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."org_owner_delete_work"("p_owner" "uuid", "p_job_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."org_owner_work"("p_owner" "uuid", "p_job_id" "uuid") RETURNS TABLE("id" "uuid", "user_id" "uuid", "credit_pool" "text", "output_key" "text")
@@ -20493,6 +20550,18 @@ CREATE TABLE IF NOT EXISTS "public"."org_signup_bonuses" (
 ALTER TABLE "public"."org_signup_bonuses" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."org_work_deletions" (
+    "job_id" "uuid" NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "maker_user_id" "uuid" NOT NULL,
+    "deleted_by" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."org_work_deletions" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."partner_links" (
     "user_id" "uuid" NOT NULL,
     "partner" "text" NOT NULL,
@@ -21719,6 +21788,11 @@ ALTER TABLE ONLY "public"."org_signup_bonuses"
 
 
 
+ALTER TABLE ONLY "public"."org_work_deletions"
+    ADD CONSTRAINT "org_work_deletions_pkey" PRIMARY KEY ("job_id");
+
+
+
 ALTER TABLE ONLY "public"."orgs"
     ADD CONSTRAINT "orgs_invite_token_key" UNIQUE ("invite_token");
 
@@ -22567,6 +22641,10 @@ CREATE INDEX "org_pool_returns_open_idx" ON "public"."org_pool_returns" USING "b
 
 
 CREATE INDEX "org_signup_bonuses_org_idx" ON "public"."org_signup_bonuses" USING "btree" ("org_id", "created_at");
+
+
+
+CREATE INDEX "org_work_deletions_org_idx" ON "public"."org_work_deletions" USING "btree" ("org_id", "created_at" DESC);
 
 
 
@@ -23791,6 +23869,11 @@ ALTER TABLE ONLY "public"."org_signup_bonuses"
 
 
 
+ALTER TABLE ONLY "public"."org_work_deletions"
+    ADD CONSTRAINT "org_work_deletions_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
+
+
+
 ALTER TABLE ONLY "public"."orgs"
     ADD CONSTRAINT "orgs_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
 
@@ -24494,6 +24577,9 @@ ALTER TABLE "public"."org_signup_bonus_errors" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_signup_bonuses" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."org_work_deletions" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."orgs" ENABLE ROW LEVEL SECURITY;
@@ -25589,6 +25675,15 @@ REVOKE ALL ON FUNCTION "public"."_org_settle_returns"("p_org" "uuid") FROM PUBLI
 
 
 REVOKE ALL ON FUNCTION "public"."_org_signup_bonus"() FROM PUBLIC;
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_jobs" TO "service_role";
+GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_work_mark_deleted"("p_job" "public"."generation_jobs", "p_actor" "uuid") FROM PUBLIC;
 
 
 
@@ -26848,11 +26943,6 @@ GRANT ALL ON FUNCTION "public"."code_preview_credits"("offer" "public"."codes") 
 
 
 
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_jobs" TO "service_role";
-GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
-
-
-
 REVOKE ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_kept_inputs" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_kept_inputs" "text"[]) TO "service_role";
 
@@ -27069,6 +27159,11 @@ GRANT ALL ON FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" 
 
 REVOKE ALL ON FUNCTION "public"."org_monthly_topup"("p_period" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_monthly_topup"("p_period" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_owner_delete_work"("p_owner" "uuid", "p_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_owner_delete_work"("p_owner" "uuid", "p_job_id" "uuid") TO "service_role";
 
 
 
@@ -27945,6 +28040,10 @@ GRANT SELECT ON TABLE "public"."org_signup_bonus_errors" TO "service_role";
 
 
 GRANT SELECT ON TABLE "public"."org_signup_bonuses" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."org_work_deletions" TO "service_role";
 
 
 
