@@ -1960,6 +1960,52 @@
         "removed": "Left",
         "unknown": "Account"
       }
+    },
+    "templateShare": {
+      "modeOff": "Share templates",
+      "modeOffShort": "Share",
+      "modeOn": "Exit",
+      "pickHint": "Tap templates or series to pick them for your client.",
+      "pickedCount": "{count, plural, one {# picked} other {# picked}}",
+      "pickedMax": "{count} picked, the most one link can hold",
+      "picked": "Picked",
+      "notPicked": "Not picked",
+      "cancel": "Cancel",
+      "shareSelected": "Share selected ({count})",
+      "sheetTitle": "Share with a client",
+      "sheetText": "{count, plural, one {# pick} other {# picks}} in one link. Your client sees only these, in this order, and can start with any of them.",
+      "titleLabel": "Title",
+      "noteLabel": "Note for your client",
+      "optional": "(optional)",
+      "titlePlaceholder": "For example: Spring menu photos",
+      "notePlaceholder": "For example: Pick the look you like best and tell me which one.",
+      "create": "Create link",
+      "creating": "Creating link…",
+      "error": {
+        "rate_limited": "You’ve made many links in a short time. Try again in a while.",
+        "unavailable": "One of the picks is no longer available. Unpick it and try again.",
+        "failed": "The link couldn’t be made. Try again."
+      },
+      "readyTitle": "Your link is ready",
+      "readyText": "Send it to your client. Anyone with the link can see these templates; you can revoke it any time in Account.",
+      "linkLabel": "Share link",
+      "send": "Send link",
+      "copied": "Link copied",
+      "copyByHand": "Copy this link to share it:",
+      "sendText": "{title}: templates picked for you on Shotviva",
+      "defaultTitle": "Templates picked for you",
+      "done": "Done",
+      "mine": "See all my share links",
+      "listTitle": "Template share links",
+      "listLede": "Links you made with Share templates on Create. Revoke one and your client sees “not available”.",
+      "listEmpty": "No share links yet. On Create, tap Share templates, pick some, and make a link.",
+      "itemCount": "{count, plural, one {# pick} other {# picks}}",
+      "revoked": "Revoked",
+      "revoke": "Revoke link",
+      "revokeConfirm": "Revoke this link? Your client will no longer see these templates.",
+      "revokeFailed": "Couldn’t revoke it. Try again.",
+      "older": "Older links",
+      "back": "Account"
     }
   },
   "paywall": {
@@ -2694,5 +2740,22 @@
     "button": "View the reply",
     "fallback": "If the button doesn't work, copy and paste this link into your browser:",
     "footer": "This is an automated email, please don't reply to it. Reply in your ticket on Shotviva instead."
+  },
+  "templateShare": {
+    "metaTitle": "{title} · Shotviva templates",
+    "metaDescription": "A set of Shotviva templates picked for you. Choose one and turn a phone photo into a polished image.",
+    "title": "Templates picked for you",
+    "kicker": "{count, plural, one {# template} other {# templates}} to choose from",
+    "hint": "Each picture shows a real phone photo on the left and the AI result on the right. Choose the one you like and start with it.",
+    "use": "Use this template",
+    "alt": "phone photo and AI result (illustrative example)",
+    "seriesCount": "{count, plural, one {# template} other {# templates}}",
+    "show": "Show the templates",
+    "hide": "Hide the templates",
+    "illustrative": "Template images are illustrative examples.",
+    "missingTitle": "This link isn’t available",
+    "missingText": "It may have been withdrawn, or its templates are no longer offered. Have a look at the other templates.",
+    "missingBrowse": "See other templates",
+    "badge": "Series"
   }
 }

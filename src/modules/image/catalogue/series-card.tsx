@@ -13,6 +13,7 @@ import type { CatalogueSeries } from './catalogue-view'
 import { COVER_SIZES } from './cover-sizes'
 import { PairMedia } from './pair-media'
 import { SeriesBadge } from './series-badge'
+import { PickMark } from '../template-share/pick-mark'
 
 type Props = { series: CatalogueSeries; onOpen(id: string): void; eager?: boolean }
 
@@ -30,8 +31,9 @@ export function SeriesCard({ series, onOpen, eager }: Props) {
       aria-haspopup="dialog"
       aria-label={t('cardAria', { name: series.name, count: series.members.length })}
       onClick={() => onOpen(series.id)}
-      className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house hover:-translate-y-0.5 active:scale-[.97]"
+      className="group relative block w-full rounded-tile text-left transition-transform duration-250 ease-house hover:-translate-y-0.5 active:scale-[.97]"
     >
+      <PickMark item={{ type: 'series', id: series.id }} />
       <span className="relative block">
         <PrintEdge className="translate-x-[3px] translate-y-[5px] rotate-[2.8deg] bg-secondary" />
         <PrintEdge className="-translate-x-[2px] translate-y-[2px] -rotate-[2deg] bg-accent" />

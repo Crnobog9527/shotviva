@@ -26,7 +26,7 @@ vi.mock('./signup-ip', async (original) => ({
   recordSignupIp: mocks.recordSignupIp,
 }))
 
-const { onVerifiedSignIn } = await import('./first-sign-in')
+const { onVerifiedSignIn, signupMarks } = await import('./first-sign-in')
 
 // `signup` fires once per account (ARCHITECTURE §16.2), also for an account the same-IP rule
 // refused the gift (T25): with an IP the first sign-in is the one that stored it.
@@ -87,5 +87,15 @@ describe('onVerifiedSignIn', () => {
     mocks.grantSignupCredits.mockResolvedValue(true)
     await onVerifiedSignIn('u1', benefits, 'email', 'zh')
     expect(mocks.track).toHaveBeenCalledOnce()
+  })
+})
+
+// Share links opened before signing up ride on the signup event (§5.1f, §5.1g).
+describe('signupMarks', () => {
+  it('carries a template share and a template collection link, and drops malformed ones', () => {
+    expect(signupMarks(new Map([['sv_share', { value: 'ramen.k3x9m2pa' }], ['sv_tshare', { value: 'a2p138a5lj0w' }]]), new Map())).toEqual({
+      share_template_id: 'ramen', share_id: 'k3x9m2pa', share_collection_id: 'a2p138a5lj0w',
+    })
+    expect(signupMarks(new Map([['sv_tshare', { value: 'bad' }]]), new Map())).toEqual({})
   })
 })

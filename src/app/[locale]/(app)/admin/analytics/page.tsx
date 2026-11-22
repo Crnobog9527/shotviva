@@ -3,9 +3,8 @@ import type { Metadata } from 'next'
 import {
   AdminPage,
   ANALYTICS_COPY,
-  AnalyticsView,
   cheapestCreditUsd,
-  GROWTH_COPY,
+  DetailsView,
   InsightsPanel,
   GrowthView,
   parseFunnelDim,
@@ -16,7 +15,6 @@ import {
   PostHogOff,
   posthogProjectId,
   RangeTabs,
-  Unconfigured,
   ViewTabs,
 } from '@/core/admin'
 import { requireAdmin } from '@/core/auth'
@@ -44,17 +42,10 @@ export default async function AdminAnalyticsPage({ searchParams }: PageProps<'/[
         {off ? <PostHogOff /> : null}
         {query.view === 'overview' ? (
           <GrowthView range={query.range} />
-        ) : off ? null : query.view === 'funnel' || query.view === 'templates' ? (
-          <InsightsPanel view={query.view} params={params} creditUsd={cheapestCreditUsd(site.billing.products)} />
+        ) : query.view === 'funnel' || query.view === 'templates' ? (
+          off ? null : <InsightsPanel view={query.view} params={params} creditUsd={cheapestCreditUsd(site.billing.products)} />
         ) : (
-          <>
-            <p className="text-sm text-muted-foreground">{GROWTH_COPY.detailsNote}</p>
-            {projectId ? (
-              <AnalyticsView query={query} projectId={projectId} giftCredits={site.billing.freeCredits} />
-            ) : (
-              <Unconfigured range={query.range} />
-            )}
-          </>
+          <DetailsView query={query} projectId={projectId} posthog={!off} giftCredits={site.billing.freeCredits} />
         )}
       </div>
     </AdminPage>

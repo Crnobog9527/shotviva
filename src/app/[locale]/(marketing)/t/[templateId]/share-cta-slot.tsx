@@ -17,13 +17,13 @@ export async function shareCtaText(locale: Locale) {
 }
 
 // "3 free Standard images", worked out exactly as the home page does.
-async function giftOf(locale: Locale) {
+export async function giftOf(locale: Locale) {
   return fillCredits(freeImagesIn(locale), creditFacts(await cachedWebCatalogue(locale)))
 }
 
 // A shared link is often someone's first page: an auth hiccup shows the signed-out action, as
 // the home page does, never an error page.
-async function signedIn(): Promise<boolean> {
+export async function signedIn(): Promise<boolean> {
   try {
     return Boolean((await getSessionUser())?.verified)
   } catch (error) {
