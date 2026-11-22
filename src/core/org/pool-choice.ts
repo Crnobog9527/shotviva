@@ -3,7 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import type { PoolChoiceOffer } from '@/core/billing/pools'
+import { orgBalance, type Balance, type PoolChoiceOffer } from '@/core/billing/pools'
 import { logger } from '@/core/logger'
 
 // 在职成员只用企业积分、出图时自选 (ARCHITECTURE §6.5, migration 1897): for an active member of an org,
@@ -37,4 +37,12 @@ export async function readPoolChoiceOffer(db: SupabaseClient, user: string, now 
     logger.warn('pool choice unavailable', { code: error instanceof Error ? error.name : 'UNKNOWN' })
     return null
   }
+}
+
+// The balance a page shows and checks for the signed-in account: an active member's org shares
+// (their own credits are frozen, §6.5), otherwise their own balance. `admin` is the service-role
+// client (org_members has no client grant).
+export async function spendableBalance(admin: SupabaseClient, user: string, own: Balance): Promise<Balance> {
+  const offer = await readPoolChoiceOffer(admin, user)
+  return offer ? orgBalance(offer) : own
 }
