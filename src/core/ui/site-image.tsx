@@ -44,7 +44,7 @@ function PresizedImage({ sized, ref, onLoad, ...props }: Props & { sized: Presiz
     preload(avif.src, { as: 'image', imageSrcSet: avif.srcSet, imageSizes: avif.sizes, type: 'image/avif', ...(props.fetchPriority ? { fetchPriority: props.fetchPriority } : {}) })
   }
   return (
-    <Picture avif={avif.srcSet && img.loading !== 'lazy' ? { srcSet: avif.srcSet, sizes: avif.sizes } : undefined}>
+    <Picture avif={avif.srcSet ? { srcSet: avif.srcSet, sizes: avif.sizes } : undefined}>
       {/* eslint-disable-next-line @next/next/no-img-element -- next/image's own markup, one format per element */}
       <img {...img} alt={props.alt} ref={ref} onLoad={onLoad} />
     </Picture>
