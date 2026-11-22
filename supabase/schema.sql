@@ -4613,7 +4613,7 @@ declare
 begin
   select min(x.at) into v_start from (
     select g.decided_at as at from public.partner_promo_grants g
-     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted'
+     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null
     union all
     select t.created_at from public.partner_promo_topups t where t.recipient_user_id = p_user and t.expires_at = p_expires
   ) x;
@@ -4621,10 +4621,7 @@ begin
   for e in
     with adds as (
       select g.decided_at as at, 0 as ord, 'grant' as src, g.id, g.total as amount from public.partner_promo_grants g
-       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted'
-      union all
-      select g.voided_at, 2, 'void', g.id, 0 from public.partner_promo_grants g
-       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is not null
+       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null
       union all
       select t.created_at, 0, 'topup', t.id, t.credits from public.partner_promo_topups t
        where t.recipient_user_id = p_user and t.expires_at = p_expires
@@ -4645,11 +4642,7 @@ begin
       from reserves r left join refunds f on f.reserve_key = r.idempotency_key
     order by 1, 2, 4
   loop
-    if e.src = 'void' then
-      for i in 1 .. cardinality(v_id) loop
-        if v_src[i] = 'grant' and v_id[i] = e.id then v_left[i] := 0; end if;
-      end loop;
-    elsif e.src <> 'spend' then
+    if e.src <> 'spend' then
       v_src := v_src || e.src;
       v_id := v_id || e.id;
       v_left := v_left || e.amount::integer;
@@ -4663,8 +4656,7 @@ begin
       end loop;
     end if;
   end loop;
-  return query select u.s, u.i, u.l from unnest(v_src, v_id, v_left) as u(s, i, l)
-    where not (u.s = 'grant' and exists (select from public.partner_promo_grants g where g.id = u.i and g.voided_at is not null));
+  return query select u.s, u.i, u.l from unnest(v_src, v_id, v_left) as u(s, i, l);
 end;
 $_$;
 
@@ -9804,6 +9796,11 @@ begin
   if g.voided_at is not null then return jsonb_build_object('applied', false, 'reason', 'already', 'grant_id', g.id); end if;
   if g.status <> 'granted' then raise exception 'PROMO_GRANT_NOT_GRANTED'; end if;
   if g.expired_at is not null then raise exception 'PROMO_GRANT_EXPIRED'; end if;
+  -- A later sheet already clawed back from this one: voiding would hide that repayment.
+  if exists (select from public.partner_promo_clawbacks c join public.partner_promo_grants a on a.id = c.applied_grant_id
+              where c.source_grant_id = g.id and a.voided_at is null) then
+    raise exception 'PROMO_GRANT_CLAWED';
+  end if;
   update public.partner_promo_grants set voided_at = now(), voided_by = p_actor, void_reason = v_reason where id = g.id;
   perform public._org_audit(p_actor, 'partner_promo_void', g.id::text,
     jsonb_build_object('org_id', g.org_id, 'period', g.period, 'recipient', g.recipient_user_id, 'total', g.total,
