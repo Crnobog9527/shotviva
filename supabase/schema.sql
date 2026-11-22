@@ -4330,6 +4330,41 @@ $$;
 ALTER FUNCTION "public"."_org_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."org_billing_profiles" (
+    "org_id" "uuid" NOT NULL,
+    "legal_name" "text" NOT NULL,
+    "tax_id" "text" NOT NULL,
+    "country" "text" DEFAULT 'CN'::"text" NOT NULL,
+    "postcode" "text",
+    "state" "text",
+    "invoice_email" "text",
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid",
+    CONSTRAINT "org_billing_profiles_country_check" CHECK (("country" ~ '^[A-Z]{2}$'::"text")),
+    CONSTRAINT "org_billing_profiles_invoice_email_check" CHECK ((("length"("invoice_email") <= 254) AND ("invoice_email" ~ '^[^@[:space:][:cntrl:]]+@[^@[:space:][:cntrl:]]+\.[^@[:space:][:cntrl:]]+$'::"text"))),
+    CONSTRAINT "org_billing_profiles_legal_name_check" CHECK (((("length"("legal_name") >= 2) AND ("length"("legal_name") <= 200)) AND ("legal_name" = "btrim"("legal_name")) AND ("legal_name" !~ '[[:cntrl:]]'::"text"))),
+    CONSTRAINT "org_billing_profiles_postcode_check" CHECK (("postcode" ~ '^[0-9A-Za-z][0-9A-Za-z -]{0,15}$'::"text")),
+    CONSTRAINT "org_billing_profiles_state_check" CHECK (((("length"("state") >= 1) AND ("length"("state") <= 80)) AND ("state" = "btrim"("state")) AND ("state" !~ '[[:cntrl:]]'::"text"))),
+    CONSTRAINT "org_billing_profiles_tax_id_check" CHECK (("tax_id" ~ '^[0-9A-Z][0-9A-Z./-]{2,39}$'::"text"))
+);
+
+
+ALTER TABLE "public"."org_billing_profiles" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_billing_profile_json"("p" "public"."org_billing_profiles") RETURNS "jsonb"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select case when p.org_id is null then null else jsonb_build_object(
+    'legal_name', p.legal_name, 'tax_id', p.tax_id, 'country', p.country, 'postcode', p.postcode,
+    'state', p.state, 'invoice_email', p.invoice_email, 'updated_at', p.updated_at) end
+$$;
+
+
+ALTER FUNCTION "public"."_org_billing_profile_json"("p" "public"."org_billing_profiles") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_check_limits"("p_input" "jsonb") RETURNS "void"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -15676,6 +15711,102 @@ $$;
 ALTER FUNCTION "public"."org_allocate_promo"("p_owner" "uuid", "p_member" "uuid", "p_amount" integer, "p_request_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."org_billing_profile_clear"("p_owner" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  o public.orgs;
+begin
+  o := public._org_lock_owned(p_owner, true);
+  delete from public.org_billing_profiles where org_id = o.id;
+  if not found then return false; end if;
+  insert into public.org_billing_profile_events (org_id, actor, action) values (o.id, p_owner, 'clear');
+  return true;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."org_billing_profile_clear"("p_owner" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_billing_profile_get"("p_owner" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  org uuid;
+  p public.org_billing_profiles;
+begin
+  select id into org from public.orgs where owner_user_id = p_owner;
+  if org is null then raise exception 'NOT_ORG_OWNER'; end if;
+  select * into p from public.org_billing_profiles where org_id = org;
+  return public._org_billing_profile_json(p);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."org_billing_profile_get"("p_owner" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_billing_profile_save"("p_owner" "uuid", "p_legal_name" "text", "p_tax_id" "text", "p_country" "text", "p_postcode" "text" DEFAULT NULL::"text", "p_state" "text" DEFAULT NULL::"text", "p_invoice_email" "text" DEFAULT NULL::"text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  o public.orgs;
+  v_name text := regexp_replace(btrim(coalesce(p_legal_name, '')), '\s+', ' ', 'g');
+  v_tax text := upper(regexp_replace(coalesce(p_tax_id, ''), '\s', '', 'g'));
+  v_country text := upper(btrim(coalesce(p_country, '')));
+  v_post text := nullif(btrim(coalesce(p_postcode, '')), '');
+  v_state text := nullif(btrim(coalesce(p_state, '')), '');
+  v_email text := nullif(lower(btrim(coalesce(p_invoice_email, ''))), '');
+  p public.org_billing_profiles;
+  result jsonb;
+begin
+  o := public._org_lock_owned(p_owner, true);
+  -- Only the places the form offers; Waffo wants a state code (CA, NY, NSW, ON) where the
+  -- country needs one, so those three require it.
+  if v_country not in ('CN','HK','MO','TW','SG','MY','JP','KR','US','GB','AU','CA','DE','FR')
+     or (v_country = 'CN' and v_tax !~ '^[0-9A-HJ-NPQRTUWXY]{2}[0-9]{6}[0-9A-HJ-NPQRTUWXY]{10}$')
+     or (v_country in ('US','CA','AU') and coalesce(upper(v_state), '') !~ '^[A-Z]{2,3}$') then
+    raise exception 'INVALID_INPUT';
+  end if;
+  if v_country in ('US','CA','AU') then v_state := upper(v_state); end if;
+  begin
+    insert into public.org_billing_profiles as b (org_id, legal_name, tax_id, country, postcode, state, invoice_email, updated_at, updated_by)
+    values (o.id, v_name, v_tax, v_country, v_post, v_state, v_email, now(), p_owner)
+    on conflict (org_id) do update set legal_name = excluded.legal_name, tax_id = excluded.tax_id,
+      country = excluded.country, postcode = excluded.postcode, state = excluded.state,
+      invoice_email = excluded.invoice_email, updated_at = excluded.updated_at, updated_by = excluded.updated_by
+    returning * into p;
+  exception when check_violation or not_null_violation then
+    raise exception 'INVALID_INPUT';
+  end;
+  result := public._org_billing_profile_json(p);
+  insert into public.org_billing_profile_events (org_id, actor, action, profile)
+  values (o.id, p_owner, 'save', result - 'updated_at');
+  return result;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."org_billing_profile_save"("p_owner" "uuid", "p_legal_name" "text", "p_tax_id" "text", "p_country" "text", "p_postcode" "text", "p_state" "text", "p_invoice_email" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_checkout_billing_profile"("p_user" "uuid") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select public._org_billing_profile_json(b)
+  from public.orgs o join public.org_billing_profiles b on b.org_id = o.id
+  where o.owner_user_id = p_user
+$$;
+
+
+ALTER FUNCTION "public"."org_checkout_billing_profile"("p_user" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."org_customer_counts"("p_caller" "uuid", "p_org_id" "uuid") RETURNS TABLE("member_user_id" "uuid", "l1_customers" integer, "l2_customers" integer)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -21278,6 +21409,32 @@ CREATE TABLE IF NOT EXISTS "public"."org_attribution_errors" (
 ALTER TABLE "public"."org_attribution_errors" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."org_billing_profile_events" (
+    "id" bigint NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "actor" "uuid",
+    "action" "text" NOT NULL,
+    "profile" "jsonb",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "org_billing_profile_events_action_check" CHECK (("action" = ANY (ARRAY['save'::"text", 'clear'::"text"]))),
+    CONSTRAINT "org_billing_profile_events_profile" CHECK ((("action" = 'save'::"text") = ("profile" IS NOT NULL)))
+);
+
+
+ALTER TABLE "public"."org_billing_profile_events" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."org_billing_profile_events" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."org_billing_profile_events_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."org_credit_ledger" (
     "id" bigint NOT NULL,
     "org_id" "uuid" NOT NULL,
@@ -22692,6 +22849,16 @@ ALTER TABLE ONLY "public"."org_attribution_errors"
 
 
 
+ALTER TABLE ONLY "public"."org_billing_profile_events"
+    ADD CONSTRAINT "org_billing_profile_events_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."org_billing_profiles"
+    ADD CONSTRAINT "org_billing_profiles_pkey" PRIMARY KEY ("org_id");
+
+
+
 ALTER TABLE ONLY "public"."org_credit_ledger"
     ADD CONSTRAINT "org_credit_ledger_pkey" PRIMARY KEY ("id");
 
@@ -23590,6 +23757,10 @@ CREATE INDEX "identity_refusals_created_at_idx" ON "public"."identity_refusals" 
 
 
 CREATE INDEX "identity_refusals_user_id_created_at_idx" ON "public"."identity_refusals" USING "btree" ("user_id", "created_at" DESC);
+
+
+
+CREATE INDEX "org_billing_profile_events_org_idx" ON "public"."org_billing_profile_events" USING "btree" ("org_id", "created_at" DESC, "id" DESC);
 
 
 
@@ -24776,6 +24947,26 @@ ALTER TABLE ONLY "public"."org_attribution_errors"
 
 
 
+ALTER TABLE ONLY "public"."org_billing_profile_events"
+    ADD CONSTRAINT "org_billing_profile_events_actor_fkey" FOREIGN KEY ("actor") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."org_billing_profile_events"
+    ADD CONSTRAINT "org_billing_profile_events_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
+
+
+
+ALTER TABLE ONLY "public"."org_billing_profiles"
+    ADD CONSTRAINT "org_billing_profiles_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
+
+
+
+ALTER TABLE ONLY "public"."org_billing_profiles"
+    ADD CONSTRAINT "org_billing_profiles_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
 ALTER TABLE ONLY "public"."org_credit_ledger"
     ADD CONSTRAINT "org_credit_ledger_member_user_id_fkey" FOREIGN KEY ("member_user_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -25577,6 +25768,12 @@ ALTER TABLE "public"."identity_refusals" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_attribution_errors" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."org_billing_profile_events" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."org_billing_profiles" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_credit_ledger" ENABLE ROW LEVEL SECURITY;
@@ -26675,6 +26872,14 @@ REVOKE ALL ON FUNCTION "public"."_org_attribute_invite"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."_org_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") FROM PUBLIC;
+
+
+
+GRANT SELECT ON TABLE "public"."org_billing_profiles" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_billing_profile_json"("p" "public"."org_billing_profiles") FROM PUBLIC;
 
 
 
@@ -28233,6 +28438,26 @@ GRANT ALL ON FUNCTION "public"."org_allocate_promo"("p_owner" "uuid", "p_member"
 
 
 
+REVOKE ALL ON FUNCTION "public"."org_billing_profile_clear"("p_owner" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_billing_profile_clear"("p_owner" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_billing_profile_get"("p_owner" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_billing_profile_get"("p_owner" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_billing_profile_save"("p_owner" "uuid", "p_legal_name" "text", "p_tax_id" "text", "p_country" "text", "p_postcode" "text", "p_state" "text", "p_invoice_email" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_billing_profile_save"("p_owner" "uuid", "p_legal_name" "text", "p_tax_id" "text", "p_country" "text", "p_postcode" "text", "p_state" "text", "p_invoice_email" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_checkout_billing_profile"("p_user" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_checkout_billing_profile"("p_user" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."org_customer_counts"("p_caller" "uuid", "p_org_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_customer_counts"("p_caller" "uuid", "p_org_id" "uuid") TO "service_role";
 
@@ -29145,6 +29370,10 @@ GRANT UPDATE ON SEQUENCE "public"."identity_refusals_id_seq" TO "service_role";
 
 
 GRANT SELECT ON TABLE "public"."org_attribution_errors" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."org_billing_profile_events" TO "service_role";
 
 
 
