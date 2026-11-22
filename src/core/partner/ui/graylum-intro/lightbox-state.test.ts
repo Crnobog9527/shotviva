@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
-import { HERO_MEDIA, INTRO_SCENES } from './intro-shots'
+import { heroMedia, INTRO_SCENES } from './intro-shots'
+
+const HERO_MEDIA = heroMedia('zh')
 import { canStep, DRAG_TO_CLOSE, lightboxReducer, pulledDown } from './lightbox-state'
 
 const reduce = lightboxReducer(INTRO_SCENES.length)

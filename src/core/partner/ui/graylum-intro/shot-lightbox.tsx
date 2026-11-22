@@ -1,11 +1,11 @@
 'use client'
 
 import { ChevronLeft, ChevronRight, XIcon } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import type { KeyboardEvent } from 'react'
 
-import { INTRO_SCENES } from './intro-shots'
+import { introScenes } from './intro-shots'
 import { canStep, type LightboxAction } from './lightbox-state'
 import { LoopVideo } from './loop-video'
 import { useSwipeDown } from './use-swipe-down'
@@ -18,8 +18,10 @@ type Props = { state: { index: number }; dispatch: (action: LightboxAction) => v
 // opened it. The video is asked for only here and is removed on close.
 export function ShotLightbox({ state, dispatch, opener }: Props) {
   const t = useTranslations('partner.intro')
-  const count = INTRO_SCENES.length
-  const scene = INTRO_SCENES[state.index]
+  const locale = useLocale()
+  const scenes = introScenes(locale)
+  const count = scenes.length
+  const scene = scenes[state.index]
   const close = () => dispatch({ type: 'close' })
   const swipe = useSwipeDown(close)
   if (!scene) return null
@@ -58,7 +60,7 @@ export function ShotLightbox({ state, dispatch, opener }: Props) {
             </DialogPrimitive.Close>
           </header>
           {/* key: stepping to another scene mounts a fresh video, and the old one is paused and gone */}
-          <LoopVideo key={scene.key} media={scene.media} label={t(`shots.${scene.key}.alt`)} className="mx-auto w-[min(100%,calc((100dvh-var(--sat)-200px)*1.6))] sm:w-[min(100%,calc((100dvh-210px)*1.6))]" />
+          <LoopVideo key={`${locale}-${scene.key}`} media={scene.media} label={t(`shots.${scene.key}.alt`)} className="mx-auto w-[min(100%,calc((100dvh-var(--sat)-200px)*1.6))] sm:w-[min(100%,calc((100dvh-210px)*1.6))]" />
           <nav aria-label={t('lightbox.label')} className="flex items-center justify-center gap-3 text-caption text-muted-foreground tabular-nums">
             <StepButton label={t('lightbox.prev')} disabled={!canStep(state, -1, count)} onClick={() => step(-1)}><ChevronLeft className="size-5" aria-hidden /></StepButton>
             <span className="min-w-12 text-center">{t('lightbox.count', { n: state.index + 1, total: count })}</span>

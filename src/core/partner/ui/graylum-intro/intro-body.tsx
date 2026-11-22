@@ -1,12 +1,12 @@
 'use client'
 
 import { Check } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 
 import { ConnectionCard } from './connection-card'
 import type { GraylumLinks } from './intro-links'
-import { HERO_MEDIA, INTRO_SCENES } from './intro-shots'
+import { heroMedia, introScenes } from './intro-shots'
 import { LoopVideo } from './loop-video'
 import { ShotThumb, type ViewShot } from './shot-thumb'
 
@@ -17,6 +17,7 @@ type Props = { connected: boolean; links: GraylumLinks; disconnect: () => Promis
 // Graylum's own looping animations, and what connecting changes.
 export function IntroBody({ connected, links, disconnect, onView }: Props) {
   const t = useTranslations('partner.intro')
+  const locale = useLocale()
   return (
     <>
       <DialogPrimitive.Description className="text-[17px] leading-[1.55] font-medium text-pretty text-foreground">{t('tagline')}</DialogPrimitive.Description>
@@ -24,11 +25,11 @@ export function IntroBody({ connected, links, disconnect, onView }: Props) {
       <ConnectionCard connected={connected} connectUrl={links.connect} disconnect={disconnect} />
       <Section title={t('what')}>
         <p className="mb-3 text-[15px] leading-[1.65] text-pretty text-bone-dim">{t('whatNote')}</p>
-        <LoopVideo media={HERO_MEDIA} label={t('heroAlt')} />
+        <LoopVideo media={heroMedia(locale)} label={t('heroAlt')} />
       </Section>
       <Section title={t('when')}>
         <ul role="list" className="grid grid-cols-1 gap-x-3 gap-y-5 sm:grid-cols-3">
-          {INTRO_SCENES.map((scene, at) => (
+          {introScenes(locale).map((scene, at) => (
             <li key={scene.key}>
               <figure>
                 <ShotThumb scene={scene} index={at} onView={onView} />
