@@ -2,3 +2,4 @@
 // registry is plain and safe anywhere.
 export { cachedSystemSettings, loadSystemSettings, settingsOrDefaults, SETTINGS_LIFE, SYSTEM_SETTINGS_CACHE_TAG } from './read'
 export { isSystemSettingKey, settingValue, SYSTEM_SETTINGS, type SystemSettingKey, type SystemSettingValues } from './registry'
+export { FOOD_TOGGLES_SWITCH_TAG, foodTogglesEnabled, foodTogglesOrOff } from './food-toggles'

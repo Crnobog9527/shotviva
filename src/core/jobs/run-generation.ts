@@ -10,6 +10,7 @@ import { screenIdentityText, type IdentityJudge } from '../identity-guard'
 import { isOwnInputKey, loadInputImage, outputKeyFor, writeInputPreview } from '../storage'
 import {
   DEFAULT_RESOLUTION,
+  FOOD_TOGGLE_KEYS,
   loadGenerationTemplate,
   allowedWebAspects,
   assertPricedTier,
@@ -59,6 +60,9 @@ export type GenerationDeps = Omit<SettleDeps, 'provider'> & {
   afterPoster?: (job: Job) => void
   // A food template's toggle flows (§5.1c): the dish reader and the vessel library.
   food?: FoodDeps | null
+  // The site-wide switch for 优化摆盘 / 优化器皿 (system_settings food_toggles_enabled). Absent or
+  // false: both are rendered off whatever the request says, so no dish reading and no vessel.
+  foodTogglesEnabled?: () => Promise<boolean>
 }
 
 const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'partner' }
@@ -112,6 +116,11 @@ async function finishPoster(deps: GenerationDeps, poster: Prepared['poster'], jo
 }
 
 // Everything that can be rejected without touching credits: template, fields, key
+// 优化摆盘 / 优化器皿 while the site-wide switch is off (food_toggles_enabled, 1848).
+async function forcedOffToggles(deps: GenerationDeps): Promise<readonly string[]> {
+  return (await deps.foodTogglesEnabled?.()) ? [] : FOOD_TOGGLE_KEYS
+}
+
 // ownership, tier limits (batch size, rate limit), then the user's words (ARCHITECTURE §5.1a:
 // no face swap) alongside the stored upload itself (HEAD + bytes; bad ones are deleted).
 async function prepare(deps: GenerationDeps, req: GenerationRequest) {
@@ -134,6 +143,7 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
     imageCount: req.inputKey ? 1 : 0,
     ...(inputSlots ? { slots: inputSlots } : {}),
     aspects: requestAspects(req, template),
+    forceOff: await forcedOffToggles(deps),
   })
   const { inputs, poster, qr } = withPoster(validated, await posterPart(deps, req, template, validated))
   const keys = uploadKeys(req, inputs)

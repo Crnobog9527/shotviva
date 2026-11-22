@@ -45,6 +45,9 @@ export type RawGenerationInputs = {
   // Sizes this entry point may ask for, default first. The web offers the eight output sizes
   // (DESIGN §4.3); the partner route keeps the template's own list (its contract, §14.6).
   aspects?: readonly string[]
+  // Toggles switched off site-wide (food_toggles_enabled off): rendered off whatever the request
+  // says, never refused, so an open tab or Make again still runs, at the price of the off result.
+  forceOff?: readonly string[]
 }
 
 const invalid = (message: string) => new AppError('INVALID_INPUT', message)
@@ -90,7 +93,8 @@ function toggleValue(toggle: ToggleField, given: Record<string, unknown>, accept
 // removed or renamed it), refused when it asks for something on.
 function checkToggles(fields: TemplateFields, raw: RawGenerationInputs): Pick<GenerationInputs, 'toggles' | 'confirmed'> {
   const defined = fields.toggles ?? []
-  const given = raw.toggles ?? {}
+  const off = new Set(raw.forceOff ?? [])
+  const given = Object.fromEntries(Object.entries(raw.toggles ?? {}).filter(([key]) => !off.has(key)))
   const unknown = Object.keys(given).find((key) => given[key] !== false && !defined.some((toggle) => toggle.key === key))
   if (unknown) throw invalid(`Unknown option: ${unknown}`)
   const accepted = new Set(raw.togglesConfirmed ?? [])
