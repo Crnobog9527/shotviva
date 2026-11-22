@@ -9,6 +9,7 @@ import { publishedTerms } from './terms'
 import { CommissionList } from './commission-list'
 import { viewHref } from './format'
 import { SettingsForm } from './settings-form'
+import { TermsGate } from './terms-gate'
 import { dashboardViews, searchSchema, type Account, type Query, type SearchParams } from './models'
 import { Overview } from './overview'
 import { PayoutList, ReferralList, TeamReport } from './reports'
@@ -29,6 +30,10 @@ async function guard() {
   if (!(await isAffiliateEnabled())) notFound()
 }
 export async function Dashboard({ user, account, query }: { user: string; account: Account; query: Query }) {
+  // Every view (personal and enterprise) waits for acceptance of the current terms version.
+  const settings = await readSettings()
+  const accepted = account.terms_version === settings.terms_version && account.terms_accepted_at !== null
+  if (!accepted && (await publishedTerms(settings.terms_version))) return <TermsGate version={settings.terms_version} />
   switch (query.view) {
     case 'commissions':
       return <CommissionList user={user} query={query} />
