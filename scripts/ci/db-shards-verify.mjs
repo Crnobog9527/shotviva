@@ -16,7 +16,8 @@
  * SHARD_COUNT, REPORT_DIR, GITHUB_SHA; optional TEST_ROOT (default tests/db), GITHUB_STEP_SUMMARY.
  */
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, relative, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 /** Test files the db project includes (vitest.config.ts: tests/db/**\/*.test.ts), sorted. */
 export function expectedFiles(root) {
@@ -106,7 +107,8 @@ export function verify(env, load, expected) {
   return { ok: errors.length === 0, errors, rows }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compared as URLs, so a path with spaces or non-ASCII never skips the check and exits 0.
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   const env = process.env
   const dir = env.REPORT_DIR ?? ''
   const load = (shard) => {

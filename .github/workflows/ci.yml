@@ -168,8 +168,10 @@ jobs:
       - name: schema.sql matches migrations (export)
         if: steps.changes.outputs.db == 'true'
         run: pnpm db:schema
-      # A stale file on a same-repo PR is not a failure: the tests run with the regenerated file
-      # and the schema-sql job below commits it to the branch (scripts/ci/schema-check.sh).
+      # A stale file on a same-repo PR is not a failure: the schema-sql job below commits the
+      # regenerated file to the branch (scripts/ci/schema-check.sh). The shards test the migrations,
+      # never schema.sql (config.toml schema_paths = [], no DB test reads it), so their results
+      # hold for that commit too; a test that reads supabase/schema.sql would break that carry.
       - name: schema.sql matches migrations
         id: schema
         if: steps.changes.outputs.db == 'true'
@@ -244,8 +246,9 @@ jobs:
         with:
           name: db-shard-${{ matrix.shard }}
           path: ${{ runner.temp }}/db-shard/
-          retention-days: 3
-          # A re-run of a failed shard replaces its record from the earlier attempt.
+          retention-days: 30
+          # A re-run of a failed shard replaces its record from the earlier attempt. Kept as long as
+          # failed jobs can be re-run, since the sum reads the passed shards' records again.
           overwrite: true
 
   # The required check. Passes only when the schema job and every shard succeeded, all five made
