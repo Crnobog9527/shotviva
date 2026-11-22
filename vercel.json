@@ -39,6 +39,10 @@
     {
       "path": "/api/cron/org-topup",
       "schedule": "20 0 1 * *"
+    },
+    {
+      "path": "/api/cron/partner-promo",
+      "schedule": "40 0 1 * *"
     }
   ],
   "regions": [
