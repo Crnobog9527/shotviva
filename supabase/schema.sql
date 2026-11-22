@@ -3717,7 +3717,7 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."
     'parent',case when a.status='active' and parent.team_enabled and parent.status='active' then parent.user_id end,
     'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,s.org_l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
     'bonus',coalesce(po.l2_bp,r.l2_bp),
-    'same_ip',coalesce(customer.signup_ip=referrer.signup_ip,false),
+    'same_ip',a.org_id is null and coalesce(customer.signup_ip=referrer.signup_ip,false),
     'confirm_after',p_payment.created_at+make_interval(days=>s.hold_days),
     'void',case when a.org_id is not null and exists(select from public.org_members m
       where m.org_id=a.org_id and m.user_id=customer.id and m.status='active') then 'org_member' end)
