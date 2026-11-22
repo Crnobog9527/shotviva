@@ -5,11 +5,12 @@ import { z } from 'zod'
 import { callRpc, type RpcClient } from '../../billing/rpc'
 import { DELETED_MAKERS } from './makers'
 
-// 企业作品 (ARCHITECTURE §6.5, migrations 1941–1944, 1970–1972): the org owner's view of the works
-// its members made with org credits, removed members included, and works whose maker deleted
-// their account (archived, no maker: userId null). Service role only; `owner` is the signed-in
-// account's own id from the session, and the SQL finds the org it owns, so no other org's works
-// can be named.
+// 企业作品 (ARCHITECTURE §6.5, migrations 1941–1944, 1970–1972, 1992): the works an org's members
+// made with org credits, removed members included, and works whose maker deleted their account
+// (archived, no maker: userId null). Every active member of the org reads them (Owner 2026-11-23,
+// 1992's org_member_work_*); deleting stays the owner's (delete.ts). Service role only; `user` is
+// the signed-in account's own id from the session, and the SQL finds the org it is an active
+// member of, so no other org's works can be named and a removed member reads nothing.
 
 export const ORG_WORKS_PAGE = 30
 
@@ -36,10 +37,10 @@ export type OrgWorkMember = { userId: string | null; role: 'owner' | 'member'; s
 // member: a member's id, or DELETED_MAKERS for the archived works.
 export type OrgWorksQuery = { member?: string; limit?: number; before?: { at: string; id: string } }
 
-export async function orgOwnerWorks(client: RpcClient, owner: string, query: OrgWorksQuery = {}): Promise<OrgWork[]> {
+export async function orgWorks(client: RpcClient, user: string, query: OrgWorksQuery = {}): Promise<OrgWork[]> {
   const archived = query.member === DELETED_MAKERS
-  const rows = await callRpc(client, 'org_owner_work_list', {
-    p_owner: uuid.parse(owner),
+  const rows = await callRpc(client, 'org_member_work_list', {
+    p_user: uuid.parse(user),
     p_member: query.member && !archived ? uuid.parse(query.member) : null,
     p_archived: archived,
     p_limit: query.limit ?? ORG_WORKS_PAGE,
@@ -52,8 +53,8 @@ export async function orgOwnerWorks(client: RpcClient, owner: string, query: Org
   }))
 }
 
-export async function orgOwnerWorkMembers(client: RpcClient, owner: string): Promise<OrgWorkMember[]> {
-  const rows = await callRpc(client, 'org_owner_work_makers', { p_owner: uuid.parse(owner) }, z.array(memberRow))
+export async function orgWorkMakers(client: RpcClient, user: string): Promise<OrgWorkMember[]> {
+  const rows = await callRpc(client, 'org_member_work_makers', { p_user: uuid.parse(user) }, z.array(memberRow))
   return rows.map((r) => ({ userId: r.user_id, role: r.role, status: r.status, removedAt: r.removed_at, works: r.works }))
 }
 
@@ -61,11 +62,11 @@ const fileRow = z.object({ id: z.uuid(), user_id: z.uuid().nullable(), credit_po
 // archiveKey: where an unfinished account deletion copies a live work (served once it exists).
 export type OrgWorkFile = { id: string; userId: string | null; creditPool: 'free' | 'paid'; outputKey: string; archiveKey: string | null }
 
-// One finished org work of the owner's org, live or archived, or null (a missing one, another
-// org's, a deleted one).
-export async function orgOwnerWork(client: RpcClient, owner: string, jobId: string): Promise<OrgWorkFile | null> {
+// One finished work of the user's org, live or archived, or null (a missing one, another org's, a
+// deleted one, or the user is not an active member of any org).
+export async function findOrgWork(client: RpcClient, user: string, jobId: string): Promise<OrgWorkFile | null> {
   if (!uuid.safeParse(jobId).success) return null
-  const rows = await callRpc(client, 'org_owner_work_file', { p_owner: uuid.parse(owner), p_job_id: jobId }, z.array(fileRow))
+  const rows = await callRpc(client, 'org_member_work_file', { p_user: uuid.parse(user), p_job_id: jobId }, z.array(fileRow))
   const row = rows[0]
   return row ? { id: row.id, userId: row.user_id, creditPool: row.credit_pool, outputKey: row.output_key, archiveKey: row.archive_key } : null
 }

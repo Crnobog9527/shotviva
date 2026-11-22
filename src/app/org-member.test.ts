@@ -84,3 +84,35 @@ describe.each(['en', 'zh'] as const)('a member of an org (%s)', (locale) => {
     expect(text).toContain('$67.89')
   })
 })
+
+const { EnterpriseFrame } = await import('@/core/org/ui/enterprise-frame')
+const { OrgWorksView } = await import('@/core/org/ui/works-view')
+
+describe.each(['en', 'zh'] as const)('企业作品 for staff (%s)', (locale) => {
+  it("gives a member's org page two sections: their own view and 企业作品, none of the owner's", () => {
+    const { html, errors } = render(locale, createElement(EnterpriseFrame, { orgName: 'Acme Studio', current: 'workspace', affiliate: true, role: 'member', intro: '' }, null))
+    expect(errors).toEqual([])
+    expect(html).toContain('href="/account/enterprise/works"')
+    expect(html).toMatch(/<a href="\/account\/enterprise" aria-current="page"/)
+    expect(html).not.toContain('/account/enterprise/purchasing')
+    expect(html).not.toContain('/partners/enterprise')
+  })
+
+  const page = {
+    members: [], member: null, next: null,
+    works: [{ id: '22222222-2222-4222-8222-222222222222', userId: '00000000-0000-4000-8000-0000000000b2', templateId: 't', templateName: 'Menu', createdAt: '2026-11-20T00:00:00Z', aspectRatio: '4:5', memberActive: true, label: 'ann@acme.test' }],
+  }
+
+  it('lets staff open and download every work but not delete one', () => {
+    const { html, errors } = render(locale, createElement(OrgWorksView, { page, remove: null }))
+    expect(errors).toEqual([])
+    expect(html).toContain('/api/account/enterprise/works/22222222-2222-4222-8222-222222222222?download=1')
+    expect(html).toContain('/api/account/enterprise/works/22222222-2222-4222-8222-222222222222?size=thumb')
+    expect(html).not.toMatch(/Delete|删除/)
+  })
+
+  it('still gives the owner the delete button', () => {
+    const { html } = render(locale, createElement(OrgWorksView, { page, remove: async () => undefined }))
+    expect(html).toMatch(/Delete|删除/)
+  })
+})

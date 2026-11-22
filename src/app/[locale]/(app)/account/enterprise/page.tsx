@@ -5,7 +5,7 @@ import { getTranslations } from 'next-intl/server'
 import { AppPage } from '@/core/app-shell'
 import { maskPhone } from '@/core/auth/phone'
 import { readOwnerReport, type StaffCard } from '@/core/org/console'
-import { BillingProfilePanel, EnterpriseFrame, EnterpriseHeader, MemberOrgView, OwnerConsoleView, type OwnerActions } from '@/core/org/ui'
+import { BillingProfilePanel, EnterpriseFrame, MemberOrgView, OwnerConsoleView, type OwnerActions } from '@/core/org/ui'
 
 import {
   allocateAction, allocatePromoAction, bulkGrantAction, bulkSetAllowanceAction, depositAction, poolsAction,
@@ -56,14 +56,13 @@ async function Workspace({ searchParams }: { searchParams: Promise<{ month?: str
   )
 }
 
-// A member's page: the org's name and their own numbers only, on the account page's reading width.
+// A member's page: their own numbers only, with 企业作品 next to it in the member's navigation.
 async function MemberArea({ data }: { data: StaffCard }) {
   const t = await getTranslations('app.org.staff')
   return (
-    <div className="mx-(--gutter) mt-4 space-y-4 md:max-w-[720px] lg:mt-8">
-      <EnterpriseHeader orgName={data.orgName} intro={t('pageIntro')} />
+    <EnterpriseFrame orgName={data.orgName} current="workspace" affiliate={false} role="member" intro={t('pageIntro')}>
       <MemberOrgView data={data} />
-    </div>
+    </EnterpriseFrame>
   )
 }
 

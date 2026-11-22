@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { reserveJob } from '@/core/jobs'
 import { allocateOrgCredits, joinOrg } from '@/core/org'
-import { archiveOrgWorksOf, archiveThumbKey, DELETED_MAKERS, orgOwnerDeleteWork, orgOwnerWork, orgOwnerWorkMembers, orgOwnerWorks } from '@/core/org/works'
+import { archiveOrgWorksOf, archiveThumbKey, DELETED_MAKERS, findOrgWork, orgOwnerDeleteWork, orgWorkMakers, orgWorks } from '@/core/org/works'
 import { workThumbKeyFor } from '@/core/storage'
 
 import { jpeg } from '../fakes/images'
@@ -124,17 +124,17 @@ describe('account deletion', () => {
     expect(await store.head(archived)).not.toBeNull()
     expect(await store.head(archiveThumbKey(archived))).not.toBeNull()
     // Until the account is gone the work is listed once, live.
-    expect((await orgOwnerWorks(service, owner)).filter((w) => w.id === orgWork)).toHaveLength(1)
+    expect((await orgWorks(service, owner)).filter((w) => w.id === orgWork)).toHaveLength(1)
 
     await deleteAuthUser(staff)
     expect((await db.query('select count(*)::int as n from public.generation_jobs where user_id = $1', [staff])).rows[0].n).toBe(0)
     expect(await archiveRow(orgWork)).toMatchObject({ org_id: orgId, output_key: archived, reason: 'account_deleted', deleted_at: null })
     expect(await archiveRow(personal)).toBeUndefined()
 
-    expect(await orgOwnerWorks(service, owner)).toEqual([expect.objectContaining({ id: orgWork, userId: null, memberActive: false })])
-    expect(await orgOwnerWorks(service, owner, { member: DELETED_MAKERS })).toHaveLength(1)
-    expect(await orgOwnerWorkMembers(service, owner)).toEqual([expect.objectContaining({ userId: null, status: 'deleted', works: 1 })])
-    expect(await orgOwnerWork(service, owner, orgWork)).toMatchObject({ userId: null, outputKey: archived })
+    expect(await orgWorks(service, owner)).toEqual([expect.objectContaining({ id: orgWork, userId: null, memberActive: false })])
+    expect(await orgWorks(service, owner, { member: DELETED_MAKERS })).toHaveLength(1)
+    expect(await orgWorkMakers(service, owner)).toEqual([expect.objectContaining({ userId: null, status: 'deleted', works: 1 })])
+    expect(await findOrgWork(service, owner, orgWork)).toMatchObject({ userId: null, outputKey: archived })
     // The code deployed before 1972 reads 1943's functions, which never return a null maker.
     const old = await db.query('select count(*)::int as n from public.org_owner_works($1)', [owner])
     expect(old.rows[0].n).toBe(0)
@@ -145,7 +145,7 @@ describe('account deletion', () => {
     const orgWork = await made(staff)
     await deleteAuthUser(staff)
     expect(await archiveRow(orgWork)).toMatchObject({ org_id: orgId, output_key: `outputs/${staff}/${orgWork}.png`, reason: 'job_deleted' })
-    expect((await orgOwnerWorks(service, owner)).map((w) => w.id)).toEqual([orgWork])
+    expect((await orgWorks(service, owner)).map((w) => w.id)).toEqual([orgWork])
   })
 
   it('lets only the owner delete an archived work, audited once with no maker', async () => {
@@ -164,8 +164,8 @@ describe('account deletion', () => {
     expect(await archiveRow(orgWork)).toMatchObject({ deleted_by: owner })
     const audit = await db.query('select maker_user_id, deleted_by from public.org_work_deletions where job_id = $1', [orgWork])
     expect(audit.rows).toEqual([{ maker_user_id: null, deleted_by: owner }])
-    expect(await orgOwnerWorks(service, owner)).toHaveLength(0)
-    expect(await orgOwnerWork(service, owner, orgWork)).toBeNull()
+    expect(await orgWorks(service, owner)).toHaveLength(0)
+    expect(await findOrgWork(service, owner, orgWork)).toBeNull()
   })
 
   it('skips works already deleted', async () => {
@@ -199,14 +199,14 @@ describe('account deletion', () => {
     for (const id of [kept, dropped]) upload(`outputs/${staff}/${id}.png`, new Uint8Array([1]), 'image/png')
     expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(2)
     // While the account is still there the file route knows where the copy is.
-    expect(await orgOwnerWork(service, owner, kept)).toMatchObject({ userId: staff, archiveKey: `org-works/${orgId}/${kept}.png` })
+    expect(await findOrgWork(service, owner, kept)).toMatchObject({ userId: staff, archiveKey: `org-works/${orgId}/${kept}.png` })
     await orgOwnerDeleteWork({ db: rest, store }, { owner, jobId: dropped })
     expect(await archiveRow(dropped)).toMatchObject({ deleted_by: owner })
     // Its copy goes with it.
     expect(await store.head(`org-works/${orgId}/${dropped}.png`)).toBeNull()
     expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(0)
     await deleteAuthUser(staff)
-    expect((await orgOwnerWorks(service, owner)).map((w) => w.id)).toEqual([kept])
+    expect((await orgWorks(service, owner)).map((w) => w.id)).toEqual([kept])
     // No creator id survives in the audit of the earlier delete.
     const audit = await db.query('select maker_user_id from public.org_work_deletions where job_id = $1', [dropped])
     expect(audit.rows).toEqual([{ maker_user_id: null }])

@@ -18,7 +18,17 @@ const SECTIONS: readonly { id: EnterpriseSection; href: string; label: 'affiliat
   { id: 'purchasing', href: '/account/enterprise/purchasing', label: 'purchasing' },
 ]
 
-export function enterpriseSections(affiliate: boolean) {
+// A member's sections (Owner 2026-11-23): their own view of the org (the same address as the
+// owner's workspace) and 企业作品, which every active member sees.
+const MEMBER_SECTIONS: readonly { id: EnterpriseSection; href: string; label: 'mine' | 'works' }[] = [
+  { id: 'workspace', href: '/account/enterprise', label: 'mine' },
+  { id: 'works', href: '/account/enterprise/works', label: 'works' },
+]
+
+export type EnterpriseRole = 'owner' | 'member'
+
+export function enterpriseSections(affiliate: boolean, role: EnterpriseRole = 'owner') {
+  if (role === 'member') return MEMBER_SECTIONS
   return SECTIONS.filter((section) => affiliate || section.id !== 'affiliate')
 }
 
@@ -31,6 +41,8 @@ type FrameProps = {
   orgName: string
   current: EnterpriseSection
   affiliate: boolean
+  // Whose sections the navigation shows; the owner's unless said otherwise.
+  role?: EnterpriseRole
   intro: string
   // The affiliate dashboard's own views (overview, commissions, …), shown under its section.
   subnav?: ReactNode
@@ -40,12 +52,12 @@ type FrameProps = {
 // One header and one navigation for all three sections, so switching never leaves the area. On a
 // phone: a compact title, then a sticky segmented control across the top and the section's own
 // views as a chip rail. From lg up: the #825 layout, the navigation in a sticky side column.
-export function EnterpriseFrame({ orgName, current, affiliate, intro, subnav, children }: FrameProps) {
+export function EnterpriseFrame({ orgName, current, affiliate, role = 'owner', intro, subnav, children }: FrameProps) {
   return (
     <div className="mx-(--gutter) mt-4 grid gap-4 lg:mt-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-x-10 lg:gap-y-8">
       <EnterpriseHeader orgName={orgName} intro={intro} className="lg:col-span-2" />
       <aside className="max-lg:contents lg:sticky lg:top-[80px] lg:self-start">
-        <SectionNav current={current} affiliate={affiliate} subnav={subnav} />
+        <SectionNav current={current} affiliate={affiliate} role={role} subnav={subnav} />
       </aside>
       <div className="min-w-0 space-y-4">{children}</div>
     </div>
@@ -67,11 +79,11 @@ export function EnterpriseHeader({ orgName, intro, className }: { orgName: strin
   )
 }
 
-const GRID_COLS: Record<number, string> = { 3: 'grid-cols-3', 4: 'grid-cols-4' }
+const GRID_COLS: Record<number, string> = { 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4' }
 
-function SectionNav({ current, affiliate, subnav }: { current: EnterpriseSection; affiliate: boolean; subnav?: ReactNode }) {
+function SectionNav({ current, affiliate, role, subnav }: { current: EnterpriseSection; affiliate: boolean; role: EnterpriseRole; subnav?: ReactNode }) {
   const t = useTranslations('app.org.tabs')
-  const sections = enterpriseSections(affiliate)
+  const sections = enterpriseSections(affiliate, role)
   return (
     <>
       <nav
