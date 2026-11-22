@@ -9,6 +9,7 @@ export const COPY = {
   attribution: '归属',
   settings: '设置',
   fees: '手续费',
+  promo: '推广积分',
   errors: '重算异常',
   detail: '详情',
   empty: '暂无记录',

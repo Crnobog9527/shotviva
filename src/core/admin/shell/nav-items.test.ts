@@ -63,3 +63,11 @@ describe('admin nav', () => {
     expect(items.find((item) => item.key === 'gallery')).toMatchObject({ href: '/admin/gallery', label: '创作库审核', count: 4 })
   })
 })
+
+describe('admin nav counts', () => {
+  it('shows the pending promotion grant sheets on 联盟营销 (ARCHITECTURE §6.5)', () => {
+    const items = adminNavItems({ wishlist: false, affiliate: true }, { affiliates: 2 })
+    expect(items.find((item) => item.key === 'affiliates')?.count).toBe(2)
+    expect(adminNavItems({ wishlist: false, affiliate: true }, { affiliates: 0 }).find((item) => item.key === 'affiliates')?.count).toBeUndefined()
+  })
+})
