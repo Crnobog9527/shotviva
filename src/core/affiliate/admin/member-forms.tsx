@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { COPY } from './copy'
 import { MutationForm, type SaveAction } from './form'
 import { Field, Hidden, Select } from './parts'
-import { Rates, type Rate } from './rates'
+import { Rates, type OrgL2Defaults, type Rate } from './rates'
 import type { Member } from './read'
 
 function Slug({ value }: { value?: string }) {
@@ -31,7 +31,7 @@ export function ReopenApplication({ member, action }: { member: Member; action: 
     </MutationForm>
   )
 }
-export function SetMember({ member, rates, action, orgL2DefaultBp }: { member: Member; rates: Rate[]; action: SaveAction; orgL2DefaultBp?: number }) {
+export function SetMember({ member, rates, action, orgL2Defaults }: { member: Member; rates: Rate[]; action: SaveAction; orgL2Defaults?: OrgL2Defaults }) {
   return (
     <MutationForm action={action} operation="set" label={COPY.save}>
       <Hidden name="user_id" value={member.user_id} />
@@ -48,7 +48,7 @@ export function SetMember({ member, rates, action, orgL2DefaultBp }: { member: M
         <input type="checkbox" name="void_unconfirmed" />
         {COPY.voidUnconfirmed}
       </label>
-      <Rates values={rates} optional orgL2DefaultBp={orgL2DefaultBp} />
+      <Rates values={rates} optional orgL2Defaults={orgL2Defaults} />
     </MutationForm>
   )
 }
