@@ -74,11 +74,11 @@ it('leaves a top-up of the same month to expire on its own: the voided sheet abs
   const t = await row(db, 'select admin_partner_promo_topup($1,$2) as r', [actor,
     { org_id: orgId, recipient: owner, period: m.current, credits: 5000, reason: 'extra', request_key: randomUUID() }])
   await voidSheet(actor, { grant_id: s.id, reason: 'manual' })
-  // 3,000 spent during the month, after both: it comes out of the top-up.
+  // 3,000 spent during the month, after the void: it comes out of the top-up.
   await db.query("select _apply_credit_change($1,'free','reserve',-3000,'job','job:v1:reserve')", [owner])
   await db.query("update credit_ledger set created_at=now()-interval '1 minute' where idempotency_key='job:v1:reserve'")
-  await db.query("update partner_promo_topups set created_at=now()-interval '1 day', expires_at=now() where id=$1", [t.r.topup_id])
-  await db.query("update partner_promo_grants set decided_at=now()-interval '1 day', expires_at=now() where id=$1", [s.id])
+  await db.query("update partner_promo_topups set created_at=now()-interval '12 hours', expires_at=now() where id=$1", [t.r.topup_id])
+  await db.query("update partner_promo_grants set decided_at=now()-interval '1 day', voided_at=now()-interval '2 minutes', expires_at=now() where id=$1", [s.id])
   expect(await freeOf(db, owner)).toBe(2510 + 5000 - 3000)
   expect(await expirePass()).toMatchObject({ expired: 1, taken: 2000, failed: [] })
   expect(await freeOf(db, owner)).toBe(2510)
@@ -153,4 +153,43 @@ it('takes no clawback from later months for a voided sheet whose bonus was alrea
   await run(db, m.current)
   expect(await sheet(db, orgId, m.current)).toMatchObject({ base: 10000, clawback_owed: 0, clawback_applied: 0, total: 10000 })
   expect((await sheet(db, orgId, m.current)).detail.sources).toEqual([])
+})
+
+it('charges spending made before the void to the voided sheet, not to a later top-up', async () => {
+  const { orgId, owner } = await partner(db, actor)
+  await run(db, m.current)
+  const s = await sheet(db, orgId, m.current)
+  await confirm(db, actor, s) // 10,000
+  await db.query("select _apply_credit_change($1,'free','reserve',-3000,'job','job:v2:reserve')", [owner])
+  const t = await row(db, 'select admin_partner_promo_topup($1,$2) as r', [actor,
+    { org_id: orgId, recipient: owner, period: m.current, credits: 2000, reason: 'extra', request_key: randomUUID() }])
+  // The admin takes back what was left of the sheet (7,000) by hand, then voids it.
+  await db.query("select _apply_credit_change($1,'free','admin_adjust',-7000,'收回推广积分',$2)", [owner, 'adj:' + s.id])
+  await voidSheet(actor, { grant_id: s.id, reason: '已手动收回' })
+  await db.query("update partner_promo_grants set decided_at=now()-interval '3 days', voided_at=now()-interval '1 hour', expires_at=now() where id=$1", [s.id])
+  await db.query("update credit_ledger set created_at=now()-interval '2 days' where idempotency_key='job:v2:reserve'")
+  await db.query("update partner_promo_topups set created_at=now()-interval '1 day', expires_at=now() where id=$1", [t.r.topup_id])
+  expect(await freeOf(db, owner)).toBe(2000)
+  // The 3,000 came out of the sheet (older); the whole top-up is left and expires.
+  expect(await expirePass()).toMatchObject({ taken: 2000, failed: [] })
+  expect(await freeOf(db, owner)).toBe(0)
+  expect(await voidOf(s.id)).toMatchObject({ expired_at: null })
+})
+
+it('owes again the clawback a voided sheet applied, since that grant was taken back', async () => {
+  const { orgId, owner } = await partner(db, actor)
+  const sales = await fiveCustomers(db, owner, 600000, m.in_before)
+  await run(db, m.previous)
+  await db.query("update partner_promo_grants set expires_at=now()+interval '1 day' where org_id=$1 and period=$2", [orgId, m.previous])
+  const last = await sheet(db, orgId, m.previous)
+  await confirm(db, actor, last) // bonus 300,000
+  for (const x of sales) await db.query("select record_payment_issue($1,'refunded',2490)", [x.charge])
+  await run(db, m.current)
+  const now = await sheet(db, orgId, m.current)
+  expect(now).toMatchObject({ clawback_owed: 300000, clawback_applied: 10000, total: 0 })
+  await confirm(db, actor, now)
+  await voidSheet(actor, { grant_id: now.id, reason: 'manual' })
+  // The month after: the 10,000 the voided sheet applied counts as unpaid again.
+  const next = (await row(db, "select _partner_promo_calc($1, to_char((now() at time zone 'UTC') + interval '1 month','YYYY-MM')) as c", [orgId])).c
+  expect(next).toMatchObject({ clawback_owed: 300000, clawback_applied: 10000 })
 })
