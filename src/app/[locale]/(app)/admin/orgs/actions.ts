@@ -3,7 +3,7 @@
 import { refresh } from 'next/cache'
 import { z } from 'zod'
 
-import { addOrgMember, createOrg, grantOrg, runOrgAction, saveOrg, savePackage, savePaymentAccount, saveSignupBonus, searchPickerUsers, type PickerUser } from '@/core/admin/orgs'
+import { addOrgMember, createOrg, grantOrg, runOrgAction, saveOrg, savePackage, savePaymentAccount, saveSignupBonus, searchPickerUsers, transferOrgOwner, type PickerUser } from '@/core/admin/orgs'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { logger } from '@/core/logger'
 
@@ -59,6 +59,14 @@ export async function saveSignupBonusAction(input: unknown) {
 export async function addMemberAction(input: unknown) {
   const d = await deps()
   const result = await runOrgAction(() => addOrgMember(d, input))
+  if (result.ok) refresh()
+  return result
+}
+
+// 更换主管理员 (1930): the org's channel assets stay with the org.
+export async function transferOwnerAction(input: unknown) {
+  const d = await deps()
+  const result = await runOrgAction(() => transferOrgOwner(d, input))
   if (result.ok) refresh()
   return result
 }

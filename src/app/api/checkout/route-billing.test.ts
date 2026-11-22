@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ notify: vi.fn(), getSessionUser: vi.fn(), createCheckout: vi.fn(), createWaffoCheckout: vi.fn(), channel: vi.fn(), mirror: vi.fn(), tier: vi.fn(), pricing: vi.fn(), catalog: vi.fn(), billing: vi.fn() }))
 
 vi.mock('@/core/alerts', () => ({ notifyOwner: mocks.notify }))
+// The org-member guard (#841) has its own tests; an owner passes it.
+vi.mock('@/core/billing/org-member-guard', () => ({ assertNotOrgMember: vi.fn(async () => undefined) }))
 vi.mock('@/core/auth/session', () => ({ getSessionUser: mocks.getSessionUser }))
 vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.catalog }) }))
 

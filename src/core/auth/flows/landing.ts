@@ -9,6 +9,7 @@ import type { Locale } from '../../i18n/locales'
 import { localeOfPath } from '../../i18n/paths'
 import { logger } from '../../logger'
 import { onVerifiedSignIn } from '../first-sign-in'
+import { staffTokenFor } from '../staff-signup'
 import { sanitizeNext } from '../redirect-target'
 import { isVerified, metadataLocale } from '../session-user'
 import type { CallbackFlow } from './callback-url'
@@ -49,7 +50,7 @@ export async function landOnSession(
   // Google accounts never pass through signUp, so their auth emails would stay English: store
   // the language the sign-in started in, once (ARCHITECTURE §7). Email sign-ups already have it.
   if (flow === 'oauth' && !stored) await rememberAccountLocale(supabase, locale)
-  if (verified) await onVerifiedSignIn(data.user.id, benefits, flow === 'oauth' ? 'google' : 'email', locale)
+  if (verified) await onVerifiedSignIn(data.user.id, benefits, flow === 'oauth' ? 'google' : 'email', locale, staffTokenFor(nextParam, data.user))
   return { kind: 'signed_in', verified, userId: data.user.id, flow }
 }
 

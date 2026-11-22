@@ -14,6 +14,7 @@ export {
   adminGrantOrg,
   adminSaveOrgPackage,
   adminSetOrgSignupBonus,
+  adminTransferOrgOwner,
   adminUpdateOrg,
   ORG_SIGNUP_BONUS_MAX,
   orgCreateSchema,
@@ -21,6 +22,7 @@ export {
   orgPackageSchema,
   orgUpdateSchema,
   orgUsageSchema,
+  type OrgOwnerTransfer,
 } from './admin'
 export { runMonthlyTopup, topupPeriod, type TopupSummary } from './monthly-topup'
 export {

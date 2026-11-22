@@ -121,3 +121,15 @@ describe('updatePassword', () => {
     expect(mocks.updateUser).toHaveBeenCalledWith({ password: 'hunter2x' })
   })
 })
+
+describe('signUpWithPassword: staff link sign-up', () => {
+  // Codex P1 (#841): a staff-link sign-up remembers its token for a confirmation resent from /login.
+  it('stores the staff link token on the account; any other sign-up stores none', async () => {
+    mocks.signUp.mockResolvedValue({ data: { user: { identities: [{}] } }, error: null })
+    const token = 'b'.repeat(32)
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next: `/zh/join/org/${token}` }))
+    expect(mocks.signUp.mock.calls[0]![0].options.data).toEqual({ locale: 'zh', staff_invite: token })
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next: '/zh/account' }))
+    expect(mocks.signUp.mock.calls[1]![0].options.data).toEqual({ locale: 'zh' })
+  })
+})

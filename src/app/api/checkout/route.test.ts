@@ -1,13 +1,14 @@
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ notify: vi.fn(), getSessionUser: vi.fn(), createCheckout: vi.fn(), createWaffoCheckout: vi.fn(), channel: vi.fn(), mirror: vi.fn(), tier: vi.fn(), pricing: vi.fn(), catalog: vi.fn(), billing: vi.fn() }))
+const mocks = vi.hoisted(() => ({ notify: vi.fn(), getSessionUser: vi.fn(), createCheckout: vi.fn(), createWaffoCheckout: vi.fn(), channel: vi.fn(), mirror: vi.fn(), tier: vi.fn(), pricing: vi.fn(), catalog: vi.fn(), billing: vi.fn(), orgGuard: vi.fn() }))
 
 vi.mock('@/core/alerts', () => ({ notifyOwner: mocks.notify }))
 vi.mock('@/core/auth/session', () => ({ getSessionUser: mocks.getSessionUser }))
 vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.catalog }) }))
+vi.mock('@/core/billing/org-member-guard', () => ({ assertNotOrgMember: mocks.orgGuard }))
 
-beforeEach(() => { mocks.notify.mockClear(); mocks.catalog.mockReset().mockImplementation(catalogRpc) })
+beforeEach(() => { mocks.notify.mockClear(); mocks.catalog.mockReset().mockImplementation(catalogRpc); mocks.orgGuard.mockReset().mockResolvedValue(undefined) })
 
 async function catalogRpc(fn: string) {
   if (fn === 'resume_catalog_checkout') return { data: null, error: null }
