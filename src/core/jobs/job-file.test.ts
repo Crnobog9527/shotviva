@@ -34,7 +34,7 @@ async function setup(pool: 'free' | 'paid', background?: string) {
 }
 
 const WHITE_KEY = `inputs/${USER}/downloads/${JOB}-white.jpg`
-const MARKED_KEY = `inputs/${USER}/downloads/${JOB}-marked.png`
+const MARKED_KEY = `inputs/${USER}/downloads/${JOB}-marked-p1.png`
 
 describe('download files for a cut-out (白底 / 透明底)', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -86,7 +86,7 @@ describe('download files for a cut-out (白底 / 透明底)', () => {
 })
 
 describe('白底 + 透明 pair ZIP', () => {
-  const MARKED_WHITE_KEY = `inputs/${USER}/downloads/${JOB}-marked-white.jpg`
+  const MARKED_WHITE_KEY = `inputs/${USER}/downloads/${JOB}-marked-p1-white.jpg`
   const BOTH_KEY = `inputs/${USER}/downloads/${JOB}-both.zip`
 
   async function pair(pool: 'free' | 'paid', background?: string) {
@@ -112,8 +112,10 @@ describe('白底 + 透明 pair ZIP', () => {
 
   it('free: both files carry the mark (white JPEG and alpha PNG), never the clean original', async () => {
     const { memory, zip } = await pair('free', 'transparent')
-    const files = zip.mock.calls[0]?.[0] as unknown as { files: { key: string }[] }
-    expect(files.files.map((f) => f.key)).toEqual([MARKED_WHITE_KEY, MARKED_KEY])
+    const archive = zip.mock.calls[0]?.[0] as unknown as { key: string; files: { key: string }[] }
+    expect(archive.files.map((f) => f.key)).toEqual([MARKED_WHITE_KEY, MARKED_KEY])
+    // Its own ZIP name: a pair packed before 2026-11-22 (corner mark only) is never handed out again.
+    expect(archive.key).toBe(`inputs/${USER}/downloads/${JOB}-marked-p1-both.zip`)
     expect(await sharp(memory.objects.get(MARKED_WHITE_KEY)?.body).metadata()).toMatchObject({ format: 'jpeg', hasAlpha: false })
     expect(await sharp(memory.objects.get(MARKED_KEY)?.body).metadata()).toMatchObject({ format: 'png', hasAlpha: true })
   })

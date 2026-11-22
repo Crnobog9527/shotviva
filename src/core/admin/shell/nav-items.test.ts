@@ -17,6 +17,7 @@ describe('admin nav', () => {
       'orgs',
       'disputes',
       'jobs',
+      'trace',
       'costs',
       'templates',
       'references',

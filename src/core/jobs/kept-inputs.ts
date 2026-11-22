@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { AppError } from '../errors'
 import { galleryVariantKeys } from '../gallery/variants'
 import { logger } from '../logger'
-import { copyBackKeptInputs, DOWNLOAD_VARIANTS, downloadVariantKeyFor, inputPreviewKeyFor, workThumbKeyFor, type ObjectStore } from '../storage'
+import { copyBackKeptInputs, DOWNLOAD_VARIANTS, downloadVariantKeyFor, inputPreviewKeyFor, protectedCopyKeyFor, retiredVariantKeysFor, workThumbKeysFor, type ObjectStore } from '../storage'
 import { EDIT_TEMPLATE_ID } from '../templates/edit-params'
 import { keptSlotIndex, storedSlotOrder } from '../templates/image-slots'
 import type { Job } from './job-schema'
@@ -52,7 +52,7 @@ export async function photosForAgain(store: ObjectStore, job: Job): Promise<Agai
 }
 
 // Every file a work owns (§8.3: kept and deleted together): the result, its small copy for lists
-// (「作品小图」), the 768px preview (T32) and the kept uploads (T40), plus any staged 白底 / 透明底
+// (「作品小图」, both the clean and the protected key) and a free work's protected full copy, the 768px preview (T32) and the kept uploads (T40), plus any staged 白底 / 透明底
 // download copy or pair ZIP (§8; usually absent, and a missing key deletes fine), and the
 // gallery's copies (§9 第 9 条; only approved works have them). For deleting one work; account
 // deletion clears both user prefixes.
@@ -61,10 +61,12 @@ export function workFileKeys(job: Pick<Job, 'id' | 'userId' | 'outputKey' | 'inp
   const gallery = job.outputKey ? galleryVariantKeys(job.outputKey) : []
   return [
     ...(job.outputKey ? [job.outputKey] : []),
-    workThumbKeyFor(job.userId, job.id),
+    ...workThumbKeysFor(job.userId, job.id),
+    protectedCopyKeyFor(job.userId, job.id),
     inputPreviewKeyFor(job.userId, job.id),
     ...keptInputsOf(job),
     ...staged,
+    ...retiredVariantKeysFor(job.userId, job.id),
     ...gallery,
   ]
 }

@@ -2,6 +2,7 @@ import { Link } from '@/core/i18n/ui'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
+import { savedLongEdge } from '@/core/storage/rules'
 import { cn } from '@/core/ui/cn'
 
 import { DetailHead } from '../detail/detail-head'
@@ -31,7 +32,8 @@ type Props = {
   // The Photos viewer around it (2026-11-12): its two columns (this section takes part in the
   // viewer's grid), the step buttons over the photo, Make again switching the viewer in place,
   // and the batch the work belongs to.
-  viewer: { tray: string; side: string; photoExtra: ReactNode; again: ReactNode; batch: ReactNode }
+  // clean: 「去水印：用付费积分重新生成」 for a free work (remove-watermark.tsx), under the actions.
+  viewer: { tray: string; side: string; photoExtra: ReactNode; again: ReactNode; batch: ReactNode; clean?: ReactNode }
 }
 
 // A finished photo opened from Photos (T6 photo.html; DESIGN §4.4), in the Photos viewer: the
@@ -59,9 +61,10 @@ export function ResultView({ item, detail, shareText, edit, parent, parentDelete
       <div className={viewer.side}>
         <DetailHead item={item} />
         <div className="mt-4 grid gap-2">
-          <ShareButton fileUrl={fileUrl} name={`shotviva-${item.templateId}`} shareText={shareText} px={tierPx(item.resolution, item.aspect)} work={{ pool: item.creditPool, transparent: item.transparent }} watermarked={item.creditPool === 'free'} />
+          <ShareButton fileUrl={fileUrl} name={`shotviva-${item.templateId}`} shareText={shareText} px={savedLongEdge(item.creditPool, tierPx(item.resolution, item.aspect))} work={{ pool: item.creditPool, transparent: item.transparent }} watermarked={item.creditPool === 'free'} />
           {/* Edit and Make again side by side (B comp photo.html .acts .two); alone, full width. */}
           <QuietActions edit={edit} again={again} />
+          {viewer.clean}
           {remove}
         </div>
         {viewer.batch}

@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AppError } from '../errors'
 import { logger } from '../logger'
-import { shouldWatermark, workThumbKeyFor, writeWorkThumb, type ObjectStore } from '../storage'
+import { workThumbKeyFor, writeWorkThumb, type ObjectStore } from '../storage'
 import { findOwnJob } from './job-lookup'
 import type { Job } from './job-schema'
 import { fileUrlFor } from './job-view'
@@ -12,12 +12,12 @@ import { fileUrlFor } from './job-view'
 // Same short life as the full file's signed URL (job-file.ts).
 const SIGNED_GET_SECONDS = 300
 
-type Owned = Pick<Job, 'id' | 'userId'>
+type Owned = Pick<Job, 'id' | 'userId' | 'creditPool'>
 
 // An R2 error reads as "not there" (logged): the caller then makes the copy or shows the full file.
 async function hasThumb(store: ObjectStore, job: Owned): Promise<boolean> {
   try {
-    return (await store.head(workThumbKeyFor(job.userId, job.id))) !== null
+    return (await store.head(workThumbKeyFor(job.userId, job.id, job.creditPool))) !== null
   } catch (error) {
     logger.warn('work thumbnail head failed', { jobId: job.id, error })
     return false
@@ -25,11 +25,12 @@ async function hasThumb(store: ObjectStore, job: Owned): Promise<boolean> {
 }
 
 // A work finished before thumbnails existed, or whose copy failed at settle, gets one the first
-// time it is asked for. The watermark follows the work's own pool, as on the full file.
-async function makeThumb(store: ObjectStore, job: Owned & Pick<Job, 'creditPool'>, outputKey: string): Promise<boolean> {
+// time it is asked for, and so does a free work whose copy predates the protected one (its old
+// key is never read). The protection follows the work's own pool, as on the full file.
+async function makeThumb(store: ObjectStore, job: Owned, outputKey: string): Promise<boolean> {
   try {
     const bytes = await store.get(outputKey)
-    return await writeWorkThumb(store, { userId: job.userId, jobId: job.id, bytes, watermark: shouldWatermark(job.creditPool) })
+    return await writeWorkThumb(store, { userId: job.userId, jobId: job.id, bytes, pool: job.creditPool })
   } catch (error) {
     logger.warn('work thumbnail source not read', { jobId: job.id, error })
     return false
@@ -44,7 +45,7 @@ export async function resolveJobThumb(deps: { db: SupabaseClient; store: ObjectS
   const job = await findOwnJob(deps.db, req.userId, req.jobId)
   if (!job || job.status !== 'succeeded' || !job.outputKey) throw new AppError('NOT_FOUND', 'Not found')
   if ((await hasThumb(deps.store, job)) || (await makeThumb(deps.store, job, job.outputKey))) {
-    return deps.store.presignGet(workThumbKeyFor(job.userId, job.id), { expiresInSeconds: SIGNED_GET_SECONDS })
+    return deps.store.presignGet(workThumbKeyFor(job.userId, job.id, job.creditPool), { expiresInSeconds: SIGNED_GET_SECONDS })
   }
   return fileUrlFor(job.id)
 }
@@ -64,7 +65,7 @@ export async function firstThumbUrls(store: () => ObjectStore, jobs: readonly Ow
     const signed = await Promise.all(
       jobs.slice(0, count).map(async (job) => {
         if (!(await hasThumb(r2, job))) return null
-        return [job.id, await r2.presignGet(workThumbKeyFor(job.userId, job.id), { expiresInSeconds: SIGNED_GET_SECONDS })] as const
+        return [job.id, await r2.presignGet(workThumbKeyFor(job.userId, job.id, job.creditPool), { expiresInSeconds: SIGNED_GET_SECONDS })] as const
       }),
     )
     return new Map(signed.filter((entry) => entry !== null))
