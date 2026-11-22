@@ -3719,7 +3719,7 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."
     SET "search_path" TO ''
     SET "TimeZone" TO 'UTC'
     AS $$
-  select jsonb_build_object('owner',a.user_id,'inactive',a.status<>'active',
+  select jsonb_build_object('owner',a.user_id,'org',a.org_id,'inactive',a.status<>'active',
     'parent',case when a.status='active' and parent.team_enabled and parent.status='active' then parent.user_id end,
     'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,r.org_l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
     'bonus',coalesce(po.l2_bp,r.l2_bp),
@@ -3746,6 +3746,20 @@ $$;
 
 
 ALTER FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."payments") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select coalesce((
+    select p_snapshot || jsonb_build_object('owner', a.user_id)
+      from public.affiliates a
+     where jsonb_typeof(p_snapshot->'org') = 'string' and a.org_id = (p_snapshot->>'org')::uuid), p_snapshot);
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_affiliate_write_commission"("p_payment" "public"."payments", "p_snapshot" "jsonb", "p_level" smallint, "p_open" boolean, "p_lost" boolean, "p_release" boolean DEFAULT false) RETURNS "void"
@@ -4220,25 +4234,32 @@ CREATE OR REPLACE FUNCTION "public"."_org_attribute_invite"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare v_org uuid; v_account uuid; v_member uuid; v_via uuid; v_source text;
+declare v_org uuid; v_account uuid; v_member uuid; v_via uuid; v_source text; v_try integer;
 begin
   begin
-    select o.id,a.user_id into v_org,v_account from public.org_members m
-      join public.orgs o on o.id=m.org_id
-      join public.affiliates a on a.org_id=o.id
-      where m.user_id=new.inviter_user_id and m.status='active' and o.status='active' and o.affiliate_enabled
-        and a.status='active';
-    if found then
-      v_source:='org_l1'; v_member:=new.inviter_user_id; v_via:=null;
-    else
-      select o.id,a.user_id,inviter.referred_member into v_org,v_account,v_member from public.profiles inviter
-        join public.affiliates a on a.user_id=inviter.referred_by and a.org_id is not null
-        join public.orgs o on o.id=a.org_id
-        where inviter.id=new.inviter_user_id and inviter.referred_source='org_l1'
-          and o.status='active' and o.affiliate_enabled and o.affiliate_levels=2 and a.status='active';
-      if not found then return null; end if;
-      v_source:='org_l2'; v_via:=new.inviter_user_id;
-    end if;
+    for v_try in 1..2 loop
+      select o.id,a.user_id into v_org,v_account from public.org_members m
+        join public.orgs o on o.id=m.org_id
+        join public.affiliates a on a.org_id=o.id
+        where m.user_id=new.inviter_user_id and m.status='active' and o.status='active' and o.affiliate_enabled
+          and a.status='active';
+      if found then
+        v_source:='org_l1'; v_member:=new.inviter_user_id; v_via:=null;
+      else
+        select o.id,a.user_id,inviter.referred_member into v_org,v_account,v_member from public.profiles inviter
+          join public.affiliates a on a.user_id=inviter.referred_by and a.org_id is not null
+          join public.orgs o on o.id=a.org_id
+          where inviter.id=new.inviter_user_id and inviter.referred_source='org_l1'
+            and o.status='active' and o.affiliate_enabled and o.affiliate_levels=2 and a.status='active';
+        if not found then return null; end if;
+        v_source:='org_l2'; v_via:=new.inviter_user_id;
+      end if;
+      -- An org owner transfer (1930) holds the account row and then moves it to another user id:
+      -- wait for it and resolve once more.
+      perform 1 from public.affiliates where user_id=v_account for key share;
+      exit when found;
+      if v_try=2 then return null; end if;
+    end loop;
     if v_account=new.user_id then return null; end if;
     if exists(select from public.org_members m where m.org_id=v_org and m.user_id=new.user_id and m.status='active') then
       return null;
@@ -9745,6 +9766,150 @@ $$;
 ALTER FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_org_transfer_owner"("p_actor" "uuid", "p_input" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_uuid constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+  v_org_id uuid;
+  v_new uuid;
+  v_expected timestamptz;
+  v_account uuid;
+  v_errors bigint[] := '{}';
+  v_old uuid;
+  o public.orgs;
+  v_banned timestamptz;
+  v_found boolean;
+  v_current uuid;
+  a public.affiliates;
+  n_comm bigint; n_pay bigint; n_adj bigint; n_cust bigint;
+  v_moved jsonb := null;
+begin
+  perform public._org_require_admin(p_actor);
+  if p_input is null or jsonb_typeof(p_input) <> 'object'
+     or coalesce(lower(p_input->>'org_id'), '') !~ v_uuid
+     or coalesce(lower(p_input->>'user_id'), '') !~ v_uuid
+     or jsonb_typeof(p_input->'expected_updated_at') is distinct from 'string' then
+    raise exception 'INVALID_INPUT';
+  end if;
+  begin
+    v_expected := (p_input->>'expected_updated_at')::timestamptz;
+  exception when others then
+    raise exception 'INVALID_INPUT';
+  end;
+  v_org_id := (p_input->>'org_id')::uuid;
+  v_new := (p_input->>'user_id')::uuid;
+
+  -- FOR UPDATE, not NO KEY UPDATE: owner_user_id is a unique key (orgs_owner_user_id_key), so the
+  -- update below needs it, and taking it now (holding nothing yet) keeps that update from waiting.
+  select * into o from public.orgs where id = v_org_id for update;
+  if not found then raise exception 'ORG_NOT_FOUND'; end if;
+  if o.owner_user_id = v_new then return jsonb_build_object('applied', false); end if;
+  if v_expected is distinct from o.updated_at then raise exception 'ORG_CHANGED'; end if;
+  v_old := o.owner_user_id;
+
+  -- Every other lock is taken NOWAIT (see the header): busy means a payment, refund, binding or
+  -- settlement is writing for this org right now, and the admin simply tries again.
+  begin
+    select * into a from public.affiliates where org_id = o.id for update nowait;
+    v_account := case when found then a.user_id end;
+    perform 1 from public.profiles
+     where id in (select v_old union all select v_new union all
+                  select c.id from public.profiles c where v_account is not null and c.referred_by = v_account)
+     order by id for no key update nowait;
+    perform 1 from public.org_members where org_id = o.id and user_id in (v_old, v_new) order by user_id for no key update nowait;
+    -- Rows the writes reference through a foreign key: the admin (audit log) and the account's
+    -- approver (the copied row).
+    perform 1 from public.profiles where id in (p_actor, a.approved_by) order by id for key share nowait;
+    -- The affiliates statement trigger refreshes the template floor budget under this lock.
+    if v_account is not null and not pg_try_advisory_xact_lock(hashtextextended('shotviva.template_floor_budget_cache', 0)) then
+      raise exception using errcode = 'lock_not_available';
+    end if;
+    if v_account is not null then
+      perform 1 from public.affiliate_commissions where affiliate_user_id = v_account order by id for no key update nowait;
+      -- (affiliate_user_id, period) is a unique key: the update needs FOR UPDATE.
+      perform 1 from public.affiliate_payouts where affiliate_user_id = v_account order by id for update nowait;
+      perform 1 from public.affiliate_adjustments where affiliate_user_id = v_account order by id for no key update nowait;
+      perform 1 from public.affiliate_click_days where affiliate_user_id = v_account order by day for update nowait;
+      perform 1 from public.affiliate_rate_overrides where user_id = v_account order by product_kind for update nowait;
+      perform 1 from public.affiliates where parent_user_id = v_account order by user_id for no key update nowait;
+      -- Only these rows are rewritten below; one committed later carries 'org' (case 3).
+      select coalesce(array_agg(id order by id), '{}') into v_errors from (
+        select e.id from public.affiliate_recompute_errors e where e.resolved_at is null
+          and (e.snapshot->>'owner' = v_account::text or e.snapshot->>'parent' = v_account::text)
+          and (jsonb_typeof(e.snapshot->'org') is distinct from 'string' or e.snapshot->>'org' = o.id::text)
+         order by e.id for no key update nowait) x;
+    end if;
+  exception when lock_not_available then
+    raise exception 'ORG_BUSY';
+  end;
+  select true, banned_at into v_found, v_banned from public.profiles where id = v_new;
+  if v_found is null then raise exception 'PROFILE_NOT_FOUND'; end if;
+  if v_banned is not null then raise exception 'USER_BANNED'; end if;
+  select org_id into v_current from public.org_members where user_id = v_new and status = 'active';
+  if (v_current is not null and v_current <> o.id) or exists(select from public.orgs where owner_user_id = v_new) then
+    raise exception 'ORG_MEMBER_EXISTS';
+  end if;
+
+  if v_account is not null then
+    -- The org's account is always its owner's row (1640/1643); refuse rather than move anything
+    -- of someone else's if that ever stops being true.
+    if a.user_id <> v_old then raise exception 'ORG_AFFILIATE_MISMATCH'; end if;
+    if exists(select from public.affiliates where user_id = v_new) then raise exception 'ORG_NEW_OWNER_AFFILIATE'; end if;
+    -- Free the unique slug and org_id on the old row, insert the copy under the new owner, re-point
+    -- every reference, then drop the old row (nothing references it any more, so nothing cascades).
+    update public.affiliates set slug = 'mv-' || substr(md5(gen_random_uuid()::text), 1, 20), org_id = null
+      where user_id = a.user_id;
+    a.user_id := v_new;
+    -- The terms consent was the previous owner's own (case 7): the new owner re-accepts.
+    a.terms_version := null;
+    a.terms_accepted_at := null;
+    insert into public.affiliates select (a).*;
+    update public.affiliate_commissions set affiliate_user_id = v_new where affiliate_user_id = v_old;
+    get diagnostics n_comm = row_count;
+    update public.affiliate_payouts set affiliate_user_id = v_new where affiliate_user_id = v_old;
+    get diagnostics n_pay = row_count;
+    update public.affiliate_adjustments set affiliate_user_id = v_new where affiliate_user_id = v_old;
+    get diagnostics n_adj = row_count;
+    update public.affiliate_click_days set affiliate_user_id = v_new where affiliate_user_id = v_old;
+    update public.affiliate_rate_overrides set user_id = v_new where user_id = v_old;
+    update public.affiliates set parent_user_id = v_new where parent_user_id = v_old;
+    update public.profiles set referred_by = v_new where referred_by = v_old;
+    get diagnostics n_cust = row_count;
+    delete from public.affiliates where user_id = v_old;
+    -- Unresolved retries stored before now named the moved row as it was: the org's account
+    -- (case 2 above).
+    update public.affiliate_recompute_errors set snapshot = snapshot
+        || case when snapshot->>'owner' = v_old::text then jsonb_build_object('owner', v_new) else '{}'::jsonb end
+        || case when snapshot->>'parent' = v_old::text then jsonb_build_object('parent', v_new) else '{}'::jsonb end
+      where id = any(v_errors);
+    v_moved := jsonb_build_object('commissions', n_comm, 'payouts', n_pay, 'adjustments', n_adj, 'customers', n_cust);
+  elsif public._affiliate_personal_open(v_new) then
+    raise exception 'ORG_PERSONAL_AFFILIATE';
+  end if;
+
+  update public.org_members set role = 'member' where org_id = o.id and user_id = v_old and role = 'owner';
+  -- An active member keeps their allowance and held credits; a removed or new one starts clean,
+  -- as admin_org_add_member does.
+  insert into public.org_members(org_id, user_id, role) values (o.id, v_new, 'owner')
+    on conflict (org_id, user_id) do update set role = 'owner',
+      monthly_allowance = case when public.org_members.status = 'active' then public.org_members.monthly_allowance else 0 end,
+      held_credits = case when public.org_members.status = 'active' then public.org_members.held_credits else 0 end,
+      joined_at = case when public.org_members.status = 'active' then public.org_members.joined_at else now() end,
+      status = 'active', removed_at = null;
+  update public.orgs set owner_user_id = v_new, updated_at = now() where id = o.id returning * into o;
+
+  perform public._org_audit(p_actor, 'org_transfer_owner', o.id::text,
+    jsonb_build_object('from', v_old, 'to', v_new, 'affiliate', v_moved)::text);
+  return jsonb_build_object('applied', true, 'updated_at', o.updated_at, 'previous_owner', v_old, 'affiliate', v_moved);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_org_transfer_owner"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_org_update"("p_actor" "uuid", "p_org_id" "uuid", "p_input" "jsonb") RETURNS timestamp with time zone
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -12674,6 +12839,13 @@ begin
   if not (select enabled from public.affiliate_settings where singleton) then return false; end if;
   select user_id into v_owner from public.affiliates where slug=p_slug and status='active' and user_id<>p_user;
   if not found then return false; end if;
+  -- An org owner transfer (1930) holds this row and then moves it to another user id: wait for
+  -- it and resolve the slug once more.
+  perform 1 from public.affiliates where user_id=v_owner for key share;
+  if not found then
+    select user_id into v_owner from public.affiliates where slug=p_slug and status='active' and user_id<>p_user;
+    if not found then return false; end if;
+  end if;
   -- Billing already takes the profile row lock in settle_checkout. Lock before observing payment history.
   perform 1 from public.profiles where id=p_user and referred_by is null for update;
   if not found then return false; end if;
@@ -12932,6 +13104,7 @@ begin
   -- Serializes manual/cron retries with the existing billing transaction on this payment.
   select p.* into strict v_payment from public.payments p where p.id=p_payment_id for update;
   if v_payment.amount_total=0 then return; end if;
+  if v_retry then v_snapshot:=public._affiliate_snapshot_remap(v_snapshot); end if;
   if not v_exists and v_snapshot is null then v_snapshot:=public._affiliate_snapshot(v_payment); end if;
   if not v_exists and v_snapshot is null then
     if v_retry then update public.affiliate_recompute_errors set resolved_at=now() where payment_id=p_payment_id and resolved_at is null; end if;
@@ -19804,7 +19977,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text", 'partner_promo_set'::"text", 'partner_promo_confirm'::"text", 'partner_promo_reject'::"text", 'partner_promo_run'::"text", 'partner_promo_topup'::"text", 'payment_acknowledge'::"text", 'payment_unacknowledge'::"text", 'partner_promo_void'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text", 'partner_promo_set'::"text", 'partner_promo_confirm'::"text", 'partner_promo_reject'::"text", 'partner_promo_run'::"text", 'partner_promo_topup'::"text", 'payment_acknowledge'::"text", 'payment_unacknowledge'::"text", 'partner_promo_void'::"text", 'org_transfer_owner'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -25660,6 +25833,10 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."paym
 
 
 
+REVOKE ALL ON FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_affiliate_write_commission"("p_payment" "public"."payments", "p_snapshot" "jsonb", "p_level" smallint, "p_open" boolean, "p_lost" boolean, "p_release" boolean) FROM PUBLIC;
 
 
@@ -26424,6 +26601,11 @@ GRANT ALL ON FUNCTION "public"."admin_org_payment_account_save"("p_actor" "uuid"
 
 REVOKE ALL ON FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_org_transfer_owner"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_org_transfer_owner"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
 
 
