@@ -92,7 +92,8 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
     expect(text).toContain('120,000')
     expect(text).toContain('$1,234')
     expect(text).toContain('98,765')
-    expect(text).toContain('/join/org/' + 'a'.repeat(32))
+    // Built in Chinese whatever the console's language (ENTERPRISE_LINK_LOCALE).
+    expect(text).toContain('/zh/join/org/' + 'a'.repeat(32))
     expect(text).toContain('ann@acme.test')
     expect(html).toContain('/account?help=new')
     // Packages are USD only: no yuan sign anywhere.
