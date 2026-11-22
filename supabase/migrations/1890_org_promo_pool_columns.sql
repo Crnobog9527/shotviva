@@ -4,7 +4,7 @@
 -- (free-pool credits: watermarked, demo-only, expiring at the end of the UTC month). The owner hands
 -- both kinds to members with separate monthly allowances and one-off grants.
 --
--- This file only adds structure: columns with defaults and the ledger kinds / audit actions widened
+-- This file only adds structure: columns with defaults and the ledger kinds widened
 -- from what they are now (read from the constraints, as 1840 did, so nothing another migration
 -- added is dropped). Code running before the deploy never reads the new columns.
 
@@ -22,16 +22,12 @@ alter table public.org_members
   add column held_promo_credits integer not null default 0 check (held_promo_credits >= 0);
 
 -- Where a grant or top-up went: 'owner' (the owner's own free pool, every row before this
--- migration) or 'org' (the org promo pool, every row confirmed or made after it). moved_at /
--- moved_credits: an 'owner' row whose unspent part an admin moved into the org pool (1894).
+-- migration; it expires there at month end as before) or 'org' (the org promo pool, every row
+-- confirmed or made after it).
 alter table public.partner_promo_grants
-  add column destination text not null default 'owner' check (destination in ('owner', 'org')),
-  add column moved_at timestamptz,
-  add column moved_credits integer check (moved_credits >= 0);
+  add column destination text not null default 'owner' check (destination in ('owner', 'org'));
 alter table public.partner_promo_topups
-  add column destination text not null default 'owner' check (destination in ('owner', 'org')),
-  add column moved_at timestamptz,
-  add column moved_credits integer check (moved_credits >= 0);
+  add column destination text not null default 'owner' check (destination in ('owner', 'org'));
 
 -- A refund that lands after the member left: 'paid' (as before) or 'promo'. A promo return is only
 -- put back into the promo pool while its month (period) is still the org's live one.
@@ -61,21 +57,11 @@ begin
          regexp_matches(pg_get_constraintdef(c.oid), '''([a-z0-9_]+)''', 'g') with ordinality as t(m, ord)
    where c.conrelid = 'public.credit_ledger'::regclass and c.conname = 'credit_ledger_kind_check';
   if v_kinds is null or not 'partner_promo_topup' = any(v_kinds) then raise exception 'credit_ledger_kind_check not found or unreadable'; end if;
-  foreach v_new in array array['org_promo_allocate', 'org_promo_reclaim', 'org_promo_expire', 'org_promo_move'] loop
+  foreach v_new in array array['org_promo_allocate', 'org_promo_reclaim', 'org_promo_expire'] loop
     if not v_new = any(v_kinds) then v_kinds := array_append(v_kinds, v_new); end if;
   end loop;
   execute 'alter table public.credit_ledger drop constraint credit_ledger_kind_check';
   execute 'alter table public.credit_ledger add constraint credit_ledger_kind_check check (kind in ('
-    || (select string_agg(quote_literal(k), ',' order by o) from unnest(v_kinds) with ordinality u(k, o)) || '))';
-
-  select array_agg(m[1] order by ord) into v_kinds
-    from pg_constraint c,
-         regexp_matches(pg_get_constraintdef(c.oid), '''([a-z0-9_]+)''', 'g') with ordinality as t(m, ord)
-   where c.conrelid = 'public.admin_audit_log'::regclass and c.conname = 'admin_audit_log_action_check';
-  if v_kinds is null or not 'partner_promo_topup' = any(v_kinds) then raise exception 'admin_audit_log_action_check not found or unreadable'; end if;
-  if not 'partner_promo_move' = any(v_kinds) then v_kinds := array_append(v_kinds, 'partner_promo_move'); end if;
-  execute 'alter table public.admin_audit_log drop constraint admin_audit_log_action_check';
-  execute 'alter table public.admin_audit_log add constraint admin_audit_log_action_check check (action in ('
     || (select string_agg(quote_literal(k), ',' order by o) from unnest(v_kinds) with ordinality u(k, o)) || '))';
 end;
 $$;

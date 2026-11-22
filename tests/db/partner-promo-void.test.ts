@@ -148,6 +148,7 @@ it('takes no clawback from later months for a voided sheet whose bonus was alrea
   await db.query("update partner_promo_grants set expires_at=now()+interval '1 day' where org_id=$1 and period=$2", [orgId, m.previous])
   const last = await sheet(db, orgId, m.previous)
   expect(await confirm(db, actor, last)).toMatchObject({ applied: true, total: 310000 })
+  await asLegacy(db, 'partner_promo_grants', last.id) // granted before 1894, into the owner's own pool
   await db.query("select _apply_credit_change($1,'free','admin_adjust',-310000,'收回推广积分',$2)", [owner, 'adj:' + last.id])
   await voidSheet(actor, { grant_id: last.id, reason: '已手动收回' })
 

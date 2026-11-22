@@ -3,7 +3,6 @@ import type { ViewProps } from './members-view'
 import { GridTable, Hidden, Section } from './parts'
 import { PROMO_COPY as P } from './promo-copy'
 import { promoPartners, promoSheets, type PromoPartner } from './promo-read'
-import { movePreview } from './promo-move'
 import { PromoSheetCard } from './promo-sheet'
 import { currentPeriod, promoTopups, topupsOf } from './promo-topup-read'
 import { PromoTopups } from './promo-topups-view'
@@ -38,10 +37,8 @@ function Partners({ partners, action }: { partners: PromoPartner[]; action: View
   )
 }
 
-export async function PromoView({ db, action, actor }: ViewProps & { actor: string }) {
+export async function PromoView({ db, action }: ViewProps) {
   const [sheets, partners, topups] = await Promise.all([promoSheets(db), promoPartners(db), promoTopups(db)])
-  const active = partners.filter((p) => p.promo_partner && p.status === 'active')
-  const moves = new Map(await Promise.all(active.map(async (p) => [p.id, await movePreview(db, actor, p.id)] as const)))
   const now = new Date()
   const period = currentPeriod(now)
   const waiting = sheets.filter((s) => s.status === 'pending' && new Date(s.expires_at) > now).length
@@ -65,7 +62,7 @@ export async function PromoView({ db, action, actor }: ViewProps & { actor: stri
           sheets.map((s) => <PromoSheetCard key={s.id} sheet={s} topups={topupsOf(topups, s.org_id, s.period).sum} action={action} now={now} />)
         )}
       </Section>
-      <PromoTopups partners={partners} sheets={sheets} topups={topups} period={period} action={action} moves={moves} />
+      <PromoTopups partners={partners} sheets={sheets} topups={topups} period={period} action={action} />
       <Partners partners={partners} action={action} />
     </div>
   )
