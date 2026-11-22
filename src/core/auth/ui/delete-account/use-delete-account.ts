@@ -5,8 +5,9 @@ import { useState } from 'react'
 import { localeOfPath, localizePath } from '../../../i18n/paths'
 
 export type DeleteStatus = 'idle' | 'confirming' | 'deleting' | 'failed'
-// Why it failed: Stripe would not cancel a subscription, the account is an org's primary admin,
-// a company photo is still being made (nothing was deleted in those cases), or anything else.
+// Why it failed: Stripe would not cancel a subscription, the account is an org's primary admin
+// (nothing was deleted either way), a company photo is still being made (no photo or account
+// was deleted; subscriptions may already be cancelled if one started mid-deletion), or anything else.
 export type DeleteFailure = 'subscription' | 'orgOwner' | 'running' | 'other'
 
 export async function failureOf(response: Response): Promise<DeleteFailure> {
