@@ -9,6 +9,7 @@ import { HTML_LIMITED_BOTS } from './src/core/seo/html-limited-bots'
 import { indexingOpen, parseIndexingEnv, xRobotsTagRules } from './src/core/seo/indexing-env'
 import { legacyUserRedirects } from './src/core/admin/users/legacy-redirects'
 import { legacyHelpRedirects } from './src/core/support/legacy-redirects'
+import { PRESIZED_DEVICE_SIZES, PRESIZED_IMAGE_SIZES, PRESIZED_PREFIX } from './src/core/presized'
 import { assetsHeaders, assetsRemotePatterns, assetsRewrites, readAssetsEnv } from './src/core/storage/assets-env'
 import { SITE_DOMAIN } from './src/site/domain'
 
@@ -76,7 +77,15 @@ const nextConfig: NextConfig = {
   // AVIF first (about a fifth smaller than WebP at the same quality, which matters most on the
   // slow cross-border link to mainland China), WebP for browsers without it. Each format is
   // encoded once per width and then cached: the stored covers are immutable, content-hashed.
-  images: { formats: ['image/avif', 'image/webp'], remotePatterns: assetsRemotePatterns(assets.NEXT_PUBLIC_ASSETS_BASE_URL) },
+  // The widths are the pre-sized copies' (core/presized): with NEXT_PUBLIC_PRESIZED_IMAGES_URL on,
+  // a srcset names stored files, so it may only ask for widths that are stored. Next's defaults
+  // minus 32–96 and 1920–3840; every slot of 128 px and up picks the same width as before.
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    imageSizes: [...PRESIZED_IMAGE_SIZES],
+    deviceSizes: [...PRESIZED_DEVICE_SIZES],
+    remotePatterns: assetsRemotePatterns(assets.NEXT_PUBLIC_ASSETS_BASE_URL),
+  },
   poweredByHeader: false,
   // PostHog's API paths end in a slash (/i/v0/e/); a trailing-slash redirect would break them.
   skipTrailingSlashRedirect: true,
@@ -109,6 +118,14 @@ const nextConfig: NextConfig = {
       // must ship under a new file name, never over an old one.
       {
         source: '/home/:asset(.+\\.webp)',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+      // The pre-sized copies the build writes (scripts/presize-public.ts) of public/home and public/cases:
+      // named after their source, which never changes under the same name, so the same rule. The
+      // copies of public/intros and public/partners have no such convention and keep the default
+      // (revalidated) caching.
+      {
+        source: `/${PRESIZED_PREFIX}/:width(w\\d+)/:dir(home|cases)/:asset(.+\\.(?:avif|webp))`,
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
       // The inner landing pages' case pictures in public/cases: the same rule as public/home.

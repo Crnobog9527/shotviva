@@ -2,7 +2,8 @@
 
 /* eslint-disable @next/next/no-img-element -- a motion member's poster through the optimiser's srcset (coverImage) */
 import { cn } from '@/core/ui/cn'
-import { coverImage } from '@/core/ui/cover-image'
+import { coverAvif, coverImage } from '@/core/ui/cover-image'
+import { Picture } from '@/core/ui/picture'
 
 import { hasStills, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { COVER_SIZES } from '../catalogue/cover-sizes'
@@ -58,8 +59,8 @@ function Thumb({ member, eager }: { member: CatalogueTemplate; eager: boolean })
   if (!poster) return <span className="hairline block aspect-[8/5] rounded-[9px] bg-muted" />
   return (
     <span className="hairline relative block aspect-[8/5] overflow-hidden rounded-[9px] bg-muted">
-      <img {...coverImage(poster, COVER_SIZES.memberFrame)} alt="" aria-hidden="true" loading={eager ? 'eager' : 'lazy'} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" />
-      <img {...coverImage(poster, COVER_SIZES.memberFrame)} alt="" loading={eager ? 'eager' : 'lazy'} decoding="async" className="absolute inset-0 size-full object-contain" />
+      <Picture avif={coverAvif(poster, COVER_SIZES.memberFrame)}><img {...coverImage(poster, COVER_SIZES.memberFrame)} alt="" aria-hidden="true" loading={eager ? 'eager' : 'lazy'} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" /></Picture>
+      <Picture avif={coverAvif(poster, COVER_SIZES.memberFrame)}><img {...coverImage(poster, COVER_SIZES.memberFrame)} alt="" loading={eager ? 'eager' : 'lazy'} decoding="async" className="absolute inset-0 size-full object-contain" /></Picture>
     </span>
   )
 }
