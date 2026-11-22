@@ -15121,6 +15121,54 @@ $$;
 ALTER FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."org_promo_month"("p_org" "uuid", "p_now" timestamp with time zone DEFAULT "now"()) RETURNS TABLE("promo_partner" boolean, "period" "text", "monthly" integer, "topups" integer, "expires_at" timestamp with time zone, "remaining" integer)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_period text := to_char(p_now at time zone 'UTC', 'YYYY-MM');
+  v_partner boolean;
+  v_monthly integer;
+  v_topups integer;
+  v_expires timestamptz;
+  v_left bigint := 0;
+  b record;
+begin
+  select o.promo_partner into v_partner from public.orgs o where o.id = p_org;
+  if v_partner is null then return; end if;
+  select coalesce(sum(g.total), 0)::integer, min(g.expires_at) into v_monthly, v_expires
+    from public.partner_promo_grants g
+   where g.org_id = p_org and g.period = v_period and g.status = 'granted';
+  select coalesce(sum(t.credits), 0)::integer, least(v_expires, min(t.expires_at)) into v_topups, v_expires
+    from public.partner_promo_topups t
+   where t.org_id = p_org and t.period = v_period;
+  -- Each (recipient, expiry) bucket the org's rows sit in; normally one.
+  for b in
+    select x.u, x.e, sum(x.k)::bigint as own from (
+      select g.recipient_user_id as u, g.expires_at as e, 1 as k from public.partner_promo_grants g
+       where g.org_id = p_org and g.period = v_period and g.status = 'granted'
+      union all
+      select t.recipient_user_id, t.expires_at, 1 from public.partner_promo_topups t
+       where t.org_id = p_org and t.period = v_period
+    ) x group by x.u, x.e
+  loop
+    v_left := v_left + least(
+      coalesce((select p.free_credits from public.profiles p where p.id = b.u), 0),
+      coalesce((select sum(l.credits_left) from public._partner_promo_bucket_left(b.u, b.e) l
+                 where (l.source = 'grant' and exists (select 1 from public.partner_promo_grants g
+                                                       where g.id = l.source_id and g.org_id = p_org and g.period = v_period))
+                    or (l.source = 'topup' and exists (select 1 from public.partner_promo_topups t
+                                                       where t.id = l.source_id and t.org_id = p_org and t.period = v_period))), 0));
+  end loop;
+  return query select v_partner, v_period, v_monthly, v_topups, v_expires,
+    case when v_expires is not null and v_expires <= p_now then 0 else v_left::integer end;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."org_promo_month"("p_org" "uuid", "p_now" timestamp with time zone) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."org_remove_member"("p_owner" "uuid", "p_member" "uuid", "p_request_id" "text") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -26701,6 +26749,11 @@ GRANT ALL ON FUNCTION "public"."org_monthly_topup"("p_period" "text") TO "servic
 
 REVOKE ALL ON FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_promo_month"("p_org" "uuid", "p_now" timestamp with time zone) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_promo_month"("p_org" "uuid", "p_now" timestamp with time zone) TO "service_role";
 
 
 

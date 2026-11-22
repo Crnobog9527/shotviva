@@ -10,6 +10,8 @@ vi.mock('next-intl/server', () => ({
 vi.mock('@/core/i18n/server', () => ({ currentLocale: async () => 'en' }))
 vi.mock('@/core/i18n/ui', () => ({ Link: 'a' }))
 vi.mock('../copy-link', () => ({ CopyLink: () => null }))
+// The promotion-credits card reads the database; here it only marks where it renders.
+vi.mock('./promo-month', () => ({ PromoMonthCard: ({ orgId }: { orgId: string }) => `promo-card:${orgId}` }))
 vi.mock('./repository', () => ({
   readSummary: async () => ({ clicks: 0, referred: 0, paidUsers: 0, pending: 0, available: 30000, paid: 0, maturing: 0, nextSettlement: '2031-05-01' }),
   readFees: async (): Promise<PartnerFees> => ({ method: 'bank', rules: [], estimate: { gross: 30000, fees: 0, net: 30000, lines: [] } }),
@@ -30,6 +32,7 @@ it('measures an enterprise account against the enterprise threshold: progress, g
   expect(result).toContain('fees.intro{&quot;threshold&quot;:&quot;$1,000.00&quot;}')
   expect(result).toContain('notEligible')
   expect(result).not.toContain('$200.00')
+  expect(result).toContain('promo-card:00000000-0000-4000-8000-000000000001')
 })
 
 it('keeps a personal account on the personal threshold', async () => {
@@ -37,4 +40,5 @@ it('keeps a personal account on the personal threshold', async () => {
   expect(result).toContain('thresholdMet{&quot;threshold&quot;:&quot;$200.00&quot;}')
   expect(result).toContain('fees.intro{&quot;threshold&quot;:&quot;$200.00&quot;}')
   expect(result).not.toContain('$1,000.00')
+  expect(result).not.toContain('promo-card')
 })
