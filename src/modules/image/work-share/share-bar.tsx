@@ -1,13 +1,16 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import dynamic from 'next/dynamic'
 import { useState } from 'react'
 
 import { Button } from '@/core/ui/button'
 
-import { CreateShareSheet } from './create-share-sheet'
 import { useShareSelect } from './select-context'
 import { SHARE_MAX, type CreateShareAction } from './share-types'
+
+// The dialog's code loads on the first Create link, not with Photos (scripts/js-budget.json).
+const CreateShareSheet = dynamic(() => import('./create-share-sheet').then((mod) => mod.CreateShareSheet), { ssr: false })
 
 // While picking: a bar over the tab bar on phones (sticky at the bottom of the content from md)
 // with the count and the one primary, which opens the link dialog.
@@ -30,7 +33,7 @@ export function ShareBar({ create }: { create: CreateShareAction }) {
       </div>
       {/* Room under the grid so the fixed bar never covers the last row on a phone. */}
       <div aria-hidden="true" className="h-40 md:hidden" />
-      <CreateShareSheet open={open} onOpenChange={setOpen} jobIds={select.selected} create={create} onDone={select.stop} />
+      {open ? <CreateShareSheet open={open} onOpenChange={setOpen} jobIds={select.selected} create={create} onDone={select.stop} /> : null}
     </>
   )
 }
