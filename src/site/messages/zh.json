@@ -2641,7 +2641,17 @@
     },
     "enterprise": {
       "pill": "企业账号",
-      "title": "企业联盟后台"
+      "title": "企业联盟后台",
+      "promo": {
+        "title": "本月推广积分",
+        "granted": "已发放",
+        "monthly": "月度发放",
+        "topups": "临时追加",
+        "remaining": "剩余",
+        "validThrough": "有效期至（UTC）",
+        "note": "推广积分在你自己账号的免费积分里，月底没用完的部分会收回。",
+        "none": "本月还没有发放推广积分。"
+      }
     },
     "orderFees": {
       "paid": "实付（美元）",
