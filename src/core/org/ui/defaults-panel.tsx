@@ -16,9 +16,12 @@ const digits = (raw: string) => raw.replace(/\D/g, '').slice(0, 10)
 // people who join later included. A personal value overrides it; 「恢复默认」 on a member goes back.
 export function DefaultsForm({ data, actions }: { data: OwnerConsole; actions: OwnerActions }) {
   const t = useTranslations('app.org.defaults')
-  const [paid, setPaid] = useState(String(data.org.defaultPaidAllowance))
-  const [promo, setPromo] = useState(String(data.org.defaultPromoAllowance))
+  const [paid, setPaidValue] = useState(String(data.org.defaultPaidAllowance))
+  const [promo, setPromoValue] = useState(String(data.org.defaultPromoAllowance))
   const [requestId, setRequestId] = useState(() => crypto.randomUUID())
+  // Changed values are a new request (a repeat of the same one stays idempotent).
+  const setPaid = (next: string) => { setPaidValue(next); setRequestId(crypto.randomUUID()) }
+  const setPromo = (next: string) => { setPromoValue(next); setRequestId(crypto.randomUUID()) }
   const { pending, outcome, run } = useConsoleAction()
   const suspended = data.org.status === 'suspended'
   const valid = paid !== '' && promo !== ''

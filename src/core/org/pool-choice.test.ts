@@ -51,3 +51,17 @@ describe('pool_choice on the request', () => {
     expect(generateBodySchema.safeParse({ template_id: 't', pool_choice: 'gift' }).success).toBe(false)
   })
 })
+
+describe('spendableBalance', () => {
+  const db = (seat: unknown, profile: unknown) => {
+    const chain = (data: unknown) => { const c = { select: () => c, eq: () => c, maybeSingle: async () => ({ data, error: null }) }; return c }
+    return { from: (table: string) => chain(table === 'org_members' ? seat : profile) } as never
+  }
+  it("shows an active member their org shares, and anyone else their own balance", async () => {
+    const { spendableBalance } = await import('./pool-choice')
+    const seat = { held_credits: 30, held_promo_credits: 70, orgs: { promo_expires_at: '2999-01-01T00:00:00Z' } }
+    const profile = { credits: 500, free_credits: 80, org_pool_choice: null }
+    expect(await spendableBalance(db(seat, profile), 'u', { paid: 500, free: 80 })).toEqual({ paid: 30, free: 70 })
+    expect(await spendableBalance(db(null, profile), 'u', { paid: 500, free: 80 })).toEqual({ paid: 500, free: 80 })
+  })
+})

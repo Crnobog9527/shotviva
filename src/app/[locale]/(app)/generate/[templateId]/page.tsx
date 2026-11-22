@@ -1,3 +1,4 @@
+import { orgBalance } from '@/core/billing/pools'
 import { notFound, redirect } from 'next/navigation'
 import { readPoolChoiceOffer } from '@/core/org'
 import { useTranslations } from 'next-intl'
@@ -69,7 +70,7 @@ async function Workspace({ params, searchParams }: RouteProps) {
   const t = await getTranslations('app.result')
   return (
     <>
-      <Nav title={template.name} aside={<BalanceChip balance={balance} />} />
+      <Nav title={template.name} aside={<BalanceChip balance={poolChoice ? orgBalance(poolChoice) : balance} />} />
       <WorkspaceHead template={template} />
       <ImageWorkspace
         template={template}

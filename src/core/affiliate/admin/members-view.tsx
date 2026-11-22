@@ -66,7 +66,7 @@ async function MemberView(props: DossierProps) {
           <summary className="cursor-pointer font-medium">{DOSSIER.manage}</summary>
           <div className="mt-4 grid gap-3">
             {member.status === 'active' && <ConsumerReferral slug={member.slug} />}
-            <SetMember member={member} rates={member.rates} action={action} orgL2DefaultBp={member.org_l2_default_bp ?? undefined} />
+            <SetMember member={member} rates={member.rates} action={action} orgL2Defaults={member.org_l2_defaults ?? undefined} />
             <div className="flex gap-4">
               <LinkTo filters={{ tab: 'commissions', affiliate: id }}>{COPY.commissions}</LinkTo>
               <LinkTo filters={{ tab: 'commissions', affiliate: id, flag: 'yes' }}>{COPY.flagged}</LinkTo>

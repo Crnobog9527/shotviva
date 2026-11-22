@@ -21,8 +21,9 @@ export function useMemberSelection(members: readonly ConsoleMember[]) {
   const [filter, setFilter] = useState<MemberFilter>({ query: '', joinedFrom: '' })
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
   const shown = useMemo(() => (selecting ? filterMembers(members, filter) : [...members]), [members, filter, selecting])
-  // Only members still listed count (one may have been removed since it was ticked).
-  const selected = members.filter((m) => picked.has(m.userId)).map((m) => m.userId)
+  // Only members shown by the current filter count, so a bulk action never reaches someone the
+  // owner can no longer see (and no one removed since they were ticked).
+  const selected = shown.filter((m) => picked.has(m.userId)).map((m) => m.userId)
   const allShown = shown.length > 0 && shown.every((m) => picked.has(m.userId))
   return {
     selecting, filter, shown, selected, allShown,

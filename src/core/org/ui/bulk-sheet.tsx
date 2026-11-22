@@ -59,10 +59,13 @@ function SettingField({ label, value, onChange }: { label: string; value: Settin
 
 function AllowanceForm({ members, actions, onDone }: Pick<Props, 'members' | 'actions' | 'onDone'>) {
   const t = useTranslations('app.org.bulk')
-  const [paid, setPaid] = useState<Setting>({ mode: 'keep', value: '' })
-  const [promo, setPromo] = useState<Setting>({ mode: 'keep', value: '' })
+  const [paid, setPaidValue] = useState<Setting>({ mode: 'keep', value: '' })
+  const [promo, setPromoValue] = useState<Setting>({ mode: 'keep', value: '' })
   const [confirming, setConfirming] = useState(false)
   const [requestId, setRequestId] = useState(() => crypto.randomUUID())
+  // A changed form is a new request: only a repeat of the same one may be answered 'already'.
+  const setPaid = (next: Setting) => { setPaidValue(next); setRequestId(crypto.randomUUID()) }
+  const setPromo = (next: Setting) => { setPromoValue(next); setRequestId(crypto.randomUUID()) }
   const { pending, outcome, run } = useConsoleAction()
   const valid = (paid.mode !== 'keep' || promo.mode !== 'keep') && settingValid(paid) && settingValid(promo)
   const send = () => run(
@@ -85,10 +88,13 @@ function AllowanceForm({ members, actions, onDone }: Pick<Props, 'members' | 'ac
 function GrantForm({ members, data, actions, onDone }: Omit<Props, 'open' | 'onOpenChange'>) {
   const t = useTranslations('app.org.bulk')
   const format = useFormatter()
-  const [kind, setKind] = useState<'paid' | 'promo'>('promo')
-  const [each, setEach] = useState('')
+  const [kind, setKindValue] = useState<'paid' | 'promo'>('promo')
+  const [each, setEachValue] = useState('')
   const [confirming, setConfirming] = useState(false)
   const [requestId, setRequestId] = useState(() => crypto.randomUUID())
+  // A changed kind or amount is a new request: only a repeat of the same one may be answered 'already'.
+  const setKind = (next: 'paid' | 'promo') => { setKindValue(next); setRequestId(crypto.randomUUID()) }
+  const setEach = (next: string) => { setEachValue(next); setRequestId(crypto.randomUUID()) }
   const { pending, outcome, run } = useConsoleAction()
   const amount = Number(each)
   const total = amount * members.length
@@ -98,7 +104,7 @@ function GrantForm({ members, data, actions, onDone }: Omit<Props, 'open' | 'onO
   const send = () => run(
     () => actions.bulkGrant({ requestId, members, kind, each: amount }),
     t('given', { count: members.length, total: format.number(total) }),
-    () => { setRequestId(crypto.randomUUID()); setConfirming(false); setEach(''); onDone() },
+    () => { setRequestId(crypto.randomUUID()); setConfirming(false); setEachValue(''); onDone() },
   )
   return (
     <div className="grid gap-4">

@@ -2,16 +2,24 @@
 -- already taken a grant's credits back by hand (an admin_adjust), the sheet still says granted and
 -- the month-end expiry would take "what is left" of it a second time, out of the owner's other free
 -- credits. A voided sheet keeps its status ('granted': it was granted and its lines still keep
--- those orders from being counted twice) but no longer belongs to its expiry bucket: the expiry
--- pass, its overdue alarm and the owner's month card skip it. Voiding moves no credits.
+-- those orders from being counted twice), but is otherwise ignored: the expiry pass, its bucket,
+-- its overdue alarm and the owner's month card skip it, and its clawback books are closed
+-- (it owes nothing, and what it applied to earlier sheets no longer counts as paid). Voiding
+-- moves no credits.
 --
--- Expand only: three nullable columns (set together, only by admin_partner_promo_void), one audit action widened, one new admin function, and
--- create or replace of _partner_promo_bucket_left and _partner_promo_expire (1847),
--- org_promo_month (1849) and _partner_promo_owed (1910) with `and g.voided_at is null` added
--- wherever they pick granted sheets; nothing else in them changes. Code running before the deploy
--- never sets voided_at, so for it every answer stays the same. A voided sheet is no clawback
--- source either: its credits, bonus included, were already taken back, so a later refund of its
--- orders must not take its bonus a second time from the next month's grant.
+-- Expand only: three nullable columns (set together, only by admin_partner_promo_void), one audit
+-- action widened, one new admin function, and create or replace of _partner_promo_expire (1847),
+-- org_promo_month (1849) and _partner_promo_owed (1910) with `voided_at` filters added where they
+-- pick granted sheets, and of _partner_promo_bucket_left (1847) the same way; nothing else in
+-- them changes. Code running before the deploy never sets voided_at, so for it every
+-- answer stays the same.
+--
+-- Simplest safe rule: a voided sheet is ignored by the expiry, its bucket and every clawback
+-- (it owes nothing, and what it applied to earlier sheets no longer counts as paid). Known limit:
+-- spending the owner did from the voided sheet before it was taken back is charged to the other
+-- rows of its bucket (a top-up, or another sheet with the same recipient and expiry) instead, so
+-- they may expire too little (never too much). The void trusts that the sheet's whole `total`
+-- was taken back by hand; the admin page shows that number before confirming.
 
 alter table public.partner_promo_grants
   add column voided_at timestamptz,
@@ -40,7 +48,7 @@ $$;
 -- {applied: true, grant_id}, or {applied: false, reason: 'already', grant_id} for a sheet already
 -- voided (nothing changes, the first reason stays). Refused: PROMO_GRANT_NOT_FOUND,
 -- PROMO_GRANT_NOT_GRANTED (pending, rejected or lapsed), PROMO_GRANT_EXPIRED (the expiry pass has
--- already taken it back), NOT_ADMIN, INVALID_INPUT. Allowed until the expiry pass handles the
+-- already taken it back), PROMO_GRANT_CLAWED (a later sheet already clawed back from it), NOT_ADMIN, INVALID_INPUT. Allowed until the expiry pass handles the
 -- sheet, so a pass that runs late still skips it. Locks the org, then the sheet, like the decide
 -- and the expiry pass (which locks the sheet before measuring its bucket).
 create function public.admin_partner_promo_void(p_actor uuid, p_input jsonb) returns jsonb
@@ -63,6 +71,11 @@ begin
   if g.voided_at is not null then return jsonb_build_object('applied', false, 'reason', 'already', 'grant_id', g.id); end if;
   if g.status <> 'granted' then raise exception 'PROMO_GRANT_NOT_GRANTED'; end if;
   if g.expired_at is not null then raise exception 'PROMO_GRANT_EXPIRED'; end if;
+  -- A later sheet already clawed back from this one: voiding would hide that repayment.
+  if exists (select from public.partner_promo_clawbacks c join public.partner_promo_grants a on a.id = c.applied_grant_id
+              where c.source_grant_id = g.id and a.voided_at is null) then
+    raise exception 'PROMO_GRANT_CLAWED';
+  end if;
   update public.partner_promo_grants set voided_at = now(), voided_by = p_actor, void_reason = v_reason where id = g.id;
   perform public._org_audit(p_actor, 'partner_promo_void', g.id::text,
     jsonb_build_object('org_id', g.org_id, 'period', g.period, 'recipient', g.recipient_user_id, 'total', g.total,
@@ -73,7 +86,9 @@ $$;
 revoke all on function public.admin_partner_promo_void(uuid, jsonb) from public, anon, authenticated, service_role;
 grant execute on function public.admin_partner_promo_void(uuid, jsonb) to service_role;
 
--- 1847's bucket without voided sheets (their credits were handled by hand).
+-- 1847's bucket without voided sheets: from its void on, a voided sheet never existed for the
+-- bucket. When its credits were taken back by hand is not known, so no spending is charged to it;
+-- leaving a row out only moves spending onto the other rows (less left), so this never takes more.
 create or replace function public._partner_promo_bucket_left(p_user uuid, p_expires timestamptz)
 returns table(source text, source_id bigint, credits_left integer)
 language plpgsql stable security definer set search_path = '' as $$
@@ -265,7 +280,9 @@ begin
 end;
 $$;
 
--- 1910's clawback debts without voided sheets (their bonus was already taken back by hand).
+-- 1910's clawback debts without voided sheets (their bonus was already taken back by hand), and
+-- not counting as paid what a voided sheet applied (that grant was taken back, so the debt it
+-- settled is owed again).
 create or replace function public._partner_promo_owed(p_org uuid, p_period text)
 returns table(grant_id bigint, period text, owed integer)
 language sql stable security definer set search_path = '' as $$
@@ -278,7 +295,9 @@ language sql stable security definer set search_path = '' as $$
                 where l.grant_id = g.id), '[]'::jsonb),
                coalesce((g.detail->>'customer_cap_bp')::integer, 2000),
                coalesce((g.detail->>'min_customers')::integer, 3))->>'bonus')::integer
-           - coalesce((select sum(c.credits) from public.partner_promo_clawbacks c where c.source_grant_id = g.id), 0)::integer)
+           - coalesce((select sum(c.credits) from public.partner_promo_clawbacks c
+                         join public.partner_promo_grants a on a.id = c.applied_grant_id and a.voided_at is null
+                        where c.source_grant_id = g.id), 0)::integer)
     from public.partner_promo_grants g
    where g.org_id = p_org and g.status = 'granted' and g.voided_at is null and g.period < p_period and g.bonus > 0
    order by g.period, g.id;

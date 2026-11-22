@@ -1,3 +1,4 @@
+import { spendableBalance } from '@/core/org'
 import { unstable_rethrow } from 'next/navigation'
 import { Suspense } from 'react'
 
@@ -26,7 +27,7 @@ async function viewerOf(): Promise<HomeViewer | null> {
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
   const [balance, limits, runningIds, favoriteIds] = await Promise.all([
-    readBalance(supabase, user.id),
+    readBalance(supabase, user.id).then((own) => spendableBalance(admin, user.id, own)),
     // effective_limits() (tier, an unbanned admin as Max, plus the org lift) is service-role only; the user's own id comes from the session.
     effectiveLimits(admin, user.id),
     listRunningJobIds(admin, user.id, new Date()),

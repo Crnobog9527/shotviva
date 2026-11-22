@@ -1,3 +1,4 @@
+import { orgBalance } from '@/core/billing/pools'
 import type { Metadata } from 'next'
 import { readPoolChoiceOffer } from '@/core/org'
 import { connection } from 'next/server'
@@ -73,7 +74,7 @@ async function Create({ searchParams }: { searchParams: Search }) {
         aside={
           <>
             <GeneratingPill />
-            <BalanceChip balance={balance} />
+            <BalanceChip balance={poolChoice ? orgBalance(poolChoice) : balance} />
           </>
         }
       />
