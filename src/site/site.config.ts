@@ -87,6 +87,10 @@ export const site = defineSite({
       '/s/t/[shareId]',
       // The member's own collection share links.
       '/account/template-shares',
+      // A shared work collection (Owner 2026-11-22), noindex in both languages.
+      '/s/w/[shareId]',
+      // The owner's list of their share links (signed in, noindex like every app page).
+      '/photos/shares',
     ],
     // Languages whose pages are not live yet but whose template covers can be prepared in the
     // admin ahead of launch (ARCHITECTURE §8.3, T87). Never shown on the site until launched.

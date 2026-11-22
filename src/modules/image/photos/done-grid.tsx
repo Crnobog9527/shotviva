@@ -1,4 +1,5 @@
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
+import { Link } from '@/core/i18n/ui'
 import { thumbUrlFor } from '@/core/jobs/job-view'
 import { Reveal } from '@/core/ui/reveal-item'
 import { ThumbImg } from '@/core/ui/thumb-img'
@@ -13,13 +14,21 @@ import { PhotosEmpty } from './photos-empty'
 import { doneMeta, doneWhen, type PhotoItem } from './photo-item'
 import { WorkLink } from './viewer/work-link'
 import { WorksIndex } from './viewer/works-index'
+import { ShareSelectProvider } from '../work-share/select-context'
+import { SelectTile } from '../work-share/select-tile'
+import { ShareBar } from '../work-share/share-bar'
+import { ShareToggle } from '../work-share/share-toggle'
+import type { CreateShareAction } from '../work-share/share-types'
 
 // "Done", newest first (B comp photos.html): finished photos with their pool's tag, two columns
 // on phones, three from md, four from lg. Each opens the viewer over the grid (2026-11-12);
 // below it a quiet "Make again" opens the viewer on the creation form when the template is still
 // in the catalogue (an edit or a retired template has none). Empty state per DESIGN §4.6. Every tile shows the
-// work's small copy, never the full file (ARCHITECTURE §8.3「作品小图」).
-export function DoneGrid({ items, now, anyRunning, liveTemplates }: { items: PhotoItem[]; now: Date; anyRunning: boolean; liveTemplates: string[] }) {
+// work's small copy, never the full file (ARCHITECTURE §8.3「作品小图」). share: with it, a Share
+// button next to "Done" turns on picking works for one share link (§6.2「作品集分享」).
+type Props = { items: PhotoItem[]; now: Date; anyRunning: boolean; liveTemplates: string[]; share?: CreateShareAction }
+
+export function DoneGrid({ items, now, anyRunning, liveTemplates, share }: Props) {
   const t = useTranslations('app')
   const format = useFormatter()
   const day = (date: Date) => format.dateTime(date, { month: 'short', day: 'numeric', timeZone: 'UTC' })
@@ -29,12 +38,15 @@ export function DoneGrid({ items, now, anyRunning, liveTemplates }: { items: Pho
   const ordered = entries.flatMap((entry) => (entry.kind === 'photo' ? [entry.item] : entry.items))
   const place = new Map(ordered.map((item, index) => [item.id, index]))
   const card = (item: PhotoItem) => <DoneCard item={item} meta={doneMeta(item, now, t, day)} live={liveTemplates.includes(item.templateId)} place={place.get(item.id) ?? EAGER_TILES} />
-  return (
+  const grid = (
     <section aria-labelledby="done-h">
       <WorksIndex items={ordered} />
-      <div className="mx-(--gutter) mt-6 mb-3 flex items-baseline justify-between gap-3 md:mt-8">
+      <div className="mx-(--gutter) mt-6 mb-3 flex items-center justify-between gap-3 md:mt-8">
         <h2 id="done-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('photos.done')}</h2>
-        <span className="text-caption text-muted-foreground">{t('photos.newest')}</span>
+        <span className="flex items-center gap-3">
+          <span className="text-caption text-muted-foreground">{t('photos.newest')}</span>
+          {share ? <ShareToggle /> : null}
+        </span>
       </div>
       <ul className={GRID}>
         {entries.map((entry) =>
@@ -50,8 +62,15 @@ export function DoneGrid({ items, now, anyRunning, liveTemplates }: { items: Pho
         )}
       </ul>
       <p className="mx-(--gutter) mt-4 max-w-[72ch] text-caption leading-[1.4] text-muted-foreground">{t('photos.footnote')}</p>
+      {share ? (
+        <Link href="/photos/shares" prefetch={false} className="mx-(--gutter) mt-3 inline-flex min-h-11 items-center text-caption font-medium text-foreground underline underline-offset-4">
+          {t('workShare.manage')}
+        </Link>
+      ) : null}
+      {share ? <ShareBar create={share} /> : null}
     </section>
   )
+  return share ? <ShareSelectProvider>{grid}</ShareSelectProvider> : grid
 }
 
 const GRID = 'grid grid-cols-2 gap-x-2 gap-y-4 px-(--gutter) md:grid-cols-3 md:gap-x-4 md:gap-y-6 lg:grid-cols-4'
@@ -66,7 +85,8 @@ const FIRST_ROW = 4
 function DoneCard({ item, meta, live, place }: { item: PhotoItem; meta: string; live: boolean; place: number }) {
   const t = useTranslations('app')
   return (
-    <div className="flex h-full flex-col transition-transform duration-250 ease-house hover:-translate-y-0.5">
+    <div className="relative flex h-full flex-col transition-transform duration-250 ease-house hover:-translate-y-0.5">
+      <SelectTile jobId={item.id} name={item.templateName} />
       <WorkLink workId={item.id} className="group press block rounded-control">
         <span className="hairline relative block aspect-[4/5] overflow-hidden rounded-control bg-muted transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]">
           {item.thumbUrl ? (
