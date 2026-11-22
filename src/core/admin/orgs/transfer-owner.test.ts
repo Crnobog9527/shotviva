@@ -8,6 +8,8 @@ const { transferOrgOwner } = await import('./transfer-owner')
 const { orgFailure } = await import('./commands')
 const { TRANSFER_COPY } = await import('./transfer-copy')
 const { AppError } = await import('@/core/errors')
+const { toRpcError } = await import('@/core/billing/rpc')
+const { transferBlocked } = await import('../orgs-ui/transfer-owner-form')
 
 const deps = { db: {} as never, actor: '00000000-0000-4000-8000-0000000000aa' }
 const ORG = '11111111-1111-4111-8111-111111111111'
@@ -37,5 +39,42 @@ describe('transferOrgOwner', () => {
   it('maps the affiliate-row collision and a busy org to their messages', () => {
     expect(orgFailure(new AppError('INTERNAL', 'ORG_NEW_OWNER_AFFILIATE'))).toEqual({ ok: false, message: TRANSFER_COPY.newOwnerAffiliate })
     expect(orgFailure(new AppError('INTERNAL', 'ORG_BUSY'))).toEqual({ ok: false, message: TRANSFER_COPY.busy })
+  })
+
+  // Production 2026-11-23: the SQL codes reached the form as the generic failure because the RPC
+  // layer did not know them.
+  it('maps each refusal the SQL raises, through the RPC layer, to its own message', () => {
+    const via = (message: string) => orgFailure(toRpcError('admin_org_transfer_owner', { message, code: 'P0001' }))
+    expect(via('ORG_NEW_OWNER_AFFILIATE_HISTORY')).toEqual({ ok: false, message: TRANSFER_COPY.newOwnerAffiliateHistory })
+    expect(TRANSFER_COPY.newOwnerAffiliateHistory).toBe('这个账号已有个人推广员账户且有推广记录，不能直接接任主管理员')
+    expect(via('ORG_NEW_OWNER_AFFILIATE')).toEqual({ ok: false, message: TRANSFER_COPY.newOwnerAffiliate })
+    expect(via('ORG_AFFILIATE_MISMATCH')).toEqual({ ok: false, message: TRANSFER_COPY.affiliateMismatch })
+    expect(via('ORG_BUSY')).toEqual({ ok: false, message: TRANSFER_COPY.busy })
+  })
+
+  it('reports a deleted empty personal affiliate account', async () => {
+    transfer.mockResolvedValue({ applied: true, updated_at: 'x', previous_owner: USER, affiliate: { commissions: 0, payouts: 0, adjustments: 0, customers: 0 }, removed_personal: { slug: 'abc', status: 'suspended' } })
+    const result = await transferOrgOwner(deps, input)
+    expect(result.message).toContain('abc')
+    expect(result.message).toContain('已删除')
+  })
+})
+
+describe('transferBlocked', () => {
+  const OWNER = '33333333-3333-4333-8333-333333333333'
+  const user = (over: Record<string, unknown>) => ({
+    id: USER, email: 'u@example.com', phone: null, createdAt: 'x', tier: null, status: 'ok', orgName: null, orgRole: null, affiliateHistory: false, ...over,
+  }) as never
+  const blocked = transferBlocked(OWNER)
+  it('lets an empty personal affiliate account through and stops one with history', () => {
+    expect(blocked(user({ status: 'personal_affiliate' }))).toBeNull()
+    expect(blocked(user({ status: 'ok', affiliateHistory: true }))).toBe(TRANSFER_COPY.pickerHistory)
+    expect(blocked(user({ status: 'in_this_org', affiliateHistory: true }))).toBe(TRANSFER_COPY.pickerHistory)
+    expect(blocked(user({ status: 'in_this_org' }))).toBeNull()
+  })
+  it('keeps the other reasons', () => {
+    expect(blocked(user({ id: OWNER }))).toBe(TRANSFER_COPY.current)
+    expect(blocked(user({ status: 'banned' }))).toContain('封禁')
+    expect(blocked(user({ status: 'in_org', orgName: 'X', orgRole: 'member' }))).toContain('X')
   })
 })

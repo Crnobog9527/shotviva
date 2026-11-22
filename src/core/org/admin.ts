@@ -105,12 +105,14 @@ const transferResult = z.union([
     updated_at: z.string(),
     previous_owner: uuid,
     affiliate: z.object({ commissions: count, payouts: count, adjustments: count, customers: count }).nullable(),
+    // The new owner's empty personal affiliate row this transfer deleted (1990); absent before it.
+    removed_personal: z.object({ slug: z.string(), status: z.string() }).nullable().optional(),
   }),
 ])
 export type OrgOwnerTransfer = z.infer<typeof transferResult>
 
-// 更换主管理员 (1930). The org's affiliate account moves with the org; a repeat for the same new
-// owner answers applied=false. expectedUpdatedAt is the orgs.updated_at the admin's page showed.
+// 更换主管理员 (1930, 1990). The org's affiliate account moves with the org, and an empty personal
+// affiliate row of the new owner is deleted first; a repeat for the same new owner answers applied=false. expectedUpdatedAt is the orgs.updated_at the admin's page showed.
 export async function adminTransferOrgOwner(client: RpcClient, actor: string, orgId: string, userId: string, expectedUpdatedAt: string): Promise<OrgOwnerTransfer> {
   const args = { p_actor: uuid.parse(actor), p_input: { org_id: uuid.parse(orgId), user_id: uuid.parse(userId), expected_updated_at: z.string().min(1).parse(expectedUpdatedAt) } }
   return callRpc(client, 'admin_org_transfer_owner', args, transferResult)

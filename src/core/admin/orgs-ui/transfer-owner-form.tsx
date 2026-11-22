@@ -16,10 +16,15 @@ export type TransferOwnerAction = (input: unknown) => Promise<OrgActionResult<{ 
 
 type Props = { orgId: string; ownerId: string; ownerLabel: string; updatedAt: string; search: SearchUsers; transfer: TransferOwnerAction }
 
-// An active member of this org may become owner; everyone else follows the add-member rules
-// (the SQL checks again, including the affiliate-row collision the picker cannot see).
-function transferBlocked(ownerId: string) {
-  return (user: PickerUser) => user.id === ownerId ? COPY.current : user.status === 'in_this_org' ? null : blockedReason(user)
+// An active member of this org may become owner; everyone else follows the add-member rules,
+// except that a personal affiliate account without history is fine (the transfer deletes it,
+// 1990) and one with history is not, whatever its status. The SQL checks every rule again.
+export function transferBlocked(ownerId: string) {
+  return (user: PickerUser) => {
+    if (user.id === ownerId) return COPY.current
+    if (user.status === 'banned' || user.status === 'in_org') return blockedReason(user)
+    return user.affiliateHistory ? COPY.pickerHistory : null
+  }
 }
 
 // 更换主管理员: open, pick, then a confirm dialog that lists what stays with the org.
@@ -69,6 +74,7 @@ function ConfirmTransfer({ from, to, pending, error, onCancel, onConfirm }: {
             {COPY.stays.map((line) => <li key={line}>{line}</li>)}
           </ul>
           <p className="text-muted-foreground">{COPY.personal}</p>
+          <p className="text-muted-foreground">{COPY.removesEmpty}</p>
         </div>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <DialogFooter>

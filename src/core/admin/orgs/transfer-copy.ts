@@ -16,13 +16,18 @@ export const TRANSFER_COPY = {
     '原主管理员自己推广来的客户和业绩（仍记在他名下，作为企业成员的业绩）',
   ],
   personal: '原主管理员个人的购买、个人积分和个人邀请码不动，仍是他自己的；企业联盟账号上的东西他一样都不保留。',
+  removesEmpty: '如果新主管理员自己有一个空的个人推广员账户（没有佣金、打款、调账、客户、下级推广员和专属比例），会被一并删除，删除记录写进操作日志。有推广记录的账号不能接任。',
   cancel: '取消',
   confirm: '确认更换',
   saving: '更换中…',
-  done: (moved: { commissions: number; customers: number } | null) =>
-    moved ? `已更换主管理员；企业联盟账号已随企业转给新主管理员（佣金 ${moved.commissions} 条、客户 ${moved.customers} 个）` : '已更换主管理员',
+  done: (moved: { commissions: number; customers: number } | null, removed: { slug: string } | null = null) =>
+    (moved ? `已更换主管理员；企业联盟账号已随企业转给新主管理员（佣金 ${moved.commissions} 条、客户 ${moved.customers} 个）` : '已更换主管理员')
+      + (removed ? `；新主管理员原来空的个人推广员账户（${removed.slug}）已删除` : ''),
   already: '他已经是本企业的主管理员，没有重复更换',
-  newOwnerAffiliate: '这个账号自己有联盟账号记录（哪怕已关闭），和企业联盟账号冲突，不能当主管理员。请改选或先找技术处理',
+  newOwnerAffiliate: '这个账号的推广员账户属于别的企业，不能当主管理员。请改选或先找技术处理',
+  newOwnerAffiliateHistory: '这个账号已有个人推广员账户且有推广记录，不能直接接任主管理员',
+  affiliateMismatch: '这家企业的联盟账号不在当前主管理员名下，没有更换。请先找技术处理',
+  pickerHistory: '有带推广记录的个人推广员账户，不能接任',
   changed: '企业信息刚被改过，请刷新页面后再换',
   busy: '这家企业这会儿正好有付款、退款或客户绑定在处理，请过几秒再点一次「确认更换」',
 } as const
