@@ -5,7 +5,7 @@
 -- those orders from being counted twice) but no longer belongs to its expiry bucket: the expiry
 -- pass, its overdue alarm and the owner's month card skip it. Voiding moves no credits.
 --
--- Expand only: three nullable columns, one audit action widened, one new admin function, and
+-- Expand only: three nullable columns (set together, only by admin_partner_promo_void), one audit action widened, one new admin function, and
 -- create or replace of _partner_promo_bucket_left and _partner_promo_expire (1847) and
 -- org_promo_month (1849) with `and g.voided_at is null` added wherever they pick granted sheets;
 -- nothing else in them changes. Code running before the deploy never sets voided_at, so for it
@@ -17,9 +17,7 @@
 alter table public.partner_promo_grants
   add column voided_at timestamptz,
   add column voided_by uuid references public.profiles(id),
-  add column void_reason text check (length(void_reason) <= 500),
-  add constraint partner_promo_grants_void_check
-    check (voided_at is null or (status = 'granted' and voided_by is not null and void_reason is not null));
+  add column void_reason text check (length(void_reason) <= 500);
 
 do $$
 declare
