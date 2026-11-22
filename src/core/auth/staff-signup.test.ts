@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('../logger', () => ({ logger: { warn: vi.fn(), error: vi.fn() } }))
 
-const { isStaffSignup, markStaffSignup, staffSignup, staffJoinToken } = await import('./staff-signup')
+const { isStaffSignup, markStaffSignup, staffSignup, staffJoinToken, staffInviteOf, staffTokenFor } = await import('./staff-signup')
 
 const TOKEN = '0123456789abcdef0123456789abcdef'
 
@@ -28,17 +28,30 @@ describe('staffJoinToken', () => {
   })
 })
 
+// Codex P1 (#841): the token stored at sign-up survives a confirmation resent from /login.
+describe('staffTokenFor', () => {
+  it('reads the token from next, else from the one stored at sign-up', () => {
+    const stored = { user_metadata: { staff_invite: TOKEN } }
+    expect(staffTokenFor(`/zh/join/org/${TOKEN}`, { user_metadata: {} })).toBe(TOKEN)
+    expect(staffTokenFor('/account', stored)).toBe(TOKEN)
+    expect(staffTokenFor('/account', { user_metadata: {} })).toBeNull()
+    expect(staffTokenFor('/account', { user_metadata: null })).toBeNull()
+    expect(staffInviteOf({ user_metadata: { staff_invite: 'nope' } })).toBeNull()
+    expect(staffInviteOf({ user_metadata: { staff_invite: 42 } })).toBeNull()
+  })
+})
+
 describe('isStaffSignup', () => {
   it('counts only a token of an active org', async () => {
     const hit = client({ data: { id: 'o' }, error: null })
-    expect(await isStaffSignup(hit.db, `/join/org/${TOKEN}`)).toBe(true)
+    expect(await isStaffSignup(hit.db, TOKEN)).toBe(true)
     expect(hit.calls).toContainEqual(['eq', 'invite_token', TOKEN])
     expect(hit.calls).toContainEqual(['eq', 'status', 'active'])
-    expect(await isStaffSignup(client({ data: null, error: null }).db, `/join/org/${TOKEN}`)).toBe(false)
+    expect(await isStaffSignup(client({ data: null, error: null }).db, TOKEN)).toBe(false)
   })
   it('keeps the gift when the lookup fails or there is no staff link', async () => {
-    expect(await isStaffSignup(client({ data: null, error: { code: 'x' } }).db, `/join/org/${TOKEN}`)).toBe(false)
-    expect(await isStaffSignup(client({ data: { id: 'o' }, error: null }).db, '/account')).toBe(false)
+    expect(await isStaffSignup(client({ data: null, error: { code: 'x' } }).db, TOKEN)).toBe(false)
+    expect(await isStaffSignup(client({ data: { id: 'o' }, error: null }).db, null)).toBe(false)
   })
 })
 
@@ -68,18 +81,18 @@ describe('staffSignup', () => {
   }
   it('is a staff sign-up only when headed for an active org staff link and marked', async () => {
     const hit = db(true, { data: true, error: null })
-    expect(await staffSignup(hit.db, 'u1', `/join/org/${TOKEN}`)).toBe(true)
+    expect(await staffSignup(hit.db, 'u1', TOKEN)).toBe(true)
     expect(hit.rpc).toHaveBeenCalledOnce()
     const none = db(true, { data: true, error: null })
-    expect(await staffSignup(none.db, 'u1', '/account')).toBe(false)
-    expect(await staffSignup(db(false, { data: true, error: null }).db, 'u1', `/join/org/${TOKEN}`)).toBe(false)
+    expect(await staffSignup(none.db, 'u1', null)).toBe(false)
+    expect(await staffSignup(db(false, { data: true, error: null }).db, 'u1', TOKEN)).toBe(false)
     expect(none.rpc).not.toHaveBeenCalled()
   })
   // Codex P1 (#841): an existing account the SQL declines to mark (paid, pending, older) keeps its gift.
   it('is not a staff sign-up when the SQL declines the account', async () => {
-    expect(await staffSignup(db(true, { data: false, error: null }).db, 'u1', `/join/org/${TOKEN}`)).toBe(false)
+    expect(await staffSignup(db(true, { data: false, error: null }).db, 'u1', TOKEN)).toBe(false)
   })
   it('pays nothing on this sign-in when the mark fails', async () => {
-    expect(await staffSignup(db(true, { data: null, error: { code: 'x' } }).db, 'u1', `/join/org/${TOKEN}`)).toBe(true)
+    expect(await staffSignup(db(true, { data: null, error: { code: 'x' } }).db, 'u1', TOKEN)).toBe(true)
   })
 })

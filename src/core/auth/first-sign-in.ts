@@ -63,15 +63,16 @@ export async function onVerifiedSignIn(
   benefits: SignupBenefits,
   method: SignInMethod,
   locale: Locale,
-  next?: string | null,
+  // The staff link token of this sign-up (core/auth/staff-signup staffTokenFor), if any.
+  staffToken?: string | null,
 ): Promise<void> {
   const admin = createAdminSupabase()
   const address = clientIp(await headers())
-  // An org's staff link (next = /join/org/<token>) on a new account signs up a staff account: no
+  // An org's staff link (next = /join/org/<token>, or the token stored at sign-up) on a new account signs up a staff account: no
   // free credits, now or later (the stored refusal 'staff' stops every retry and claim,
   // 1940/1950), and no signup code or partner binding. Before the signup IP is stored (the SQL
   // reads "no IP yet" as the first verified sign-in) and before the grant, so it refuses.
-  const staff = await staffSignup(admin, userId, next)
+  const staff = await staffSignup(admin, userId, staffToken ?? null)
   const ipStored = await recordSignupIp(admin, userId, address)
   const { granted, claimed } = await payGift(admin, userId, staff ? 0 : benefits.freeCredits)
   const first = address ? ipStored : granted

@@ -47,6 +47,16 @@ describe('sendPhoneCode', () => {
     })
   })
 
+  // Codex P1 follow-up (#841): a phone sign-up from a staff link remembers the token, so a code
+  // requested again from /login later is still a staff sign-up.
+  it('stores the staff link token on a new account only when the code is asked from a staff link', async () => {
+    const token = 'd'.repeat(32)
+    await sendPhoneCode(form({ ...ok, next: `/zh/join/org/${token}` }))
+    expect(mocks.signInWithOtp.mock.calls[0]![0].options.data).toMatchObject({ locale: 'zh', staff_invite: token })
+    await sendPhoneCode(form({ ...ok, next: '/zh/account' }))
+    expect(mocks.signInWithOtp.mock.calls[1]![0].options.data).not.toHaveProperty('staff_invite')
+  })
+
   it('sends nothing without the consent box, or for a number outside mainland China', async () => {
     expect(await sendPhoneCode(form({ ...ok, consent: '' }))).toEqual({ status: 'error', code: 'AUTH_CONSENT_REQUIRED' })
     expect(await sendPhoneCode(form({ ...ok, phone: '+14155550123' }))).toEqual({ status: 'error', code: 'AUTH_PHONE_INVALID' })
@@ -82,7 +92,7 @@ describe('verifyPhoneCode', () => {
     mocks.verifyOtp.mockResolvedValueOnce({ data: { user: { id: 'u1', user_metadata: { locale: 'zh' } } }, error: null })
     await expect(verifyPhoneCode(form({ phone: '+8614000000001', code: '402913', next: '/zh/generate' }), benefits)).rejects.toThrow('redirect:/zh/generate')
     expect(mocks.verifyOtp).toHaveBeenCalledWith({ phone: '+8614000000001', token: '402913', type: 'sms' })
-    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('u1', benefits, 'phone', 'zh', '/zh/generate')
+    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('u1', benefits, 'phone', 'zh', null)
   })
 
   it('says a wrong or expired code plainly and signs nobody in', async () => {

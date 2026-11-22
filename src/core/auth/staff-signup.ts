@@ -20,9 +20,24 @@ export function staffJoinToken(next: string | null | undefined): string | null {
   return STAFF_PATH.exec(splitLocale(pathname).path)?.[1] ?? null
 }
 
+// Where a sign-up came from survives a resent confirmation email (Codex P1 on #841): sign-up
+// stores the staff link's token in user_metadata.staff_invite (flows/sign-up.ts), so a later
+// confirmation link built on the ordinary login page, whose `next` is /account, still counts.
+// The account can write its own metadata, but setting it only ever costs itself the gift.
+export const STAFF_INVITE_KEY = 'staff_invite'
+
+export function staffInviteOf(user: { user_metadata?: Record<string, unknown> | null }): string | null {
+  const value = user.user_metadata?.[STAFF_INVITE_KEY]
+  return typeof value === 'string' && /^[0-9a-f]{32}$/.test(value) ? value : null
+}
+
+// The staff link token this sign-in carries: in its `next`, else the one stored at sign-up.
+export function staffTokenFor(next: string | null | undefined, user: { user_metadata?: Record<string, unknown> | null }): string | null {
+  return staffJoinToken(next) ?? staffInviteOf(user)
+}
+
 // A lookup failure grants the gift as before (a sign-in never fails over it); it is logged.
-export async function isStaffSignup(admin: SupabaseClient, next: string | null | undefined): Promise<boolean> {
-  const token = staffJoinToken(next)
+export async function isStaffSignup(admin: SupabaseClient, token: string | null): Promise<boolean> {
   if (!token) return false
   const { data, error } = await admin.from('orgs').select('id').eq('invite_token', token).eq('status', 'active').maybeSingle()
   if (error) {
@@ -50,7 +65,7 @@ export async function markStaffSignup(admin: SupabaseClient, userId: string): Pr
 // existing account that signs in through the link, say before joining, keeps its gift, paid or
 // pending (Codex P1 on #841). A staff sign-up gets no gift, no signup code and no partner binding.
 // A failed mark still counts for this sign-in, so nothing is paid now; it is logged.
-export async function staffSignup(admin: SupabaseClient, userId: string, next: string | null | undefined): Promise<boolean> {
-  if (!(await isStaffSignup(admin, next))) return false
+export async function staffSignup(admin: SupabaseClient, userId: string, token: string | null): Promise<boolean> {
+  if (!(await isStaffSignup(admin, token))) return false
   return (await markStaffSignup(admin, userId)) !== false
 }

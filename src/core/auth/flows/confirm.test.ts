@@ -65,7 +65,7 @@ describe('GET /auth/confirm: signup links', () => {
     expect(response.status).toBe(307)
     expect(target(response)).toBe('/account')
     expect(response.headers.get('set-cookie')).toContain('sb-access-token=session')
-    expect(mocks.onVerifiedSignIn).toHaveBeenCalledExactlyOnceWith('u1', benefits, 'email', 'en', '/account')
+    expect(mocks.onVerifiedSignIn).toHaveBeenCalledExactlyOnceWith('u1', benefits, 'email', 'en', null)
   })
 
   it('lets an invited promoter choose a password when the program is open', async () => {

@@ -103,7 +103,7 @@ describe('signupMarks', () => {
 })
 
 describe('onVerifiedSignIn: staff-link signups', () => {
-  const next = '/zh/join/org/' + 'a'.repeat(32)
+  const next = 'a'.repeat(32)
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.headers.mockResolvedValue(new Headers({ 'x-forwarded-for': '203.0.113.7' }))
@@ -135,7 +135,8 @@ describe('onVerifiedSignIn: staff-link signups', () => {
   it('a customer sign-up (no staff link) is unchanged', async () => {
     mocks.recordSignupIp.mockResolvedValue(true)
     mocks.grantSignupCredits.mockResolvedValue(true)
-    await onVerifiedSignIn('u1', benefits, 'email', 'en', '/account')
+    await onVerifiedSignIn('u1', benefits, 'email', 'en', null)
+    expect(mocks.staff).toHaveBeenCalledWith({}, 'u1', null)
     expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', benefits.freeCredits)
     expect(mocks.bind).toHaveBeenCalledWith('u1', 'partner', 'signup')
     expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', true, benefits.invite, 'en')
