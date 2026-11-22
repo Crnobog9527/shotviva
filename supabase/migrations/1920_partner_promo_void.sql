@@ -2,22 +2,24 @@
 -- already taken a grant's credits back by hand (an admin_adjust), the sheet still says granted and
 -- the month-end expiry would take "what is left" of it a second time, out of the owner's other free
 -- credits. A voided sheet keeps its status ('granted': it was granted and its lines still keep
--- those orders from being counted twice), but nothing is left of it from its void on: the expiry
--- pass, its overdue alarm and the owner's month card skip it, and its clawback books are closed
+-- those orders from being counted twice), but is otherwise ignored: the expiry pass, its bucket,
+-- its overdue alarm and the owner's month card skip it, and its clawback books are closed
 -- (it owes nothing, and what it applied to earlier sheets no longer counts as paid). Voiding
 -- moves no credits.
 --
 -- Expand only: three nullable columns (set together, only by admin_partner_promo_void), one audit
 -- action widened, one new admin function, and create or replace of _partner_promo_expire (1847),
 -- org_promo_month (1849) and _partner_promo_owed (1910) with `voided_at` filters added where they
--- pick granted sheets, and of _partner_promo_bucket_left (1847) with a void event (below); nothing
--- else in them changes. Code running before the deploy never sets voided_at, so for it every
+-- pick granted sheets, and of _partner_promo_bucket_left (1847) the same way; nothing else in
+-- them changes. Code running before the deploy never sets voided_at, so for it every
 -- answer stays the same.
 --
--- Known limit: a free-pool job reserved before the void and refunded after it nets to 0 spent,
--- so the voided sheet had that much more left at its void; those refunded credits then belong to
--- no bucket row and do not expire (bounded by the jobs running at the moment of the void; never
--- takes more than before).
+-- Simplest safe rule: a voided sheet is ignored by the expiry, its bucket and every clawback
+-- (it owes nothing, and what it applied to earlier sheets no longer counts as paid). Known limit:
+-- spending the owner did from the voided sheet before it was taken back is charged to the other
+-- rows of its bucket (a top-up, or another sheet with the same recipient and expiry) instead, so
+-- they may expire too little (never too much). The void trusts that the sheet's whole `total`
+-- was taken back by hand; the admin page shows that number before confirming.
 
 alter table public.partner_promo_grants
   add column voided_at timestamptz,
@@ -46,7 +48,7 @@ $$;
 -- {applied: true, grant_id}, or {applied: false, reason: 'already', grant_id} for a sheet already
 -- voided (nothing changes, the first reason stays). Refused: PROMO_GRANT_NOT_FOUND,
 -- PROMO_GRANT_NOT_GRANTED (pending, rejected or lapsed), PROMO_GRANT_EXPIRED (the expiry pass has
--- already taken it back), NOT_ADMIN, INVALID_INPUT. Allowed until the expiry pass handles the
+-- already taken it back), PROMO_GRANT_CLAWED (a later sheet already clawed back from it), NOT_ADMIN, INVALID_INPUT. Allowed until the expiry pass handles the
 -- sheet, so a pass that runs late still skips it. Locks the org, then the sheet, like the decide
 -- and the expiry pass (which locks the sheet before measuring its bucket).
 create function public.admin_partner_promo_void(p_actor uuid, p_input jsonb) returns jsonb
@@ -69,6 +71,11 @@ begin
   if g.voided_at is not null then return jsonb_build_object('applied', false, 'reason', 'already', 'grant_id', g.id); end if;
   if g.status <> 'granted' then raise exception 'PROMO_GRANT_NOT_GRANTED'; end if;
   if g.expired_at is not null then raise exception 'PROMO_GRANT_EXPIRED'; end if;
+  -- A later sheet already clawed back from this one: voiding would hide that repayment.
+  if exists (select from public.partner_promo_clawbacks c join public.partner_promo_grants a on a.id = c.applied_grant_id
+              where c.source_grant_id = g.id and a.voided_at is null) then
+    raise exception 'PROMO_GRANT_CLAWED';
+  end if;
   update public.partner_promo_grants set voided_at = now(), voided_by = p_actor, void_reason = v_reason where id = g.id;
   perform public._org_audit(p_actor, 'partner_promo_void', g.id::text,
     jsonb_build_object('org_id', g.org_id, 'period', g.period, 'recipient', g.recipient_user_id, 'total', g.total,
@@ -79,9 +86,9 @@ $$;
 revoke all on function public.admin_partner_promo_void(uuid, jsonb) from public, anon, authenticated, service_role;
 grant execute on function public.admin_partner_promo_void(uuid, jsonb) to service_role;
 
--- 1847's bucket, where a voided sheet still takes the spending made before its void (oldest
--- first, as before) and drops to 0 left at voided_at (the rest was handled by hand), so spending
--- before the void is never pushed onto a later top-up. Voided sheets are not returned.
+-- 1847's bucket without voided sheets: from its void on, a voided sheet never existed for the
+-- bucket. When its credits were taken back by hand is not known, so no spending is charged to it;
+-- leaving a row out only moves spending onto the other rows (less left), so this never takes more.
 create or replace function public._partner_promo_bucket_left(p_user uuid, p_expires timestamptz)
 returns table(source text, source_id bigint, credits_left integer)
 language plpgsql stable security definer set search_path = '' as $$
@@ -97,7 +104,7 @@ declare
 begin
   select min(x.at) into v_start from (
     select g.decided_at as at from public.partner_promo_grants g
-     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted'
+     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null
     union all
     select t.created_at from public.partner_promo_topups t where t.recipient_user_id = p_user and t.expires_at = p_expires
   ) x;
@@ -105,10 +112,7 @@ begin
   for e in
     with adds as (
       select g.decided_at as at, 0 as ord, 'grant' as src, g.id, g.total as amount from public.partner_promo_grants g
-       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted'
-      union all
-      select g.voided_at, 2, 'void', g.id, 0 from public.partner_promo_grants g
-       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is not null
+       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null
       union all
       select t.created_at, 0, 'topup', t.id, t.credits from public.partner_promo_topups t
        where t.recipient_user_id = p_user and t.expires_at = p_expires
@@ -129,11 +133,7 @@ begin
       from reserves r left join refunds f on f.reserve_key = r.idempotency_key
     order by 1, 2, 4
   loop
-    if e.src = 'void' then
-      for i in 1 .. cardinality(v_id) loop
-        if v_src[i] = 'grant' and v_id[i] = e.id then v_left[i] := 0; end if;
-      end loop;
-    elsif e.src <> 'spend' then
+    if e.src <> 'spend' then
       v_src := v_src || e.src;
       v_id := v_id || e.id;
       v_left := v_left || e.amount::integer;
@@ -147,8 +147,7 @@ begin
       end loop;
     end if;
   end loop;
-  return query select u.s, u.i, u.l from unnest(v_src, v_id, v_left) as u(s, i, l)
-    where not (u.s = 'grant' and exists (select from public.partner_promo_grants g where g.id = u.i and g.voided_at is not null));
+  return query select u.s, u.i, u.l from unnest(v_src, v_id, v_left) as u(s, i, l);
 end;
 $$;
 

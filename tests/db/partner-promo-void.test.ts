@@ -155,24 +155,19 @@ it('takes no clawback from later months for a voided sheet whose bonus was alrea
   expect((await sheet(db, orgId, m.current)).detail.sources).toEqual([])
 })
 
-it('charges spending made before the void to the voided sheet, not to a later top-up', async () => {
-  const { orgId, owner } = await partner(db, actor)
-  await run(db, m.current)
-  const s = await sheet(db, orgId, m.current)
-  await confirm(db, actor, s) // 10,000
-  await db.query("select _apply_credit_change($1,'free','reserve',-3000,'job','job:v2:reserve')", [owner])
+it('never takes unrelated credits when the owner spent between the manual take-back and the void', async () => {
+  const { orgId, owner, s } = await grantedThenTakenBack() // 10,000 granted and taken back; 2,510 unrelated
   const t = await row(db, 'select admin_partner_promo_topup($1,$2) as r', [actor,
-    { org_id: orgId, recipient: owner, period: m.current, credits: 2000, reason: 'extra', request_key: randomUUID() }])
-  // The admin takes back what was left of the sheet (7,000) by hand, then voids it.
-  await db.query("select _apply_credit_change($1,'free','admin_adjust',-7000,'收回推广积分',$2)", [owner, 'adj:' + s.id])
+    { org_id: orgId, recipient: owner, period: m.current, credits: 5000, reason: 'extra', request_key: randomUUID() }])
+  await db.query("select _apply_credit_change($1,'free','reserve',-3000,'job','job:v2:reserve')", [owner])
   await voidSheet(actor, { grant_id: s.id, reason: '已手动收回' })
   await db.query("update partner_promo_grants set decided_at=now()-interval '3 days', voided_at=now()-interval '1 hour', expires_at=now() where id=$1", [s.id])
-  await db.query("update credit_ledger set created_at=now()-interval '2 days' where idempotency_key='job:v2:reserve'")
-  await db.query("update partner_promo_topups set created_at=now()-interval '1 day', expires_at=now() where id=$1", [t.r.topup_id])
-  expect(await freeOf(db, owner)).toBe(2000)
-  // The 3,000 came out of the sheet (older); the whole top-up is left and expires.
+  await db.query("update partner_promo_topups set created_at=now()-interval '2 days', expires_at=now() where id=$1", [t.r.topup_id])
+  await db.query("update credit_ledger set created_at=now()-interval '1 day' where idempotency_key='job:v2:reserve'")
+  expect(await freeOf(db, owner)).toBe(4510)
+  // The 3,000 came out of the top-up: 2,000 of it expires, the unrelated 2,510 stays.
   expect(await expirePass()).toMatchObject({ taken: 2000, failed: [] })
-  expect(await freeOf(db, owner)).toBe(0)
+  expect(await freeOf(db, owner)).toBe(2510)
   expect(await voidOf(s.id)).toMatchObject({ expired_at: null })
 })
 
@@ -192,4 +187,18 @@ it('owes again the clawback a voided sheet applied, since that grant was taken b
   // The month after: the 10,000 the voided sheet applied counts as unpaid again.
   const next = (await row(db, "select _partner_promo_calc($1, to_char((now() at time zone 'UTC') + interval '1 month','YYYY-MM')) as c", [orgId])).c
   expect(next).toMatchObject({ clawback_owed: 300000, clawback_applied: 10000 })
+})
+
+it('refuses to void a sheet a later sheet already clawed back from', async () => {
+  const { orgId, owner } = await partner(db, actor)
+  const sales = await fiveCustomers(db, owner, 600000, m.in_before)
+  await run(db, m.previous)
+  await db.query("update partner_promo_grants set expires_at=now()+interval '1 day' where org_id=$1 and period=$2", [orgId, m.previous])
+  const last = await sheet(db, orgId, m.previous)
+  await confirm(db, actor, last)
+  for (const x of sales) await db.query("select record_payment_issue($1,'refunded',2490)", [x.charge])
+  await run(db, m.current)
+  await confirm(db, actor, await sheet(db, orgId, m.current)) // claws 10,000 back from last month's sheet
+  await refused(db, () => voidSheet(actor, { grant_id: last.id, reason: 'x' }), 'PROMO_GRANT_CLAWED')
+  expect(await voidOf(last.id)).toMatchObject({ voided: false })
 })
