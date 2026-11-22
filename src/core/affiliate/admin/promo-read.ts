@@ -40,13 +40,15 @@ const sheet = z.object({
   decided_at: z.string().nullable(),
   decision_note: z.string().nullable(),
   expired_credits: int.nullable(),
+  voided_at: z.string().nullable(),
+  void_reason: z.string().nullable(),
   orgs: z.object({ name: z.string() }).nullable(),
 })
 export type PromoSheet = z.infer<typeof sheet>
 
 const SHEET_COLUMNS =
   'id,org_id,period,status,recipient_user_id,base,bonus,raw_credits,counted_credits,customer_cap,customers,capped_customers,' +
-  'clawback_owed,clawback_applied,total,detail,fingerprint,computed_at,expires_at,decided_at,decision_note,expired_credits,orgs(name)'
+  'clawback_owed,clawback_applied,total,detail,fingerprint,computed_at,expires_at,decided_at,decision_note,expired_credits,voided_at,void_reason,orgs(name)'
 
 /** The latest sheets, newest month first (partner_promo_grants_list_idx); two partners × a year fits. */
 export async function promoSheets(db: SupabaseClient, limit = 30): Promise<PromoSheet[]> {

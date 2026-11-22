@@ -21,7 +21,7 @@ const sheet = {
   id: '9', org_id: org, period: '2026-12', status: 'granted', recipient_user_id: owner, base: 10000, bonus: 0, raw_credits: 0,
   counted_credits: 0, customer_cap: 0, customers: 0, capped_customers: 0, clawback_owed: 0, clawback_applied: 0, total: 10000,
   fingerprint: '0123456789abcdef0123456789abcdef', computed_at: '2026-12-01T00:40:00Z', expires_at: '2027-01-01T00:00:00Z',
-  decided_at: '2026-12-01T03:00:00Z', decision_note: null, expired_credits: null, orgs: { name: 'Acme' },
+  decided_at: '2026-12-01T03:00:00Z', decision_note: null, expired_credits: null, voided_at: null, void_reason: null, orgs: { name: 'Acme' },
   detail: { per: [], sources: [], bonus_bp: 1000, customer_cap_bp: 2000, min_customers: 3 },
 } satisfies PromoSheet
 const render = (props: Partial<Parameters<typeof PromoTopups>[0]> = {}) =>

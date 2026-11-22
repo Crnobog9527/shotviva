@@ -14,7 +14,7 @@ const sheet: PromoSheet = {
   recipient_user_id: '1b1c2d3e-4f50-4617-8899-aabbccddeeff', base: 10000, bonus: 16000, raw_credits: 300000,
   counted_credits: 160000, customer_cap: 60000, customers: 5, capped_customers: 1, clawback_owed: 3000, clawback_applied: 3000,
   total: 23000, fingerprint: '0123456789abcdef0123456789abcdef', computed_at: '2026-12-01T00:40:00Z',
-  expires_at: '2027-01-01T00:00:00Z', decided_at: null, decision_note: null, expired_credits: null, orgs: { name: 'Acme' },
+  expires_at: '2027-01-01T00:00:00Z', decided_at: null, decision_note: null, expired_credits: null, voided_at: null, void_reason: null, orgs: { name: 'Acme' },
   detail: {
     per: [{ customer, raw: 200000, counted: 60000, capped: true }],
     sources: [{ grant_id: 4, period: '2026-11', owed: 3000, applied: 3000 }],
@@ -47,4 +47,24 @@ it('flags a granted sheet past its month that the expiry pass has not taken back
   expect(render(late)).toContain(P.expiryOverdue)
   expect(render({ ...late, expired_credits: 500 })).toContain(P.expired(500))
   expect(render({ ...late, expired_credits: 500 })).not.toContain(P.expiryOverdue)
+})
+
+it('offers 作废 on a granted sheet not yet taken back, and shows the void once done', async () => {
+  const granted = { ...sheet, status: 'granted', decided_at: '2026-12-02T00:00:00Z' }
+  const html = render(granted)
+  expect(html).toContain(P.void)
+  expect(html).toContain('value="promoVoid"')
+  expect(html).toContain('name="reason"')
+  expect(html).not.toContain(P.voided)
+  // Not offered while pending or once the expiry pass has taken it back.
+  expect(render(sheet)).not.toContain('value="promoVoid"')
+  expect(render({ ...granted, expires_at: '2026-12-01T00:00:00Z', expired_credits: 0 })).not.toContain('value="promoVoid"')
+
+  const voided = { ...granted, expires_at: '2026-12-01T00:00:00Z', voided_at: '2026-11-30T02:00:00Z', void_reason: '已手动收回' }
+  const after = render(voided)
+  expect(after).toContain(P.voided)
+  expect(after).toContain(P.voidedAt)
+  expect(after).toContain('已手动收回')
+  expect(after).not.toContain('value="promoVoid"')
+  expect(after).not.toContain(P.expiryOverdue)
 })

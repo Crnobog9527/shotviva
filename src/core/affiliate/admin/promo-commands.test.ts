@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { describe, expect, it, vi } from 'vitest'
-import { decidePromo, runPromoNow, setPromoPartner } from './promo-commands'
+import { decidePromo, runPromoNow, setPromoPartner, voidPromo } from './promo-commands'
 import { PROMO_COPY as P } from './promo-copy'
 
 vi.mock('server-only', () => ({}))
@@ -41,6 +41,29 @@ describe('decidePromo', () => {
 
   it('throws an unexpected database error for the action to log', async () => {
     await expect(decidePromo(dbAnswering({ data: null, error: { message: 'boom' } }).db, 'a', form(confirm))).rejects.toThrow()
+  })
+})
+
+describe('voidPromo', () => {
+  const voiding = { operation: 'promoVoid', grant_id: '1', reason: ' 已手动收回 ' }
+
+  it('sends the grant and the trimmed reason, and tells a first void from a repeat', async () => {
+    const { db, rpc } = dbAnswering({ data: { applied: true, grant_id: 1 }, error: null })
+    expect(await voidPromo(db, 'admin', form(voiding))).toBe(P.answers.voided)
+    expect(rpc).toHaveBeenCalledWith('admin_partner_promo_void', { p_actor: 'admin', p_input: { grant_id: '1', reason: '已手动收回' } })
+    expect(await voidPromo(dbAnswering({ data: { applied: false, reason: 'already', grant_id: 1 }, error: null }).db, 'a', form(voiding)))
+      .toBe(P.answers.alreadyVoided)
+  })
+
+  it('requires a reason, checks the form before calling the database and maps refusals', async () => {
+    const { db, rpc } = dbAnswering({ data: null, error: null })
+    expect(await voidPromo(db, 'a', form({ grant_id: '1', reason: '   ' }))).toBe(P.answers.voidReasonMissing)
+    expect(await voidPromo(db, 'a', form({ grant_id: '1' }))).toBe(P.answers.voidReasonMissing)
+    expect(await voidPromo(db, 'a', form({ grant_id: '0', reason: 'x' }))).toBe(P.answers.invalid)
+    expect(rpc).not.toHaveBeenCalled()
+    expect(await voidPromo(dbAnswering({ data: null, error: { message: 'PROMO_GRANT_NOT_GRANTED' } }).db, 'a', form(voiding))).toBe(P.answers.notGranted)
+    expect(await voidPromo(dbAnswering({ data: null, error: { message: 'PROMO_GRANT_EXPIRED' } }).db, 'a', form(voiding))).toBe(P.answers.voidExpired)
+    await expect(voidPromo(dbAnswering({ data: null, error: { message: 'NOT_ADMIN' } }).db, 'a', form(voiding))).rejects.toThrow()
   })
 })
 
