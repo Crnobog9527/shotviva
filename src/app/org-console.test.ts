@@ -11,7 +11,7 @@ import { CONSOLE_ERRORS, type OwnerConsole, type OwnerReport, type PaymentAccoun
 vi.mock('@/core/i18n/ui', () => ({ Link: ({ href, children, ...rest }: { href: string; children: unknown }) => createElement('a', { href, ...rest }, children as never) }))
 vi.mock('@/core/analytics/replay', () => ({ REPLAY_BLOCK_CLASS: 'sv-replay-block' }))
 
-const { OwnerConsoleView, OwnerEntryRow } = await import('@/core/org/ui/owner-console')
+const { OwnerConsoleView, OwnerEntryRow, PurchasingView } = await import('@/core/org/ui/owner-console')
 const { StaffCardView } = await import('@/core/org/ui/staff-card')
 const { JoinForm } = await import('@/core/org/ui/join-form')
 
@@ -63,7 +63,7 @@ const report = (over: Partial<OwnerReport> = {}): OwnerReport => ({
 
 describe.each(['en', 'zh'] as const)('monthly table (%s)', (locale) => {
   it('shows the monthly table with totals, a month picker and the CSV downloads, and no commission', () => {
-    const { html, text, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: report() }))
+    const { html, text, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, affiliate: true, report: report() }))
     expect(errors).toEqual([])
     expect(text).toContain('$123.45')
     expect(text).toContain('$9.99')
@@ -76,27 +76,30 @@ describe.each(['en', 'zh'] as const)('monthly table (%s)', (locale) => {
     expect(text).toMatch(/Left|已离开/)
     expect(text).not.toMatch(/commission|佣金/i)
     // Level 2 columns only for an org that has level 2.
-    const one = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: report({ withLevel2: false }) }))
+    const one = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, affiliate: true, report: report({ withLevel2: false }) }))
     expect(one.html.match(/<th /g)?.length).toBeLessThan(html.match(/<th /g)?.length ?? 0)
     // No affiliate: no customer columns and no customer download.
-    const none = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: report({ withAffiliate: false, withLevel2: false }) }))
+    const none = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, affiliate: true, report: report({ withAffiliate: false, withLevel2: false }) }))
     expect(none.html).not.toContain('kind=customers')
   })
 })
 
 describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
 
-  it("shows the owner's pool, USD packages with the transfer note, the invite link and the members", () => {
-    const { text, html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null }))
+  it("shows the workspace: the staff-only link first, then the pool and the members, without packages", () => {
+    const { text, html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null, affiliate: true }))
     expect(errors).toEqual([])
     expect(text).toContain('120,000')
-    expect(text).toContain('$1,234')
-    expect(text).toContain('98,765')
-    expect(text).toContain('/join/org/' + 'a'.repeat(32))
+    // Built in Chinese whatever the console's language (ENTERPRISE_LINK_LOCALE).
+    expect(text).toContain('/zh/join/org/' + 'a'.repeat(32))
     expect(text).toContain('ann@acme.test')
-    expect(html).toContain('/account?help=new')
-    // Packages are USD only: no yuan sign anywhere.
-    expect(text).not.toMatch(/[¥￥]|CNY|RMB/)
+    // Owner 2026-11-22: the staff link comes before the pool, and warns that customers must not get it.
+    expect(text.indexOf(locale === 'en' ? 'Staff-only link' : '员工专用链接')).toBeLessThan(text.indexOf(locale === 'en' ? 'Credit pool' : '积分池'))
+    expect(text).toMatch(locale === 'en' ? /send it to customers/ : /不要发给客户/)
+    expect(html).toContain('href="/partners/enterprise"')
+    expect(html).toContain('var(--caution-edge)')
+    // Packages and bank transfer moved to the purchasing page.
+    expect(text).not.toContain('$1,234')
     // No report read: the table says so instead of a made-up number.
     expect(text).toMatch(/be loaded|加载失败/)
   })
@@ -106,7 +109,7 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
       { kind: 'overseas_us', details: { account_name: 'Sample Holdings', bank_name: 'Example Bank', account_number: '0000 0000', empty: '' } },
       { kind: 'mainland_agent', details: { account_name: 'Example Agent', currency: 'CNY' } },
     ]
-    const shown = render(locale, createElement(OwnerConsoleView, { data: owner({}, { paymentAccounts: groups }), actions: ownerActions, report: null }))
+    const shown = render(locale, createElement(PurchasingView, { data: owner({}, { paymentAccounts: groups }) }))
     expect(shown.errors).toEqual([])
     expect(shown.text).toContain(locale === 'en' ? 'US company business account' : '海外美国公司对公账户')
     expect(shown.text).toContain(locale === 'en' ? 'Account number / IBAN' : '账号 / IBAN')
@@ -115,21 +118,14 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
     expect(shown.text).toContain(locale === 'en' ? 'Put this number in your payment reference' : '汇款时请在附言中填写企业编号')
     expect(shown.html).toContain('data-slot="org-ref-code"')
     expect(shown.html).not.toContain('org-payment-accounts-pending')
-    const pending = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null }))
+    const pending = render(locale, createElement(PurchasingView, { data: owner() }))
     expect(pending.html).toContain('data-slot="org-payment-accounts-pending"')
   })
 
   it('offers no remove button for the owner row and one for each member', () => {
-    const { html } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null }))
+    const { html } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null, affiliate: true }))
     const removes = html.match(/<button[^>]*>(Remove|移除)<\/button>/g) ?? []
     expect(removes).toHaveLength(1)
-  })
-
-  it('says the account is paused and disables pool actions for a suspended org', () => {
-    const { html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner({ status: 'suspended' }), actions: ownerActions, report: null }))
-    expect(errors).toEqual([])
-    expect(html).toMatch(/paused|暂停/)
-    expect((html.match(/disabled=""/g) ?? []).length).toBeGreaterThanOrEqual(5)
   })
 
   it("shows a member's card with this month's numbers, a leave button and the customers' spend", () => {
@@ -144,14 +140,61 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
     expect(text).not.toMatch(/Coming soon|即将上线|commission|佣金/i)
   })
 
-  it('renders the account row and the join confirmation', () => {
-    const row = render(locale, createElement(OwnerEntryRow, { name: 'Acme Studio', pool: '120,000', suspended: false }))
+  it('renders the account row', () => {
+    const row = render(locale, createElement(OwnerEntryRow, { name: 'Acme Studio', pool: '120,000', suspended: false, affiliate: false }))
     expect(row.errors).toEqual([])
     expect(row.html).toContain('href="/account/enterprise"')
-    const join = render(locale, createElement(JoinForm, { join: async () => ({ ok: true as const }), orgName: 'Acme Studio' }))
+    // With the affiliate on, the area opens on 企业联盟 (Owner 2026-11-22).
+    const affiliateRow = render(locale, createElement(OwnerEntryRow, { name: 'Acme Studio', pool: '120,000', suspended: false, affiliate: true }))
+    expect(affiliateRow.html).toContain('href="/partners/enterprise"')
+  })
+})
+
+describe.each(['en', 'zh'] as const)('join confirmation (%s)', (locale) => {
+  it('asks for the click and never joins on its own', () => {
+    // Joining always takes the click (review of #829): rendering the form never joins.
+    const joinSpy = vi.fn(async () => ({ ok: true as const }))
+    const join = render(locale, createElement(JoinForm, { join: joinSpy, orgName: 'Acme Studio' }))
     expect(join.errors).toEqual([])
     expect(join.text).toContain('Acme Studio')
+    expect(join.html).toMatch(/<button[^>]*>[^<]*Acme Studio/)
+    expect(joinSpy).not.toHaveBeenCalled()
   })
+})
+
+describe.each(['en', 'zh'] as const)('purchasing and the staff link (%s)', (locale) => {
+  it('leaves out the affiliate pointer when the org has no affiliate section', () => {
+    const { html } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null, affiliate: false }))
+    expect(html).not.toContain('href="/partners/enterprise"')
+  })
+
+  it('opens the China region contact instead of a ticket when the site names one (Owner 2026-11-22)', () => {
+    const contact = { name: 'Sample Manager', email: 'sales@example.test', wechat: 'sample-wechat' }
+    const { html, text, errors } = render(locale, createElement(PurchasingView, { data: owner(), contact }))
+    expect(errors).toEqual([])
+    expect(text).toMatch(locale === 'en' ? /Contact us to arrange a transfer/ : /联系我们转账/)
+    expect(html).not.toContain('/account?help=new')
+    // The email is plain text with a copy button, never a mailto link.
+    expect(html).not.toContain('mailto:')
+  })
+
+  it('shows USD packages with the transfer note on the purchasing page', () => {
+    const { text, html, errors } = render(locale, createElement(PurchasingView, { data: owner() }))
+    expect(errors).toEqual([])
+    expect(text).toContain('$1,234')
+    expect(text).toContain('98,765')
+    expect(html).toContain('/account?help=new')
+    // Packages are USD only: no yuan sign anywhere.
+    expect(text).not.toMatch(/[¥￥]|CNY|RMB/)
+    expect(text).not.toContain('/join/org/')
+  })
+  it('says the account is paused and disables pool actions for a suspended org', () => {
+    const { html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner({ status: 'suspended' }), actions: ownerActions, report: null, affiliate: true }))
+    expect(errors).toEqual([])
+    expect(html).toMatch(/paused|暂停/)
+    expect((html.match(/disabled=""/g) ?? []).length).toBeGreaterThanOrEqual(5)
+  })
+
 })
 
 describe('messages', () => {

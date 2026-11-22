@@ -24,6 +24,12 @@ export function loginPath(next?: string): string {
   return `/login?next=${encodeURIComponent(sanitizeNext(next))}`
 }
 
+// The sign-up page with the same `next` rule, for links aimed at people who have no account yet
+// (an org's staff invite link); its "already have an account" link keeps `next` for sign-in.
+export function signupPath(next?: string): string {
+  return `/signup?next=${encodeURIComponent(sanitizeNext(next))}`
+}
+
 // `next` for a login or signup page in `locale`: a valid `next` is kept as written (it already
 // carries its language), the fallback is the account page of the page's own language.
 export function nextIn(value: string | null | undefined, locale: Locale): string {

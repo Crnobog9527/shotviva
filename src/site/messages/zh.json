@@ -1783,14 +1783,24 @@
       },
       "tabs": {
         "label": "企业分区",
-        "console": "企业",
-        "affiliate": "企业联盟"
+        "console": "企业工作台",
+        "affiliate": "企业联盟",
+        "purchasing": "企业集采信息",
+        "short": {
+          "affiliate": "企业联盟",
+          "console": "企业工作台",
+          "purchasing": "企业集采信息"
+        }
       },
       "entry": {
         "title": "企业",
         "pool": "积分池 {pool} 积分",
         "suspended": "账号已暂停",
-        "open": "管理"
+        "open": "管理",
+        "customerTitle": "客户推广链接",
+        "customerHint": "用来邀请和发展客户。客户通过这个链接注册和付费，佣金记在企业联盟名下。这不是员工链接。",
+        "copy": "复制链接",
+        "copied": "已复制"
       },
       "pool": {
         "title": "积分池",
@@ -1817,8 +1827,8 @@
         "contactLink": "联系我们转账"
       },
       "invite": {
-        "title": "邀请链接",
-        "hint": "把这个链接发给你的团队。已登录的人打开后即可加入企业。",
+        "title": "员工专用链接",
+        "hint": "只发给你自己的员工。员工打开后注册或登录，就会加入企业，使用企业划给他的积分。",
         "suspended": "企业已暂停，暂时不能通过链接加入。",
         "copy": "复制链接",
         "copied": "链接已复制。",
@@ -1828,7 +1838,9 @@
         "resetBody": "现有链接会立即失效。已经加入的成员不受影响。",
         "resetConfirm": "重置",
         "resetDone": "新链接已生成。",
-        "cancel": "取消"
+        "cancel": "取消",
+        "warning": "不要发给客户。客户打开这个链接会作为员工加入你的企业，不会记为你推荐的客户。",
+        "toAffiliate": "邀请客户请用企业联盟里的客户推广链接"
       },
       "members": {
         "title": "成员",
@@ -1959,6 +1971,22 @@
         "active": "在职",
         "removed": "已离开",
         "unknown": "账号"
+      },
+      "area": {
+        "workspaceIntro": "把 Shotviva 当作生产力工具批量出图时的数据管理台：积分池、员工和每月产出都在这里管理。",
+        "purchasingIntro": "企业套餐价格和对公转账信息。需要给积分池充值时，按这里的方式线下办理。",
+        "affiliateIntro": "推广客户、查看佣金和结算。客户通过你的推广链接注册和付费，佣金记在企业名下。"
+      },
+      "contact": {
+        "open": "联系我们转账",
+        "title": "联系我们转账",
+        "body": "请联系我们的中国地区负责人，确认汇率和转账安排。",
+        "name": "中国地区负责人",
+        "email": "企业邮箱",
+        "wechat": "微信号",
+        "copy": "复制",
+        "copied": "已复制",
+        "copyFailed": "请手动选中复制"
       }
     },
     "templateShare": {

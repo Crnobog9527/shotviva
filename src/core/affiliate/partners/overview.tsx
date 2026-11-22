@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server'
 import { currentLocale } from '@/core/i18n/server'
+import { ENTERPRISE_LINK_LOCALE } from '@/core/i18n/locales'
 import { consumerReferralUrl } from '../consumer-link'
 import { Link } from '@/core/i18n/ui'
 import { date, money } from './format'
@@ -63,7 +64,7 @@ export async function Overview({
 
       <section className="af-panel af-linkbox" aria-labelledby="af-mylink">
         <h2 id="af-mylink">{t('myLink')}</h2>
-        <CopyLink url={consumerReferralUrl(account.slug, locale)} copy={t('copy')} copied={t('copied')} />
+        <CopyLink url={consumerReferralUrl(account.slug, account.org_id ? ENTERPRISE_LINK_LOCALE : locale)} copy={t('copy')} copied={t('copied')} />
         <p className="af-hint">{t('anyPage', { suffix: '?ref=' + account.slug })}</p>
       </section>
 
