@@ -1213,6 +1213,7 @@
         "deleting": "Deleting…",
         "cancel": "Cancel",
         "running": "This photo is still developing. Delete it once it's done.",
+        "org": "This photo was made with your company's credits, so it belongs to the company and only the company admin can delete it.",
         "failed": "Couldn't delete the photo. Please try again."
       }
     },
@@ -1784,11 +1785,13 @@
       "tabs": {
         "label": "Company sections",
         "console": "Company workspace",
+        "works": "Company works",
         "affiliate": "Company affiliate",
         "purchasing": "Bulk purchasing",
         "short": {
           "affiliate": "Affiliate",
           "console": "Workspace",
+          "works": "Works",
           "purchasing": "Purchasing"
         }
       },
@@ -1975,7 +1978,8 @@
       "area": {
         "workspaceIntro": "Where you run Shotviva as a production tool: manage the credit pool, your staff and what they make each month, for image work at scale.",
         "purchasingIntro": "Company package prices and bank transfer details. Top up the credit pool offline, the way described here.",
-        "affiliateIntro": "Bring in customers and follow commissions and payouts. Sign-ups and purchases through your referral link count toward the company."
+        "affiliateIntro": "Bring in customers and follow commissions and payouts. Sign-ups and purchases through your referral link count toward the company.",
+        "worksIntro": "Everything staff make with company credits belongs to the company. It shows only here and is never public. When someone leaves, their company works stay here and leave their own account."
       },
       "contact": {
         "open": "Contact us to arrange a transfer",
@@ -1987,6 +1991,21 @@
         "copy": "Copy",
         "copied": "Copied",
         "copyFailed": "Select and copy it"
+      },
+      "works": {
+        "title": "Company works",
+        "all": "All staff",
+        "filterLabel": "Filter by staff member",
+        "removed": "Left",
+        "owner": "Main admin",
+        "count": "{count, plural, one {# photo} other {# photos}}",
+        "empty": "No photos made with company credits yet.",
+        "emptyMember": "This person has not made photos with company credits yet.",
+        "more": "Older works",
+        "open": "View full size",
+        "download": "Download original",
+        "madeBy": "{who} · {date}",
+        "unknown": "Account"
       }
     },
     "templateShare": {
