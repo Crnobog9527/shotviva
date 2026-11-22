@@ -32,3 +32,13 @@ export const BATCH_UPLOAD_TICKETS_MAX = 10
 export const INPUT_PREVIEW_PX = 768
 
 export { MATTE_DARK, MATTE_WHITE, matteCss, matteFor, type Matte } from './alpha-matte'
+
+// Every copy of a free work that leaves the server has its long edge capped here (Owner
+// 2026-11-22, storage/protect): about a phone screen, too small for print or a menu board. The
+// browser reads it to say what a free download really is.
+export const FREE_MAX_EDGE = 1080
+
+// The long edge of the file a work's download gives: the tier's size, capped for a free work.
+export function savedLongEdge(pool: 'free' | 'paid' | null | undefined, px: number): number {
+  return pool === 'free' && px > FREE_MAX_EDGE ? FREE_MAX_EDGE : px
+}

@@ -17,6 +17,9 @@ export type AgainStart = {
   missing: 'old' | 'failed' | null
   // 'gallery': 一键复用 from someone's public work (T108): its settings only, never its photo.
   from?: 'gallery'
+  // 「去水印：用付费积分重新生成」 (2026-11-22): Make again of a free work that only paid credits may
+  // pay, so the new photo is clean and private. Opened by removeWatermarkHref.
+  paidOnly?: boolean
 }
 
 // Make again's link from a finished work (the photo page and the Photos grid): the template's
@@ -24,6 +27,11 @@ export type AgainStart = {
 // must not prefetch: opening it copies the kept photo back to a fresh upload.
 export function makeAgainHref(templateId: string, jobId: string): string {
   return `/generate/${encodeURIComponent(templateId)}?again=${encodeURIComponent(jobId)}`
+}
+
+// 「去水印：用付费积分重新生成」 next to a free work: Make again, paid credits only (paidOnly above).
+export function removeWatermarkHref(templateId: string, jobId: string): string {
+  return `${makeAgainHref(templateId, jobId)}&clean=1`
 }
 
 const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {}, toggles: {} }

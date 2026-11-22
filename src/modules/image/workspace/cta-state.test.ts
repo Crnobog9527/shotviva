@@ -48,4 +48,13 @@ describe('ctaState: batch balance pre-check (T28)', () => {
   it('does not wait on the concurrency limit: the batch queues behind running photos', () => {
     expect(ctaState({ ...base, balance: { paid: 20, free: 0 }, running: 2, count: 10 }).kind).toBe('generate')
   })
+
+  // 「去水印：用付费积分重新生成」 (2026-11-22): free credits must not pay, or the new photo would be
+  // marked again; the primary asks for paid credits instead.
+  it('lets only paid credits pay when the run is to remove the watermark', () => {
+    expect(ctaState({ ...base, paidOnly: true })).toEqual({ kind: 'get-credits', cost: 2, needed: 2, count: 1 })
+    expect(ctaState({ ...base, balance: { paid: 1, free: 6 }, paidOnly: true })).toMatchObject({ kind: 'get-credits', needed: 1 })
+    expect(ctaState({ ...base, balance: { paid: 2, free: 0 }, paidOnly: true })).toMatchObject({ kind: 'generate', pool: 'paid' })
+    expect(ctaState(base)).toMatchObject({ kind: 'generate', pool: 'free' })
+  })
 })

@@ -1,38 +1,82 @@
-// Renders the "Made with Shotviva" mark once, on a machine with fonts, into a PNG embedded
-// as base64. Vercel's function image has no usable system fonts, so rendering SVG <text> at
-// request time would come out blank; compositing a pre-rendered bitmap does not depend on fonts.
+// Renders the free-work marks once, on a machine with fonts, into PNGs embedded as base64.
+// Vercel's function image has no usable system fonts, so rendering SVG <text> at request time
+// would come out blank; compositing pre-rendered bitmaps does not depend on fonts.
+//   - the tile: "Made with Shotviva", white fill over a faint dark stroke (paint-order stroke),
+//     drawn at full opacity; the request side scales it, repeats it on the −30° grid and sets
+//     the opacity (src/core/storage/protect/visible-mark.ts);
+//   - the label: 「仅供演示 · 未授权商用」 over "Demo only · Not licensed for commercial use",
+//     right-aligned, white with a soft dark halo, for the bottom-right corner.
+// Chinese needs a CJK face: Hiragino Sans GB / PingFang ship with macOS; the text is rasterised
+// here, so no font file ever leaves the build machine or reaches a served image as a font.
 // Run: pnpm tsx scripts/build-watermark.ts
 import { writeFileSync } from 'node:fs'
 
 import sharp from 'sharp'
 
-const WIDTH = 1200
-const HEIGHT = 160
-const TEXT = 'Made with Shotviva'
+const TILE_TEXT = 'Made with Shotviva'
+const LABEL_ZH = '仅供演示 · 未授权商用'
+const LABEL_EN = 'Demo only · Not licensed for commercial use'
 
-// White text over a soft dark halo stays legible on bright plates and dark tables alike.
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">
+// The tile's font size in pixels; the request side scales the bitmap to 4% of the image width.
+const TILE_FONT = 100
+// Stroke width ÷ font size: 0.16% of the width ÷ 4% of the width.
+const TILE_STROKE = TILE_FONT * 0.04
+// Stroke opacity ≈ 0.7 × the fill's (both are scaled together at request time).
+const TILE_STROKE_OPACITY = 0.7
+const LATIN = 'Helvetica Neue, Helvetica, Arial, sans-serif'
+const CJK = 'Hiragino Sans GB, PingFang SC, STHeiti, sans-serif'
+
+// Generous canvas; trimmed afterwards. The baseline-left anchor is tracked through the trim.
+const PAD = 40
+const TILE_W = 1400
+const TILE_H = TILE_FONT * 2
+const BASELINE = PAD + TILE_FONT
+
+const tileSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${TILE_W}" height="${TILE_H}">
+  <text x="${PAD}" y="${BASELINE}" font-family="${LATIN}" font-size="${TILE_FONT}" font-weight="600"
+    fill="#ffffff" stroke="#000000" stroke-opacity="${TILE_STROKE_OPACITY}" stroke-width="${TILE_STROKE}"
+    stroke-linejoin="round" paint-order="stroke">${TILE_TEXT}</text>
+</svg>`
+
+// The label's two lines share one font size (the request side scales the bitmap so a line is
+// ≈ 3.2% of the width); right-aligned so the corner margin holds for both.
+const LABEL_FONT = 64
+const LABEL_W = 2800
+const LABEL_H = Math.round(LABEL_FONT * 2.9)
+const labelSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${LABEL_W}" height="${LABEL_H}">
   <defs>
     <filter id="halo" x="-10%" y="-40%" width="120%" height="180%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
-      <feComponentTransfer><feFuncA type="linear" slope="0.55"/></feComponentTransfer>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4.5"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.6"/></feComponentTransfer>
       <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <text x="${WIDTH - 24}" y="${HEIGHT / 2}" text-anchor="end" dominant-baseline="central"
-    font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="96" font-weight="600"
-    fill="#ffffff" fill-opacity="0.92" filter="url(#halo)">${TEXT}</text>
+  <g filter="url(#halo)" fill="#ffffff" fill-opacity="0.94" font-weight="600" text-anchor="end">
+    <text x="${LABEL_W - PAD}" y="${PAD + LABEL_FONT}" font-family="${CJK}" font-size="${LABEL_FONT}">${LABEL_ZH}</text>
+    <text x="${LABEL_W - PAD}" y="${PAD + LABEL_FONT * 2.2}" font-family="${LATIN}" font-size="${LABEL_FONT * 0.82}">${LABEL_EN}</text>
+  </g>
 </svg>`
 
+async function trimmed(svg: string) {
+  const { data, info } = await sharp(Buffer.from(svg)).png().trim({ threshold: 1 }).toBuffer({ resolveWithObject: true })
+  const png = await sharp(data).png({ compressionLevel: 9 }).toBuffer()
+  return { png, width: info.width, height: info.height, left: -(info.trimOffsetLeft ?? 0), top: -(info.trimOffsetTop ?? 0) }
+}
+
 async function main() {
-  const png = await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).trim().toBuffer()
-  const target = new URL('../src/core/storage/watermark-asset.generated.ts', import.meta.url)
+  const tile = await trimmed(tileSvg)
+  const label = await trimmed(labelSvg)
+  const target = new URL('../src/core/storage/protect/mark-assets.generated.ts', import.meta.url)
   writeFileSync(
     target,
     `// Generated by scripts/build-watermark.ts — do not edit by hand.\n` +
-      `export const WATERMARK_PNG_BASE64 =\n  '${png.toString('base64')}'\n`,
+      `// tile: the font size it was drawn at and where its baseline-left anchor sits in the bitmap.\n` +
+      `export const MARK_TILE = {\n  font: ${TILE_FONT},\n  anchorX: ${PAD - tile.left},\n  anchorY: ${BASELINE - tile.top},\n` +
+      `  png: '${tile.png.toString('base64')}',\n}\n\n` +
+      `// label: the font size of its (Chinese) first line.\n` +
+      `export const MARK_LABEL = {\n  font: ${LABEL_FONT},\n  png: '${label.png.toString('base64')}',\n}\n`,
   )
-  process.stdout.write(`watermark: ${png.length} bytes\n`)
+  process.stdout.write(`tile ${tile.width}x${tile.height} (${tile.png.length} B), label ${label.width}x${label.height} (${label.png.length} B)\n`)
 }
 
 void main()
