@@ -12,7 +12,7 @@ export const PAYMENT_FIELDS: Record<PaymentKind, readonly string[]> = {
 
 // Labels in both languages: the admin form shows zh, the owner's package section (E4) picks by locale.
 export const PAYMENT_KIND_LABELS: Record<PaymentKind, { zh: string; en: string }> = {
-  overseas_us: { zh: '海外美国公司对公账户', en: 'US company business account' },
+  overseas_us: { zh: '美国公司对公账户', en: 'US company business account' },
   mainland_agent: { zh: '中国大陆代收机构账户', en: 'Mainland China collection agent account' },
 }
 export const PAYMENT_FIELD_LABELS: Record<string, { zh: string; en: string }> = {

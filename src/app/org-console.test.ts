@@ -114,14 +114,17 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
 
   it('shows the collecting accounts by group with the enterprise number to quote, or a marked placeholder', () => {
     const groups: PaymentAccountGroup[] = [
-      { kind: 'overseas_us', details: { account_name: 'Sample Holdings', bank_name: 'Example Bank', account_number: '0000 0000', empty: '' } },
       { kind: 'mainland_agent', details: { account_name: 'Example Agent', currency: 'CNY' } },
+      { kind: 'overseas_us', details: { account_name: 'Sample Holdings', bank_name: 'Example Bank', account_number: '0000 0000', empty: '' } },
     ]
     const shown = render(locale, createElement(PurchasingView, { data: owner({}, { paymentAccounts: groups }) }))
     expect(shown.errors).toEqual([])
-    expect(shown.text).toContain(locale === 'en' ? 'US company business account' : '海外美国公司对公账户')
+    expect(shown.text).toContain(locale === 'en' ? 'US company business account' : '美国公司对公账户')
     expect(shown.text).toContain(locale === 'en' ? 'Account number / IBAN' : '账号 / IBAN')
     expect(shown.text).toContain('Example Agent')
+    // Each group is its own panel, the US company first whatever order the read returns (Owner 2026-11-23).
+    expect(shown.html.match(/data-slot="org-payment-account"/g)).toHaveLength(2)
+    expect(shown.text.indexOf('Sample Holdings')).toBeLessThan(shown.text.indexOf('Example Agent'))
     expect(shown.text).toContain('SV-K7M2PX')
     expect(shown.text).toContain(locale === 'en' ? 'Put this number in your payment reference' : '汇款时请在附言中填写企业编号')
     expect(shown.html).toContain('data-slot="org-ref-code"')
