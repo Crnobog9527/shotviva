@@ -8,7 +8,7 @@ const n = (value: number) => value.toLocaleString('zh-CN')
 
 export const TOPUP_COPY = {
   title: '临时追加',
-  intro: `随时给渠道商追加本月的推广积分（例如第一个月还没有推广积分奖励、保底不够用）。和每月发放单一样进主账号的免费池，不进企业积分池，本月底（UTC）一起清零；不影响每月发放单的保底、推广积分奖励和扣回。每次最多 ${n(PROMO_TOPUP_MAX)}，原因必填。`,
+  intro: `随时给渠道商追加本月的推广积分（例如第一个月还没有推广积分奖励、保底不够用）。和每月发放单一样进企业的推广积分池（不进主账号个人余额），本月底（UTC）连同员工手里没用完的一起清零；不影响每月发放单的保底、推广积分奖励和扣回。每次最多 ${n(PROMO_TOPUP_MAX)}，原因必填。`,
   noPartners: '还没有渠道商。先在下面的「渠道商」表里把企业设为渠道商。',
   sheet: '本月发放单',
   sheetNone: '还没有生成',
@@ -17,11 +17,11 @@ export const TOPUP_COPY = {
   topups: '本月临时追加',
   noTopups: '本月还没有临时追加。',
   monthTotal: '本月合计',
-  monthTotalHint: '已发放的发放单 + 临时追加；本月底一起清零。',
+  monthTotalHint: '已发放的发放单 + 临时追加，都在企业推广积分池；本月底一起清零。',
   amount: '追加积分',
   reason: '原因（必填）',
   submit: '临时追加',
-  confirmAsk: (org: string, credits: number) => `确认给 ${org} 追加 ${n(credits)} 推广积分？本月底清零。`,
+  confirmAsk: (org: string, credits: number) => `确认给 ${org} 的推广积分池追加 ${n(credits)}？本月底清零。`,
   when: '时间',
   who: '操作人',
   expires: '到期',

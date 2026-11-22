@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 
 import { row } from './affiliate-fixtures'
 import { connectAdmin, createUser } from './helpers'
-import { adminActor, confirm, decide, fiveCustomers, freeOf, months, partner, refused, run, sheet } from './partner-promo-fixtures'
+import { adminActor, asLegacy, confirm, decide, fiveCustomers, freeOf, months, partner, refused, run, sheet } from './partner-promo-fixtures'
 
 // Voiding a granted monthly promotion sheet whose credits an admin already took back by hand
 // (ARCHITECTURE §6.5 渠道商推广积分, migration 1920): the void moves no credits and the month-end
@@ -35,6 +35,8 @@ async function grantedThenTakenBack() {
   await run(db, m.current)
   const s = await sheet(db, orgId, m.current)
   expect(await confirm(db, actor, s)).toMatchObject({ applied: true, total: 10000 })
+  // Granted the way production's sheet was, before migration 1894: into the owner's own pool.
+  await asLegacy(db, 'partner_promo_grants', s.id)
   await db.query("select _apply_credit_change($1,'free','admin_adjust',-10000,'收回推广积分',$2)", [owner, 'adj:' + s.id])
   await db.query("select _apply_credit_change($1,'free','admin_adjust',2510,'other',$2)", [owner, 'adj2:' + s.id])
   return { orgId, owner, s }
@@ -73,6 +75,7 @@ it('leaves a top-up of the same month to expire on its own: the voided sheet abs
   const { orgId, owner, s } = await grantedThenTakenBack()
   const t = await row(db, 'select admin_partner_promo_topup($1,$2) as r', [actor,
     { org_id: orgId, recipient: owner, period: m.current, credits: 5000, reason: 'extra', request_key: randomUUID() }])
+  await asLegacy(db, 'partner_promo_topups', t.r.topup_id)
   await voidSheet(actor, { grant_id: s.id, reason: 'manual' })
   // 3,000 spent during the month, after the void: it comes out of the top-up.
   await db.query("select _apply_credit_change($1,'free','reserve',-3000,'job','job:v1:reserve')", [owner])
@@ -145,6 +148,7 @@ it('takes no clawback from later months for a voided sheet whose bonus was alrea
   await db.query("update partner_promo_grants set expires_at=now()+interval '1 day' where org_id=$1 and period=$2", [orgId, m.previous])
   const last = await sheet(db, orgId, m.previous)
   expect(await confirm(db, actor, last)).toMatchObject({ applied: true, total: 310000 })
+  await asLegacy(db, 'partner_promo_grants', last.id) // granted before 1894, into the owner's own pool
   await db.query("select _apply_credit_change($1,'free','admin_adjust',-310000,'收回推广积分',$2)", [owner, 'adj:' + last.id])
   await voidSheet(actor, { grant_id: last.id, reason: '已手动收回' })
 
@@ -159,6 +163,7 @@ it('never takes unrelated credits when the owner spent between the manual take-b
   const { orgId, owner, s } = await grantedThenTakenBack() // 10,000 granted and taken back; 2,510 unrelated
   const t = await row(db, 'select admin_partner_promo_topup($1,$2) as r', [actor,
     { org_id: orgId, recipient: owner, period: m.current, credits: 5000, reason: 'extra', request_key: randomUUID() }])
+  await asLegacy(db, 'partner_promo_topups', t.r.topup_id)
   await db.query("select _apply_credit_change($1,'free','reserve',-3000,'job','job:v2:reserve')", [owner])
   await voidSheet(actor, { grant_id: s.id, reason: '已手动收回' })
   await db.query("update partner_promo_grants set decided_at=now()-interval '3 days', voided_at=now()-interval '1 hour', expires_at=now() where id=$1", [s.id])
@@ -183,6 +188,7 @@ it('owes again the clawback a voided sheet applied, since that grant was taken b
   const now = await sheet(db, orgId, m.current)
   expect(now).toMatchObject({ clawback_owed: 300000, clawback_applied: 10000, total: 0 })
   await confirm(db, actor, now)
+  await asLegacy(db, 'partner_promo_grants', now.id) // a sheet in the owner's own pool, as before 1894
   await voidSheet(actor, { grant_id: now.id, reason: 'manual' })
   // The month after: the 10,000 the voided sheet applied counts as unpaid again.
   const next = (await row(db, "select _partner_promo_calc($1, to_char((now() at time zone 'UTC') + interval '1 month','YYYY-MM')) as c", [orgId])).c
@@ -196,6 +202,7 @@ it('refuses to void a sheet a later sheet already clawed back from', async () =>
   await db.query("update partner_promo_grants set expires_at=now()+interval '1 day' where org_id=$1 and period=$2", [orgId, m.previous])
   const last = await sheet(db, orgId, m.previous)
   await confirm(db, actor, last)
+  await asLegacy(db, 'partner_promo_grants', last.id) // a sheet in the owner's own pool, as before 1894
   for (const x of sales) await db.query("select record_payment_issue($1,'refunded',2490)", [x.charge])
   await run(db, m.current)
   await confirm(db, actor, await sheet(db, orgId, m.current)) // claws 10,000 back from last month's sheet

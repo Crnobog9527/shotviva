@@ -7,6 +7,7 @@ import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 
 import { allocateOrgCredits, depositOrgCredits, joinOrg, leaveOrg, removeOrgMember, rotateOrgInvite, setOrgAllowance } from '../actions'
+import { allocateOrgPromoCredits, setOrgPromoAllowance } from '../promo-actions'
 import type { ConsoleError, ConsoleResult } from './types'
 
 // Server-side commands of the account centre's enterprise block. The signed-in account's id comes
@@ -85,6 +86,21 @@ export const setAllowance = (d: Deps, input: unknown) => run(async () => {
   const form = allowanceInput.parse(input)
   await ownedOrg(d)
   return { allowance: await setOrgAllowance(d.db, d.user, form.member, form.allowance) }
+})
+
+// The promotion pool (migration 1893): the same forms, the other pool. Request ids are namespaced
+// by kind too, so a paid and a promotion give can never share one.
+export const allocatePromo = (d: Deps, input: unknown) => run(async () => {
+  const form = allocateInput.parse(input)
+  const org = await ownedOrg(d)
+  const moved = await allocateOrgPromoCredits(d.db, d.user, form.member, form.credits, requestFor(org, 'allocate_promo', form.requestId))
+  return { pool: moved.promo_pool_credits }
+})
+
+export const setPromoAllowance = (d: Deps, input: unknown) => run(async () => {
+  const form = allowanceInput.parse(input)
+  await ownedOrg(d)
+  return { allowance: await setOrgPromoAllowance(d.db, d.user, form.member, form.allowance) }
 })
 
 export const deposit = (d: Deps, input: unknown) => run(async () => {

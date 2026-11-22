@@ -32,3 +32,12 @@ export {
   type PaymentAccountView,
 } from './payment-accounts'
 export { PAYMENT_FIELD_LABELS, PAYMENT_FIELDS, PAYMENT_KIND_LABELS, PAYMENT_KINDS, type PaymentKind } from './payment-labels'
+export {
+  allocateOrgPromoCredits,
+  readMemberPromoStats,
+  readPoolMonth,
+  setOrgPromoAllowance,
+  type MemberPromoStats,
+  type PoolMonth,
+  type PromoMove,
+} from './promo-actions'
