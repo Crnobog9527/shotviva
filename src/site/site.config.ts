@@ -66,6 +66,9 @@ export const site = defineSite({
       '/account/purchases/[paymentId]/[document]',
       // The enterprise owner's console (ARCHITECTURE §6.5, card E4), so Chinese owners reach it.
       '/account/enterprise',
+      '/account/enterprise/purchasing',
+      // An org's staff invite link (card E4); its links are built with /zh (ENTERPRISE_LINK_LOCALE).
+      '/join/org/[token]',
       '/wishlist',
       '/wishlist/new',
       '/wishlist/mine',
@@ -119,6 +122,11 @@ export const site = defineSite({
       { id: 'pack_l', tier: 'pack', interval: null, credits: pricingV2 ? 4990 : 115, paidDays: null, priceUsd: 49.9 },
     ],
     channels: { primary: 'stripe', fallback: 'waffo' },
+  },
+  // The China region manager enterprise customers agree the exchange rate and the transfer with
+  // (Owner 2026-11-22, verbatim). Shown on /account/enterprise/purchasing only.
+  enterprise: {
+    transferContact: { name: 'Simon Lee', email: 'simonlee@shotviva.com', wechat: 'crnobogkin' },
   },
   partners: {
     graylum: {

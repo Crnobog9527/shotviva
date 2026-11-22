@@ -20,6 +20,11 @@ const floorBudget = () => num('select admin.template_floor_budget()')
 const routeFloor = () => num("select (admin.alternate_route_floor($1,'1k','medium')->>'credits')::int", [tag])
 const fallbackFloor = () => num("select admin.fallback_route_floor($1,'1k','medium')", [tag])
 const setPrice = (price: number) => db.query(`update public.templates set credits_cost=jsonb_set(credits_cost,'{1k}',to_jsonb($2::int)) where id=$1`, [template, price])
+const admin = async () => {
+  const id = await createUser(db)
+  await db.query("update profiles set role='admin' where id=$1", [id])
+  return id
+}
 const assertFloor = () => db.query('select admin.assert_template_sale_floor(t) from public.templates t where id=$1', [template])
 // An expected exception aborts the test transaction: run it in a savepoint and roll back to it.
 async function refuses(run: () => Promise<unknown>, error: RegExp) {
@@ -35,8 +40,9 @@ async function expectedBreakeven() {
   const products = (await db.query(`select p.product_id id,p.kind,v.usd_cents cents,v.credits from admin.catalog_products p
     join admin.catalog_product_versions v on (v.product_id,v.revision)=(p.product_id,p.published_revision) where v.listed`)).rows
   const commission = async (kind: string) => num(`select greatest($2::int,
-      (select l1_bp+l2_bp from public.affiliate_rates where product_kind=$1),
-      (select max(coalesce(o.l1_bp,r.l1_bp)+case when parent.status='active' and parent.team_enabled then coalesce(po.l2_bp,r.l2_bp) else 0 end)
+      (select greatest(l1_bp+l2_bp,org_l2_bp) from public.affiliate_rates where product_kind=$1),
+      (select max(greatest(coalesce(o.l1_bp,r.l1_bp)+case when parent.status='active' and parent.team_enabled then coalesce(po.l2_bp,r.l2_bp) else 0 end,
+          case when a.org_id is not null then coalesce(o.l2_bp,r.org_l2_bp) else 0 end))
         from public.affiliates a join public.affiliate_rates r on r.product_kind=$1
         left join public.affiliate_rate_overrides o on (o.user_id,o.product_kind)=(a.user_id,$1)
         left join public.affiliates parent on parent.user_id=a.parent_user_id
@@ -91,6 +97,13 @@ describe('template floor budget', () => {
     const raised = await expectedBreakeven()
     expect(raised).toBeLessThan(breakeven)
     expect(await floorBudget()).toBeCloseTo(raised, 12)
+
+    // The enterprise level-2 default (1900) counts too: an org_l2 payment pays it alone.
+    await db.query('select admin_affiliate_settings($1,$2)', [await admin(), { rates: ['pack', 'monthly', 'yearly']
+      .map((kind) => ({ product_kind: kind, l1_bp: kind === 'yearly' ? 1000 : 1500, l2_bp: kind === 'yearly' ? 300 : 500, org_l2_bp: 6000 })) }])
+    const org = await expectedBreakeven()
+    expect(org).toBeLessThan(raised)
+    expect(await floorBudget()).toBeCloseTo(org, 12)
   })
 
   it('save and open sale refuse a price under the break-even floor and accept the floor', async () => {

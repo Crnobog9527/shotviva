@@ -915,9 +915,10 @@ CREATE OR REPLACE FUNCTION "admin"."catalog_fee_components"("p_kind" "text") RET
     AS $$
   select jsonb_build_object('payment_bp',(policy->>'payment_bp')::int,'refund_bp',(policy->>'refund_bp')::int,
     'commission_bp',greatest((policy->>case when p_kind='yearly' then 'yearly_commission_bp' else 'other_commission_bp' end)::int,
-      (select r.l1_bp+r.l2_bp from public.affiliate_rates r where product_kind=p_kind),
-      (select max(coalesce(o.l1_bp,r.l1_bp) +
-          case when parent.status='active' and parent.team_enabled then coalesce(po.l2_bp,r.l2_bp) else 0 end)
+      (select greatest(r.l1_bp+r.l2_bp,r.org_l2_bp) from public.affiliate_rates r where product_kind=p_kind),
+      (select max(greatest(coalesce(o.l1_bp,r.l1_bp) +
+          case when parent.status='active' and parent.team_enabled then coalesce(po.l2_bp,r.l2_bp) else 0 end,
+          case when a.org_id is not null then coalesce(o.l2_bp,r.org_l2_bp) else 0 end))
         from public.affiliates a join public.affiliate_rates r on r.product_kind=p_kind
         left join public.affiliate_rate_overrides o on (o.user_id,o.product_kind)=(a.user_id,p_kind)
         left join public.affiliates parent on parent.user_id=a.parent_user_id
@@ -3380,6 +3381,11 @@ CREATE TABLE IF NOT EXISTS "public"."payments" (
     "code_effects_applied_at" timestamp with time zone,
     "fee_status" "text",
     "fee_cents" integer,
+    "acknowledged_at" timestamp with time zone,
+    "acknowledged_by" "uuid",
+    "acknowledged_status" "text",
+    "acknowledged_refunded" integer,
+    CONSTRAINT "payments_acknowledged_check" CHECK (((("acknowledged_at" IS NULL) = ("acknowledged_status" IS NULL)) AND (("acknowledged_at" IS NULL) = ("acknowledged_refunded" IS NULL)) AND (("acknowledged_at" IS NOT NULL) OR ("acknowledged_by" IS NULL)))),
     CONSTRAINT "payments_amount_discount_check" CHECK (("amount_discount" >= 0)),
     CONSTRAINT "payments_amount_total_check" CHECK (("amount_total" >= 0)),
     CONSTRAINT "payments_channel_check" CHECK (("channel" = ANY (ARRAY['stripe'::"text", 'waffo'::"text"]))),
@@ -3715,7 +3721,7 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."
     AS $$
   select jsonb_build_object('owner',a.user_id,'inactive',a.status<>'active',
     'parent',case when a.status='active' and parent.team_enabled and parent.status='active' then parent.user_id end,
-    'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,s.org_l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
+    'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,r.org_l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
     'bonus',coalesce(po.l2_bp,r.l2_bp),
     'same_ip',coalesce(customer.referred_source not in ('org_l1','org_l2'),true) and coalesce(customer.signup_ip=referrer.signup_ip,false),
     'confirm_after',p_payment.created_at+make_interval(days=>s.hold_days),
@@ -4546,6 +4552,18 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") RE
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
+  select public._partner_promo_bonus(p_lines, (r->>'customer_cap_bp')::integer, (r->>'min_customers')::integer)
+    from (select public._partner_promo_rules() r) x;
+$$;
+
+
+ALTER FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb", "p_cap_bp" integer, "p_min" integer) RETURNS "jsonb"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
   with rules as (select public._partner_promo_rules() r),
   per as (
     select x.customer, sum(x.credits)::bigint as raw
@@ -4554,7 +4572,7 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") RE
   ),
   tot as (
     select coalesce(sum(raw), 0)::bigint as raw, count(*)::integer as n,
-           (coalesce(sum(raw), 0) * ((select r from rules)->>'customer_cap_bp')::bigint / 10000)::bigint as cap
+           (coalesce(sum(raw), 0) * p_cap_bp::bigint / 10000)::bigint as cap
       from per
   ),
   counted as (
@@ -4567,8 +4585,8 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") RE
     'cap', tot.cap,
     'counted', coalesce((select sum(c.counted) from counted c), 0)::bigint,
     'capped_customers', (select count(*) from counted c where c.capped)::integer,
-    'min_customers', (r->>'min_customers')::integer,
-    'bonus', case when tot.n >= (r->>'min_customers')::integer
+    'min_customers', p_min,
+    'bonus', case when tot.n >= p_min
                   then (coalesce((select sum(c.counted) from counted c), 0) * (r->>'bonus_bp')::bigint / 10000)::integer
                   else 0 end,
     'per', coalesce((select jsonb_agg(jsonb_build_object('customer', c.customer, 'raw', c.raw, 'counted', c.counted,
@@ -4577,7 +4595,7 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") RE
 $$;
 
 
-ALTER FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") OWNER TO "postgres";
+ALTER FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb", "p_cap_bp" integer, "p_min" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_partner_promo_bucket_left"("p_user" "uuid", "p_expires" timestamp with time zone) RETURNS TABLE("source" "text", "source_id" bigint, "credits_left" integer)
@@ -4596,7 +4614,7 @@ declare
 begin
   select min(x.at) into v_start from (
     select g.decided_at as at from public.partner_promo_grants g
-     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted'
+     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null
     union all
     select t.created_at from public.partner_promo_topups t where t.recipient_user_id = p_user and t.expires_at = p_expires
   ) x;
@@ -4604,7 +4622,7 @@ begin
   for e in
     with adds as (
       select g.decided_at as at, 0 as ord, 'grant' as src, g.id, g.total as amount from public.partner_promo_grants g
-       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted'
+       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null
       union all
       select t.created_at, 0, 'topup', t.id, t.credits from public.partner_promo_topups t
        where t.recipient_user_id = p_user and t.expires_at = p_expires
@@ -4749,6 +4767,9 @@ CREATE TABLE IF NOT EXISTS "public"."partner_promo_grants" (
     "expired_credits" integer,
     "expired_basis" integer,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "voided_at" timestamp with time zone,
+    "voided_by" "uuid",
+    "void_reason" "text",
     CONSTRAINT "partner_promo_grants_base_check" CHECK (("base" >= 0)),
     CONSTRAINT "partner_promo_grants_bonus_check" CHECK (("bonus" >= 0)),
     CONSTRAINT "partner_promo_grants_capped_customers_check" CHECK (("capped_customers" >= 0)),
@@ -4765,7 +4786,8 @@ CREATE TABLE IF NOT EXISTS "public"."partner_promo_grants" (
     CONSTRAINT "partner_promo_grants_period_check" CHECK (("period" ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'::"text")),
     CONSTRAINT "partner_promo_grants_raw_credits_check" CHECK (("raw_credits" >= 0)),
     CONSTRAINT "partner_promo_grants_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'granted'::"text", 'rejected'::"text", 'lapsed'::"text"]))),
-    CONSTRAINT "partner_promo_grants_total_check" CHECK (("total" >= 0))
+    CONSTRAINT "partner_promo_grants_total_check" CHECK (("total" >= 0)),
+    CONSTRAINT "partner_promo_grants_void_reason_check" CHECK (("length"("void_reason") <= 500))
 );
 
 
@@ -4829,7 +4851,7 @@ declare
 begin
   for b in
     select g.recipient_user_id as u, g.expires_at as e from public.partner_promo_grants g
-     where g.status = 'granted' and g.expires_at <= now() and (g.expired_at is null or g.expires_at > now() - interval '7 days')
+     where g.status = 'granted' and g.voided_at is null and g.expires_at <= now() and (g.expired_at is null or g.expires_at > now() - interval '7 days')
     union
     select t.recipient_user_id, t.expires_at from public.partner_promo_topups t
      where t.expires_at <= now() and (t.expired_at is null or t.expires_at > now() - interval '7 days')
@@ -4837,7 +4859,7 @@ begin
   loop
   begin
     perform from public.partner_promo_grants g
-     where g.recipient_user_id = b.u and g.expires_at = b.e and g.status = 'granted' order by g.id for update;
+     where g.recipient_user_id = b.u and g.expires_at = b.e and g.status = 'granted' and g.voided_at is null order by g.id for update;
     perform from public.partner_promo_topups t where t.recipient_user_id = b.u and t.expires_at = b.e order by t.id for update;
     perform from public.profiles where id = b.u for update;
     for r in select * from public._partner_promo_bucket_left(b.u, b.e) order by source, source_id loop
@@ -4875,7 +4897,7 @@ begin
   exception when others then
     v_failed := v_failed
       || coalesce((select jsonb_agg(jsonb_build_object('grant_id', g.id, 'error', sqlerrm) order by g.id) from public.partner_promo_grants g
-                    where g.recipient_user_id = b.u and g.expires_at = b.e and g.status = 'granted'), '[]'::jsonb)
+                    where g.recipient_user_id = b.u and g.expires_at = b.e and g.status = 'granted' and g.voided_at is null), '[]'::jsonb)
       || coalesce((select jsonb_agg(jsonb_build_object('grant_id', 0, 'topup_id', t.id, 'error', sqlerrm) order by t.id)
                     from public.partner_promo_topups t
                     where t.recipient_user_id = b.u and t.expires_at = b.e), '[]'::jsonb);
@@ -4883,7 +4905,7 @@ begin
   end loop;
   return jsonb_build_object('expired', v_expired, 'taken', v_taken, 'failed', v_failed,
     'overdue', (select count(*) from public.partner_promo_grants
-                 where status = 'granted' and expired_at is null and expires_at <= now() - interval '1 hour')::integer
+                 where status = 'granted' and voided_at is null and expired_at is null and expires_at <= now() - interval '1 hour')::integer
              + (select count(*) from public.partner_promo_topups
                  where expired_at is null and expires_at <= now() - interval '1 hour')::integer);
 end;
@@ -4915,10 +4937,14 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_owed"("p_org" "uuid", "p_per
                select jsonb_agg(jsonb_build_object('customer', l.customer_user_id,
                                                    'credits', public._partner_promo_payment_credits(p)))
                  from public.partner_promo_grant_lines l join public.payments p on p.id = l.payment_id
-                where l.grant_id = g.id), '[]'::jsonb))->>'bonus')::integer
-           - coalesce((select sum(c.credits) from public.partner_promo_clawbacks c where c.source_grant_id = g.id), 0)::integer)
+                where l.grant_id = g.id), '[]'::jsonb),
+               coalesce((g.detail->>'customer_cap_bp')::integer, 2000),
+               coalesce((g.detail->>'min_customers')::integer, 3))->>'bonus')::integer
+           - coalesce((select sum(c.credits) from public.partner_promo_clawbacks c
+                         join public.partner_promo_grants a on a.id = c.applied_grant_id and a.voided_at is null
+                        where c.source_grant_id = g.id), 0)::integer)
     from public.partner_promo_grants g
-   where g.org_id = p_org and g.status = 'granted' and g.period < p_period and g.bonus > 0
+   where g.org_id = p_org and g.status = 'granted' and g.voided_at is null and g.period < p_period and g.bonus > 0
    order by g.period, g.id;
 $$;
 
@@ -4960,7 +4986,7 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_rules"() RETURNS "jsonb"
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
     AS $$
-  select jsonb_build_object('base', 10000, 'bonus_bp', 1000, 'customer_cap_bp', 2000, 'min_customers', 3);
+  select jsonb_build_object('base', 10000, 'bonus_bp', 1000, 'customer_cap_bp', 10000, 'min_customers', 0);
 $$;
 
 
@@ -5503,6 +5529,46 @@ end $$;
 
 
 ALTER FUNCTION "public"."admin_ack_reference_deletions"("p_actor" "uuid", "p_keys" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_acknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_payment public.payments;
+  v_changed boolean := false;
+begin
+  perform public._org_require_admin(p_actor);
+  select * into v_payment from public.payments where id = p_payment_id for update;
+  if not found then
+    raise exception 'PAYMENT_NOT_FOUND';
+  end if;
+  if v_payment.status = 'paid' then
+    raise exception 'PAYMENT_NOT_FLAGGED';
+  end if;
+
+  if v_payment.acknowledged_at is null
+     or v_payment.acknowledged_status <> v_payment.status
+     or v_payment.acknowledged_refunded <> v_payment.amount_refunded then
+    update public.payments
+       set acknowledged_at = now(), acknowledged_by = p_actor,
+           acknowledged_status = status, acknowledged_refunded = amount_refunded
+     where id = p_payment_id
+    returning * into v_payment;
+    insert into public.admin_audit_log (action, user_id, reason, target_id)
+    values ('payment_acknowledge', v_payment.user_id,
+            '标记已知晓 · ' || v_payment.status || ' · 已退 ' || v_payment.amount_refunded || ' · 操作人 ' || p_actor::text,
+            p_payment_id::text);
+    v_changed := true;
+  end if;
+
+  return jsonb_build_object('changed', v_changed, 'acknowledged_at', v_payment.acknowledged_at);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_acknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") RETURNS "uuid"[]
@@ -6169,6 +6235,9 @@ begin
   insert into public.affiliate_rates(product_kind,l1_bp,l2_bp)
     select r.product_kind,r.l1_bp,r.l2_bp from jsonb_to_recordset(p_input->'rates') r(product_kind text,l1_bp integer,l2_bp integer)
     on conflict(product_kind) do update set l1_bp=excluded.l1_bp,l2_bp=excluded.l2_bp;
+  update public.affiliate_rates t set org_l2_bp=r.org_l2_bp
+    from jsonb_to_recordset(p_input->'rates') r(product_kind text,org_l2_bp integer)
+    where t.product_kind=r.product_kind and r.org_l2_bp is not null;
   perform public._affiliate_audit(p_actor,'settings','settings',(p_input - 'terms_version')::text);
 end;
 $$;
@@ -6285,6 +6354,25 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_attention_payment_ids"() RETURNS bigint[]
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  -- payments_issues_created_at_idx (0188) for the window; affiliate_disputes_payment_idx for disputes.
+  select coalesce(array_agg(p.id order by p.created_at desc, p.id desc), '{}')
+    from public.payments p
+   where p.status <> 'paid'
+     and p.created_at >= now() - interval '60 days'
+     and (p.acknowledged_at is null
+          or p.acknowledged_status <> p.status
+          or p.acknowledged_refunded <> p.amount_refunded
+          or exists (select from public.payment_disputes d where d.payment_id = p.id and d.closed_at is null))
+$$;
+
+
+ALTER FUNCTION "public"."admin_attention_payment_ids"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") RETURNS timestamp with time zone
@@ -9183,6 +9271,20 @@ $$;
 ALTER FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_open_dispute_payment_ids"("p_payment_ids" bigint[]) RETURNS bigint[]
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  -- affiliate_disputes_payment_idx.
+  select coalesce(array_agg(distinct d.payment_id), '{}')
+    from public.payment_disputes d
+   where d.payment_id = any(p_payment_ids[1:100]) and d.closed_at is null
+$$;
+
+
+ALTER FUNCTION "public"."admin_open_dispute_payment_ids"("p_payment_ids" bigint[]) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_open_prompt_lab"("p_actor" "uuid", "p_asset_id" "uuid") RETURNS "uuid"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -9674,6 +9776,45 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_partner_promo_topup"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_partner_promo_void"("p_actor" "uuid", "p_input" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_id bigint;
+  v_reason text := nullif(trim(p_input->>'reason'), '');
+  g public.partner_promo_grants;
+begin
+  perform public._org_require_admin(p_actor);
+  if jsonb_typeof(p_input) is distinct from 'object' or coalesce(p_input->>'grant_id', '') !~ '^[1-9][0-9]{0,17}$'
+     or v_reason is null or length(v_reason) > 500 then
+    raise exception 'INVALID_INPUT';
+  end if;
+  v_id := (p_input->>'grant_id')::bigint;
+  select * into g from public.partner_promo_grants where id = v_id;
+  if not found then raise exception 'PROMO_GRANT_NOT_FOUND'; end if;
+  perform from public.orgs where id = g.org_id for no key update;
+  select * into g from public.partner_promo_grants where id = v_id for update;
+  if g.voided_at is not null then return jsonb_build_object('applied', false, 'reason', 'already', 'grant_id', g.id); end if;
+  if g.status <> 'granted' then raise exception 'PROMO_GRANT_NOT_GRANTED'; end if;
+  if g.expired_at is not null then raise exception 'PROMO_GRANT_EXPIRED'; end if;
+  -- A later sheet already clawed back from this one: voiding would hide that repayment.
+  if exists (select from public.partner_promo_clawbacks c join public.partner_promo_grants a on a.id = c.applied_grant_id
+              where c.source_grant_id = g.id and a.voided_at is null) then
+    raise exception 'PROMO_GRANT_CLAWED';
+  end if;
+  update public.partner_promo_grants set voided_at = now(), voided_by = p_actor, void_reason = v_reason where id = g.id;
+  perform public._org_audit(p_actor, 'partner_promo_void', g.id::text,
+    jsonb_build_object('org_id', g.org_id, 'period', g.period, 'recipient', g.recipient_user_id, 'total', g.total,
+      'reason', v_reason)::text);
+  return jsonb_build_object('applied', true, 'grant_id', g.id);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_partner_promo_void"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_payment_fee_schedule_save"("p_actor" "uuid", "p_input" "jsonb") RETURNS bigint
@@ -12042,9 +12183,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_todo_counts"() RETURNS "jsonb"
       select count(*) from public.template_requests where status = 'pending'),
     'unresolved_dispute_links', (
       select count(*) from public.payment_dispute_link_errors where resolved_at is null),
-    'payment_issues', (
-      select count(*) from public.payments
-       where status <> 'paid' and created_at >= now() - interval '60 days'),
+    'payment_issues', cardinality(public.admin_attention_payment_ids()),
     'last_purchase_at', (
       select created_at from public.credit_ledger
        where kind = 'purchase' order by created_at desc, id desc limit 1),
@@ -12091,6 +12230,38 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_top_inviters"("p_actor" "uuid", "p_days" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_unacknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_payment public.payments;
+  v_changed boolean := false;
+begin
+  perform public._org_require_admin(p_actor);
+  select * into v_payment from public.payments where id = p_payment_id for update;
+  if not found then
+    raise exception 'PAYMENT_NOT_FOUND';
+  end if;
+
+  if v_payment.acknowledged_at is not null then
+    update public.payments
+       set acknowledged_at = null, acknowledged_by = null, acknowledged_status = null, acknowledged_refunded = null
+     where id = p_payment_id
+    returning * into v_payment;
+    insert into public.admin_audit_log (action, user_id, reason, target_id)
+    values ('payment_unacknowledge', v_payment.user_id, '撤销已知晓 · 操作人 ' || p_actor::text, p_payment_id::text);
+    v_changed := true;
+  end if;
+
+  return jsonb_build_object('changed', v_changed, 'acknowledged_at', v_payment.acknowledged_at);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_unacknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") RETURNS "void"
@@ -15138,7 +15309,7 @@ begin
   if v_partner is null then return; end if;
   select coalesce(sum(g.total), 0)::integer, min(g.expires_at) into v_monthly, v_expires
     from public.partner_promo_grants g
-   where g.org_id = p_org and g.period = v_period and g.status = 'granted';
+   where g.org_id = p_org and g.period = v_period and g.status = 'granted' and g.voided_at is null;
   select coalesce(sum(t.credits), 0)::integer, least(v_expires, min(t.expires_at)) into v_topups, v_expires
     from public.partner_promo_topups t
    where t.org_id = p_org and t.period = v_period;
@@ -15146,7 +15317,7 @@ begin
   for b in
     select x.u, x.e, sum(x.k)::bigint as own from (
       select g.recipient_user_id as u, g.expires_at as e, 1 as k from public.partner_promo_grants g
-       where g.org_id = p_org and g.period = v_period and g.status = 'granted'
+       where g.org_id = p_org and g.period = v_period and g.status = 'granted' and g.voided_at is null
       union all
       select t.recipient_user_id, t.expires_at, 1 from public.partner_promo_topups t
        where t.org_id = p_org and t.period = v_period
@@ -19408,7 +19579,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text", 'partner_promo_set'::"text", 'partner_promo_confirm'::"text", 'partner_promo_reject'::"text", 'partner_promo_run'::"text", 'partner_promo_topup'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text", 'partner_promo_set'::"text", 'partner_promo_confirm'::"text", 'partner_promo_reject'::"text", 'partner_promo_run'::"text", 'partner_promo_topup'::"text", 'payment_acknowledge'::"text", 'payment_unacknowledge'::"text", 'partner_promo_void'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -19631,8 +19802,10 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_rates" (
     "product_kind" "text" NOT NULL,
     "l1_bp" integer NOT NULL,
     "l2_bp" integer NOT NULL,
+    "org_l2_bp" integer DEFAULT 500 NOT NULL,
     CONSTRAINT "affiliate_rates_l1_bp_check" CHECK ((("l1_bp" >= 0) AND ("l1_bp" <= 10000))),
     CONSTRAINT "affiliate_rates_l2_bp_check" CHECK ((("l2_bp" >= 0) AND ("l2_bp" <= 10000))),
+    CONSTRAINT "affiliate_rates_org_l2_bp_check" CHECK ((("org_l2_bp" >= 0) AND ("org_l2_bp" <= 10000))),
     CONSTRAINT "affiliate_rates_product_kind_check" CHECK (("product_kind" = ANY (ARRAY['pack'::"text", 'monthly'::"text", 'yearly'::"text"])))
 );
 
@@ -23562,6 +23735,11 @@ ALTER TABLE ONLY "public"."partner_promo_grants"
 
 
 
+ALTER TABLE ONLY "public"."partner_promo_grants"
+    ADD CONSTRAINT "partner_promo_grants_voided_by_fkey" FOREIGN KEY ("voided_by") REFERENCES "public"."profiles"("id");
+
+
+
 ALTER TABLE ONLY "public"."partner_promo_topups"
     ADD CONSTRAINT "partner_promo_topups_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
 
@@ -23634,6 +23812,11 @@ ALTER TABLE ONLY "public"."payment_fee_stripe_batch_items"
 
 ALTER TABLE ONLY "public"."payment_refunds"
     ADD CONSTRAINT "payment_refunds_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "public"."payments"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."payments"
+    ADD CONSTRAINT "payments_acknowledged_by_fkey" FOREIGN KEY ("acknowledged_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
 
 
@@ -25303,6 +25486,10 @@ REVOKE ALL ON FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") FROM P
 
 
 
+REVOKE ALL ON FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb", "p_cap_bp" integer, "p_min" integer) FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_partner_promo_bucket_left"("p_user" "uuid", "p_expires" timestamp with time zone) FROM PUBLIC;
 
 
@@ -25405,6 +25592,11 @@ GRANT ALL ON FUNCTION "public"."add_ticket_message"("p_ticket_id" "uuid", "p_use
 
 REVOKE ALL ON FUNCTION "public"."admin_ack_reference_deletions"("p_actor" "uuid", "p_keys" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_ack_reference_deletions"("p_actor" "uuid", "p_keys" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_acknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_acknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") TO "service_role";
 
 
 
@@ -25531,6 +25723,11 @@ GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
 
 REVOKE ALL ON FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_attention_payment_ids"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_attention_payment_ids"() TO "service_role";
 
 
 
@@ -25889,6 +26086,11 @@ GRANT ALL ON FUNCTION "public"."admin_move_template_category"("p_key" "text", "p
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_open_dispute_payment_ids"("p_payment_ids" bigint[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_open_dispute_payment_ids"("p_payment_ids" bigint[]) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_open_prompt_lab"("p_actor" "uuid", "p_asset_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_open_prompt_lab"("p_actor" "uuid", "p_asset_id" "uuid") TO "service_role";
 
@@ -25951,6 +26153,11 @@ GRANT ALL ON FUNCTION "public"."admin_partner_promo_set"("p_actor" "uuid", "p_in
 
 REVOKE ALL ON FUNCTION "public"."admin_partner_promo_topup"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_partner_promo_topup"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_partner_promo_void"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_partner_promo_void"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
 
 
@@ -26261,6 +26468,11 @@ GRANT ALL ON FUNCTION "public"."admin_todo_counts"() TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."admin_top_inviters"("p_actor" "uuid", "p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_top_inviters"("p_actor" "uuid", "p_days" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_unacknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_unacknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") TO "service_role";
 
 
 

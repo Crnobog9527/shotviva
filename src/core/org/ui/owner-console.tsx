@@ -1,56 +1,55 @@
 import { ChevronRight } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
+import type { EnterpriseContact } from '@/core/config'
 import { Link } from '@/core/i18n/ui'
 
 import type { OwnerConsole, OwnerReport } from '../console/types'
 import type { OwnerActions } from './actions'
+import { enterpriseHome } from './enterprise-frame'
 import { MembersPanel } from './members-panel'
 import { PerformancePanel } from './performance-panel'
-import { InvitePanel, PackagesPanel, PaymentAccountsPanel, PoolPanel } from './owner-panels'
+import { PackagesPanel, PaymentAccountsPanel, PoolPanel } from './owner-panels'
+import { StaffLinkPanel } from './staff-link-panel'
 
-// /account/enterprise, 「企业」 tab (ARCHITECTURE §6.5, card E4): pool, packages, invite link,
-// members. The server page reads `data` and passes the server actions; everything below is the
-// owner's own org, read from their session.
-
-export function OwnerConsoleView({ data, actions, report }: { data: OwnerConsole; actions: OwnerActions; report: OwnerReport | null }) {
-  const t = useTranslations('app.org')
+// /account/enterprise, 「企业工作台」 (ARCHITECTURE §6.5, card E4): the staff-only link first (Owner
+// 2026-11-22), then pool, members and this month's output. The server page reads `data` and
+// passes the server actions; everything below is the owner's own org, read from their session.
+export function OwnerConsoleView({ data, actions, report, affiliate }: { data: OwnerConsole; actions: OwnerActions; report: OwnerReport | null; affiliate: boolean }) {
   return (
-    <div className="space-y-4">
-      {data.org.status === 'suspended' ? (
-        <p role="status" className="hairline rounded-panel bg-card p-4 text-label text-destructive">{t('suspendedBanner')}</p>
-      ) : null}
+    <>
+      <SuspendedBanner data={data} />
+      <StaffLinkPanel data={data} actions={actions} affiliate={affiliate} />
       <PoolPanel data={data} actions={actions} />
-      <PackagesPanel packages={data.packages} />
-      <PaymentAccountsPanel groups={data.paymentAccounts} orgName={data.org.name} refCode={data.org.refCode} />
-      <InvitePanel data={data} actions={actions} />
       <MembersPanel data={data} actions={actions} />
       <PerformancePanel report={report} />
-    </div>
+    </>
   )
 }
 
-// The two tabs of the owner's enterprise area. 「企业联盟」 is the partner dashboard of the org's
-// affiliate account (reusing the /partners components), shown only when the org's affiliate
-// switch is on.
-export function OrgTabs({ current, affiliate }: { current: 'console' | 'affiliate'; affiliate: boolean }) {
-  const t = useTranslations('app.org.tabs')
-  const base = 'inline-flex min-h-11 items-center rounded-button px-4 text-label font-semibold'
+// /account/enterprise/purchasing, 「企业集采信息」: package prices and how to pay for them.
+export function PurchasingView({ data, contact }: { data: OwnerConsole; contact?: EnterpriseContact }) {
   return (
-    <nav aria-label={t('label')} className="flex gap-1 border-b border-hairline">
-      <Link href="/account/enterprise" aria-current={current === 'console' ? 'page' : undefined} className={`${base} ${current === 'console' ? 'bg-wash' : 'text-muted-foreground'}`}>{t('console')}</Link>
-      {affiliate ? (
-        <Link href="/partners/enterprise" aria-current={current === 'affiliate' ? 'page' : undefined} className={`${base} ${current === 'affiliate' ? 'bg-wash' : 'text-muted-foreground'}`}>{t('affiliate')}</Link>
-      ) : null}
-    </nav>
+    <>
+      <SuspendedBanner data={data} />
+      <PackagesPanel packages={data.packages} contact={contact} />
+      <PaymentAccountsPanel groups={data.paymentAccounts} orgName={data.org.name} refCode={data.org.refCode} />
+    </>
   )
 }
 
-// The row on /account that opens the console: the pool at a glance.
-export function OwnerEntryRow({ name, pool, suspended }: { name: string; pool: string; suspended: boolean }) {
+function SuspendedBanner({ data }: { data: OwnerConsole }) {
+  const t = useTranslations('app.org')
+  if (data.org.status !== 'suspended') return null
+  return <p role="status" className="hairline rounded-panel bg-card p-4 text-label text-destructive">{t('suspendedBanner')}</p>
+}
+
+// The row on /account that opens the enterprise area, at its first section: the affiliate
+// dashboard when the org has one, else the workspace.
+export function OwnerEntryRow({ name, pool, suspended, affiliate }: { name: string; pool: string; suspended: boolean; affiliate: boolean }) {
   const t = useTranslations('app.org.entry')
   return (
-    <Link href="/account/enterprise" className="flex min-h-14 w-full items-center justify-between gap-3 text-left text-body text-foreground">
+    <Link href={enterpriseHome(affiliate)} className="flex min-h-14 w-full items-center justify-between gap-3 text-left text-body text-foreground">
       <span className="min-w-0">
         <span className="block truncate font-medium">{name}</span>
         <span className="block text-caption text-muted-foreground">{suspended ? t('suspended') : t('pool', { pool })}</span>

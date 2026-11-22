@@ -52,6 +52,12 @@ export async function isOrgMember(user: string) {
   return parse(z.object({ org_id: z.uuid() }).nullable(), result) !== null
 }
 
+// The name of the org an enterprise affiliate account belongs to, for the enterprise area's header.
+export async function readOrgName(orgId: string) {
+  const result = await createAdminSupabase().from('orgs').select('name').eq('id', orgId).maybeSingle()
+  return parse(z.object({ name: z.string() }).nullable(), result)?.name ?? null
+}
+
 export async function readSettings() {
   const result = await createAdminSupabase()
     .from('affiliate_settings')

@@ -61,7 +61,7 @@ export async function SettingsView({ db, action }: Omit<ViewProps, 'filters'>) {
   return (
     <div className="grid gap-8">
       <MutationForm action={action} operation="settings" label={COPY.save}>
-        <Rates values={rates} />
+        <Rates values={rates} editOrgL2 />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field name="commission_months" label={COPY.commissionMonths} type="number" min="1" step="1" defaultValue={s.commission_months ?? ''} />
           <Field name="hold_days" label={COPY.confirmDays} type="number" min="0" step="1" required defaultValue={s.hold_days} />

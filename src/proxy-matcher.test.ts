@@ -35,6 +35,14 @@ describe('proxy matcher', () => {
     expect(runsOn('/assets/presized/v1/w384/covers/x/after-0123456789abcdef.avif')).toBe(false)
   })
 
+  // The Graylum intro animations in public/: a video request must not land on the not-found page.
+  it('skips the intro animation videos but not a page that merely mentions them', () => {
+    expect(runsOn('/partners/graylum/graylum-hero-6steps.mp4')).toBe(false)
+    expect(runsOn('/partners/graylum/graylum-hero-6steps-en.webm')).toBe(false)
+    expect(runsOn('/partners/graylum/graylum-hero-6steps-poster.webp')).toBe(false)
+    expect(runsOn('/pricing/mp4')).toBe(true)
+  })
+
   // T90: the version check never touches the session.
   it('skips /api/version but not the other API routes', () => {
     expect(runsOn('/api/version')).toBe(false)

@@ -18,7 +18,8 @@ const fail = (what: string, error: { message: string }): never => {
 
 const PAYMENT_COLUMNS =
   'id, created_at, user_id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, waffo_order_id, ' +
-  'amount_total, amount_tax, amount_discount, amount_refunded, currency, method, status, credits_clawed_back, clawback_shortfall'
+  'amount_total, amount_tax, amount_discount, amount_refunded, currency, method, status, credits_clawed_back, clawback_shortfall, ' +
+  'acknowledged_at, acknowledged_status, acknowledged_refunded'
 
 const nullableId = z.string().nullable()
 
@@ -41,7 +42,12 @@ const paymentRow = z.object({
   status: z.enum(['paid', 'refunded', 'partially_refunded', 'disputed']),
   credits_clawed_back: z.number().int(),
   clawback_shortfall: z.number().int(),
+  acknowledged_at: z.string().nullable(),
+  acknowledged_status: z.string().nullable(),
+  acknowledged_refunded: z.number().int().nullable(),
 })
+
+type PaymentRow = z.infer<typeof paymentRow>
 
 export type PaymentStatus = z.infer<typeof paymentRow>['status']
 
@@ -64,6 +70,10 @@ export type AdminPurchase = PurchaseSource & {
   // T71: credits taken back for this payment, and those already spent (「欠扣」, written off).
   creditsClawedBack: number
   clawbackShortfall: number
+  // 「标记已知晓」 (1881): stale when the status or refunded amount changed after the mark, so the
+  // payment counts again. openDispute: a dispute on it is not closed yet, which counts regardless.
+  acknowledgement: { at: string; stale: boolean } | null
+  openDispute: boolean
 }
 
 // Emails come live from Auth, one call per distinct user on the page (≤ 30), never copied.
@@ -73,25 +83,29 @@ async function emailsFor(db: SupabaseClient, ids: string[]): Promise<Map<string,
   return new Map(found)
 }
 
-export async function listPurchases(db: SupabaseClient, cursor?: string | null): Promise<Page<AdminPurchase>> {
-  let query = db
-    .from('payments')
-    .select(PAYMENT_COLUMNS)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(PAGE_SIZE + 1)
-  const after = decodeCursor(cursor)
-  if (after) query = query.or(afterCursor(after))
-  const { data, error } = await query
-  if (error) fail('payments', error)
-  const rows = paymentRow.array().parse(data)
-  const emails = await emailsFor(db, rows.slice(0, PAGE_SIZE).map((row) => row.user_id))
-  return toPage(rows, (row) => ({
+function acknowledgementOf(row: PaymentRow): AdminPurchase['acknowledgement'] {
+  if (!row.acknowledged_at) return null
+  const stale = row.acknowledged_status !== row.status || row.acknowledged_refunded !== row.amount_refunded
+  return { at: row.acknowledged_at, stale }
+}
+
+// Open disputes among the page's payments (admin_open_dispute_payment_ids, 1882: the table itself
+// grants no access, not even to the service role).
+async function openDisputesFor(db: SupabaseClient, rows: PaymentRow[]): Promise<Set<string>> {
+  const ids = rows.filter((row) => row.status !== 'paid').map((row) => Number(row.id))
+  if (ids.length === 0) return new Set()
+  const { data, error } = await db.rpc('admin_open_dispute_payment_ids', { p_payment_ids: ids })
+  if (error) fail('open disputes', error)
+  return new Set(z.array(z.union([z.number(), z.string()]).transform(String)).parse(data))
+}
+
+function toPurchase(row: PaymentRow, email: string | null, openDispute: boolean): AdminPurchase {
+  return {
     ...paymentSource(row),
     id: row.id,
     createdAt: row.created_at,
     userId: row.user_id,
-    email: emails.get(row.user_id) ?? null,
+    email,
     productId: row.product_id,
     amountTotal: row.amount_total,
     amountTax: row.amount_tax,
@@ -102,7 +116,29 @@ export async function listPurchases(db: SupabaseClient, cursor?: string | null):
     status: row.status,
     creditsClawedBack: row.credits_clawed_back,
     clawbackShortfall: row.clawback_shortfall,
-  }))
+    acknowledgement: acknowledgementOf(row),
+    openDispute,
+  }
+}
+
+// `onlyIds` narrows the list to the overview counter's payments (?attention=1); empty lists nothing.
+export async function listPurchases(db: SupabaseClient, cursor?: string | null, onlyIds?: string[]): Promise<Page<AdminPurchase>> {
+  if (onlyIds && onlyIds.length === 0) return { items: [], nextCursor: null }
+  let query = db
+    .from('payments')
+    .select(PAYMENT_COLUMNS)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(PAGE_SIZE + 1)
+  if (onlyIds) query = query.in('id', onlyIds)
+  const after = decodeCursor(cursor)
+  if (after) query = query.or(afterCursor(after))
+  const { data, error } = await query
+  if (error) fail('payments', error)
+  const rows = paymentRow.array().parse(data)
+  const shown = rows.slice(0, PAGE_SIZE)
+  const [emails, open] = await Promise.all([emailsFor(db, shown.map((row) => row.user_id)), openDisputesFor(db, shown)])
+  return toPage(rows, (row) => toPurchase(row, emails.get(row.user_id) ?? null, open.has(row.id)))
 }
 
 const subscriptionRow = z.object({

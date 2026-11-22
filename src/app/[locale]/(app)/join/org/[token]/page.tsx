@@ -3,7 +3,10 @@ import { Suspense } from 'react'
 import { getTranslations } from 'next-intl/server'
 
 import { AppPage } from '@/core/app-shell'
-import { createAdminSupabase, requireUser } from '@/core/auth'
+import { redirect } from 'next/navigation'
+
+import { createAdminSupabase, getSessionUser, requireUser, signupPath } from '@/core/auth'
+import { localized } from '@/core/i18n/server'
 import { Link } from '@/core/i18n/ui'
 import { readInviteOrg, readSeatOrgId } from '@/core/org/console'
 import { JoinForm } from '@/core/org/ui'
@@ -26,12 +29,21 @@ function Notice({ title, body, children }: { title: string; body: string; childr
 
 const linkClass = 'inline-flex min-h-11 items-center text-label font-medium text-primary underline underline-offset-4'
 
-// /join/org/[token] (ARCHITECTURE §6.5, card E4): needs a signed-in account (the login page sends
-// them back here), shows the org, and joins on one confirmation. The token is only ever matched
-// against orgs.invite_token on the server; a wrong or reset one is the same "no longer valid" page.
-async function Join({ params }: { params: Promise<{ token: string }> }) {
+// Staff opening the link signed out usually have no account yet: they go to sign-up (its "sign in"
+// link keeps `next`) and come back here to confirm. Joining always takes that one click: nothing
+// in a link or a cookie may join an account by itself (review of #829).
+async function joiningUser(token: string) {
+  const path = `/join/org/${encodeURIComponent(token)}`
+  if (!(await getSessionUser())) redirect(await localized(signupPath(await localized(path))))
+  return requireUser(path)
+}
+
+// /join/org/[token] (ARCHITECTURE §6.5, card E4): needs a signed-in account, shows the org, and
+// joins on one confirmation. The token is only ever matched against orgs.invite_token on the
+// server; a wrong or reset one is the same "no longer valid" page.
+async function Join({ params }: Pick<PageProps<'/[locale]/join/org/[token]'>, 'params'>) {
   const { token } = await params
-  const user = await requireUser(`/join/org/${encodeURIComponent(token)}`)
+  const user = await joiningUser(token)
   const t = await getTranslations('app.org.join')
   const db = createAdminSupabase()
   const [org, seat] = await Promise.all([readInviteOrg(db, token), readSeatOrgId(db, user.id)])

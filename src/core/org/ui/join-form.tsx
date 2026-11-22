@@ -16,6 +16,7 @@ export function JoinForm({ join, orgName }: { join: JoinAction; orgName: string 
   const t = useTranslations('app.org.join')
   const [joined, setJoined] = useState(false)
   const { pending, outcome, run } = useConsoleAction()
+  const submit = () => run(join, t('done', { org: orgName }), () => setJoined(true))
   if (joined) {
     return (
       <div className="space-y-3" role="status">
@@ -26,7 +27,7 @@ export function JoinForm({ join, orgName }: { join: JoinAction; orgName: string 
   }
   return (
     <div className="space-y-3">
-      <Button type="button" variant="cta" size="cta" disabled={pending} onClick={() => run(join, t('done', { org: orgName }), () => setJoined(true))}>
+      <Button type="button" variant="cta" size="cta" disabled={pending} onClick={submit}>
         {pending ? t('joining') : t('confirm', { org: orgName })}
       </Button>
       <Result outcome={outcome} />

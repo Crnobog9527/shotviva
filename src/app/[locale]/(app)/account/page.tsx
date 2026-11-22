@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
-import { Suspense } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 
-import { hasAffiliateDashboard } from '@/core/affiliate/feature'
+import { enterpriseCustomerLink, hasAffiliateDashboard } from '@/core/affiliate/feature'
 import { AppPage } from '@/core/app-shell'
 import { AccountHeader, AccountView, GiftClaimCard, InviteCard, RedeemCard, STRIP_FRAMES } from '@/core/account/ui'
 import { Group, RowsPanel, groupClass } from '@/core/account/ui/rows'
@@ -16,7 +16,7 @@ import { lastMembership, readMemberSince, readSubscriptionSummary } from '@/core
 import { listMonthWorks } from '@/core/jobs'
 import { serverEnv } from '@/core/env'
 import { readOrgView } from '@/core/org/console'
-import { OwnerEntryRow, StaffCardView } from '@/core/org/ui'
+import { CustomerLinkRow, OwnerEntryRow, StaffCardView } from '@/core/org/ui'
 import { readLinkStatus } from '@/core/partner'
 import { graylumIntroLinks } from '@/core/partner/ui'
 import { formatMoney, hasUnreadReply, listPaymentOptions, paymentChoices, PICKER_LIMIT, ReplyTime } from '@/core/support'
@@ -74,7 +74,7 @@ async function Account() {
     <>
       <AccountView data={data} actions={actions} site={{ brand: site.brand.name, products: offers, freeCredits: signupGift.granted }}>
         {claimOptions ? <GiftClaimCard credits={site.billing.freeCredits} options={claimOptions} actions={claimActions} /> : null}
-        <OrgBlock view={org} />
+        <OrgBlock view={org} customerLink={org.kind === 'owner' && org.org.affiliateEnabled && affiliate ? <Suspense fallback={null}><OwnerCustomerLink user={user.id} /></Suspense> : null} />
         <StoreCard actions={storeActions} />
         <InviteCard load={loadMyInvites} />
         <RedeemCard pending={discount} />
@@ -86,7 +86,7 @@ async function Account() {
 
 // The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a
 // member gets their card; everyone else sees nothing.
-function OrgBlock({ view }: { view: Awaited<ReturnType<typeof readOrgView>> }) {
+function OrgBlock({ view, customerLink }: { view: Awaited<ReturnType<typeof readOrgView>>; customerLink: ReactNode }) {
   const t = useTranslations('app.org.entry')
   const format = useFormatter()
   if (view.kind === 'owner') {
@@ -94,8 +94,9 @@ function OrgBlock({ view }: { view: Awaited<ReturnType<typeof readOrgView>> }) {
     return (
       <Group title={t('title')}>
         <RowsPanel>
-          <OwnerEntryRow name={view.org.name} pool={pool} suspended={view.org.status === 'suspended'} />
+          <OwnerEntryRow name={view.org.name} pool={pool} suspended={view.org.status === 'suspended'} affiliate={customerLink !== null} />
         </RowsPanel>
+        {customerLink}
       </Group>
     )
   }
@@ -107,6 +108,12 @@ function OrgBlock({ view }: { view: Awaited<ReturnType<typeof readOrgView>> }) {
     )
   }
   return null
+}
+
+// Streams in after the rest of the page: the org owner's customer link, when the program is on.
+async function OwnerCustomerLink({ user }: { user: string }) {
+  const url = await enterpriseCustomerLink(user)
+  return url ? <CustomerLinkRow url={url} /> : null
 }
 
 const staffActions = { leave: leaveOrgAction }

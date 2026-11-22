@@ -1,4 +1,6 @@
 export type { JoinAction, OwnerActions, StaffActions } from './actions'
 export { JoinForm } from './join-form'
-export { OrgTabs, OwnerConsoleView, OwnerEntryRow } from './owner-console'
+export { EnterpriseFrame, enterpriseHome, type EnterpriseSection } from './enterprise-frame'
+export { OwnerConsoleView, OwnerEntryRow, PurchasingView } from './owner-console'
+export { CustomerLinkRow } from './customer-link-row'
 export { StaffCardView } from './staff-card'

@@ -5,7 +5,7 @@ const deps = vi.hoisted(() => ({ enabled: vi.fn(), user: vi.fn(), account: vi.fn
 vi.mock('./terms', () => ({ publishedTerms: deps.terms }))
 vi.mock('../feature', () => ({ isAffiliateEnabled: deps.enabled }))
 vi.mock('@/core/auth', () => ({ getSessionUser: deps.user, requireApiUser: deps.user, loginPath: (next: string) => '/login?next=' + encodeURIComponent(next) }))
-vi.mock('./repository', () => ({ readAccount: deps.account, readSettings: deps.settings, readOpenEnrollmentSettings: deps.openSettings, canApply: deps.canApply, isOrgMember: deps.orgMember }))
+vi.mock('./repository', () => ({ readAccount: deps.account, readSettings: deps.settings, readOpenEnrollmentSettings: deps.openSettings, canApply: deps.canApply, isOrgMember: deps.orgMember, readOrgName: async () => 'Acme Studio' }))
 vi.mock('next/server', async (original) => ({
   ...(await original<typeof import('next/server')>()),
   connection: async () => {},
@@ -129,7 +129,10 @@ it('shows the personal-style dashboard to an org account and keeps the view when
   deps.user.mockResolvedValue({ id: 'owner', verified: true })
   deps.account.mockResolvedValue({ status: 'active', org_id: '00000000-0000-4000-8000-000000000001', slug: 'acme', team_enabled: false })
   const screen = await EnterpriseScreen({ search: Promise.resolve({ view: 'payouts' }) })
-  expect(screen.props.className).toBe('af-dash')
+  // Inside the enterprise area's shared frame (Owner 2026-11-22), on its 企业联盟 section.
+  expect(screen.props).toMatchObject({ orgName: 'Acme Studio', current: 'affiliate', affiliate: true })
+  expect(screen.props.children.props.className).toContain('af-embed')
+  expect(screen.props.children.props.children.props.query.view).toBe('payouts')
   await expect(PartnerScreen({ search: Promise.resolve({ view: 'payouts', cursor: 'abc' }) })).rejects.toMatchObject({
     digest: expect.stringContaining('/zh/partners/enterprise?view=payouts&cursor=abc;'),
   })

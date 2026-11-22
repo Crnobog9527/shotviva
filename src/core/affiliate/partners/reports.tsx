@@ -24,6 +24,11 @@ export async function ReferralList({ user, query }: Props) {
         headers={['customer', 'bound', 'purchases', 'totalCommission'].map((k) => t(k))}
         empty={t('empty')}
         rows={page.items.map((r) => [r.mask, date(locale, r.date), r.count, money(locale, r.amount)])}
+        summaries={page.items.map((r) => ({
+          title: r.mask,
+          meta: `${date(locale, r.date)} · ${t('purchases')} ${r.count}`,
+          value: money(locale, r.amount),
+        }))}
       />
       <More query={query} next={page.nextCursor} />
     </section>
@@ -55,6 +60,12 @@ export async function PayoutList({ user, query }: Props) {
             r.paid_at ? date(locale, r.paid_at) : '—',
           ]
         })}
+        summaries={page.items.map((r) => ({
+          title: date(locale, r.period),
+          meta: r.paid_at ? `${t('paidDate')} ${date(locale, r.paid_at)}` : undefined,
+          value: money(locale, r.status === 'paid' ? (r.paid_amount ?? r.amount) : r.amount),
+          badge: <StatusPill status={r.status} t={t} />,
+        }))}
       />
       <FeeLines items={page.items} locale={locale} t={t} />
       <More query={query} next={page.nextCursor} />

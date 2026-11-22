@@ -281,6 +281,8 @@
         "connect": "Connect in Graylum"
       },
       "what": "What it does",
+      "whatNote": "From positioning to a 30-day action plan, six steps to find your direction.",
+      "heroAlt": "Graylum 6-step account positioning animation",
       "when": "When it helps",
       "after": {
         "title": "Once connected",
@@ -292,45 +294,41 @@
       "newTab": "(opens in a new tab)",
       "zoom": "View larger: {name}",
       "lightbox": {
-        "label": "Graylum screenshot",
+        "label": "Graylum animation",
         "prev": "Previous",
         "next": "Next",
         "count": "{n} / {total}"
       },
       "shots": {
-        "roadmap": {
-          "name": "Roadmap home",
-          "note": "From positioning to a 30-day action plan, six steps to find your direction."
+        "voiceover": {
+          "label": "Voiceover Script",
+          "note": "When you have an idea but don't know how to start talking",
+          "alt": "Voiceover Script: Graylum drafts a short-video voiceover"
         },
-        "script": {
-          "name": "Voiceover draft",
-          "label": "Voiceovers",
-          "note": "When you have an idea but don't know how to start talking"
-        },
-        "xhsPost": {
-          "name": "Xiaohongshu post draft",
-          "label": "Image posts",
-          "note": "When you want to post but can't write a draft that's ready to go"
+        "post": {
+          "label": "Posts & Articles",
+          "note": "When you want to post but can't write a draft that's ready to go",
+          "alt": "Posts & Articles: Graylum builds an image post step by step"
         },
         "storyboard": {
-          "name": "Video storyboard",
-          "label": "Video",
-          "note": "When the script is set but you're not sure how to shoot each shot"
+          "label": "Video Storyboard",
+          "note": "When the script is set but you're not sure how to shoot each shot",
+          "alt": "Video Storyboard: Graylum turns the voiceover into shot-by-shot scenes"
         },
-        "storeVisit": {
-          "name": "Store visit post draft",
-          "label": "One draft, many platforms",
-          "note": "When you want to post the same story on different platforms"
+        "repurpose": {
+          "label": "Repurpose",
+          "note": "When you want to post the same story on different platforms",
+          "alt": "Repurpose: Graylum rewrites one final draft as a voiceover, an image post and an article"
         },
-        "shotvivaImage": {
-          "name": "Shotviva images in the chat",
-          "label": "Images right after writing",
-          "note": "When the post is written but still needs a decent image"
+        "imageWithShotviva": {
+          "label": "Image with Shotviva",
+          "note": "When the post is written but still needs a decent image",
+          "alt": "Image with Shotviva: making an image with Shotviva inside a Graylum chat"
         },
-        "tools": {
-          "name": "Tools",
-          "label": "More tools",
-          "note": "Positioning, reviews, editing tips and more, all here."
+        "moreTools": {
+          "label": "Tools",
+          "note": "Positioning, reviews, editing tips and more, all here.",
+          "alt": "Tools: the tools in Graylum's tool square"
         }
       }
     }
@@ -1783,14 +1781,24 @@
       },
       "tabs": {
         "label": "Company sections",
-        "console": "Company",
-        "affiliate": "Company affiliate"
+        "console": "Company workspace",
+        "affiliate": "Company affiliate",
+        "purchasing": "Bulk purchasing",
+        "short": {
+          "affiliate": "Affiliate",
+          "console": "Workspace",
+          "purchasing": "Purchasing"
+        }
       },
       "entry": {
         "title": "Company",
         "pool": "Pool {pool} credits",
         "suspended": "Account paused",
-        "open": "Manage"
+        "open": "Manage",
+        "customerTitle": "Customer referral link",
+        "customerHint": "For inviting and winning customers. Sign-ups and purchases through it earn commission for your company affiliate. This is not the staff link.",
+        "copy": "Copy link",
+        "copied": "Copied"
       },
       "pool": {
         "title": "Credit pool",
@@ -1817,8 +1825,8 @@
         "contactLink": "Contact us to arrange a transfer"
       },
       "invite": {
-        "title": "Invite link",
-        "hint": "Send this link to your team. Anyone signed in who opens it can join the company.",
+        "title": "Staff-only link",
+        "hint": "Send it only to your own staff. They sign up or sign in and join the company, then use the credits you give them.",
         "suspended": "The company is paused, so nobody can join with this link for now.",
         "copy": "Copy link",
         "copied": "Link copied.",
@@ -1828,7 +1836,9 @@
         "resetBody": "The current link stops working right away. People already in the company stay.",
         "resetConfirm": "Reset link",
         "resetDone": "New link ready.",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "warning": "Don't send it to customers. A customer who opens it joins your company as staff instead of counting as a customer you referred.",
+        "toAffiliate": "To invite customers, use the customer referral link in Company affiliate"
       },
       "members": {
         "title": "Members",
@@ -1959,6 +1969,22 @@
         "active": "Active",
         "removed": "Left",
         "unknown": "Account"
+      },
+      "area": {
+        "workspaceIntro": "Where you run Shotviva as a production tool: manage the credit pool, your staff and what they make each month, for image work at scale.",
+        "purchasingIntro": "Company package prices and bank transfer details. Top up the credit pool offline, the way described here.",
+        "affiliateIntro": "Bring in customers and follow commissions and payouts. Sign-ups and purchases through your referral link count toward the company."
+      },
+      "contact": {
+        "open": "Contact us to arrange a transfer",
+        "title": "Contact us to arrange a transfer",
+        "body": "Contact our China region manager to agree the exchange rate and how the transfer is made.",
+        "name": "China region manager",
+        "email": "Company email",
+        "wechat": "WeChat ID",
+        "copy": "Copy",
+        "copied": "Copied",
+        "copyFailed": "Select and copy it"
       }
     },
     "templateShare": {
