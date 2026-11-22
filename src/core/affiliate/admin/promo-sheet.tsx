@@ -7,6 +7,7 @@ import { MutationForm, type SaveAction } from './form'
 import { GridTable, Hidden } from './parts'
 import { PROMO_COPY as P } from './promo-copy'
 import type { PromoSheet } from './promo-read'
+import { TOPUP_COPY as T } from './promo-topup-copy'
 
 // One monthly grant sheet (ARCHITECTURE §6.5 渠道商推广积分): every number the grant is made of, the
 // per-customer breakdown and, while it is pending and its month not over, the three decisions.
@@ -29,7 +30,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function Numbers({ s, now }: { s: PromoSheet; now: Date }) {
+function Numbers({ s, topups, now }: { s: PromoSheet; topups: number; now: Date }) {
   const d = s.detail
   const short_ = s.customers < d.min_customers
   return (
@@ -46,6 +47,8 @@ function Numbers({ s, now }: { s: PromoSheet; now: Date }) {
       <Row label={P.clawbackApplied}>{n(s.clawback_applied)}</Row>
       <Row label={P.carry}>{n(s.clawback_owed - s.clawback_applied)}</Row>
       <Row label={P.total}><strong className="text-base">{n(s.total)}</strong></Row>
+      {topups > 0 && <Row label={T.sheetTopups}>{n(topups)}</Row>}
+      {topups > 0 && <Row label={T.sheetMonthTotal}><strong>{n((s.status === 'granted' ? s.total : 0) + topups)}</strong></Row>}
       <Row label={P.expires}>{formatBeijing(s.expires_at)}{expiryNote(s, now)}</Row>
       <Row label={P.computedAt}>{formatBeijing(s.computed_at)}</Row>
       {s.decided_at && <Row label={P.decidedBy}>{formatBeijing(s.decided_at)}{s.decision_note && ` · ${s.decision_note}`}</Row>}
@@ -100,7 +103,9 @@ function Decisions({ s, action }: { s: PromoSheet; action: SaveAction }) {
   )
 }
 
-export function PromoSheetCard({ sheet: s, action, now }: { sheet: PromoSheet; action: SaveAction; now: Date }) {
+type CardProps = { sheet: PromoSheet; topups?: number; action: SaveAction; now: Date }
+
+export function PromoSheetCard({ sheet: s, topups = 0, action, now }: CardProps) {
   const open = s.status === 'pending' && new Date(s.expires_at) > now
   return (
     <article className="grid gap-4 rounded-lg border p-4">
@@ -109,7 +114,7 @@ export function PromoSheetCard({ sheet: s, action, now }: { sheet: PromoSheet; a
         <span className="text-sm text-muted-foreground">{P.period(s.period)}</span>
         <Badge variant={s.status === 'pending' ? 'default' : 'outline'}>{P.status[s.status] ?? s.status}</Badge>
       </header>
-      <Numbers s={s} now={now} />
+      <Numbers s={s} topups={topups} now={now} />
       <Breakdown s={s} />
       {open && <Decisions s={s} action={action} />}
     </article>
