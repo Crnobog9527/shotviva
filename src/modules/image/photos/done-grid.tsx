@@ -1,5 +1,4 @@
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
-import { Link } from '@/core/i18n/ui'
 import { thumbUrlFor } from '@/core/jobs/job-view'
 import { Reveal } from '@/core/ui/reveal-item'
 import { ThumbImg } from '@/core/ui/thumb-img'
@@ -62,11 +61,6 @@ export function DoneGrid({ items, now, anyRunning, liveTemplates, share }: Props
         )}
       </ul>
       <p className="mx-(--gutter) mt-4 max-w-[72ch] text-caption leading-[1.4] text-muted-foreground">{t('photos.footnote')}</p>
-      {share ? (
-        <Link href="/photos/shares" prefetch={false} className="mx-(--gutter) mt-3 inline-flex min-h-11 items-center text-caption font-medium text-foreground underline underline-offset-4">
-          {t('workShare.manage')}
-        </Link>
-      ) : null}
       {share ? <ShareBar create={share} /> : null}
     </section>
   )
