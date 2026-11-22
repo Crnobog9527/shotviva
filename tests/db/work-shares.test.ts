@@ -107,14 +107,36 @@ describe('creating a link', () => {
     expect(Number((await db.query('select count(*) from public.work_shares where user_id = $1', [owner])).rows[0].count)).toBe(0)
   })
 
-  it('caps live links per account and refuses a banned account', async () => {
+  it('keeps at most 200 live links by revoking the oldest, and refuses a banned account', async () => {
     const owner = await createUser(db)
     const job = await work(owner)
-    // Older than a day, so only the live-link cap applies.
-    await db.query(`insert into public.work_shares (user_id, job_ids, created_at) select $1, array[$2::uuid], now() - interval '2 days' from generate_series(1, 200)`, [owner, job])
-    await expect(createWorkShare(service, owner, { jobIds: [job] })).rejects.toMatchObject({ code: 'RATE_LIMITED' })
-    await db.query('update public.work_shares set revoked_at = now() where id = (select id from public.work_shares where user_id = $1 limit 1)', [owner])
-    await expect(createWorkShare(service, owner, { jobIds: [job] })).resolves.toMatch(/^[0-9a-f]{32}$/)
+    // Older than a day, so only the live-link cap applies: 200 live links, minute n the n-th
+    // newest, and one long revoked.
+    await db.query(
+      `insert into public.work_shares (user_id, job_ids, created_at)
+       select $1, array[$2::uuid], now() - interval '2 days' - make_interval(mins => g) from generate_series(1, 200) g`,
+      [owner, job],
+    )
+    const old = await db.query<{ id: string; revoked_at: Date }>(
+      `insert into public.work_shares (user_id, job_ids, created_at, revoked_at) values ($1, array[$2::uuid], now() - interval '9 days', now() - interval '8 days') returning id, revoked_at`,
+      [owner, job],
+    )
+    const oldest = (await db.query<{ id: string }>('select id from public.work_shares where user_id = $1 and revoked_at is null order by created_at limit 2', [owner])).rows.map((row) => row.id)
+
+    const made = await createWorkShare(service, owner, { jobIds: [job] })
+    const live = async () => Number((await db.query('select count(*) from public.work_shares where user_id = $1 and revoked_at is null', [owner])).rows[0].count)
+    expect(await live()).toBe(200)
+    expect(await readWorkShare(service, made)).not.toBeNull()
+    expect(await readWorkShare(service, oldest[0]!)).toBeNull()
+    expect(await readWorkShare(service, oldest[1]!)).not.toBeNull()
+    // An already revoked link keeps its own time.
+    const kept = await db.query<{ revoked_at: Date }>('select revoked_at from public.work_shares where id = $1', [old.rows[0]!.id])
+    expect(kept.rows[0]!.revoked_at).toEqual(old.rows[0]!.revoked_at)
+
+    // The next one pushes out the next oldest.
+    await createWorkShare(service, owner, { jobIds: [job] })
+    expect(await live()).toBe(200)
+    expect(await readWorkShare(service, oldest[1]!)).toBeNull()
 
     const banned = await createUser(db)
     const bannedJob = await work(banned)

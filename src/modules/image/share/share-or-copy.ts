@@ -17,7 +17,30 @@ export async function shareOrCopy(url: string, data: { title: string; text: stri
   return (await copyText(url)) ? 'copied' : 'failed'
 }
 
-async function copyText(value: string): Promise<boolean> {
+type ShareEnv = { share?: (data: ShareData) => Promise<void>; copy(value: string): Promise<boolean> }
+
+// 「分享链接」 on a made link (Owner 2026-11-23): the system share sheet wherever the browser has
+// one, desktop included, so WeChat or any other app can be picked. No sheet, or one that fails
+// for any reason but the user closing it, copies the link instead.
+export async function shareLink(url: string, data: { title: string; text: string }, env: ShareEnv = browserShareEnv()): Promise<ShareOutcome> {
+  if (env.share) {
+    try {
+      await env.share({ ...data, url })
+      return 'shared'
+    } catch (error) {
+      if (isAbort(error)) return 'cancelled'
+    }
+  }
+  return (await env.copy(url)) ? 'copied' : 'failed'
+}
+
+const isAbort = (error: unknown) => typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
+
+function browserShareEnv(): ShareEnv {
+  return { share: typeof navigator.share === 'function' ? (data) => navigator.share(data) : undefined, copy: copyText }
+}
+
+export async function copyText(value: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(value)
     return true

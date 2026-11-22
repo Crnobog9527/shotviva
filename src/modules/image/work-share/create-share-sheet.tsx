@@ -3,11 +3,11 @@
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
-import { Link } from '@/core/i18n/ui'
 import { Button } from '@/core/ui/button'
 import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
 import { Switch } from '@/core/ui/switch'
 
+import { LinkShareButtons } from '../share/link-share-buttons'
 import { SHARE_NOTE_MAX, SHARE_TITLE_MAX, type CreateShareAction } from './share-types'
 import { useCreateShare, type CreateState } from './use-create-share'
 
@@ -38,7 +38,7 @@ export function CreateShareSheet({ open, onOpenChange, jobIds, create, onDone }:
   )
 }
 
-const ERROR_KEY = { gone: 'errorGone', limit: 'errorLimit', busy: 'errorBusy', error: 'errorOther' } as const
+const ERROR_KEY = { gone: 'errorGone', busy: 'errorBusy', error: 'errorOther' } as const
 
 type Fields = { title: string; note: string; showBefore: boolean }
 
@@ -79,34 +79,14 @@ function ShareForm({ state, pending, onSubmit }: { state: CreateState; pending: 
 
 function ShareReady({ url, onDone }: { url: string; onDone(): void }) {
   const t = useTranslations('app.workShare')
-  const [copied, setCopied] = useState(false)
-  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
-  const copy = () => navigator.clipboard?.writeText(url).then(() => setCopied(true), () => setCopied(false))
+  const labels = { copy: t('copy'), copied: t('copied'), share: t('shareLink'), copiedHint: t('copiedHint'), copyByHand: t('copyByHand') }
   return (
     <div className="mt-5 grid gap-4">
       <p className="hairline rounded-control bg-wash px-3.5 py-3 font-mono text-caption break-all select-all">{url}</p>
-      <div className="grid grid-cols-2 gap-2">
-        <Button variant="glass" size="touch" onClick={copy} aria-live="polite">
-          {copied ? t('copied') : t('copy')}
-        </Button>
-        {canShare ? (
-          <Button variant="glass" size="touch" onClick={() => navigator.share({ url }).catch(() => undefined)}>
-            {t('shareNative')}
-          </Button>
-        ) : (
-          <Link href="/photos/shares" prefetch={false} className="press hairline inline-flex min-h-11 items-center justify-center rounded-button bg-wash px-4 text-label font-semibold">
-            {t('manage')}
-          </Link>
-        )}
-      </div>
+      <LinkShareButtons url={url} title={t('shareTitle')} text={t('shareTitle')} labels={labels} />
       <Button variant="cta" size="cta" onClick={onDone}>
         {t('done')}
       </Button>
-      {canShare ? (
-        <Link href="/photos/shares" prefetch={false} className="justify-self-center text-caption font-medium underline underline-offset-4">
-          {t('manage')}
-        </Link>
-      ) : null}
     </div>
   )
 }
