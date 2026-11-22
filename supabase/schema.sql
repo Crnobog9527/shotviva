@@ -3351,6 +3351,20 @@ $$;
 ALTER FUNCTION "public"."_affiliate_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_current_account"("p_user" "uuid") RETURNS "uuid"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select case when p_user is null then null
+    when exists(select from public.affiliates a where a.user_id = p_user) then p_user
+    else coalesce((select a.user_id from public.affiliate_account_moves m join public.affiliates a on a.org_id = m.org_id
+                    where m.from_user_id = p_user order by m.id desc limit 1), p_user) end;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_current_account"("p_user" "uuid") OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."payments" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -3745,6 +3759,19 @@ $$;
 
 
 ALTER FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."payments") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select case when p_snapshot is null then null else p_snapshot || jsonb_strip_nulls(jsonb_build_object(
+    'owner', public._affiliate_current_account((p_snapshot->>'owner')::uuid),
+    'parent', public._affiliate_current_account((p_snapshot->>'parent')::uuid))) end;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_affiliate_write_commission"("p_payment" "public"."payments", "p_snapshot" "jsonb", "p_level" smallint, "p_open" boolean, "p_lost" boolean, "p_release" boolean DEFAULT false) RETURNS "void"
@@ -9634,6 +9661,9 @@ begin
     update public.profiles set referred_by = v_new where referred_by = v_old;
     get diagnostics n_cust = row_count;
     delete from public.affiliates where user_id = v_old;
+    insert into public.affiliate_account_moves(org_id, from_user_id, to_user_id, actor) values (o.id, v_old, v_new, p_actor);
+    update public.affiliate_recompute_errors set snapshot = public._affiliate_snapshot_remap(snapshot)
+      where resolved_at is null and (snapshot->>'owner' = v_old::text or snapshot->>'parent' = v_old::text);
     v_moved := jsonb_build_object('commissions', n_comm, 'payouts', n_pay, 'adjustments', n_adj, 'customers', n_cust);
   elsif public._affiliate_personal_open(v_new) then
     raise exception 'ORG_PERSONAL_AFFILIATE';
@@ -12804,6 +12834,7 @@ begin
   select exists(select from public.affiliate_commissions c where c.payment_id=p_payment_id) into v_exists;
   select e.snapshot into v_snapshot from public.affiliate_recompute_errors e where e.payment_id=p_payment_id and e.resolved_at is null;
   v_retry:=found;
+  v_snapshot:=public._affiliate_snapshot_remap(v_snapshot);
   if not (v_exists or v_retry or (p_new_payment and v_enabled)) then return; end if;
   -- Serializes manual/cron retries with the existing billing transaction on this payment.
   select p.* into strict v_payment from public.payments p where p.id=p_payment_id for update;
@@ -19718,6 +19749,30 @@ CREATE TABLE IF NOT EXISTS "public"."admin_test_spend" (
 ALTER TABLE "public"."admin_test_spend" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."affiliate_account_moves" (
+    "id" bigint NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "from_user_id" "uuid" NOT NULL,
+    "to_user_id" "uuid" NOT NULL,
+    "moved_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "actor" "uuid" NOT NULL
+);
+
+
+ALTER TABLE "public"."affiliate_account_moves" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."affiliate_account_moves" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."affiliate_account_moves_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 ALTER TABLE "public"."affiliate_adjustments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "public"."affiliate_adjustments_id_seq"
     START WITH 1
@@ -21419,6 +21474,11 @@ ALTER TABLE ONLY "public"."admin_test_spend"
 
 
 
+ALTER TABLE ONLY "public"."affiliate_account_moves"
+    ADD CONSTRAINT "affiliate_account_moves_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."affiliate_adjustments"
     ADD CONSTRAINT "affiliate_adjustments_pkey" PRIMARY KEY ("id");
 
@@ -22189,6 +22249,10 @@ CREATE INDEX "admin_test_runs_template_created_idx" ON "public"."admin_test_runs
 
 
 CREATE INDEX "admin_test_spend_started_at_idx" ON "public"."admin_test_spend" USING "btree" ("started_at");
+
+
+
+CREATE INDEX "affiliate_account_moves_from_idx" ON "public"."affiliate_account_moves" USING "btree" ("from_user_id", "id");
 
 
 
@@ -23360,6 +23424,11 @@ ALTER TABLE ONLY "public"."admin_test_runs"
 
 
 
+ALTER TABLE ONLY "public"."affiliate_account_moves"
+    ADD CONSTRAINT "affiliate_account_moves_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
+
+
+
 ALTER TABLE ONLY "public"."affiliate_adjustments"
     ADD CONSTRAINT "affiliate_adjustments_affiliate_user_id_fkey" FOREIGN KEY ("affiliate_user_id") REFERENCES "public"."affiliates"("user_id") ON DELETE CASCADE;
 
@@ -24283,6 +24352,9 @@ ALTER TABLE "public"."admin_test_runs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."admin_test_spend" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."affiliate_account_moves" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."affiliate_adjustments" ENABLE ROW LEVEL SECURITY;
@@ -25332,6 +25404,10 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_audit"("p_actor" "uuid", "p_action" 
 
 
 
+REVOKE ALL ON FUNCTION "public"."_affiliate_current_account"("p_user" "uuid") FROM PUBLIC;
+
+
+
 GRANT SELECT ON TABLE "public"."payments" TO "service_role";
 
 
@@ -25413,6 +25489,10 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_retained_cents"("p_ranges" "int8mult
 
 
 REVOKE ALL ON FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."payments") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb") FROM PUBLIC;
 
 
 
@@ -27629,6 +27709,16 @@ GRANT ALL ON TABLE "public"."admin_test_runs" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."admin_test_spend" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."affiliate_account_moves" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."affiliate_account_moves_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."affiliate_account_moves_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."affiliate_account_moves_id_seq" TO "service_role";
 
 
 

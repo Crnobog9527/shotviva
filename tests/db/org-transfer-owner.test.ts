@@ -167,6 +167,35 @@ describe('moving the org to a new primary admin', () => {
     expect(await account(owner)).toBeUndefined()
   })
 
+  it('recovers commissions whose stored retry snapshot names the old account, before and after the move', async () => {
+    const { owner, orgId, staff, customer } = await channelOrg()
+    // A payment whose commission write failed and is waiting for a retry: the stored snapshot
+    // names the old owner. Raw SQL only builds that state.
+    const failed = async () => {
+      const paid = await sale(db, customer, 'pack_m', 2490)
+      const snap = (await row(db, 'select public._affiliate_snapshot(p) s from payments p where p.id=$1', [paid.id])).s
+      await db.query('delete from affiliate_commission_changes where commission_id in (select id from affiliate_commissions where payment_id=$1)', [paid.id])
+      await db.query('delete from affiliate_commissions where payment_id=$1', [paid.id])
+      return { paid, snap: { ...snap, owner } }
+    }
+    const store = (id: string, snap: object) =>
+      db.query("insert into affiliate_recompute_errors(payment_id,error,snapshot) values($1,'23503: fixture',$2)", [id, snap])
+    const before = await failed()
+    await store(before.paid.id, before.snap)
+    const late = await failed()
+
+    await transfer(orgId, staff)
+    expect((await row(db, 'select snapshot->>\'owner\' o from affiliate_recompute_errors where payment_id=$1 and resolved_at is null', [before.paid.id])).o).toBe(staff)
+    // A payment that raced the transfer stores the stale snapshot after it; the retry remaps it.
+    await store(late.paid.id, late.snap)
+    for (const { paid } of [before, late]) {
+      await db.query('select affiliate_recompute_payment($1)', [paid.id])
+      expect(await row(db, 'select affiliate_user_id from affiliate_commissions where payment_id=$1 and level=1', [paid.id])).toEqual({ affiliate_user_id: staff })
+      expect(await row(db, 'select count(*)::int n from affiliate_recompute_errors where payment_id=$1 and resolved_at is null', [paid.id])).toEqual({ n: 0 })
+    }
+    expect(await row(db, 'select from_user_id,to_user_id from affiliate_account_moves where org_id=$1', [orgId])).toEqual({ from_user_id: owner, to_user_id: staff })
+  })
+
   it('does nothing on a repeat, even from a stale form', async () => {
     const { orgId, staff } = await channelOrg()
     const seen = await updatedAt(orgId)
@@ -224,5 +253,13 @@ describe('refusals', () => {
     const { rows } = await db.query(`select r as role, has_function_privilege(r, 'public.admin_org_transfer_owner(uuid,jsonb)', 'execute') as can
       from unnest(array['anon','authenticated','service_role']) r order by r`)
     expect(rows).toEqual([{ role: 'anon', can: false }, { role: 'authenticated', can: false }, { role: 'service_role', can: true }])
+    const table = await db.query(`select r as role, has_table_privilege(r, 'public.affiliate_account_moves', 'select') as can_read,
+        has_table_privilege(r, 'public.affiliate_account_moves', 'insert') as can_write
+      from unnest(array['anon','authenticated','service_role']) r order by r`)
+    expect(table.rows).toEqual([
+      { role: 'anon', can_read: false, can_write: false },
+      { role: 'authenticated', can_read: false, can_write: false },
+      { role: 'service_role', can_read: true, can_write: false },
+    ])
   })
 })
