@@ -5,11 +5,12 @@ import { Button } from '@/core/ui/button'
 import { COPY, STATUS } from './copy'
 import { href, type Filters } from './query'
 
-export function Field({ label, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+export function Field({ label, hint, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
   return (
     <label className="grid min-w-0 gap-1 text-sm">
       <span>{label}</span>
       <Input {...props} />
+      {hint && <span className="text-muted-foreground">{hint}</span>}
     </label>
   )
 }

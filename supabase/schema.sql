@@ -6163,6 +6163,7 @@ begin
     commission_months=case when p_input ? 'commission_months' then (p_input->>'commission_months')::integer else commission_months end,
     hold_days=coalesce((p_input->>'hold_days')::integer,hold_days),
     payout_min_usd=coalesce((p_input->>'payout_min_usd')::bigint,payout_min_usd),
+    org_payout_min_usd=coalesce((p_input->>'org_payout_min_usd')::bigint,org_payout_min_usd),
     settlement_day=coalesce((p_input->>'settlement_day')::integer,settlement_day),
     apply_min_level=coalesce(p_input->>'apply_min_level',apply_min_level) where singleton;
   insert into public.affiliate_rates(product_kind,l1_bp,l2_bp)
@@ -12429,7 +12430,8 @@ begin
         jsonb_build_object('payout_method',a.payout_method,'payout_details',a.payout_details),
         public.affiliate_payout_fee_rules_for('standard',a.payout_method,v_cutoff)
         from public.affiliates a join public.affiliate_balances b on b.affiliate_user_id=a.user_id
-       where a.status='active' and a.payout_method is not null and b.available>0 and b.available>=v_settings.payout_min_usd
+       where a.status='active' and a.payout_method is not null and b.available>0
+         and b.available>=case when a.org_id is not null then v_settings.org_payout_min_usd else v_settings.payout_min_usd end
       on conflict(affiliate_user_id,period) do nothing returning id,affiliate_user_id,amount)
   insert into public.affiliate_payout_items(payout_id,commission_id,prior_amount,issue_amount)
     select n.id,a.* from issued n
@@ -19673,11 +19675,13 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_settings" (
     "commission_months" integer,
     "org_l2_bp" integer DEFAULT 500 NOT NULL,
     "fee_final_grace_days" integer DEFAULT 14 NOT NULL,
+    "org_payout_min_usd" bigint DEFAULT 20000 NOT NULL,
     CONSTRAINT "affiliate_settings_apply_min_level_check" CHECK (("apply_min_level" = ANY (ARRAY['none'::"text", 'any_paid'::"text", 'starter'::"text", 'pro'::"text", 'max'::"text"]))),
     CONSTRAINT "affiliate_settings_commission_months_check" CHECK (("commission_months" > 0)),
     CONSTRAINT "affiliate_settings_fee_final_grace_days_check" CHECK ((("fee_final_grace_days" >= 0) AND ("fee_final_grace_days" <= 365))),
     CONSTRAINT "affiliate_settings_hold_days_check" CHECK (("hold_days" >= 0)),
     CONSTRAINT "affiliate_settings_org_l2_bp_check" CHECK ((("org_l2_bp" >= 0) AND ("org_l2_bp" <= 10000))),
+    CONSTRAINT "affiliate_settings_org_payout_min_usd_check" CHECK (("org_payout_min_usd" > 0)),
     CONSTRAINT "affiliate_settings_payout_min_usd_check" CHECK (("payout_min_usd" > 0)),
     CONSTRAINT "affiliate_settings_settlement_day_check" CHECK ((("settlement_day" >= 1) AND ("settlement_day" <= 28))),
     CONSTRAINT "affiliate_settings_singleton_check" CHECK ("singleton"),

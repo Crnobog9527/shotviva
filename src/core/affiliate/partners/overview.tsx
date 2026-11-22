@@ -4,7 +4,7 @@ import { consumerReferralUrl } from '../consumer-link'
 import { Link } from '@/core/i18n/ui'
 import { date, money } from './format'
 import { CopyLink } from '../copy-link'
-import type { Account, Settings } from './models'
+import { payoutThreshold, type Account, type Settings } from './models'
 import { FeePanel } from './fee-panel'
 import { PromoMonthCard } from './promo-month'
 import { readFees, readSummary } from './repository'
@@ -19,9 +19,10 @@ export async function Overview({
   settings: Settings
 }) {
   const [s, fees, t, locale] = await Promise.all([readSummary(user), readFees(user), getTranslations('affiliate'), currentLocale()])
-  const gap = Math.max(0, settings.payout_min_usd - s.available)
+  const threshold = payoutThreshold(account, settings)
+  const gap = Math.max(0, threshold - s.available)
   const eligible = gap === 0 && !!account.payout_method && account.status === 'active'
-  const progress = Math.min(100, Math.round((s.available / settings.payout_min_usd) * 100))
+  const progress = Math.min(100, Math.round((s.available / threshold) * 100))
   const usd = (cents: number) => money(locale, cents)
   const activity = [
     ['clicks', String(s.clicks)],
@@ -38,11 +39,11 @@ export async function Overview({
         <h2 id="af-balance" className="af-label">{t('metrics.available')}</h2>
         <p className="af-balance-figure">{usd(s.available)}</p>
         <div className="af-meter" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}
-          aria-label={t('gap', { threshold: usd(settings.payout_min_usd), gap: usd(gap) })}>
+          aria-label={t('gap', { threshold: usd(threshold), gap: usd(gap) })}>
           <span style={{ inlineSize: progress + '%' }} />
         </div>
         <p className="af-balance-line">
-          {gap > 0 ? t('gap', { threshold: usd(settings.payout_min_usd), gap: usd(gap) }) : t('thresholdMet', { threshold: usd(settings.payout_min_usd) })}
+          {gap > 0 ? t('gap', { threshold: usd(threshold), gap: usd(gap) }) : t('thresholdMet', { threshold: usd(threshold) })}
         </p>
         <dl className="af-balance-facts">
           <div>
@@ -68,7 +69,7 @@ export async function Overview({
 
       {account.org_id ? <PromoMonthCard orgId={account.org_id} locale={locale} /> : null}
 
-      <FeePanel fees={fees} threshold={settings.payout_min_usd} locale={locale} t={t} />
+      <FeePanel fees={fees} threshold={threshold} locale={locale} t={t} />
 
       <section className="af-stats" aria-label={t('statsLabel')}>
         {[...activity, ...earnings].map(([key, value]) => (
