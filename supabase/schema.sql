@@ -4613,7 +4613,7 @@ declare
 begin
   select min(x.at) into v_start from (
     select g.decided_at as at from public.partner_promo_grants g
-     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null
+     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted'
     union all
     select t.created_at from public.partner_promo_topups t where t.recipient_user_id = p_user and t.expires_at = p_expires
   ) x;
@@ -4621,7 +4621,10 @@ begin
   for e in
     with adds as (
       select g.decided_at as at, 0 as ord, 'grant' as src, g.id, g.total as amount from public.partner_promo_grants g
-       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null
+       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted'
+      union all
+      select g.voided_at, 2, 'void', g.id, 0 from public.partner_promo_grants g
+       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is not null
       union all
       select t.created_at, 0, 'topup', t.id, t.credits from public.partner_promo_topups t
        where t.recipient_user_id = p_user and t.expires_at = p_expires
@@ -4642,7 +4645,11 @@ begin
       from reserves r left join refunds f on f.reserve_key = r.idempotency_key
     order by 1, 2, 4
   loop
-    if e.src <> 'spend' then
+    if e.src = 'void' then
+      for i in 1 .. cardinality(v_id) loop
+        if v_src[i] = 'grant' and v_id[i] = e.id then v_left[i] := 0; end if;
+      end loop;
+    elsif e.src <> 'spend' then
       v_src := v_src || e.src;
       v_id := v_id || e.id;
       v_left := v_left || e.amount::integer;
@@ -4656,7 +4663,8 @@ begin
       end loop;
     end if;
   end loop;
-  return query select u.s, u.i, u.l from unnest(v_src, v_id, v_left) as u(s, i, l);
+  return query select u.s, u.i, u.l from unnest(v_src, v_id, v_left) as u(s, i, l)
+    where not (u.s = 'grant' and exists (select from public.partner_promo_grants g where g.id = u.i and g.voided_at is not null));
 end;
 $_$;
 
@@ -4939,7 +4947,9 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_owed"("p_org" "uuid", "p_per
                 where l.grant_id = g.id), '[]'::jsonb),
                coalesce((g.detail->>'customer_cap_bp')::integer, 2000),
                coalesce((g.detail->>'min_customers')::integer, 3))->>'bonus')::integer
-           - coalesce((select sum(c.credits) from public.partner_promo_clawbacks c where c.source_grant_id = g.id), 0)::integer)
+           - coalesce((select sum(c.credits) from public.partner_promo_clawbacks c
+                         join public.partner_promo_grants a on a.id = c.applied_grant_id and a.voided_at is null
+                        where c.source_grant_id = g.id), 0)::integer)
     from public.partner_promo_grants g
    where g.org_id = p_org and g.status = 'granted' and g.voided_at is null and g.period < p_period and g.bonus > 0
    order by g.period, g.id;
