@@ -5,7 +5,7 @@ import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { decideWorks } from '@/core/admin/gallery-review'
-import { galleryVariantKeys } from '@/core/gallery/variants'
+import { galleryVariantKeys, galleryVariantKeysFor } from '@/core/gallery/variants'
 import { syncGalleryVariants } from '@/core/gallery/variant-sync'
 import { deleteOwnWork } from '@/core/jobs'
 
@@ -34,7 +34,7 @@ async function work(options: { pool?: 'free' | 'paid'; templateId?: string } = {
      values ($1, $2, 'image', $3, 'web', 'succeeded', 'public', 2, $4, now(), $5, '{}'::jsonb)`,
     [id, owner, options.templateId ?? template, outputKey, options.pool ?? 'free'],
   )
-  return { id, outputKey }
+  return { id, outputKey, creditPool: options.pool ?? 'free' }
 }
 
 // Runs what the server action would run after its response, at once.
@@ -49,7 +49,8 @@ async function decide(r2: ReturnType<typeof createMemoryStore>, jobIds: string[]
   return changed
 }
 
-const hasVariants = (r2: ReturnType<typeof createMemoryStore>, outputKey: string) => galleryVariantKeys(outputKey).map((key) => r2.objects.has(key))
+// The copies a work is served from (free works: the protected -p1 copies, 2026-11-22).
+const hasVariants = (r2: ReturnType<typeof createMemoryStore>, w: { outputKey: string; creditPool: 'free' | 'paid' }) => galleryVariantKeysFor(w).map((key) => r2.objects.has(key))
 
 beforeAll(async () => {
   db = await connectAdmin()
@@ -74,14 +75,15 @@ describe('gallery copies', () => {
     const paid = await work({ pool: 'paid' })
     for (const w of [free, paid]) r2.upload(w.outputKey, await png(1200, 1500), 'image/png')
     expect(await decide(r2, [free.id, paid.id], 'approved')).toBe(2)
-    for (const w of [free, paid]) expect(hasVariants(r2, w.outputKey)).toEqual([true, true])
-    const [small, large] = galleryVariantKeys(free.outputKey).map((key) => r2.objects.get(key)!.body)
+    for (const w of [free, paid]) expect(hasVariants(r2, w)).toEqual([true, true])
+    const [small, large] = galleryVariantKeysFor(free).map((key) => r2.objects.get(key)!.body)
     expect(await sharp(small).metadata()).toMatchObject({ format: 'webp', width: 480 })
-    expect(await sharp(large).metadata()).toMatchObject({ format: 'webp', width: 960 })
+    // A free work's large copy is capped at 1080 on the long edge (protected copy).
+    expect(await sharp(large).metadata()).toMatchObject({ format: 'webp', width: 864, height: 1080 })
 
     expect(await decide(r2, [free.id], 'rejected')).toBe(1)
-    expect(hasVariants(r2, free.outputKey)).toEqual([false, false])
-    expect(hasVariants(r2, paid.outputKey)).toEqual([true, true])
+    expect(hasVariants(r2, free)).toEqual([false, false])
+    expect(hasVariants(r2, paid)).toEqual([true, true])
   })
 
   it('are not made for a work the decision did not approve or the gallery does not show', async () => {
@@ -94,13 +96,13 @@ describe('gallery copies', () => {
     await decide(r2, [gone.id, freeform.id], 'approved')
     // A stale call for a work that is still pending changes nothing either.
     await syncGalleryVariants({ db: service, store: r2.store }, 'approved', [pending.id])
-    for (const w of [gone, freeform, pending]) expect(hasVariants(r2, w.outputKey)).toEqual([false, false])
+    for (const w of [gone, freeform, pending]) expect(hasVariants(r2, w)).toEqual([false, false])
     // Nor does a stale rejection remove an approved work's copies.
     const approved = await work()
     r2.upload(approved.outputKey, await png(600, 600), 'image/png')
     await decide(r2, [approved.id], 'approved')
     await syncGalleryVariants({ db: service, store: r2.store }, 'rejected', [approved.id])
-    expect(hasVariants(r2, approved.outputKey)).toEqual([true, true])
+    expect(hasVariants(r2, approved)).toEqual([true, true])
   })
 
   it('go with the work when its owner deletes it', async () => {
@@ -110,6 +112,6 @@ describe('gallery copies', () => {
     await decide(r2, [w.id], 'approved')
     await deleteOwnWork({ db: service, store: r2.store }, { userId: owner, jobId: w.id })
     expect(r2.objects.has(w.outputKey)).toBe(false)
-    expect(hasVariants(r2, w.outputKey)).toEqual([false, false])
+    expect(galleryVariantKeys(w.outputKey).some((key) => r2.objects.has(key))).toBe(false)
   })
 })

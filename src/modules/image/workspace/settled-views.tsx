@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 
 import { ActionBar } from '@/core/app-shell'
 import { Link } from '@/core/i18n/ui'
+import { savedLongEdge } from '@/core/storage/rules'
 import { buttonVariants } from '@/core/ui/button'
 
 import { CompareSlider } from '../catalogue/compare-slider'
@@ -11,6 +12,7 @@ import { EditHint } from '../edit-ui/edit-hint'
 import { editHref } from '../edit-ui/edit-link'
 import type { JobFailure, TrackedJob } from '../generation/job-model'
 import { SIDE_BY_SIDE } from '../result/action-styles'
+import { RemoveWatermark } from '../result/remove-watermark'
 import { ResultPhoto } from '../result/result-photo'
 import { ShareButton } from '../result/share-button'
 import { DevelopTray, StageLayout, TRAY_SIZE, TrayCaption } from './develop-tray'
@@ -49,7 +51,7 @@ export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps)
   ) : null
   const bar = (
     <ActionBar className="md:px-0">
-      <ShareButton fileUrl={fileUrl} name={`shotviva-${job.templateId}`} shareText={shareText} px={px} work={{ pool: job.creditPool, transparent: job.transparent }} watermarked={job.creditPool === 'free'} />
+      <ShareButton fileUrl={fileUrl} name={`shotviva-${job.templateId}`} shareText={shareText} px={savedLongEdge(job.creditPool, px)} work={{ pool: job.creditPool, transparent: job.transparent }} watermarked={job.creditPool === 'free'} />
     </ActionBar>
   )
   return (
@@ -60,6 +62,11 @@ export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps)
           {t.rich('workspace.doneState.line', { tier: tierName(job.resolution, t), px, count: job.credits, pool: donePool(job), mono: monoTag })}
         </p>
         <DoneActions jobId={job.id} editable={editable} onAgain={onAgain} />
+        {job.creditPool === 'free' ? (
+          <div className="mt-3 w-full">
+            <RemoveWatermark templateId={job.templateId} jobId={job.id} />
+          </div>
+        ) : null}
       </ResultPanel>
     </StageLayout>
   )

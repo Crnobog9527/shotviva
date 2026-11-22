@@ -15,10 +15,11 @@ vi.mock('./job-lookup', () => ({ findOwnJob: mocks.findOwnJob }))
 const { firstThumbUrls, resolveJobThumb } = await import('./job-thumb')
 
 const db = {} as SupabaseClient
-const job = { id: 'j1', userId: 'u1', status: 'succeeded', creditPool: 'paid', outputKey: 'outputs/u1/j1.png' } as Job
-const THUMB = 'outputs/u1/j1-thumb.webp'
+const job = { id: '0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e', userId: 'u1', status: 'succeeded', creditPool: 'paid', outputKey: 'outputs/u1/j1.png' } as Job
+const THUMB = `outputs/u1/${job.id}-thumb.webp`
+const FREE_THUMB = `outputs/u1/${job.id}-thumb-p1.webp`
 const SIGNED = `memory://get/${THUMB}?expires=300`
-const req = { userId: 'u1', jobId: 'j1' }
+const req = { userId: 'u1', jobId: job.id }
 
 // ARCHITECTURE §8.3「作品小图」: the thumbnail route's rules.
 describe('resolveJobThumb', () => {
@@ -33,7 +34,7 @@ describe('resolveJobThumb', () => {
       mocks.findOwnJob.mockResolvedValue(found)
       await expect(resolveJobThumb({ db, store: r2.store }, req)).rejects.toMatchObject({ status: 404 })
     }
-    expect(mocks.findOwnJob).toHaveBeenCalledWith(db, 'u1', 'j1')
+    expect(mocks.findOwnJob).toHaveBeenCalledWith(db, 'u1', job.id)
     expect(r2.objects.size).toBe(0)
   })
 
@@ -52,29 +53,30 @@ describe('resolveJobThumb', () => {
     expect(await sharp(r2.objects.get(THUMB)?.body).metadata()).toMatchObject({ format: 'webp', width: 480, height: 600 })
   })
 
-  it('marks the copy it makes for a free work, like the full file', async () => {
+  it('makes a free work its protected copy under its own key, like the full file', async () => {
     const [free, paid] = [createMemoryStore(), createMemoryStore()]
     const bytes = await png(1024, 1024)
     free.upload(job.outputKey!, bytes, 'image/png')
     paid.upload(job.outputKey!, bytes, 'image/png')
     await resolveJobThumb({ db, store: paid.store }, req)
     mocks.findOwnJob.mockResolvedValue({ ...job, creditPool: 'free' })
-    await resolveJobThumb({ db, store: free.store }, req)
-    expect(Buffer.from(free.objects.get(THUMB)!.body).equals(Buffer.from(paid.objects.get(THUMB)!.body))).toBe(false)
+    expect(await resolveJobThumb({ db, store: free.store }, req)).toBe(`memory://get/${FREE_THUMB}?expires=300`)
+    expect(free.objects.has(THUMB)).toBe(false)
+    expect(Buffer.from(free.objects.get(FREE_THUMB)!.body).equals(Buffer.from(paid.objects.get(THUMB)!.body))).toBe(false)
   })
 
   it('falls back to the full-file route when no copy exists and none can be made', async () => {
     const gone = createMemoryStore()
-    expect(await resolveJobThumb({ db, store: gone.store }, req)).toBe('/api/files/j1')
+    expect(await resolveJobThumb({ db, store: gone.store }, req)).toBe(`/api/files/${job.id}`)
 
     const unreadable = createMemoryStore()
     unreadable.upload(job.outputKey!, text('not an image'), 'image/png')
-    expect(await resolveJobThumb({ db, store: unreadable.store }, req)).toBe('/api/files/j1')
+    expect(await resolveJobThumb({ db, store: unreadable.store }, req)).toBe(`/api/files/${job.id}`)
 
     const down = createMemoryStore()
     down.upload(job.outputKey!, await png(600, 600), 'image/png')
     down.failPut.next = true
-    expect(await resolveJobThumb({ db, store: down.store }, req)).toBe('/api/files/j1')
+    expect(await resolveJobThumb({ db, store: down.store }, req)).toBe(`/api/files/${job.id}`)
   })
 
   it('treats an R2 error on the existence check as missing, not as a failure', async () => {
@@ -85,8 +87,23 @@ describe('resolveJobThumb', () => {
   })
 })
 
+describe('resolveJobThumb for a free work made before 2026-11-22', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  // 2026-11-22: a free work's list copy made before the protected one (corner mark only) sits at
+  // the old key; it is never signed again, and the protected copy is made in its place.
+  it('never signs a free work’s older list copy', async () => {
+    const r2 = createMemoryStore()
+    r2.upload(job.outputKey!, await png(800, 1000), 'image/png')
+    r2.upload(THUMB, text('old corner-marked copy'), 'image/webp')
+    mocks.findOwnJob.mockResolvedValue({ ...job, creditPool: 'free' })
+    expect(await resolveJobThumb({ db, store: r2.store }, req)).toBe(`memory://get/${FREE_THUMB}?expires=300`)
+    expect(await sharp(r2.objects.get(FREE_THUMB)!.body).metadata()).toMatchObject({ format: 'webp', width: 480, height: 600 })
+  })
+})
+
 describe('firstThumbUrls', () => {
-  const jobs = ['a', 'b', 'c'].map((id) => ({ id, userId: 'u1' }))
+  const jobs = ['a', 'b', 'c'].map((id) => ({ id, userId: 'u1', creditPool: 'paid' as const }))
 
   it('signs only the works that already have a small copy, and only the first few', async () => {
     const r2 = createMemoryStore()
@@ -100,6 +117,14 @@ describe('firstThumbUrls', () => {
     // Nothing is made here: a missing copy is the thumbnail route's job.
     expect(get).not.toHaveBeenCalled()
     expect([...(await firstThumbUrls(() => r2.store, jobs, 1)).keys()]).toEqual(['a'])
+  })
+
+  it('signs a free work’s protected copy, never its older one', async () => {
+    const r2 = createMemoryStore()
+    r2.upload('outputs/u1/a-thumb.webp', text('old'), 'image/webp')
+    r2.upload('outputs/u1/b-thumb-p1.webp', text('protected'), 'image/webp')
+    const free = jobs.map((item) => ({ ...item, creditPool: 'free' as const }))
+    expect([...(await firstThumbUrls(() => r2.store, free))]).toEqual([['b', 'memory://get/outputs/u1/b-thumb-p1.webp?expires=300']])
   })
 
   it('answers nothing, never throws, when R2 is not configured or fails', async () => {

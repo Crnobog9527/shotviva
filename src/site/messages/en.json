@@ -1157,6 +1157,8 @@
       "makeAnotherWith": "Make another with {name}",
       "shareText": "Made with {brand} {url}",
       "makeAgain": "Make again",
+      "removeWatermark": "Remove watermark: regenerate with paid credits",
+      "removeWatermarkNote": "Free photos are for demo only and not licensed for commercial use.",
       "tierPx": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off}}}",
       "when": {
         "today": "Today",
@@ -2619,7 +2621,7 @@
       "text": "Text on the photo",
       "reuse": "Make one like this",
       "reuseNote": "Opens the same template with the same settings. You add your own photo: this one is never reused.",
-      "watermark": "Made with free credits, so it carries a small watermark.",
+      "watermark": "Made with free credits: watermarked, for demo only, not licensed for commercial use.",
       "alt": "{template} photo made with Shotviva"
     },
     "report": {

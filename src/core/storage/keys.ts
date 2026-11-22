@@ -9,17 +9,25 @@ import type { UploadContentType } from './rules'
 //   outputs/{user_id}/{job_id}-input.webp
 //                                     768px preview of the job's upload, kept with the result
 //                                     (ARCHITECTURE §8 「原图小图」, T32)
-//   outputs/{user_id}/{job_id}-thumb.webp
-//                                     the result's small copy for lists, watermarked when the
-//                                     work is (ARCHITECTURE §8.3「作品小图」)
+//   outputs/{user_id}/{job_id}-thumb.webp | -thumb-p1.webp
+//                                     the result's small copy for lists (ARCHITECTURE §8.3
+//                                     「作品小图」): clean for a paid work; a free work's is the
+//                                     protected copy (-p1, storage/protect, 2026-11-22). Free
+//                                     works' older -thumb.webp (corner mark only) is never served
+//                                     again, only deleted with the work
+//   outputs/{user_id}/{job_id}-protected-p1.jpg
+//                                     a free work's protected full copy, for links that must live
+//                                     longer than a download (the partner API's 7-day URL)
 //   outputs/{user_id}/{job_id}-in-{n}.{ext}
 //                                     the job's own uploads (n from 1), copied at settle and
 //                                     kept with the result for Make again (§8.3, T40)
-//   inputs/{user_id}/downloads/{job_id}-white.jpg | -marked.png | -marked-white.jpg | -both.zip
-//                                     a cut-out's 白底 copy, a free cut-out's watermarked 透明底
-//                                     PNG or 白底 JPEG, or the 白底 + 透明 pair as one ZIP, made on
-//                                     first download and reused; 7-day lifecycle like every
-//                                     inputs/ key, removed with the work too
+//   inputs/{user_id}/downloads/{job_id}-white.jpg | -both.zip | -marked-p1.png |
+//                             -marked-p1-white.jpg | -marked-p1-both.zip
+//                                     a paid cut-out's 白底 copy and pair ZIP; a free cut-out's
+//                                     protected 透明底 PNG, 白底 JPEG and pair ZIP; made on first
+//                                     download and reused; 7-day lifecycle like every inputs/ key,
+//                                     removed with the work too (with the pre-2026-11-22 -marked
+//                                     names, which nothing serves any more)
 //   outputs/{user_id}/store-qr-{uuid}.{ext}
 //                                     the store profile's QR code (§5.3 店铺信息), a copy of the
 //                                     user's upload; replaced on save, removed with the account
@@ -59,24 +67,48 @@ export function outputKeyFor(userId: string, jobId: string): string {
   return `outputs/${userId}/${jobId}.png`
 }
 
-// Staged copies. White: a paid cut-out flattened onto white, unmarked. Marked: a free cut-out's
-// watermarked PNG with its alpha kept. Marked-white: a free cut-out's marked JPEG on white, staged
-// only for the pair ZIP (the single 白底 download makes it per request). Both: the 白底 + 透明 pair
-// as one ZIP. A paid 透明底 download is the stored original itself.
-const VARIANT_SUFFIX = { white: 'white.jpg', marked: 'marked.png', 'marked-white': 'marked-white.jpg', both: 'both.zip' } as const
+// Staged copies. White: a paid cut-out flattened onto white, unmarked. Both: a paid cut-out's
+// 白底 + 透明 pair as one ZIP. Marked: a free cut-out's protected PNG with its alpha kept.
+// Marked-white: a free cut-out's protected JPEG on white, staged only for the pair ZIP (the single
+// 白底 download makes it per request). Marked-both: a free cut-out's pair ZIP. A paid 透明底
+// download is the stored original itself. The -p1 names are the protected copies (2026-11-22); a
+// change to what storage/protect draws bumps them, so an older copy is never handed out again.
+const VARIANT_SUFFIX = {
+  white: 'white.jpg',
+  both: 'both.zip',
+  marked: 'marked-p1.png',
+  'marked-white': 'marked-p1-white.jpg',
+  'marked-both': 'marked-p1-both.zip',
+} as const
 export type DownloadVariant = keyof typeof VARIANT_SUFFIX
 export const DOWNLOAD_VARIANTS = Object.keys(VARIANT_SUFFIX) as DownloadVariant[]
+// Names earlier versions staged; never served, only deleted with the work.
+const RETIRED_VARIANT_SUFFIXES = ['marked.png', 'marked-white.jpg'] as const
 
 export function downloadVariantKeyFor(userId: string, jobId: string, variant: DownloadVariant): string {
   return `inputs/${userId}/downloads/${jobId}-${VARIANT_SUFFIX[variant]}`
+}
+
+export function retiredVariantKeysFor(userId: string, jobId: string): string[] {
+  return RETIRED_VARIANT_SUFFIXES.map((suffix) => `inputs/${userId}/downloads/${jobId}-${suffix}`)
 }
 
 export function inputPreviewKeyFor(userId: string, jobId: string): string {
   return `outputs/${userId}/${jobId}-input.webp`
 }
 
-export function workThumbKeyFor(userId: string, jobId: string): string {
-  return `outputs/${userId}/${jobId}-thumb.webp`
+// The list copy for a work of this pool: a free work's is the protected one.
+export function workThumbKeyFor(userId: string, jobId: string, pool: 'free' | 'paid'): string {
+  return pool === 'free' ? `outputs/${userId}/${jobId}-thumb-p1.webp` : `outputs/${userId}/${jobId}-thumb.webp`
+}
+
+// Every list copy a work may have (current and retired), for deleting the work.
+export function workThumbKeysFor(userId: string, jobId: string): string[] {
+  return [workThumbKeyFor(userId, jobId, 'paid'), workThumbKeyFor(userId, jobId, 'free')]
+}
+
+export function protectedCopyKeyFor(userId: string, jobId: string): string {
+  return `outputs/${userId}/${jobId}-protected-p1.jpg`
 }
 
 // The upload's own extension is kept: normal uploads are JPEG (the browser compresses), the

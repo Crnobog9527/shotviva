@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import type { Client } from 'pg'
+import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { reserveJob, runGeneration } from '@/core/jobs'
@@ -56,6 +57,21 @@ describe('POST /api/partner/generate: success', () => {
     expect(body.image_url).toBe(`memory://get/outputs/${userId}/${body.job_id}.png?expires=604800`)
     const { rows } = await db.query('select source, idempotency_key, status from public.generation_jobs where id = $1', [body.job_id])
     expect(rows[0]).toEqual({ source: 'graylum', idempotency_key: 'call-1', status: 'succeeded' })
+  })
+
+  // Owner 2026-11-22: a work made with free (or promo) credits never leaves as its clean original;
+  // the link is to its protected copy (≤ 1080 px, visible and tracking marks), kept with the work.
+  it('links a free work to its protected copy, never the original', async () => {
+    const userId = await linkedUser(db, { freeCredits: 3 })
+    const r2 = createMemoryStore()
+    const deps = { ...routeDeps(r2.store), provider: fakeProvider().provider, providerTimeoutMs: 200 }
+    const response = await handleGenerate(partnerRequest('/api/partner/generate', { method: 'POST', account: userId, idempotencyKey: randomUUID(), body: freeform }), deps)
+    const body = await response.json()
+    expect(body).toMatchObject({ status: 'succeeded', free_credits_remaining: 1 })
+    const key = `outputs/${userId}/${body.job_id}-protected-p1.jpg`
+    expect(body.image_url).toBe(`memory://get/${key}?expires=604800`)
+    const { width = 0, height = 0 } = await sharp(r2.objects.get(key)!.body).metadata()
+    expect(Math.max(width, height)).toBeLessThanOrEqual(1080)
   })
 
   it('fetches the image URL, downsizes it and feeds it to the model', async () => {
