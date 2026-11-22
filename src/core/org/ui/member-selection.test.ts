@@ -45,3 +45,12 @@ describe('search outside selection mode', () => {
     expect(many.length).toBeGreaterThan(PAGE_SIZE)
   })
 })
+
+describe('select-all is bounded by the rows on screen', () => {
+  it('a page is PAGE_SIZE rows of the filtered, sorted list', () => {
+    const many = Array.from({ length: PAGE_SIZE + 5 }, (_, i) => m(`user${String(i).padStart(2, '0')}@acme.test`, '2026-11-02T08:00:00Z', `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`))
+    const page = filterMembers(sortMembers(many), { query: '', joinedFrom: '' }).slice(0, PAGE_SIZE)
+    expect(page).toHaveLength(PAGE_SIZE)
+    expect(page.at(-1)?.account).toBe('user29@acme.test')
+  })
+})

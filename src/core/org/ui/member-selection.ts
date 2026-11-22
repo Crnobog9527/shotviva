@@ -42,22 +42,22 @@ export function useMemberSelection(members: readonly ConsoleMember[], initialOpe
   const sorted = useMemo(() => sortMembers(members), [members])
   const shown = useMemo(() => filterMembers(sorted, filter), [sorted, filter])
   const visible = shown.slice(0, limit)
-  // Only members shown by the current filter count, so a bulk action never reaches someone the
-  // owner can no longer see (and no one removed since they were ticked).
-  const selected = shown.filter((m) => picked.has(m.userId)).map((m) => m.userId)
-  const allShown = shown.length > 0 && shown.every((m) => picked.has(m.userId))
+  // Only the rows on screen count (the filter's current page), so a bulk action never reaches someone
+  // the owner can not see (and no one removed since they were ticked).
+  const selected = visible.filter((m) => picked.has(m.userId)).map((m) => m.userId)
+  const allShown = visible.length > 0 && visible.every((m) => picked.has(m.userId))
   return {
     selecting, filter, shown, visible, selected, allShown, open,
     hidden: shown.length - visible.length,
     start: () => { setSelecting(true); setOpen(null) },
-    stop: () => { setSelecting(false); setPicked(new Set()) },
+    stop: () => { setSelecting(false); setPicked(new Set()); setFilter({ query: '', joinedFrom: '' }); setLimit(PAGE_SIZE) },
     setFilter: (next: Partial<MemberFilter>) => { setFilter((f) => ({ ...f, ...next })); setLimit(PAGE_SIZE) },
     showMore: () => setLimit((n) => n + PAGE_SIZE),
     toggleOpen: (id: string) => setOpen((o) => toggleOpen(o, id)),
     toggle: (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n }),
     toggleAll: () => setPicked((p) => {
       const n = new Set(p)
-      for (const m of shown) if (allShown) n.delete(m.userId); else n.add(m.userId)
+      for (const m of visible) if (allShown) n.delete(m.userId); else n.add(m.userId)
       return n
     }),
     clear: () => setPicked(new Set()),

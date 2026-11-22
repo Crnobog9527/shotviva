@@ -12,6 +12,7 @@ import type { OwnerActions } from './actions'
 import { BulkBar, BulkToolbar } from './bulk-toolbar'
 import { Confirm } from './confirm'
 import { DefaultsForm } from './defaults-panel'
+import { KeptContext, createKept, newRequestId, useKeptState, type Kept } from './kept-state'
 import { PAGE_SIZE, useMemberSelection } from './member-selection'
 import { FIELD, Panel, Result } from './parts'
 import { useConsoleAction } from './use-console-action'
@@ -57,9 +58,9 @@ const follows = (member: ConsoleMember, kind: Kind) => (kind === 'paid' ? member
 // 「恢复默认」: this member's allowance of this kind follows the org default again (a one-member bulk set).
 function UseDefault({ member, actions, kind, suspended }: Pick<FormProps, 'member' | 'actions' | 'kind' | 'suspended'>) {
   const t = useTranslations('app.org.members')
-  const [requestId, setRequestId] = useState(() => crypto.randomUUID())
+  const [requestId, setRequestId] = useKeptState(`${member.userId}:${kind}:default:id`, newRequestId)
   const { pending, outcome, run } = useConsoleAction()
-  const reset = () => run(() => actions.bulkSetAllowance({ requestId, members: [member.userId], [kind]: 'default' }), t('defaultRestored'), () => setRequestId(crypto.randomUUID()))
+  const reset = () => run(() => actions.bulkSetAllowance({ requestId, members: [member.userId], [kind]: 'default' }), t('defaultRestored'), () => setRequestId(newRequestId()))
   return (
     <span className="flex flex-wrap items-center gap-2">
       <Button type="button" size="touch" variant="ghost" disabled={pending || suspended} onClick={reset}>{t('useDefault')}</Button>
@@ -73,8 +74,8 @@ function UseDefault({ member, actions, kind, suspended }: Pick<FormProps, 'membe
 function GiveForm({ member, actions, suspended, label, kind }: FormProps) {
   const t = useTranslations('app.org.members')
   const format = useFormatter()
-  const [give, setGive] = useState('')
-  const [requestId, setRequestId] = useState(() => crypto.randomUUID())
+  const [give, setGive] = useKeptState(`${member.userId}:${kind}:give:amount`, () => '')
+  const [requestId, setRequestId] = useKeptState(`${member.userId}:${kind}:give:id`, newRequestId)
   const { pending, outcome, run } = useConsoleAction()
   const value = Number(give)
   const valid = Number.isInteger(value) && value > 0
@@ -85,7 +86,7 @@ function GiveForm({ member, actions, suspended, label, kind }: FormProps) {
         event.preventDefault()
         if (pending || !valid || suspended) return
         const allocate = kind === 'paid' ? actions.allocate : actions.allocatePromo
-        run(() => allocate({ requestId, member: member.userId, credits: value }), t('given', { count: value }), () => { setRequestId(crypto.randomUUID()); setGive('') })
+        run(() => allocate({ requestId, member: member.userId, credits: value }), t('given', { count: value }), () => { setRequestId(newRequestId()); setGive('') })
       }}
     >
       <label className="grid gap-1 text-label">
@@ -103,7 +104,7 @@ function GiveForm({ member, actions, suspended, label, kind }: FormProps) {
 
 function RemoveControl({ member, actions, label }: Omit<RowProps, 'suspended'>) {
   const t = useTranslations('app.org.members')
-  const [requestId, setRequestId] = useState(() => crypto.randomUUID())
+  const [requestId, setRequestId] = useKeptState(`${member.userId}:remove:id`, newRequestId)
   const [open, setOpen] = useState(false)
   const { pending, outcome, run } = useConsoleAction()
   return (
@@ -121,7 +122,7 @@ function RemoveControl({ member, actions, label }: Omit<RowProps, 'suspended'>) 
         onConfirm={() => run(
           () => actions.removeMember({ requestId, member: member.userId }),
           t('removed'),
-          () => { setRequestId(crypto.randomUUID()); setOpen(false) },
+          () => { setRequestId(newRequestId()); setOpen(false) },
         )}
       />
     </div>
@@ -206,7 +207,10 @@ export function MembersPanel({ data, actions, initialOpen = null }: { data: Owne
   const t = useTranslations('app.org.members')
   const suspended = data.org.status === 'suspended'
   const selection = useMemberSelection(data.members, initialOpen)
+  // Request ids and typed amounts outlive the rows (filter, paging and selection mode unmount them).
+  const [kept] = useState<Kept>(createKept)
   return (
+    <KeptContext.Provider value={kept}>
     <Panel title={t('title')} hint={t('hint')}>
       <DefaultsForm data={data} actions={actions} />
       <BulkToolbar selection={selection} disabled={suspended} />
@@ -227,5 +231,6 @@ export function MembersPanel({ data, actions, initialOpen = null }: { data: Owne
       {data.memberTotal > data.members.length ? <p className="text-caption text-muted-foreground">{t('truncated', { shown: data.members.length, total: data.memberTotal })}</p> : null}
       {data.members.length <= 1 ? <p className="text-label text-muted-foreground">{t('inviteEmpty')}</p> : null}
     </Panel>
+    </KeptContext.Provider>
   )
 }
