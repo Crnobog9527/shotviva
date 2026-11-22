@@ -9,7 +9,8 @@ import { recordSignupIp } from '@/core/auth/signup-ip'
 import { claimSignupGift } from '@/core/auth/signup-gift-claim'
 import { markStaffSignup } from '@/core/auth/staff-signup'
 import { assertNotOrgMember } from '@/core/billing/org-member-guard'
-import { joinOrg, leaveOrg, removeOrgMember } from '@/core/org'
+import { staffNewUserCode } from '@/core/codes/staff-guard'
+import { adminUpdateOrg, joinOrg, leaveOrg, removeOrgMember } from '@/core/org'
 import { site } from '@/site/site.config'
 
 import { invite } from '../t94-config'
@@ -128,5 +129,30 @@ describe('personal checkout while an org member', () => {
     await expect(assertNotOrgMember(service, staff)).rejects.toMatchObject({ code: 'ORG_MEMBER_CHECKOUT' })
     await leaveOrg(rest, staff, `leave:${randomUUID()}`)
     await expect(assertNotOrgMember(service, staff)).resolves.toBeUndefined()
+  })
+
+  // Owner 2026-11-23: a member of a suspended org buys again; reactivated, it is refused again.
+  it('allows a member of a suspended org, refuses it again once the org is active', async () => {
+    const actor = await adminAccount(db, rest)
+    const { orgId, token } = await orgWith(db, rest, actor)
+    const staff = await member(db, rest, token)
+    await expect(assertNotOrgMember(service, staff)).rejects.toMatchObject({ code: 'ORG_MEMBER_CHECKOUT' })
+    await adminUpdateOrg(rest, actor, orgId, { status: 'suspended' })
+    await expect(assertNotOrgMember(service, staff)).resolves.toBeUndefined()
+    await adminUpdateOrg(rest, actor, orgId, { status: 'active' })
+    await expect(assertNotOrgMember(service, staff)).rejects.toMatchObject({ code: 'ORG_MEMBER_CHECKOUT' })
+  })
+})
+
+// Follow-up of #841: a staff-link sign-up gets no new-user code reward, also after leaving.
+describe('new-user codes for a staff-link sign-up', () => {
+  it('are refused (invite codes here; new_users_only campaign codes use the same lookup)', async () => {
+    const inviter = await createUser(db)
+    const { rows: [{ code }] } = await db.query<{ code: string }>('select public.get_or_create_invite_code($1) as code', [inviter])
+    const staff = await createUser(db)
+    expect(await markStaffSignup(service, staff)).toBe(true)
+    expect(await staffNewUserCode(service, staff, code)).toBe(true)
+    const other = await createUser(db)
+    expect(await staffNewUserCode(service, other, code)).toBe(false)
   })
 })
