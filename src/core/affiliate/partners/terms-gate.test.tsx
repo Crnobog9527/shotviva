@@ -8,7 +8,10 @@ vi.mock('@/core/auth', () => ({ getSessionUser: vi.fn() }))
 vi.mock('@/core/i18n/server', () => ({ localized: vi.fn() }))
 vi.mock('@/core/i18n/ui', () => ({ Link: () => null }))
 vi.mock('../feature', () => ({ isAffiliateEnabled: vi.fn() }))
-vi.mock('./terms', () => ({ publishedTerms: deps.published }))
+vi.mock('./terms', async () => {
+  const real = await vi.importActual<typeof import('./terms')>('./terms')
+  return { ...real, publishedTerms: deps.published }
+})
 vi.mock('./repository', () => ({ readSettings: deps.settings, readAccount: vi.fn() }))
 vi.mock('./commission-list', () => ({ CommissionList: () => null }))
 vi.mock('./settings-form', () => ({ SettingsForm: () => null }))
@@ -47,4 +50,8 @@ it('shows the dashboard once the current version is accepted', async () => {
 it('does not gate on a version whose text is not published', async () => {
   deps.published.mockResolvedValue(null)
   expect((await render({ ...base, terms_version: '2026-11-10', terms_accepted_at: '2026-11-10T00:00:00Z' })).type).toBe(Overview)
+})
+it('leaves a suspended account on its read-only view, since it cannot accept', async () => {
+  const element = await render({ ...base, status: 'suspended', terms_version: '2026-11-10', terms_accepted_at: '2026-11-10T00:00:00Z' })
+  expect(element.type).toBe(Overview)
 })
