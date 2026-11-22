@@ -4580,6 +4580,73 @@ $$;
 ALTER FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_partner_promo_bucket_left"("p_user" "uuid", "p_expires" timestamp with time zone) RETURNS TABLE("source" "text", "source_id" bigint, "credits_left" integer)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  e record;
+  v_src text[] := '{}';
+  v_id bigint[] := '{}';
+  v_left integer[] := '{}';
+  v_head integer := 1;
+  v_need bigint;
+  v_use integer;
+  v_start timestamptz;
+begin
+  select min(x.at) into v_start from (
+    select g.decided_at as at from public.partner_promo_grants g
+     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted'
+    union all
+    select t.created_at from public.partner_promo_topups t where t.recipient_user_id = p_user and t.expires_at = p_expires
+  ) x;
+  if v_start is null then return; end if;
+  for e in
+    with adds as (
+      select g.decided_at as at, 0 as ord, 'grant' as src, g.id, g.total as amount from public.partner_promo_grants g
+       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted'
+      union all
+      select t.created_at, 0, 'topup', t.id, t.credits from public.partner_promo_topups t
+       where t.recipient_user_id = p_user and t.expires_at = p_expires
+    ),
+    reserves as (
+      select r.created_at as at, r.id, r.idempotency_key, -r.delta as spent from public.credit_ledger r
+       where r.user_id = p_user and r.pool = 'free' and r.kind = 'reserve' and r.created_at >= v_start and r.created_at < p_expires
+    ),
+    refunds as (
+      select regexp_replace(f.idempotency_key, ':[^:]+$', ':reserve') as reserve_key, sum(f.delta) as back
+        from public.credit_ledger f
+       where f.user_id = p_user and f.pool = 'free' and f.kind = 'refund' and f.created_at >= v_start
+       group by 1
+    )
+    select a.at, a.ord, a.src, a.id, a.amount::bigint from adds a
+    union all
+    select r.at, 1, 'spend', r.id, greatest(0, r.spent - least(r.spent, coalesce(f.back, 0)))::bigint
+      from reserves r left join refunds f on f.reserve_key = r.idempotency_key
+    order by 1, 2, 4
+  loop
+    if e.src <> 'spend' then
+      v_src := v_src || e.src;
+      v_id := v_id || e.id;
+      v_left := v_left || e.amount::integer;
+    else
+      v_need := e.amount;
+      while v_need > 0 and v_head <= cardinality(v_left) loop
+        v_use := least(v_left[v_head], v_need)::integer;
+        v_left[v_head] := v_left[v_head] - v_use;
+        v_need := v_need - v_use;
+        if v_left[v_head] = 0 then v_head := v_head + 1; end if;
+      end loop;
+    end if;
+  end loop;
+  return query select u.s, u.i, u.l from unnest(v_src, v_id, v_left) as u(s, i, l);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."_partner_promo_bucket_left"("p_user" "uuid", "p_expires" timestamp with time zone) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_partner_promo_calc"("p_org" "uuid", "p_period" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -4748,8 +4815,11 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_expire"() RETURNS "jsonb"
     SET "search_path" TO ''
     AS $$
 declare
-  g public.partner_promo_grants;
-  v_left integer;
+  b record;
+  r record;
+  v_at timestamptz;
+  v_basis integer;
+  v_period text;
   v_free integer;
   v_take integer;
   v_key text;
@@ -4757,34 +4827,65 @@ declare
   v_taken bigint := 0;
   v_failed jsonb := '[]'::jsonb;
 begin
-  for g in select * from public.partner_promo_grants
-            where status = 'granted' and expires_at <= now() and (expired_at is null or expires_at > now() - interval '7 days')
-            order by id loop
+  for b in
+    select g.recipient_user_id as u, g.expires_at as e from public.partner_promo_grants g
+     where g.status = 'granted' and g.expires_at <= now() and (g.expired_at is null or g.expires_at > now() - interval '7 days')
+    union
+    select t.recipient_user_id, t.expires_at from public.partner_promo_topups t
+     where t.expires_at <= now() and (t.expired_at is null or t.expires_at > now() - interval '7 days')
+    order by 2, 1
+  loop
   begin
-    select * into g from public.partner_promo_grants where id = g.id for update;
-    select free_credits into v_free from public.profiles where id = g.recipient_user_id for update;
-    v_left := case when g.total > 0 then public._partner_promo_left(g) else 0 end;
-    v_take := least(coalesce(v_free, 0), greatest(0, v_left - coalesce(g.expired_basis, 0)))::integer;
-    v_key := 'partner_promo_expire:' || g.id || case when g.expired_at is null then '' else ':' || g.expired_basis end;
-    if v_take > 0 then
-      perform public._apply_credit_change(g.recipient_user_id, 'free', 'partner_promo_expire', -v_take,
-        'Channel partner promotion credits expired ' || g.period, v_key);
-    end if;
-    if g.expired_at is null or v_left > g.expired_basis then
-      update public.partner_promo_grants
-         set expired_at = coalesce(expired_at, now()), expired_credits = coalesce(expired_credits, 0) + v_take,
-             expired_basis = greatest(coalesce(expired_basis, 0), v_left)
-       where id = g.id;
-    end if;
-    if g.expired_at is null then v_expired := v_expired + 1; end if;
-    v_taken := v_taken + v_take;
+    perform from public.partner_promo_grants g
+     where g.recipient_user_id = b.u and g.expires_at = b.e and g.status = 'granted' order by g.id for update;
+    perform from public.partner_promo_topups t where t.recipient_user_id = b.u and t.expires_at = b.e order by t.id for update;
+    perform from public.profiles where id = b.u for update;
+    for r in select * from public._partner_promo_bucket_left(b.u, b.e) order by source, source_id loop
+      if r.source = 'grant' then
+        select g.expired_at, g.expired_basis, g.period into v_at, v_basis, v_period from public.partner_promo_grants g where g.id = r.source_id;
+      else
+        select t.expired_at, t.expired_basis, t.period into v_at, v_basis, v_period from public.partner_promo_topups t where t.id = r.source_id;
+      end if;
+      continue when v_at is not null and b.e <= now() - interval '7 days';
+      select free_credits into v_free from public.profiles where id = b.u;
+      v_take := least(coalesce(v_free, 0), greatest(0, r.credits_left - coalesce(v_basis, 0)))::integer;
+      v_key := case when r.source = 'grant' then 'partner_promo_expire:' else 'partner_promo_topup_expire:' end
+        || r.source_id || case when v_at is null then '' else ':' || v_basis end;
+      if v_take > 0 then
+        perform public._apply_credit_change(b.u, 'free', 'partner_promo_expire', -v_take,
+          case when r.source = 'grant' then 'Channel partner promotion credits expired ' else 'Channel partner promotion top-up expired ' end
+            || v_period, v_key);
+      end if;
+      if v_at is null or r.credits_left > v_basis then
+        if r.source = 'grant' then
+          update public.partner_promo_grants
+             set expired_at = coalesce(expired_at, now()), expired_credits = coalesce(expired_credits, 0) + v_take,
+                 expired_basis = greatest(coalesce(expired_basis, 0), r.credits_left)
+           where id = r.source_id;
+        else
+          update public.partner_promo_topups
+             set expired_at = coalesce(expired_at, now()), expired_credits = coalesce(expired_credits, 0) + v_take,
+                 expired_basis = greatest(coalesce(expired_basis, 0), r.credits_left)
+           where id = r.source_id;
+        end if;
+      end if;
+      if v_at is null then v_expired := v_expired + 1; end if;
+      v_taken := v_taken + v_take;
+    end loop;
   exception when others then
-    v_failed := v_failed || jsonb_build_array(jsonb_build_object('grant_id', g.id, 'error', sqlerrm));
+    v_failed := v_failed
+      || coalesce((select jsonb_agg(jsonb_build_object('grant_id', g.id, 'error', sqlerrm) order by g.id) from public.partner_promo_grants g
+                    where g.recipient_user_id = b.u and g.expires_at = b.e and g.status = 'granted'), '[]'::jsonb)
+      || coalesce((select jsonb_agg(jsonb_build_object('grant_id', 0, 'topup_id', t.id, 'error', sqlerrm) order by t.id)
+                    from public.partner_promo_topups t
+                    where t.recipient_user_id = b.u and t.expires_at = b.e), '[]'::jsonb);
   end;
   end loop;
   return jsonb_build_object('expired', v_expired, 'taken', v_taken, 'failed', v_failed,
     'overdue', (select count(*) from public.partner_promo_grants
-                 where status = 'granted' and expired_at is null and expires_at <= now() - interval '1 hour')::integer);
+                 where status = 'granted' and expired_at is null and expires_at <= now() - interval '1 hour')::integer
+             + (select count(*) from public.partner_promo_topups
+                 where expired_at is null and expires_at <= now() - interval '1 hour')::integer);
 end;
 $$;
 
@@ -4795,21 +4896,10 @@ ALTER FUNCTION "public"."_partner_promo_expire"() OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."_partner_promo_left"("g" "public"."partner_promo_grants") RETURNS integer
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
-    AS $_$
-  with reserves as (
-    select r.idempotency_key, -r.delta as spent from public.credit_ledger r
-     where r.user_id = g.recipient_user_id and r.pool = 'free' and r.kind = 'reserve'
-       and r.created_at >= g.decided_at and r.created_at < g.expires_at
-  ),
-  refunds as (
-    select regexp_replace(f.idempotency_key, ':[^:]+$', ':reserve') as reserve_key, sum(f.delta) as back
-      from public.credit_ledger f
-     where f.user_id = g.recipient_user_id and f.pool = 'free' and f.kind = 'refund' and f.created_at >= g.decided_at
-     group by 1
-  )
-  select greatest(0, g.total - coalesce(sum(greatest(0, r.spent - least(r.spent, coalesce(f.back, 0)))), 0))::integer
-    from reserves r left join refunds f on f.reserve_key = r.idempotency_key;
-$_$;
+    AS $$
+  select coalesce((select b.credits_left from public._partner_promo_bucket_left(g.recipient_user_id, g.expires_at) b
+                    where b.source = 'grant' and b.source_id = g.id), 0);
+$$;
 
 
 ALTER FUNCTION "public"."_partner_promo_left"("g" "public"."partner_promo_grants") OWNER TO "postgres";
@@ -9524,6 +9614,65 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_partner_promo_set"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_partner_promo_topup"("p_actor" "uuid", "p_input" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_uuid constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+  v_reason text := btrim(p_input->>'reason');
+  v_credits integer;
+  v_key uuid;
+  v_month date := date_trunc('month', now() at time zone 'UTC')::date;
+  v_period text;
+  o public.orgs;
+  t public.partner_promo_topups;
+begin
+  perform public._org_require_admin(p_actor);
+  if jsonb_typeof(p_input) is distinct from 'object'
+     or coalesce(lower(p_input->>'org_id'), '') !~ v_uuid or coalesce(lower(p_input->>'request_key'), '') !~ v_uuid
+     or coalesce(lower(p_input->>'recipient'), '') !~ v_uuid
+     or coalesce(p_input->>'period', '') !~ '^[0-9]{4}-(0[1-9]|1[0-2])$'
+     or coalesce(p_input->>'credits', '') !~ '^[1-9][0-9]{0,5}$'
+     or v_reason is null or v_reason = '' or length(v_reason) > 500 then
+    raise exception 'INVALID_INPUT';
+  end if;
+  v_credits := (p_input->>'credits')::integer;
+  if v_credits > 100000 then raise exception 'INVALID_INPUT'; end if;
+  v_key := (p_input->>'request_key')::uuid;
+  v_period := to_char(v_month, 'YYYY-MM');
+
+  -- The org row serialises top-ups (and the monthly run and confirms) of one partner, so a second
+  -- submit with the same key waits here and then finds the first one's row.
+  select * into o from public.orgs where id = (p_input->>'org_id')::uuid for no key update;
+  if not found then raise exception 'ORG_NOT_FOUND'; end if;
+  select * into t from public.partner_promo_topups where request_key = v_key;
+  if found then
+    if t.org_id <> o.id then raise exception 'IDEMPOTENCY_CONFLICT'; end if;
+    return jsonb_build_object('applied', false, 'reason', 'already', 'topup_id', t.id, 'credits', t.credits);
+  end if;
+  if not o.promo_partner or o.status <> 'active' then raise exception 'PROMO_PARTNER_OFF'; end if;
+  if (p_input->>'recipient')::uuid <> o.owner_user_id or p_input->>'period' <> v_period then
+    return jsonb_build_object('applied', false, 'reason', 'changed');
+  end if;
+
+  insert into public.partner_promo_topups(org_id, period, recipient_user_id, credits, reason, request_key, created_by, expires_at)
+    values (o.id, v_period, o.owner_user_id, v_credits, v_reason, v_key, p_actor,
+      (v_month + interval '1 month')::timestamp at time zone 'UTC')
+  returning * into t;
+  perform public._apply_credit_change(t.recipient_user_id, 'free', 'partner_promo_topup', t.credits,
+    'Channel partner promotion top-up ' || t.period, 'partner_promo_topup:' || t.id);
+  perform public._org_audit(p_actor, 'partner_promo_topup', t.id::text,
+    jsonb_build_object('org_id', t.org_id, 'period', t.period, 'recipient', t.recipient_user_id,
+      'credits', t.credits, 'reason', t.reason, 'request_key', t.request_key)::text);
+  return jsonb_build_object('applied', true, 'topup_id', t.id, 'credits', t.credits, 'expires_at', t.expires_at);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_partner_promo_topup"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_payment_fee_schedule_save"("p_actor" "uuid", "p_input" "jsonb") RETURNS bigint
@@ -19209,7 +19358,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text", 'partner_promo_set'::"text", 'partner_promo_confirm'::"text", 'partner_promo_reject'::"text", 'partner_promo_run'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text", 'partner_promo_set'::"text", 'partner_promo_confirm'::"text", 'partner_promo_reject'::"text", 'partner_promo_run'::"text", 'partner_promo_topup'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -19631,7 +19780,7 @@ CREATE TABLE IF NOT EXISTS "public"."credit_ledger" (
     "payment_id" bigint,
     CONSTRAINT "credit_ledger_balance_after_check" CHECK (("balance_after" >= 0)),
     CONSTRAINT "credit_ledger_delta_check" CHECK (("delta" <> 0)),
-    CONSTRAINT "credit_ledger_kind_check" CHECK (("kind" = ANY (ARRAY['grant'::"text", 'reserve'::"text", 'refund'::"text", 'purchase'::"text", 'admin_adjust'::"text", 'clawback'::"text", 'clawback_restore'::"text", 'code_grant'::"text", 'invite_reward'::"text", 'org_allocate'::"text", 'org_reclaim'::"text", 'org_deposit'::"text", 'org_signup_bonus'::"text", 'partner_promo'::"text", 'partner_promo_expire'::"text"]))),
+    CONSTRAINT "credit_ledger_kind_check" CHECK (("kind" = ANY (ARRAY['grant'::"text", 'reserve'::"text", 'refund'::"text", 'purchase'::"text", 'admin_adjust'::"text", 'clawback'::"text", 'clawback_restore'::"text", 'code_grant'::"text", 'invite_reward'::"text", 'org_allocate'::"text", 'org_reclaim'::"text", 'org_deposit'::"text", 'org_signup_bonus'::"text", 'partner_promo'::"text", 'partner_promo_expire'::"text", 'partner_promo_topup'::"text"]))),
     CONSTRAINT "credit_ledger_pool_check" CHECK (("pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
     CONSTRAINT "credit_ledger_reason_check" CHECK (("length"("reason") > 0))
 );
@@ -20072,6 +20221,42 @@ ALTER TABLE "public"."partner_promo_grant_lines" OWNER TO "postgres";
 
 ALTER TABLE "public"."partner_promo_grants" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "public"."partner_promo_grants_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."partner_promo_topups" (
+    "id" bigint NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "period" "text" NOT NULL,
+    "recipient_user_id" "uuid" NOT NULL,
+    "credits" integer NOT NULL,
+    "reason" "text" NOT NULL,
+    "request_key" "uuid" NOT NULL,
+    "created_by" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "expires_at" timestamp with time zone NOT NULL,
+    "expired_at" timestamp with time zone,
+    "expired_credits" integer,
+    "expired_basis" integer,
+    CONSTRAINT "partner_promo_topups_credits_check" CHECK ((("credits" >= 1) AND ("credits" <= 100000))),
+    CONSTRAINT "partner_promo_topups_expired_basis_check" CHECK (("expired_basis" >= 0)),
+    CONSTRAINT "partner_promo_topups_expired_credits_check" CHECK (("expired_credits" >= 0)),
+    CONSTRAINT "partner_promo_topups_period_check" CHECK (("period" ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'::"text")),
+    CONSTRAINT "partner_promo_topups_reason_check" CHECK ((("length"("btrim"("reason")) >= 1) AND ("length"("btrim"("reason")) <= 500)))
+);
+
+
+ALTER TABLE "public"."partner_promo_topups" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."partner_promo_topups" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."partner_promo_topups_id_seq"
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -21259,6 +21444,16 @@ ALTER TABLE ONLY "public"."partner_promo_grants"
 
 
 
+ALTER TABLE ONLY "public"."partner_promo_topups"
+    ADD CONSTRAINT "partner_promo_topups_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."partner_promo_topups"
+    ADD CONSTRAINT "partner_promo_topups_request_key_key" UNIQUE ("request_key");
+
+
+
 ALTER TABLE ONLY "public"."payment_dispute_link_errors"
     ADD CONSTRAINT "payment_dispute_link_errors_pkey" PRIMARY KEY ("payment_id");
 
@@ -22077,6 +22272,18 @@ CREATE INDEX "partner_promo_grants_list_idx" ON "public"."partner_promo_grants" 
 
 
 CREATE INDEX "partner_promo_grants_pending_idx" ON "public"."partner_promo_grants" USING "btree" ("created_at") WHERE ("status" = 'pending'::"text");
+
+
+
+CREATE INDEX "partner_promo_topups_bucket_idx" ON "public"."partner_promo_topups" USING "btree" ("recipient_user_id", "expires_at");
+
+
+
+CREATE INDEX "partner_promo_topups_expiry_idx" ON "public"."partner_promo_topups" USING "btree" ("expires_at");
+
+
+
+CREATE INDEX "partner_promo_topups_list_idx" ON "public"."partner_promo_topups" USING "btree" ("period" DESC, "id" DESC);
 
 
 
@@ -23303,6 +23510,21 @@ ALTER TABLE ONLY "public"."partner_promo_grants"
 
 
 
+ALTER TABLE ONLY "public"."partner_promo_topups"
+    ADD CONSTRAINT "partner_promo_topups_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."partner_promo_topups"
+    ADD CONSTRAINT "partner_promo_topups_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
+
+
+
+ALTER TABLE ONLY "public"."partner_promo_topups"
+    ADD CONSTRAINT "partner_promo_topups_recipient_user_id_fkey" FOREIGN KEY ("recipient_user_id") REFERENCES "public"."profiles"("id");
+
+
+
 ALTER TABLE ONLY "public"."payment_dispute_link_errors"
     ADD CONSTRAINT "payment_dispute_link_errors_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "public"."payments"("id") ON DELETE CASCADE;
 
@@ -23946,6 +24168,9 @@ ALTER TABLE "public"."partner_promo_grant_lines" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."partner_promo_grants" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."partner_promo_topups" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."payment_dispute_link_errors" ENABLE ROW LEVEL SECURITY;
@@ -25026,6 +25251,10 @@ REVOKE ALL ON FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") FROM P
 
 
 
+REVOKE ALL ON FUNCTION "public"."_partner_promo_bucket_left"("p_user" "uuid", "p_expires" timestamp with time zone) FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_partner_promo_calc"("p_org" "uuid", "p_period" "text") FROM PUBLIC;
 
 
@@ -25665,6 +25894,11 @@ GRANT ALL ON FUNCTION "public"."admin_partner_promo_run"("p_actor" "uuid") TO "s
 
 REVOKE ALL ON FUNCTION "public"."admin_partner_promo_set"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_partner_promo_set"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_partner_promo_topup"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_partner_promo_topup"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
 
 
@@ -27352,6 +27586,16 @@ GRANT SELECT ON TABLE "public"."partner_promo_grant_lines" TO "service_role";
 GRANT UPDATE ON SEQUENCE "public"."partner_promo_grants_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."partner_promo_grants_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."partner_promo_grants_id_seq" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."partner_promo_topups" TO "service_role";
+
+
+
+GRANT UPDATE ON SEQUENCE "public"."partner_promo_topups_id_seq" TO "anon";
+GRANT UPDATE ON SEQUENCE "public"."partner_promo_topups_id_seq" TO "authenticated";
+GRANT UPDATE ON SEQUENCE "public"."partner_promo_topups_id_seq" TO "service_role";
 
 
 
