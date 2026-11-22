@@ -12,13 +12,10 @@ import { BulkSheet } from './bulk-sheet'
 import type { MemberSelection } from './member-selection'
 import { FIELD } from './parts'
 
-// Above the member list: enter / leave selection mode; while selecting, a search, a joined-from
-// date and select-all (of what the filter shows).
+// Above the member list: a search and a joined-from date that are always there, and the button
+// that enters selection mode (while selecting, select-all of what the filter shows).
 export function BulkToolbar({ selection, disabled }: { selection: MemberSelection; disabled: boolean }) {
   const t = useTranslations('app.org.bulk')
-  if (!selection.selecting) {
-    return <Button type="button" size="touch" variant="glass" disabled={disabled} onClick={selection.start}>{t('select')}</Button>
-  }
   return (
     <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-end">
       <label className="grid gap-1 text-label">
@@ -29,10 +26,14 @@ export function BulkToolbar({ selection, disabled }: { selection: MemberSelectio
         <span className="font-medium">{t('joinedFrom')}</span>
         <input className={FIELD} type="date" value={selection.filter.joinedFrom} onChange={(e) => selection.setFilter({ joinedFrom: e.target.value })} />
       </label>
-      <label className="flex min-h-11 items-center gap-2 text-label">
-        <Checkbox checked={selection.allShown} onCheckedChange={selection.toggleAll} aria-label={t('selectAll')} />
-        {t('selectAll')}
-      </label>
+      {selection.selecting ? (
+        <label className="flex min-h-11 items-center gap-2 text-label">
+          <Checkbox checked={selection.allShown} onCheckedChange={selection.toggleAll} aria-label={t('selectAll')} />
+          {t('selectAll')}
+        </label>
+      ) : (
+        <Button type="button" size="touch" variant="glass" disabled={disabled} onClick={selection.start}>{t('select')}</Button>
+      )}
     </div>
   )
 }
