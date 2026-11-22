@@ -1,3 +1,4 @@
+import { spendableBalance } from '@/core/org'
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -25,7 +26,7 @@ export async function loadAgainContext(deps: Deps, req: { userId: string; jobId:
   if (!found) return null
   const template = toCatalogueTemplate(found)
   const [balance, limits, runningIds, again] = await Promise.all([
-    readBalance(deps.db, req.userId),
+    readBalance(deps.db, req.userId).then((own) => spendableBalance(deps.admin, req.userId, own)),
     // effective_limits() (tier, an unbanned admin as Max, plus the org lift) is service-role only; the user's own id comes from the session.
     effectiveLimits(deps.admin, req.userId),
     listRunningJobIds(deps.admin, req.userId, new Date()),

@@ -30,11 +30,13 @@ const DEBOUNCE_MS = 300
 // Type 2+ characters, pick a registered account. Accounts that cannot take the role are listed
 // with the reason and cannot be clicked. The caller keeps its own exact input; this only helps
 // to find the account.
-export function UserPicker({ search, orgId, onPick, label = COPY.pickerLabel }: {
+export function UserPicker({ search, orgId, onPick, label = COPY.pickerLabel, blocked = blockedReason }: {
   search: SearchUsers
   orgId: string | null
   onPick: (user: PickerUser) => void
   label?: string
+  // Why a row cannot be picked (null = pickable). Defaults to the add-member / new-org rules.
+  blocked?: (user: PickerUser) => string | null
 }) {
   const [query, setQuery] = useState('')
   const [users, setUsers] = useState<PickerUser[] | null>(null)
@@ -64,24 +66,25 @@ export function UserPicker({ search, orgId, onPick, label = COPY.pickerLabel }: 
         <span className="font-medium">{label}</span>
         <Input value={query} maxLength={200} placeholder={COPY.pickerPlaceholder} autoComplete="off" onChange={(e) => setQuery(e.target.value)} />
       </label>
-      <Results enough={enough} state={state} users={users} label={label} onPick={onPick} />
+      <Results enough={enough} state={state} users={users} label={label} onPick={onPick} blocked={blocked} />
     </div>
   )
 }
 
-function Results({ enough, state, users, label, onPick }: {
+function Results({ enough, state, users, label, onPick, blocked }: {
   enough: boolean
   state: 'idle' | 'loading' | 'failed'
   users: PickerUser[] | null
   label: string
   onPick: (user: PickerUser) => void
+  blocked: (user: PickerUser) => string | null
 }) {
   return (
     <div aria-live="polite" className="grid gap-1">
       <Status enough={enough} state={state} empty={users?.length === 0} />
       {enough && users && users.length > 0 ? (
         <ul className="grid gap-1" aria-label={label}>
-          {users.map((user) => <PickerRow key={user.id} user={user} onPick={() => onPick(user)} />)}
+          {users.map((user) => <PickerRow key={user.id} user={user} reason={blocked(user)} onPick={() => onPick(user)} />)}
           {users.length >= PICKER_LIMIT ? <li className="text-xs text-muted-foreground">{COPY.pickerMore(PICKER_LIMIT)}</li> : null}
         </ul>
       ) : null}
@@ -96,8 +99,7 @@ function Status({ enough, state, empty }: { enough: boolean; state: 'idle' | 'lo
   return empty ? <p className="text-xs text-muted-foreground">{COPY.pickerNone}</p> : null
 }
 
-function PickerRow({ user, onPick }: { user: PickerUser; onPick: () => void }) {
-  const blocked = blockedReason(user)
+function PickerRow({ user, reason: blocked, onPick }: { user: PickerUser; reason: string | null; onPick: () => void }) {
   return (
     <li>
       <button

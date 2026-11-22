@@ -6,6 +6,7 @@ describe('checkout answer', () => {
   it('goes to the checkout URL, or says a subscription is already running (409)', () => {
     expect(readAnswer(200, { url: 'https://checkout.stripe.test/c/1' })).toEqual({ kind: 'url', url: 'https://checkout.stripe.test/c/1' })
     expect(readAnswer(409, { code: 'DOWNGRADE_NOT_ALLOWED', message: 'x' })).toEqual({ kind: 'refused' })
+    expect(readAnswer(409, { code: 'ORG_MEMBER_CHECKOUT', message: 'x' })).toEqual({ kind: 'org_member' })
   })
 
   it('throws (generic error) on anything else', () => {

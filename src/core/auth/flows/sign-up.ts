@@ -8,6 +8,7 @@ import { currentOrigin } from '../../request-origin'
 import { nextIn } from '../redirect-target'
 import { clientIp } from '../signup-ip'
 import { requestSignup } from '../signup-request'
+import { staffSignupData } from '../staff-signup'
 import { createAdminSupabase } from '../supabase-admin'
 import { createSessionSupabase } from '../supabase-server'
 import { classifyAuthError } from './classify-auth-error'
@@ -34,10 +35,14 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   const locale = await currentLocale()
   // user_metadata.locale picks the language of every auth email this account gets
   // (ARCHITECTURE §7: `{{ if eq .Data.locale "zh" }}` in supabase/templates/*.html).
+  // A sign-up through an org's staff link remembers it (token and org), so a confirmation resent
+  // from the ordinary login page, or one after the org reset its link, is still a staff sign-up
+  // (no signup gift, 1940/1950).
+  const data = { locale, ...(await staffSignupData(createAdminSupabase(), next)) }
   const { error } = await supabase.auth.signUp({
     email,
     password,
-    options: { captchaToken, data: { locale }, emailRedirectTo: confirmUrl(nextIn(next, locale), await currentOrigin()) },
+    options: { captchaToken, data, emailRedirectTo: confirmUrl(nextIn(next, locale), await currentOrigin()) },
   })
   if (error && !REGISTERED.has(error.code ?? '')) {
     const code = classifyAuthError(error)

@@ -40,6 +40,7 @@ export function PhoneSignIn({ actions, next, submitLabel }: Props) {
     <>
       <LastError form={send} />
       <form method="post" onSubmit={send.onSubmit} noValidate className="au-form au-form-gap">
+        <input type="hidden" name="next" value={next} />
         <SignupCodeHiddenInput />
         <PhoneField form={send} value={phone} onChange={setPhone} />
         <ConsentCheck form={send} />
@@ -91,7 +92,7 @@ function PhoneCode({ phone, actions, next, submitLabel, onBack }: CodeProps) {
         <SubmitButton pending={verify.pending}>{submitLabel}</SubmitButton>
         <FormStatus form={verify} />
       </form>
-      <ResendCode phone={e164} send={actions.send} />
+      <ResendCode phone={e164} next={next} send={actions.send} />
       <button type="button" className="au-btn au-quiet au-change" onClick={onBack}>
         {t('code.change')}
       </button>
@@ -100,7 +101,7 @@ function PhoneCode({ phone, actions, next, submitLabel, onBack }: CodeProps) {
 }
 
 // 「重新获取验证码」, with the same 60-second wait the server enforces (sms_request_send).
-function ResendCode({ phone, send }: { phone: string; send: FormAction }) {
+function ResendCode({ phone, next, send }: { phone: string; next: string; send: FormAction }) {
   const t = useTranslations('auth')
   const resend = useAuthForm(send, { captcha: true })
   const cooldown = useCooldown()
@@ -115,6 +116,7 @@ function ResendCode({ phone, send }: { phone: string; send: FormAction }) {
   return (
     <form method="post" onSubmit={resend.onSubmit} className="au-acts">
       <input type="hidden" name="phone" value={phone} />
+      <input type="hidden" name="next" value={next} />
       <input type="hidden" name="consent" value="on" />
       <LastError form={resend} />
       <button type="submit" className="au-btn au-ghost" disabled={resend.pending || waiting}>

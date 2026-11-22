@@ -331,9 +331,10 @@ describe('refunds give the org share back', () => {
     for (let i = 0; i < 4; i++) await fail(await reserve(userId))
     expect(await creditsOf(db, userId)).toBe(110)
     expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 100 })
-    // A succeeded job keeps its draw: own 10 first, then the org's.
+    // A succeeded job keeps its draw: a member's job is paid from the org's share (1897), own 10 untouched.
     await reserve(userId)
-    expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: Math.min(100, 110 - cost) })
+    expect(await memberRow(db, orgId, userId)).toMatchObject({ held_credits: 100 - cost })
+    expect(await creditsOf(db, userId)).toBe(110 - cost)
   })
 
   it('maps a poster photo refund to its reserve', async () => {

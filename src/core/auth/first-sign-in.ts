@@ -14,6 +14,7 @@ import { billingGrant, grantSignupCredits } from './free-credits'
 import { consumeSignupCode, type SignupBenefits } from './signup-code'
 import { claimQuietly } from './signup-gift-claim'
 import { clientIp, recordSignupIp } from './signup-ip'
+import { staffSignup, type StaffOrigin } from './staff-signup'
 import { createAdminSupabase } from './supabase-admin'
 
 export type SignInMethod = 'email' | 'google' | 'phone'
@@ -48,26 +49,47 @@ async function bindSignupReferral(userId: string, first: boolean, cookie: string
   if (first) await bindReferral(userId, cookie, 'signup')
 }
 
+// The signup gift (0 for a staff sign-up). 1480: an account over the per-network allowance is
+// pending; a confirmed phone or a linked Google account pays it now (a phone or Google sign-up,
+// or a Google account just linked).
+async function payGift(admin: ReturnType<typeof createAdminSupabase>, userId: string, gift: number) {
+  const granted = await grantSignupCredits(billingGrant(admin), userId, gift)
+  const claimed = !granted && gift > 0 && (await claimQuietly(admin, userId))
+  return { granted, claimed }
+}
+
+// An unchecked staff link (the org lookup failed) leaves the IP for the next sign-in to store, so
+// that one is still the account's first for mark_staff_signup (1950).
+async function recordIpUnlessUnchecked(admin: ReturnType<typeof createAdminSupabase>, userId: string, address: string | null, staff: boolean | 'unchecked') {
+  return staff !== 'unchecked' && (await recordSignupIp(admin, userId, address))
+}
+
 export async function onVerifiedSignIn(
   userId: string,
   benefits: SignupBenefits,
   method: SignInMethod,
   locale: Locale,
+  // The staff link this sign-up came from (core/auth/staff-signup staffOriginFor), if any.
+  staffOrigin?: StaffOrigin | null,
 ): Promise<void> {
   const admin = createAdminSupabase()
   const address = clientIp(await headers())
-  const ipStored = await recordSignupIp(admin, userId, address)
-  const granted = await grantSignupCredits(billingGrant(admin), userId, benefits.freeCredits)
-  // 1480: an account over the per-network allowance is pending; a confirmed phone or a linked
-  // Google account pays it now (a phone or Google sign-up, or a Google account just linked).
-  const claimed = !granted && benefits.freeCredits > 0 && (await claimQuietly(admin, userId))
+  // An org's staff link (next = /join/org/<token>, or the origin stored at sign-up) on a new account signs up a staff account: no
+  // free credits, now or later (the stored refusal 'staff' stops every retry and claim,
+  // 1940/1950), and no signup code or partner binding. Before the signup IP is stored (the SQL
+  // reads "no IP yet" as the first verified sign-in) and before the grant, so it refuses.
+  const staff = await staffSignup(admin, userId, staffOrigin ?? null)
+  const ipStored = await recordIpUnlessUnchecked(admin, userId, address, staff)
+  const { granted, claimed } = await payGift(admin, userId, staff ? 0 : benefits.freeCredits)
   const first = address ? ipStored : granted
   if (claimed && !first) noteSignupGift()
   const jar = await cookies()
   // A personal partner's link (sv_ref) binds before the signup code is redeemed: an org member's
   // invite code binds the customer to the org only when nobody else already has (§6.5).
-  await bindSignupReferral(userId, first, jar.get('sv_ref')?.value)
-  const kind = await consumeSignupCode(admin, userId, first, benefits.invite, locale)
+  // A staff sign-up skips both; the code cookie is still cleared.
+  const fresh = first && !staff
+  await bindSignupReferral(userId, fresh, jar.get('sv_ref')?.value)
+  const kind = await consumeSignupCode(admin, userId, fresh, benefits.invite, locale)
   // A/B variants onto the account, and the account's back into the cookie (ARCHITECTURE §16.5).
   const experiments = await syncExperimentsAtSignIn(admin, userId, first, jar, isSecure(await headers()))
   // Where this browser first landed, onto the account once (ARCHITECTURE §16.6).

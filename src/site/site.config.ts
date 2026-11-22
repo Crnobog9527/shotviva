@@ -67,6 +67,7 @@ export const site = defineSite({
       // The enterprise owner's console (ARCHITECTURE §6.5, card E4), so Chinese owners reach it.
       '/account/enterprise',
       '/account/enterprise/purchasing',
+      '/account/enterprise/works',
       // An org's staff invite link (card E4); its links are built with /zh (ENTERPRISE_LINK_LOCALE).
       '/join/org/[token]',
       '/wishlist',

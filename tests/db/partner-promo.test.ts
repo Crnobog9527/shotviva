@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 import { row, sale } from './affiliate-fixtures'
 import { connectAdmin, createUser } from './helpers'
 import {
-  adminActor, confirm, confirmedSale, customer, decide, fiveCustomers, freeOf, months, partner, refused, run, sheet,
+  adminActor, confirm, confirmedSale, customer, decide, fiveCustomers, freeOf, months, partner, promoPoolOf, refused, run, sheet,
 } from './partner-promo-fixtures'
 
 // Channel partner promotion grants: how a month's sheet is computed (ARCHITECTURE §6.5 渠道商推广积分,
@@ -30,14 +30,16 @@ it("grants the Owner's example: 300,000 confirmed level-1 credits give 30,000 + 
   expect(s).toMatchObject({ status: 'pending', recipient_user_id: owner, base: 10000, bonus: 30000, raw_credits: 300000,
     counted_credits: 300000, customers: 5, capped_customers: 0, clawback_owed: 0, total: 40000 })
   expect(s.detail.per).toHaveLength(5)
-  const before = await freeOf(db, owner)
+  const before = await promoPoolOf(db, orgId)
   expect(await confirm(db, actor, s)).toMatchObject({ applied: true, total: 40000 })
-  expect(await freeOf(db, owner)).toBe(before + 40000)
-  expect(await row(db, "select pool,kind,delta from credit_ledger where idempotency_key=$1", ['partner_promo:' + s.id]))
-    .toEqual({ pool: 'free', kind: 'partner_promo', delta: 40000 })
+  expect(await promoPoolOf(db, orgId)).toBe(before + 40000)
+  expect(await row(db, "select kind,delta::int from org_credit_ledger where request_id=$1", ['partner_promo:' + s.id]))
+    .toEqual({ kind: 'promo_grant', delta: 40000 })
+  expect(await freeOf(db, owner)).toBe(0) // never the owner's own account any more
+  expect(await row(db, 'select destination from partner_promo_grants where id=$1', [s.id])).toEqual({ destination: 'org' })
   const audit = await row(db, "select user_id,reason from admin_audit_log where action='partner_promo_confirm' and target_id=$1", [s.id])
   expect(audit.user_id).toBe(actor)
-  expect(JSON.parse(audit.reason)).toMatchObject({ org_id: orgId, period: m.current, total: 40000, recipient: owner })
+  expect(JSON.parse(audit.reason)).toMatchObject({ org_id: orgId, period: m.current, total: 40000, destination: 'org' })
 })
 
 it('counts one large customer in full: no per-customer cap (the Owner 2026-11-22)', async () => {
@@ -103,13 +105,13 @@ it('keeps one sheet per partner and month however often it runs; a double confir
   expect(await sheet(db, orgId, m.current)).toMatchObject({ id: s.id, fingerprint: s.fingerprint, total: 20000 })
   expect(await row(db, 'select count(*)::int n from partner_promo_grants where org_id=$1', [orgId])).toEqual({ n: 1 })
 
-  const before = await freeOf(db, owner)
+  const before = await promoPoolOf(db, orgId)
   expect(await confirm(db, actor, s)).toMatchObject({ applied: true })
   expect(await confirm(db, actor, s)).toMatchObject({ applied: false, reason: 'already' })
   // A run after the confirm leaves the frozen sheet alone.
   expect(await run(db, m.current)).toMatchObject({ sheets: 0 })
-  expect(await freeOf(db, owner)).toBe(before + 20000)
-  expect(await row(db, "select count(*)::int n from credit_ledger where kind='partner_promo' and user_id=$1", [owner])).toEqual({ n: 1 })
+  expect(await promoPoolOf(db, orgId)).toBe(before + 20000)
+  expect(await row(db, "select count(*)::int n from org_credit_ledger where kind='promo_grant' and org_id=$1", [orgId])).toEqual({ n: 1 })
   expect(await row(db, "select count(*)::int n from admin_audit_log where action='partner_promo_confirm' and target_id=$1", [s.id])).toEqual({ n: 1 })
   await refused(db, () => decide(db, actor, { grant_id: s.id, decision: 'reject', note: 'late' }), 'PROMO_GRANT_DECIDED')
 })
@@ -120,9 +122,9 @@ it('refuses a stale page: data changed since the sheet was shown → recomputed,
   await run(db, m.current)
   const shown = await sheet(db, orgId, m.current)
   await confirmedSale(db, await customer(db, owner), 20000, m.in_previous)
-  const before = await freeOf(db, owner)
+  const before = await promoPoolOf(db, orgId)
   expect(await confirm(db, actor, shown)).toMatchObject({ applied: false, reason: 'changed', total: 22000 })
-  expect(await freeOf(db, owner)).toBe(before)
+  expect(await promoPoolOf(db, orgId)).toBe(before)
   const fresh = await sheet(db, orgId, m.current)
   expect(fresh).toMatchObject({ status: 'pending', total: 22000, customers: 6 })
   expect(fresh.fingerprint).not.toBe(shown.fingerprint)
@@ -132,7 +134,7 @@ it('refuses a stale page: data changed since the sheet was shown → recomputed,
 })
 
 it('rejects with a note, refuses non-admins, bad input and partners without an affiliate account', async () => {
-  const { orgId, owner } = await partner(db, actor)
+  const { orgId } = await partner(db, actor)
   await run(db, m.current)
   const s = await sheet(db, orgId, m.current)
   expect(s).toMatchObject({ customers: 0, bonus: 0, total: 10000 })
@@ -142,7 +144,7 @@ it('rejects with a note, refuses non-admins, bad input and partners without an a
   expect(await decide(db, actor, { grant_id: s.id, decision: 'reject', note: 'wrong partner' })).toMatchObject({ applied: true })
   expect(await decide(db, actor, { grant_id: s.id, decision: 'reject', note: 'again' })).toMatchObject({ applied: false, reason: 'already' })
   await refused(db, () => confirm(db, actor, s), 'PROMO_GRANT_DECIDED')
-  expect(await freeOf(db, owner)).toBe(0)
+  expect(await promoPoolOf(db, orgId)).toBe(0)
 
   const plain = await createUser(db)
   const noAffiliate = (await row(db, 'select admin_org_create($1,$2) as id', [actor, { owner_user_id: plain, name: 'Plain org' }])).id

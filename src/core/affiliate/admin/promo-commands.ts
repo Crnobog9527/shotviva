@@ -45,6 +45,7 @@ const voidRefusals: Record<string, string> = {
   PROMO_GRANT_NOT_GRANTED: P.answers.notGranted,
   PROMO_GRANT_EXPIRED: P.answers.voidExpired,
   PROMO_GRANT_CLAWED: P.answers.voidClawed,
+  PROMO_GRANT_IN_ORG_POOL: P.answers.voidOrgPool,
   PROMO_GRANT_NOT_FOUND: P.answers.invalid,
   INVALID_INPUT: P.answers.invalid,
 }

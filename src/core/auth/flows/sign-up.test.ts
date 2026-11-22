@@ -14,7 +14,9 @@ vi.mock('../../env', async (importOriginal) => {
   return { ...actual, serverEnv: () => ({ ...actual.serverEnv(), ...request.env }) }
 })
 vi.mock('../supabase-server', () => ({ createSessionSupabase: async () => ({ auth: mocks }) }))
-vi.mock('../supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc }) }))
+// orgs lookups for the staff link (core/auth/staff-signup): an active org.
+const orgChain = { select: () => orgChain, eq: () => orgChain, maybeSingle: async () => ({ data: { id: '11111111-2222-4333-8444-555555555555' }, error: null }) }
+vi.mock('../supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc, from: () => orgChain }) }))
 
 const { resendSignupEmail, signUpWithPassword, updatePassword } = await import('./sign-up')
 
@@ -119,5 +121,17 @@ describe('updatePassword', () => {
     expect(mocks.updateUser).not.toHaveBeenCalled()
     expect(await updatePassword(form({ password: 'hunter2x', confirm: 'hunter2x' }))).toEqual({ status: 'sent' })
     expect(mocks.updateUser).toHaveBeenCalledWith({ password: 'hunter2x' })
+  })
+})
+
+describe('signUpWithPassword: staff link sign-up', () => {
+  // Codex P1 (#841): a staff-link sign-up remembers its token for a confirmation resent from /login.
+  it('stores the staff link token on the account; any other sign-up stores none', async () => {
+    mocks.signUp.mockResolvedValue({ data: { user: { identities: [{}] } }, error: null })
+    const token = 'b'.repeat(32)
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next: `/zh/join/org/${token}` }))
+    expect(mocks.signUp.mock.calls[0]![0].options.data).toEqual({ locale: 'zh', staff_invite: token, staff_org: '11111111-2222-4333-8444-555555555555' })
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next: '/zh/account' }))
+    expect(mocks.signUp.mock.calls[1]![0].options.data).toEqual({ locale: 'zh' })
   })
 })

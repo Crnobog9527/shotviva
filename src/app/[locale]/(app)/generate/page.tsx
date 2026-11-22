@@ -1,4 +1,6 @@
+import { orgBalance } from '@/core/billing/pools'
 import type { Metadata } from 'next'
+import { readPoolChoiceOffer } from '@/core/org'
 import { connection } from 'next/server'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
@@ -53,7 +55,7 @@ async function Create({ searchParams }: { searchParams: Search }) {
     loadAccess: sharedCreateFeatureAccess,
     tierOf: () => limitsPromise.then(featureTierOf),
   }).catch(() => false)
-  const [payload, { balance, favoriteIds }, limits, runningIds, wishlistLive] = await Promise.all([
+  const [payload, { balance, favoriteIds }, limits, runningIds, wishlistLive, poolChoice] = await Promise.all([
     currentLocale().then((locale) => loadCataloguePayload(locale, posterAllowed)),
     createServerSupabase().then((db) => readCreatePersonalData(db, user.id)),
     limitsPromise,
@@ -61,6 +63,8 @@ async function Create({ searchParams }: { searchParams: Search }) {
     listRunningJobIds(admin, user.id, new Date()),
     // The grid ends on "Not finding it? Make a wish" while the wishlist is open (cached read).
     isWishlistEnabled(site),
+    // 出图时让员工自选 (§6.5): only for a member holding both kinds of org credits.
+    readPoolChoiceOffer(admin, user.id),
   ])
   const { tier } = limits
   const batch = batchLimitsOf(limits)
@@ -70,7 +74,7 @@ async function Create({ searchParams }: { searchParams: Search }) {
         aside={
           <>
             <GeneratingPill />
-            <BalanceChip balance={balance} />
+            <BalanceChip balance={poolChoice ? orgBalance(poolChoice) : balance} />
           </>
         }
       />
@@ -83,7 +87,7 @@ async function Create({ searchParams }: { searchParams: Search }) {
         <FavoritesProvider initialIds={favoriteIds} signedIn>
           <TemplateCatalogue
             payload={payload}
-            create={{ balance, tier, batch, concurrency: { limit: limits.concurrency, runningIds } }}
+            create={{ balance, tier, batch, concurrency: { limit: limits.concurrency, runningIds }, poolChoice }}
             endCard={wishlistLive ? <WishCard /> : undefined}
           />
         </FavoritesProvider>

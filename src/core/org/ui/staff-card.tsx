@@ -49,6 +49,30 @@ function Levels({ data }: { data: StaffCard }) {
   )
 }
 
+// The org's promotion credits for this member: allowance, given and used this month, and left
+// (watermarked free credits, spent before the member's own free credits, gone at month end).
+function PromoStats({ data }: { data: StaffCard }) {
+  const t = useTranslations('app.org.staff')
+  const format = useFormatter()
+  const promo = data.promo
+  return (
+    <div className="space-y-2 border-t border-hairline pt-3">
+      <div>
+        <p className="font-medium">{t('promoCredits')}</p>
+        <p className="text-caption text-muted-foreground">{t('promoCreditsHint')}</p>
+      </div>
+      {promo ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat label={t('allowance')} value={format.number(promo.allowance)} />
+          <Stat label={t('allocated')} value={format.number(promo.allocated)} />
+          <Stat label={t('used')} value={format.number(promo.used)} />
+          <Stat label={t('promoLeft')} value={format.number(promo.held)} />
+        </div>
+      ) : <p className="text-caption text-muted-foreground">{t('statsUnavailable')}</p>}
+    </div>
+  )
+}
+
 // 「我的企业」 on /account for a member of an org (ARCHITECTURE §6.5, card E4): this month's
 // share, the promo link (the member's own invite link, T94), their level-1 / level-2 customers with
 // this month's spend (card E5, from the staff variant of org_member_stats: only their own row,
@@ -74,11 +98,13 @@ export function StaffCardView({ data, actions, loadInvite }: { data: StaffCard; 
 
   return (
     <Panel title={t('title', { org: data.orgName })} hint={data.status === 'suspended' ? t('suspended') : t('hint')}>
+      <p className="font-medium">{t('paidCredits')}</p>
       <div className="grid grid-cols-3 gap-3">
         <Stat label={t('allowance')} value={format.number(data.monthlyAllowance)} />
         <Stat label={t('allocated')} value={format.number(data.allocatedThisMonth)} />
         <Stat label={t('remaining')} value={format.number(data.heldCredits)} />
       </div>
+      <PromoStats data={data} />
       <div className="space-y-2 border-t border-hairline pt-3">
         <p className="font-medium">{t('promoTitle')}</p>
         <p className="text-label text-muted-foreground">{t('promoHint')}</p>

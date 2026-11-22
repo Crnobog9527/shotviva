@@ -7,9 +7,13 @@ vi.mock('../actions', () => ({
   allocateOrgCredits: sql.allocate, depositOrgCredits: sql.deposit, joinOrg: sql.join, leaveOrg: sql.leave,
   removeOrgMember: sql.remove, rotateOrgInvite: sql.rotate, setOrgAllowance: sql.allowance,
 }))
+const promo = vi.hoisted(() => ({ allocate: vi.fn(), allowance: vi.fn() }))
+const bulk = vi.hoisted(() => ({ grant: vi.fn(), set: vi.fn(), defaults: vi.fn() }))
+vi.mock('../bulk-actions', () => ({ bulkGrantOrgCredits: bulk.grant, bulkSetOrgAllowance: bulk.set, setOrgDefaultAllowances: bulk.defaults }))
+vi.mock('../promo-actions', () => ({ allocateOrgPromoCredits: promo.allocate, setOrgPromoAllowance: promo.allowance }))
 vi.mock('@/core/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn() } }))
 
-const { allocate, deposit, join, leave, removeMember, resetInvite, setAllowance } = await import('./commands')
+const { allocate, allocatePromo, bulkGrant, bulkSetAllowance, setDefaults, deposit, join, leave, removeMember, resetInvite, setAllowance, setPromoAllowance } = await import('./commands')
 const { AppError } = await import('@/core/errors')
 
 const USER = '00000000-0000-4000-8000-0000000000a1'
@@ -50,6 +54,20 @@ describe('owner commands', () => {
     expect(retry).toEqual(first)
     expect(sql.allocate).toHaveBeenNthCalledWith(1, expect.anything(), USER, MEMBER, 10, `console:allocate:${ORG}:${FORM}`)
     expect(sql.allocate.mock.calls[1]?.slice(1)).toEqual(sql.allocate.mock.calls[0]?.slice(1))
+  })
+
+  it('moves promotion credits under their own request id, and refuses a non-owner before any SQL', async () => {
+    promo.allocate.mockResolvedValue({ applied: true, promo_pool_credits: 700, held_promo_credits: 300 })
+    promo.allowance.mockResolvedValue(2000)
+    expect(await allocatePromo(owner(), { requestId: FORM, member: MEMBER, credits: '300' })).toEqual({ ok: true, pool: 700 })
+    expect(promo.allocate).toHaveBeenCalledWith(expect.anything(), USER, MEMBER, 300, `console:allocate_promo:${ORG}:${FORM}`)
+    expect(await setPromoAllowance(owner(), { member: MEMBER, allowance: '2000' })).toEqual({ ok: true, allowance: 2000 })
+    const stranger = { db: db(null), user: USER }
+    expect(await allocatePromo(stranger, { requestId: FORM, member: MEMBER, credits: 1 })).toEqual({ ok: false, error: 'NOT_OWNER' })
+    expect(await setPromoAllowance(stranger, { member: MEMBER, allowance: 1 })).toEqual({ ok: false, error: 'NOT_OWNER' })
+    expect(promo.allocate).toHaveBeenCalledTimes(1)
+    promo.allocate.mockRejectedValue(sqlError('ORG_POOL_INSUFFICIENT'))
+    expect(await allocatePromo(owner(), { requestId: FORM, member: MEMBER, credits: 1 })).toEqual({ ok: false, error: 'POOL_INSUFFICIENT' })
   })
 
   it('uses a different SQL request id per kind of action', async () => {
@@ -137,5 +155,25 @@ describe('member commands', () => {
     sql.join.mockResolvedValue(ORG)
     expect(await join({ db: db(null), user: USER }, 'b'.repeat(32))).toEqual({ ok: true })
     expect(sql.join).toHaveBeenCalledWith(expect.anything(), USER, 'b'.repeat(32))
+  })
+})
+
+describe('bulk commands', () => {
+  it('runs bulk actions as one request per form, namespaced, and only for the owner', async () => {
+    bulk.grant.mockResolvedValue({ applied: true, members: 2, total: 600, pool_credits: 400 })
+    bulk.set.mockResolvedValue({ applied: true, members: 2 })
+    bulk.defaults.mockResolvedValue({ applied: true, default_paid_allowance: 200, default_promo_allowance: 500 })
+    const members = [MEMBER, USER]
+    expect(await bulkGrant(owner(), { requestId: FORM, members, kind: 'promo', each: '300' })).toEqual({ ok: true, members: 2, total: 600, pool: 400 })
+    expect(bulk.grant).toHaveBeenCalledWith(expect.anything(), USER, { members, kind: 'promo', each: 300 }, `console:bulk_grant:${ORG}:${FORM}`)
+    expect(await bulkSetAllowance(owner(), { requestId: FORM, members, promo: 'default', paid: '50' })).toEqual({ ok: true, members: 2 })
+    expect(bulk.set).toHaveBeenCalledWith(expect.anything(), USER, { members, paid: 50, promo: 'default' }, `console:bulk_set:${ORG}:${FORM}`)
+    expect(await setDefaults(owner(), { requestId: FORM, paid: '200', promo: '500' })).toEqual({ ok: true, paid: 200, promo: 500 })
+    const stranger = { db: db(null), user: USER }
+    expect(await bulkGrant(stranger, { requestId: FORM, members, kind: 'paid', each: 1 })).toEqual({ ok: false, error: 'NOT_OWNER' })
+    expect(bulk.grant).toHaveBeenCalledTimes(1)
+    expect(await bulkGrant(owner(), { requestId: FORM, members: [], kind: 'paid', each: 1 })).toEqual({ ok: false, error: 'INVALID' })
+    bulk.grant.mockRejectedValue(sqlError('ORG_POOL_INSUFFICIENT'))
+    expect(await bulkGrant(owner(), { requestId: FORM, members, kind: 'paid', each: 1 })).toEqual({ ok: false, error: 'POOL_INSUFFICIENT' })
   })
 })

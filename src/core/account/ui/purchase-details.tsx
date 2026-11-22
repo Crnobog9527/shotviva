@@ -45,8 +45,9 @@ function PurchaseItem({ line }: { line: PurchaseLine }) {
     <li className="pt-3 pb-1">
       <p className="text-body text-foreground">{line.label}</p>
       <div className="flex flex-wrap items-center gap-x-5">
-        {line.receiptHref ? <DocumentLink href={line.receiptHref} text={t('receipt')} of={line.label} /> : <span className="py-2.5 text-caption text-muted-foreground">{t('emailed')}</span>}
+        {line.receiptHref ? <DocumentLink href={line.receiptHref} text={t('receipt')} of={line.label} /> : line.portalHref ? null : <span className="py-2.5 text-caption text-muted-foreground">{t('emailed')}</span>}
         {line.invoiceHref ? <DocumentLink href={line.invoiceHref} text={t('invoice')} of={line.label} /> : null}
+        {line.portalHref ? <WaffoNote href={line.portalHref} /> : null}
         {line.refund ? (
           <span className="ms-auto rounded-full border border-hairline px-2.5 py-0.5 text-caption text-muted-foreground">
             {t(line.refund === 'full' ? 'refunded' : 'partlyRefunded')}
@@ -71,5 +72,19 @@ function DocumentLink({ href, text, of }: { href: string; text: string; of: stri
       {text}
       <ArrowUpRight aria-hidden strokeWidth={1.75} className="size-4" />
     </a>
+  )
+}
+
+// Waffo sends its invoice by email and keeps it in its Consumer Portal (PDF, company title editable).
+function WaffoNote({ href }: { href: string }) {
+  const t = useTranslations('app.account.purchases')
+  return (
+    <span className="grid py-1 text-caption text-muted-foreground">
+      <span>{t('waffoInvoice')}</span>
+      <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 text-label font-medium text-primary underline-offset-3 hover:underline focus-visible:underline">
+        {t('waffoPortal')}
+        <ArrowUpRight aria-hidden strokeWidth={1.75} className="size-4 shrink-0" />
+      </a>
+    </span>
   )
 }

@@ -1,3 +1,4 @@
+import { spendableBalance } from '@/core/org'
 import type { Metadata } from 'next'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
@@ -31,7 +32,8 @@ async function Matrix({ searchParams }: { searchParams: Promise<Record<string, s
   const [{ templates, initial, browse }, balance, limits] = await Promise.all([
     // Series members included: a series dialog's link arrives with a member's id (?t=).
     loadBatchCatalogue(await currentLocale(), query.t),
-    readBalance(supabase, user.id),
+    // An org member's batch is paid from the org's paid share only (§6.5).
+    readBalance(supabase, user.id).then((own) => spendableBalance(admin, user.id, own)),
     // effective_limits() (tier, an unbanned admin as Max, plus the org lift) is service-role only; the user's own id comes from the session.
     effectiveLimits(admin, user.id),
   ])

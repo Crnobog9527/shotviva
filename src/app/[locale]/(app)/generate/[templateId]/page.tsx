@@ -1,4 +1,6 @@
+import { orgBalance } from '@/core/billing/pools'
 import { notFound, redirect } from 'next/navigation'
+import { readPoolChoiceOffer } from '@/core/org'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
@@ -53,7 +55,7 @@ async function Workspace({ params, searchParams }: RouteProps) {
   const againId = typeof query.again === 'string' ? query.again : undefined
   const reuseId = !againId && typeof query.reuse === 'string' ? query.reuse : undefined
   const admin = createAdminSupabase()
-  const [balance, limits, runningIds, again, reuse, editOffer] = await Promise.all([
+  const [balance, limits, runningIds, again, reuse, editOffer, poolChoice] = await Promise.all([
     readBalance(supabase, user.id),
     // effective_limits() (tier, an unbanned admin as Max, plus the org lift) is service-role only; the user's own id comes from the session.
     effectiveLimits(admin, user.id),
@@ -62,11 +64,13 @@ async function Workspace({ params, searchParams }: RouteProps) {
     loadReuse(site, { jobId: reuseId, template }),
     // "Edit this photo" on the done view only when editing is on (T30).
     loadEditOffer(supabase),
+    // 出图时让员工自选 (§6.5): only for a member holding both kinds of org credits.
+    readPoolChoiceOffer(admin, user.id),
   ])
   const t = await getTranslations('app.result')
   return (
     <>
-      <Nav title={template.name} aside={<BalanceChip balance={balance} />} />
+      <Nav title={template.name} aside={<BalanceChip balance={poolChoice ? orgBalance(poolChoice) : balance} />} />
       <WorkspaceHead template={template} />
       <ImageWorkspace
         template={template}
@@ -74,6 +78,7 @@ async function Workspace({ params, searchParams }: RouteProps) {
         tier={limits.tier}
         batch={batchLimitsOf(limits)}
         concurrency={{ limit: limits.concurrency, runningIds }}
+        poolChoice={poolChoice}
         again={again && query.clean === '1' ? { ...again, paidOnly: true } : (again ?? reuse)}
         editable={editOffer !== null}
         shareText={t('shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}

@@ -216,6 +216,8 @@
       "deleting": "Deleting…",
       "deleteFailed": "Deletion did not finish. Please try again.",
       "deleteSubscriptionFailed": "We couldn't cancel your subscription, so nothing was deleted. Please try again later, or contact support.",
+      "deleteOrgOwner": "You are your company's main admin, so this account cannot be deleted yet. Contact us to hand the company to a new admin first.",
+      "deleteRunning": "A company photo is still being made. Delete the account once it is done.",
       "cancel": "Cancel"
     }
   },
@@ -591,6 +593,7 @@
           "invited": "You’ve already used an invite code.",
           "checkout": "You have a checkout open with your current discount. Finish or cancel it before replacing the discount.",
           "ineligible": "This account isn’t eligible for the invitation reward.",
+          "orgMember": "Enterprise staff accounts use the credits their organisation allocates. For more, contact your organisation's admin.",
           "forbidden": "This account can’t redeem codes.",
           "auth": "Sign in again to redeem a code.",
           "rate": "Too many attempts. Please try again later.",
@@ -644,7 +647,8 @@
       "panelTitle": "Credits",
       "signupGiftRefused": "No signup credits yet: this network already used today's allowance. Verify a phone number or a Google account below to claim them.",
       "signupGiftRefusedCap": "No sign-up credits for this account: that day's sign-up gifts had all been given out.",
-      "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up."
+      "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up.",
+      "signupGiftRefusedStaff": "No sign-up credits for this account: it was created through an organisation's staff link."
     },
     "create": {
       "title": "Create",
@@ -1058,7 +1062,9 @@
         "clearGroup": "Clear this group",
         "left": "{fields} still show the sample’s text. Use it anyway?",
         "joiner": ", "
-      }
+      },
+      "orgNeedsCredits": "Your company's credits don't cover this one. Ask your admin to allocate more; your own credits can't be used while you're a member.",
+      "orgShortCta": "Not enough company credits"
     },
     "errors": {
       "NETWORK": "Couldn't reach Shotviva. Check your connection and try again.",
@@ -1211,6 +1217,7 @@
         "deleting": "Deleting…",
         "cancel": "Cancel",
         "running": "This photo is still developing. Delete it once it's done.",
+        "org": "Company photos can only be deleted by the company admin.",
         "failed": "Couldn't delete the photo. Please try again."
       }
     },
@@ -1406,7 +1413,9 @@
         "emailed": "Receipt sent to your payment email",
         "refunded": "Refunded",
         "partlyRefunded": "Partly refunded",
-        "unavailable": "We couldn't open that receipt or invoice just now. Try again in a minute. If it still won't open, ask us in Support and we'll send it to you."
+        "unavailable": "We couldn't open that receipt or invoice just now. Try again in a minute. If it still won't open, ask us in Support and we'll send it to you.",
+        "waffoInvoice": "Waffo emailed the invoice with your order confirmation.",
+        "waffoPortal": "Download PDF invoices and edit company name and tax ID in the Waffo portal"
       },
       "session": {
         "title": "Session",
@@ -1782,11 +1791,13 @@
       "tabs": {
         "label": "Company sections",
         "console": "Company workspace",
+        "works": "Company works",
         "affiliate": "Company affiliate",
         "purchasing": "Bulk purchasing",
         "short": {
           "affiliate": "Affiliate",
           "console": "Workspace",
+          "works": "Works",
           "purchasing": "Purchasing"
         }
       },
@@ -1801,19 +1812,23 @@
         "copied": "Copied"
       },
       "pool": {
-        "title": "Credit pool",
-        "hint": "Credits your company holds. Give them to members, who spend them on their own generations.",
-        "balance": "In the pool",
+        "title": "Credit pools",
+        "hint": "Your company holds two kinds: paid credits (bought or deposited by you) and promotion credits (the monthly channel partner grant). Give them to members, who spend them on their own generations.",
+        "balance": "Paid pool",
         "unit": "credits",
         "yours": "Yours to deposit",
         "yoursNote": "your own paid credits",
         "suspended": "The company is paused: deposits are off.",
-        "depositLabel": "Deposit your own credits",
+        "depositLabel": "Deposit your own paid credits",
         "depositPlaceholder": "Number of credits",
         "depositHint": "Moves credits you bought into the pool. Pool credits can't be refunded or moved back.",
         "deposit": "Deposit",
         "depositing": "Depositing…",
-        "deposited": "Deposited into the pool."
+        "deposited": "Deposited into the pool.",
+        "promoBalance": "Promotion pool",
+        "promoExpires": "Valid through {at} (UTC)",
+        "promoNone": "No promotion credits this month",
+        "promoHint": "Images made with promotion credits are watermarked, public and not for commercial use. What is left in the pool and with members goes at the end of the month (UTC). Only paid credits can be deposited."
       },
       "packages": {
         "title": "Company packages",
@@ -1842,10 +1857,10 @@
       },
       "members": {
         "title": "Members",
-        "hint": "Monthly allowance tops each person up to that number of credits on the 1st (UTC). Give now moves credits from the pool straight away.",
+        "hint": "Each kind is set separately. The paid monthly allowance tops a person up to that number on the 1st (UTC). The promotion allowance is the most they get automatically each month, given when promotion credits arrive or the allowance changes. Give now moves credits from that pool straight away.",
         "unknown": "Account",
         "owner": "Main admin",
-        "held": "{count, plural, one {# company credit left} other {# company credits left}}",
+        "held": "{count, plural, one {# paid credit left} other {# paid credits left}}",
         "customers": "{count, plural, one {# customer} other {# customers}}",
         "allowance": "Monthly allowance",
         "allowanceFor": "Monthly allowance for {who}",
@@ -1858,12 +1873,23 @@
         "giving": "Giving…",
         "remove": "Remove",
         "removeTitle": "Remove {who}?",
-        "removeBody": "The company's unspent credits go back to the pool. Credits they bought themselves stay with them. Customers they brought stay with the company.",
+        "removeBody": "The company's unspent paid credits go back to the paid pool and promotion credits to the promotion pool. Credits of their own stay with them. Customers they brought stay with the company.",
         "removeConfirm": "Remove",
         "removed": "Removed.",
         "cancel": "Cancel",
         "truncated": "Showing {shown} of {total} members.",
-        "inviteEmpty": "No one has joined yet. Send them the invite link above."
+        "inviteEmpty": "No one has joined yet. Send them the invite link above.",
+        "heldPromo": "{count, plural, one {# promotion credit left} other {# promotion credits left}}",
+        "paidKind": "Paid credits",
+        "promoKind": "Promotion credits (watermarked, expire at month end)",
+        "promoAllowance": "Monthly promotion allowance",
+        "promoAllowanceFor": "Monthly promotion allowance for {who}",
+        "promoGiveNow": "Give promotion credits now",
+        "promoGiveFor": "Promotion credits to give {who}",
+        "isDefault": "(default)",
+        "useDefault": "Use default",
+        "defaultRestored": "Back on the default.",
+        "pick": "Select {who}"
       },
       "performance": {
         "title": "Monthly performance",
@@ -1906,7 +1932,7 @@
         "spend": "Spend this month",
         "leave": "Leave company",
         "leaveTitle": "Leave {org}?",
-        "leaveBody": "The company's unspent credits go back to its pool. Credits you bought yourself stay with you, and customers you brought stay with the company.",
+        "leaveBody": "The company's unspent paid and promotion credits go back to its pools. Credits of your own stay with you, and customers you brought stay with the company.",
         "leaveConfirm": "Leave",
         "left": "You left the company.",
         "cancel": "Cancel",
@@ -1916,7 +1942,12 @@
         "level2Hint": "Brought in by your customers. This month: {month}.",
         "newThisMonth": "{count} new this month",
         "paying": "Paying this month",
-        "statsUnavailable": "This month's numbers couldn't be loaded."
+        "statsUnavailable": "This month's numbers couldn't be loaded.",
+        "paidCredits": "Paid credits",
+        "promoCredits": "Promotion credits",
+        "promoCreditsHint": "Promotion credits from your company: images are watermarked, public and not for commercial use. They are used only when paid credits can't cover a generation, before your own free credits, and whatever is left goes at the end of the month (UTC).",
+        "used": "Used this month",
+        "promoLeft": "Left"
       },
       "join": {
         "metaTitle": "Join a company",
@@ -1973,7 +2004,8 @@
       "area": {
         "workspaceIntro": "Where you run Shotviva as a production tool: manage the credit pool, your staff and what they make each month, for image work at scale.",
         "purchasingIntro": "Company package prices and bank transfer details. Top up the credit pool offline, the way described here.",
-        "affiliateIntro": "Bring in customers and follow commissions and payouts. Sign-ups and purchases through your referral link count toward the company."
+        "affiliateIntro": "Bring in customers and follow commissions and payouts. Sign-ups and purchases through your referral link count toward the company.",
+        "worksIntro": "Everything staff make with company credits belongs to the company. It shows only here and is never public. When someone leaves, their company works stay here and leave their own account."
       },
       "contact": {
         "open": "Contact us to arrange a transfer",
@@ -1985,6 +2017,120 @@
         "copy": "Copy",
         "copied": "Copied",
         "copyFailed": "Select and copy it"
+      },
+      "billing": {
+        "title": "Invoice details",
+        "hint": "Once saved, when your organisation's primary admin buys a plan or credit pack on Shotviva with Waffo, the invoice carries your company name and tax ID automatically (you can still change them on Waffo's invoice page).",
+        "notFapiao": "This is a commercial invoice issued by Waffo, the merchant of record, not a Chinese VAT invoice (fapiao). It applies to Waffo payments only.",
+        "legalName": "Company legal name",
+        "legalNameHint": "As on your business registration, 2–200 characters.",
+        "country": "Country or region",
+        "taxIdCn": "Unified social credit code",
+        "taxIdCnHint": "18 characters, capital letters, no I, O, S, V or Z.",
+        "taxId": "Tax ID",
+        "taxIdHint": "3–40 letters or digits; . / - allowed.",
+        "state": "State / province (optional)",
+        "postcode": "Postcode (optional)",
+        "invoiceEmail": "Invoice email (optional)",
+        "invoiceEmailHint": "For your records only. Waffo sends the invoice to the email entered at checkout.",
+        "updatedAt": "Last saved {date}",
+        "save": "Save",
+        "saving": "Saving…",
+        "saved": "Saved. Waffo orders from now on carry these details.",
+        "clear": "Clear",
+        "cleared": "Cleared. Later Waffo orders no longer carry a company name.",
+        "unavailable": "We couldn't load your invoice details. Refresh the page in a minute.",
+        "errors": {
+          "INVALID": "Something doesn't look right: the company name needs 2–200 characters, a mainland China tax ID is the 18-character unified social credit code, and the email must be complete.",
+          "NOT_OWNER": "Only your organisation's primary admin can see and change invoice details.",
+          "FAILED": "Something went wrong. Try again."
+        },
+        "stateCode": "State / province code",
+        "stateCodeHint": "Required for the US, Canada and Australia: the 2–3 letter code, e.g. CA, ON, NSW."
+      },
+      "works": {
+        "title": "Company works",
+        "all": "All staff",
+        "filterLabel": "Filter by staff member",
+        "removed": "Left",
+        "owner": "Main admin",
+        "count": "{count, plural, one {# photo} other {# photos}}",
+        "empty": "No photos made with company credits yet.",
+        "emptyMember": "This person has not made photos with company credits yet.",
+        "more": "Older works",
+        "open": "View full size",
+        "download": "Download original",
+        "madeBy": "{who} · {date}",
+        "unknown": "Account",
+        "delete": {
+          "open": "Delete {name}",
+          "title": "Delete this company photo?",
+          "body": "This cannot be undone, and it also disappears for the staff member who made it. The deletion is recorded for the company.",
+          "confirm": "Delete photo",
+          "deleting": "Deleting…",
+          "cancel": "Cancel",
+          "running": "This photo is still developing. Delete it once it is done.",
+          "error": "The photo could not be deleted. Please try again later."
+        },
+        "deletedAccounts": "Deleted accounts"
+      },
+      "poolMonth": {
+        "title": "This month's credits ({month})",
+        "hint": "UTC month. The month-end expiry of promotion credits is booked just after the month ends and counted for it.",
+        "item": "Item",
+        "paid": "Paid",
+        "promo": "Promotion",
+        "in": "Into the pool",
+        "allocated": "Given to members",
+        "reclaimed": "Back to the pool",
+        "held": "Still with members",
+        "expired": "Expired at month end"
+      },
+      "defaults": {
+        "title": "Default monthly allowances",
+        "hint": "Every member without a setting of their own follows these, people who join later included. A personal value wins; Use default goes back.",
+        "paid": "Paid credits",
+        "promo": "Promotion credits",
+        "save": "Save defaults",
+        "saved": "Defaults saved.",
+        "confirmTitle": "Save the default allowances?",
+        "cancel": "Cancel",
+        "confirmPaid": "Paid default becomes {value}: {followers} members follow it ({unset} of them were at 0 or never set and will start receiving it from the 1st).",
+        "confirmPromo": "Promotion default becomes {value}: {followers} members follow it ({unset} of them were at 0 or never set and will start receiving it); up to {max} leaves the promotion pool now.",
+        "confirmPin": "To keep someone at 0, first set them to 0 with Select members (a personal value)."
+      },
+      "bulk": {
+        "select": "Select members",
+        "search": "Search accounts",
+        "joinedFrom": "Joined from",
+        "selectAll": "Select all shown",
+        "selected": "{count} selected",
+        "open": "Bulk actions",
+        "cancel": "Cancel",
+        "title": "Bulk actions for {count}",
+        "hint": "Set the monthly allowance, or give everyone the same one-off amount.",
+        "allowance": "Set allowance",
+        "grant": "One-off grant",
+        "paidAllowance": "Paid monthly allowance",
+        "promoAllowance": "Promotion monthly allowance",
+        "setting": {
+          "keep": "Keep",
+          "set": "Set to",
+          "default": "Use default"
+        },
+        "apply": "Apply",
+        "saved": "Set for {count}.",
+        "confirmTitle": "Apply to {count} members?",
+        "allowanceConfirm": "This replaces their monthly allowances. A promotion allowance gives what this month still lacks from the promotion pool straight away.",
+        "kind": {
+          "paid": "paid",
+          "promo": "promotion"
+        },
+        "each": "Credits each",
+        "total": "{count} × {each} = {total} from the {kind} pool ({pool} in it)",
+        "short": "The pool can't cover everyone, so nobody gets any.",
+        "give": "Give",
+        "given": "Gave {total} to {count}."
       }
     },
     "templateShare": {
@@ -2078,6 +2224,14 @@
       "revokeYes": "Turn off",
       "revokeFailed": "Could not turn the link off. Try again.",
       "more": "Show more"
+    },
+    "poolChoice": {
+      "title": "Which company credits to use",
+      "promo": "Promotion credits (watermarked, demo only)",
+      "paid": "Paid credits (no watermark, commercial use)",
+      "left": "{count, number} left",
+      "hint": "If the chosen kind runs short, the other kind is never used instead.",
+      "short": "{count, number} left, not enough for this one"
     }
   },
   "paywall": {
@@ -2239,6 +2393,7 @@
     "codeMonths": "First {months} months",
     "codeEvery": "Every billing period",
     "codeCheckoutFloor": "This discount is unavailable for this item at its current price. Choose another eligible item.",
+    "orgMemberCheckout": "Enterprise staff accounts use the credits their organisation allocates. For more, contact your organisation's admin.",
     "codeCheckoutChanged": "The price or your discount has changed. Check the updated price before trying again.",
     "codeCheckoutInUse": "This discount is in use in another checkout. Return to that checkout to finish or cancel it, then try again.",
     "fineDiscount": "{term} at {price}, then {original} per {period, select, year {year} other {month}} · cancel anytime · USD"
@@ -2675,7 +2830,7 @@
         "topups": "Top-ups",
         "remaining": "Remaining",
         "validThrough": "Valid through (UTC)",
-        "note": "They are free credits in your own account. Whatever is left is taken back at the end of the month.",
+        "note": "They go into your company's promotion pool, and you hand them to staff in the workspace. Images made with them are watermarked and not for commercial use. Remaining = the pool plus what staff still hold; whatever is left goes at the end of the month (UTC).",
         "none": "No promotion credits have been granted this month yet."
       }
     },

@@ -16,6 +16,10 @@ export type RpcClient = {
 // SQL functions raise these exception messages (supabase/migrations/0023–0026, 0141–0142).
 const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   CREDITS_INSUFFICIENT: 'CREDITS_INSUFFICIENT',
+  // The member chose a kind of org credits that cannot cover the price (1897); never the other kind.
+  POOL_CHOICE_INSUFFICIENT: 'CREDITS_INSUFFICIENT',
+  // An org member whose org credits cannot cover the job (1897); their own credits are never used.
+  ORG_CREDITS_INSUFFICIENT: 'CREDITS_INSUFFICIENT',
   INVALID_INPUT: 'INVALID_INPUT',
   PROFILE_NOT_FOUND: 'NOT_FOUND',
   JOB_NOT_FOUND: 'NOT_FOUND',
@@ -41,6 +45,10 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   FREE_WORK_PUBLIC: 'FORBIDDEN',
   // A work from a gallery-excluded category (the posters root) is never public (§9 第 7 条).
   WORK_PRIVATE_ONLY: 'FORBIDDEN',
+  // 企业作品 (1942): a member cannot delete a work the org paid for.
+  ORG_WORK_DELETE_FORBIDDEN: 'FORBIDDEN',
+  // Account deletion (1971): an org's primary admin cannot delete their account.
+  ORG_OWNER_CANNOT_DELETE_ACCOUNT: 'ACCOUNT_OWNS_ORG',
   // Dispute evidence (T82): an unknown dispute, a Managed Payments one (Stripe answers it), and a
   // second submit of the one submission Stripe allows.
   DISPUTE_NOT_FOUND: 'NOT_FOUND',

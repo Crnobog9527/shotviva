@@ -20,19 +20,22 @@ const ORG = '11111111-1111-4111-8111-111111111111'
 const MEMBER = '00000000-0000-4000-8000-0000000000b2'
 const owner = (over: Partial<OwnerConsole['org']> = {}, extra: Partial<OwnerConsole> = {}): OwnerConsole => ({
   kind: 'owner',
-  org: { id: ORG, name: 'Acme Studio', refCode: 'SV-K7M2PX', status: 'active', poolCredits: 120000, affiliateEnabled: true, affiliateLevels: 1, ...over },
+  org: { id: ORG, name: 'Acme Studio', refCode: 'SV-K7M2PX', status: 'active', poolCredits: 120000, affiliateEnabled: true, affiliateLevels: 1,
+    promoPoolCredits: 4321, promoExpiresAt: '2026-12-01T00:00:00Z', defaultPaidAllowance: 200, defaultPromoAllowance: 500, ...over },
   inviteToken: 'a'.repeat(32),
   members: [
-    { userId: '00000000-0000-4000-8000-0000000000a1', account: 'owner@acme.test', role: 'owner', monthlyAllowance: 0, heldCredits: 0, customers: 0, joinedAt: '2026-11-01T00:00:00Z' },
-    { userId: MEMBER, account: 'ann@acme.test', role: 'member', monthlyAllowance: 500, heldCredits: 320, customers: 3, joinedAt: '2026-11-02T00:00:00Z' },
+    { userId: '00000000-0000-4000-8000-0000000000a1', account: 'owner@acme.test', role: 'owner', monthlyAllowance: 0, heldCredits: 0, promoAllowance: 500, heldPromoCredits: 0, paidFollowsDefault: true, promoFollowsDefault: true, paidUnset: true, promoUnset: true, customers: 0, joinedAt: '2026-11-01T00:00:00Z' },
+    { userId: MEMBER, account: 'ann@acme.test', role: 'member', monthlyAllowance: 500, heldCredits: 320, promoAllowance: 2000, heldPromoCredits: 1750, paidFollowsDefault: false, promoFollowsDefault: false, paidUnset: false, promoUnset: false, customers: 3, joinedAt: '2026-11-02T00:00:00Z' },
   ],
   memberTotal: 2,
   packages: [{ id: ORG, name: 'Starter', priceUsdCents: 123400, credits: 98765 }],
   depositable: 700,
   paymentAccounts: null,
+  poolMonth: { period: '2026-11', paid: { in: 5000, allocated: 600, reclaimed: 0 }, promo: { granted: 10000, allocated: 2000, reclaimed: 0, expired: 0, held: 1750 } },
   ...extra,
 })
 const staff: StaffCard = { kind: 'member', orgName: 'Acme Studio', status: 'active', monthlyAllowance: 500, allocatedThisMonth: 600, heldCredits: 80, customers: 3,
+  promo: { allowance: 2000, allocated: 2000, used: 250, held: 1750 },
   withLevel2: false, period: '2026-11', performance: { l1: { customers: 3, signups: 1, paying: 2, paidCents: 12345 }, l2: { customers: 0, signups: 0, paying: 0, paidCents: 0 } },
 }
 
@@ -40,6 +43,9 @@ const ownerActions = {
   deposit: async () => ({ ok: true as const, pool: 1 }), allocate: async () => ({ ok: true as const, pool: 1 }),
   setAllowance: async () => ({ ok: true as const, allowance: 1 }), removeMember: async () => ({ ok: true as const, reclaimed: 1 }),
   resetInvite: async () => ({ ok: true as const, token: 'b'.repeat(32) }),
+  allocatePromo: async () => ({ ok: true as const, pool: 1 }), setPromoAllowance: async () => ({ ok: true as const, allowance: 1 }),
+  setDefaults: async () => ({ ok: true as const, paid: 1, promo: 1 }), bulkSetAllowance: async () => ({ ok: true as const, members: 1 }),
+  bulkGrant: async () => ({ ok: true as const, members: 1, total: 1, pool: 1 }),
 }
 
 type Messages = typeof en
@@ -138,6 +144,11 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
     // Level-1 customers, how many pay and what they spent this month (fake data: $123.45).
     expect(text).toContain('$123.45')
     expect(text).not.toMatch(/Coming soon|即将上线|commission|佣金/i)
+    // The promotion side: allowance, given, used and left this month, and that it is watermarked.
+    expect(text).toContain(locale === 'en' ? 'Promotion credits' : '推广积分')
+    expect(text).toContain('1,750')
+    expect(text).toContain('250')
+    expect(text).toMatch(locale === 'en' ? /watermarked/ : /带水印/)
   })
 
   it('renders the account row', () => {
@@ -147,6 +158,66 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
     // With the affiliate on, the area opens on 企业联盟 (Owner 2026-11-22).
     const affiliateRow = render(locale, createElement(OwnerEntryRow, { name: 'Acme Studio', pool: '120,000', suspended: false, affiliate: true }))
     expect(affiliateRow.html).toContain('href="/partners/enterprise"')
+  })
+})
+
+describe.each(['en', 'zh'] as const)('promotion pool (%s)', (locale) => {
+  it('shows both pools, the month of each, and separate paid and promotion allowances per member (企业推广积分池)', () => {
+    const { text, html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null, affiliate: true }))
+    expect(errors).toEqual([])
+    expect(text).toContain(locale === 'en' ? 'Promotion pool' : '推广积分池')
+    expect(text).toContain('4,321')
+    // Valid through the last day of November (the pool expires at 1 December 00:00 UTC).
+    expect(text).toMatch(locale === 'en' ? /Valid through Nov 30, 2026/ : /有效期至 2026年11月30日/)
+    expect(text).toContain(locale === 'en' ? 'Monthly promotion allowance' : '推广月额度')
+    expect(text).toContain('1,750')
+    expect(text).toContain('10,000') // granted into the promotion pool this month
+    // Deposit stays paid-only.
+    expect(text).toContain(locale === 'en' ? 'Deposit your own paid credits' : '存入自己的付费积分')
+    // Two forms per kind and member: allowance and give.
+    expect(html.match(/<fieldset/g)).toHaveLength(4)
+  })
+})
+
+describe.each(['en', 'zh'] as const)('pool choice picker (%s)', (locale) => {
+  it('shows both kinds with what is left of each, and nothing when there is no choice', async () => {
+    const { PoolChoicePicker, PoolChoiceSlot } = await import('@/modules/image/workspace/pool-choice-picker')
+    const { text, html, errors } = render(locale, createElement(PoolChoicePicker, { offer: { paid: 1200, promo: 3400, last: 'promo' }, value: 'promo', onChange: () => {} }))
+    expect(errors).toEqual([])
+    expect(text).toContain(locale === 'en' ? 'Promotion credits (watermarked, demo only)' : '推广积分（带水印，仅供演示）')
+    expect(text).toContain(locale === 'en' ? 'Paid credits (no watermark, commercial use)' : '付费积分（无水印，可商用）')
+    expect(text).toContain('3,400')
+    expect(text).toContain('1,200')
+    expect(html.match(/checked=""/g)).toHaveLength(1)
+    expect(render(locale, createElement(PoolChoiceSlot, { choice: null })).html).toBe('')
+    // A kind that cannot cover this job is shown but cannot be picked.
+    const short = render(locale, createElement(PoolChoicePicker, { offer: { paid: 5, promo: 3400, last: 'paid' }, value: 'promo', onChange: () => {}, cost: 20 }))
+    expect(short.html.match(/disabled=""/g)).toHaveLength(1)
+    expect(short.text).toContain(locale === 'en' ? 'not enough for this one' : '不够这一张')
+  })
+
+  it('asks an org member to go to the admin instead of opening the paywall when the org credits are short', async () => {
+    const { FormAction } = await import('@/modules/image/workspace/form-action')
+    const state = { kind: 'get-credits' as const, cost: 20, needed: 10, count: 1 }
+    const member = render(locale, createElement(FormAction, { state, resolution: '1k', batch: false, onGenerate: () => {}, orgOnly: true }))
+    expect(member.errors).toEqual([])
+    expect(member.text).toContain(locale === 'en' ? 'Ask your admin to allocate more' : '请找管理员分配额度')
+    expect(member.html).toContain('disabled')
+  })
+})
+
+describe.each(['en', 'zh'] as const)('defaults and bulk (%s)', (locale) => {
+  it('shows the default allowances, marks who follows them, offers use-default to personal ones and the selection entry', () => {
+    const { text, html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null, affiliate: true }))
+    expect(errors).toEqual([])
+    expect(text).toContain(locale === 'en' ? 'Default monthly allowances' : '默认月额度')
+    expect(html).toContain('value="200"')
+    expect(html).toContain('value="500"')
+    // The owner follows both defaults; ann has personal values (two use-default buttons).
+    expect(text.split(locale === 'en' ? '(default)' : '（默认）').length - 1).toBe(2)
+    expect(html.match(locale === 'en' ? /<button[^>]*>Use default<\/button>/g : /<button[^>]*>恢复默认<\/button>/g)).toHaveLength(2)
+    expect(text).toContain(locale === 'en' ? 'Select members' : '批量选择')
+    expect(html).not.toContain('data-slot="org-bulk-bar"') // only in selection mode
   })
 })
 

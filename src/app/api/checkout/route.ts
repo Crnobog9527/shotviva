@@ -22,7 +22,8 @@ import { readActivePricing } from '@/core/billing/active-pricing'
 import { assertPricingVersions, buyerQuote, type BuyerQuote } from '@/core/billing/buyer-quote'
 import { configuredPricing } from '@/core/billing/checkout-price'
 import { assertCanBuy } from '@/core/billing/subscription'
-import { createWaffoCheckout, paymentChannel, waffoClient, waffoConfig, waffoWechatPayEnabled } from '@/core/billing/waffo'
+import { assertNotOrgMember } from '@/core/billing/org-member-guard'
+import { buyerBillingDetail, createWaffoCheckout, paymentChannel, waffoClient, waffoConfig, waffoWechatPayEnabled } from '@/core/billing/waffo'
 import { AppError } from '@/core/errors'
 import { requestOrigin } from '@/core/request-origin'
 import { site } from '@/site/site.config'
@@ -42,6 +43,8 @@ export async function POST(request: NextRequest) {
     // Upgrades only: the same or a lower plan while a membership runs answers 409. An upgrade is
     // an ordinary checkout at full price; the payment webhook cancels the old subscription.
     const admin = createAdminSupabase()
+    // Before a retry can hand back an open session: active org members never buy for themselves.
+    await assertNotOrgMember(admin, user.id)
     const version = configuredPricing(site.billing)
     const {id,response: retry,legacyPreview} = await findRetry(request,user.id,body,channel)
     if (retry) return retry
@@ -93,9 +96,12 @@ function startStripe(origin: string, products: SiteProduct[], user: Buyer, body:
   return createCheckout(deps, { attempt, userId: user.id, body, client, token, quote: quote?.price, selectedCode: quote?.selectedCode })
 }
 
-function startWaffo(origin: string, products: SiteProduct[], userId: string, body: CheckoutBody, quote?: BuyerQuote, attempt?: Attempt) {
+// An org's primary admin gets the org's 开票信息 on the Waffo invoice (billing-detail.ts); Stripe never does.
+async function startWaffo(origin: string, products: SiteProduct[], userId: string, body: CheckoutBody, quote?: BuyerQuote, attempt?: Attempt) {
   if (body.expected_code) throw new AppError('CODE_CHECKOUT_OFFER_CHANGED', 'Discount is unavailable on this payment channel')
   const config = waffoConfig()
+  const db = createAdminSupabase()
   const deps = { origin, returnToHosts, products, waffo: waffoClient(), productIds: config.productIds, subscriptionProductIds: config.subscriptionProductIds, wechatPay: waffoWechatPayEnabled() }
-  return createWaffoCheckout(deps, { bound:attempt ? {attempt,db:createAdminSupabase(),store:config} : undefined, userId, body, quote: quote?.price })
+  const billing = await buyerBillingDetail(db, userId)
+  return createWaffoCheckout(deps, { bound:attempt ? {attempt,db,store:config} : undefined, userId, body, quote: quote?.price, billing })
 }

@@ -14,6 +14,7 @@ export {
   adminGrantOrg,
   adminSaveOrgPackage,
   adminSetOrgSignupBonus,
+  adminTransferOrgOwner,
   adminUpdateOrg,
   ORG_SIGNUP_BONUS_MAX,
   orgCreateSchema,
@@ -21,6 +22,7 @@ export {
   orgPackageSchema,
   orgUpdateSchema,
   orgUsageSchema,
+  type OrgOwnerTransfer,
 } from './admin'
 export { runMonthlyTopup, topupPeriod, type TopupSummary } from './monthly-topup'
 export {
@@ -30,3 +32,14 @@ export {
   type PaymentAccountView,
 } from './payment-accounts'
 export { PAYMENT_FIELD_LABELS, PAYMENT_FIELDS, PAYMENT_KIND_LABELS, PAYMENT_KINDS, type PaymentKind } from './payment-labels'
+export {
+  allocateOrgPromoCredits,
+  readMemberPromoStats,
+  readPoolMonth,
+  setOrgPromoAllowance,
+  type MemberPromoStats,
+  type PoolMonth,
+  type PromoMove,
+} from './promo-actions'
+export { readPoolChoiceOffer, spendableBalance } from './pool-choice'
+export { bulkGrantOrgCredits, bulkSetOrgAllowance, setOrgDefaultAllowances } from './bulk-actions'

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-import type { Balance } from '@/core/billing/pools'
+import { bothKinds, chosenBalance, coveringChoice, orgBalance, type Balance, type PoolChoice, type PoolChoiceOffer } from '@/core/billing/pools'
 import { batchMaxFor, type BatchLimits } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 
@@ -39,6 +39,8 @@ export type DraftInput = {
   // The creation dialog takes one photo; a batch is added on the workspace page (DESIGN §6.9
   // item 2).
   single?: boolean
+  // 在职成员只用企业积分 (§6.5): an active org member's org shares; null/absent: not a member.
+  poolChoice?: PoolChoiceOffer | null
 }
 
 const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {}, toggles: {} }
@@ -47,16 +49,17 @@ const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', c
 // dialog Create opens and the workspace page. Photos upload as they are picked; start() queues
 // one job per ready photo in the generation store and makes them this template's workspace
 // jobs, so the workspace page shows them developing (and after a refresh).
-export function useWorkspaceDraft({ template, balance, tier, batch, concurrency, again = null, single = false }: DraftInput) {
+export function useWorkspaceDraft({ template, balance, tier, batch, concurrency, again = null, single = false, poolChoice }: DraftInput) {
   const { photos, slots, slotted } = useDraftPhotos(template, batchMaxFor(tier, batch), single, again)
   const { options, values, change } = useOutputValues(template, again)
   useAgainOpensForm(template.id, again?.jobId)
   const running = useRunningCount(concurrency.runningIds)
   const { summary } = photos
   const run = useDraftStart(template, concurrency.limit, again, photos.photos.map((photo) => photo.id).join(','))
+  const choice = usePoolChoice(poolChoice, summary.ready.length <= 1, again, balance, template.creditsCost[values.resolution])
   const needsRatio = summary.ready.some(({ photo }) => !chosenAspect(values.aspect, options, photo.originalRatio))
   const ready = (): CtaState => ctaState({
-    balance,
+    balance: choice.balance,
     cost: template.creditsCost[values.resolution],
     running,
     limit: concurrency.limit,
@@ -70,8 +73,8 @@ export function useWorkspaceDraft({ template, balance, tier, batch, concurrency,
     // A dialog that starts here then moves to the template's workspace page, whose pending view
     // draws this template's head before the server answers (pending-template.ts).
     rememberTemplate(template)
-    if (slotted) return run.start(withAgainOf(slotInputs(template, values, slots), again), [])
-    return run.start(withAgainOf(startInputs(template, values, summary.ready), again), summary.ready)
+    if (slotted) return run.start(withChoice(withAgainOf(slotInputs(template, values, slots), again), choice.value), [])
+    return run.start(withChoice(withAgainOf(startInputs(template, values, summary.ready), again), choice.value), summary.ready)
   }
   const changeValues = (next: Partial<FormValues>) => {
     run.clearError()
@@ -80,10 +83,26 @@ export function useWorkspaceDraft({ template, balance, tier, batch, concurrency,
   // A fresh form starts from the cover's text (copy-examples.ts); Make again keeps its own.
   const fromExamples = !again
   return {
-    photos, slots, values, change: changeValues, state, start, error: run.error, missingPhoto: again?.missing != null,
+    photos, slots, values, change: changeValues, state, start, choice, error: run.error, missingPhoto: again?.missing != null,
     fromExamples, examplesLeft: fromExamples ? examplesLeft(template.copyFields, values.copy) : [],
   }
 }
+
+// An org member spends the org's shares only (their own credits are frozen); holding both kinds,
+// they pick one (default: their last choice), except for a batch (paid only, §6.2) and Remove
+// watermark (paid). `balance` is what the action bar checks.
+function usePoolChoice(offer: PoolChoiceOffer | null | undefined, single: boolean, again: AgainStart | null, balance: Balance, cost: number) {
+  const [picked, set] = useState<PoolChoice>(offer?.last ?? 'paid')
+  if (!offer) return { picker: null, balance, value: undefined, orgOnly: false }
+  const org = orgBalance(offer)
+  if (!bothKinds(offer) || !single || again?.paidOnly === true) return { picker: null, balance: org, value: undefined, orgOnly: true }
+  // The pick (or the remembered one) when it covers this job, else the kind that does.
+  const value = coveringChoice(offer, picked, cost)
+  return { picker: { offer, value, set, cost }, balance: chosenBalance(org, value), value, orgOnly: true }
+}
+
+const withChoice = (inputs: StartInput[], choice: PoolChoice | undefined): StartInput[] =>
+  choice ? inputs.map((input) => ({ ...input, body: { ...input.body, pool_choice: choice } })) : inputs
 
 // Generate: one photo is queued at once, as it always was. Two or more go through the batch
 // preflight first (T107); resolves to its refusal (the caller opens the paywall or says why),

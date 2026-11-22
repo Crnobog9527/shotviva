@@ -30,7 +30,7 @@ export function archiveFilename(photo: string, template: string, position: numbe
 export async function batchArchive(db: SupabaseClient, userId: string, batchId: string, background: DownloadBackground = 'white') {
   const { data, error } = await db.from('generation_jobs')
     .select('id,output_key,position:inputs->>batch_position,photo:inputs->>batch_photo_name,template:inputs->>batch_template_name,background:inputs->>background')
-    .eq('user_id', userId).eq('batch_id', batchId).eq('credit_pool', 'paid').eq('status', 'succeeded').is('deleted_at', null)
+    .eq('user_id', userId).eq('batch_id', batchId).eq('credit_pool', 'paid').eq('status', 'succeeded').is('deleted_at', null).is('org_access_ended_at', null)
     .limit(MAX_BATCH_SIZE)
   if (error) throw new AppError('INTERNAL', 'Batch lookup failed', { cause: error })
   if (!data.length) throw new AppError('NOT_FOUND', 'No completed works in this batch')

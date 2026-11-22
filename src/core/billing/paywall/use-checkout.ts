@@ -16,7 +16,7 @@ import { refreshDiscount } from "./discount-context"
 // "refused": the server refused a membership as the same plan or a lower one than the buyer
 // holds (409 DOWNGRADE_NOT_ALLOWED, T66), say from a page opened before the plan changed; the
 // paywall says plans only go up and points to Account.
-export type CheckoutStatus = "idle" | "pending" | "error" | "refused" | "in_use" | "offer_changed" | "floor"
+export type CheckoutStatus = "idle" | "pending" | "error" | "refused" | "in_use" | "offer_changed" | "floor" | "org_member"
 
 // The quote identifies what the tab displayed, including tabs opened before a catalogue switch.
 export function displayedTerms(cents: number, version: "v1" | "v2") {
@@ -78,7 +78,7 @@ export function checkoutAttempt(body: string, previous: CheckoutAttempt | null, 
   return { body, id: crypto.randomUUID(), created: now }
 }
 
-type Answer = { kind: "url"; url: string } | { kind: "refused" | "in_use" | "offer_changed" | "floor" }
+type Answer = { kind: "url"; url: string } | { kind: "refused" | "in_use" | "offer_changed" | "floor" | "org_member" }
 
 // The checkout URL, or 409 DOWNGRADE_NOT_ALLOWED (only upgrades while a membership runs);
 // anything else throws and shows the generic error.
@@ -92,9 +92,9 @@ export function readAnswer(status: number, body: unknown): Answer {
   return { kind: "url", url: record.url }
 }
 
-const conflicts = new Map<string, "refused" | "in_use" | "offer_changed" | "floor">([
+const conflicts = new Map<string, "refused" | "in_use" | "offer_changed" | "floor" | "org_member">([
   ["CODE_CHECKOUT_IN_PROGRESS", "in_use"], ["CODE_CHECKOUT_OFFER_CHANGED", "offer_changed"],
-  ["DOWNGRADE_NOT_ALLOWED", "refused"], ["CODE_CHECKOUT_FLOOR", "floor"],
+  ["DOWNGRADE_NOT_ALLOWED", "refused"], ["CODE_CHECKOUT_FLOOR", "floor"], ["ORG_MEMBER_CHECKOUT", "org_member"],
 ])
 
 // A Graylum top-up arrives as /pricing?from=graylum&return_to=…; the server checks the host.

@@ -1,5 +1,6 @@
 'use client'
 
+
 import { useEffect } from 'react'
 
 import { trackTemplateView } from '@/core/analytics/browser'
@@ -19,6 +20,8 @@ import { FailureView, SuccessView } from './settled-views'
 import { useWorkspaceDraft, type DraftInput } from './use-workspace-draft'
 import { WorkspaceForm } from './workspace-form'
 import { WorkspaceStage } from './workspace-stage'
+import { PoolChoiceMount } from './pool-choice-mount'
+
 
 // editable: editing is on (T30), so the done view offers "Edit this photo".
 export type WorkspaceProps = DraftInput & { shareText: string; editable: boolean }
@@ -30,7 +33,7 @@ export type WorkspaceProps = DraftInput & { shareText: string; editable: boolean
 // refresh, or Generate in the dialog, lands on the developing view or result, not the form.
 // From lg up the form is the left column and the stage the right (B comp workspace.html).
 export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps) {
-  const { template, tier, balance, concurrency } = input
+  const { template, tier, concurrency } = input
   const draft = useWorkspaceDraft(input)
   const jobIds = useWorkspaceJobs(template.id)
   const single = useJob(jobIds.length === 1 ? (jobIds[0] ?? null) : null)
@@ -63,7 +66,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
       <div ref={reveal} className="min-w-0 px-(--gutter) lg:px-0">
         <WorkspaceForm
           template={template}
-          balance={balance}
+          balance={draft.choice.balance}
           tier={tier}
           photos={draft.photos}
           slots={draft.slots}
@@ -73,6 +76,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
           examples={draft.fromExamples}
           photoExtra={<MatrixLink template={template} tier={tier} />}
         />
+        <PoolChoiceMount choice={draft.choice.picker} />
         <FormAction
           state={draft.state}
           resolution={draft.values.resolution}
@@ -83,6 +87,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
           privateOnly={template.privateOnly}
           examplesLeft={draft.examplesLeft}
           onGenerate={generate}
+          orgOnly={draft.choice.orgOnly}
         />
       </div>
       <WorkspaceStage template={template} photo={draft.photos.photos[0] ?? null} />

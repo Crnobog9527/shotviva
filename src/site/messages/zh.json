@@ -216,6 +216,8 @@
       "deleting": "正在注销…",
       "deleteFailed": "注销没有完成，请再试一次。",
       "deleteSubscriptionFailed": "没能取消你的订阅，所以什么都没有删除。请稍后再试，或联系客服。",
+      "deleteOrgOwner": "你是企业的主管理员，不能直接注销账号。请先联系我们更换企业主管理员，再注销。",
+      "deleteRunning": "还有企业作品正在生成，等它完成后再注销。",
       "cancel": "取消"
     }
   },
@@ -591,6 +593,7 @@
           "invited": "你已经用过邀请码了。",
           "checkout": "当前折扣正在结账，请先完成或取消该笔结账，再替换折扣。",
           "ineligible": "这个账号不符合邀请奖励条件。",
+          "orgMember": "企业员工账号使用企业分配的积分，如需更多请联系企业管理员",
           "forbidden": "这个账号暂时无法兑换。",
           "auth": "请重新登录后兑换。",
           "rate": "尝试次数过多，请稍后再试。",
@@ -644,7 +647,8 @@
       "panelTitle": "积分",
       "signupGiftRefused": "这个账号还没领到注册赠分：同一网络 24 小时内领取的账号已满，可以在下面验证手机号或 Google 账号领取。",
       "signupGiftRefusedCap": "这个账号没有领到注册赠分：当天的注册赠分名额已经发完。",
-      "signupGiftRefusedPaused": "这个账号没有领到注册赠分：注册时赠分暂停发放。"
+      "signupGiftRefusedPaused": "这个账号没有领到注册赠分：注册时赠分暂停发放。",
+      "signupGiftRefusedStaff": "这个账号没有注册赠分：它是通过企业员工链接注册的。"
     },
     "create": {
       "title": "创作",
@@ -1058,7 +1062,9 @@
         "clearGroup": "清空本组",
         "left": "{fields}还是示例内容，确认要用吗？",
         "joiner": "、"
-      }
+      },
+      "orgNeedsCredits": "企业分给你的积分不够这一张，请找管理员分配额度。在企业期间不能用你自己的积分。",
+      "orgShortCta": "企业积分不够"
     },
     "errors": {
       "NETWORK": "连不上 Shotviva，请检查网络后再试。",
@@ -1211,6 +1217,7 @@
         "deleting": "正在删除…",
         "cancel": "取消",
         "running": "这张还在生成中，生成完再删除。",
+        "org": "企业作品只能由企业管理员删除。",
         "failed": "没能删除这张作品，请稍后再试。"
       }
     },
@@ -1406,7 +1413,9 @@
         "emailed": "收据已发送到付款邮箱",
         "refunded": "已退款",
         "partlyRefunded": "部分退款",
-        "unavailable": "刚才没能打开这份收据或发票，请稍后再试。还是打不开的话，在客服里告诉我们，我们发给你。"
+        "unavailable": "刚才没能打开这份收据或发票，请稍后再试。还是打不开的话，在客服里告诉我们，我们发给你。",
+        "waffoInvoice": "Waffo 的发票已随订单确认邮件发送。",
+        "waffoPortal": "在 Waffo 买家中心下载 PDF 发票、修改公司名称和税号"
       },
       "session": {
         "title": "登录",
@@ -1782,12 +1791,14 @@
       "tabs": {
         "label": "企业分区",
         "console": "企业工作台",
+        "works": "企业作品",
         "affiliate": "企业联盟",
         "purchasing": "企业集采信息",
         "short": {
           "affiliate": "企业联盟",
-          "console": "企业工作台",
-          "purchasing": "企业集采信息"
+          "console": "工作台",
+          "works": "企业作品",
+          "purchasing": "集采信息"
         }
       },
       "entry": {
@@ -1802,18 +1813,22 @@
       },
       "pool": {
         "title": "积分池",
-        "hint": "企业持有的积分。划给成员后，由成员用于自己的出图。",
-        "balance": "池里余额",
+        "hint": "企业持有两种积分：付费积分（你买的或存入的）和推广积分（渠道商每月发放）。分给成员后，由成员用于自己的出图。",
+        "balance": "付费积分池",
         "unit": "积分",
         "yours": "你可存入",
         "yoursNote": "你自己购买的积分",
         "suspended": "企业已暂停，暂时不能存入。",
-        "depositLabel": "存入自己的积分",
+        "depositLabel": "存入自己的付费积分",
         "depositPlaceholder": "积分数量",
         "depositHint": "把你自己购买的积分存入积分池。池里的积分不能退款，也不能再取回。",
         "deposit": "存入",
         "depositing": "存入中…",
-        "deposited": "已存入积分池。"
+        "deposited": "已存入积分池。",
+        "promoBalance": "推广积分池",
+        "promoExpires": "有效期至 {at}（UTC）",
+        "promoNone": "本月还没有推广积分",
+        "promoHint": "推广积分出的图带水印、公开、不可商用，月底（UTC）企业池和成员手里没用完的一起清零；存入只能存付费积分。"
       },
       "packages": {
         "title": "企业套餐",
@@ -1842,10 +1857,10 @@
       },
       "members": {
         "title": "成员",
-        "hint": "月额度：每月 1 日（UTC）把成员补到这个积分数。立即划拨：马上从积分池划给成员。",
+        "hint": "两种积分分开设：付费月额度每月 1 日（UTC）补到这个数；推广月额度是每月最多自动分到的推广积分，推广积分到账或改额度时就分。立即划拨：马上从对应的池划给成员。",
         "unknown": "账号",
         "owner": "主管理员",
-        "held": "企业积分剩 {count, number}",
+        "held": "付费积分剩 {count, number}",
         "customers": "客户 {count, number}",
         "allowance": "月额度",
         "allowanceFor": "{who} 的月额度",
@@ -1858,12 +1873,23 @@
         "giving": "划拨中…",
         "remove": "移除",
         "removeTitle": "移除 {who}？",
-        "removeBody": "企业没用完的积分会回到积分池；他自己购买的积分仍归他；他带来的客户仍归企业。",
+        "removeBody": "企业没用完的付费积分回到付费积分池，推广积分回到推广积分池；他自己的积分仍归他；他带来的客户仍归企业。",
         "removeConfirm": "移除",
         "removed": "已移除。",
         "cancel": "取消",
         "truncated": "显示 {shown} / {total} 位成员。",
-        "inviteEmpty": "还没有人加入，把上面的邀请链接发给他们。"
+        "inviteEmpty": "还没有人加入，把上面的邀请链接发给他们。",
+        "heldPromo": "推广积分剩 {count, number}",
+        "paidKind": "付费积分",
+        "promoKind": "推广积分（带水印，月底清零）",
+        "promoAllowance": "推广月额度",
+        "promoAllowanceFor": "{who} 的推广月额度",
+        "promoGiveNow": "立即划拨推广积分",
+        "promoGiveFor": "划给 {who} 的推广积分",
+        "isDefault": "（默认）",
+        "useDefault": "恢复默认",
+        "defaultRestored": "已恢复默认。",
+        "pick": "选择 {who}"
       },
       "performance": {
         "title": "月度业绩",
@@ -1906,7 +1932,7 @@
         "spend": "本月消费",
         "leave": "退出企业",
         "leaveTitle": "退出 {org}？",
-        "leaveBody": "企业没用完的积分会回到积分池；你自己购买的积分仍归你；你带来的客户仍归企业。",
+        "leaveBody": "企业没用完的付费积分和推广积分会回到各自的积分池；你自己的积分仍归你；你带来的客户仍归企业。",
         "leaveConfirm": "退出",
         "left": "你已退出企业。",
         "cancel": "取消",
@@ -1916,7 +1942,12 @@
         "level2Hint": "由你的客户分享而来。本月：{month}。",
         "newThisMonth": "本月新增 {count}",
         "paying": "本月付费人数",
-        "statsUnavailable": "本月数据加载失败。"
+        "statsUnavailable": "本月数据加载失败。",
+        "paidCredits": "付费积分",
+        "promoCredits": "推广积分",
+        "promoCreditsHint": "企业分给你的推广积分：出的图带水印、公开、不可商用；付费积分不够时才用，先于你自己的免费积分扣，月底（UTC）没用完的清零。",
+        "used": "本月已用",
+        "promoLeft": "剩余"
       },
       "join": {
         "metaTitle": "加入企业",
@@ -1973,7 +2004,8 @@
       "area": {
         "workspaceIntro": "把 Shotviva 当作生产力工具批量出图时的数据管理台：积分池、员工和每月产出都在这里管理。",
         "purchasingIntro": "企业套餐价格和对公转账信息。需要给积分池充值时，按这里的方式线下办理。",
-        "affiliateIntro": "推广客户、查看佣金和结算。客户通过你的推广链接注册和付费，佣金记在企业名下。"
+        "affiliateIntro": "推广客户、查看佣金和结算。客户通过你的推广链接注册和付费，佣金记在企业名下。",
+        "worksIntro": "员工用企业积分生成的作品都归企业所有，只在这里展示，永远不会公开。员工离开企业后，这些作品仍留在这里，员工自己的账号里不再能看到。"
       },
       "contact": {
         "open": "联系我们转账",
@@ -1985,6 +2017,120 @@
         "copy": "复制",
         "copied": "已复制",
         "copyFailed": "请手动选中复制"
+      },
+      "billing": {
+        "title": "开票信息",
+        "hint": "填写后，企业主管理员在 Shotviva 用 Waffo 购买订阅或积分包时，发票会自动带上公司抬头和税号（可在 Waffo 发票页再修改）。",
+        "notFapiao": "这是 Waffo 开具的商业发票（Invoice），开票方是 Waffo（代收款的商户），不是中国的增值税发票。只对 Waffo 付款生效。",
+        "legalName": "公司全称",
+        "legalNameHint": "和营业执照上一致，2–200 个字。",
+        "country": "国家或地区",
+        "taxIdCn": "统一社会信用代码",
+        "taxIdCnHint": "18 位，字母大写，不含 I、O、S、V、Z。",
+        "taxId": "税号（Tax ID）",
+        "taxIdHint": "3–40 位字母或数字，可含 . / -。",
+        "state": "省 / 州（选填）",
+        "postcode": "邮编（选填）",
+        "invoiceEmail": "收票邮箱（选填）",
+        "invoiceEmailHint": "仅作记录。Waffo 会把发票发到结账时填写的邮箱。",
+        "updatedAt": "最近保存：{date}",
+        "save": "保存",
+        "saving": "保存中…",
+        "saved": "已保存。之后用 Waffo 付款的订单会带上这些信息。",
+        "clear": "清空",
+        "cleared": "已清空。之后的 Waffo 订单不再带公司抬头。",
+        "unavailable": "暂时读不到开票信息，请稍后刷新页面。",
+        "errors": {
+          "INVALID": "有内容格式不对：公司全称 2–200 个字；中国大陆的税号是 18 位统一社会信用代码；邮箱要完整。",
+          "NOT_OWNER": "只有企业主管理员可以查看和修改开票信息。",
+          "FAILED": "出了点问题，请重试。"
+        },
+        "stateCode": "省 / 州代码",
+        "stateCodeHint": "美国、加拿大、澳大利亚必填，填 2–3 位代码，例如 CA、ON、NSW。"
+      },
+      "works": {
+        "title": "企业作品",
+        "all": "全部员工",
+        "filterLabel": "按员工查看",
+        "removed": "已离开",
+        "owner": "主管理员",
+        "count": "{count} 张",
+        "empty": "还没有用企业积分生成的作品。",
+        "emptyMember": "这位员工还没有用企业积分生成的作品。",
+        "more": "更早的作品",
+        "open": "查看大图",
+        "download": "下载原图",
+        "madeBy": "{who} · {date}",
+        "unknown": "账号",
+        "delete": {
+          "open": "删除 {name}",
+          "title": "删除这张企业作品？",
+          "body": "删除后无法恢复，员工那边也会一起消失。删除会记录在企业名下。",
+          "confirm": "删除作品",
+          "deleting": "正在删除…",
+          "cancel": "取消",
+          "running": "这张还在生成中，生成完再删除。",
+          "error": "没能删除这张作品，请稍后再试。"
+        },
+        "deletedAccounts": "已注销成员"
+      },
+      "poolMonth": {
+        "title": "本月积分进出（{month}）",
+        "hint": "按 UTC 月统计。推广积分月底清零的数在下个月初记入本月。",
+        "item": "项目",
+        "paid": "付费积分",
+        "promo": "推广积分",
+        "in": "进池（到账 / 存入 / 发放）",
+        "allocated": "分给成员",
+        "reclaimed": "收回到池",
+        "held": "成员手里还剩",
+        "expired": "月底清零"
+      },
+      "defaults": {
+        "title": "默认月额度",
+        "hint": "没有单独设置的成员（包括以后加入的）都按这里。单独给某人设的值优先；点「恢复默认」改回。",
+        "paid": "付费积分",
+        "promo": "推广积分",
+        "save": "保存默认",
+        "saved": "默认月额度已保存。",
+        "confirmTitle": "保存默认月额度？",
+        "cancel": "取消",
+        "confirmPaid": "付费默认改为 {value}：{followers} 人按默认（其中 {unset} 人原来是 0 或没设过，会开始按新默认补发，下月 1 日生效）。",
+        "confirmPromo": "推广默认改为 {value}：{followers} 人按默认（其中 {unset} 人原来是 0 或没设过，会开始收到），本月最多立刻从推广积分池分出 {max}。",
+        "confirmPin": "想让某些人保持 0，先在批量选择里把他们设为 0（单独设置）。"
+      },
+      "bulk": {
+        "select": "批量选择",
+        "search": "搜索账号",
+        "joinedFrom": "加入日期从",
+        "selectAll": "全选（当前筛选）",
+        "selected": "已选 {count} 人",
+        "open": "批量设置",
+        "cancel": "取消",
+        "title": "批量设置 {count} 人",
+        "hint": "设月额度，或给每人一次性划拨同样的积分。",
+        "allowance": "设月额度",
+        "grant": "一次性划拨",
+        "paidAllowance": "付费月额度",
+        "promoAllowance": "推广月额度",
+        "setting": {
+          "keep": "不改",
+          "set": "设为",
+          "default": "恢复默认"
+        },
+        "apply": "应用",
+        "saved": "已为 {count} 人设置。",
+        "confirmTitle": "确认操作 {count} 人？",
+        "allowanceConfirm": "会覆盖这些人的月额度；推广月额度会立刻从推广积分池补发本月还差的部分。",
+        "kind": {
+          "paid": "付费积分",
+          "promo": "推广积分"
+        },
+        "each": "每人积分",
+        "total": "{count} 人 × {each} = {total}，从{kind}池扣（池里 {pool}）",
+        "short": "池里不够，一个人都不会划。",
+        "give": "划拨",
+        "given": "已给 {count} 人共划拨 {total}。"
       }
     },
     "templateShare": {
@@ -2078,6 +2224,14 @@
       "revokeYes": "关闭",
       "revokeFailed": "没能关闭链接，请再试一次。",
       "more": "加载更多"
+    },
+    "poolChoice": {
+      "title": "用哪种企业积分",
+      "promo": "推广积分（带水印，仅供演示）",
+      "paid": "付费积分（无水印，可商用）",
+      "left": "剩余 {count, number}",
+      "hint": "选的那种不够时不会改用另一种。",
+      "short": "剩余 {count, number}，不够这一张"
     }
   },
   "paywall": {
@@ -2239,6 +2393,7 @@
     "codeMonths": "前 {months} 个月",
     "codeEvery": "每期",
     "codeCheckoutFloor": "按当前价格，这个商品不能使用此优惠。请选择其他适用商品。",
+    "orgMemberCheckout": "企业员工账号使用企业分配的积分，如需更多请联系企业管理员",
     "codeCheckoutChanged": "价格或优惠已更新，请确认最新价格后重试。",
     "codeCheckoutInUse": "这份优惠正在另一个结账页面使用。请返回原页面完成或取消付款，再重试。",
     "fineDiscount": "{term} {price}，之后每{period, select, year {年} other {月}} {original} · 可随时取消 · 美元"
@@ -2675,7 +2830,7 @@
         "topups": "临时追加",
         "remaining": "剩余",
         "validThrough": "有效期至（UTC）",
-        "note": "推广积分在你自己账号的免费积分里，月底没用完的部分会收回。",
+        "note": "推广积分发进企业的推广积分池，由你在「企业工作台」分给员工；推广积分出的图带水印、不可商用。剩余 = 企业池 + 员工手里还没用完的，月底（UTC）一起清零。",
         "none": "本月还没有发放推广积分。"
       }
     },

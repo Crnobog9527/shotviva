@@ -60,9 +60,14 @@ export const ERROR_CODES = [
   // Account deletion: Stripe would not cancel a live subscription, so nothing was deleted
   // (ARCHITECTURE §13).
   'SUBSCRIPTION_CANCEL_FAILED',
+  // Account deletion: the account is an org's primary admin, so it cannot go (企业作品, 1971);
+  // nothing was deleted. The org's admin is changed first.
+  'ACCOUNT_OWNS_ORG',
   // A membership checkout for the same plan or a lower one while a membership runs: only
   // upgrades (ARCHITECTURE §6.2 「升级」, T66); to go lower, cancel and buy again once it ends.
   'DOWNGRADE_NOT_ALLOWED',
+  // An active enterprise org member tried to buy for themself (staff accounts, §6.5).
+  'ORG_MEMBER_CHECKOUT',
   // Saved templates (ARCHITECTURE §5.1b, T83): the account already holds the most it may.
   'FAVORITES_LIMIT',
   // Admin test runs (ARCHITECTURE §10.b, T85): today's test-run budget is spent; nothing was called.
@@ -121,7 +126,9 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   IDENTITY_SWAP_REFUSED: 422,
   GENERATION_FAILED: 502,
   SUBSCRIPTION_CANCEL_FAILED: 502,
+  ACCOUNT_OWNS_ORG: 409,
   DOWNGRADE_NOT_ALLOWED: 409,
+  ORG_MEMBER_CHECKOUT: 409,
   FAVORITES_LIMIT: 409,
   TEST_BUDGET_EXCEEDED: 429,
   TICKET_CLOSED: 409,
