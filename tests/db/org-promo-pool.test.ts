@@ -299,3 +299,38 @@ it('takes a clawback from the next grant into the pool, never from credits alrea
   await confirm(db, actor, s)
   expect(await promoPoolOf(db, orgId)).toBe(2000 + 6000)
 })
+
+it('does not count spending paid from an org promotion share against a legacy grant (Codex #836)', async () => {
+  const { orgId, owner } = await partner(db, actor)
+  await run(db, m.current)
+  const s = await sheet(db, orgId, m.current)
+  await confirm(db, actor, s) // 10,000 into the org pool
+  await asLegacy(db, 'partner_promo_grants', s.id) // now in the owner's own pool, as before 1894
+  await db.query("update partner_promo_grants set decided_at=now()-interval '1 hour' where id=$1", [s.id])
+  await topup(orgId, owner, 300)
+  await db.query("select org_allocate_promo($1,$1,300,'self-300')", [owner]) // the owner holds 300 of the org's
+  const key = 'job:' + randomUUID()
+  await db.query("select _apply_credit_change($1,'free','reserve',-300,'job',$2)", [owner, key + ':reserve'])
+  // The 300 came from the org share, so the legacy grant still has all 10,000 left (and may move).
+  expect((await row(db, "select credits_left from _partner_promo_bucket_left($1,(select expires_at from partner_promo_grants where id=$2))", [owner, s.id])).credits_left).toBe(10000)
+  expect((await row(db, 'select admin_partner_promo_move_preview($1,$2) p', [actor, orgId])).p).toMatchObject({ credits: 10000 })
+  // A failed job gives the share back; still nothing is counted against the legacy grant.
+  await db.query("select _apply_credit_change($1,'free','refund',300,'job',$2)", [owner, key + ':refund'])
+  expect((await row(db, "select credits_left from _partner_promo_bucket_left($1,(select expires_at from partner_promo_grants where id=$2))", [owner, s.id])).credits_left).toBe(10000)
+})
+
+it('moves nothing for a voided legacy grant (its credits were taken back by hand), and takes nothing from the owner', async () => {
+  const { orgId, owner } = await partner(db, actor)
+  await db.query('update profiles set free_credits=500 where id=$1', [owner]) // the owner's own free credits
+  await run(db, m.current)
+  const s = await sheet(db, orgId, m.current)
+  await confirm(db, actor, s)
+  await asLegacy(db, 'partner_promo_grants', s.id)
+  // The Owner took the 10,000 back by hand, then voided the sheet.
+  await db.query("select _apply_credit_change($1,'free','admin_adjust',-10000,'manual','manual-take-back')", [owner])
+  await db.query('select admin_partner_promo_void($1,$2)', [actor, { grant_id: s.id, reason: 'taken back by hand' }])
+  expect((await row(db, 'select admin_partner_promo_move_preview($1,$2) p', [actor, orgId])).p).toMatchObject({ credits: 0 })
+  expect((await row(db, 'select admin_partner_promo_move($1,$2) r', [actor, { org_id: orgId, credits: 0 }])).r).toEqual({ applied: false, reason: 'nothing', credits: 0 })
+  expect(await freeOf(db, owner)).toBe(500)
+  expect(await promoPoolOf(db, orgId)).toBe(0)
+})
