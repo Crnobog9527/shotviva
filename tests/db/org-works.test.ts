@@ -159,8 +159,9 @@ describe('leaving the org', () => {
     expect((await job(orgWork)).org_access_ended_at).not.toBeNull()
     expect(await findOwnJob(rest, staff, orgWork)).toBeNull()
     expect((await listOwnJobs(rest, staff, new Date())).done.map((j) => j.id)).toEqual([personal])
-    expect((await readWorkShare(service, shareId))?.items).toEqual([])
-    expect((await listWorkShares(service, staff))[0]).toMatchObject({ id: shareId, works: 0 })
+    // The link is revoked for good, so its page and image routes are gone.
+    expect(await readWorkShare(service, shareId)).toBeNull()
+    expect((await listWorkShares(service, staff))[0]).toMatchObject({ id: shareId, works: 0, revokedAt: expect.any(Date) })
     await expect(createWorkShare(service, staff, { jobIds: [orgWork] })).rejects.toMatchObject({ code: 'NOT_FOUND' })
     const downloaded = await db.query('select public.record_job_download($1, $2) as ok', [orgWork, staff])
     expect(downloaded.rows[0].ok).toBe(false)
@@ -190,13 +191,45 @@ describe('leaving the org', () => {
     expect(await visible()).toBe(0)
   })
 
-  it('gives the works back when the person joins the org again', async () => {
+  it('gives the works back when the person joins the org again, but never the old links', async () => {
     const { owner, token, staff } = await staffed()
     const orgWork = await made(staff)
+    await db.query('update public.profiles set credits = credits + $2 where id = $1', [staff, cost])
+    const personalShare = await createWorkShare(service, staff, { jobIds: [orgWork] })
     await removeOrgMember(service, owner, staff, randomUUID())
     await joinOrg(service, staff, token)
     expect((await job(orgWork)).org_access_ended_at).toBeNull()
     expect(await findOwnJob(rest, staff, orgWork)).not.toBeNull()
+    expect(await readWorkShare(service, personalShare)).toBeNull()
+    // Sharing again works.
+    const fresh = await createWorkShare(service, staff, { jobIds: [orgWork] })
+    expect((await readWorkShare(service, fresh))?.items).toHaveLength(1)
+  })
+
+  it('revokes, on rejoining, links from a leave that predates the trigger', async () => {
+    const { owner, token, staff } = await staffed()
+    const orgWork = await made(staff)
+    const shareId = await createWorkShare(service, staff, { jobIds: [orgWork] })
+    // A member removed before 1941: their link was never revoked, only hidden by the backfill.
+    await db.query('alter table public.org_members disable trigger org_members_works_access')
+    try {
+      await removeOrgMember(service, owner, staff, randomUUID())
+    } finally {
+      await db.query('alter table public.org_members enable trigger org_members_works_access')
+    }
+    await db.query('update public.generation_jobs set org_access_ended_at = now() where id = $1', [orgWork])
+    await joinOrg(service, staff, token)
+    expect(await readWorkShare(service, shareId)).toBeNull()
+  })
+
+  it('leaves links without the org’s works alone', async () => {
+    const { owner, staff } = await staffed()
+    await db.query('update public.profiles set credits = credits + $2 where id = $1', [staff, cost * 10])
+    const own = await made(staff)
+    expect((await job(own)).org_id).toBeNull()
+    const shareId = await createWorkShare(service, staff, { jobIds: [own] })
+    await removeOrgMember(service, owner, staff, randomUUID())
+    expect((await readWorkShare(service, shareId))?.items).toHaveLength(1)
   })
 })
 

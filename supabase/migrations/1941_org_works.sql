@@ -83,6 +83,11 @@ before insert or update of org_id, visibility, gallery_excluded on public.genera
 for each row execute function public._org_work_stamp();
 
 -- Leaving (removed) cuts the maker off from that org's works; joining again restores them.
+-- Their share links holding any of those works are revoked for good on leaving (control
+-- 2026-11-22): rejoining does not bring an old link back, they share again. Revoked like the
+-- owner's own 「停止分享」 (revoked_at), so every reader already treats it as dead. Done again on
+-- rejoining: a live link holding the org's works then can only predate the leave (while away
+-- create_work_share refuses them), which covers members who left before this migration too.
 create function public._org_member_works_access() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
@@ -90,6 +95,11 @@ begin
   update public.generation_jobs
      set org_access_ended_at = case when new.status = 'active' then null else coalesce(new.removed_at, now()) end
    where org_id = new.org_id and user_id = new.user_id;
+  update public.work_shares s
+     set revoked_at = now()
+   where s.user_id = new.user_id and s.revoked_at is null
+     and exists (select 1 from public.generation_jobs j
+                    where j.id = any(s.job_ids) and j.org_id = new.org_id and j.user_id = new.user_id);
   return new;
 end $$;
 
