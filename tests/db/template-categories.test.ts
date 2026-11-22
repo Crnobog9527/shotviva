@@ -224,9 +224,15 @@ describe('admin category functions', () => {
 
   it('keeps the last category', async () => {
     // Alone inside a rolled-back transaction: every template on one category, the rest gone.
+    // Everything that points at a category moves to pets first, whatever other test files left
+    // in the database (series, reference assets, subcategories), so the delete never trips a key.
     await db.query('begin')
     try {
       await db.query("update public.templates set category_key = 'pets' where category_key <> 'pets' and category_key not in ('edit', 'freeform')")
+      await db.query("update public.templates set subcategory_key = null where subcategory_key is not null")
+      await db.query("update public.template_series set category_key = 'pets' where category_key <> 'pets'")
+      await db.query("update public.reference_assets set category_id = 'pets' where category_id <> 'pets'")
+      await db.query("update public.template_categories set parent_id = null where key = 'pets'")
       await db.query("delete from public.template_categories where key <> 'pets' and not is_system")
       await expect(db.query('select public.admin_delete_template_category($1, null, $2)', ['pets', admin])).rejects.toThrow(/CATEGORY_LAST/)
     } finally {
