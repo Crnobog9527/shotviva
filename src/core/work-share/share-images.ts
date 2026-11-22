@@ -3,7 +3,7 @@ import 'server-only'
 import type { RpcClient } from '../billing/rpc'
 import { AppError } from '../errors'
 import { logger } from '../logger'
-import { applyWatermark, downloadVariantKeyFor, inputPreviewKeyFor, shouldWatermark, stageVariant, type ObjectStore } from '../storage'
+import { inputPreviewKeyFor, protectedWorkCopy, shouldWatermark, type ObjectStore } from '../storage'
 import type { SharedItem, WorkShare } from './share-schema'
 import { readWorkShare } from './share-store'
 
@@ -21,15 +21,12 @@ export const isShareImageSide = (value: string): value is ShareImageSide => valu
 type Deps = { db: RpcClient; store: ObjectStore }
 
 // The result as anyone but its owner may see it. A free work is never served clean: it is the
-// same marked JPEG the owner's display and 白底 download give (job-file.ts), staged once under
-// the work's own download key (deleted with the work, §8.3) and then signed. A paid work is the
-// clean file. The free-work protection rebuild (#820) replaces this body with its
-// protectedWorkCopy(store, { id, userId, outputKey }); nothing else here names the marked copy.
+// free-work protected copy (protectedWorkCopy: at most 1080px, tiled mark, label and tracking
+// mark), made the first time it is asked for and kept and deleted with the work, then signed. A
+// paid work is the clean file.
 async function protectedResultKey(store: ObjectStore, ownerId: string, item: SharedItem): Promise<string> {
   if (!shouldWatermark(item.creditPool)) return item.outputKey
-  const key = downloadVariantKeyFor(ownerId, item.jobId, 'marked-white')
-  await stageVariant(store, { sourceKey: item.outputKey, key, contentType: 'image/jpeg', make: (source) => applyWatermark(source) })
-  return key
+  return protectedWorkCopy(store, { id: item.jobId, userId: ownerId, outputKey: item.outputKey })
 }
 
 // The photo the work was made from: the 768px, metadata-free preview (T32), never the upload
