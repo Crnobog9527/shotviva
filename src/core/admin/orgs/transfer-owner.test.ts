@@ -34,7 +34,8 @@ describe('transferOrgOwner', () => {
     expect(transfer).not.toHaveBeenCalled()
   })
 
-  it('maps the affiliate-row collision to its message', () => {
+  it('maps the affiliate-row collision and a busy org to their messages', () => {
     expect(orgFailure(new AppError('INTERNAL', 'ORG_NEW_OWNER_AFFILIATE'))).toEqual({ ok: false, message: TRANSFER_COPY.newOwnerAffiliate })
+    expect(orgFailure(new AppError('INTERNAL', 'ORG_BUSY'))).toEqual({ ok: false, message: TRANSFER_COPY.busy })
   })
 })

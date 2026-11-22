@@ -9603,6 +9603,8 @@ declare
   v_org_id uuid;
   v_new uuid;
   v_expected timestamptz;
+  v_account uuid;
+  v_errors bigint[] := '{}';
   v_old uuid;
   o public.orgs;
   v_banned timestamptz;
@@ -9627,13 +9629,49 @@ begin
   v_org_id := (p_input->>'org_id')::uuid;
   v_new := (p_input->>'user_id')::uuid;
 
-  select * into o from public.orgs where id = v_org_id for no key update;
+  -- FOR UPDATE, not NO KEY UPDATE: owner_user_id is a unique key (orgs_owner_user_id_key), so the
+  -- update below needs it, and taking it now (holding nothing yet) keeps that update from waiting.
+  select * into o from public.orgs where id = v_org_id for update;
   if not found then raise exception 'ORG_NOT_FOUND'; end if;
   if o.owner_user_id = v_new then return jsonb_build_object('applied', false); end if;
   if v_expected is distinct from o.updated_at then raise exception 'ORG_CHANGED'; end if;
   v_old := o.owner_user_id;
 
-  perform 1 from public.profiles where id in (v_old, v_new) order by id for no key update;
+  -- Every other lock is taken NOWAIT (see the header): busy means a payment, refund, binding or
+  -- settlement is writing for this org right now, and the admin simply tries again.
+  begin
+    select * into a from public.affiliates where org_id = o.id for update nowait;
+    v_account := case when found then a.user_id end;
+    perform 1 from public.profiles
+     where id in (select v_old union all select v_new union all
+                  select c.id from public.profiles c where v_account is not null and c.referred_by = v_account)
+     order by id for no key update nowait;
+    perform 1 from public.org_members where org_id = o.id and user_id in (v_old, v_new) order by user_id for no key update nowait;
+    -- Rows the writes reference through a foreign key: the admin (audit log) and the account's
+    -- approver (the copied row).
+    perform 1 from public.profiles where id in (p_actor, a.approved_by) order by id for key share nowait;
+    -- The affiliates statement trigger refreshes the template floor budget under this lock.
+    if v_account is not null and not pg_try_advisory_xact_lock(hashtextextended('shotviva.template_floor_budget_cache', 0)) then
+      raise exception using errcode = 'lock_not_available';
+    end if;
+    if v_account is not null then
+      perform 1 from public.affiliate_commissions where affiliate_user_id = v_account order by id for no key update nowait;
+      -- (affiliate_user_id, period) is a unique key: the update needs FOR UPDATE.
+      perform 1 from public.affiliate_payouts where affiliate_user_id = v_account order by id for update nowait;
+      perform 1 from public.affiliate_adjustments where affiliate_user_id = v_account order by id for no key update nowait;
+      perform 1 from public.affiliate_click_days where affiliate_user_id = v_account order by day for update nowait;
+      perform 1 from public.affiliate_rate_overrides where user_id = v_account order by product_kind for update nowait;
+      perform 1 from public.affiliates where parent_user_id = v_account order by user_id for no key update nowait;
+      -- Only these rows are rewritten below; one committed later carries 'org' (case 3).
+      select coalesce(array_agg(id order by id), '{}') into v_errors from (
+        select e.id from public.affiliate_recompute_errors e where e.resolved_at is null
+          and (e.snapshot->>'owner' = v_account::text or e.snapshot->>'parent' = v_account::text)
+          and (jsonb_typeof(e.snapshot->'org') is distinct from 'string' or e.snapshot->>'org' = o.id::text)
+         order by e.id for no key update nowait) x;
+    end if;
+  exception when lock_not_available then
+    raise exception 'ORG_BUSY';
+  end;
   select true, banned_at into v_found, v_banned from public.profiles where id = v_new;
   if v_found is null then raise exception 'PROFILE_NOT_FOUND'; end if;
   if v_banned is not null then raise exception 'USER_BANNED'; end if;
@@ -9642,8 +9680,7 @@ begin
     raise exception 'ORG_MEMBER_EXISTS';
   end if;
 
-  select * into a from public.affiliates where org_id = o.id for update;
-  if found then
+  if v_account is not null then
     -- The org's account is always its owner's row (1640/1643); refuse rather than move anything
     -- of someone else's if that ever stops being true.
     if a.user_id <> v_old then raise exception 'ORG_AFFILIATE_MISMATCH'; end if;
@@ -9671,8 +9708,7 @@ begin
     update public.affiliate_recompute_errors set snapshot = snapshot
         || case when snapshot->>'owner' = v_old::text then jsonb_build_object('owner', v_new) else '{}'::jsonb end
         || case when snapshot->>'parent' = v_old::text then jsonb_build_object('parent', v_new) else '{}'::jsonb end
-      where resolved_at is null and (snapshot->>'owner' = v_old::text or snapshot->>'parent' = v_old::text)
-        and (jsonb_typeof(snapshot->'org') is distinct from 'string' or snapshot->>'org' = o.id::text);
+      where id = any(v_errors);
     v_moved := jsonb_build_object('commissions', n_comm, 'payouts', n_pay, 'adjustments', n_adj, 'customers', n_cust);
   elsif public._affiliate_personal_open(v_new) then
     raise exception 'ORG_PERSONAL_AFFILIATE';

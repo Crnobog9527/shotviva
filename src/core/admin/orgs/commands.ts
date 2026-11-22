@@ -256,6 +256,7 @@ const KNOWN: Record<string, string> = {
   INVALID_INPUT: COPY.invalid,
   ORG_LIMIT_ABOVE_CAP: COPY.aboveCapGeneric,
   ORG_NEW_OWNER_AFFILIATE: TRANSFER_COPY.newOwnerAffiliate,
+  ORG_BUSY: TRANSFER_COPY.busy,
 }
 
 // Turns anything thrown into the message the form shows; unknown failures are logged, not shown.
