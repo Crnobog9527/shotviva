@@ -328,3 +328,13 @@ it('records a draw under the month its share was funded for, so a refund after t
   expect(await seat(orgId, staff)).toMatchObject({ held_promo_credits: 0 })
 })
 
+
+it('starts a rejoining member with no promotion allowance, as the paid one (Codex #836)', async () => {
+  const { orgId, owner, staff } = await org(1000)
+  await db.query('select org_set_promo_allowance($1,$2,700)', [owner, staff])
+  expect(await seat(orgId, staff)).toMatchObject({ promo_allowance: 700, held_promo_credits: 700 })
+  await db.query("select org_leave($1,'leave-rejoin')", [staff])
+  await db.query('select org_join($1,(select invite_token from orgs where id=$2))', [staff, orgId])
+  expect(await seat(orgId, staff)).toMatchObject({ status: 'active', promo_allowance: 0, held_promo_credits: 0 })
+  expect(await row(db, 'select monthly_allowance, held_credits from org_members where org_id=$1 and user_id=$2', [orgId, staff])).toEqual({ monthly_allowance: 0, held_credits: 0 })
+})
