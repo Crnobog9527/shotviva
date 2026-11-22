@@ -22,5 +22,5 @@ export function PosterDialogSlot({ id, templates, series, onSwitch, onClose, cre
   if (id && !loaded) setLoaded(true)
   if (!loaded) return null
   const summary = templates.find((item) => item.id === id) ?? null
-  return <PosterDialog id={id} summary={summary} series={series} onSwitch={onSwitch} onClose={onClose} balance={create.balance} concurrency={create.concurrency.limit} />
+  return <PosterDialog id={id} summary={summary} series={series} onSwitch={onSwitch} onClose={onClose} balance={create.balance} concurrency={create.concurrency.limit} poolChoice={create.poolChoice} />
 }

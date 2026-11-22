@@ -39,3 +39,4 @@ export {
   type PoolMonth,
   type PromoMove,
 } from './promo-actions'
+export { readPoolChoiceOffer } from './pool-choice'

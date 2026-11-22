@@ -22,6 +22,7 @@ import { ShareButton } from '../share/share-button'
 import { FavoriteButton } from '../favorites/favorite-button'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
+import { PoolChoiceSlot } from './pool-choice-picker'
 import { PendingCatalogueForm } from './pending-catalogue-form'
 import { useSubmitOnce } from './use-submit-once'
 import { useWarmRoute } from './use-warm-route'
@@ -107,6 +108,7 @@ function CreateForm({ template, open, onClose, forms, ...context }: BodyProps & 
           detailsStatus={!forms.ready && <CatalogueFormStatus failed={forms.failed} retry={forms.retry} />}
           photoExtra={batch ? <BatchLink templateId={template.id} onGo={onClose} /> : null}
         />
+        <PoolChoiceSlot choice={draft.choice.picker} />
       </>}
       bar={<FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} placement="sheet" limit={context.concurrency.limit} privateOnly={template.privateOnly} examplesLeft={draft.examplesLeft} />}
     />

@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
 import { ActionBar } from '@/core/app-shell/action-bar'
-import type { Balance } from '@/core/billing/pools'
+import { chosenBalance, type Balance, type PoolChoice, type PoolChoiceOffer } from '@/core/billing/pools'
 import { useRouter } from '@/core/i18n'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
@@ -12,6 +12,7 @@ import type { CatalogueTemplate } from '../../catalogue/catalogue-template'
 import type { PosterSeries } from '../../catalogue/poster-series'
 import { MemberPicker } from '../../workspace/member-picker'
 import { CreateSheet } from '../../workspace/create-sheet'
+import { PoolChoiceSlot } from '../../workspace/pool-choice-picker'
 import { carryDraft, usePosterStudio, type StudioTemplate } from '../use-poster-studio'
 import { usePhotoSort } from '../use-photo-sort'
 import { usePosterWeekly } from '../use-poster-weekly'
@@ -19,7 +20,8 @@ import { studioFor, useStudioTemplate } from '../use-studio-template'
 import { PosterSample } from './poster-sample'
 import { StudioBar, StudioForm } from './poster-studio'
 
-type Context = { balance: Balance; concurrency: number }
+// poolChoice: 出图时让员工自选 (§6.5), only when the member holds both kinds of org credits.
+type Context = { balance: Balance; concurrency: number; poolChoice?: PoolChoiceOffer | null }
 type Switcher = { series: PosterSeries | null; onSwitch(id: string): void }
 type Props = Context & Switcher & { id: string | null; summary: CatalogueTemplate | null; onClose(): void }
 
@@ -41,15 +43,17 @@ export function PosterDialog({ id, summary, series, onSwitch, onClose, ...contex
 
 type SheetProps = Context & Switcher & { template: StudioTemplate; summary: CatalogueTemplate | null; open: boolean; onClose(): void }
 
-function PosterSheet({ template, summary, open, series, onSwitch, onClose, balance, concurrency }: SheetProps) {
+function PosterSheet({ template, summary, open, series, onSwitch, onClose, balance: held, concurrency, poolChoice = null }: SheetProps) {
   const t = useTranslations('app.poster')
   const tApp = useTranslations('app')
   const router = useRouter()
+  const choice = usePosterChoice(poolChoice, held)
+  const balance = choice.balance
   // Generate queues every poster of the set and moves to Photos, where they develop.
   const studio = usePosterStudio(template, concurrency, () => {
     onClose()
     router.push('/photos', { transitionTypes: navTypesFor('/photos') })
-  })
+  }, choice.value)
   // 用上一期 reads this style and the series' others; their names say where it came from.
   const members = series?.members ?? []
   const weekly = usePosterWeekly(template, studio, members.map((member) => member.id).filter((id) => id !== template.id))
@@ -69,8 +73,18 @@ function PosterSheet({ template, summary, open, series, onSwitch, onClose, balan
           onChange={(next) => { carryDraft(template.id, next); onSwitch(next) }} />
       ) : undefined}
       sample={<PosterSample cover={summary?.cover ?? null} name={template.name} />}
-      form={<StudioForm studio={studio} template={template} balance={balance} reuse={{ weekly, names, photo }} />}
+      form={<>
+        <StudioForm studio={studio} template={template} balance={balance} reuse={{ weekly, names, photo }} />
+        <PoolChoiceSlot choice={choice.picker} />
+      </>}
       bar={<ActionBar inline><StudioBar studio={studio} template={template} balance={balance} /></ActionBar>}
     />
   )
+}
+
+// Every poster of the set is paid with the chosen kind; the bar checks that kind's balance only.
+function usePosterChoice(offer: PoolChoiceOffer | null, held: Balance) {
+  const [value, set] = useState<PoolChoice>(offer?.last ?? 'paid')
+  if (!offer) return { picker: null, balance: held, value: undefined }
+  return { picker: { offer, value, set }, balance: chosenBalance(held, value), value }
 }

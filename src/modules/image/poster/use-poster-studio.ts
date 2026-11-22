@@ -104,7 +104,7 @@ export const defaultResolution = (resolutions: readonly Resolution[]): Resolutio
 export const sortFailure = (reply: { status: string; code?: string }): 'rateLimited' | 'sortFailed' =>
   reply.status === 'error' && reply.code === 'RATE_LIMITED' ? 'rateLimited' : 'sortFailed'
 
-export function usePosterStudio(template: StudioTemplate, concurrency: number, onStarted: () => void) {
+export function usePosterStudio(template: StudioTemplate, concurrency: number, onStarted: () => void, poolChoice?: 'paid' | 'promo') {
   const [draft, setDraft, ready] = useStoredDraft(template)
   const [aspect, setAspect] = useState<OutputAspect>(template.aspects[0] ?? '9:16')
   const [resolution, setResolution] = useState<Resolution>(() => defaultResolution(template.resolutions))
@@ -157,7 +157,7 @@ export function usePosterStudio(template: StudioTemplate, concurrency: number, o
       const slots = pageUploads(template, page.kind, photos.uploads, unusedPhotoSlots(template.poster.featured, parsed.data.prizes?.rows))
       startJob({
         templateId: template.id, templateName: template.name, resolution, aspect, credits, inputKey: null, batchId: undefined,
-        body: { template_id: template.id, input_key: null, expected_credits: credits, inputs: { copy: {}, aspect_ratio: aspect, resolution }, poster: { set_id: saved.id, part }, ...(slots ? { input_slots: slots } : {}) },
+        body: { template_id: template.id, input_key: null, expected_credits: credits, inputs: { copy: {}, aspect_ratio: aspect, resolution }, poster: { set_id: saved.id, part }, ...(slots ? { input_slots: slots } : {}), ...(poolChoice ? { pool_choice: poolChoice } : {}) },
       }, concurrency)
     })
     onStarted()

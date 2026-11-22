@@ -20,6 +20,8 @@ export type GenerateBody = {
   poster?: { set_id: string; part: number; redraw_of?: string }
   // Make again from one of the user's own works (T40): that work's id (ARCHITECTURE §16.2c).
   again_of?: string
+  // 出图时让员工自选 (§6.5): which kind of org credits pays (only when the member holds both).
+  pool_choice?: 'paid' | 'promo'
 }
 
 // A photo edit (ARCHITECTURE §5.2): goes to /api/edit, settles and polls like any job.

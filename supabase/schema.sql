@@ -5546,6 +5546,72 @@ $$;
 ALTER FUNCTION "public"."_payment_granted_credits"("p_payment" "public"."payments") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."profiles" (
+    "id" "uuid" NOT NULL,
+    "role" "text" DEFAULT 'user'::"text" NOT NULL,
+    "credits" integer DEFAULT 0 NOT NULL,
+    "paid_until" timestamp with time zone,
+    "signup_ip" "inet",
+    "banned_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "free_credits" integer DEFAULT 0 NOT NULL,
+    "code_redeem_attempts" timestamp with time zone[] DEFAULT '{}'::timestamp with time zone[] NOT NULL,
+    "referred_by" "uuid",
+    "referred_at" timestamp with time zone,
+    "referred_source" "text",
+    "signup_gift_refusal" "text",
+    "referred_member" "uuid",
+    "referred_via" "uuid",
+    "org_pool_choice" "text",
+    CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
+    CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
+    CONSTRAINT "profiles_org_pool_choice_check" CHECK (("org_pool_choice" = ANY (ARRAY['paid'::"text", 'promo'::"text"]))),
+    CONSTRAINT "profiles_referred_source_check" CHECK (("referred_source" = ANY (ARRAY['signup'::"text", 'first_checkout'::"text", 'admin'::"text", 'org_l1'::"text", 'org_l2'::"text"]))),
+    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"]))),
+    CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'same_ip_pending'::"text", 'daily_cap'::"text", 'paused'::"text"])))
+);
+
+
+ALTER TABLE "public"."profiles" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_both boolean := false;
+  v_pool text;
+begin
+  if p_choice is not null and p_choice not in ('paid', 'promo') then
+    raise exception 'INVALID_INPUT' using detail = 'pool_choice must be paid or promo';
+  end if;
+  if p_choice is not null and p_source = 'web' then
+    select least(m.held_credits, p_profile.credits) > 0 and least(m.held_promo_credits, p_profile.free_credits) > 0
+      into v_both
+      from public.org_members m join public.orgs o on o.id = m.org_id
+     where m.user_id = p_profile.id and m.status = 'active' and o.promo_expires_at > now();
+  end if;
+  if coalesce(v_both, false) then
+    v_pool := case p_choice when 'paid' then 'paid' else 'free' end;
+    if (case when v_pool = 'paid' then p_profile.credits else p_profile.free_credits end) < p_cost then
+      raise exception 'POOL_CHOICE_INSUFFICIENT';
+    end if;
+    if p_profile.org_pool_choice is distinct from p_choice then
+      update public.profiles set org_pool_choice = p_choice where id = p_profile.id;
+    end if;
+    return v_pool;
+  end if;
+  if p_profile.credits >= p_cost then return 'paid'; end if;
+  if p_profile.free_credits >= p_cost then return 'free'; end if;
+  raise exception 'CREDITS_INSUFFICIENT';
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -17586,13 +17652,8 @@ begin
       coalesce(p_inputs->>'fallback_route'='true',false),v_v2) then
     raise exception 'TEMPLATE_UNAVAILABLE';
   end if;
-  if v_profile.credits >= v_cost then
-    v_pool := 'paid';
-  elsif v_profile.free_credits >= v_cost then
-    v_pool := 'free';
-  else
-    raise exception 'CREDITS_INSUFFICIENT';
-  end if;
+  -- Paid first, then free, unless a member holding both kinds of org credits chose one (1897).
+  v_pool := public._reserve_pool(v_profile, v_cost, p_source, p_inputs->>'pool_choice');
 
   perform public._apply_credit_change(
     p_user_id, v_pool, 'reserve', -v_cost, 'generation reserve',
@@ -19897,33 +19958,6 @@ CREATE OR REPLACE VIEW "admin"."template_tariffs_v2" AS
 
 
 ALTER VIEW "admin"."template_tariffs_v2" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."profiles" (
-    "id" "uuid" NOT NULL,
-    "role" "text" DEFAULT 'user'::"text" NOT NULL,
-    "credits" integer DEFAULT 0 NOT NULL,
-    "paid_until" timestamp with time zone,
-    "signup_ip" "inet",
-    "banned_at" timestamp with time zone,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "free_credits" integer DEFAULT 0 NOT NULL,
-    "code_redeem_attempts" timestamp with time zone[] DEFAULT '{}'::timestamp with time zone[] NOT NULL,
-    "referred_by" "uuid",
-    "referred_at" timestamp with time zone,
-    "referred_source" "text",
-    "signup_gift_refusal" "text",
-    "referred_member" "uuid",
-    "referred_via" "uuid",
-    CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
-    CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
-    CONSTRAINT "profiles_referred_source_check" CHECK (("referred_source" = ANY (ARRAY['signup'::"text", 'first_checkout'::"text", 'admin'::"text", 'org_l1'::"text", 'org_l2'::"text"]))),
-    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"]))),
-    CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'same_ip_pending'::"text", 'daily_cap'::"text", 'paused'::"text"])))
-);
-
-
-ALTER TABLE "public"."profiles" OWNER TO "postgres";
 
 
 CREATE OR REPLACE VIEW "admin"."users_overview" AS
@@ -26109,6 +26143,19 @@ REVOKE ALL ON FUNCTION "public"."_payment_granted_credits"("p_payment" "public".
 
 
 
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."profiles" TO "service_role";
+GRANT SELECT ON TABLE "public"."profiles" TO "authenticated";
+
+
+
+GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) TO "service_role";
 
@@ -28122,15 +28169,6 @@ GRANT SELECT,INSERT ON TABLE "admin"."template_copy_requests" TO "service_role";
 
 
 GRANT SELECT ON TABLE "admin"."template_floor_budget_cache" TO "service_role";
-
-
-
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."profiles" TO "service_role";
-GRANT SELECT ON TABLE "public"."profiles" TO "authenticated";
-
-
-
-GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
 
 
 

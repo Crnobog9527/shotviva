@@ -2108,6 +2108,13 @@
       "revokeYes": "关闭",
       "revokeFailed": "没能关闭链接，请再试一次。",
       "more": "加载更多"
+    },
+    "poolChoice": {
+      "title": "用哪种企业积分",
+      "promo": "推广积分（带水印，仅供演示）",
+      "paid": "付费积分（无水印，可商用）",
+      "left": "剩余 {count, number}",
+      "hint": "选的那种不够时不会改用另一种。"
     }
   },
   "paywall": {

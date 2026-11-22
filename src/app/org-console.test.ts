@@ -177,6 +177,20 @@ describe.each(['en', 'zh'] as const)('promotion pool (%s)', (locale) => {
   })
 })
 
+describe.each(['en', 'zh'] as const)('pool choice picker (%s)', (locale) => {
+  it('shows both kinds with what is left of each, and nothing when there is no choice', async () => {
+    const { PoolChoicePicker, PoolChoiceSlot } = await import('@/modules/image/workspace/pool-choice-picker')
+    const { text, html, errors } = render(locale, createElement(PoolChoicePicker, { offer: { paid: 1200, promo: 3400, last: 'promo' }, value: 'promo', onChange: () => {} }))
+    expect(errors).toEqual([])
+    expect(text).toContain(locale === 'en' ? 'Promotion credits (watermarked, demo only)' : '推广积分（带水印，仅供演示）')
+    expect(text).toContain(locale === 'en' ? 'Paid credits (no watermark, commercial use)' : '付费积分（无水印，可商用）')
+    expect(text).toContain('3,400')
+    expect(text).toContain('1,200')
+    expect(html.match(/checked=""/g)).toHaveLength(1)
+    expect(render(locale, createElement(PoolChoiceSlot, { choice: null })).html).toBe('')
+  })
+})
+
 describe.each(['en', 'zh'] as const)('join confirmation (%s)', (locale) => {
   it('asks for the click and never joins on its own', () => {
     // Joining always takes the click (review of #829): rendering the form never joins.

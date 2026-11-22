@@ -14,6 +14,7 @@ import { useBatchRefusal } from '../batch/use-batch-refusal'
 import { MatrixEntry } from '../matrix/matrix-entry'
 import { BatchProgressView } from './batch-progress-view'
 import { FormAction } from './form-action'
+import { PoolChoiceSlot } from './pool-choice-picker'
 import { GeneratingView } from './generating-view'
 import { FailureView, SuccessView } from './settled-views'
 import { useWorkspaceDraft, type DraftInput } from './use-workspace-draft'
@@ -73,6 +74,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
           examples={draft.fromExamples}
           photoExtra={<MatrixLink template={template} tier={tier} />}
         />
+        <PoolChoiceSlot choice={draft.choice.picker} />
         <FormAction
           state={draft.state}
           resolution={draft.values.resolution}
