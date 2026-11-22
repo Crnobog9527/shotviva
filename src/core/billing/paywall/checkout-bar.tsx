@@ -60,6 +60,7 @@ export function CheckoutBar({ label, fine, note, tone, status, locked, onClick, 
 function FineLine({ status, fine }: { status: CheckoutStatus; fine: string }) {
   const t = useTranslations("paywall")
   if (status === "floor") return <span className="text-foreground">{t("codeCheckoutFloor")}</span>
+  if (status === "org_member") return <span className="text-foreground">{t("orgMemberCheckout")}</span>
   if (status === "offer_changed") return <span className="text-foreground">{t("codeCheckoutChanged")}</span>
   if (status === "in_use") return <span className="text-foreground">{t("codeCheckoutInUse")}</span>
   if (status === "error") return <span className="text-destructive">{t("error")}</span>

@@ -3,11 +3,11 @@ import { notFound } from 'next/navigation'
 
 import { AdminPage, StatCard } from '@/core/admin'
 import { loadOrgDetail, ORGS_COPY as COPY } from '@/core/admin/orgs'
-import { AddMemberForm, AffiliateCard, GrantForm, LedgerTable, MemberTable, num, OrgEditForm, OrgStatusBadge, SignupBonusForm } from '@/core/admin/orgs-ui'
+import { AddMemberForm, AffiliateCard, GrantForm, LedgerTable, MemberTable, num, OrgEditForm, OrgStatusBadge, SignupBonusForm, TransferOwnerForm } from '@/core/admin/orgs-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { ORG_SIGNUP_BONUS_MAX } from '@/core/org'
 
-import { addMemberAction, grantOrgAction, saveOrgAction, saveSignupBonusAction, searchUsersAction } from '../actions'
+import { addMemberAction, grantOrgAction, saveOrgAction, saveSignupBonusAction, searchUsersAction, transferOwnerAction } from '../actions'
 
 export const instant = false
 
@@ -29,6 +29,15 @@ export default async function OrgPage({ params }: PageProps<'/[locale]/admin/org
         <StatCard title={COPY.pool} value={num(org.poolCredits)} />
         <StatCard title={COPY.owner} value={detail.ownerAccount ?? '—'} />
       </div>
+      <TransferOwnerForm
+        key={`owner-${org.ownerUserId}`}
+        orgId={org.id}
+        ownerId={org.ownerUserId}
+        ownerLabel={detail.ownerAccount ?? org.ownerUserId}
+        updatedAt={org.updatedAt}
+        search={searchUsersAction}
+        transfer={transferOwnerAction}
+      />
       <GrantForm orgId={org.id} packages={packages} grant={grantOrgAction} />
       <OrgEditForm key={org.updatedAt} org={org} caps={caps} save={saveOrgAction} />
       <SignupBonusForm key={`bonus-${org.updatedAt}`} org={org} max={ORG_SIGNUP_BONUS_MAX} given={detail.signupBonusUsers} save={saveSignupBonusAction} />
