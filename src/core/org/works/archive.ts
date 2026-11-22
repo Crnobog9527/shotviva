@@ -35,8 +35,13 @@ export async function archiveOrgWorksOf(deps: { db: SupabaseClient; store: Objec
   let copied = 0
   for (let at = 0; at < rows.length; at += MARK_EVERY) {
     const { done, failure } = await copyAll(deps.store, user, rows.slice(at, at + MARK_EVERY))
-    // What was copied is marked even when another copy failed, so the retry does only the rest.
-    if (done.length > 0) await callRpc(deps.db, 'mark_org_works_copied', { p_user_id: user, p_job_ids: done }, z.number().int())
+    // What was copied is marked even when another copy failed, so the retry does only the rest;
+    // the copy's failure is the one reported (unmarked copies are only redone, never lost).
+    if (done.length > 0) {
+      const marking = callRpc(deps.db, 'mark_org_works_copied', { p_user_id: user, p_job_ids: done }, z.number().int())
+      if (failure !== null) await marking.catch(() => undefined)
+      else await marking
+    }
     copied += done.length
     if (failure !== null) throw failure
   }

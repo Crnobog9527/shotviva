@@ -222,20 +222,24 @@ describe('account deletion', () => {
     expect(await store.head(archiveThumbKey(`org-works/${orgId}/${free}.png`))).not.toBeNull()
   })
 
-  it('copies many works a few at a time, and marks those copied when one copy fails', async () => {
-    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: cost * 20 })
+  it('copies many works a few at a time, chunk by chunk, keeping the marks of a chunk that failed', async () => {
+    const total = 50
+    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: cost * total })
     const staff = await member(db, service, token)
-    await allocateOrgCredits(service, owner, staff, cost * 20, randomUUID())
+    await allocateOrgCredits(service, owner, staff, cost * total, randomUUID())
     const ids: string[] = []
-    for (let i = 0; i < 20; i++) ids.push(await made(staff))
+    for (let i = 0; i < total; i++) ids.push(await made(staff))
+    const order = (await db.query<{ job_id: string }>('select job_id from public.archive_org_works($1)', [staff])).rows.map((r) => r.job_id)
+    // The last work handed out sits in the second chunk (48 per chunk); its file is missing.
+    const missing = order[order.length - 1]!
     const { store, upload } = createMemoryStore()
-    for (const id of ids.slice(1)) upload(`outputs/${staff}/${id}.png`, new Uint8Array([1]), 'image/png')
-    // The first work's file is missing, so its copy fails.
+    for (const id of ids) if (id !== missing) upload(`outputs/${staff}/${id}.png`, new Uint8Array([1]), 'image/png')
     await expect(archiveOrgWorksOf({ db: rest, store }, staff)).rejects.toThrow()
-    const marked = await db.query('select count(*)::int as n from public.org_work_archive where job_id = any($1) and copied_at is not null', [ids])
-    expect(marked.rows[0].n).toBeGreaterThan(0)
-    upload(`outputs/${staff}/${ids[0]}.png`, new Uint8Array([1]), 'image/png')
-    expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(20 - marked.rows[0].n)
+    const marked = async () =>
+      (await db.query('select count(*)::int as n from public.org_work_archive where job_id = any($1) and copied_at is not null', [ids])).rows[0].n as number
+    expect(await marked()).toBe(total - 1)
+    upload(`outputs/${staff}/${missing}.png`, new Uint8Array([1]), 'image/png')
+    expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(1)
     expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(0)
     for (const id of ids) expect(await store.head(`org-works/${orgId}/${id}.png`)).not.toBeNull()
   })

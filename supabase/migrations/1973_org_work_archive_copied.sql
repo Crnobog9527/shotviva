@@ -4,7 +4,7 @@
 -- result (and a free work's protected small copy) is in org-works/<org_id>/.
 --
 -- Expand-only: a nullable column, a new function, and 1971's archive_org_works recreated with the
--- one filter `a.copied_at is null` on what it returns (same signature).
+-- one filter `a.copied_at is null` and an order on what it returns (same signature).
 
 alter table public.org_work_archive add column copied_at timestamptz;
 
@@ -29,7 +29,8 @@ $$;
 revoke execute on function public.mark_org_works_copied(uuid, uuid[]) from public, anon, authenticated;
 grant execute on function public.mark_org_works_copied(uuid, uuid[]) to service_role;
 
--- 1971's body; only the returned rows change: those not copied yet.
+-- 1971's body; only the returned rows change: those not copied yet, oldest first (a stable order,
+-- so chunks and retries walk them the same way).
 create or replace function public.archive_org_works(p_user_id uuid)
 returns table (job_id uuid, credit_pool text, source_key text, archive_key text)
 language plpgsql
@@ -69,6 +70,7 @@ begin
       from public.org_work_archive a
       join public.generation_jobs j on j.id = a.job_id
      where j.user_id = p_user_id and a.reason = 'account_deleted' and a.deleted_at is null
-       and j.status = 'succeeded' and j.deleted_at is null and a.copied_at is null;
+       and j.status = 'succeeded' and j.deleted_at is null and a.copied_at is null
+     order by a.made_at, a.job_id;
 end;
 $$;
