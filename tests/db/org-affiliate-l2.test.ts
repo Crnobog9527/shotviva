@@ -7,8 +7,9 @@ import { bind, commission, promoter, refund, row, sale } from './affiliate-fixtu
 import { connectAdmin, createUser, ledgerOf } from './helpers'
 
 // Enterprise level 2, card E6 (ARCHITECTURE §6.5): a level-1 customer's own invitees become the
-// org's level-2 customers when the org has two levels, and earn the org its l2_bp (5% by default on
-// every product kind). Each test runs in a transaction that is rolled back.
+// org's level-2 customers when the org has two levels, and earn the org its l2_bp (by default the
+// kind's affiliate_rates.org_l2_bp since 1900: pack and monthly 5%, yearly 3%). Each test runs in a
+// transaction that is rolled back.
 
 let db: Client
 let actor: string
@@ -53,7 +54,7 @@ async function chain(levels = 2) {
   return { owner, orgId, staff, a }
 }
 
-it('binds a level-1 customer\'s invitee as the org\'s level-2 customer; payments earn the org 5% on every kind and refunds claw back', async () => {
+it('binds a level-1 customer\'s invitee as the org\'s level-2 customer; payments earn the org its per-kind default and refunds claw back', async () => {
   const { owner, staff, a } = await chain()
   const { customer: b, result } = await invitedBy(a)
   expect(result.status).toBe('ok')
@@ -64,9 +65,11 @@ it('binds a level-1 customer\'s invitee as the org\'s level-2 customer; payments
   expect(await commission(db, pack.id)).toMatchObject({ rate_bp: 500, amount: 124, status: 'pending' })
   expect(await row(db, 'select affiliate_user_id from affiliate_commissions where payment_id=$1', [pack.id])).toEqual({ affiliate_user_id: owner })
   expect(await commission(db, pack.id, 2)).toBeUndefined()
-  // Yearly too: the program's default l2_bp for yearly (the personal team bonus) is lower.
+  const monthly = await sale(db, b, 'starter_monthly', 1990)
+  expect(await commission(db, monthly.id)).toMatchObject({ rate_bp: 500, amount: 99 })
+  // Yearly plans 3% (Owner 2026-11-22).
   const yearly = await sale(db, b, 'pro_yearly', 47900)
-  expect(await commission(db, yearly.id)).toMatchObject({ rate_bp: 500, amount: 2395 })
+  expect(await commission(db, yearly.id)).toMatchObject({ rate_bp: 300, amount: 1437 })
   // Level 1 keeps its own rates.
   const fromA = await sale(db, a, 'pro_yearly', 47900)
   expect(await commission(db, fromA.id)).toMatchObject({ rate_bp: 1000, amount: 4790 })
@@ -184,14 +187,17 @@ it('falls back to the org level-2 default, not the personal team bonus, when the
   await yearly(900)
   expect(await commission(db, (await sale(db, b, 'pro_yearly', 47900)).id)).toMatchObject({ rate_bp: 900 })
   await yearly(null)
-  expect(await commission(db, (await sale(db, b, 'pro_yearly', 47900)).id)).toMatchObject({ rate_bp: 500, amount: 2395 })
-  // The default lives in one setting.
-  await db.query('update affiliate_settings set org_l2_bp=600')
+  expect(await commission(db, (await sale(db, b, 'pro_yearly', 47900)).id)).toMatchObject({ rate_bp: 300, amount: 1437 })
+  // The default is per kind in affiliate_rates; the old single setting is no longer read.
+  await db.query("update affiliate_rates set org_l2_bp=600 where product_kind='pack'")
+  await db.query('update affiliate_settings set org_l2_bp=900')
   expect(await commission(db, (await sale(db, b, 'pack_m', 2490)).id)).toMatchObject({ rate_bp: 600, amount: 149 })
+  expect(await commission(db, (await sale(db, b, 'starter_monthly', 1990)).id)).toMatchObject({ rate_bp: 500 })
 })
 
 it('keeps the personal team bonus on the program defaults', async () => {
   await db.query('update affiliate_settings set org_l2_bp=900')
+  await db.query('update affiliate_rates set org_l2_bp=900')
   const parent = await promoter(db)
   await db.query('update affiliates set team_enabled=true where user_id=$1', [parent.id])
   const child = await promoter(db, parent.id)
