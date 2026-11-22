@@ -135,6 +135,10 @@ export const ORGS_COPY = {
     allocate: '划给成员',
     reclaim: '收回',
     admin_adjust: '后台更正',
+    promo_grant: '推广积分进池',
+    promo_allocate: '推广积分划给成员',
+    promo_reclaim: '推广积分收回',
+    promo_expire: '推广积分月底清零',
   } as Record<string, string>,
   // 成员
   membersTitle: '成员（只读）',

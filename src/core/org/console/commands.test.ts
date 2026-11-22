@@ -7,9 +7,11 @@ vi.mock('../actions', () => ({
   allocateOrgCredits: sql.allocate, depositOrgCredits: sql.deposit, joinOrg: sql.join, leaveOrg: sql.leave,
   removeOrgMember: sql.remove, rotateOrgInvite: sql.rotate, setOrgAllowance: sql.allowance,
 }))
+const promo = vi.hoisted(() => ({ allocate: vi.fn(), allowance: vi.fn() }))
+vi.mock('../promo-actions', () => ({ allocateOrgPromoCredits: promo.allocate, setOrgPromoAllowance: promo.allowance }))
 vi.mock('@/core/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn() } }))
 
-const { allocate, deposit, join, leave, removeMember, resetInvite, setAllowance } = await import('./commands')
+const { allocate, allocatePromo, deposit, join, leave, removeMember, resetInvite, setAllowance, setPromoAllowance } = await import('./commands')
 const { AppError } = await import('@/core/errors')
 
 const USER = '00000000-0000-4000-8000-0000000000a1'
@@ -50,6 +52,20 @@ describe('owner commands', () => {
     expect(retry).toEqual(first)
     expect(sql.allocate).toHaveBeenNthCalledWith(1, expect.anything(), USER, MEMBER, 10, `console:allocate:${ORG}:${FORM}`)
     expect(sql.allocate.mock.calls[1]?.slice(1)).toEqual(sql.allocate.mock.calls[0]?.slice(1))
+  })
+
+  it('moves promotion credits under their own request id, and refuses a non-owner before any SQL', async () => {
+    promo.allocate.mockResolvedValue({ applied: true, promo_pool_credits: 700, held_promo_credits: 300 })
+    promo.allowance.mockResolvedValue(2000)
+    expect(await allocatePromo(owner(), { requestId: FORM, member: MEMBER, credits: '300' })).toEqual({ ok: true, pool: 700 })
+    expect(promo.allocate).toHaveBeenCalledWith(expect.anything(), USER, MEMBER, 300, `console:allocate_promo:${ORG}:${FORM}`)
+    expect(await setPromoAllowance(owner(), { member: MEMBER, allowance: '2000' })).toEqual({ ok: true, allowance: 2000 })
+    const stranger = { db: db(null), user: USER }
+    expect(await allocatePromo(stranger, { requestId: FORM, member: MEMBER, credits: 1 })).toEqual({ ok: false, error: 'NOT_OWNER' })
+    expect(await setPromoAllowance(stranger, { member: MEMBER, allowance: 1 })).toEqual({ ok: false, error: 'NOT_OWNER' })
+    expect(promo.allocate).toHaveBeenCalledTimes(1)
+    promo.allocate.mockRejectedValue(sqlError('ORG_POOL_INSUFFICIENT'))
+    expect(await allocatePromo(owner(), { requestId: FORM, member: MEMBER, credits: 1 })).toEqual({ ok: false, error: 'POOL_INSUFFICIENT' })
   })
 
   it('uses a different SQL request id per kind of action', async () => {

@@ -7,9 +7,10 @@ import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 
 import { getOrgPaymentAccounts } from '../payment-accounts'
+import { readMemberPromoStats, readPoolMonth } from '../promo-actions'
 import { currentPeriod, readCustomerCounts, readMemberStats } from '../stats'
 
-import type { ConsoleMember, ConsolePackage, OrgView, OwnerConsole, PaymentAccountGroup, StaffCard, StaffLevel } from './types'
+import type { ConsoleMember, ConsolePackage, OrgView, OwnerConsole, PaymentAccountGroup, PoolMonthView, StaffCard, StaffLevel } from './types'
 
 // Read side of the account centre's enterprise block. The org tables have no client grant and the
 // service role may select (same as the admin page); every write goes through core/org. Everything
@@ -22,6 +23,8 @@ const orgSchema = z.object({
   owner_user_id: z.uuid(),
   status: z.enum(['active', 'suspended']),
   pool_credits: z.number(),
+  promo_pool_credits: z.number(),
+  promo_expires_at: z.string().nullable(),
   invite_token: z.string(),
   ref_code: z.string(),
   affiliate_enabled: z.boolean(),
@@ -38,6 +41,8 @@ const memberSchema = z.object({
   role: z.enum(['owner', 'member']),
   monthly_allowance: z.number(),
   held_credits: z.number(),
+  promo_allowance: z.number(),
+  held_promo_credits: z.number(),
   joined_at: z.string(),
 })
 
@@ -80,9 +85,9 @@ export async function readPaymentAccounts(db: SupabaseClient, owner: string): Pr
 
 type Deps = { db: SupabaseClient; now?: Date; maskPhone?: (phone: string) => string }
 
-async function ownerConsole({ db, mask }: { db: SupabaseClient; mask: (phone: string) => string }, org: z.infer<typeof orgSchema>): Promise<OwnerConsole> {
+async function ownerConsole({ db, mask, now }: { db: SupabaseClient; mask: (phone: string) => string; now: Date }, org: z.infer<typeof orgSchema>): Promise<OwnerConsole> {
   const [memberRows, total, packages, owner] = await Promise.all([
-    db.from('org_members').select('user_id,role,monthly_allowance,held_credits,joined_at').eq('org_id', org.id).eq('status', 'active')
+    db.from('org_members').select('user_id,role,monthly_allowance,held_credits,promo_allowance,held_promo_credits,joined_at').eq('org_id', org.id).eq('status', 'active')
       .order('joined_at').order('user_id').limit(MEMBER_LIMIT),
     db.from('org_members').select('user_id', { count: 'exact' }).eq('org_id', org.id).eq('status', 'active').limit(1),
     activePackages(db),
@@ -92,20 +97,47 @@ async function ownerConsole({ db, mask }: { db: SupabaseClient; mask: (phone: st
   const credits = z.object({ credits: z.number() }).nullable().parse(ok(owner, 'owner balance'))?.credits ?? 0
   const seat = members.find((m) => m.user_id === org.owner_user_id)
   const [counts, labels] = await Promise.all([readCustomerCounts(db, org.owner_user_id, org.id), accountLabels(db, members.map((m) => m.user_id), mask)])
-  const paymentAccounts = await readPaymentAccounts(db, org.owner_user_id)
+  const [paymentAccounts, poolMonth] = await Promise.all([readPaymentAccounts(db, org.owner_user_id), readOwnerPoolMonth(db, org.owner_user_id, now)])
+  const promoLive = org.promo_expires_at !== null && Date.parse(org.promo_expires_at) > now.getTime()
   return {
     kind: 'owner',
-    org: { id: org.id, name: org.name, refCode: org.ref_code, status: org.status, poolCredits: org.pool_credits, affiliateEnabled: org.affiliate_enabled, affiliateLevels: org.affiliate_levels },
+    org: { id: org.id, name: org.name, refCode: org.ref_code, status: org.status, poolCredits: org.pool_credits, affiliateEnabled: org.affiliate_enabled, affiliateLevels: org.affiliate_levels,
+      promoPoolCredits: promoLive ? org.promo_pool_credits : 0, promoExpiresAt: promoLive ? org.promo_expires_at : null },
     inviteToken: org.invite_token,
     members: members.map((m): ConsoleMember => ({
       userId: m.user_id, account: labels.get(m.user_id) ?? null, role: m.role, monthlyAllowance: m.monthly_allowance,
-      heldCredits: m.held_credits, customers: counts.get(m.user_id)?.l1 ?? 0, joinedAt: m.joined_at,
+      heldCredits: m.held_credits, promoAllowance: m.promo_allowance, heldPromoCredits: promoLive ? m.held_promo_credits : 0, customers: counts.get(m.user_id)?.l1 ?? 0, joinedAt: m.joined_at,
     })),
     memberTotal: total.count ?? members.length,
     packages,
     // Mirrors org_deposit: credits minus the org's share, min(held, credits).
     depositable: Math.max(0, credits - Math.min(seat?.held_credits ?? 0, credits)),
     paymentAccounts,
+    poolMonth,
+  }
+}
+
+// This month's movements of both pools for the owner's panel. A failed read must not take the
+// console down: null, and the panel leaves the month out.
+async function readOwnerPoolMonth(db: SupabaseClient, owner: string, now: Date): Promise<PoolMonthView | null> {
+  try {
+    const month = await readPoolMonth(db, owner, currentPeriod(now))
+    return { period: month.period, paid: { in: month.paid.in, allocated: month.paid.allocated, reclaimed: month.paid.reclaimed },
+      promo: { granted: month.promo.granted, allocated: month.promo.allocated, reclaimed: month.promo.reclaimed, expired: month.promo.expired, held: month.promo.held } }
+  } catch (error) {
+    logger.warn('org pool month unavailable', { code: error instanceof AppError ? error.code : 'UNKNOWN' })
+    return null
+  }
+}
+
+// The member's own promotion numbers this month (staff variant: only their row); null if unread.
+async function staffPromo(db: SupabaseClient, user: string, orgId: string, period: string): Promise<StaffCard['promo']> {
+  try {
+    const row = (await readMemberPromoStats(db, user, orgId, period)).find((r) => r.userId === user)
+    return row ? { allowance: row.allowance, held: row.held, allocated: row.allocated, used: row.used } : null
+  } catch (error) {
+    logger.warn('org staff promo stats unavailable', { code: error instanceof AppError ? error.code : 'UNKNOWN' })
+    return null
   }
 }
 
@@ -133,10 +165,13 @@ async function staffCard(db: SupabaseClient, now: Date, org: z.infer<typeof orgS
     readCustomerCounts(db, user, org.id),
   ])
   const given = z.array(z.object({ delta: z.number() })).parse(ok(ledger, 'allocations')).reduce((sum, row) => sum - row.delta, 0)
-  const performance = await staffLevel(db, user, org.id, period, new Map([['org_l1', counts.get(user)?.l1 ?? 0], ['org_l2', counts.get(user)?.l2 ?? 0]]))
+  const [performance, promo] = await Promise.all([
+    staffLevel(db, user, org.id, period, new Map([['org_l1', counts.get(user)?.l1 ?? 0], ['org_l2', counts.get(user)?.l2 ?? 0]])),
+    staffPromo(db, user, org.id, period),
+  ])
   return {
     kind: 'member', orgName: org.name, status: org.status, monthlyAllowance: seat.monthly_allowance,
-    allocatedThisMonth: given, heldCredits: seat.held_credits, customers: counts.get(user)?.l1 ?? 0,
+    allocatedThisMonth: given, heldCredits: seat.held_credits, promo, customers: counts.get(user)?.l1 ?? 0,
     withLevel2, period, performance,
   }
 }
@@ -146,11 +181,11 @@ export async function readOrgView(user: string, { db, now = new Date(), maskPhon
   const seatRow = ok(await db.from('org_members').select('org_id,role,monthly_allowance,held_credits').eq('user_id', user).eq('status', 'active').maybeSingle(), 'seat')
   if (!seatRow) return { kind: 'none' }
   const seat = seatSchema.parse(seatRow)
-  const found = ok(await db.from('orgs').select('id,name,owner_user_id,status,pool_credits,invite_token,ref_code,affiliate_enabled,affiliate_levels').eq('id', seat.org_id).maybeSingle(), 'org')
+  const found = ok(await db.from('orgs').select('id,name,owner_user_id,status,pool_credits,promo_pool_credits,promo_expires_at,invite_token,ref_code,affiliate_enabled,affiliate_levels').eq('id', seat.org_id).maybeSingle(), 'org')
   if (!found) return { kind: 'none' }
   const org = orgSchema.parse(found)
   // The owner is the org's owner_user_id; a member row says role = 'member' for everyone else.
-  if (org.owner_user_id === user && seat.role === 'owner') return ownerConsole({ db, mask: maskPhone }, org)
+  if (org.owner_user_id === user && seat.role === 'owner') return ownerConsole({ db, mask: maskPhone, now }, org)
   return staffCard(db, now, org, seat, user)
 }
 

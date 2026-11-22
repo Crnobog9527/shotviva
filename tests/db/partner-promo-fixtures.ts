@@ -86,3 +86,21 @@ export async function fiveCustomers(db: Client, account: string, each: number, a
   for (let i = 0; i < 5; i++) sales.push(await confirmedSale(db, await customer(db, account), each, at))
   return sales
 }
+
+// The org's promotion pool (where grants land since migration 1894).
+export async function promoPoolOf(db: Client, orgId: string): Promise<number> {
+  return Number((await row(db, 'select promo_pool_credits from orgs where id=$1', [orgId])).promo_pool_credits)
+}
+
+// Turns a grant or top-up made now (into the org pool) into one made before migration 1894: its
+// credits leave the org pool and land in the owner's own free pool, as the old confirm and top-up
+// did. Used to keep testing the month-end expiry of such rows, which still exist on production.
+export async function asLegacy(db: Client, table: 'partner_promo_grants' | 'partner_promo_topups', id: string | number) {
+  const amount = table === 'partner_promo_grants' ? 'total' : 'credits'
+  const r = await row(db, `update ${table} set destination='owner' where id=$1 returning org_id, recipient_user_id, ${amount} as amt`, [id])
+  if (r.amt === 0) return
+  await db.query(`update orgs set promo_pool_credits=promo_pool_credits-$2,
+    promo_expires_at=case when promo_pool_credits-$2=0 then null else promo_expires_at end where id=$1`, [r.org_id, r.amt])
+  const kind = table === 'partner_promo_grants' ? 'partner_promo' : 'partner_promo_topup'
+  await db.query("select _apply_credit_change($1,'free',$2,$3,'legacy',$4)", [r.recipient_user_id, kind, r.amt, `${kind}:${id}`])
+}

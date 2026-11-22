@@ -14,10 +14,13 @@ import { useConsoleAction } from './use-console-action'
 const digits = (raw: string) => raw.replace(/\D/g, '').slice(0, 10)
 
 type RowProps = { member: ConsoleMember; actions: OwnerActions; suspended: boolean; label: string }
+// Paid credits (pool_credits) or promotion credits (promo pool: watermarked, expire at month end).
+type Kind = 'paid' | 'promo'
+type FormProps = RowProps & { kind: Kind }
 
-function AllowanceForm({ member, actions, suspended, label }: RowProps) {
+function AllowanceForm({ member, actions, suspended, label, kind }: FormProps) {
   const t = useTranslations('app.org.members')
-  const [allowance, setAllowance] = useState(String(member.monthlyAllowance))
+  const [allowance, setAllowance] = useState(String(kind === 'paid' ? member.monthlyAllowance : member.promoAllowance))
   const { pending, outcome, run } = useConsoleAction()
   const value = Number(allowance)
   const valid = allowance !== '' && Number.isInteger(value) && value >= 0
@@ -27,13 +30,14 @@ function AllowanceForm({ member, actions, suspended, label }: RowProps) {
       onSubmit={(event) => {
         event.preventDefault()
         if (pending || !valid || suspended) return
-        run(() => actions.setAllowance({ member: member.userId, allowance: value }), t('allowanceSaved'))
+        const save = kind === 'paid' ? actions.setAllowance : actions.setPromoAllowance
+        run(() => save({ member: member.userId, allowance: value }), t('allowanceSaved'))
       }}
     >
       <label className="grid gap-1 text-label">
-        <span className="font-medium">{t('allowance')}</span>
+        <span className="font-medium">{t(kind === 'paid' ? 'allowance' : 'promoAllowance')}</span>
         <span className="flex gap-2">
-          <input className={FIELD} inputMode="numeric" aria-label={t('allowanceFor', { who: label })} value={allowance} onChange={(e) => setAllowance(digits(e.target.value))} />
+          <input className={FIELD} inputMode="numeric" aria-label={t(kind === 'paid' ? 'allowanceFor' : 'promoAllowanceFor', { who: label })} value={allowance} onChange={(e) => setAllowance(digits(e.target.value))} />
           <Button type="submit" size="touch" variant="glass" disabled={pending || !valid || suspended}>{t('save')}</Button>
         </span>
       </label>
@@ -44,7 +48,7 @@ function AllowanceForm({ member, actions, suspended, label }: RowProps) {
 
 // "Give now": one request id per form, kept until it succeeds, so a double click or a retry after
 // a lost answer is the same request to the database.
-function GiveForm({ member, actions, suspended, label }: RowProps) {
+function GiveForm({ member, actions, suspended, label, kind }: FormProps) {
   const t = useTranslations('app.org.members')
   const format = useFormatter()
   const [give, setGive] = useState('')
@@ -58,13 +62,15 @@ function GiveForm({ member, actions, suspended, label }: RowProps) {
       onSubmit={(event) => {
         event.preventDefault()
         if (pending || !valid || suspended) return
-        run(() => actions.allocate({ requestId, member: member.userId, credits: value }), t('given', { count: value }), () => { setRequestId(crypto.randomUUID()); setGive('') })
+        const allocate = kind === 'paid' ? actions.allocate : actions.allocatePromo
+        run(() => allocate({ requestId, member: member.userId, credits: value }), t('given', { count: value }), () => { setRequestId(crypto.randomUUID()); setGive('') })
       }}
     >
       <label className="grid gap-1 text-label">
-        <span className="font-medium">{t('giveNow')}</span>
+        <span className="font-medium">{t(kind === 'paid' ? 'giveNow' : 'promoGiveNow')}</span>
         <span className="flex gap-2">
-          <input className={FIELD} inputMode="numeric" aria-label={t('giveFor', { who: label })} value={give} placeholder={format.number(member.monthlyAllowance)} onChange={(e) => setGive(digits(e.target.value))} />
+          <input className={FIELD} inputMode="numeric" aria-label={t(kind === 'paid' ? 'giveFor' : 'promoGiveFor', { who: label })} value={give}
+            placeholder={format.number(kind === 'paid' ? member.monthlyAllowance : member.promoAllowance)} onChange={(e) => setGive(digits(e.target.value))} />
           <Button type="submit" size="touch" variant="glass" disabled={pending || !valid || suspended}>{pending ? t('giving') : t('give')}</Button>
         </span>
       </label>
@@ -100,6 +106,18 @@ function RemoveControl({ member, actions, label }: Omit<RowProps, 'suspended'>) 
   )
 }
 
+// One pool's allowance and "give now" for one person, under that pool's name.
+function KindForms(props: FormProps) {
+  const t = useTranslations('app.org.members')
+  return (
+    <fieldset className="grid gap-3 sm:grid-cols-2">
+      <legend className="mb-1 text-caption font-medium text-muted-foreground">{t(props.kind === 'paid' ? 'paidKind' : 'promoKind')}</legend>
+      <AllowanceForm {...props} />
+      <GiveForm {...props} />
+    </fieldset>
+  )
+}
+
 // One person: what they hold, their monthly allowance, "give now", and removal.
 function MemberRow({ member, actions, suspended }: { member: ConsoleMember; actions: OwnerActions; suspended: boolean }) {
   const t = useTranslations('app.org.members')
@@ -109,12 +127,12 @@ function MemberRow({ member, actions, suspended }: { member: ConsoleMember; acti
     <li className="space-y-3 py-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="min-w-0 break-all font-medium">{label}{member.role === 'owner' ? <span className="ml-2 rounded-full bg-wash px-2 py-0.5 text-caption font-normal">{t('owner')}</span> : null}</p>
-        <p className="text-caption text-muted-foreground tabular-nums">{t('held', { count: member.heldCredits })} · {t('customers', { count: member.customers })}</p>
+        <p className="text-caption text-muted-foreground tabular-nums">
+          {t('held', { count: member.heldCredits })} · {t('heldPromo', { count: member.heldPromoCredits })} · {t('customers', { count: member.customers })}
+        </p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <AllowanceForm {...props} />
-        <GiveForm {...props} />
-      </div>
+      <KindForms {...props} kind="paid" />
+      <KindForms {...props} kind="promo" />
       {member.role === 'owner' ? null : <RemoveControl {...props} />}
     </li>
   )

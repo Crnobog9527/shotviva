@@ -7,7 +7,7 @@ import { maskPhone } from '@/core/auth/phone'
 import { readOwnerReport } from '@/core/org/console'
 import { EnterpriseFrame, OwnerConsoleView, type OwnerActions } from '@/core/org/ui'
 
-import { allocateAction, depositAction, removeMemberAction, resetInviteAction, setAllowanceAction } from '../org-actions'
+import { allocateAction, allocatePromoAction, depositAction, removeMemberAction, resetInviteAction, setAllowanceAction, setPromoAllowanceAction } from '../org-actions'
 import { readOwnerArea } from './owner-area'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -18,6 +18,8 @@ const actions: OwnerActions = {
   deposit: depositAction,
   allocate: allocateAction,
   setAllowance: setAllowanceAction,
+  allocatePromo: allocatePromoAction,
+  setPromoAllowance: setPromoAllowanceAction,
   removeMember: removeMemberAction,
   resetInvite: resetInviteAction,
 }
