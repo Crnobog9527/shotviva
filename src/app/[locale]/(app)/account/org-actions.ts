@@ -4,6 +4,7 @@ import { refresh } from 'next/cache'
 
 import { createAdminSupabase, requireUser } from '@/core/auth'
 import { orgCommands } from '@/core/org/console'
+import { clearJoinIntent } from '@/core/org/join-intent'
 import type { ConsoleResult } from '@/core/org/console'
 
 // Server actions of the account centre's enterprise block. They are public endpoints, so each
@@ -46,5 +47,7 @@ export async function leaveOrgAction(input: unknown) {
 
 export async function joinOrgAction(token: string) {
   const user = await requireUser(`/join/org/${encodeURIComponent(token)}`)
+  // The sign-up mark is used once, whatever the outcome (core/org/join-intent.ts).
+  await clearJoinIntent()
   return applied(await orgCommands.join({ db: createAdminSupabase(), user: user.id }, token))
 }
