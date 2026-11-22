@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 
 import { row } from './affiliate-fixtures'
 import { connectAdmin, createUser } from './helpers'
-import { adminActor, asLegacy, confirm, decide, freeOf, months, partner, refused, run, sheet } from './partner-promo-fixtures'
+import { adminActor, asLegacy, confirm, decide, fiveCustomers, freeOf, months, partner, refused, run, sheet } from './partner-promo-fixtures'
 
 // Voiding a granted monthly promotion sheet whose credits an admin already took back by hand
 // (ARCHITECTURE §6.5 渠道商推广积分, migration 1920): the void moves no credits and the month-end
@@ -139,4 +139,22 @@ it('can still void after the month ended while the expiry pass has not run yet',
   expect(await voidSheet(actor, { grant_id: s.id, reason: 'late' })).toMatchObject({ applied: true })
   expect(await expirePass()).toMatchObject({ taken: 0 })
   expect(await freeOf(db, owner)).toBe(2510)
+})
+
+it('takes no clawback from later months for a voided sheet whose bonus was already taken back', async () => {
+  const { orgId, owner } = await partner(db, actor)
+  const sales = await fiveCustomers(db, owner, 600000, m.in_before)
+  await run(db, m.previous)
+  await db.query("update partner_promo_grants set expires_at=now()+interval '1 day' where org_id=$1 and period=$2", [orgId, m.previous])
+  const last = await sheet(db, orgId, m.previous)
+  expect(await confirm(db, actor, last)).toMatchObject({ applied: true, total: 310000 })
+  await asLegacy(db, 'partner_promo_grants', last.id) // granted before 1894, into the owner's own pool
+  await db.query("select _apply_credit_change($1,'free','admin_adjust',-310000,'收回推广积分',$2)", [owner, 'adj:' + last.id])
+  await voidSheet(actor, { grant_id: last.id, reason: '已手动收回' })
+
+  // Every order of the voided sheet is refunded afterwards: nothing is owed from it.
+  for (const x of sales) await db.query("select record_payment_issue($1,'refunded',2490)", [x.charge])
+  await run(db, m.current)
+  expect(await sheet(db, orgId, m.current)).toMatchObject({ base: 10000, clawback_owed: 0, clawback_applied: 0, total: 10000 })
+  expect((await sheet(db, orgId, m.current)).detail.sources).toEqual([])
 })

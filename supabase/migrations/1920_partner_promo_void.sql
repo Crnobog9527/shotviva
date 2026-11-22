@@ -6,13 +6,12 @@
 -- pass, its overdue alarm and the owner's month card skip it. Voiding moves no credits.
 --
 -- Expand only: three nullable columns (set together, only by admin_partner_promo_void), one audit action widened, one new admin function, and
--- create or replace of _partner_promo_bucket_left and _partner_promo_expire (1847) and
--- org_promo_month (1849) with `and g.voided_at is null` added wherever they pick granted sheets;
--- nothing else in them changes. Code running before the deploy never sets voided_at, so for it
--- every answer stays the same.
---
--- Known limit: _partner_promo_calc (1841) still counts a voided sheet as a clawback source; a
--- void of a sheet with a bonus would let later refunds claw back from the next month as before.
+-- create or replace of _partner_promo_bucket_left and _partner_promo_expire (1847),
+-- org_promo_month (1849) and _partner_promo_owed (1910) with `and g.voided_at is null` added
+-- wherever they pick granted sheets; nothing else in them changes. Code running before the deploy
+-- never sets voided_at, so for it every answer stays the same. A voided sheet is no clawback
+-- source either: its credits, bonus included, were already taken back, so a later refund of its
+-- orders must not take its bonus a second time from the next month's grant.
 
 alter table public.partner_promo_grants
   add column voided_at timestamptz,
@@ -264,4 +263,23 @@ begin
   return query select v_partner, v_period, v_monthly, v_topups, v_expires,
     case when v_expires is not null and v_expires <= p_now then 0 else v_left::integer end;
 end;
+$$;
+
+-- 1910's clawback debts without voided sheets (their bonus was already taken back by hand).
+create or replace function public._partner_promo_owed(p_org uuid, p_period text)
+returns table(grant_id bigint, period text, owed integer)
+language sql stable security definer set search_path = '' as $$
+  select g.id, g.period,
+         greatest(0, g.bonus
+           - (public._partner_promo_bonus(coalesce((
+               select jsonb_agg(jsonb_build_object('customer', l.customer_user_id,
+                                                   'credits', public._partner_promo_payment_credits(p)))
+                 from public.partner_promo_grant_lines l join public.payments p on p.id = l.payment_id
+                where l.grant_id = g.id), '[]'::jsonb),
+               coalesce((g.detail->>'customer_cap_bp')::integer, 2000),
+               coalesce((g.detail->>'min_customers')::integer, 3))->>'bonus')::integer
+           - coalesce((select sum(c.credits) from public.partner_promo_clawbacks c where c.source_grant_id = g.id), 0)::integer)
+    from public.partner_promo_grants g
+   where g.org_id = p_org and g.status = 'granted' and g.voided_at is null and g.period < p_period and g.bonus > 0
+   order by g.period, g.id;
 $$;

@@ -319,5 +319,5 @@ revoke all on function public._org_promo_follows_ledger() from public, anon, aut
 
 create trigger credit_ledger_org_promo_held
   after insert on public.credit_ledger
-  for each row when (new.pool = 'free' and new.kind not in ('org_promo_allocate', 'org_promo_reclaim', 'org_promo_expire', 'org_promo_move'))
+  for each row when (new.pool = 'free' and new.kind not in ('org_promo_allocate', 'org_promo_reclaim', 'org_promo_expire'))
   execute function public._org_promo_follows_ledger();

@@ -13,7 +13,7 @@ import { adminActor, asLegacy, confirm, freeOf, months, partner, promoPoolOf, re
 // grants land in the org, the owner hands paid and promotion credits to members separately, a
 // generation spends paid first and the org's promotion share before the member's own free credits,
 // refunds go back to the pool kind they came from, promotion credits expire at month end (pool and
-// member-held), and this month's old grants move from the owner's own pool once.
+// member-held), and grants made before 1894 still expire in the owner's own pool.
 let db: Client
 let actor: string
 let m: Awaited<ReturnType<typeof months>>
@@ -219,11 +219,10 @@ it('refuses non-owners and keeps every new table and function away from clients'
   await refused(db, () => db.query('select org_set_promo_allowance($1,$2,10)', [outsider, staff]), 'NOT_ORG_OWNER')
   await refused(db, () => db.query('select org_pool_month($1,$2)', [staff, m.current]), 'NOT_ORG_OWNER')
   await refused(db, () => db.query('select * from org_member_promo_stats($1,$2,$3)', [outsider, orgId, m.current]), 'NOT_ORG_MEMBER')
-  await refused(db, () => db.query('select admin_partner_promo_move($1,$2)', [staff, { org_id: orgId, credits: 0 }]), 'NOT_ADMIN')
   const fns = ['org_allocate_promo(uuid,uuid,integer,text)', 'org_set_promo_allowance(uuid,uuid,integer)', 'org_pool_month(uuid,text)',
-    'org_member_promo_stats(uuid,uuid,text)', 'admin_partner_promo_move(uuid,jsonb)', 'admin_partner_promo_move_preview(uuid,uuid)']
+    'org_member_promo_stats(uuid,uuid,text)',]
   const internal = ['_org_promo_expire_due(uuid)', '_org_allocate_promo(uuid,uuid,integer,text,uuid)', '_org_promo_topup(uuid)',
-    '_org_promo_grant(uuid,integer,timestamptz,text,text,uuid)', '_partner_promo_moveable(uuid)', '_org_promo_follows_ledger()', '_utc_period(timestamptz)']
+    '_org_promo_grant(uuid,integer,timestamptz,text,text,uuid)', '_org_promo_follows_ledger()', '_utc_period(timestamptz)']
   for (const fn of fns) {
     expect(await row(db, `select has_function_privilege('anon','public.${fn}','execute') a, has_function_privilege('authenticated','public.${fn}','execute') u,
       has_function_privilege('service_role','public.${fn}','execute') s`)).toEqual({ a: false, u: false, s: true })
@@ -255,42 +254,6 @@ it('shows the owner both pools for the month and each member their promotion num
   expect((await db.query('select * from org_member_promo_stats($1,$2,$3)', [owner, orgId, m.current])).rows).toHaveLength(2)
 })
 
-it("moves this month's unspent old grants from the owner's own pool into the org pool once, and the month end takes nothing twice", async () => {
-  const { orgId, owner } = await partner(db, actor)
-  await db.query('update profiles set free_credits=300 where id=$1', [owner]) // the owner's own free credits stay
-  await run(db, m.current)
-  const s = await sheet(db, orgId, m.current)
-  await confirm(db, actor, s) // 10,000, made the old way below
-  await asLegacy(db, 'partner_promo_grants', s.id)
-  await db.query("update partner_promo_grants set decided_at=now()-interval '1 hour' where id=$1", [s.id])
-  const spendKey = 'job:' + randomUUID()
-  await db.query("select _apply_credit_change($1,'free','reserve',-2500,'job',$2)", [owner, spendKey + ':reserve'])
-  await db.query("update credit_ledger set created_at=now()-interval '30 minutes' where idempotency_key=$1", [spendKey + ':reserve'])
-  expect(await freeOf(db, owner)).toBe(7800)
-
-  const preview = (await row(db, 'select admin_partner_promo_move_preview($1,$2) p', [actor, orgId])).p
-  expect(preview).toMatchObject({ period: m.current, credits: 7500, moved: 0, recipients: [{ user: owner, credits: 7500 }] })
-  expect((await row(db, 'select admin_partner_promo_move($1,$2) r', [actor, { org_id: orgId, credits: 7000 }])).r)
-    .toEqual({ applied: false, reason: 'changed', credits: 7500 })
-  expect((await row(db, 'select admin_partner_promo_move($1,$2) r', [actor, { org_id: orgId, credits: 7500 }])).r).toEqual({ applied: true, credits: 7500 })
-  expect((await row(db, 'select admin_partner_promo_move($1,$2) r', [actor, { org_id: orgId, credits: 7500 }])).r)
-    .toEqual({ applied: false, reason: 'nothing', credits: 0 }) // a double click
-  expect(await freeOf(db, owner)).toBe(300)
-  expect(await promoPoolOf(db, orgId)).toBe(7500)
-  expect(await row(db, 'select moved_credits, expired_basis from partner_promo_grants where id=$1', [s.id])).toEqual({ moved_credits: 7500, expired_basis: 0 })
-  expect(await row(db, "select count(*)::int n from admin_audit_log where action='partner_promo_move' and target_id=$1", [orgId])).toEqual({ n: 1 })
-  expect((await row(db, 'select remaining from org_promo_month($1)', [orgId])).remaining).toBe(7500)
-
-  // Month end: the moved grant takes back only what a later refund of an earlier job adds.
-  await db.query("select _apply_credit_change($1,'free','refund',500,'job',$2)", [owner, spendKey + ':refund'])
-  await db.query('update partner_promo_grants set expires_at=now() where id=$1', [s.id])
-  await endMonth(orgId)
-  expect(await expirePass()).toMatchObject({ taken: 7500 + 500, failed: [] })
-  expect(await freeOf(db, owner)).toBe(300)
-  expect(await promoPoolOf(db, orgId)).toBe(0)
-  expect(await expirePass()).toMatchObject({ taken: 0 })
-})
-
 it('takes a clawback from the next grant into the pool, never from credits already granted', async () => {
   const { orgId, owner } = await partner(db, actor)
   await topup(orgId, owner, 2000)
@@ -313,46 +276,11 @@ it('does not count spending paid from an org promotion share against a legacy gr
   await db.query("select org_allocate_promo($1,$1,300,'self-300')", [owner]) // the owner holds 300 of the org's
   const key = 'job:' + randomUUID()
   await db.query("select _apply_credit_change($1,'free','reserve',-300,'job',$2)", [owner, key + ':reserve'])
-  // The 300 came from the org share, so the legacy grant still has all 10,000 left (and may move).
+  // The 300 came from the org share, so the legacy grant still has all 10,000 left to expire.
   expect((await row(db, "select credits_left from _partner_promo_bucket_left($1,(select expires_at from partner_promo_grants where id=$2))", [owner, s.id])).credits_left).toBe(10000)
-  expect((await row(db, 'select admin_partner_promo_move_preview($1,$2) p', [actor, orgId])).p).toMatchObject({ credits: 10000 })
   // A failed job gives the share back; still nothing is counted against the legacy grant.
   await db.query("select _apply_credit_change($1,'free','refund',300,'job',$2)", [owner, key + ':refund'])
   expect((await row(db, "select credits_left from _partner_promo_bucket_left($1,(select expires_at from partner_promo_grants where id=$2))", [owner, s.id])).credits_left).toBe(10000)
-})
-
-it('moves nothing for a voided legacy grant (its credits were taken back by hand), and takes nothing from the owner', async () => {
-  const { orgId, owner } = await partner(db, actor)
-  await db.query('update profiles set free_credits=500 where id=$1', [owner]) // the owner's own free credits
-  await run(db, m.current)
-  const s = await sheet(db, orgId, m.current)
-  await confirm(db, actor, s)
-  await asLegacy(db, 'partner_promo_grants', s.id)
-  // The Owner took the 10,000 back by hand, then voided the sheet.
-  await db.query("select _apply_credit_change($1,'free','admin_adjust',-10000,'manual','manual-take-back')", [owner])
-  await db.query('select admin_partner_promo_void($1,$2)', [actor, { grant_id: s.id, reason: 'taken back by hand' }])
-  expect((await row(db, 'select admin_partner_promo_move_preview($1,$2) p', [actor, orgId])).p).toMatchObject({ credits: 0 })
-  expect((await row(db, 'select admin_partner_promo_move($1,$2) r', [actor, { org_id: orgId, credits: 0 }])).r).toEqual({ applied: false, reason: 'nothing', credits: 0 })
-  expect(await freeOf(db, owner)).toBe(500)
-  expect(await promoPoolOf(db, orgId)).toBe(0)
-})
-
-it('takes a moved grant from the account it was granted to, not from a new owner', async () => {
-  const { orgId, owner } = await partner(db, actor)
-  await run(db, m.current)
-  const s = await sheet(db, orgId, m.current)
-  await confirm(db, actor, s)
-  await asLegacy(db, 'partner_promo_grants', s.id)
-  // The owner changes mid-month (as an owner transfer would); the new owner has free credits of their own.
-  const next = await createUser(db, { freeCredits: 4000 })
-  await db.query('select org_join($1,(select invite_token from orgs where id=$2))', [next, orgId])
-  await db.query("update org_members set role=case when user_id=$2 then 'owner' else 'member' end where org_id=$1 and user_id in ($2,$3)", [orgId, next, owner])
-  await db.query('update orgs set owner_user_id=$2 where id=$1', [orgId, next])
-  expect((await row(db, 'select admin_partner_promo_move_preview($1,$2) p', [actor, orgId])).p).toMatchObject({ credits: 10000, recipients: [{ user: owner, credits: 10000 }] })
-  expect((await row(db, 'select admin_partner_promo_move($1,$2) r', [actor, { org_id: orgId, credits: 10000 }])).r).toEqual({ applied: true, credits: 10000 })
-  expect(await freeOf(db, owner)).toBe(0)
-  expect(await freeOf(db, next)).toBe(4000)
-  expect(await promoPoolOf(db, orgId)).toBe(10000)
 })
 
 it('ends with the 1921 definitions: the org pool and the voided-sheet filter of 1920 together', async () => {
@@ -367,18 +295,15 @@ it('ends with the 1921 definitions: the org pool and the voided-sheet filter of 
   const month = await def('org_promo_month(uuid,timestamptz)')
   expect(month).toContain('voided_at is null')
   expect(month).toContain('promo_pool_credits')
-  const move = await def('_partner_promo_moveable(uuid)')
-  expect(move).toContain('voided_at is null')
-  expect(move).toContain('recipients')
 })
 
 it('ends with the 1921 definitions on production too, where 1920 ran before 1890–1894', async () => {
-  // Production order with --include-all: 1920 (already applied), then this PR's 1890–1894, 1921 and 1922.
+  // Production order with --include-all: 1920 (already applied), then this PR's 1890–1894 and 1921.
   // Re-run 1920's function bodies, then 1921: the final bodies must be 1921's again.
   const dir = path.join(process.cwd(), 'supabase/migrations')
   const replaced = readFileSync(path.join(dir, '1920_partner_promo_void.sql'), 'utf8')
     .split(/\n(?=create or replace function )/).slice(1).map((chunk) => chunk.slice(0, chunk.indexOf('\n$$;') + 4))
-  expect(replaced).toHaveLength(3)
+  expect(replaced.length).toBeGreaterThanOrEqual(3)
   for (const sql of replaced) await db.query(sql)
   expect((await row(db, "select pg_get_functiondef('public._partner_promo_expire()'::regprocedure) d")).d).not.toContain('_org_promo_expire_due')
   await db.query(readFileSync(path.join(dir, '1921_org_promo_pool_reads.sql'), 'utf8'))
@@ -403,27 +328,3 @@ it('records a draw under the month its share was funded for, so a refund after t
   expect(await seat(orgId, staff)).toMatchObject({ held_promo_credits: 0 })
 })
 
-it('keeps a refund of a pre-move job for the month end even when the owner spends their own credits after the move (Codex #836)', async () => {
-  const { orgId, owner } = await partner(db, actor)
-  await db.query('update profiles set free_credits=100 where id=$1', [owner]) // the owner's own 100
-  await db.query("select admin_partner_promo_topup($1,$2)", [actor, { org_id: orgId, recipient: owner, period: m.current, credits: 200, reason: 'legacy', request_key: randomUUID() }])
-  const t = (await row(db, 'select id from partner_promo_topups where org_id=$1', [orgId])).id
-  await asLegacy(db, 'partner_promo_topups', t) // 200 legacy credits in the owner's pool
-  await db.query("update partner_promo_topups set created_at=now()-interval '1 hour' where id=$1", [t])
-  const at = async (key: string, delta: number, kind: string, ago: string) => {
-    await db.query("select _apply_credit_change($1,'free',$2,$3,'job',$4)", [owner, kind, delta, key])
-    await db.query('update credit_ledger set created_at=now()-$2::interval where idempotency_key=$1', [key, ago])
-  }
-  await at('job:a:reserve', -100, 'reserve', '50 minutes') // from the legacy credits
-  expect((await row(db, 'select admin_partner_promo_move_preview($1,$2) p', [actor, orgId])).p).toMatchObject({ credits: 100 })
-  expect((await row(db, 'select admin_partner_promo_move($1,$2) r', [actor, { org_id: orgId, credits: 100 }])).r).toMatchObject({ applied: true })
-  await db.query("update partner_promo_topups set moved_at=now()-interval '40 minutes' where id=$1", [t])
-  await at('job:b:reserve', -100, 'reserve', '30 minutes') // the owner's own 100, after the move
-  await at('job:a:refund', 100, 'refund', '20 minutes') // the pre-move job fails: 100 legacy credits come back
-  expect(await freeOf(db, owner)).toBe(100)
-  await db.query('update partner_promo_topups set expires_at=now() where id=$1', [t])
-  await db.query("update orgs set promo_expires_at=now()-interval '1 second' where id=$1", [orgId])
-  expect(await expirePass()).toMatchObject({ failed: [] })
-  expect(await freeOf(db, owner)).toBe(0) // the refunded legacy 100 expired
-  expect(await expirePass()).toMatchObject({ taken: 0 })
-})
