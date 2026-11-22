@@ -68,10 +68,6 @@ export async function resetInviteAction() {
   return applied(await orgCommands.resetInvite(await deps()))
 }
 
-export async function leaveOrgAction(input: unknown) {
-  return applied(await orgCommands.leave(await deps(), input))
-}
-
 export async function joinOrgAction(token: string) {
   const user = await requireUser(`/join/org/${encodeURIComponent(token)}`)
   return applied(await orgCommands.join({ db: createAdminSupabase(), user: user.id }, token))

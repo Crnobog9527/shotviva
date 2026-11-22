@@ -77,7 +77,7 @@ describe('owner console commands', () => {
 })
 
 describe('members through the console', () => {
-  it('gives a member credits and shows both sides the same numbers, then reclaims on leave', async () => {
+  it('gives a member credits and shows both sides the same numbers, then reclaims when the owner removes them', async () => {
     const { orgId, owner, token } = await orgWith(db, service, actor, { pool: 1000 })
     const staff = await account(db, service)
     expect(await orgCommands.join(as(staff), token)).toEqual({ ok: true })
@@ -94,9 +94,12 @@ describe('members through the console', () => {
     }
     expect(await readOrgView(staff, { db: supabase })).toMatchObject({ kind: 'member', monthlyAllowance: 300, allocatedThisMonth: 250, heldCredits: 250 })
 
-    // The member spends 100 (the org's credits are spent first), so leaving gives back the 150 left.
+    // The member spends 100 (the org's credits are spent first). They cannot leave by themselves
+    // (Owner 2026-11-23: no command for it), so the owner removes them and gets the 150 left back.
     await db.query('update public.profiles set credits = credits - 100 where id = $1', [staff])
-    expect(await orgCommands.leave(as(staff), { requestId: randomUUID() })).toEqual({ ok: true, reclaimed: 150 })
+    expect('leave' in orgCommands).toBe(false)
+    expect(await readOrgView(staff, { db: supabase })).toMatchObject({ kind: 'member' })
+    expect(await orgCommands.removeMember(as(owner), { requestId: randomUUID(), member: staff })).toEqual({ ok: true, reclaimed: 150 })
     expect(await poolOf(db, orgId)).toBe(900)
     expect(await readOrgView(staff, { db: supabase })).toEqual({ kind: 'none' })
   })
@@ -122,6 +125,5 @@ describe('members through the console', () => {
     expect(await orgCommands.join(as(staff), first.token)).toEqual({ ok: true })
     expect(await orgCommands.join(as(staff), second.token)).toEqual({ ok: false, error: 'ALREADY_IN_ORG' })
     expect(await orgCommands.join(as(await account(db, service)), 'f'.repeat(32))).toEqual({ ok: false, error: 'INVITE_INVALID' })
-    expect(await orgCommands.leave(as(first.owner), { requestId: randomUUID() })).toEqual({ ok: false, error: 'OWNER_CANNOT_LEAVE' })
   })
 })

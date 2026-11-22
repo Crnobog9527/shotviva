@@ -41,21 +41,29 @@ type FrameProps = {
 // phone: a compact title, then a sticky segmented control across the top and the section's own
 // views as a chip rail. From lg up: the #825 layout, the navigation in a sticky side column.
 export function EnterpriseFrame({ orgName, current, affiliate, intro, subnav, children }: FrameProps) {
-  const t = useTranslations('app.org')
   return (
     <div className="mx-(--gutter) mt-4 grid gap-4 lg:mt-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-x-10 lg:gap-y-8">
-      <header className="min-w-0 lg:col-span-2">
-        <Link href="/account" className="-ml-1 inline-flex min-h-11 items-center gap-0.5 text-label text-muted-foreground hover:text-foreground">
-          <ChevronLeft aria-hidden strokeWidth={1.75} className="size-[18px] text-primary" />{t('back')}
-        </Link>
-        <h1 className="mt-1 font-display text-[clamp(1.75rem,6vw,2.75rem)] leading-[1.05] tracking-[-0.02em] text-balance">{orgName}</h1>
-        <p className="mt-2 max-w-[62ch] text-label text-bone-dim">{intro}</p>
-      </header>
+      <EnterpriseHeader orgName={orgName} intro={intro} className="lg:col-span-2" />
       <aside className="max-lg:contents lg:sticky lg:top-[80px] lg:self-start">
         <SectionNav current={current} affiliate={affiliate} subnav={subnav} />
       </aside>
       <div className="min-w-0 space-y-4">{children}</div>
     </div>
+  )
+}
+
+// Back to /account, the org's name and one line on the page. A member's own org page has this
+// header alone: the sections below it are the owner's.
+export function EnterpriseHeader({ orgName, intro, className }: { orgName: string; intro: string; className?: string }) {
+  const t = useTranslations('app.org')
+  return (
+    <header className={cn('min-w-0', className)}>
+      <Link href="/account" className="-ml-1 inline-flex min-h-11 items-center gap-0.5 text-label text-muted-foreground hover:text-foreground">
+        <ChevronLeft aria-hidden strokeWidth={1.75} className="size-[18px] text-primary" />{t('back')}
+      </Link>
+      <h1 className="mt-1 font-display text-[clamp(1.75rem,6vw,2.75rem)] leading-[1.05] tracking-[-0.02em] text-balance">{orgName}</h1>
+      <p className="mt-2 max-w-[62ch] text-label text-bone-dim">{intro}</p>
+    </header>
   )
 }
 

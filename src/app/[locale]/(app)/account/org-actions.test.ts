@@ -20,7 +20,6 @@ const calls = [
   () => actions.setAllowanceAction({}),
   () => actions.removeMemberAction({}),
   () => actions.resetInviteAction(),
-  () => actions.leaveOrgAction({}),
   () => actions.joinOrgAction('a'.repeat(32)),
 ]
 
@@ -62,5 +61,10 @@ describe('enterprise server actions', () => {
     await actions.joinOrgAction('c'.repeat(32))
     expect(spies.user).toHaveBeenCalledWith(`/join/org/${'c'.repeat(32)}`)
     expect(spies.command).toHaveBeenCalledWith(expect.objectContaining({ user: USER }), 'c'.repeat(32))
+  })
+
+  it('offer no way for staff to leave an org by themselves (only the owner or a site admin removes them)', () => {
+    expect(Object.keys(actions).filter((name) => /leave/i.test(name))).toEqual([])
+    expect(spies.command).not.toHaveBeenCalled()
   })
 })
