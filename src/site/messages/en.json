@@ -1806,19 +1806,23 @@
         "copied": "Copied"
       },
       "pool": {
-        "title": "Credit pool",
-        "hint": "Credits your company holds. Give them to members, who spend them on their own generations.",
-        "balance": "In the pool",
+        "title": "Credit pools",
+        "hint": "Your company holds two kinds: paid credits (bought or deposited by you) and promotion credits (the monthly channel partner grant). Give them to members, who spend them on their own generations.",
+        "balance": "Paid pool",
         "unit": "credits",
         "yours": "Yours to deposit",
         "yoursNote": "your own paid credits",
         "suspended": "The company is paused: deposits are off.",
-        "depositLabel": "Deposit your own credits",
+        "depositLabel": "Deposit your own paid credits",
         "depositPlaceholder": "Number of credits",
         "depositHint": "Moves credits you bought into the pool. Pool credits can't be refunded or moved back.",
         "deposit": "Deposit",
         "depositing": "Depositing…",
-        "deposited": "Deposited into the pool."
+        "deposited": "Deposited into the pool.",
+        "promoBalance": "Promotion pool",
+        "promoExpires": "Valid through {at} (UTC)",
+        "promoNone": "No promotion credits this month",
+        "promoHint": "Images made with promotion credits are watermarked, public and not for commercial use. What is left in the pool and with members goes at the end of the month (UTC). Only paid credits can be deposited."
       },
       "packages": {
         "title": "Company packages",
@@ -1847,10 +1851,10 @@
       },
       "members": {
         "title": "Members",
-        "hint": "Monthly allowance tops each person up to that number of credits on the 1st (UTC). Give now moves credits from the pool straight away.",
+        "hint": "Each kind is set separately. The paid monthly allowance tops a person up to that number on the 1st (UTC). The promotion allowance is the most they get automatically each month, given when promotion credits arrive or the allowance changes. Give now moves credits from that pool straight away.",
         "unknown": "Account",
         "owner": "Main admin",
-        "held": "{count, plural, one {# company credit left} other {# company credits left}}",
+        "held": "{count, plural, one {# paid credit left} other {# paid credits left}}",
         "customers": "{count, plural, one {# customer} other {# customers}}",
         "allowance": "Monthly allowance",
         "allowanceFor": "Monthly allowance for {who}",
@@ -1863,12 +1867,19 @@
         "giving": "Giving…",
         "remove": "Remove",
         "removeTitle": "Remove {who}?",
-        "removeBody": "The company's unspent credits go back to the pool. Credits they bought themselves stay with them. Customers they brought stay with the company.",
+        "removeBody": "The company's unspent paid credits go back to the paid pool and promotion credits to the promotion pool. Credits of their own stay with them. Customers they brought stay with the company.",
         "removeConfirm": "Remove",
         "removed": "Removed.",
         "cancel": "Cancel",
         "truncated": "Showing {shown} of {total} members.",
-        "inviteEmpty": "No one has joined yet. Send them the invite link above."
+        "inviteEmpty": "No one has joined yet. Send them the invite link above.",
+        "heldPromo": "{count, plural, one {# promotion credit left} other {# promotion credits left}}",
+        "paidKind": "Paid credits",
+        "promoKind": "Promotion credits (watermarked, expire at month end)",
+        "promoAllowance": "Monthly promotion allowance",
+        "promoAllowanceFor": "Monthly promotion allowance for {who}",
+        "promoGiveNow": "Give promotion credits now",
+        "promoGiveFor": "Promotion credits to give {who}"
       },
       "performance": {
         "title": "Monthly performance",
@@ -1911,7 +1922,7 @@
         "spend": "Spend this month",
         "leave": "Leave company",
         "leaveTitle": "Leave {org}?",
-        "leaveBody": "The company's unspent credits go back to its pool. Credits you bought yourself stay with you, and customers you brought stay with the company.",
+        "leaveBody": "The company's unspent paid and promotion credits go back to its pools. Credits of your own stay with you, and customers you brought stay with the company.",
         "leaveConfirm": "Leave",
         "left": "You left the company.",
         "cancel": "Cancel",
@@ -1921,7 +1932,12 @@
         "level2Hint": "Brought in by your customers. This month: {month}.",
         "newThisMonth": "{count} new this month",
         "paying": "Paying this month",
-        "statsUnavailable": "This month's numbers couldn't be loaded."
+        "statsUnavailable": "This month's numbers couldn't be loaded.",
+        "paidCredits": "Paid credits",
+        "promoCredits": "Promotion credits",
+        "promoCreditsHint": "Promotion credits from your company: images are watermarked, public and not for commercial use. They are used only when paid credits can't cover a generation, before your own free credits, and whatever is left goes at the end of the month (UTC).",
+        "used": "Used this month",
+        "promoLeft": "Left"
       },
       "join": {
         "metaTitle": "Join a company",
@@ -2016,6 +2032,18 @@
           "running": "This photo is still developing. Delete it once it is done.",
           "error": "The photo could not be deleted. Please try again later."
         }
+      },
+      "poolMonth": {
+        "title": "This month's credits ({month})",
+        "hint": "UTC month. The month-end expiry of promotion credits is booked just after the month ends and counted for it.",
+        "item": "Item",
+        "paid": "Paid",
+        "promo": "Promotion",
+        "in": "Into the pool",
+        "allocated": "Given to members",
+        "reclaimed": "Back to the pool",
+        "held": "Still with members",
+        "expired": "Expired at month end"
       }
     },
     "templateShare": {
@@ -2707,7 +2735,7 @@
         "topups": "Top-ups",
         "remaining": "Remaining",
         "validThrough": "Valid through (UTC)",
-        "note": "They are free credits in your own account. Whatever is left is taken back at the end of the month.",
+        "note": "They go into your company's promotion pool, and you hand them to staff in the workspace. Images made with them are watermarked and not for commercial use. Remaining = the pool plus what staff still hold; whatever is left goes at the end of the month (UTC).",
         "none": "No promotion credits have been granted this month yet."
       }
     },

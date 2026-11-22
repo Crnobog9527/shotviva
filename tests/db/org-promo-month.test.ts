@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 
 import { row } from './affiliate-fixtures'
 import { connectAdmin } from './helpers'
-import { adminActor, confirm, months, partner, refused, run, sheet } from './partner-promo-fixtures'
+import { adminActor, asLegacy, confirm, months, partner, refused, run, sheet } from './partner-promo-fixtures'
 
 // The owner's read-only card of this month's promotion credits (migration 1849): granted = the
 // confirmed monthly sheet + top-ups, expiry = month end, remaining = what the expiry would take now.
@@ -43,6 +43,8 @@ it('sums the confirmed monthly sheet and the top-ups, and counts down what the o
   const { month_end } = await row(db, "select (date_trunc('month', now() at time zone 'UTC') + interval '1 month') at time zone 'UTC' as month_end")
   expect(now?.expires_at).toEqual(month_end)
 
+  // The owner gives themself 4,000 of it and spends 3,500: pool 8,000 + 500 still held.
+  await db.query("select org_allocate_promo($1,$1,4000,'self')", [owner])
   await spend(owner, 3500)
   expect(await month(orgId)).toMatchObject({ remaining: 8500 })
 })
@@ -52,6 +54,8 @@ it('never shows more than the free balance, nor another org\'s credits; a plain 
   const b = await partner(db, actor)
   await topup(a.orgId, a.owner, 4000)
   await topup(b.orgId, b.owner, 9000)
+  // a's top-up as granted before migration 1894: in the owner's own pool, measured there.
+  await asLegacy(db, 'partner_promo_topups', (await row(db, 'select id from partner_promo_topups where org_id=$1', [a.orgId])).id)
   expect(await month(a.orgId)).toMatchObject({ topups: 4000, remaining: 4000 })
   await db.query('update profiles set free_credits=1500 where id=$1', [a.owner])
   expect(await month(a.orgId)).toMatchObject({ remaining: 1500 })
