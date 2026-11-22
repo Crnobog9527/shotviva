@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('../logger', () => ({ logger: { warn: vi.fn(), error: vi.fn() } }))
 
-const { isStaffSignup, markStaffSignup, signupGiftFor, staffJoinToken } = await import('./staff-signup')
+const { isStaffSignup, markStaffSignup, staffSignup, staffJoinToken } = await import('./staff-signup')
 
 const TOKEN = '0123456789abcdef0123456789abcdef'
 
@@ -43,21 +43,43 @@ describe('isStaffSignup', () => {
 })
 
 describe('markStaffSignup', () => {
-  it('stores the staff refusal through the SQL function and never throws', async () => {
-    const rpc = vi.fn().mockResolvedValueOnce({ data: true, error: null }).mockResolvedValueOnce({ data: null, error: { code: 'x' } })
-    await markStaffSignup({ rpc } as never, 'u1')
-    await expect(markStaffSignup({ rpc } as never, 'u1')).resolves.toBeUndefined()
+  it('answers what the SQL function did and never throws', async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: true, error: null })
+      .mockResolvedValueOnce({ data: false, error: null })
+      .mockResolvedValueOnce({ data: null, error: { code: 'x' } })
+      .mockResolvedValueOnce({ data: true, error: null })
+      .mockResolvedValueOnce({ data: null, error: { code: 'x' } })
+      .mockResolvedValueOnce({ data: null, error: { code: 'x' } })
+    expect(await markStaffSignup({ rpc } as never, 'u1')).toBe(true)
+    expect(await markStaffSignup({ rpc } as never, 'u1')).toBe(false)
+    // One failure is retried; two give up.
+    expect(await markStaffSignup({ rpc } as never, 'u1')).toBe(true)
+    expect(await markStaffSignup({ rpc } as never, 'u1')).toBeNull()
+    expect(rpc).toHaveBeenCalledTimes(6)
     expect(rpc).toHaveBeenCalledWith('mark_staff_signup', { p_user_id: 'u1' })
   })
 })
 
-describe('signupGiftFor', () => {
-  it('is the normal gift without a staff link, 0 and marked with one', async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: true, error: null })
-    const none = client({ data: null, error: null })
-    expect(await signupGiftFor({ ...(none.db as object), rpc } as never, 'u1', '/account', 100)).toBe(100)
-    const hit = client({ data: { id: 'o' }, error: null })
-    expect(await signupGiftFor({ ...(hit.db as object), rpc } as never, 'u1', `/join/org/${TOKEN}`, 100)).toBe(0)
-    expect(rpc).toHaveBeenCalledOnce()
+describe('staffSignup', () => {
+  const db = (org: boolean, mark: { data: unknown; error: { code: string } | null }) => {
+    const rpc = vi.fn().mockResolvedValue(mark)
+    return { db: { ...(client({ data: org ? { id: 'o' } : null, error: null }).db as object), rpc } as never, rpc }
+  }
+  it('is a staff sign-up only when headed for an active org staff link and marked', async () => {
+    const hit = db(true, { data: true, error: null })
+    expect(await staffSignup(hit.db, 'u1', `/join/org/${TOKEN}`)).toBe(true)
+    expect(hit.rpc).toHaveBeenCalledOnce()
+    const none = db(true, { data: true, error: null })
+    expect(await staffSignup(none.db, 'u1', '/account')).toBe(false)
+    expect(await staffSignup(db(false, { data: true, error: null }).db, 'u1', `/join/org/${TOKEN}`)).toBe(false)
+    expect(none.rpc).not.toHaveBeenCalled()
+  })
+  // Codex P1 (#841): an existing account the SQL declines to mark (paid, pending, older) keeps its gift.
+  it('is not a staff sign-up when the SQL declines the account', async () => {
+    expect(await staffSignup(db(true, { data: false, error: null }).db, 'u1', `/join/org/${TOKEN}`)).toBe(false)
+  })
+  it('pays nothing on this sign-in when the mark fails', async () => {
+    expect(await staffSignup(db(true, { data: null, error: { code: 'x' } }).db, 'u1', `/join/org/${TOKEN}`)).toBe(true)
   })
 })

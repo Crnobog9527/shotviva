@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   recordSignupIp: vi.fn(),
   grantSignupCredits: vi.fn(),
   noteSignupGift: vi.fn(),
-  gift: vi.fn(async (_admin: unknown, _user: string, _next: unknown, credits: number) => credits),
+  staff: vi.fn(async () => false),
 }))
 
 vi.mock('../affiliate/referral', () => ({ bindReferral: mocks.bind }))
@@ -21,7 +21,7 @@ vi.mock('next/headers', () => ({ headers: mocks.headers, cookies: async () => ne
 vi.mock('../analytics', () => ({ track: mocks.track }))
 vi.mock('../alerts', () => ({ noteSignupGift: mocks.noteSignupGift }))
 vi.mock('./supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
-vi.mock('./staff-signup', () => ({ signupGiftFor: mocks.gift }))
+vi.mock('./staff-signup', () => ({ staffSignup: mocks.staff }))
 vi.mock('./free-credits', () => ({ billingGrant: () => vi.fn(), grantSignupCredits: mocks.grantSignupCredits }))
 vi.mock('./signup-ip', async (original) => ({
   ...(await original<typeof import('./signup-ip')>()),
@@ -103,15 +103,41 @@ describe('signupMarks', () => {
 })
 
 describe('onVerifiedSignIn: staff-link signups', () => {
-  it('pays the gift the staff rule allows and asks for no pending gift when it is 0', async () => {
+  const next = '/zh/join/org/' + 'a'.repeat(32)
+  beforeEach(() => {
+    vi.clearAllMocks()
     mocks.headers.mockResolvedValue(new Headers({ 'x-forwarded-for': '203.0.113.7' }))
+  })
+
+  it('a staff sign-up gets no gift, no pending claim, no signup code and no partner binding', async () => {
     mocks.recordSignupIp.mockResolvedValue(true)
     mocks.grantSignupCredits.mockResolvedValue(false)
-    mocks.gift.mockResolvedValueOnce(0)
-    const next = '/zh/join/org/' + 'a'.repeat(32)
+    mocks.staff.mockResolvedValueOnce(true)
     await onVerifiedSignIn('u1', benefits, 'email', 'zh', next)
-    expect(mocks.gift).toHaveBeenCalledWith({}, 'u1', next, benefits.freeCredits)
+    expect(mocks.staff).toHaveBeenCalledWith({}, 'u1', next)
     expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', 0)
     expect(mocks.claimQuietly).not.toHaveBeenCalled()
+    expect(mocks.bind).not.toHaveBeenCalled()
+    expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', false, benefits.invite, 'zh')
+    // 1950 reads "no signup IP yet" as the first verified sign-in: the mark comes before the IP.
+    expect(mocks.staff.mock.invocationCallOrder[0]).toBeLessThan(mocks.recordSignupIp.mock.invocationCallOrder[0])
+  })
+
+  // Codex P1 (#841): an existing account the SQL declines to mark keeps its gift.
+  it('pays the gift as before when the staff rule declines the account', async () => {
+    mocks.recordSignupIp.mockResolvedValue(false)
+    mocks.grantSignupCredits.mockResolvedValue(false)
+    await onVerifiedSignIn('u1', benefits, 'email', 'zh', next)
+    expect(mocks.staff).toHaveBeenCalledWith({}, 'u1', next)
+    expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', benefits.freeCredits)
+  })
+
+  it('a customer sign-up (no staff link) is unchanged', async () => {
+    mocks.recordSignupIp.mockResolvedValue(true)
+    mocks.grantSignupCredits.mockResolvedValue(true)
+    await onVerifiedSignIn('u1', benefits, 'email', 'en', '/account')
+    expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', benefits.freeCredits)
+    expect(mocks.bind).toHaveBeenCalledWith('u1', 'partner', 'signup')
+    expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', true, benefits.invite, 'en')
   })
 })

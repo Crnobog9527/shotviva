@@ -32,16 +32,25 @@ export async function isStaffSignup(admin: SupabaseClient, next: string | null |
   return data !== null
 }
 
-// Stores the refusal 'staff' on the account (1940), so no later sign-in, claim or removal from the
-// org pays the gift. A failure is logged; the first attempt is still skipped by the caller.
-export async function markStaffSignup(admin: SupabaseClient, userId: string): Promise<void> {
-  const { error } = await admin.rpc('mark_staff_signup', { p_user_id: userId })
-  if (error) logger.error('staff signup mark failed', { userId, code: error.code })
+// Stores the refusal 'staff' on the account (1940, 1950), so no later sign-in, claim or removal
+// from the org pays the gift. true: marked now or before; false: nothing written (the gift was
+// paid, or another refusal such as a pending same-IP one stands); null: the call failed (logged).
+// Tried twice: a mark that never lands lets a later sign-in pay the gift.
+export async function markStaffSignup(admin: SupabaseClient, userId: string): Promise<boolean | null> {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const { data, error } = await admin.rpc('mark_staff_signup', { p_user_id: userId })
+    if (!error) return data === true
+    if (attempt === 2) logger.error('staff signup mark failed', { userId, code: error.code })
+  }
+  return null
 }
 
-// The signup gift this sign-in may pay: 0 for a staff-link signup (marked so it stays 0).
-export async function signupGiftFor(admin: SupabaseClient, userId: string, next: string | null | undefined, credits: number): Promise<number> {
-  if (!(await isStaffSignup(admin, next))) return credits
-  await markStaffSignup(admin, userId)
-  return 0
+// Whether this sign-in is a staff-link sign-up: headed for an active org's staff link, and the SQL
+// marked the account (1950: only a new account, never paid and never refused otherwise). An
+// existing account that signs in through the link, say before joining, keeps its gift, paid or
+// pending (Codex P1 on #841). A staff sign-up gets no gift, no signup code and no partner binding.
+// A failed mark still counts for this sign-in, so nothing is paid now; it is logged.
+export async function staffSignup(admin: SupabaseClient, userId: string, next: string | null | undefined): Promise<boolean> {
+  if (!(await isStaffSignup(admin, next))) return false
+  return (await markStaffSignup(admin, userId)) !== false
 }

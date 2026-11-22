@@ -593,6 +593,7 @@
           "invited": "You’ve already used an invite code.",
           "checkout": "You have a checkout open with your current discount. Finish or cancel it before replacing the discount.",
           "ineligible": "This account isn’t eligible for the invitation reward.",
+          "orgMember": "Enterprise staff accounts use the credits their organisation allocates. For more, contact your organisation's admin.",
           "forbidden": "This account can’t redeem codes.",
           "auth": "Sign in again to redeem a code.",
           "rate": "Too many attempts. Please try again later.",
@@ -2242,7 +2243,7 @@
     "codeMonths": "First {months} months",
     "codeEvery": "Every billing period",
     "codeCheckoutFloor": "This discount is unavailable for this item at its current price. Choose another eligible item.",
-    "orgMemberCheckout": "Your account belongs to an organisation, so you create with its credits. Ask your organisation's admin for more.",
+    "orgMemberCheckout": "Enterprise staff accounts use the credits their organisation allocates. For more, contact your organisation's admin.",
     "codeCheckoutChanged": "The price or your discount has changed. Check the updated price before trying again.",
     "codeCheckoutInUse": "This discount is in use in another checkout. Return to that checkout to finish or cancel it, then try again.",
     "fineDiscount": "{term} at {price}, then {original} per {period, select, year {year} other {month}} · cancel anytime · USD"
