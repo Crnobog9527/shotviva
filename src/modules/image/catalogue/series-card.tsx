@@ -5,7 +5,8 @@
 import { useTranslations } from 'next-intl'
 
 import { cn } from '@/core/ui/cn'
-import { coverImage } from '@/core/ui/cover-image'
+import { coverAvif, coverImage } from '@/core/ui/cover-image'
+import { Picture } from '@/core/ui/picture'
 
 import { LoopPlate } from './card-media'
 import { hasStills, isMotion, pairedMember } from './catalogue-template'
@@ -72,10 +73,11 @@ function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boole
     // hands): it is contained, and the same picture, blurred and dimmed, fills the bands a cover
     // of another shape leaves. One download: both use the same srcset.
     const cover = coverImage(series.cover, COVER_SIZES.cardFrame)
+    const avif = coverAvif(series.cover, COVER_SIZES.cardFrame)
     return (
       <span className="hairline relative isolate block aspect-[8/5] overflow-hidden rounded-control bg-muted">
-        <img {...cover} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" />
-        <img {...cover} alt={alt} loading={loading} decoding="async" className="absolute inset-0 size-full object-contain" />
+        <Picture avif={avif}><img {...cover} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" /></Picture>
+        <Picture avif={avif}><img {...cover} alt={alt} loading={loading} decoding="async" className="absolute inset-0 size-full object-contain" /></Picture>
       </span>
     )
   }

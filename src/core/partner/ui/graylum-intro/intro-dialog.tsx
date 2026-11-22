@@ -9,20 +9,20 @@ import { useReducer, useState } from 'react'
 import { cn } from '../../../ui/cn'
 import { IntroBody } from './intro-body'
 import type { GraylumLinks } from './intro-links'
-import { GRAYLUM_ICON, INTRO_SHOTS } from './intro-shots'
+import { GRAYLUM_ICON, INTRO_SCENES } from './intro-shots'
 import { lightboxReducer } from './lightbox-state'
 import { ShotLightbox } from './shot-lightbox'
 
 type Props = { open: boolean; onOpenChange(open: boolean): void; connected: boolean; links: GraylumLinks; disconnect: () => Promise<void> }
 
 // Graylum's introduction, laid out like the Shotviva one inside Graylum: a head that stays put
-// (icon, name, close), the words and screenshots scrolling between, one link out in a foot that
+// (icon, name, close), the words and animations scrolling between, one link out in a foot that
 // stays put. A centred dialog from 640px; below that a sheet from the bottom edge. The
 // lightbox is mounted inside this dialog's content so it is the layer above it: Esc and a
 // press outside close the lightbox alone.
 export function IntroDialog({ open, onOpenChange, connected, links, disconnect }: Props) {
   const t = useTranslations('partner.intro')
-  const [viewing, dispatch] = useReducer(lightboxReducer(INTRO_SHOTS.length), null)
+  const [viewing, dispatch] = useReducer(lightboxReducer(INTRO_SCENES.length), null)
   // The thumbnail that opened the lightbox: focus goes back to it when the lightbox closes.
   const [opener, setOpener] = useState<HTMLElement | null>(null)
   const view = (index: number, from: HTMLElement) => {

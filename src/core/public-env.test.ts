@@ -20,6 +20,7 @@ const unset: RawPublicEnv = {
   NEXT_PUBLIC_ASSETS_BASE_URL: undefined,
   NEXT_PUBLIC_IMAGE_CDN_URL: undefined,
   NEXT_PUBLIC_ASSET_CDN_URL: undefined,
+  NEXT_PUBLIC_PRESIZED_IMAGES_URL: undefined,
   NEXT_PUBLIC_APP_VERSION: undefined,
 }
 
@@ -40,6 +41,7 @@ const configured: RawPublicEnv = {
   NEXT_PUBLIC_ASSETS_BASE_URL: 'https://shotviva.com/assets//',
   NEXT_PUBLIC_IMAGE_CDN_URL: 'https://img-eo.shotviva.com/',
   NEXT_PUBLIC_ASSET_CDN_URL: 'https://img-eo.shotviva.com/',
+  NEXT_PUBLIC_PRESIZED_IMAGES_URL: 'https://img-eo.shotviva.com/',
   NEXT_PUBLIC_APP_VERSION: 'dpl_abc',
 }
 

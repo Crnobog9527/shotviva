@@ -25,6 +25,10 @@
  *                is cleared only by a Claude review of that commit or a later one.
  *     Unresolved threads of any Claude review by the owner block exactly like Codex threads, even
  *     after its commit left the PR (force-push) or the commit list (GitHub lists 250 at most).
+ *   - Carries a review over to the head when only scripts/ci/schema-commit.sh's bot commits
+ *     (supabase/schema.sql alone, see schemaCarry) came after the reviewed commit: no head-is-newer
+ *     warning. That push starts no workflow, so the ci.yml job after it posts this check on the
+ *     new commit (scripts/ci/codex-findings-post.mjs). Thread rules are the same either way.
  *
  * Env: GH_TOKEN, REPO (owner/name), PR (number), HEAD_SHA, RISK (high | normal | trivial),
  * WAIT_MINUTES (default 20). Writes a summary to GITHUB_STEP_SUMMARY when set.
@@ -110,6 +114,64 @@ export function combineStates(codex, claude, prCommits) {
   }
 }
 
+/** The commit scripts/ci/schema-commit.sh pushes: author, committer, first message line, file. */
+export const SCHEMA_BOT = 'github-actions[bot]'
+const SCHEMA_BOT_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com'
+export const SCHEMA_MARKER = 'chore(db): regenerate schema.sql [auto]'
+export const SCHEMA_FILE = 'supabase/schema.sql'
+const MAX_CARRIED = 10
+
+const isSha = (sha, min = 7) => typeof sha === 'string' && sha.length >= min && /^[0-9a-f]+$/.test(sha)
+const onlySchema = (files) =>
+  Array.isArray(files) && files.length === 1 && files[0].filename === SCHEMA_FILE && files[0].status === 'modified' && !files[0].previous_filename
+
+/**
+ * Whether a review of `reviewed` holds for `head`: every commit between them is a bot commit of
+ * scripts/ci/schema-commit.sh (both author and committer the github-actions bot, first message line
+ * exactly the [auto] marker, one parent, changing supabase/schema.sql and nothing else). Takes the
+ * compare API's `reviewed...head` response and each commit's own file list (`filesOf(sha)`).
+ * Returns `{ carried, reason }`; anything unexpected is not carried (fail closed).
+ *
+ * Advisory only: commit identity comes from the commit's email, which anyone with push access can
+ * set to the bot's (schema-commit.sh's commits are unsigned). A forged commit gains nothing today:
+ * a carry only replaces the head-is-newer warning, which never fails the check, and a schema.sql
+ * that does not match the migrations fails "supabase db tests". Before ever making that warning
+ * an error, have schema-commit.sh create server-signed commits and require commit.verification.
+ */
+export function schemaCarry({ reviewed, head, compare, filesOf }) {
+  const no = (reason) => ({ carried: false, reason })
+  if (!isSha(reviewed) || !isSha(head, 40)) return no('unknown commits')
+  if (head.startsWith(reviewed)) return no('same commit')
+  const commits = compare?.commits
+  if (compare?.status !== 'ahead' || compare.behind_by !== 0 || !Array.isArray(commits)) return no('head does not descend from the reviewed commit')
+  if (commits.length === 0 || commits.length > MAX_CARRIED || compare.ahead_by !== commits.length) return no('unexpected number of commits')
+  const base = compare.merge_base_commit?.sha
+  if (!isSha(base, 40) || !base.startsWith(reviewed)) return no('the reviewed commit is not the base')
+  if (commits.at(-1).sha !== head) return no('the compare does not end at the head')
+  if (!onlySchema(compare.files)) return no(`the commits change more than ${SCHEMA_FILE}`)
+  let parent = base
+  for (const c of commits) {
+    const short = c.sha?.slice(0, 7)
+    if (c.parents?.length !== 1 || c.parents[0].sha !== parent) return no(`${short} is a merge or out of line`)
+    if (c.author?.login !== SCHEMA_BOT || c.committer?.login !== SCHEMA_BOT) return no(`${short} is not by ${SCHEMA_BOT}`)
+    const meta = c.commit ?? {}
+    if (meta.author?.email !== SCHEMA_BOT_EMAIL || meta.committer?.email !== SCHEMA_BOT_EMAIL) return no(`${short} is not by ${SCHEMA_BOT}`)
+    if (typeof meta.message !== 'string' || meta.message.split('\n')[0] !== SCHEMA_MARKER) return no(`${short} is not an [auto] schema commit`)
+    if (!onlySchema(filesOf(c.sha))) return no(`${short} changes more than ${SCHEMA_FILE}`)
+    parent = c.sha
+  }
+  return { carried: true, reason: `${commits.length} [auto] schema.sql commit(s) since ${reviewed.slice(0, 7)}` }
+}
+
+/** schemaCarry with its data read from GitHub (`get` = one REST GET returning JSON). */
+export async function carriedOver({ repo, reviewed, head, get }) {
+  if (!isSha(reviewed) || !isSha(head, 40) || head.startsWith(reviewed)) return schemaCarry({ reviewed, head })
+  const compare = await get(`/repos/${repo}/compare/${reviewed}...${head}`)
+  const files = new Map()
+  for (const c of (compare?.commits ?? []).slice(0, MAX_CARRIED)) files.set(c.sha, (await get(`/repos/${repo}/commits/${c.sha}`)).files)
+  return schemaCarry({ reviewed, head, compare, filesOf: (sha) => files.get(sha) })
+}
+
 async function threads(claudeReviewIds = new Set()) {
   const query = `query($owner: String!, $name: String!, $pr: Int!, $after: String) {
     repository(owner: $owner, name: $name) { pullRequest(number: $pr) {
@@ -190,7 +252,7 @@ export function codexState(comments, reviews) {
 }
 
 /** Codex's and Claude's reviews together, plus the review ids whose threads count. */
-export async function fullState({ repo = env.REPO ?? '', pr = env.PR, list = all } = {}) {
+export async function fullState({ repo = env.REPO ?? '', pr = env.PR, list = all, get = github, head = env.HEAD_SHA } = {}) {
   const [repoOwner] = repo.split('/')
   const base = `/repos/${repo}`
   const reviews = await list(`${base}/pulls/${pr}/reviews`)
@@ -204,7 +266,18 @@ export async function fullState({ repo = env.REPO ?? '', pr = env.PR, list = all
     commit: latestCommit(accepted.map((r) => r.commit), prCommits),
     reviewers: [...new Set(accepted.map((r) => r.reviewer).filter(Boolean))],
   }
-  return { state: combineStates(codex, claude, prCommits), claudeReviewIds: claudeThreadReviewIds(reviews, { repoOwner }) }
+  const state = combineStates(codex, claude, prCommits)
+  // A review of an earlier commit holds for the head when only schema-commit.sh's bot commits
+  // came after it (schemaCarry); otherwise the head-is-newer warning stays.
+  let carry = { carried: false }
+  if (state.completed && state.commit && head) {
+    try {
+      carry = await carriedOver({ repo, reviewed: state.commit, head, get })
+    } catch (error) {
+      carry = { carried: false, reason: `could not compare: ${error.message.slice(0, 200)}` }
+    }
+  }
+  return { state: { ...state, head, carried: carry.carried, carryReason: carry.reason }, claudeReviewIds: claudeThreadReviewIds(reviews, { repoOwner }) }
 }
 
 const titleOf = (thread) =>
@@ -249,7 +322,9 @@ export function judge({ risk, reviewThreads, state }) {
     )
   }
   const head = state.head ?? env.HEAD_SHA
-  if (risk === 'high' && state.completed && state.commit && head && !head.startsWith(state.commit.slice(0, 7))) {
+  if (state.carried) {
+    lines.push(`::notice::Review of ${state.commit.slice(0, 7)} carried over to the head ${head?.slice(0, 7)}: ${state.carryReason}.`)
+  } else if (risk === 'high' && state.completed && state.commit && head && !head.startsWith(state.commit.slice(0, 7))) {
     const who = state.reviewers?.join(' / ') || 'Codex'
     lines.push(
       `::warning::${who} last reviewed ${state.commit.slice(0, 7)}, not the head ${head.slice(0, 7)}. ` +
@@ -259,22 +334,34 @@ export function judge({ risk, reviewThreads, state }) {
   return { ok, lines, table, open: open.length, stale: stale.length }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const risk = env.RISK ?? 'high'
-  const deadline = Date.now() + Number(env.WAIT_MINUTES ?? 20) * 60_000
+/**
+ * Runs the whole check: waits (up to waitMinutes) for a running or missing review, then judges.
+ * Returns `{ ok, lines, summary, readAt }`; the CLI below and scripts/ci/codex-findings-post.mjs use it.
+ */
+export async function evaluate({ risk = env.RISK ?? 'high', waitMinutes = Number(env.WAIT_MINUTES ?? 20), log = console.log } = {}) {
+  const deadline = Date.now() + waitMinutes * 60_000
+  // When the state judged below was read: a check run posted after it may know more.
+  let readAt = new Date()
   let { state, claudeReviewIds } = await fullState()
   while ((state.running || (risk === 'high' && !state.completed)) && Date.now() < deadline) {
-    console.log(state.running ? 'Codex review running; waiting for it…' : 'No finished review yet; waiting for one…')
+    log(state.running ? 'Codex review running; waiting for it…' : 'No finished review yet; waiting for one…')
     await new Promise((resolve) => setTimeout(resolve, 30_000))
+    readAt = new Date()
     ;({ state, claudeReviewIds } = await fullState())
   }
   const result = judge({ risk, reviewThreads: await threads(claudeReviewIds), state })
-  for (const line of result.lines) console.log(line)
-  const reviewed = state.completed ? `yes, ${state.reviewers.join(' + ')} (${state.commit?.slice(0, 7) ?? '?'})` : state.failed ? 'no (Codex failed)' : 'no'
+  const carried = state.carried ? ` (carried to ${state.head.slice(0, 7)}: ${state.carryReason})` : ''
+  const reviewed = state.completed ? `yes, ${state.reviewers.join(' + ')} (${state.commit?.slice(0, 7) ?? '?'})${carried}` : state.failed ? 'no (Codex failed)' : 'no'
   const rows = result.table.length ? `\n| | Finding | File | Thread |\n|---|---|---|---|\n${result.table.join('\n')}\n` : ''
   const by = state.claudeReviewers.length ? ` · Claude reviewer: ${state.claudeReviewers.join(', ')}` : ''
   const summary = `### Codex findings\n\nRisk: **${risk}** · Review finished: **${reviewed}**${by} · unresolved findings: **${result.open}** · outdated, unresolved: ${result.stale}\n${rows}`
+  return { ok: result.ok, lines: result.lines, summary, readAt }
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const { ok, lines, summary } = await evaluate()
+  for (const line of lines) console.log(line)
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, summary)
   console.log(summary)
-  process.exit(result.ok ? 0 : 1)
+  process.exit(ok ? 0 : 1)
 }

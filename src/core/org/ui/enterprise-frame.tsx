@@ -5,14 +5,16 @@ import { useTranslations } from 'next-intl'
 import { Link } from '@/core/i18n/ui'
 import { cn } from '@/core/ui/cn'
 
-export type EnterpriseSection = 'affiliate' | 'workspace' | 'purchasing'
+export type EnterpriseSection = 'affiliate' | 'workspace' | 'works' | 'purchasing'
 
-// The three sections of an org owner's enterprise area, in the Owner's order (2026-11-22):
+// The sections of an org owner's enterprise area, in the Owner's order (2026-11-22):
 // 企业联盟 first (the landing page whenever the org's affiliate is on), then the workspace, then
 // the purchasing details. Hrefs are logical; Link adds /zh.
-const SECTIONS: readonly { id: EnterpriseSection; href: string; label: 'affiliate' | 'console' | 'purchasing' }[] = [
+// 企业作品 (Owner 2026-11-22) sits next to the workspace: the works the org's credits paid for.
+const SECTIONS: readonly { id: EnterpriseSection; href: string; label: 'affiliate' | 'console' | 'works' | 'purchasing' }[] = [
   { id: 'affiliate', href: '/partners/enterprise', label: 'affiliate' },
   { id: 'workspace', href: '/account/enterprise', label: 'console' },
+  { id: 'works', href: '/account/enterprise/works', label: 'works' },
   { id: 'purchasing', href: '/account/enterprise/purchasing', label: 'purchasing' },
 ]
 
@@ -57,6 +59,8 @@ export function EnterpriseFrame({ orgName, current, affiliate, intro, subnav, ch
   )
 }
 
+const GRID_COLS: Record<number, string> = { 3: 'grid-cols-3', 4: 'grid-cols-4' }
+
 function SectionNav({ current, affiliate, subnav }: { current: EnterpriseSection; affiliate: boolean; subnav?: ReactNode }) {
   const t = useTranslations('app.org.tabs')
   const sections = enterpriseSections(affiliate)
@@ -66,7 +70,7 @@ function SectionNav({ current, affiliate, subnav }: { current: EnterpriseSection
         aria-label={t('label')}
         className="sticky top-0 z-30 -mx-(--gutter) bar-material px-(--gutter) py-2 shadow-[inset_0_-1px_0_var(--border)] md:top-14 lg:static lg:mx-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-none"
       >
-        <ul className={cn('grid rounded-control bg-wash p-1 shadow-[inset_0_0_0_1px_var(--border)] lg:grid-cols-1 lg:gap-0.5 lg:bg-transparent lg:p-0 lg:shadow-none', sections.length === 3 ? 'grid-cols-3' : 'grid-cols-2')}>
+        <ul className={cn('grid rounded-control bg-wash p-1 shadow-[inset_0_0_0_1px_var(--border)] lg:grid-cols-1 lg:gap-0.5 lg:bg-transparent lg:p-0 lg:shadow-none', GRID_COLS[sections.length] ?? 'grid-cols-3')}>
           {sections.map((section) => {
             const here = section.id === current
             return (
