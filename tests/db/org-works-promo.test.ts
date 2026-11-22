@@ -66,10 +66,13 @@ it('cuts a promotion-funded org work off when its maker leaves', async () => {
   expect((await jobRow(job)).org_access_ended_at).not.toBeNull()
 })
 
-it('leaves a free work from the member’s own free credits personal', async () => {
+// Since #838 an active member (the owner included) spends only the org's shares, so a personal
+// free work is one made outside the org: here by the same person after they were removed.
+it('leaves a free work from a former member’s own free credits personal', async () => {
   const template = await seedTemplate(db, { credits: { '1k': 10, '2k': 20, '3k': 30 } })
-  const { staff } = await promoOrg(0)
+  const { owner, staff } = await promoOrg(0)
+  await db.query('select org_remove_member($1,$2,$3)', [owner, staff, randomUUID()])
   await db.query('update profiles set free_credits=50 where id=$1', [staff])
   const job = await generate(staff, template)
-  expect(await jobRow(job)).toMatchObject({ org_id: null, credit_pool: 'free', visibility: 'public' })
+  expect(await jobRow(job)).toMatchObject({ org_id: null, credit_pool: 'free', visibility: 'public', gallery_excluded: false })
 })

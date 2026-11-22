@@ -14152,29 +14152,24 @@ CREATE OR REPLACE VIEW "admin"."published_web_members" WITH ("security_invoker"=
 ALTER VIEW "admin"."published_web_members" OWNER TO "postgres";
 
 
-CREATE OR REPLACE VIEW "public"."web_template_members" WITH ("security_invoker"='true') AS
- SELECT "id",
-    "series_id",
-    "series_sort_order",
-    "sort_order",
-    "category_key",
-    "standalone"
-   FROM "admin"."published_web_members" "m"
-  WHERE "admin"."web_standard_sale_allowed"("id");
-
-
-ALTER VIEW "public"."web_template_members" OWNER TO "postgres";
-
-
 CREATE OR REPLACE VIEW "public"."web_catalogue_entries" WITH ("security_invoker"='true') AS
- WITH "members" AS MATERIALIZED (
-         SELECT "web_template_members"."id",
-            "web_template_members"."series_id",
-            "web_template_members"."series_sort_order",
-            "web_template_members"."sort_order",
-            "web_template_members"."category_key",
-            "web_template_members"."standalone"
-           FROM "public"."web_template_members"
+ WITH "published" AS MATERIALIZED (
+         SELECT "published_web_members"."id",
+            "published_web_members"."series_id",
+            "published_web_members"."series_sort_order",
+            "published_web_members"."sort_order",
+            "published_web_members"."category_key",
+            "published_web_members"."standalone"
+           FROM "admin"."published_web_members"
+        ), "members" AS MATERIALIZED (
+         SELECT "p"."id",
+            "p"."series_id",
+            "p"."series_sort_order",
+            "p"."sort_order",
+            "p"."category_key",
+            "p"."standalone"
+           FROM "published" "p"
+          WHERE "admin"."web_standard_sale_allowed"("p"."id")
         )
  SELECT 'template'::"text" AS "type",
     ('template-'::"text" || "m"."id") AS "entry_key",
@@ -22703,6 +22698,20 @@ CREATE TABLE IF NOT EXISTS "public"."template_sync_history" (
 ALTER TABLE "public"."template_sync_history" OWNER TO "postgres";
 
 
+CREATE OR REPLACE VIEW "public"."web_template_members" WITH ("security_invoker"='true') AS
+ SELECT "id",
+    "series_id",
+    "series_sort_order",
+    "sort_order",
+    "category_key",
+    "standalone"
+   FROM "admin"."published_web_members" "m"
+  WHERE "admin"."web_standard_sale_allowed"("id");
+
+
+ALTER VIEW "public"."web_template_members" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."work_reports" (
     "id" bigint NOT NULL,
     "job_id" "uuid" NOT NULL,
@@ -28478,12 +28487,6 @@ GRANT SELECT ON TABLE "admin"."published_web_members" TO "service_role";
 
 
 
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."web_template_members" TO "service_role";
-GRANT SELECT ON TABLE "public"."web_template_members" TO "anon";
-GRANT SELECT ON TABLE "public"."web_template_members" TO "authenticated";
-
-
-
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."web_catalogue_entries" TO "service_role";
 GRANT SELECT ON TABLE "public"."web_catalogue_entries" TO "anon";
 GRANT SELECT ON TABLE "public"."web_catalogue_entries" TO "authenticated";
@@ -29979,6 +29982,12 @@ GRANT SELECT ON TABLE "public"."template_shares" TO "service_role";
 
 
 GRANT SELECT,INSERT ON TABLE "public"."template_sync_history" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."web_template_members" TO "service_role";
+GRANT SELECT ON TABLE "public"."web_template_members" TO "anon";
+GRANT SELECT ON TABLE "public"."web_template_members" TO "authenticated";
 
 
 

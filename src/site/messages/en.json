@@ -2020,7 +2020,7 @@
       },
       "billing": {
         "title": "Invoice details",
-        "hint": "Once saved, when your organisation's primary admin buys a plan or credit pack on Shotviva with Waffo, the invoice carries your company name and tax ID automatically (you can still change them on Waffo's invoice page).",
+        "hint": "We keep the company name and tax ID for your records and send them to Waffo when your organisation's primary admin pays with Waffo. If Waffo's checkout doesn't show them pre-filled, enter them on Waffo's page, or add them afterwards in the Waffo buyer portal: Payment History → View Invoice → Edit Details.",
         "notFapiao": "This is a commercial invoice issued by Waffo, the merchant of record, not a Chinese VAT invoice (fapiao). It applies to Waffo payments only.",
         "legalName": "Company legal name",
         "legalNameHint": "As on your business registration, 2–200 characters.",
@@ -2128,7 +2128,7 @@
         },
         "each": "Credits each",
         "total": "{count} × {each} = {total} from the {kind} pool ({pool} in it)",
-        "short": "The pool can't cover everyone, so nobody gets any.",
+        "short": "The {kind} pool has {pool} now, not enough for everyone, so nobody gets any.",
         "give": "Give",
         "given": "Gave {total} to {count}."
       }

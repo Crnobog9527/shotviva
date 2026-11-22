@@ -15,8 +15,9 @@ async function deps() {
   return { db: createAdminSupabase(), user: user.id }
 }
 
+// A refused give because the pool is short also refreshes: the page's pool number was stale.
 async function applied<T extends ConsoleResult<object>>(result: T): Promise<T> {
-  if (result.ok) refresh()
+  if (result.ok || result.error === 'POOL_INSUFFICIENT') refresh()
   return result
 }
 
@@ -50,6 +51,13 @@ export async function bulkSetAllowanceAction(input: unknown) {
 
 export async function bulkGrantAction(input: unknown) {
   return applied(await orgCommands.bulkGrant(await deps(), input))
+}
+
+// The pools now, read before a bulk give is confirmed; refreshes the page so every number agrees.
+export async function poolsAction() {
+  const result = await orgCommands.pools(await deps())
+  if (result.ok) refresh()
+  return result
 }
 
 export async function removeMemberAction(input: unknown) {

@@ -8,7 +8,8 @@ import { readOwnerReport } from '@/core/org/console'
 import { BillingProfilePanel, EnterpriseFrame, OwnerConsoleView, type OwnerActions } from '@/core/org/ui'
 
 import {
-  allocateAction, allocatePromoAction, bulkGrantAction, bulkSetAllowanceAction, depositAction, removeMemberAction, resetInviteAction, setAllowanceAction,
+  allocateAction, allocatePromoAction, bulkGrantAction, bulkSetAllowanceAction, depositAction, poolsAction,
+  removeMemberAction, resetInviteAction, setAllowanceAction,
   setDefaultsAction, setPromoAllowanceAction,
 } from '../org-actions'
 import { billingActions, readBilling } from './billing'
@@ -27,6 +28,7 @@ const actions: OwnerActions = {
   setDefaults: setDefaultsAction,
   bulkSetAllowance: bulkSetAllowanceAction,
   bulkGrant: bulkGrantAction,
+  pools: poolsAction,
   removeMember: removeMemberAction,
   resetInvite: resetInviteAction,
 }
