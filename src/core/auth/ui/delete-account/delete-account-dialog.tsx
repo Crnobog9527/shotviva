@@ -6,6 +6,8 @@ import { cn } from '../../../ui/cn'
 import { ResponsiveSheet } from '../../../ui/responsive-sheet'
 import type { useDeleteAccount } from './use-delete-account'
 
+const FAILURE_TEXT = { subscription: 'deleteSubscriptionFailed', orgOwner: 'deleteOrgOwner', other: 'deleteFailed' } as const
+
 export function DeleteAccountDialog({ del }: { del: ReturnType<typeof useDeleteAccount> }) {
   const t = useTranslations('auth.account')
   return (
@@ -23,7 +25,7 @@ export function DeleteAccountDialog({ del }: { del: ReturnType<typeof useDeleteA
       </label>
       {del.status === 'failed' ? (
         <p role="alert" className="mt-3 text-caption text-destructive">
-          {del.failure === 'subscription' ? t('deleteSubscriptionFailed') : t('deleteFailed')}
+          {t(FAILURE_TEXT[del.failure])}
         </p>
       ) : null}
       <button

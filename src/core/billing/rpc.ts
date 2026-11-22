@@ -43,6 +43,8 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   WORK_PRIVATE_ONLY: 'FORBIDDEN',
   // 企业作品 (1942): a member cannot delete a work the org paid for.
   ORG_WORK_DELETE_FORBIDDEN: 'FORBIDDEN',
+  // Account deletion (1971): an org's primary admin cannot delete their account.
+  ORG_OWNER_CANNOT_DELETE_ACCOUNT: 'ACCOUNT_OWNS_ORG',
   // Dispute evidence (T82): an unknown dispute, a Managed Payments one (Stripe answers it), and a
   // second submit of the one submission Stripe allows.
   DISPUTE_NOT_FOUND: 'NOT_FOUND',

@@ -8,6 +8,7 @@ import { allocateOrgCredits } from '@/core/org'
 import { archiveOrgWorksOf, archiveThumbKey, DELETED_MAKERS, orgOwnerDeleteWork, orgOwnerWork, orgOwnerWorkMembers, orgOwnerWorks } from '@/core/org/works'
 import { workThumbKeyFor } from '@/core/storage'
 
+import { jpeg } from '../fakes/images'
 import { createMemoryStore } from '../fakes/memory-store'
 import { seedTemplate } from './generation-fixtures'
 import { connectAdmin, serviceClient } from './helpers'
@@ -167,4 +168,54 @@ describe('account deletion', () => {
     await deleteAuthUser(staff)
     expect(await archiveRow(orgWork)).toBeUndefined()
   })
+
+  it('refuses an org’s primary admin and an account with an org work still being made, before anything', async () => {
+    const { owner, staff } = await staffed()
+    const store = createMemoryStore().store
+    await expect(archiveOrgWorksOf({ db: rest, store }, owner)).rejects.toMatchObject({ code: 'ACCOUNT_OWNS_ORG' })
+    const running = randomUUID()
+    await reserveJob(rest, { jobId: running, userId: staff, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
+      inputs: { resolution: '1k', attempt_id: randomUUID() } })
+    await expect(archiveOrgWorksOf({ db: rest, store }, staff)).rejects.toMatchObject({ code: 'CONFLICT' })
+    expect(await archiveRow(running)).toBeUndefined()
+  })
+
+  it('drops a work deleted between two tries, and serves a copied work from its copy meanwhile', async () => {
+    const { orgId, owner, staff } = await staffed()
+    await allocateOrgCredits(service, owner, staff, cost, randomUUID())
+    const kept = await made(staff)
+    const dropped = await made(staff)
+    const { store, upload } = createMemoryStore()
+    for (const id of [kept, dropped]) upload(`outputs/${staff}/${id}.png`, new Uint8Array([1]), 'image/png')
+    expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(2)
+    // The try stopped after removing files: the owner still gets the copy.
+    await store.delete(`outputs/${staff}/${kept}.png`)
+    expect(await orgOwnerWork(service, owner, kept)).toMatchObject({ userId: null, outputKey: `org-works/${orgId}/${kept}.png` })
+    await orgOwnerDeleteWork({ db: rest, store }, { owner, jobId: dropped })
+    expect(await archiveRow(dropped)).toMatchObject({ deleted_by: owner })
+    expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(1)
+    await deleteAuthUser(staff)
+    expect((await orgOwnerWorks(service, owner)).map((w) => w.id)).toEqual([kept])
+    // No creator id survives in the audit of the earlier delete.
+    const audit = await db.query('select maker_user_id from public.org_work_deletions where job_id = $1', [dropped])
+    expect(audit.rows).toEqual([{ maker_user_id: null }])
+  })
+
+  it('keeps a free org work’s protected small copy, making it when missing', async () => {
+    const { orgId, staff } = await staffed()
+    const parent = await made(staff)
+    const free = randomUUID()
+    await db.query(
+      `insert into public.generation_jobs (id, user_id, module, template_id, source, status, visibility, credits_cost, credit_pool, parent_job_id, output_key, finished_at)
+       values ($1, $2, 'image', $3, 'web', 'succeeded', 'public', 1, 'free', $4, $5, now())`,
+      [free, staff, template, parent, `outputs/${staff}/${free}.png`],
+    )
+    expect(await orgOf(free)).toBe(orgId)
+    const { store, upload } = createMemoryStore()
+    upload(`outputs/${staff}/${parent}.png`, new Uint8Array([1]), 'image/png')
+    upload(`outputs/${staff}/${free}.png`, await jpeg(64, 80), 'image/png')
+    await archiveOrgWorksOf({ db: rest, store }, staff)
+    expect(await store.head(archiveThumbKey(`org-works/${orgId}/${free}.png`))).not.toBeNull()
+  })
 })
+

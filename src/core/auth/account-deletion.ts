@@ -23,16 +23,17 @@ export function accountPrefixes(userId: string): string[] {
   return [`inputs/${userId}/`, `outputs/${userId}/`, `requests/${userId}/`, `tickets/${userId}/`]
 }
 
-// Subscriptions go first (ARCHITECTURE §13): if Stripe will not cancel one, nothing is deleted
-// and the user can retry; deleting first would leave a card being charged for an account that
-// no longer exists. Then the org's works are archived and their files copied out of the
-// account's prefixes; if that fails nothing is deleted either. Files next: if R2 fails the account still exists and the user can retry,
+// The org's works go first (they belong to the org): archived and their files copied out of the
+// account's prefixes, which deletes nothing, and refused outright for an org's primary admin or
+// while an org work is still being made, before anything changes. Subscriptions next
+// (ARCHITECTURE §13): if Stripe will not cancel one, nothing is deleted and the user can retry;
+// deleting first would leave a card being charged for an account that no longer exists. Files next: if R2 fails the account still exists and the user can retry,
 // whereas the reverse order would leave orphaned photos nobody can delete. Deleting the auth
 // user then cascades to profiles and everything keyed on it (generation_jobs via T2's FK, the
 // subscriptions mirror); an org work's row is kept in org_work_archive by a trigger (1971).
 export async function deleteAccount(userId: string, deps: AccountDeletionDeps): Promise<void> {
-  await deps.cancelSubscriptions(userId)
   await deps.archiveOrgWorks(userId)
+  await deps.cancelSubscriptions(userId)
   for (const prefix of accountPrefixes(userId)) {
     await deps.storage.deletePrefix(prefix)
   }

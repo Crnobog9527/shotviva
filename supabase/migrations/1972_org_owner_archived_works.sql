@@ -87,9 +87,12 @@ stable
 security definer
 set search_path = ''
 as $$
-  select j.id, j.user_id, j.credit_pool, j.output_key
+  -- A live work an unfinished account deletion already copied is served from the copy (the
+  -- original may be gone if the deletion stopped after removing files), as an archived one.
+  select j.id, case when a.job_id is null then j.user_id end, j.credit_pool, coalesce(a.output_key, j.output_key)
     from public.generation_jobs j
     join public.orgs o on o.id = j.org_id
+    left join public.org_work_archive a on a.job_id = j.id and a.reason = 'account_deleted' and a.deleted_at is null
    where j.id = p_job_id and o.owner_user_id = p_owner
      and j.status = 'succeeded' and j.deleted_at is null and j.output_key is not null
   union all

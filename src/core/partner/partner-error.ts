@@ -70,6 +70,7 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   GENERATION_FAILED: 'generation_failed',
   // Account deletion only; no partner route deletes accounts.
   SUBSCRIPTION_CANCEL_FAILED: 'internal',
+  ACCOUNT_OWNS_ORG: 'internal',
   DOWNGRADE_NOT_ALLOWED: 'internal',
   // Saved templates are a web-only feature; no partner route saves templates.
   FAVORITES_LIMIT: 'internal',
