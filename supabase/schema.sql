@@ -4851,6 +4851,19 @@ $$;
 ALTER FUNCTION "public"."_org_signup_bonus"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_work_forget_maker"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  update public.org_work_deletions set maker_user_id = null where maker_user_id = old.id;
+  return old;
+end $$;
+
+
+ALTER FUNCTION "public"."_org_work_forget_maker"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_work_keep_on_delete"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -13745,7 +13758,8 @@ begin
       from public.org_work_archive a
       join public.generation_jobs j on j.id = a.job_id
      where j.user_id = p_user_id and a.reason = 'account_deleted' and a.deleted_at is null
-       and j.status = 'succeeded' and j.deleted_at is null;
+       and j.status = 'succeeded' and j.deleted_at is null and a.copied_at is null
+     order by a.made_at, a.job_id;
 end;
 $_$;
 
@@ -15510,6 +15524,24 @@ $$;
 
 
 ALTER FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."mark_org_works_copied"("p_user_id" "uuid", "p_job_ids" "uuid"[]) RETURNS integer
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  with done as (
+    update public.org_work_archive a set copied_at = now()
+      from public.generation_jobs j
+     where a.job_id = any(p_job_ids) and j.id = a.job_id and j.user_id = p_user_id
+       and a.reason = 'account_deleted' and a.copied_at is null
+    returning 1
+  )
+  select count(*)::integer from done;
+$$;
+
+
+ALTER FUNCTION "public"."mark_org_works_copied"("p_user_id" "uuid", "p_job_ids" "uuid"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."mark_staff_signup"("p_user_id" "uuid") RETURNS boolean
@@ -21660,6 +21692,7 @@ CREATE TABLE IF NOT EXISTS "public"."org_work_archive" (
     "reason" "text" DEFAULT 'account_deleted'::"text" NOT NULL,
     "deleted_at" timestamp with time zone,
     "deleted_by" "uuid",
+    "copied_at" timestamp with time zone,
     CONSTRAINT "org_work_archive_check" CHECK ((("deleted_at" IS NULL) = ("deleted_by" IS NULL))),
     CONSTRAINT "org_work_archive_credit_pool_check" CHECK (("credit_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
     CONSTRAINT "org_work_archive_reason_check" CHECK (("reason" = ANY (ARRAY['account_deleted'::"text", 'job_deleted'::"text"])))
@@ -23802,6 +23835,10 @@ CREATE INDEX "org_work_archive_org_idx" ON "public"."org_work_archive" USING "bt
 
 
 
+CREATE INDEX "org_work_deletions_maker_idx" ON "public"."org_work_deletions" USING "btree" ("maker_user_id") WHERE ("maker_user_id" IS NOT NULL);
+
+
+
 CREATE INDEX "org_work_deletions_org_idx" ON "public"."org_work_deletions" USING "btree" ("org_id", "created_at" DESC);
 
 
@@ -24359,6 +24396,10 @@ CREATE OR REPLACE TRIGGER "payment_fee_lines_append_only" BEFORE UPDATE ON "publ
 
 
 CREATE OR REPLACE TRIGGER "payment_fee_schedules_immutable" BEFORE DELETE OR UPDATE ON "public"."payment_fee_schedules" FOR EACH ROW EXECUTE FUNCTION "public"."_payment_fee_schedule_immutable"();
+
+
+
+CREATE OR REPLACE TRIGGER "profiles_org_work_forget_maker" BEFORE DELETE ON "public"."profiles" FOR EACH ROW EXECUTE FUNCTION "public"."_org_work_forget_maker"();
 
 
 
@@ -26949,6 +26990,10 @@ REVOKE ALL ON FUNCTION "public"."_org_signup_bonus"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."_org_work_forget_maker"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_org_work_keep_on_delete"() FROM PUBLIC;
 
 
@@ -28396,6 +28441,11 @@ GRANT ALL ON FUNCTION "public"."lock_catalog_checkout"("p_user" "uuid", "p_token
 
 REVOKE ALL ON FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."mark_dispute_drafted"("p_dispute_id" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."mark_org_works_copied"("p_user_id" "uuid", "p_job_ids" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."mark_org_works_copied"("p_user_id" "uuid", "p_job_ids" "uuid"[]) TO "service_role";
 
 
 
