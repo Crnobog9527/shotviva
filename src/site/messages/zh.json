@@ -2015,7 +2015,8 @@
           "cancel": "取消",
           "running": "这张还在生成中，生成完再删除。",
           "error": "没能删除这张作品，请稍后再试。"
-        }
+        },
+        "deletedAccounts": "已注销成员"
       }
     },
     "templateShare": {

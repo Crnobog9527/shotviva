@@ -2015,7 +2015,8 @@
           "cancel": "Cancel",
           "running": "This photo is still developing. Delete it once it is done.",
           "error": "The photo could not be deleted. Please try again later."
-        }
+        },
+        "deletedAccounts": "Deleted accounts"
       }
     },
     "templateShare": {

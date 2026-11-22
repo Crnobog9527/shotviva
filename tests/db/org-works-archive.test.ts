@@ -1,0 +1,170 @@
+import { randomUUID } from 'node:crypto'
+
+import type { Client } from 'pg'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+import { reserveJob } from '@/core/jobs'
+import { allocateOrgCredits } from '@/core/org'
+import { archiveOrgWorksOf, archiveThumbKey, DELETED_MAKERS, orgOwnerDeleteWork, orgOwnerWork, orgOwnerWorkMembers, orgOwnerWorks } from '@/core/org/works'
+import { workThumbKeyFor } from '@/core/storage'
+
+import { createMemoryStore } from '../fakes/memory-store'
+import { seedTemplate } from './generation-fixtures'
+import { connectAdmin, serviceClient } from './helpers'
+import { serviceSupabase } from './supabase-env'
+import { adminAccount, member, orgWith } from './org-fixtures'
+
+// 企业作品 follow-ups (migrations 1970–1972, control 2026-11-22): a child of an org work (edit,
+// again, poster redraw) is an org work whoever paid; and deleting an account never takes the org's
+// works with it: they move to org_work_archive (no creator id), their files are copied under
+// org-works/<org_id>/, and the owner keeps them in 企业作品 as 「已注销成员」. Personal works keep
+// today's behaviour.
+
+const service = serviceClient()
+const rest = serviceSupabase()
+let db: Client
+let actor: string
+let template: string
+let cost: number
+
+beforeAll(async () => {
+  db = await connectAdmin()
+  actor = await adminAccount(db, service)
+  template = await seedTemplate(db)
+  cost = (await db.query(`select (credits_cost->>'1k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
+}, 60_000)
+
+afterAll(async () => {
+  await db.end()
+})
+
+async function made(userId: string, inputs: Record<string, unknown> = {}) {
+  const jobId = randomUUID()
+  await reserveJob(rest, { jobId, userId, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
+    inputs: { resolution: '1k', attempt_id: randomUUID(), ...inputs } })
+  await db.query('select public.confirm_job($1, $2)', [jobId, `outputs/${userId}/${jobId}.png`])
+  return jobId
+}
+
+// A row written straight in, the way an edit or a poster redraw lands after reserve_credits.
+async function child(userId: string, extra: { parent?: string; inputs?: Record<string, unknown> }) {
+  const id = randomUUID()
+  await db.query(
+    `insert into public.generation_jobs (id, user_id, module, template_id, source, visibility, credits_cost, credit_pool, parent_job_id, inputs)
+     values ($1, $2, 'image', $3, 'web', 'private', 1, 'paid', $4, $5)`,
+    [id, userId, template, extra.parent ?? null, JSON.stringify(extra.inputs ?? {})],
+  )
+  return id
+}
+
+const orgOf = async (id: string) => (await db.query('select org_id from public.generation_jobs where id = $1', [id])).rows[0]?.org_id ?? null
+
+// A member holding one org-funded photo's worth of credits, plus `own` credits of their own.
+async function staffed(own = 0) {
+  const { orgId, owner, token } = await orgWith(db, service, actor, { pool: cost * 4 })
+  const staff = await member(db, service, token, { credits: own })
+  await allocateOrgCredits(service, owner, staff, cost, randomUUID())
+  return { orgId, owner, staff }
+}
+
+describe('children of org works', () => {
+  it('makes an edit, an again and a poster redraw of an org work org works, even paid with own credits', async () => {
+    const { orgId, staff } = await staffed()
+    const orgWork = await made(staff)
+    // From here on only their own credits.
+    await db.query('update public.profiles set credits = credits + $2 where id = $1', [staff, cost * 3])
+    expect(await orgOf(await made(staff))).toBeNull()
+    expect(await orgOf(await child(staff, { parent: orgWork }))).toBe(orgId)
+    expect(await orgOf(await made(staff, { again_of: orgWork }))).toBe(orgId)
+    expect(await orgOf(await child(staff, { inputs: { poster: { set_id: randomUUID(), part: 0, redraw_of: orgWork } } }))).toBe(orgId)
+  })
+
+  it('leaves children of personal works personal, and ignores a malformed redraw source', async () => {
+    const { staff } = await staffed(cost * 3)
+    const own = await made(staff)
+    expect(await orgOf(own)).toBeNull()
+    expect(await orgOf(await child(staff, { parent: own }))).toBeNull()
+    expect(await orgOf(await child(staff, { inputs: { poster: { set_id: randomUUID(), part: 0, redraw_of: 'not-a-uuid' } } }))).toBeNull()
+  })
+
+  it('never inherits from someone else’s work', async () => {
+    const { staff } = await staffed()
+    const orgWork = await made(staff)
+    const other = await staffed(cost * 2)
+    expect(await orgOf(await child(other.staff, { inputs: { poster: { set_id: randomUUID(), part: 0, redraw_of: orgWork } } }))).toBeNull()
+  })
+})
+
+const deleteAuthUser = (id: string) => db.query('delete from auth.users where id = $1', [id])
+const archiveRow = async (jobId: string) =>
+  (await db.query('select org_id, output_key, reason, deleted_at, deleted_by from public.org_work_archive where job_id = $1', [jobId])).rows[0]
+
+describe('account deletion', () => {
+  it('moves the org works into the org, files copied, personal works going as before', async () => {
+    const { orgId, owner, staff } = await staffed(cost)
+    const personal = await made(staff)
+    const orgWork = await made(staff)
+    expect(await orgOf(personal)).toBeNull()
+    expect(await orgOf(orgWork)).toBe(orgId)
+    const { store, upload } = createMemoryStore()
+    upload(`outputs/${staff}/${orgWork}.png`, new Uint8Array([1]), 'image/png')
+    upload(workThumbKeyFor(staff, orgWork, 'paid'), new Uint8Array([2]), 'image/webp')
+
+    expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(1)
+    expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(1)
+    const archived = `org-works/${orgId}/${orgWork}.png`
+    expect(await store.head(archived)).not.toBeNull()
+    expect(await store.head(archiveThumbKey(archived))).not.toBeNull()
+    // Until the account is gone the work is listed once, live.
+    expect((await orgOwnerWorks(service, owner)).filter((w) => w.id === orgWork)).toHaveLength(1)
+
+    await deleteAuthUser(staff)
+    expect((await db.query('select count(*)::int as n from public.generation_jobs where user_id = $1', [staff])).rows[0].n).toBe(0)
+    expect(await archiveRow(orgWork)).toMatchObject({ org_id: orgId, output_key: archived, reason: 'account_deleted', deleted_at: null })
+    expect(await archiveRow(personal)).toBeUndefined()
+
+    expect(await orgOwnerWorks(service, owner)).toEqual([expect.objectContaining({ id: orgWork, userId: null, memberActive: false })])
+    expect(await orgOwnerWorks(service, owner, { member: DELETED_MAKERS })).toHaveLength(1)
+    expect(await orgOwnerWorkMembers(service, owner)).toEqual([expect.objectContaining({ userId: null, status: 'deleted', works: 1 })])
+    expect(await orgOwnerWork(service, owner, orgWork)).toMatchObject({ userId: null, outputKey: archived })
+    // The code deployed before 1972 reads 1943's functions, which never return a null maker.
+    const old = await db.query('select count(*)::int as n from public.org_owner_works($1)', [owner])
+    expect(old.rows[0].n).toBe(0)
+  })
+
+  it('keeps the row when an account is removed some other way (the Auth dashboard), files where they were', async () => {
+    const { orgId, owner, staff } = await staffed()
+    const orgWork = await made(staff)
+    await deleteAuthUser(staff)
+    expect(await archiveRow(orgWork)).toMatchObject({ org_id: orgId, output_key: `outputs/${staff}/${orgWork}.png`, reason: 'job_deleted' })
+    expect((await orgOwnerWorks(service, owner)).map((w) => w.id)).toEqual([orgWork])
+  })
+
+  it('lets only the owner delete an archived work, audited once with no maker', async () => {
+    const { orgId, owner, staff } = await staffed()
+    const orgWork = await made(staff)
+    const { store, upload } = createMemoryStore()
+    upload(`outputs/${staff}/${orgWork}.png`, new Uint8Array([1]), 'image/png')
+    await archiveOrgWorksOf({ db: rest, store }, staff)
+    await deleteAuthUser(staff)
+    const stranger = await staffed()
+    await expect(orgOwnerDeleteWork({ db: rest, store }, { owner: stranger.owner, jobId: orgWork })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+
+    await orgOwnerDeleteWork({ db: rest, store }, { owner, jobId: orgWork })
+    await orgOwnerDeleteWork({ db: rest, store }, { owner, jobId: orgWork })
+    expect(await store.head(`org-works/${orgId}/${orgWork}.png`)).toBeNull()
+    expect(await archiveRow(orgWork)).toMatchObject({ deleted_by: owner })
+    const audit = await db.query('select maker_user_id, deleted_by from public.org_work_deletions where job_id = $1', [orgWork])
+    expect(audit.rows).toEqual([{ maker_user_id: null, deleted_by: owner }])
+    expect(await orgOwnerWorks(service, owner)).toHaveLength(0)
+    expect(await orgOwnerWork(service, owner, orgWork)).toBeNull()
+  })
+
+  it('skips works already deleted', async () => {
+    const { owner, staff } = await staffed()
+    const orgWork = await made(staff)
+    await orgOwnerDeleteWork({ db: rest, store: createMemoryStore().store }, { owner, jobId: orgWork })
+    await deleteAuthUser(staff)
+    expect(await archiveRow(orgWork)).toBeUndefined()
+  })
+})

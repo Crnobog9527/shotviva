@@ -2,12 +2,16 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { accountPrefixes, deleteAccount, type AccountDeletionDeps } from './account-deletion'
 
-function deps(overrides: Partial<{ storageError: Error; authError: string; cancelError: Error }> = {}) {
+function deps(overrides: Partial<{ storageError: Error; authError: string; cancelError: Error; archiveError: Error }> = {}) {
   const calls: string[] = []
   const value: AccountDeletionDeps = {
     cancelSubscriptions: vi.fn(async (id: string) => {
       calls.push(`stripe:${id}`)
       if (overrides.cancelError) throw overrides.cancelError
+    }),
+    archiveOrgWorks: vi.fn(async (id: string) => {
+      calls.push(`org-archive:${id}`)
+      if (overrides.archiveError) throw overrides.archiveError
     }),
     storage: {
       deletePrefix: vi.fn(async (prefix: string) => {
@@ -29,7 +33,13 @@ describe('deleteAccount', () => {
   it('cancels subscriptions, clears every R2 prefix (wishlist images included), then deletes the auth user', async () => {
     const { value, calls } = deps()
     await deleteAccount('u1', value)
-    expect(calls).toEqual(['stripe:u1', 'r2:inputs/u1/', 'r2:outputs/u1/', 'r2:requests/u1/', 'r2:tickets/u1/', 'auth:u1'])
+    expect(calls).toEqual(['stripe:u1', 'org-archive:u1', 'r2:inputs/u1/', 'r2:outputs/u1/', 'r2:requests/u1/', 'r2:tickets/u1/', 'auth:u1'])
+  })
+
+  it('deletes nothing when the org’s works cannot be archived', async () => {
+    const { value, calls } = deps({ archiveError: new Error('r2 copy failed') })
+    await expect(deleteAccount('u1', value)).rejects.toThrow('r2 copy failed')
+    expect(calls).toEqual(['stripe:u1', 'org-archive:u1'])
   })
 
   it('deletes nothing when a subscription cannot be cancelled (ARCHITECTURE §13)', async () => {

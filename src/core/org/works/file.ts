@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AppError } from '../../errors'
 import { workThumbKeyFor, type ObjectStore } from '../../storage'
+import { archiveThumbKey } from './archive'
 import { orgOwnerWork } from './reads'
 
 // Same short life as the member's own file routes (core/jobs/job-file.ts).
@@ -20,7 +21,8 @@ type Request = { owner: string; jobId: string; size: OrgWorkSize; download: bool
 export async function resolveOrgWorkFile(deps: { db: SupabaseClient; store: ObjectStore }, req: Request): Promise<string> {
   const work = await orgOwnerWork(deps.db, req.owner, req.jobId)
   if (!work) throw new AppError('NOT_FOUND', 'Not found')
-  const thumb = workThumbKeyFor(work.userId, work.id, work.creditPool)
+  // A work of a deleted account (no maker) has its small copy in the archive (1971).
+  const thumb = work.userId ? workThumbKeyFor(work.userId, work.id, work.creditPool) : archiveThumbKey(work.outputKey)
   if (work.creditPool === 'free' || (req.size === 'thumb' && (await exists(deps.store, thumb)))) {
     return deps.store.presignGet(thumb, { expiresInSeconds: SIGNED_GET_SECONDS })
   }
