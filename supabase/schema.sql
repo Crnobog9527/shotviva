@@ -4941,7 +4941,7 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_owed"("p_org" "uuid", "p_per
                coalesce((g.detail->>'min_customers')::integer, 3))->>'bonus')::integer
            - coalesce((select sum(c.credits) from public.partner_promo_clawbacks c where c.source_grant_id = g.id), 0)::integer)
     from public.partner_promo_grants g
-   where g.org_id = p_org and g.status = 'granted' and g.period < p_period and g.bonus > 0
+   where g.org_id = p_org and g.status = 'granted' and g.voided_at is null and g.period < p_period and g.bonus > 0
    order by g.period, g.id;
 $$;
 
