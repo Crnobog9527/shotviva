@@ -1,6 +1,7 @@
 'use client'
 
 import { Switch } from '@/core/ui/switch'
+import { useOfferedToggles } from '@/core/templates/offered-toggles'
 import type { ToggleField } from '@/core/templates/toggles'
 
 import { TEST_RUN_COPY as COPY } from './copy'
@@ -9,7 +10,9 @@ type Props = { toggles: readonly ToggleField[]; values: Record<string, boolean>;
 
 // The template's toggles (T89) for a test run: an admin flips each one straight to on or off to
 // try both prompt fragments; the user's confirm dialog is not shown here.
-export function TestToggles({ toggles, values, onChange }: Props) {
+// 优化摆盘 / 优化器皿 are left out while the site-wide switch is off (food_toggles_enabled), as for users.
+export function TestToggles({ toggles: all, values, onChange }: Props) {
+  const toggles = useOfferedToggles(all)
   if (toggles.length === 0) return null
   return (
     <fieldset className="grid gap-2">
