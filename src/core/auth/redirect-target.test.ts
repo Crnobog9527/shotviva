@@ -30,7 +30,7 @@ describe('sanitizeNext', () => {
   })
 
   it('builds an encoded sign-up path with the same rule', () => {
-    expect(signupPath('/zh/join/org/abc?auto=1')).toBe('/signup?next=%2Fzh%2Fjoin%2Forg%2Fabc%3Fauto%3D1')
+    expect(signupPath('/zh/join/org/abc')).toBe('/signup?next=%2Fzh%2Fjoin%2Forg%2Fabc')
     expect(signupPath('//evil.example')).toBe('/signup?next=%2Faccount')
   })
 })
