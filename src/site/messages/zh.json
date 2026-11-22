@@ -281,6 +281,8 @@
         "connect": "去 Graylum 连接"
       },
       "what": "能做什么",
+      "whatNote": "从定位到 30 天行动计划，六步帮你找准方向。",
+      "heroAlt": "Graylum 账号定位六步示意动画",
       "when": "什么时候适合用",
       "after": {
         "title": "连接以后",
@@ -292,45 +294,41 @@
       "newTab": "（在新标签页打开）",
       "zoom": "看大图：{name}",
       "lightbox": {
-        "label": "Graylum 截图",
+        "label": "Graylum 示意动画",
         "prev": "上一张",
         "next": "下一张",
         "count": "{n} / {total}"
       },
       "shots": {
-        "roadmap": {
-          "name": "路线图首页",
-          "note": "从定位到 30 天行动计划，六步帮你找准方向。"
-        },
-        "script": {
-          "name": "口播建议稿",
+        "voiceover": {
           "label": "写口播",
-          "note": "有想法但不知道怎么开口的时候"
+          "note": "有想法但不知道怎么开口的时候",
+          "alt": "写口播：Graylum 生成口播建议稿的示意"
         },
-        "xhsPost": {
-          "name": "小红书图文成稿",
+        "post": {
           "label": "写图文",
-          "note": "想发笔记却写不出能直接发的稿子的时候"
+          "note": "想发笔记却写不出能直接发的稿子的时候",
+          "alt": "写图文：Graylum 逐步写成一篇图文笔记的示意"
         },
         "storyboard": {
-          "name": "视频分镜",
-          "label": "拍视频",
-          "note": "稿子定了，不知道每个镜头怎么拍的时候"
+          "label": "拍视频（分镜）",
+          "note": "稿子定了，不知道每个镜头怎么拍的时候",
+          "alt": "拍视频（分镜）：Graylum 为口播稿生成分镜的示意"
         },
-        "storeVisit": {
-          "name": "探店笔记成稿",
+        "repurpose": {
           "label": "一稿多用",
-          "note": "同一件事想发到不同平台的时候"
+          "note": "同一件事想发到不同平台的时候",
+          "alt": "一稿多用：Graylum 把一份定稿改写成口播稿、图文笔记和长文的示意"
         },
-        "shotvivaImage": {
-          "name": "对话里用 Shotviva 出图",
-          "label": "写完就配图",
-          "note": "内容写好了还缺一张像样配图的时候"
+        "imageWithShotviva": {
+          "label": "写完就配图（用 Shotviva 出图）",
+          "note": "内容写好了还缺一张像样配图的时候",
+          "alt": "写完就配图：在 Graylum 对话里用 Shotviva 出图的示意"
         },
-        "tools": {
-          "name": "功能广场",
+        "moreTools": {
           "label": "更多工具",
-          "note": "定位、复盘、剪辑建议等都在这里。"
+          "note": "定位、复盘、剪辑建议等都在这里。",
+          "alt": "更多工具：Graylum 功能广场里各个工具的示意"
         }
       }
     }

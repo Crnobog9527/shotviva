@@ -281,6 +281,8 @@
         "connect": "Connect in Graylum"
       },
       "what": "What it does",
+      "whatNote": "From positioning to a 30-day action plan, six steps to find your direction.",
+      "heroAlt": "Animation of Graylum's six steps to find your account positioning",
       "when": "When it helps",
       "after": {
         "title": "Once connected",
@@ -292,45 +294,41 @@
       "newTab": "(opens in a new tab)",
       "zoom": "View larger: {name}",
       "lightbox": {
-        "label": "Graylum screenshot",
+        "label": "Graylum animation",
         "prev": "Previous",
         "next": "Next",
         "count": "{n} / {total}"
       },
       "shots": {
-        "roadmap": {
-          "name": "Roadmap home",
-          "note": "From positioning to a 30-day action plan, six steps to find your direction."
-        },
-        "script": {
-          "name": "Voiceover draft",
+        "voiceover": {
           "label": "Voiceovers",
-          "note": "When you have an idea but don't know how to start talking"
+          "note": "When you have an idea but don't know how to start talking",
+          "alt": "Voiceovers: Graylum writing a suggested voiceover draft"
         },
-        "xhsPost": {
-          "name": "Xiaohongshu post draft",
+        "post": {
           "label": "Image posts",
-          "note": "When you want to post but can't write a draft that's ready to go"
+          "note": "When you want to post but can't write a draft that's ready to go",
+          "alt": "Image posts: Graylum building an image post step by step"
         },
         "storyboard": {
-          "name": "Video storyboard",
-          "label": "Video",
-          "note": "When the script is set but you're not sure how to shoot each shot"
+          "label": "Video (storyboard)",
+          "note": "When the script is set but you're not sure how to shoot each shot",
+          "alt": "Video storyboard: Graylum turning a voiceover into shots"
         },
-        "storeVisit": {
-          "name": "Store visit post draft",
+        "repurpose": {
           "label": "One draft, many platforms",
-          "note": "When you want to post the same story on different platforms"
+          "note": "When you want to post the same story on different platforms",
+          "alt": "One draft, many platforms: Graylum rewriting one final draft as a voiceover, an image post and an article"
         },
-        "shotvivaImage": {
-          "name": "Shotviva images in the chat",
-          "label": "Images right after writing",
-          "note": "When the post is written but still needs a decent image"
+        "imageWithShotviva": {
+          "label": "Images right after writing (with Shotviva)",
+          "note": "When the post is written but still needs a decent image",
+          "alt": "Images right after writing: making an image with Shotviva inside a Graylum chat"
         },
-        "tools": {
-          "name": "Tools",
+        "moreTools": {
           "label": "More tools",
-          "note": "Positioning, reviews, editing tips and more, all here."
+          "note": "Positioning, reviews, editing tips and more, all here.",
+          "alt": "More tools: the tools in Graylum's tool square"
         }
       }
     }

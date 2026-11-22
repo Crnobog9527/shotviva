@@ -2,30 +2,30 @@ import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
-import { INTRO_SHOTS } from './intro-shots'
+import { HERO_MEDIA, INTRO_SCENES } from './intro-shots'
 import { canStep, DRAG_TO_CLOSE, lightboxReducer, pulledDown } from './lightbox-state'
 
-const reduce = lightboxReducer(INTRO_SHOTS.length)
+const reduce = lightboxReducer(INTRO_SCENES.length)
 
-describe('the screenshot lightbox', () => {
-  it('opens on the screenshot that was pressed', () => {
+describe('the scene lightbox', () => {
+  it('opens on the scene that was pressed', () => {
     expect(reduce(null, { type: 'open', index: 3 })).toEqual({ index: 3 })
-    expect(reduce(null, { type: 'open', index: 7 })).toBeNull()
+    expect(reduce(null, { type: 'open', index: 6 })).toBeNull()
   })
 
   it('steps left and right and stops at both ends', () => {
     let state = reduce(null, { type: 'open', index: 0 })
-    expect(canStep(state, -1, 7)).toBe(false)
+    expect(canStep(state, -1, 6)).toBe(false)
     expect(reduce(state, { type: 'step', by: -1 })).toEqual({ index: 0 })
     state = reduce(state, { type: 'step', by: 1 })
     expect(state).toEqual({ index: 1 })
-    state = reduce({ index: 6 }, { type: 'step', by: 1 })
-    expect(state).toEqual({ index: 6 })
-    expect(canStep(state, 1, 7)).toBe(false)
-    expect(canStep(state, -1, 7)).toBe(true)
+    state = reduce({ index: 5 }, { type: 'step', by: 1 })
+    expect(state).toEqual({ index: 5 })
+    expect(canStep(state, 1, 6)).toBe(false)
+    expect(canStep(state, -1, 6)).toBe(true)
   })
 
-  it('closes from any screenshot, and a closed lightbox does not step', () => {
+  it('closes from any scene, and a closed lightbox does not step', () => {
     expect(reduce({ index: 4 }, { type: 'close' })).toBeNull()
     expect(reduce(null, { type: 'step', by: 1 })).toBeNull()
   })
@@ -38,32 +38,31 @@ describe('the screenshot lightbox', () => {
     expect(DRAG_TO_CLOSE).toBeGreaterThan(12)
   })
 
-  it('keeps seven screenshots, each with a thumbnail and a large file', () => {
-    expect(INTRO_SHOTS.map(shot => shot.key)).toEqual(['roadmap', 'script', 'xhsPost', 'storyboard', 'storeVisit', 'shotvivaImage', 'tools'])
-    for (const shot of INTRO_SHOTS) {
-      expect(shot.thumb.src).toMatch(/-thumb\.webp$/)
-      expect(Math.max(shot.large.width, shot.large.height)).toBe(1200)
+  it('keeps six scenes in order, each with a webm, an mp4 and a poster', () => {
+    expect(INTRO_SCENES.map(scene => scene.key)).toEqual(['voiceover', 'post', 'storyboard', 'repurpose', 'imageWithShotviva', 'moreTools'])
+    for (const { media } of [{ media: HERO_MEDIA }, ...INTRO_SCENES]) {
+      expect(media.webm).toMatch(/^\/partners\/graylum\/graylum-.+\.webm$/)
+      expect(media.mp4).toMatch(/\.mp4$/)
+      expect(media.poster).toMatch(/-poster\.webp$/)
     }
   })
 })
 
-// The real files in public/: thumbnails ≤ 40 KB, large ≤ 150 KB, and the pixel sizes the boxes
-// are reserved with. Lossy WebP ('VP8 ') stores width and height in its frame header.
-function webpSize(path: string): { bytes: number; width: number; height: number } {
-  const file = readFileSync(new URL(`../../../../../public${path}`, import.meta.url))
-  expect(file.toString('ascii', 12, 16)).toBe('VP8 ')
-  return { bytes: file.length, width: file.readUInt16LE(26) & 0x3fff, height: file.readUInt16LE(28) & 0x3fff }
-}
-
-describe('the screenshot files', () => {
-  it('match the sizes the dialog reserves and stay within budget', () => {
-    for (const shot of INTRO_SHOTS) {
-      const thumb = webpSize(shot.thumb.src)
-      expect([thumb.width, thumb.height]).toEqual([shot.thumb.width, shot.thumb.height])
-      expect(thumb.bytes).toBeLessThanOrEqual(40 * 1024)
-      const large = webpSize(shot.large.src)
-      expect([large.width, large.height]).toEqual([shot.large.width, shot.large.height])
-      expect(large.bytes).toBeLessThanOrEqual(150 * 1024)
+// The real files in public/: present, a lossy WebP poster at 1280×800 (16:10) under 60 KB, and
+// each video under 1 MB (about 4.5 MB for all twenty-one).
+describe('the animation files', () => {
+  it('exist at the size the dialog reserves and stay within budget', () => {
+    const all = [HERO_MEDIA, ...INTRO_SCENES.map(scene => scene.media)]
+    for (const media of all) {
+      const poster = readFileSync(new URL(`../../../../../public${media.poster}`, import.meta.url))
+      expect(poster.toString('ascii', 12, 16)).toBe('VP8 ')
+      expect([poster.readUInt16LE(26) & 0x3fff, poster.readUInt16LE(28) & 0x3fff]).toEqual([1280, 800])
+      expect(poster.length).toBeLessThanOrEqual(60 * 1024)
+      for (const src of [media.webm, media.mp4]) {
+        const bytes = readFileSync(new URL(`../../../../../public${src}`, import.meta.url)).length
+        expect(bytes).toBeGreaterThan(0)
+        expect(bytes).toBeLessThanOrEqual(1024 * 1024)
+      }
     }
   })
 })
