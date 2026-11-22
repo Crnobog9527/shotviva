@@ -4,8 +4,8 @@
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "scripts": {
-    "dev": "pnpm css:sources && next dev",
-    "build": "pnpm css:sources && pnpm pricing:waffo --build && next build",
+    "dev": "pnpm css:sources && pnpm images:presize && next dev",
+    "build": "pnpm css:sources && pnpm images:presize && pnpm pricing:waffo --build && next build",
     "start": "next start",
     "lint": "eslint --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",
@@ -40,6 +40,8 @@
     "css:sources": "tsx scripts/public-css-sources.ts",
     "css:check": "tsx scripts/public-css-check.ts",
     "images:first-frames": "tsx scripts/first-frames.ts",
+    "images:presize": "tsx --conditions=react-server scripts/presize-public.ts",
+    "covers:presize": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/presize-covers/run.ts",
     "eval:identity": "tsx --conditions=react-server scripts/identity-judge-eval.ts"
   },
   "dependencies": {

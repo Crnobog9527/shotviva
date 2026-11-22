@@ -4372,6 +4372,11 @@ begin
   update public.generation_jobs
      set org_access_ended_at = case when new.status = 'active' then null else coalesce(new.removed_at, now()) end
    where org_id = new.org_id and user_id = new.user_id;
+  update public.work_shares s
+     set revoked_at = now()
+   where s.user_id = new.user_id and s.revoked_at is null
+     and exists (select 1 from public.generation_jobs j
+                    where j.id = any(s.job_ids) and j.org_id = new.org_id and j.user_id = new.user_id);
   return new;
 end $$;
 

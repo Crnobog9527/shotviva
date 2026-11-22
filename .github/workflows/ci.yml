@@ -352,6 +352,8 @@ jobs:
     permissions:
       contents: write
       checks: write
+    outputs:
+      new-head: ${{ steps.commit.outputs.new-head }}
     steps:
       # All executable files in the write job come from main. The full fetch includes the
       # same-repo PR branch. Build its schema-only child using Git objects.
@@ -368,6 +370,7 @@ jobs:
           name: schema-sql
           path: ${{ runner.temp }}/schema-fix
       - name: Commit schema.sql and carry the results over
+        id: commit
         env:
           FIX_FILE: ${{ runner.temp }}/schema-fix/schema.sql
           TREE: ${{ needs.db.outputs.schema-tree }}
@@ -382,3 +385,39 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_TOKEN: ${{ github.token }}
         run: scripts/ci/schema-commit.sh
+
+  # The schema.sql commit above starts no workflow run, so nothing would post the required "Codex
+  # findings" check on it. This job runs the same evaluation as codex-review.yml against the new
+  # commit and posts its real result (scripts/ci/codex-findings-post.mjs): a review of the tested
+  # commit holds there only through the schema-only carry rule, and open threads still fail it.
+  # Scripts come from main; the token can read the PR and write check runs, nothing else.
+  codex-findings:
+    name: post Codex findings on the schema.sql commit
+    needs: schema-sql
+    # Drafts are skipped, as in codex-review.yml.
+    if: ${{ !cancelled() && !github.event.pull_request.draft && needs.schema-sql.result == 'success' && needs.schema-sql.outputs.new-head != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: refs/heads/main
+          sparse-checkout: scripts/ci
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ needs.schema-sql.outputs.new-head }}
+          # schema-sql runs only for PRs that change the database, which review-risk.mjs rates high.
+          RISK: high
+          WAIT_MINUTES: '20'
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/ci/codex-findings-post.mjs

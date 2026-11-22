@@ -56,7 +56,7 @@ function run() {
   write('fix.sql', 'regenerated')
   const result = spawnSync('bash', [writer], {
     cwd: dir, encoding: 'utf8', env: {
-      ...process.env, PATH: join(dir, 'bin') + ':' + process.env.PATH, CHECK_LOG: join(dir, 'checks'),
+      ...process.env, PATH: join(dir, 'bin') + ':' + process.env.PATH, CHECK_LOG: join(dir, 'checks'), GITHUB_OUTPUT: join(dir, 'outputs'),
       OLD_HEAD: head, HEAD_REF: 'pr', TREE: tree, FIX_FILE: join(dir, 'fix.sql'), GH_TOKEN: 'fixture',
       CHECKS_RESULT: 'success', DB_RESULT: 'success', RUN_URL: 'local-test', REPO: 'fixture/repo', PR_TITLE: '',
     },
@@ -85,4 +85,6 @@ it('pushes only the verified schema child and posts the guard results for a safe
   const checks = readFileSync(join(dir, 'checks'), 'utf8')
   expect(checks).toContain('name=merged migrations unchanged')
   expect(checks).toContain('name=new migrations keep the deployed code working')
+  // The codex-findings job in ci.yml posts "Codex findings" on exactly this commit.
+  expect(readFileSync(join(dir, 'outputs'), 'utf8')).toBe(`new-head=${git('rev-parse', 'pr')}\n`)
 })

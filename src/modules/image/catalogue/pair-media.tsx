@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- the optimiser's srcset on a plain <img> (coverImage),
    so the plates keep their hover-wipe markup */
 import { cn } from '@/core/ui/cn'
-import { coverImage } from '@/core/ui/cover-image'
+import { coverAvif, coverImage } from '@/core/ui/cover-image'
+import { Picture } from '@/core/ui/picture'
 
 import { GroundedImg } from '../result/grounded-img'
 import { SplitTags } from './split-tags'
@@ -34,11 +35,11 @@ export function PairMedia({ before, after, alt, eager = false, video, size = 'ca
       <BeforePlate src={before} sizes={sizes} loading={loading} />
       <span className="relative flex items-center justify-center overflow-hidden">
         <Backdrop src={before} sizes={sizes} loading={loading} />
-        <img {...coverImage(before, sizes)} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full object-contain saturate-[.85]" />
+        <Picture avif={coverAvif(before, sizes)}><img {...coverImage(before, sizes)} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full object-contain saturate-[.85]" /></Picture>
         <span data-wipe="ai" className="absolute inset-0 z-1 flex items-center justify-center overflow-hidden bg-muted">
           <Backdrop src={after} sizes={sizes} loading={loading} />
           {/* White behind the result: a transparent cut-out cover reads as white, not as the phone photo underneath. */}
-          <GroundedImg ground="white" {...coverImage(after, sizes)} alt={alt} loading={loading} decoding="async" fitPlate={size === 'card'} style={fitImage(size)} className="relative z-1 object-contain" />
+          <Picture avif={coverAvif(after, sizes)}><GroundedImg ground="white" {...coverImage(after, sizes)} alt={alt} loading={loading} decoding="async" fitPlate={size === 'card'} style={fitImage(size)} className="relative z-1 object-contain" /></Picture>
         </span>
         {video ? <video data-wipe="video" data-src={video} muted playsInline preload="none" aria-hidden="true" className="absolute inset-0 z-2 size-full object-cover opacity-0" /> : null}
         <span data-wipe="seam" aria-hidden="true" className="absolute inset-y-0 left-0 z-3 -ml-px w-0.5 bg-primary opacity-0" />
@@ -52,10 +53,10 @@ export function PairMedia({ before, after, alt, eager = false, video, size = 'ca
 function BeforePlate({ src, sizes, loading }: { src: string; sizes: string; loading: 'eager' | 'lazy' }) {
   return <span className="relative overflow-hidden">
     <Backdrop src={src} sizes={sizes} loading={loading} />
-    <img {...coverImage(src, sizes)} alt="" loading={loading} decoding="async" className="absolute inset-0 size-full object-contain saturate-[.85]" />
+    <Picture avif={coverAvif(src, sizes)}><img {...coverImage(src, sizes)} alt="" loading={loading} decoding="async" className="absolute inset-0 size-full object-contain saturate-[.85]" /></Picture>
   </span>
 }
 
 function Backdrop({ src, sizes, loading }: { src: string; sizes: string; loading: 'eager' | 'lazy' }) {
-  return <img {...coverImage(src, sizes)} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" />
+  return <Picture avif={coverAvif(src, sizes)}><img {...coverImage(src, sizes)} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" /></Picture>
 }

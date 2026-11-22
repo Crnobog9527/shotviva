@@ -2,7 +2,8 @@
 
 import { useTranslations } from 'next-intl'
 
-import { coverImage } from '@/core/ui/cover-image'
+import { coverAvif, coverImage } from '@/core/ui/cover-image'
+import { Picture } from '@/core/ui/picture'
 
 import { cardPrice, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { FavoriteButton } from '../favorites/favorite-button'
@@ -31,9 +32,9 @@ export function PickerSample({ selected, sampleOf }: Props) {
         {sample ? (
           <span className="mk-pair mk-pair-lg mk-pair-static">
             {/* eslint-disable-next-line @next/next/no-img-element -- a cover through the optimiser (coverImage) */}
-            <img className="mk-b" {...coverImage(sample.before, PLATE_SIZES)} alt="" />
+            <Picture avif={coverAvif(sample.before, PLATE_SIZES)}><img className="mk-b" {...coverImage(sample.before, PLATE_SIZES)} alt="" /></Picture>
             {/* White behind the result: a transparent cut-out cover reads as white. */}
-            <GroundedImg className="mk-a" ground="white" {...coverImage(sample.after, PLATE_SIZES)} alt={t('cardAlt', { name: selected.name })} />
+            <Picture avif={coverAvif(sample.after, PLATE_SIZES)}><GroundedImg className="mk-a" ground="white" {...coverImage(sample.after, PLATE_SIZES)} alt={t('cardAlt', { name: selected.name })} /></Picture>
             <span className="mk-hl" aria-hidden />
             <span className="mk-tag mk-tag-l" aria-hidden>
               {t('phone')}
