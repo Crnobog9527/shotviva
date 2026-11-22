@@ -8,6 +8,8 @@ import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
 
 import type { OwnerConsole } from '../console/types'
 import type { OwnerActions } from './actions'
+import { blankAllowance, blankGrant, draftFor, membersKey, type AllowanceDraft, type GrantDraft, type Setting } from './bulk-drafts'
+import { newRequestId, useKeptState } from './kept-state'
 import { FIELD, Result } from './parts'
 import { useConsoleAction } from './use-console-action'
 
@@ -15,7 +17,6 @@ import { useConsoleAction } from './use-console-action'
 // the monthly allowance of either or both kinds (a number or "use default"), or give everyone the
 // same one-off amount of one kind. One confirm shows what it takes from the pool; the request id
 // stays until it succeeds, so a double click or a retry is one action.
-type Setting = { mode: 'keep' | 'set' | 'default'; value: string }
 type Props = { open: boolean; onOpenChange(open: boolean): void; members: string[]; data: OwnerConsole; actions: OwnerActions; onDone(): void }
 
 const digits = (raw: string) => raw.replace(/\D/g, '').slice(0, 10)
@@ -61,19 +62,19 @@ function SettingField({ label, value, onChange }: { label: string; value: Settin
 
 function AllowanceForm({ members, actions, onDone }: Pick<Props, 'members' | 'actions' | 'onDone'>) {
   const t = useTranslations('app.org.bulk')
-  const [paid, setPaidValue] = useState<Setting>({ mode: 'keep', value: '' })
-  const [promo, setPromoValue] = useState<Setting>({ mode: 'keep', value: '' })
+  const key = membersKey(members)
+  const [stored, setDraft] = useKeptState<AllowanceDraft>('bulk:allowance', () => blankAllowance(key, newRequestId))
+  const { requestId, paid, promo } = draftFor(stored, key, () => blankAllowance(key, newRequestId))
   const [confirming, setConfirming] = useState(false)
-  const [requestId, setRequestId] = useState(() => crypto.randomUUID())
   // A changed form is a new request: only a repeat of the same one may be answered 'already'.
-  const setPaid = (next: Setting) => { setPaidValue(next); setRequestId(crypto.randomUUID()) }
-  const setPromo = (next: Setting) => { setPromoValue(next); setRequestId(crypto.randomUUID()) }
+  const setPaid = (next: Setting) => setDraft({ members: key, requestId: newRequestId(), paid: next, promo })
+  const setPromo = (next: Setting) => setDraft({ members: key, requestId: newRequestId(), paid, promo: next })
   const { pending, outcome, run } = useConsoleAction()
   const valid = (paid.mode !== 'keep' || promo.mode !== 'keep') && settingValid(paid) && settingValid(promo)
   const send = () => run(
     () => actions.bulkSetAllowance({ requestId, members, paid: allowanceOf(paid), promo: allowanceOf(promo) }),
     t('saved', { count: members.length }),
-    () => { setRequestId(crypto.randomUUID()); setConfirming(false); onDone() },
+    () => { setDraft(blankAllowance(key, newRequestId)); setConfirming(false); onDone() },
   )
   return (
     <div className="grid gap-4">
@@ -90,18 +91,18 @@ function AllowanceForm({ members, actions, onDone }: Pick<Props, 'members' | 'ac
 function GrantForm({ members, data, actions, onDone }: Omit<Props, 'open' | 'onOpenChange'>) {
   const t = useTranslations('app.org.bulk')
   const format = useFormatter()
-  const [kind, setKindValue] = useState<'paid' | 'promo'>('promo')
-  const [each, setEachValue] = useState('')
+  const key = membersKey(members)
+  const [stored, setDraft] = useKeptState<GrantDraft>('bulk:grant', () => blankGrant(key, newRequestId))
+  const { requestId, kind, each } = draftFor(stored, key, () => blankGrant(key, newRequestId))
   const [confirming, setConfirming] = useState(false)
   // The pool as read just now (null until "Give" reads it): the page's number may be stale either
   // way (a promotion top-up is handed out at once to members on the default; deposits and grants
   // raise it), so only this read decides whether the confirm opens or the short warning shows.
   const [fresh, setFresh] = useState<number | null>(null)
-  const [requestId, setRequestId] = useState(() => crypto.randomUUID())
   // A changed kind or amount is a new request, and needs a new read before it can be confirmed.
-  const reset = () => { setRequestId(crypto.randomUUID()); setConfirming(false); setFresh(null) }
-  const setKind = (next: 'paid' | 'promo') => { setKindValue(next); reset() }
-  const setEach = (next: string) => { setEachValue(next); reset() }
+  const edit = (patch: Partial<Pick<GrantDraft, 'kind' | 'each'>>) => { setDraft({ members: key, requestId: newRequestId(), kind, each, ...patch }); setConfirming(false); setFresh(null) }
+  const setKind = (next: 'paid' | 'promo') => edit({ kind: next })
+  const setEach = (next: string) => edit({ each: next })
   const { pending, outcome, run } = useConsoleAction()
   const check = useConsoleAction()
   const amount = Number(each)
@@ -119,7 +120,7 @@ function GrantForm({ members, data, actions, onDone }: Omit<Props, 'open' | 'onO
   const send = () => run(
     () => actions.bulkGrant({ requestId, members, kind, each: amount }),
     t('given', { count: members.length, total: format.number(total) }),
-    () => { reset(); setEachValue(''); onDone() },
+    () => { setDraft(blankGrant(key, newRequestId)); setConfirming(false); setFresh(null); onDone() },
     () => { setConfirming(false); setFresh(null) },
   )
   const busy = pending || check.pending
