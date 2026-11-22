@@ -7,6 +7,9 @@ export type OwnerActions = {
   setAllowance: (input: { member: string; allowance: number }) => Promise<ConsoleResult<{ allowance: number }>>
   allocatePromo: (input: { requestId: string; member: string; credits: number }) => Promise<ConsoleResult<{ pool: number }>>
   setPromoAllowance: (input: { member: string; allowance: number }) => Promise<ConsoleResult<{ allowance: number }>>
+  setDefaults: (input: { requestId: string; paid?: number; promo?: number }) => Promise<ConsoleResult<{ paid: number; promo: number }>>
+  bulkSetAllowance: (input: { requestId: string; members: string[]; paid?: number | 'default'; promo?: number | 'default' }) => Promise<ConsoleResult<{ members: number }>>
+  bulkGrant: (input: { requestId: string; members: string[]; kind: 'paid' | 'promo'; each: number }) => Promise<ConsoleResult<{ members: number; total: number; pool: number }>>
   removeMember: (input: { requestId: string; member: string }) => Promise<ConsoleResult<{ reclaimed: number }>>
   resetInvite: () => Promise<ConsoleResult<{ token: string }>>
 }

@@ -1885,7 +1885,11 @@
         "promoAllowance": "推广月额度",
         "promoAllowanceFor": "{who} 的推广月额度",
         "promoGiveNow": "立即划拨推广积分",
-        "promoGiveFor": "划给 {who} 的推广积分"
+        "promoGiveFor": "划给 {who} 的推广积分",
+        "isDefault": "（默认）",
+        "useDefault": "恢复默认",
+        "defaultRestored": "已恢复默认。",
+        "pick": "选择 {who}"
       },
       "performance": {
         "title": "月度业绩",
@@ -2081,6 +2085,52 @@
         "reclaimed": "收回到池",
         "held": "成员手里还剩",
         "expired": "月底清零"
+      },
+      "defaults": {
+        "title": "默认月额度",
+        "hint": "没有单独设置的成员（包括以后加入的）都按这里。单独给某人设的值优先；点「恢复默认」改回。",
+        "paid": "付费积分",
+        "promo": "推广积分",
+        "save": "保存默认",
+        "saved": "默认月额度已保存。",
+        "confirmTitle": "保存默认月额度？",
+        "cancel": "取消",
+        "confirmPaid": "付费默认改为 {value}：{followers} 人按默认（其中 {unset} 人原来是 0 或没设过，会开始按新默认补发，下月 1 日生效）。",
+        "confirmPromo": "推广默认改为 {value}：{followers} 人按默认（其中 {unset} 人原来是 0 或没设过，会开始收到），本月最多立刻从推广积分池分出 {max}。",
+        "confirmPin": "想让某些人保持 0，先在批量选择里把他们设为 0（单独设置）。"
+      },
+      "bulk": {
+        "select": "批量选择",
+        "search": "搜索账号",
+        "joinedFrom": "加入日期从",
+        "selectAll": "全选（当前筛选）",
+        "selected": "已选 {count} 人",
+        "open": "批量设置",
+        "cancel": "取消",
+        "title": "批量设置 {count} 人",
+        "hint": "设月额度，或给每人一次性划拨同样的积分。",
+        "allowance": "设月额度",
+        "grant": "一次性划拨",
+        "paidAllowance": "付费月额度",
+        "promoAllowance": "推广月额度",
+        "setting": {
+          "keep": "不改",
+          "set": "设为",
+          "default": "恢复默认"
+        },
+        "apply": "应用",
+        "saved": "已为 {count} 人设置。",
+        "confirmTitle": "确认操作 {count} 人？",
+        "allowanceConfirm": "会覆盖这些人的月额度；推广月额度会立刻从推广积分池补发本月还差的部分。",
+        "kind": {
+          "paid": "付费积分",
+          "promo": "推广积分"
+        },
+        "each": "每人积分",
+        "total": "{count} 人 × {each} = {total}，从{kind}池扣（池里 {pool}）",
+        "short": "池里不够，一个人都不会划。",
+        "give": "划拨",
+        "given": "已给 {count} 人共划拨 {total}。"
       }
     },
     "templateShare": {

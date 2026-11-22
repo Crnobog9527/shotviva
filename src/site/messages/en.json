@@ -1885,7 +1885,11 @@
         "promoAllowance": "Monthly promotion allowance",
         "promoAllowanceFor": "Monthly promotion allowance for {who}",
         "promoGiveNow": "Give promotion credits now",
-        "promoGiveFor": "Promotion credits to give {who}"
+        "promoGiveFor": "Promotion credits to give {who}",
+        "isDefault": "(default)",
+        "useDefault": "Use default",
+        "defaultRestored": "Back on the default.",
+        "pick": "Select {who}"
       },
       "performance": {
         "title": "Monthly performance",
@@ -2081,6 +2085,52 @@
         "reclaimed": "Back to the pool",
         "held": "Still with members",
         "expired": "Expired at month end"
+      },
+      "defaults": {
+        "title": "Default monthly allowances",
+        "hint": "Every member without a setting of their own follows these, people who join later included. A personal value wins; Use default goes back.",
+        "paid": "Paid credits",
+        "promo": "Promotion credits",
+        "save": "Save defaults",
+        "saved": "Defaults saved.",
+        "confirmTitle": "Save the default allowances?",
+        "cancel": "Cancel",
+        "confirmPaid": "Paid default becomes {value}: {followers} members follow it ({unset} of them were at 0 or never set and will start receiving it from the 1st).",
+        "confirmPromo": "Promotion default becomes {value}: {followers} members follow it ({unset} of them were at 0 or never set and will start receiving it); up to {max} leaves the promotion pool now.",
+        "confirmPin": "To keep someone at 0, first set them to 0 with Select members (a personal value)."
+      },
+      "bulk": {
+        "select": "Select members",
+        "search": "Search accounts",
+        "joinedFrom": "Joined from",
+        "selectAll": "Select all shown",
+        "selected": "{count} selected",
+        "open": "Bulk actions",
+        "cancel": "Cancel",
+        "title": "Bulk actions for {count}",
+        "hint": "Set the monthly allowance, or give everyone the same one-off amount.",
+        "allowance": "Set allowance",
+        "grant": "One-off grant",
+        "paidAllowance": "Paid monthly allowance",
+        "promoAllowance": "Promotion monthly allowance",
+        "setting": {
+          "keep": "Keep",
+          "set": "Set to",
+          "default": "Use default"
+        },
+        "apply": "Apply",
+        "saved": "Set for {count}.",
+        "confirmTitle": "Apply to {count} members?",
+        "allowanceConfirm": "This replaces their monthly allowances. A promotion allowance gives what this month still lacks from the promotion pool straight away.",
+        "kind": {
+          "paid": "paid",
+          "promo": "promotion"
+        },
+        "each": "Credits each",
+        "total": "{count} × {each} = {total} from the {kind} pool ({pool} in it)",
+        "short": "The pool can't cover everyone, so nobody gets any.",
+        "give": "Give",
+        "given": "Gave {total} to {count}."
       }
     },
     "templateShare": {

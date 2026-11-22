@@ -25,6 +25,8 @@ const orgSchema = z.object({
   pool_credits: z.number(),
   promo_pool_credits: z.number(),
   promo_expires_at: z.string().nullable(),
+  default_paid_allowance: z.number().default(0),
+  default_promo_allowance: z.number().default(0),
   invite_token: z.string(),
   ref_code: z.string(),
   affiliate_enabled: z.boolean(),
@@ -35,6 +37,9 @@ const seatSchema = z.object({
   role: z.enum(['owner', 'member']),
   monthly_allowance: z.number(),
   held_credits: z.number(),
+  promo_allowance: z.number().default(0),
+  paid_allowance_custom: z.boolean().nullable().default(null),
+  promo_allowance_custom: z.boolean().nullable().default(null),
 })
 const memberSchema = z.object({
   user_id: z.uuid(),
@@ -43,6 +48,8 @@ const memberSchema = z.object({
   held_credits: z.number(),
   promo_allowance: z.number(),
   held_promo_credits: z.number(),
+  paid_allowance_custom: z.boolean().nullable().default(null),
+  promo_allowance_custom: z.boolean().nullable().default(null),
   joined_at: z.string(),
 })
 
@@ -87,7 +94,7 @@ type Deps = { db: SupabaseClient; now?: Date; maskPhone?: (phone: string) => str
 
 async function ownerConsole({ db, mask, now }: { db: SupabaseClient; mask: (phone: string) => string; now: Date }, org: z.infer<typeof orgSchema>): Promise<OwnerConsole> {
   const [memberRows, total, packages, owner] = await Promise.all([
-    db.from('org_members').select('user_id,role,monthly_allowance,held_credits,promo_allowance,held_promo_credits,joined_at').eq('org_id', org.id).eq('status', 'active')
+    db.from('org_members').select('user_id,role,monthly_allowance,held_credits,promo_allowance,held_promo_credits,paid_allowance_custom,promo_allowance_custom,joined_at').eq('org_id', org.id).eq('status', 'active')
       .order('joined_at').order('user_id').limit(MEMBER_LIMIT),
     db.from('org_members').select('user_id', { count: 'exact' }).eq('org_id', org.id).eq('status', 'active').limit(1),
     activePackages(db),
@@ -102,11 +109,13 @@ async function ownerConsole({ db, mask, now }: { db: SupabaseClient; mask: (phon
   return {
     kind: 'owner',
     org: { id: org.id, name: org.name, refCode: org.ref_code, status: org.status, poolCredits: org.pool_credits, affiliateEnabled: org.affiliate_enabled, affiliateLevels: org.affiliate_levels,
-      promoPoolCredits: promoLive ? org.promo_pool_credits : 0, promoExpiresAt: promoLive ? org.promo_expires_at : null },
+      promoPoolCredits: promoLive ? org.promo_pool_credits : 0, promoExpiresAt: promoLive ? org.promo_expires_at : null,
+      defaultPaidAllowance: org.default_paid_allowance, defaultPromoAllowance: org.default_promo_allowance },
     inviteToken: org.invite_token,
     members: members.map((m): ConsoleMember => ({
-      userId: m.user_id, account: labels.get(m.user_id) ?? null, role: m.role, monthlyAllowance: m.monthly_allowance,
-      heldCredits: m.held_credits, promoAllowance: m.promo_allowance, heldPromoCredits: promoLive ? m.held_promo_credits : 0, customers: counts.get(m.user_id)?.l1 ?? 0, joinedAt: m.joined_at,
+      userId: m.user_id, account: labels.get(m.user_id) ?? null, role: m.role,
+      ...allowances(m, org), heldCredits: m.held_credits, heldPromoCredits: promoLive ? m.held_promo_credits : 0,
+      customers: counts.get(m.user_id)?.l1 ?? 0, joinedAt: m.joined_at,
     })),
     memberTotal: total.count ?? members.length,
     packages,
@@ -114,6 +123,20 @@ async function ownerConsole({ db, mask, now }: { db: SupabaseClient; mask: (phon
     depositable: Math.max(0, credits - Math.min(seat?.held_credits ?? 0, credits)),
     paymentAccounts,
     poolMonth,
+  }
+}
+
+// The allowance of each kind in force, as _org_allowance (1899) decides it: a personal value, or
+// the org default (an unset row with 0 follows the default).
+export function allowances(m: Pick<z.infer<typeof memberSchema>, 'monthly_allowance' | 'promo_allowance' | 'paid_allowance_custom' | 'promo_allowance_custom'>,
+  org: Pick<z.infer<typeof orgSchema>, 'default_paid_allowance' | 'default_promo_allowance'>) {
+  const paidOwn = m.paid_allowance_custom ?? m.monthly_allowance > 0
+  const promoOwn = m.promo_allowance_custom ?? m.promo_allowance > 0
+  return {
+    monthlyAllowance: paidOwn ? m.monthly_allowance : org.default_paid_allowance, paidFollowsDefault: !paidOwn,
+    promoAllowance: promoOwn ? m.promo_allowance : org.default_promo_allowance, promoFollowsDefault: !promoOwn,
+    paidUnset: m.paid_allowance_custom === null && m.monthly_allowance === 0,
+    promoUnset: m.promo_allowance_custom === null && m.promo_allowance === 0,
   }
 }
 
@@ -170,7 +193,7 @@ async function staffCard(db: SupabaseClient, now: Date, org: z.infer<typeof orgS
     staffPromo(db, user, org.id, period),
   ])
   return {
-    kind: 'member', orgName: org.name, status: org.status, monthlyAllowance: seat.monthly_allowance,
+    kind: 'member', orgName: org.name, status: org.status, monthlyAllowance: allowances(seat, org).monthlyAllowance,
     allocatedThisMonth: given, heldCredits: seat.held_credits, promo, customers: counts.get(user)?.l1 ?? 0,
     withLevel2, period, performance,
   }
@@ -178,10 +201,10 @@ async function staffCard(db: SupabaseClient, now: Date, org: z.infer<typeof orgS
 
 // The org the account belongs to, as its owner's console or a member's card; none for everyone else.
 export async function readOrgView(user: string, { db, now = new Date(), maskPhone = (phone) => phone }: Deps): Promise<OrgView> {
-  const seatRow = ok(await db.from('org_members').select('org_id,role,monthly_allowance,held_credits').eq('user_id', user).eq('status', 'active').maybeSingle(), 'seat')
+  const seatRow = ok(await db.from('org_members').select('org_id,role,monthly_allowance,held_credits,promo_allowance,paid_allowance_custom,promo_allowance_custom').eq('user_id', user).eq('status', 'active').maybeSingle(), 'seat')
   if (!seatRow) return { kind: 'none' }
   const seat = seatSchema.parse(seatRow)
-  const found = ok(await db.from('orgs').select('id,name,owner_user_id,status,pool_credits,promo_pool_credits,promo_expires_at,invite_token,ref_code,affiliate_enabled,affiliate_levels').eq('id', seat.org_id).maybeSingle(), 'org')
+  const found = ok(await db.from('orgs').select('id,name,owner_user_id,status,pool_credits,promo_pool_credits,promo_expires_at,default_paid_allowance,default_promo_allowance,invite_token,ref_code,affiliate_enabled,affiliate_levels').eq('id', seat.org_id).maybeSingle(), 'org')
   if (!found) return { kind: 'none' }
   const org = orgSchema.parse(found)
   // The owner is the org's owner_user_id; a member row says role = 'member' for everyone else.
