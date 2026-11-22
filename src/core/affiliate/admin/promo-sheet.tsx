@@ -32,16 +32,14 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 function Numbers({ s, topups, now }: { s: PromoSheet; topups: number; now: Date }) {
   const d = s.detail
-  const short_ = s.customers < d.min_customers
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
       <Row label={P.window}>{d.window_start && d.window_end ? `${formatBeijing(d.window_start)} – ${formatBeijing(d.window_end)}` : '—'}</Row>
       <Row label={P.recipient}><UserLink userId={s.recipient_user_id} className="font-mono text-xs">{short(s.recipient_user_id)}</UserLink></Row>
       <Row label={P.base}>{n(s.base)}</Row>
       <Row label={P.raw}>{n(s.raw_credits)}</Row>
-      <Row label={P.cap(d.customer_cap_bp)}>{n(s.customer_cap)}{s.capped_customers > 0 && ` · ${P.capped(s.capped_customers)}`}</Row>
       <Row label={P.counted}>{n(s.counted_credits)}</Row>
-      <Row label={P.customers}>{n(s.customers)}{short_ && ` · ${P.minNotMet(d.min_customers)}`}</Row>
+      <Row label={P.customers}>{n(s.customers)}</Row>
       <Row label={P.bonus}>{n(s.bonus)} <span className="text-muted-foreground">({P.bonusRule(d.bonus_bp)})</span></Row>
       <Row label={P.clawbackOwed}>{n(s.clawback_owed)}</Row>
       <Row label={P.clawbackApplied}>{n(s.clawback_applied)}</Row>
