@@ -25,30 +25,43 @@ export const archiveThumbKey = (archiveKey: string) => archiveKey.replace(/\.[a-
 // R2 copies in flight at once: enough for an account with hundreds of org works to finish within
 // the route's time limit, few enough not to trip R2's request rate.
 export const ARCHIVE_COPY_CONCURRENCY = 12
+// Works marked copied per round trip, so a run the platform stops at its time limit keeps what it did.
+const MARK_EVERY = 48
 
 // Returns how many works it copied this time (0 on a pass after everything was copied).
 export async function archiveOrgWorksOf(deps: { db: SupabaseClient; store: ObjectStore }, userId: string): Promise<number> {
   const user = z.uuid().parse(userId)
   const rows = await callRpc(deps.db, 'archive_org_works', { p_user_id: user }, pairs)
-  const copied: string[] = []
+  let copied = 0
+  for (let at = 0; at < rows.length; at += MARK_EVERY) {
+    const { done, failure } = await copyAll(deps.store, user, rows.slice(at, at + MARK_EVERY))
+    // What was copied is marked even when another copy failed, so the retry does only the rest.
+    if (done.length > 0) await callRpc(deps.db, 'mark_org_works_copied', { p_user_id: user, p_job_ids: done }, z.number().int())
+    copied += done.length
+    if (failure !== null) throw failure
+  }
+  return copied
+}
+
+// One chunk, ARCHIVE_COPY_CONCURRENCY at a time; after a failure no new copy starts, and every
+// copy in flight settles before this returns.
+async function copyAll(store: ObjectStore, userId: string, rows: Pair[]): Promise<{ done: string[]; failure: unknown }> {
+  const done: string[] = []
   let failure: unknown = null
   let next = 0
   const worker = async () => {
     while (failure === null && next < rows.length) {
       const row = rows[next++]!
       try {
-        await keepWork(deps.store, user, row)
-        copied.push(row.job_id)
+        await keepWork(store, userId, row)
+        done.push(row.job_id)
       } catch (error) {
         failure ??= error
       }
     }
   }
   await Promise.all(Array.from({ length: Math.min(ARCHIVE_COPY_CONCURRENCY, rows.length) }, worker))
-  // What was copied is marked even when another copy failed, so the retry does only the rest.
-  if (copied.length > 0) await callRpc(deps.db, 'mark_org_works_copied', { p_user_id: user, p_job_ids: copied }, z.number().int())
-  if (failure !== null) throw failure
-  return copied.length
+  return { done, failure }
 }
 
 async function keepWork(store: ObjectStore, userId: string, row: Pair) {
