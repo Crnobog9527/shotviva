@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { deleteDishware, listDishware, saveDishware } from '@/core/dishware'
 import { runGeneration, type DishReader, type DishReading, type FoodDeps } from '@/core/jobs'
+import { confirmTestPhoto, runTestGenerate, saveTestBudget } from '@/modules/image'
 import { newInputKey } from '@/core/storage'
 
 import { jpeg } from '../fakes/images'
@@ -12,6 +13,7 @@ import { createMemoryStore } from '../fakes/memory-store'
 import { fakeProvider } from './generation-fixtures'
 import { connectAdmin, createUser, publishFixture } from './helpers'
 import { serviceSupabase } from './supabase-env'
+import { holdTestBudget } from './test-run-fixtures'
 
 // ARCHITECTURE §5.1c「餐饮开关的出图流程」: the toggle pair picks the flow, the dish is read only
 // once credits are held, a failed reading still makes (and charges) the ordinary image, and the
@@ -146,6 +148,37 @@ describe('the site-wide switch off (1848)', () => {
     const { rows } = await db.query('select model_params from public.template_prompts where template_id = $1', [templateId])
     expect(rows[0].model_params.food_flow).toEqual(FLOW)
     expect((await generate({ plating: true, tableware: false })).call.prompt).toBe('PLATING Fish')
+  })
+})
+
+// Admin test runs (§10.b) follow the same switch: off, both render off and nothing is read.
+describe('admin test runs and the switch (1848)', () => {
+  let release: () => Promise<void>
+  beforeAll(async () => { release = await holdTestBudget(db) }, 120_000)
+  afterAll(async () => { await release() })
+
+  async function testRun(switchOn: boolean) {
+    await saveTestBudget(serviceSupabase(), admin, 1000)
+    const photoId = randomUUID()
+    const key = `admin-tests/photos/${photoId}.jpg`
+    r2.upload(key, await jpeg(1200, 1600), 'image/jpeg')
+    await confirmTestPhoto({ db: serviceSupabase(), store: r2.store }, admin, photoId, key)
+    const fake = fakeProvider()
+    const deps = { db: serviceSupabase(), store: r2.store, provider: fake.provider, providerTimeoutMs: 2000, food: food(READING), foodTogglesEnabled: async () => switchOn }
+    const run = await runTestGenerate(deps, { actorId: admin, body: {
+      run_id: randomUUID(), batch_id: randomUUID(), template_id: templateId, photo_id: photoId,
+      inputs: { copy: {}, resolution: '1k', aspect_ratio: '2:3', toggles: { plating: true, tableware: false } },
+    } })
+    return { prompt: fake.calls[0]?.prompt, run }
+  }
+
+  it('renders both off with the switch off, and runs the flow with it on', async () => {
+    const before = { ...touched }
+    const off = await testRun(false)
+    expect(off.prompt).toBe('ORDINARY P-OFF T-OFF')
+    expect(off.run.inputs.toggles).toEqual({ plating: false, tableware: false })
+    expect(touched).toEqual(before)
+    expect((await testRun(true)).prompt).toBe('PLATING Fish')
   })
 })
 
