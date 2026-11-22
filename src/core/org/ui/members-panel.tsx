@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
 
 import { Button } from '@/core/ui/button'
@@ -11,7 +12,7 @@ import type { OwnerActions } from './actions'
 import { BulkBar, BulkToolbar } from './bulk-toolbar'
 import { Confirm } from './confirm'
 import { DefaultsForm } from './defaults-panel'
-import { useMemberSelection } from './member-selection'
+import { PAGE_SIZE, useMemberSelection } from './member-selection'
 import { FIELD, Panel, Result } from './parts'
 import { useConsoleAction } from './use-console-action'
 
@@ -67,7 +68,7 @@ function UseDefault({ member, actions, kind, suspended }: Pick<FormProps, 'membe
   )
 }
 
-// "Give now": one request id per form, kept until it succeeds, so a double click or a retry after
+// "Top up manually": one request id per form, kept until it succeeds, so a double click or a retry after
 // a lost answer is the same request to the database.
 function GiveForm({ member, actions, suspended, label, kind }: FormProps) {
   const t = useTranslations('app.org.members')
@@ -140,45 +141,88 @@ function KindForms(props: FormProps) {
   )
 }
 
-// One person: what they hold, their monthly allowance, "give now", and removal.
-type MemberRowProps = { member: ConsoleMember; actions: OwnerActions; suspended: boolean; pick: { checked: boolean; toggle(): void } | null }
+// One person: a compact row (account, role, what they hold, customers); tapping it opens the editor
+// (allowances, "top up manually", removal) in place.
+type MemberRowProps = { member: ConsoleMember; actions: OwnerActions; suspended: boolean; pick: { checked: boolean; toggle(): void } | null; open: boolean; onToggle(): void }
 
-function MemberRow({ member, actions, suspended, pick }: MemberRowProps) {
+function MemberSummary({ member, label }: { member: ConsoleMember; label: string }) {
+  const t = useTranslations('app.org.members')
+  return (
+    <>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="min-w-0 break-all font-medium">{label}</span>
+        {member.role === 'owner' ? <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-caption font-normal">{t('owner')}</span> : null}
+      </span>
+      <span className="text-caption text-muted-foreground tabular-nums">
+        {t('held', { count: member.heldCredits })} · {t('heldPromo', { count: member.heldPromoCredits })} · {t('customers', { count: member.customers })}
+      </span>
+    </>
+  )
+}
+
+function Chevron({ show, open }: { show: boolean; open: boolean }) {
+  return show ? <ChevronDown aria-hidden className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} /> : null
+}
+
+function MemberEditor({ id, hidden, ...props }: RowProps & { id: string; hidden: boolean }) {
+  return (
+    <div id={id} hidden={hidden} className="space-y-3 pb-4 pt-2">
+      <KindForms {...props} kind="paid" />
+      <KindForms {...props} kind="promo" />
+      {props.member.role === 'owner' ? null : <RemoveControl {...props} />}
+    </div>
+  )
+}
+
+function MemberRow({ member, actions, suspended, pick, open, onToggle }: MemberRowProps) {
   const t = useTranslations('app.org.members')
   const label = member.account ?? t('unknown')
-  const props = { member, actions, suspended, label }
+  const panelId = `member-editor-${member.userId}`
+  // Once opened, the editor stays mounted (hidden when closed) so a request id, a typed amount or an
+  // answer still on its way survives collapsing the row: a retry is the same request.
+  const [opened, setOpened] = useState(open)
+  if (open && !opened) setOpened(true)
   return (
-    <li className="space-y-3 py-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        {pick ? <Checkbox checked={pick.checked} onCheckedChange={pick.toggle} aria-label={t('pick', { who: label })} className="size-5 self-center" /> : null}
-        <p className="min-w-0 flex-1 break-all font-medium">{label}{member.role === 'owner' ? <span className="ml-2 rounded-full bg-wash px-2 py-0.5 text-caption font-normal">{t('owner')}</span> : null}</p>
-        <p className="text-caption text-muted-foreground tabular-nums">
-          {t('held', { count: member.heldCredits })} · {t('heldPromo', { count: member.heldPromoCredits })} · {t('customers', { count: member.customers })}
-        </p>
+    <li className="py-1">
+      <div className="flex items-center gap-3">
+        {pick ? <Checkbox checked={pick.checked} onCheckedChange={pick.toggle} aria-label={t('pick', { who: label })} className="size-5 shrink-0" /> : null}
+        {pick ? (
+          <div className="grid min-h-14 min-w-0 flex-1 content-center gap-0.5"><MemberSummary member={member} label={label} /></div>
+        ) : (
+          <button type="button" aria-expanded={open} aria-controls={opened ? panelId : undefined} onClick={onToggle}
+            className="grid min-h-14 min-w-0 flex-1 content-center gap-0.5 text-left">
+            <MemberSummary member={member} label={label} />
+          </button>
+        )}
+        <Chevron show={!pick} open={open} />
       </div>
-      {pick ? null : <>
-        <KindForms {...props} kind="paid" />
-        <KindForms {...props} kind="promo" />
-        {member.role === 'owner' ? null : <RemoveControl {...props} />}
-      </>}
+      {!pick && opened ? <MemberEditor id={panelId} hidden={!open} member={member} actions={actions} suspended={suspended} label={label} /> : null}
     </li>
   )
 }
 
-export function MembersPanel({ data, actions }: { data: OwnerConsole; actions: OwnerActions }) {
+// `initialOpen`: the member whose editor starts open (the rows start collapsed otherwise).
+export function MembersPanel({ data, actions, initialOpen = null }: { data: OwnerConsole; actions: OwnerActions; initialOpen?: string | null }) {
   const t = useTranslations('app.org.members')
   const suspended = data.org.status === 'suspended'
-  const selection = useMemberSelection(data.members)
+  const selection = useMemberSelection(data.members, initialOpen)
   return (
     <Panel title={t('title')} hint={t('hint')}>
       <DefaultsForm data={data} actions={actions} />
       <BulkToolbar selection={selection} disabled={suspended} />
       <ul className="divide-y divide-hairline">
-        {selection.shown.map((member) => (
+        {selection.visible.map((member) => (
           <MemberRow key={member.userId} member={member} actions={actions} suspended={suspended}
+            open={selection.open === member.userId} onToggle={() => selection.toggleOpen(member.userId)}
             pick={selection.selecting ? { checked: selection.selected.includes(member.userId), toggle: () => selection.toggle(member.userId) } : null} />
         ))}
       </ul>
+      {selection.shown.length === 0 && data.members.length > 0 ? <p className="text-label text-muted-foreground">{t('noMatch')}</p> : null}
+      {selection.hidden > 0 ? (
+        <Button type="button" size="touch" variant="glass" onClick={selection.showMore}>
+          {t('showMore', { count: Math.min(PAGE_SIZE, selection.hidden), shown: selection.visible.length, total: selection.shown.length })}
+        </Button>
+      ) : null}
       <BulkBar selection={selection} data={data} actions={actions} />
       {data.memberTotal > data.members.length ? <p className="text-caption text-muted-foreground">{t('truncated', { shown: data.members.length, total: data.memberTotal })}</p> : null}
       {data.members.length <= 1 ? <p className="text-label text-muted-foreground">{t('inviteEmpty')}</p> : null}

@@ -12,6 +12,7 @@ vi.mock('@/core/i18n/ui', () => ({ Link: ({ href, children, ...rest }: { href: s
 vi.mock('@/core/analytics/replay', () => ({ REPLAY_BLOCK_CLASS: 'sv-replay-block' }))
 
 const { OwnerConsoleView, OwnerEntryRow, PurchasingView } = await import('@/core/org/ui/owner-console')
+const { MembersPanel } = await import('@/core/org/ui/members-panel')
 const { StaffCardView } = await import('@/core/org/ui/staff-card')
 const { JoinForm } = await import('@/core/org/ui/join-form')
 
@@ -129,10 +130,10 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
     expect(pending.html).toContain('data-slot="org-payment-accounts-pending"')
   })
 
-  it('offers no remove button for the owner row and one for each member', () => {
-    const { html } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null, affiliate: true }))
-    const removes = html.match(/<button[^>]*>(Remove|移除)<\/button>/g) ?? []
-    expect(removes).toHaveLength(1)
+  it('offers no remove button on the owner row and one on a member row, once its editor is open', () => {
+    const panel = (initialOpen: string) => render(locale, createElement(MembersPanel, { data: owner(), actions: ownerActions, initialOpen })).html
+    expect(panel('00000000-0000-4000-8000-0000000000a1').match(/<button[^>]*>(Remove|移除)<\/button>/g) ?? []).toHaveLength(0)
+    expect(panel(MEMBER).match(/<button[^>]*>(Remove|移除)<\/button>/g) ?? []).toHaveLength(1)
   })
 
   it("shows a member's card with this month's numbers, a leave button and the customers' spend", () => {
@@ -164,19 +165,25 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
 
 describe.each(['en', 'zh'] as const)('promotion pool (%s)', (locale) => {
   it('shows both pools, the month of each, and separate paid and promotion allowances per member (企业推广积分池)', () => {
-    const { text, html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null, affiliate: true }))
+    const { text, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null, affiliate: true }))
     expect(errors).toEqual([])
     expect(text).toContain(locale === 'en' ? 'Promotion pool' : '推广积分池')
     expect(text).toContain('4,321')
     // Valid through the last day of November (the pool expires at 1 December 00:00 UTC).
     expect(text).toMatch(locale === 'en' ? /Valid through Nov 30, 2026/ : /有效期至 2026年11月30日/)
-    expect(text).toContain(locale === 'en' ? 'Monthly promotion allowance' : '推广月额度')
+    // Each row is compact: what is left of each kind, and the customers.
+    expect(text).toContain(locale === 'en' ? '1,750 promotion credits left' : '推广积分剩 1,750')
     expect(text).toContain('1,750')
     expect(text).toContain('10,000') // granted into the promotion pool this month
     // Deposit stays paid-only.
     expect(text).toContain(locale === 'en' ? 'Deposit your own paid credits' : '存入自己的付费积分')
-    // Two forms per kind and member: allowance and give.
-    expect(html.match(/<fieldset/g)).toHaveLength(4)
+    // Two forms per kind for the member whose editor is open: allowance and top-up.
+    const open = render(locale, createElement(MembersPanel, { data: owner(), actions: ownerActions, initialOpen: MEMBER }))
+    expect(open.text).toContain(locale === 'en' ? 'Monthly promotion allowance' : '推广月额度')
+    expect(open.html.match(/<fieldset/g)).toHaveLength(2)
+    expect(open.text).toContain(locale === 'en' ? 'Top up paid credits manually' : '手动补充付费积分')
+    expect(open.text).toContain(locale === 'en' ? 'Top up promotion credits manually' : '手动补充推广积分')
+    expect(open.text).not.toMatch(/立即划拨|Give now/)
   })
 })
 
@@ -214,11 +221,30 @@ describe.each(['en', 'zh'] as const)('defaults and bulk (%s)', (locale) => {
     expect(text).toContain(locale === 'en' ? 'Default monthly allowances' : '默认月额度')
     expect(html).toContain('value="200"')
     expect(html).toContain('value="500"')
-    // The owner follows both defaults; ann has personal values (two use-default buttons).
-    expect(text.split(locale === 'en' ? '(default)' : '（默认）').length - 1).toBe(2)
-    expect(html.match(locale === 'en' ? /<button[^>]*>Use default<\/button>/g : /<button[^>]*>恢复默认<\/button>/g)).toHaveLength(2)
+    // The owner follows both defaults (marked when open); ann has personal values (two use-default buttons when open).
+    const mark = locale === 'en' ? '(default)' : '（默认）'
+    const useDefault = locale === 'en' ? /<button[^>]*>Use default<\/button>/g : /<button[^>]*>恢复默认<\/button>/g
+    expect(text.split(mark).length - 1).toBe(0)
+    const ownerOpen = render(locale, createElement(MembersPanel, { data: owner(), actions: ownerActions, initialOpen: '00000000-0000-4000-8000-0000000000a1' }))
+    expect(ownerOpen.text.split(mark).length - 1).toBe(2)
+    expect(ownerOpen.html.match(useDefault)).toBeNull()
+    const annOpen = render(locale, createElement(MembersPanel, { data: owner(), actions: ownerActions, initialOpen: MEMBER }))
+    expect(annOpen.html.match(useDefault)).toHaveLength(2)
     expect(text).toContain(locale === 'en' ? 'Select members' : '批量选择')
     expect(html).not.toContain('data-slot="org-bulk-bar"') // only in selection mode
+  })
+
+  it('shows the search and joined-from filter outside selection mode, rows collapsed, and 30 rows with a show-more button', () => {
+    const many = Array.from({ length: 35 }, (_, i) => ({ ...owner().members[1], userId: `00000000-0000-4000-8000-${String(i + 100).padStart(12, '0')}`, account: `user${String(i).padStart(2, '0')}@acme.test` }))
+    const { html, text, errors } = render(locale, createElement(MembersPanel, { data: owner({}, { members: many, memberTotal: 35 }), actions: ownerActions }))
+    expect(errors).toEqual([])
+    expect(html).toContain('type="search"')
+    expect(html).toContain('type="date"')
+    expect(html).not.toContain('<fieldset') // every editor closed
+    expect(html.match(/aria-expanded="false"/g)).toHaveLength(30)
+    expect(text).toContain('user29@acme.test')
+    expect(text).not.toContain('user30@acme.test')
+    expect(text).toContain(locale === 'en' ? 'Show 5 more (30 of 35 shown)' : '再显示 5 位（已显示 30 / 35）')
   })
 })
 
@@ -264,7 +290,10 @@ describe.each(['en', 'zh'] as const)('purchasing and the staff link (%s)', (loca
     const { html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner({ status: 'suspended' }), actions: ownerActions, report: null, affiliate: true }))
     expect(errors).toEqual([])
     expect(html).toMatch(/paused|暂停/)
-    expect((html.match(/disabled=""/g) ?? []).length).toBeGreaterThanOrEqual(5)
+    expect((html.match(/disabled=""/g) ?? []).length).toBeGreaterThanOrEqual(3)
+    // An open editor disables its own save / top-up / use-default buttons too.
+    const open = render(locale, createElement(MembersPanel, { data: owner({ status: 'suspended' }), actions: ownerActions, initialOpen: MEMBER }))
+    expect((open.html.match(/disabled=""/g) ?? []).length).toBeGreaterThanOrEqual(6)
   })
 
 })
