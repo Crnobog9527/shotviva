@@ -43,14 +43,17 @@ describe('enterprise server actions', () => {
     expect(spies.command.mock.calls[0]?.[0]).toEqual({ db: 'db', user: USER })
   })
 
-  it('refresh the page only when the action applied', async () => {
+  it('refresh the page when the action applied, or when the pool was short (its number was stale)', async () => {
     spies.user.mockResolvedValue({ id: USER })
-    spies.command.mockResolvedValueOnce({ ok: false, error: 'POOL_INSUFFICIENT' })
+    spies.command.mockResolvedValueOnce({ ok: false, error: 'CREDITS_INSUFFICIENT' })
     await actions.depositAction({})
     expect(spies.refresh).not.toHaveBeenCalled()
     spies.command.mockResolvedValueOnce({ ok: true, pool: 1 })
     await actions.depositAction({})
     expect(spies.refresh).toHaveBeenCalledTimes(1)
+    spies.command.mockResolvedValueOnce({ ok: false, error: 'POOL_INSUFFICIENT' })
+    await actions.depositAction({})
+    expect(spies.refresh).toHaveBeenCalledTimes(2)
   })
 
   it('join binds the token it was given and sends login back to the join page', async () => {
