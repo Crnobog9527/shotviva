@@ -23,7 +23,8 @@ type Deps = { db: RpcClient; store: ObjectStore }
 // The result as anyone but its owner may see it. A free work is never served clean: it is the
 // same marked JPEG the owner's display and 白底 download give (job-file.ts), staged once under
 // the work's own download key (deleted with the work, §8.3) and then signed. A paid work is the
-// clean file. The free-work protection rebuild swaps the marked copy here and nowhere else.
+// clean file. The free-work protection rebuild (#820) replaces this body with its
+// protectedWorkCopy(store, { id, userId, outputKey }); nothing else here names the marked copy.
 async function protectedResultKey(store: ObjectStore, ownerId: string, item: SharedItem): Promise<string> {
   if (!shouldWatermark(item.creditPool)) return item.outputKey
   const key = downloadVariantKeyFor(ownerId, item.jobId, 'marked-white')

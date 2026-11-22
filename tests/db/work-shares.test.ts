@@ -170,7 +170,7 @@ describe('moderation', () => {
     const r2 = await storeFor(owner, [kept, later])
     const deps = { db: service, store: r2.store }
     const id = await createWorkShare(service, owner, { jobIds: [later, kept], showBefore: true })
-    await expect(sharedImageUrl(deps, { shareId: id, jobId: later, side: 'after' })).resolves.toContain('marked-white')
+    expect(keyOf(await sharedImageUrl(deps, { shareId: id, jobId: later, side: 'after' }))).not.toBe(`outputs/${owner}/${later}.png`)
     await reject(later)
     expect((await readWorkShare(service, id))?.items.map((item) => item.jobId)).toEqual([kept])
     expect((await listWorkShares(service, owner))[0]).toMatchObject({ id, works: 1, coverJobId: kept })
@@ -231,7 +231,6 @@ describe('the images of a link', () => {
 
     const freeAfter = keyOf(await sharedImageUrl(deps, { shareId: closed, jobId: free, side: 'after' }))
     expect(freeAfter).not.toBe(`outputs/${owner}/${free}.png`)
-    expect(freeAfter).toMatch(/marked-white\.jpg$/)
     expect(r2.objects.get(freeAfter)?.body).not.toEqual(r2.objects.get(`outputs/${owner}/${free}.png`)?.body)
     expect(keyOf(await sharedImageUrl(deps, { shareId: closed, jobId: paid, side: 'after' }))).toBe(`outputs/${owner}/${paid}.png`)
     await expect(sharedImageUrl(deps, { shareId: closed, jobId: paid, side: 'before' })).rejects.toMatchObject({ code: 'NOT_FOUND' })
