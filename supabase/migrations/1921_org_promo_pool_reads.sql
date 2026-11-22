@@ -5,6 +5,7 @@
 --  * _partner_promo_expire: orgs first (org pool + member-held promotion credits), then the owner
 --    buckets; voided sheets skipped;
 --  * org_promo_month: remaining = legacy rows still in an owner's pool + the org pool + what members hold.
+--  * admin_partner_promo_void: refuses a sheet granted into the org promo pool.
 -- create or replace with the same signatures and answers.
 
 -- The bucket of 1847, limited to the rows that went to an owner's own pool and not voided (1920),
@@ -232,5 +233,44 @@ begin
   end if;
   return query select v_partner, v_period, v_monthly, v_topups, v_expires,
     case when v_expires is not null and v_expires <= p_now then 0 else v_left::integer end;
+end;
+$$;
+
+-- The void (1920) is for a sheet whose credits sat in the owner's own pool and were taken back by
+-- hand. A sheet granted into the org promo pool (destination 'org') is refused
+-- (PROMO_GRANT_IN_ORG_POOL); otherwise unchanged.
+create or replace function public.admin_partner_promo_void(p_actor uuid, p_input jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_id bigint;
+  v_reason text := nullif(trim(p_input->>'reason'), '');
+  g public.partner_promo_grants;
+begin
+  perform public._org_require_admin(p_actor);
+  if jsonb_typeof(p_input) is distinct from 'object' or coalesce(p_input->>'grant_id', '') !~ '^[1-9][0-9]{0,17}$'
+     or v_reason is null or length(v_reason) > 500 then
+    raise exception 'INVALID_INPUT';
+  end if;
+  v_id := (p_input->>'grant_id')::bigint;
+  select * into g from public.partner_promo_grants where id = v_id;
+  if not found then raise exception 'PROMO_GRANT_NOT_FOUND'; end if;
+  perform from public.orgs where id = g.org_id for no key update;
+  select * into g from public.partner_promo_grants where id = v_id for update;
+  if g.voided_at is not null then return jsonb_build_object('applied', false, 'reason', 'already', 'grant_id', g.id); end if;
+  if g.status <> 'granted' then raise exception 'PROMO_GRANT_NOT_GRANTED'; end if;
+  if g.expired_at is not null then raise exception 'PROMO_GRANT_EXPIRED'; end if;
+  -- A sheet granted into the org promo pool (1894) was never in the owner's own pool, so "its
+  -- credits were taken back by hand" cannot hold; the pool expires as a whole at month end.
+  if g.destination = 'org' then raise exception 'PROMO_GRANT_IN_ORG_POOL'; end if;
+  -- A later sheet already clawed back from this one: voiding would hide that repayment.
+  if exists (select from public.partner_promo_clawbacks c join public.partner_promo_grants a on a.id = c.applied_grant_id
+              where c.source_grant_id = g.id and a.voided_at is null) then
+    raise exception 'PROMO_GRANT_CLAWED';
+  end if;
+  update public.partner_promo_grants set voided_at = now(), voided_by = p_actor, void_reason = v_reason where id = g.id;
+  perform public._org_audit(p_actor, 'partner_promo_void', g.id::text,
+    jsonb_build_object('org_id', g.org_id, 'period', g.period, 'recipient', g.recipient_user_id, 'total', g.total,
+      'reason', v_reason)::text);
+  return jsonb_build_object('applied', true, 'grant_id', g.id);
 end;
 $$;

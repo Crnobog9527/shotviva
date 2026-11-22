@@ -338,3 +338,24 @@ it('starts a rejoining member with no promotion allowance, as the paid one (Code
   expect(await seat(orgId, staff)).toMatchObject({ status: 'active', promo_allowance: 0, held_promo_credits: 0 })
   expect(await row(db, 'select monthly_allowance, held_credits from org_members where org_id=$1 and user_id=$2', [orgId, staff])).toEqual({ monthly_allowance: 0, held_credits: 0 })
 })
+
+it('refuses to void a sheet granted into the org promo pool (Claude review #836)', async () => {
+  const { orgId } = await partner(db, actor)
+  await run(db, m.current)
+  const s = await sheet(db, orgId, m.current)
+  await confirm(db, actor, s) // destination 'org'
+  await refused(db, () => db.query('select admin_partner_promo_void($1,$2)', [actor, { grant_id: s.id, reason: 'x' }]), 'PROMO_GRANT_IN_ORG_POOL')
+  expect(await row(db, 'select voided_at from partner_promo_grants where id=$1', [s.id])).toEqual({ voided_at: null })
+})
+
+it('lets only a generation reserve draw the org promotion share first; other free debits only cap it (Claude review #836)', async () => {
+  const { orgId, owner, staff } = await org(1000)
+  await db.query('update profiles set free_credits=50 where id=$1', [staff]) // own free credits
+  await allocatePromo(owner, staff, 100) // free 150, share 100
+  await db.query("select _apply_credit_change($1,'free','admin_adjust',-30,'fix','adj-a')", [staff])
+  expect(await seat(orgId, staff)).toMatchObject({ held_promo_credits: 100 }) // taken from own credits, share intact
+  expect(await row(db, "select count(*)::int n from org_promo_draws where debit_key='adj-a'")).toEqual({ n: 0 })
+  await db.query("select _apply_credit_change($1,'free','admin_adjust',-80,'fix','adj-b')", [staff]) // balance 40 < share
+  expect(await seat(orgId, staff)).toMatchObject({ held_promo_credits: 40 }) // only capped at the balance
+  expect(await row(db, "select count(*)::int n from org_promo_draws where debit_key='adj-b'")).toEqual({ n: 0 })
+})

@@ -79,8 +79,10 @@ begin
       'allocated', coalesce(-sum(l.delta) filter (where l.kind = 'promo_allocate' and l.created_at >= v_start and l.created_at < v_end), 0),
       'reclaimed', coalesce(sum(l.delta) filter (where l.kind = 'promo_reclaim' and l.created_at >= v_start and l.created_at < v_end), 0),
       'expired', coalesce(-sum(l.delta) filter (where l.kind = 'promo_expire' and l.request_id like 'org_promo_expire:' || p_period || ':%'), 0)
-        + coalesce((select -sum(c.delta) from public.credit_ledger c
-                     where c.kind = 'org_promo_expire' and c.idempotency_key like 'org_promo_expire:' || p_period || ':' || o.id::text || ':%'), 0),
+        -- Scoped to the org's members (credit_ledger_user_id_created_at_idx), never a ledger-wide scan.
+        + coalesce((select -sum(c.delta) from public.org_members om join public.credit_ledger c on c.user_id = om.user_id
+                     where om.org_id = o.id and c.created_at >= v_start
+                       and c.kind = 'org_promo_expire' and c.idempotency_key like 'org_promo_expire:' || p_period || ':' || o.id::text || ':%'), 0),
       'held', case when o.promo_expires_at > now() then
         coalesce((select sum(least(m.held_promo_credits, p.free_credits)) from public.org_members m join public.profiles p on p.id = m.user_id
                    where m.org_id = o.id and m.status = 'active'), 0) else 0 end)

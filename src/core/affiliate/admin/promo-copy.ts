@@ -63,6 +63,7 @@ export const PROMO_COPY = {
     notGranted: '只有已发放的单可以作废。',
     voidExpired: '这张单月底已清零，不能再作废。',
     voidClawed: '后面的发放单已经从这张单扣回过积分，不能作废；请联系技术处理。',
+    voidOrgPool: '这张单的积分进的是企业推广积分池，不在主账号个人余额里，不能作废；企业池月底会整体清零。',
     invalid: '提交的内容无效，请刷新后重试。',
     failed: '操作失败，请稍后重试。',
   },
