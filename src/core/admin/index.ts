@@ -182,6 +182,7 @@ export {
 export {
   FEATURES_COPY,
   FeaturesEditor,
+  FoodTogglesCard,
   PosterPhotoCard,
   SignupGiftCard,
   WISHLIST_SWITCH_COPY,

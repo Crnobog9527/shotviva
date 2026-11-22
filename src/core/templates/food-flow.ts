@@ -8,6 +8,9 @@ import { z } from 'zod'
 // Fixed toggle keys: the flow means these two, whatever their labels say.
 export const PLATING_TOGGLE = 'plating'
 export const TABLEWARE_TOGGLE = 'tableware'
+// Both, for the site-wide switch (system_settings food_toggles_enabled): while it is off neither
+// is offered and the server renders both off.
+export const FOOD_TOGGLE_KEYS: readonly string[] = [PLATING_TOGGLE, TABLEWARE_TOGGLE]
 
 // Placeholders the flow bodies take, filled from the dish reading and the library vessel. Reserved
 // so no copy field, toggle or slot can take the name.

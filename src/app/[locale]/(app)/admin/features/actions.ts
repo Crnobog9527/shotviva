@@ -8,7 +8,7 @@ import { AppError } from '@/core/errors'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { FEATURES_CACHE_TAG } from '@/core/features'
 import { GALLERY_SWITCH_TAG } from '@/core/gallery'
-import { SYSTEM_SETTINGS_CACHE_TAG } from '@/core/system-settings'
+import { FOOD_TOGGLES_SWITCH_TAG, SYSTEM_SETTINGS_CACHE_TAG } from '@/core/system-settings'
 import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 // Server actions are public endpoints, so each re-checks the admin role itself. A save expires
@@ -90,4 +90,14 @@ export async function saveAffiliateSwitchAction(value: boolean): Promise<boolean
 export async function savePosterPhotoPriceAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()
   return runAdminAction(() => savePosterPhotoPrice({ db: createAdminSupabase(), invalidate: settingsChanged }, admin.id, input))
+}
+
+// 1848: 优化摆盘 / 优化器皿 site-wide. The root layout and /api/generate read it through its own tag.
+export async function saveFoodTogglesAction(input: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  const invalidate = () => {
+    updateTag(FOOD_TOGGLES_SWITCH_TAG)
+    settingsChanged()
+  }
+  return runAdminAction(() => saveSettingSwitch({ db: createAdminSupabase(), invalidate }, admin.id, 'food_toggles_enabled', input))
 }
