@@ -7,8 +7,11 @@ import { isWaffoRejection, type WaffoApi, type WaffoBillingDetail, type WaffoSes
 
 // 开票信息 on Waffo invoices (ARCHITECTURE §6.5). Waffo is the Merchant of Record, so it is the
 // seller on the invoice; `billingDetail` on create-checkout-session pre-fills the buyer side:
-// with isBusiness true, businessName and taxId are printed on the invoice. It is only a pre-fill:
+// with isBusiness true, businessName and taxId should appear on the invoice. It is only a pre-fill:
 // the buyer can still change it on Waffo's page and later in the Waffo Consumer Portal.
+// Measured 2026-11-23 (test mode): Waffo keeps country, isBusiness, postcode and state on the
+// session but drops businessName and taxId, so the workbench copy tells the owner to enter them on
+// Waffo's page or in the portal. We keep sending them: harmless, and they work once Waffo keeps them.
 // Waffo ignores billingDetail in subscription plan-change mode; Shotviva never opens that mode
 // (an upgrade is an ordinary checkout, see app/api/checkout), so every session we create carries it.
 // Stripe never gets it: Managed Payments cannot show a buyer company.

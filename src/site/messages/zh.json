@@ -2020,7 +2020,7 @@
       },
       "billing": {
         "title": "开票信息",
-        "hint": "填写后，企业主管理员在 Shotviva 用 Waffo 购买订阅或积分包时，发票会自动带上公司抬头和税号（可在 Waffo 发票页再修改）。",
+        "hint": "公司全称和税号会保存在 Shotviva 留档，企业主管理员用 Waffo 购买时也会一并发给 Waffo。如果 Waffo 付款页没有自动带出，请在 Waffo 付款页直接填写，或付款后在 Waffo 买家门户补填：Payment History → View Invoice → Edit Details。",
         "notFapiao": "这是 Waffo 开具的商业发票（Invoice），开票方是 Waffo（代收款的商户），不是中国的增值税发票。只对 Waffo 付款生效。",
         "legalName": "公司全称",
         "legalNameHint": "和营业执照上一致，2–200 个字。",
