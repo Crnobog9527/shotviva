@@ -57,6 +57,7 @@ const commands = {
     hold_days: z.coerce.number().int().nonnegative(),
     commission_months: z.union([z.literal('').transform(() => null), z.coerce.number().pipe(z.int32().positive())]).optional(),
     payout_min_usd: money.refine((n) => n > 0),
+    org_payout_min_usd: money.refine((n) => n > 0),
     settlement_day: z.coerce.number().int().min(1).max(28),
     apply_min_level: z.enum(['none', 'any_paid', 'starter', 'pro', 'max']),
     // terms_version is not set here: it moves only with 「开始记录手续费」 (1820).

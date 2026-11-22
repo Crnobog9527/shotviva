@@ -33,13 +33,14 @@ const settingsRow = z.object({
   hold_days: z.number(),
   commission_months: z.number().int().positive().nullable(),
   payout_min_usd: z.number(),
+  org_payout_min_usd: z.number(),
   settlement_day: z.number(),
   apply_min_level: z.string(),
   terms_version: z.string(),
 })
 export async function settings(db: SupabaseClient) {
   const [s, r] = await Promise.all([
-    db.from('affiliate_settings').select('hold_days,commission_months,payout_min_usd,settlement_day,apply_min_level,terms_version').single(),
+    db.from('affiliate_settings').select('hold_days,commission_months,payout_min_usd,org_payout_min_usd,settlement_day,apply_min_level,terms_version').single(),
     db.from('affiliate_rates').select('product_kind,l1_bp,l2_bp'),
   ])
   return { settings: settingsRow.parse(checked(s)), rates: rateRow.array().parse(checked(r)) }

@@ -74,6 +74,16 @@ export async function SettingsView({ db, action }: Omit<ViewProps, 'filters'>) {
             required
             defaultValue={s.payout_min_usd / 100}
           />
+          <Field
+            name="org_payout_min_usd"
+            label="企业提现门槛（美元）"
+            hint="只用于企业联盟账号，按扣费前余额判断；个人推广员仍用上面的结算门槛。"
+            type="number"
+            min=".01"
+            step=".01"
+            required
+            defaultValue={s.org_payout_min_usd / 100}
+          />
           <Field name="settlement_day" label={COPY.day} type="number" min="1" max="28" step="1" required defaultValue={s.settlement_day} />
           <Select
             name="apply_min_level"
