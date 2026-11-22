@@ -281,6 +281,8 @@
         "connect": "去 Graylum 连接"
       },
       "what": "能做什么",
+      "whatNote": "从定位到 30 天行动计划，六步帮你找准方向。",
+      "heroAlt": "Graylum 账号定位六步示意动画",
       "when": "什么时候适合用",
       "after": {
         "title": "连接以后",
@@ -292,45 +294,41 @@
       "newTab": "（在新标签页打开）",
       "zoom": "看大图：{name}",
       "lightbox": {
-        "label": "Graylum 截图",
+        "label": "Graylum 示意动画",
         "prev": "上一张",
         "next": "下一张",
         "count": "{n} / {total}"
       },
       "shots": {
-        "roadmap": {
-          "name": "路线图首页",
-          "note": "从定位到 30 天行动计划，六步帮你找准方向。"
-        },
-        "script": {
-          "name": "口播建议稿",
+        "voiceover": {
           "label": "写口播",
-          "note": "有想法但不知道怎么开口的时候"
+          "note": "有想法但不知道怎么开口的时候",
+          "alt": "写口播：Graylum 生成口播建议稿的示意"
         },
-        "xhsPost": {
-          "name": "小红书图文成稿",
+        "post": {
           "label": "写图文",
-          "note": "想发笔记却写不出能直接发的稿子的时候"
+          "note": "想发笔记却写不出能直接发的稿子的时候",
+          "alt": "写图文：Graylum 逐步写成一篇图文笔记的示意"
         },
         "storyboard": {
-          "name": "视频分镜",
-          "label": "拍视频",
-          "note": "稿子定了，不知道每个镜头怎么拍的时候"
+          "label": "拍视频（分镜）",
+          "note": "稿子定了，不知道每个镜头怎么拍的时候",
+          "alt": "拍视频（分镜）：Graylum 为口播稿生成分镜的示意"
         },
-        "storeVisit": {
-          "name": "探店笔记成稿",
+        "repurpose": {
           "label": "一稿多用",
-          "note": "同一件事想发到不同平台的时候"
+          "note": "同一件事想发到不同平台的时候",
+          "alt": "一稿多用：Graylum 把一份定稿改写成口播稿、图文笔记和长文的示意"
         },
-        "shotvivaImage": {
-          "name": "对话里用 Shotviva 出图",
-          "label": "写完就配图",
-          "note": "内容写好了还缺一张像样配图的时候"
+        "imageWithShotviva": {
+          "label": "写完就配图（用 Shotviva 出图）",
+          "note": "内容写好了还缺一张像样配图的时候",
+          "alt": "写完就配图：在 Graylum 对话里用 Shotviva 出图的示意"
         },
-        "tools": {
-          "name": "功能广场",
+        "moreTools": {
           "label": "更多工具",
-          "note": "定位、复盘、剪辑建议等都在这里。"
+          "note": "定位、复盘、剪辑建议等都在这里。",
+          "alt": "更多工具：Graylum 功能广场里各个工具的示意"
         }
       }
     }
@@ -1213,6 +1211,7 @@
         "deleting": "正在删除…",
         "cancel": "取消",
         "running": "这张还在生成中，生成完再删除。",
+        "org": "企业作品只能由企业管理员删除。",
         "failed": "没能删除这张作品，请稍后再试。"
       }
     },
@@ -1786,12 +1785,14 @@
       "tabs": {
         "label": "企业分区",
         "console": "企业工作台",
+        "works": "企业作品",
         "affiliate": "企业联盟",
         "purchasing": "企业集采信息",
         "short": {
           "affiliate": "企业联盟",
-          "console": "企业工作台",
-          "purchasing": "企业集采信息"
+          "console": "工作台",
+          "works": "企业作品",
+          "purchasing": "集采信息"
         }
       },
       "entry": {
@@ -1977,7 +1978,8 @@
       "area": {
         "workspaceIntro": "把 Shotviva 当作生产力工具批量出图时的数据管理台：积分池、员工和每月产出都在这里管理。",
         "purchasingIntro": "企业套餐价格和对公转账信息。需要给积分池充值时，按这里的方式线下办理。",
-        "affiliateIntro": "推广客户、查看佣金和结算。客户通过你的推广链接注册和付费，佣金记在企业名下。"
+        "affiliateIntro": "推广客户、查看佣金和结算。客户通过你的推广链接注册和付费，佣金记在企业名下。",
+        "worksIntro": "员工用企业积分生成的作品都归企业所有，只在这里展示，永远不会公开。员工离开企业后，这些作品仍留在这里，员工自己的账号里不再能看到。"
       },
       "contact": {
         "open": "联系我们转账",
@@ -2019,6 +2021,31 @@
         },
         "stateCode": "省 / 州代码",
         "stateCodeHint": "美国、加拿大、澳大利亚必填，填 2–3 位代码，例如 CA、ON、NSW。"
+      },
+      "works": {
+        "title": "企业作品",
+        "all": "全部员工",
+        "filterLabel": "按员工查看",
+        "removed": "已离开",
+        "owner": "主管理员",
+        "count": "{count} 张",
+        "empty": "还没有用企业积分生成的作品。",
+        "emptyMember": "这位员工还没有用企业积分生成的作品。",
+        "more": "更早的作品",
+        "open": "查看大图",
+        "download": "下载原图",
+        "madeBy": "{who} · {date}",
+        "unknown": "账号",
+        "delete": {
+          "open": "删除 {name}",
+          "title": "删除这张企业作品？",
+          "body": "删除后无法恢复，员工那边也会一起消失。删除会记录在企业名下。",
+          "confirm": "删除作品",
+          "deleting": "正在删除…",
+          "cancel": "取消",
+          "running": "这张还在生成中，生成完再删除。",
+          "error": "没能删除这张作品，请稍后再试。"
+        }
       }
     },
     "templateShare": {

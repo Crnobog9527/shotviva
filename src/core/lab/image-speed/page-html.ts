@@ -1,4 +1,5 @@
 import { CLIENT_SCRIPT } from './client-script'
+import { PRESIZED_PREFIX } from '../../presized'
 import { HERO_WIDTH, LAB_FONT_FILES, LAB_HERO_FILES, SMALL_WIDTH, type LabConfig } from './sources'
 
 // An internal measuring tool, not a site page: Chinese only (like the admin, DESIGN §7), no
@@ -29,11 +30,11 @@ const BODY = `<h1>图片加载测速</h1>
 <div class="wrap"><table><thead><tr><th>来源</th><th>首张（含建连）</th><th>热 中位</th><th>热 P90</th><th>热 成功</th>
 <th>冷 中位</th><th>冷 P90</th><th>冷 成功</th></tr></thead><tbody id="rows"></tbody></table></div>
 <p>单位：毫秒（一张图从发请求到收完）。热 = CDN 已缓存；冷 = CDN 没缓存、要回源。失败 = 20 秒内没加载完或打不开。</p>
-<p>「小图」两行是网站卡片实际用的压缩图（AVIF/WebP，约 6–15 KB），其余行是原图（约 140 KB）。小图的「冷」：Vercel 那行仍是 Vercel 缓存，img-eo 那行是 EdgeOne 没缓存、回源到 Vercel。「首屏大图」两行是首页第一屏的图（手机上最先看到的大图，约 25–30 KB）。「静态文件」两行是网页的字体文件（约 45 KB，脚本、样式也是同类文件），比较它们从 Vercel 和从 img-eo 下载的速度。</p>
+<p>「小图」两行是网站卡片实际用的压缩图（AVIF/WebP，约 6–15 KB），其余行是原图（约 140 KB）。「预生成 WebP」两行是同一张图提前做好的固定尺寸文件（不经图片优化，所有浏览器共用一份缓存），EdgeOne 放行 /assets/presized/ 和 /presized/ 之前会显示失败。小图的「冷」：Vercel 那行仍是 Vercel 缓存，img-eo 那行是 EdgeOne 没缓存、回源到 Vercel。「首屏大图」两行是首页第一屏的图（手机上最先看到的大图，约 25–30 KB）。「静态文件」两行是网页的字体文件（约 45 KB，脚本、样式也是同类文件），比较它们从 Vercel 和从 img-eo 下载的速度。</p>
 <textarea id="out" readonly></textarea>`
 
 export function labPageHtml(config: LabConfig): string {
-  const json = JSON.stringify({ ...config, smallWidth: SMALL_WIDTH, fontFiles: LAB_FONT_FILES, heroFiles: LAB_HERO_FILES, heroWidth: HERO_WIDTH }).replace(/</g, '\\u003c')
+  const json = JSON.stringify({ ...config, smallWidth: SMALL_WIDTH, fontFiles: LAB_FONT_FILES, heroFiles: LAB_HERO_FILES, heroWidth: HERO_WIDTH, presizedPrefix: PRESIZED_PREFIX }).replace(/</g, '\\u003c')
   const empty = config.keys.length === 0 ? '<p><strong>没有取到模板封面，暂时测不了。</strong></p>' : ''
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">

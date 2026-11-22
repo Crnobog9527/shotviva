@@ -56,6 +56,15 @@ const publicEnvShape = z.object({
     .url({ protocol: /^https$/ })
     .transform((url) => url.replace(/\/+$/, ''))
     .optional(),
+  // The pre-sized pictures switch (core/presized): the origin that serves this site's
+  // /assets/presized/… and /presized/… files, e.g. https://img-eo.shotviva.com. Set: covers and the
+  // site's pictures load fixed-width WebP files (one cached copy per width, whatever the browser's
+  // Accept header); unset: /_next/image as before. Turn it on only after the covers' copies exist
+  // (scripts/presize-covers) and the CDN forwards both paths. Read at build.
+  NEXT_PUBLIC_PRESIZED_IMAGES_URL: z
+    .url({ protocol: /^https?$/ })
+    .transform((url) => url.replace(/\/+$/, ''))
+    .optional(),
   // This build's version (T90): set by next.config.ts from the deployment id; `dev` locally.
   NEXT_PUBLIC_APP_VERSION: z.string().min(1).default('dev'),
 })

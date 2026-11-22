@@ -102,21 +102,18 @@ describe('Graylum introduction body', () => {
     expect(text(body(false))).toContain('未连接：在 Graylum 的集成页连接后，就能在 Graylum 写内容时直接用 Shotviva 出图。')
   })
 
-  it('shows seven screenshots as named buttons, lazy thumbnails with their boxes held', () => {
+  it('shows the hero animation, then six scenes as named buttons with lazy posters', () => {
     const html = body(true)
+    expect(html).toContain('aria-label="Graylum 账号定位六步示意动画"')
+    expect(html).toContain('/partners/graylum/graylum-hero-6steps-poster.webp')
     const buttons = [...html.matchAll(/<button type="button" data-shot="[^"]+" aria-label="([^"]+)"/g)].map(match => match[1])
-    expect(buttons).toEqual(['看大图：路线图首页', '看大图：口播建议稿', '看大图：小红书图文成稿', '看大图：视频分镜', '看大图：探店笔记成稿', '看大图：对话里用 Shotviva 出图', '看大图：功能广场'])
-    const thumbs = [...html.matchAll(/<img src="([^"]+)" alt="" width="(\d+)" height="(\d+)" loading="lazy"/g)]
-    expect(thumbs).toHaveLength(7)
-    expect(html).not.toContain('-large.webp')
-  })
-
-  it('pairs each use with its title and line', () => {
-    const words = text(body(true))
-    for (const line of ['写口播有想法但不知道怎么开口的时候', '写图文想发笔记却写不出能直接发的稿子的时候', '拍视频稿子定了，不知道每个镜头怎么拍的时候', '一稿多用同一件事想发到不同平台的时候', '写完就配图内容写好了还缺一张像样配图的时候', '更多工具定位、复盘、剪辑建议等都在这里。'])
-      expect(words).toContain(line)
-    expect(words).toContain('从定位到 30 天行动计划，六步帮你找准方向。')
-    expect(words).toContain('Shotviva 只把你的 Shotviva 账号 ID 交给 Graylum，Graylum 拿不到你的 Shotviva 密码；')
+    expect(buttons).toEqual(['看大图：写口播', '看大图：写图文', '看大图：拍视频（分镜）', '看大图：一稿多用', '看大图：写完就配图（用 Shotviva 出图）', '看大图：更多工具'])
+    const posters = [...html.matchAll(/<img src="(\/partners\/graylum\/graylum-scene-[^"]+-poster\.webp)" alt="([^"]+)" width="1280" height="800" loading="lazy"/g)]
+    expect(posters).toHaveLength(6)
+    expect(posters[0]?.[2]).toBe('写口播：Graylum 生成口播建议稿的示意')
+    // Only the hero is a <video>; the grid never autoplays anything.
+    expect(html.match(/<video/g)).toHaveLength(1)
+    expect(html).not.toMatch(/graylum-scene-[^"]*\.(mp4|webm)/)
   })
 
   it('has no prices or credit amounts in either language', () => {

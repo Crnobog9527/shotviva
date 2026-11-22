@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 
 import { HeadBucketCommand } from '@aws-sdk/client-s3'
 
-import { createR2Client, createR2Store } from '../../src/core/storage'
+import { createR2Client, createR2Store, withPresizedCopies } from '../../src/core/storage'
 import type { Target } from './options'
 import { parseBatch, type Batch } from './schema'
 
@@ -52,5 +52,5 @@ export async function targetStores(target: Target, env: Record<string, string | 
     process.stdout.write(`R2 令牌检查：正式桶 ${PRODUCTION_BUCKET} 拒绝访问（HTTP ${await checked}），只用测试站的桶。\n`)
   }
   await checked
-  return { privateStore: createR2Store(client, target.storage.privateBucket), publicStore: createR2Store(client, target.storage.publicBucket) }
+  return { privateStore: createR2Store(client, target.storage.privateBucket), publicStore: withPresizedCopies(createR2Store(client, target.storage.publicBucket)) }
 }
