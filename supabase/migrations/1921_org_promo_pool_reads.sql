@@ -4,15 +4,11 @@
 --    voided, and only the spending not already drawn from an org promotion share;
 --  * _partner_promo_expire: orgs first (org pool + member-held promotion credits), then the owner
 --    buckets; voided sheets skipped;
---  * org_promo_month: remaining = unmoved legacy rows + the org pool + what members hold.
+--  * org_promo_month: remaining = legacy rows still in an owner's pool + the org pool + what members hold.
 -- create or replace with the same signatures and answers.
 
 -- The bucket of 1847, limited to the rows that went to an owner's own pool and not voided (1920),
 -- and counting only the spending not paid from an org promotion share.
--- After a one-off move (1922: moved_at), the bucket stops at the move: reserves and refunds up to
--- then are measured as before (that is what was moved); from then on a moved row only holds what
--- refunds landing after the move give back of reserves made before it (their part not paid from an
--- org share), and spending after the move never consumes it, so the month end takes exactly that.
 create or replace function public._partner_promo_bucket_left(p_user uuid, p_expires timestamptz)
 returns table(source text, source_id bigint, credits_left integer)
 language plpgsql stable security definer set search_path = '' as $$
@@ -25,16 +21,7 @@ declare
   v_need bigint;
   v_use integer;
   v_start timestamptz;
-  v_moved timestamptz;
-  v_rise bigint;
-  v_first boolean := true;
 begin
-  select max(g.moved_at) into v_moved from (
-    select g.moved_at from public.partner_promo_grants g
-     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null and g.destination = 'owner'
-    union all
-    select t.moved_at from public.partner_promo_topups t where t.recipient_user_id = p_user and t.expires_at = p_expires and t.destination = 'owner'
-  ) g;
   select min(x.at) into v_start from (
     select g.decided_at as at from public.partner_promo_grants g
      where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null and g.destination = 'owner'
@@ -58,13 +45,12 @@ begin
         from public.credit_ledger r
         left join public.org_promo_draws d on d.debit_key = r.idempotency_key and d.user_id = r.user_id
        where r.user_id = p_user and r.pool = 'free' and r.kind = 'reserve' and r.created_at >= v_start
-         and r.created_at < least(p_expires, coalesce(v_moved, p_expires))
+         and r.created_at < p_expires
     ),
     refunds as (
       select regexp_replace(f.idempotency_key, ':[^:]+$', ':reserve') as reserve_key, sum(f.delta) as back
         from public.credit_ledger f
        where f.user_id = p_user and f.pool = 'free' and f.kind = 'refund' and f.created_at >= v_start
-         and (v_moved is null or f.created_at < v_moved)
        group by 1
     )
     select a.at, a.ord, a.src, a.id, a.amount::bigint from adds a
@@ -87,22 +73,6 @@ begin
       end loop;
     end if;
   end loop;
-  if v_moved is not null then
-    select coalesce(sum(least(f.back, greatest(0, -r.delta - coalesce(d.drawn, 0)))), 0) into v_rise
-      from (select regexp_replace(f.idempotency_key, ':[^:]+$', ':reserve') as reserve_key, sum(f.delta) as back
-              from public.credit_ledger f
-             where f.user_id = p_user and f.pool = 'free' and f.kind = 'refund' and f.created_at >= v_moved group by 1) f
-      join public.credit_ledger r on r.idempotency_key = f.reserve_key and r.user_id = p_user and r.kind = 'reserve'
-       and r.created_at >= v_start and r.created_at < v_moved
-      left join public.org_promo_draws d on d.debit_key = r.idempotency_key and d.user_id = p_user;
-    for i in 1..cardinality(v_id) loop
-      if exists(select from public.partner_promo_grants g where v_src[i] = 'grant' and g.id = v_id[i] and g.moved_at is not null)
-         or exists(select from public.partner_promo_topups t where v_src[i] = 'topup' and t.id = v_id[i] and t.moved_at is not null) then
-        v_left[i] := case when v_first then v_rise else 0 end;
-        v_first := false;
-      end if;
-    end loop;
-  end if;
   return query select u.s, u.i, u.l from unnest(v_src, v_id, v_left) as u(s, i, l);
 end;
 $$;
@@ -207,7 +177,7 @@ end;
 $$;
 
 -- The 企业联盟 card (1849): granted this month as before; remaining = what is still unspent of it:
--- rows still in the owner's own pool (not moved, measured as 1849 did) plus the org's live promo
+-- rows still in the owner's own pool (measured as 1849 did) plus the org's live promo
 -- pool plus what active members still hold of it.
 create or replace function public.org_promo_month(p_org uuid, p_now timestamptz default now())
 returns table(
@@ -241,19 +211,19 @@ begin
   for b in
     select x.u, x.e from (
       select g.recipient_user_id as u, g.expires_at as e from public.partner_promo_grants g
-       where g.org_id = p_org and g.period = v_period and g.status = 'granted' and g.voided_at is null and g.destination = 'owner' and g.moved_at is null
+       where g.org_id = p_org and g.period = v_period and g.status = 'granted' and g.voided_at is null and g.destination = 'owner'
       union
       select t.recipient_user_id, t.expires_at from public.partner_promo_topups t
-       where t.org_id = p_org and t.period = v_period and t.destination = 'owner' and t.moved_at is null
+       where t.org_id = p_org and t.period = v_period and t.destination = 'owner'
     ) x
   loop
     v_left := v_left + least(
       coalesce((select p.free_credits from public.profiles p where p.id = b.u), 0),
       coalesce((select sum(l.credits_left) from public._partner_promo_bucket_left(b.u, b.e) l
                  where (l.source = 'grant' and exists (select 1 from public.partner_promo_grants g
-                          where g.id = l.source_id and g.org_id = p_org and g.period = v_period and g.moved_at is null and g.voided_at is null))
+                          where g.id = l.source_id and g.org_id = p_org and g.period = v_period and g.voided_at is null))
                     or (l.source = 'topup' and exists (select 1 from public.partner_promo_topups t
-                          where t.id = l.source_id and t.org_id = p_org and t.period = v_period and t.moved_at is null))), 0));
+                          where t.id = l.source_id and t.org_id = p_org and t.period = v_period))), 0));
   end loop;
   if o.promo_expires_at > p_now then
     v_left := v_left + o.promo_pool_credits

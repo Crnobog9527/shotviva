@@ -1,37 +1,53 @@
--- 出图时让员工自选 (ARCHITECTURE §6.5 企业推广积分池, the Owner 2026-11-22). A member of an org who
--- holds BOTH kinds of org credits (a paid share min(held_credits, credits) > 0 and a promotion
--- share min(held_promo_credits, free_credits) > 0 while the org's promotion month is live) picks
--- per generation which kind pays: inputs.pool_choice = 'paid' or 'promo'.
---  - 'paid': the paid pool (own paid credits first, then the org's paid share, as always);
---  - 'promo': the free pool (the org's promotion share first, then own free credits): a free work;
---  - the chosen pool cannot cover the price: POOL_CHOICE_INSUFFICIENT, never the other pool.
--- Everyone else, and every non-web source (partner API, Graylum), keeps paid-first-then-free and
--- the choice is ignored. A honoured choice is remembered in profiles.org_pool_choice. Batches stay
--- paid only (reserve_batch_cell refuses a free cell, unchanged).
+-- Org members pay with org credits only, and choose which kind (ARCHITECTURE §6.5 企业推广积分池,
+-- the Owner 2026-11-22: 「出图时让员工自选」, and 「在职成员只用企业积分」).
 --
--- reserve_credits is re-created from its current body with only the pool selection moved into
--- _reserve_pool (same signature and answers).
+-- An active member of an org (staff and the org's owner alike, Owner 2026-11-22) generates ONLY
+-- from the org's shares in their account: the paid share
+-- min(held_credits, credits) and the promotion share min(held_promo_credits, free_credits) while
+-- the org's promotion month is live. Their own credits stay frozen while they are a member (usable
+-- again once they leave), and one job is never paid partly by the org and partly by the member.
+--  - Holding both shares, a web job may choose (inputs.pool_choice): 'paid' charges the paid pool,
+--    'promo' the free pool (a free work, watermarked). A chosen kind that cannot cover the price is
+--    refused (POOL_CHOICE_INSUFFICIENT), never charged from the other kind. A honoured choice is
+--    remembered in profiles.org_pool_choice.
+--  - Otherwise (no choice, one kind, any non-web source) the org paid share pays if it covers the
+--    price, else the org promotion share; neither covers it: ORG_CREDITS_INSUFFICIENT (the member
+--    asks the org's admin; personal credits are never used).
+-- The whole price comes out of the org's share: the paid share trigger (1629) now draws a member's
+-- reserve from held_credits first (it used to spend own credits first), as the promotion trigger
+-- (1892) already does, so the draw tables hold the job's full cost (org work stamping reads them).
+-- Everyone who is not an active member keeps paid-first-then-free on their own credits. Batches
+-- stay paid only (reserve_batch_cell refuses a free cell, unchanged). Poster photo extraction
+-- (start_poster_photo) follows the same pool rule.
+--
+-- reserve_credits and start_poster_photo are re-created from their current bodies with only the
+-- pool selection replaced by _reserve_pool (same signatures and answers).
 
--- The pool a reserve charges. The caller holds the profile row (reserve_credits locks it first).
 create function public._reserve_pool(p_profile public.profiles, p_cost integer, p_source text, p_choice text)
 returns text
 language plpgsql security definer set search_path = '' as $$
 declare
-  v_both boolean := false;
+  v_member boolean := false;
+  v_paid integer;
+  v_promo integer;
   v_pool text;
 begin
   if p_choice is not null and p_choice not in ('paid', 'promo') then
     raise exception 'INVALID_INPUT' using detail = 'pool_choice must be paid or promo';
   end if;
-  if p_choice is not null and p_source = 'web' then
-    select least(m.held_credits, p_profile.credits) > 0 and least(m.held_promo_credits, p_profile.free_credits) > 0
-      into v_both
-      from public.org_members m join public.orgs o on o.id = m.org_id
-     where m.user_id = p_profile.id and m.status = 'active' and o.promo_expires_at > now();
+  select true, least(m.held_credits, p_profile.credits),
+         case when o.promo_expires_at > now() then least(m.held_promo_credits, p_profile.free_credits) else 0 end
+    into v_member, v_paid, v_promo
+    from public.org_members m join public.orgs o on o.id = m.org_id
+   where m.user_id = p_profile.id and m.status = 'active';
+  if not coalesce(v_member, false) then
+    if p_profile.credits >= p_cost then return 'paid'; end if;
+    if p_profile.free_credits >= p_cost then return 'free'; end if;
+    raise exception 'CREDITS_INSUFFICIENT';
   end if;
-  if coalesce(v_both, false) then
+  if p_choice is not null and p_source = 'web' and v_paid > 0 and v_promo > 0 then
     v_pool := case p_choice when 'paid' then 'paid' else 'free' end;
-    if (case when v_pool = 'paid' then p_profile.credits else p_profile.free_credits end) < p_cost then
+    if (case when v_pool = 'paid' then v_paid else v_promo end) < p_cost then
       raise exception 'POOL_CHOICE_INSUFFICIENT';
     end if;
     if p_profile.org_pool_choice is distinct from p_choice then
@@ -39,9 +55,9 @@ begin
     end if;
     return v_pool;
   end if;
-  if p_profile.credits >= p_cost then return 'paid'; end if;
-  if p_profile.free_credits >= p_cost then return 'free'; end if;
-  raise exception 'CREDITS_INSUFFICIENT';
+  if v_paid >= p_cost then return 'paid'; end if;
+  if v_promo >= p_cost then return 'free'; end if;
+  raise exception 'ORG_CREDITS_INSUFFICIENT';
 end;
 $$;
 revoke all on function public._reserve_pool(public.profiles, integer, text, text) from public, anon, authenticated, service_role;
@@ -154,3 +170,81 @@ begin
 end;
 $$;
 
+-- Poster photo extraction: the same pool rule.
+create or replace function public.start_poster_photo(p_user_id uuid, p_provider text, p_per_hour integer) returns table(extraction_id bigint, credits integer)
+language plpgsql security definer set search_path = '' as $_$
+declare
+  v_profile public.profiles;
+  v_price integer;
+  v_pool text;
+  v_id bigint;
+begin
+  select * into v_profile from public.profiles where id = p_user_id for update;
+  if not found then raise exception 'PROFILE_NOT_FOUND'; end if;
+  if v_profile.banned_at is not null then raise exception 'USER_BANNED'; end if;
+
+  select (s.value #>> '{}')::integer into v_price from public.system_settings s
+   where s.key = 'poster_photo_credits' and jsonb_typeof(s.value) = 'number' and (s.value #>> '{}') ~ '^[1-9][0-9]*$';
+  if v_price is null then raise exception 'PRICE_UNSET'; end if;
+
+  if (select count(*) from public.poster_extractions e
+       where e.user_id = p_user_id and e.created_at >= now() - interval '1 hour') >= p_per_hour then
+    raise exception 'RATE_LIMITED';
+  end if;
+
+  -- Paid first, then free; org members from org shares only (1897).
+  v_pool := public._reserve_pool(v_profile, v_price, 'web', null);
+
+  insert into public.poster_extractions (user_id, source, input_chars, status, provider, credits, credit_pool)
+  values (p_user_id, 'photo', 0, 'pending', p_provider, v_price, v_pool)
+  returning id into v_id;
+
+  perform public._apply_credit_change(p_user_id, v_pool, 'reserve', -v_price, 'poster photo',
+    'poster_photo:' || v_id::text || ':reserve');
+  return query select v_id, v_price;
+end;
+$_$;
+
+-- The paid share follows what a member spends (1629), except that a member's reserve now takes
+-- the org's share first (the whole price: _reserve_pool only lets the share pay). Every other
+-- paid debit (a clawback, an admin adjustment) still spends the member's own credits first.
+create or replace function public._org_held_follows_ledger() returns trigger
+language plpgsql security definer set search_path = '' as $_$
+declare
+  m public.org_members;
+  d public.org_held_draws;
+  back integer;
+  v_draw integer;
+begin
+  if new.delta < 0 then
+    select * into m from public.org_members where user_id = new.user_id and status = 'active' for update;
+    if not found then return new; end if;
+    v_draw := case when new.kind = 'reserve' then least(m.held_credits, -new.delta)
+                   else greatest(0, m.held_credits - new.balance_after) end;
+    if v_draw > 0 or m.held_credits > new.balance_after then
+      update public.org_members set held_credits = least(held_credits - v_draw, new.balance_after) where org_id = m.org_id and user_id = m.user_id;
+    end if;
+    if v_draw > 0 then
+      insert into public.org_held_draws(debit_key, org_id, user_id, drawn) values (new.idempotency_key, m.org_id, m.user_id, v_draw);
+    end if;
+  elsif new.kind = 'refund' then
+    select * into d from public.org_held_draws
+     where debit_key = regexp_replace(new.idempotency_key, ':[^:]+$', ':reserve') and user_id = new.user_id for update;
+    if not found or d.restored >= d.drawn then return new; end if;
+    back := least(new.delta, d.drawn - d.restored);
+    select * into m from public.org_members where org_id = d.org_id and user_id = d.user_id and status = 'active' for update;
+    if not found then
+      -- Left before the refund: the org's part goes back to the org, not to the member.
+      update public.org_held_draws set restored = restored + back where debit_key = d.debit_key;
+      perform public._apply_credit_change(new.user_id, 'paid', 'org_reclaim', -back, 'org:' || d.org_id::text,
+        'org_return:' || new.idempotency_key);
+      insert into public.org_pool_returns(refund_key, org_id, user_id, credits) values (new.idempotency_key, d.org_id, d.user_id, back);
+      return new;
+    end if;
+    update public.org_members set held_credits = least(held_credits + back, new.balance_after)
+     where org_id = m.org_id and user_id = m.user_id;
+    update public.org_held_draws set restored = restored + back where debit_key = d.debit_key;
+  end if;
+  return new;
+end;
+$_$;

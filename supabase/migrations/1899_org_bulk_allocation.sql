@@ -12,9 +12,9 @@ language sql immutable set search_path = '' as $$
 $$;
 revoke all on function public._org_allowance(boolean, integer, integer) from public, anon, authenticated, service_role;
 
--- A member who leaves and rejoins starts over: no personal allowance of either kind (so the org
--- defaults apply), as org_join and admin_org_add_member already reset the paid allowance to 0.
-create function public._org_member_rejoin_reset() returns trigger
+-- A member who leaves and rejoins starts over (1892): also no personal allowance of either kind,
+-- so the org defaults apply.
+create or replace function public._org_member_rejoin_reset() returns trigger
 language plpgsql set search_path = '' as $$
 begin
   if old.status = 'removed' and new.status = 'active' then
@@ -26,9 +26,6 @@ begin
   return new;
 end;
 $$;
-revoke all on function public._org_member_rejoin_reset() from public, anon, authenticated, service_role;
-create trigger org_members_rejoin_reset before update of status on public.org_members
-  for each row execute function public._org_member_rejoin_reset();
 
 -- The monthly paid top-up (1628) with the allowance in force (own or default).
 create or replace function public.org_monthly_topup(p_period text) returns jsonb

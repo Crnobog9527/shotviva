@@ -6,10 +6,10 @@ import { z } from 'zod'
 import type { PoolChoiceOffer } from '@/core/billing/pools'
 import { logger } from '@/core/logger'
 
-// 出图时让员工自选 (ARCHITECTURE §6.5, migration 1897): whether the signed-in account holds both
-// kinds of org credits right now (a paid share and a live promotion share), as reserve_credits
-// decides it, and their last choice. null: no choice to offer (the page shows no picker and the
-// server keeps paid first, then free). Read with the service role: org_members has no client grant.
+// 在职成员只用企业积分、出图时自选 (ARCHITECTURE §6.5, migration 1897): for an active member of an org,
+// the org's paid and promotion shares they can spend (their own credits are frozen) and their last
+// choice; null for everyone else (their own balance applies). Read with the service role:
+// org_members has no client grant.
 const seat = z.object({
   held_credits: z.number(),
   held_promo_credits: z.number(),
@@ -17,12 +17,12 @@ const seat = z.object({
 })
 const profile = z.object({ credits: z.number(), free_credits: z.number(), org_pool_choice: z.enum(['paid', 'promo']).nullable() })
 
-// Mirrors _reserve_pool: both shares held while the promotion month is live.
-export function offerOf(s: z.infer<typeof seat>, b: z.infer<typeof profile>, now: Date): PoolChoiceOffer | null {
+// Mirrors _reserve_pool: an active member spends only the org's shares (paid, and promotion while
+// the month is live); the picker shows when both are above 0.
+export function offerOf(s: z.infer<typeof seat>, b: z.infer<typeof profile>, now: Date): PoolChoiceOffer {
   const expires = s.orgs.promo_expires_at
   const live = expires !== null && Date.parse(expires) > now.getTime()
-  const both = live && Math.min(s.held_credits, b.credits) > 0 && Math.min(s.held_promo_credits, b.free_credits) > 0
-  return both ? { paid: b.credits, promo: b.free_credits, last: b.org_pool_choice ?? 'paid' } : null
+  return { paid: Math.min(s.held_credits, b.credits), promo: live ? Math.min(s.held_promo_credits, b.free_credits) : 0, last: b.org_pool_choice ?? 'paid' }
 }
 
 export async function readPoolChoiceOffer(db: SupabaseClient, user: string, now = new Date()): Promise<PoolChoiceOffer | null> {

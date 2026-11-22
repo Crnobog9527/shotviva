@@ -257,6 +257,23 @@ begin
 end;
 $$;
 
+-- A member who leaves and rejoins starts over on promotion credits too: org_join and
+-- admin_org_add_member reset the paid allowance and share when they reactivate a removed row, and
+-- this resets the promotion allowance and share the same way (Codex #836).
+create function public._org_member_rejoin_reset() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if old.status = 'removed' and new.status = 'active' then
+    new.promo_allowance := 0;
+    new.held_promo_credits := 0;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public._org_member_rejoin_reset() from public, anon, authenticated, service_role;
+create trigger org_members_rejoin_reset before update of status on public.org_members
+  for each row execute function public._org_member_rejoin_reset();
+
 -- Keeps held_promo_credits right as the member's free pool moves (the promotion twin of 1629):
 --  - a free-pool debit draws from the org's promotion share first (it expires) and records how much
 --    under the debit's key and month; a month-end expiry of the owner's own old promotion grants
@@ -319,5 +336,5 @@ revoke all on function public._org_promo_follows_ledger() from public, anon, aut
 
 create trigger credit_ledger_org_promo_held
   after insert on public.credit_ledger
-  for each row when (new.pool = 'free' and new.kind not in ('org_promo_allocate', 'org_promo_reclaim', 'org_promo_expire', 'org_promo_move'))
+  for each row when (new.pool = 'free' and new.kind not in ('org_promo_allocate', 'org_promo_reclaim', 'org_promo_expire'))
   execute function public._org_promo_follows_ledger();

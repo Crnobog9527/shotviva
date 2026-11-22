@@ -97,7 +97,7 @@ function CreateForm({ template, open, onClose, forms, ...context }: BodyProps & 
         {forms.ready ? <FormWeeklyTools weekly={weekly} names={{ [template.id]: template.name }} storeFields={matchesStore(template.copyFields)} /> : null}
         <WorkspaceForm
           template={template}
-          balance={context.balance}
+          balance={draft.choice.balance}
           tier={context.tier}
           photos={draft.photos}
           slots={draft.slots}
@@ -110,7 +110,7 @@ function CreateForm({ template, open, onClose, forms, ...context }: BodyProps & 
         />
         <PoolChoiceSlot choice={draft.choice.picker} />
       </>}
-      bar={<FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} placement="sheet" limit={context.concurrency.limit} privateOnly={template.privateOnly} examplesLeft={draft.examplesLeft} />}
+      bar={<FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} placement="sheet" limit={context.concurrency.limit} privateOnly={template.privateOnly} examplesLeft={draft.examplesLeft} orgOnly={draft.choice.orgOnly} />}
     />
   )
 }

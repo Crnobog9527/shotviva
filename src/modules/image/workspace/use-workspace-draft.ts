@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { chosenBalance, type Balance, type PoolChoice, type PoolChoiceOffer } from '@/core/billing/pools'
+import { bothKinds, chosenBalance, orgBalance, type Balance, type PoolChoice, type PoolChoiceOffer } from '@/core/billing/pools'
 import { batchMaxFor, type BatchLimits } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 
@@ -39,7 +39,7 @@ export type DraftInput = {
   // The creation dialog takes one photo; a batch is added on the workspace page (DESIGN §6.9
   // item 2).
   single?: boolean
-  // 出图时让员工自选 (§6.5): the member holds both kinds of org credits; null/absent: no picker.
+  // 在职成员只用企业积分 (§6.5): an active org member's org shares; null/absent: not a member.
   poolChoice?: PoolChoiceOffer | null
 }
 
@@ -88,14 +88,15 @@ export function useWorkspaceDraft({ template, balance, tier, batch, concurrency,
   }
 }
 
-// The kind of org credits the member picked (default: their last choice). Offered only with both
-// kinds held and a single job: a batch is paid only (§6.2), so it never carries a choice.
-// Remove watermark (paidOnly) always pays with paid credits: no picker there. `balance` is what the
-// action bar checks: the chosen kind's pool only.
+// An org member spends the org's shares only (their own credits are frozen); holding both kinds,
+// they pick one (default: their last choice), except for a batch (paid only, §6.2) and Remove
+// watermark (paid). `balance` is what the action bar checks.
 function usePoolChoice(offer: PoolChoiceOffer | null | undefined, single: boolean, again: AgainStart | null, balance: Balance) {
   const [value, set] = useState<PoolChoice>(offer?.last ?? 'paid')
-  if (!offer || !single || again?.paidOnly === true) return { picker: null, balance, value: undefined }
-  return { picker: { offer, value, set }, balance: chosenBalance(balance, value), value }
+  if (!offer) return { picker: null, balance, value: undefined, orgOnly: false }
+  const org = orgBalance(offer)
+  if (!bothKinds(offer) || !single || again?.paidOnly === true) return { picker: null, balance: org, value: undefined, orgOnly: true }
+  return { picker: { offer, value, set }, balance: chosenBalance(org, value), value, orgOnly: true }
 }
 
 const withChoice = (inputs: StartInput[], choice: PoolChoice | undefined): StartInput[] =>
