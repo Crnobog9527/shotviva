@@ -142,6 +142,33 @@ function WorkRow({ work, label, actions }: { work: AdminOrgWork; label: string; 
   )
 }
 
+// Below 640px the table would hide member and status behind a sideways scroll: one card per work.
+function WorkCard({ work, label, actions }: { work: AdminOrgWork; label: string; actions: JobSupportActions }) {
+  return (
+    <li className="grid gap-3 border-b border-border py-3 last:border-b-0">
+      <div className="flex gap-3">
+        <Thumb work={work} />
+        <div className="grid min-w-0 flex-1 gap-1 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <CopyText value={work.id} label={COPY.copyId} copied={COPY.copied}>{work.ref}</CopyText>
+            <span className="font-mono text-muted-foreground">{formatBeijing(work.createdAt)}</span>
+          </div>
+          <UserLink userId={work.userId} jobId={work.id} className="[overflow-wrap:anywhere]">{label}</UserLink>
+          <div className="text-muted-foreground">{work.templateName ?? work.templateId}</div>
+        </div>
+      </div>
+      <div className="flex items-start justify-between gap-3">
+        <Status work={work} />
+        <Credits work={work} />
+      </div>
+      <div className="flex flex-wrap items-center gap-1">
+        <JobActions job={work} actions={actions} />
+        <Link href={`/admin/jobs?ref=${work.ref}`} title={COPY.openInJobsHint} className="inline-flex min-h-9 items-center px-2 text-xs text-primary hover:underline">{COPY.openInJobs}</Link>
+      </div>
+    </li>
+  )
+}
+
 export function OrgWorksSection({ orgId, filters, page, members, actions }: Props) {
   const labels = new Map(members.map((m) => [m.userId, m.label]))
   const { cursor, ...kept } = filters
@@ -153,6 +180,13 @@ export function OrgWorksSection({ orgId, filters, page, members, actions }: Prop
       </div>
       <Filters orgId={orgId} filters={filters} members={members} />
       {page.items.length === 0 ? <p className="text-sm text-muted-foreground">{COPY.empty}</p> : (
+        <>
+        <ul className="sm:hidden">
+          {page.items.map((work) => (
+            <WorkCard key={work.id} work={work} label={labels.get(work.userId) ?? COPY.unknownMember(work.userId)} actions={actions} />
+          ))}
+        </ul>
+        <div className="hidden sm:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -172,6 +206,8 @@ export function OrgWorksSection({ orgId, filters, page, members, actions }: Prop
             ))}
           </TableBody>
         </Table>
+        </div>
+        </>
       )}
       {cursor || page.nextCursor ? (
         <div className="flex flex-wrap gap-4 text-sm">
