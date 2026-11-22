@@ -149,6 +149,8 @@ declare o public.orgs;
 begin
   if p_allowance is null or p_allowance not between 0 and 1000000000 then raise exception 'INVALID_INPUT'; end if;
   o := public._org_lock_owned(p_owner, false);
+  -- Lock order org -> profile -> member: the hand-out below locks this profile (Codex #836).
+  perform 1 from public.profiles where id = p_member for update;
   update public.org_members set promo_allowance = p_allowance, promo_allowance_custom = true
    where org_id = o.id and user_id = p_member and status = 'active';
   if not found then raise exception 'ORG_MEMBER_NOT_FOUND'; end if;
