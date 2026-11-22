@@ -2,6 +2,7 @@ import { Badge } from '@/core/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
 import { formatBeijing } from '../shell/format'
+import { AcknowledgeCell, type AcknowledgeActions } from './acknowledge-cell'
 import { ORDERS_COPY as COPY } from './copy'
 import { formatMinor } from './money'
 import type { AdminPurchase } from './repository'
@@ -22,9 +23,12 @@ function ProviderLink({ row, stripeLive }: { row: AdminPurchase; stripeLive: boo
   )
 }
 
-type RowProps = { row: AdminPurchase; stripeLive: boolean; clawback?: ClawbackActions }
+// T71 clawback and 1881 「标记已知晓」, both optional (absent outside the orders page).
+export type PurchaseActions = { clawback?: ClawbackActions; acknowledge?: AcknowledgeActions }
 
-function PurchaseRow({ row, stripeLive, clawback }: RowProps) {
+type RowProps = { row: AdminPurchase; stripeLive: boolean; actions: PurchaseActions }
+
+function PurchaseRow({ row, stripeLive, actions: { clawback, acknowledge } }: RowProps) {
   const money = (amount: number) => formatMinor(amount, row.currency)
   return (
     <TableRow>
@@ -47,7 +51,10 @@ function PurchaseRow({ row, stripeLive, clawback }: RowProps) {
       <TableCell className="text-xs">{COPY.forms[row.form]}</TableCell>
       <TableCell className="text-xs">{COPY.channels[row.channel]}</TableCell>
       <TableCell>
-        <Badge variant={row.status === 'paid' ? 'secondary' : 'destructive'}>{COPY.statuses[row.status]}</Badge>
+        <span className="grid justify-items-start gap-1">
+          <Badge variant={row.status === 'paid' ? 'secondary' : 'destructive'}>{COPY.statuses[row.status]}</Badge>
+          {acknowledge ? <AcknowledgeCell paymentId={row.id} state={row} actions={acknowledge} /> : null}
+        </span>
       </TableCell>
       <TableCell>
         <ProviderLink row={row} stripeLive={stripeLive} />
@@ -56,8 +63,10 @@ function PurchaseRow({ row, stripeLive, clawback }: RowProps) {
   )
 }
 
-export function PurchasesTable({ purchases, stripeLive, clawback }: { purchases: AdminPurchase[]; stripeLive: boolean; clawback?: ClawbackActions }) {
-  if (purchases.length === 0) return <p className="text-sm text-muted-foreground">{COPY.noPurchases}</p>
+type TableProps = { purchases: AdminPurchase[]; stripeLive: boolean; actions?: PurchaseActions; empty?: string }
+
+export function PurchasesTable({ purchases, stripeLive, actions = {}, empty = COPY.noPurchases }: TableProps) {
+  if (purchases.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>
   return (
     <Table>
       <TableHeader>
@@ -69,7 +78,7 @@ export function PurchasesTable({ purchases, stripeLive, clawback }: { purchases:
       </TableHeader>
       <TableBody>
         {purchases.map((row) => (
-          <PurchaseRow key={row.id} row={row} stripeLive={stripeLive} clawback={clawback} />
+          <PurchaseRow key={row.id} row={row} stripeLive={stripeLive} actions={actions} />
         ))}
       </TableBody>
     </Table>

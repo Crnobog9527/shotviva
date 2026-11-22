@@ -3380,6 +3380,11 @@ CREATE TABLE IF NOT EXISTS "public"."payments" (
     "code_effects_applied_at" timestamp with time zone,
     "fee_status" "text",
     "fee_cents" integer,
+    "acknowledged_at" timestamp with time zone,
+    "acknowledged_by" "uuid",
+    "acknowledged_status" "text",
+    "acknowledged_refunded" integer,
+    CONSTRAINT "payments_acknowledged_check" CHECK (((("acknowledged_at" IS NULL) = ("acknowledged_status" IS NULL)) AND (("acknowledged_at" IS NULL) = ("acknowledged_refunded" IS NULL)) AND (("acknowledged_at" IS NOT NULL) OR ("acknowledged_by" IS NULL)))),
     CONSTRAINT "payments_amount_discount_check" CHECK (("amount_discount" >= 0)),
     CONSTRAINT "payments_amount_total_check" CHECK (("amount_total" >= 0)),
     CONSTRAINT "payments_channel_check" CHECK (("channel" = ANY (ARRAY['stripe'::"text", 'waffo'::"text"]))),
@@ -5505,6 +5510,46 @@ end $$;
 ALTER FUNCTION "public"."admin_ack_reference_deletions"("p_actor" "uuid", "p_keys" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_acknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_payment public.payments;
+  v_changed boolean := false;
+begin
+  perform public._org_require_admin(p_actor);
+  select * into v_payment from public.payments where id = p_payment_id for update;
+  if not found then
+    raise exception 'PAYMENT_NOT_FOUND';
+  end if;
+  if v_payment.status = 'paid' then
+    raise exception 'PAYMENT_NOT_FLAGGED';
+  end if;
+
+  if v_payment.acknowledged_at is null
+     or v_payment.acknowledged_status <> v_payment.status
+     or v_payment.acknowledged_refunded <> v_payment.amount_refunded then
+    update public.payments
+       set acknowledged_at = now(), acknowledged_by = p_actor,
+           acknowledged_status = status, acknowledged_refunded = amount_refunded
+     where id = p_payment_id
+    returning * into v_payment;
+    insert into public.admin_audit_log (action, user_id, reason, target_id)
+    values ('payment_acknowledge', v_payment.user_id,
+            '标记已知晓 · ' || v_payment.status || ' · 已退 ' || v_payment.amount_refunded || ' · 操作人 ' || p_actor::text,
+            p_payment_id::text);
+    v_changed := true;
+  end if;
+
+  return jsonb_build_object('changed', v_changed, 'acknowledged_at', v_payment.acknowledged_at);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_acknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") RETURNS "uuid"[]
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -6285,6 +6330,25 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_attention_payment_ids"() RETURNS bigint[]
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  -- payments_issues_created_at_idx (0188) for the window; affiliate_disputes_payment_idx for disputes.
+  select coalesce(array_agg(p.id order by p.created_at desc, p.id desc), '{}')
+    from public.payments p
+   where p.status <> 'paid'
+     and p.created_at >= now() - interval '60 days'
+     and (p.acknowledged_at is null
+          or p.acknowledged_status <> p.status
+          or p.acknowledged_refunded <> p.amount_refunded
+          or exists (select from public.payment_disputes d where d.payment_id = p.id and d.closed_at is null))
+$$;
+
+
+ALTER FUNCTION "public"."admin_attention_payment_ids"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_ban_user"("p_user_id" "uuid", "p_reason" "text") RETURNS timestamp with time zone
@@ -12042,9 +12106,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_todo_counts"() RETURNS "jsonb"
       select count(*) from public.template_requests where status = 'pending'),
     'unresolved_dispute_links', (
       select count(*) from public.payment_dispute_link_errors where resolved_at is null),
-    'payment_issues', (
-      select count(*) from public.payments
-       where status <> 'paid' and created_at >= now() - interval '60 days'),
+    'payment_issues', cardinality(public.admin_attention_payment_ids()),
     'last_purchase_at', (
       select created_at from public.credit_ledger
        where kind = 'purchase' order by created_at desc, id desc limit 1),
@@ -12091,6 +12153,38 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_top_inviters"("p_actor" "uuid", "p_days" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_unacknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_payment public.payments;
+  v_changed boolean := false;
+begin
+  perform public._org_require_admin(p_actor);
+  select * into v_payment from public.payments where id = p_payment_id for update;
+  if not found then
+    raise exception 'PAYMENT_NOT_FOUND';
+  end if;
+
+  if v_payment.acknowledged_at is not null then
+    update public.payments
+       set acknowledged_at = null, acknowledged_by = null, acknowledged_status = null, acknowledged_refunded = null
+     where id = p_payment_id
+    returning * into v_payment;
+    insert into public.admin_audit_log (action, user_id, reason, target_id)
+    values ('payment_unacknowledge', v_payment.user_id, '撤销已知晓 · 操作人 ' || p_actor::text, p_payment_id::text);
+    v_changed := true;
+  end if;
+
+  return jsonb_build_object('changed', v_changed, 'acknowledged_at', v_payment.acknowledged_at);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_unacknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_unban_user"("p_user_id" "uuid", "p_reason" "text") RETURNS "void"
@@ -19408,7 +19502,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text", 'partner_promo_set'::"text", 'partner_promo_confirm'::"text", 'partner_promo_reject'::"text", 'partner_promo_run'::"text", 'partner_promo_topup'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text", 'partner_promo_set'::"text", 'partner_promo_confirm'::"text", 'partner_promo_reject'::"text", 'partner_promo_run'::"text", 'partner_promo_topup'::"text", 'payment_acknowledge'::"text", 'payment_unacknowledge'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -23638,6 +23732,11 @@ ALTER TABLE ONLY "public"."payment_refunds"
 
 
 ALTER TABLE ONLY "public"."payments"
+    ADD CONSTRAINT "payments_acknowledged_by_fkey" FOREIGN KEY ("acknowledged_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."payments"
     ADD CONSTRAINT "payments_code_id_fkey" FOREIGN KEY ("code_id") REFERENCES "public"."codes"("id") ON DELETE SET NULL;
 
 
@@ -25408,6 +25507,11 @@ GRANT ALL ON FUNCTION "public"."admin_ack_reference_deletions"("p_actor" "uuid",
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_acknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_acknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_activate_announcement"("p_id" "uuid", "p_active" boolean, "p_actor" "uuid") TO "service_role";
 
@@ -25531,6 +25635,11 @@ GRANT SELECT ON TABLE "public"."template_categories" TO "authenticated";
 
 REVOKE ALL ON FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_assigned_template_count"("public"."template_categories") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_attention_payment_ids"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_attention_payment_ids"() TO "service_role";
 
 
 
@@ -26261,6 +26370,11 @@ GRANT ALL ON FUNCTION "public"."admin_todo_counts"() TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."admin_top_inviters"("p_actor" "uuid", "p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_top_inviters"("p_actor" "uuid", "p_days" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_unacknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_unacknowledge_payment"("p_payment_id" bigint, "p_actor" "uuid") TO "service_role";
 
 
 
