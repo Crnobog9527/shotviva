@@ -120,16 +120,22 @@ jobs:
           retention-days: 1
           compression-level: 0
 
-  # One local Supabase per run serves both the DB tests and the schema.sql snapshot check
-  # (AGENTS §5), which used to start its own database in a separate workflow. T88: it runs only
-  # when the change can affect the database or the DB tests (scripts/ci/db-test-inputs.ts);
-  # otherwise it stops after change detection and reports success under the same required name.
-  db:
-    name: supabase db tests
+  # The database stage (T88) is three jobs. "supabase schema" and the four "supabase db tests (k/4)"
+  # shards each start their own local Supabase and run in parallel; "supabase db tests", the
+  # required check, sums them up (scripts/ci/db-shards-verify.mjs). Each one decides on its own,
+  # from the same commit, whether the change can affect the database or the DB tests
+  # (scripts/ci/db-test-inputs.ts); when it cannot, they stop after change detection and the sum
+  # reports success under the same required name, as before sharding.
+  #
+  # Schema check, kept apart from the tests so the snapshot comes from migrations only, never from
+  # test data, and so the release dry run gets a database no test is writing to.
+  db-schema:
+    name: supabase schema
     runs-on: ubuntu-latest
     outputs:
-      schema-fix: ${{ steps.schema.outputs.fix }}
-      schema-tree: ${{ steps.schema.outputs.tree }}
+      db: ${{ steps.changes.outputs.db }}
+      fix: ${{ steps.schema.outputs.fix }}
+      tree: ${{ steps.schema.outputs.tree }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -153,12 +159,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       # Pinned CLI and the stack's images from the Actions cache; downloads, pulls and the start
       # itself are retried with backoff (.github/actions/supabase-start). Only the services DB
-      # tests need; later cards drop names from this list as they need them.
+      # tests need; later cards drop names from this list as they need them. The shards below
+      # pass the same list, so all five jobs share one cache entry.
       - if: steps.changes.outputs.db == 'true'
         uses: ./.github/actions/supabase-start
         with:
           exclude: studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
-      # Before the tests, so the snapshot comes from migrations only, not from test data.
       - name: schema.sql matches migrations (export)
         if: steps.changes.outputs.db == 'true'
         run: pnpm db:schema
@@ -182,8 +188,97 @@ jobs:
           retention-days: 3
       - if: steps.changes.outputs.db == 'true'
         run: pnpm exec vitest run --project pricing-release
+
+  # The DB tests in four shards (vitest --shard splits the files), each on its own database and
+  # serial within it, as `pnpm test:db` runs them. Every shard uploads a record of what it decided
+  # and the JSON report of what it ran, even when it fails, for the sum below to check.
+  db-shard:
+    name: supabase db tests (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    strategy:
+      # Every shard finishes, so one run shows every failing file.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - id: changes
+        uses: ./.github/actions/changes
+        with:
+          db: 'true'
       - if: steps.changes.outputs.db == 'true'
-        run: pnpm test:db
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - if: steps.changes.outputs.db == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: steps.changes.outputs.db == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.db == 'true'
+        uses: ./.github/actions/supabase-start
+        with:
+          exclude: studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
+      - if: steps.changes.outputs.db == 'true'
+        env:
+          SHARD: ${{ matrix.shard }}
+          REPORT: ${{ runner.temp }}/db-shard/report.json
+        run: pnpm test:db --shard="$SHARD/4" --reporter=default --reporter=json --outputFile.json="$REPORT"
+      - name: Record the shard
+        if: always()
+        env:
+          SHARD: ${{ matrix.shard }}
+          DB: ${{ steps.changes.outputs.db }}
+          DIR: ${{ runner.temp }}/db-shard
+        run: |
+          mkdir -p "$DIR"
+          printf '{"shard":%s,"of":4,"db":"%s","sha":"%s"}\n' "$SHARD" "$DB" "$GITHUB_SHA" > "$DIR/marker.json"
+          cat "$DIR/marker.json"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: db-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/db-shard/
+          retention-days: 3
+          # A re-run of a failed shard replaces its record from the earlier attempt.
+          overwrite: true
+
+  # The required check. Passes only when the schema job and every shard succeeded, all five made
+  # the same run/skip decision, and, when the tests ran, the shards' reports together cover every
+  # test file under tests/db exactly once with nothing failed (scripts/ci/db-shards-verify.mjs).
+  # Runs even when a shard failed or the run was cancelled, so it is never skipped: a skipped
+  # required check would count as passed.
+  db:
+    name: supabase db tests
+    needs: [db-schema, db-shard]
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      schema-fix: ${{ needs.db-schema.outputs.fix }}
+      schema-tree: ${{ needs.db-schema.outputs.tree }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          sparse-checkout: |
+            scripts/ci
+            tests/db
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: db-shard-*
+          path: ${{ runner.temp }}/db-shards
+      - env:
+          SCHEMA_RESULT: ${{ needs.db-schema.result }}
+          SHARDS_RESULT: ${{ needs.db-shard.result }}
+          SCHEMA_DB: ${{ needs.db-schema.outputs.db }}
+          SHARD_COUNT: '4'
+          REPORT_DIR: ${{ runner.temp }}/db-shards
+        run: node scripts/ci/db-shards-verify.mjs
 
   # The base commit's fingerprint, built here in parallel with the checks. Skipped when the change
   # forces Lighthouse anyway (scripts/ci/lighthouse-force.sh) or has no code.

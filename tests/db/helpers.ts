@@ -85,6 +85,14 @@ export async function createUser(db: Client, profile: TestProfile = {}) {
   return id
 }
 
+// A signup IP no other test (or earlier run on the same database) uses: random in the IPv6
+// documentation range 2001:db8::/32, every group non-zero so host() prints it back unchanged.
+// Same-IP lists and clusters then hold only the accounts the test itself put there.
+export function uniqueIp() {
+  const group = () => (0x1000 + Math.floor(Math.random() * 0xefff)).toString(16)
+  return `2001:db8:${Array.from({ length: 6 }, group).join(':')}`
+}
+
 export async function setBalances(db: Client, id: string, profile: TestProfile) {
   await db.query('update public.profiles set credits = $2, free_credits = $3, paid_until = $4 where id = $1', [
     id,

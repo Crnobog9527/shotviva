@@ -62,8 +62,10 @@ describe('prompt lab private sessions and paid calls', () => {
   it('serializes T85 and the prompt lab against the last available budget', async () => {
     const { data: v } = await save().throwOnError()
     const { data: before } = await api.rpc('admin_test_budget_status').throwOnError()
-    await f.pg!.query(`insert into public.system_settings(key,value) values('admin_test_daily_budget_usd',$1)
-      on conflict(key) do update set value=excluded.value`, [Number(before.spent_usd) + 0.5])
+    // Exactly one more 0.5 run fits: added as numeric in SQL, since the float sum in JS lands just
+    // under spent + 0.5 for some of the amounts earlier test files leave spent (0.00938 + 0.5).
+    await f.pg!.query(`insert into public.system_settings(key,value) values('admin_test_daily_budget_usd',to_jsonb($1::numeric + 0.5))
+      on conflict(key) do update set value=excluded.value`, [String(before.spent_usd)])
     const tid = randomUUID()
     f.runs.add(tid)
     const [lab, t85] = await Promise.all([matrix(v, randomUUID(), { p_estimate_usd: 0.5 }),
