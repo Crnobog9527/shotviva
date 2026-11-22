@@ -10,6 +10,8 @@ import { UpdateSlot } from '@/core/app-update'
 import { htmlLang, isLocale, publicClientMessages } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata, ShortcutTitleSync } from '@/core/seo'
+import { foodTogglesEnabled } from '@/core/system-settings'
+import { FoodTogglesProvider } from '@/core/templates/offered-toggles'
 import { GeistFonts } from '@/core/ui/geist-fonts'
 import { MiSansStylesheet } from '@/core/ui/misans-stylesheet'
 import { site } from '@/site/site.config'
@@ -44,6 +46,8 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
   // label, spec #186), nor what only the logged-in app reads, which the (app) layout adds.
   const messages = publicClientMessages(await getMessages())
   const lang = isLocale(locale) ? locale : site.locales.default
+  // 优化摆盘 / 优化器皿 are offered only while this site-wide switch is on (cached, own tag).
+  const foodToggles = await foodTogglesEnabled()
   return (
     <html lang={htmlLang(lang)} className="h-full antialiased">
       <body className="flex min-h-full flex-col">
@@ -54,7 +58,7 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
         {lang === 'zh' ? <MiSansStylesheet /> : null}
         <NextIntlClientProvider messages={messages}>
           <TranslatedPathsProvider paths={site.locales.zhPaths}>
-            {children}
+            <FoodTogglesProvider enabled={foodToggles}>{children}</FoodTogglesProvider>
             {/* The analytics cookie bar, for EU/EEA/UK/CH visitors who have not answered (T70). */}
             <ConsentSlot />
             {/* "Shotviva has been updated" with Refresh, on every page (T90). */}

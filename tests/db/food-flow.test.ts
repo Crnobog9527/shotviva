@@ -64,21 +64,27 @@ afterAll(async () => {
 
 const vessel = { id: vesselId, label: 'long-a', category: 'long' as const, shape: 'teardrop platter', imageKey: vesselKey, width: 4, height: 3, isActive: true }
 
+// Counts what the flow touched: a dish reading or a vessel library read is extra cost.
+const touched = { reads: 0, vessels: 0 }
+
 function food(reading: DishReading | Error): FoodDeps {
   const reader: DishReader = { tag: 'judge/fake', prices: { inputTextPerM: 1, inputImagePerM: null, outputPerM: 2 }, read: async () => {
+    touched.reads += 1
     if (reading instanceof Error) throw reading
     return { reading, usage: { inputTokens: 1000, outputTokens: 100 } }
   } }
-  return { reader: async () => reader, vessels: async () => [vessel], random: () => 0 }
+  return { reader: async () => reader, vessels: async () => { touched.vessels += 1; return [vessel] }, random: () => 0 }
 }
 
-async function generate(toggles: { plating: boolean; tableware: boolean }, reading: DishReading | Error = READING) {
+// switchOn: the site-wide food_toggles_enabled (1848); these flows only run while it is on.
+async function generate(toggles: { plating: boolean; tableware: boolean }, reading: DishReading | Error = READING, switchOn: boolean | 'absent' = true) {
   const userId = await createUser(db, { credits: 3 })
   const inputKey = newInputKey(userId, 'image/jpeg')
   const photo = await jpeg(1200, 1600)
   r2.upload(inputKey, photo, 'image/jpeg')
   const fake = fakeProvider()
-  const deps = { db: serviceSupabase(), store: r2.store, provider: fake.provider, providerTimeoutMs: 2000, now: () => NOW, food: food(reading) }
+  const deps = { db: serviceSupabase(), store: r2.store, provider: fake.provider, providerTimeoutMs: 2000, now: () => NOW, food: food(reading),
+    ...(switchOn === 'absent' ? {} : { foodTogglesEnabled: async () => switchOn }) }
   const view = await runGeneration(deps, { userId, source: 'web', templateId, inputKey, toggles })
   const { rows } = await db.query('select status, credits_cost, provider_usage, inputs from public.generation_jobs where id = $1', [view.id])
   return { call: fake.calls[0]!, job: rows[0], images: fake.calls[0]!.images.map((image) => image.bytes.length) }
@@ -114,6 +120,32 @@ describe('food toggle flows (§5.1c)', () => {
     const { call, job } = await generate({ plating: true, tableware: true }, new Error('timeout'))
     expect(call.prompt).toBe('ORDINARY P-OFF T-OFF')
     expect(job).toMatchObject({ status: 'succeeded', credits_cost: 1 })
+  })
+})
+
+describe('the site-wide switch off (1848)', () => {
+  for (const switchOn of [false, 'absent'] as const) {
+    it(`renders both off, reads no dish and no vessel, at the same price (switch ${String(switchOn)})`, async () => {
+      await saveDishware({ db: serviceSupabase(), store: r2.store }, admin, vessel)
+      const before = { ...touched }
+      const off = await generate({ plating: false, tableware: false }, READING, switchOn)
+      for (const toggles of [{ plating: true, tableware: false }, { plating: false, tableware: true }, { plating: true, tableware: true }]) {
+        const run = await generate(toggles, READING, switchOn)
+        // Exactly today's ordinary call with both toggles off: the off fragments, photo + reference.
+        expect(run.call.prompt).toBe('ORDINARY P-OFF T-OFF')
+        expect(run.images).toEqual(off.images)
+        expect(run.job).toMatchObject({ status: 'succeeded', credits_cost: off.job.credits_cost, provider_usage: null })
+        expect(run.job.inputs.toggles).toEqual({ plating: false, tableware: false })
+        expect(run.job.inputs).not.toHaveProperty('toggles_confirmed_at')
+      }
+      expect(touched).toEqual(before)
+    })
+  }
+
+  it('keeps the template setup, so the switch on runs the flow again', async () => {
+    const { rows } = await db.query('select model_params from public.template_prompts where template_id = $1', [templateId])
+    expect(rows[0].model_params.food_flow).toEqual(FLOW)
+    expect((await generate({ plating: true, tableware: false })).call.prompt).toBe('PLATING Fish')
   })
 })
 

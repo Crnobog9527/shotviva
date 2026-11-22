@@ -6,6 +6,7 @@ import {
   AdminPage,
   FEATURES_COPY,
   FeaturesEditor,
+  FoodTogglesCard,
   listFeatureSettings,
   loadPosterPhotoPrice,
   loadSettingSwitch,
@@ -25,6 +26,7 @@ import { site } from '@/site/site.config'
 import {
   saveAffiliateSwitchAction,
   saveFeatureAccessAction,
+  saveFoodTogglesAction,
   setFeatureInviteAction,
   saveGallerySwitchAction,
   saveSignupGiftPausedAction,
@@ -53,8 +55,9 @@ async function galleryState(db: ReturnType<typeof createAdminSupabase>): Promise
 export default async function AdminFeaturesPage() {
   await requireAdmin()
   const db = createAdminSupabase()
-  const [settings, wishlist, gallery, affiliate, signupGift, photoPrice] = await Promise.all([
+  const [settings, wishlist, gallery, affiliate, signupGift, photoPrice, foodToggles] = await Promise.all([
     listFeatureSettings(db), wishlistState(db), galleryState(db), isAffiliateEnabled(), loadSignupGift(db), loadPosterPhotoPrice(db),
+    loadSettingSwitch(db, 'food_toggles_enabled'),
   ])
   return (
     <AdminPage title={FEATURES_COPY.title}>
@@ -62,6 +65,7 @@ export default async function AdminFeaturesPage() {
       <div className="my-6 grid gap-4">
         <SignupGiftCard state={signupGift} savePaused={saveSignupGiftPausedAction} saveRules={saveSignupGiftRulesAction} />
         <PosterPhotoCard credits={photoPrice} save={savePosterPhotoPriceAction} />
+        <FoodTogglesCard value={foodToggles} save={saveFoodTogglesAction} />
       </div>
       <FeaturesEditor
         settings={settings}

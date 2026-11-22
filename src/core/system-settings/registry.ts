@@ -22,6 +22,9 @@ type SettingTypes = {
   // 1521: 拍照识别's price per run in credits (§5.3「每周复用」); 0 (no row) keeps the feature off.
   // start_poster_photo reads the row itself.
   poster_photo_credits: number
+  // 1848: whether food templates offer 优化摆盘 / 优化器皿 (fields.toggles plating, tableware). Off
+  // (no row): neither is shown and the server renders both off; the templates' data stays.
+  food_toggles_enabled: boolean
 }
 
 export type SystemSettingKey = keyof SettingTypes
@@ -38,6 +41,7 @@ export const SYSTEM_SETTINGS: { [K in SystemSettingKey]: SettingDefinition<Setti
   signup_gift_claim_phone: { schema: z.boolean(), fallback: true },
   signup_gift_claim_google: { schema: z.boolean(), fallback: true },
   poster_photo_credits: { schema: z.number().int().min(1).max(1000), fallback: 0 },
+  food_toggles_enabled: { schema: z.boolean(), fallback: false },
 }
 
 export function isSystemSettingKey(key: string): key is SystemSettingKey {

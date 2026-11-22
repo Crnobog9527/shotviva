@@ -125,3 +125,26 @@ describe('toggles (T89)', () => {
     expect(renderPrompt('A {{steam}} B', inputs)).toBe('A  B')
   })
 })
+
+// 1848: the site-wide switch for 优化摆盘 / 优化器皿. Off, the server takes no "on" for them.
+describe('forceOff (food_toggles_enabled off)', () => {
+  const body = 'Shot of {{dish}}. {{replate}} {{steam}}'
+  const asked = { imageCount: 1, copy: { dish: 'Ramen' }, toggles: { replate: true, steam: true }, togglesConfirmed: ['replate'] }
+
+  it('renders forced toggles off whatever the request says, exactly like a request that left them off', () => {
+    const forced = validateGenerationInputs(toggled, { ...asked, forceOff: ['replate', 'steam'] })
+    const left = validateGenerationInputs(toggled, { imageCount: 1, copy: { dish: 'Ramen' } })
+    expect(forced).toEqual(left)
+    expect(renderPrompt(body, forced, fragments)).toBe('Shot of Ramen. FAKE-OFF STEAM-OFF')
+  })
+
+  it('never refuses: no confirmation needed, a forced key the template lacks is dropped', () => {
+    const inputs = validateGenerationInputs(toggled, { imageCount: 1, toggles: { replate: true, gone: true }, forceOff: ['replate', 'gone'] })
+    expect(inputs).toMatchObject({ toggles: { replate: false, steam: false }, confirmed: [] })
+  })
+
+  it('leaves the other toggles, and everything with no forced keys, as before', () => {
+    expect(validateGenerationInputs(toggled, { ...asked, forceOff: ['replate'] }).toggles).toEqual({ replate: false, steam: true })
+    expect(validateGenerationInputs(toggled, { ...asked, forceOff: [] })).toEqual(validateGenerationInputs(toggled, asked))
+  })
+})
