@@ -38,11 +38,11 @@ async function member(paid: number, promo: number, own: { credits?: number; free
 
 // A 1k job of a template costing 10, with an optional choice and source.
 const seed = async () => (template ??= await seedTemplate(db, { visibleIn: ['web', 'partner'], credits: { '1k': 10, '2k': 20, '3k': 30 } }))
-async function generate(user: string, choice?: string, source = 'web') {
+async function generate(user: string, choice?: string, source = 'web', visibility: string | null = null) {
   await seed()
   const inputs = { resolution: '1k', attempt_id: randomUUID(), ...(choice ? { pool_choice: choice } : {}) }
-  return row(db, "select credit_pool, visibility from reserve_credits($1,$2,'image',$3,10,$4,$5)", [randomUUID(), user, template, source, inputs]) as
-    Promise<{ credit_pool: string; visibility: string }>
+  return row(db, "select credit_pool, visibility, gallery_excluded, org_id from reserve_credits($1,$2,'image',$3,10,$4,$5,null,null,$6)",
+    [randomUUID(), user, template, source, inputs, visibility]) as Promise<{ credit_pool: string; visibility: string; gallery_excluded: boolean; org_id: string | null }>
 }
 const balances = (user: string) => row(db, 'select credits, free_credits, org_pool_choice from profiles where id=$1', [user])
 
@@ -121,6 +121,14 @@ it('lets the owner deposit their own (frozen) paid credits into the pool, then u
   await db.query("select org_allocate($1,$1,50,'self-paid')", [owner])
   expect(await generate(owner)).toMatchObject({ credit_pool: 'paid' })
   expect(await balances(owner)).toMatchObject({ credits: 40 })
+})
+
+it('makes every org-funded work private and out of the gallery, promotion-funded ones included, whatever visibility was asked', async () => {
+  const { orgId, staff } = await member(100, 100)
+  expect(await generate(staff, 'promo', 'web', 'public')).toEqual({ credit_pool: 'free', visibility: 'private', gallery_excluded: true, org_id: orgId })
+  expect(await generate(staff, 'paid', 'web', 'public')).toEqual({ credit_pool: 'paid', visibility: 'private', gallery_excluded: true, org_id: orgId })
+  const outsider = await createUser(db, { freeCredits: 50 })
+  expect(await generate(outsider)).toMatchObject({ credit_pool: 'free', visibility: 'public', org_id: null }) // a personal free work, as before
 })
 
 it('charges poster photo extraction from the org shares too', async () => {

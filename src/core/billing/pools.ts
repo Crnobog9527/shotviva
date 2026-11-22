@@ -37,3 +37,13 @@ export const bothKinds = (offer: PoolChoiceOffer) => offer.paid > 0 && offer.pro
 export function chosenBalance(balance: Balance, choice: PoolChoice): Balance {
   return choice === 'paid' ? { paid: balance.paid, free: 0 } : { paid: 0, free: balance.free }
 }
+
+// The kind that actually pays a job of `cost`: the preferred one (the member's last or current
+// pick) when it covers the cost, else the other one when that does, else the preferred one (the
+// page then asks the admin).
+export function coveringChoice(offer: PoolChoiceOffer, preferred: PoolChoice, cost: number): PoolChoice {
+  const left = (kind: PoolChoice) => (kind === 'paid' ? offer.paid : offer.promo)
+  const other: PoolChoice = preferred === 'paid' ? 'promo' : 'paid'
+  if (left(preferred) >= cost || left(other) < cost) return preferred
+  return other
+}

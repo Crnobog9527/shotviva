@@ -188,6 +188,10 @@ describe.each(['en', 'zh'] as const)('pool choice picker (%s)', (locale) => {
     expect(text).toContain('1,200')
     expect(html.match(/checked=""/g)).toHaveLength(1)
     expect(render(locale, createElement(PoolChoiceSlot, { choice: null })).html).toBe('')
+    // A kind that cannot cover this job is shown but cannot be picked.
+    const short = render(locale, createElement(PoolChoicePicker, { offer: { paid: 5, promo: 3400, last: 'paid' }, value: 'promo', onChange: () => {}, cost: 20 }))
+    expect(short.html.match(/disabled=""/g)).toHaveLength(1)
+    expect(short.text).toContain(locale === 'en' ? 'not enough for this one' : '不够这一张')
   })
 
   it('asks an org member to go to the admin instead of opening the paywall when the org credits are short', async () => {

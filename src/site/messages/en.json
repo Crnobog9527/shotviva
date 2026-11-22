@@ -2143,7 +2143,8 @@
       "promo": "Promotion credits (watermarked, demo only)",
       "paid": "Paid credits (no watermark, commercial use)",
       "left": "{count, number} left",
-      "hint": "If the chosen kind runs short, the other kind is never used instead."
+      "hint": "If the chosen kind runs short, the other kind is never used instead.",
+      "short": "{count, number} left, not enough for this one"
     }
   },
   "paywall": {

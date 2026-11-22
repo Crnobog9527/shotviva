@@ -7,17 +7,19 @@ import { cn } from '@/core/ui/cn'
 
 // 出图时让员工自选 (ARCHITECTURE §6.5): shown only when the member holds both kinds of org
 // credits. Each option says what the work will be and how much of that kind is left.
-export function PoolChoicePicker({ offer, value, onChange }: { offer: PoolChoiceOffer; value: PoolChoice; onChange: (next: PoolChoice) => void }) {
+export function PoolChoicePicker({ offer, value, onChange, cost = 0 }: { offer: PoolChoiceOffer; value: PoolChoice; onChange: (next: PoolChoice) => void; cost?: number }) {
   const t = useTranslations('app.poolChoice')
+  // A kind that cannot cover this job cannot be picked; it says so.
   const option = (kind: PoolChoice, left: number) => (
     <label
       key={kind}
-      className={cn('flex min-h-11 cursor-pointer items-start gap-3 rounded-md border px-3 py-2', value === kind ? 'border-primary bg-primary/5' : 'border-input')}
+      className={cn('flex min-h-11 items-start gap-3 rounded-md border px-3 py-2', left < cost ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+        value === kind ? 'border-primary bg-primary/5' : 'border-input')}
     >
-      <input type="radio" name="pool-choice" value={kind} checked={value === kind} onChange={() => onChange(kind)} className="mt-1 size-4 accent-[var(--primary)]" />
+      <input type="radio" name="pool-choice" value={kind} checked={value === kind} disabled={left < cost} onChange={() => onChange(kind)} className="mt-1 size-4 accent-[var(--primary)]" />
       <span className="min-w-0">
         <span className="block text-label font-medium">{t(kind)}</span>
-        <span className="block text-caption text-muted-foreground tabular-nums">{t('left', { count: left })}</span>
+        <span className="block text-caption text-muted-foreground tabular-nums">{left < cost ? t('short', { count: left }) : t('left', { count: left })}</span>
       </span>
     </label>
   )
@@ -34,7 +36,7 @@ export function PoolChoicePicker({ offer, value, onChange }: { offer: PoolChoice
 }
 
 // The picker in a form, or nothing when there is no choice to make.
-export function PoolChoiceSlot({ choice }: { choice: { offer: PoolChoiceOffer; value: PoolChoice; set: (next: PoolChoice) => void } | null }) {
+export function PoolChoiceSlot({ choice }: { choice: { offer: PoolChoiceOffer; value: PoolChoice; set: (next: PoolChoice) => void; cost?: number } | null }) {
   if (!choice) return null
-  return <div className="mt-4"><PoolChoicePicker offer={choice.offer} value={choice.value} onChange={choice.set} /></div>
+  return <div className="mt-4"><PoolChoicePicker offer={choice.offer} value={choice.value} onChange={choice.set} cost={choice.cost} /></div>
 }
