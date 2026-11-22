@@ -13,6 +13,7 @@ export const TOPUP_COPY = {
   sheet: '本月发放单',
   sheetNone: '还没有生成',
   sheetNotGranted: (status: string) => `${status}（未发放，不计入合计）`,
+  sheetVoided: (total: string) => `${total}（已作废，不计入合计）`,
   topups: '本月临时追加',
   noTopups: '本月还没有临时追加。',
   monthTotal: '本月合计',
