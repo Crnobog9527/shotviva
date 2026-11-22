@@ -28,7 +28,7 @@ export function CreateShareSheet({ open, onOpenChange, jobIds, create, onDone }:
   }
   const ready = share.state.kind === 'ready'
   return (
-    <ResponsiveSheet open={open} onOpenChange={close} title={ready ? t('readyTitle') : t('title')} description={ready ? t('readyText') : t('lede', { count: jobIds.length })}>
+    <ResponsiveSheet open={open} onOpenChange={close} title={ready ? t('readyTitle') : t('title', { count: jobIds.length })} description={ready ? t('readyText') : t('lede', { count: jobIds.length })}>
       {share.state.kind === 'ready' ? (
         <ShareReady url={share.state.url} onDone={() => close(false)} />
       ) : (
