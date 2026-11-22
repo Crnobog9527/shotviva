@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 
 import { row } from './affiliate-fixtures'
 import { connectAdmin, createUser } from './helpers'
-import { adminActor, confirm, decide, freeOf, months, partner, refused, run, sheet } from './partner-promo-fixtures'
+import { adminActor, asLegacy, confirm, decide, freeOf, months, partner, refused, run, sheet } from './partner-promo-fixtures'
 
 // Voiding a granted monthly promotion sheet whose credits an admin already took back by hand
 // (ARCHITECTURE §6.5 渠道商推广积分, migration 1920): the void moves no credits and the month-end
@@ -35,6 +35,8 @@ async function grantedThenTakenBack() {
   await run(db, m.current)
   const s = await sheet(db, orgId, m.current)
   expect(await confirm(db, actor, s)).toMatchObject({ applied: true, total: 10000 })
+  // Granted the way production's sheet was, before migration 1894: into the owner's own pool.
+  await asLegacy(db, 'partner_promo_grants', s.id)
   await db.query("select _apply_credit_change($1,'free','admin_adjust',-10000,'收回推广积分',$2)", [owner, 'adj:' + s.id])
   await db.query("select _apply_credit_change($1,'free','admin_adjust',2510,'other',$2)", [owner, 'adj2:' + s.id])
   return { orgId, owner, s }
@@ -73,6 +75,7 @@ it('leaves a top-up of the same month to expire on its own: the voided sheet abs
   const { orgId, owner, s } = await grantedThenTakenBack()
   const t = await row(db, 'select admin_partner_promo_topup($1,$2) as r', [actor,
     { org_id: orgId, recipient: owner, period: m.current, credits: 5000, reason: 'extra', request_key: randomUUID() }])
+  await asLegacy(db, 'partner_promo_topups', t.r.topup_id)
   await voidSheet(actor, { grant_id: s.id, reason: 'manual' })
   // 3,000 spent during the month, after both: it comes out of the top-up.
   await db.query("select _apply_credit_change($1,'free','reserve',-3000,'job','job:v1:reserve')", [owner])
