@@ -120,6 +120,20 @@ describe('the Codex findings check with a carried review', () => {
     }
     const ok = await fullState({ repo: 'o/r', pr: '1', list, head: S1, get: async (p: string) => data[p] })
     expect(ok.state).toMatchObject({ completed: true, commit: R, carried: true })
+    // A Claude review (owner-marked PR review of R) carries the same way, with no Codex at all.
+    const claudeList = async (path: string) =>
+      path.endsWith('/reviews')
+        ? [{ id: 9, user: { login: 'o', type: 'User' }, state: 'COMMENTED', commit_id: R, body: `<!-- claude-review:v1 commit=${R} reviewer=rev -->` }]
+        : path.endsWith('/commits')
+          ? [{ sha: R }, { sha: S1 }]
+          : []
+    const claude = await fullState({ repo: 'o/r', pr: '1', list: claudeList, head: S1, get: async (p: string) => data[p] })
+    expect(claude.state).toMatchObject({ completed: true, commit: R, reviewers: ['Claude'], carried: true })
+    expect(judge({ risk: 'high', reviewThreads: [], state: claude.state }).lines).toEqual([expect.stringContaining('carried over')])
+    // A human commit after the Claude review is not carried.
+    const human = { ...data, [`/repos/o/r/compare/${R}...${S1}`]: compareOf([commit(S1, R, { login: 'o', email: 'o@example.org' })]) }
+    const notCarried = await fullState({ repo: 'o/r', pr: '1', list: claudeList, head: S1, get: async (p: string) => human[p] })
+    expect(notCarried.state).toMatchObject({ reviewers: ['Claude'], carried: false })
     const broken = await fullState({ repo: 'o/r', pr: '1', list, head: S1, get: async () => Promise.reject(new Error('404')) })
     expect(broken.state).toMatchObject({ completed: true, carried: false })
   })
