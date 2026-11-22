@@ -57,9 +57,10 @@ describe('messages handed to the client', () => {
       // T108: the public gallery translates on the server, so no other page carries its text.
       expect(all).toHaveProperty('gallery')
       expect(client).not.toHaveProperty('gallery')
-      // The template share page (Owner 2026-11-13) and the blog translate on the server too.
+      // The template share page (Owner 2026-11-13), the collection share page (§5.1g) and the blog
+      // translate on the server too.
       expect(client).not.toHaveProperty('blog')
-      expect(Object.keys(client)).toEqual(Object.keys(all).filter((key) => !['adminEntry', 'affiliate', 'gallery', 'share', 'blog'].includes(key)))
+      expect(Object.keys(client)).toEqual(Object.keys(all).filter((key) => !['adminEntry', 'affiliate', 'gallery', 'share', 'templateShare', 'blog'].includes(key)))
       expect(JSON.stringify(client)).not.toContain('管理后台')
     }
   })
