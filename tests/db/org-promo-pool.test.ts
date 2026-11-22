@@ -114,7 +114,7 @@ it('spends paid first, then the org promotion share before the member’s own fr
   expect(paid).toMatchObject({ credit_pool: 'paid', visibility: 'private' })
   expect(await balances(staff)).toEqual({ credits: 5, free_credits: 75 })
   const promo = await generate(staff) // 5 paid left: not enough, the whole order goes to the free pool
-  expect(promo).toMatchObject({ credit_pool: 'free', visibility: 'public' }) // a free work: watermark, public, no commercial use
+  expect(promo).toMatchObject({ credit_pool: 'free', visibility: 'private' }) // a free work (watermark, no commercial use), and an org work: never public (#842)
   expect(await balances(staff)).toEqual({ credits: 5, free_credits: 65 })
   expect(await seat(orgId, staff)).toMatchObject({ held_credits: 5, held_promo_credits: 15 }) // promotion share drawn first
   await generate(staff)
