@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 
-import { FOOD_TOGGLE_KEYS } from './food-flow'
+import { FOOD_TOGGLE_KEYS } from './food-toggle-keys'
 
 // The site-wide switch for 优化摆盘 / 优化器皿 (system_settings food_toggles_enabled), handed to
 // the browser by the root layout. Without a provider it reads off, the safe side.

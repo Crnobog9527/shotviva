@@ -1,16 +1,14 @@
 import { z } from 'zod'
 
+import { PLATING_TOGGLE, TABLEWARE_TOGGLE } from './food-toggle-keys'
+
 // The food templates' two toggles as their own generation flows (ARCHITECTURE §5.1c「餐饮开关的出图
 // 流程」). A template opts in with the private template_prompts.model_params.food_flow: the
 // instructions of the dish reading and one prompt body per flow. Without it the toggles stay plain
 // prompt fragments, as before. No `server-only`: the admin save checks the same shape.
 
 // Fixed toggle keys: the flow means these two, whatever their labels say.
-export const PLATING_TOGGLE = 'plating'
-export const TABLEWARE_TOGGLE = 'tableware'
-// Both, for the site-wide switch (system_settings food_toggles_enabled): while it is off neither
-// is offered and the server renders both off.
-export const FOOD_TOGGLE_KEYS: readonly string[] = [PLATING_TOGGLE, TABLEWARE_TOGGLE]
+export { FOOD_TOGGLE_KEYS, PLATING_TOGGLE, TABLEWARE_TOGGLE } from './food-toggle-keys'
 
 // Placeholders the flow bodies take, filled from the dish reading and the library vessel. Reserved
 // so no copy field, toggle or slot can take the name.
