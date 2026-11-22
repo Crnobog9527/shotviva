@@ -256,6 +256,8 @@ const KNOWN: Record<string, string> = {
   INVALID_INPUT: COPY.invalid,
   ORG_LIMIT_ABOVE_CAP: COPY.aboveCapGeneric,
   ORG_NEW_OWNER_AFFILIATE: TRANSFER_COPY.newOwnerAffiliate,
+  ORG_NEW_OWNER_AFFILIATE_HISTORY: TRANSFER_COPY.newOwnerAffiliateHistory,
+  ORG_AFFILIATE_MISMATCH: TRANSFER_COPY.affiliateMismatch,
   ORG_BUSY: TRANSFER_COPY.busy,
 }
 

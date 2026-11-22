@@ -19,7 +19,7 @@ const row = (id: string, over: Record<string, unknown> = {}) => ({
 
 // A fake service client: each table answers with its rows; filters are ignored on purpose (the
 // code under test asks for the right accounts, the rows say who is where).
-function fakeDb(tables: Record<string, unknown[]>, auth: { user?: unknown; error?: unknown } = {}) {
+function fakeDb(tables: Record<string, unknown[]>, auth: { user?: unknown; error?: unknown } = {}, history: { data?: string[]; error?: { message: string } } = {}) {
   const chain = (data: unknown[]) => {
     const q: Record<string, unknown> = { data, error: null }
     for (const m of ['select', 'in', 'eq', 'is']) q[m] = () => q
@@ -28,6 +28,9 @@ function fakeDb(tables: Record<string, unknown[]>, auth: { user?: unknown; error
   }
   return {
     from: (table: string) => chain(tables[table] ?? []),
+    rpc: (fn: string) => Promise.resolve(fn === 'admin_org_picker_affiliate_history'
+      ? { data: history.error ? null : (history.data ?? []), error: history.error ?? null }
+      : { data: null, error: { message: `unexpected rpc ${fn}` } }),
     auth: { admin: { getUserById: () => Promise.resolve({ data: { user: auth.user ?? null }, error: auth.error ?? null }) } },
   } as never
 }
@@ -61,6 +64,14 @@ describe('searchPickerUsers', () => {
     // Picking an owner (no org yet): a member of any org is simply "in an org".
     const asOwner = await searchPickerUsers(db, 'exam', null)
     expect(asOwner.find((u) => u.id === D)?.status).toBe('in_org')
+  })
+
+  it('marks personal affiliate accounts with history, and marks nobody when that read fails', async () => {
+    spies.list.mockResolvedValue({ rows: [row(A), row(E)] })
+    const users = await searchPickerUsers(fakeDb({ affiliates: [{ user_id: E }] }, {}, { data: [E] }), 'exam', ORG_HERE)
+    expect(users.map((u) => [u.id, u.affiliateHistory])).toEqual([[A, false], [E, true]])
+    const failed = await searchPickerUsers(fakeDb({}, {}, { error: { message: 'missing' } }), 'exam', ORG_HERE)
+    expect(failed.map((u) => u.affiliateHistory)).toEqual([false, false])
   })
 
   it('lists at most eight accounts', async () => {

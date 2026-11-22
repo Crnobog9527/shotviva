@@ -85,6 +85,12 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   ORG_PERSONAL_AFFILIATE: 'CONFLICT',
   ORG_PERSONAL_AFFILIATE_UNSETTLED: 'CONFLICT',
   AFFILIATE_ORG_MEMBER: 'FORBIDDEN',
+  // 更换主管理员 (1930, 1990): the new owner's affiliate row is not an empty personal one, the
+  // org's account is not its owner's, or a payment/binding holds the org's rows right now.
+  ORG_NEW_OWNER_AFFILIATE: 'CONFLICT',
+  ORG_NEW_OWNER_AFFILIATE_HISTORY: 'CONFLICT',
+  ORG_AFFILIATE_MISMATCH: 'CONFLICT',
+  ORG_BUSY: 'CONFLICT',
 }
 
 export function toRpcError(fn: string, error: { message: string; code?: string }): AppError {
