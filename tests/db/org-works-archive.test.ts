@@ -4,7 +4,7 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { reserveJob } from '@/core/jobs'
-import { allocateOrgCredits } from '@/core/org'
+import { allocateOrgCredits, joinOrg } from '@/core/org'
 import { archiveOrgWorksOf, archiveThumbKey, DELETED_MAKERS, orgOwnerDeleteWork, orgOwnerWork, orgOwnerWorkMembers, orgOwnerWorks } from '@/core/org/works'
 import { workThumbKeyFor } from '@/core/storage'
 
@@ -13,7 +13,7 @@ import { createMemoryStore } from '../fakes/memory-store'
 import { seedTemplate } from './generation-fixtures'
 import { connectAdmin, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
-import { adminAccount, member, orgWith } from './org-fixtures'
+import { account, adminAccount, member, orgWith } from './org-fixtures'
 
 // 企业作品 follow-ups (migrations 1970–1972, control 2026-11-22): a child of an org work (edit,
 // again, poster redraw) is an org work whoever paid; and deleting an account never takes the org's
@@ -65,24 +65,30 @@ async function staffed(own = 0) {
   const { orgId, owner, token } = await orgWith(db, service, actor, { pool: cost * 4 })
   const staff = await member(db, service, token, { credits: own })
   await allocateOrgCredits(service, owner, staff, cost, randomUUID())
-  return { orgId, owner, staff }
+  return { orgId, owner, staff, token }
+}
+
+// An active member spends only org credits (§6.5, #838): a personal work is one made before joining.
+async function personalThenJoin(token: string) {
+  const user = await account(db, service, { credits: cost * 3 })
+  const own = await made(user)
+  await joinOrg(service, user, token)
+  return { user, own }
 }
 
 describe('children of org works', () => {
-  it('makes an edit, an again and a poster redraw of an org work org works, even paid with own credits', async () => {
-    const { orgId, staff } = await staffed()
+  it('makes an edit, an again and a poster redraw of an org work org works', async () => {
+    const { orgId, owner, staff } = await staffed()
     const orgWork = await made(staff)
-    // From here on only their own credits.
-    await db.query('update public.profiles set credits = credits + $2 where id = $1', [staff, cost * 3])
-    expect(await orgOf(await made(staff))).toBeNull()
+    await allocateOrgCredits(service, owner, staff, cost, randomUUID())
     expect(await orgOf(await child(staff, { parent: orgWork }))).toBe(orgId)
     expect(await orgOf(await made(staff, { again_of: orgWork }))).toBe(orgId)
     expect(await orgOf(await child(staff, { inputs: { poster: { set_id: randomUUID(), part: 0, redraw_of: orgWork } } }))).toBe(orgId)
   })
 
   it('leaves children of personal works personal, and ignores a malformed redraw source', async () => {
-    const { staff } = await staffed(cost * 3)
-    const own = await made(staff)
+    const { token } = await staffed()
+    const { user: staff, own } = await personalThenJoin(token)
     expect(await orgOf(own)).toBeNull()
     expect(await orgOf(await child(staff, { parent: own }))).toBeNull()
     expect(await orgOf(await child(staff, { inputs: { poster: { set_id: randomUUID(), part: 0, redraw_of: 'not-a-uuid' } } }))).toBeNull()
@@ -102,8 +108,9 @@ const archiveRow = async (jobId: string) =>
 
 describe('account deletion', () => {
   it('moves the org works into the org, files copied, personal works going as before', async () => {
-    const { orgId, owner, staff } = await staffed(cost)
-    const personal = await made(staff)
+    const { orgId, owner, token } = await staffed()
+    const { user: staff, own: personal } = await personalThenJoin(token)
+    await allocateOrgCredits(service, owner, staff, cost, randomUUID())
     const orgWork = await made(staff)
     expect(await orgOf(personal)).toBeNull()
     expect(await orgOf(orgWork)).toBe(orgId)
