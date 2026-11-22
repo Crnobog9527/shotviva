@@ -6,7 +6,8 @@ import type { Locale } from '@/core/i18n'
 import { isAffiliateEnabled } from '../feature'
 import { productLabel } from './format'
 import type { Commission } from './models'
-import { readAccount, readCommissions } from './repository'
+import { readAccount, readCommissions, readSettings } from './repository'
+import { mustAcceptTerms } from './terms'
 
 function csvCell(value: string) {
   // Quoting handles delimiters; spreadsheets still treat a quoted leading '=' as a formula.
@@ -31,6 +32,8 @@ export async function exportCommissions(locale: Locale) {
   const user = await requireApiUser()
   const account = await readAccount(user.id)
   if (account?.status !== 'active') throw new AppError('NOT_FOUND', 'Not found')
+  // Same gate as the dashboard: no records leave before the current terms are accepted.
+  if (await mustAcceptTerms(account, (await readSettings()).terms_version)) throw new AppError('FORBIDDEN', 'Terms not accepted')
   const t = await getTranslations({ locale, namespace: 'affiliate' })
   const header = line(['date', 'item', 'base', 'orderFees.fees', 'orderFees.netBase', 'rate', 'commission', 'state', 'confirms'].map((key) => t(key)))
   const row = (r: Commission) =>
