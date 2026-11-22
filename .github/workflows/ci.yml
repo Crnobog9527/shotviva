@@ -16,15 +16,15 @@ concurrency:
 permissions:
   contents: read
 
-# "lint · typecheck · test · build" and "supabase db tests" are required checks on main, and
-# "CI gate" sums up every job here (meant to become the one required check). A docs/spec-only PR
+# "lint · typecheck · test · build" and "supabase db tests" each sum up parallel jobs, and "CI gate"
+# sums up every job here (the required check on main, with "Codex findings"). A docs/spec-only PR
 # or push to main (规范/, seo资料/, docs/, design/, *.md) still runs the required jobs, but each
 # stops after the change detection step and reports success in seconds (.github/actions/changes).
 #
 # Lighthouse (mobile, marketing pages) runs on a PR only when it can measure something new: the
 # pages' fingerprint (HTML, headers, static files they load, public/; scripts/ci/page-fingerprint.mjs)
 # differs from the base commit's, or the change touches what the fingerprint cannot see
-# (scripts/ci/lighthouse-force.sh). It measures the build the checks job made, in four parallel
+# (scripts/ci/lighthouse-force.sh). It measures the build the build job made, in four parallel
 # jobs, and an LCP just over its limit is measured once more (scripts/ci/lighthouse-run.sh).
 #
 # Server action ids are derived from this key; fixed in CI so two builds of the same code send the
@@ -33,8 +33,82 @@ env:
   NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: c2hvdHZpdmEtY2ktZmluZ2VycHJpbnQta2V5LTAwMDE=
 
 jobs:
-  checks:
-    name: lint · typecheck · test · build
+  # "lint · typecheck · test · build" (required through the CI gate) is the sum of four jobs that
+  # run in parallel: lint, typecheck, unit tests and the build with its checks. Each decides on its
+  # own, from the same commit, whether there is code to check (.github/actions/changes); the sum
+  # passes only when all four succeeded and agree (scripts/ci/checks-verify.mjs). Lighthouse needs
+  # only the build, so it starts as soon as the build is done.
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+      - id: changes
+        uses: ./.github/actions/changes
+      - if: steps.changes.outputs.code == 'true'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - if: steps.changes.outputs.code == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm lint
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+      - id: changes
+        uses: ./.github/actions/changes
+      - if: steps.changes.outputs.code == 'true'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - if: steps.changes.outputs.code == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm typecheck
+
+  unit:
+    name: unit tests
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+      - id: changes
+        uses: ./.github/actions/changes
+      - if: steps.changes.outputs.code == 'true'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - if: steps.changes.outputs.code == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm test
+
+  build:
+    name: build
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.changes.outputs.code }}
@@ -63,12 +137,6 @@ jobs:
           path: .next/cache
           key: next-cache-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: next-cache-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
-      - if: steps.changes.outputs.code == 'true'
-        run: pnpm lint
-      - if: steps.changes.outputs.code == 'true'
-        run: pnpm typecheck
-      - if: steps.changes.outputs.code == 'true'
-        run: pnpm test
       - if: steps.changes.outputs.code == 'true'
         run: pnpm build
       # The app top bar must be in every app page's prerendered shell (scripts/app-shell-check-lib.ts).
@@ -119,6 +187,27 @@ jobs:
           path: ${{ runner.temp }}/next-build.tar.gz
           retention-days: 1
           compression-level: 0
+
+  # The required "lint · typecheck · test · build". Runs even when a part failed or the run was
+  # cancelled, so it is never skipped (a skipped required check would count as passed). Its
+  # outputs are the build's, for Lighthouse's decision in the gate.
+  checks:
+    name: lint · typecheck · test · build
+    needs: [lint, typecheck, unit, build]
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ needs.build.outputs.code }}
+      fingerprint: ${{ needs.build.outputs.fingerprint }}
+      pages: ${{ needs.build.outputs.pages }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          sparse-checkout: scripts/ci
+          persist-credentials: false
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/ci/checks-verify.mjs
 
   # The database stage (T88) is three jobs. "supabase schema" and the four "supabase db tests (k/4)"
   # shards each start their own local Supabase and run in parallel; "supabase db tests", the
@@ -356,7 +445,7 @@ jobs:
           echo "hash=$(jq -r .hash "$RUNNER_TEMP/fingerprint.json")" >> "$GITHUB_OUTPUT"
           echo "pages=$(jq -c .pages "$RUNNER_TEMP/fingerprint.json")" >> "$GITHUB_OUTPUT"
 
-  # Mobile Lighthouse on the marketing pages of the checks job's build (performance pass, B8):
+  # Mobile Lighthouse on the marketing pages of the build job's build (performance pass, B8):
   # simulated throttling (lighthouserc.json: score ≥ 0.85, CLS ≤ 0.1; warns on LCP > 2.5 s and
   # TBT > 200 ms) and throttling in the browser for the Owner's mobile LCP standard
   # (lighthouserc.devtools.json: LCP ≤ 1.2 s on the median of 5 runs). The build has no
@@ -364,13 +453,13 @@ jobs:
   # production. Pages are served through scripts/ci/lighthouse-server.mjs (HTTP/2 + brotli).
   lighthouse:
     name: lighthouse (${{ matrix.name }})
-    needs: [checks, lighthouse-base]
+    needs: [build, lighthouse-base]
     if: >-
       !cancelled() && github.event_name != 'push' &&
-      needs.checks.result == 'success' && needs.checks.outputs.code == 'true' &&
+      needs.build.result == 'success' && needs.build.outputs.code == 'true' &&
       (needs.lighthouse-base.result != 'success' || needs.lighthouse-base.outputs.force != 'false' ||
-       needs.checks.outputs.fingerprint == '' || needs.lighthouse-base.outputs.fingerprint == '' ||
-       needs.checks.outputs.fingerprint != needs.lighthouse-base.outputs.fingerprint)
+       needs.build.outputs.fingerprint == '' || needs.lighthouse-base.outputs.fingerprint == '' ||
+       needs.build.outputs.fingerprint != needs.lighthouse-base.outputs.fingerprint)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -416,7 +505,7 @@ jobs:
   # fails, Lighthouse runs and decides.
   gate:
     name: CI gate
-    needs: [checks, db, lighthouse-base, lighthouse]
+    needs: [checks, build, db, lighthouse-base, lighthouse]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -426,6 +515,7 @@ jobs:
           persist-credentials: false
       - env:
           CHECKS: ${{ needs.checks.result }}
+          BUILD: ${{ needs.build.result }}
           DB: ${{ needs.db.result }}
           LIGHTHOUSE: ${{ needs.lighthouse.result }}
           BASE: ${{ needs.lighthouse-base.result }}
