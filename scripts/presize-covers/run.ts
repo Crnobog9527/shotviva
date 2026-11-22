@@ -11,7 +11,8 @@
  */
 import { ListObjectsV2Command, type S3Client } from '@aws-sdk/client-s3'
 
-import { serverEnv } from '../../src/core/env'
+import { z } from 'zod'
+
 import { createR2Client, createR2Store, writePresizedCopies } from '../../src/core/storage'
 import { runBackfill } from './backfill'
 
@@ -29,12 +30,21 @@ async function* listKeys(client: S3Client, bucket: string, prefix: string, start
   } while (token)
 }
 
+// Only the four variables this needs, so an env file's unrelated settings never stop it.
+const r2Env = z.object({
+  R2_ACCOUNT_ID: z.string().min(1),
+  R2_ACCESS_KEY_ID: z.string().min(1),
+  R2_SECRET_ACCESS_KEY: z.string().min(1),
+  R2_PUBLIC_BUCKET: z.string().min(1),
+})
+
 async function main() {
   const bucket = argValue('--bucket')
-  const env = serverEnv()
   if (!bucket) throw new Error('--bucket <public bucket name> is required')
+  const parsed = r2Env.safeParse(process.env)
+  if (!parsed.success) throw new Error(`R2 settings missing: ${parsed.error.issues.map((issue) => issue.path.join('.')).join(', ')}`)
+  const env = parsed.data
   if (env.R2_PUBLIC_BUCKET !== bucket) throw new Error('--bucket does not match R2_PUBLIC_BUCKET in this env file')
-  if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY) throw new Error('R2 credentials are not set')
   const client = createR2Client({ accountId: env.R2_ACCOUNT_ID, accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY })
   const store = createR2Store(client, bucket)
   const write = process.argv.includes('--write')
