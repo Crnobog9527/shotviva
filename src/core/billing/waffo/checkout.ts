@@ -14,7 +14,8 @@ import type { RpcClient } from '../rpc'
 import { quoteMetadata, type CheckoutPrice } from '../checkout-price'
 import { CHECKOUT_RETURN, successPath, type CheckoutBody } from '../stripe/checkout'
 import { overWechatLimit } from '../wechat-limit'
-import type { WaffoApi, WaffoSessionRequest } from './client'
+import { createWithBillingDetail, withoutBillingDetail } from './billing-detail'
+import type { WaffoApi, WaffoBillingDetail, WaffoSessionRequest } from './client'
 
 // Waffo hosted checkout for one product (ARCHITECTURE §6.3, T50). A membership paid by card is a
 // Waffo subscription product that renews every month or year (cards only on the page); paid by
@@ -76,7 +77,7 @@ export function waffoMethods(method: CheckoutBody['method'], recurring: boolean,
 
 export function waffoSessionRequest(
   deps: Pick<WaffoCheckoutDeps, 'productIds' | 'subscriptionProductIds' | 'origin' | 'returnToHosts' | 'wechatPay'>,
-  input: { userId: string; product: SiteProduct; body: CheckoutBody; orderRef: string; quote?: CheckoutPrice },
+  input: { userId: string; product: SiteProduct; body: CheckoutBody; orderRef: string; quote?: CheckoutPrice; billing?: WaffoBillingDetail },
 ): WaffoSessionRequest {
   const { product, body } = input
   const recurring = isRecurring(product, body.method)
@@ -95,9 +96,17 @@ export function waffoSessionRequest(
     orderMerchantExternalId: input.quote ? `v2_${input.orderRef}` : input.orderRef,
     language: body.locale === 'zh' ? 'zh-Hans' : 'en',
     includePaymentMethods: waffoMethods(body.method, recurring, deps.wechatPay === true && !overWechatLimit(cents)),
+    ...sessionOptions(Boolean(input.quote), recurring, input.billing),
+  }
+}
+
+function sessionOptions(quoted: boolean, recurring: boolean, billing?: WaffoBillingDetail): Partial<WaffoSessionRequest> {
+  return {
     // The default can expose merchant dashboard codes; v2 offers exactly the quoted pack/plan.
-    ...(input.quote && { allowPromotionCodes: false }),
-    ...(input.quote && recurring ? { withTrial: false } : {}),
+    ...(quoted && { allowPromotionCodes: false }),
+    ...(quoted && recurring ? { withTrial: false } : {}),
+    // 开票信息: only for the current owner of an org with a saved profile (billing-detail.ts).
+    ...(billing && { billingDetail: billing }),
   }
 }
 
@@ -105,7 +114,7 @@ type BoundCheckout = { attempt: Attempt; db: RpcClient; store: { storeId: string
 
 export async function createWaffoCheckout(
   deps: WaffoCheckoutDeps,
-  input: { userId: string; body: CheckoutBody; quote?: CheckoutPrice; bound?: BoundCheckout },
+  input: { userId: string; body: CheckoutBody; quote?: CheckoutPrice; bound?: BoundCheckout; billing?: WaffoBillingDetail },
 ): Promise<{ url: string }> {
   const product = deps.products.find((p) => p.id === input.body.product_id)
   if (!product || product.priceUsd <= 0) throw new AppError('NOT_FOUND', 'Unknown product')
@@ -116,9 +125,10 @@ export async function createWaffoCheckout(
     body: input.body,
     quote: input.quote,
     orderRef,
+    billing: input.billing,
   })
   const url = input.bound ? await openBound(deps.waffo, input.userId, input.bound, request, isRecurring(product, input.body.method))
-    : checkoutUrl(await deps.waffo.createCheckoutSession(request))
+    : checkoutUrl(await createWithBillingDetail(deps.waffo, request, request.billingDetail))
   ;(deps.trackStart ?? trackCheckoutStart)(input.userId, {
     product_id: product.id,
     tier: product.tier,
@@ -137,6 +147,9 @@ async function openBound(waffo: WaffoCheckoutDeps['waffo'], user: string, bound:
   Object.assign(request.metadata, {
     catalog_attempt: attempt.token, catalog_price: request.productId, catalog_revision: String(attempt.revision),
   })
-  const saved = await lockAttempt(db, user, attempt, { channel: 'waffo', key, price: request.productId, recurring, params: request, store })
-  return (await finishWaffo(db, waffo, user, attempt.token, saved)).url
+  // The company title is not saved with the attempt: it is added when the session is created
+  // (billing-detail.ts), so a title Waffo refuses can be dropped without touching the saved terms.
+  const params = withoutBillingDetail(request)
+  const saved = await lockAttempt(db, user, attempt, { channel: 'waffo', key, price: request.productId, recurring, params, store })
+  return (await finishWaffo(db, waffo, user, attempt.token, saved, request.billingDetail)).url
 }

@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { accountLabels } from '../console/reads'
+import { DELETED_MAKERS } from './makers'
 import { ORG_WORKS_PAGE, orgOwnerWorkMembers, orgOwnerWorks, type OrgWork, type OrgWorkMember } from './reads'
 
 export type OrgWorksPage = {
@@ -26,7 +27,8 @@ function parseCursor(value: string | undefined): { at: string; id: string } | un
 }
 
 // The 企业作品 page for the signed-in owner: who made org works (to filter by), and one page of
-// works, each with its maker's account label. A member id that is not one of them shows all.
+// works, each with its maker's account label. A member id that is not one of them shows all;
+// DELETED_MAKERS shows the works of deleted accounts.
 export async function readOrgWorksPage(
   db: SupabaseClient,
   owner: string,
@@ -34,13 +36,15 @@ export async function readOrgWorksPage(
   maskPhone: (phone: string) => string,
 ): Promise<OrgWorksPage> {
   const members = await orgOwnerWorkMembers(db, owner)
-  const member = members.some((m) => m.userId === query.member) ? (query.member as string) : null
+  const known = (m: OrgWorkMember) => (m.userId ?? DELETED_MAKERS) === query.member
+  const member = members.some(known) ? (query.member as string) : null
   const page = await orgOwnerWorks(db, owner, { ...(member ? { member } : {}), limit: ORG_WORKS_PAGE + 1, before: parseCursor(query.before) })
   const works = page.slice(0, ORG_WORKS_PAGE)
-  const labels = await accountLabels(db, members.map((m) => m.userId), maskPhone)
+  const labels = await accountLabels(db, members.flatMap((m) => (m.userId ? [m.userId] : [])), maskPhone)
+  const label = (id: string | null) => (id ? (labels.get(id) ?? null) : null)
   return {
-    members: members.map((m) => ({ ...m, label: labels.get(m.userId) ?? null })),
-    works: works.map((w) => ({ ...w, label: labels.get(w.userId) ?? null })),
+    members: members.map((m) => ({ ...m, label: label(m.userId) })),
+    works: works.map((w) => ({ ...w, label: label(w.userId) })),
     member,
     next: page.length > ORG_WORKS_PAGE ? cursorOf(works[works.length - 1]!) : null,
   }

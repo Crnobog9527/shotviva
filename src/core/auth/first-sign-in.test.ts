@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   recordSignupIp: vi.fn(),
   grantSignupCredits: vi.fn(),
   noteSignupGift: vi.fn(),
-  staff: vi.fn(async () => false),
+  staff: vi.fn(async (): Promise<boolean | 'unchecked'> => false),
 }))
 
 vi.mock('../affiliate/referral', () => ({ bindReferral: mocks.bind }))
@@ -103,7 +103,7 @@ describe('signupMarks', () => {
 })
 
 describe('onVerifiedSignIn: staff-link signups', () => {
-  const next = 'a'.repeat(32)
+  const next = { token: 'a'.repeat(32), orgId: null }
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.headers.mockResolvedValue(new Headers({ 'x-forwarded-for': '203.0.113.7' }))
@@ -130,6 +130,15 @@ describe('onVerifiedSignIn: staff-link signups', () => {
     await onVerifiedSignIn('u1', benefits, 'email', 'zh', next)
     expect(mocks.staff).toHaveBeenCalledWith({}, 'u1', next)
     expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', benefits.freeCredits)
+  })
+
+  it('an unchecked staff link pays nothing and leaves the signup IP for the next sign-in', async () => {
+    mocks.staff.mockResolvedValueOnce('unchecked')
+    mocks.grantSignupCredits.mockResolvedValue(false)
+    await onVerifiedSignIn('u1', benefits, 'email', 'zh', next)
+    expect(mocks.recordSignupIp).not.toHaveBeenCalled()
+    expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', 0)
+    expect(mocks.bind).not.toHaveBeenCalled()
   })
 
   it('a customer sign-up (no staff link) is unchanged', async () => {

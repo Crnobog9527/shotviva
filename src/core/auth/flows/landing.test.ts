@@ -40,12 +40,12 @@ describe('landOnSession: account language (ARCHITECTURE §7)', () => {
 
   // Codex P1 (#841): a confirmation resent from /login lands on /account, but the staff link token
   // stored at sign-up still reaches the first sign-in.
-  it('passes the staff link token from next, else the one stored at sign-up', async () => {
+  it('passes the staff origin from next, else the one stored at sign-up', async () => {
     const token = 'c'.repeat(32)
     const email = { ...GOOGLE, app_metadata: { provider: 'email' }, email_confirmed_at: '2026-11-06T00:00:00Z' }
     await landOnSession(client({ ...email, user_metadata: { locale: 'zh', staff_invite: token } }).supabase, 'email', benefits, '/zh/account')
-    expect(mocks.onVerifiedSignIn).toHaveBeenLastCalledWith('g1', benefits, 'email', 'zh', token)
+    expect(mocks.onVerifiedSignIn).toHaveBeenLastCalledWith('g1', benefits, 'email', 'zh', { token, orgId: null })
     await landOnSession(client({ ...email, user_metadata: { locale: 'zh' } }).supabase, 'email', benefits, `/zh/join/org/${token}`)
-    expect(mocks.onVerifiedSignIn).toHaveBeenLastCalledWith('g1', benefits, 'email', 'zh', token)
+    expect(mocks.onVerifiedSignIn).toHaveBeenLastCalledWith('g1', benefits, 'email', 'zh', { token, orgId: null })
   })
 })

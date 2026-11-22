@@ -4,6 +4,7 @@ import { Link } from '@/core/i18n/ui'
 import { cn } from '@/core/ui/cn'
 
 import type { OrgWorksPage } from '../works'
+import { DELETED_MAKERS } from '../works/makers'
 
 const WORKS_HREF = '/account/enterprise/works'
 
@@ -15,8 +16,9 @@ export function WorksMemberFilter({ page }: { page: Pick<OrgWorksPage, 'members'
   const items = [
     { id: null, label: t('all'), works: total, removed: false },
     ...page.members.map((m) => ({
-      id: m.userId,
-      label: m.role === 'owner' ? t('owner') : (m.label ?? t('unknown')),
+      // Works of deleted accounts are one entry, 「已注销成员」.
+      id: m.userId ?? DELETED_MAKERS,
+      label: m.status === 'deleted' ? t('deletedAccounts') : m.role === 'owner' ? t('owner') : (m.label ?? t('unknown')),
       works: m.works,
       removed: m.status === 'removed',
     })),

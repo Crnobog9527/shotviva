@@ -14,7 +14,7 @@ import { billingGrant, grantSignupCredits } from './free-credits'
 import { consumeSignupCode, type SignupBenefits } from './signup-code'
 import { claimQuietly } from './signup-gift-claim'
 import { clientIp, recordSignupIp } from './signup-ip'
-import { staffSignup } from './staff-signup'
+import { staffSignup, type StaffOrigin } from './staff-signup'
 import { createAdminSupabase } from './supabase-admin'
 
 export type SignInMethod = 'email' | 'google' | 'phone'
@@ -58,22 +58,28 @@ async function payGift(admin: ReturnType<typeof createAdminSupabase>, userId: st
   return { granted, claimed }
 }
 
+// An unchecked staff link (the org lookup failed) leaves the IP for the next sign-in to store, so
+// that one is still the account's first for mark_staff_signup (1950).
+async function recordIpUnlessUnchecked(admin: ReturnType<typeof createAdminSupabase>, userId: string, address: string | null, staff: boolean | 'unchecked') {
+  return staff !== 'unchecked' && (await recordSignupIp(admin, userId, address))
+}
+
 export async function onVerifiedSignIn(
   userId: string,
   benefits: SignupBenefits,
   method: SignInMethod,
   locale: Locale,
-  // The staff link token of this sign-up (core/auth/staff-signup staffTokenFor), if any.
-  staffToken?: string | null,
+  // The staff link this sign-up came from (core/auth/staff-signup staffOriginFor), if any.
+  staffOrigin?: StaffOrigin | null,
 ): Promise<void> {
   const admin = createAdminSupabase()
   const address = clientIp(await headers())
-  // An org's staff link (next = /join/org/<token>, or the token stored at sign-up) on a new account signs up a staff account: no
+  // An org's staff link (next = /join/org/<token>, or the origin stored at sign-up) on a new account signs up a staff account: no
   // free credits, now or later (the stored refusal 'staff' stops every retry and claim,
   // 1940/1950), and no signup code or partner binding. Before the signup IP is stored (the SQL
   // reads "no IP yet" as the first verified sign-in) and before the grant, so it refuses.
-  const staff = await staffSignup(admin, userId, staffToken ?? null)
-  const ipStored = await recordSignupIp(admin, userId, address)
+  const staff = await staffSignup(admin, userId, staffOrigin ?? null)
+  const ipStored = await recordIpUnlessUnchecked(admin, userId, address, staff)
   const { granted, claimed } = await payGift(admin, userId, staff ? 0 : benefits.freeCredits)
   const first = address ? ipStored : granted
   if (claimed && !first) noteSignupGift()

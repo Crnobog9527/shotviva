@@ -5,12 +5,13 @@ import { AppError } from '@/core/errors'
 import { appOrigin } from '@/core/site-url'
 import { POST } from './route'
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), redeem: vi.fn(), rpc: vi.fn(), bind: vi.fn(), member: vi.fn() }))
+const mocks = vi.hoisted(() => ({ session: vi.fn(), redeem: vi.fn(), rpc: vi.fn(), bind: vi.fn(), member: vi.fn(), staffCode: vi.fn() }))
 vi.mock('@/core/auth/session', () => ({ getSessionUser: mocks.session }))
 vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc }) }))
 vi.mock('@/core/codes/server', () => ({ redeemCode: mocks.redeem }))
 vi.mock('@/core/affiliate/referral', () => ({ bindReferral: mocks.bind }))
 vi.mock('@/core/billing/org-member-guard', () => ({ assertNotOrgMember: mocks.member }))
+vi.mock('@/core/codes/staff-guard', () => ({ staffNewUserCode: mocks.staffCode }))
 
 const user = { id: 'u1', role: 'user', locale: 'zh', verified: true, banned: false }
 
@@ -111,4 +112,24 @@ it('refuses an active org member before binding or redeeming anything', async ()
   expect(mocks.bind).not.toHaveBeenCalled()
   expect(mocks.redeem).not.toHaveBeenCalled()
   expect(mocks.rpc).not.toHaveBeenCalled()
+})
+
+// A staff-link sign-up (1940) never gets a new-user reward, also after leaving the org.
+it('refuses a new-user code to a staff-link sign-up before binding or redeeming', async () => {
+  mocks.staffCode.mockResolvedValueOnce(true)
+  const response = await post('{"code":"WELCOME"}', appOrigin, 'sv_ref=qa-partner.1700000000')
+  expect(response.status).toBe(403)
+  expect(await response.json()).toMatchObject({ code: 'CODE_NEW_USERS_ONLY' })
+  expect(mocks.staffCode).toHaveBeenCalledWith(expect.anything(), user.id, 'WELCOME')
+  // The refusal spends an attempt of the budget, like any redemption.
+  expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('redeem_limited_code', expect.objectContaining({ p_user: user.id, p_code: null }))
+  expect(mocks.bind).not.toHaveBeenCalled()
+  expect(mocks.redeem).not.toHaveBeenCalled()
+})
+
+it('answers rate_limited, not the staff refusal, once the budget is spent (no probing past it)', async () => {
+  mocks.staffCode.mockResolvedValueOnce(true)
+  mocks.rpc.mockResolvedValueOnce({ data: { status: 'rate_limited' }, error: null })
+  const response = await post('{"code":"WELCOME"}')
+  expect(response.status).toBe(429)
 })

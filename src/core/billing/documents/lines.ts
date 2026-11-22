@@ -24,8 +24,15 @@ export type PurchaseLine = {
   label: string
   receiptHref: string | null
   invoiceHref: string | null
+  // Waffo rows only: the Waffo Consumer Portal, where the buyer downloads PDF invoices and edits
+  // the company name and tax ID on them.
+  portalHref: string | null
   refund: 'full' | 'partial' | null
 }
+
+// Waffo's own buyer portal (docs.waffo.ai/features/customer-portal). The buyer signs in there
+// with their payment email; we have no per-order invoice link to put in the page.
+export const WAFFO_CONSUMER_PORTAL = 'https://pancake.waffo.ai/consumer/portal/login'
 
 // Logical path of the redirect route; the caller localizes it.
 export function documentPath(paymentId: string, document: PaymentDocument): string {
@@ -35,8 +42,9 @@ export function documentPath(paymentId: string, document: PaymentDocument): stri
 // Every Stripe charge has a receipt (refunded ones too: the page shows the refund), whatever
 // the method: card, 中国银行卡, Alipay, WeChat Pay. Only rows
 // with an invoice id get 「发票」: subscriptions, and one-time Managed Payments purchases,
-// which Stripe invoices as "Sold through Link". Waffo's API has neither (its buyer gets an
-// order confirmation email), so its rows get the email note instead of links.
+// which Stripe invoices as "Sold through Link". Waffo does send invoices, in the order
+// confirmation email and in its Consumer Portal (PDF, editable company name and tax ID), but its
+// API has no per-order receipt or invoice link, so its rows get that note and the portal link.
 export function purchaseLine(row: DocumentRow, label: string, locale: Locale): PurchaseLine {
   const stripe = row.channel === 'stripe'
   const href = (document: PaymentDocument) => localizePath(documentPath(row.id, document), locale)
@@ -45,6 +53,7 @@ export function purchaseLine(row: DocumentRow, label: string, locale: Locale): P
     label,
     receiptHref: stripe ? href('receipt') : null,
     invoiceHref: stripe && row.hasInvoice ? href('invoice') : null,
+    portalHref: row.channel === 'waffo' ? WAFFO_CONSUMER_PORTAL : null,
     refund: row.status === 'refunded' ? 'full' : row.status === 'partially_refunded' ? 'partial' : null,
   }
 }
