@@ -13743,8 +13743,14 @@ begin
   end if;
 
   if (select count(*) from public.generation_jobs
-       where id = any(p_job_ids) and user_id = p_user_id and status = 'succeeded' and deleted_at is null) <> v_count then
+       where id = any(p_job_ids) and user_id = p_user_id and status = 'succeeded' and deleted_at is null
+         and moderation_status <> 'rejected') <> v_count then
     raise exception 'WORK_SHARE_JOB_NOT_FOUND';
+  end if;
+
+  if (select count(*) from public.work_shares where user_id = p_user_id and created_at > now() - interval '1 hour') >= 20
+     or (select count(*) from public.work_shares where user_id = p_user_id and created_at > now() - interval '1 day') >= 100 then
+    raise exception 'WORK_SHARE_RATE_LIMITED';
   end if;
 
   if (select count(*) from public.work_shares where user_id = p_user_id and revoked_at is null) >= 200 then
@@ -14357,7 +14363,7 @@ CREATE OR REPLACE FUNCTION "public"."list_work_shares"("p_user_id" "uuid", "p_li
       select count(*)::integer as works, (array_agg(j.id order by k.ord))[1] as cover
         from unnest(s.job_ids) with ordinality as k(job_id, ord)
         join public.generation_jobs j on j.id = k.job_id
-       where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null
+       where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null and j.moderation_status <> 'rejected'
     ) live
    where s.user_id = p_user_id
      and (p_before_at is null or (s.created_at, s.id) < (p_before_at, p_before_id))
@@ -15847,7 +15853,7 @@ CREATE OR REPLACE FUNCTION "public"."read_work_share"("p_share_id" "text") RETUR
              ) order by k.ord)
         from unnest(s.job_ids) with ordinality as k(job_id, ord)
         join public.generation_jobs j on j.id = k.job_id
-       where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null
+       where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null and j.moderation_status <> 'rejected'
     ), '[]'::jsonb)
   )
     from public.work_shares s
