@@ -1,5 +1,6 @@
 'use client'
 
+
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 
@@ -13,13 +14,14 @@ import type { CatalogueTemplate } from '../../catalogue/catalogue-template'
 import type { PosterSeries } from '../../catalogue/poster-series'
 import { MemberPicker } from '../../workspace/member-picker'
 import { CreateSheet } from '../../workspace/create-sheet'
-import { PoolChoiceSlot } from '../../workspace/pool-choice-picker'
 import { carryDraft, usePosterStudio, type StudioTemplate } from '../use-poster-studio'
 import { usePhotoSort } from '../use-photo-sort'
 import { usePosterWeekly } from '../use-poster-weekly'
 import { studioFor, useStudioTemplate } from '../use-studio-template'
 import { PosterSample } from './poster-sample'
 import { StudioBar, StudioForm } from './poster-studio'
+import { PoolChoiceMount } from '../../workspace/pool-choice-mount'
+
 
 // poolChoice: 出图时让员工自选 (§6.5), only when the member holds both kinds of org credits.
 type Context = { balance: Balance; concurrency: number; poolChoice?: PoolChoiceOffer | null }
@@ -79,7 +81,7 @@ function PosterSheet({ template, summary, open, series, onSwitch, onClose, balan
       sample={<PosterSample cover={summary?.cover ?? null} name={template.name} />}
       form={<>
         <StudioForm studio={studio} template={template} balance={balance} photoBalance={poolChoice ? orgBalance(poolChoice) : held} reuse={{ weekly, names, photo }} />
-        <PoolChoiceSlot choice={choice.picker} />
+        <PoolChoiceMount choice={choice.picker} />
       </>}
       bar={<ActionBar inline><StudioBar studio={studio} template={template} balance={balance} /></ActionBar>}
     />
