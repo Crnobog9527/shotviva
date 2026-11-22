@@ -90,6 +90,10 @@ export type PartnerSiteConfig = {
   imageHosts: readonly string[]
 }
 
+// The person enterprise customers arrange bank transfers with (Owner 2026-11-22): enterprise
+// customers are onboarded by hand, so the purchasing page names this contact instead of a ticket.
+export type EnterpriseContact = { name: string; email: string; wechat: string }
+
 export type SiteConfig = {
   brand: SiteBrand
   modules: Record<ModuleId, boolean>
@@ -113,6 +117,9 @@ export type SiteConfig = {
     channels: { primary: PaymentChannel; fallback: PaymentChannel | null }
   }
   partners: { graylum: PartnerSiteConfig }
+  // Optional so a site without enterprise sales leaves it out; the purchasing page then falls
+  // back to the support ticket.
+  enterprise?: { transferContact: EnterpriseContact }
   // Whether the site has a public gallery at all (ARCHITECTURE §9 第 1 条); one that has it is
   // still closed until an admin opens it. Read through core/gallery isGalleryEnabled, never directly.
   gallery: { enabled: boolean }

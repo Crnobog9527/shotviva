@@ -39,6 +39,12 @@ export function CommissionTable(props: Props) {
       headers={headers}
       empty={t('empty')}
       rows={rows.map((row) => cells(props, row))}
+      summaries={rows.map((row) => ({
+        title: productLabel(row.product_id, t),
+        meta: date(locale, row.created_at),
+        value: money(locale, row.amount),
+        badge: <StatusPill status={row.status} t={t} />,
+      }))}
       details={rows.map((row) => (
         <div key={row.id} className="af-row-extra">
           <OrderFeeDetail row={row} order={orders.get(row.payment_id)} locale={locale} t={t} />

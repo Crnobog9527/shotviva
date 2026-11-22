@@ -37,3 +37,10 @@ describe('zhPaths covers the app pages', () => {
     expect(matchesPaths(route.replace(/\[[^\]]+\]/g, 'sample'), site.locales.zhPaths)).toBe(true)
   })
 })
+
+// The purchasing page's transfer contact, verbatim from the Owner (2026-11-22).
+describe('enterprise transfer contact', () => {
+  it('names the China region manager, the company email and the WeChat ID', () => {
+    expect(site.enterprise?.transferContact).toEqual({ name: '倪十三', email: 'simonlee@shotviva.com', wechat: 'crnobogkin' })
+  })
+})
