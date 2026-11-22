@@ -4398,6 +4398,23 @@ $$;
 ALTER FUNCTION "public"."_org_lock_owned"("p_owner" "uuid", "p_allow_suspended" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_member_rejoin_reset"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if old.status = 'removed' and new.status = 'active' then
+    new.promo_allowance := 0;
+    new.held_promo_credits := 0;
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_org_member_rejoin_reset"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_payment_fields"("p_kind" "text") RETURNS "text"[]
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -23433,6 +23450,10 @@ CREATE OR REPLACE TRIGGER "org_invite_attribution" AFTER INSERT ON "public"."cod
 
 
 
+CREATE OR REPLACE TRIGGER "org_members_rejoin_reset" BEFORE UPDATE OF "status" ON "public"."org_members" FOR EACH ROW EXECUTE FUNCTION "public"."_org_member_rejoin_reset"();
+
+
+
 CREATE OR REPLACE TRIGGER "org_signup_bonus" AFTER UPDATE OF "referred_source" ON "public"."profiles" FOR EACH ROW WHEN ((("new"."referred_source" = 'org_l1'::"text") AND ("old"."referred_source" IS NULL) AND ("old"."referred_by" IS NULL) AND ("new"."referred_by" IS NOT NULL))) EXECUTE FUNCTION "public"."_org_signup_bonus"();
 
 
@@ -25918,6 +25939,10 @@ REVOKE ALL ON FUNCTION "public"."_org_held_follows_ledger"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."_org_lock_owned"("p_owner" "uuid", "p_allow_suspended" boolean) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_member_rejoin_reset"() FROM PUBLIC;
 
 
 
