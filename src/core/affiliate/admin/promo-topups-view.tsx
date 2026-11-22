@@ -20,6 +20,7 @@ const short = (id: string) => id.slice(0, 8)
 function sheetLine(s: PromoSheet | undefined): string {
   if (!s) return T.sheetNone
   const status = P.status[s.status] ?? s.status
+  if (s.voided_at) return T.sheetVoided(n(s.total))
   return s.status === 'granted' ? `${n(s.total)}（${status}）` : T.sheetNotGranted(status)
 }
 
@@ -49,7 +50,7 @@ type CardProps = { partner: PromoPartner; sheet?: PromoSheet; topups: PromoTopup
 
 function PartnerTopups({ partner, sheet, topups, period, action, move }: CardProps) {
   const { list, sum } = topupsOf(topups, partner.id, period)
-  const granted = sheet?.status === 'granted' ? sheet.total : 0
+  const granted = sheet?.status === 'granted' && !sheet.voided_at ? sheet.total : 0
   return (
     <article className="grid min-w-0 gap-3 rounded-lg border p-4">
       <h3 className="font-semibold break-words">{partner.name}</h3>

@@ -24,7 +24,7 @@ begin
   if not found then raise exception 'ORG_NOT_FOUND'; end if;
   with mine as (
     select 'grant' as source, g.id, g.recipient_user_id as u, g.expires_at as e from public.partner_promo_grants g
-     where g.org_id = p_org and g.period = v_period and g.status = 'granted' and g.destination = 'owner'
+     where g.org_id = p_org and g.period = v_period and g.status = 'granted' and g.voided_at is null and g.destination = 'owner'
        and g.moved_at is null and g.expired_at is null and g.expires_at > now()
     union all
     select 'topup', t.id, t.recipient_user_id, t.expires_at from public.partner_promo_topups t
