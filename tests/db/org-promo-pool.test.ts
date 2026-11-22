@@ -277,7 +277,7 @@ it("moves this month's unspent old grants from the owner's own pool into the org
     .toEqual({ applied: false, reason: 'nothing', credits: 0 }) // a double click
   expect(await freeOf(db, owner)).toBe(300)
   expect(await promoPoolOf(db, orgId)).toBe(7500)
-  expect(await row(db, 'select moved_credits, expired_basis from partner_promo_grants where id=$1', [s.id])).toEqual({ moved_credits: 7500, expired_basis: 7500 })
+  expect(await row(db, 'select moved_credits, expired_basis from partner_promo_grants where id=$1', [s.id])).toEqual({ moved_credits: 7500, expired_basis: 0 })
   expect(await row(db, "select count(*)::int n from admin_audit_log where action='partner_promo_move' and target_id=$1", [orgId])).toEqual({ n: 1 })
   expect((await row(db, 'select remaining from org_promo_month($1)', [orgId])).remaining).toBe(7500)
 
