@@ -92,7 +92,8 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
     expect(text).toContain('120,000')
     expect(text).toContain('$1,234')
     expect(text).toContain('98,765')
-    expect(text).toContain('/join/org/' + 'a'.repeat(32))
+    // Built in Chinese whatever the console's language (ENTERPRISE_LINK_LOCALE).
+    expect(text).toContain('/zh/join/org/' + 'a'.repeat(32))
     expect(text).toContain('ann@acme.test')
     expect(html).toContain('/account?help=new')
     // Packages are USD only: no yuan sign anywhere.
@@ -144,13 +145,22 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
     expect(text).not.toMatch(/Coming soon|即将上线|commission|佣金/i)
   })
 
-  it('renders the account row and the join confirmation', () => {
+  it('renders the account row', () => {
     const row = render(locale, createElement(OwnerEntryRow, { name: 'Acme Studio', pool: '120,000', suspended: false }))
     expect(row.errors).toEqual([])
     expect(row.html).toContain('href="/account/enterprise"')
-    const join = render(locale, createElement(JoinForm, { join: async () => ({ ok: true as const }), orgName: 'Acme Studio' }))
+  })
+})
+
+describe.each(['en', 'zh'] as const)('join confirmation (%s)', (locale) => {
+  it('asks for the click and never joins on its own', () => {
+    // Joining always takes the click (review of #829): rendering the form never joins.
+    const joinSpy = vi.fn(async () => ({ ok: true as const }))
+    const join = render(locale, createElement(JoinForm, { join: joinSpy, orgName: 'Acme Studio' }))
     expect(join.errors).toEqual([])
     expect(join.text).toContain('Acme Studio')
+    expect(join.html).toMatch(/<button[^>]*>[^<]*Acme Studio/)
+    expect(joinSpy).not.toHaveBeenCalled()
   })
 })
 

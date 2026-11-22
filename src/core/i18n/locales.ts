@@ -3,6 +3,10 @@
 export const LOCALES = ['en', 'zh'] as const
 export type Locale = (typeof LOCALES)[number]
 export const DEFAULT_LOCALE: Locale = 'en'
+// Links an enterprise hands out (the staff invite link, the enterprise affiliate's customer link)
+// open in Chinese: the enterprise customers are Chinese-speaking (Owner 2026-11-22). A visitor who
+// chose English is still moved to the English twin by the proxy (cookie).
+export const ENTERPRISE_LINK_LOCALE: Locale = 'zh'
 
 // The cookie a visitor's explicit choice is stored in (globe menu and hint, footer switch,
 // account Language row). Functional, never analytics; the proxy reads it to send later visits to

@@ -16,7 +16,7 @@ import { InviteLinkBox } from './invite-link-box'
 import { RefCodeBox } from './ref-code-box'
 import { FIELD, Panel, Result, Stat } from './parts'
 import { useConsoleAction } from './use-console-action'
-import type { Locale } from '@/core/i18n/locales'
+import { ENTERPRISE_LINK_LOCALE } from '@/core/i18n/locales'
 import { localizePath } from '@/core/i18n/paths'
 
 // The owner's console, panel by panel (ARCHITECTURE §6.5): pool and deposit, packages, invite
@@ -97,13 +97,12 @@ export function PackagesPanel({ packages }: { packages: readonly ConsolePackage[
 
 export function InvitePanel({ data, actions }: { data: OwnerConsole; actions: OwnerActions }) {
   const t = useTranslations('app.org.invite')
-  const locale = useLocale() as Locale
   const [token, setToken] = useState(data.inviteToken)
   const [confirming, setConfirming] = useState(false)
   const { pending, outcome, run } = useConsoleAction()
   const suspended = data.org.status === 'suspended'
   // The origin is read in the browser, after hydration; the server render shows the path only.
-  const path = localizePath(`/join/org/${token}`, locale)
+  const path = localizePath(`/join/org/${token}`, ENTERPRISE_LINK_LOCALE)
   return (
     <Panel title={t('title')} hint={t('hint')}>
       <InviteLinkBox path={path} />
