@@ -10,7 +10,7 @@ import { workThumbKeyFor, writeWorkThumb, type ObjectStore } from '../../storage
 // archive_org_works files every finished org work of the account under its org, then the files are
 // copied to org-works/<org_id>/ inside the bucket (no bytes pass the function), before account
 // deletion removes outputs/<user>/. Throws when a result cannot be copied, so nothing is deleted
-// and the user can retry; a repeat copies again. A paid work's small copy is best effort (the
+// and the user can retry; works copied are marked (copied_at, 1973), so a repeat copies only the rest. A paid work's small copy is best effort (the
 // owner's file route falls back to the full file). A free work's protected small copy is the only
 // file of it ever served, so it is required: made from the result when missing, and a failure throws.
 
@@ -22,15 +22,40 @@ export const archiveKeyFor = (orgId: string, jobId: string, outputKey: string) =
 
 export const archiveThumbKey = (archiveKey: string) => archiveKey.replace(/\.[a-z0-9]{2,5}$/i, '') + '-thumb.webp'
 
+// R2 copies in flight at once: enough for an account with hundreds of org works to finish within
+// the route's time limit, few enough not to trip R2's request rate.
+export const ARCHIVE_COPY_CONCURRENCY = 12
+
+// Returns how many works it copied this time (0 on a pass after everything was copied).
 export async function archiveOrgWorksOf(deps: { db: SupabaseClient; store: ObjectStore }, userId: string): Promise<number> {
-  const rows = await callRpc(deps.db, 'archive_org_works', { p_user_id: z.uuid().parse(userId) }, pairs)
-  for (const row of rows) {
-    // Already copied by an earlier try whose deletion then failed: the source may be gone.
-    if (!(await deps.store.head(row.archive_key))) await deps.store.copy(row.source_key, row.archive_key)
-    if (row.credit_pool === 'free') await keepFreeThumb(deps.store, userId, row)
-    else await keepPaidThumb(deps.store, userId, row)
+  const user = z.uuid().parse(userId)
+  const rows = await callRpc(deps.db, 'archive_org_works', { p_user_id: user }, pairs)
+  const copied: string[] = []
+  let failure: unknown = null
+  let next = 0
+  const worker = async () => {
+    while (failure === null && next < rows.length) {
+      const row = rows[next++]!
+      try {
+        await keepWork(deps.store, user, row)
+        copied.push(row.job_id)
+      } catch (error) {
+        failure ??= error
+      }
+    }
   }
-  return rows.length
+  await Promise.all(Array.from({ length: Math.min(ARCHIVE_COPY_CONCURRENCY, rows.length) }, worker))
+  // What was copied is marked even when another copy failed, so the retry does only the rest.
+  if (copied.length > 0) await callRpc(deps.db, 'mark_org_works_copied', { p_user_id: user, p_job_ids: copied }, z.number().int())
+  if (failure !== null) throw failure
+  return copied.length
+}
+
+async function keepWork(store: ObjectStore, userId: string, row: Pair) {
+  // Already copied by an earlier try that stopped before marking it: the source may be gone.
+  if (!(await store.head(row.archive_key))) await store.copy(row.source_key, row.archive_key)
+  if (row.credit_pool === 'free') await keepFreeThumb(store, userId, row)
+  else await keepPaidThumb(store, userId, row)
 }
 
 type Pair = z.infer<typeof pairs>[number]

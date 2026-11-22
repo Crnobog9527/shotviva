@@ -112,7 +112,7 @@ describe('account deletion', () => {
     upload(workThumbKeyFor(staff, orgWork, 'paid'), new Uint8Array([2]), 'image/webp')
 
     expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(1)
-    expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(1)
+    expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(0)
     const archived = `org-works/${orgId}/${orgWork}.png`
     expect(await store.head(archived)).not.toBeNull()
     expect(await store.head(archiveThumbKey(archived))).not.toBeNull()
@@ -197,7 +197,7 @@ describe('account deletion', () => {
     expect(await archiveRow(dropped)).toMatchObject({ deleted_by: owner })
     // Its copy goes with it.
     expect(await store.head(`org-works/${orgId}/${dropped}.png`)).toBeNull()
-    expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(1)
+    expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(0)
     await deleteAuthUser(staff)
     expect((await orgOwnerWorks(service, owner)).map((w) => w.id)).toEqual([kept])
     // No creator id survives in the audit of the earlier delete.
@@ -220,6 +220,33 @@ describe('account deletion', () => {
     upload(`outputs/${staff}/${free}.png`, await jpeg(64, 80), 'image/png')
     await archiveOrgWorksOf({ db: rest, store }, staff)
     expect(await store.head(archiveThumbKey(`org-works/${orgId}/${free}.png`))).not.toBeNull()
+  })
+
+  it('copies many works a few at a time, and marks those copied when one copy fails', async () => {
+    const { orgId, owner, token } = await orgWith(db, service, actor, { pool: cost * 20 })
+    const staff = await member(db, service, token)
+    await allocateOrgCredits(service, owner, staff, cost * 20, randomUUID())
+    const ids: string[] = []
+    for (let i = 0; i < 20; i++) ids.push(await made(staff))
+    const { store, upload } = createMemoryStore()
+    for (const id of ids.slice(1)) upload(`outputs/${staff}/${id}.png`, new Uint8Array([1]), 'image/png')
+    // The first work's file is missing, so its copy fails.
+    await expect(archiveOrgWorksOf({ db: rest, store }, staff)).rejects.toThrow()
+    const marked = await db.query('select count(*)::int as n from public.org_work_archive where job_id = any($1) and copied_at is not null', [ids])
+    expect(marked.rows[0].n).toBeGreaterThan(0)
+    upload(`outputs/${staff}/${ids[0]}.png`, new Uint8Array([1]), 'image/png')
+    expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(20 - marked.rows[0].n)
+    expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(0)
+    for (const id of ids) expect(await store.head(`org-works/${orgId}/${id}.png`)).not.toBeNull()
+  })
+
+  it('forgets the creator in the audit also when the account goes without the archive step', async () => {
+    const { owner, staff } = await staffed()
+    const orgWork = await made(staff)
+    await orgOwnerDeleteWork({ db: rest, store: createMemoryStore().store }, { owner, jobId: orgWork })
+    await deleteAuthUser(staff)
+    const audit = await db.query('select maker_user_id from public.org_work_deletions where job_id = $1', [orgWork])
+    expect(audit.rows).toEqual([{ maker_user_id: null }])
   })
 })
 
