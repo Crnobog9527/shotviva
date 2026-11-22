@@ -160,7 +160,7 @@ describe('leaving the org', () => {
     expect((await listOwnJobs(rest, staff, new Date())).done.map((j) => j.id)).toEqual([personal])
     expect((await readWorkShare(service, shareId))?.items).toEqual([])
     expect((await listWorkShares(service, staff))[0]).toMatchObject({ id: shareId, works: 0 })
-    await expect(createWorkShare(service, staff, { jobIds: [orgWork] })).rejects.toMatchObject({ message: 'WORK_SHARE_JOB_NOT_FOUND' })
+    await expect(createWorkShare(service, staff, { jobIds: [orgWork] })).rejects.toMatchObject({ code: 'NOT_FOUND' })
     const downloaded = await db.query('select public.record_job_download($1, $2) as ok', [orgWork, staff])
     expect(downloaded.rows[0].ok).toBe(false)
     await expect(setJobVisibility(service, { jobId: orgWork, userId: staff, visibility: 'private' })).rejects.toMatchObject({ message: 'JOB_NOT_FOUND' })

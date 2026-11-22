@@ -4363,6 +4363,22 @@ $$;
 ALTER FUNCTION "public"."_org_lock_owned"("p_owner" "uuid", "p_allow_suspended" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_member_works_access"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if new.status = old.status then return new; end if;
+  update public.generation_jobs
+     set org_access_ended_at = case when new.status = 'active' then null else coalesce(new.removed_at, now()) end
+   where org_id = new.org_id and user_id = new.user_id;
+  return new;
+end $$;
+
+
+ALTER FUNCTION "public"."_org_member_works_access"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_payment_fields"("p_kind" "text") RETURNS "text"[]
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -4528,6 +4544,49 @@ $$;
 
 
 ALTER FUNCTION "public"."_org_signup_bonus"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_work_stamp"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_promo_org uuid;
+begin
+  if tg_op = 'INSERT' then
+    -- Never taken from the caller: only the reserve debit decides.
+    new.org_id := (select d.org_id from public.org_held_draws d
+                    where d.debit_key = 'job:' || new.id::text || ':reserve' and d.user_id = new.user_id);
+    -- The org's promo credits (#836) are org credits too. Looked up dynamically so this works
+    -- before and after that table exists, without depending on its migration.
+    if new.org_id is null and to_regclass('public.org_promo_draws') is not null then
+      execute 'select org_id from public.org_promo_draws where debit_key = $1 and user_id = $2'
+        into v_promo_org using 'job:' || new.id::text || ':reserve', new.user_id;
+      new.org_id := v_promo_org;
+    end if;
+    new.org_access_ended_at := null;
+    -- An ex-member cannot edit or redraw a work of the org they left: it looks missing, as
+    -- reserve_credits' own parent check would say.
+    if new.parent_job_id is not null and exists (
+      select 1 from public.generation_jobs p where p.id = new.parent_job_id and p.org_access_ended_at is not null) then
+      raise exception 'PARENT_JOB_NOT_FOUND';
+    end if;
+    if new.again_of is not null and exists (
+      select 1 from public.generation_jobs a where a.id = new.again_of and a.org_access_ended_at is not null) then
+      new.again_of := null;
+    end if;
+  elsif old.org_id is not null and new.org_id is distinct from old.org_id then
+    raise exception 'ORG_WORK_IMMUTABLE';
+  end if;
+  if new.org_id is not null then
+    new.gallery_excluded := true;
+    new.visibility := 'private';
+  end if;
+  return new;
+end $_$;
+
+
+ALTER FUNCTION "public"."_org_work_stamp"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_orgs_ref_code_guard"() RETURNS "trigger"
@@ -13771,6 +13830,8 @@ CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
     "last_screen_at" timestamp with time zone,
     "gallery_excluded" boolean DEFAULT false NOT NULL,
     "again_of" "uuid",
+    "org_id" "uuid",
+    "org_access_ended_at" timestamp with time zone,
     CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
     CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
     CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
@@ -13797,6 +13858,14 @@ COMMENT ON COLUMN "public"."generation_jobs"."deleted_at" IS 'When the owner del
 
 
 COMMENT ON COLUMN "public"."generation_jobs"."again_of" IS 'Make again: the caller''s own succeeded work, same template, this job was made again from (1513). Null otherwise.';
+
+
+
+COMMENT ON COLUMN "public"."generation_jobs"."org_id" IS 'The org whose credits paid for this work (企业作品, 1941). Set once at insert from org_held_draws; never public.';
+
+
+
+COMMENT ON COLUMN "public"."generation_jobs"."org_access_ended_at" IS 'When the maker left org_id (1941). Non-null: the work is hidden from the maker, their shares and files.';
 
 
 
@@ -14034,7 +14103,7 @@ begin
 
   if (select count(*) from public.generation_jobs
        where id = any(p_job_ids) and user_id = p_user_id and status = 'succeeded' and deleted_at is null
-         and moderation_status <> 'rejected') <> v_count then
+         and moderation_status <> 'rejected' and org_access_ended_at is null) <> v_count then
     raise exception 'WORK_SHARE_JOB_NOT_FOUND';
   end if;
 
@@ -14103,7 +14172,7 @@ declare
   v_job public.generation_jobs;
 begin
   select * into v_job from public.generation_jobs
-   where id = p_job_id and user_id = p_user_id
+   where id = p_job_id and user_id = p_user_id and org_access_ended_at is null
      for update;
   if not found then
     raise exception 'JOB_NOT_FOUND';
@@ -14113,6 +14182,10 @@ begin
   end if;
   if v_job.status = 'running' then
     raise exception 'JOB_RUNNING';
+  end if;
+  if v_job.org_id is not null
+     and not exists (select 1 from public.orgs o where o.id = v_job.org_id and o.owner_user_id = p_user_id) then
+    raise exception 'ORG_WORK_DELETE_FORBIDDEN';
   end if;
 
   update public.generation_jobs
@@ -14654,6 +14727,7 @@ CREATE OR REPLACE FUNCTION "public"."list_work_shares"("p_user_id" "uuid", "p_li
         from unnest(s.job_ids) with ordinality as k(job_id, ord)
         join public.generation_jobs j on j.id = k.job_id
        where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null and j.moderation_status <> 'rejected'
+         and j.org_access_ended_at is null
     ) live
    where s.user_id = p_user_id
      and (p_before_at is null or (s.created_at, s.id) < (p_before_at, p_before_id))
@@ -15226,6 +15300,64 @@ $_$;
 
 
 ALTER FUNCTION "public"."org_monthly_topup"("p_period" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_owner_work"("p_owner" "uuid", "p_job_id" "uuid") RETURNS TABLE("id" "uuid", "user_id" "uuid", "credit_pool" "text", "output_key" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select j.id, j.user_id, j.credit_pool, j.output_key
+    from public.generation_jobs j
+    join public.orgs o on o.id = j.org_id
+   where j.id = p_job_id and o.owner_user_id = p_owner
+     and j.status = 'succeeded' and j.deleted_at is null and j.output_key is not null;
+$$;
+
+
+ALTER FUNCTION "public"."org_owner_work"("p_owner" "uuid", "p_job_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_owner_work_members"("p_owner" "uuid") RETURNS TABLE("user_id" "uuid", "role" "text", "status" "text", "removed_at" timestamp with time zone, "works" integer)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select m.user_id, m.role, m.status, m.removed_at, w.works
+    from public.orgs o
+    join lateral (
+      select j.user_id, count(*)::integer as works
+        from public.generation_jobs j
+       where j.org_id = o.id and j.status = 'succeeded' and j.deleted_at is null
+       group by j.user_id
+    ) w on true
+    join public.org_members m on m.org_id = o.id and m.user_id = w.user_id
+   where o.owner_user_id = p_owner
+   order by (m.status = 'active') desc, w.works desc, m.user_id
+   limit 200;
+$$;
+
+
+ALTER FUNCTION "public"."org_owner_work_members"("p_owner" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_owner_works"("p_owner" "uuid", "p_member" "uuid" DEFAULT NULL::"uuid", "p_limit" integer DEFAULT 30, "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "user_id" "uuid", "template_id" "text", "template_name" "text", "created_at" timestamp with time zone, "aspect_ratio" "text", "member_active" boolean)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select j.id, j.user_id, j.template_id, t.name, j.created_at, j.inputs ->> 'aspect_ratio',
+         j.org_access_ended_at is null
+    from public.orgs o
+    join public.generation_jobs j on j.org_id = o.id
+    left join public.templates t on t.id = j.template_id
+   where o.owner_user_id = p_owner
+     and j.status = 'succeeded' and j.deleted_at is null
+     and (p_member is null or j.user_id = p_member)
+     and (p_before_at is null or (j.created_at, j.id) < (p_before_at, p_before_id))
+   order by j.created_at desc, j.id desc
+   limit least(greatest(coalesce(p_limit, 30), 1), 60);
+$$;
+
+
+ALTER FUNCTION "public"."org_owner_works"("p_owner" "uuid", "p_member" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid") RETURNS "jsonb"
@@ -16192,6 +16324,7 @@ CREATE OR REPLACE FUNCTION "public"."read_work_share"("p_share_id" "text") RETUR
         from unnest(s.job_ids) with ordinality as k(job_id, ord)
         join public.generation_jobs j on j.id = k.job_id
        where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null and j.moderation_status <> 'rejected'
+         and j.org_access_ended_at is null
     ), '[]'::jsonb)
   )
     from public.work_shares s
@@ -16317,7 +16450,8 @@ begin
    where id = p_job_id
      and user_id = p_user_id
      and status = 'succeeded'
-     and deleted_at is null;
+     and deleted_at is null
+     and org_access_ended_at is null;
   return found;
 end;
 $$;
@@ -17247,12 +17381,13 @@ begin
   end if;
 
   select * into v_job from public.generation_jobs
-   where id = p_job_id and user_id = p_user_id and deleted_at is null
+   where id = p_job_id and user_id = p_user_id and deleted_at is null and org_access_ended_at is null
      for update;
   if not found then
     raise exception 'JOB_NOT_FOUND';
   end if;
 
+  -- An org work is gallery-excluded (1941), so it stays private here too.
   if v_job.gallery_excluded then
     if p_visibility = 'public' then
       raise exception 'WORK_PRIVATE_ONLY';
@@ -22339,6 +22474,14 @@ CREATE INDEX "generation_jobs_moderation_queue_idx" ON "public"."generation_jobs
 
 
 
+CREATE INDEX "generation_jobs_org_member_works_idx" ON "public"."generation_jobs" USING "btree" ("org_id", "user_id", "created_at" DESC, "id" DESC) WHERE ("org_id" IS NOT NULL);
+
+
+
+CREATE INDEX "generation_jobs_org_works_idx" ON "public"."generation_jobs" USING "btree" ("org_id", "created_at" DESC, "id" DESC) WHERE ("org_id" IS NOT NULL);
+
+
+
 CREATE INDEX "generation_jobs_parent_job_id_idx" ON "public"."generation_jobs" USING "btree" ("parent_job_id") WHERE ("parent_job_id" IS NOT NULL);
 
 
@@ -22927,6 +23070,10 @@ CREATE OR REPLACE TRIGGER "generation_jobs_gallery_excluded" BEFORE INSERT OR UP
 
 
 
+CREATE OR REPLACE TRIGGER "generation_jobs_org_work" BEFORE INSERT OR UPDATE OF "org_id", "visibility", "gallery_excluded" ON "public"."generation_jobs" FOR EACH ROW EXECUTE FUNCTION "public"."_org_work_stamp"();
+
+
+
 CREATE OR REPLACE TRIGGER "link_disputes_payment_charge" AFTER UPDATE OF "stripe_charge_id" ON "public"."payments" FOR EACH ROW WHEN ((("old"."stripe_charge_id" IS NULL) AND ("new"."stripe_charge_id" IS NOT NULL))) EXECUTE FUNCTION "public"."_link_early_payment_disputes"();
 
 
@@ -22944,6 +23091,10 @@ CREATE OR REPLACE TRIGGER "org_affiliate_account" AFTER INSERT OR UPDATE OF "aff
 
 
 CREATE OR REPLACE TRIGGER "org_invite_attribution" AFTER INSERT ON "public"."code_redemptions" FOR EACH ROW WHEN ((("new"."kind" = 'invite'::"text") AND ("new"."status" = 'ok'::"text") AND ("new"."inviter_user_id" IS NOT NULL))) EXECUTE FUNCTION "public"."_org_attribute_invite"();
+
+
+
+CREATE OR REPLACE TRIGGER "org_members_works_access" AFTER UPDATE OF "status" ON "public"."org_members" FOR EACH ROW EXECUTE FUNCTION "public"."_org_member_works_access"();
 
 
 
@@ -23502,6 +23653,11 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 ALTER TABLE ONLY "public"."generation_jobs"
     ADD CONSTRAINT "generation_jobs_moderated_by_fkey" FOREIGN KEY ("moderated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."generation_jobs"
+    ADD CONSTRAINT "generation_jobs_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
 
 
 
@@ -24290,6 +24446,10 @@ ALTER TABLE "public"."generation_jobs" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "generation_jobs_hide_style_refs" ON "public"."generation_jobs" AS RESTRICTIVE FOR SELECT TO "authenticated" USING (((NOT ("inputs" ? 'style_ref_keys'::"text")) OR (("inputs" -> 'style_ref_keys'::"text") = '[]'::"jsonb")));
+
+
+
+CREATE POLICY "generation_jobs_org_access" ON "public"."generation_jobs" AS RESTRICTIVE FOR SELECT TO "authenticated" USING (("org_access_ended_at" IS NULL));
 
 
 
@@ -25400,6 +25560,10 @@ REVOKE ALL ON FUNCTION "public"."_org_lock_owned"("p_owner" "uuid", "p_allow_sus
 
 
 
+REVOKE ALL ON FUNCTION "public"."_org_member_works_access"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_org_payment_fields"("p_kind" "text") FROM PUBLIC;
 
 
@@ -25425,6 +25589,10 @@ REVOKE ALL ON FUNCTION "public"."_org_settle_returns"("p_org" "uuid") FROM PUBLI
 
 
 REVOKE ALL ON FUNCTION "public"."_org_signup_bonus"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_work_stamp"() FROM PUBLIC;
 
 
 
@@ -26901,6 +27069,21 @@ GRANT ALL ON FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" 
 
 REVOKE ALL ON FUNCTION "public"."org_monthly_topup"("p_period" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_monthly_topup"("p_period" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_owner_work"("p_owner" "uuid", "p_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_owner_work"("p_owner" "uuid", "p_job_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_owner_work_members"("p_owner" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_owner_work_members"("p_owner" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_owner_works"("p_owner" "uuid", "p_member" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_owner_works"("p_owner" "uuid", "p_member" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid") TO "service_role";
 
 
 
