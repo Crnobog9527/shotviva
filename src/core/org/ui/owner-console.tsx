@@ -1,6 +1,7 @@
 import { ChevronRight } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
+import type { EnterpriseContact } from '@/core/config'
 import { Link } from '@/core/i18n/ui'
 
 import type { OwnerConsole, OwnerReport } from '../console/types'
@@ -27,11 +28,11 @@ export function OwnerConsoleView({ data, actions, report, affiliate }: { data: O
 }
 
 // /account/enterprise/purchasing, 「企业集采信息」: package prices and how to pay for them.
-export function PurchasingView({ data }: { data: OwnerConsole }) {
+export function PurchasingView({ data, contact }: { data: OwnerConsole; contact?: EnterpriseContact }) {
   return (
     <>
       <SuspendedBanner data={data} />
-      <PackagesPanel packages={data.packages} />
+      <PackagesPanel packages={data.packages} contact={contact} />
       <PaymentAccountsPanel groups={data.paymentAccounts} orgName={data.org.name} refCode={data.org.refCode} />
     </>
   )

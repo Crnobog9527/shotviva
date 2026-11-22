@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server'
 
 import { AppPage } from '@/core/app-shell'
 import { EnterpriseFrame, PurchasingView } from '@/core/org/ui'
+import { site } from '@/site/site.config'
 
 import { readOwnerArea } from '../owner-area'
 
@@ -17,7 +18,7 @@ async function Purchasing() {
   const [{ view, affiliate }, t] = await Promise.all([readOwnerArea('/account/enterprise/purchasing'), getTranslations('app.org.area')])
   return (
     <EnterpriseFrame orgName={view.org.name} current="purchasing" affiliate={affiliate} intro={t('purchasingIntro')}>
-      <PurchasingView data={view} />
+      <PurchasingView data={view} contact={site.enterprise?.transferContact} />
     </EnterpriseFrame>
   )
 }

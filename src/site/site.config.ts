@@ -123,6 +123,11 @@ export const site = defineSite({
     ],
     channels: { primary: 'stripe', fallback: 'waffo' },
   },
+  // The China region manager enterprise customers agree the exchange rate and the transfer with
+  // (Owner 2026-11-22, verbatim). Shown on /account/enterprise/purchasing only.
+  enterprise: {
+    transferContact: { name: '倪十三', email: 'simonlee@shotviva.com', wechat: 'crnobogkin' },
+  },
   partners: {
     graylum: {
       // Graylum production (apex and www) and staging (the domain bound to Graylum's staging

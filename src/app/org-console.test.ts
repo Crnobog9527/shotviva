@@ -159,6 +159,16 @@ describe.each(['en', 'zh'] as const)('purchasing and the staff link (%s)', (loca
     expect(html).not.toContain('href="/partners/enterprise"')
   })
 
+  it('opens the China region contact instead of a ticket when the site names one (Owner 2026-11-22)', () => {
+    const contact = { name: 'Sample Manager', email: 'sales@example.test', wechat: 'sample-wechat' }
+    const { html, text, errors } = render(locale, createElement(PurchasingView, { data: owner(), contact }))
+    expect(errors).toEqual([])
+    expect(text).toMatch(locale === 'en' ? /Contact us to arrange a transfer/ : /联系我们转账/)
+    expect(html).not.toContain('/account?help=new')
+    // The email is plain text with a copy button, never a mailto link.
+    expect(html).not.toContain('mailto:')
+  })
+
   it('shows USD packages with the transfer note on the purchasing page', () => {
     const { text, html, errors } = render(locale, createElement(PurchasingView, { data: owner() }))
     expect(errors).toEqual([])

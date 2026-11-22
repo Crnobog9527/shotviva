@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useFormatter, useLocale, useTranslations } from 'next-intl'
 import { Coins } from 'lucide-react'
 
+import type { EnterpriseContact } from '@/core/config'
 import { Link } from '@/core/i18n/ui'
 import { Button } from '@/core/ui/button'
 
@@ -12,6 +13,7 @@ import { unitPricePer100Credits } from '../unit-price'
 import { PAYMENT_FIELD_LABELS, PAYMENT_FIELDS, PAYMENT_KIND_LABELS } from '../payment-labels'
 import type { OwnerActions } from './actions'
 import { RefCodeBox } from './ref-code-box'
+import { TransferContactButton } from './transfer-contact'
 import { FIELD, Panel, Result, Stat } from './parts'
 import { useConsoleAction } from './use-console-action'
 
@@ -66,7 +68,7 @@ function price(format: ReturnType<typeof useFormatter>, cents: number) {
 }
 
 // Prices are in US dollars, shown only: the order goes through us offline (wire transfer).
-export function PackagesPanel({ packages }: { packages: readonly ConsolePackage[] }) {
+export function PackagesPanel({ packages, contact }: { packages: readonly ConsolePackage[]; contact?: EnterpriseContact }) {
   const t = useTranslations('app.org.packages')
   const format = useFormatter()
   return (
@@ -86,7 +88,9 @@ export function PackagesPanel({ packages }: { packages: readonly ConsolePackage[
         </ul>
       )}
       <p className="text-label text-muted-foreground">{t('contact')}</p>
-      <Link href="/account?help=new" className="inline-flex min-h-11 items-center text-label font-medium text-primary underline underline-offset-4">{t('contactLink')}</Link>
+      {contact ? <TransferContactButton contact={contact} /> : (
+        <Link href="/account?help=new" className="inline-flex min-h-11 items-center text-label font-medium text-primary underline underline-offset-4">{t('contactLink')}</Link>
+      )}
     </Panel>
   )
 }

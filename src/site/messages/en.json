@@ -1976,6 +1976,17 @@
         "workspaceIntro": "Where you run Shotviva as a production tool: manage the credit pool, your staff and what they make each month, for image work at scale.",
         "purchasingIntro": "Company package prices and bank transfer details. Top up the credit pool offline, the way described here.",
         "affiliateIntro": "Bring in customers and follow commissions and payouts. Sign-ups and purchases through your referral link count toward the company."
+      },
+      "contact": {
+        "open": "Contact us to arrange a transfer",
+        "title": "Contact us to arrange a transfer",
+        "body": "Contact our China region manager to agree the exchange rate and how the transfer is made.",
+        "name": "China region manager",
+        "email": "Company email",
+        "wechat": "WeChat ID",
+        "copy": "Copy",
+        "copied": "Copied",
+        "copyFailed": "Select and copy it"
       }
     },
     "templateShare": {
