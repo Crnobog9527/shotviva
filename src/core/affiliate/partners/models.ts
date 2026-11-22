@@ -39,10 +39,16 @@ export const accountSchema = z.object({
 export const settingsSchema = z.object({
   settlement_day: z.number().int(),
   payout_min_usd: cents,
+  // Enterprise (org) accounts settle against this one instead (1880).
+  org_payout_min_usd: cents,
   hold_days: z.number().int(),
   terms_version: z.string(),
   apply_min_level: z.enum(['none', 'any_paid', 'starter', 'pro', 'max']),
 })
+// The balance an account must reach to be settled: enterprise accounts have their own (1880).
+export function payoutThreshold(account: Pick<Account, 'org_id'>, settings: Settings) {
+  return account.org_id ? settings.org_payout_min_usd : settings.payout_min_usd
+}
 export const summarySchema = z.object({
   clicks: cents,
   referred: cents,
