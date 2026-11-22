@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createServerTracker, type ServerTrackerDeps } from '../server-track'
-import { pvuvServerEvent } from './events'
+import { logger } from '../../logger'
+import { pvuvServerEvent, sendPvuvEvent } from './events'
 import { pvuvProps } from './props'
 
 type Fetch = NonNullable<ServerTrackerDeps['fetch']>
@@ -85,5 +86,29 @@ describe('dedupe id', () => {
     expect(pvuvServerEvent('checkout_start', {}, { ...base, eventId: 'attempt token:1' }, 1).id).toBe('checkout_start-attempt_token_1')
     expect('id' in pvuvServerEvent('signup', {}, base, 1)).toBe(false)
     expect(pvuvServerEvent('purchase', {}, { ...base, eventId: 'x'.repeat(100) }, 1).id).toHaveLength(64)
+  })
+})
+
+describe('sendPvuvEvent logging', () => {
+  const event = pvuvServerEvent('signup', { method: 'email' }, { userId: 'u1', locale: 'en' }, 1)
+  const config = { site: 'S1', token: 'tok' }
+
+  it('warns with status and reasons when PVUV refuses, without token or user id', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined)
+    await sendPvuvEvent(config, event, async () => ({ ok: false, status: 401 }))
+    await sendPvuvEvent(config, event, async () => ({ ok: true, status: 200, json: async () => ({ accepted: 0, rejected: [{ index: 0, error: 'bad_name' }] }) }))
+    expect(warn).toHaveBeenCalledWith('pvuv event rejected', { event: 'signup', status: 401, reasons: [] })
+    expect(warn).toHaveBeenCalledWith('pvuv event rejected', { event: 'signup', status: 200, reasons: ['bad_name'] })
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/tok|u1/)
+    warn.mockRestore()
+  })
+
+  it('stays quiet when accepted, and logs a thrown fetch without throwing', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined)
+    await sendPvuvEvent(config, event, async () => ({ ok: true, status: 200, json: async () => ({ accepted: 1, rejected: [] }) }))
+    expect(warn).not.toHaveBeenCalled()
+    await expect(sendPvuvEvent(config, event, async () => { throw new Error('down') })).resolves.toBeUndefined()
+    expect(warn).toHaveBeenCalledWith('pvuv event not sent', expect.objectContaining({ event: 'signup' }))
+    warn.mockRestore()
   })
 })

@@ -109,5 +109,5 @@ export async function proxy(request: NextRequest, event?: NextFetchEvent) {
 // the image CDN fetches with its header: like the other static files, never a page.
 // api/version is the open tabs' version check (T90): no session work, no locale routing.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|presized/|api/version$|fonts/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|presized/|api/version$|fonts/|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest|mp4|webm)$).*)'],
 }

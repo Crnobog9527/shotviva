@@ -2,7 +2,9 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { HERO_MEDIA } from './intro-shots'
+import { heroMedia } from './intro-shots'
+
+const HERO_MEDIA = heroMedia('zh')
 import { LoopMedia } from './loop-video'
 
 const render = (reduced: boolean) => renderToStaticMarkup(createElement(LoopMedia, { media: HERO_MEDIA, label: 'Hero', reduced }))

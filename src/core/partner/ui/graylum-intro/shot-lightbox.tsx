@@ -1,11 +1,11 @@
 'use client'
 
 import { ChevronLeft, ChevronRight, XIcon } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import type { KeyboardEvent } from 'react'
 
-import { INTRO_SCENES } from './intro-shots'
+import { introScenes } from './intro-shots'
 import { canStep, type LightboxAction } from './lightbox-state'
 import { LoopVideo } from './loop-video'
 import { useSwipeDown } from './use-swipe-down'
@@ -18,8 +18,10 @@ type Props = { state: { index: number }; dispatch: (action: LightboxAction) => v
 // opened it. The video is asked for only here and is removed on close.
 export function ShotLightbox({ state, dispatch, opener }: Props) {
   const t = useTranslations('partner.intro')
-  const count = INTRO_SCENES.length
-  const scene = INTRO_SCENES[state.index]
+  const locale = useLocale()
+  const scenes = introScenes(locale)
+  const count = scenes.length
+  const scene = scenes[state.index]
   const close = () => dispatch({ type: 'close' })
   const swipe = useSwipeDown(close)
   if (!scene) return null
@@ -44,7 +46,7 @@ export function ShotLightbox({ state, dispatch, opener }: Props) {
           }}
           {...swipe.handlers}
           style={{ transform: swipe.pulled ? `translateY(${swipe.pulled}px)` : undefined }}
-          className="dialog-motion fixed inset-x-0 bottom-0 z-120 grid max-h-[calc(100dvh-var(--sat)-12px)] gap-3 rounded-t-sheet bg-popover px-4 pt-6 pb-[calc(var(--sab)+12px)] shadow-sheet outline-none before:absolute before:top-2 before:left-1/2 before:h-[5px] before:w-[38px] before:-translate-x-1/2 before:rounded-full before:bg-wash-strong sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-h-[calc(100dvh-48px)] sm:w-[min(1080px,calc(100vw-48px))] sm:-translate-1/2 sm:rounded-panel sm:px-6 sm:pt-4 sm:pb-4 sm:before:hidden"
+          className="dialog-motion fixed inset-x-0 bottom-0 z-120 grid grid-cols-[minmax(0,1fr)] max-h-[calc(100dvh-var(--sat)-12px)] gap-3 rounded-t-sheet bg-popover px-4 pt-6 pb-[calc(var(--sab)+12px)] shadow-sheet outline-none before:absolute before:top-2 before:left-1/2 before:h-[5px] before:w-[38px] before:-translate-x-1/2 before:rounded-full before:bg-wash-strong sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-h-[calc(100dvh-48px)] sm:w-[min(1080px,calc(100vw-48px))] sm:-translate-1/2 sm:rounded-panel sm:px-6 sm:pt-4 sm:pb-4 sm:before:hidden"
         >
           <header className="flex items-start justify-between gap-4">
             <div aria-live="polite" className="min-w-0 pt-1">
@@ -58,7 +60,7 @@ export function ShotLightbox({ state, dispatch, opener }: Props) {
             </DialogPrimitive.Close>
           </header>
           {/* key: stepping to another scene mounts a fresh video, and the old one is paused and gone */}
-          <LoopVideo key={scene.key} media={scene.media} label={t(`shots.${scene.key}.alt`)} className="mx-auto w-[min(100%,calc((100dvh-var(--sat)-200px)*1.6))] sm:w-[min(100%,calc((100dvh-210px)*1.6))]" />
+          <LoopVideo key={`${locale}-${scene.key}`} media={scene.media} label={t(`shots.${scene.key}.alt`)} className="mx-auto w-full max-w-[calc((100dvh-var(--sat)-200px)*1.6)] sm:max-w-[calc((100dvh-210px)*1.6)]" />
           <nav aria-label={t('lightbox.label')} className="flex items-center justify-center gap-3 text-caption text-muted-foreground tabular-nums">
             <StepButton label={t('lightbox.prev')} disabled={!canStep(state, -1, count)} onClick={() => step(-1)}><ChevronLeft className="size-5" aria-hidden /></StepButton>
             <span className="min-w-12 text-center">{t('lightbox.count', { n: state.index + 1, total: count })}</span>
