@@ -222,6 +222,9 @@ describe.each(['en', 'zh'] as const)('defaults and bulk (%s)', (locale) => {
     expect(html).toContain('type="search"')
     expect(html).toContain('type="date"')
     expect(html).not.toContain('<fieldset') // every editor closed
+    // The list is its own surface: titled, bordered, and scrolling on its own.
+    expect(text).toContain(locale === 'en' ? 'Staff (35)' : '员工（35）')
+    expect(html).toMatch(/<section[^>]*border-hairline bg-wash[^>]*>.*<ul[^>]*overflow-y-auto/)
     expect(html.match(/aria-expanded="false"/g)).toHaveLength(30)
     expect(text).toContain('user29@acme.test')
     expect(text).not.toContain('user30@acme.test')

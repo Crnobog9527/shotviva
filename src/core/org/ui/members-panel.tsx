@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
 
@@ -152,10 +152,12 @@ function MemberSummary({ member, label }: { member: ConsoleMember; label: string
     <>
       <span className="flex min-w-0 items-center gap-2">
         <span className="min-w-0 break-all font-medium">{label}</span>
-        {member.role === 'owner' ? <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-caption font-normal">{t('owner')}</span> : null}
+        {member.role === 'owner' ? <span className="shrink-0 rounded-full border border-hairline bg-card px-2 py-0.5 text-caption font-normal">{t('owner')}</span> : null}
       </span>
-      <span className="text-caption text-muted-foreground tabular-nums">
-        {t('held', { count: member.heldCredits })} · {t('heldPromo', { count: member.heldPromoCredits })} · {t('customers', { count: member.customers })}
+      <span className="flex flex-wrap gap-x-2 text-caption text-muted-foreground tabular-nums">
+        <span className="whitespace-nowrap">{t('held', { count: member.heldCredits })}</span>
+        <span className="whitespace-nowrap">{t('heldPromo', { count: member.heldPromoCredits })}</span>
+        <span className="whitespace-nowrap">{t('customers', { count: member.customers })}</span>
       </span>
     </>
   )
@@ -183,8 +185,11 @@ function MemberRow({ member, actions, suspended, pick, open, onToggle }: MemberR
   // answer still on its way survives collapsing the row: a retry is the same request.
   const [opened, setOpened] = useState(open)
   if (open && !opened) setOpened(true)
+  // An editor opened near the bottom of the scrolling list is brought into view.
+  const rowRef = useRef<HTMLLIElement>(null)
+  useEffect(() => { if (open) rowRef.current?.scrollIntoView?.({ block: 'nearest' }) }, [open])
   return (
-    <li className="py-1">
+    <li ref={rowRef} className={`scroll-my-2 px-3 py-1 ${open ? 'bg-card shadow-[inset_3px_0_0_var(--color-primary)]' : ''}`}>
       <div className="flex items-center gap-3">
         {pick ? <Checkbox checked={pick.checked} onCheckedChange={pick.toggle} aria-label={t('pick', { who: label })} className="size-5 shrink-0" /> : null}
         {pick ? (
@@ -214,14 +219,18 @@ export function MembersPanel({ data, actions, initialOpen = null }: { data: Owne
     <Panel title={t('title')} hint={t('hint')}>
       <DefaultsForm data={data} actions={actions} />
       <BulkToolbar selection={selection} disabled={suspended} />
-      <ul className="divide-y divide-hairline">
-        {selection.visible.map((member) => (
-          <MemberRow key={member.userId} member={member} actions={actions} suspended={suspended}
-            open={selection.open === member.userId} onToggle={() => selection.toggleOpen(member.userId)}
-            pick={selection.selecting ? { checked: selection.selected.includes(member.userId), toggle: () => selection.toggle(member.userId) } : null} />
-        ))}
-      </ul>
-      {selection.shown.length === 0 && data.members.length > 0 ? <p className="text-label text-muted-foreground">{t('noMatch')}</p> : null}
+      <section aria-label={t('listTitle', { count: data.memberTotal })} className="overflow-hidden rounded-xl border border-hairline bg-wash">
+        <h3 className="border-b border-hairline px-3 py-2 text-label font-medium">{t('listTitle', { count: data.memberTotal })}</h3>
+        <ul className="max-h-[60vh] divide-y divide-hairline overflow-y-auto overscroll-contain sm:max-h-[28rem]">
+          {selection.visible.map((member) => (
+            <MemberRow key={member.userId} member={member} actions={actions} suspended={suspended}
+              open={selection.open === member.userId} onToggle={() => selection.toggleOpen(member.userId)}
+              pick={selection.selecting ? { checked: selection.selected.includes(member.userId), toggle: () => selection.toggle(member.userId) } : null} />
+          ))}
+        </ul>
+        {selection.shown.length === 0 && data.members.length > 0 ? <p className="px-3 py-3 text-label text-muted-foreground">{t('noMatch')}</p> : null}
+        {data.members.length <= 1 ? <p className="border-t border-hairline px-3 py-3 text-label text-muted-foreground">{t('inviteEmpty')}</p> : null}
+      </section>
       {selection.hidden > 0 ? (
         <Button type="button" size="touch" variant="glass" onClick={selection.showMore}>
           {t('showMore', { count: Math.min(PAGE_SIZE, selection.hidden), shown: selection.visible.length, total: selection.shown.length })}
@@ -229,7 +238,6 @@ export function MembersPanel({ data, actions, initialOpen = null }: { data: Owne
       ) : null}
       <BulkBar selection={selection} data={data} actions={actions} />
       {data.memberTotal > data.members.length ? <p className="text-caption text-muted-foreground">{t('truncated', { shown: data.members.length, total: data.memberTotal })}</p> : null}
-      {data.members.length <= 1 ? <p className="text-label text-muted-foreground">{t('inviteEmpty')}</p> : null}
     </Panel>
     </KeptContext.Provider>
   )

@@ -1886,6 +1886,7 @@
         "promoAllowanceFor": "Monthly promotion allowance for {who}",
         "promoGiveNow": "Top up promotion credits manually",
         "showMore": "Show {count} more ({shown} of {total} shown)",
+        "listTitle": "{count, plural, one {Staff (#)} other {Staff (#)}}",
         "noMatch": "No members match.",
         "promoGiveFor": "Promotion credits to give {who}",
         "isDefault": "(default)",
