@@ -1886,6 +1886,7 @@
         "promoAllowanceFor": "{who} 的推广月额度",
         "promoGiveNow": "手动补充推广积分",
         "showMore": "再显示 {count} 位（已显示 {shown} / {total}）",
+        "listTitle": "员工（{count, number}）",
         "noMatch": "没有符合条件的成员。",
         "promoGiveFor": "划给 {who} 的推广积分",
         "isDefault": "（默认）",
