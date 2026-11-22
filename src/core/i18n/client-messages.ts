@@ -3,7 +3,7 @@
 // which a normal user's page must not carry at all (ARCHITECTURE §10, spec #186), not even as
 // an unused string in the serialized messages. Affiliate pages translate on the server too, and so
 // does the public gallery (T108), so its text adds nothing to any other page.
-export const SERVER_ONLY_NAMESPACES = ['adminEntry', 'affiliate', 'affiliateAgreement', 'gallery', 'share', 'blog', 'workShare'] as const
+export const SERVER_ONLY_NAMESPACES = ['adminEntry', 'affiliate', 'affiliateAgreement', 'gallery', 'share', 'templateShare', 'blog', 'workShare'] as const
 
 // What no client component on a public page (marketing, sign-in, the root error and not-found
 // pages) reads: whole namespaces, and subtrees of `app` that only the logged-in app uses. The
@@ -36,6 +36,8 @@ export const APP_ONLY_APP_KEYS = [
   'org',
   // A gift's claim page is in the app; public pages only link to it.
   'giftClaim',
+  // Create's share mode and the member's share links (§5.1g).
+  'templateShare',
   // 作品集分享 (§6.2): the Photos picker, its dialog and the Share links page.
   'workShare',
 ] as const

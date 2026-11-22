@@ -11661,6 +11661,19 @@ $$;
 ALTER FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_template_share_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone) RETURNS TABLE("links" bigint, "creators" bigint, "revoked" bigint)
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select count(*), count(distinct s.user_id), count(*) filter (where s.revoked_at is not null)
+    from public.template_shares s
+   where s.created_at >= p_start and s.created_at < p_end
+$$;
+
+
+ALTER FUNCTION "public"."admin_template_share_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_template_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone, "p_redraw_minutes" integer DEFAULT 30) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -18341,6 +18354,103 @@ $$;
 ALTER FUNCTION "public"."template_request_votes_count"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."template_share_create"("p_user" "uuid", "p_items" "jsonb", "p_title" "text" DEFAULT NULL::"text", "p_note" "text" DEFAULT NULL::"text") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  alphabet constant text := 'abcdefghijklmnopqrstuvwxyz0123456789';
+  v_item jsonb;
+  v_type text;
+  v_key text;
+  v_seen text[] := '{}';
+  v_title text := nullif(btrim(coalesce(p_title, '')), '');
+  v_note text := nullif(btrim(coalesce(p_note, '')), '');
+  v_id text;
+  v_bytes bytea;
+  i int;
+begin
+  if p_user is null then
+    raise exception 'UNAUTHENTICATED';
+  end if;
+  perform 1 from public.profiles where id = p_user for update;
+  if not found then
+    raise exception 'PROFILE_NOT_FOUND';
+  end if;
+
+  if jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) not between 1 and 50
+     or (v_title is not null and char_length(v_title) > 80) or (v_note is not null and char_length(v_note) > 500) then
+    raise exception 'INVALID_INPUT';
+  end if;
+
+  for v_item in select value from jsonb_array_elements(p_items) loop
+    if jsonb_typeof(v_item) <> 'object' or (v_item - 'type' - 'id') <> '{}'::jsonb
+       or jsonb_typeof(v_item -> 'id') is distinct from 'string' then
+      raise exception 'INVALID_INPUT';
+    end if;
+    v_type := v_item ->> 'type';
+    v_key := v_type || ':' || (v_item ->> 'id');
+    if v_key = any (v_seen) then
+      raise exception 'INVALID_INPUT';
+    end if;
+    v_seen := v_seen || v_key;
+    if v_type = 'template' then
+      if not exists (select 1 from public.web_template_members m where m.id = v_item ->> 'id') then
+        raise exception 'TEMPLATE_NOT_FOUND';
+      end if;
+    elsif v_type = 'series' then
+      if (v_item ->> 'id') !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+         or not exists (select 1 from public.web_catalogue_entries e where e.series_id = (v_item ->> 'id')::uuid) then
+        raise exception 'TEMPLATE_NOT_FOUND';
+      end if;
+    else
+      raise exception 'INVALID_INPUT';
+    end if;
+  end loop;
+
+  if (select count(*) from public.template_shares s where s.user_id = p_user and s.created_at > now() - interval '1 hour') >= 20
+     or (select count(*) from public.template_shares s where s.user_id = p_user and s.created_at > now() - interval '1 day') >= 100 then
+    raise exception 'RATE_LIMITED';
+  end if;
+
+  -- 12 of 36 characters (about 62 bits) from a random uuid's bytes; a collision is retried.
+  loop
+    v_bytes := uuid_send(gen_random_uuid());
+    v_id := '';
+    for i in 0..11 loop
+      v_id := v_id || substr(alphabet, 1 + (get_byte(v_bytes, i) % 36), 1);
+    end loop;
+    exit when not exists (select 1 from public.template_shares s where s.id = v_id);
+  end loop;
+
+  insert into public.template_shares (id, user_id, items, title, note)
+  values (v_id, p_user, p_items, v_title, v_note);
+  return v_id;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."template_share_create"("p_user" "uuid", "p_items" "jsonb", "p_title" "text", "p_note" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."template_share_revoke"("p_user" "uuid", "p_id" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_user is null then
+    raise exception 'UNAUTHENTICATED';
+  end if;
+  update public.template_shares set revoked_at = now()
+   where id = p_id and user_id = p_user and revoked_at is null;
+  return found;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."template_share_revoke"("p_user" "uuid", "p_id" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."template_sync_pricing_input"("p_env_model" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -20611,6 +20721,25 @@ CREATE TABLE IF NOT EXISTS "public"."template_sale_approvals" (
 ALTER TABLE "public"."template_sale_approvals" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."template_shares" (
+    "id" "text" NOT NULL COLLATE "pg_catalog"."C",
+    "user_id" "uuid" NOT NULL,
+    "items" "jsonb" NOT NULL,
+    "title" "text",
+    "note" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "revoked_at" timestamp with time zone,
+    CONSTRAINT "template_shares_check" CHECK ((("revoked_at" IS NULL) OR ("revoked_at" >= "created_at"))),
+    CONSTRAINT "template_shares_id_check" CHECK (("id" ~ '^[a-z0-9]{12}$'::"text")),
+    CONSTRAINT "template_shares_items_check" CHECK ((("jsonb_typeof"("items") = 'array'::"text") AND (("jsonb_array_length"("items") >= 1) AND ("jsonb_array_length"("items") <= 50)))),
+    CONSTRAINT "template_shares_note_check" CHECK ((("note" IS NULL) OR (("char_length"("note") >= 1) AND ("char_length"("note") <= 500)))),
+    CONSTRAINT "template_shares_title_check" CHECK ((("title" IS NULL) OR (("char_length"("title") >= 1) AND ("char_length"("title") <= 80))))
+);
+
+
+ALTER TABLE "public"."template_shares" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."template_sync_history" (
     "template_id" "text" NOT NULL,
     "run_id" "text" NOT NULL,
@@ -21465,6 +21594,11 @@ ALTER TABLE ONLY "public"."template_series"
 
 
 
+ALTER TABLE ONLY "public"."template_shares"
+    ADD CONSTRAINT "template_shares_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."template_sync_history"
     ADD CONSTRAINT "template_sync_history_pkey" PRIMARY KEY ("template_id", "run_id");
 
@@ -22223,6 +22357,14 @@ CREATE INDEX "template_series_admin_order_idx" ON "public"."template_series" USI
 
 
 CREATE INDEX "template_series_category_idx" ON "public"."template_series" USING "btree" ("category_key", "sort_order", "id");
+
+
+
+CREATE INDEX "template_shares_created_idx" ON "public"."template_shares" USING "btree" ("created_at");
+
+
+
+CREATE INDEX "template_shares_user_created_idx" ON "public"."template_shares" USING "btree" ("user_id", "created_at" DESC, "id" DESC);
 
 
 
@@ -23526,6 +23668,11 @@ ALTER TABLE ONLY "public"."template_series"
 
 
 
+ALTER TABLE ONLY "public"."template_shares"
+    ADD CONSTRAINT "template_shares_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."template_sync_history"
     ADD CONSTRAINT "template_sync_history_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
 
@@ -24009,6 +24156,13 @@ ALTER TABLE "public"."template_sale_approvals" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."template_series" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."template_shares" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "template_shares_select_own" ON "public"."template_shares" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
 
 
 ALTER TABLE "public"."template_sync_history" ENABLE ROW LEVEL SECURITY;
@@ -25794,6 +25948,11 @@ GRANT ALL ON FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") TO 
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_template_share_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_template_share_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_template_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone, "p_redraw_minutes" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_template_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone, "p_redraw_minutes" integer) TO "service_role";
 
@@ -26818,6 +26977,16 @@ REVOKE ALL ON FUNCTION "public"."template_request_votes_count"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."template_share_create"("p_user" "uuid", "p_items" "jsonb", "p_title" "text", "p_note" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."template_share_create"("p_user" "uuid", "p_items" "jsonb", "p_title" "text", "p_note" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."template_share_revoke"("p_user" "uuid", "p_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."template_share_revoke"("p_user" "uuid", "p_id" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."template_sync_pricing_input"("p_env_model" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."template_sync_pricing_input"("p_env_model" "text") TO "service_role";
 
@@ -27353,6 +27522,11 @@ GRANT SELECT ON TABLE "public"."template_request_votes" TO "authenticated";
 
 
 GRANT SELECT ON TABLE "public"."template_sale_approvals" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."template_shares" TO "authenticated";
+GRANT SELECT ON TABLE "public"."template_shares" TO "service_role";
 
 
 

@@ -27,11 +27,15 @@ import { SearchBox } from './search-box'
 import { FeatureCard } from './feature-card'
 import { SeriesCard } from './series-card'
 import { TemplateCard } from './template-card'
+import { ShareModeButton } from '../template-share/share-mode-button'
+import { ShareSelectionProvider, useShareSelectionState, type ShareSelection } from '../template-share/share-selection'
 import { useSeeAllLanding } from './use-see-all-landing'
 import { useCatalogueQuery } from './use-catalogue-query'
 import { browseView, slimBrowse } from './picker-browse'
 
 // The series panel is only fetched once a series is opened (scripts/js-budget.json).
+// Share mode's bar and sheet (§5.1g) only once share mode is turned on.
+const ShareModeChrome = dynamic(() => import('../template-share/share-mode').then((m) => m.ShareModeChrome), { ssr: false })
 const SeriesCreateDialog = dynamic(() => import('../workspace/series-create-dialog').then((m) => m.SeriesCreateDialog), { ssr: false })
 
 // `endCard`: the grid's last card, after every filter's cards (the Wishlist's "Not finding it?",
@@ -56,7 +60,8 @@ export function TemplateCatalogue({ payload, create, endCard }: Props) {
   const batchBrowse = useMemo(() => slimBrowse(view), [view])
   // A poster template's card opens its editor dialog, kept in the address (?poster=<id>, where
   // old /posters/<id> links land too); every other card opens the creation dialog.
-  const open = (id: string) => (isPosterIn(openable, id) ? query.openPoster(id) : setOpenId(id))
+  const share = useShareSelectionState()
+  const { open, openSeries } = useOpeners(share, view, query, (id) => (isPosterIn(openable, id) ? query.openPoster(id) : setOpenId(id)))
   const featured = featuredOf(view.entries)
   const favoriteIds = useFavorites()?.ids
   const saved = useMemo(() => (favoriteIds ? savedIn(favoriteIds, openable) : []), [favoriteIds, openable])
@@ -86,7 +91,7 @@ export function TemplateCatalogue({ payload, create, endCard }: Props) {
     )
   }
   return (
-    <>
+    <ShareSelectionProvider value={share}>
       {featured ? (
         <Reveal className="px-(--gutter)">
           <FeatureCard template={featured} onOpen={open} />
@@ -94,21 +99,45 @@ export function TemplateCatalogue({ payload, create, endCard }: Props) {
       ) : null}
       <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
       <div ref={bar} data-stuck={stuck || undefined} data-chrome="" className="sticky top-0 z-40 py-2 data-[stuck]:chrome-bleed data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
-        <div className="mb-2 px-(--gutter)">
-          <SearchBox value={search.query} onChange={search.setQuery} label={t('search')} clear={t('searchClear')} className="md:max-w-[420px]" />
+        <div className="mb-2 flex items-center gap-2 px-(--gutter)">
+          <SearchBox value={search.query} onChange={search.setQuery} label={t('search')} clear={t('searchClear')} className="min-w-0 flex-1 md:max-w-[420px]" />
+          <ShareModeButton />
         </div>
         <CategoryChips hidden={search.results !== null} filters={view.filters} saved={showSaved(saved.length, active.saved)} value={active} onChange={query.select} labels={chipLabels(t)} />
       </div>
       <h2 className="sr-only">{t('templates')}</h2>
-      <CatalogueBody search={search} sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={query.openSeries} onSeeAll={seeAll} />
+      <CatalogueBody search={search} sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onSeeAll={seeAll} />
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       {sheetLoaded ? <SeriesCreateDialog series={series} onClose={query.closeSeries} {...create} /> : null}
       <CreateDialog template={openable.find((item) => item.id === openId) ?? null} onClose={() => setOpenId(null)} {...create} />
       <PosterDialogSlot id={query.posterId} templates={openable} series={posterSeriesOf(view.entries, query.posterId)} onSwitch={query.openPoster} onClose={query.closePoster} create={create} />
       <BatchDialogSlot templates={batchable} browse={batchBrowse} create={create} />
-    </>
+      <ShareModeSlot selection={share} />
+    </ShareSelectionProvider>
   )
 }
+
+// A card's tap: in share mode (§5.1g) it picks the card instead of opening it; poster templates
+// (and series of them) are never shared, so they do nothing then.
+function useOpeners(share: ShareSelection, view: CatalogueView, query: ReturnType<typeof useCatalogueQuery>, openCard: (id: string) => void) {
+  const posterIds = useMemo(() => new Set(view.entries.flatMap(posterIdsOf)), [view.entries])
+  const open = (id: string) => {
+    if (!share.selecting) return openCard(id)
+    if (!posterIds.has(id)) share.toggle({ type: 'template', id })
+  }
+  const openSeries = (slug: string) => {
+    if (!share.selecting) return query.openSeries(slug)
+    const found = findSeries(view.entries, slug)
+    if (found && !posterStart(found)) share.toggle({ type: 'series', id: found.id })
+  }
+  return { open, openSeries }
+}
+
+// The bar and sheet are fetched the first time share mode is turned on.
+const ShareModeSlot = ({ selection }: { selection: ShareSelection }) => (selection.selecting ? <ShareModeChrome selection={selection} /> : null)
+
+const posterIdsOf = (entry: GridEntry): string[] =>
+  (entry.type === 'series' ? entry.series.members : [entry.template]).filter((template) => template.poster).map((template) => template.id)
 
 // A series of poster templates opens the poster editor (with its styles to switch between),
 // from its card or from a ?series= link alike; any other series opens the series panel.

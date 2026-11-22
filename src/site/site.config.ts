@@ -83,6 +83,10 @@ export const site = defineSite({
       '/g/[jobId]',
       // A template's share page (Owner 2026-11-13), noindex in both languages.
       '/t/[templateId]',
+      // A template collection share page (ARCHITECTURE §5.1g), noindex in both languages.
+      '/s/t/[shareId]',
+      // The member's own collection share links.
+      '/account/template-shares',
       // A shared work collection (Owner 2026-11-22), noindex in both languages.
       '/s/w/[shareId]',
       // The owner's list of their share links (signed in, noindex like every app page).

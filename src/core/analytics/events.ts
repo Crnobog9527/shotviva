@@ -57,6 +57,8 @@ export const WORK_REPORT_REASONS = ['sexual', 'violence', 'hate', 'minor', 'priv
 // Template share links (Owner 2026-11-13): how a link left, and the share's own random id.
 export const TEMPLATE_SHARE_METHODS = ['copy', 'native'] as const
 export const shareIdSchema = z.string().regex(/^[a-z0-9]{8}$/)
+// A template collection share link's id (ARCHITECTURE §5.1g).
+const collectionIdSchema = z.string().regex(/^[a-z0-9]{12}$/)
 // The referring site's host only (no path, no www.), never a full address.
 const referrerHost = z.string().regex(/^(?!www\.)[a-z0-9.-]+$/).max(100)
 export const UPLOAD_ERROR_REASONS = ['too_large', 'unsupported', 'ticket_failed', 'transfer_failed', 'unknown'] as const
@@ -77,6 +79,8 @@ export const eventSchemas = {
     method: z.enum(['email', 'google', 'phone']), code_kind: z.enum(['invite', 'campaign']).nullable().optional(),
     // The template share link this browser opened before signing up (sv_share cookie), if any.
     share_template_id: slug.optional(), share_id: shareIdSchema.nullable().optional(),
+    // The template collection link this browser opened before signing up (sv_tshare), if any.
+    share_collection_id: collectionIdSchema.optional(),
     // ARCHITECTURE §16.5: the A/B variants this browser saw first, `<experiment>:<variant>` joined by ','.
     experiments: z.string().regex(/^\d+:\d+(,\d+:\d+)*$/).max(200).optional(),
   }),
@@ -150,6 +154,13 @@ export const eventSchemas = {
   template_share_open: z.strictObject({ template_id: slug, share_id: shareIdSchema.nullable(), signed_in: z.boolean(), referrer_host: referrerHost.nullable() }),
   template_share_signup_start: z.strictObject({ template_id: slug, share_id: shareIdSchema.nullable() }),
   template_share_generate: z.strictObject({ template_id: slug, share_id: shareIdSchema.nullable() }),
+  // Template collection share links (ARCHITECTURE §5.1g): a collection page seen (once the visitor
+  // is known; `entries` its picks still live), and a signed-out visitor starting sign-up from one
+  // of its templates.
+  template_collection_open: z.strictObject({
+    collection_id: collectionIdSchema, entries: z.number().int().min(1).max(50), signed_in: z.boolean(), referrer_host: referrerHost.nullable(),
+  }),
+  template_collection_signup_start: z.strictObject({ collection_id: collectionIdSchema, template_id: slug }),
   // T89: a toggle's confirm dialog shown, accepted or cancelled, or the toggle turned off.
   template_toggle: z.strictObject({
     template_id: slug,
@@ -198,6 +209,8 @@ export const BROWSER_EVENTS = [
   'experiment_exposure',
   'template_share_signup_start',
   'template_share_generate',
+  'template_collection_open',
+  'template_collection_signup_start',
 ] as const
 export type ServerEventName = (typeof SERVER_EVENTS)[number]
 export type BrowserEventName = (typeof BROWSER_EVENTS)[number]
