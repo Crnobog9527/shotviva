@@ -105,22 +105,19 @@ it("gives each member this month's promotion allowance once, the rest when more 
   expect(await row(db, 'select monthly_allowance from org_members where org_id=$1 and user_id=$2', [orgId, staff])).toEqual({ monthly_allowance: 0 })
 })
 
-it('spends paid first, then the org promotion share before the member’s own free credits; rights follow the pool', async () => {
+it('spends the org paid share, then the org promotion share, never the member’s own credits; rights follow the pool', async () => {
   const { orgId, owner, staff } = await org(1000, 1000)
-  await db.query('update profiles set free_credits=50 where id=$1', [staff]) // the member's own free credits
+  await db.query('update profiles set free_credits=50 where id=$1', [staff]) // the member's own free credits stay frozen
   await allocate(owner, staff, 15)
   await allocatePromo(owner, staff, 25)
-  const paid = await generate(staff)
-  expect(paid).toMatchObject({ credit_pool: 'paid', visibility: 'private' })
+  expect(await generate(staff)).toMatchObject({ credit_pool: 'paid' })
   expect(await balances(staff)).toEqual({ credits: 5, free_credits: 75 })
-  const promo = await generate(staff) // 5 paid left: not enough, the whole order goes to the free pool
-  expect(promo).toMatchObject({ credit_pool: 'free', visibility: 'public' }) // a free work: watermark, public, no commercial use
-  expect(await balances(staff)).toEqual({ credits: 5, free_credits: 65 })
-  expect(await seat(orgId, staff)).toMatchObject({ held_credits: 5, held_promo_credits: 15 }) // promotion share drawn first
+  expect(await generate(staff)).toMatchObject({ credit_pool: 'free' }) // 5 paid left: the promotion share pays the whole job
+  expect(await seat(orgId, staff)).toMatchObject({ held_credits: 5, held_promo_credits: 15 })
   await generate(staff)
-  await generate(staff) // 5 of the share + 5 of the member's own
-  expect(await seat(orgId, staff)).toMatchObject({ held_promo_credits: 0 })
-  expect(await freeOf(db, staff)).toBe(45)
+  await refused(db, () => generate(staff), 'ORG_CREDITS_INSUFFICIENT') // 5 + 5 left: never mixed, never own credits
+  expect(await seat(orgId, staff)).toMatchObject({ held_credits: 5, held_promo_credits: 5 })
+  expect(await freeOf(db, staff)).toBe(55)
 })
 
 it('refunds a failed job to the pool kind it came from and restores the org share', async () => {
@@ -314,20 +311,29 @@ it('ends with the 1921 definitions on production too, where 1920 ran before 1890
   }
 })
 
-it('records a draw under the month its share was funded for, so a refund after the expiry cannot bring expired credits back (Codex #836)', async () => {
+it('lets no member spend a promotion share once its month is over, even before the expiry pass', async () => {
   const { orgId, owner, staff } = await org(1000)
   await allocatePromo(owner, staff, 100)
-  // The month is over (expiry at the start of this UTC month) but the expiry pass has not run yet.
   await db.query("update orgs set promo_expires_at=(date_trunc('month', now() at time zone 'UTC')) at time zone 'UTC' where id=$1", [orgId])
-  const job = await generate(staff) // spends 10 of last month's share
-  expect(await row(db, 'select period from org_promo_draws where debit_key=$1', ['job:' + job.job + ':reserve'])).toEqual({ period: m.previous })
-  await expirePass() // takes back the 90 still held
+  await refused(db, () => generate(staff), 'ORG_CREDITS_INSUFFICIENT')
+  await expirePass()
   expect(await seat(orgId, staff)).toMatchObject({ held_promo_credits: 0 })
-  await fail(job.job) // the job fails after the expiry: its 10 expire at once, nothing is restored
+  expect(await freeOf(db, staff)).toBe(0)
+})
+
+it('records a draw under the month its share was funded for, so a refund after the expiry cannot bring expired credits back (Codex #836)', async () => {
+  // A free-pool debit at month end that is not a member's reserve (here an admin correction) still
+  // draws last month's share: its refund-like reversal after the expiry must not restore it.
+  const { orgId, owner, staff } = await org(1000)
+  await allocatePromo(owner, staff, 100)
+  await db.query("update orgs set promo_expires_at=(date_trunc('month', now() at time zone 'UTC')) at time zone 'UTC' where id=$1", [orgId])
+  await db.query("select _apply_credit_change($1,'free','reserve',-10,'job','job:late-x:reserve')", [staff])
+  expect(await row(db, 'select period from org_promo_draws where debit_key=$1', ['job:late-x:reserve'])).toEqual({ period: m.previous })
+  await expirePass()
+  await db.query("select _apply_credit_change($1,'free','refund',10,'job','job:late-x:refund')", [staff])
   expect(await freeOf(db, staff)).toBe(0)
   expect(await seat(orgId, staff)).toMatchObject({ held_promo_credits: 0 })
 })
-
 
 it('starts a rejoining member with no promotion allowance, as the paid one (Codex #836)', async () => {
   const { orgId, owner, staff } = await org(1000)
