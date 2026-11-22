@@ -30,18 +30,18 @@ function CappedImage({ ref, onLoad, ...props }: Props) {
   return <img {...capSrcSet(img, props.sizes)} alt={props.alt} ref={ref} onLoad={onLoad} />
 }
 
-// A picture with stored AVIF + WebP copies (core/presized): next/image's attributes for each format,
-// the AVIF ones as a <picture> source. A preloaded or prioritised one (the hero, the LCP image) is
-// fetched early as next/image would, except that the <head> preload names the AVIF srcset with
-// type="image/avif" (a browser without AVIF skips it and loads the WebP <img> as usual).
-function PresizedImage({ sized, ref, onLoad, preload: early, priority, fetchPriority, loading, ...props }: Props & { sized: PresizedUrl }) {
-  const eager = Boolean(early || priority)
-  const common = { ...props, fetchPriority: eager ? (fetchPriority ?? 'high') : fetchPriority, loading: eager ? ('eager' as const) : loading }
-  const img = capSrcSet(getImageProps({ ...common, loader: presizedLoader(sized, 'webp') }).props, props.sizes)
-  const avif = capSrcSet(getImageProps({ ...common, loader: presizedLoader(sized, 'avif') }).props, props.sizes)
+// A picture with stored AVIF + WebP copies (core/presized): next/image's attributes for each format
+// (getImageProps, so loading and priority are exactly what <Image> would render), the AVIF ones as a
+// <picture> source. A preloaded or prioritised one (the hero, the LCP image) gets the <head> preload
+// next/image would add, naming the AVIF srcset with type="image/avif" (a browser without AVIF skips
+// it and loads the WebP <img>), and no fetch priority beyond what the caller asked for: a high one
+// here made desktop first paint ~20 ms later (it competes with what the first paint waits for).
+function PresizedImage({ sized, ref, onLoad, ...props }: Props & { sized: PresizedUrl }) {
+  const img = capSrcSet(getImageProps({ ...props, loader: presizedLoader(sized, 'webp') }).props, props.sizes)
+  const avif = capSrcSet(getImageProps({ ...props, loader: presizedLoader(sized, 'avif') }).props, props.sizes)
   preconnect(presizedLoader(sized).origin)
-  if (eager && avif.srcSet) {
-    preload(avif.src, { as: 'image', imageSrcSet: avif.srcSet, imageSizes: avif.sizes, fetchPriority: 'high', type: 'image/avif' })
+  if ((props.preload || props.priority) && avif.srcSet) {
+    preload(avif.src, { as: 'image', imageSrcSet: avif.srcSet, imageSizes: avif.sizes, type: 'image/avif', ...(props.fetchPriority ? { fetchPriority: props.fetchPriority } : {}) })
   }
   return (
     <Picture avif={avif.srcSet && img.loading !== 'lazy' ? { srcSet: avif.srcSet, sizes: avif.sizes } : undefined}>

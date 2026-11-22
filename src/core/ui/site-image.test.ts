@@ -30,12 +30,19 @@ describe('SiteImage with pre-sized copies (NEXT_PUBLIC_PRESIZED_IMAGES_URL)', ()
     }
   })
 
-  it('preloads the hero’s AVIF srcset with its type and keeps the <img> high priority', () => {
+  it('preloads the hero’s AVIF srcset with its type, as eager as next/image and no higher priority', () => {
     const html = render({ preload: true })
     expect(html).toMatch(/<link rel="preload"[^>]*as="image"[^>]*type="image\/avif"|<link rel="preload"[^>]*type="image\/avif"[^>]*as="image"/)
     expect(html).toMatch(new RegExp(`imageSrcSet="${CDN}/presized/v1/w\\d+/home/hero-set-phone\\.avif 1x`))
+    expect(html).toContain('<picture')
+    expect(html).not.toMatch(/<img[^>]*loading="lazy"/)
+    expect(html).not.toMatch(/fetchPriority="high"/)
+  })
+
+  it('passes a caller’s fetch priority to the <img> and the preload', () => {
+    const html = render({ preload: true, fetchPriority: 'high' })
+    expect(html).toMatch(/<link rel="preload"[^>]*fetchPriority="high"/)
     expect(html).toMatch(/<img[^>]*fetchPriority="high"/)
-    expect(html).toMatch(/<img[^>]*loading="eager"/)
   })
 
   it('keeps next/image for a picture without copies', () => {
