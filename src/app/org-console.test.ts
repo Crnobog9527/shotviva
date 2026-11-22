@@ -195,7 +195,7 @@ describe.each(['en', 'zh'] as const)('pool choice picker (%s)', (locale) => {
     const state = { kind: 'get-credits' as const, cost: 20, needed: 10, count: 1 }
     const member = render(locale, createElement(FormAction, { state, resolution: '1k', batch: false, onGenerate: () => {}, orgOnly: true }))
     expect(member.errors).toEqual([])
-    expect(member.text).toContain(locale === 'en' ? 'Ask your company admin' : '请联系企业管理员分配')
+    expect(member.text).toContain(locale === 'en' ? 'Ask your admin to allocate more' : '请找管理员分配额度')
     expect(member.html).toContain('disabled')
   })
 })
