@@ -3719,7 +3719,7 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."
     SET "search_path" TO ''
     SET "TimeZone" TO 'UTC'
     AS $$
-  select jsonb_build_object('owner',a.user_id,'inactive',a.status<>'active',
+  select jsonb_build_object('owner',a.user_id,'org',a.org_id,'inactive',a.status<>'active',
     'parent',case when a.status='active' and parent.team_enabled and parent.status='active' then parent.user_id end,
     'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,r.org_l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
     'bonus',coalesce(po.l2_bp,r.l2_bp),
@@ -3748,25 +3748,18 @@ $$;
 ALTER FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."payments") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb", "p_customer" "uuid") RETURNS "jsonb"
+CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb") RETURNS "jsonb"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
   select coalesce((
-    select p_snapshot || jsonb_build_object('owner', c.referred_by)
-      from public.profiles c join public.affiliates a on a.user_id = c.referred_by
-     where c.id = p_customer and a.org_id is not null
-       and c.referred_by::text is distinct from p_snapshot->>'owner'
-       and exists (select from public.affiliate_account_moves m
-                    where m.org_id = a.org_id and m.from_user_id::text = p_snapshot->>'owner')), (
     select p_snapshot || jsonb_build_object('owner', a.user_id)
-      from public.affiliate_account_moves m join public.affiliates a on a.org_id = m.org_id
-     where m.from_user_id::text = p_snapshot->>'owner'
-     order by m.id desc limit 1), p_snapshot);
+      from public.affiliates a
+     where jsonb_typeof(p_snapshot->'org') = 'string' and a.org_id = (p_snapshot->>'org')::uuid), p_snapshot);
 $$;
 
 
-ALTER FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb", "p_customer" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_affiliate_write_commission"("p_payment" "public"."payments", "p_snapshot" "jsonb", "p_level" smallint, "p_open" boolean, "p_lost" boolean, "p_release" boolean DEFAULT false) RETURNS "void"
@@ -4241,25 +4234,32 @@ CREATE OR REPLACE FUNCTION "public"."_org_attribute_invite"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare v_org uuid; v_account uuid; v_member uuid; v_via uuid; v_source text;
+declare v_org uuid; v_account uuid; v_member uuid; v_via uuid; v_source text; v_try integer;
 begin
   begin
-    select o.id,a.user_id into v_org,v_account from public.org_members m
-      join public.orgs o on o.id=m.org_id
-      join public.affiliates a on a.org_id=o.id
-      where m.user_id=new.inviter_user_id and m.status='active' and o.status='active' and o.affiliate_enabled
-        and a.status='active';
-    if found then
-      v_source:='org_l1'; v_member:=new.inviter_user_id; v_via:=null;
-    else
-      select o.id,a.user_id,inviter.referred_member into v_org,v_account,v_member from public.profiles inviter
-        join public.affiliates a on a.user_id=inviter.referred_by and a.org_id is not null
-        join public.orgs o on o.id=a.org_id
-        where inviter.id=new.inviter_user_id and inviter.referred_source='org_l1'
-          and o.status='active' and o.affiliate_enabled and o.affiliate_levels=2 and a.status='active';
-      if not found then return null; end if;
-      v_source:='org_l2'; v_via:=new.inviter_user_id;
-    end if;
+    for v_try in 1..2 loop
+      select o.id,a.user_id into v_org,v_account from public.org_members m
+        join public.orgs o on o.id=m.org_id
+        join public.affiliates a on a.org_id=o.id
+        where m.user_id=new.inviter_user_id and m.status='active' and o.status='active' and o.affiliate_enabled
+          and a.status='active';
+      if found then
+        v_source:='org_l1'; v_member:=new.inviter_user_id; v_via:=null;
+      else
+        select o.id,a.user_id,inviter.referred_member into v_org,v_account,v_member from public.profiles inviter
+          join public.affiliates a on a.user_id=inviter.referred_by and a.org_id is not null
+          join public.orgs o on o.id=a.org_id
+          where inviter.id=new.inviter_user_id and inviter.referred_source='org_l1'
+            and o.status='active' and o.affiliate_enabled and o.affiliate_levels=2 and a.status='active';
+        if not found then return null; end if;
+        v_source:='org_l2'; v_via:=new.inviter_user_id;
+      end if;
+      -- An org owner transfer (1930) holds the account row and then moves it to another user id:
+      -- wait for it and resolve once more.
+      perform 1 from public.affiliates where user_id=v_account for key share;
+      exit when found;
+      if v_try=2 then return null; end if;
+    end loop;
     if v_account=new.user_id then return null; end if;
     if exists(select from public.org_members m where m.org_id=v_org and m.user_id=new.user_id and m.status='active') then
       return null;
@@ -9666,12 +9666,13 @@ begin
     update public.profiles set referred_by = v_new where referred_by = v_old;
     get diagnostics n_cust = row_count;
     delete from public.affiliates where user_id = v_old;
-    insert into public.affiliate_account_moves(org_id, from_user_id, to_user_id, actor) values (o.id, v_old, v_new, p_actor);
-    -- Unresolved retries stored before now named the moved row as it was: the org's account.
+    -- Unresolved retries stored before now named the moved row as it was: the org's account
+    -- (case 2 above).
     update public.affiliate_recompute_errors set snapshot = snapshot
         || case when snapshot->>'owner' = v_old::text then jsonb_build_object('owner', v_new) else '{}'::jsonb end
         || case when snapshot->>'parent' = v_old::text then jsonb_build_object('parent', v_new) else '{}'::jsonb end
-      where resolved_at is null and (snapshot->>'owner' = v_old::text or snapshot->>'parent' = v_old::text);
+      where resolved_at is null and (snapshot->>'owner' = v_old::text or snapshot->>'parent' = v_old::text)
+        and (jsonb_typeof(snapshot->'org') is distinct from 'string' or snapshot->>'org' = o.id::text);
     v_moved := jsonb_build_object('commissions', n_comm, 'payouts', n_pay, 'adjustments', n_adj, 'customers', n_cust);
   elsif public._affiliate_personal_open(v_new) then
     raise exception 'ORG_PERSONAL_AFFILIATE';
@@ -12588,6 +12589,13 @@ begin
   if not (select enabled from public.affiliate_settings where singleton) then return false; end if;
   select user_id into v_owner from public.affiliates where slug=p_slug and status='active' and user_id<>p_user;
   if not found then return false; end if;
+  -- An org owner transfer (1930) holds this row and then moves it to another user id: wait for
+  -- it and resolve the slug once more.
+  perform 1 from public.affiliates where user_id=v_owner for key share;
+  if not found then
+    select user_id into v_owner from public.affiliates where slug=p_slug and status='active' and user_id<>p_user;
+    if not found then return false; end if;
+  end if;
   -- Billing already takes the profile row lock in settle_checkout. Lock before observing payment history.
   perform 1 from public.profiles where id=p_user and referred_by is null for update;
   if not found then return false; end if;
@@ -12846,7 +12854,7 @@ begin
   -- Serializes manual/cron retries with the existing billing transaction on this payment.
   select p.* into strict v_payment from public.payments p where p.id=p_payment_id for update;
   if v_payment.amount_total=0 then return; end if;
-  if v_retry then v_snapshot:=public._affiliate_snapshot_remap(v_snapshot,v_payment.user_id); end if;
+  if v_retry then v_snapshot:=public._affiliate_snapshot_remap(v_snapshot); end if;
   if not v_exists and v_snapshot is null then v_snapshot:=public._affiliate_snapshot(v_payment); end if;
   if not v_exists and v_snapshot is null then
     if v_retry then update public.affiliate_recompute_errors set resolved_at=now() where payment_id=p_payment_id and resolved_at is null; end if;
@@ -19757,30 +19765,6 @@ CREATE TABLE IF NOT EXISTS "public"."admin_test_spend" (
 ALTER TABLE "public"."admin_test_spend" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."affiliate_account_moves" (
-    "id" bigint NOT NULL,
-    "org_id" "uuid" NOT NULL,
-    "from_user_id" "uuid" NOT NULL,
-    "to_user_id" "uuid" NOT NULL,
-    "moved_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "actor" "uuid" NOT NULL
-);
-
-
-ALTER TABLE "public"."affiliate_account_moves" OWNER TO "postgres";
-
-
-ALTER TABLE "public"."affiliate_account_moves" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME "public"."affiliate_account_moves_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
-
 ALTER TABLE "public"."affiliate_adjustments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "public"."affiliate_adjustments_id_seq"
     START WITH 1
@@ -21484,11 +21468,6 @@ ALTER TABLE ONLY "public"."admin_test_spend"
 
 
 
-ALTER TABLE ONLY "public"."affiliate_account_moves"
-    ADD CONSTRAINT "affiliate_account_moves_pkey" PRIMARY KEY ("id");
-
-
-
 ALTER TABLE ONLY "public"."affiliate_adjustments"
     ADD CONSTRAINT "affiliate_adjustments_pkey" PRIMARY KEY ("id");
 
@@ -22259,10 +22238,6 @@ CREATE INDEX "admin_test_runs_template_created_idx" ON "public"."admin_test_runs
 
 
 CREATE INDEX "admin_test_spend_started_at_idx" ON "public"."admin_test_spend" USING "btree" ("started_at");
-
-
-
-CREATE INDEX "affiliate_account_moves_from_idx" ON "public"."affiliate_account_moves" USING "btree" ("from_user_id", "id");
 
 
 
@@ -23434,11 +23409,6 @@ ALTER TABLE ONLY "public"."admin_test_runs"
 
 
 
-ALTER TABLE ONLY "public"."affiliate_account_moves"
-    ADD CONSTRAINT "affiliate_account_moves_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
-
-
-
 ALTER TABLE ONLY "public"."affiliate_adjustments"
     ADD CONSTRAINT "affiliate_adjustments_affiliate_user_id_fkey" FOREIGN KEY ("affiliate_user_id") REFERENCES "public"."affiliates"("user_id") ON DELETE CASCADE;
 
@@ -24362,9 +24332,6 @@ ALTER TABLE "public"."admin_test_runs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."admin_test_spend" ENABLE ROW LEVEL SECURITY;
-
-
-ALTER TABLE "public"."affiliate_account_moves" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."affiliate_adjustments" ENABLE ROW LEVEL SECURITY;
@@ -25498,7 +25465,7 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."paym
 
 
 
-REVOKE ALL ON FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb", "p_customer" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb") FROM PUBLIC;
 
 
 
@@ -27715,16 +27682,6 @@ GRANT ALL ON TABLE "public"."admin_test_runs" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."admin_test_spend" TO "service_role";
-
-
-
-GRANT SELECT ON TABLE "public"."affiliate_account_moves" TO "service_role";
-
-
-
-GRANT UPDATE ON SEQUENCE "public"."affiliate_account_moves_id_seq" TO "anon";
-GRANT UPDATE ON SEQUENCE "public"."affiliate_account_moves_id_seq" TO "authenticated";
-GRANT UPDATE ON SEQUENCE "public"."affiliate_account_moves_id_seq" TO "service_role";
 
 
 

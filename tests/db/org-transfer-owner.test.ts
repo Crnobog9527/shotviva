@@ -1,10 +1,9 @@
 import type { Client } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
-import { invite } from '../t94-config'
-
 import { commission, refund, row, sale } from './affiliate-fixtures'
 import { connectAdmin, createUser } from './helpers'
+import { transferKit } from './org-transfer-fixtures'
 
 // admin_org_transfer_owner (1930, ARCHITECTURE §6.5): an admin changes an org's primary admin.
 // Everything the org earned stays with the org (Owner 2026-11-22): the enterprise affiliate
@@ -30,54 +29,8 @@ async function refused(run: () => Promise<unknown>, message: string) {
   await db.query('rollback to savepoint refused')
 }
 
-async function createOrg(owner: string, affiliate = true) {
-  const input = { owner_user_id: owner, name: 'Org ' + owner.slice(0, 8), affiliate_enabled: affiliate }
-  return (await row(db, 'select admin_org_create($1,$2) as id', [actor, input])).id as string
-}
-async function joinOrg(user: string, orgId: string) {
-  const { invite_token } = await row(db, 'select invite_token from orgs where id=$1', [orgId])
-  await db.query('select org_join($1,$2)', [user, invite_token])
-}
-const updatedAt = async (orgId: string) => (await row(db, 'select updated_at::text as at from orgs where id=$1', [orgId])).at as string
-async function transfer(orgId: string, user: string, opts: { as?: string; expected?: string } = {}) {
-  const input = { org_id: orgId, user_id: user, expected_updated_at: opts.expected ?? (await updatedAt(orgId)) }
-  return (await row(db, 'select admin_org_transfer_owner($1,$2) as r', [opts.as ?? actor, input])).r
-}
-const role = async (orgId: string, user: string) =>
-  row(db, 'select role,status,monthly_allowance,held_credits from org_members where org_id=$1 and user_id=$2', [orgId, user])
-const owners = async (orgId: string) =>
-  (await db.query("select user_id from org_members where org_id=$1 and role='owner' and status='active'", [orgId])).rows.map((r) => r.user_id)
-
-// A new account that signs up with `inviter`'s personal invite code (T94); for an org member
-// it becomes the org's level-1 customer.
-async function invitedBy(inviter: string) {
-  const customer = await createUser(db)
-  await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [customer, 'signup:' + customer])
-  const { code } = await row(db, 'select get_or_create_invite_code($1) as code', [inviter])
-  await db.query("select redeem_code($1,$2,'signup',null,$3)", [customer, code, invite.windowDays])
-  return customer
-}
-
-// An org with the affiliate switch on, a member, one customer each for the owner and the member,
-// a payment, an adjustment, a payout, a rate override and a promo sheet.
-async function channelOrg() {
-  const owner = await createUser(db)
-  const orgId = await createOrg(owner)
-  const staff = await createUser(db)
-  await joinOrg(staff, orgId)
-  const customer = await invitedBy(staff)
-  const ownersCustomer = await invitedBy(owner)
-  await db.query("update affiliates set payout_method='bank',payout_details='company account',admin_note='kept' where user_id=$1", [owner])
-  await db.query("insert into affiliate_rate_overrides(user_id,product_kind,l1_bp,l2_bp) values($1,'pack',2000,700)", [owner])
-  const paid = await sale(db, customer, 'pack_m', 2490)
-  await db.query("insert into affiliate_adjustments(request_id,affiliate_user_id,amount,reason) values(gen_random_uuid(),$1,500,'fixture')", [owner])
-  await db.query("insert into affiliate_payouts(affiliate_user_id,period,amount,status,payout_snapshot) values($1,'2031-04-01',300,'paid','{}')", [owner])
-  await db.query(`insert into partner_promo_grants(org_id,period,status,recipient_user_id,base,bonus,raw_credits,counted_credits,customer_cap,
-      customers,capped_customers,clawback_owed,clawback_applied,total,fingerprint,expires_at,decided_at,decided_by)
-    values($1,'2031-05','granted',$2,10000,0,0,0,0,0,0,0,0,10000,repeat('a',32),'2031-06-01',now(),$3)`, [orgId, owner, actor])
-  await db.query('update org_members set monthly_allowance=40,held_credits=0 where org_id=$1 and user_id=$2', [orgId, staff])
-  return { owner, orgId, staff, customer, ownersCustomer, paid }
-}
+const kit = transferKit(() => db, () => actor)
+const { createOrg, joinOrg, updatedAt, transfer, role, owners, channelOrg } = kit
 
 const account = (user: string) =>
   row(db, 'select slug,status,org_id,payout_method,payout_details,admin_note from affiliates where user_id=$1', [user])
@@ -167,52 +120,6 @@ describe('moving the org to a new primary admin', () => {
     expect(await account(owner)).toBeUndefined()
   })
 
-  it('recovers commissions whose stored retry snapshot names the old account, before and after the move', async () => {
-    const { owner, orgId, staff, customer } = await channelOrg()
-    // A payment whose commission write failed and is waiting for a retry: the stored snapshot
-    // names the old owner. Raw SQL only builds that state.
-    const failed = async () => {
-      const paid = await sale(db, customer, 'pack_m', 2490)
-      const snap = (await row(db, 'select public._affiliate_snapshot(p) s from payments p where p.id=$1', [paid.id])).s
-      await db.query('delete from affiliate_commission_changes where commission_id in (select id from affiliate_commissions where payment_id=$1)', [paid.id])
-      await db.query('delete from affiliate_commissions where payment_id=$1', [paid.id])
-      return { paid, snap: { ...snap, owner } }
-    }
-    const store = (id: string, snap: object) =>
-      db.query("insert into affiliate_recompute_errors(payment_id,error,snapshot) values($1,'23503: fixture',$2)", [id, snap])
-    const before = await failed()
-    await store(before.paid.id, before.snap)
-    const late = await failed()
-
-    await transfer(orgId, staff)
-    expect((await row(db, 'select snapshot->>\'owner\' o from affiliate_recompute_errors where payment_id=$1 and resolved_at is null', [before.paid.id])).o).toBe(staff)
-    // A payment that raced the transfer stores the stale snapshot after it; the retry remaps it.
-    await store(late.paid.id, late.snap)
-    // The former owner leaves and opens a personal account under the same user id before the
-    // daily retry: the org's commissions must still go to the org, never to that account.
-    await db.query("select org_remove_member($1,$2,'rm:late')", [staff, owner])
-    await db.query("insert into affiliates(user_id,slug,status) values($1,$2,'active')", [owner, 'qa-' + owner.slice(0, 12)])
-    for (const { paid } of [before, late]) {
-      await db.query('select affiliate_recompute_payment($1)', [paid.id])
-      expect(await row(db, 'select affiliate_user_id from affiliate_commissions where payment_id=$1 and level=1', [paid.id])).toEqual({ affiliate_user_id: staff })
-      expect(await row(db, 'select count(*)::int n from affiliate_recompute_errors where payment_id=$1 and resolved_at is null', [paid.id])).toEqual({ n: 0 })
-    }
-    expect(await row(db, 'select from_user_id,to_user_id from affiliate_account_moves where org_id=$1', [orgId])).toEqual({ from_user_id: owner, to_user_id: staff })
-  })
-
-  it('still books a racing payment to the org when the customer was rebound before the retry', async () => {
-    const { owner, orgId, staff, customer } = await channelOrg()
-    const paid = await sale(db, customer, 'pack_m', 2490)
-    const snap = (await row(db, 'select public._affiliate_snapshot(p) s from payments p where p.id=$1', [paid.id])).s
-    await db.query('delete from affiliate_commission_changes where commission_id in (select id from affiliate_commissions where payment_id=$1)', [paid.id])
-    await db.query('delete from affiliate_commissions where payment_id=$1', [paid.id])
-    await transfer(orgId, staff)
-    await db.query("insert into affiliate_recompute_errors(payment_id,error,snapshot) values($1,'23503: fixture',$2)", [paid.id, { ...snap, owner }])
-    await db.query('update profiles set referred_by=null,referred_source=null where id=$1', [customer])
-    await db.query('select affiliate_recompute_payment($1)', [paid.id])
-    expect(await row(db, 'select affiliate_user_id from affiliate_commissions where payment_id=$1 and level=1', [paid.id])).toEqual({ affiliate_user_id: staff })
-  })
-
   it('does nothing on a repeat, even from a stale form', async () => {
     const { orgId, staff } = await channelOrg()
     const seen = await updatedAt(orgId)
@@ -270,13 +177,5 @@ describe('refusals', () => {
     const { rows } = await db.query(`select r as role, has_function_privilege(r, 'public.admin_org_transfer_owner(uuid,jsonb)', 'execute') as can
       from unnest(array['anon','authenticated','service_role']) r order by r`)
     expect(rows).toEqual([{ role: 'anon', can: false }, { role: 'authenticated', can: false }, { role: 'service_role', can: true }])
-    const table = await db.query(`select r as role, has_table_privilege(r, 'public.affiliate_account_moves', 'select') as can_read,
-        has_table_privilege(r, 'public.affiliate_account_moves', 'insert') as can_write
-      from unnest(array['anon','authenticated','service_role']) r order by r`)
-    expect(table.rows).toEqual([
-      { role: 'anon', can_read: false, can_write: false },
-      { role: 'authenticated', can_read: false, can_write: false },
-      { role: 'service_role', can_read: true, can_write: false },
-    ])
   })
 })

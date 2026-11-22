@@ -35,62 +35,150 @@
 --
 -- Commission snapshots that still name the old account. affiliate_recompute_payment stores a
 -- failed payment's snapshot in affiliate_recompute_errors and reuses it on every retry (the daily
--- run, an admin retry). Two ways one can name the moved-away account: an unresolved error from
--- before the transfer, and a payment written while the transfer runs (its snapshot read the old
--- referred_by, its commission insert then waits on the affiliates row lock and fails the foreign
--- key once the old row is gone; the recompute catches that and stores the stale snapshot, the
--- payment itself succeeds). The transfer rewrites the stored errors that exist when it runs.
--- Each move is recorded in affiliate_account_moves, and every retry passes its snapshot through
--- _affiliate_snapshot_remap: an owner that moved out of an org is replaced by the customer's
--- current account when that is the same org's account. So the org still earns the racing
--- commissions, on the new owner's account, and a later personal account of the former owner
--- never does.
+-- run, an admin retry). A user id alone cannot tell an org account from a later personal account
+-- of the same person (allowed once they leave the org, 1642), so from now on a snapshot carries
+-- the account's org: _affiliate_snapshot adds 'org' (affiliates.org_id, null for a personal
+-- account). Every case that can name the old owner:
+--   1. commission rows written before the transfer: moved row by row (recompute reads the row);
+--   2. unresolved errors stored before the transfer that belong to this org's account (no 'org'
+--      key, a null 'org', or this org): the transfer rewrites owner and parent from the old to
+--      the new owner. At that moment the old owner's only row is the org's, and history from the
+--      personal era of a converted row (1643) is the org's too (Owner 2026-11-22, option A). A
+--      snapshot naming another org keeps its owner; the remap below sends it to that org;
+--   3. a payment racing the transfer (snapshot read before the commit, insert fails the foreign
+--      key after it, error stored with the stale snapshot): it carries 'org', and every retry
+--      replaces its owner with that org's current account (_affiliate_snapshot_remap);
+--   4. payments of the former owner's later personal account: 'org' is null, never remapped;
+--   5. the former owner owning another org later, or the org moving again or back: 'org' names
+--      the right org, and the remap reads its current account.
+-- Snapshots without 'org' were stored before this migration, before any transfer was possible:
+-- case 2 covers them.
+--   6. a binding racing the transfer (affiliate_bind by slug, _org_attribute_invite by org):
+--      both now lock the resolved account FOR KEY SHARE and, if it was moved away meanwhile,
+--      resolve once more, so the customer is bound to the new owner instead of failing the
+--      foreign key and staying unbound.
 --
--- Expand-only: one new private table, one new helper, the new admin function, a widened
--- audit-action check (read from the live constraint, as 1840 did, so other open migrations'
--- actions are kept), and create or replace of affiliate_recompute_payment identical to 1740
--- except one line (the remap of a retried snapshot; a no-op for every snapshot whose accounts
--- still exist, i.e. everything before this deploy).
+-- Expand-only: one new helper, the new admin function, a widened audit-action check (read from
+-- the live constraint, as 1840 did, so other open migrations' actions are kept), and create or
+-- replace of four functions with their signatures: _affiliate_snapshot identical to 1900 plus the
+-- 'org' key (an extra key every reader ignores), affiliate_recompute_payment identical to 1740 plus
+-- one line (the remap; a no-op for a snapshot without 'org' or whose org account is the owner),
+-- affiliate_bind identical to 0904 and _org_attribute_invite identical to 1680 plus the lock and
+-- one re-resolution (no-ops while no transfer runs).
 
-create table public.affiliate_account_moves (
-  id bigint generated always as identity primary key,
-  org_id uuid not null references public.orgs(id),
-  from_user_id uuid not null,
-  to_user_id uuid not null,
-  moved_at timestamptz not null default now(),
-  actor uuid not null
-);
-create index affiliate_account_moves_from_idx on public.affiliate_account_moves(from_user_id, id);
-alter table public.affiliate_account_moves enable row level security;
-revoke all on public.affiliate_account_moves from public, anon, authenticated, service_role;
-grant select on public.affiliate_account_moves to service_role;
+-- Same as 1900 except the 'org' key.
+create or replace function public._affiliate_snapshot(p_payment public.payments) returns jsonb
+language sql stable security definer set search_path='' set "TimeZone" to 'UTC' as $$
+  select jsonb_build_object('owner',a.user_id,'org',a.org_id,'inactive',a.status<>'active',
+    'parent',case when a.status='active' and parent.team_enabled and parent.status='active' then parent.user_id end,
+    'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,r.org_l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
+    'bonus',coalesce(po.l2_bp,r.l2_bp),
+    'same_ip',coalesce(customer.referred_source not in ('org_l1','org_l2'),true) and coalesce(customer.signup_ip=referrer.signup_ip,false),
+    'confirm_after',p_payment.created_at+make_interval(days=>s.hold_days),
+    'void',case when a.org_id is not null and exists(select from public.org_members m
+      where m.org_id=a.org_id and m.user_id=customer.id and m.status='active') then 'org_member' end)
+    from public.profiles customer join public.affiliates a on a.user_id=customer.referred_by
+    join public.profiles referrer on referrer.id=a.user_id
+    cross join public.affiliate_settings s
+    join admin.catalog_products sku on sku.product_id=p_payment.product_id
+    join public.affiliate_rates r on r.product_kind=sku.kind
+    left join public.affiliates parent on parent.user_id=a.parent_user_id
+    left join public.affiliate_rate_overrides o on (o.user_id,o.product_kind)=(a.user_id,r.product_kind)
+    left join public.affiliate_rate_overrides po on (po.user_id,po.product_kind)=(parent.user_id,r.product_kind)
+    where s.singleton and customer.id=p_payment.user_id
+      and (s.commission_months is null or case
+        -- A term extending beyond the payment year always covers this sale. Avoid overflowing
+        -- timestamp arithmetic for long terms accepted by the integer setting.
+        when s.commission_months > 12 * (1 + extract(year from p_payment.created_at) - extract(year from customer.referred_at)) then true
+        else p_payment.created_at <= customer.referred_at + make_interval(months => s.commission_months)
+      end);
+$$;
 
--- A retried snapshot whose owner is an account that moved: point it at the customer's current
--- account, but only when that account is the account of an org the snapshot's owner was moved out
--- of. Identity, not existence or time: the former owner may since have opened a personal
--- affiliate account under the same user id (allowed once they leave the org, 1642), and must
--- never receive the org's commission. A customer's binding is first-wins and the transfer moves
--- it, so a customer of the moved account is now bound to the org's current account (any number
--- of moves later). If the customer is no longer bound to such an account (an admin rebind
--- between the race and the retry), the owner still moved out of an org: the payment was the
--- org's, so it goes to that org's current account (the latest move out of that user id). Any
--- other snapshot, and the parent (org accounts have no team; the transfer rewrites stored parents
--- itself), is returned unchanged.
-create function public._affiliate_snapshot_remap(p_snapshot jsonb, p_customer uuid) returns jsonb
+-- A retried org snapshot earns the org's current account; anything else is returned unchanged
+-- (no 'org', a personal account's null 'org', or an org without an account row).
+create function public._affiliate_snapshot_remap(p_snapshot jsonb) returns jsonb
 language sql stable security definer set search_path = '' as $$
   select coalesce((
-    select p_snapshot || jsonb_build_object('owner', c.referred_by)
-      from public.profiles c join public.affiliates a on a.user_id = c.referred_by
-     where c.id = p_customer and a.org_id is not null
-       and c.referred_by::text is distinct from p_snapshot->>'owner'
-       and exists (select from public.affiliate_account_moves m
-                    where m.org_id = a.org_id and m.from_user_id::text = p_snapshot->>'owner')), (
     select p_snapshot || jsonb_build_object('owner', a.user_id)
-      from public.affiliate_account_moves m join public.affiliates a on a.org_id = m.org_id
-     where m.from_user_id::text = p_snapshot->>'owner'
-     order by m.id desc limit 1), p_snapshot);
+      from public.affiliates a
+     where jsonb_typeof(p_snapshot->'org') = 'string' and a.org_id = (p_snapshot->>'org')::uuid), p_snapshot);
 $$;
-revoke all on function public._affiliate_snapshot_remap(jsonb, uuid) from public, anon, authenticated, service_role;
+revoke all on function public._affiliate_snapshot_remap(jsonb) from public, anon, authenticated, service_role;
+
+-- Same as 0904 except the lock on the resolved account and one re-resolution (case 6).
+create or replace function public.affiliate_bind(p_user uuid,p_slug text,p_source text) returns boolean
+language plpgsql security definer set search_path='' as $$
+declare v_owner uuid;
+begin
+  if p_source not in ('signup','first_checkout') or p_source is null then return false; end if;
+  if not (select enabled from public.affiliate_settings where singleton) then return false; end if;
+  select user_id into v_owner from public.affiliates where slug=p_slug and status='active' and user_id<>p_user;
+  if not found then return false; end if;
+  -- An org owner transfer (1930) holds this row and then moves it to another user id: wait for
+  -- it and resolve the slug once more.
+  perform 1 from public.affiliates where user_id=v_owner for key share;
+  if not found then
+    select user_id into v_owner from public.affiliates where slug=p_slug and status='active' and user_id<>p_user;
+    if not found then return false; end if;
+  end if;
+  -- Billing already takes the profile row lock in settle_checkout. Lock before observing payment history.
+  perform 1 from public.profiles where id=p_user and referred_by is null for update;
+  if not found then return false; end if;
+  if p_source='first_checkout' and exists(select from public.payments where user_id=p_user) then return false; end if;
+  update public.profiles set referred_by=v_owner,referred_at=now(),referred_source=p_source where id=p_user and referred_by is null;
+  return found;
+end;
+$$;
+
+-- Same as 1680 except the lock on the resolved account and one re-resolution (case 6).
+create or replace function public._org_attribute_invite() returns trigger
+language plpgsql security definer set search_path='' as $$
+declare v_org uuid; v_account uuid; v_member uuid; v_via uuid; v_source text; v_try integer;
+begin
+  begin
+    for v_try in 1..2 loop
+      select o.id,a.user_id into v_org,v_account from public.org_members m
+        join public.orgs o on o.id=m.org_id
+        join public.affiliates a on a.org_id=o.id
+        where m.user_id=new.inviter_user_id and m.status='active' and o.status='active' and o.affiliate_enabled
+          and a.status='active';
+      if found then
+        v_source:='org_l1'; v_member:=new.inviter_user_id; v_via:=null;
+      else
+        select o.id,a.user_id,inviter.referred_member into v_org,v_account,v_member from public.profiles inviter
+          join public.affiliates a on a.user_id=inviter.referred_by and a.org_id is not null
+          join public.orgs o on o.id=a.org_id
+          where inviter.id=new.inviter_user_id and inviter.referred_source='org_l1'
+            and o.status='active' and o.affiliate_enabled and o.affiliate_levels=2 and a.status='active';
+        if not found then return null; end if;
+        v_source:='org_l2'; v_via:=new.inviter_user_id;
+      end if;
+      -- An org owner transfer (1930) holds the account row and then moves it to another user id:
+      -- wait for it and resolve once more.
+      perform 1 from public.affiliates where user_id=v_account for key share;
+      exit when found;
+      if v_try=2 then return null; end if;
+    end loop;
+    if v_account=new.user_id then return null; end if;
+    if exists(select from public.org_members m where m.org_id=v_org and m.user_id=new.user_id and m.status='active') then
+      return null;
+    end if;
+    update public.profiles set referred_by=v_account,referred_at=now(),referred_source=v_source,
+      referred_member=v_member,referred_via=v_via
+      where id=new.user_id and referred_by is null;
+  exception when others or query_canceled or assert_failure then
+    -- Keep no exception DETAIL/CONTEXT (it can contain a whole row).
+    begin
+      insert into public.org_attribution_errors(redemption_id,error)
+        values(new.id,sqlstate || ': ' || left(sqlerrm,300)) on conflict(redemption_id) do nothing;
+    exception when others or query_canceled or assert_failure then
+      -- Even an unavailable error sink must never undo a successful redemption.
+      return null;
+    end;
+  end;
+  return null;
+end;
+$$;
 
 -- Same as 1740 except the remap of a retried snapshot (the line after the payment lock).
 create or replace function public.affiliate_recompute_payment(p_payment_id bigint,p_new_payment boolean default false) returns void
@@ -109,7 +197,7 @@ begin
   -- Serializes manual/cron retries with the existing billing transaction on this payment.
   select p.* into strict v_payment from public.payments p where p.id=p_payment_id for update;
   if v_payment.amount_total=0 then return; end if;
-  if v_retry then v_snapshot:=public._affiliate_snapshot_remap(v_snapshot,v_payment.user_id); end if;
+  if v_retry then v_snapshot:=public._affiliate_snapshot_remap(v_snapshot); end if;
   if not v_exists and v_snapshot is null then v_snapshot:=public._affiliate_snapshot(v_payment); end if;
   if not v_exists and v_snapshot is null then
     if v_retry then update public.affiliate_recompute_errors set resolved_at=now() where payment_id=p_payment_id and resolved_at is null; end if;
@@ -232,12 +320,13 @@ begin
     update public.profiles set referred_by = v_new where referred_by = v_old;
     get diagnostics n_cust = row_count;
     delete from public.affiliates where user_id = v_old;
-    insert into public.affiliate_account_moves(org_id, from_user_id, to_user_id, actor) values (o.id, v_old, v_new, p_actor);
-    -- Unresolved retries stored before now named the moved row as it was: the org's account.
+    -- Unresolved retries stored before now named the moved row as it was: the org's account
+    -- (case 2 above).
     update public.affiliate_recompute_errors set snapshot = snapshot
         || case when snapshot->>'owner' = v_old::text then jsonb_build_object('owner', v_new) else '{}'::jsonb end
         || case when snapshot->>'parent' = v_old::text then jsonb_build_object('parent', v_new) else '{}'::jsonb end
-      where resolved_at is null and (snapshot->>'owner' = v_old::text or snapshot->>'parent' = v_old::text);
+      where resolved_at is null and (snapshot->>'owner' = v_old::text or snapshot->>'parent' = v_old::text)
+        and (jsonb_typeof(snapshot->'org') is distinct from 'string' or snapshot->>'org' = o.id::text);
     v_moved := jsonb_build_object('commissions', n_comm, 'payouts', n_pay, 'adjustments', n_adj, 'customers', n_cust);
   elsif public._affiliate_personal_open(v_new) then
     raise exception 'ORG_PERSONAL_AFFILIATE';
