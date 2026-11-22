@@ -14,7 +14,7 @@ describe('purchase lines (T80)', () => {
       ],
       'en',
     )
-    expect(pack).toEqual({ value: '7', label: 'Credit pack', receiptHref: '/account/purchases/7/receipt', invoiceHref: null, refund: null })
+    expect(pack).toEqual({ value: '7', label: 'Credit pack', receiptHref: '/account/purchases/7/receipt', invoiceHref: null, portalHref: null, refund: null })
     expect(plan?.invoiceHref).toBe('/account/purchases/8/invoice')
   })
 
@@ -23,9 +23,9 @@ describe('purchase lines (T80)', () => {
     expect(line).toMatchObject({ receiptHref: '/zh/account/purchases/7/receipt', invoiceHref: '/zh/account/purchases/7/invoice' })
   })
 
-  it('Waffo rows have no links (the email note shows instead)', () => {
+  it('Waffo rows link only to the Waffo Consumer Portal (invoices are in its email and portal)', () => {
     const [line] = purchaseLines([row({ channel: 'waffo', hasInvoice: false })], [{ value: '7', label: 'x' }], 'en')
-    expect(line).toMatchObject({ receiptHref: null, invoiceHref: null })
+    expect(line).toMatchObject({ receiptHref: null, invoiceHref: null, portalHref: 'https://pancake.waffo.ai/consumer/portal/login' })
   })
 
   it('refunded rows keep their links and carry the mark', () => {

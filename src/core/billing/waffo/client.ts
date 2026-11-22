@@ -20,6 +20,17 @@ const CREATE_SESSION_PATH = '/v1/actions/checkout/create-session'
 const CANCEL_SUBSCRIPTION_PATH = '/v1/actions/subscription-order/cancel-order'
 const TIMEOUT_MS = 20_000
 
+// Pre-fills the buyer side of Waffo's invoice (billing-detail.ts). country and isBusiness are
+// required by Waffo whenever billingDetail is sent.
+export type WaffoBillingDetail = {
+  country: string
+  isBusiness: true
+  businessName: string
+  taxId: string
+  postcode?: string
+  state?: string
+}
+
 export type WaffoSessionRequest = {
   productId: string
   currency: 'USD'
@@ -35,6 +46,7 @@ export type WaffoSessionRequest = {
   excludePaymentMethods?: readonly string[]
   withTrial?: false
   allowPromotionCodes?: false
+  billingDetail?: WaffoBillingDetail
 }
 
 // cancel-order answers the order, its new status (`canceling` until the period ends, or

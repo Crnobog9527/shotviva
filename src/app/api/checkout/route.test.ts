@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ notify: vi.fn(), getSessionUser: vi.fn(), createCheckout: vi.fn(), createWaffoCheckout: vi.fn(), channel: vi.fn(), mirror: vi.fn(), tier: vi.fn(), pricing: vi.fn(), catalog: vi.fn() }))
+const mocks = vi.hoisted(() => ({ notify: vi.fn(), getSessionUser: vi.fn(), createCheckout: vi.fn(), createWaffoCheckout: vi.fn(), channel: vi.fn(), mirror: vi.fn(), tier: vi.fn(), pricing: vi.fn(), catalog: vi.fn(), billing: vi.fn() }))
 
 vi.mock('@/core/alerts', () => ({ notifyOwner: mocks.notify }))
 vi.mock('@/core/auth/session', () => ({ getSessionUser: mocks.getSessionUser }))
@@ -43,6 +43,7 @@ vi.mock('@/core/billing/waffo', () => ({
   waffoConfig: () => ({ productIds: {}, subscriptionProductIds: {} }),
   waffoWechatPayEnabled: () => false,
   createWaffoCheckout: mocks.createWaffoCheckout,
+  buyerBillingDetail: mocks.billing,
 }))
 
 const { POST } = await import('./route')
