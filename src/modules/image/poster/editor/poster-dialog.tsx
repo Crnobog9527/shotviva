@@ -1,11 +1,12 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { ActionBar } from '@/core/app-shell/action-bar'
-import { bothKinds, chosenBalance, orgBalance, type Balance, type PoolChoice, type PoolChoiceOffer } from '@/core/billing/pools'
+import { bothKinds, chosenBalance, coveringChoice, orgBalance, type Balance, type PoolChoice, type PoolChoiceOffer } from '@/core/billing/pools'
 import { useRouter } from '@/core/i18n'
+import { setCredits } from '@/core/templates/set-price'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
 import type { CatalogueTemplate } from '../../catalogue/catalogue-template'
@@ -47,13 +48,16 @@ function PosterSheet({ template, summary, open, series, onSwitch, onClose, balan
   const t = useTranslations('app.poster')
   const tApp = useTranslations('app')
   const router = useRouter()
-  const choice = usePosterChoice(poolChoice, held)
-  const balance = choice.balance
+  // The studio reads the kind at Generate time; it depends on the set's total, known only from the studio.
+  const chosen = useRef<PoolChoice | undefined>(undefined)
   // Generate queues every poster of the set and moves to Photos, where they develop.
   const studio = usePosterStudio(template, concurrency, () => {
     onClose()
     router.push('/photos', { transitionTypes: navTypesFor('/photos') })
-  }, choice.value)
+  }, () => chosen.current)
+  const choice = usePosterChoice(poolChoice, held, setCredits(template.creditsCost[studio.resolution], studio.parts.length))
+  useEffect(() => { chosen.current = choice.value }, [choice.value])
+  const balance = choice.balance
   // 用上一期 reads this style and the series' others; their names say where it came from.
   const members = series?.members ?? []
   const weekly = usePosterWeekly(template, studio, members.map((member) => member.id).filter((id) => id !== template.id))
@@ -84,9 +88,11 @@ function PosterSheet({ template, summary, open, series, onSwitch, onClose, balan
 
 // Every poster of the set is paid with the chosen kind; an org member spends only the org's shares
 // (their own credits are frozen), so the bar checks those.
-function usePosterChoice(offer: PoolChoiceOffer | null, held: Balance) {
-  const [value, set] = useState<PoolChoice>(offer?.last ?? 'paid')
+// The pick (or the remembered one) when it covers the whole set, else the kind that does.
+function usePosterChoice(offer: PoolChoiceOffer | null, held: Balance, cost: number) {
+  const [picked, set] = useState<PoolChoice>(offer?.last ?? 'paid')
   if (!offer) return { picker: null, balance: held, value: undefined }
   if (!bothKinds(offer)) return { picker: null, balance: orgBalance(offer), value: undefined }
-  return { picker: { offer, value, set }, balance: chosenBalance(orgBalance(offer), value), value }
+  const value = coveringChoice(offer, picked, cost)
+  return { picker: { offer, value, set, cost }, balance: chosenBalance(orgBalance(offer), value), value }
 }

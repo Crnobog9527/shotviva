@@ -4170,22 +4170,15 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "signup_bonus_credits" integer DEFAULT 0 NOT NULL,
     "ref_code" "text",
     "promo_partner" boolean DEFAULT false NOT NULL,
-    "promo_pool_credits" bigint DEFAULT 0 NOT NULL,
-    "promo_expires_at" timestamp with time zone,
-    "default_paid_allowance" integer DEFAULT 0 NOT NULL,
-    "default_promo_allowance" integer DEFAULT 0 NOT NULL,
     CONSTRAINT "orgs_admin_note_check" CHECK (("length"("admin_note") <= 2000)),
     CONSTRAINT "orgs_affiliate_levels_check" CHECK (("affiliate_levels" = ANY (ARRAY[1, 2]))),
     CONSTRAINT "orgs_batch_max_check" CHECK (("batch_max" >= 1)),
     CONSTRAINT "orgs_concurrency_check" CHECK (("concurrency" >= 1)),
-    CONSTRAINT "orgs_default_paid_allowance_check" CHECK ((("default_paid_allowance" >= 0) AND ("default_paid_allowance" <= 1000000000))),
-    CONSTRAINT "orgs_default_promo_allowance_check" CHECK ((("default_promo_allowance" >= 0) AND ("default_promo_allowance" <= 1000000000))),
     CONSTRAINT "orgs_invite_token_check" CHECK (("invite_token" ~ '^[0-9a-f]{32}$'::"text")),
     CONSTRAINT "orgs_multi_template_max_check" CHECK (("multi_template_max" >= 0)),
     CONSTRAINT "orgs_name_check" CHECK ((("length"(TRIM(BOTH FROM "name")) >= 1) AND ("length"(TRIM(BOTH FROM "name")) <= 120))),
     CONSTRAINT "orgs_per_window_check" CHECK (("per_window" >= 1)),
     CONSTRAINT "orgs_pool_credits_check" CHECK (("pool_credits" >= 0)),
-    CONSTRAINT "orgs_promo_pool_credits_check" CHECK (("promo_pool_credits" >= 0)),
     CONSTRAINT "orgs_ref_code_format" CHECK (("ref_code" ~ '^SV-[2-9A-HJKMNP-Z]{6}$'::"text")),
     CONSTRAINT "orgs_signup_bonus_credits_check" CHECK ((("signup_bonus_credits" >= 0) AND ("signup_bonus_credits" <= 1000))),
     CONSTRAINT "orgs_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'suspended'::"text"])))
@@ -4221,66 +4214,6 @@ $$;
 
 
 ALTER FUNCTION "public"."_org_allocate"("p_org" "public"."orgs", "p_member" "uuid", "p_amount" integer, "p_request" "text", "p_actor" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."_org_allocate_promo"("p_org" "uuid", "p_member" "uuid", "p_amount" integer, "p_request" "text", "p_actor" "uuid") RETURNS integer
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-declare
-  v_pool bigint;
-  m public.org_members;
-  change public.credit_change;
-begin
-  if p_amount is null or p_amount <= 0 then raise exception 'INVALID_INPUT'; end if;
-  select promo_pool_credits into v_pool from public.orgs where id = p_org;
-  perform 1 from public.profiles where id = p_member for update;
-  select * into m from public.org_members where org_id = p_org and user_id = p_member and status = 'active' for update;
-  if not found then raise exception 'ORG_MEMBER_NOT_FOUND'; end if;
-  if v_pool < p_amount then raise exception 'ORG_POOL_INSUFFICIENT'; end if;
-  change := public._apply_credit_change(p_member, 'free', 'org_promo_allocate', p_amount, 'org:' || p_org::text,
-    'org_promo:' || p_request);
-  update public.org_members set held_promo_credits = least(held_promo_credits, change.free_credits - p_amount) + p_amount
-   where org_id = p_org and user_id = p_member returning held_promo_credits into m.held_promo_credits;
-  update public.orgs set promo_pool_credits = promo_pool_credits - p_amount, updated_at = now() where id = p_org
-  returning promo_pool_credits into v_pool;
-  insert into public.org_credit_ledger(org_id, kind, delta, pool_after, member_user_id, request_id, actor)
-    values (p_org, 'promo_allocate', -p_amount, v_pool, p_member, p_request, p_actor);
-  return m.held_promo_credits;
-end;
-$$;
-
-
-ALTER FUNCTION "public"."_org_allocate_promo"("p_org" "uuid", "p_member" "uuid", "p_amount" integer, "p_request" "text", "p_actor" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."_org_allowance"("p_custom" boolean, "p_own" integer, "p_default" integer) RETURNS integer
-    LANGUAGE "sql" IMMUTABLE
-    SET "search_path" TO ''
-    AS $$
-  select case when coalesce(p_custom, p_own > 0) then p_own else p_default end;
-$$;
-
-
-ALTER FUNCTION "public"."_org_allowance"("p_custom" boolean, "p_own" integer, "p_default" integer) OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."_org_allowance_input"("p_value" "jsonb") RETURNS "jsonb"
-    LANGUAGE "plpgsql" IMMUTABLE
-    SET "search_path" TO ''
-    AS $_$
-begin
-  if p_value is null or p_value = 'null'::jsonb then return null; end if;
-  if p_value = '"default"'::jsonb then return p_value; end if;
-  if jsonb_typeof(p_value) <> 'number' or (p_value #>> '{}') !~ '^[0-9]{1,10}$' or (p_value #>> '{}')::bigint > 1000000000 then
-    raise exception 'INVALID_INPUT';
-  end if;
-  return p_value;
-end;
-$_$;
-
-
-ALTER FUNCTION "public"."_org_allowance_input"("p_value" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_org_attribute_invite"() RETURNS "trigger"
@@ -4342,50 +4275,6 @@ $$;
 ALTER FUNCTION "public"."_org_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."_org_bulk_members"("p_org" "uuid", "p_members" "jsonb") RETURNS "uuid"[]
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-declare
-  v_ids uuid[];
-  v_found integer;
-begin
-  if jsonb_typeof(p_members) is distinct from 'array' or jsonb_array_length(p_members) not between 1 and 200 then
-    raise exception 'INVALID_INPUT';
-  end if;
-  select array_agg(distinct x::uuid order by x::uuid) into v_ids from jsonb_array_elements_text(p_members) x;
-  if cardinality(v_ids) <> jsonb_array_length(p_members) then raise exception 'INVALID_INPUT'; end if;
-  perform from public.profiles where id = any(v_ids) order by id for update;
-  select count(*) into v_found from (
-    select from public.org_members where org_id = p_org and user_id = any(v_ids) and status = 'active' order by user_id for update
-  ) x;
-  if v_found <> cardinality(v_ids) then raise exception 'ORG_MEMBER_NOT_FOUND'; end if;
-  return v_ids;
-end;
-$$;
-
-
-ALTER FUNCTION "public"."_org_bulk_members"("p_org" "uuid", "p_members" "jsonb") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."_org_bulk_replayed"("p_request" "text", "p_org" "uuid", "p_action" "text") RETURNS boolean
-    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-declare prior public.org_bulk_actions;
-begin
-  perform public._org_replayed(p_request, p_org, 'bulk', null, null);
-  select * into prior from public.org_bulk_actions where request_id = p_request;
-  if not found then return false; end if;
-  if prior.org_id <> p_org or prior.action <> p_action then raise exception 'IDEMPOTENCY_CONFLICT'; end if;
-  return true;
-end;
-$$;
-
-
-ALTER FUNCTION "public"."_org_bulk_replayed"("p_request" "text", "p_org" "uuid", "p_action" "text") OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."_org_check_limits"("p_input" "jsonb") RETURNS "void"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -4422,18 +4311,13 @@ declare
   m public.org_members;
   d public.org_held_draws;
   back integer;
-  v_draw integer;
 begin
   if new.delta < 0 then
     select * into m from public.org_members where user_id = new.user_id and status = 'active' for update;
-    if not found then return new; end if;
-    v_draw := case when new.kind = 'reserve' then least(m.held_credits, -new.delta)
-                   else greatest(0, m.held_credits - new.balance_after) end;
-    if v_draw > 0 or m.held_credits > new.balance_after then
-      update public.org_members set held_credits = least(held_credits - v_draw, new.balance_after) where org_id = m.org_id and user_id = m.user_id;
-    end if;
-    if v_draw > 0 then
-      insert into public.org_held_draws(debit_key, org_id, user_id, drawn) values (new.idempotency_key, m.org_id, m.user_id, v_draw);
+    if found and m.held_credits > new.balance_after then
+      update public.org_members set held_credits = new.balance_after where org_id = m.org_id and user_id = m.user_id;
+      insert into public.org_held_draws(debit_key, org_id, user_id, drawn)
+        values (new.idempotency_key, m.org_id, m.user_id, m.held_credits - new.balance_after);
     end if;
   elsif new.kind = 'refund' then
     select * into d from public.org_held_draws
@@ -4469,9 +4353,7 @@ declare o public.orgs;
 begin
   select * into o from public.orgs where owner_user_id = p_owner for no key update;
   if not found then raise exception 'NOT_ORG_OWNER'; end if;
-  perform public._org_promo_expire_due(o.id);
-  perform public._org_settle_returns(o.id);
-  select * into o from public.orgs where id = o.id;
+  if public._org_settle_returns(o.id) > 0 then select * into o from public.orgs where id = o.id; end if;
   if o.status <> 'active' and not p_allow_suspended then raise exception 'ORG_SUSPENDED'; end if;
   return o;
 end;
@@ -4481,23 +4363,25 @@ $$;
 ALTER FUNCTION "public"."_org_lock_owned"("p_owner" "uuid", "p_allow_suspended" boolean) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."_org_member_rejoin_reset"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION "public"."_org_member_works_access"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 begin
-  if old.status = 'removed' and new.status = 'active' then
-    new.promo_allowance := 0;
-    new.held_promo_credits := 0;
-    new.paid_allowance_custom := null;
-    new.promo_allowance_custom := null;
-  end if;
+  if new.status = old.status then return new; end if;
+  update public.generation_jobs
+     set org_access_ended_at = case when new.status = 'active' then null else coalesce(new.removed_at, now()) end
+   where org_id = new.org_id and user_id = new.user_id;
+  update public.work_shares s
+     set revoked_at = now()
+   where s.user_id = new.user_id and s.revoked_at is null
+     and exists (select 1 from public.generation_jobs j
+                    where j.id = any(s.job_ids) and j.org_id = new.org_id and j.user_id = new.user_id);
   return new;
-end;
-$$;
+end $$;
 
 
-ALTER FUNCTION "public"."_org_member_rejoin_reset"() OWNER TO "postgres";
+ALTER FUNCTION "public"."_org_member_works_access"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_org_payment_fields"("p_kind" "text") RETURNS "text"[]
@@ -4512,171 +4396,6 @@ $$;
 
 
 ALTER FUNCTION "public"."_org_payment_fields"("p_kind" "text") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."_org_promo_expire_due"("p_org" "uuid") RETURNS bigint
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-declare
-  o public.orgs;
-  m record;
-  v_period text;
-  v_take integer;
-  v_total bigint := 0;
-begin
-  select * into o from public.orgs where id = p_org;
-  if o.promo_expires_at is null or o.promo_expires_at > now() then return 0; end if;
-  v_period := public._utc_period(o.promo_expires_at - interval '1 second');
-  if o.promo_pool_credits > 0 then
-    update public.orgs set promo_pool_credits = 0, updated_at = now() where id = o.id;
-    insert into public.org_credit_ledger(org_id, kind, delta, pool_after, request_id, note)
-      values (o.id, 'promo_expire', -o.promo_pool_credits, 0, 'org_promo_expire:' || v_period || ':' || o.id::text,
-        'promotion credits expired at month end');
-    v_total := o.promo_pool_credits;
-  end if;
-  for m in select mm.user_id from public.org_members mm
-            where mm.org_id = o.id and mm.status = 'active' and mm.held_promo_credits > 0 order by mm.user_id loop
-    perform from public.profiles where id = m.user_id for update;
-    select least(mm.held_promo_credits, p.free_credits) into v_take
-      from public.org_members mm join public.profiles p on p.id = mm.user_id
-     where mm.org_id = o.id and mm.user_id = m.user_id for update of mm;
-    if v_take > 0 then
-      perform public._apply_credit_change(m.user_id, 'free', 'org_promo_expire', -v_take,
-        'org promotion credits expired ' || v_period, 'org_promo_expire:' || v_period || ':' || o.id::text || ':' || m.user_id::text);
-      v_total := v_total + v_take;
-    end if;
-    update public.org_members set held_promo_credits = 0 where org_id = o.id and user_id = m.user_id;
-  end loop;
-  update public.orgs set promo_expires_at = null, updated_at = now() where id = o.id;
-  return v_total;
-end;
-$$;
-
-
-ALTER FUNCTION "public"."_org_promo_expire_due"("p_org" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."_org_promo_follows_ledger"() RETURNS "trigger"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $_$
-declare
-  m public.org_members;
-  d public.org_promo_draws;
-  v_draw integer;
-  back integer;
-begin
-  if new.delta < 0 then
-    select * into m from public.org_members where user_id = new.user_id and status = 'active' for update;
-    if not found or m.held_promo_credits = 0 then return new; end if;
-    v_draw := case when new.kind = 'partner_promo_expire' then 0 else least(m.held_promo_credits, -new.delta) end;
-    update public.org_members set held_promo_credits = least(held_promo_credits - v_draw, new.balance_after)
-     where org_id = m.org_id and user_id = m.user_id;
-    if v_draw > 0 then
-      insert into public.org_promo_draws(debit_key, org_id, user_id, period, drawn)
-        values (new.idempotency_key, m.org_id, m.user_id,
-          -- The month the share was funded for (the org's promotion month), not the debit's: a job
-          -- reserved after month end but before the expiry pass still spends last month's credits.
-          coalesce((select public._utc_period(o.promo_expires_at - interval '1 second') from public.orgs o where o.id = m.org_id),
-                   public._utc_period(new.created_at)), v_draw);
-    end if;
-  elsif new.kind = 'refund' then
-    select * into d from public.org_promo_draws
-     where debit_key = regexp_replace(new.idempotency_key, ':[^:]+$', ':reserve') and user_id = new.user_id for update;
-    if not found or d.restored >= d.drawn then return new; end if;
-    back := least(new.delta, d.drawn - d.restored);
-    update public.org_promo_draws set restored = restored + back where debit_key = d.debit_key;
-    -- Only while that month is still the org's live promotion month; otherwise it has expired.
-    if d.period is distinct from (select case when o.promo_expires_at > now() then public._utc_period(o.promo_expires_at - interval '1 second') end
-                                    from public.orgs o where o.id = d.org_id) then
-      perform public._apply_credit_change(new.user_id, 'free', 'org_promo_expire', -back,
-        'org promotion credits expired ' || d.period, 'org_promo_return:' || new.idempotency_key);
-      return new;
-    end if;
-    select * into m from public.org_members where org_id = d.org_id and user_id = d.user_id and status = 'active' for update;
-    if not found then
-      perform public._apply_credit_change(new.user_id, 'free', 'org_promo_reclaim', -back, 'org:' || d.org_id::text,
-        'org_promo_return:' || new.idempotency_key);
-      insert into public.org_pool_returns(refund_key, org_id, user_id, credits, pool, period)
-        values (new.idempotency_key, d.org_id, d.user_id, back, 'promo', d.period);
-      return new;
-    end if;
-    update public.org_members set held_promo_credits = least(held_promo_credits + back, new.balance_after)
-     where org_id = m.org_id and user_id = m.user_id;
-  end if;
-  return new;
-end;
-$_$;
-
-
-ALTER FUNCTION "public"."_org_promo_follows_ledger"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."_org_promo_grant"("p_org" "uuid", "p_credits" integer, "p_expires" timestamp with time zone, "p_request" "text", "p_note" "text", "p_actor" "uuid") RETURNS bigint
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-declare v_pool bigint;
-begin
-  if p_credits is null or p_credits <= 0 or p_expires is null or p_expires <= now() then raise exception 'INVALID_INPUT'; end if;
-  perform public._org_promo_expire_due(p_org);
-  update public.orgs set promo_pool_credits = promo_pool_credits + p_credits,
-         promo_expires_at = coalesce(promo_expires_at, p_expires), updated_at = now()
-   where id = p_org returning promo_pool_credits into v_pool;
-  insert into public.org_credit_ledger(org_id, kind, delta, pool_after, request_id, note, actor)
-    values (p_org, 'promo_grant', p_credits, v_pool, p_request, p_note, p_actor);
-  perform public._org_promo_topup(p_org);
-  return v_pool;
-end;
-$$;
-
-
-ALTER FUNCTION "public"."_org_promo_grant"("p_org" "uuid", "p_credits" integer, "p_expires" timestamp with time zone, "p_request" "text", "p_note" "text", "p_actor" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."_org_promo_topup"("p_org" "uuid") RETURNS bigint
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-declare
-  o public.orgs;
-  m record;
-  v_period text := public._utc_period(now());
-  v_give integer;
-  v_total bigint := 0;
-begin
-  select * into o from public.orgs where id = p_org;
-  if o.status <> 'active' or o.promo_expires_at is null or o.promo_expires_at <= now() then return 0; end if;
-  for m in
-    select x.user_id, x.allowance, x.granted from (
-      select mm.user_id, mm.joined_at, coalesce(t.granted, 0) as granted,
-             public._org_allowance(mm.promo_allowance_custom, mm.promo_allowance, o.default_promo_allowance) as allowance
-        from public.org_members mm
-        left join public.org_member_promo_topups t on t.org_id = mm.org_id and t.user_id = mm.user_id and t.period = v_period
-       where mm.org_id = o.id and mm.status = 'active'
-    ) x
-     where x.allowance > x.granted
-     order by x.joined_at, x.user_id
-  loop
-    select promo_pool_credits into o.promo_pool_credits from public.orgs where id = o.id;
-    v_give := least(m.allowance - m.granted, o.promo_pool_credits)::integer;
-    if v_give > 0 then
-      perform public._org_allocate_promo(o.id, m.user_id, v_give,
-        'org_promo_topup:' || v_period || ':' || o.id::text || ':' || m.user_id::text || ':' || m.granted, null);
-      v_total := v_total + v_give;
-    end if;
-    insert into public.org_member_promo_topups as t(org_id, user_id, period, granted, short)
-      values (o.id, m.user_id, v_period, m.granted + v_give, m.allowance - m.granted - v_give)
-    on conflict (org_id, user_id, period) do update
-      set granted = t.granted + v_give, short = greatest(0, m.allowance - t.granted - v_give), updated_at = now();
-  end loop;
-  return v_total;
-end;
-$$;
-
-
-ALTER FUNCTION "public"."_org_promo_topup"("p_org" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_org_ref_code_new"() RETURNS "text"
@@ -4711,34 +4430,22 @@ CREATE OR REPLACE FUNCTION "public"."_org_release"("p_org" "public"."orgs", "p_m
     AS $$
 declare
   m public.org_members;
-  v_credits integer;
-  v_free integer;
+  credits integer;
   back integer;
-  back_promo integer;
   pool bigint;
 begin
-  perform public._org_promo_expire_due(p_org.id);
-  select p.credits, p.free_credits into v_credits, v_free from public.profiles p where p.id = p_member for update;
+  select p.credits into credits from public.profiles p where p.id = p_member for update;
   select * into m from public.org_members where org_id = p_org.id and user_id = p_member and status = 'active' for update;
   if not found then raise exception 'ORG_MEMBER_NOT_FOUND'; end if;
   if m.role = 'owner' then raise exception 'ORG_OWNER_CANNOT_LEAVE'; end if;
-  back := least(m.held_credits, coalesce(v_credits, 0));
+  back := least(m.held_credits, coalesce(credits, 0));
   if back > 0 then
     perform public._apply_credit_change(p_member, 'paid', 'org_reclaim', -back, 'org:' || p_org.id::text, 'org:' || p_request);
     update public.orgs set pool_credits = pool_credits + back, updated_at = now() where id = p_org.id returning pool_credits into pool;
     insert into public.org_credit_ledger(org_id, kind, delta, pool_after, member_user_id, request_id, actor)
       values (p_org.id, 'reclaim', back, pool, p_member, p_request, p_actor);
   end if;
-  back_promo := least(m.held_promo_credits, coalesce(v_free, 0));
-  if back_promo > 0 then
-    perform public._apply_credit_change(p_member, 'free', 'org_promo_reclaim', -back_promo, 'org:' || p_org.id::text,
-      'org_promo:' || p_request);
-    update public.orgs set promo_pool_credits = promo_pool_credits + back_promo, updated_at = now() where id = p_org.id
-    returning promo_pool_credits into pool;
-    insert into public.org_credit_ledger(org_id, kind, delta, pool_after, member_user_id, request_id, actor)
-      values (p_org.id, 'promo_reclaim', back_promo, pool, p_member, left(p_request, 194) || ':promo', p_actor);
-  end if;
-  update public.org_members set status = 'removed', removed_at = now(), held_credits = 0, held_promo_credits = 0
+  update public.org_members set status = 'removed', removed_at = now(), held_credits = 0
     where org_id = p_org.id and user_id = p_member;
   return back;
 end;
@@ -4754,8 +4461,7 @@ CREATE OR REPLACE FUNCTION "public"."_org_replayed"("p_request" "text", "p_org" 
     AS $$
 declare prior public.org_credit_ledger;
 begin
-  if p_request is null or length(p_request) not between 1 and 200 or starts_with(p_request, 'org_topup:')
-     or starts_with(p_request, 'org_return:') or starts_with(p_request, 'org_promo_') or starts_with(p_request, 'partner_promo') then
+  if p_request is null or length(p_request) not between 1 and 200 or starts_with(p_request, 'org_topup:') or starts_with(p_request, 'org_return:') then
     raise exception 'INVALID_INPUT';
   end if;
   select * into prior from public.org_credit_ledger where request_id = p_request;
@@ -4792,24 +4498,14 @@ CREATE OR REPLACE FUNCTION "public"."_org_settle_returns"("p_org" "uuid") RETURN
     AS $$
 declare
   r record;
-  v_after bigint;
+  pool bigint;
   total bigint := 0;
-  v_live text;
 begin
-  select case when promo_expires_at > now() then public._utc_period(now()) end into v_live from public.orgs where id = p_org;
   for r in update public.org_pool_returns set settled_at = now() where org_id = p_org and settled_at is null
-      returning org_pool_returns.refund_key, org_pool_returns.user_id, org_pool_returns.credits, org_pool_returns.pool as kind, org_pool_returns.period loop
-    if r.kind = 'promo' then
-      continue when r.period is distinct from v_live;
-      update public.orgs set promo_pool_credits = promo_pool_credits + r.credits, updated_at = now() where id = p_org
-      returning promo_pool_credits into v_after;
-      insert into public.org_credit_ledger(org_id, kind, delta, pool_after, member_user_id, request_id, note)
-        values (p_org, 'promo_reclaim', r.credits, v_after, r.user_id, 'org_return:' || r.refund_key, 'refunded after the member left');
-    else
-      update public.orgs set pool_credits = pool_credits + r.credits, updated_at = now() where id = p_org returning pool_credits into v_after;
-      insert into public.org_credit_ledger(org_id, kind, delta, pool_after, member_user_id, request_id, note)
-        values (p_org, 'reclaim', r.credits, v_after, r.user_id, 'org_return:' || r.refund_key, 'refunded after the member left');
-    end if;
+      returning refund_key, user_id, credits loop
+    update public.orgs set pool_credits = pool_credits + r.credits, updated_at = now() where id = p_org returning pool_credits into pool;
+    insert into public.org_credit_ledger(org_id, kind, delta, pool_after, member_user_id, request_id, note)
+      values (p_org, 'reclaim', r.credits, pool, r.user_id, 'org_return:' || r.refund_key, 'refunded after the member left');
     total := total + r.credits;
   end loop;
   return total;
@@ -4853,6 +4549,151 @@ $$;
 
 
 ALTER FUNCTION "public"."_org_signup_bonus"() OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
+    "id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "module" "text" NOT NULL,
+    "template_id" "text" NOT NULL,
+    "inputs" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "provider" "text",
+    "source" "text" NOT NULL,
+    "idempotency_key" "text",
+    "status" "text" DEFAULT 'running'::"text" NOT NULL,
+    "visibility" "text" NOT NULL,
+    "credits_cost" integer NOT NULL,
+    "output_key" "text",
+    "error_code" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "finished_at" timestamp with time zone,
+    "credit_pool" "text" NOT NULL,
+    "parent_job_id" "uuid",
+    "provider_usage" "jsonb",
+    "cost_usd" numeric(10,6),
+    "deleted_at" timestamp with time zone,
+    "client_ip" "inet",
+    "downloaded_at" timestamp with time zone,
+    "download_ip" "inet",
+    "download_count" integer DEFAULT 0 NOT NULL,
+    "batch_id" "uuid",
+    "moderation_status" "text" DEFAULT 'pending'::"text" NOT NULL,
+    "moderation_reason" "text",
+    "moderation_categories" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "auto_moderated_at" timestamp with time zone,
+    "moderated_at" timestamp with time zone,
+    "moderated_by" "uuid",
+    "screen_attempts" integer DEFAULT 0 NOT NULL,
+    "last_screen_at" timestamp with time zone,
+    "gallery_excluded" boolean DEFAULT false NOT NULL,
+    "again_of" "uuid",
+    "org_id" "uuid",
+    "org_access_ended_at" timestamp with time zone,
+    CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
+    CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
+    CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
+    CONSTRAINT "generation_jobs_credit_pool_check" CHECK (("credit_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
+    CONSTRAINT "generation_jobs_credits_cost_check" CHECK (("credits_cost" > 0)),
+    CONSTRAINT "generation_jobs_download_count_check" CHECK (("download_count" >= 0)),
+    CONSTRAINT "generation_jobs_free_work_public" CHECK ((("credit_pool" = 'paid'::"text") OR ("visibility" = 'public'::"text") OR "gallery_excluded")),
+    CONSTRAINT "generation_jobs_moderation_reason_check" CHECK (("moderation_reason" = ANY (ARRAY['auto'::"text", 'sexual'::"text", 'violence'::"text", 'hate'::"text", 'minor'::"text", 'privacy'::"text", 'ip'::"text", 'spam'::"text", 'quality'::"text", 'other'::"text"]))),
+    CONSTRAINT "generation_jobs_moderation_status_check" CHECK (("moderation_status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text"]))),
+    CONSTRAINT "generation_jobs_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
+    CONSTRAINT "generation_jobs_provider_usage_object" CHECK ((("provider_usage" IS NULL) OR ("jsonb_typeof"("provider_usage") = 'object'::"text"))),
+    CONSTRAINT "generation_jobs_screen_attempts_check" CHECK (("screen_attempts" >= 0)),
+    CONSTRAINT "generation_jobs_source_check" CHECK (("source" = ANY (ARRAY['web'::"text", 'graylum'::"text"]))),
+    CONSTRAINT "generation_jobs_status_check" CHECK (("status" = ANY (ARRAY['running'::"text", 'succeeded'::"text", 'failed'::"text"]))),
+    CONSTRAINT "generation_jobs_visibility_check" CHECK (("visibility" = ANY (ARRAY['public'::"text", 'private'::"text"])))
+);
+
+
+ALTER TABLE "public"."generation_jobs" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."generation_jobs"."deleted_at" IS 'When the owner deleted this work (T41). Set only by delete_own_job; user-facing reads skip it.';
+
+
+
+COMMENT ON COLUMN "public"."generation_jobs"."again_of" IS 'Make again: the caller''s own succeeded work, same template, this job was made again from (1513). Null otherwise.';
+
+
+
+COMMENT ON COLUMN "public"."generation_jobs"."org_id" IS 'The org whose credits paid for this work (企业作品, 1941). Set once at insert from org_held_draws; never public.';
+
+
+
+COMMENT ON COLUMN "public"."generation_jobs"."org_access_ended_at" IS 'When the maker left org_id (1941). Non-null: the work is hidden from the maker, their shares and files.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_work_mark_deleted"("p_job" "public"."generation_jobs", "p_actor" "uuid") RETURNS "public"."generation_jobs"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_job public.generation_jobs;
+begin
+  update public.generation_jobs
+     set deleted_at = now(), inputs = inputs - 'note' - 'copy' - 'instruction'
+   where id = p_job.id
+  returning * into v_job;
+  insert into public.org_work_deletions (job_id, org_id, maker_user_id, deleted_by)
+  values (p_job.id, p_job.org_id, p_job.user_id, p_actor)
+  on conflict (job_id) do nothing;
+  return v_job;
+end $$;
+
+
+ALTER FUNCTION "public"."_org_work_mark_deleted"("p_job" "public"."generation_jobs", "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_work_stamp"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_promo_org uuid;
+begin
+  if tg_op = 'INSERT' then
+    -- Never taken from the caller: only the reserve debit decides.
+    new.org_id := (select d.org_id from public.org_held_draws d
+                    where d.debit_key = 'job:' || new.id::text || ':reserve' and d.user_id = new.user_id);
+    -- The org's promo credits (#836) are org credits too. Looked up dynamically so this works
+    -- before and after that table exists, without depending on its migration.
+    if new.org_id is null and to_regclass('public.org_promo_draws') is not null then
+      execute 'select org_id from public.org_promo_draws where debit_key = $1 and user_id = $2'
+        into v_promo_org using 'job:' || new.id::text || ':reserve', new.user_id;
+      new.org_id := v_promo_org;
+    end if;
+    new.org_access_ended_at := null;
+    -- An ex-member cannot edit or redraw a work of the org they left: it looks missing, as
+    -- reserve_credits' own parent check would say.
+    if new.parent_job_id is not null and exists (
+      select 1 from public.generation_jobs p where p.id = new.parent_job_id and p.org_access_ended_at is not null) then
+      raise exception 'PARENT_JOB_NOT_FOUND';
+    end if;
+    if new.again_of is not null and exists (
+      select 1 from public.generation_jobs a where a.id = new.again_of and a.org_access_ended_at is not null) then
+      new.again_of := null;
+    end if;
+    -- Nor claim a free poster redraw (a refund, grant_poster_free_redraw) against one.
+    if new.inputs -> 'poster' ->> 'redraw_of' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' and exists (
+      select 1 from public.generation_jobs r
+       where r.id = (new.inputs -> 'poster' ->> 'redraw_of')::uuid and r.org_access_ended_at is not null) then
+      new.inputs := new.inputs #- '{poster,redraw_of}';
+    end if;
+  elsif old.org_id is not null and new.org_id is distinct from old.org_id then
+    raise exception 'ORG_WORK_IMMUTABLE';
+  end if;
+  if new.org_id is not null then
+    new.gallery_excluded := true;
+    new.visibility := 'private';
+  end if;
+  return new;
+end $_$;
+
+
+ALTER FUNCTION "public"."_org_work_stamp"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_orgs_ref_code_guard"() RETURNS "trigger"
@@ -4939,28 +4780,22 @@ declare
 begin
   select min(x.at) into v_start from (
     select g.decided_at as at from public.partner_promo_grants g
-     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null and g.destination = 'owner'
+     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null
     union all
-    select t.created_at from public.partner_promo_topups t
-     where t.recipient_user_id = p_user and t.expires_at = p_expires and t.destination = 'owner'
+    select t.created_at from public.partner_promo_topups t where t.recipient_user_id = p_user and t.expires_at = p_expires
   ) x;
   if v_start is null then return; end if;
   for e in
     with adds as (
       select g.decided_at as at, 0 as ord, 'grant' as src, g.id, g.total as amount from public.partner_promo_grants g
-       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null and g.destination = 'owner'
+       where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null
       union all
       select t.created_at, 0, 'topup', t.id, t.credits from public.partner_promo_topups t
-       where t.recipient_user_id = p_user and t.expires_at = p_expires and t.destination = 'owner'
+       where t.recipient_user_id = p_user and t.expires_at = p_expires
     ),
-    -- A reserve's part drawn from an org promotion share (1892 org_promo_draws, net of what its
-    -- refunds gave back to that share) was paid by the org's credits, not by this bucket.
     reserves as (
-      select r.created_at as at, r.id, r.idempotency_key, -r.delta as spent, coalesce(d.drawn - d.restored, 0) as org_part
-        from public.credit_ledger r
-        left join public.org_promo_draws d on d.debit_key = r.idempotency_key and d.user_id = r.user_id
-       where r.user_id = p_user and r.pool = 'free' and r.kind = 'reserve' and r.created_at >= v_start
-         and r.created_at < p_expires
+      select r.created_at as at, r.id, r.idempotency_key, -r.delta as spent from public.credit_ledger r
+       where r.user_id = p_user and r.pool = 'free' and r.kind = 'reserve' and r.created_at >= v_start and r.created_at < p_expires
     ),
     refunds as (
       select regexp_replace(f.idempotency_key, ':[^:]+$', ':reserve') as reserve_key, sum(f.delta) as back
@@ -4970,7 +4805,7 @@ begin
     )
     select a.at, a.ord, a.src, a.id, a.amount::bigint from adds a
     union all
-    select r.at, 1, 'spend', r.id, greatest(0, r.spent - least(r.spent, coalesce(f.back, 0)) - r.org_part)::bigint
+    select r.at, 1, 'spend', r.id, greatest(0, r.spent - least(r.spent, coalesce(f.back, 0)))::bigint
       from reserves r left join refunds f on f.reserve_key = r.idempotency_key
     order by 1, 2, 4
   loop
@@ -5098,7 +4933,6 @@ CREATE TABLE IF NOT EXISTS "public"."partner_promo_grants" (
     "expired_credits" integer,
     "expired_basis" integer,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "destination" "text" DEFAULT 'owner'::"text" NOT NULL,
     "voided_at" timestamp with time zone,
     "voided_by" "uuid",
     "void_reason" "text",
@@ -5112,7 +4946,6 @@ CREATE TABLE IF NOT EXISTS "public"."partner_promo_grants" (
     CONSTRAINT "partner_promo_grants_customer_cap_check" CHECK (("customer_cap" >= 0)),
     CONSTRAINT "partner_promo_grants_customers_check" CHECK (("customers" >= 0)),
     CONSTRAINT "partner_promo_grants_decision_note_check" CHECK (("length"("decision_note") <= 500)),
-    CONSTRAINT "partner_promo_grants_destination_check" CHECK (("destination" = ANY (ARRAY['owner'::"text", 'org'::"text"]))),
     CONSTRAINT "partner_promo_grants_expired_basis_check" CHECK (("expired_basis" >= 0)),
     CONSTRAINT "partner_promo_grants_expired_credits_check" CHECK (("expired_credits" >= 0)),
     CONSTRAINT "partner_promo_grants_fingerprint_check" CHECK (("fingerprint" ~ '^[0-9a-f]{32}$'::"text")),
@@ -5147,16 +4980,15 @@ begin
     return jsonb_build_object('applied', false, 'reason', 'changed', 'grant_id', g.id, 'total', g.total);
   end if;
   if g.total > 0 then
-    perform public._org_promo_grant(g.org_id, g.total, g.expires_at, 'partner_promo:' || g.id,
-      'Channel partner promotion credits ' || g.period, p_actor);
+    perform public._apply_credit_change(g.recipient_user_id, 'free', 'partner_promo', g.total,
+      'Channel partner promotion credits ' || g.period, 'partner_promo:' || g.id);
   end if;
   insert into public.partner_promo_clawbacks(source_grant_id, applied_grant_id, credits)
     select x.grant_id, g.id, x.applied from jsonb_to_recordset(v_calc->'sources') as x(grant_id bigint, applied integer)
      where x.applied > 0;
-  update public.partner_promo_grants set status = 'granted', decided_at = now(), decided_by = p_actor, destination = 'org'
-   where id = g.id;
+  update public.partner_promo_grants set status = 'granted', decided_at = now(), decided_by = p_actor where id = g.id;
   perform public._org_audit(p_actor, 'partner_promo_confirm', g.id::text,
-    jsonb_build_object('org_id', g.org_id, 'period', g.period, 'destination', 'org', 'base', g.base,
+    jsonb_build_object('org_id', g.org_id, 'period', g.period, 'recipient', g.recipient_user_id, 'base', g.base,
       'bonus', g.bonus, 'clawback_applied', g.clawback_applied, 'total', g.total, 'fingerprint', g.fingerprint)::text);
   return jsonb_build_object('applied', true, 'grant_id', g.id, 'total', g.total);
 end;
@@ -5182,34 +5014,19 @@ declare
   v_expired integer := 0;
   v_taken bigint := 0;
   v_failed jsonb := '[]'::jsonb;
-  v_org uuid;
 begin
-  -- Orgs first: their lock order is org -> profile, and locks taken in a subtransaction stay held
-  -- until the pass commits, so the owner buckets (profile locks only) come after.
-  for v_org in select o.id from public.orgs o where o.promo_expires_at <= now() order by o.promo_expires_at, o.id loop
-  begin
-    perform from public.orgs where id = v_org for no key update;
-    v_taken := v_taken + public._org_promo_expire_due(v_org);
-    v_expired := v_expired + 1;
-  exception when others then
-    v_failed := v_failed || jsonb_build_array(jsonb_build_object('grant_id', 0, 'org_id', v_org, 'error', sqlerrm));
-  end;
-  end loop;
-
   for b in
     select g.recipient_user_id as u, g.expires_at as e from public.partner_promo_grants g
-     where g.status = 'granted' and g.voided_at is null and g.destination = 'owner' and g.expires_at <= now()
-       and (g.expired_at is null or g.expires_at > now() - interval '7 days')
+     where g.status = 'granted' and g.voided_at is null and g.expires_at <= now() and (g.expired_at is null or g.expires_at > now() - interval '7 days')
     union
     select t.recipient_user_id, t.expires_at from public.partner_promo_topups t
-     where t.destination = 'owner' and t.expires_at <= now() and (t.expired_at is null or t.expires_at > now() - interval '7 days')
+     where t.expires_at <= now() and (t.expired_at is null or t.expires_at > now() - interval '7 days')
     order by 2, 1
   loop
   begin
     perform from public.partner_promo_grants g
-     where g.recipient_user_id = b.u and g.expires_at = b.e and g.status = 'granted' and g.voided_at is null and g.destination = 'owner' order by g.id for update;
-    perform from public.partner_promo_topups t
-     where t.recipient_user_id = b.u and t.expires_at = b.e and t.destination = 'owner' order by t.id for update;
+     where g.recipient_user_id = b.u and g.expires_at = b.e and g.status = 'granted' and g.voided_at is null order by g.id for update;
+    perform from public.partner_promo_topups t where t.recipient_user_id = b.u and t.expires_at = b.e order by t.id for update;
     perform from public.profiles where id = b.u for update;
     for r in select * from public._partner_promo_bucket_left(b.u, b.e) order by source, source_id loop
       if r.source = 'grant' then
@@ -5246,20 +5063,17 @@ begin
   exception when others then
     v_failed := v_failed
       || coalesce((select jsonb_agg(jsonb_build_object('grant_id', g.id, 'error', sqlerrm) order by g.id) from public.partner_promo_grants g
-                    where g.recipient_user_id = b.u and g.expires_at = b.e and g.status = 'granted' and g.voided_at is null and g.destination = 'owner'), '[]'::jsonb)
+                    where g.recipient_user_id = b.u and g.expires_at = b.e and g.status = 'granted' and g.voided_at is null), '[]'::jsonb)
       || coalesce((select jsonb_agg(jsonb_build_object('grant_id', 0, 'topup_id', t.id, 'error', sqlerrm) order by t.id)
                     from public.partner_promo_topups t
-                    where t.recipient_user_id = b.u and t.expires_at = b.e and t.destination = 'owner'), '[]'::jsonb);
+                    where t.recipient_user_id = b.u and t.expires_at = b.e), '[]'::jsonb);
   end;
   end loop;
-
-
   return jsonb_build_object('expired', v_expired, 'taken', v_taken, 'failed', v_failed,
     'overdue', (select count(*) from public.partner_promo_grants
-                 where status = 'granted' and voided_at is null and destination = 'owner' and expired_at is null and expires_at <= now() - interval '1 hour')::integer
+                 where status = 'granted' and voided_at is null and expired_at is null and expires_at <= now() - interval '1 hour')::integer
              + (select count(*) from public.partner_promo_topups
-                 where destination = 'owner' and expired_at is null and expires_at <= now() - interval '1 hour')::integer
-             + (select count(*) from public.orgs where promo_expires_at <= now() - interval '1 hour')::integer);
+                 where expired_at is null and expires_at <= now() - interval '1 hour')::integer);
 end;
 $$;
 
@@ -5638,78 +5452,6 @@ $$;
 ALTER FUNCTION "public"."_payment_granted_credits"("p_payment" "public"."payments") OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."profiles" (
-    "id" "uuid" NOT NULL,
-    "role" "text" DEFAULT 'user'::"text" NOT NULL,
-    "credits" integer DEFAULT 0 NOT NULL,
-    "paid_until" timestamp with time zone,
-    "signup_ip" "inet",
-    "banned_at" timestamp with time zone,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "free_credits" integer DEFAULT 0 NOT NULL,
-    "code_redeem_attempts" timestamp with time zone[] DEFAULT '{}'::timestamp with time zone[] NOT NULL,
-    "referred_by" "uuid",
-    "referred_at" timestamp with time zone,
-    "referred_source" "text",
-    "signup_gift_refusal" "text",
-    "referred_member" "uuid",
-    "referred_via" "uuid",
-    "org_pool_choice" "text",
-    CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
-    CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
-    CONSTRAINT "profiles_org_pool_choice_check" CHECK (("org_pool_choice" = ANY (ARRAY['paid'::"text", 'promo'::"text"]))),
-    CONSTRAINT "profiles_referred_source_check" CHECK (("referred_source" = ANY (ARRAY['signup'::"text", 'first_checkout'::"text", 'admin'::"text", 'org_l1'::"text", 'org_l2'::"text"]))),
-    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"]))),
-    CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'same_ip_pending'::"text", 'daily_cap'::"text", 'paused'::"text"])))
-);
-
-
-ALTER TABLE "public"."profiles" OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text") RETURNS "text"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-declare
-  v_member boolean := false;
-  v_paid integer;
-  v_promo integer;
-  v_pool text;
-begin
-  if p_choice is not null and p_choice not in ('paid', 'promo') then
-    raise exception 'INVALID_INPUT' using detail = 'pool_choice must be paid or promo';
-  end if;
-  select true, least(m.held_credits, p_profile.credits),
-         case when o.promo_expires_at > now() then least(m.held_promo_credits, p_profile.free_credits) else 0 end
-    into v_member, v_paid, v_promo
-    from public.org_members m join public.orgs o on o.id = m.org_id
-   where m.user_id = p_profile.id and m.status = 'active';
-  if not coalesce(v_member, false) then
-    if p_profile.credits >= p_cost then return 'paid'; end if;
-    if p_profile.free_credits >= p_cost then return 'free'; end if;
-    raise exception 'CREDITS_INSUFFICIENT';
-  end if;
-  if p_choice is not null and p_source = 'web' and v_paid > 0 and v_promo > 0 then
-    v_pool := case p_choice when 'paid' then 'paid' else 'free' end;
-    if (case when v_pool = 'paid' then v_paid else v_promo end) < p_cost then
-      raise exception 'POOL_CHOICE_INSUFFICIENT';
-    end if;
-    if p_profile.org_pool_choice is distinct from p_choice then
-      update public.profiles set org_pool_choice = p_choice where id = p_profile.id;
-    end if;
-    return v_pool;
-  end if;
-  if v_paid >= p_cost then return 'paid'; end if;
-  if v_promo >= p_cost then return 'free'; end if;
-  raise exception 'ORG_CREDITS_INSUFFICIENT';
-end;
-$$;
-
-
-ALTER FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text") OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -5722,17 +5464,6 @@ $$;
 
 
 ALTER FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."_utc_period"("p_at" timestamp with time zone) RETURNS "text"
-    LANGUAGE "sql" IMMUTABLE
-    SET "search_path" TO ''
-    AS $$
-  select to_char(p_at at time zone 'UTC', 'YYYY-MM');
-$$;
-
-
-ALTER FUNCTION "public"."_utc_period"("p_at" timestamp with time zone) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_validate_code_discount"("p_products" "text"[], "p_percent" integer, "p_catalog" "jsonb", "p_floor_product_id" "text") RETURNS "void"
@@ -10182,6 +9913,8 @@ begin
   v_key := (p_input->>'request_key')::uuid;
   v_period := to_char(v_month, 'YYYY-MM');
 
+  -- The org row serialises top-ups (and the monthly run and confirms) of one partner, so a second
+  -- submit with the same key waits here and then finds the first one's row.
   select * into o from public.orgs where id = (p_input->>'org_id')::uuid for no key update;
   if not found then raise exception 'ORG_NOT_FOUND'; end if;
   select * into t from public.partner_promo_topups where request_key = v_key;
@@ -10194,14 +9927,14 @@ begin
     return jsonb_build_object('applied', false, 'reason', 'changed');
   end if;
 
-  insert into public.partner_promo_topups(org_id, period, recipient_user_id, credits, reason, request_key, created_by, expires_at, destination)
+  insert into public.partner_promo_topups(org_id, period, recipient_user_id, credits, reason, request_key, created_by, expires_at)
     values (o.id, v_period, o.owner_user_id, v_credits, v_reason, v_key, p_actor,
-      (v_month + interval '1 month')::timestamp at time zone 'UTC', 'org')
+      (v_month + interval '1 month')::timestamp at time zone 'UTC')
   returning * into t;
-  perform public._org_promo_grant(o.id, t.credits, t.expires_at, 'partner_promo_topup:' || t.id,
-    'Channel partner promotion top-up ' || t.period, p_actor);
+  perform public._apply_credit_change(t.recipient_user_id, 'free', 'partner_promo_topup', t.credits,
+    'Channel partner promotion top-up ' || t.period, 'partner_promo_topup:' || t.id);
   perform public._org_audit(p_actor, 'partner_promo_topup', t.id::text,
-    jsonb_build_object('org_id', t.org_id, 'period', t.period, 'destination', 'org',
+    jsonb_build_object('org_id', t.org_id, 'period', t.period, 'recipient', t.recipient_user_id,
       'credits', t.credits, 'reason', t.reason, 'request_key', t.request_key)::text);
   return jsonb_build_object('applied', true, 'topup_id', t.id, 'credits', t.credits, 'expires_at', t.expires_at);
 end;
@@ -14213,71 +13946,6 @@ $$;
 ALTER FUNCTION "public"."code_preview_credits"("offer" "public"."codes") OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."generation_jobs" (
-    "id" "uuid" NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "module" "text" NOT NULL,
-    "template_id" "text" NOT NULL,
-    "inputs" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "provider" "text",
-    "source" "text" NOT NULL,
-    "idempotency_key" "text",
-    "status" "text" DEFAULT 'running'::"text" NOT NULL,
-    "visibility" "text" NOT NULL,
-    "credits_cost" integer NOT NULL,
-    "output_key" "text",
-    "error_code" "text",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "finished_at" timestamp with time zone,
-    "credit_pool" "text" NOT NULL,
-    "parent_job_id" "uuid",
-    "provider_usage" "jsonb",
-    "cost_usd" numeric(10,6),
-    "deleted_at" timestamp with time zone,
-    "client_ip" "inet",
-    "downloaded_at" timestamp with time zone,
-    "download_ip" "inet",
-    "download_count" integer DEFAULT 0 NOT NULL,
-    "batch_id" "uuid",
-    "moderation_status" "text" DEFAULT 'pending'::"text" NOT NULL,
-    "moderation_reason" "text",
-    "moderation_categories" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
-    "auto_moderated_at" timestamp with time zone,
-    "moderated_at" timestamp with time zone,
-    "moderated_by" "uuid",
-    "screen_attempts" integer DEFAULT 0 NOT NULL,
-    "last_screen_at" timestamp with time zone,
-    "gallery_excluded" boolean DEFAULT false NOT NULL,
-    "again_of" "uuid",
-    CONSTRAINT "generation_jobs_check" CHECK ((("status" = 'running'::"text") = ("finished_at" IS NULL))),
-    CONSTRAINT "generation_jobs_check1" CHECK ((("status" <> 'succeeded'::"text") OR ("output_key" IS NOT NULL))),
-    CONSTRAINT "generation_jobs_cost_usd_nonnegative" CHECK ((("cost_usd" IS NULL) OR ("cost_usd" >= (0)::numeric))),
-    CONSTRAINT "generation_jobs_credit_pool_check" CHECK (("credit_pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
-    CONSTRAINT "generation_jobs_credits_cost_check" CHECK (("credits_cost" > 0)),
-    CONSTRAINT "generation_jobs_download_count_check" CHECK (("download_count" >= 0)),
-    CONSTRAINT "generation_jobs_free_work_public" CHECK ((("credit_pool" = 'paid'::"text") OR ("visibility" = 'public'::"text") OR "gallery_excluded")),
-    CONSTRAINT "generation_jobs_moderation_reason_check" CHECK (("moderation_reason" = ANY (ARRAY['auto'::"text", 'sexual'::"text", 'violence'::"text", 'hate'::"text", 'minor'::"text", 'privacy'::"text", 'ip'::"text", 'spam'::"text", 'quality'::"text", 'other'::"text"]))),
-    CONSTRAINT "generation_jobs_moderation_status_check" CHECK (("moderation_status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text"]))),
-    CONSTRAINT "generation_jobs_module_check" CHECK (("module" = ANY (ARRAY['image'::"text", 'video'::"text"]))),
-    CONSTRAINT "generation_jobs_provider_usage_object" CHECK ((("provider_usage" IS NULL) OR ("jsonb_typeof"("provider_usage") = 'object'::"text"))),
-    CONSTRAINT "generation_jobs_screen_attempts_check" CHECK (("screen_attempts" >= 0)),
-    CONSTRAINT "generation_jobs_source_check" CHECK (("source" = ANY (ARRAY['web'::"text", 'graylum'::"text"]))),
-    CONSTRAINT "generation_jobs_status_check" CHECK (("status" = ANY (ARRAY['running'::"text", 'succeeded'::"text", 'failed'::"text"]))),
-    CONSTRAINT "generation_jobs_visibility_check" CHECK (("visibility" = ANY (ARRAY['public'::"text", 'private'::"text"])))
-);
-
-
-ALTER TABLE "public"."generation_jobs" OWNER TO "postgres";
-
-
-COMMENT ON COLUMN "public"."generation_jobs"."deleted_at" IS 'When the owner deleted this work (T41). Set only by delete_own_job; user-facing reads skip it.';
-
-
-
-COMMENT ON COLUMN "public"."generation_jobs"."again_of" IS 'Make again: the caller''s own succeeded work, same template, this job was made again from (1513). Null otherwise.';
-
-
-
 CREATE OR REPLACE FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb" DEFAULT NULL::"jsonb", "p_cost_usd" numeric DEFAULT NULL::numeric, "p_kept_inputs" "text"[] DEFAULT NULL::"text"[]) RETURNS "public"."generation_jobs"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -14512,7 +14180,7 @@ begin
 
   if (select count(*) from public.generation_jobs
        where id = any(p_job_ids) and user_id = p_user_id and status = 'succeeded' and deleted_at is null
-         and moderation_status <> 'rejected') <> v_count then
+         and moderation_status <> 'rejected' and org_access_ended_at is null) <> v_count then
     raise exception 'WORK_SHARE_JOB_NOT_FOUND';
   end if;
 
@@ -14581,7 +14249,7 @@ declare
   v_job public.generation_jobs;
 begin
   select * into v_job from public.generation_jobs
-   where id = p_job_id and user_id = p_user_id
+   where id = p_job_id and user_id = p_user_id and org_access_ended_at is null
      for update;
   if not found then
     raise exception 'JOB_NOT_FOUND';
@@ -14591,6 +14259,12 @@ begin
   end if;
   if v_job.status = 'running' then
     raise exception 'JOB_RUNNING';
+  end if;
+  if v_job.org_id is not null then
+    if not exists (select 1 from public.orgs o where o.id = v_job.org_id and o.owner_user_id = p_user_id) then
+      raise exception 'ORG_WORK_DELETE_FORBIDDEN';
+    end if;
+    return public._org_work_mark_deleted(v_job, p_user_id);
   end if;
 
   update public.generation_jobs
@@ -15132,6 +14806,7 @@ CREATE OR REPLACE FUNCTION "public"."list_work_shares"("p_user_id" "uuid", "p_li
         from unnest(s.job_ids) with ordinality as k(job_id, ord)
         join public.generation_jobs j on j.id = k.job_id
        where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null and j.moderation_status <> 'rejected'
+         and j.org_access_ended_at is null
     ) live
    where s.user_id = p_user_id
      and (p_before_at is null or (s.created_at, s.id) < (p_before_at, p_before_id))
@@ -15390,113 +15065,6 @@ $$;
 ALTER FUNCTION "public"."org_allocate"("p_owner" "uuid", "p_member" "uuid", "p_amount" integer, "p_request_id" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."org_allocate_promo"("p_owner" "uuid", "p_member" "uuid", "p_amount" integer, "p_request_id" "text") RETURNS "jsonb"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-declare
-  o public.orgs;
-  held integer;
-begin
-  if p_amount is null or p_amount <= 0 then raise exception 'INVALID_INPUT'; end if;
-  o := public._org_lock_owned(p_owner, false);
-  if public._org_replayed(p_request_id, o.id, 'promo_allocate', -p_amount, p_member) then
-    return jsonb_build_object('applied', false, 'promo_pool_credits', o.promo_pool_credits);
-  end if;
-  held := public._org_allocate_promo(o.id, p_member, p_amount, p_request_id, p_owner);
-  return jsonb_build_object('applied', true, 'promo_pool_credits', o.promo_pool_credits - p_amount, 'held_promo_credits', held);
-end;
-$$;
-
-
-ALTER FUNCTION "public"."org_allocate_promo"("p_owner" "uuid", "p_member" "uuid", "p_amount" integer, "p_request_id" "text") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."org_bulk_grant"("p_owner" "uuid", "p_input" "jsonb", "p_request_id" "text") RETURNS "jsonb"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $_$
-declare
-  o public.orgs;
-  v_kind text := p_input->>'kind';
-  v_each integer;
-  v_ids uuid[];
-  v_total bigint;
-  v_member uuid;
-  v_pool bigint;
-begin
-  if jsonb_typeof(p_input) is distinct from 'object' or v_kind is null or v_kind not in ('paid', 'promo')
-     or coalesce(p_input->>'each', '') !~ '^[1-9][0-9]{0,9}$' or (p_input->>'each')::bigint > 1000000000 then
-    raise exception 'INVALID_INPUT';
-  end if;
-  v_each := (p_input->>'each')::integer;
-  o := public._org_lock_owned(p_owner, false);
-  if public._org_bulk_replayed(p_request_id, o.id, 'grant') then
-    return jsonb_build_object('applied', false, 'members', 0, 'total', 0,
-      'pool_credits', case when v_kind = 'paid' then o.pool_credits else o.promo_pool_credits end);
-  end if;
-  v_ids := public._org_bulk_members(o.id, p_input->'members');
-  v_total := v_each::bigint * cardinality(v_ids);
-  if (case when v_kind = 'paid' then o.pool_credits else o.promo_pool_credits end) < v_total then
-    raise exception 'ORG_POOL_INSUFFICIENT';
-  end if;
-  foreach v_member in array v_ids loop
-    if v_kind = 'paid' then
-      select * into o from public.orgs where id = o.id;
-      perform public._org_allocate(o, v_member, v_each, p_request_id || ':' || v_member::text, p_owner);
-    else
-      perform public._org_allocate_promo(o.id, v_member, v_each, p_request_id || ':' || v_member::text, p_owner);
-    end if;
-  end loop;
-  insert into public.org_bulk_actions(request_id, org_id, actor, action, members, total, payload)
-    values (p_request_id, o.id, p_owner, 'grant', cardinality(v_ids), v_total,
-      jsonb_build_object('members', to_jsonb(v_ids), 'kind', v_kind, 'each', v_each));
-  select case when v_kind = 'paid' then pool_credits else promo_pool_credits end into v_pool from public.orgs where id = o.id;
-  return jsonb_build_object('applied', true, 'members', cardinality(v_ids), 'total', v_total, 'pool_credits', v_pool);
-end;
-$_$;
-
-
-ALTER FUNCTION "public"."org_bulk_grant"("p_owner" "uuid", "p_input" "jsonb", "p_request_id" "text") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."org_bulk_set_allowance"("p_owner" "uuid", "p_input" "jsonb", "p_request_id" "text") RETURNS "jsonb"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-declare
-  o public.orgs;
-  v_paid jsonb;
-  v_promo jsonb;
-  v_ids uuid[];
-begin
-  if jsonb_typeof(p_input) is distinct from 'object' then raise exception 'INVALID_INPUT'; end if;
-  v_paid := public._org_allowance_input(p_input->'paid');
-  v_promo := public._org_allowance_input(p_input->'promo');
-  if v_paid is null and v_promo is null then raise exception 'INVALID_INPUT'; end if;
-  o := public._org_lock_owned(p_owner, false);
-  if public._org_bulk_replayed(p_request_id, o.id, 'set_allowance') then
-    return jsonb_build_object('applied', false, 'members', 0);
-  end if;
-  v_ids := public._org_bulk_members(o.id, p_input->'members');
-  update public.org_members m set
-      monthly_allowance = case when v_paid is null or v_paid = '"default"'::jsonb then m.monthly_allowance else (v_paid #>> '{}')::integer end,
-      paid_allowance_custom = case when v_paid is null then m.paid_allowance_custom else v_paid <> '"default"'::jsonb end,
-      promo_allowance = case when v_promo is null or v_promo = '"default"'::jsonb then m.promo_allowance else (v_promo #>> '{}')::integer end,
-      promo_allowance_custom = case when v_promo is null then m.promo_allowance_custom else v_promo <> '"default"'::jsonb end
-   where m.org_id = o.id and m.user_id = any(v_ids);
-  insert into public.org_bulk_actions(request_id, org_id, actor, action, members, payload)
-    values (p_request_id, o.id, p_owner, 'set_allowance', cardinality(v_ids),
-      jsonb_build_object('members', to_jsonb(v_ids), 'paid', v_paid, 'promo', v_promo));
-  if v_promo is not null then perform public._org_promo_topup(o.id); end if;
-  return jsonb_build_object('applied', true, 'members', cardinality(v_ids));
-end;
-$$;
-
-
-ALTER FUNCTION "public"."org_bulk_set_allowance"("p_owner" "uuid", "p_input" "jsonb", "p_request_id" "text") OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."org_customer_counts"("p_caller" "uuid", "p_org_id" "uuid") RETURNS TABLE("member_user_id" "uuid", "l1_customers" integer, "l2_customers" integer)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -15669,45 +15237,6 @@ $_$;
 ALTER FUNCTION "public"."org_member_customers"("p_owner" "uuid", "p_period" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."org_member_promo_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") RETURNS TABLE("member_user_id" "uuid", "promo_allowance" integer, "held_promo" integer, "promo_allocated" bigint, "promo_used" bigint)
-    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
-    SET "search_path" TO ''
-    SET "TimeZone" TO 'UTC'
-    AS $_$
-#variable_conflict use_column
-declare
-  v_owner boolean;
-  v_start timestamptz;
-  v_end timestamptz;
-  v_live boolean;
-  v_default integer;
-begin
-  if p_period is null or p_period !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' then raise exception 'INVALID_INPUT'; end if;
-  select o.owner_user_id = p_caller, coalesce(o.promo_expires_at > now(), false), o.default_promo_allowance
-    into v_owner, v_live, v_default from public.orgs o where o.id = p_org_id;
-  if v_owner is distinct from true and not exists(
-    select from public.org_members m where m.org_id = p_org_id and m.user_id = p_caller and m.status = 'active'
-  ) then raise exception 'NOT_ORG_MEMBER'; end if;
-  v_start := ((p_period || '-01')::timestamp) at time zone 'UTC';
-  v_end := v_start + interval '1 month';
-  return query
-  select m.user_id, public._org_allowance(m.promo_allowance_custom, m.promo_allowance, v_default),
-         case when v_live then least(m.held_promo_credits, p.free_credits) else 0 end,
-         coalesce((select -sum(l.delta) from public.org_credit_ledger l
-                    where l.org_id = p_org_id and l.member_user_id = m.user_id and l.kind = 'promo_allocate'
-                      and l.created_at >= v_start and l.created_at < v_end), 0)::bigint,
-         coalesce((select sum(d.drawn - d.restored) from public.org_promo_draws d
-                    where d.org_id = p_org_id and d.user_id = m.user_id and d.period = p_period), 0)::bigint
-    from public.org_members m join public.profiles p on p.id = m.user_id
-   where m.org_id = p_org_id and m.status = 'active' and (coalesce(v_owner, false) or m.user_id = p_caller)
-   order by m.joined_at, m.user_id;
-end;
-$_$;
-
-
-ALTER FUNCTION "public"."org_member_promo_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") RETURNS TABLE("member_user_id" "uuid", "member_role" "text", "member_status" "text", "allocated" bigint, "used" bigint, "l1_signups" integer, "l1_paying" integer, "l1_paid_cents" bigint, "l2_signups" integer, "l2_paying" integer, "l2_paid_cents" bigint)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -15817,11 +15346,9 @@ begin
     n_members := 0;
     org_granted := 0;
     for m in
-      select mm.user_id, public._org_allowance(mm.paid_allowance_custom, mm.monthly_allowance, o.default_paid_allowance) as monthly_allowance,
-             mm.held_credits, p.credits
+      select mm.user_id, mm.monthly_allowance, mm.held_credits, p.credits
         from public.org_members mm join public.profiles p on p.id = mm.user_id
-       where mm.org_id = o.id and mm.status = 'active'
-         and public._org_allowance(mm.paid_allowance_custom, mm.monthly_allowance, o.default_paid_allowance) > 0
+       where mm.org_id = o.id and mm.status = 'active' and mm.monthly_allowance > 0
          and not exists(select from public.org_member_topups t where t.org_id = o.id and t.user_id = mm.user_id and t.period = p_period)
        order by mm.joined_at, mm.user_id
     loop
@@ -15854,6 +15381,92 @@ $_$;
 ALTER FUNCTION "public"."org_monthly_topup"("p_period" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."org_owner_delete_work"("p_owner" "uuid", "p_job_id" "uuid") RETURNS "public"."generation_jobs"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_job public.generation_jobs;
+begin
+  select j.* into v_job from public.generation_jobs j
+    join public.orgs o on o.id = j.org_id
+   where j.id = p_job_id and o.owner_user_id = p_owner
+     for update of j;
+  if not found then
+    raise exception 'JOB_NOT_FOUND';
+  end if;
+  if v_job.deleted_at is not null then
+    return v_job;
+  end if;
+  if v_job.status = 'running' then
+    raise exception 'JOB_RUNNING';
+  end if;
+  return public._org_work_mark_deleted(v_job, p_owner);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."org_owner_delete_work"("p_owner" "uuid", "p_job_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_owner_work"("p_owner" "uuid", "p_job_id" "uuid") RETURNS TABLE("id" "uuid", "user_id" "uuid", "credit_pool" "text", "output_key" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select j.id, j.user_id, j.credit_pool, j.output_key
+    from public.generation_jobs j
+    join public.orgs o on o.id = j.org_id
+   where j.id = p_job_id and o.owner_user_id = p_owner
+     and j.status = 'succeeded' and j.deleted_at is null and j.output_key is not null;
+$$;
+
+
+ALTER FUNCTION "public"."org_owner_work"("p_owner" "uuid", "p_job_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_owner_work_members"("p_owner" "uuid") RETURNS TABLE("user_id" "uuid", "role" "text", "status" "text", "removed_at" timestamp with time zone, "works" integer)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select m.user_id, m.role, m.status, m.removed_at, w.works
+    from public.orgs o
+    join lateral (
+      select j.user_id, count(*)::integer as works
+        from public.generation_jobs j
+       where j.org_id = o.id and j.status = 'succeeded' and j.deleted_at is null
+       group by j.user_id
+    ) w on true
+    join public.org_members m on m.org_id = o.id and m.user_id = w.user_id
+   where o.owner_user_id = p_owner
+   order by (m.status = 'active') desc, w.works desc, m.user_id
+   limit 200;
+$$;
+
+
+ALTER FUNCTION "public"."org_owner_work_members"("p_owner" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_owner_works"("p_owner" "uuid", "p_member" "uuid" DEFAULT NULL::"uuid", "p_limit" integer DEFAULT 30, "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "user_id" "uuid", "template_id" "text", "template_name" "text", "created_at" timestamp with time zone, "aspect_ratio" "text", "member_active" boolean)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select j.id, j.user_id, j.template_id, t.name, j.created_at, j.inputs ->> 'aspect_ratio',
+         j.org_access_ended_at is null
+    from public.orgs o
+    join public.generation_jobs j on j.org_id = o.id
+    left join public.templates t on t.id = j.template_id
+   where o.owner_user_id = p_owner
+     and j.status = 'succeeded' and j.deleted_at is null
+     and (p_member is null or j.user_id = p_member)
+     and (p_before_at is null or (j.created_at, j.id) < (p_before_at, p_before_id))
+   order by j.created_at desc, j.id desc
+   limit least(greatest(coalesce(p_limit, 30), 1), 60);
+$$;
+
+
+ALTER FUNCTION "public"."org_owner_works"("p_owner" "uuid", "p_member" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -15873,54 +15486,6 @@ $$;
 ALTER FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."org_pool_month"("p_owner" "uuid", "p_period" "text") RETURNS "jsonb"
-    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
-    SET "search_path" TO ''
-    SET "TimeZone" TO 'UTC'
-    AS $_$
-declare
-  o public.orgs;
-  v_start timestamptz;
-  v_end timestamptz;
-  v_paid jsonb;
-  v_promo jsonb;
-begin
-  if p_period is null or p_period !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' then raise exception 'INVALID_INPUT'; end if;
-  select * into o from public.orgs where owner_user_id = p_owner;
-  if not found then raise exception 'NOT_ORG_OWNER'; end if;
-  v_start := ((p_period || '-01')::timestamp) at time zone 'UTC';
-  v_end := v_start + interval '1 month';
-  select jsonb_build_object(
-      'balance', o.pool_credits,
-      'in', coalesce(sum(l.delta) filter (where l.kind in ('bank_grant', 'owner_deposit')), 0),
-      'allocated', coalesce(-sum(l.delta) filter (where l.kind = 'allocate'), 0),
-      'reclaimed', coalesce(sum(l.delta) filter (where l.kind = 'reclaim'), 0),
-      'adjusted', coalesce(sum(l.delta) filter (where l.kind = 'admin_adjust'), 0))
-    into v_paid
-    from public.org_credit_ledger l where l.org_id = o.id and l.created_at >= v_start and l.created_at < v_end;
-  select jsonb_build_object(
-      'balance', case when o.promo_expires_at > now() then o.promo_pool_credits else 0 end,
-      'expires_at', case when o.promo_expires_at > now() then o.promo_expires_at end,
-      'granted', coalesce(sum(l.delta) filter (where l.kind = 'promo_grant' and l.created_at >= v_start and l.created_at < v_end), 0),
-      'allocated', coalesce(-sum(l.delta) filter (where l.kind = 'promo_allocate' and l.created_at >= v_start and l.created_at < v_end), 0),
-      'reclaimed', coalesce(sum(l.delta) filter (where l.kind = 'promo_reclaim' and l.created_at >= v_start and l.created_at < v_end), 0),
-      'expired', coalesce(-sum(l.delta) filter (where l.kind = 'promo_expire' and l.request_id like 'org_promo_expire:' || p_period || ':%'), 0)
-        + coalesce((select -sum(c.delta) from public.credit_ledger c
-                     where c.kind = 'org_promo_expire' and c.idempotency_key like 'org_promo_expire:' || p_period || ':' || o.id::text || ':%'), 0),
-      'held', case when o.promo_expires_at > now() then
-        coalesce((select sum(least(m.held_promo_credits, p.free_credits)) from public.org_members m join public.profiles p on p.id = m.user_id
-                   where m.org_id = o.id and m.status = 'active'), 0) else 0 end)
-    into v_promo
-    from public.org_credit_ledger l
-   where l.org_id = o.id and l.kind like 'promo_%' and l.created_at >= v_start and l.created_at < v_end + interval '8 days';
-  return jsonb_build_object('period', p_period, 'paid', v_paid, 'promo', v_promo);
-end;
-$_$;
-
-
-ALTER FUNCTION "public"."org_pool_month"("p_owner" "uuid", "p_period" "text") OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."org_promo_month"("p_org" "uuid", "p_now" timestamp with time zone DEFAULT "now"()) RETURNS TABLE("promo_partner" boolean, "period" "text", "monthly" integer, "topups" integer, "expires_at" timestamp with time zone, "remaining" integer)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -15932,40 +15497,34 @@ declare
   v_topups integer;
   v_expires timestamptz;
   v_left bigint := 0;
-  o public.orgs;
   b record;
 begin
-  select * into o from public.orgs where id = p_org;
-  if not found then return; end if;
-  v_partner := o.promo_partner;
+  select o.promo_partner into v_partner from public.orgs o where o.id = p_org;
+  if v_partner is null then return; end if;
   select coalesce(sum(g.total), 0)::integer, min(g.expires_at) into v_monthly, v_expires
     from public.partner_promo_grants g
    where g.org_id = p_org and g.period = v_period and g.status = 'granted' and g.voided_at is null;
   select coalesce(sum(t.credits), 0)::integer, least(v_expires, min(t.expires_at)) into v_topups, v_expires
     from public.partner_promo_topups t
    where t.org_id = p_org and t.period = v_period;
+  -- Each (recipient, expiry) bucket the org's rows sit in; normally one.
   for b in
-    select x.u, x.e from (
-      select g.recipient_user_id as u, g.expires_at as e from public.partner_promo_grants g
-       where g.org_id = p_org and g.period = v_period and g.status = 'granted' and g.voided_at is null and g.destination = 'owner'
-      union
-      select t.recipient_user_id, t.expires_at from public.partner_promo_topups t
-       where t.org_id = p_org and t.period = v_period and t.destination = 'owner'
-    ) x
+    select x.u, x.e, sum(x.k)::bigint as own from (
+      select g.recipient_user_id as u, g.expires_at as e, 1 as k from public.partner_promo_grants g
+       where g.org_id = p_org and g.period = v_period and g.status = 'granted' and g.voided_at is null
+      union all
+      select t.recipient_user_id, t.expires_at, 1 from public.partner_promo_topups t
+       where t.org_id = p_org and t.period = v_period
+    ) x group by x.u, x.e
   loop
     v_left := v_left + least(
       coalesce((select p.free_credits from public.profiles p where p.id = b.u), 0),
       coalesce((select sum(l.credits_left) from public._partner_promo_bucket_left(b.u, b.e) l
                  where (l.source = 'grant' and exists (select 1 from public.partner_promo_grants g
-                          where g.id = l.source_id and g.org_id = p_org and g.period = v_period and g.voided_at is null))
+                                                       where g.id = l.source_id and g.org_id = p_org and g.period = v_period))
                     or (l.source = 'topup' and exists (select 1 from public.partner_promo_topups t
-                          where t.id = l.source_id and t.org_id = p_org and t.period = v_period))), 0));
+                                                       where t.id = l.source_id and t.org_id = p_org and t.period = v_period))), 0));
   end loop;
-  if o.promo_expires_at > p_now then
-    v_left := v_left + o.promo_pool_credits
-      + coalesce((select sum(least(m.held_promo_credits, p.free_credits)) from public.org_members m
-                   join public.profiles p on p.id = m.user_id where m.org_id = p_org and m.status = 'active'), 0);
-  end if;
   return query select v_partner, v_period, v_monthly, v_topups, v_expires,
     case when v_expires is not null and v_expires <= p_now then 0 else v_left::integer end;
 end;
@@ -16022,7 +15581,7 @@ declare o public.orgs;
 begin
   if p_allowance is null or p_allowance not between 0 and 1000000000 then raise exception 'INVALID_INPUT'; end if;
   o := public._org_lock_owned(p_owner, false);
-  update public.org_members set monthly_allowance = p_allowance, paid_allowance_custom = true
+  update public.org_members set monthly_allowance = p_allowance
     where org_id = o.id and user_id = p_member and status = 'active';
   if not found then raise exception 'ORG_MEMBER_NOT_FOUND'; end if;
   return p_allowance;
@@ -16031,59 +15590,6 @@ $$;
 
 
 ALTER FUNCTION "public"."org_set_allowance"("p_owner" "uuid", "p_member" "uuid", "p_allowance" integer) OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."org_set_default_allowances"("p_owner" "uuid", "p_input" "jsonb", "p_request_id" "text") RETURNS "jsonb"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-declare
-  o public.orgs;
-  v_paid jsonb;
-  v_promo jsonb;
-begin
-  if jsonb_typeof(p_input) is distinct from 'object' then raise exception 'INVALID_INPUT'; end if;
-  v_paid := public._org_allowance_input(p_input->'paid');
-  v_promo := public._org_allowance_input(p_input->'promo');
-  if (v_paid is null and v_promo is null) or v_paid = '"default"'::jsonb or v_promo = '"default"'::jsonb then raise exception 'INVALID_INPUT'; end if;
-  o := public._org_lock_owned(p_owner, false);
-  if public._org_bulk_replayed(p_request_id, o.id, 'set_defaults') then
-    return jsonb_build_object('applied', false, 'default_paid_allowance', o.default_paid_allowance, 'default_promo_allowance', o.default_promo_allowance);
-  end if;
-  update public.orgs set default_paid_allowance = coalesce((v_paid #>> '{}')::integer, default_paid_allowance),
-         default_promo_allowance = coalesce((v_promo #>> '{}')::integer, default_promo_allowance), updated_at = now()
-   where id = o.id returning * into o;
-  insert into public.org_bulk_actions(request_id, org_id, actor, action, members, payload)
-    values (p_request_id, o.id, p_owner, 'set_defaults', 0, jsonb_build_object('paid', v_paid, 'promo', v_promo));
-  if v_promo is not null then perform public._org_promo_topup(o.id); end if;
-  return jsonb_build_object('applied', true, 'default_paid_allowance', o.default_paid_allowance, 'default_promo_allowance', o.default_promo_allowance);
-end;
-$$;
-
-
-ALTER FUNCTION "public"."org_set_default_allowances"("p_owner" "uuid", "p_input" "jsonb", "p_request_id" "text") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."org_set_promo_allowance"("p_owner" "uuid", "p_member" "uuid", "p_allowance" integer) RETURNS integer
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-declare o public.orgs;
-begin
-  if p_allowance is null or p_allowance not between 0 and 1000000000 then raise exception 'INVALID_INPUT'; end if;
-  o := public._org_lock_owned(p_owner, false);
-  -- Lock order org -> profile -> member: the hand-out below locks this profile (Codex #836).
-  perform 1 from public.profiles where id = p_member for update;
-  update public.org_members set promo_allowance = p_allowance, promo_allowance_custom = true
-   where org_id = o.id and user_id = p_member and status = 'active';
-  if not found then raise exception 'ORG_MEMBER_NOT_FOUND'; end if;
-  perform public._org_promo_topup(o.id);
-  return p_allowance;
-end;
-$$;
-
-
-ALTER FUNCTION "public"."org_set_promo_allowance"("p_owner" "uuid", "p_member" "uuid", "p_allowance" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."partner_image_aspects"("public"."templates") RETURNS "text"[]
@@ -16925,6 +16431,7 @@ CREATE OR REPLACE FUNCTION "public"."read_work_share"("p_share_id" "text") RETUR
         from unnest(s.job_ids) with ordinality as k(job_id, ord)
         join public.generation_jobs j on j.id = k.job_id
        where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null and j.moderation_status <> 'rejected'
+         and j.org_access_ended_at is null
     ), '[]'::jsonb)
   )
     from public.work_shares s
@@ -17050,7 +16557,8 @@ begin
    where id = p_job_id
      and user_id = p_user_id
      and status = 'succeeded'
-     and deleted_at is null;
+     and deleted_at is null
+     and org_access_ended_at is null;
   return found;
 end;
 $$;
@@ -17834,8 +17342,13 @@ begin
       coalesce(p_inputs->>'fallback_route'='true',false),v_v2) then
     raise exception 'TEMPLATE_UNAVAILABLE';
   end if;
-  -- Paid first, then free, unless a member holding both kinds of org credits chose one (1897).
-  v_pool := public._reserve_pool(v_profile, v_cost, p_source, p_inputs->>'pool_choice');
+  if v_profile.credits >= v_cost then
+    v_pool := 'paid';
+  elsif v_profile.free_credits >= v_cost then
+    v_pool := 'free';
+  else
+    raise exception 'CREDITS_INSUFFICIENT';
+  end if;
 
   perform public._apply_credit_change(
     p_user_id, v_pool, 'reserve', -v_cost, 'generation reserve',
@@ -17975,12 +17488,13 @@ begin
   end if;
 
   select * into v_job from public.generation_jobs
-   where id = p_job_id and user_id = p_user_id and deleted_at is null
+   where id = p_job_id and user_id = p_user_id and deleted_at is null and org_access_ended_at is null
      for update;
   if not found then
     raise exception 'JOB_NOT_FOUND';
   end if;
 
+  -- An org work is gallery-excluded (1941), so it stays private here too.
   if v_job.gallery_excluded then
     if p_visibility = 'public' then
       raise exception 'WORK_PRIVATE_ONLY';
@@ -18386,8 +17900,10 @@ begin
     raise exception 'RATE_LIMITED';
   end if;
 
-  -- Paid first, then free; org members from org shares only (1897).
-  v_pool := public._reserve_pool(v_profile, v_price, 'web', null);
+  if v_profile.credits >= v_price then v_pool := 'paid';
+  elsif v_profile.free_credits >= v_price then v_pool := 'free';
+  else raise exception 'CREDITS_INSUFFICIENT';
+  end if;
 
   insert into public.poster_extractions (user_id, source, input_chars, status, provider, credits, credit_pool)
   values (p_user_id, 'photo', 0, 'pending', p_provider, v_price, v_pool)
@@ -20140,6 +19656,33 @@ CREATE OR REPLACE VIEW "admin"."template_tariffs_v2" AS
 ALTER VIEW "admin"."template_tariffs_v2" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."profiles" (
+    "id" "uuid" NOT NULL,
+    "role" "text" DEFAULT 'user'::"text" NOT NULL,
+    "credits" integer DEFAULT 0 NOT NULL,
+    "paid_until" timestamp with time zone,
+    "signup_ip" "inet",
+    "banned_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "free_credits" integer DEFAULT 0 NOT NULL,
+    "code_redeem_attempts" timestamp with time zone[] DEFAULT '{}'::timestamp with time zone[] NOT NULL,
+    "referred_by" "uuid",
+    "referred_at" timestamp with time zone,
+    "referred_source" "text",
+    "signup_gift_refusal" "text",
+    "referred_member" "uuid",
+    "referred_via" "uuid",
+    CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
+    CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
+    CONSTRAINT "profiles_referred_source_check" CHECK (("referred_source" = ANY (ARRAY['signup'::"text", 'first_checkout'::"text", 'admin'::"text", 'org_l1'::"text", 'org_l2'::"text"]))),
+    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"]))),
+    CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'same_ip_pending'::"text", 'daily_cap'::"text", 'paused'::"text"])))
+);
+
+
+ALTER TABLE "public"."profiles" OWNER TO "postgres";
+
+
 CREATE OR REPLACE VIEW "admin"."users_overview" AS
  SELECT "u"."id",
     ("u"."email")::"text" AS "email",
@@ -20659,7 +20202,7 @@ CREATE TABLE IF NOT EXISTS "public"."credit_ledger" (
     "payment_id" bigint,
     CONSTRAINT "credit_ledger_balance_after_check" CHECK (("balance_after" >= 0)),
     CONSTRAINT "credit_ledger_delta_check" CHECK (("delta" <> 0)),
-    CONSTRAINT "credit_ledger_kind_check" CHECK (("kind" = ANY (ARRAY['grant'::"text", 'reserve'::"text", 'refund'::"text", 'purchase'::"text", 'admin_adjust'::"text", 'clawback'::"text", 'clawback_restore'::"text", 'code_grant'::"text", 'invite_reward'::"text", 'org_allocate'::"text", 'org_reclaim'::"text", 'org_deposit'::"text", 'org_signup_bonus'::"text", 'partner_promo'::"text", 'partner_promo_expire'::"text", 'partner_promo_topup'::"text", 'org_promo_allocate'::"text", 'org_promo_reclaim'::"text", 'org_promo_expire'::"text"]))),
+    CONSTRAINT "credit_ledger_kind_check" CHECK (("kind" = ANY (ARRAY['grant'::"text", 'reserve'::"text", 'refund'::"text", 'purchase'::"text", 'admin_adjust'::"text", 'clawback'::"text", 'clawback_restore'::"text", 'code_grant'::"text", 'invite_reward'::"text", 'org_allocate'::"text", 'org_reclaim'::"text", 'org_deposit'::"text", 'org_signup_bonus'::"text", 'partner_promo'::"text", 'partner_promo_expire'::"text", 'partner_promo_topup'::"text"]))),
     CONSTRAINT "credit_ledger_pool_check" CHECK (("pool" = ANY (ARRAY['free'::"text", 'paid'::"text"]))),
     CONSTRAINT "credit_ledger_reason_check" CHECK (("length"("reason") > 0))
 );
@@ -20896,25 +20439,6 @@ CREATE TABLE IF NOT EXISTS "public"."org_attribution_errors" (
 ALTER TABLE "public"."org_attribution_errors" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."org_bulk_actions" (
-    "request_id" "text" NOT NULL,
-    "org_id" "uuid" NOT NULL,
-    "actor" "uuid" NOT NULL,
-    "action" "text" NOT NULL,
-    "members" integer NOT NULL,
-    "total" bigint DEFAULT 0 NOT NULL,
-    "payload" "jsonb" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "org_bulk_actions_action_check" CHECK (("action" = ANY (ARRAY['set_allowance'::"text", 'grant'::"text", 'set_defaults'::"text"]))),
-    CONSTRAINT "org_bulk_actions_members_check" CHECK (("members" >= 0)),
-    CONSTRAINT "org_bulk_actions_request_id_check" CHECK ((("length"("request_id") >= 1) AND ("length"("request_id") <= 200))),
-    CONSTRAINT "org_bulk_actions_total_check" CHECK (("total" >= 0))
-);
-
-
-ALTER TABLE "public"."org_bulk_actions" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."org_credit_ledger" (
     "id" bigint NOT NULL,
     "org_id" "uuid" NOT NULL,
@@ -20931,7 +20455,7 @@ CREATE TABLE IF NOT EXISTS "public"."org_credit_ledger" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     CONSTRAINT "org_credit_ledger_amount_cny_fen_check" CHECK (("amount_cny_fen" >= 0)),
     CONSTRAINT "org_credit_ledger_delta_check" CHECK (("delta" <> 0)),
-    CONSTRAINT "org_credit_ledger_kind_check" CHECK (("kind" = ANY (ARRAY['bank_grant'::"text", 'owner_deposit'::"text", 'allocate'::"text", 'reclaim'::"text", 'admin_adjust'::"text", 'promo_grant'::"text", 'promo_allocate'::"text", 'promo_reclaim'::"text", 'promo_expire'::"text"]))),
+    CONSTRAINT "org_credit_ledger_kind_check" CHECK (("kind" = ANY (ARRAY['bank_grant'::"text", 'owner_deposit'::"text", 'allocate'::"text", 'reclaim'::"text", 'admin_adjust'::"text"]))),
     CONSTRAINT "org_credit_ledger_note_check" CHECK (("length"("note") <= 2000)),
     CONSTRAINT "org_credit_ledger_pool_after_check" CHECK (("pool_after" >= 0)),
     CONSTRAINT "org_credit_ledger_reference_check" CHECK (("length"("reference") <= 200)),
@@ -20968,22 +20492,6 @@ CREATE TABLE IF NOT EXISTS "public"."org_held_draws" (
 ALTER TABLE "public"."org_held_draws" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."org_member_promo_topups" (
-    "org_id" "uuid" NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "period" "text" NOT NULL,
-    "granted" integer DEFAULT 0 NOT NULL,
-    "short" integer DEFAULT 0 NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "org_member_promo_topups_granted_check" CHECK (("granted" >= 0)),
-    CONSTRAINT "org_member_promo_topups_period_check" CHECK (("period" ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'::"text")),
-    CONSTRAINT "org_member_promo_topups_short_check" CHECK (("short" >= 0))
-);
-
-
-ALTER TABLE "public"."org_member_promo_topups" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."org_member_topups" (
     "org_id" "uuid" NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -21009,14 +20517,8 @@ CREATE TABLE IF NOT EXISTS "public"."org_members" (
     "status" "text" DEFAULT 'active'::"text" NOT NULL,
     "joined_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "removed_at" timestamp with time zone,
-    "promo_allowance" integer DEFAULT 0 NOT NULL,
-    "held_promo_credits" integer DEFAULT 0 NOT NULL,
-    "paid_allowance_custom" boolean,
-    "promo_allowance_custom" boolean,
     CONSTRAINT "org_members_held_credits_check" CHECK (("held_credits" >= 0)),
-    CONSTRAINT "org_members_held_promo_credits_check" CHECK (("held_promo_credits" >= 0)),
     CONSTRAINT "org_members_monthly_allowance_check" CHECK ((("monthly_allowance" >= 0) AND ("monthly_allowance" <= 1000000000))),
-    CONSTRAINT "org_members_promo_allowance_check" CHECK ((("promo_allowance" >= 0) AND ("promo_allowance" <= 1000000000))),
     CONSTRAINT "org_members_removed_at" CHECK ((("status" = 'removed'::"text") = ("removed_at" IS NOT NULL))),
     CONSTRAINT "org_members_role_check" CHECK (("role" = ANY (ARRAY['owner'::"text", 'member'::"text"]))),
     CONSTRAINT "org_members_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'removed'::"text"])))
@@ -21068,32 +20570,11 @@ CREATE TABLE IF NOT EXISTS "public"."org_pool_returns" (
     "credits" integer NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "settled_at" timestamp with time zone,
-    "pool" "text" DEFAULT 'paid'::"text" NOT NULL,
-    "period" "text",
-    CONSTRAINT "org_pool_returns_credits_check" CHECK (("credits" > 0)),
-    CONSTRAINT "org_pool_returns_period_check" CHECK (("period" ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'::"text")),
-    CONSTRAINT "org_pool_returns_pool_check" CHECK (("pool" = ANY (ARRAY['paid'::"text", 'promo'::"text"])))
+    CONSTRAINT "org_pool_returns_credits_check" CHECK (("credits" > 0))
 );
 
 
 ALTER TABLE "public"."org_pool_returns" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."org_promo_draws" (
-    "debit_key" "text" NOT NULL,
-    "org_id" "uuid" NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "period" "text" NOT NULL,
-    "drawn" integer NOT NULL,
-    "restored" integer DEFAULT 0 NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "org_promo_draws_check" CHECK ((("restored" >= 0) AND ("restored" <= "drawn"))),
-    CONSTRAINT "org_promo_draws_drawn_check" CHECK (("drawn" > 0)),
-    CONSTRAINT "org_promo_draws_period_check" CHECK (("period" ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'::"text"))
-);
-
-
-ALTER TABLE "public"."org_promo_draws" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."org_signup_bonus_errors" (
@@ -21117,6 +20598,18 @@ CREATE TABLE IF NOT EXISTS "public"."org_signup_bonuses" (
 
 
 ALTER TABLE "public"."org_signup_bonuses" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."org_work_deletions" (
+    "job_id" "uuid" NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "maker_user_id" "uuid" NOT NULL,
+    "deleted_by" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."org_work_deletions" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."partner_links" (
@@ -21185,9 +20678,7 @@ CREATE TABLE IF NOT EXISTS "public"."partner_promo_topups" (
     "expired_at" timestamp with time zone,
     "expired_credits" integer,
     "expired_basis" integer,
-    "destination" "text" DEFAULT 'owner'::"text" NOT NULL,
     CONSTRAINT "partner_promo_topups_credits_check" CHECK ((("credits" >= 1) AND ("credits" <= 100000))),
-    CONSTRAINT "partner_promo_topups_destination_check" CHECK (("destination" = ANY (ARRAY['owner'::"text", 'org'::"text"]))),
     CONSTRAINT "partner_promo_topups_expired_basis_check" CHECK (("expired_basis" >= 0)),
     CONSTRAINT "partner_promo_topups_expired_credits_check" CHECK (("expired_credits" >= 0)),
     CONSTRAINT "partner_promo_topups_period_check" CHECK (("period" ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'::"text")),
@@ -22297,11 +21788,6 @@ ALTER TABLE ONLY "public"."org_attribution_errors"
 
 
 
-ALTER TABLE ONLY "public"."org_bulk_actions"
-    ADD CONSTRAINT "org_bulk_actions_pkey" PRIMARY KEY ("request_id");
-
-
-
 ALTER TABLE ONLY "public"."org_credit_ledger"
     ADD CONSTRAINT "org_credit_ledger_pkey" PRIMARY KEY ("id");
 
@@ -22314,11 +21800,6 @@ ALTER TABLE ONLY "public"."org_credit_ledger"
 
 ALTER TABLE ONLY "public"."org_held_draws"
     ADD CONSTRAINT "org_held_draws_pkey" PRIMARY KEY ("debit_key");
-
-
-
-ALTER TABLE ONLY "public"."org_member_promo_topups"
-    ADD CONSTRAINT "org_member_promo_topups_pkey" PRIMARY KEY ("org_id", "user_id", "period");
 
 
 
@@ -22347,11 +21828,6 @@ ALTER TABLE ONLY "public"."org_pool_returns"
 
 
 
-ALTER TABLE ONLY "public"."org_promo_draws"
-    ADD CONSTRAINT "org_promo_draws_pkey" PRIMARY KEY ("debit_key");
-
-
-
 ALTER TABLE ONLY "public"."org_signup_bonus_errors"
     ADD CONSTRAINT "org_signup_bonus_errors_pkey" PRIMARY KEY ("user_id");
 
@@ -22359,6 +21835,11 @@ ALTER TABLE ONLY "public"."org_signup_bonus_errors"
 
 ALTER TABLE ONLY "public"."org_signup_bonuses"
     ADD CONSTRAINT "org_signup_bonuses_pkey" PRIMARY KEY ("user_id");
+
+
+
+ALTER TABLE ONLY "public"."org_work_deletions"
+    ADD CONSTRAINT "org_work_deletions_pkey" PRIMARY KEY ("job_id");
 
 
 
@@ -23117,6 +22598,14 @@ CREATE INDEX "generation_jobs_moderation_queue_idx" ON "public"."generation_jobs
 
 
 
+CREATE INDEX "generation_jobs_org_member_works_idx" ON "public"."generation_jobs" USING "btree" ("org_id", "user_id", "created_at" DESC, "id" DESC) WHERE ("org_id" IS NOT NULL);
+
+
+
+CREATE INDEX "generation_jobs_org_works_idx" ON "public"."generation_jobs" USING "btree" ("org_id", "created_at" DESC, "id" DESC) WHERE ("org_id" IS NOT NULL);
+
+
+
 CREATE INDEX "generation_jobs_parent_job_id_idx" ON "public"."generation_jobs" USING "btree" ("parent_job_id") WHERE ("parent_job_id" IS NOT NULL);
 
 
@@ -23185,10 +22674,6 @@ CREATE INDEX "identity_refusals_user_id_created_at_idx" ON "public"."identity_re
 
 
 
-CREATE INDEX "org_bulk_actions_org_idx" ON "public"."org_bulk_actions" USING "btree" ("org_id", "created_at" DESC);
-
-
-
 CREATE INDEX "org_credit_ledger_org_idx" ON "public"."org_credit_ledger" USING "btree" ("org_id", "created_at" DESC, "id" DESC);
 
 
@@ -23205,11 +22690,11 @@ CREATE INDEX "org_pool_returns_open_idx" ON "public"."org_pool_returns" USING "b
 
 
 
-CREATE INDEX "org_promo_draws_org_period_idx" ON "public"."org_promo_draws" USING "btree" ("org_id", "period");
-
-
-
 CREATE INDEX "org_signup_bonuses_org_idx" ON "public"."org_signup_bonuses" USING "btree" ("org_id", "created_at");
+
+
+
+CREATE INDEX "org_work_deletions_org_idx" ON "public"."org_work_deletions" USING "btree" ("org_id", "created_at" DESC);
 
 
 
@@ -23697,10 +23182,6 @@ CREATE OR REPLACE TRIGGER "credit_ledger_org_held" AFTER INSERT ON "public"."cre
 
 
 
-CREATE OR REPLACE TRIGGER "credit_ledger_org_promo_held" AFTER INSERT ON "public"."credit_ledger" FOR EACH ROW WHEN ((("new"."pool" = 'free'::"text") AND ("new"."kind" <> ALL (ARRAY['org_promo_allocate'::"text", 'org_promo_reclaim'::"text", 'org_promo_expire'::"text"])))) EXECUTE FUNCTION "public"."_org_promo_follows_ledger"();
-
-
-
 CREATE OR REPLACE TRIGGER "dishware_library_set_updated_at" BEFORE UPDATE ON "public"."dishware_library" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
@@ -23714,6 +23195,10 @@ CREATE OR REPLACE TRIGGER "generation_jobs_again_of" BEFORE INSERT ON "public"."
 
 
 CREATE OR REPLACE TRIGGER "generation_jobs_gallery_excluded" BEFORE INSERT OR UPDATE OF "gallery_excluded", "visibility" ON "public"."generation_jobs" FOR EACH ROW EXECUTE FUNCTION "admin"."keep_gallery_excluded_private"();
+
+
+
+CREATE OR REPLACE TRIGGER "generation_jobs_org_work" BEFORE INSERT OR UPDATE OF "org_id", "visibility", "gallery_excluded" ON "public"."generation_jobs" FOR EACH ROW EXECUTE FUNCTION "public"."_org_work_stamp"();
 
 
 
@@ -23737,7 +23222,7 @@ CREATE OR REPLACE TRIGGER "org_invite_attribution" AFTER INSERT ON "public"."cod
 
 
 
-CREATE OR REPLACE TRIGGER "org_members_rejoin_reset" BEFORE UPDATE OF "status" ON "public"."org_members" FOR EACH ROW EXECUTE FUNCTION "public"."_org_member_rejoin_reset"();
+CREATE OR REPLACE TRIGGER "org_members_works_access" AFTER UPDATE OF "status" ON "public"."org_members" FOR EACH ROW EXECUTE FUNCTION "public"."_org_member_works_access"();
 
 
 
@@ -24300,6 +23785,11 @@ ALTER TABLE ONLY "public"."generation_jobs"
 
 
 ALTER TABLE ONLY "public"."generation_jobs"
+    ADD CONSTRAINT "generation_jobs_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
+
+
+
+ALTER TABLE ONLY "public"."generation_jobs"
     ADD CONSTRAINT "generation_jobs_parent_job_id_fkey" FOREIGN KEY ("parent_job_id") REFERENCES "public"."generation_jobs"("id") ON DELETE SET NULL;
 
 
@@ -24339,16 +23829,6 @@ ALTER TABLE ONLY "public"."org_attribution_errors"
 
 
 
-ALTER TABLE ONLY "public"."org_bulk_actions"
-    ADD CONSTRAINT "org_bulk_actions_actor_fkey" FOREIGN KEY ("actor") REFERENCES "public"."profiles"("id");
-
-
-
-ALTER TABLE ONLY "public"."org_bulk_actions"
-    ADD CONSTRAINT "org_bulk_actions_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
-
-
-
 ALTER TABLE ONLY "public"."org_credit_ledger"
     ADD CONSTRAINT "org_credit_ledger_member_user_id_fkey" FOREIGN KEY ("member_user_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -24371,16 +23851,6 @@ ALTER TABLE ONLY "public"."org_held_draws"
 
 ALTER TABLE ONLY "public"."org_held_draws"
     ADD CONSTRAINT "org_held_draws_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."org_member_promo_topups"
-    ADD CONSTRAINT "org_member_promo_topups_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
-
-
-
-ALTER TABLE ONLY "public"."org_member_promo_topups"
-    ADD CONSTRAINT "org_member_promo_topups_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -24429,16 +23899,6 @@ ALTER TABLE ONLY "public"."org_pool_returns"
 
 
 
-ALTER TABLE ONLY "public"."org_promo_draws"
-    ADD CONSTRAINT "org_promo_draws_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
-
-
-
-ALTER TABLE ONLY "public"."org_promo_draws"
-    ADD CONSTRAINT "org_promo_draws_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
-
-
-
 ALTER TABLE ONLY "public"."org_signup_bonus_errors"
     ADD CONSTRAINT "org_signup_bonus_errors_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
@@ -24456,6 +23916,11 @@ ALTER TABLE ONLY "public"."org_signup_bonuses"
 
 ALTER TABLE ONLY "public"."org_signup_bonuses"
     ADD CONSTRAINT "org_signup_bonuses_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."org_work_deletions"
+    ADD CONSTRAINT "org_work_deletions_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
 
 
 
@@ -25122,6 +24587,10 @@ CREATE POLICY "generation_jobs_hide_style_refs" ON "public"."generation_jobs" AS
 
 
 
+CREATE POLICY "generation_jobs_org_access" ON "public"."generation_jobs" AS RESTRICTIVE FOR SELECT TO "authenticated" USING (("org_access_ended_at" IS NULL));
+
+
+
 CREATE POLICY "generation_jobs_select_own" ON "public"."generation_jobs" FOR SELECT TO "authenticated" USING (((( SELECT "auth"."uid"() AS "uid") = "user_id") AND ("deleted_at" IS NULL)));
 
 
@@ -25138,16 +24607,10 @@ ALTER TABLE "public"."identity_refusals" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."org_attribution_errors" ENABLE ROW LEVEL SECURITY;
 
 
-ALTER TABLE "public"."org_bulk_actions" ENABLE ROW LEVEL SECURITY;
-
-
 ALTER TABLE "public"."org_credit_ledger" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_held_draws" ENABLE ROW LEVEL SECURITY;
-
-
-ALTER TABLE "public"."org_member_promo_topups" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_member_topups" ENABLE ROW LEVEL SECURITY;
@@ -25165,13 +24628,13 @@ ALTER TABLE "public"."org_payment_accounts" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."org_pool_returns" ENABLE ROW LEVEL SECURITY;
 
 
-ALTER TABLE "public"."org_promo_draws" ENABLE ROW LEVEL SECURITY;
-
-
 ALTER TABLE "public"."org_signup_bonus_errors" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_signup_bonuses" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."org_work_deletions" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."orgs" ENABLE ROW LEVEL SECURITY;
@@ -26218,31 +25681,11 @@ REVOKE ALL ON FUNCTION "public"."_org_allocate"("p_org" "public"."orgs", "p_memb
 
 
 
-REVOKE ALL ON FUNCTION "public"."_org_allocate_promo"("p_org" "uuid", "p_member" "uuid", "p_amount" integer, "p_request" "text", "p_actor" "uuid") FROM PUBLIC;
-
-
-
-REVOKE ALL ON FUNCTION "public"."_org_allowance"("p_custom" boolean, "p_own" integer, "p_default" integer) FROM PUBLIC;
-
-
-
-REVOKE ALL ON FUNCTION "public"."_org_allowance_input"("p_value" "jsonb") FROM PUBLIC;
-
-
-
 REVOKE ALL ON FUNCTION "public"."_org_attribute_invite"() FROM PUBLIC;
 
 
 
 REVOKE ALL ON FUNCTION "public"."_org_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") FROM PUBLIC;
-
-
-
-REVOKE ALL ON FUNCTION "public"."_org_bulk_members"("p_org" "uuid", "p_members" "jsonb") FROM PUBLIC;
-
-
-
-REVOKE ALL ON FUNCTION "public"."_org_bulk_replayed"("p_request" "text", "p_org" "uuid", "p_action" "text") FROM PUBLIC;
 
 
 
@@ -26258,27 +25701,11 @@ REVOKE ALL ON FUNCTION "public"."_org_lock_owned"("p_owner" "uuid", "p_allow_sus
 
 
 
-REVOKE ALL ON FUNCTION "public"."_org_member_rejoin_reset"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."_org_member_works_access"() FROM PUBLIC;
 
 
 
 REVOKE ALL ON FUNCTION "public"."_org_payment_fields"("p_kind" "text") FROM PUBLIC;
-
-
-
-REVOKE ALL ON FUNCTION "public"."_org_promo_expire_due"("p_org" "uuid") FROM PUBLIC;
-
-
-
-REVOKE ALL ON FUNCTION "public"."_org_promo_follows_ledger"() FROM PUBLIC;
-
-
-
-REVOKE ALL ON FUNCTION "public"."_org_promo_grant"("p_org" "uuid", "p_credits" integer, "p_expires" timestamp with time zone, "p_request" "text", "p_note" "text", "p_actor" "uuid") FROM PUBLIC;
-
-
-
-REVOKE ALL ON FUNCTION "public"."_org_promo_topup"("p_org" "uuid") FROM PUBLIC;
 
 
 
@@ -26303,6 +25730,19 @@ REVOKE ALL ON FUNCTION "public"."_org_settle_returns"("p_org" "uuid") FROM PUBLI
 
 
 REVOKE ALL ON FUNCTION "public"."_org_signup_bonus"() FROM PUBLIC;
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_jobs" TO "service_role";
+GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_work_mark_deleted"("p_job" "public"."generation_jobs", "p_actor" "uuid") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_work_stamp"() FROM PUBLIC;
 
 
 
@@ -26394,25 +25834,8 @@ REVOKE ALL ON FUNCTION "public"."_payment_granted_credits"("p_payment" "public".
 
 
 
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."profiles" TO "service_role";
-GRANT SELECT ON TABLE "public"."profiles" TO "authenticated";
-
-
-
-GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text") FROM PUBLIC;
-
-
-
 REVOKE ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."_utc_period"("p_at" timestamp with time zone) FROM PUBLIC;
 
 
 
@@ -27580,11 +27003,6 @@ GRANT ALL ON FUNCTION "public"."code_preview_credits"("offer" "public"."codes") 
 
 
 
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_jobs" TO "service_role";
-GRANT SELECT ON TABLE "public"."generation_jobs" TO "authenticated";
-
-
-
 REVOKE ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_kept_inputs" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb", "p_cost_usd" numeric, "p_kept_inputs" "text"[]) TO "service_role";
 
@@ -27769,21 +27187,6 @@ GRANT ALL ON FUNCTION "public"."org_allocate"("p_owner" "uuid", "p_member" "uuid
 
 
 
-REVOKE ALL ON FUNCTION "public"."org_allocate_promo"("p_owner" "uuid", "p_member" "uuid", "p_amount" integer, "p_request_id" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."org_allocate_promo"("p_owner" "uuid", "p_member" "uuid", "p_amount" integer, "p_request_id" "text") TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."org_bulk_grant"("p_owner" "uuid", "p_input" "jsonb", "p_request_id" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."org_bulk_grant"("p_owner" "uuid", "p_input" "jsonb", "p_request_id" "text") TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."org_bulk_set_allowance"("p_owner" "uuid", "p_input" "jsonb", "p_request_id" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."org_bulk_set_allowance"("p_owner" "uuid", "p_input" "jsonb", "p_request_id" "text") TO "service_role";
-
-
-
 REVOKE ALL ON FUNCTION "public"."org_customer_counts"("p_caller" "uuid", "p_org_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_customer_counts"("p_caller" "uuid", "p_org_id" "uuid") TO "service_role";
 
@@ -27809,11 +27212,6 @@ GRANT ALL ON FUNCTION "public"."org_member_customers"("p_owner" "uuid", "p_perio
 
 
 
-REVOKE ALL ON FUNCTION "public"."org_member_promo_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."org_member_promo_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") TO "service_role";
-
-
-
 REVOKE ALL ON FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") TO "service_role";
 
@@ -27824,13 +27222,28 @@ GRANT ALL ON FUNCTION "public"."org_monthly_topup"("p_period" "text") TO "servic
 
 
 
+REVOKE ALL ON FUNCTION "public"."org_owner_delete_work"("p_owner" "uuid", "p_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_owner_delete_work"("p_owner" "uuid", "p_job_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_owner_work"("p_owner" "uuid", "p_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_owner_work"("p_owner" "uuid", "p_job_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_owner_work_members"("p_owner" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_owner_work_members"("p_owner" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_owner_works"("p_owner" "uuid", "p_member" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_owner_works"("p_owner" "uuid", "p_member" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_payment_accounts_for_owner"("p_owner" "uuid") TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."org_pool_month"("p_owner" "uuid", "p_period" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."org_pool_month"("p_owner" "uuid", "p_period" "text") TO "service_role";
 
 
 
@@ -27851,16 +27264,6 @@ GRANT ALL ON FUNCTION "public"."org_rotate_invite"("p_owner" "uuid") TO "service
 
 REVOKE ALL ON FUNCTION "public"."org_set_allowance"("p_owner" "uuid", "p_member" "uuid", "p_allowance" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_set_allowance"("p_owner" "uuid", "p_member" "uuid", "p_allowance" integer) TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."org_set_default_allowances"("p_owner" "uuid", "p_input" "jsonb", "p_request_id" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."org_set_default_allowances"("p_owner" "uuid", "p_input" "jsonb", "p_request_id" "text") TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."org_set_promo_allowance"("p_owner" "uuid", "p_member" "uuid", "p_allowance" integer) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."org_set_promo_allowance"("p_owner" "uuid", "p_member" "uuid", "p_allowance" integer) TO "service_role";
 
 
 
@@ -28433,6 +27836,15 @@ GRANT SELECT ON TABLE "admin"."template_floor_budget_cache" TO "service_role";
 
 
 
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."profiles" TO "service_role";
+GRANT SELECT ON TABLE "public"."profiles" TO "authenticated";
+
+
+
+GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
+
+
+
 GRANT SELECT ON TABLE "admin"."users_overview" TO "service_role";
 
 
@@ -28655,19 +28067,11 @@ GRANT SELECT ON TABLE "public"."org_attribution_errors" TO "service_role";
 
 
 
-GRANT SELECT ON TABLE "public"."org_bulk_actions" TO "service_role";
-
-
-
 GRANT SELECT ON TABLE "public"."org_credit_ledger" TO "service_role";
 
 
 
 GRANT SELECT ON TABLE "public"."org_held_draws" TO "service_role";
-
-
-
-GRANT SELECT ON TABLE "public"."org_member_promo_topups" TO "service_role";
 
 
 
@@ -28691,15 +28095,15 @@ GRANT SELECT ON TABLE "public"."org_pool_returns" TO "service_role";
 
 
 
-GRANT SELECT ON TABLE "public"."org_promo_draws" TO "service_role";
-
-
-
 GRANT SELECT ON TABLE "public"."org_signup_bonus_errors" TO "service_role";
 
 
 
 GRANT SELECT ON TABLE "public"."org_signup_bonuses" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."org_work_deletions" TO "service_role";
 
 
 

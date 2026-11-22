@@ -45,6 +45,8 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   FREE_WORK_PUBLIC: 'FORBIDDEN',
   // A work from a gallery-excluded category (the posters root) is never public (§9 第 7 条).
   WORK_PRIVATE_ONLY: 'FORBIDDEN',
+  // 企业作品 (1942): a member cannot delete a work the org paid for.
+  ORG_WORK_DELETE_FORBIDDEN: 'FORBIDDEN',
   // Dispute evidence (T82): an unknown dispute, a Managed Payments one (Stripe answers it), and a
   // second submit of the one submission Stripe allows.
   DISPUTE_NOT_FOUND: 'NOT_FOUND',

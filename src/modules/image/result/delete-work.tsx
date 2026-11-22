@@ -9,7 +9,9 @@ import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
 
 // The server action the page passes in (modules never import app/): deletes the work and
 // redirects to Photos, or answers with why it could not.
-export type DeleteWorkAction = () => Promise<{ failed: 'running' | 'error' } | undefined>
+// 'org': a work the member made with org credits belongs to the org (企业作品), so only its owner deletes it.
+export type DeleteFailure = 'running' | 'org' | 'error'
+export type DeleteWorkAction = () => Promise<{ failed: DeleteFailure } | undefined>
 
 // "Delete" at the end of the photo's actions (T41, ARCHITECTURE §6.2「删除作品」): a quiet button in
 // the danger colour, then a confirm sheet (drawer on phones, dialog from md, DESIGN §8.4) that
@@ -17,7 +19,7 @@ export type DeleteWorkAction = () => Promise<{ failed: 'running' | 'error' } | u
 export function DeleteWork({ action }: { action: DeleteWorkAction }) {
   const t = useTranslations('app.result.delete')
   const [open, setOpen] = useState(false)
-  const [failed, setFailed] = useState<'running' | 'error' | null>(null)
+  const [failed, setFailed] = useState<DeleteFailure | null>(null)
   const [pending, start] = useTransition()
   const confirm = () =>
     start(async () => {
@@ -43,7 +45,7 @@ export function DeleteWork({ action }: { action: DeleteWorkAction }) {
       <ResponsiveSheet open={open} onOpenChange={close} title={t('title')} description={t('body')}>
         {failed ? (
           <p role="alert" className="mt-4 text-caption text-destructive">
-            {t(failed === 'running' ? 'running' : 'failed')}
+            {t(failed === 'error' ? 'failed' : failed)}
           </p>
         ) : null}
         <button

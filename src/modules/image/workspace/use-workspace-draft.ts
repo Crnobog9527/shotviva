@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { bothKinds, chosenBalance, orgBalance, type Balance, type PoolChoice, type PoolChoiceOffer } from '@/core/billing/pools'
+import { bothKinds, chosenBalance, coveringChoice, orgBalance, type Balance, type PoolChoice, type PoolChoiceOffer } from '@/core/billing/pools'
 import { batchMaxFor, type BatchLimits } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 
@@ -56,7 +56,7 @@ export function useWorkspaceDraft({ template, balance, tier, batch, concurrency,
   const running = useRunningCount(concurrency.runningIds)
   const { summary } = photos
   const run = useDraftStart(template, concurrency.limit, again, photos.photos.map((photo) => photo.id).join(','))
-  const choice = usePoolChoice(poolChoice, summary.ready.length <= 1, again, balance)
+  const choice = usePoolChoice(poolChoice, summary.ready.length <= 1, again, balance, template.creditsCost[values.resolution])
   const needsRatio = summary.ready.some(({ photo }) => !chosenAspect(values.aspect, options, photo.originalRatio))
   const ready = (): CtaState => ctaState({
     balance: choice.balance,
@@ -91,12 +91,14 @@ export function useWorkspaceDraft({ template, balance, tier, batch, concurrency,
 // An org member spends the org's shares only (their own credits are frozen); holding both kinds,
 // they pick one (default: their last choice), except for a batch (paid only, §6.2) and Remove
 // watermark (paid). `balance` is what the action bar checks.
-function usePoolChoice(offer: PoolChoiceOffer | null | undefined, single: boolean, again: AgainStart | null, balance: Balance) {
-  const [value, set] = useState<PoolChoice>(offer?.last ?? 'paid')
+function usePoolChoice(offer: PoolChoiceOffer | null | undefined, single: boolean, again: AgainStart | null, balance: Balance, cost: number) {
+  const [picked, set] = useState<PoolChoice>(offer?.last ?? 'paid')
   if (!offer) return { picker: null, balance, value: undefined, orgOnly: false }
   const org = orgBalance(offer)
   if (!bothKinds(offer) || !single || again?.paidOnly === true) return { picker: null, balance: org, value: undefined, orgOnly: true }
-  return { picker: { offer, value, set }, balance: chosenBalance(org, value), value, orgOnly: true }
+  // The pick (or the remembered one) when it covers this job, else the kind that does.
+  const value = coveringChoice(offer, picked, cost)
+  return { picker: { offer, value, set, cost }, balance: chosenBalance(org, value), value, orgOnly: true }
 }
 
 const withChoice = (inputs: StartInput[], choice: PoolChoice | undefined): StartInput[] =>

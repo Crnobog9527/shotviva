@@ -188,6 +188,7 @@ it('owes again the clawback a voided sheet applied, since that grant was taken b
   const now = await sheet(db, orgId, m.current)
   expect(now).toMatchObject({ clawback_owed: 300000, clawback_applied: 10000, total: 0 })
   await confirm(db, actor, now)
+  await asLegacy(db, 'partner_promo_grants', now.id) // a sheet in the owner's own pool, as before 1894
   await voidSheet(actor, { grant_id: now.id, reason: 'manual' })
   // The month after: the 10,000 the voided sheet applied counts as unpaid again.
   const next = (await row(db, "select _partner_promo_calc($1, to_char((now() at time zone 'UTC') + interval '1 month','YYYY-MM')) as c", [orgId])).c
@@ -201,6 +202,7 @@ it('refuses to void a sheet a later sheet already clawed back from', async () =>
   await db.query("update partner_promo_grants set expires_at=now()+interval '1 day' where org_id=$1 and period=$2", [orgId, m.previous])
   const last = await sheet(db, orgId, m.previous)
   await confirm(db, actor, last)
+  await asLegacy(db, 'partner_promo_grants', last.id) // a sheet in the owner's own pool, as before 1894
   for (const x of sales) await db.query("select record_payment_issue($1,'refunded',2490)", [x.charge])
   await run(db, m.current)
   await confirm(db, actor, await sheet(db, orgId, m.current)) // claws 10,000 back from last month's sheet

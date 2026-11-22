@@ -65,3 +65,13 @@ describe('spendableBalance', () => {
     expect(await spendableBalance(db(null, profile), 'u', { paid: 500, free: 80 })).toEqual({ paid: 500, free: 80 })
   })
 })
+
+describe('coveringChoice', () => {
+  it('keeps the pick when it covers the job, else takes the kind that does, else keeps the pick', async () => {
+    const { coveringChoice } = await import('@/core/billing/pools')
+    const offer = { paid: 30, promo: 100, last: 'paid' as const }
+    expect(coveringChoice(offer, 'paid', 20)).toBe('paid')
+    expect(coveringChoice(offer, 'paid', 50)).toBe('promo') // paid short, promotion covers
+    expect(coveringChoice(offer, 'promo', 200)).toBe('promo') // neither covers: the page asks the admin
+  })
+})
