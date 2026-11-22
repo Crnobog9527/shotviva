@@ -262,7 +262,8 @@ $$;
 --    under the debit's key and month; a month-end expiry of the owner's own old promotion grants
 --    (partner_promo_expire) does not draw, it only keeps the share within the balance;
 --  - a refund paired with such a debit (`job:<id>:refund` etc. for `job:<id>:reserve`) gives the
---    drawn part back to the share while the member is still in the org and the month is the same;
+--    drawn part back to the share while the member is still in the org and the month the share was
+--    funded for (recorded with the draw) is still the org's live promotion month;
 --    in a later month that part has expired and is taken straight back (org_promo_expire); after
 --    the member left it is taken back and queued for the promo pool (org_pool_returns, pool promo).
 create function public._org_promo_follows_ledger() returns trigger
@@ -281,7 +282,11 @@ begin
      where org_id = m.org_id and user_id = m.user_id;
     if v_draw > 0 then
       insert into public.org_promo_draws(debit_key, org_id, user_id, period, drawn)
-        values (new.idempotency_key, m.org_id, m.user_id, public._utc_period(new.created_at), v_draw);
+        values (new.idempotency_key, m.org_id, m.user_id,
+          -- The month the share was funded for (the org's promotion month), not the debit's: a job
+          -- reserved after month end but before the expiry pass still spends last month's credits.
+          coalesce((select public._utc_period(o.promo_expires_at - interval '1 second') from public.orgs o where o.id = m.org_id),
+                   public._utc_period(new.created_at)), v_draw);
     end if;
   elsif new.kind = 'refund' then
     select * into d from public.org_promo_draws
@@ -289,7 +294,9 @@ begin
     if not found or d.restored >= d.drawn then return new; end if;
     back := least(new.delta, d.drawn - d.restored);
     update public.org_promo_draws set restored = restored + back where debit_key = d.debit_key;
-    if d.period <> public._utc_period(now()) then
+    -- Only while that month is still the org's live promotion month; otherwise it has expired.
+    if d.period is distinct from (select case when o.promo_expires_at > now() then public._utc_period(o.promo_expires_at - interval '1 second') end
+                                    from public.orgs o where o.id = d.org_id) then
       perform public._apply_credit_change(new.user_id, 'free', 'org_promo_expire', -back,
         'org promotion credits expired ' || d.period, 'org_promo_return:' || new.idempotency_key);
       return new;
