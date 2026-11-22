@@ -37,6 +37,7 @@ type RouteProps = { params: Promise<{ templateId: string }>; searchParams: Promi
 // The workspace, a flow page: no tab bar, back to Create, one fixed primary (DESIGN §8.2).
 // ?again=<jobId> is Make again from a finished work (T40): its settings and kept photos.
 // ?reuse=<jobId> is 一键复用 from a public gallery work (T108): its settings, no photo.
+// ?again=<jobId>&clean=1 is 「去水印：用付费积分重新生成」: Make again, paid credits only.
 async function Workspace({ params, searchParams }: RouteProps) {
   const [{ templateId }, query] = await Promise.all([params, searchParams])
   const user = await requireUser(`/generate/${templateId}`)
@@ -73,7 +74,7 @@ async function Workspace({ params, searchParams }: RouteProps) {
         tier={limits.tier}
         batch={batchLimitsOf(limits)}
         concurrency={{ limit: limits.concurrency, runningIds }}
-        again={again ?? reuse}
+        again={again && query.clean === '1' ? { ...again, paidOnly: true } : (again ?? reuse)}
         editable={editOffer !== null}
         shareText={t('shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}
       />

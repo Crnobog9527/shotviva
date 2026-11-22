@@ -19,6 +19,7 @@ export const SHELL_COPY = {
     orgs: '企业客户',
     disputes: '拒付',
     jobs: '出图记录',
+    trace: '水印追查',
     costs: '成本对账',
     templates: '模板',
     references: '素材参考库',

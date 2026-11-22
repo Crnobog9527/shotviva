@@ -62,6 +62,7 @@ export function useWorkspaceDraft({ template, balance, tier, batch, concurrency,
     limit: concurrency.limit,
     ...photoCta(template, photos, slots, again),
     copyMissing: missingRequiredCopy(template.copyFields, values.copy),
+    paidOnly: again?.paidOnly === true,
   })
   const state: CtaState = run.checking || template.formDeferred ? { kind: 'checking' } : !hasOutputOptions(options) ? { kind: 'no-options' } : needsRatio ? { kind: 'need-size' } : ready()
   const start = () => {

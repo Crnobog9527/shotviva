@@ -75,7 +75,8 @@ export const acceptableUsePage = defineLegalPage({
       blocks: [
         {
           list: [
-            'Do not remove, crop out, cover or edit the watermark on free works, or try to get a free work without the watermark.',
+            'Do not remove, crop out, cover or edit the watermark, the "Demo only" label or the invisible tracking mark on free works, or try to get a free work without them.',
+            'Do not use free works commercially. They are for demonstration only; for commercial use, create the image again with paid credits.',
             'Do not create more than one account, use fake details, or use other tricks to get extra free credits or get around limits.',
             'Do not use bots, scripts or scrapers to access the service, create images in bulk, or copy content from the site, except through an integration we have approved.',
             'Do not try to find out, extract or copy our template instructions or how our templates work, and do not reverse engineer the service.',

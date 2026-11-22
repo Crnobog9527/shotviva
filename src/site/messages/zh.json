@@ -1157,6 +1157,8 @@
       "makeAnotherWith": "用 {name} 再做一张",
       "shareText": "用 {brand} 制作 {url}",
       "makeAgain": "再做一张",
+      "removeWatermark": "去水印：用付费积分重新生成",
+      "removeWatermarkNote": "免费积分作品仅供演示，未授权商用。",
       "tierPx": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off}}}",
       "when": {
         "today": "今天",
@@ -2619,7 +2621,7 @@
       "text": "照片上的文字",
       "reuse": "做一张同款",
       "reuseNote": "会打开同一个模板，设置也一样。照片换成你自己的，不会用这张图。",
-      "watermark": "这张是用免费积分做的，所以带一个小水印。",
+      "watermark": "这张是用免费积分做的：带水印，仅供演示，未授权商用。",
       "alt": "用 Shotviva 做的{template}照片"
     },
     "report": {

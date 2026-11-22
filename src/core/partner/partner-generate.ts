@@ -17,7 +17,7 @@ export type PartnerGenerateRequest = {
   body: z.infer<typeof generateRequestSchema>
 }
 
-export type PartnerGenerateOutcome = Pick<Job, 'id' | 'status' | 'creditsCost' | 'outputKey'>
+export type PartnerGenerateOutcome = Pick<Job, 'id' | 'userId' | 'status' | 'creditsCost' | 'outputKey' | 'creditPool'>
 
 // A replayed key whose job failed answers with that failure again (already refunded).
 // The answer to a replayed Idempotency-Key whose job failed. A job refunded because the image
@@ -76,8 +76,10 @@ export async function partnerGenerate(deps: PartnerGenerateDeps, req: PartnerGen
   if (view.status === 'failed') throw replayFailure(await mustFind(deps, req))
   return {
     id: view.id,
+    userId: req.userId,
     status: view.status,
     creditsCost: view.credits_cost,
+    creditPool: view.credit_pool,
     outputKey: view.status === 'succeeded' ? outputKeyFor(req.userId, view.id) : null,
   }
 }

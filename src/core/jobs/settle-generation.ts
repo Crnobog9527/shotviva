@@ -6,7 +6,7 @@ import { noteGenerationFailure, noteSaleFloorCheck } from '../alerts'
 import { captureError } from '../analytics'
 import { logger } from '../logger'
 import { scheduleScreen } from '../moderation'
-import { keepJobInputs, opaquePng, shouldWatermark, writeWorkThumb, type ObjectStore } from '../storage'
+import { keepJobInputs, opaquePng, writeWorkThumb, type ObjectStore } from '../storage'
 import { classifyFailure, GenerationFailure, type FailureStage } from './generation-failure'
 import { keepsAlpha } from './job-background'
 import { estimatedRouterCost, jobCostUsd } from './job-cost'
@@ -114,7 +114,7 @@ async function storeOutput(deps: SettleDeps, job: Job, output: { key: string; by
   const [, kept] = await Promise.all([
     deps.store.put(output.key, output.bytes, output.contentType),
     keepJobInputs(deps.store, owner, inputKeys),
-    writeWorkThumb(deps.store, { ...owner, bytes: output.bytes, watermark: shouldWatermark(job.creditPool) }),
+    writeWorkThumb(deps.store, { ...owner, bytes: output.bytes, pool: job.creditPool }),
   ])
   return kept
 }
