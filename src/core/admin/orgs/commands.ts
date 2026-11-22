@@ -13,6 +13,7 @@ import { toAppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 
 import { ORGS_COPY as COPY, USAGE_FIELDS, type UsageField } from './copy'
+import { TRANSFER_COPY } from './transfer-copy'
 import { loadOrgDetail } from './reads'
 import type { LimitCaps, OrgActionResult, OrgRow } from './types'
 
@@ -254,6 +255,8 @@ const KNOWN: Record<string, string> = {
   PROFILE_NOT_FOUND: COPY.noAccount,
   INVALID_INPUT: COPY.invalid,
   ORG_LIMIT_ABOVE_CAP: COPY.aboveCapGeneric,
+  ORG_NEW_OWNER_AFFILIATE: TRANSFER_COPY.newOwnerAffiliate,
+  ORG_BUSY: TRANSFER_COPY.busy,
 }
 
 // Turns anything thrown into the message the form shows; unknown failures are logged, not shown.
