@@ -1783,14 +1783,24 @@
       },
       "tabs": {
         "label": "Company sections",
-        "console": "Company",
-        "affiliate": "Company affiliate"
+        "console": "Company workspace",
+        "affiliate": "Company affiliate",
+        "purchasing": "Bulk purchasing",
+        "short": {
+          "affiliate": "Affiliate",
+          "console": "Workspace",
+          "purchasing": "Purchasing"
+        }
       },
       "entry": {
         "title": "Company",
         "pool": "Pool {pool} credits",
         "suspended": "Account paused",
-        "open": "Manage"
+        "open": "Manage",
+        "customerTitle": "Customer referral link",
+        "customerHint": "For inviting and winning customers. Sign-ups and purchases through it earn commission for your company affiliate. This is not the staff link.",
+        "copy": "Copy link",
+        "copied": "Copied"
       },
       "pool": {
         "title": "Credit pool",
@@ -1817,8 +1827,8 @@
         "contactLink": "Contact us to arrange a transfer"
       },
       "invite": {
-        "title": "Invite link",
-        "hint": "Send this link to your team. Anyone signed in who opens it can join the company.",
+        "title": "Staff-only link",
+        "hint": "Send it only to your own staff. They sign up or sign in and join the company, then use the credits you give them.",
         "suspended": "The company is paused, so nobody can join with this link for now.",
         "copy": "Copy link",
         "copied": "Link copied.",
@@ -1828,7 +1838,9 @@
         "resetBody": "The current link stops working right away. People already in the company stay.",
         "resetConfirm": "Reset link",
         "resetDone": "New link ready.",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "warning": "Don't send it to customers. A customer who opens it joins your company as staff instead of counting as a customer you referred.",
+        "toAffiliate": "To invite customers, use the customer referral link in Company affiliate"
       },
       "members": {
         "title": "Members",
@@ -1959,6 +1971,11 @@
         "active": "Active",
         "removed": "Left",
         "unknown": "Account"
+      },
+      "area": {
+        "workspaceIntro": "Where you run Shotviva as a production tool: manage the credit pool, your staff and what they make each month, for image work at scale.",
+        "purchasingIntro": "Company package prices and bank transfer details. Top up the credit pool offline, the way described here.",
+        "affiliateIntro": "Bring in customers and follow commissions and payouts. Sign-ups and purchases through your referral link count toward the company."
       }
     },
     "templateShare": {

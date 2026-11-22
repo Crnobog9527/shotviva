@@ -11,16 +11,12 @@ import type { ConsolePackage, OwnerConsole, PaymentAccountGroup } from '../conso
 import { unitPricePer100Credits } from '../unit-price'
 import { PAYMENT_FIELD_LABELS, PAYMENT_FIELDS, PAYMENT_KIND_LABELS } from '../payment-labels'
 import type { OwnerActions } from './actions'
-import { Confirm } from './confirm'
-import { InviteLinkBox } from './invite-link-box'
 import { RefCodeBox } from './ref-code-box'
 import { FIELD, Panel, Result, Stat } from './parts'
 import { useConsoleAction } from './use-console-action'
-import { ENTERPRISE_LINK_LOCALE } from '@/core/i18n/locales'
-import { localizePath } from '@/core/i18n/paths'
 
-// The owner's console, panel by panel (ARCHITECTURE §6.5): pool and deposit, packages, invite
-// link. The members table is in members-panel.tsx.
+// The owner's console, panel by panel (ARCHITECTURE §6.5): pool and deposit, packages, bank
+// transfer. The staff-only link is in staff-link-panel.tsx. The members table is in members-panel.tsx.
 
 export function PoolPanel({ data, actions }: { data: OwnerConsole; actions: OwnerActions }) {
   const t = useTranslations('app.org.pool')
@@ -91,36 +87,6 @@ export function PackagesPanel({ packages }: { packages: readonly ConsolePackage[
       )}
       <p className="text-label text-muted-foreground">{t('contact')}</p>
       <Link href="/account?help=new" className="inline-flex min-h-11 items-center text-label font-medium text-primary underline underline-offset-4">{t('contactLink')}</Link>
-    </Panel>
-  )
-}
-
-export function InvitePanel({ data, actions }: { data: OwnerConsole; actions: OwnerActions }) {
-  const t = useTranslations('app.org.invite')
-  const [token, setToken] = useState(data.inviteToken)
-  const [confirming, setConfirming] = useState(false)
-  const { pending, outcome, run } = useConsoleAction()
-  const suspended = data.org.status === 'suspended'
-  // The origin is read in the browser, after hydration; the server render shows the path only.
-  const path = localizePath(`/join/org/${token}`, ENTERPRISE_LINK_LOCALE)
-  return (
-    <Panel title={t('title')} hint={t('hint')}>
-      <InviteLinkBox path={path} />
-      {suspended ? <p role="status" className="text-label text-muted-foreground">{t('suspended')}</p> : null}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" size="touch" variant="glass" disabled={pending} onClick={() => setConfirming(true)}>{t('reset')}</Button>
-        <Result outcome={outcome} />
-      </div>
-      <Confirm
-        open={confirming}
-        onOpenChange={setConfirming}
-        title={t('resetTitle')}
-        description={t('resetBody')}
-        confirm={t('resetConfirm')}
-        cancel={t('cancel')}
-        busy={pending}
-        onConfirm={() => run(() => actions.resetInvite(), t('resetDone'), (result) => { setToken(result.token); setConfirming(false) })}
-      />
     </Panel>
   )
 }

@@ -50,3 +50,13 @@
     box-shadow: none;
   }
 }
+
+/* Caution (Owner 2026-11-22): the one warning surface outside the paywall, used where a wrong
+   send has consequences (the enterprise staff-only link, which customers must never get). A warm
+   amber that sits beside the safelight without being mistaken for an action. Ink is 10.9:1 on
+   Tray; the tint and edge are washes of it. App-only, so the marketing sheet does not carry it. */
+:root {
+  --caution: #F2C46B;
+  --caution-tint: rgba(242, 196, 107, 0.08);
+  --caution-edge: rgba(242, 196, 107, 0.34);
+}
