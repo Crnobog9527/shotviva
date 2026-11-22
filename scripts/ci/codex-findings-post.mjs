@@ -15,12 +15,24 @@ import { evaluate } from './codex-findings.mjs'
 const env = process.env
 if (!/^[0-9a-f]{40}$/.test(env.HEAD_SHA ?? '')) throw new Error('HEAD_SHA must be a full commit sha')
 
-const { ok, lines, summary } = await evaluate()
+const { ok, lines, summary, readAt } = await evaluate()
 for (const line of lines) console.log(line)
+const headers = { authorization: `Bearer ${env.GH_TOKEN}`, accept: 'application/vnd.github+json' }
+// A codex-review.yml run (a review or thread event) that posted after this read the state judged
+// newer data: never overwrite it with this result.
+const existing = await fetch(
+  `https://api.github.com/repos/${env.REPO}/commits/${env.HEAD_SHA}/check-runs?check_name=${encodeURIComponent('Codex findings')}&filter=all&per_page=100`,
+  { headers },
+)
+if (!existing.ok) throw new Error(`check-runs list: ${existing.status} ${await existing.text()}`)
+if ((await existing.json()).check_runs.some((run) => new Date(run.started_at ?? run.completed_at ?? 0) > readAt)) {
+  console.log('::notice::A newer "Codex findings" check is already on this commit; not posting.')
+  process.exit(0)
+}
 const text = `${summary}\n${lines.map((l) => `- ${l.replace(/^::(\w+)[^:]*::/, '**$1**: ')}`).join('\n')}\n`
 const response = await fetch(`https://api.github.com/repos/${env.REPO}/check-runs`, {
   method: 'POST',
-  headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: 'application/vnd.github+json' },
+  headers,
   body: JSON.stringify({
     name: 'Codex findings',
     head_sha: env.HEAD_SHA,

@@ -131,6 +131,12 @@ const onlySchema = (files) =>
  * exactly the [auto] marker, one parent, changing supabase/schema.sql and nothing else). Takes the
  * compare API's `reviewed...head` response and each commit's own file list (`filesOf(sha)`).
  * Returns `{ carried, reason }`; anything unexpected is not carried (fail closed).
+ *
+ * Advisory only: commit identity comes from the commit's email, which anyone with push access can
+ * set to the bot's (schema-commit.sh's commits are unsigned). A forged commit gains nothing today:
+ * a carry only replaces the head-is-newer warning, which never fails the check, and a schema.sql
+ * that does not match the migrations fails "supabase db tests". Before ever making that warning
+ * an error, have schema-commit.sh create server-signed commits and require commit.verification.
  */
 export function schemaCarry({ reviewed, head, compare, filesOf }) {
   const no = (reason) => ({ carried: false, reason })
@@ -330,14 +336,17 @@ export function judge({ risk, reviewThreads, state }) {
 
 /**
  * Runs the whole check: waits (up to waitMinutes) for a running or missing review, then judges.
- * Returns `{ ok, lines, summary }`; the CLI below and scripts/ci/codex-findings-post.mjs use it.
+ * Returns `{ ok, lines, summary, readAt }`; the CLI below and scripts/ci/codex-findings-post.mjs use it.
  */
 export async function evaluate({ risk = env.RISK ?? 'high', waitMinutes = Number(env.WAIT_MINUTES ?? 20), log = console.log } = {}) {
   const deadline = Date.now() + waitMinutes * 60_000
+  // When the state judged below was read: a check run posted after it may know more.
+  let readAt = new Date()
   let { state, claudeReviewIds } = await fullState()
   while ((state.running || (risk === 'high' && !state.completed)) && Date.now() < deadline) {
     log(state.running ? 'Codex review running; waiting for it…' : 'No finished review yet; waiting for one…')
     await new Promise((resolve) => setTimeout(resolve, 30_000))
+    readAt = new Date()
     ;({ state, claudeReviewIds } = await fullState())
   }
   const result = judge({ risk, reviewThreads: await threads(claudeReviewIds), state })
@@ -346,7 +355,7 @@ export async function evaluate({ risk = env.RISK ?? 'high', waitMinutes = Number
   const rows = result.table.length ? `\n| | Finding | File | Thread |\n|---|---|---|---|\n${result.table.join('\n')}\n` : ''
   const by = state.claudeReviewers.length ? ` · Claude reviewer: ${state.claudeReviewers.join(', ')}` : ''
   const summary = `### Codex findings\n\nRisk: **${risk}** · Review finished: **${reviewed}**${by} · unresolved findings: **${result.open}** · outdated, unresolved: ${result.stale}\n${rows}`
-  return { ok: result.ok, lines: result.lines, summary }
+  return { ok: result.ok, lines: result.lines, summary, readAt }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -394,7 +394,8 @@ jobs:
   codex-findings:
     name: post Codex findings on the schema.sql commit
     needs: schema-sql
-    if: ${{ !cancelled() && needs.schema-sql.result == 'success' && needs.schema-sql.outputs.new-head != '' }}
+    # Drafts are skipped, as in codex-review.yml.
+    if: ${{ !cancelled() && !github.event.pull_request.draft && needs.schema-sql.result == 'success' && needs.schema-sql.outputs.new-head != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
