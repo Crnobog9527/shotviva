@@ -3758,7 +3758,11 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "js
      where c.id = p_customer and a.org_id is not null
        and c.referred_by::text is distinct from p_snapshot->>'owner'
        and exists (select from public.affiliate_account_moves m
-                    where m.org_id = a.org_id and m.from_user_id::text = p_snapshot->>'owner')), p_snapshot);
+                    where m.org_id = a.org_id and m.from_user_id::text = p_snapshot->>'owner')), (
+    select p_snapshot || jsonb_build_object('owner', a.user_id)
+      from public.affiliate_account_moves m join public.affiliates a on a.org_id = m.org_id
+     where m.from_user_id::text = p_snapshot->>'owner'
+     order by m.id desc limit 1), p_snapshot);
 $$;
 
 
@@ -9598,13 +9602,13 @@ declare
   v_uuid constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
   v_org_id uuid;
   v_new uuid;
+  v_expected timestamptz;
   v_old uuid;
   o public.orgs;
   v_banned timestamptz;
   v_found boolean;
   v_current uuid;
   a public.affiliates;
-  v_slug text;
   n_comm bigint; n_pay bigint; n_adj bigint; n_cust bigint;
   v_moved jsonb := null;
 begin
@@ -9615,13 +9619,18 @@ begin
      or jsonb_typeof(p_input->'expected_updated_at') is distinct from 'string' then
     raise exception 'INVALID_INPUT';
   end if;
+  begin
+    v_expected := (p_input->>'expected_updated_at')::timestamptz;
+  exception when others then
+    raise exception 'INVALID_INPUT';
+  end;
   v_org_id := (p_input->>'org_id')::uuid;
   v_new := (p_input->>'user_id')::uuid;
 
   select * into o from public.orgs where id = v_org_id for no key update;
   if not found then raise exception 'ORG_NOT_FOUND'; end if;
   if o.owner_user_id = v_new then return jsonb_build_object('applied', false); end if;
-  if (p_input->>'expected_updated_at')::timestamptz is distinct from o.updated_at then raise exception 'ORG_CHANGED'; end if;
+  if v_expected is distinct from o.updated_at then raise exception 'ORG_CHANGED'; end if;
   v_old := o.owner_user_id;
 
   perform 1 from public.profiles where id in (v_old, v_new) order by id for no key update;
@@ -9635,10 +9644,12 @@ begin
 
   select * into a from public.affiliates where org_id = o.id for update;
   if found then
+    -- The org's account is always its owner's row (1640/1643); refuse rather than move anything
+    -- of someone else's if that ever stops being true.
+    if a.user_id <> v_old then raise exception 'ORG_AFFILIATE_MISMATCH'; end if;
     if exists(select from public.affiliates where user_id = v_new) then raise exception 'ORG_NEW_OWNER_AFFILIATE'; end if;
     -- Free the unique slug and org_id on the old row, insert the copy under the new owner, re-point
     -- every reference, then drop the old row (nothing references it any more, so nothing cascades).
-    v_slug := a.slug;
     update public.affiliates set slug = 'mv-' || substr(md5(gen_random_uuid()::text), 1, 20), org_id = null
       where user_id = a.user_id;
     a.user_id := v_new;
