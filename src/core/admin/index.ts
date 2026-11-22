@@ -66,8 +66,11 @@ export { dryRunIdentityScreen, type DryRunResult } from './identity-dry-run'
 export { IdentityDryRun } from './identity-dry-run-ui'
 export { AdminPage, AdminShell, adminNavItems, EmptyState, SHELL_COPY, StatCard, type AdminNavItem } from './shell'
 export {
+  acknowledgePayment,
   listPurchases,
   listSubscriptions,
+  loadAttentionIds,
+  unacknowledgePayment,
   applyClawback,
   loadRevenueStats,
   ORDERS_COPY,
@@ -78,6 +81,7 @@ export {
   usd,
   type AdminPurchase,
   type AdminSubscription,
+  type AcknowledgeResult,
   type ClawbackPreview,
   type ClawbackResult,
   type RevenueStats,

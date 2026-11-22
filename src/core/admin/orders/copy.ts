@@ -1,7 +1,7 @@
 // /admin/orders copy (DESIGN §7: Chinese only, kept out of site/messages).
 export const ORDERS_COPY = {
   title: '订单与收入',
-  priceNote: '收入为净额：实付减去税（Managed Payments 代扣）再减去已退款。付款记录显示实付金额（含税）。退款和争议在 Stripe 后台处理；退款、拒付回调会自动扣回这笔发放的积分，「积分扣回」列显示已扣回和欠扣。用过积分要按比例退款的，先点「扣回剩余积分」再去退款。T10 上线前的付款不在其中。',
+  priceNote: '收入为净额：实付减去税（Managed Payments 代扣）再减去已退款。付款记录显示实付金额（含税）。退款和争议在 Stripe 后台处理；退款、拒付回调会自动扣回这笔发放的积分，「积分扣回」列显示已扣回和欠扣。用过积分要按比例退款的，先点「扣回剩余积分」再去退款。「标记已知晓」只把退款或争议从概览的待处理计数里去掉，不动钱；未结的争议仍会计入，直到结案。T10 上线前的付款不在其中。',
   windows: { today: '今日', '7d': '近 7 天', period: (days: number) => `近 ${days} 天` },
   revenue: '收入（净额）',
   purchases: (n: number) => `${n} 笔付款`,
@@ -50,4 +50,19 @@ export const ORDERS_COPY = {
   no: '否',
   next: '下一页',
   first: '回到第一页',
+  // 「标记已知晓」 (1881): hides a refund or dispute from the overview counter, changes no money.
+  ack: {
+    button: '标记已知晓',
+    undo: '撤销',
+    pending: '处理中…',
+    done: (at: string) => `已知晓 · ${at}`,
+    stale: '标记后状态又变了，需重新确认',
+    openDispute: '争议未结，仍计入待处理',
+    hint: '只是从概览的「退款和争议」计数里去掉，不改退款、积分或付款状态。',
+  },
+  attention: {
+    title: '待处理的退款和争议（60 天内，未标记已知晓）',
+    showAll: '显示全部付款',
+    none: '没有待处理的退款和争议。',
+  },
 } as const
