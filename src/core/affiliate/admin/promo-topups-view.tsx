@@ -1,7 +1,7 @@
 import { formatBeijing } from '@/core/admin/shell'
 import { UserLink } from '@/core/admin/users-ui'
 import type { SaveAction } from './form'
-import { GridTable, Section } from './parts'
+import { Section } from './parts'
 import { PROMO_COPY as P } from './promo-copy'
 import type { PromoPartner, PromoSheet } from './promo-read'
 import { TOPUP_COPY as T } from './promo-topup-copy'
@@ -21,22 +21,25 @@ function sheetLine(s: PromoSheet | undefined): string {
   return s.status === 'granted' ? `${n(s.total)}（${status}）` : T.sheetNotGranted(status)
 }
 
+// Stacked rather than a table: the reason is free text and stays readable at 375 px.
 function TopupList({ list }: { list: PromoTopup[] }) {
   if (list.length === 0) return <p className="text-sm text-muted-foreground">{T.noTopups}</p>
   return (
-    <GridTable
-      heads={[T.credits, T.why, T.who, T.when, T.expires]}
-      rows={list.map((t) => ({
-        key: t.id,
-        cells: [
-          n(t.credits),
-          <span key="r" className="break-words">{t.reason}</span>,
-          <UserLink key="u" userId={t.created_by} className="font-mono text-xs">{short(t.created_by)}</UserLink>,
-          formatBeijing(t.created_at),
-          t.expired_credits === null ? formatBeijing(t.expires_at) : `${formatBeijing(t.expires_at)} · ${T.expired(t.expired_credits)}`,
-        ],
-      }))}
-    />
+    <ul className="grid gap-2 text-sm">
+      {list.map((t) => (
+        <li key={t.id} className="grid gap-1 rounded-md border p-3">
+          <p className="flex flex-wrap items-baseline gap-x-2">
+            <strong>+{n(t.credits)}</strong>
+            <span className="min-w-0 break-words">{t.reason}</span>
+          </p>
+          <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+            <span>{T.who} <UserLink userId={t.created_by} className="font-mono">{short(t.created_by)}</UserLink></span>
+            <span>{T.when} {formatBeijing(t.created_at)}</span>
+            <span>{T.expires} {formatBeijing(t.expires_at)}{t.expired_credits !== null && ` · ${T.expired(t.expired_credits)}`}</span>
+          </p>
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -56,6 +59,7 @@ function PartnerTopups({ partner, sheet, topups, period, action }: CardProps) {
         <dt className="text-muted-foreground">{T.monthTotal}</dt>
         <dd><strong className="text-base">{n(granted + sum)}</strong></dd>
       </dl>
+      <p className="text-xs text-muted-foreground">{T.monthTotalHint}</p>
       <TopupList list={list} />
       <PromoTopupForm action={action} orgId={partner.id} orgName={partner.name} recipient={partner.owner_user_id} period={period} />
     </article>
