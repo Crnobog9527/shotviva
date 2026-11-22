@@ -6,7 +6,7 @@ import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { currentOrigin } from '../../request-origin'
 import { onVerifiedSignIn } from '../first-sign-in'
-import { staffTokenFor } from '../staff-signup'
+import { staffOriginFor } from '../staff-signup'
 import { sanitizeNext } from '../redirect-target'
 import { isVerified, metadataLocale } from '../session-user'
 import { createSessionSupabase } from '../supabase-server'
@@ -35,7 +35,7 @@ export async function signInWithPassword(form: FormData, options: SignInOptions)
     await supabase.auth.signOut({ scope: 'local' })
     return failed('AUTH_EMAIL_NOT_CONFIRMED')
   }
-  await onVerifiedSignIn(data.user.id, options, 'email', metadataLocale(data.user) ?? (await currentLocale()), staffTokenFor(fields.next, data.user))
+  await onVerifiedSignIn(data.user.id, options, 'email', metadataLocale(data.user) ?? (await currentLocale()), staffOriginFor(fields.next, data.user))
   redirect(sanitizeNext(fields.next))
 }
 

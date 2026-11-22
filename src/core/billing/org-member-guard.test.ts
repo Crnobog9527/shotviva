@@ -11,10 +11,10 @@ describe('assertNotOrgMember', () => {
   it('lets an account in no org through', async () => {
     await expect(assertNotOrgMember(client({ data: [], error: null }), 'u')).resolves.toBeUndefined()
   })
-  it('refuses an active staff member with ORG_MEMBER_CHECKOUT, looking only at role member (the owner buys)', async () => {
+  it('refuses an active staff member of an active org with ORG_MEMBER_CHECKOUT, looking only at role member (the owner buys)', async () => {
     const eqs: unknown[][] = []
     await expect(assertNotOrgMember(client({ data: [{ org_id: 'o' }], error: null }, eqs), 'u')).rejects.toMatchObject({ code: 'ORG_MEMBER_CHECKOUT' })
-    expect(eqs).toEqual([['user_id', 'u'], ['status', 'active'], ['role', 'member']])
+    expect(eqs).toEqual([['user_id', 'u'], ['status', 'active'], ['role', 'member'], ['orgs.status', 'active']])
   })
   it('fails closed when the lookup fails', async () => {
     await expect(assertNotOrgMember(client({ data: null, error: { message: 'down' } }), 'u')).rejects.toMatchObject({ code: 'INTERNAL' })

@@ -14,7 +14,9 @@ vi.mock('../../env', async (importOriginal) => {
   return { ...actual, serverEnv: () => ({ ...actual.serverEnv(), ...request.env }) }
 })
 vi.mock('../supabase-server', () => ({ createSessionSupabase: async () => ({ auth: mocks }) }))
-vi.mock('../supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc }) }))
+// orgs lookups for the staff link (core/auth/staff-signup): an active org.
+const orgChain = { select: () => orgChain, eq: () => orgChain, maybeSingle: async () => ({ data: { id: '11111111-2222-4333-8444-555555555555' }, error: null }) }
+vi.mock('../supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc, from: () => orgChain }) }))
 
 const { resendSignupEmail, signUpWithPassword, updatePassword } = await import('./sign-up')
 
@@ -128,7 +130,7 @@ describe('signUpWithPassword: staff link sign-up', () => {
     mocks.signUp.mockResolvedValue({ data: { user: { identities: [{}] } }, error: null })
     const token = 'b'.repeat(32)
     await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next: `/zh/join/org/${token}` }))
-    expect(mocks.signUp.mock.calls[0]![0].options.data).toEqual({ locale: 'zh', staff_invite: token })
+    expect(mocks.signUp.mock.calls[0]![0].options.data).toEqual({ locale: 'zh', staff_invite: token, staff_org: '11111111-2222-4333-8444-555555555555' })
     await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next: '/zh/account' }))
     expect(mocks.signUp.mock.calls[1]![0].options.data).toEqual({ locale: 'zh' })
   })
