@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 
-import { allocateOrgCredits, depositOrgCredits, joinOrg, leaveOrg, removeOrgMember, rotateOrgInvite, setOrgAllowance } from '../actions'
+import { allocateOrgCredits, depositOrgCredits, joinOrg, removeOrgMember, rotateOrgInvite, setOrgAllowance } from '../actions'
 import { bulkGrantOrgCredits, bulkSetOrgAllowance, setOrgDefaultAllowances } from '../bulk-actions'
 import { allocateOrgPromoCredits, setOrgPromoAllowance } from '../promo-actions'
 import type { ConsoleError, ConsoleResult } from './types'
@@ -74,7 +74,6 @@ export const allocateInput = z.object({ requestId: formId, member: uuid, credits
 export const allowanceInput = z.object({ member: uuid, allowance: z.coerce.number().int().min(0).max(1_000_000_000) })
 export const depositInput = z.object({ requestId: formId, credits })
 export const removeInput = z.object({ requestId: formId, member: uuid })
-export const leaveInput = z.object({ requestId: formId })
 
 export const allocate = (d: Deps, input: unknown) => run(async () => {
   const form = allocateInput.parse(input)
@@ -161,11 +160,9 @@ export const resetInvite = (d: Deps) => run(async () => {
   return { token: await rotateOrgInvite(d.db, d.user) }
 })
 
-// A member leaves their org; the owner cannot (the SQL says OWNER_CANNOT_LEAVE).
-export const leave = (d: Deps, input: unknown) => run(async () => {
-  const form = leaveInput.parse(input)
-  return { reclaimed: await leaveOrg(d.db, d.user, `console:leave:${d.user}:${form.requestId}`) }
-})
+// There is no leave command (Owner 2026-11-23): staff cannot leave an org by themselves. Only
+// the org owner (removeMember) or a site admin (/admin) takes a member out, so no public action
+// reaches org_leave.
 
 export const join = (d: Deps, token: string) => run(async () => {
   await joinOrg(d.db, d.user, token)

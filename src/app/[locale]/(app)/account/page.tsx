@@ -5,8 +5,9 @@ import { getTranslations } from 'next-intl/server'
 
 import { enterpriseCustomerLink, hasAffiliateDashboard } from '@/core/affiliate/feature'
 import { AppPage } from '@/core/app-shell'
+import { readInviteSummary } from '@/core/account/codes'
 import { AccountHeader, AccountView, GiftClaimCard, InviteCard, RedeemCard, STRIP_FRAMES } from '@/core/account/ui'
-import { Group, RowsPanel, groupClass } from '@/core/account/ui/rows'
+import { Group, RowsPanel } from '@/core/account/ui/rows'
 import { createAdminSupabase, createServerSupabase, readClaimOptions, readSignupGift, requireUser } from '@/core/auth'
 import { maskPhone } from '@/core/auth/phone'
 import { readPendingDiscount } from '@/core/codes/server'
@@ -16,13 +17,13 @@ import { lastMembership, readMemberSince, readSubscriptionSummary } from '@/core
 import { listMonthWorks } from '@/core/jobs'
 import { serverEnv } from '@/core/env'
 import { readOrgView } from '@/core/org/console'
-import { CustomerLinkRow, OwnerEntryRow, StaffCardView } from '@/core/org/ui'
+import { CustomerLinkRow, MemberEntry, MemberLinkCallout, OwnerEntryRow } from '@/core/org/ui'
 import { readLinkStatus } from '@/core/partner'
 import { graylumIntroLinks } from '@/core/partner/ui'
 import { formatMoney, hasUnreadReply, listPaymentOptions, paymentChoices, PICKER_LIMIT, ReplyTime } from '@/core/support'
 import { StoreCard } from '@/core/store-profile/ui'
 import { AccountHelp } from '@/core/support/ui/account'
-import { currentLocale } from '@/core/i18n/server'
+import { currentLocale, localized } from '@/core/i18n/server'
 import type { Translate } from '@/core/translate'
 import { contractProducts, displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
@@ -30,7 +31,6 @@ import { site } from '@/site/site.config'
 import { actions, helpActions } from './account-actions'
 import { claimGoogleAction, claimPhoneSendAction, claimPhoneVerifyAction } from './claim-actions'
 import { loadMyInvites } from './invite-action'
-import { leaveOrgAction } from './org-actions'
 import { loadStoreProfile, saveStoreProfileAction } from './store-actions'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -74,7 +74,7 @@ async function Account() {
     <>
       <AccountView data={data} actions={actions} site={{ brand: site.brand.name, products: offers, freeCredits: signupGift.granted }}>
         {claimOptions ? <GiftClaimCard credits={site.billing.freeCredits} options={claimOptions} actions={claimActions} /> : null}
-        <OrgBlock view={org} customerLink={org.kind === 'owner' && org.org.affiliateEnabled && affiliate ? <Suspense fallback={null}><OwnerCustomerLink user={user.id} /></Suspense> : null} />
+        <OrgBlock view={org} memberLink={org.kind === 'member' ? <Suspense fallback={null}><MemberLink user={user.id} /></Suspense> : null} customerLink={org.kind === 'owner' && org.org.affiliateEnabled && affiliate ? <Suspense fallback={null}><OwnerCustomerLink user={user.id} /></Suspense> : null} />
         <StoreCard actions={storeActions} />
         <InviteCard load={loadMyInvites} />
         <RedeemCard pending={discount} />
@@ -85,8 +85,9 @@ async function Account() {
 }
 
 // The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a
-// member gets their card; everyone else sees nothing.
-function OrgBlock({ view, customerLink }: { view: Awaited<ReturnType<typeof readOrgView>>; customerLink: ReactNode }) {
+// member a row into their own org page with what is left of this month's credits, then their
+// promotion link (Owner 2026-11-23); everyone else sees nothing.
+function OrgBlock({ view, customerLink, memberLink }: { view: Awaited<ReturnType<typeof readOrgView>>; customerLink: ReactNode; memberLink: ReactNode }) {
   const t = useTranslations('app.org.entry')
   const format = useFormatter()
   if (view.kind === 'owner') {
@@ -102,9 +103,10 @@ function OrgBlock({ view, customerLink }: { view: Awaited<ReturnType<typeof read
   }
   if (view.kind === 'member') {
     return (
-      <div className={groupClass}>
-        <StaffCardView data={view} actions={staffActions} loadInvite={loadMyInvites} />
-      </div>
+      <Group title={t('title')}>
+        <MemberEntry data={view} />
+        {memberLink}
+      </Group>
     )
   }
   return null
@@ -116,7 +118,12 @@ async function OwnerCustomerLink({ user }: { user: string }) {
   return url ? <CustomerLinkRow url={url} /> : null
 }
 
-const staffActions = { leave: leaveOrgAction }
+// Streams in too: a member's promotion link, their own invite code on the page's language.
+async function MemberLink({ user }: { user: string }) {
+  const summary = await readInviteSummary(createAdminSupabase(), user, site.growth.invite.inviterRewardCap).catch(() => null)
+  return summary ? <MemberLinkCallout path={await localized('/?code=' + summary.code)} /> : null
+}
+
 const storeActions = { load: loadStoreProfile, save: saveStoreProfileAction }
 const claimActions = { sendCode: claimPhoneSendAction, verifyCode: claimPhoneVerifyAction, google: claimGoogleAction }
 
