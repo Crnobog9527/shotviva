@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 import { row } from './affiliate-fixtures'
 import { connectAdmin, createUser } from './helpers'
 import {
-  adminActor, confirm, fiveCustomers, asLegacy, freeOf, months, partner, promoPoolOf, refused, run, sheet, type Sheet,
+  adminActor, asLegacy, confirm, confirmedSale, customer, fiveCustomers, freeOf, months, partner, promoPoolOf, refused, run, sheet, type Sheet,
 } from './partner-promo-fixtures'
 
 // Channel partner promotion grants after the confirm (ARCHITECTURE §6.5 渠道商推广积分): refunds after
@@ -84,9 +84,31 @@ it('claws back pro rata: a partial refund takes back only the bonus it changed',
   await fiveCustomers(db, owner, 100000, m.in_previous)
   await db.query("select record_payment_issue($1,'refunded',1245)", [sales[0]!.charge])
   await run(db, m.current)
-  // Last month re-measured: raw 450,000 → cap 90,000: 50,000 + 4 × 90,000 = 410,000 → 41,000 (owed 9,000).
-  // This month: 5 × 100,000 → 50,000 bonus, base 10,000, minus 9,000.
-  expect(await sheet(db, orgId, m.current)).toMatchObject({ bonus: 50000, clawback_owed: 9000, clawback_applied: 9000, total: 51000 })
+  // Last month re-measured: 50,000 + 4 × 100,000 = 450,000 → 45,000 (owed 5,000).
+  // This month: 5 × 100,000 → 50,000 bonus, base 10,000, minus 5,000.
+  expect(await sheet(db, orgId, m.current)).toMatchObject({ bonus: 50000, clawback_owed: 5000, clawback_applied: 5000, total: 55000 })
+})
+
+it('re-measures a sheet granted under the old limits (20% cap, 3 customers) by those limits', async () => {
+  const { orgId, owner } = await partner(db, actor)
+  const whale = await confirmedSale(db, await customer(db, owner), 200000, m.in_before)
+  const small = []
+  for (let i = 0; i < 4; i++) small.push(await confirmedSale(db, await customer(db, owner), 25000, m.in_before))
+  const last = await grantedLastMonth(orgId)
+  // Made into a sheet granted before migration 1910: the old limits in its detail and the capped
+  // bonus it was granted (raw 300,000 → cap 60,000: 60,000 + 4 × 25,000 = 160,000 → 16,000).
+  await db.query(`update partner_promo_grants set bonus=16000,
+    detail=detail || '{"customer_cap_bp":2000,"min_customers":3}'::jsonb where id=$1`, [last.id])
+  // Half of one small order refunded: old rules give raw 287,500 → cap 57,500 → 57,500 + 3 × 25,000
+  // + 12,500 = 145,000 → 14,500, owed 1,500. (Measured without the cap it would owe nothing.)
+  await db.query("select record_payment_issue($1,'refunded',1245)", [small[0]!.charge])
+  await run(db, m.current)
+  expect(await sheet(db, orgId, m.current)).toMatchObject({ bonus: 0, clawback_owed: 1500, clawback_applied: 1500, total: 8500 })
+  // The whale refunded too: 4 customers, raw 87,500 → cap 17,500 → 12,500 + 3 × 17,500 = 65,000
+  // → 6,500, owed 9,500.
+  await db.query("select record_payment_issue($1,'refunded',2490)", [whale.charge])
+  await run(db, m.current)
+  expect(await sheet(db, orgId, m.current)).toMatchObject({ clawback_owed: 9500, clawback_applied: 9500, total: 500 })
 })
 
 it('expires what is left at month end; promotion credits are spent first, other free credits stay', async () => {

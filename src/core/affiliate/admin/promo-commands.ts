@@ -5,7 +5,7 @@ import { checked } from './read'
 import { PROMO_COPY as P } from './promo-copy'
 
 // Admin writes for promotion credits (ARCHITECTURE §6.5 渠道商推广积分): one RPC each (migrations
-// 1842–1843), all audited there. Every answer is a line of PROMO_COPY for the form's status.
+// 1842–1843, 1920), all audited there. Every answer is a line of PROMO_COPY for the form's status.
 
 const decision = z.object({
   grant_id: z.string().regex(/^[1-9]\d{0,17}$/),
@@ -38,6 +38,26 @@ export async function decidePromo(db: SupabaseClient, actor: string, form: FormD
   const refused = answer.error ? refusals[answer.error.message] : undefined
   if (refused) return refused
   return answerOf(input.decision, decided.parse(checked(answer)))
+}
+
+const voiding = z.object({ grant_id: z.string().regex(/^[1-9]\d{0,17}$/), reason: z.string().trim().max(500).optional() })
+const voidRefusals: Record<string, string> = {
+  PROMO_GRANT_NOT_GRANTED: P.answers.notGranted,
+  PROMO_GRANT_EXPIRED: P.answers.voidExpired,
+  PROMO_GRANT_NOT_FOUND: P.answers.invalid,
+  INVALID_INPUT: P.answers.invalid,
+}
+
+/** Void a granted sheet whose credits were already handled by hand → admin_partner_promo_void (1920). Moves no credits. */
+export async function voidPromo(db: SupabaseClient, actor: string, form: FormData): Promise<string> {
+  const parsed = voiding.safeParse(Object.fromEntries(form))
+  if (!parsed.success) return P.answers.invalid
+  const { grant_id, reason } = parsed.data
+  if (!reason) return P.answers.voidReasonMissing
+  const answer = await db.rpc('admin_partner_promo_void', { p_actor: actor, p_input: { grant_id, reason } })
+  const refused = answer.error ? voidRefusals[answer.error.message] : undefined
+  if (refused) return refused
+  return decided.parse(checked(answer)).applied ? P.answers.voided : P.answers.alreadyVoided
 }
 
 const mark = z.object({ org_id: z.uuid(), on: z.enum(['true', 'false']) })
