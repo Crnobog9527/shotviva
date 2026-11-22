@@ -32,13 +32,14 @@ const expiry = z.object({
   expired: z.number().int(),
   taken: z.number().int(),
   overdue: z.number().int(),
-  failed: z.array(z.object({ grant_id: z.number(), error: z.string() })),
+  // A failed top-up's expiry (migration 1847) reports grant_id 0 and its topup_id.
+  failed: z.array(z.object({ grant_id: z.number(), topup_id: z.number().optional(), error: z.string() })),
 })
 
 export type PromoExpirySummary = z.infer<typeof expiry>
 
-// The daily expiry pass (migration 1843 partner_promo_expire_run): takes back what is left of every
-// grant whose month is over, and for a week after settles refunds that landed late.
+// The daily expiry pass (migration 1843 partner_promo_expire_run, 1847): takes back what is left of
+// every grant and top-up whose month is over, and for a week after settles refunds that landed late.
 export async function expirePartnerPromo(client: RpcClient): Promise<PromoExpirySummary> {
   return callRpc(client, 'partner_promo_expire_run', {}, expiry)
 }

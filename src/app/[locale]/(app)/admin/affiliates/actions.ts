@@ -5,7 +5,7 @@ import { createAdminSupabase } from '@/core/auth'
 import { logger } from '@/core/logger'
 import {
   COPY, FEE_COPY, START_COPY, isFeeAnswer, enrollAffiliate, enrollmentLabel, execute, requireAffiliateAdmin, startPaymentFees,
-  decidePromo, runPromoNow, setPromoPartner,
+  decidePromo, runPromoNow, setPromoPartner, topupPromo,
 } from '@/core/affiliate/admin'
 import { latestAffiliateTermsVersion } from '@/site/content/affiliate-terms'
 
@@ -22,13 +22,14 @@ function logFailure(form: FormData, error: unknown) {
 
 // Operations that answer with their own line (admin only, as above). Fee go-live: one-way, sets
 // record_from and the newest terms together. Channel partner promotion credits (ARCHITECTURE §6.5
-// 渠道商推广积分): decide a sheet, mark a partner, generate this month's sheets.
+// 渠道商推广积分): decide a sheet, mark a partner, generate this month's sheets, top up a partner.
 type OwnOperation = (db: ReturnType<typeof createAdminSupabase>, actor: string, form: FormData) => Promise<string>
 const ownAnswers: Record<string, OwnOperation> = {
   feesStart: async (db, actor, form) => START_COPY.answers[await startPaymentFees(db, actor, form, latestAffiliateTermsVersion())] ?? COPY.failed,
   promoDecide: decidePromo,
   promoPartner: setPromoPartner,
   promoRun: (db, actor) => runPromoNow(db, actor),
+  promoTopup: topupPromo,
 }
 
 async function runOwn(operation: OwnOperation, actor: string, form: FormData) {

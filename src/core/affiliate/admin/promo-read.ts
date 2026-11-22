@@ -68,13 +68,13 @@ export async function pendingPromoCount(db: SupabaseClient, now = new Date()): P
   return answer.count ?? 0
 }
 
-const partnerRow = z.object({ id: z.uuid(), name: z.string(), status: z.string(), promo_partner: z.boolean() })
+const partnerRow = z.object({ id: z.uuid(), name: z.string(), status: z.string(), promo_partner: z.boolean(), owner_user_id: z.uuid() })
 export type PromoPartner = z.infer<typeof partnerRow>
 
 /** Orgs with their affiliate switch on (the only ones that can be partners); a handful of rows. */
 export async function promoPartners(db: SupabaseClient): Promise<PromoPartner[]> {
   const rows = checked(
-    await db.from('orgs').select('id,name,status,promo_partner').eq('affiliate_enabled', true).order('created_at').limit(200),
+    await db.from('orgs').select('id,name,status,promo_partner,owner_user_id').eq('affiliate_enabled', true).order('created_at').limit(200),
   )
   return z.array(partnerRow).parse(rows)
 }
