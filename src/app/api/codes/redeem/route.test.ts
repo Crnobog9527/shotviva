@@ -5,11 +5,12 @@ import { AppError } from '@/core/errors'
 import { appOrigin } from '@/core/site-url'
 import { POST } from './route'
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), redeem: vi.fn(), rpc: vi.fn(), bind: vi.fn() }))
+const mocks = vi.hoisted(() => ({ session: vi.fn(), redeem: vi.fn(), rpc: vi.fn(), bind: vi.fn(), member: vi.fn() }))
 vi.mock('@/core/auth/session', () => ({ getSessionUser: mocks.session }))
 vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc }) }))
 vi.mock('@/core/codes/server', () => ({ redeemCode: mocks.redeem }))
 vi.mock('@/core/affiliate/referral', () => ({ bindReferral: mocks.bind }))
+vi.mock('@/core/billing/org-member-guard', () => ({ assertNotOrgMember: mocks.member }))
 
 const user = { id: 'u1', role: 'user', locale: 'zh', verified: true, banned: false }
 
@@ -98,4 +99,16 @@ it('binds a partner link before redeeming, so an org member\'s invite never take
 it('does not bind on a malformed request', async () => {
   await post('{}', appOrigin, 'sv_ref=qa-partner.1700000000')
   expect(mocks.bind).not.toHaveBeenCalled()
+})
+
+// Owner 2026-11-22: an active org member (owner included) redeems nothing and binds no partner.
+it('refuses an active org member before binding or redeeming anything', async () => {
+  mocks.member.mockRejectedValueOnce(new AppError('ORG_MEMBER_CHECKOUT', 'org member'))
+  const response = await post('{"code":"GIFT"}', appOrigin, 'sv_ref=qa-partner.1700000000')
+  expect(response.status).toBe(409)
+  expect(await response.json()).toMatchObject({ code: 'ORG_MEMBER_CHECKOUT' })
+  expect(mocks.member).toHaveBeenCalledWith(expect.anything(), user.id)
+  expect(mocks.bind).not.toHaveBeenCalled()
+  expect(mocks.redeem).not.toHaveBeenCalled()
+  expect(mocks.rpc).not.toHaveBeenCalled()
 })

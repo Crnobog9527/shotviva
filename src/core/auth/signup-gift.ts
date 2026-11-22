@@ -13,13 +13,14 @@ import { AppError } from '../errors'
 // reading would also cover a grant that failed and has not been retried yet; the next verified
 // sign-in retries it and the note goes away. Service-role client: the ledger is private.
 // Lookups: profiles primary key and credit_ledger_idempotency_key_key.
-export type SignupGiftRefusal = 'same_ip_pending' | 'daily_cap' | 'paused'
+export type SignupGiftRefusal = 'same_ip_pending' | 'daily_cap' | 'paused' | 'staff'
 
 type GiftProfile = { signup_ip: string | null; signup_gift_refusal: string | null }
 
 function refusalOf(profile: GiftProfile | null): SignupGiftRefusal | null {
   const stored = profile?.signup_gift_refusal
-  if (stored === 'daily_cap' || stored === 'paused') return stored
+  // 'staff': signed up through an org's staff link (1940); final like the two below.
+  if (stored === 'daily_cap' || stored === 'paused' || stored === 'staff') return stored
   if (stored === 'same_ip_pending' || stored === 'same_ip') return 'same_ip_pending'
   return profile?.signup_ip ? 'same_ip_pending' : null
 }

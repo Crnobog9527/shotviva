@@ -72,6 +72,7 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   SUBSCRIPTION_CANCEL_FAILED: 'internal',
   ACCOUNT_OWNS_ORG: 'internal',
   DOWNGRADE_NOT_ALLOWED: 'internal',
+  ORG_MEMBER_CHECKOUT: 'internal',
   // Saved templates are a web-only feature; no partner route saves templates.
   FAVORITES_LIMIT: 'internal',
   // Admin-only (T85); never on a partner route.

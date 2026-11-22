@@ -8,6 +8,7 @@ import type { ErrorCode } from '../../errors'
 import { currentLocale } from '../../i18n/server'
 import { logger } from '../../logger'
 import { onVerifiedSignIn } from '../first-sign-in'
+import { STAFF_INVITE_KEY, staffJoinToken, staffTokenFor } from '../staff-signup'
 import { phoneKey } from '../phone/phone-key'
 import { maskPhone, parseMainlandPhone } from '../phone/phone-number'
 import { releaseSmsSend, requestSmsSend } from '../phone/sms-limits'
@@ -22,10 +23,15 @@ import { formFields } from './schemas'
 
 // Phone sign-in (ARCHITECTURE §7, T63): one code both signs up and signs in, no password.
 
-const sendSchema = z.object({ phone: z.string().max(32), consent: z.literal('on'), captchaToken: z.string().max(4096).optional() })
+const sendSchema = z.object({ phone: z.string().max(32), consent: z.literal('on'), captchaToken: z.string().max(4096).optional(), next: z.string().max(512).optional() })
 const verifySchema = z.object({ phone: z.string().max(32), code: z.string().regex(/^\d{6}$/), next: z.string().max(512).optional() })
 
 export type PhoneSignInOptions = SignupBenefits
+
+function staffInviteData(next: string | undefined) {
+  const token = staffJoinToken(next)
+  return token ? { [STAFF_INVITE_KEY]: token } : {}
+}
 
 // Our limits first (they also note the visitor's IP for the hook), then Supabase, which checks
 // hCaptcha and calls the Send SMS hook. A refusal before the hook gives the request back.
@@ -50,8 +56,10 @@ export async function sendPhoneCode(form: FormData): Promise<FormState> {
       shouldCreateUser: true,
       captchaToken: parsed.data.captchaToken,
       // Applied only when this creates the account: its language, and when it agreed to the
-      // privacy policy and the cross-border transfer (PIPL), as the box it ticked.
-      data: { locale, phone_consent_at: new Date().toISOString() },
+      // privacy policy and the cross-border transfer (PIPL), as the box it ticked. A sign-up from
+      // an org's staff link also remembers its token, so a code verified later from /login is still
+      // a staff sign-up (no signup gift, 1940/1950).
+      data: { locale, phone_consent_at: new Date().toISOString(), ...staffInviteData(parsed.data.next) },
     },
   })
   if (!error) return { status: 'sent' }
@@ -72,7 +80,7 @@ export async function verifyPhoneCode(form: FormData, options: PhoneSignInOption
   const supabase = await createSessionSupabase()
   const { data, error } = await supabase.auth.verifyOtp({ phone: phone.e164, token: parsed.data.code, type: 'sms' })
   if (error || !data.user) return failed(verifyError(error))
-  await onVerifiedSignIn(data.user.id, options, 'phone', metadataLocale(data.user) ?? (await currentLocale()))
+  await onVerifiedSignIn(data.user.id, options, 'phone', metadataLocale(data.user) ?? (await currentLocale()), staffTokenFor(parsed.data.next, data.user))
   redirect(sanitizeNext(parsed.data.next))
 }
 

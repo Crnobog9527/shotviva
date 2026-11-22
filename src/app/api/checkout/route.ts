@@ -22,6 +22,7 @@ import { readActivePricing } from '@/core/billing/active-pricing'
 import { assertPricingVersions, buyerQuote, type BuyerQuote } from '@/core/billing/buyer-quote'
 import { configuredPricing } from '@/core/billing/checkout-price'
 import { assertCanBuy } from '@/core/billing/subscription'
+import { assertNotOrgMember } from '@/core/billing/org-member-guard'
 import { createWaffoCheckout, paymentChannel, waffoClient, waffoConfig, waffoWechatPayEnabled } from '@/core/billing/waffo'
 import { AppError } from '@/core/errors'
 import { requestOrigin } from '@/core/request-origin'
@@ -42,6 +43,8 @@ export async function POST(request: NextRequest) {
     // Upgrades only: the same or a lower plan while a membership runs answers 409. An upgrade is
     // an ordinary checkout at full price; the payment webhook cancels the old subscription.
     const admin = createAdminSupabase()
+    // Before a retry can hand back an open session: active org members never buy for themselves.
+    await assertNotOrgMember(admin, user.id)
     const version = configuredPricing(site.billing)
     const {id,response: retry,legacyPreview} = await findRetry(request,user.id,body,channel)
     if (retry) return retry
