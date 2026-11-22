@@ -18,7 +18,7 @@ type Work = OrgWorksPage['works'][number]
 // The page's delete action; the tile binds it to its work.
 export type DeleteOrgWorkById = (jobId: string) => Promise<{ failed: 'running' | 'error' } | undefined>
 
-function WorkTile({ work, remove }: { work: Work; remove: DeleteOrgWorkById }) {
+function WorkTile({ work, remove }: { work: Work; remove: DeleteOrgWorkById | null }) {
   const t = useTranslations('app.org.works')
   const format = useFormatter()
   const who = work.userId ? (work.label ?? t('unknown')) : t('deletedAccounts')
@@ -37,7 +37,7 @@ function WorkTile({ work, remove }: { work: Work; remove: DeleteOrgWorkById }) {
             {work.memberActive || !work.userId ? null : ` · ${t('removed')}`}
           </p>
         </div>
-        <DeleteOrgWork action={remove.bind(null, work.id)} name={work.templateName ?? work.templateId} />
+        {remove ? <DeleteOrgWork action={remove.bind(null, work.id)} name={work.templateName ?? work.templateId} /> : null}
         <a href={fileHref(work.id, '?download=1')} aria-label={t('download')} className="-mr-2 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-bone-dim hover:bg-wash hover:text-foreground">
           <Download aria-hidden strokeWidth={1.75} className="size-[18px]" />
         </a>
@@ -47,8 +47,9 @@ function WorkTile({ work, remove }: { work: Work; remove: DeleteOrgWorkById }) {
 }
 
 // 企业作品 (ARCHITECTURE §6.5): the org's works, newest first, two across on a phone. "Older" moves
-// the (created_at, id) cursor; the member filter stays.
-export function OrgWorksView({ page, remove }: { page: OrgWorksPage; remove: DeleteOrgWorkById }) {
+// the (created_at, id) cursor; the member filter stays. `remove` is the owner's delete; staff
+// (null) view and download only.
+export function OrgWorksView({ page, remove }: { page: OrgWorksPage; remove: DeleteOrgWorkById | null }) {
   const t = useTranslations('app.org.works')
   if (page.works.length === 0) {
     return <p className="hairline-lit rounded-panel bg-card p-4 text-label text-muted-foreground">{t(page.member ? 'emptyMember' : 'empty')}</p>

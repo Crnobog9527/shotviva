@@ -1798,8 +1798,10 @@
           "affiliate": "Affiliate",
           "console": "Workspace",
           "works": "Works",
-          "purchasing": "Purchasing"
-        }
+          "purchasing": "Purchasing",
+          "mine": "Mine"
+        },
+        "mine": "My company"
       },
       "entry": {
         "title": "Company",
@@ -2003,7 +2005,8 @@
         "workspaceIntro": "Where you run Shotviva as a production tool: manage the credit pool, your staff and what they make each month, for image work at scale.",
         "purchasingIntro": "Company package prices and bank transfer details. Top up the credit pool offline, the way described here.",
         "affiliateIntro": "Bring in customers and follow commissions and payouts. Sign-ups and purchases through your referral link count toward the company.",
-        "worksIntro": "Everything staff make with company credits belongs to the company. It shows only here and is never public. When someone leaves, their company works stay here and leave their own account."
+        "worksIntro": "Everything staff make with company credits belongs to the company. It shows only here and is never public. When someone leaves, their company works stay here and leave their own account.",
+        "worksIntroMember": "Everything the company made with its credits, for every colleague to view and download for work. Visible inside the company only, never public."
       },
       "contact": {
         "open": "Contact us to arrange a transfer",
