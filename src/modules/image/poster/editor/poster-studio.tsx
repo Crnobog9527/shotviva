@@ -21,14 +21,16 @@ import { WeeklyTools } from './weekly-tools'
 type Props = { studio: PosterStudioState; template: StudioTemplate; balance: Balance }
 // 每周复用 (§5.3): 用上一期 and the store details, and 拍照识别 on the paste step.
 export type StudioReuse = { weekly: PosterWeekly; names: Record<string, string>; photo: PhotoSort }
-type FormProps = Props & { reuse: StudioReuse }
+// photoBalance: what 拍照识别 may spend. It never follows the generation picker (§6.5): an org member's
+// extraction is charged from the org paid share, else the promotion share, like any job sent without a choice.
+type FormProps = Props & { reuse: StudioReuse; photoBalance?: Balance }
 
 // The dense-text poster editor's scrolling body (ARCHITECTURE §5.3, DESIGN mobile 375 first):
 // paste → check the sorted blocks → sizes. Its primary sits in the dialog's bar (StudioBar).
-export function StudioForm({ studio, template, balance, reuse }: FormProps) {
+export function StudioForm({ studio, template, balance, reuse, photoBalance = balance }: FormProps) {
   const t = useTranslations('app.poster')
   const tools = <WeeklyTools studio={studio} weekly={reuse.weekly} names={reuse.names} />
-  if (studio.draft.step === 'paste') return <section className="grid gap-6 pt-2">{tools}<PasteStep studio={studio} photo={template.photoCredits > 0 ? <PhotoPick photo={reuse.photo} credits={template.photoCredits} balance={balance} /> : null} /></section>
+  if (studio.draft.step === 'paste') return <section className="grid gap-6 pt-2">{tools}<PasteStep studio={studio} photo={template.photoCredits > 0 ? <PhotoPick photo={reuse.photo} credits={template.photoCredits} balance={photoBalance} /> : null} /></section>
   return (
     <section className="grid gap-6 pt-2">
       <StudioNotes studio={studio} />

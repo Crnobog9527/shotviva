@@ -74,7 +74,7 @@ function PosterSheet({ template, summary, open, series, onSwitch, onClose, balan
       ) : undefined}
       sample={<PosterSample cover={summary?.cover ?? null} name={template.name} />}
       form={<>
-        <StudioForm studio={studio} template={template} balance={balance} reuse={{ weekly, names, photo }} />
+        <StudioForm studio={studio} template={template} balance={balance} photoBalance={poolChoice ? orgBalance(poolChoice) : held} reuse={{ weekly, names, photo }} />
         <PoolChoiceSlot choice={choice.picker} />
       </>}
       bar={<ActionBar inline><StudioBar studio={studio} template={template} balance={balance} /></ActionBar>}
