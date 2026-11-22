@@ -14722,10 +14722,19 @@ CREATE OR REPLACE FUNCTION "public"."mark_staff_signup"("p_user_id" "uuid") RETU
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+declare
+  v_refusal text;
+  v_created timestamptz;
+  v_ip inet;
 begin
   if p_user_id is null then raise exception 'INVALID_INPUT'; end if;
-  perform 1 from public.profiles where id = p_user_id for update;
-  if not found or exists (select 1 from public.credit_ledger where idempotency_key = 'signup:' || p_user_id::text) then
+  select signup_gift_refusal, created_at, signup_ip into v_refusal, v_created, v_ip
+    from public.profiles where id = p_user_id for update;
+  if not found then return false; end if;
+  if v_refusal = 'staff' then return true; end if;
+  if v_refusal is not null
+     or (v_ip is not null and v_created <= now() - interval '24 hours')
+     or exists (select 1 from public.credit_ledger where idempotency_key = 'signup:' || p_user_id::text) then
     return false;
   end if;
   update public.profiles set signup_gift_refusal = 'staff' where id = p_user_id;
