@@ -102,6 +102,10 @@ const serverEnvSchema = z.object({
   // Either unset → nothing is reported. Never NEXT_PUBLIC_: the token stays on the server.
   PVUV_SITE: z.preprocess(blankAsUnset, z.string().regex(/^[A-Za-z0-9_-]{1,64}$/).optional()),
   PVUV_INGEST_TOKEN: optionalSecret,
+  // A read-only PVUV.ai token ("AI assistant / CLI - read only", single site) for /admin/analytics'
+  // template collection block (ARCHITECTURE §5.1g). Unset → that block shows its database numbers
+  // only and says PVUV is not connected. Server only.
+  PVUV_READ_TOKEN: optionalSecret,
   // Optional server-only Observability query access. The offline snapshot contains aggregates only.
   VERCEL_OBSERVABILITY_TOKEN: optionalSecret,
   VERCEL_OBSERVABILITY_PROJECT_ID: optionalSecret,

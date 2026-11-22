@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useRef } from 'react'
 
 import { FavoriteButton } from '../favorites/favorite-button'
+import { PickMark } from '../template-share/pick-mark'
 import { LoopPlate } from './card-media'
 import { cardPrice, hasStills, isCompareCategory, isMotion, type CatalogueTemplate } from './catalogue-template'
 import { CompareSlider } from './compare-slider'
@@ -49,7 +50,9 @@ function PairCard({ template, onOpen, eager, sizes }: Props) {
         )}
         <CardMeta template={template} />
       </button>
-      <FavoriteButton template={template} surface="create_card" className="top-0.5 right-0.5" />
+      <PickMark item={{ type: 'template', id: template.id }}>
+        <FavoriteButton template={template} surface="create_card" className="top-0.5 right-0.5" />
+      </PickMark>
     </div>
   )
 }
@@ -61,7 +64,9 @@ function ArtCard({ template, onOpen, eager, sizes }: Props) {
   const t = useTranslations('app.template')
   return (
     <div className="relative flex h-full flex-col rounded-tile">
-      <FavoriteButton template={template} surface="create_card" className="top-0.5 right-0.5" />
+      <PickMark item={{ type: 'template', id: template.id }}>
+        <FavoriteButton template={template} surface="create_card" className="top-0.5 right-0.5" />
+      </PickMark>
       <CompareSlider
         before={template.cover.before as string}
         after={template.cover.after as string}

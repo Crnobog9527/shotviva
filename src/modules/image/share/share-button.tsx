@@ -10,6 +10,7 @@ import { localizePath } from '@/core/i18n'
 import type { Locale } from '@/core/i18n/locales'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { shareOrCopy } from './share-or-copy'
 
 type Props = { template: Pick<CatalogueTemplate, 'id' | 'name' | 'category'> }
 
@@ -48,39 +49,4 @@ export function ShareButton({ template }: Props) {
       <span aria-live="polite">{copied ? t('copied') : t('button')}</span>
     </button>
   )
-}
-
-type Outcome = 'shared' | 'copied' | 'cancelled' | 'failed'
-
-// The phone's share sheet where there is one and the screen is a touch screen (a desktop
-// browser's share dialog is less useful than a copied link); a cancelled sheet does nothing.
-async function shareOrCopy(url: string, data: { title: string; text: string }): Promise<Outcome> {
-  const touch = window.matchMedia('(pointer: coarse)').matches
-  if (touch && typeof navigator.share === 'function') {
-    try {
-      await navigator.share({ ...data, url })
-      return 'shared'
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return 'cancelled'
-    }
-  }
-  return (await copyText(url)) ? 'copied' : 'failed'
-}
-
-async function copyText(value: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(value)
-    return true
-  } catch {
-    // Older WebViews (WeChat) without the async clipboard: a hidden field and the copy command.
-    const field = document.createElement('textarea')
-    field.value = value
-    field.setAttribute('readonly', '')
-    field.style.cssText = 'position:fixed;opacity:0'
-    document.body.append(field)
-    field.select()
-    const ok = document.execCommand('copy')
-    field.remove()
-    return ok
-  }
 }

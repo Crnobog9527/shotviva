@@ -21,6 +21,7 @@ export function SettingsRows({ email, phone, purchases, morePurchases, helpUnrea
   const affiliateT = useTranslations('affiliate')
   const adminT = useTranslations('adminEntry')
   const favoritesT = useTranslations('app.favorites')
+  const sharesT = useTranslations('app.templateShare')
   return (
     <RowsPanel>
       {admin ? (
@@ -38,6 +39,11 @@ export function SettingsRows({ email, phone, purchases, morePurchases, helpUnrea
       {/* 我的收藏 (Owner 2026-11-13): Create opened on its Saved filter. */}
       <Link href="/generate?saved=1" className={rowClass}>
         {favoritesT('mine')}
+        <RowValue />
+      </Link>
+      {/* Template collection share links (§5.1g): the ones made from Create's share mode. */}
+      <Link href="/account/template-shares" className={rowClass}>
+        {sharesT('listTitle')}
         <RowValue />
       </Link>
       {phone ? <FactRow label={t('phone')} value={phone} /> : null}

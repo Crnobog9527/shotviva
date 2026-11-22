@@ -220,7 +220,7 @@ export {
   type CostSettingsInput,
 } from './costs'
 export { parseFunnelDim, parsePageSort, parseRange, posthogOn, posthogProjectId, type FunnelDim, type PageSort, type Range } from './analytics'
-export { ANALYTICS_COPY, AnalyticsView, parseView, PostHogOff, RangeTabs, Unconfigured, ViewTabs, type AnalyticsQuery } from './analytics-ui'
+export { ANALYTICS_COPY, AnalyticsView, DetailsView, parseView, PostHogOff, RangeTabs, Unconfigured, ViewTabs, type AnalyticsQuery } from './analytics-ui'
 export { GROWTH_COPY, GrowthView } from './growth-ui'
 export { cheapestCreditUsd } from './insights'
 export { INSIGHTS_COPY, InsightsPanel } from './insights-ui'
