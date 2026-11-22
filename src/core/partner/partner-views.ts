@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 import { AppError } from '../errors'
 import type { Job } from '../jobs'
-import type { ObjectStore } from '../storage'
+import { protectedWorkCopy, shouldWatermark, type ObjectStore } from '../storage'
 import type { Template } from '../templates'
 import type { JobResponse, PartnerTemplate } from './partner-types'
 
@@ -13,9 +13,14 @@ import type { JobResponse, PartnerTemplate } from './partner-types'
 // Graylum conversation opened the next day still shows the picture.
 export const PARTNER_IMAGE_URL_SECONDS = 7 * 24 * 60 * 60
 
-export async function partnerImageUrl(store: ObjectStore, job: Pick<Job, 'status' | 'outputKey'>): Promise<string | null> {
+// A paid work: the stored original. A free work (free or promo credits): never the original, but
+// its protected copy (storage/protected-copy.ts: ≤ 1080 px, visible and tracking marks), kept as
+// long as the work, so it outlives the 7-day link.
+export async function partnerImageUrl(store: ObjectStore, job: Pick<Job, 'id' | 'userId' | 'status' | 'outputKey' | 'creditPool'>): Promise<string | null> {
   if (job.status !== 'succeeded' || !job.outputKey) return null
-  return store.presignGet(job.outputKey, { expiresInSeconds: PARTNER_IMAGE_URL_SECONDS })
+  if (!shouldWatermark(job.creditPool)) return store.presignGet(job.outputKey, { expiresInSeconds: PARTNER_IMAGE_URL_SECONDS })
+  const key = await protectedWorkCopy(store, { id: job.id, userId: job.userId, outputKey: job.outputKey })
+  return store.presignGet(key, { expiresInSeconds: PARTNER_IMAGE_URL_SECONDS })
 }
 
 // What the job cost the user in the end: a failed job was refunded.

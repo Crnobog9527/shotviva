@@ -4,7 +4,8 @@ import { chargePool, creditsNeeded, type Balance, type CreditPool } from '@/core
 // "Get credits · N needed" (neutral fill, opens the paywall); a single photo with too many
 // already developing → wait; no photo yet / still uploading → disabled; else Generate.
 // A batch (count > 1) is paid credits only (ARCHITECTURE §6.2): the whole cost must fit the paid
-// pool, so no watermarked photo ends up in it. It skips the wait: its photos queue.
+// pool, so no watermarked photo ends up in it. It skips the wait: its photos queue. So is
+// 「去水印：用付费积分重新生成」 (paidOnly, 2026-11-22): its whole point is a clean, paid photo.
 export type CtaState =
   | { kind: 'generate'; cost: number; pool: CreditPool; count: number }
   | { kind: 'get-credits'; cost: number; needed: number; count: number }
@@ -28,20 +29,22 @@ export type CtaInput = {
   copyMissing?: boolean
   // Photos this run will generate; 1 (or 0, nothing picked yet) is a single photo.
   count?: number
+  // Only paid credits may pay (Remove watermark): free credits would make another marked photo.
+  paidOnly?: boolean
 }
 
 type Charge = { pool: CreditPool } | { needed: number }
 
-function charge(balance: Balance, cost: number, count: number): Charge {
-  if (count > 1) return balance.paid >= cost ? { pool: 'paid' } : { needed: cost - balance.paid }
+function charge(balance: Balance, cost: number, count: number, paidOnly: boolean): Charge {
+  if (count > 1 || paidOnly) return balance.paid >= cost ? { pool: 'paid' } : { needed: cost - balance.paid }
   const pool = chargePool(balance, cost)
   return pool === null ? { needed: creditsNeeded(balance, cost) } : { pool }
 }
 
-export function ctaState({ balance, cost, running, limit, photo, copyMissing = false, count = 1 }: CtaInput): CtaState {
+export function ctaState({ balance, cost, running, limit, photo, copyMissing = false, count = 1, paidOnly = false }: CtaInput): CtaState {
   const photos = Math.max(1, count)
   const total = cost * photos
-  const verdict = charge(balance, total, photos)
+  const verdict = charge(balance, total, photos, paidOnly)
   if ('needed' in verdict) return { kind: 'get-credits', cost: total, needed: verdict.needed, count: photos }
   if (photos === 1 && running >= limit) return { kind: 'wait', limit }
   if (photo === 'none') return { kind: 'need-photo' }

@@ -13,26 +13,36 @@ export type GalleryWidth = (typeof GALLERY_WIDTHS)[number]
 
 export type VariantSource = { id: string; outputKey: string; creditPool: 'free' | 'paid' }
 
-// The version of what galleryImage draws (size rule, watermark, WebP quality). Bump it whenever
-// that changes: copies made before then are simply not found, so each work is rendered once more
-// with the new settings and stored under the new key, instead of serving stale bytes.
-export const GALLERY_VARIANT_VERSION = 'v1'
+// The version of what galleryImage draws (size rule, protection, WebP quality), per pool. Bump it
+// whenever that changes: copies made before then are simply not found, so each work is rendered
+// once more with the new settings and stored under the new key, instead of serving stale bytes.
+// Free works moved to the protected copy (storage/protect) on 2026-11-22: 'p1'; their 'v1' copies
+// (a small corner mark only) are never read again, only deleted with the work.
+const VERSION = { paid: 'v1', free: 'p1' } as const
+const ALL_VERSIONS = ['v1', 'p1'] as const
+export const galleryVariantVersion = (pool: 'free' | 'paid'): string => VERSION[pool]
 
 // Next to the work's own output in the PRIVATE bucket (§8.3: user works never go in the public
 // bucket): outputs/{user_id}/{job_id}.png → outputs/{user_id}/{job_id}-gallery-v1-960.webp. Under
 // the owner's outputs/{user_id}/ prefix, so account deletion clears them with everything else.
-export function galleryVariantKey(outputKey: string, width: GalleryWidth, version: string = GALLERY_VARIANT_VERSION): string {
+export function galleryVariantKey(outputKey: string, width: GalleryWidth, version: string): string {
   const dot = outputKey.lastIndexOf('.')
   const stem = dot > outputKey.lastIndexOf('/') ? outputKey.slice(0, dot) : outputKey
   return `${stem}-gallery-${version}-${width}.webp`
 }
 
-export function galleryVariantKeys(outputKey: string): string[] {
-  return GALLERY_WIDTHS.map((width) => galleryVariantKey(outputKey, width))
+// The copies a work of this pool is served from.
+export function galleryVariantKeysFor(work: Pick<VariantSource, 'outputKey' | 'creditPool'>): string[] {
+  return GALLERY_WIDTHS.map((width) => galleryVariantKey(work.outputKey, width, galleryVariantVersion(work.creditPool)))
 }
 
-// Both sizes from the original, marked when the work was made with free credits (the same rule
-// as the download, §6.2). `ready` carries a size already rendered (the image route's fallback),
+// Every copy a work may have, current or retired, for deleting it.
+export function galleryVariantKeys(outputKey: string): string[] {
+  return ALL_VERSIONS.flatMap((version) => GALLERY_WIDTHS.map((width) => galleryVariantKey(outputKey, width, version)))
+}
+
+// Both sizes from the original, protected when the work was made with free credits (the same
+// rule as the download, §6.2). `ready` carries a size already rendered (the image route's fallback),
 // so it is not rendered twice. Never throws: a work without its copies is still shown, rendered on
 // request, and the route writes them then.
 export async function storeGalleryVariants(
@@ -42,10 +52,11 @@ export async function storeGalleryVariants(
   ready: Partial<Record<GalleryWidth, Uint8Array>> = {},
 ): Promise<boolean> {
   try {
-    const watermark = shouldWatermark(work.creditPool)
+    const mark = shouldWatermark(work.creditPool) ? { jobId: work.id } : null
+    const version = galleryVariantVersion(work.creditPool)
     for (const width of GALLERY_WIDTHS) {
-      const body = ready[width] ?? (await galleryImage(original, width, watermark))
-      await store.put(galleryVariantKey(work.outputKey, width), body, 'image/webp')
+      const body = ready[width] ?? (await galleryImage(original, width, mark))
+      await store.put(galleryVariantKey(work.outputKey, width, version), body, 'image/webp')
     }
     return true
   } catch (error) {
@@ -58,7 +69,7 @@ export async function storeGalleryVariants(
 // from the original. Never throws.
 export async function writeGalleryVariants(store: Pick<ObjectStore, 'get' | 'head' | 'put'>, work: VariantSource): Promise<boolean> {
   try {
-    const present = await Promise.all(galleryVariantKeys(work.outputKey).map((key) => store.head(key)))
+    const present = await Promise.all(galleryVariantKeysFor(work).map((key) => store.head(key)))
     if (present.every((head) => head !== null)) return true
     return await storeGalleryVariants(store, work, await store.get(work.outputKey))
   } catch (error) {

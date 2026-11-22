@@ -7,13 +7,13 @@ import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { GridEntry } from '../catalogue/catalogue-view'
 import { loadCatalogueView } from '../catalogue/load-catalogue-view'
 
-type Shown = Pick<CatalogueTemplate, 'id' | 'name' | 'description' | 'category' | 'categoryName' | 'compare' | 'cover'>
+export type Shown = Pick<CatalogueTemplate, 'id' | 'name' | 'description' | 'category' | 'categoryName' | 'compare' | 'cover'>
 
 // What a share page may show of a template (Owner 2026-11-13): what the public catalogue card
 // and dialog already show, nothing more. No prices, text fields, toggles or anything behind them.
 export type SharedTemplate = Shown & { series: { name: string; members: Shown[] } | null }
 
-const shown = ({ id, name, description, category, categoryName, compare, cover }: CatalogueTemplate): Shown => ({ id, name, description, category, categoryName, compare, cover })
+export const shown = ({ id, name, description, category, categoryName, compare, cover }: CatalogueTemplate): Shown => ({ id, name, description, category, categoryName, compare, cover })
 
 // The template as Create would open it today, from the cached catalogue; null when it is not
 // live on the web (unpublished or soft-deleted, which the database keeps unpublished; partner-only)

@@ -22,7 +22,8 @@ import type { Job } from './job-schema'
 export type JobFile =
   // Clean output or a staged copy: the browser fetches it straight from R2, so no bytes pass the function.
   | { kind: 'redirect'; url: string }
-  // Free work: watermarked here (ARCHITECTURE §6.2), JPEG so it stays well under 4.5MB.
+  // Free work: protected here (storage/protect: ≤ 1080 px, visible and tracking marks), JPEG
+  // so it stays well under 4.5MB. No clean copy of a free work is ever signed.
   | { kind: 'bytes'; body: Uint8Array; contentType: 'image/jpeg'; filename: string }
 
 // Short: the URL is minted per request, so a revoked share never outlives it for long.
@@ -46,8 +47,8 @@ export async function resolveJobFile(deps: Deps, req: FileRequest): Promise<JobF
   const variant = stagedVariantFor(free, background)
   if (variant) return staged(deps, job, req, variant)
   if (!free) return signed(deps.store, job.outputKey, req.download ? `shotviva-${job.id}.png` : undefined)
-  // A free work's display and its 白底 download are the same marked JPEG on white.
-  const body = await applyWatermark(await deps.store.get(job.outputKey))
+  // A free work's display and its 白底 download are the same protected JPEG on white.
+  const body = await applyWatermark(await deps.store.get(job.outputKey), { jobId: job.id })
   const filename = background === 'white' ? `shotviva-${job.id}-white.jpg` : `shotviva-${job.id}.jpg`
   return { kind: 'bytes', body, contentType: 'image/jpeg', filename }
 }
@@ -59,15 +60,15 @@ function stagedVariantFor(free: boolean, background: DownloadBackground | null):
   return null
 }
 
-type ImageVariant = Exclude<DownloadVariant, 'both'>
+type ImageVariant = Exclude<DownloadVariant, 'both' | 'marked-both'>
 
-const VARIANTS: Record<ImageVariant, { contentType: string; suffix: string; make(source: Uint8Array): Promise<Uint8Array> }> = {
+const VARIANTS: Record<ImageVariant, { contentType: string; suffix: string; make(source: Uint8Array, jobId: string): Promise<Uint8Array> }> = {
   // Paid cut-out → pure white JPEG, no mark (a paid work never carries one).
   white: { contentType: 'image/jpeg', suffix: '-white.jpg', make: (source) => flattenOnWhite(source) },
-  // Free cut-out → the same mark, alpha kept.
-  marked: { contentType: 'image/png', suffix: '.png', make: (source) => applyWatermark(source, 'transparent') },
-  // Free cut-out's 白底 for the pair ZIP: the same marked JPEG the single download makes per request.
-  'marked-white': { contentType: 'image/jpeg', suffix: '-white.jpg', make: (source) => applyWatermark(source) },
+  // Free cut-out → the same protection, alpha kept.
+  marked: { contentType: 'image/png', suffix: '.png', make: (source, jobId) => applyWatermark(source, { jobId }, 'transparent') },
+  // Free cut-out's 白底 for the pair ZIP: the same protected JPEG the single download makes per request.
+  'marked-white': { contentType: 'image/jpeg', suffix: '-white.jpg', make: (source, jobId) => applyWatermark(source, { jobId }) },
 }
 
 async function staged(deps: Deps, job: Job, req: FileRequest, variant: ImageVariant): Promise<JobFile> {
@@ -78,7 +79,7 @@ async function staged(deps: Deps, job: Job, req: FileRequest, variant: ImageVari
 async function stage(store: ObjectStore, job: Job, variant: ImageVariant): Promise<string> {
   const spec = VARIANTS[variant]
   const key = downloadVariantKeyFor(job.userId, job.id, variant)
-  await stageVariant(store, { sourceKey: job.outputKey as string, key, contentType: spec.contentType, make: spec.make })
+  await stageVariant(store, { sourceKey: job.outputKey as string, key, contentType: spec.contentType, make: (source) => spec.make(source, job.id) })
   return key
 }
 
@@ -95,7 +96,7 @@ export async function resolveJobPair(deps: PairDeps, req: { userId: string; jobI
     { key: white, name: `shotviva-${job.id}-white.jpg` },
     { key: transparent, name: `shotviva-${job.id}.png` },
   ]
-  const zip = { key: downloadVariantKeyFor(job.userId, job.id, 'both'), name: `shotviva-${job.id}.zip`, files }
+  const zip = { key: downloadVariantKeyFor(job.userId, job.id, free ? 'marked-both' : 'both'), name: `shotviva-${job.id}.zip`, files }
   return { kind: 'redirect', url: await (deps.zip ?? signBatchZip)(zip) }
 }
 

@@ -58,6 +58,8 @@ const valid: { [E in EventName]: unknown } = {
   template_share_open: { template_id: 'ramen-studio', share_id: 'k3x9m2pa', signed_in: false, referrer_host: 'mp.weixin.qq.com' },
   template_share_signup_start: { template_id: 'ramen-studio', share_id: null },
   template_share_generate: { template_id: 'ramen-studio', share_id: 'k3x9m2pa' },
+  template_collection_open: { collection_id: 'a2p138a5lj0w', entries: 5, signed_in: false, referrer_host: 'mp.weixin.qq.com' },
+  template_collection_signup_start: { collection_id: 'a2p138a5lj0w', template_id: 'ramen-studio' },
 }
 
 const EVENT_NAMES = [
@@ -80,6 +82,8 @@ const EVENT_NAMES = [
       'paywall_view',
       'purchase',
       'signup',
+      'template_collection_open',
+      'template_collection_signup_start',
       'template_favorite',
       'template_share',
       'template_share_generate',
@@ -150,6 +154,15 @@ describe('event dictionary (ARCHITECTURE §16.2)', () => {
     expect(validateEvent('template_share', { ...(valid.template_share as object), method: 'email' }).ok).toBe(false)
     expect(validateEvent('signup', { method: 'email', share_template_id: 'ramen-studio', share_id: 'k3x9m2pa' }).ok).toBe(true)
     expect(validateEvent('signup', { method: 'email', share_template_id: 'Ramen Studio' }).ok).toBe(false)
+  })
+
+  // Template collection links (§5.1g): the 12-character link id only, a host, never an address.
+  it('keeps the collection funnel to link ids and hosts', () => {
+    expect(validateEvent('template_collection_open', { ...(valid.template_collection_open as object), collection_id: 'short' }).ok).toBe(false)
+    expect(validateEvent('template_collection_open', { ...(valid.template_collection_open as object), referrer_host: 'https://mp.weixin.qq.com/s/abc' }).ok).toBe(false)
+    expect(validateEvent('template_collection_open', { ...(valid.template_collection_open as object), entries: 0 }).ok).toBe(false)
+    expect(validateEvent('signup', { method: 'email', share_collection_id: 'a2p138a5lj0w' }).ok).toBe(true)
+    expect(validateEvent('signup', { method: 'email', share_collection_id: 'A2P138A5LJ0W' }).ok).toBe(false)
   })
 
   // 中国银行卡 (T64, ARCHITECTURE §6.3): checkout_start.method = 'cn_card'.

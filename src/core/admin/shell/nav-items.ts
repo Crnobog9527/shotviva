@@ -23,6 +23,8 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   // T82 (ARCHITECTURE §6.3 「后台拒付页」), next to the payments it is about.
   { key: 'disputes', href: '/admin/disputes' },
   { key: 'jobs', href: '/admin/jobs' },
+  // Free works' tracking mark read back (ARCHITECTURE §6.2, 2026-11-22), next to the jobs it names.
+  { key: 'trace', href: '/admin/trace' },
   // T33 (ARCHITECTURE §10.0), next to the jobs whose cost it reconciles.
   { key: 'costs', href: '/admin/costs' },
   { key: 'templates', href: '/admin/templates' },
