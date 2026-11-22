@@ -3570,7 +3570,8 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_has_history"("p_user" "uuid") RE
       or exists(select from public.affiliate_commissions where affiliate_user_id = p_user)
       or exists(select from public.affiliate_payouts where affiliate_user_id = p_user)
       or exists(select from public.affiliate_adjustments where affiliate_user_id = p_user)
-      or exists(select from public.affiliate_rate_overrides where user_id = p_user)
+      or exists(select from public.affiliate_rate_overrides
+                 where user_id = p_user and (l1_bp is not null or l2_bp is not null))
       or exists(select from public.profiles where referred_by = p_user)
       or exists(select from public.affiliates where parent_user_id = p_user)
       or exists(select from public.affiliate_recompute_errors e
@@ -3645,8 +3646,12 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_overrides"("p_user" "uuid", "p_v
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+  delete from public.affiliate_rate_overrides o
+   using jsonb_to_recordset(coalesce(p_values,'[]'::jsonb)) r(product_kind text,l1_bp integer,l2_bp integer)
+   where o.user_id=p_user and o.product_kind=r.product_kind and r.l1_bp is null and r.l2_bp is null;
   insert into public.affiliate_rate_overrides(user_id,product_kind,l1_bp,l2_bp)
     select p_user,r.product_kind,r.l1_bp,r.l2_bp from jsonb_to_recordset(p_values) r(product_kind text,l1_bp integer,l2_bp integer)
+     where r.l1_bp is not null or r.l2_bp is not null
     on conflict(user_id,product_kind) do update set l1_bp=excluded.l1_bp,l2_bp=excluded.l2_bp;
 $$;
 
@@ -10374,6 +10379,8 @@ begin
     v_has_personal := found;
     if v_has_personal then
       perform 1 from public.affiliate_click_days where affiliate_user_id = v_new order by day for update nowait;
+      -- 1991: its override rows go with it too; an all-null one is not history.
+      perform 1 from public.affiliate_rate_overrides where user_id = v_new order by product_kind for update nowait;
     end if;
     perform 1 from public.profiles
      where id in (select v_old union all select v_new union all
