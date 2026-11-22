@@ -4344,13 +4344,18 @@ declare
   m public.org_members;
   d public.org_held_draws;
   back integer;
+  v_draw integer;
 begin
   if new.delta < 0 then
     select * into m from public.org_members where user_id = new.user_id and status = 'active' for update;
-    if found and m.held_credits > new.balance_after then
-      update public.org_members set held_credits = new.balance_after where org_id = m.org_id and user_id = m.user_id;
-      insert into public.org_held_draws(debit_key, org_id, user_id, drawn)
-        values (new.idempotency_key, m.org_id, m.user_id, m.held_credits - new.balance_after);
+    if not found then return new; end if;
+    v_draw := case when new.kind = 'reserve' then least(m.held_credits, -new.delta)
+                   else greatest(0, m.held_credits - new.balance_after) end;
+    if v_draw > 0 or m.held_credits > new.balance_after then
+      update public.org_members set held_credits = least(held_credits - v_draw, new.balance_after) where org_id = m.org_id and user_id = m.user_id;
+    end if;
+    if v_draw > 0 then
+      insert into public.org_held_draws(debit_key, org_id, user_id, drawn) values (new.idempotency_key, m.org_id, m.user_id, v_draw);
     end if;
   elsif new.kind = 'refund' then
     select * into d from public.org_held_draws
@@ -5581,21 +5586,27 @@ CREATE OR REPLACE FUNCTION "public"."_reserve_pool"("p_profile" "public"."profil
     SET "search_path" TO ''
     AS $$
 declare
-  v_both boolean := false;
+  v_member boolean := false;
+  v_paid integer;
+  v_promo integer;
   v_pool text;
 begin
   if p_choice is not null and p_choice not in ('paid', 'promo') then
     raise exception 'INVALID_INPUT' using detail = 'pool_choice must be paid or promo';
   end if;
-  if p_choice is not null and p_source = 'web' then
-    select least(m.held_credits, p_profile.credits) > 0 and least(m.held_promo_credits, p_profile.free_credits) > 0
-      into v_both
-      from public.org_members m join public.orgs o on o.id = m.org_id
-     where m.user_id = p_profile.id and m.status = 'active' and o.promo_expires_at > now();
+  select true, least(m.held_credits, p_profile.credits),
+         case when o.promo_expires_at > now() then least(m.held_promo_credits, p_profile.free_credits) else 0 end
+    into v_member, v_paid, v_promo
+    from public.org_members m join public.orgs o on o.id = m.org_id
+   where m.user_id = p_profile.id and m.status = 'active';
+  if not coalesce(v_member, false) then
+    if p_profile.credits >= p_cost then return 'paid'; end if;
+    if p_profile.free_credits >= p_cost then return 'free'; end if;
+    raise exception 'CREDITS_INSUFFICIENT';
   end if;
-  if coalesce(v_both, false) then
+  if p_choice is not null and p_source = 'web' and v_paid > 0 and v_promo > 0 then
     v_pool := case p_choice when 'paid' then 'paid' else 'free' end;
-    if (case when v_pool = 'paid' then p_profile.credits else p_profile.free_credits end) < p_cost then
+    if (case when v_pool = 'paid' then v_paid else v_promo end) < p_cost then
       raise exception 'POOL_CHOICE_INSUFFICIENT';
     end if;
     if p_profile.org_pool_choice is distinct from p_choice then
@@ -5603,9 +5614,9 @@ begin
     end if;
     return v_pool;
   end if;
-  if p_profile.credits >= p_cost then return 'paid'; end if;
-  if p_profile.free_credits >= p_cost then return 'free'; end if;
-  raise exception 'CREDITS_INSUFFICIENT';
+  if v_paid >= p_cost then return 'paid'; end if;
+  if v_promo >= p_cost then return 'free'; end if;
+  raise exception 'ORG_CREDITS_INSUFFICIENT';
 end;
 $$;
 
@@ -18163,10 +18174,8 @@ begin
     raise exception 'RATE_LIMITED';
   end if;
 
-  if v_profile.credits >= v_price then v_pool := 'paid';
-  elsif v_profile.free_credits >= v_price then v_pool := 'free';
-  else raise exception 'CREDITS_INSUFFICIENT';
-  end if;
+  -- Paid first, then free; org members from org shares only (1897).
+  v_pool := public._reserve_pool(v_profile, v_price, 'web', null);
 
   insert into public.poster_extractions (user_id, source, input_chars, status, provider, credits, credit_pool)
   values (p_user_id, 'photo', 0, 'pending', p_provider, v_price, v_pool)
