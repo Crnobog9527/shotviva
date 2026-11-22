@@ -143,7 +143,7 @@ export const usdRange = (range: UsdRange) => `${usd(range.low)}–${usd(range.hi
 export const styledShotUsd = photographer.styledShotUsd
 export const packshotUsd = photographer.packshotUsd
 export const dayRateUsd = photographer.dayRateUsd
-export const foodHalfDayUsd = photographer.foodHalfDayUsd
+export const foodShootUsd = photographer.foodShootUsd
 // Three styled shots, the whole quote: $150–$1,050 (retouching is in the shot price).
 export const setShotsUsd = times(styledShotUsd, SET_PHOTOS)
 export const quoteUsd: UsdRange = setShotsUsd

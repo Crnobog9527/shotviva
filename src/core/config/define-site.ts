@@ -148,8 +148,8 @@ export type MarketingNumbers = {
     packshotUsd: UsdRange
     // A studio day for product photography.
     dayRateUsd: UsdRange
-    // A half-day food shoot for a restaurant menu (the food stylist is billed apart).
-    foodHalfDayUsd: UsdRange
+    // One food photography session for a restaurant menu (styling, props and licensing often extra).
+    foodShootUsd: UsdRange
   }
   // About how many seconds a photo takes, one round figure for every quality (Owner
   // 2026-11-06): no ranges or per-quality times, so a slower provider never breaks a promise.
