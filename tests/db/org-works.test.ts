@@ -169,6 +169,9 @@ describe('leaving the org', () => {
     // Edit and again from the org work look missing too.
     await expect(editOf(staff, orgWork)).rejects.toThrow('PARENT_JOB_NOT_FOUND')
     expect((await job(await made(staff, { againOf: orgWork }))).again_of).toBeNull()
+    // A replay of the same job (web job id, partner key) does not hand the old work back either.
+    await expect(reserveJob(rest, { jobId: orgWork, userId: staff, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
+      inputs: { resolution: '1k', attempt_id: randomUUID() } })).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 
   it('hides them from the member’s own session reads (RLS)', async () => {
