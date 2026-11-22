@@ -6,8 +6,12 @@ type Translate = Awaited<ReturnType<typeof getTranslations<'templateShare'>>>
 
 // The page's words in the visitor's language; counts worked out here, so the page needs no
 // translator of its own.
+// Templates the client can choose from: single picks and every live member of a picked series.
+const liveTemplates = (collection: TemplateCollection) =>
+  collection.entries.reduce((sum, entry) => sum + (entry.type === 'series' ? entry.series.members.length : 1), 0)
+
 export function collectionText(t: Translate, collection: TemplateCollection): CollectionPageText {
-  const templates = collection.entries.reduce((sum, entry) => sum + (entry.type === 'series' ? entry.series.members.length : 1), 0)
+  const templates = liveTemplates(collection)
   const seriesCount = Object.fromEntries(
     collection.entries.flatMap((entry) => (entry.type === 'series' ? [[entry.series.id, t('seriesCount', { count: entry.series.members.length })]] : [])),
   )

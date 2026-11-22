@@ -1,7 +1,11 @@
 'use client'
 
 import { useLocale } from 'next-intl'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+
+import { track } from '@/core/analytics/browser'
+import { COLLECTION_COOKIE, COLLECTION_COOKIE_MAX_AGE } from '@/core/analytics/collection-link'
+import { referrerHostOf } from '@/core/analytics/share-link'
 
 import type { FormAction } from '@/core/auth/ui'
 import { localizePath } from '@/core/i18n'
@@ -19,13 +23,18 @@ const ViewerContext = createContext<Viewer>({ signedIn: null, setSignedIn: () =>
 
 export const useCollectionViewer = () => useContext(ViewerContext)
 
-type Props = { googleAction: FormAction; gift: string; children: ReactNode }
+// `collection`: the link id and how many picks are still live, for the funnel events.
+type Props = { collection: { id: string; entries: number }; googleAction: FormAction; gift: string; children: ReactNode }
 
-export function CollectionViewer({ googleAction, gift, children }: Props) {
+export function CollectionViewer({ collection, googleAction, gift, children }: Props) {
   const locale = useLocale() as Locale
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
   const [target, setTarget] = useState<string | null>(null)
-  const signUpFor = useCallback((templateId: string) => setTarget(templateId), [])
+  useCollectionOpen(collection, signedIn)
+  const signUpFor = useCallback((templateId: string) => {
+    track('template_collection_signup_start', { collection_id: collection.id, template_id: templateId })
+    setTarget(templateId)
+  }, [collection.id])
   const value = useMemo(() => ({ signedIn, setSignedIn, signUpFor }), [signedIn, signUpFor])
   const next = localizePath(`/generate/${encodeURIComponent(target ?? '')}`, locale)
   return (
@@ -41,4 +50,19 @@ export function CollectionViewerStatus({ signedIn }: { signedIn: boolean }) {
   const { setSignedIn } = useCollectionViewer()
   useEffect(() => setSignedIn(signedIn), [signedIn, setSignedIn])
   return null
+}
+
+// template_collection_open once the visitor is known (never for the streaming placeholder), and
+// the sv_tshare mark the sign-up event reads (core/analytics/collection-link.ts). Our own pages
+// as the referrer count as none.
+function useCollectionOpen(collection: { id: string; entries: number }, signedIn: boolean | null) {
+  const sent = useRef(false)
+  useEffect(() => {
+    if (signedIn === null || sent.current) return
+    sent.current = true
+    document.cookie = `${COLLECTION_COOKIE}=${collection.id}; Path=/; Max-Age=${COLLECTION_COOKIE_MAX_AGE}; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`
+    track('template_collection_open', {
+      collection_id: collection.id, entries: collection.entries, signed_in: signedIn, referrer_host: referrerHostOf(document.referrer, location.hostname),
+    })
+  }, [collection.id, collection.entries, signedIn])
 }

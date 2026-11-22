@@ -4,6 +4,7 @@ import { cookies, headers } from 'next/headers'
 import { bindReferral } from '../affiliate/referral'
 import { noteSignupGift } from '../alerts'
 import { track } from '../analytics'
+import { COLLECTION_COOKIE, parseCollectionMark } from '../analytics/collection-link'
 import { parseShareMark, SHARE_COOKIE } from '../analytics/share-link'
 import { FIRST_TOUCH_COOKIE, recordFirstTouchAtSignIn } from '../attribution/sign-in'
 import { serverEnv } from '../env'
@@ -24,12 +25,19 @@ export type SignInMethod = 'email' | 'google' | 'phone'
 // same-IP rule refuses never has a grant applied. Without one (local dev) it falls back to the
 // grant, whose signup idempotency key applies only once.
 // `locale` is the language the account signed up in (user_metadata) or else the page's.
-// A template share link opened before signing up (core/analytics/share-link.ts), and the A/B
-// variants this browser saw first (ARCHITECTURE §16.5).
-function signupMarks(shareCookie: string | undefined, experiments: Parameters<typeof signupExperiments>[0]) {
-  const share = parseShareMark(shareCookie)
+// A template share link and a template collection link opened before signing up
+// (core/analytics/share-link.ts, collection-link.ts), and the A/B variants this browser saw first
+// (ARCHITECTURE §16.5).
+type Jar = { get(name: string): { value: string } | undefined }
+export function signupMarks(jar: Jar, experiments: Parameters<typeof signupExperiments>[0]) {
+  const share = parseShareMark(jar.get(SHARE_COOKIE)?.value)
+  const collection = parseCollectionMark(jar.get(COLLECTION_COOKIE)?.value)
   const seen = signupExperiments(experiments)
-  return { ...(share ? { share_template_id: share.templateId, share_id: share.shareId } : {}), ...(seen ? { experiments: seen } : {}) }
+  return {
+    ...(share ? { share_template_id: share.templateId, share_id: share.shareId } : {}),
+    ...(collection ? { share_collection_id: collection } : {}),
+    ...(seen ? { experiments: seen } : {}),
+  }
 }
 
 // Local dev runs on http; everywhere else the cookie is Secure.
@@ -67,6 +75,6 @@ export async function onVerifiedSignIn(
   if (first) {
     // 1350: tell the Owner when half, then all, of today's signup gifts are gone (after()).
     noteSignupGift()
-    track('signup', { method, code_kind: kind, ...signupMarks(jar.get(SHARE_COOKIE)?.value, experiments) }, { distinctId: userId, locale })
+    track('signup', { method, code_kind: kind, ...signupMarks(jar, experiments) }, { distinctId: userId, locale })
   }
 }

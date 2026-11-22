@@ -53,7 +53,7 @@ export default async function TemplateCollectionRoute(route: Route) {
   const t = await getTranslations({ locale, namespace: 'templateShare' })
   if (!collection) return <SharedTemplateMissing title={t('missingTitle')} text={t('missingText')} browse={t('missingBrowse')} />
   return (
-    <CollectionViewer googleAction={googleAction} gift={await giftOf(locale)}>
+    <CollectionViewer collection={{ id: collection.id, entries: collection.entries.length }} googleAction={googleAction} gift={await giftOf(locale)}>
       <TemplateCollectionPage collection={collection} text={collectionText(t, collection)} viewer={<Suspense fallback={null}><ViewerSlot /></Suspense>} />
     </CollectionViewer>
   )
