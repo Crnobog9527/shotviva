@@ -915,9 +915,10 @@ CREATE OR REPLACE FUNCTION "admin"."catalog_fee_components"("p_kind" "text") RET
     AS $$
   select jsonb_build_object('payment_bp',(policy->>'payment_bp')::int,'refund_bp',(policy->>'refund_bp')::int,
     'commission_bp',greatest((policy->>case when p_kind='yearly' then 'yearly_commission_bp' else 'other_commission_bp' end)::int,
-      (select r.l1_bp+r.l2_bp from public.affiliate_rates r where product_kind=p_kind),
-      (select max(coalesce(o.l1_bp,r.l1_bp) +
-          case when parent.status='active' and parent.team_enabled then coalesce(po.l2_bp,r.l2_bp) else 0 end)
+      (select greatest(r.l1_bp+r.l2_bp,r.org_l2_bp) from public.affiliate_rates r where product_kind=p_kind),
+      (select max(greatest(coalesce(o.l1_bp,r.l1_bp) +
+          case when parent.status='active' and parent.team_enabled then coalesce(po.l2_bp,r.l2_bp) else 0 end,
+          case when a.org_id is not null then coalesce(o.l2_bp,r.org_l2_bp) else 0 end))
         from public.affiliates a join public.affiliate_rates r on r.product_kind=p_kind
         left join public.affiliate_rate_overrides o on (o.user_id,o.product_kind)=(a.user_id,p_kind)
         left join public.affiliates parent on parent.user_id=a.parent_user_id

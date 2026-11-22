@@ -18,6 +18,28 @@
 alter table public.affiliate_rates
   add column org_l2_bp integer not null default 500 check (org_l2_bp between 0 and 10000);
 
+-- The break-even fee (admin.catalog_fee_components, used by catalogue price checks and the template
+-- credit floor) must cover the highest commission any payment of a kind can pay. Before 1900 it
+-- counted the policy, the program l1+l2 and each active account's own l1 plus its parent's team
+-- bonus, but no enterprise level 2. An org_l2 payment pays the org account its level-2 rate alone
+-- (no level-1 row, an org account has no parent), so the new candidates are the kind's org default
+-- and, per active org account, coalesce(override.l2_bp, org default). Same as 1127 otherwise.
+-- Created before the rate updates below so their floor-budget refresh already uses it.
+create or replace function admin.catalog_fee_components(p_kind text) returns jsonb
+language sql stable set search_path='' as $$
+  select jsonb_build_object('payment_bp',(policy->>'payment_bp')::int,'refund_bp',(policy->>'refund_bp')::int,
+    'commission_bp',greatest((policy->>case when p_kind='yearly' then 'yearly_commission_bp' else 'other_commission_bp' end)::int,
+      (select greatest(r.l1_bp+r.l2_bp,r.org_l2_bp) from public.affiliate_rates r where product_kind=p_kind),
+      (select max(greatest(coalesce(o.l1_bp,r.l1_bp) +
+          case when parent.status='active' and parent.team_enabled then coalesce(po.l2_bp,r.l2_bp) else 0 end,
+          case when a.org_id is not null then coalesce(o.l2_bp,r.org_l2_bp) else 0 end))
+        from public.affiliates a join public.affiliate_rates r on r.product_kind=p_kind
+        left join public.affiliate_rate_overrides o on (o.user_id,o.product_kind)=(a.user_id,p_kind)
+        left join public.affiliates parent on parent.user_id=a.parent_user_id
+        left join public.affiliate_rate_overrides po on (po.user_id,po.product_kind)=(parent.user_id,p_kind)
+        where a.status='active'))) from (select admin.catalog_policy() policy) x where policy is not null
+$$;
+
 -- Backfill from the live single setting (the singleton row exists once 0901 has run).
 update public.affiliate_rates r set org_l2_bp = s.org_l2_bp from public.affiliate_settings s where s.singleton;
 
