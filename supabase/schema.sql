@@ -16407,6 +16407,53 @@ $_$;
 ALTER FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."org_member_work_file"("p_user" "uuid", "p_job_id" "uuid") RETURNS TABLE("id" "uuid", "user_id" "uuid", "credit_pool" "text", "output_key" "text", "archive_key" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select w.id, w.user_id, w.credit_pool, w.output_key, w.archive_key
+    from public.org_members m
+    join public.orgs o on o.id = m.org_id
+   cross join lateral public.org_owner_work_file(o.owner_user_id, p_job_id) w
+   where m.user_id = p_user and m.status = 'active';
+$$;
+
+
+ALTER FUNCTION "public"."org_member_work_file"("p_user" "uuid", "p_job_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_member_work_list"("p_user" "uuid", "p_member" "uuid" DEFAULT NULL::"uuid", "p_archived" boolean DEFAULT false, "p_limit" integer DEFAULT 30, "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "user_id" "uuid", "template_id" "text", "template_name" "text", "created_at" timestamp with time zone, "aspect_ratio" "text", "member_active" boolean)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select w.id, w.user_id, w.template_id, w.template_name, w.created_at, w.aspect_ratio, w.member_active
+    from public.org_members m
+    join public.orgs o on o.id = m.org_id
+   cross join lateral public.org_owner_work_list(o.owner_user_id, p_member, p_archived, p_limit, p_before_at, p_before_id) with ordinality w
+   where m.user_id = p_user and m.status = 'active'
+   order by w.ordinality;
+$$;
+
+
+ALTER FUNCTION "public"."org_member_work_list"("p_user" "uuid", "p_member" "uuid", "p_archived" boolean, "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_member_work_makers"("p_user" "uuid") RETURNS TABLE("user_id" "uuid", "role" "text", "status" "text", "removed_at" timestamp with time zone, "works" integer)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select w.user_id, w.role, w.status, w.removed_at, w.works
+    from public.org_members m
+    join public.orgs o on o.id = m.org_id
+   cross join lateral public.org_owner_work_makers(o.owner_user_id) with ordinality w
+   where m.user_id = p_user and m.status = 'active'
+   order by w.ordinality;
+$$;
+
+
+ALTER FUNCTION "public"."org_member_work_makers"("p_user" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."org_monthly_topup"("p_period" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -28896,6 +28943,21 @@ GRANT ALL ON FUNCTION "public"."org_member_promo_stats"("p_caller" "uuid", "p_or
 
 REVOKE ALL ON FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_member_work_file"("p_user" "uuid", "p_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_member_work_file"("p_user" "uuid", "p_job_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_member_work_list"("p_user" "uuid", "p_member" "uuid", "p_archived" boolean, "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_member_work_list"("p_user" "uuid", "p_member" "uuid", "p_archived" boolean, "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_member_work_makers"("p_user" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_member_work_makers"("p_user" "uuid") TO "service_role";
 
 
 
