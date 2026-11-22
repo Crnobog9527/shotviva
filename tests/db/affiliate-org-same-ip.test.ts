@@ -75,3 +75,18 @@ it('level 2 follows the level-1 referrer: a personal parent of a flagged persona
   expect(await commission(db, q.id, 1)).toMatchObject({ status: 'pending', flags: [] })
   expect(await commission(db, q.id, 2)).toMatchObject({ status: 'pending', flags: [] })
 })
+
+it('a customer bound in the personal era stays held after the owner\'s affiliate row becomes an org account', async () => {
+  const owner = await promoter(db)
+  const buyer = await createUser(db)
+  await bind(db, buyer, owner.slug)
+  // 1643 converts a suspended or rejected personal row with nothing owed.
+  await db.query("update affiliates set status='suspended' where user_id=$1", [owner.id])
+  const input = { owner_user_id: owner.id, name: 'Org ' + owner.id.slice(0, 8), affiliate_enabled: true }
+  await db.query('select admin_org_create($1,$2)', [actor, input])
+  expect(await row(db, 'select org_id is not null as org from affiliates where user_id=$1', [owner.id])).toEqual({ org: true })
+  expect(await row(db, 'select referred_source from profiles where id=$1', [buyer])).toEqual({ referred_source: 'signup' })
+  await sameIp([owner.id, buyer])
+  const p = await sale(db, buyer, 'pack_m', 2490)
+  expect(await commission(db, p.id)).toMatchObject({ status: 'on_hold', flags: ['same_ip'] })
+})

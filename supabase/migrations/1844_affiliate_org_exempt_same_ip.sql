@@ -5,8 +5,10 @@
 -- (status on_hold, flags {same_ip}) until an admin releases it. For a personal affiliate that is a
 -- self-referral / duplicate-account signal. For an enterprise (org) affiliate it is the normal case:
 -- the owner and the staff register from one office network, so every employee payment would freeze.
--- The owner decided (2026-11-22) to drop the flag for them: when the referring affiliate has
--- org_id is not null, same_ip is false. Personal affiliates keep today's behaviour.
+-- The owner decided (2026-11-22) to drop the flag for them. The exemption keys on how the customer
+-- was bound (referred_source org_l1 / org_l2), not on the affiliate row: an owner's old personal
+-- affiliate row can later become an org account (1643 trigger), and customers bound in the personal
+-- era keep their same_ip holding. Personal-source customers keep today's behaviour.
 --
 -- Level 2: the snapshot is computed once per payment from the level-1 referrer, and both commission
 -- rows of that payment read the same 'same_ip' key. So an org level-1 payment gets no flag on either
@@ -25,7 +27,7 @@ language sql stable security definer set search_path='' set "TimeZone" to 'UTC' 
     'parent',case when a.status='active' and parent.team_enabled and parent.status='active' then parent.user_id end,
     'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,s.org_l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
     'bonus',coalesce(po.l2_bp,r.l2_bp),
-    'same_ip',a.org_id is null and coalesce(customer.signup_ip=referrer.signup_ip,false),
+    'same_ip',coalesce(customer.referred_source not in ('org_l1','org_l2'),true) and coalesce(customer.signup_ip=referrer.signup_ip,false),
     'confirm_after',p_payment.created_at+make_interval(days=>s.hold_days),
     'void',case when a.org_id is not null and exists(select from public.org_members m
       where m.org_id=a.org_id and m.user_id=customer.id and m.status='active') then 'org_member' end)
