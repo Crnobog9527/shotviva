@@ -27,6 +27,14 @@ describe('proxy matcher', () => {
     expect(runsOn('/manifest.webmanifest')).toBe(false)
   })
 
+  // The pre-sized copies of public pictures (core/presized), fetched by the image CDN with its header:
+  // the proxy would answer those 404 (image-cdn-guard.ts), and an AVIF is not in the extension list.
+  it('skips the pre-sized pictures in both formats', () => {
+    expect(runsOn('/presized/v1/w640/home/hero-set-phone.avif')).toBe(false)
+    expect(runsOn('/presized/v1/w640/home/hero-set-phone.webp')).toBe(false)
+    expect(runsOn('/assets/presized/v1/w384/covers/x/after-0123456789abcdef.avif')).toBe(false)
+  })
+
   // T90: the version check never touches the session.
   it('skips /api/version but not the other API routes', () => {
     expect(runsOn('/api/version')).toBe(false)

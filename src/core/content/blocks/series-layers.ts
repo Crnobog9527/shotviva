@@ -35,6 +35,7 @@ export function pictureAttrs(url: string, sizes: string) {
   return capSrcSet({ sizes: props.sizes, srcSet: props.srcSet, src: props.src }, sizes)
 }
 
+// Always lazy, so WebP only (no AVIF <source>, picture.tsx): these load after the first screen.
 function picture(doc: Document, url: string, sizes: string, className: string, after: boolean): HTMLImageElement {
   const img = doc.createElement('img')
   const attrs = pictureAttrs(url, sizes)

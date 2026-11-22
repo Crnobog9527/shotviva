@@ -105,7 +105,9 @@ export async function proxy(request: NextRequest, event?: NextFetchEvent) {
 // /ingest is the PostHog proxy (next.config.ts rewrites, only while PostHog is on): no session work for analytics beacons.
 // fonts/ holds public, content-addressed font files only (MiSans, ARCHITECTURE §17; Instrument Serif).
 // assets/ is the template-cover rewrite to the public bucket (ARCHITECTURE §8.3, T51).
+// presized/ holds the build's fixed-width AVIF / WebP copies of public pictures (core/presized), which
+// the image CDN fetches with its header: like the other static files, never a page.
 // api/version is the open tabs' version check (T90): no session work, no locale routing.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|api/version$|fonts/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|presized/|api/version$|fonts/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)'],
 }

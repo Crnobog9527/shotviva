@@ -5,7 +5,8 @@
 import { useRef } from 'react'
 
 import { cn } from '@/core/ui/cn'
-import { coverImage, coverSrc } from '@/core/ui/cover-image'
+import { coverAvif, coverImage, coverSrc } from '@/core/ui/cover-image'
+import { Picture } from '@/core/ui/picture'
 import { useMediaQuery } from '@/core/ui/use-media-query'
 
 import type { CatalogueTemplate } from './catalogue-template'
@@ -43,7 +44,9 @@ function AnimatedImage({ src, poster, label, sizes }: { src: string; poster: str
   const reduce = useMediaQuery(REDUCED_MOTION)
   return (
     <>
-      <img {...(reduce ? coverImage(poster, sizes) : { src })} alt={label} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
+      <Picture avif={reduce ? coverAvif(poster, sizes) : undefined}>
+        <img {...(reduce ? coverImage(poster, sizes) : { src })} alt={label} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
+      </Picture>
       <SplitTags hidden={!reduce} />
     </>
   )
