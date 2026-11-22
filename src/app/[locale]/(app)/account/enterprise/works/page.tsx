@@ -8,6 +8,7 @@ import { readOrgWorksPage } from '@/core/org/works'
 import { EnterpriseFrame, OrgWorksView, WorksMemberFilter } from '@/core/org/ui'
 
 import { readOwnerArea } from '../owner-area'
+import { deleteOrgWorkAction } from './actions'
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('app.org.tabs'))('works') }
@@ -23,7 +24,7 @@ async function Works({ searchParams }: { searchParams: Search }) {
   const page = await readOrgWorksPage(db, user.id, { member: one(query.member), before: one(query.before) }, maskPhone)
   return (
     <EnterpriseFrame orgName={view.org.name} current="works" affiliate={affiliate} intro={t('worksIntro')} subnav={<WorksMemberFilter page={page} />}>
-      <OrgWorksView page={page} />
+      <OrgWorksView page={page} remove={deleteOrgWorkAction} />
     </EnterpriseFrame>
   )
 }

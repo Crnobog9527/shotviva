@@ -1213,7 +1213,7 @@
         "deleting": "Deleting…",
         "cancel": "Cancel",
         "running": "This photo is still developing. Delete it once it's done.",
-        "org": "This photo was made with your company's credits, so it belongs to the company and only the company admin can delete it.",
+        "org": "Company photos can only be deleted by the company admin.",
         "failed": "Couldn't delete the photo. Please try again."
       }
     },
@@ -2005,7 +2005,17 @@
         "open": "View full size",
         "download": "Download original",
         "madeBy": "{who} · {date}",
-        "unknown": "Account"
+        "unknown": "Account",
+        "delete": {
+          "open": "Delete {name}",
+          "title": "Delete this company photo?",
+          "body": "This cannot be undone, and it also disappears for the staff member who made it. The deletion is recorded for the company.",
+          "confirm": "Delete photo",
+          "deleting": "Deleting…",
+          "cancel": "Cancel",
+          "running": "This photo is still developing. Delete it once it is done.",
+          "error": "The photo could not be deleted. Please try again later."
+        }
       }
     },
     "templateShare": {

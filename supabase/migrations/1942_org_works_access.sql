@@ -2,9 +2,9 @@
 -- look missing everywhere they could reach them. Their own reads (RLS here; the server's
 -- service-role reads filter the same column in core/jobs), sharing (a link already made stops
 -- showing them, its image routes included, since both read through read_work_share), downloads,
--- the visibility switch, and deleting. Edits, redraws and again are refused at insert (1941).
--- Each function below is its 0340 / 0724 / 1320 / 1871 body plus that one column check, and for
--- delete_own_job the org-work rule. Signatures, grants and errors are unchanged.
+-- and the visibility switch (deleting: 1944). Edits, redraws and again are refused at insert
+-- (1941). Each function below is its 0724 / 1320 / 1871 body plus that one column check.
+-- Signatures, grants and errors are unchanged.
 
 -- Restrictive, so it narrows generation_jobs_select_own without touching it.
 create policy generation_jobs_org_access on public.generation_jobs
@@ -189,42 +189,6 @@ begin
   end if;
 
   update public.generation_jobs set visibility = p_visibility where id = p_job_id
-  returning * into v_job;
-  return v_job;
-end;
-$$;
-
--- An org work belongs to the org, so a member cannot delete it (deleting also removes its files):
--- ORG_WORK_DELETE_FORBIDDEN. The org's owner deletes their own org works like any other.
-create or replace function public.delete_own_job(p_job_id uuid, p_user_id uuid)
-returns public.generation_jobs
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_job public.generation_jobs;
-begin
-  select * into v_job from public.generation_jobs
-   where id = p_job_id and user_id = p_user_id and org_access_ended_at is null
-     for update;
-  if not found then
-    raise exception 'JOB_NOT_FOUND';
-  end if;
-  if v_job.deleted_at is not null then
-    return v_job;
-  end if;
-  if v_job.status = 'running' then
-    raise exception 'JOB_RUNNING';
-  end if;
-  if v_job.org_id is not null
-     and not exists (select 1 from public.orgs o where o.id = v_job.org_id and o.owner_user_id = p_user_id) then
-    raise exception 'ORG_WORK_DELETE_FORBIDDEN';
-  end if;
-
-  update public.generation_jobs
-     set deleted_at = now(), inputs = inputs - 'note' - 'copy' - 'instruction'
-   where id = p_job_id
   returning * into v_job;
   return v_job;
 end;

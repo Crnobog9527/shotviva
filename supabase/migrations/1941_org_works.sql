@@ -62,6 +62,12 @@ begin
       select 1 from public.generation_jobs a where a.id = new.again_of and a.org_access_ended_at is not null) then
       new.again_of := null;
     end if;
+    -- Nor claim a free poster redraw (a refund, grant_poster_free_redraw) against one.
+    if new.inputs -> 'poster' ->> 'redraw_of' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' and exists (
+      select 1 from public.generation_jobs r
+       where r.id = (new.inputs -> 'poster' ->> 'redraw_of')::uuid and r.org_access_ended_at is not null) then
+      new.inputs := new.inputs #- '{poster,redraw_of}';
+    end if;
   elsif old.org_id is not null and new.org_id is distinct from old.org_id then
     raise exception 'ORG_WORK_IMMUTABLE';
   end if;

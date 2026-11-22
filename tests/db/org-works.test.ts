@@ -6,9 +6,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { deleteOwnJob, findOwnJob, listOwnJobs, reserveJob, setJobVisibility } from '@/core/jobs'
 import { allocateOrgCredits, joinOrg, leaveOrg, removeOrgMember } from '@/core/org'
-import { orgOwnerWork, orgOwnerWorkMembers, orgOwnerWorks } from '@/core/org/works'
+import { orgOwnerDeleteWork, orgOwnerWork, orgOwnerWorkMembers, orgOwnerWorks } from '@/core/org/works'
 import { createWorkShare, listWorkShares, readWorkShare } from '@/core/work-share'
 
+import { createMemoryStore } from '../fakes/memory-store'
 import { seedTemplate } from './generation-fixtures'
 import { connectAdmin, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
@@ -233,14 +234,65 @@ describe('the owner’s 企业作品', () => {
   })
 })
 
+const audits = async (jobId: string) =>
+  (await db.query('select org_id, maker_user_id, deleted_by from public.org_work_deletions where job_id = $1', [jobId])).rows
+
 describe('deleting', () => {
-  it('refuses a member deleting an org work but lets the owner delete their own', async () => {
-    const { owner, staff } = await staffed()
+  it('refuses a member deleting an org work; the owner deletes their own, audited', async () => {
+    const { orgId, owner, staff } = await staffed()
     const orgWork = await made(staff)
     await expect(deleteOwnJob(service, { jobId: orgWork, userId: staff })).rejects.toMatchObject({ message: 'ORG_WORK_DELETE_FORBIDDEN' })
+    expect((await db.query('select deleted_at from public.generation_jobs where id = $1', [orgWork])).rows[0].deleted_at).toBeNull()
+    // The primary admin follows the same rule: their org-funded works are org works.
     await allocateOrgCredits(service, owner, owner, cost, randomUUID())
     const ownersWork = await made(owner)
-    expect((await job(ownersWork)).org_id).not.toBeNull()
+    expect((await job(ownersWork)).org_id).toBe(orgId)
     expect((await deleteOwnJob(service, { jobId: ownersWork, userId: owner })).deletedAt).not.toBeNull()
+    expect(await audits(ownersWork)).toEqual([{ org_id: orgId, maker_user_id: owner, deleted_by: owner }])
+  })
+
+  it('lets the owner delete any member’s org work from 企业作品, removed members included, files and all', async () => {
+    const { orgId, owner, staff } = await staffed()
+    const orgWork = await made(staff)
+    await removeOrgMember(service, owner, staff, randomUUID())
+    const { store, upload } = createMemoryStore()
+    upload(`outputs/${staff}/${orgWork}.png`, new Uint8Array([1]), 'image/png')
+    const stranger = await staffed()
+    await expect(orgOwnerDeleteWork({ db: rest, store }, { owner: stranger.owner, jobId: orgWork })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    await expect(orgOwnerDeleteWork({ db: rest, store }, { owner: staff, jobId: orgWork })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+
+    await orgOwnerDeleteWork({ db: rest, store }, { owner, jobId: orgWork })
+    await orgOwnerDeleteWork({ db: rest, store }, { owner, jobId: orgWork })
+    expect(await store.head(`outputs/${staff}/${orgWork}.png`)).toBeNull()
+    expect(await audits(orgWork)).toEqual([{ org_id: orgId, maker_user_id: staff, deleted_by: owner }])
+    expect((await orgOwnerWorks(service, owner)).map((w) => w.id)).not.toContain(orgWork)
+  })
+
+  it('moves deleting and the 企业作品 view with the org when the primary admin changes', async () => {
+    const { owner, token } = await staffed()
+    await allocateOrgCredits(service, owner, owner, cost, randomUUID())
+    const ownersWork = await made(owner)
+    const next = await member(db, service, token)
+    // What #840's transfer does to the org row; the works never move.
+    await db.query('update public.orgs set owner_user_id = $2 where owner_user_id = $1', [owner, next])
+    await expect(deleteOwnJob(service, { jobId: ownersWork, userId: owner })).rejects.toMatchObject({ message: 'ORG_WORK_DELETE_FORBIDDEN' })
+    expect(await orgOwnerWorks(service, owner)).toHaveLength(0)
+    expect((await orgOwnerWorks(service, next)).map((w) => w.id)).toEqual([ownersWork])
+  })
+})
+
+describe('poster redraws', () => {
+  it('drops a free-redraw claim against a work of an org the maker left', async () => {
+    const { owner, staff } = await staffed()
+    const orgWork = await made(staff)
+    await removeOrgMember(service, owner, staff, randomUUID())
+    const id = randomUUID()
+    await db.query(
+      `insert into public.generation_jobs (id, user_id, module, template_id, source, visibility, credits_cost, credit_pool, inputs)
+       values ($1, $2, 'image', $3, 'web', 'private', 1, 'paid', $4)`,
+      [id, staff, template, JSON.stringify({ poster: { set_id: randomUUID(), part: 0, redraw_of: orgWork } })],
+    )
+    const { rows } = await db.query(`select inputs -> 'poster' as poster from public.generation_jobs where id = $1`, [id])
+    expect(rows[0].poster).not.toHaveProperty('redraw_of')
   })
 })
