@@ -40,6 +40,18 @@ export async function setPromoAllowanceAction(input: unknown) {
   return applied(await orgCommands.setPromoAllowance(await deps(), input))
 }
 
+export async function setDefaultsAction(input: unknown) {
+  return applied(await orgCommands.setDefaults(await deps(), input))
+}
+
+export async function bulkSetAllowanceAction(input: unknown) {
+  return applied(await orgCommands.bulkSetAllowance(await deps(), input))
+}
+
+export async function bulkGrantAction(input: unknown) {
+  return applied(await orgCommands.bulkGrant(await deps(), input))
+}
+
 export async function removeMemberAction(input: unknown) {
   return applied(await orgCommands.removeMember(await deps(), input))
 }
