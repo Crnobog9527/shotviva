@@ -40,32 +40,31 @@ it("grants the Owner's example: 300,000 confirmed level-1 credits give 30,000 + 
   expect(JSON.parse(audit.reason)).toMatchObject({ org_id: orgId, period: m.current, total: 40000, recipient: owner })
 })
 
-it('caps one customer at 20% of the month\'s total', async () => {
+it('counts one large customer in full: no per-customer cap (the Owner 2026-11-22)', async () => {
   const { orgId, owner } = await partner(db, actor)
   const whale = await customer(db, owner)
   await confirmedSale(db, whale, 200000, m.in_previous)
   for (let i = 0; i < 4; i++) await confirmedSale(db, await customer(db, owner), 25000, m.in_previous)
   await run(db, m.current)
-  // raw 300,000 → cap 60,000; counted 60,000 + 4 × 25,000 = 160,000; bonus 16,000.
+  // raw 300,000 all counted → bonus 30,000. The old cap column holds the uncapped total.
   const s = await sheet(db, orgId, m.current)
-  expect(s).toMatchObject({ raw_credits: 300000, customer_cap: 60000, counted_credits: 160000, capped_customers: 1, bonus: 16000, total: 26000 })
-  expect(s.detail.per[0]).toEqual({ customer: whale, raw: 200000, counted: 60000, capped: true })
+  expect(s).toMatchObject({ raw_credits: 300000, customer_cap: 300000, counted_credits: 300000, capped_customers: 0, bonus: 30000, total: 40000 })
+  expect(s.detail.per[0]).toEqual({ customer: whale, raw: 200000, counted: 200000, capped: false })
+  expect(s.detail).toMatchObject({ bonus_bp: 1000, customer_cap_bp: 10000, min_customers: 0 })
 })
 
-it('pays no bonus below 3 distinct paying customers, only the base', async () => {
+it('pays the bonus with fewer than 3 paying customers, even a single one', async () => {
   const { orgId, owner } = await partner(db, actor)
   const a = await customer(db, owner)
   // Two orders of the same customer are still one customer.
   await confirmedSale(db, a, 100000, m.in_previous)
   await confirmedSale(db, a, 50000, m.in_previous)
-  await confirmedSale(db, await customer(db, owner), 100000, m.in_previous)
   await run(db, m.current)
-  expect(await sheet(db, orgId, m.current)).toMatchObject({ customers: 2, bonus: 0, total: 10000, raw_credits: 250000 })
+  expect(await sheet(db, orgId, m.current)).toMatchObject({ customers: 1, raw_credits: 150000, counted_credits: 150000, bonus: 15000, total: 25000 })
 
   await confirmedSale(db, await customer(db, owner), 100000, m.in_previous)
   await run(db, m.current)
-  // raw 350,000 → cap 70,000 each: 70,000 + 70,000 + 70,000 = 210,000 → 21,000.
-  expect(await sheet(db, orgId, m.current)).toMatchObject({ customers: 3, counted_credits: 210000, bonus: 21000, total: 31000 })
+  expect(await sheet(db, orgId, m.current)).toMatchObject({ customers: 2, counted_credits: 250000, bonus: 25000, total: 35000 })
 })
 
 it('counts only org_l1 personal purchases confirmed last month: not org_l2, other accounts, other months or enterprise packages', async () => {
@@ -90,8 +89,8 @@ it('counts a partial refund before the run pro rata, and a disputed order not at
   await db.query("select record_payment_issue($1,'refunded',1245)", [sales[0]!.charge]) // half of 2490
   await db.query("update payments set status='disputed' where id=$1", [sales[1]!.id])
   await run(db, m.current)
-  // raw 50,000 + 3 × 100,000 = 350,000 → cap 70,000: 50,000 + 3 × 70,000 = 260,000 → 26,000.
-  expect(await sheet(db, orgId, m.current)).toMatchObject({ customers: 4, raw_credits: 350000, counted_credits: 260000, bonus: 26000 })
+  // 50,000 + 3 × 100,000 = 350,000, all counted → 35,000.
+  expect(await sheet(db, orgId, m.current)).toMatchObject({ customers: 4, raw_credits: 350000, counted_credits: 350000, bonus: 35000 })
 })
 
 it('keeps one sheet per partner and month however often it runs; a double confirm grants once', async () => {

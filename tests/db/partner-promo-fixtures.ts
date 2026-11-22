@@ -80,8 +80,7 @@ export async function refused(db: Client, run: () => Promise<unknown>, message: 
   await db.query('rollback to savepoint refused')
 }
 
-// Five equal customers of `each` credits confirmed at `at`: each exactly the 20% cap, so the
-// counted total is the raw total.
+// Five equal customers of `each` credits confirmed at `at`.
 export async function fiveCustomers(db: Client, account: string, each: number, at: Date) {
   const sales = []
   for (let i = 0; i < 5; i++) sales.push(await confirmedSale(db, await customer(db, account), each, at))

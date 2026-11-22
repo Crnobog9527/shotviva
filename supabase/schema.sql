@@ -4552,6 +4552,18 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") RE
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
+  select public._partner_promo_bonus(p_lines, (r->>'customer_cap_bp')::integer, (r->>'min_customers')::integer)
+    from (select public._partner_promo_rules() r) x;
+$$;
+
+
+ALTER FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb", "p_cap_bp" integer, "p_min" integer) RETURNS "jsonb"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
   with rules as (select public._partner_promo_rules() r),
   per as (
     select x.customer, sum(x.credits)::bigint as raw
@@ -4560,7 +4572,7 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") RE
   ),
   tot as (
     select coalesce(sum(raw), 0)::bigint as raw, count(*)::integer as n,
-           (coalesce(sum(raw), 0) * ((select r from rules)->>'customer_cap_bp')::bigint / 10000)::bigint as cap
+           (coalesce(sum(raw), 0) * p_cap_bp::bigint / 10000)::bigint as cap
       from per
   ),
   counted as (
@@ -4573,8 +4585,8 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") RE
     'cap', tot.cap,
     'counted', coalesce((select sum(c.counted) from counted c), 0)::bigint,
     'capped_customers', (select count(*) from counted c where c.capped)::integer,
-    'min_customers', (r->>'min_customers')::integer,
-    'bonus', case when tot.n >= (r->>'min_customers')::integer
+    'min_customers', p_min,
+    'bonus', case when tot.n >= p_min
                   then (coalesce((select sum(c.counted) from counted c), 0) * (r->>'bonus_bp')::bigint / 10000)::integer
                   else 0 end,
     'per', coalesce((select jsonb_agg(jsonb_build_object('customer', c.customer, 'raw', c.raw, 'counted', c.counted,
@@ -4583,7 +4595,7 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") RE
 $$;
 
 
-ALTER FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") OWNER TO "postgres";
+ALTER FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb", "p_cap_bp" integer, "p_min" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_partner_promo_bucket_left"("p_user" "uuid", "p_expires" timestamp with time zone) RETURNS TABLE("source" "text", "source_id" bigint, "credits_left" integer)
@@ -4921,7 +4933,9 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_owed"("p_org" "uuid", "p_per
                select jsonb_agg(jsonb_build_object('customer', l.customer_user_id,
                                                    'credits', public._partner_promo_payment_credits(p)))
                  from public.partner_promo_grant_lines l join public.payments p on p.id = l.payment_id
-                where l.grant_id = g.id), '[]'::jsonb))->>'bonus')::integer
+                where l.grant_id = g.id), '[]'::jsonb),
+               coalesce((g.detail->>'customer_cap_bp')::integer, 2000),
+               coalesce((g.detail->>'min_customers')::integer, 3))->>'bonus')::integer
            - coalesce((select sum(c.credits) from public.partner_promo_clawbacks c where c.source_grant_id = g.id), 0)::integer)
     from public.partner_promo_grants g
    where g.org_id = p_org and g.status = 'granted' and g.period < p_period and g.bonus > 0
@@ -4966,7 +4980,7 @@ CREATE OR REPLACE FUNCTION "public"."_partner_promo_rules"() RETURNS "jsonb"
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
     AS $$
-  select jsonb_build_object('base', 10000, 'bonus_bp', 1000, 'customer_cap_bp', 2000, 'min_customers', 3);
+  select jsonb_build_object('base', 10000, 'bonus_bp', 1000, 'customer_cap_bp', 10000, 'min_customers', 0);
 $$;
 
 
@@ -25419,6 +25433,10 @@ REVOKE ALL ON FUNCTION "public"."_orgs_ref_code_guard"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_partner_promo_bonus"("p_lines" "jsonb", "p_cap_bp" integer, "p_min" integer) FROM PUBLIC;
 
 
 
