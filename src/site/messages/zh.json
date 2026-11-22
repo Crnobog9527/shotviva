@@ -1411,7 +1411,9 @@
         "emailed": "收据已发送到付款邮箱",
         "refunded": "已退款",
         "partlyRefunded": "部分退款",
-        "unavailable": "刚才没能打开这份收据或发票，请稍后再试。还是打不开的话，在客服里告诉我们，我们发给你。"
+        "unavailable": "刚才没能打开这份收据或发票，请稍后再试。还是打不开的话，在客服里告诉我们，我们发给你。",
+        "waffoInvoice": "Waffo 的发票已随订单确认邮件发送。",
+        "waffoPortal": "在 Waffo 买家中心下载 PDF 发票、修改公司名称和税号"
       },
       "session": {
         "title": "登录",
@@ -2009,6 +2011,36 @@
         "copy": "复制",
         "copied": "已复制",
         "copyFailed": "请手动选中复制"
+      },
+      "billing": {
+        "title": "开票信息",
+        "hint": "填写后，企业主管理员在 Shotviva 用 Waffo 购买订阅或积分包时，发票会自动带上公司抬头和税号（可在 Waffo 发票页再修改）。",
+        "notFapiao": "这是 Waffo 开具的商业发票（Invoice），开票方是 Waffo（代收款的商户），不是中国的增值税发票。只对 Waffo 付款生效。",
+        "legalName": "公司全称",
+        "legalNameHint": "和营业执照上一致，2–200 个字。",
+        "country": "国家或地区",
+        "taxIdCn": "统一社会信用代码",
+        "taxIdCnHint": "18 位，字母大写，不含 I、O、S、V、Z。",
+        "taxId": "税号（Tax ID）",
+        "taxIdHint": "3–40 位字母或数字，可含 . / -。",
+        "state": "省 / 州（选填）",
+        "postcode": "邮编（选填）",
+        "invoiceEmail": "收票邮箱（选填）",
+        "invoiceEmailHint": "仅作记录。Waffo 会把发票发到结账时填写的邮箱。",
+        "updatedAt": "最近保存：{date}",
+        "save": "保存",
+        "saving": "保存中…",
+        "saved": "已保存。之后用 Waffo 付款的订单会带上这些信息。",
+        "clear": "清空",
+        "cleared": "已清空。之后的 Waffo 订单不再带公司抬头。",
+        "unavailable": "暂时读不到开票信息，请稍后刷新页面。",
+        "errors": {
+          "INVALID": "有内容格式不对：公司全称 2–200 个字；中国大陆的税号是 18 位统一社会信用代码；邮箱要完整。",
+          "NOT_OWNER": "只有企业主管理员可以查看和修改开票信息。",
+          "FAILED": "出了点问题，请重试。"
+        },
+        "stateCode": "省 / 州代码",
+        "stateCodeHint": "美国、加拿大、澳大利亚必填，填 2–3 位代码，例如 CA、ON、NSW。"
       },
       "works": {
         "title": "企业作品",

@@ -3,7 +3,7 @@ import { createAdminSupabase } from '@/core/auth'
 import { jsonResponse } from '@/core/api-response'
 import { attemptIdentity, resumeAttempt, finishStripe, finishWaffo } from '@/core/billing/catalog-attempt'
 import { DISCOUNT_CANCEL_COOKIE, stripeClient, type CheckoutBody } from '@/core/billing/stripe'
-import { waffoClient } from '@/core/billing/waffo'
+import { buyerBillingDetail, waffoClient } from '@/core/billing/waffo'
 import { PRODUCT_IDS, type PaymentChannel, type SiteProduct } from '@/core/config'
 import { catalogReadErrorCode } from '@/core/billing/product-catalog'
 import { serverEnv } from '@/core/env'
@@ -31,7 +31,7 @@ export async function findRetry(request: NextRequest, user: string, body: Checko
   const result =
     channel === 'stripe'
       ? await finishStripe(db, stripeClient(), user, id.token, saved)
-      : await finishWaffo(db, waffoClient(), user, id.token, saved)
+      : await finishWaffo(db, waffoClient(), user, id.token, saved, saved.session_url ? undefined : await buyerBillingDetail(db, user))
   return { id, response: checkoutResponse(result) }
 }
 

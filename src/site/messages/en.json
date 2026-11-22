@@ -1411,7 +1411,9 @@
         "emailed": "Receipt sent to your payment email",
         "refunded": "Refunded",
         "partlyRefunded": "Partly refunded",
-        "unavailable": "We couldn't open that receipt or invoice just now. Try again in a minute. If it still won't open, ask us in Support and we'll send it to you."
+        "unavailable": "We couldn't open that receipt or invoice just now. Try again in a minute. If it still won't open, ask us in Support and we'll send it to you.",
+        "waffoInvoice": "Waffo emailed the invoice with your order confirmation.",
+        "waffoPortal": "Download PDF invoices and edit company name and tax ID in the Waffo portal"
       },
       "session": {
         "title": "Session",
@@ -2009,6 +2011,36 @@
         "copy": "Copy",
         "copied": "Copied",
         "copyFailed": "Select and copy it"
+      },
+      "billing": {
+        "title": "Invoice details",
+        "hint": "Once saved, when your organisation's primary admin buys a plan or credit pack on Shotviva with Waffo, the invoice carries your company name and tax ID automatically (you can still change them on Waffo's invoice page).",
+        "notFapiao": "This is a commercial invoice issued by Waffo, the merchant of record, not a Chinese VAT invoice (fapiao). It applies to Waffo payments only.",
+        "legalName": "Company legal name",
+        "legalNameHint": "As on your business registration, 2–200 characters.",
+        "country": "Country or region",
+        "taxIdCn": "Unified social credit code",
+        "taxIdCnHint": "18 characters, capital letters, no I, O, S, V or Z.",
+        "taxId": "Tax ID",
+        "taxIdHint": "3–40 letters or digits; . / - allowed.",
+        "state": "State / province (optional)",
+        "postcode": "Postcode (optional)",
+        "invoiceEmail": "Invoice email (optional)",
+        "invoiceEmailHint": "For your records only. Waffo sends the invoice to the email entered at checkout.",
+        "updatedAt": "Last saved {date}",
+        "save": "Save",
+        "saving": "Saving…",
+        "saved": "Saved. Waffo orders from now on carry these details.",
+        "clear": "Clear",
+        "cleared": "Cleared. Later Waffo orders no longer carry a company name.",
+        "unavailable": "We couldn't load your invoice details. Refresh the page in a minute.",
+        "errors": {
+          "INVALID": "Something doesn't look right: the company name needs 2–200 characters, a mainland China tax ID is the 18-character unified social credit code, and the email must be complete.",
+          "NOT_OWNER": "Only your organisation's primary admin can see and change invoice details.",
+          "FAILED": "Something went wrong. Try again."
+        },
+        "stateCode": "State / province code",
+        "stateCodeHint": "Required for the US, Canada and Australia: the 2–3 letter code, e.g. CA, ON, NSW."
       },
       "works": {
         "title": "Company works",
