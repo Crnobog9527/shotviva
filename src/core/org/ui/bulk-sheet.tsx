@@ -8,7 +8,6 @@ import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
 
 import type { OwnerConsole } from '../console/types'
 import type { OwnerActions } from './actions'
-import { Confirm } from './confirm'
 import { FIELD, Result } from './parts'
 import { useConsoleAction } from './use-console-action'
 
@@ -79,8 +78,8 @@ function AllowanceForm({ members, actions, onDone }: Pick<Props, 'members' | 'ac
       <SettingField label={t('promoAllowance')} value={promo} onChange={setPromo} />
       <Button type="button" size="touch" disabled={!valid || pending} onClick={() => setConfirming(true)}>{t('apply')}</Button>
       <Result outcome={outcome} />
-      <Confirm open={confirming} onOpenChange={setConfirming} title={t('confirmTitle', { count: members.length })} description={t('allowanceConfirm')}
-        confirm={t('apply')} cancel={t('cancel')} busy={pending} onConfirm={send} />
+      {confirming ? <InlineConfirm title={t('confirmTitle', { count: members.length })} description={t('allowanceConfirm')}
+        confirm={t('apply')} cancel={t('cancel')} busy={pending} onConfirm={send} onCancel={() => setConfirming(false)} /> : null}
     </div>
   )
 }
@@ -121,8 +120,25 @@ function GrantForm({ members, data, actions, onDone }: Omit<Props, 'open' | 'onO
       {total > pool ? <p role="alert" className="text-label text-destructive">{t('short')}</p> : null}
       <Button type="button" size="touch" disabled={!valid || pending} onClick={() => setConfirming(true)}>{t('give')}</Button>
       <Result outcome={outcome} />
-      <Confirm open={confirming} onOpenChange={setConfirming} title={t('confirmTitle', { count: members.length })} description={summary}
-        confirm={t('give')} cancel={t('cancel')} busy={pending} onConfirm={send} />
+      {confirming ? <InlineConfirm title={t('confirmTitle', { count: members.length })} description={summary}
+        confirm={t('give')} cancel={t('cancel')} busy={pending} onConfirm={send} onCancel={() => setConfirming(false)} /> : null}
+    </div>
+  )
+}
+
+// The confirm step inside the sheet itself: a dialog opened from the sheet would sit under it
+// (the sheet is a higher layer), so the last step stays in the same layer, in place of the action.
+type InlineConfirmProps = { title: string; description: string; confirm: string; cancel: string; busy: boolean; onConfirm(): void; onCancel(): void }
+
+function InlineConfirm({ title, description, confirm, cancel, busy, onConfirm, onCancel }: InlineConfirmProps) {
+  return (
+    <div role="alertdialog" aria-label={title} className="grid gap-3 rounded-md border border-primary/40 bg-primary/5 p-3">
+      <p className="font-medium">{title}</p>
+      <p className="text-label tabular-nums">{description}</p>
+      <div className="flex gap-2">
+        <Button type="button" size="touch" variant="glass" disabled={busy} onClick={onCancel}>{cancel}</Button>
+        <Button type="button" size="touch" disabled={busy} onClick={onConfirm}>{confirm}</Button>
+      </div>
     </div>
   )
 }

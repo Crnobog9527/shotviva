@@ -2028,7 +2028,12 @@
         "paid": "付费积分",
         "promo": "推广积分",
         "save": "保存默认",
-        "saved": "默认月额度已保存。"
+        "saved": "默认月额度已保存。",
+        "confirmTitle": "保存默认月额度？",
+        "cancel": "取消",
+        "confirmPaid": "付费默认改为 {value}：{followers} 人按默认（其中 {unset} 人原来是 0 或没设过，会开始按新默认补发，下月 1 日生效）。",
+        "confirmPromo": "推广默认改为 {value}：{followers} 人按默认（其中 {unset} 人原来是 0 或没设过，会开始收到），本月最多立刻从推广积分池分出 {max}。",
+        "confirmPin": "想让某些人保持 0，先在批量选择里把他们设为 0（单独设置）。"
       },
       "bulk": {
         "select": "批量选择",

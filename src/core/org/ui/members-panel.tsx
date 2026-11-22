@@ -133,7 +133,8 @@ function KindForms(props: FormProps) {
   return (
     <fieldset className="grid gap-3 sm:grid-cols-2">
       <legend className="mb-1 text-caption font-medium text-muted-foreground">{t(props.kind === 'paid' ? 'paidKind' : 'promoKind')}</legend>
-      <AllowanceForm {...props} />
+      {/* Keyed by the value in force, so 恢复默认 or a new org default refreshes the field. */}
+      <AllowanceForm key={`${props.kind}:${props.kind === 'paid' ? props.member.monthlyAllowance : props.member.promoAllowance}:${follows(props.member, props.kind)}`} {...props} />
       <GiveForm {...props} />
     </fieldset>
   )

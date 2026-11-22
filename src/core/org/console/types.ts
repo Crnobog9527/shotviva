@@ -23,6 +23,10 @@ export type ConsoleMember = {
   // allowance in force either way (migration 1899).
   paidFollowsDefault: boolean
   promoFollowsDefault: boolean
+  // Follows the default only because nothing was ever set (or 0 was stored before 1899): such a
+  // member starts receiving a new default (the save confirm counts them).
+  paidUnset: boolean
+  promoUnset: boolean
   // Level-1 customers this member brought (profiles.referred_member).
   customers: number
   joinedAt: string

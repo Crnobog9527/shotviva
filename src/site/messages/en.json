@@ -2028,7 +2028,12 @@
         "paid": "Paid credits",
         "promo": "Promotion credits",
         "save": "Save defaults",
-        "saved": "Defaults saved."
+        "saved": "Defaults saved.",
+        "confirmTitle": "Save the default allowances?",
+        "cancel": "Cancel",
+        "confirmPaid": "Paid default becomes {value}: {followers} members follow it ({unset} of them were at 0 or never set and will start receiving it from the 1st).",
+        "confirmPromo": "Promotion default becomes {value}: {followers} members follow it ({unset} of them were at 0 or never set and will start receiving it); up to {max} leaves the promotion pool now.",
+        "confirmPin": "To keep someone at 0, first set them to 0 with Select members (a personal value)."
       },
       "bulk": {
         "select": "Select members",

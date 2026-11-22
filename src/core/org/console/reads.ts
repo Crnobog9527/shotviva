@@ -135,6 +135,8 @@ export function allowances(m: Pick<z.infer<typeof memberSchema>, 'monthly_allowa
   return {
     monthlyAllowance: paidOwn ? m.monthly_allowance : org.default_paid_allowance, paidFollowsDefault: !paidOwn,
     promoAllowance: promoOwn ? m.promo_allowance : org.default_promo_allowance, promoFollowsDefault: !promoOwn,
+    paidUnset: m.paid_allowance_custom === null && m.monthly_allowance === 0,
+    promoUnset: m.promo_allowance_custom === null && m.promo_allowance === 0,
   }
 }
 

@@ -172,11 +172,12 @@ describe('allowances in force', () => {
   const row = (monthly: number, promo: number, paid: boolean | null, promoCustom: boolean | null) =>
     ({ monthly_allowance: monthly, promo_allowance: promo, paid_allowance_custom: paid, promo_allowance_custom: promoCustom })
   it('follows the org default without a personal setting, an unset 0 included', () => {
-    expect(allowances(row(0, 0, null, null), org)).toEqual({ monthlyAllowance: 200, paidFollowsDefault: true, promoAllowance: 500, promoFollowsDefault: true })
+    expect(allowances(row(0, 0, null, null), org)).toEqual({ monthlyAllowance: 200, paidFollowsDefault: true, promoAllowance: 500, promoFollowsDefault: true, paidUnset: true, promoUnset: true })
+    expect(allowances(row(0, 0, false, false), org)).toMatchObject({ paidUnset: false, promoUnset: false }) // explicitly set to follow
     expect(allowances(row(900, 0, false, false), org)).toMatchObject({ monthlyAllowance: 200, promoAllowance: 500 })
   })
   it('keeps a personal value, an old nonzero allowance included', () => {
-    expect(allowances(row(300, 40, null, true), org)).toEqual({ monthlyAllowance: 300, paidFollowsDefault: false, promoAllowance: 40, promoFollowsDefault: false })
+    expect(allowances(row(300, 40, null, true), org)).toEqual({ monthlyAllowance: 300, paidFollowsDefault: false, promoAllowance: 40, promoFollowsDefault: false, paidUnset: false, promoUnset: false })
     expect(allowances(row(0, 0, true, true), org)).toMatchObject({ monthlyAllowance: 0, promoAllowance: 0 })
   })
 })

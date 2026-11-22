@@ -24,8 +24,8 @@ const owner = (over: Partial<OwnerConsole['org']> = {}, extra: Partial<OwnerCons
     promoPoolCredits: 4321, promoExpiresAt: '2026-12-01T00:00:00Z', defaultPaidAllowance: 200, defaultPromoAllowance: 500, ...over },
   inviteToken: 'a'.repeat(32),
   members: [
-    { userId: '00000000-0000-4000-8000-0000000000a1', account: 'owner@acme.test', role: 'owner', monthlyAllowance: 0, heldCredits: 0, promoAllowance: 500, heldPromoCredits: 0, paidFollowsDefault: true, promoFollowsDefault: true, customers: 0, joinedAt: '2026-11-01T00:00:00Z' },
-    { userId: MEMBER, account: 'ann@acme.test', role: 'member', monthlyAllowance: 500, heldCredits: 320, promoAllowance: 2000, heldPromoCredits: 1750, paidFollowsDefault: false, promoFollowsDefault: false, customers: 3, joinedAt: '2026-11-02T00:00:00Z' },
+    { userId: '00000000-0000-4000-8000-0000000000a1', account: 'owner@acme.test', role: 'owner', monthlyAllowance: 0, heldCredits: 0, promoAllowance: 500, heldPromoCredits: 0, paidFollowsDefault: true, promoFollowsDefault: true, paidUnset: true, promoUnset: true, customers: 0, joinedAt: '2026-11-01T00:00:00Z' },
+    { userId: MEMBER, account: 'ann@acme.test', role: 'member', monthlyAllowance: 500, heldCredits: 320, promoAllowance: 2000, heldPromoCredits: 1750, paidFollowsDefault: false, promoFollowsDefault: false, paidUnset: false, promoUnset: false, customers: 3, joinedAt: '2026-11-02T00:00:00Z' },
   ],
   memberTotal: 2,
   packages: [{ id: ORG, name: 'Starter', priceUsdCents: 123400, credits: 98765 }],
