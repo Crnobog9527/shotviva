@@ -4473,7 +4473,11 @@ begin
      where org_id = m.org_id and user_id = m.user_id;
     if v_draw > 0 then
       insert into public.org_promo_draws(debit_key, org_id, user_id, period, drawn)
-        values (new.idempotency_key, m.org_id, m.user_id, public._utc_period(new.created_at), v_draw);
+        values (new.idempotency_key, m.org_id, m.user_id,
+          -- The month the share was funded for (the org's promotion month), not the debit's: a job
+          -- reserved after month end but before the expiry pass still spends last month's credits.
+          coalesce((select public._utc_period(o.promo_expires_at - interval '1 second') from public.orgs o where o.id = m.org_id),
+                   public._utc_period(new.created_at)), v_draw);
     end if;
   elsif new.kind = 'refund' then
     select * into d from public.org_promo_draws
@@ -4481,7 +4485,9 @@ begin
     if not found or d.restored >= d.drawn then return new; end if;
     back := least(new.delta, d.drawn - d.restored);
     update public.org_promo_draws set restored = restored + back where debit_key = d.debit_key;
-    if d.period <> public._utc_period(now()) then
+    -- Only while that month is still the org's live promotion month; otherwise it has expired.
+    if d.period is distinct from (select case when o.promo_expires_at > now() then public._utc_period(o.promo_expires_at - interval '1 second') end
+                                    from public.orgs o where o.id = d.org_id) then
       perform public._apply_credit_change(new.user_id, 'free', 'org_promo_expire', -back,
         'org promotion credits expired ' || d.period, 'org_promo_return:' || new.idempotency_key);
       return new;
@@ -4824,7 +4830,16 @@ declare
   v_need bigint;
   v_use integer;
   v_start timestamptz;
+  v_moved timestamptz;
+  v_rise bigint;
+  v_first boolean := true;
 begin
+  select max(g.moved_at) into v_moved from (
+    select g.moved_at from public.partner_promo_grants g
+     where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null and g.destination = 'owner'
+    union all
+    select t.moved_at from public.partner_promo_topups t where t.recipient_user_id = p_user and t.expires_at = p_expires and t.destination = 'owner'
+  ) g;
   select min(x.at) into v_start from (
     select g.decided_at as at from public.partner_promo_grants g
      where g.recipient_user_id = p_user and g.expires_at = p_expires and g.status = 'granted' and g.voided_at is null and g.destination = 'owner'
@@ -4847,12 +4862,14 @@ begin
       select r.created_at as at, r.id, r.idempotency_key, -r.delta as spent, coalesce(d.drawn - d.restored, 0) as org_part
         from public.credit_ledger r
         left join public.org_promo_draws d on d.debit_key = r.idempotency_key and d.user_id = r.user_id
-       where r.user_id = p_user and r.pool = 'free' and r.kind = 'reserve' and r.created_at >= v_start and r.created_at < p_expires
+       where r.user_id = p_user and r.pool = 'free' and r.kind = 'reserve' and r.created_at >= v_start
+         and r.created_at < least(p_expires, coalesce(v_moved, p_expires))
     ),
     refunds as (
       select regexp_replace(f.idempotency_key, ':[^:]+$', ':reserve') as reserve_key, sum(f.delta) as back
         from public.credit_ledger f
        where f.user_id = p_user and f.pool = 'free' and f.kind = 'refund' and f.created_at >= v_start
+         and (v_moved is null or f.created_at < v_moved)
        group by 1
     )
     select a.at, a.ord, a.src, a.id, a.amount::bigint from adds a
@@ -4875,6 +4892,22 @@ begin
       end loop;
     end if;
   end loop;
+  if v_moved is not null then
+    select coalesce(sum(least(f.back, greatest(0, -r.delta - coalesce(d.drawn, 0)))), 0) into v_rise
+      from (select regexp_replace(f.idempotency_key, ':[^:]+$', ':reserve') as reserve_key, sum(f.delta) as back
+              from public.credit_ledger f
+             where f.user_id = p_user and f.pool = 'free' and f.kind = 'refund' and f.created_at >= v_moved group by 1) f
+      join public.credit_ledger r on r.idempotency_key = f.reserve_key and r.user_id = p_user and r.kind = 'reserve'
+       and r.created_at >= v_start and r.created_at < v_moved
+      left join public.org_promo_draws d on d.debit_key = r.idempotency_key and d.user_id = p_user;
+    for i in 1..cardinality(v_id) loop
+      if exists(select from public.partner_promo_grants g where v_src[i] = 'grant' and g.id = v_id[i] and g.moved_at is not null)
+         or exists(select from public.partner_promo_topups t where v_src[i] = 'topup' and t.id = v_id[i] and t.moved_at is not null) then
+        v_left[i] := case when v_first then v_rise else 0 end;
+        v_first := false;
+      end if;
+    end loop;
+  end if;
   return query select u.s, u.i, u.l from unnest(v_src, v_id, v_left) as u(s, i, l);
 end;
 $_$;
@@ -5177,8 +5210,8 @@ declare
   o public.orgs;
   v_period text := public._utc_period(now());
   v_rows jsonb;
+  v_recipients jsonb;
   v_sum bigint;
-  v_room integer;
 begin
   select * into o from public.orgs where id = p_org;
   if not found then raise exception 'ORG_NOT_FOUND'; end if;
@@ -5195,15 +5228,21 @@ begin
   lefts as (
     select l.source, l.source_id, l.credits_left, b.u from buckets b cross join lateral public._partner_promo_bucket_left(b.u, b.e) l
   )
-  select coalesce(jsonb_agg(jsonb_build_object('source', m.source, 'id', m.id, 'left', coalesce(l.credits_left, 0)) order by m.source, m.id), '[]'::jsonb),
-         coalesce(sum(coalesce(l.credits_left, 0)), 0)
-    into v_rows, v_sum
+  select coalesce(jsonb_agg(jsonb_build_object('source', m.source, 'id', m.id, 'user', m.u, 'left', coalesce(l.credits_left, 0)) order by m.source, m.id), '[]'::jsonb)
+    into v_rows
     from mine m left join lefts l on l.source = m.source and l.source_id = m.id;
-  select greatest(0, p.free_credits - coalesce((select least(mm.held_promo_credits, p.free_credits) from public.org_members mm
-                                                 where mm.org_id = p_org and mm.user_id = p.id and mm.status = 'active'), 0))
-    into v_room from public.profiles p where p.id = o.owner_user_id;
-  return jsonb_build_object('period', v_period, 'recipient', o.owner_user_id,
-    'credits', least(v_sum, coalesce(v_room, 0)), 'rows', v_rows);
+  -- Per recipient (the account each row was granted to, not today's owner: the owner may have
+  -- changed since): what is left of their rows, never more than their free balance outside what
+  -- they hold of this org's promotion share.
+  select coalesce(jsonb_agg(jsonb_build_object('user', x.u, 'credits', x.credits) order by x.u), '[]'::jsonb), coalesce(sum(x.credits), 0)
+    into v_recipients, v_sum
+    from (
+      select r.u, least(r.left_sum, greatest(0, p.free_credits - coalesce((select least(mm.held_promo_credits, p.free_credits)
+                from public.org_members mm where mm.org_id = p_org and mm.user_id = p.id and mm.status = 'active'), 0)))::integer as credits
+        from (select (e->>'user')::uuid as u, sum((e->>'left')::integer) as left_sum from jsonb_array_elements(v_rows) e group by 1) r
+        join public.profiles p on p.id = r.u
+    ) x;
+  return jsonb_build_object('period', v_period, 'credits', v_sum, 'recipients', v_recipients, 'rows', v_rows);
 end;
 $$;
 
@@ -10051,7 +10090,10 @@ begin
   if o.status <> 'active' then raise exception 'PROMO_PARTNER_OFF'; end if;
   perform from public.partner_promo_grants g where g.org_id = o.id and g.destination = 'owner' order by g.id for update;
   perform from public.partner_promo_topups t where t.org_id = o.id and t.destination = 'owner' order by t.id for update;
-  perform from public.profiles where id = o.owner_user_id for update;
+  perform from public.profiles p where p.id in (
+    select g.recipient_user_id from public.partner_promo_grants g where g.org_id = o.id and g.destination = 'owner'
+    union select t.recipient_user_id from public.partner_promo_topups t where t.org_id = o.id and t.destination = 'owner'
+  ) order by p.id for update;
   v_calc := public._partner_promo_moveable(o.id);
   v_credits := (v_calc->>'credits')::integer;
   if v_credits = 0 and (p_input->>'credits')::integer = 0 or jsonb_array_length(v_calc->'rows') = 0 then
@@ -10061,17 +10103,17 @@ begin
     return jsonb_build_object('applied', false, 'reason', 'changed', 'credits', v_credits);
   end if;
   v_key := 'partner_promo_move:' || o.id::text || ':' || (v_calc->>'period');
-  if v_credits > 0 then
-    perform public._apply_credit_change(o.owner_user_id, 'free', 'org_promo_move', -v_credits,
-      'Channel partner promotion credits moved to the org ' || (v_calc->>'period'), v_key);
-  end if;
+  for r in select * from jsonb_to_recordset(v_calc->'recipients') as x("user" uuid, credits integer) where x.credits > 0 loop
+    perform public._apply_credit_change(r."user", 'free', 'org_promo_move', -r.credits,
+      'Channel partner promotion credits moved to the org ' || (v_calc->>'period'), v_key || ':' || r."user"::text);
+  end loop;
   for r in select * from jsonb_to_recordset(v_calc->'rows') as x(source text, id bigint, "left" integer) loop
     if r.source = 'grant' then
       update public.partner_promo_grants set moved_at = now(), moved_credits = r."left",
-             expired_at = now(), expired_credits = 0, expired_basis = r."left" where id = r.id;
+             expired_at = now(), expired_credits = 0, expired_basis = 0 where id = r.id;
     else
       update public.partner_promo_topups set moved_at = now(), moved_credits = r."left",
-             expired_at = now(), expired_credits = 0, expired_basis = r."left" where id = r.id;
+             expired_at = now(), expired_credits = 0, expired_basis = 0 where id = r.id;
     end if;
   end loop;
   if v_credits > 0 then
@@ -10079,7 +10121,7 @@ begin
       'moved from the owner''s own pool ' || (v_calc->>'period'), p_actor);
   end if;
   perform public._org_audit(p_actor, 'partner_promo_move', o.id::text,
-    jsonb_build_object('org_id', o.id, 'period', v_calc->>'period', 'recipient', o.owner_user_id, 'credits', v_credits,
+    jsonb_build_object('org_id', o.id, 'period', v_calc->>'period', 'recipients', v_calc->'recipients', 'credits', v_credits,
       'rows', v_calc->'rows')::text);
   return jsonb_build_object('applied', true, 'credits', v_credits);
 end;
