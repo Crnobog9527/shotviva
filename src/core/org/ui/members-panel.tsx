@@ -146,6 +146,15 @@ function KindForms(props: FormProps) {
 // (allowances, "top up manually", removal) in place.
 type MemberRowProps = { member: ConsoleMember; actions: OwnerActions; suspended: boolean; pick: { checked: boolean; toggle(): void } | null; open: boolean; onToggle(): void }
 
+// Scroll the list container (the row's parent) just enough to show the whole row.
+export function revealInList(row: HTMLElement | null) {
+  const list = row?.parentElement
+  if (!row || !list) return
+  const top = row.offsetTop // the list is positioned, so this is relative to it
+  if (top < list.scrollTop) list.scrollTop = top
+  else if (top + row.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = top + row.offsetHeight - list.clientHeight
+}
+
 function MemberSummary({ member, label }: { member: ConsoleMember; label: string }) {
   const t = useTranslations('app.org.members')
   return (
@@ -185,9 +194,15 @@ function MemberRow({ member, actions, suspended, pick, open, onToggle }: MemberR
   // answer still on its way survives collapsing the row: a retry is the same request.
   const [opened, setOpened] = useState(open)
   if (open && !opened) setOpened(true)
-  // An editor opened near the bottom of the scrolling list is brought into view.
+  // An editor the owner opens near the bottom of the scrolling list is brought into view inside the
+  // list only (never the page), and only when `open` goes from false to true: a row that mounts open
+  // (first load, or back after a filter or page change) does not move anything.
   const rowRef = useRef<HTMLLIElement>(null)
-  useEffect(() => { if (open) rowRef.current?.scrollIntoView?.({ block: 'nearest' }) }, [open])
+  const wasOpen = useRef(open)
+  useEffect(() => {
+    if (open && !wasOpen.current) revealInList(rowRef.current)
+    wasOpen.current = open
+  }, [open])
   return (
     <li ref={rowRef} className={`scroll-my-2 px-3 py-1 ${open ? 'bg-card shadow-[inset_3px_0_0_var(--color-primary)]' : ''}`}>
       <div className="flex items-center gap-3">
@@ -221,7 +236,7 @@ export function MembersPanel({ data, actions, initialOpen = null }: { data: Owne
       <BulkToolbar selection={selection} disabled={suspended} />
       <section aria-label={t('listTitle', { count: data.memberTotal })} className="overflow-hidden rounded-xl border border-hairline bg-wash">
         <h3 className="border-b border-hairline px-3 py-2 text-label font-medium">{t('listTitle', { count: data.memberTotal })}</h3>
-        <ul className="max-h-[60vh] divide-y divide-hairline overflow-y-auto overscroll-contain sm:max-h-[28rem]">
+        <ul className="relative max-h-[60vh] divide-y divide-hairline overflow-y-auto overscroll-contain sm:max-h-[28rem]">
           {selection.visible.map((member) => (
             <MemberRow key={member.userId} member={member} actions={actions} suspended={suspended}
               open={selection.open === member.userId} onToggle={() => selection.toggleOpen(member.userId)}
