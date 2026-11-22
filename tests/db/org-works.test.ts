@@ -37,17 +37,24 @@ afterAll(async () => {
   await db.end()
 })
 
-async function made(userId: string, extra: { visibility?: 'public' | 'private'; parent?: string; againOf?: string } = {}) {
+async function made(userId: string, extra: { visibility?: 'public' | 'private'; againOf?: string } = {}) {
   const jobId = randomUUID()
   await reserveJob(rest, {
-    jobId, userId, module: 'image', templateId: extra.parent ? 'edit' : template, expectedCredits: cost, source: 'web',
+    jobId, userId, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
     inputs: { resolution: '1k', attempt_id: randomUUID(), ...(extra.againOf ? { again_of: extra.againOf } : {}) },
     ...(extra.visibility ? { visibility: extra.visibility } : {}),
-    ...(extra.parent ? { parentJobId: extra.parent } : {}),
   })
   await db.query("select public.confirm_job($1, $2)", [jobId, `outputs/${userId}/${jobId}.png`])
   return jobId
 }
+
+// An edit row written straight in: the stamp trigger checks the parent whoever inserts.
+const editOf = (userId: string, parent: string) =>
+  db.query(
+    `insert into public.generation_jobs (id, user_id, module, template_id, source, visibility, credits_cost, credit_pool, parent_job_id)
+     values ($1, $2, 'image', $3, 'web', 'private', 1, 'paid', $4)`,
+    [randomUUID(), userId, template, parent],
+  )
 
 const job = async (id: string) =>
   (await db.query('select org_id, org_access_ended_at, visibility, gallery_excluded, again_of from public.generation_jobs where id = $1', [id])).rows[0]
@@ -102,18 +109,10 @@ describe('never public', () => {
   it('pulls past public org works in the backfill', async () => {
     const { orgId, staff, owner } = await staffed()
     // A job made before 1941: no stamp, public. Written with the stamp trigger off, as the old schema was.
-    await db.query('begin')
-    await db.query('alter table public.generation_jobs disable trigger generation_jobs_org_work')
-    const id = await made(staff, { visibility: 'public' })
-    await db.query('alter table public.generation_jobs enable trigger generation_jobs_org_work')
-    await db.query('commit')
+    const id = await unstamped(() => made(staff, { visibility: 'public' }))
     // A removed member's past work is cut off by the same backfill.
     const gone = await staffed()
-    await db.query('begin')
-    await db.query('alter table public.generation_jobs disable trigger generation_jobs_org_work')
-    const old = await made(gone.staff, { visibility: 'public' })
-    await db.query('alter table public.generation_jobs enable trigger generation_jobs_org_work')
-    await db.query('commit')
+    const old = await unstamped(() => made(gone.staff, { visibility: 'public' }))
     await removeOrgMember(service, gone.owner, gone.staff, randomUUID())
     expect(await job(id)).toMatchObject({ org_id: null, visibility: 'public' })
 
@@ -123,6 +122,17 @@ describe('never public', () => {
     expect((await orgOwnerWorks(service, owner)).map((w) => w.id)).toContain(id)
   })
 })
+
+// Not in a transaction: the reserve goes through PostgREST on another connection. DB test files
+// run one at a time, so nothing else inserts jobs meanwhile.
+async function unstamped<T>(run: () => Promise<T>): Promise<T> {
+  await db.query('alter table public.generation_jobs disable trigger generation_jobs_org_work')
+  try {
+    return await run()
+  } finally {
+    await db.query('alter table public.generation_jobs enable trigger generation_jobs_org_work')
+  }
+}
 
 // The migration's own backfill statement, so the test runs exactly what production ran.
 function backfillSql(): string {
@@ -156,7 +166,7 @@ describe('leaving the org', () => {
     await expect(setJobVisibility(service, { jobId: orgWork, userId: staff, visibility: 'private' })).rejects.toMatchObject({ message: 'JOB_NOT_FOUND' })
     await expect(deleteOwnJob(service, { jobId: orgWork, userId: staff })).rejects.toMatchObject({ message: 'JOB_NOT_FOUND' })
     // Edit and again from the org work look missing too.
-    await expect(made(staff, { parent: orgWork })).rejects.toMatchObject({ message: 'PARENT_JOB_NOT_FOUND' })
+    await expect(editOf(staff, orgWork)).rejects.toThrow('PARENT_JOB_NOT_FOUND')
     expect((await job(await made(staff, { againOf: orgWork }))).again_of).toBeNull()
   })
 
