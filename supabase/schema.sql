@@ -3561,6 +3561,26 @@ $$;
 ALTER FUNCTION "public"."_affiliate_fee_rule_json"("r" "public"."affiliate_payout_fee_rules") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_has_history"("p_user" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select not exists(select from public.affiliates a where a.user_id = p_user)
+      or exists(select from public.affiliates a where a.user_id = p_user and a.status = 'banned')
+      or exists(select from public.affiliate_commissions where affiliate_user_id = p_user)
+      or exists(select from public.affiliate_payouts where affiliate_user_id = p_user)
+      or exists(select from public.affiliate_adjustments where affiliate_user_id = p_user)
+      or exists(select from public.affiliate_rate_overrides where user_id = p_user)
+      or exists(select from public.profiles where referred_by = p_user)
+      or exists(select from public.affiliates where parent_user_id = p_user)
+      or exists(select from public.affiliate_recompute_errors e
+                 where e.snapshot->>'owner' = p_user::text or e.snapshot->>'parent' = p_user::text);
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_has_history"("p_user" "uuid") OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."affiliate_payouts" (
     "id" bigint NOT NULL,
     "affiliate_user_id" "uuid" NOT NULL,
@@ -10259,6 +10279,18 @@ $$;
 ALTER FUNCTION "public"."admin_org_payment_account_save"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_org_picker_affiliate_history"("p_users" "uuid"[]) RETURNS SETOF "uuid"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select a.user_id from public.affiliates a
+   where a.user_id = any(p_users) and a.org_id is null and public._affiliate_has_history(a.user_id);
+$$;
+
+
+ALTER FUNCTION "public"."admin_org_picker_affiliate_history"("p_users" "uuid"[]) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) RETURNS timestamp with time zone
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -10303,6 +10335,9 @@ declare
   a public.affiliates;
   n_comm bigint; n_pay bigint; n_adj bigint; n_cust bigint;
   v_moved jsonb := null;
+  p public.affiliates;
+  v_has_personal boolean := false;
+  v_removed jsonb := null;
 begin
   perform public._org_require_admin(p_actor);
   if p_input is null or jsonb_typeof(p_input) <> 'object'
@@ -10332,6 +10367,14 @@ begin
   begin
     select * into a from public.affiliates where org_id = o.id for update nowait;
     v_account := case when found then a.user_id end;
+    -- The new owner's own row, if any, right after the org's (1990): once held, nothing new can
+    -- reference it, so the emptiness check below sees all its history. Its click counters too,
+    -- which its delete cascades to (a click increment holds one without touching this row).
+    select * into p from public.affiliates where user_id = v_new and user_id is distinct from v_account for update nowait;
+    v_has_personal := found;
+    if v_has_personal then
+      perform 1 from public.affiliate_click_days where affiliate_user_id = v_new order by day for update nowait;
+    end if;
     perform 1 from public.profiles
      where id in (select v_old union all select v_new union all
                   select c.id from public.profiles c where v_account is not null and c.referred_by = v_account)
@@ -10341,7 +10384,7 @@ begin
     -- approver (the copied row).
     perform 1 from public.profiles where id in (p_actor, a.approved_by) order by id for key share nowait;
     -- The affiliates statement trigger refreshes the template floor budget under this lock.
-    if v_account is not null and not pg_try_advisory_xact_lock(hashtextextended('shotviva.template_floor_budget_cache', 0)) then
+    if (v_account is not null or v_has_personal) and not pg_try_advisory_xact_lock(hashtextextended('shotviva.template_floor_budget_cache', 0)) then
       raise exception using errcode = 'lock_not_available';
     end if;
     if v_account is not null then
@@ -10370,10 +10413,27 @@ begin
     raise exception 'ORG_MEMBER_EXISTS';
   end if;
 
+  -- The org's account is always its owner's row (1640/1643); refuse rather than move anything
+  -- of someone else's if that ever stops being true.
+  if v_account is not null and a.user_id <> v_old then raise exception 'ORG_AFFILIATE_MISMATCH'; end if;
+  -- The new owner's own row (1990): cleared when it is in the way (the org's row moves onto its
+  -- key, or it is open, which an org owner may not hold, 1642) and empty; refused otherwise.
+  -- A closed row is left alone when the org has no account, as in 1930.
+  if v_has_personal and (v_account is not null or p.status in ('pending', 'active')) then
+    -- Only a personal row can be cleared; any other row is not this transfer's to remove.
+    if p.org_id is not null then raise exception 'ORG_NEW_OWNER_AFFILIATE'; end if;
+    if public._affiliate_has_history(v_new) then
+      if v_account is not null then raise exception 'ORG_NEW_OWNER_AFFILIATE_HISTORY'; end if;
+      raise exception 'ORG_PERSONAL_AFFILIATE';
+    end if;
+    v_removed := jsonb_build_object('slug', p.slug, 'status', p.status, 'created_at', p.created_at,
+      'clicks', (select coalesce(sum(clicks), 0) from public.affiliate_click_days where affiliate_user_id = v_new));
+    delete from public.affiliates where user_id = v_new and org_id is null;
+    if not found then raise exception 'ORG_NEW_OWNER_AFFILIATE'; end if;
+  end if;
+
   if v_account is not null then
-    -- The org's account is always its owner's row (1640/1643); refuse rather than move anything
-    -- of someone else's if that ever stops being true.
-    if a.user_id <> v_old then raise exception 'ORG_AFFILIATE_MISMATCH'; end if;
+    -- Never true after the delete above unless a row appeared that was not locked: refuse.
     if exists(select from public.affiliates where user_id = v_new) then raise exception 'ORG_NEW_OWNER_AFFILIATE'; end if;
     -- Free the unique slug and org_id on the old row, insert the copy under the new owner, re-point
     -- every reference, then drop the old row (nothing references it any more, so nothing cascades).
@@ -10419,8 +10479,9 @@ begin
   update public.orgs set owner_user_id = v_new, updated_at = now() where id = o.id returning * into o;
 
   perform public._org_audit(p_actor, 'org_transfer_owner', o.id::text,
-    jsonb_build_object('from', v_old, 'to', v_new, 'affiliate', v_moved)::text);
-  return jsonb_build_object('applied', true, 'updated_at', o.updated_at, 'previous_owner', v_old, 'affiliate', v_moved);
+    jsonb_build_object('from', v_old, 'to', v_new, 'affiliate', v_moved, 'removed_personal', v_removed)::text);
+  return jsonb_build_object('applied', true, 'updated_at', o.updated_at, 'previous_owner', v_old, 'affiliate', v_moved,
+    'removed_personal', v_removed);
 end;
 $_$;
 
@@ -27066,6 +27127,10 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_fee_rule_json"("r" "public"."affilia
 
 
 
+REVOKE ALL ON FUNCTION "public"."_affiliate_has_history"("p_user" "uuid") FROM PUBLIC;
+
+
+
 GRANT SELECT ON TABLE "public"."affiliate_payouts" TO "service_role";
 
 
@@ -27942,6 +28007,11 @@ GRANT ALL ON FUNCTION "public"."admin_org_package_save"("p_actor" "uuid", "p_inp
 
 REVOKE ALL ON FUNCTION "public"."admin_org_payment_account_save"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_org_payment_account_save"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_org_picker_affiliate_history"("p_users" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_org_picker_affiliate_history"("p_users" "uuid"[]) TO "service_role";
 
 
 

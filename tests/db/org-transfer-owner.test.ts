@@ -161,15 +161,21 @@ describe('refusals', () => {
     expect(await account(owner)).toMatchObject({ org_id: orgId })
   })
 
-  it('refuses a new owner with an affiliate row of their own, and an open personal account', async () => {
+  // An empty personal row is deleted instead (1990, org-transfer-empty-affiliate.test.ts); these
+  // rows each have a bound customer.
+  it('refuses a new owner with a used affiliate row of their own, and an open used personal account', async () => {
     const { orgId } = await channelOrg()
-    const closed = await createUser(db)
-    await db.query("insert into affiliates(user_id,slug,status) values($1,$2,'rejected')", [closed, 'qa-' + closed.slice(0, 12)])
-    await refused(() => transfer(orgId, closed), 'ORG_NEW_OWNER_AFFILIATE')
+    const withCustomer = async (status: string) => {
+      const user = await createUser(db)
+      await db.query('insert into affiliates(user_id,slug,status) values($1,$2,$3)', [user, 'qa-' + user.slice(0, 12), status])
+      await db.query("update profiles set referred_by=$1,referred_at=now(),referred_source='admin' where id=$2", [user, await createUser(db)])
+      return user
+    }
+    const closed = await withCustomer('rejected')
+    await refused(() => transfer(orgId, closed), 'ORG_NEW_OWNER_AFFILIATE_HISTORY')
 
     const plainOrg = await createOrg(await createUser(db), false)
-    const open = await createUser(db)
-    await db.query("insert into affiliates(user_id,slug,status) values($1,$2,'active')", [open, 'qa-' + open.slice(0, 12)])
+    const open = await withCustomer('active')
     await refused(() => transfer(plainOrg, open), 'ORG_PERSONAL_AFFILIATE')
     // A closed personal row is fine when there is no org account to collide with.
     expect(await transfer(plainOrg, closed)).toMatchObject({ applied: true, affiliate: null })

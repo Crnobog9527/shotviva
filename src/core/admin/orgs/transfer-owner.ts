@@ -16,5 +16,5 @@ export async function transferOrgOwner(deps: OrgDeps, input: unknown): Promise<O
   const form = schema.parse(input)
   const result = await adminTransferOrgOwner(deps.db, deps.actor, form.orgId, form.userId, form.expectedUpdatedAt)
   if (!result.applied) return { ok: true, message: COPY.already, value: { applied: false } }
-  return { ok: true, message: COPY.done(result.affiliate), value: { applied: true } }
+  return { ok: true, message: COPY.done(result.affiliate, result.removed_personal ?? null), value: { applied: true } }
 }
