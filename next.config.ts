@@ -123,7 +123,7 @@ const nextConfig: NextConfig = {
       // The pre-sized copies of public/{home,cases,…} the build writes (scripts/build/presize-public.mjs):
       // named after their source, which never changes under the same name, so the same rule.
       {
-        source: `/${PRESIZED_PREFIX}/:asset(.+\\.webp)`,
+        source: `/${PRESIZED_PREFIX}/:asset(.+\\.(?:avif|webp))`,
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
       // The inner landing pages' case pictures in public/cases: the same rule as public/home.
