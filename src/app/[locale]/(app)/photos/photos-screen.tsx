@@ -11,6 +11,8 @@ import { r2Origin, r2Store } from '@/core/storage'
 import { cachedPosterTemplates, cachedWebTemplates, EDIT_TEMPLATE_ID } from '@/core/templates'
 import { DoneGrid, PhotosCount, RunningList, toPhotoItem, type TemplateLookup } from '@/modules/image'
 
+import { createWorkShareAction } from './share-actions'
+
 function Header({ aside }: { aside?: ReactNode }) {
   return <TabRootHeader title={useTranslations('app.photos')('title')} aside={aside} />
 }
@@ -37,7 +39,7 @@ async function Photos({ back }: { back: string | Promise<string> }) {
     <>
       <Header aside={<PhotosCount runningIds={running.map((item) => item.id)} done={done.length} />} />
       <RunningList server={running} covers={covers} />
-      <DoneGrid items={done} now={now} anyRunning={running.length > 0} liveTemplates={templates.map((template) => template.id)} />
+      <DoneGrid items={done} now={now} anyRunning={running.length > 0} liveTemplates={templates.map((template) => template.id)} share={createWorkShareAction} />
     </>
   )
 }
