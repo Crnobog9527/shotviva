@@ -57,8 +57,9 @@ export async function orgOwnerWorkMembers(client: RpcClient, owner: string): Pro
   return rows.map((r) => ({ userId: r.user_id, role: r.role, status: r.status, removedAt: r.removed_at, works: r.works }))
 }
 
-const fileRow = z.object({ id: z.uuid(), user_id: z.uuid().nullable(), credit_pool: z.enum(['free', 'paid']), output_key: z.string() })
-export type OrgWorkFile = { id: string; userId: string | null; creditPool: 'free' | 'paid'; outputKey: string }
+const fileRow = z.object({ id: z.uuid(), user_id: z.uuid().nullable(), credit_pool: z.enum(['free', 'paid']), output_key: z.string(), archive_key: z.string().nullable() })
+// archiveKey: where an unfinished account deletion copies a live work (served once it exists).
+export type OrgWorkFile = { id: string; userId: string | null; creditPool: 'free' | 'paid'; outputKey: string; archiveKey: string | null }
 
 // One finished org work of the owner's org, live or archived, or null (a missing one, another
 // org's, a deleted one).
@@ -66,5 +67,5 @@ export async function orgOwnerWork(client: RpcClient, owner: string, jobId: stri
   if (!uuid.safeParse(jobId).success) return null
   const rows = await callRpc(client, 'org_owner_work_file', { p_owner: uuid.parse(owner), p_job_id: jobId }, z.array(fileRow))
   const row = rows[0]
-  return row ? { id: row.id, userId: row.user_id, creditPool: row.credit_pool, outputKey: row.output_key } : null
+  return row ? { id: row.id, userId: row.user_id, creditPool: row.credit_pool, outputKey: row.output_key, archiveKey: row.archive_key } : null
 }

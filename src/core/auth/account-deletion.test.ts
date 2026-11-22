@@ -33,7 +33,7 @@ describe('deleteAccount', () => {
   it('cancels subscriptions, clears every R2 prefix (wishlist images included), then deletes the auth user', async () => {
     const { value, calls } = deps()
     await deleteAccount('u1', value)
-    expect(calls).toEqual(['org-archive:u1', 'stripe:u1', 'r2:inputs/u1/', 'r2:outputs/u1/', 'r2:requests/u1/', 'r2:tickets/u1/', 'auth:u1'])
+    expect(calls).toEqual(['org-archive:u1', 'stripe:u1', 'org-archive:u1', 'r2:inputs/u1/', 'r2:outputs/u1/', 'r2:requests/u1/', 'r2:tickets/u1/', 'auth:u1'])
   })
 
   it('deletes nothing when the org’s works cannot be archived', async () => {

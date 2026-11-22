@@ -19,9 +19,11 @@ type Request = { owner: string; jobId: string; size: OrgWorkSize; download: bool
 // file is the clean original; a free-pool work (none is expected: org credits are paid) only ever
 // gets its protected small copy, as everywhere else no clean free work is signed.
 export async function resolveOrgWorkFile(deps: { db: SupabaseClient; store: ObjectStore }, req: Request): Promise<string> {
-  const work = await orgOwnerWork(deps.db, req.owner, req.jobId)
-  if (!work) throw new AppError('NOT_FOUND', 'Not found')
-  // A work of a deleted account (no maker) has its small copy in the archive (1971).
+  const found = await orgOwnerWork(deps.db, req.owner, req.jobId)
+  if (!found) throw new AppError('NOT_FOUND', 'Not found')
+  const work = found.archiveKey && (await exists(deps.store, found.archiveKey)) ? { ...found, userId: null, outputKey: found.archiveKey } : found
+  // A work of a deleted account (no maker), or one already copied for it, has its small copy in
+  // the archive (1971).
   const thumb = work.userId ? workThumbKeyFor(work.userId, work.id, work.creditPool) : archiveThumbKey(work.outputKey)
   if (work.creditPool === 'free' || (req.size === 'thumb' && (await exists(deps.store, thumb)))) {
     return deps.store.presignGet(thumb, { expiresInSeconds: SIGNED_GET_SECONDS })

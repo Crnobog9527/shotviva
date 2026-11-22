@@ -34,6 +34,9 @@ export function accountPrefixes(userId: string): string[] {
 export async function deleteAccount(userId: string, deps: AccountDeletionDeps): Promise<void> {
   await deps.archiveOrgWorks(userId)
   await deps.cancelSubscriptions(userId)
+  // Again right before the files go: the account was still signed in, so an org work may have
+  // been started (refused, still running) or finished (archived now) meanwhile.
+  await deps.archiveOrgWorks(userId)
   for (const prefix of accountPrefixes(userId)) {
     await deps.storage.deletePrefix(prefix)
   }

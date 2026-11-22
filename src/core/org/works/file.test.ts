@@ -9,8 +9,8 @@ const STAFF = '00000000-0000-4000-8000-0000000000b2'
 const JOB = '11111111-1111-4111-8111-111111111111'
 
 // The org_owner_work rpc as PostgREST answers it: the row when the owner's org made it, else none.
-function db(row: { credit_pool: 'free' | 'paid' } | null): SupabaseClient {
-  const rows = row ? [{ id: JOB, user_id: STAFF, output_key: `outputs/${STAFF}/${JOB}.png`, ...row }] : []
+function db(row: { credit_pool: 'free' | 'paid'; archive_key?: string } | null): SupabaseClient {
+  const rows = row ? [{ id: JOB, user_id: STAFF, output_key: `outputs/${STAFF}/${JOB}.png`, archive_key: null, ...row }] : []
   return { rpc: async () => ({ data: rows, error: null }) } as unknown as SupabaseClient
 }
 const keyOf = (url: string) => url.replace(/^memory:\/\/get\//, '').replace(/\?.*$/, '')
@@ -32,6 +32,15 @@ describe('企业作品 file route', () => {
   it('never signs a clean copy of a free work', async () => {
     const url = await resolveOrgWorkFile({ db: db({ credit_pool: 'free' }), store: createMemoryStore().store }, { owner: OWNER, jobId: JOB, size: 'full', download: true })
     expect(keyOf(url)).toBe(`outputs/${STAFF}/${JOB}-thumb-p1.webp`)
+  })
+
+  it('serves an unfinished account deletion’s copy only once it exists', async () => {
+    const { store } = createMemoryStore()
+    const archive = `org-works/org/${JOB}.png`
+    const ask = { owner: OWNER, jobId: JOB, size: 'full' as const, download: false }
+    expect(keyOf(await resolveOrgWorkFile({ db: db({ credit_pool: 'paid', archive_key: archive }), store }, ask))).toBe(`outputs/${STAFF}/${JOB}.png`)
+    await store.put(archive, new Uint8Array([1]), 'image/png')
+    expect(keyOf(await resolveOrgWorkFile({ db: db({ credit_pool: 'paid', archive_key: archive }), store }, ask))).toBe(archive)
   })
 
   it('answers 404 for anything that is not a work of the owner’s org', async () => {

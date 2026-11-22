@@ -6,7 +6,7 @@ import { cn } from '../../../ui/cn'
 import { ResponsiveSheet } from '../../../ui/responsive-sheet'
 import type { useDeleteAccount } from './use-delete-account'
 
-const FAILURE_TEXT = { subscription: 'deleteSubscriptionFailed', orgOwner: 'deleteOrgOwner', other: 'deleteFailed' } as const
+const FAILURE_TEXT = { subscription: 'deleteSubscriptionFailed', orgOwner: 'deleteOrgOwner', running: 'deleteRunning', other: 'deleteFailed' } as const
 
 export function DeleteAccountDialog({ del }: { del: ReturnType<typeof useDeleteAccount> }) {
   const t = useTranslations('auth.account')

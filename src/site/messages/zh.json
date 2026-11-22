@@ -217,6 +217,7 @@
       "deleteFailed": "注销没有完成，请再试一次。",
       "deleteSubscriptionFailed": "没能取消你的订阅，所以什么都没有删除。请稍后再试，或联系客服。",
       "deleteOrgOwner": "你是企业的主管理员，不能直接注销账号。请先联系我们更换企业主管理员，再注销。",
+      "deleteRunning": "还有企业作品正在生成，等它完成后再注销。",
       "cancel": "取消"
     }
   },

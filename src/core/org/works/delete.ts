@@ -9,7 +9,7 @@ import { deleteWorkFiles } from '../../jobs/kept-inputs'
 import { jobRowSchema } from '../../jobs/job-schema'
 import { logger } from '../../logger'
 import type { ObjectStore } from '../../storage'
-import { archiveThumbKey } from './archive'
+import { archiveKeyFor, archiveThumbKey } from './archive'
 
 // The owner deletes one of the org's works from 企业作品 (Owner 2026-11-22: only the org's owner
 // deletes org works). A live work: org_owner_delete_work marks it deleted and writes the audit row
@@ -21,12 +21,19 @@ export async function orgOwnerDeleteWork(deps: { db: SupabaseClient; store: Obje
   const args = z.object({ owner: z.uuid(), jobId: z.uuid() }).parse(req)
   const rpcArgs = { p_owner: args.owner, p_job_id: args.jobId }
   try {
-    await deleteWorkFiles(deps.store, await callRpc(deps.db, 'org_owner_delete_work', rpcArgs, jobRowSchema))
+    const row = await callRpc(deps.db, 'org_owner_delete_work', rpcArgs, z.looseObject({ org_id: z.uuid() }))
+    const job = jobRowSchema.parse(row)
+    await deleteWorkFiles(deps.store, job)
+    // A copy an unfinished account deletion made goes too (its archive row is already marked).
+    if (job.outputKey) await removeFiles(deps.store, archiveKeyFor(row.org_id, job.id, job.outputKey), job.id)
     return
   } catch (error) {
     if (!(error instanceof AppError && error.code === 'NOT_FOUND')) throw error
   }
-  const key = await callRpc(deps.db, 'org_owner_delete_archived_work', rpcArgs, z.string())
-  const results = await Promise.allSettled([key, archiveThumbKey(key)].map((k) => deps.store.delete(k)))
-  if (results.some((r) => r.status === 'rejected')) logger.error('archived org work files not deleted', { jobId: args.jobId })
+  await removeFiles(deps.store, await callRpc(deps.db, 'org_owner_delete_archived_work', rpcArgs, z.string()), args.jobId)
+}
+
+async function removeFiles(store: ObjectStore, key: string, jobId: string) {
+  const results = await Promise.allSettled([key, archiveThumbKey(key)].map((k) => store.delete(k)))
+  if (results.some((r) => r.status === 'rejected')) logger.error('archived org work files not deleted', { jobId })
 }

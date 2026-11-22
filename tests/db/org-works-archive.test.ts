@@ -178,6 +178,9 @@ describe('account deletion', () => {
       inputs: { resolution: '1k', attempt_id: randomUUID() } })
     await expect(archiveOrgWorksOf({ db: rest, store }, staff)).rejects.toMatchObject({ code: 'CONFLICT' })
     expect(await archiveRow(running)).toBeUndefined()
+    // A row left running past the sweeper's day is dead and no longer blocks.
+    await db.query("update public.generation_jobs set created_at = now() - interval '25 hours' where id = $1", [running])
+    await expect(archiveOrgWorksOf({ db: rest, store }, staff)).resolves.toBe(0)
   })
 
   it('drops a work deleted between two tries, and serves a copied work from its copy meanwhile', async () => {
@@ -188,11 +191,12 @@ describe('account deletion', () => {
     const { store, upload } = createMemoryStore()
     for (const id of [kept, dropped]) upload(`outputs/${staff}/${id}.png`, new Uint8Array([1]), 'image/png')
     expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(2)
-    // The try stopped after removing files: the owner still gets the copy.
-    await store.delete(`outputs/${staff}/${kept}.png`)
-    expect(await orgOwnerWork(service, owner, kept)).toMatchObject({ userId: null, outputKey: `org-works/${orgId}/${kept}.png` })
+    // While the account is still there the file route knows where the copy is.
+    expect(await orgOwnerWork(service, owner, kept)).toMatchObject({ userId: staff, archiveKey: `org-works/${orgId}/${kept}.png` })
     await orgOwnerDeleteWork({ db: rest, store }, { owner, jobId: dropped })
     expect(await archiveRow(dropped)).toMatchObject({ deleted_by: owner })
+    // Its copy goes with it.
+    expect(await store.head(`org-works/${orgId}/${dropped}.png`)).toBeNull()
     expect(await archiveOrgWorksOf({ db: rest, store }, staff)).toBe(1)
     await deleteAuthUser(staff)
     expect((await orgOwnerWorks(service, owner)).map((w) => w.id)).toEqual([kept])

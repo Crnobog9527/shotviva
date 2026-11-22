@@ -217,6 +217,7 @@
       "deleteFailed": "Deletion did not finish. Please try again.",
       "deleteSubscriptionFailed": "We couldn't cancel your subscription, so nothing was deleted. Please try again later, or contact support.",
       "deleteOrgOwner": "You are your company's main admin, so this account cannot be deleted yet. Contact us to hand the company to a new admin first.",
+      "deleteRunning": "A company photo is still being made. Delete the account once it is done.",
       "cancel": "Cancel"
     }
   },

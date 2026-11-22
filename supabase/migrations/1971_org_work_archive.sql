@@ -49,8 +49,10 @@ begin
   if exists (select 1 from public.orgs o where o.owner_user_id = p_user_id) then
     raise exception 'ORG_OWNER_CANNOT_DELETE_ACCOUNT';
   end if;
-  -- An org work still being made would land in outputs/<user>/ after its copy was taken.
-  if exists (select 1 from public.generation_jobs j where j.user_id = p_user_id and j.org_id is not null and j.status = 'running') then
+  -- An org work still being made would land in outputs/<user>/ after its copy was taken. A row
+  -- left running past the sweeper's day (sweep_stale_generation_jobs) is dead and not waited for.
+  if exists (select 1 from public.generation_jobs j where j.user_id = p_user_id and j.org_id is not null
+              and j.status = 'running' and j.created_at > now() - interval '24 hours') then
     raise exception 'JOB_RUNNING';
   end if;
   -- A row from an earlier, unfinished try whose work has since been deleted is dropped.

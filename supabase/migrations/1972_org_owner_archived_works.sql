@@ -79,24 +79,24 @@ as $$
 $$;
 
 -- The file route's check (1943's org_owner_work) including archived works: user_id is null for
--- those and output_key is where the archive put the file.
+-- those and output_key is where the archive put the file. archive_key: for a live work an
+-- unfinished account deletion has archived, where its copy goes; the route serves the copy only
+-- once it exists (the deletion may have stopped before copying it, or after removing the original).
 create function public.org_owner_work_file(p_owner uuid, p_job_id uuid)
-returns table (id uuid, user_id uuid, credit_pool text, output_key text)
+returns table (id uuid, user_id uuid, credit_pool text, output_key text, archive_key text)
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  -- A live work an unfinished account deletion already copied is served from the copy (the
-  -- original may be gone if the deletion stopped after removing files), as an archived one.
-  select j.id, case when a.job_id is null then j.user_id end, j.credit_pool, coalesce(a.output_key, j.output_key)
+  select j.id, j.user_id, j.credit_pool, j.output_key, a.output_key
     from public.generation_jobs j
     join public.orgs o on o.id = j.org_id
     left join public.org_work_archive a on a.job_id = j.id and a.reason = 'account_deleted' and a.deleted_at is null
    where j.id = p_job_id and o.owner_user_id = p_owner
      and j.status = 'succeeded' and j.deleted_at is null and j.output_key is not null
   union all
-  select a.job_id, null, a.credit_pool, a.output_key
+  select a.job_id, null, a.credit_pool, a.output_key, null
     from public.org_work_archive a
     join public.orgs o on o.id = a.org_id
    where a.job_id = p_job_id and o.owner_user_id = p_owner and a.deleted_at is null

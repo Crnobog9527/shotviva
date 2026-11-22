@@ -16,7 +16,10 @@ import { workThumbKeyFor, writeWorkThumb, type ObjectStore } from '../../storage
 
 const pairs = z.array(z.object({ job_id: z.uuid(), credit_pool: z.enum(['free', 'paid']), source_key: z.string(), archive_key: z.string() }))
 
-// The archived small copy sits next to the archived result.
+// Where archive_org_works (1971) puts a work's result, and its small copy next to it.
+export const archiveKeyFor = (orgId: string, jobId: string, outputKey: string) =>
+  `org-works/${orgId}/${jobId}${outputKey.match(/\.[a-z0-9]{2,5}$/)?.[0] ?? '.png'}`
+
 export const archiveThumbKey = (archiveKey: string) => archiveKey.replace(/\.[a-z0-9]{2,5}$/i, '') + '-thumb.webp'
 
 export async function archiveOrgWorksOf(deps: { db: SupabaseClient; store: ObjectStore }, userId: string): Promise<number> {
