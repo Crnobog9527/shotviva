@@ -1,7 +1,8 @@
 -- Org members pay with org credits only, and choose which kind (ARCHITECTURE §6.5 企业推广积分池,
 -- the Owner 2026-11-22: 「出图时让员工自选」, and 「在职成员只用企业积分」).
 --
--- An active member of an org generates ONLY from the org's shares in their account: the paid share
+-- An active member (staff, role 'member'; the org's owner keeps their own credits, which they can
+-- also deposit into the pool) of an org generates ONLY from the org's shares in their account: the paid share
 -- min(held_credits, credits) and the promotion share min(held_promo_credits, free_credits) while
 -- the org's promotion month is live. Their own credits stay frozen while they are a member (usable
 -- again once they leave), and one job is never paid partly by the org and partly by the member.
@@ -38,7 +39,7 @@ begin
          case when o.promo_expires_at > now() then least(m.held_promo_credits, p_profile.free_credits) else 0 end
     into v_member, v_paid, v_promo
     from public.org_members m join public.orgs o on o.id = m.org_id
-   where m.user_id = p_profile.id and m.status = 'active';
+   where m.user_id = p_profile.id and m.status = 'active' and m.role = 'member';
   if not coalesce(v_member, false) then
     if p_profile.credits >= p_cost then return 'paid'; end if;
     if p_profile.free_credits >= p_cost then return 'free'; end if;

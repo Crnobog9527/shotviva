@@ -100,6 +100,13 @@ it('never charges an active member’s own credits: refuses when the org shares 
   expect(await balances(staff)).toMatchObject({ credits: 490 })
 })
 
+it('leaves the org owner on their own credits', async () => {
+  await seed()
+  const { owner } = await member(0, 0)
+  await db.query('update profiles set credits=100 where id=$1', [owner])
+  expect(await generate(owner)).toMatchObject({ credit_pool: 'paid' })
+})
+
 it('charges poster photo extraction from the org shares too', async () => {
   await db.query("insert into system_settings(key, value) values ('poster_photo_credits', '1'::jsonb) on conflict (key) do update set value = excluded.value")
   const { orgId, staff } = await member(0, 50, { credits: 500 })
