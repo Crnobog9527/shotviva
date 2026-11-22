@@ -18,6 +18,8 @@ vi.mock('@/core/auth', () => ({
 vi.mock('@/core/affiliate/feature', () => ({ isAffiliateEnabled: async () => true }))
 vi.mock('next-intl/server', () => ({
   getTranslations: async () => Object.assign((key: string) => key, { has: () => true }),
+  // No published agreement text: the terms gate (covered by unit tests) stays out of these isolation checks.
+  getMessages: async () => ({}),
 }))
 
 async function fixture(db: Client, product: string) {
