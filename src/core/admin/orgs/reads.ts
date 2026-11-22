@@ -214,3 +214,11 @@ export async function listPaymentAccounts(db: SupabaseClient): Promise<Partial<R
   const rows = z.array(schema).parse(ok(await db.from('org_payment_accounts').select('kind,enabled,details,updated_at'), 'payment accounts'))
   return Object.fromEntries(rows.map((r) => [r.kind, { enabled: r.enabled, details: r.details, updatedAt: r.updated_at }]))
 }
+
+// The org's staff-only join link token (orgs.invite_token, the one the owner's 员工专用链接 shows;
+// Owner 2026-11-23: the admin sends it to enterprise customers). Read here, apart from the org row
+// the edit forms receive, so it reaches only the link card. Never logged. null for a missing org.
+export async function loadOrgInviteToken(db: SupabaseClient, orgId: string): Promise<string | null> {
+  const row = ok(await db.from('orgs').select('invite_token').eq('id', orgId).maybeSingle(), 'org invite')
+  return z.object({ invite_token: z.string().regex(/^[0-9a-f]{32}$/) }).nullable().parse(row)?.invite_token ?? null
+}
