@@ -39,12 +39,14 @@
 -- before the transfer, and a payment written while the transfer runs (its snapshot read the old
 -- referred_by, its commission insert then waits on the affiliates row lock and fails the foreign
 -- key once the old row is gone; the recompute catches that and stores the stale snapshot, the
--- payment itself succeeds). Each move is recorded in affiliate_account_moves; a snapshot's owner
--- or parent with no affiliates row any more is resolved to the account its org has now
--- (_affiliate_snapshot_remap), in the transfer for existing errors and in every retry for the
--- racing ones. So the org still earns those commissions, on the new owner's account.
+-- payment itself succeeds). The transfer rewrites the stored errors that exist when it runs.
+-- Each move is recorded in affiliate_account_moves, and every retry passes its snapshot through
+-- _affiliate_snapshot_remap: an owner that moved out of an org is replaced by the customer's
+-- current account when that is the same org's account. So the org still earns the racing
+-- commissions, on the new owner's account, and a later personal account of the former owner
+-- never does.
 --
--- Expand-only: one new private table, two new helpers, the new admin function, a widened
+-- Expand-only: one new private table, one new helper, the new admin function, a widened
 -- audit-action check (read from the live constraint, as 1840 did, so other open migrations'
 -- actions are kept), and create or replace of affiliate_recompute_payment identical to 1740
 -- except one line (the remap of a retried snapshot; a no-op for every snapshot whose accounts
@@ -63,26 +65,34 @@ alter table public.affiliate_account_moves enable row level security;
 revoke all on public.affiliate_account_moves from public, anon, authenticated, service_role;
 grant select on public.affiliate_account_moves to service_role;
 
--- The account a snapshot's user id stands for now: itself while it has an affiliates row, else
--- the current account of the org it was last moved out of, else itself (nothing to remap).
-create function public._affiliate_current_account(p_user uuid) returns uuid
+-- A retried snapshot whose owner is an account that moved: point it at the customer's current
+-- account, but only when that account is the account of an org the snapshot's owner was moved out
+-- of. Identity, not existence or time: the former owner may since have opened a personal
+-- affiliate account under the same user id (allowed once they leave the org, 1642), and must
+-- never receive the org's commission. A customer's binding is first-wins and the transfer moves
+-- it, so a customer of the moved account is now bound to the org's current account (any number
+-- of moves later). If the customer is no longer bound to such an account (an admin rebind
+-- between the race and the retry), the owner still moved out of an org: the payment was the
+-- org's, so it goes to that org's current account (the latest move out of that user id). Any
+-- other snapshot, and the parent (org accounts have no team; the transfer rewrites stored parents
+-- itself), is returned unchanged.
+create function public._affiliate_snapshot_remap(p_snapshot jsonb, p_customer uuid) returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select case when p_user is null then null
-    when exists(select from public.affiliates a where a.user_id = p_user) then p_user
-    else coalesce((select a.user_id from public.affiliate_account_moves m join public.affiliates a on a.org_id = m.org_id
-                    where m.from_user_id = p_user order by m.id desc limit 1), p_user) end;
+  select coalesce((
+    select p_snapshot || jsonb_build_object('owner', c.referred_by)
+      from public.profiles c join public.affiliates a on a.user_id = c.referred_by
+     where c.id = p_customer and a.org_id is not null
+       and c.referred_by::text is distinct from p_snapshot->>'owner'
+       and exists (select from public.affiliate_account_moves m
+                    where m.org_id = a.org_id and m.from_user_id::text = p_snapshot->>'owner')), (
+    select p_snapshot || jsonb_build_object('owner', a.user_id)
+      from public.affiliate_account_moves m join public.affiliates a on a.org_id = m.org_id
+     where m.from_user_id::text = p_snapshot->>'owner'
+     order by m.id desc limit 1), p_snapshot);
 $$;
-revoke all on function public._affiliate_current_account(uuid) from public, anon, authenticated, service_role;
+revoke all on function public._affiliate_snapshot_remap(jsonb, uuid) from public, anon, authenticated, service_role;
 
-create function public._affiliate_snapshot_remap(p_snapshot jsonb) returns jsonb
-language sql stable security definer set search_path = '' as $$
-  select case when p_snapshot is null then null else p_snapshot || jsonb_strip_nulls(jsonb_build_object(
-    'owner', public._affiliate_current_account((p_snapshot->>'owner')::uuid),
-    'parent', public._affiliate_current_account((p_snapshot->>'parent')::uuid))) end;
-$$;
-revoke all on function public._affiliate_snapshot_remap(jsonb) from public, anon, authenticated, service_role;
-
--- Same as 1740 except the remap of a retried snapshot (the line after v_retry).
+-- Same as 1740 except the remap of a retried snapshot (the line after the payment lock).
 create or replace function public.affiliate_recompute_payment(p_payment_id bigint,p_new_payment boolean default false) returns void
 language plpgsql security definer set search_path='' as $$
 declare
@@ -95,11 +105,11 @@ begin
   select exists(select from public.affiliate_commissions c where c.payment_id=p_payment_id) into v_exists;
   select e.snapshot into v_snapshot from public.affiliate_recompute_errors e where e.payment_id=p_payment_id and e.resolved_at is null;
   v_retry:=found;
-  v_snapshot:=public._affiliate_snapshot_remap(v_snapshot);
   if not (v_exists or v_retry or (p_new_payment and v_enabled)) then return; end if;
   -- Serializes manual/cron retries with the existing billing transaction on this payment.
   select p.* into strict v_payment from public.payments p where p.id=p_payment_id for update;
   if v_payment.amount_total=0 then return; end if;
+  if v_retry then v_snapshot:=public._affiliate_snapshot_remap(v_snapshot,v_payment.user_id); end if;
   if not v_exists and v_snapshot is null then v_snapshot:=public._affiliate_snapshot(v_payment); end if;
   if not v_exists and v_snapshot is null then
     if v_retry then update public.affiliate_recompute_errors set resolved_at=now() where payment_id=p_payment_id and resolved_at is null; end if;
@@ -158,13 +168,13 @@ declare
   v_uuid constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
   v_org_id uuid;
   v_new uuid;
+  v_expected timestamptz;
   v_old uuid;
   o public.orgs;
   v_banned timestamptz;
   v_found boolean;
   v_current uuid;
   a public.affiliates;
-  v_slug text;
   n_comm bigint; n_pay bigint; n_adj bigint; n_cust bigint;
   v_moved jsonb := null;
 begin
@@ -175,13 +185,18 @@ begin
      or jsonb_typeof(p_input->'expected_updated_at') is distinct from 'string' then
     raise exception 'INVALID_INPUT';
   end if;
+  begin
+    v_expected := (p_input->>'expected_updated_at')::timestamptz;
+  exception when others then
+    raise exception 'INVALID_INPUT';
+  end;
   v_org_id := (p_input->>'org_id')::uuid;
   v_new := (p_input->>'user_id')::uuid;
 
   select * into o from public.orgs where id = v_org_id for no key update;
   if not found then raise exception 'ORG_NOT_FOUND'; end if;
   if o.owner_user_id = v_new then return jsonb_build_object('applied', false); end if;
-  if (p_input->>'expected_updated_at')::timestamptz is distinct from o.updated_at then raise exception 'ORG_CHANGED'; end if;
+  if v_expected is distinct from o.updated_at then raise exception 'ORG_CHANGED'; end if;
   v_old := o.owner_user_id;
 
   perform 1 from public.profiles where id in (v_old, v_new) order by id for no key update;
@@ -195,10 +210,12 @@ begin
 
   select * into a from public.affiliates where org_id = o.id for update;
   if found then
+    -- The org's account is always its owner's row (1640/1643); refuse rather than move anything
+    -- of someone else's if that ever stops being true.
+    if a.user_id <> v_old then raise exception 'ORG_AFFILIATE_MISMATCH'; end if;
     if exists(select from public.affiliates where user_id = v_new) then raise exception 'ORG_NEW_OWNER_AFFILIATE'; end if;
     -- Free the unique slug and org_id on the old row, insert the copy under the new owner, re-point
     -- every reference, then drop the old row (nothing references it any more, so nothing cascades).
-    v_slug := a.slug;
     update public.affiliates set slug = 'mv-' || substr(md5(gen_random_uuid()::text), 1, 20), org_id = null
       where user_id = a.user_id;
     a.user_id := v_new;
@@ -216,7 +233,10 @@ begin
     get diagnostics n_cust = row_count;
     delete from public.affiliates where user_id = v_old;
     insert into public.affiliate_account_moves(org_id, from_user_id, to_user_id, actor) values (o.id, v_old, v_new, p_actor);
-    update public.affiliate_recompute_errors set snapshot = public._affiliate_snapshot_remap(snapshot)
+    -- Unresolved retries stored before now named the moved row as it was: the org's account.
+    update public.affiliate_recompute_errors set snapshot = snapshot
+        || case when snapshot->>'owner' = v_old::text then jsonb_build_object('owner', v_new) else '{}'::jsonb end
+        || case when snapshot->>'parent' = v_old::text then jsonb_build_object('parent', v_new) else '{}'::jsonb end
       where resolved_at is null and (snapshot->>'owner' = v_old::text or snapshot->>'parent' = v_old::text);
     v_moved := jsonb_build_object('commissions', n_comm, 'payouts', n_pay, 'adjustments', n_adj, 'customers', n_cust);
   elsif public._affiliate_personal_open(v_new) then

@@ -3351,20 +3351,6 @@ $$;
 ALTER FUNCTION "public"."_affiliate_audit"("p_actor" "uuid", "p_action" "text", "p_target" "text", "p_reason" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."_affiliate_current_account"("p_user" "uuid") RETURNS "uuid"
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-  select case when p_user is null then null
-    when exists(select from public.affiliates a where a.user_id = p_user) then p_user
-    else coalesce((select a.user_id from public.affiliate_account_moves m join public.affiliates a on a.org_id = m.org_id
-                    where m.from_user_id = p_user order by m.id desc limit 1), p_user) end;
-$$;
-
-
-ALTER FUNCTION "public"."_affiliate_current_account"("p_user" "uuid") OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."payments" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -3761,17 +3747,21 @@ $$;
 ALTER FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."payments") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb") RETURNS "jsonb"
+CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb", "p_customer" "uuid") RETURNS "jsonb"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select case when p_snapshot is null then null else p_snapshot || jsonb_strip_nulls(jsonb_build_object(
-    'owner', public._affiliate_current_account((p_snapshot->>'owner')::uuid),
-    'parent', public._affiliate_current_account((p_snapshot->>'parent')::uuid))) end;
+  select coalesce((
+    select p_snapshot || jsonb_build_object('owner', c.referred_by)
+      from public.profiles c join public.affiliates a on a.user_id = c.referred_by
+     where c.id = p_customer and a.org_id is not null
+       and c.referred_by::text is distinct from p_snapshot->>'owner'
+       and exists (select from public.affiliate_account_moves m
+                    where m.org_id = a.org_id and m.from_user_id::text = p_snapshot->>'owner')), p_snapshot);
 $$;
 
 
-ALTER FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb") OWNER TO "postgres";
+ALTER FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb", "p_customer" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_affiliate_write_commission"("p_payment" "public"."payments", "p_snapshot" "jsonb", "p_level" smallint, "p_open" boolean, "p_lost" boolean, "p_release" boolean DEFAULT false) RETURNS "void"
@@ -9662,7 +9652,10 @@ begin
     get diagnostics n_cust = row_count;
     delete from public.affiliates where user_id = v_old;
     insert into public.affiliate_account_moves(org_id, from_user_id, to_user_id, actor) values (o.id, v_old, v_new, p_actor);
-    update public.affiliate_recompute_errors set snapshot = public._affiliate_snapshot_remap(snapshot)
+    -- Unresolved retries stored before now named the moved row as it was: the org's account.
+    update public.affiliate_recompute_errors set snapshot = snapshot
+        || case when snapshot->>'owner' = v_old::text then jsonb_build_object('owner', v_new) else '{}'::jsonb end
+        || case when snapshot->>'parent' = v_old::text then jsonb_build_object('parent', v_new) else '{}'::jsonb end
       where resolved_at is null and (snapshot->>'owner' = v_old::text or snapshot->>'parent' = v_old::text);
     v_moved := jsonb_build_object('commissions', n_comm, 'payouts', n_pay, 'adjustments', n_adj, 'customers', n_cust);
   elsif public._affiliate_personal_open(v_new) then
@@ -12834,11 +12827,11 @@ begin
   select exists(select from public.affiliate_commissions c where c.payment_id=p_payment_id) into v_exists;
   select e.snapshot into v_snapshot from public.affiliate_recompute_errors e where e.payment_id=p_payment_id and e.resolved_at is null;
   v_retry:=found;
-  v_snapshot:=public._affiliate_snapshot_remap(v_snapshot);
   if not (v_exists or v_retry or (p_new_payment and v_enabled)) then return; end if;
   -- Serializes manual/cron retries with the existing billing transaction on this payment.
   select p.* into strict v_payment from public.payments p where p.id=p_payment_id for update;
   if v_payment.amount_total=0 then return; end if;
+  if v_retry then v_snapshot:=public._affiliate_snapshot_remap(v_snapshot,v_payment.user_id); end if;
   if not v_exists and v_snapshot is null then v_snapshot:=public._affiliate_snapshot(v_payment); end if;
   if not v_exists and v_snapshot is null then
     if v_retry then update public.affiliate_recompute_errors set resolved_at=now() where payment_id=p_payment_id and resolved_at is null; end if;
@@ -25404,10 +25397,6 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_audit"("p_actor" "uuid", "p_action" 
 
 
 
-REVOKE ALL ON FUNCTION "public"."_affiliate_current_account"("p_user" "uuid") FROM PUBLIC;
-
-
-
 GRANT SELECT ON TABLE "public"."payments" TO "service_role";
 
 
@@ -25492,7 +25481,7 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."paym
 
 
 
-REVOKE ALL ON FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."_affiliate_snapshot_remap"("p_snapshot" "jsonb", "p_customer" "uuid") FROM PUBLIC;
 
 
 

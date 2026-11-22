@@ -188,12 +188,29 @@ describe('moving the org to a new primary admin', () => {
     expect((await row(db, 'select snapshot->>\'owner\' o from affiliate_recompute_errors where payment_id=$1 and resolved_at is null', [before.paid.id])).o).toBe(staff)
     // A payment that raced the transfer stores the stale snapshot after it; the retry remaps it.
     await store(late.paid.id, late.snap)
+    // The former owner leaves and opens a personal account under the same user id before the
+    // daily retry: the org's commissions must still go to the org, never to that account.
+    await db.query("select org_remove_member($1,$2,'rm:late')", [staff, owner])
+    await db.query("insert into affiliates(user_id,slug,status) values($1,$2,'active')", [owner, 'qa-' + owner.slice(0, 12)])
     for (const { paid } of [before, late]) {
       await db.query('select affiliate_recompute_payment($1)', [paid.id])
       expect(await row(db, 'select affiliate_user_id from affiliate_commissions where payment_id=$1 and level=1', [paid.id])).toEqual({ affiliate_user_id: staff })
       expect(await row(db, 'select count(*)::int n from affiliate_recompute_errors where payment_id=$1 and resolved_at is null', [paid.id])).toEqual({ n: 0 })
     }
     expect(await row(db, 'select from_user_id,to_user_id from affiliate_account_moves where org_id=$1', [orgId])).toEqual({ from_user_id: owner, to_user_id: staff })
+  })
+
+  it('still books a racing payment to the org when the customer was rebound before the retry', async () => {
+    const { owner, orgId, staff, customer } = await channelOrg()
+    const paid = await sale(db, customer, 'pack_m', 2490)
+    const snap = (await row(db, 'select public._affiliate_snapshot(p) s from payments p where p.id=$1', [paid.id])).s
+    await db.query('delete from affiliate_commission_changes where commission_id in (select id from affiliate_commissions where payment_id=$1)', [paid.id])
+    await db.query('delete from affiliate_commissions where payment_id=$1', [paid.id])
+    await transfer(orgId, staff)
+    await db.query("insert into affiliate_recompute_errors(payment_id,error,snapshot) values($1,'23503: fixture',$2)", [paid.id, { ...snap, owner }])
+    await db.query('update profiles set referred_by=null,referred_source=null where id=$1', [customer])
+    await db.query('select affiliate_recompute_payment($1)', [paid.id])
+    expect(await row(db, 'select affiliate_user_id from affiliate_commissions where payment_id=$1 and level=1', [paid.id])).toEqual({ affiliate_user_id: staff })
   })
 
   it('does nothing on a repeat, even from a stale form', async () => {
