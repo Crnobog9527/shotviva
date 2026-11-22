@@ -186,7 +186,7 @@ describe('refusals', () => {
     await db.query('update profiles set banned_at=null where id=$1', [actor])
     await refused(() => db.query('select admin_org_transfer_owner($1,$2)', [actor, { org_id: orgId, user_id: staff }]), 'INVALID_INPUT')
     await refused(() => db.query('select admin_org_transfer_owner($1,$2)', [actor, { org_id: orgId, user_id: 'x', expected_updated_at: 'x' }]), 'INVALID_INPUT')
-    await refused(() => transfer('00000000-0000-4000-8000-000000000000', staff), 'ORG_NOT_FOUND')
+    await refused(() => transfer('00000000-0000-4000-8000-000000000000', staff, { expected: '2026-01-01T00:00:00Z' }), 'ORG_NOT_FOUND')
   })
 
   it('refuses a stale form, a missing, banned or other-org account, and an owner of another org', async () => {

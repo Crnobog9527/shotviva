@@ -9569,6 +9569,97 @@ $$;
 ALTER FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_org_transfer_owner"("p_actor" "uuid", "p_input" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_uuid constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+  v_org_id uuid;
+  v_new uuid;
+  v_old uuid;
+  o public.orgs;
+  v_banned timestamptz;
+  v_found boolean;
+  v_current uuid;
+  a public.affiliates;
+  v_slug text;
+  n_comm bigint; n_pay bigint; n_adj bigint; n_cust bigint;
+  v_moved jsonb := null;
+begin
+  perform public._org_require_admin(p_actor);
+  if p_input is null or jsonb_typeof(p_input) <> 'object'
+     or coalesce(lower(p_input->>'org_id'), '') !~ v_uuid
+     or coalesce(lower(p_input->>'user_id'), '') !~ v_uuid
+     or jsonb_typeof(p_input->'expected_updated_at') is distinct from 'string' then
+    raise exception 'INVALID_INPUT';
+  end if;
+  v_org_id := (p_input->>'org_id')::uuid;
+  v_new := (p_input->>'user_id')::uuid;
+
+  select * into o from public.orgs where id = v_org_id for no key update;
+  if not found then raise exception 'ORG_NOT_FOUND'; end if;
+  if o.owner_user_id = v_new then return jsonb_build_object('applied', false); end if;
+  if (p_input->>'expected_updated_at')::timestamptz is distinct from o.updated_at then raise exception 'ORG_CHANGED'; end if;
+  v_old := o.owner_user_id;
+
+  perform 1 from public.profiles where id in (v_old, v_new) order by id for no key update;
+  select true, banned_at into v_found, v_banned from public.profiles where id = v_new;
+  if v_found is null then raise exception 'PROFILE_NOT_FOUND'; end if;
+  if v_banned is not null then raise exception 'USER_BANNED'; end if;
+  select org_id into v_current from public.org_members where user_id = v_new and status = 'active';
+  if (v_current is not null and v_current <> o.id) or exists(select from public.orgs where owner_user_id = v_new) then
+    raise exception 'ORG_MEMBER_EXISTS';
+  end if;
+
+  select * into a from public.affiliates where org_id = o.id for update;
+  if found then
+    if exists(select from public.affiliates where user_id = v_new) then raise exception 'ORG_NEW_OWNER_AFFILIATE'; end if;
+    -- Free the unique slug and org_id on the old row, insert the copy under the new owner, re-point
+    -- every reference, then drop the old row (nothing references it any more, so nothing cascades).
+    v_slug := a.slug;
+    update public.affiliates set slug = 'mv-' || substr(md5(gen_random_uuid()::text), 1, 20), org_id = null
+      where user_id = a.user_id;
+    a.user_id := v_new;
+    insert into public.affiliates select (a).*;
+    update public.affiliate_commissions set affiliate_user_id = v_new where affiliate_user_id = v_old;
+    get diagnostics n_comm = row_count;
+    update public.affiliate_payouts set affiliate_user_id = v_new where affiliate_user_id = v_old;
+    get diagnostics n_pay = row_count;
+    update public.affiliate_adjustments set affiliate_user_id = v_new where affiliate_user_id = v_old;
+    get diagnostics n_adj = row_count;
+    update public.affiliate_click_days set affiliate_user_id = v_new where affiliate_user_id = v_old;
+    update public.affiliate_rate_overrides set user_id = v_new where user_id = v_old;
+    update public.affiliates set parent_user_id = v_new where parent_user_id = v_old;
+    update public.profiles set referred_by = v_new where referred_by = v_old;
+    get diagnostics n_cust = row_count;
+    delete from public.affiliates where user_id = v_old;
+    v_moved := jsonb_build_object('commissions', n_comm, 'payouts', n_pay, 'adjustments', n_adj, 'customers', n_cust);
+  elsif public._affiliate_personal_open(v_new) then
+    raise exception 'ORG_PERSONAL_AFFILIATE';
+  end if;
+
+  update public.org_members set role = 'member' where org_id = o.id and user_id = v_old and role = 'owner';
+  -- An active member keeps their allowance and held credits; a removed or new one starts clean,
+  -- as admin_org_add_member does.
+  insert into public.org_members(org_id, user_id, role) values (o.id, v_new, 'owner')
+    on conflict (org_id, user_id) do update set role = 'owner',
+      monthly_allowance = case when public.org_members.status = 'active' then public.org_members.monthly_allowance else 0 end,
+      held_credits = case when public.org_members.status = 'active' then public.org_members.held_credits else 0 end,
+      joined_at = case when public.org_members.status = 'active' then public.org_members.joined_at else now() end,
+      status = 'active', removed_at = null;
+  update public.orgs set owner_user_id = v_new, updated_at = now() where id = o.id returning * into o;
+
+  perform public._org_audit(p_actor, 'org_transfer_owner', o.id::text,
+    jsonb_build_object('from', v_old, 'to', v_new, 'affiliate', v_moved)::text);
+  return jsonb_build_object('applied', true, 'updated_at', o.updated_at, 'previous_owner', v_old, 'affiliate', v_moved);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_org_transfer_owner"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_org_update"("p_actor" "uuid", "p_org_id" "uuid", "p_input" "jsonb") RETURNS timestamp with time zone
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -19530,7 +19621,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text", 'partner_promo_set'::"text", 'partner_promo_confirm'::"text", 'partner_promo_reject'::"text", 'partner_promo_run'::"text", 'partner_promo_topup'::"text", 'payment_acknowledge'::"text", 'payment_unacknowledge'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text", 'partner_promo_set'::"text", 'partner_promo_confirm'::"text", 'partner_promo_reject'::"text", 'partner_promo_run'::"text", 'partner_promo_topup'::"text", 'payment_acknowledge'::"text", 'payment_unacknowledge'::"text", 'org_transfer_owner'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -26072,6 +26163,11 @@ GRANT ALL ON FUNCTION "public"."admin_org_payment_account_save"("p_actor" "uuid"
 
 REVOKE ALL ON FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_org_transfer_owner"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_org_transfer_owner"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
 
 
