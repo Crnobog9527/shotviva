@@ -1,7 +1,8 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useSyncExternalStore } from 'react'
+import dynamic from 'next/dynamic'
+import { useState, useSyncExternalStore } from 'react'
 
 import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
@@ -10,13 +11,22 @@ import { monoTag, sizeTag } from '../workspace/result-panel'
 import { fileHref, pairHref, shareSource, type WorkFile } from './download-background'
 import { IosPhotoActions } from './ios-photo-actions'
 import { useCutOutChoice } from './use-download-background'
+import type { ShareMode } from './share-mode'
 import { useShareFile } from './use-share-file'
 import { useWatermarkMoment } from './use-watermark-moment'
 import { isIosBrowser } from './ios-browser'
+import type { CreateShareAction } from '../work-share/share-types'
+import { shareChoice } from './share-choice'
+
+// The Photos link dialog (作品集分享), loaded on the first tap that needs it.
+const CreateShareSheet = dynamic(() => import('../work-share/create-share-sheet').then((mod) => mod.CreateShareSheet), { ssr: false })
 
 // work: the result's pool and cut-out record, for the 白底 / 透明 choice (absent: no choice).
 // watermarked: a free work; saving it is the moment the paywall opens on Starter (T107).
-export type ResultActionProps = { fileUrl: string; name: string; shareText: string; px?: number; work?: WorkFile; watermarked?: boolean }
+// link: this work's id and the Photos 作品集分享 action, so 「分享」 is always there and falls back
+// to a share link (same server checks and watermark rules as Photos) where the file can't be shared.
+export type ResultActionProps = { fileUrl: string; name: string; shareText: string; px?: number; work?: WorkFile; watermarked?: boolean; link?: ShareLink }
+export type ShareLink = { jobId: string; create: CreateShareAction }
 
 const subscribe = () => () => {}
 const onIos = () => isIosBrowser(navigator)
@@ -29,7 +39,7 @@ const LABEL_PX = { white: 'downloadWhitePx', transparent: 'downloadTransparentPx
 // the primary names and saves that file, Share and the iPhone fallback photo follow it, and
 // 「下载白底 + 透明图」 under it saves both as one ZIP. The routes record one download per click
 // whichever file they serve.
-export default function ResultActions({ fileUrl, name, shareText, px, work, watermarked = false }: ResultActionProps) {
+export default function ResultActions({ fileUrl, name, shareText, px, work, watermarked = false, link }: ResultActionProps) {
   const t = useTranslations('app.result')
   const saved = useWatermarkMoment(watermarked)
   const [background] = useCutOutChoice(fileUrl, work)
@@ -43,7 +53,7 @@ export default function ResultActions({ fileUrl, name, shareText, px, work, wate
       {t('downloadBoth')}
     </a>
   ) : null
-  if (ios) return <div className="grid gap-2"><IosPhotoActions mode={mode} fileUrl={fileHref(fileUrl, background, false)} onSaved={saved} />{pair}</div>
+  if (ios) return <div className="grid gap-2"><IosPhotoActions mode={mode} fileUrl={fileHref(fileUrl, background, false)} onSaved={saved} />{pair}{link ? <ShareAction mode={mode} link={link} name={name} shareText={shareText} onShared={saved} block /> : null}</div>
   const label = () => {
     if (px) return t.rich(background ? LABEL_PX[background] : 'downloadPx', { px, cost: sizeTag, mono: monoTag })
     return t(background ? LABEL[background] : 'download')
@@ -55,36 +65,48 @@ export default function ResultActions({ fileUrl, name, shareText, px, work, wate
       <span>{label()}</span>
     </a>
   )
-  if (mode.kind === 'share') {
-    const share = () => {
-      // Called straight from the tap, no await before it (rule 1).
-      navigator
-        .share({ files: [mode.file], title: name, text: shareText })
-        .then(saved, () => undefined)
-    }
-    return (
-      <>
-        <div className="flex gap-2">
-          {download('min-w-0 flex-1')}
-          <button
-            type="button"
-            onClick={share}
-            aria-label={t('share')}
-            className={cn(buttonVariants({ variant: 'glass', size: 'cta' }), 'aspect-square rounded-tile px-0 lg:hidden')}
-          >
-            <ShareIcon />
-          </button>
-        </div>
-        {pair ? <div className="mt-2 grid">{pair}</div> : null}
-        <p className="mt-2 text-center text-caption text-muted-foreground lg:hidden">{t('photosHint')}</p>
-      </>
-    )
-  }
   return (
     <>
-      {download()}
+      {mode.kind === 'share' || link ? (
+        <div className="flex gap-2">
+          {download('min-w-0 flex-1')}
+          <ShareAction mode={mode} link={link} name={name} shareText={shareText} onShared={saved} />
+        </div>
+      ) : (
+        download()
+      )}
       {pair ? <div className="mt-2 grid">{pair}</div> : null}
-      <p className="mt-2 text-center text-caption text-muted-foreground lg:hidden">{t('longPress')}</p>
+      <p className="mt-2 text-center text-caption text-muted-foreground lg:hidden">{t(mode.kind === 'share' ? 'photosHint' : 'longPress')}</p>
+    </>
+  )
+}
+
+type ShareActionProps = { mode: ShareMode; link?: ShareLink; name: string; shareText: string; onShared(): void; block?: boolean }
+
+// Secondary beside the primary: an icon and 「分享」 when a link can be made (every browser, from
+// lg too); the icon alone, phones only, when only the file can be shared. block: the iPhone's
+// full-width button under 存入相册, which already hands the file over, so it makes the link.
+function ShareAction({ mode, link, name, shareText, onShared, block = false }: ShareActionProps) {
+  const t = useTranslations('app.result')
+  const [linkOpen, setLinkOpen] = useState(false)
+  const fileReady = !block && mode.kind === 'share'
+  const share = () => {
+    const touch = window.matchMedia('(pointer: coarse)').matches
+    if (shareChoice({ fileReady, touch, link: !!link }) === 'link') return setLinkOpen(true)
+    if (mode.kind !== 'share') return
+    // Called straight from the tap, no await before it (rule 1).
+    navigator.share({ files: [mode.file], title: name, text: shareText }).then(onShared, () => undefined)
+  }
+  const shape = block
+    ? buttonVariants({ variant: 'glass', size: 'touch', className: 'gap-2' })
+    : cn(buttonVariants({ variant: 'glass', size: 'cta' }), link ? 'flex-none gap-2 rounded-tile px-5' : 'aspect-square rounded-tile px-0 lg:hidden')
+  return (
+    <>
+      <button type="button" onClick={share} aria-label={link ? undefined : t('share')} className={shape}>
+        <ShareIcon />
+        {link ? <span>{t('share')}</span> : null}
+      </button>
+      {link && linkOpen ? <CreateShareSheet open onOpenChange={setLinkOpen} jobIds={[link.jobId]} create={link.create} onDone={() => undefined} /> : null}
     </>
   )
 }

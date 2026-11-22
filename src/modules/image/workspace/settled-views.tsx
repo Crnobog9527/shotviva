@@ -15,6 +15,7 @@ import { SIDE_BY_SIDE } from '../result/action-styles'
 import { RemoveWatermark } from '../result/remove-watermark'
 import { ResultPhoto } from '../result/result-photo'
 import { ShareButton } from '../result/share-button'
+import type { CreateShareAction } from '../work-share/share-types'
 import { DevelopTray, StageLayout, TRAY_SIZE, TrayCaption } from './develop-tray'
 import { failCaption, readFailure } from './error-copy'
 import { FailureNotes } from './failure-notes'
@@ -30,9 +31,10 @@ import { tierName, tierPx } from './workspace-options'
 // §9 第 7 条), so both read the job's own visibility rather than the pool's default.
 const donePool = (job: TrackedJob) => (job.creditPool === 'free' && job.visibility === 'private' ? 'freePrivate' : (job.creditPool ?? 'none'))
 
-type SuccessProps = { job: TrackedJob; shareText: string; editable: boolean; onAgain(): void }
+// shareLink: the Photos 作品集分享 action, so 「分享」 beside Download can always make a link.
+type SuccessProps = { job: TrackedJob; shareText: string; editable: boolean; onAgain(): void; shareLink?: CreateShareAction }
 
-export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps) {
+export function SuccessView({ job, shareText, editable, onAgain, shareLink }: SuccessProps) {
   const t = useTranslations('app')
   const fileUrl = job.fileUrl as string
   const px = tierPx(job.resolution, job.aspect)
@@ -51,7 +53,7 @@ export function SuccessView({ job, shareText, editable, onAgain }: SuccessProps)
   ) : null
   const bar = (
     <ActionBar className="md:px-0">
-      <ShareButton fileUrl={fileUrl} name={`shotviva-${job.templateId}`} shareText={shareText} px={savedLongEdge(job.creditPool, px)} work={{ pool: job.creditPool, transparent: job.transparent }} watermarked={job.creditPool === 'free'} />
+      <ShareButton fileUrl={fileUrl} name={`shotviva-${job.templateId}`} shareText={shareText} px={savedLongEdge(job.creditPool, px)} work={{ pool: job.creditPool, transparent: job.transparent }} watermarked={job.creditPool === 'free'} link={shareLink ? { jobId: job.id, create: shareLink } : undefined} />
     </ActionBar>
   )
   return (

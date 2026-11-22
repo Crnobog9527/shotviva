@@ -2184,7 +2184,7 @@
       "cancel": "取消",
       "next": "生成链接",
       "select": "选择 {name}",
-      "title": "分享这些作品",
+      "title": "{count, plural, =1 {分享这张作品} other {分享这些作品}}",
       "lede": "拿到链接的人都能看到这 {count} 张作品。用免费积分做的作品会保留水印。",
       "titleLabel": "标题",
       "titlePlaceholder": "例如：春季菜单初稿",

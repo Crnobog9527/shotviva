@@ -2184,7 +2184,7 @@
       "cancel": "Cancel",
       "next": "Create link",
       "select": "Select {name}",
-      "title": "Share these photos",
+      "title": "{count, plural, one {Share this photo} other {Share these photos}}",
       "lede": "Anyone with the link can see the {count, plural, one {photo} other {# photos}}. Photos made with free credits keep their watermark.",
       "titleLabel": "Title",
       "titlePlaceholder": "e.g. Spring menu, first draft",
