@@ -13878,6 +13878,58 @@ $_$;
 ALTER FUNCTION "public"."create_template_request"("p_user_id" "uuid", "p_description" "text", "p_image_keys" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."create_work_share"("p_user_id" "uuid", "p_job_ids" "uuid"[], "p_show_before" boolean DEFAULT false, "p_title" "text" DEFAULT NULL::"text", "p_note" "text" DEFAULT NULL::"text") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_banned timestamptz;
+  v_count integer := coalesce(cardinality(p_job_ids), 0);
+  v_title text := nullif(btrim(coalesce(p_title, '')), '');
+  v_note text := nullif(btrim(coalesce(p_note, '')), '');
+  v_id text;
+begin
+  select banned_at into v_banned from public.profiles where id = p_user_id for update;
+  if not found then
+    raise exception 'PROFILE_NOT_FOUND';
+  end if;
+  if v_banned is not null then
+    raise exception 'USER_BANNED';
+  end if;
+  if v_count < 1 or v_count > 30 or array_position(p_job_ids, null) is not null
+     or (select count(distinct j) from unnest(p_job_ids) j) <> v_count then
+    raise exception 'INVALID_INPUT' using detail = 'one to 30 distinct works';
+  end if;
+  if (v_title is not null and char_length(v_title) > 80) or (v_note is not null and char_length(v_note) > 500) then
+    raise exception 'INVALID_INPUT' using detail = 'title up to 80, note up to 500 characters';
+  end if;
+
+  if (select count(*) from public.generation_jobs
+       where id = any(p_job_ids) and user_id = p_user_id and status = 'succeeded' and deleted_at is null
+         and moderation_status <> 'rejected') <> v_count then
+    raise exception 'WORK_SHARE_JOB_NOT_FOUND';
+  end if;
+
+  if (select count(*) from public.work_shares where user_id = p_user_id and created_at > now() - interval '1 hour') >= 20
+     or (select count(*) from public.work_shares where user_id = p_user_id and created_at > now() - interval '1 day') >= 100 then
+    raise exception 'WORK_SHARE_RATE_LIMITED';
+  end if;
+
+  if (select count(*) from public.work_shares where user_id = p_user_id and revoked_at is null) >= 200 then
+    raise exception 'WORK_SHARE_LIMIT';
+  end if;
+
+  insert into public.work_shares (user_id, job_ids, show_before, title, note)
+  values (p_user_id, p_job_ids, coalesce(p_show_before, false), v_title, v_note)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."create_work_share"("p_user_id" "uuid", "p_job_ids" "uuid"[], "p_show_before" boolean, "p_title" "text", "p_note" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."current_tier"("p_user_id" "uuid") RETURNS "text"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -14461,6 +14513,28 @@ $$;
 
 
 ALTER FUNCTION "public"."list_my_wish_notices"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."list_work_shares"("p_user_id" "uuid", "p_limit" integer DEFAULT 30, "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "text" DEFAULT NULL::"text") RETURNS TABLE("id" "text", "title" "text", "show_before" boolean, "created_at" timestamp with time zone, "revoked_at" timestamp with time zone, "works" integer, "cover_job_id" "uuid")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select s.id, s.title, s.show_before, s.created_at, s.revoked_at, live.works, live.cover
+    from public.work_shares s
+    cross join lateral (
+      select count(*)::integer as works, (array_agg(j.id order by k.ord))[1] as cover
+        from unnest(s.job_ids) with ordinality as k(job_id, ord)
+        join public.generation_jobs j on j.id = k.job_id
+       where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null and j.moderation_status <> 'rejected'
+    ) live
+   where s.user_id = p_user_id
+     and (p_before_at is null or (s.created_at, s.id) < (p_before_at, p_before_id))
+   order by s.created_at desc, s.id desc
+   limit least(greatest(coalesce(p_limit, 30), 1), 100);
+$$;
+
+
+ALTER FUNCTION "public"."list_work_shares"("p_user_id" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."lock_catalog_checkout"("p_user" "uuid", "p_token" "uuid", "p_hash" "text", "p_product" "text", "p_revision" integer, "p_channel" "text", "p_key" "text", "p_price" "text", "p_unit" integer, "p_net" integer, "p_percent" integer, "p_method" "text", "p_form" "text", "p_params" "jsonb", "p_store" "text" DEFAULT NULL::"text", "p_mode" "text" DEFAULT NULL::"text") RETURNS "jsonb"
@@ -15919,6 +15993,40 @@ $$;
 ALTER FUNCTION "public"."read_waffo_offers"("p_version" "text", "p_store" "text", "p_mode" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."read_work_share"("p_share_id" "text") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object(
+    'id', s.id,
+    'user_id', s.user_id,
+    'title', s.title,
+    'note', s.note,
+    'show_before', s.show_before,
+    'created_at', s.created_at,
+    'ref', (select a.slug from public.affiliates a where a.user_id = s.user_id and a.status = 'active'),
+    'items', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'job_id', j.id,
+               'template_id', j.template_id,
+               'credit_pool', j.credit_pool,
+               'output_key', j.output_key,
+               'aspect_ratio', j.inputs ->> 'aspect_ratio'
+             ) order by k.ord)
+        from unnest(s.job_ids) with ordinality as k(job_id, ord)
+        join public.generation_jobs j on j.id = k.job_id
+       where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null and j.moderation_status <> 'rejected'
+    ), '[]'::jsonb)
+  )
+    from public.work_shares s
+    join public.profiles p on p.id = s.user_id
+   where s.id = p_share_id and s.revoked_at is null and p.banned_at is null;
+$$;
+
+
+ALTER FUNCTION "public"."read_work_share"("p_share_id" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") RETURNS timestamp with time zone
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -16881,6 +16989,24 @@ $$;
 
 
 ALTER FUNCTION "public"."resume_catalog_checkout"("p_user" "uuid", "p_token" "uuid", "p_hash" "text", "p_channel" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."revoke_work_share"("p_user_id" "uuid", "p_share_id" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  update public.work_shares
+     set revoked_at = coalesce(revoked_at, now())
+   where id = p_share_id and user_id = p_user_id;
+  if not found then
+    raise exception 'WORK_SHARE_NOT_FOUND';
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."revoke_work_share"("p_user_id" "uuid", "p_share_id" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."session_identity"() RETURNS TABLE("id" "uuid", "email" "text", "phone" "text", "email_confirmed_at" timestamp with time zone, "phone_confirmed_at" timestamp with time zone, "app_metadata" "jsonb", "user_metadata" "jsonb", "role" "text", "banned_at" timestamp with time zone)
@@ -20844,6 +20970,25 @@ ALTER TABLE "public"."work_reports" ALTER COLUMN "id" ADD GENERATED ALWAYS AS ID
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."work_shares" (
+    "id" "text" DEFAULT "replace"(("gen_random_uuid"())::"text", '-'::"text", ''::"text") NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "job_ids" "uuid"[] NOT NULL,
+    "show_before" boolean DEFAULT false NOT NULL,
+    "title" "text",
+    "note" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "revoked_at" timestamp with time zone,
+    CONSTRAINT "work_shares_id_check" CHECK (("id" ~ '^[0-9a-f]{32}$'::"text")),
+    CONSTRAINT "work_shares_job_ids_check" CHECK (((("cardinality"("job_ids") >= 1) AND ("cardinality"("job_ids") <= 30)) AND ("array_position"("job_ids", NULL::"uuid") IS NULL))),
+    CONSTRAINT "work_shares_note_check" CHECK ((("note" IS NULL) OR (("char_length"("note") >= 1) AND ("char_length"("note") <= 500)))),
+    CONSTRAINT "work_shares_title_check" CHECK ((("title" IS NULL) OR (("char_length"("title") >= 1) AND ("char_length"("title") <= 80))))
+);
+
+
+ALTER TABLE "public"."work_shares" OWNER TO "postgres";
+
+
 ALTER TABLE ONLY "admin"."batch_zip_requests"
     ADD CONSTRAINT "batch_zip_requests_pkey" PRIMARY KEY ("user_id");
 
@@ -21669,6 +21814,11 @@ ALTER TABLE ONLY "public"."work_reports"
 
 
 
+ALTER TABLE ONLY "public"."work_shares"
+    ADD CONSTRAINT "work_shares_pkey" PRIMARY KEY ("id");
+
+
+
 CREATE INDEX "catalog_attempt_user" ON "admin"."catalog_checkout_attempts" USING "btree" ("user_id");
 
 
@@ -22454,6 +22604,10 @@ CREATE INDEX "work_reports_open_idx" ON "public"."work_reports" USING "btree" ("
 
 
 CREATE INDEX "work_reports_reporter_idx" ON "public"."work_reports" USING "btree" ("reporter_id", "created_at");
+
+
+
+CREATE INDEX "work_shares_user_created_idx" ON "public"."work_shares" USING "btree" ("user_id", "created_at" DESC, "id" DESC);
 
 
 
@@ -23771,6 +23925,11 @@ ALTER TABLE ONLY "public"."work_reports"
 
 
 
+ALTER TABLE ONLY "public"."work_shares"
+    ADD CONSTRAINT "work_shares_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE "admin"."batch_zip_requests" ENABLE ROW LEVEL SECURITY;
 
 
@@ -24247,6 +24406,13 @@ CREATE POLICY "templates_select_active" ON "public"."templates" FOR SELECT TO "a
 
 
 ALTER TABLE "public"."work_reports" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."work_shares" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "work_shares_select_own" ON "public"."work_shares" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
 
 
 GRANT USAGE ON SCHEMA "admin" TO "service_role";
@@ -26335,6 +26501,11 @@ GRANT ALL ON FUNCTION "public"."create_template_request"("p_user_id" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."create_work_share"("p_user_id" "uuid", "p_job_ids" "uuid"[], "p_show_before" boolean, "p_title" "text", "p_note" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."create_work_share"("p_user_id" "uuid", "p_job_ids" "uuid"[], "p_show_before" boolean, "p_title" "text", "p_note" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."current_tier"("p_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."current_tier"("p_user_id" "uuid") TO "service_role";
 
@@ -26436,6 +26607,11 @@ GRANT ALL ON FUNCTION "public"."hook_before_user_created"("event" "jsonb") TO "s
 
 REVOKE ALL ON FUNCTION "public"."list_my_wish_notices"("p_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."list_my_wish_notices"("p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."list_work_shares"("p_user_id" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."list_work_shares"("p_user_id" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "text") TO "service_role";
 
 
 
@@ -26704,6 +26880,11 @@ GRANT ALL ON FUNCTION "public"."read_waffo_offers"("p_version" "text", "p_store"
 
 
 
+REVOKE ALL ON FUNCTION "public"."read_work_share"("p_share_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."read_work_share"("p_share_id" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."reconcile_dispute_submitted"("p_dispute_id" "text") TO "service_role";
 
@@ -26828,6 +27009,11 @@ GRANT ALL ON FUNCTION "public"."resolution_aliases"("p" "text") TO "service_role
 
 REVOKE ALL ON FUNCTION "public"."resume_catalog_checkout"("p_user" "uuid", "p_token" "uuid", "p_hash" "text", "p_channel" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."resume_catalog_checkout"("p_user" "uuid", "p_token" "uuid", "p_hash" "text", "p_channel" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."revoke_work_share"("p_user_id" "uuid", "p_share_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."revoke_work_share"("p_user_id" "uuid", "p_share_id" "text") TO "service_role";
 
 
 
@@ -27599,6 +27785,11 @@ GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."work_report
 GRANT UPDATE ON SEQUENCE "public"."work_reports_id_seq" TO "anon";
 GRANT UPDATE ON SEQUENCE "public"."work_reports_id_seq" TO "authenticated";
 GRANT UPDATE ON SEQUENCE "public"."work_reports_id_seq" TO "service_role";
+
+
+
+GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."work_shares" TO "service_role";
+GRANT SELECT ON TABLE "public"."work_shares" TO "authenticated";
 
 
 
