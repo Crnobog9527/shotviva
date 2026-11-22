@@ -5,10 +5,11 @@ import { getSessionUser } from '@/core/auth'
 import { localized } from '@/core/i18n/server'
 import { Link } from '@/core/i18n/ui'
 import { isAffiliateEnabled } from '../feature'
-import { publishedTerms } from './terms'
+import { mustAcceptTerms, publishedTerms } from './terms'
 import { CommissionList } from './commission-list'
 import { viewHref } from './format'
 import { SettingsForm } from './settings-form'
+import { TermsGate } from './terms-gate'
 import { dashboardViews, searchSchema, type Account, type Query, type SearchParams } from './models'
 import { Overview } from './overview'
 import { PayoutList, ReferralList, TeamReport } from './reports'
@@ -29,6 +30,10 @@ async function guard() {
   if (!(await isAffiliateEnabled())) notFound()
 }
 export async function Dashboard({ user, account, query }: { user: string; account: Account; query: Query }) {
+  // Every view (personal and enterprise) of an active account waits for acceptance of the current terms version;
+  // a suspended account cannot accept, so it keeps its read-only view.
+  const settings = await readSettings()
+  if (await mustAcceptTerms(account, settings.terms_version)) return <TermsGate version={settings.terms_version} />
   switch (query.view) {
     case 'commissions':
       return <CommissionList user={user} query={query} />
