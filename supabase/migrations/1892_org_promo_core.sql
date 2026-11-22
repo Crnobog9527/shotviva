@@ -275,9 +275,10 @@ create trigger org_members_rejoin_reset before update of status on public.org_me
   for each row execute function public._org_member_rejoin_reset();
 
 -- Keeps held_promo_credits right as the member's free pool moves (the promotion twin of 1629):
---  - a free-pool debit draws from the org's promotion share first (it expires) and records how much
---    under the debit's key and month; a month-end expiry of the owner's own old promotion grants
---    (partner_promo_expire) does not draw, it only keeps the share within the balance;
+--  - a generation reserve (kind 'reserve') draws from the org's promotion share first (it expires)
+--    and records how much under the debit's key and the month the share was funded for; any other
+--    free-pool debit (an admin adjustment, an old grant's expiry) does not draw, it only keeps the
+--    share within the balance;
 --  - a refund paired with such a debit (`job:<id>:refund` etc. for `job:<id>:reserve`) gives the
 --    drawn part back to the share while the member is still in the org and the month the share was
 --    funded for (recorded with the draw) is still the org's live promotion month;
@@ -294,7 +295,9 @@ begin
   if new.delta < 0 then
     select * into m from public.org_members where user_id = new.user_id and status = 'active' for update;
     if not found or m.held_promo_credits = 0 then return new; end if;
-    v_draw := case when new.kind = 'partner_promo_expire' then 0 else least(m.held_promo_credits, -new.delta) end;
+    -- Only a generation reserve spends the org's share first; any other free-pool debit (an admin
+    -- adjustment, an old grant's expiry) only keeps the share within the balance.
+    v_draw := case when new.kind = 'reserve' then least(m.held_promo_credits, -new.delta) else 0 end;
     update public.org_members set held_promo_credits = least(held_promo_credits - v_draw, new.balance_after)
      where org_id = m.org_id and user_id = m.user_id;
     if v_draw > 0 then
