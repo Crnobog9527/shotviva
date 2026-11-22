@@ -14,6 +14,7 @@ import type { RpcClient } from '../rpc'
 import { quoteMetadata, type CheckoutPrice } from '../checkout-price'
 import { CHECKOUT_RETURN, successPath, type CheckoutBody } from '../stripe/checkout'
 import { overWechatLimit } from '../wechat-limit'
+import { createWithBillingDetail, withoutBillingDetail } from './billing-detail'
 import type { WaffoApi, WaffoBillingDetail, WaffoSessionRequest } from './client'
 
 // Waffo hosted checkout for one product (ARCHITECTURE §6.3, T50). A membership paid by card is a
@@ -127,7 +128,7 @@ export async function createWaffoCheckout(
     billing: input.billing,
   })
   const url = input.bound ? await openBound(deps.waffo, input.userId, input.bound, request, isRecurring(product, input.body.method))
-    : checkoutUrl(await deps.waffo.createCheckoutSession(request))
+    : checkoutUrl(await createWithBillingDetail(deps.waffo, request, request.billingDetail))
   ;(deps.trackStart ?? trackCheckoutStart)(input.userId, {
     product_id: product.id,
     tier: product.tier,
@@ -146,6 +147,9 @@ async function openBound(waffo: WaffoCheckoutDeps['waffo'], user: string, bound:
   Object.assign(request.metadata, {
     catalog_attempt: attempt.token, catalog_price: request.productId, catalog_revision: String(attempt.revision),
   })
-  const saved = await lockAttempt(db, user, attempt, { channel: 'waffo', key, price: request.productId, recurring, params: request, store })
-  return (await finishWaffo(db, waffo, user, attempt.token, saved)).url
+  // The company title is not saved with the attempt: it is added when the session is created
+  // (billing-detail.ts), so a title Waffo refuses can be dropped without touching the saved terms.
+  const params = withoutBillingDetail(request)
+  const saved = await lockAttempt(db, user, attempt, { channel: 'waffo', key, price: request.productId, recurring, params, store })
+  return (await finishWaffo(db, waffo, user, attempt.token, saved, request.billingDetail)).url
 }

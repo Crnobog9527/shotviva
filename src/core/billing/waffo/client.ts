@@ -13,7 +13,8 @@ import { waffoConfig } from './config'
 // auth: RSA-SHA256 over METHOD \n PATH \n TIMESTAMP \n base64(sha256(body)). The key decides
 // test or prod; there is no environment header to get wrong. No retries: create-session has no
 // idempotency, so a retried create could leave two payable sessions; a cancel the buyer can
-// press again.
+// press again. The one exception is billing-detail.ts: after a 4xx (no session was created) it
+// retries once without the company title.
 
 export const WAFFO_API_ORIGIN = 'https://api.waffo.ai'
 const CREATE_SESSION_PATH = '/v1/actions/checkout/create-session'
@@ -70,7 +71,27 @@ export function signWaffoRequest(input: { path: string; timestamp: string; body:
   return sign('sha256', Buffer.from(canonical), input.privateKey).toString('base64')
 }
 
-type Envelope = { data?: unknown; errors?: { message?: unknown }[] }
+type Envelope = { data?: unknown; errors?: { message?: unknown; code?: unknown; extensions?: { code?: unknown } }[] }
+
+// A failed Waffo call, with Waffo's HTTP status so callers can tell a rejected request (4xx: no
+// session was created) from an outage.
+export class WaffoHttpError extends AppError {
+  readonly httpStatus: number
+  constructor(label: string, httpStatus: number) {
+    super('INTERNAL', `Waffo ${label} failed (${httpStatus})`)
+    this.httpStatus = httpStatus
+  }
+}
+
+export const isWaffoRejection = (error: unknown) => error instanceof WaffoHttpError && error.httpStatus >= 400 && error.httpStatus < 500
+
+// Waffo's error codes only, never its message text: a message can echo what we sent (buyer
+// company name, tax ID).
+function errorCodes(envelope: Envelope | null): string[] {
+  return (envelope?.errors ?? []).slice(0, 3)
+    .map((e) => String(e.code ?? e.extensions?.code ?? ''))
+    .filter((code) => /^[A-Za-z0-9_.-]{1,64}$/.test(code))
+}
 
 async function post(request: typeof fetch, path: string, payload: unknown, label: string): Promise<unknown> {
   const config = waffoConfig()
@@ -86,10 +107,9 @@ async function post(request: typeof fetch, path: string, payload: unknown, label
   })
   const envelope = (await response.json().catch(() => null)) as Envelope | null
   if (!response.ok || !envelope?.data || envelope.errors?.length) {
-    // Status and Waffo's own messages only; never the request (it names the buyer).
-    const notes = (envelope?.errors ?? []).slice(0, 3).map((e) => String(e.message ?? '').slice(0, 200))
-    logger.error(`waffo ${label} failed`, { status: response.status, errors: notes.map(note => note.replace(/PROD_[A-Za-z0-9]+/g, '[product]')) })
-    throw new AppError('INTERNAL', `Waffo ${label} failed (${response.status})`)
+    // Status and Waffo's error codes only; never the request or Waffo's message text.
+    logger.error(`waffo ${label} failed`, { status: response.status, codes: errorCodes(envelope) })
+    throw new WaffoHttpError(label, response.status)
   }
   return envelope.data
 }

@@ -3,7 +3,7 @@ import 'server-only'
 import { logger } from '../../logger'
 import { checkoutBillingProfile, type BillingProfile } from '../../org/billing/profile'
 import type { RpcClient } from '../rpc'
-import type { WaffoBillingDetail } from './client'
+import { isWaffoRejection, type WaffoApi, type WaffoBillingDetail, type WaffoSessionRequest } from './client'
 
 // 开票信息 on Waffo invoices (ARCHITECTURE §6.5). Waffo is the Merchant of Record, so it is the
 // seller on the invoice; `billingDetail` on create-checkout-session pre-fills the buyer side:
@@ -35,4 +35,31 @@ export async function buyerBillingDetail(db: RpcClient, userId: string): Promise
     logger.warn('waffo billing detail read failed; checkout continues without it')
     return undefined
   }
+}
+
+// Sends a create-session request with the buyer's company title added. A title Waffo refuses must
+// never stop an owner from paying: on a 4xx (Waffo created no session, so a second create cannot
+// leave two payable sessions) it logs the status and tries once more without billingDetail. Any
+// other failure is thrown as before. The title is added here, at send time, and never stored in
+// a bound checkout's saved params.
+export async function createWithBillingDetail(
+  waffo: Pick<WaffoApi, 'createCheckoutSession'>,
+  request: WaffoSessionRequest,
+  billing?: WaffoBillingDetail,
+): Promise<unknown> {
+  const plain = withoutBillingDetail(request)
+  if (!billing) return waffo.createCheckoutSession(plain)
+  try {
+    return await waffo.createCheckoutSession({ ...plain, billingDetail: billing })
+  } catch (error) {
+    if (!isWaffoRejection(error)) throw error
+    logger.error('waffo refused billingDetail; retrying the session without it', { status: (error as { httpStatus: number }).httpStatus })
+    return waffo.createCheckoutSession(plain)
+  }
+}
+
+export function withoutBillingDetail(request: WaffoSessionRequest): WaffoSessionRequest {
+  const plain = { ...request }
+  delete plain.billingDetail
+  return plain
 }

@@ -10,7 +10,8 @@ import type { BuyerQuote } from './buyer-quote'
 import type { CheckoutBody } from './stripe/checkout'
 import type { StripeApi } from './stripe/client'
 import { expireAndRelease } from './stripe/checkout-discount'
-import type { WaffoApi, WaffoSessionRequest } from './waffo/client'
+import { createWithBillingDetail } from './waffo/billing-detail'
+import type { WaffoApi, WaffoBillingDetail, WaffoSessionRequest } from './waffo/client'
 
 export type Attempt = { token: string; hash: string; revision: number; body: CheckoutBody; quote: BuyerQuote }
 type Saved = z.infer<typeof saved>
@@ -151,6 +152,8 @@ export async function finishWaffo(
   user: string,
   token: string,
   row: Saved,
+  // 开票信息 of the org owner, added at send time only (never in the saved params).
+  billing?: WaffoBillingDetail,
 ) {
   if (row.session_url) return { url: row.session_url }
   const claim = await callRpc(
@@ -161,7 +164,7 @@ export async function finishWaffo(
   )
   if ('url' in claim) return { url: claim.url }
   if ('pending' in claim) throw new AppError('INTERNAL', 'Waffo checkout is still pending')
-  const result = waffoResult.parse(await waffo.createCheckoutSession(row.params as unknown as WaffoSessionRequest))
+  const result = waffoResult.parse(await createWithBillingDetail(waffo, row.params as unknown as WaffoSessionRequest, billing))
   await attach(db, user, token, result.sessionId, result.checkoutUrl)
   return { url: result.checkoutUrl }
 }
