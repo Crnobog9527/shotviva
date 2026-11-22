@@ -5,10 +5,14 @@
 
 -- Create a link from the caller's own works. Every id must be the caller's own finished, undeleted
 -- work: someone else's work, a failed, running or deleted one and a missing one all look the same
--- (WORK_SHARE_JOB_NOT_FOUND), so the error tells nothing about other accounts. Org works follow the
+-- (WORK_SHARE_JOB_NOT_FOUND), so the error tells nothing about other accounts. A work moderation
+-- rejected (an automatic flag, an admin decision, an upheld report: moderation_status =
+-- 'rejected') is refused the same way and is never served by a link either. Org works follow the
 -- same rule: a work belongs to the member who made it, so an org owner cannot share a member's
--- works. At most 200 live links per account (WORK_SHARE_LIMIT); the profile row lock makes the
--- count exact under concurrent calls. Returns the new link's id.
+-- works. Limits per account: 20 links an hour and 100 a day, revoked ones included, so making and
+-- turning off links cannot grow the table without bound (WORK_SHARE_RATE_LIMITED), and at most 200
+-- live links (WORK_SHARE_LIMIT). The profile row lock makes the counts exact under concurrent
+-- calls; both counts use work_shares_user_created_idx. Returns the new link's id.
 create function public.create_work_share(
   p_user_id uuid,
   p_job_ids uuid[],
@@ -44,8 +48,14 @@ begin
   end if;
 
   if (select count(*) from public.generation_jobs
-       where id = any(p_job_ids) and user_id = p_user_id and status = 'succeeded' and deleted_at is null) <> v_count then
+       where id = any(p_job_ids) and user_id = p_user_id and status = 'succeeded' and deleted_at is null
+         and moderation_status <> 'rejected') <> v_count then
     raise exception 'WORK_SHARE_JOB_NOT_FOUND';
+  end if;
+
+  if (select count(*) from public.work_shares where user_id = p_user_id and created_at > now() - interval '1 hour') >= 20
+     or (select count(*) from public.work_shares where user_id = p_user_id and created_at > now() - interval '1 day') >= 100 then
+    raise exception 'WORK_SHARE_RATE_LIMITED';
   end if;
 
   if (select count(*) from public.work_shares where user_id = p_user_id and revoked_at is null) >= 200 then
@@ -78,7 +88,7 @@ end;
 $$;
 
 -- "My share links": one page, newest first, on work_shares_user_created_idx with the
--- (created_at, id) cursor. works counts only the works still there (a deleted work drops out);
+-- (created_at, id) cursor. works counts only the works still shown (a deleted or rejected work drops out);
 -- cover_job_id is the first of them, for the row's thumbnail (the owner's own thumbnail route).
 create function public.list_work_shares(
   p_user_id uuid,
@@ -106,7 +116,7 @@ as $$
       select count(*)::integer as works, (array_agg(j.id order by k.ord))[1] as cover
         from unnest(s.job_ids) with ordinality as k(job_id, ord)
         join public.generation_jobs j on j.id = k.job_id
-       where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null
+       where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null and j.moderation_status <> 'rejected'
     ) live
    where s.user_id = p_user_id
      and (p_before_at is null or (s.created_at, s.id) < (p_before_at, p_before_id))
@@ -116,8 +126,10 @@ $$;
 
 -- The public read behind /s/w/<id> and its image routes. null for a missing or revoked link and for
 -- a banned owner's link. Otherwise the link with its works in the sharer's order, skipping any that
--- were deleted (or are, defensively, not the owner's or not finished). output_key and the owner id
--- are for the server's image routes only; the page sends neither to the browser. ref is the
+-- were deleted or that moderation rejected after the link was made (and, defensively, any not the
+-- owner's or not finished). The page and the image routes both read through here, so a work
+-- rejected later disappears from the page and its images answer 404 on the next request.
+-- output_key and the owner id are for the server's image routes only; the page sends neither to the browser. ref is the
 -- owner's active affiliate code, so the page's "try Shotviva" link keeps their attribution.
 create function public.read_work_share(p_share_id text)
 returns jsonb
@@ -144,7 +156,7 @@ as $$
              ) order by k.ord)
         from unnest(s.job_ids) with ordinality as k(job_id, ord)
         join public.generation_jobs j on j.id = k.job_id
-       where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null
+       where j.user_id = s.user_id and j.status = 'succeeded' and j.deleted_at is null and j.moderation_status <> 'rejected'
     ), '[]'::jsonb)
   )
     from public.work_shares s

@@ -6,7 +6,7 @@ import { createAdminSupabase, requireApiUser } from '@/core/auth'
 import { toAppError } from '@/core/errors'
 import { localized } from '@/core/i18n/server'
 import { logger } from '@/core/logger'
-import { createWorkShare, isWorkShareId, revokeWorkShare } from '@/core/work-share'
+import { createWorkShare, isWorkShareId, revokeWorkShare, WORK_SHARE_TOO_OFTEN } from '@/core/work-share'
 import type { CreateShareRequest, CreateShareResult } from '@/modules/image'
 
 // 作品集分享 (ARCHITECTURE §6.2): server actions are public endpoints, so each checks the session
@@ -21,9 +21,10 @@ export async function createWorkShareAction(request: CreateShareRequest): Promis
     return { path: await localized(`/s/w/${id}`) }
   } catch (error) {
     const appError = toAppError(error)
-    // Someone else's work, a deleted or unfinished one: the picker is stale.
+    // Someone else's work, a deleted, unfinished or rejected one: the picker is stale or the work
+    // may not be shared.
     if (appError.code === 'NOT_FOUND' || appError.code === 'INVALID_INPUT') return { failed: 'gone' }
-    if (appError.code === 'RATE_LIMITED') return { failed: 'limit' }
+    if (appError.code === 'RATE_LIMITED') return { failed: appError.message === WORK_SHARE_TOO_OFTEN ? 'busy' : 'limit' }
     logger.error('work_share.create_failed', { error: appError.cause ?? appError })
     return { failed: 'error' }
   }

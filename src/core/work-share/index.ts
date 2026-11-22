@@ -13,5 +13,5 @@ export {
   type OwnShare,
   type WorkShare,
 } from './share-schema'
-export { createWorkShare, listWorkShares, OWN_SHARES_PAGE, readWorkShare, revokeWorkShare } from './share-store'
+export { createWorkShare, listWorkShares, OWN_SHARES_PAGE, readWorkShare, revokeWorkShare, WORK_SHARE_TOO_OFTEN } from './share-store'
 export { loadWorkShareView, shareViewOf, type SharedWorkView, type WorkShareView } from './share-view'

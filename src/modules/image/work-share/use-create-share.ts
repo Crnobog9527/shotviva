@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 
 import type { CreateShareAction, CreateShareRequest } from './share-types'
 
-export type CreateState = { kind: 'form' } | { kind: 'ready'; url: string } | { kind: 'failed'; reason: 'gone' | 'limit' | 'error' }
+export type CreateState = { kind: 'form' } | { kind: 'ready'; url: string } | { kind: 'failed'; reason: 'gone' | 'limit' | 'busy' | 'error' }
 
 // The dialog's one request: create the link, then hold its full address (this site's own origin,
 // so a link made on the test site opens there).

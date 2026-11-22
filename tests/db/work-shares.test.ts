@@ -110,7 +110,8 @@ describe('creating a link', () => {
   it('caps live links per account and refuses a banned account', async () => {
     const owner = await createUser(db)
     const job = await work(owner)
-    await db.query(`insert into public.work_shares (user_id, job_ids) select $1, array[$2::uuid] from generate_series(1, 200)`, [owner, job])
+    // Older than a day, so only the live-link cap applies.
+    await db.query(`insert into public.work_shares (user_id, job_ids, created_at) select $1, array[$2::uuid], now() - interval '2 days' from generate_series(1, 200)`, [owner, job])
     await expect(createWorkShare(service, owner, { jobIds: [job] })).rejects.toMatchObject({ code: 'RATE_LIMITED' })
     await db.query('update public.work_shares set revoked_at = now() where id = (select id from public.work_shares where user_id = $1 limit 1)', [owner])
     await expect(createWorkShare(service, owner, { jobIds: [job] })).resolves.toMatch(/^[0-9a-f]{32}$/)
@@ -121,6 +122,61 @@ describe('creating a link', () => {
     await db.query('update public.profiles set banned_at = now() where id = $1', [banned])
     await expect(createWorkShare(service, banned, { jobIds: [bannedJob] })).rejects.toMatchObject({ code: 'FORBIDDEN' })
     expect(await readWorkShare(service, link)).toBeNull()
+  })
+})
+
+describe('creation limits', () => {
+  const make = (owner: string, count: number, age: string, revoked = false) =>
+    db.query(
+      `insert into public.work_shares (user_id, job_ids, created_at, revoked_at)
+       select $1, array[gen_random_uuid()], now() - $3::interval, case when $4 then now() end from generate_series(1, $2)`,
+      [owner, count, age, revoked],
+    )
+
+  it('allows 20 links an hour, turned-off ones included', async () => {
+    const owner = await createUser(db)
+    const job = await work(owner)
+    await make(owner, 19, '10 minutes', true)
+    await expect(createWorkShare(service, owner, { jobIds: [job] })).resolves.toMatch(/^[0-9a-f]{32}$/)
+    await expect(createWorkShare(service, owner, { jobIds: [job] })).rejects.toMatchObject({ code: 'RATE_LIMITED', message: 'Too many share links made recently' })
+    expect((await service.rpc('create_work_share', { p_user_id: owner, p_job_ids: [job] })).error?.message).toBe('WORK_SHARE_RATE_LIMITED')
+  })
+
+  it('allows 100 links a day, turned-off ones included', async () => {
+    const owner = await createUser(db)
+    const job = await work(owner)
+    await make(owner, 100, '3 hours', true)
+    await expect(createWorkShare(service, owner, { jobIds: [job] })).rejects.toMatchObject({ code: 'RATE_LIMITED', message: 'Too many share links made recently' })
+    await db.query(`update public.work_shares set created_at = now() - interval '25 hours' where user_id = $1`, [owner])
+    await expect(createWorkShare(service, owner, { jobIds: [job] })).resolves.toMatch(/^[0-9a-f]{32}$/)
+  })
+})
+
+describe('moderation', () => {
+  const reject = (job: string) =>
+    db.query(`update public.generation_jobs set moderation_status = 'rejected', moderation_reason = 'sexual', moderated_at = now() where id = $1`, [job])
+
+  it('refuses a work moderation rejected', async () => {
+    const owner = await createUser(db)
+    const [ok, rejected] = [await work(owner, { pool: 'free' }), await work(owner, { pool: 'free' })]
+    await reject(rejected)
+    await expect(createWorkShare(service, owner, { jobIds: [ok, rejected] })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    await expect(createWorkShare(service, owner, { jobIds: [ok] })).resolves.toMatch(/^[0-9a-f]{32}$/)
+  })
+
+  it('drops a work rejected after sharing from the page, the list and the image routes', async () => {
+    const owner = await createUser(db)
+    const [kept, later] = [await work(owner), await work(owner, { pool: 'free' })]
+    const r2 = await storeFor(owner, [kept, later])
+    const deps = { db: service, store: r2.store }
+    const id = await createWorkShare(service, owner, { jobIds: [later, kept], showBefore: true })
+    await expect(sharedImageUrl(deps, { shareId: id, jobId: later, side: 'after' })).resolves.toContain('marked-white')
+    await reject(later)
+    expect((await readWorkShare(service, id))?.items.map((item) => item.jobId)).toEqual([kept])
+    expect((await listWorkShares(service, owner))[0]).toMatchObject({ id, works: 1, coverJobId: kept })
+    for (const side of ['after', 'before'] as const) {
+      await expect(sharedImageUrl(deps, { shareId: id, jobId: later, side })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    }
   })
 })
 

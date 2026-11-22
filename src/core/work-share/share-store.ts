@@ -15,6 +15,10 @@ import {
   type WorkShare,
 } from './share-schema'
 
+// The message create_work_share's hourly / daily limit carries, so the action can tell it from the
+// live-link cap.
+export const WORK_SHARE_TOO_OFTEN = 'Too many share links made recently'
+
 // The four functions of migration 1871, all service-role only: the caller passes the user it read
 // from the session and the function checks ownership itself (one round trip each, AGENTS §5.1).
 
@@ -23,6 +27,8 @@ const SHARE_ERRORS: Record<string, { code: ErrorCode; message: string }> = {
   WORK_SHARE_JOB_NOT_FOUND: { code: 'NOT_FOUND', message: 'A work is not yours, not finished or deleted' },
   WORK_SHARE_NOT_FOUND: { code: 'NOT_FOUND', message: 'No such share link' },
   WORK_SHARE_LIMIT: { code: 'RATE_LIMITED', message: 'Too many live share links' },
+  // 20 an hour, 100 a day, turned-off links included (migration 1871).
+  WORK_SHARE_RATE_LIMITED: { code: 'RATE_LIMITED', message: WORK_SHARE_TOO_OFTEN },
 }
 
 async function rpc(client: RpcClient, fn: string, args: Record<string, unknown>): Promise<unknown> {

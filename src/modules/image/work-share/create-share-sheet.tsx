@@ -38,12 +38,14 @@ export function CreateShareSheet({ open, onOpenChange, jobIds, create, onDone }:
   )
 }
 
+const ERROR_KEY = { gone: 'errorGone', limit: 'errorLimit', busy: 'errorBusy', error: 'errorOther' } as const
+
 type Fields = { title: string; note: string; showBefore: boolean }
 
 function ShareForm({ state, pending, onSubmit }: { state: CreateState; pending: boolean; onSubmit(fields: Fields): void }) {
   const t = useTranslations('app.workShare')
   const [fields, setFields] = useState<Fields>({ title: '', note: '', showBefore: false })
-  const error = state.kind === 'failed' ? t(state.reason === 'gone' ? 'errorGone' : state.reason === 'limit' ? 'errorLimit' : 'errorOther') : null
+  const error = state.kind === 'failed' ? t(ERROR_KEY[state.reason]) : null
   return (
     <form
       className="mt-5 grid gap-5"
