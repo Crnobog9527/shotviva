@@ -130,6 +130,19 @@ export const bulkGrant = (d: Deps, input: unknown) => run(async () => {
   return { members: done.members, total: done.total, pool: done.pool_credits }
 })
 
+// The pools as they are now, for a confirm step: the page may be stale (the promotion pool is
+// handed out at once to members following the default when it is topped up). Promo is 0 outside
+// its month, as the console shows it.
+const poolsRow = z.object({ pool_credits: z.number(), promo_pool_credits: z.number(), promo_expires_at: z.string().nullable() })
+export const pools = (d: Deps) => run(async () => {
+  const { data, error } = await d.db.from('orgs').select('pool_credits,promo_pool_credits,promo_expires_at').eq('owner_user_id', d.user).maybeSingle()
+  if (error) throw new AppError('INTERNAL', 'org pools lookup failed', { cause: new Error(error.message) })
+  if (!data) throw new AppError('FORBIDDEN', 'NOT_ORG_OWNER')
+  const row = poolsRow.parse(data)
+  const promoLive = row.promo_expires_at !== null && Date.parse(row.promo_expires_at) > Date.now()
+  return { pool: row.pool_credits, promoPool: promoLive ? row.promo_pool_credits : 0 }
+})
+
 export const deposit = (d: Deps, input: unknown) => run(async () => {
   const form = depositInput.parse(input)
   const org = await ownedOrg(d)

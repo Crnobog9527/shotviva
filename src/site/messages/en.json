@@ -2128,7 +2128,7 @@
         },
         "each": "Credits each",
         "total": "{count} × {each} = {total} from the {kind} pool ({pool} in it)",
-        "short": "The pool can't cover everyone, so nobody gets any.",
+        "short": "The {kind} pool has {pool} now, not enough for everyone, so nobody gets any.",
         "give": "Give",
         "given": "Gave {total} to {count}."
       }

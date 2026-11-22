@@ -2128,7 +2128,7 @@
         },
         "each": "每人积分",
         "total": "{count} 人 × {each} = {total}，从{kind}池扣（池里 {pool}）",
-        "short": "池里不够，一个人都不会划。",
+        "short": "{kind}池现在只有 {pool}，不够每人都给，所以一个人都不会划。",
         "give": "划拨",
         "given": "已给 {count} 人共划拨 {total}。"
       }
