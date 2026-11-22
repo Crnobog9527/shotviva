@@ -1,7 +1,7 @@
 import { getImageProps, type ImageLoader } from 'next/image'
 import { preconnect } from 'react-dom'
 
-import { presizedSource } from '../presized'
+import { presizedSource, type PresizedFormat, type PresizedUrl } from '../presized'
 import { publicEnv } from '../public-env'
 import { capSrcSet } from './srcset-cap'
 
@@ -46,10 +46,28 @@ export function coverImage(
   return capSrcSet({ sizes: props.sizes, srcSet: props.srcSet, src: props.src }, sizes)
 }
 
-// The stored copy for each width next/image asks for (its widths are the stored ones, next.config.ts).
-export function presizedLoader(toUrl: (width: number) => string): ImageLoader & { origin: string } {
-  const loader: ImageLoader = ({ width }) => toUrl(width)
+// The stored copy for each width next/image asks for (its widths are the stored ones, next.config.ts),
+// in one format: WebP for the <img>, AVIF for the <picture> source (picture.tsx).
+export function presizedLoader(toUrl: PresizedUrl, format: PresizedFormat = 'webp'): ImageLoader & { origin: string } {
+  const loader: ImageLoader = ({ width }) => toUrl(width, format)
   return Object.assign(loader, { origin: new URL(toUrl(0)).origin })
+}
+
+// The AVIF <source> for a cover shown with coverImage (same widths, same cap), or undefined when it
+// has no stored copies. The <img> keeps coverImage's WebP srcset for browsers without AVIF.
+export type AvifSource = { srcSet: string; sizes?: string }
+
+export function coverAvif(
+  url: string,
+  sizes: string,
+  base?: string,
+  presized: string | undefined = publicEnv.NEXT_PUBLIC_PRESIZED_IMAGES_URL,
+): AvifSource | undefined {
+  const sized = presizedSource(url, { origin: presized, assetsBase: base ?? publicEnv.NEXT_PUBLIC_ASSETS_BASE_URL })
+  if (!sized) return undefined
+  const { props } = getImageProps({ src: url, alt: '', fill: true, sizes, loader: presizedLoader(sized, 'avif') })
+  const capped = capSrcSet({ sizes: props.sizes, srcSet: props.srcSet, src: props.src }, sizes)
+  return capped.srcSet ? { srcSet: capped.srcSet, sizes: capped.sizes } : undefined
 }
 
 // Next's own default-loader URL (url, w, q in that order; covers are remote, so no dpl), on the

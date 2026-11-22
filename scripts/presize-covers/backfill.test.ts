@@ -44,6 +44,12 @@ describe('runBackfill', () => {
     expect(second).toMatchObject({ eligible: 2, complete: 2, missing: 0, written: 0 })
   })
 
+  it('counts a cover with only its WebP copies (made before AVIF was added) as missing', async () => {
+    const webpOnly = PRESIZED_WIDTHS.map((width) => presizedPath(A, width, 'webp'))
+    const counts = await runBackfill(fakeBucket([A, ...webpOnly]).deps, { write: false })
+    expect(counts).toMatchObject({ eligible: 1, complete: 0, missing: 1 })
+  })
+
   it('counts a failure and carries on, so a rerun picks it up', async () => {
     const bucket = fakeBucket([A, B], { failOn: A })
     const counts = await runBackfill(bucket.deps, { write: true, concurrency: 1 })

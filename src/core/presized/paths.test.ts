@@ -36,8 +36,15 @@ describe('presizedPath', () => {
     expect(presizedPath('home/hero-set-phone.webp', 700)).toBe('presized/v1/w750/home/hero-set-phone.webp')
   })
 
-  it('lists one path per stored width', () => {
-    expect(presizedPaths('home/a.webp')).toHaveLength(PRESIZED_WIDTHS.length)
+  it('names the AVIF copy the same way', () => {
+    expect(presizedPath('covers/manhwa/after-8c988390aa621eda.webp', 640, 'avif')).toBe('presized/v1/w640/covers/manhwa/after-8c988390aa621eda.avif')
+  })
+
+  it('lists one path per stored width and format', () => {
+    const paths = presizedPaths('home/a.webp')
+    expect(paths).toHaveLength(PRESIZED_WIDTHS.length * 2)
+    expect(paths).toContain('presized/v1/w128/home/a.avif')
+    expect(paths).toContain('presized/v1/w1600/home/a.webp')
   })
 })
 

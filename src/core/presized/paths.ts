@@ -14,9 +14,14 @@ export type PresizedWidth = (typeof PRESIZED_WIDTHS)[number]
 export const PRESIZED_IMAGE_SIZES = PRESIZED_WIDTHS.filter((width) => width < 640)
 export const PRESIZED_DEVICE_SIZES = PRESIZED_WIDTHS.filter((width) => width >= 640)
 
-// The encoder settings /_next/image used (WebP, quality 75), so a file is the bytes a WebP browser
-// got before. Bump the version whenever the encoding changes: the new files get new names and the
-// old ones, cached for a year, are never asked for again.
+// Each width in both formats /_next/image answered with: AVIF for the browsers that take it (a
+// <picture> source), WebP for the rest (the <img>). The format is in the file name, so the CDN still
+// keeps one object per URL whatever the Accept header says. The encoder settings are the
+// optimiser's (quality 75; AVIF at its webp-matched 47, effort 3), so a file is the bytes that
+// browser got before. Bump the version whenever the encoding changes: the new files get new names
+// and the old ones, cached for a year, are never asked for again.
+export const PRESIZED_FORMATS = ['avif', 'webp'] as const
+export type PresizedFormat = (typeof PRESIZED_FORMATS)[number]
 export const PRESIZED_QUALITY = 75
 export const PRESIZED_VERSION = 'v1'
 export const PRESIZED_PREFIX = `presized/${PRESIZED_VERSION}`
@@ -27,13 +32,14 @@ export function presizedWidthFor(width: number): PresizedWidth {
   return PRESIZED_WIDTHS.find((candidate) => candidate >= width) ?? PRESIZED_WIDTHS[PRESIZED_WIDTHS.length - 1]
 }
 
-// `covers/x/after-ab.webp` → `presized/v1/w640/covers/x/after-ab.webp`; always .webp.
-export function presizedPath(path: string, width: number): string {
-  return `${PRESIZED_PREFIX}/w${presizedWidthFor(width)}/${path.replace(/\.[A-Za-z0-9]+$/, '.webp')}`
+// `covers/x/after-ab.webp` → `presized/v1/w640/covers/x/after-ab.avif` (or .webp).
+export function presizedPath(path: string, width: number, format: PresizedFormat = 'webp'): string {
+  return `${PRESIZED_PREFIX}/w${presizedWidthFor(width)}/${path.replace(/\.[A-Za-z0-9]+$/, '')}.${format}`
 }
 
+// Every file a picture has: each width in each format.
 export function presizedPaths(path: string): string[] {
-  return PRESIZED_WIDTHS.map((width) => presizedPath(path, width))
+  return PRESIZED_WIDTHS.flatMap((width) => PRESIZED_FORMATS.map((format) => presizedPath(path, width, format)))
 }
 
 // The cover files that get pre-sized copies: stills whose name carries their content hash (the

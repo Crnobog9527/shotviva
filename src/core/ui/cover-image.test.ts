@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { coverImage, coverLoaderFor, coverSrc, isCoverUrl } from './cover-image'
+import { coverAvif, coverImage, coverLoaderFor, coverSrc, isCoverUrl } from './cover-image'
 
 const BASE = 'https://shotviva.com/assets'
 const COVER = `${BASE}/covers/korean-manhwa/after-8c988390aa621eda.webp`
@@ -99,5 +99,26 @@ describe('coverImage from the pre-sized copies (NEXT_PUBLIC_PRESIZED_IMAGES_URL)
     expect(coverLoaderFor(COVER, BASE, undefined, CDN)?.({ src: COVER, width: 828 })).toBe(`${CDN}/assets/presized/v1/w828/${KEY}`)
     expect(coverLoaderFor(COVER, BASE, undefined, CDN)?.origin).toBe(CDN)
     expect(coverLoaderFor('/brand/email/wordmark.png', BASE, CDN, CDN)?.({ src: '/brand/email/wordmark.png', width: 640 })).toBe(`${CDN}/_next/image?url=%2Fbrand%2Femail%2Fwordmark.png&w=640&q=75`)
+  })
+})
+
+describe('coverAvif (the <picture> source next to coverImage)', () => {
+  const CDN = 'https://img-eo.shotviva.com'
+  const KEY = 'covers/korean-manhwa/after-8c988390aa621eda.webp'
+  const AVIF = KEY.replace(/\.webp$/, '.avif')
+
+  it('lists the AVIF copies at the same widths as the <img>’s WebP srcset', () => {
+    const sizes = '(min-width: 1024px) 182px, 50vw'
+    const avif = coverAvif(COVER, sizes, BASE, CDN)
+    const webp = coverImage(COVER, sizes, BASE, undefined, CDN)
+    expect(avif?.sizes).toBe(sizes)
+    expect(avif?.srcSet).toContain(`${CDN}/assets/presized/v1/w384/${AVIF} 384w`)
+    expect(avif?.srcSet).toBe(webp.srcSet?.replaceAll('.webp ', '.avif ').replace(/\.webp$/, '.avif'))
+  })
+
+  it('is undefined with the switch off or for anything without copies', () => {
+    expect(coverAvif(COVER, '50vw', BASE, undefined)).toBeUndefined()
+    expect(coverAvif(`${BASE}/covers/x/motion-0123456789abcdef.webp`, '50vw', BASE, CDN)).toBeUndefined()
+    expect(coverAvif('/api/files/job-1', '50vw', BASE, CDN)).toBeUndefined()
   })
 })

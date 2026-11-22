@@ -1,4 +1,4 @@
-import { isPresizableCoverKey, isPresizablePublicPicture, presizedPath } from './paths'
+import { isPresizableCoverKey, isPresizablePublicPicture, presizedPath, type PresizedFormat } from './paths'
 
 // Where a page loads a pre-sized copy from. `origin` is the switch (NEXT_PUBLIC_PRESIZED_IMAGES_URL,
 // core/public-env-schema.ts): the host that serves this site's /assets/presized/… and /presized/…
@@ -25,16 +25,18 @@ function coverHost(base: string, origin: string): string {
   }
 }
 
-// A function from a requested width to the copy's URL, or null when this picture has no copies
+// A function from a requested width (and format, WebP by default) to the copy's URL, or null when this picture has no copies
 // (switch off, a motion file, a user's photo, another host, a picture outside the pre-sized dirs).
-export function presizedSource(src: unknown, env: PresizedEnv): ((width: number) => string) | null {
+export type PresizedUrl = (width: number, format?: PresizedFormat) => string
+
+export function presizedSource(src: unknown, env: PresizedEnv): PresizedUrl | null {
   const { origin, assetsBase } = env
   if (!origin || typeof src !== 'string') return null
   const key = coverKeyOf(src, assetsBase)
   if (key && assetsBase) {
     const host = coverHost(assetsBase, origin)
-    return (width) => `${host}/${presizedPath(key, width)}`
+    return (width, format) => `${host}/${presizedPath(key, width, format)}`
   }
-  if (isPresizablePublicPicture(src)) return (width) => `${origin}/${presizedPath(src.slice(1), width)}`
+  if (isPresizablePublicPicture(src)) return (width, format) => `${origin}/${presizedPath(src.slice(1), width, format)}`
   return null
 }
