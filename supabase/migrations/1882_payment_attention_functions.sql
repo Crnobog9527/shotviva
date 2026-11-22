@@ -31,6 +31,24 @@ $$;
 revoke execute on function public.admin_attention_payment_ids() from public, anon, authenticated;
 grant execute on function public.admin_attention_payment_ids() to service_role;
 
+-- Which of the given payments (one orders page, at most 30) have a dispute not closed yet, for
+-- 「争议未结，仍计入待处理」. payment_disputes grants no table access, so the page asks here.
+create or replace function public.admin_open_dispute_payment_ids(p_payment_ids bigint[])
+returns bigint[]
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  -- affiliate_disputes_payment_idx.
+  select coalesce(array_agg(distinct d.payment_id), '{}')
+    from public.payment_disputes d
+   where d.payment_id = any(p_payment_ids[1:100]) and d.closed_at is null
+$$;
+
+revoke execute on function public.admin_open_dispute_payment_ids(bigint[]) from public, anon, authenticated;
+grant execute on function public.admin_open_dispute_payment_ids(bigint[]) to service_role;
+
 create or replace function public.admin_acknowledge_payment(p_payment_id bigint, p_actor uuid)
 returns jsonb
 language plpgsql

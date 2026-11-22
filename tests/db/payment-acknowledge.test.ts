@@ -3,9 +3,10 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { acknowledgePayment, loadAttentionIds, unacknowledgePayment } from '@/core/admin'
+import { acknowledgePayment, listPurchases, loadAttentionIds, unacknowledgePayment } from '@/core/admin'
 
 import { anonClient, connectAdmin, createUser, serviceClient } from './helpers'
+import { serviceSupabase } from './supabase-env'
 
 // 「标记已知晓」 (ARCHITECTURE §10, 1881/1882): a mark takes a refunded or disputed payment out of
 // the overview counter without touching money; it is idempotent and audited; only an admin can set
@@ -87,6 +88,9 @@ describe('admin_acknowledge_payment', () => {
     const dispute = await openDispute(id)
     await acknowledgePayment(service, id, adminId)
     expect(await counted(id)).toBe(true)
+    // The orders page reads the same through the service role (payment_disputes has no grants).
+    const page = await listPurchases(serviceSupabase(), null, [id])
+    expect(page.items[0]).toMatchObject({ id, openDispute: true, acknowledgement: { stale: false } })
     await db.query("update public.payment_disputes set closed_at = now(), closed_status = 'won' where stripe_dispute_id = $1", [dispute])
     expect(await counted(id)).toBe(false)
   })
@@ -113,8 +117,14 @@ describe('admin_acknowledge_payment', () => {
   })
 
   it('is service-role only', async () => {
-    for (const fn of ['admin_acknowledge_payment', 'admin_unacknowledge_payment', 'admin_attention_payment_ids']) {
-      const { error } = await anonClient().rpc(fn, fn === 'admin_attention_payment_ids' ? {} : { p_payment_id: 1, p_actor: adminId })
+    const args: Record<string, Record<string, unknown>> = {
+      admin_acknowledge_payment: { p_payment_id: 1, p_actor: adminId },
+      admin_unacknowledge_payment: { p_payment_id: 1, p_actor: adminId },
+      admin_attention_payment_ids: {},
+      admin_open_dispute_payment_ids: { p_payment_ids: [1] },
+    }
+    for (const [fn, input] of Object.entries(args)) {
+      const { error } = await anonClient().rpc(fn, input)
       expect(error?.message).toMatch(/permission denied/)
     }
   })

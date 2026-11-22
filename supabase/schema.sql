@@ -9247,6 +9247,20 @@ $$;
 ALTER FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_open_dispute_payment_ids"("p_payment_ids" bigint[]) RETURNS bigint[]
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  -- affiliate_disputes_payment_idx.
+  select coalesce(array_agg(distinct d.payment_id), '{}')
+    from public.payment_disputes d
+   where d.payment_id = any(p_payment_ids[1:100]) and d.closed_at is null
+$$;
+
+
+ALTER FUNCTION "public"."admin_open_dispute_payment_ids"("p_payment_ids" bigint[]) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_open_prompt_lab"("p_actor" "uuid", "p_asset_id" "uuid") RETURNS "uuid"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -25995,6 +26009,11 @@ GRANT ALL ON FUNCTION "public"."admin_move_reference_category"("p_actor" "uuid",
 
 REVOKE ALL ON FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_move_template_category"("p_key" "text", "p_from_parent" "text", "p_parent" "text", "p_before" "text", "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_open_dispute_payment_ids"("p_payment_ids" bigint[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_open_dispute_payment_ids"("p_payment_ids" bigint[]) TO "service_role";
 
 
 

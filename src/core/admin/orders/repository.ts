@@ -89,13 +89,14 @@ function acknowledgementOf(row: PaymentRow): AdminPurchase['acknowledgement'] {
   return { at: row.acknowledged_at, stale }
 }
 
-// Open disputes among the page's payments, by affiliate_disputes_payment_idx.
+// Open disputes among the page's payments (admin_open_dispute_payment_ids, 1882: the table itself
+// grants no access, not even to the service role).
 async function openDisputesFor(db: SupabaseClient, rows: PaymentRow[]): Promise<Set<string>> {
-  const ids = rows.filter((row) => row.status !== 'paid').map((row) => row.id)
+  const ids = rows.filter((row) => row.status !== 'paid').map((row) => Number(row.id))
   if (ids.length === 0) return new Set()
-  const { data, error } = await db.from('payment_disputes').select('payment_id').in('payment_id', ids).is('closed_at', null)
-  if (error) fail('payment_disputes', error)
-  return new Set(z.object({ payment_id: z.union([z.number(), z.string()]).transform(String) }).array().parse(data).map((d) => d.payment_id))
+  const { data, error } = await db.rpc('admin_open_dispute_payment_ids', { p_payment_ids: ids })
+  if (error) fail('open disputes', error)
+  return new Set(z.array(z.union([z.number(), z.string()]).transform(String)).parse(data))
 }
 
 function toPurchase(row: PaymentRow, email: string | null, openDispute: boolean): AdminPurchase {
