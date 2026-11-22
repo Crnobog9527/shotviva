@@ -7,6 +7,7 @@ export {
   PRESIZED_PREFIX,
   PRESIZED_PUBLIC_DIRS,
   PRESIZED_QUALITY,
+  PRESIZED_VERSION,
   PRESIZED_WIDTHS,
   presizedPath,
   presizedPaths,

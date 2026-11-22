@@ -120,10 +120,12 @@ const nextConfig: NextConfig = {
         source: '/home/:asset(.+\\.webp)',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
-      // The pre-sized copies of public/{home,cases,…} the build writes (scripts/build/presize-public.mjs):
-      // named after their source, which never changes under the same name, so the same rule.
+      // The pre-sized copies the build writes (scripts/presize-public.ts) of public/home and public/cases:
+      // named after their source, which never changes under the same name, so the same rule. The
+      // copies of public/intros and public/partners have no such convention and keep the default
+      // (revalidated) caching.
       {
-        source: `/${PRESIZED_PREFIX}/:asset(.+\\.(?:avif|webp))`,
+        source: `/${PRESIZED_PREFIX}/:width(w\\d+)/:dir(home|cases)/:asset(.+\\.(?:avif|webp))`,
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
       // The inner landing pages' case pictures in public/cases: the same rule as public/home.

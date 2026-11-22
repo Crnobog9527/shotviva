@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -6,7 +6,7 @@ import sharp from 'sharp'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { PRESIZED_FORMATS, PRESIZED_WIDTHS } from '../src/core/presized'
-import { planPublicCopies, writePublicCopies } from './presize-public-lib'
+import { ENCODE_KEY, planPublicCopies, writePublicCopies } from './presize-public-lib'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -44,5 +44,16 @@ describe('pre-sizing public/', () => {
     const later = new Date(statSync(join(dir, 'presized/v1/w128/home/hero.webp')).mtimeMs + 5000)
     utimesSync(join(dir, 'home', 'hero.webp'), later, later)
     expect((await writePublicCopies(dir, join(dir, 'cache'))).written).toBe(PRESIZED_WIDTHS.length * PRESIZED_FORMATS.length)
+  })
+
+  it('keys the encode cache by version and settings, so copies made another way are not reused', async () => {
+    const dir = await publicDir()
+    const stale = join(dir, 'cache', 'v0-q50-webp')
+    mkdirSync(stale, { recursive: true })
+    await writePublicCopies(dir, join(dir, 'cache'))
+    expect(ENCODE_KEY).toMatch(/^v1-q75-avif\+webp$/)
+    expect(readdirSync(join(dir, 'cache', ENCODE_KEY))).toHaveLength(1)
+    expect(readdirSync(stale)).toHaveLength(0)
+    expect(existsSync(join(dir, 'cache', ENCODE_KEY))).toBe(true)
   })
 })

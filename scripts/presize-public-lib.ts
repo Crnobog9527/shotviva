@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 
-import { isPresizablePublicPicture, PRESIZED_FORMATS, PRESIZED_PUBLIC_DIRS, PRESIZED_WIDTHS, presizedPath, type PresizedFormat } from '../src/core/presized'
+import { isPresizablePublicPicture, PRESIZED_FORMATS, PRESIZED_PUBLIC_DIRS, PRESIZED_QUALITY, PRESIZED_VERSION, PRESIZED_WIDTHS, presizedPath, type PresizedFormat } from '../src/core/presized'
 import { presizedCopies } from '../src/core/storage/presized-copies'
 
 // The site's own pictures (public/home, public/cases…) as the fixed-width AVIF + WebP files the pages load
@@ -40,8 +40,12 @@ const fresh = (file: PlannedFile) => existsSync(file.target) && statSync(file.ta
 export const defaultCacheDir = (publicDir: string) => join(publicDir, '..', '.next', 'cache', 'presized')
 const hashOf = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
 
+// What the encoding depends on besides the picture: a version bump or a new quality re-encodes
+// every picture instead of reusing copies made the old way.
+export const ENCODE_KEY = `${PRESIZED_VERSION}-q${PRESIZED_QUALITY}-${PRESIZED_FORMATS.join('+')}`
+
 async function cachedCopies(cacheDir: string, source: string, files: PlannedFile[]): Promise<(file: PlannedFile) => string> {
-  const dir = join(cacheDir, hashOf(readFileSync(source)))
+  const dir = join(cacheDir, ENCODE_KEY, hashOf(readFileSync(source)))
   const cached = (file: PlannedFile) => join(dir, `${file.width}.${file.format}`)
   if (!files.every((file) => existsSync(cached(file)))) {
     mkdirSync(dir, { recursive: true })
