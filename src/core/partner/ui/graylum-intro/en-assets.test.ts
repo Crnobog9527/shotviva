@@ -61,3 +61,12 @@ describe('the English manifest', () => {
     for (const name of EN_ASSETS) expect(known.has(name), name).toBe(true)
   })
 })
+
+describe('the shipped English set', () => {
+  it('serves every en file from the -en set and every zh file from the Chinese set', () => {
+    const urls = (locale: string) => [heroMedia(locale), ...introScenes(locale).map(scene => scene.media)].flatMap(media => [media.webm, media.mp4, media.poster])
+    expect(urls('en')).toHaveLength(21)
+    for (const url of urls('en')) expect(url).toMatch(/-en(-poster)?\.(webm|mp4|webp)$/)
+    for (const url of urls('zh')) expect(url).not.toMatch(/-en(-poster)?\.(webm|mp4|webp)$/)
+  })
+})

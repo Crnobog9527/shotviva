@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
-import { heroMedia, INTRO_SCENES } from './intro-shots'
+import { heroMedia, INTRO_SCENES, introScenes } from './intro-shots'
 
 const HERO_MEDIA = heroMedia('zh')
 import { canStep, DRAG_TO_CLOSE, lightboxReducer, pulledDown } from './lightbox-state'
@@ -51,10 +51,10 @@ describe('the scene lightbox', () => {
 })
 
 // The real files in public/: present, a lossy WebP poster at 1280×800 (16:10) under 60 KB, and
-// each video under 1 MB (about 4.5 MB for all twenty-one).
+// each video under 1 MB (about 4.5 MB for the 21 Chinese files, 4.3 MB for the 21 English ones).
 describe('the animation files', () => {
   it('exist at the size the dialog reserves and stay within budget', () => {
-    const all = [HERO_MEDIA, ...INTRO_SCENES.map(scene => scene.media)]
+    const all = ['zh', 'en'].flatMap(locale => [heroMedia(locale), ...introScenes(locale).map(scene => scene.media)])
     for (const media of all) {
       const poster = readFileSync(new URL(`../../../../../public${media.poster}`, import.meta.url))
       expect(poster.toString('ascii', 12, 16)).toBe('VP8 ')
