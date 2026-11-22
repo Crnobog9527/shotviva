@@ -41,7 +41,7 @@ const settingsRow = z.object({
 export async function settings(db: SupabaseClient) {
   const [s, r] = await Promise.all([
     db.from('affiliate_settings').select('hold_days,commission_months,payout_min_usd,org_payout_min_usd,settlement_day,apply_min_level,terms_version').single(),
-    db.from('affiliate_rates').select('product_kind,l1_bp,l2_bp'),
+    db.from('affiliate_rates').select('product_kind,l1_bp,l2_bp,org_l2_bp'),
   ])
-  return { settings: settingsRow.parse(checked(s)), rates: rateRow.array().parse(checked(r)) }
+  return { settings: settingsRow.parse(checked(s)), rates: rateRow.extend({ org_l2_bp: z.number() }).array().parse(checked(r)) }
 }

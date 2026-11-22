@@ -3720,7 +3720,7 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."
     AS $$
   select jsonb_build_object('owner',a.user_id,'inactive',a.status<>'active',
     'parent',case when a.status='active' and parent.team_enabled and parent.status='active' then parent.user_id end,
-    'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,s.org_l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
+    'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,r.org_l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
     'bonus',coalesce(po.l2_bp,r.l2_bp),
     'same_ip',coalesce(customer.referred_source not in ('org_l1','org_l2'),true) and coalesce(customer.signup_ip=referrer.signup_ip,false),
     'confirm_after',p_payment.created_at+make_interval(days=>s.hold_days),
@@ -6214,6 +6214,9 @@ begin
   insert into public.affiliate_rates(product_kind,l1_bp,l2_bp)
     select r.product_kind,r.l1_bp,r.l2_bp from jsonb_to_recordset(p_input->'rates') r(product_kind text,l1_bp integer,l2_bp integer)
     on conflict(product_kind) do update set l1_bp=excluded.l1_bp,l2_bp=excluded.l2_bp;
+  update public.affiliate_rates t set org_l2_bp=r.org_l2_bp
+    from jsonb_to_recordset(p_input->'rates') r(product_kind text,org_l2_bp integer)
+    where t.product_kind=r.product_kind and r.org_l2_bp is not null;
   perform public._affiliate_audit(p_actor,'settings','settings',(p_input - 'terms_version')::text);
 end;
 $$;
@@ -19739,8 +19742,10 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_rates" (
     "product_kind" "text" NOT NULL,
     "l1_bp" integer NOT NULL,
     "l2_bp" integer NOT NULL,
+    "org_l2_bp" integer DEFAULT 500 NOT NULL,
     CONSTRAINT "affiliate_rates_l1_bp_check" CHECK ((("l1_bp" >= 0) AND ("l1_bp" <= 10000))),
     CONSTRAINT "affiliate_rates_l2_bp_check" CHECK ((("l2_bp" >= 0) AND ("l2_bp" <= 10000))),
+    CONSTRAINT "affiliate_rates_org_l2_bp_check" CHECK ((("org_l2_bp" >= 0) AND ("org_l2_bp" <= 10000))),
     CONSTRAINT "affiliate_rates_product_kind_check" CHECK (("product_kind" = ANY (ARRAY['pack'::"text", 'monthly'::"text", 'yearly'::"text"])))
 );
 
