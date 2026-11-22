@@ -51,6 +51,8 @@ if ! git -c "http.https://github.com/.extraheader=$auth" push --quiet origin "$n
   exit 0
 fi
 echo "::notice::Committed the regenerated schema.sql to $HEAD_REF as $new_head."
+# For the codex-findings job in ci.yml, which posts the "Codex findings" check on this commit.
+[ -z "${GITHUB_OUTPUT:-}" ] || echo "new-head=$new_head" >> "$GITHUB_OUTPUT"
 
 conclusion() {
   case "$1" in success | failure | cancelled | skipped) echo "$1" ;; *) echo failure ;; esac
