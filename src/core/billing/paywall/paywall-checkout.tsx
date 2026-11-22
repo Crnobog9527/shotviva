@@ -39,7 +39,7 @@ export function PaywallCheckout({ resolved, period }: { resolved: ResolvedPick; 
   const label = plan
     ? t(member.upgrade ? "ctaUpgrade" : "ctaPlan", { tier: offerLabel(plan.product, locale, t(`tiers.${plan.offer.tier}`)), price, period })
     : t("ctaPack", { count: resolved.product.credits, price })
-  const locked = member.lock === "current" ? t("lockCurrentNote") : member.lock ? t("lockLower") : null
+  const locked = standing.orgMember ? t("orgMemberCheckout") : member.lock === "current" ? t("lockCurrentNote") : member.lock ? t("lockLower") : null
   return <PaymentMethodCheckout purchase={{ resolved, period, quote, label, note, locked }} />
 }
 

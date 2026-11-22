@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { bindReferral } from '@/core/affiliate/referral'
 import { errorResponse } from '@/core/api-response'
 import { assertSameOrigin, createAdminSupabase, requireApiBuyer } from '@/core/auth'
+import { assertNotOrgMember } from '@/core/billing/org-member-guard'
 import { normalizeCode } from '@/core/codes'
 import { redemptionResponse } from '@/core/codes/api'
 import { redeemCode } from '@/core/codes/server'
@@ -19,6 +20,11 @@ export async function POST(request: NextRequest) {
     assertSameOrigin(request)
     const user = await requireApiBuyer()
     const admin = createAdminSupabase()
+    // An active org staff member takes no personal gift, discount or invite reward and binds no
+    // partner here: the org funds its work (Owner 2026-11-22). The org owner, who still buys, and
+    // a removed member redeem like anyone else; a staff-link sign-up still gets no invite reward, as redeem_code needs the
+    // signup gift it never got (blocked_no_signup_grant).
+    await assertNotOrgMember(admin, user.id)
     const body = input.safeParse(await request.json().catch(() => null))
     const code = body.success ? normalizeCode(body.data.code) : null
     const invite = site.growth.invite
