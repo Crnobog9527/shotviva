@@ -14964,6 +14964,7 @@ declare
   v_note text := nullif(btrim(coalesce(p_note, '')), '');
   v_id text;
 begin
+  -- The profile row lock serializes one owner's creates, so the live count below is exact.
   select banned_at into v_banned from public.profiles where id = p_user_id for update;
   if not found then
     raise exception 'PROFILE_NOT_FOUND';
@@ -14990,9 +14991,14 @@ begin
     raise exception 'WORK_SHARE_RATE_LIMITED';
   end if;
 
-  if (select count(*) from public.work_shares where user_id = p_user_id and revoked_at is null) >= 200 then
-    raise exception 'WORK_SHARE_LIMIT';
-  end if;
+  -- At most 200 live links: keep the newest 199, revoke the rest, then add this one.
+  update public.work_shares s set revoked_at = now()
+   where s.id in (
+     select l.id from public.work_shares l
+      where l.user_id = p_user_id and l.revoked_at is null
+      order by l.created_at desc, l.id desc
+      offset 199
+   );
 
   insert into public.work_shares (user_id, job_ids, show_before, title, note)
   values (p_user_id, p_job_ids, coalesce(p_show_before, false), v_title, v_note)
