@@ -1,5 +1,6 @@
 'use client'
 
+
 import { useEffect } from 'react'
 
 import { trackTemplateView } from '@/core/analytics/browser'
@@ -14,12 +15,13 @@ import { useBatchRefusal } from '../batch/use-batch-refusal'
 import { MatrixEntry } from '../matrix/matrix-entry'
 import { BatchProgressView } from './batch-progress-view'
 import { FormAction } from './form-action'
-import { PoolChoiceSlot } from './pool-choice-picker'
 import { GeneratingView } from './generating-view'
 import { FailureView, SuccessView } from './settled-views'
 import { useWorkspaceDraft, type DraftInput } from './use-workspace-draft'
 import { WorkspaceForm } from './workspace-form'
 import { WorkspaceStage } from './workspace-stage'
+import { PoolChoiceMount } from './pool-choice-mount'
+
 
 // editable: editing is on (T30), so the done view offers "Edit this photo".
 export type WorkspaceProps = DraftInput & { shareText: string; editable: boolean }
@@ -74,7 +76,7 @@ export function ImageWorkspace({ shareText, editable, ...input }: WorkspaceProps
           examples={draft.fromExamples}
           photoExtra={<MatrixLink template={template} tier={tier} />}
         />
-        <PoolChoiceSlot choice={draft.choice.picker} />
+        <PoolChoiceMount choice={draft.choice.picker} />
         <FormAction
           state={draft.state}
           resolution={draft.values.resolution}
