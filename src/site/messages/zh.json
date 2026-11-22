@@ -1804,18 +1804,22 @@
       },
       "pool": {
         "title": "积分池",
-        "hint": "企业持有的积分。划给成员后，由成员用于自己的出图。",
-        "balance": "池里余额",
+        "hint": "企业持有两种积分：付费积分（你买的或存入的）和推广积分（渠道商每月发放）。分给成员后，由成员用于自己的出图。",
+        "balance": "付费积分池",
         "unit": "积分",
         "yours": "你可存入",
         "yoursNote": "你自己购买的积分",
         "suspended": "企业已暂停，暂时不能存入。",
-        "depositLabel": "存入自己的积分",
+        "depositLabel": "存入自己的付费积分",
         "depositPlaceholder": "积分数量",
         "depositHint": "把你自己购买的积分存入积分池。池里的积分不能退款，也不能再取回。",
         "deposit": "存入",
         "depositing": "存入中…",
-        "deposited": "已存入积分池。"
+        "deposited": "已存入积分池。",
+        "promoBalance": "推广积分池",
+        "promoExpires": "有效期至 {at}（UTC）",
+        "promoNone": "本月还没有推广积分",
+        "promoHint": "推广积分出的图带水印、公开、不可商用，月底（UTC）企业池和成员手里没用完的一起清零；存入只能存付费积分。"
       },
       "packages": {
         "title": "企业套餐",
@@ -1844,10 +1848,10 @@
       },
       "members": {
         "title": "成员",
-        "hint": "月额度：每月 1 日（UTC）把成员补到这个积分数。立即划拨：马上从积分池划给成员。",
+        "hint": "两种积分分开设：付费月额度每月 1 日（UTC）补到这个数；推广月额度是每月最多自动分到的推广积分，推广积分到账或改额度时就分。立即划拨：马上从对应的池划给成员。",
         "unknown": "账号",
         "owner": "主管理员",
-        "held": "企业积分剩 {count, number}",
+        "held": "付费积分剩 {count, number}",
         "customers": "客户 {count, number}",
         "allowance": "月额度",
         "allowanceFor": "{who} 的月额度",
@@ -1860,12 +1864,19 @@
         "giving": "划拨中…",
         "remove": "移除",
         "removeTitle": "移除 {who}？",
-        "removeBody": "企业没用完的积分会回到积分池；他自己购买的积分仍归他；他带来的客户仍归企业。",
+        "removeBody": "企业没用完的付费积分回到付费积分池，推广积分回到推广积分池；他自己的积分仍归他；他带来的客户仍归企业。",
         "removeConfirm": "移除",
         "removed": "已移除。",
         "cancel": "取消",
         "truncated": "显示 {shown} / {total} 位成员。",
-        "inviteEmpty": "还没有人加入，把上面的邀请链接发给他们。"
+        "inviteEmpty": "还没有人加入，把上面的邀请链接发给他们。",
+        "heldPromo": "推广积分剩 {count, number}",
+        "paidKind": "付费积分",
+        "promoKind": "推广积分（带水印，月底清零）",
+        "promoAllowance": "推广月额度",
+        "promoAllowanceFor": "{who} 的推广月额度",
+        "promoGiveNow": "立即划拨推广积分",
+        "promoGiveFor": "划给 {who} 的推广积分"
       },
       "performance": {
         "title": "月度业绩",
@@ -1908,7 +1919,7 @@
         "spend": "本月消费",
         "leave": "退出企业",
         "leaveTitle": "退出 {org}？",
-        "leaveBody": "企业没用完的积分会回到积分池；你自己购买的积分仍归你；你带来的客户仍归企业。",
+        "leaveBody": "企业没用完的付费积分和推广积分会回到各自的积分池；你自己的积分仍归你；你带来的客户仍归企业。",
         "leaveConfirm": "退出",
         "left": "你已退出企业。",
         "cancel": "取消",
@@ -1918,7 +1929,12 @@
         "level2Hint": "由你的客户分享而来。本月：{month}。",
         "newThisMonth": "本月新增 {count}",
         "paying": "本月付费人数",
-        "statsUnavailable": "本月数据加载失败。"
+        "statsUnavailable": "本月数据加载失败。",
+        "paidCredits": "付费积分",
+        "promoCredits": "推广积分",
+        "promoCreditsHint": "企业分给你的推广积分：出的图带水印、公开、不可商用；付费积分不够时才用，先于你自己的免费积分扣，月底（UTC）没用完的清零。",
+        "used": "本月已用",
+        "promoLeft": "剩余"
       },
       "join": {
         "metaTitle": "加入企业",
@@ -1987,6 +2003,18 @@
         "copy": "复制",
         "copied": "已复制",
         "copyFailed": "请手动选中复制"
+      },
+      "poolMonth": {
+        "title": "本月积分进出（{month}）",
+        "hint": "按 UTC 月统计。推广积分月底清零的数在下个月初记入本月。",
+        "item": "项目",
+        "paid": "付费积分",
+        "promo": "推广积分",
+        "in": "进池（到账 / 存入 / 发放）",
+        "allocated": "分给成员",
+        "reclaimed": "收回到池",
+        "held": "成员手里还剩",
+        "expired": "月底清零"
       }
     },
     "templateShare": {
@@ -2677,7 +2705,7 @@
         "topups": "临时追加",
         "remaining": "剩余",
         "validThrough": "有效期至（UTC）",
-        "note": "推广积分在你自己账号的免费积分里，月底没用完的部分会收回。",
+        "note": "推广积分发进企业的推广积分池，由你在「企业工作台」分给员工；推广积分出的图带水印、不可商用。剩余 = 企业池 + 员工手里还没用完的，月底（UTC）一起清零。",
         "none": "本月还没有发放推广积分。"
       }
     },

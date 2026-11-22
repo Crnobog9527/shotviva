@@ -9,6 +9,7 @@ import type { OwnerActions } from './actions'
 import { enterpriseHome } from './enterprise-frame'
 import { MembersPanel } from './members-panel'
 import { PerformancePanel } from './performance-panel'
+import { PoolMonthPanel } from './pool-month-panel'
 import { PackagesPanel, PaymentAccountsPanel, PoolPanel } from './owner-panels'
 import { StaffLinkPanel } from './staff-link-panel'
 
@@ -21,6 +22,7 @@ export function OwnerConsoleView({ data, actions, report, affiliate }: { data: O
       <SuspendedBanner data={data} />
       <StaffLinkPanel data={data} actions={actions} affiliate={affiliate} />
       <PoolPanel data={data} actions={actions} />
+      <PoolMonthPanel month={data.poolMonth} />
       <MembersPanel data={data} actions={actions} />
       <PerformancePanel report={report} />
     </>

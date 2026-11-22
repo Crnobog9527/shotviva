@@ -36,7 +36,7 @@ function fakeDb(tables: Rows, rpc: Record<string, unknown> = {}) {
   return { db: { from, auth, rpc: rpcFn } as never, calls }
 }
 
-const org = { id: ORG, name: 'Acme Studio', owner_user_id: OWNER, status: 'active', pool_credits: 1200, invite_token: 'a'.repeat(32), ref_code: 'SV-K7M2PX', affiliate_enabled: true, affiliate_levels: 1 }
+const org = { id: ORG, name: 'Acme Studio', owner_user_id: OWNER, status: 'active', pool_credits: 1200, promo_pool_credits: 4000, promo_expires_at: '2026-12-01T00:00:00Z', invite_token: 'a'.repeat(32), ref_code: 'SV-K7M2PX', affiliate_enabled: true, affiliate_levels: 1 }
 
 describe('readOrgView', () => {
   it('is none for an account in no org', async () => {
@@ -47,17 +47,24 @@ describe('readOrgView', () => {
   it("gives the owner their org, members with customer counts, and what they may deposit", async () => {
     const { db } = fakeDb({
       org_members: [
-        { user_id: OWNER, role: 'owner', monthly_allowance: 0, held_credits: 30, joined_at: '2026-11-01T00:00:00Z', org_id: ORG },
-        { user_id: STAFF, role: 'member', monthly_allowance: 500, held_credits: 120, joined_at: '2026-11-02T00:00:00Z', org_id: ORG },
+        { user_id: OWNER, role: 'owner', monthly_allowance: 0, held_credits: 30, promo_allowance: 0, held_promo_credits: 0, joined_at: '2026-11-01T00:00:00Z', org_id: ORG },
+        { user_id: STAFF, role: 'member', monthly_allowance: 500, held_credits: 120, promo_allowance: 2000, held_promo_credits: 1500, joined_at: '2026-11-02T00:00:00Z', org_id: ORG },
       ],
       orgs: org,
       org_packages: [{ id: ORG, name: 'Starter', price_usd_cents: 123400, credits: 98765 }],
       profiles: [{ credits: 100 }],
-    }, { org_customer_counts: [{ member_user_id: STAFF, l1_customers: 2, l2_customers: 0 }] })
-    const view = await readOrgView(OWNER, { db, maskPhone: (phone) => phone.slice(0, 3) + '****' })
+    }, {
+      org_customer_counts: [{ member_user_id: STAFF, l1_customers: 2, l2_customers: 0 }],
+      org_pool_month: { period: '2026-11', paid: { balance: 1200, in: 1500, allocated: 300, reclaimed: 0, adjusted: 0 },
+        promo: { balance: 4000, expires_at: '2026-12-01T00:00:00Z', granted: 10000, allocated: 6000, reclaimed: 0, expired: 0, held: 1500 } },
+    })
+    const view = await readOrgView(OWNER, { db, now: new Date('2026-11-21T10:00:00Z'), maskPhone: (phone) => phone.slice(0, 3) + '****' })
     expect(view.kind).toBe('owner')
     if (view.kind !== 'owner') return
-    expect(view.org).toMatchObject({ name: 'Acme Studio', refCode: 'SV-K7M2PX', poolCredits: 1200, status: 'active' })
+    expect(view.org).toMatchObject({ name: 'Acme Studio', refCode: 'SV-K7M2PX', poolCredits: 1200, status: 'active', promoPoolCredits: 4000, promoExpiresAt: '2026-12-01T00:00:00Z' })
+    expect(view.members.map((m) => [m.promoAllowance, m.heldPromoCredits])).toEqual([[0, 0], [2000, 1500]])
+    expect(view.poolMonth).toEqual({ period: '2026-11', paid: { in: 1500, allocated: 300, reclaimed: 0 },
+      promo: { granted: 10000, allocated: 6000, reclaimed: 0, expired: 0, held: 1500 } })
     expect(view.inviteToken).toBe('a'.repeat(32))
     expect(view.members.map((m) => [m.account, m.customers])).toEqual([['owner@acme.test', 0], ['+86****', 2]])
     expect(view.packages).toEqual([{ id: ORG, name: 'Starter', priceUsdCents: 123400, credits: 98765 }])
@@ -65,9 +72,21 @@ describe('readOrgView', () => {
     expect(view.depositable).toBe(70)
   })
 
+  it('shows no promotion credits once their month is over, and no month view when it cannot be read', async () => {
+    const { db } = fakeDb({
+      org_members: [{ user_id: OWNER, role: 'owner', monthly_allowance: 0, held_credits: 0, promo_allowance: 0, held_promo_credits: 700, joined_at: '2026-11-01T00:00:00Z', org_id: ORG }],
+      orgs: org, org_packages: [], profiles: [{ credits: 0 }],
+    }, { org_customer_counts: [] })
+    const view = await readOrgView(OWNER, { db, now: new Date('2026-12-01T00:00:01Z') })
+    if (view.kind !== 'owner') throw new Error('owner view expected')
+    expect(view.org).toMatchObject({ promoPoolCredits: 0, promoExpiresAt: null })
+    expect(view.members[0]).toMatchObject({ heldPromoCredits: 0 })
+    expect(view.poolMonth).toBeNull()
+  })
+
   it('never lets a deposit exceed the owner\'s own credits when the held share is larger', async () => {
     const { db } = fakeDb({
-      org_members: [{ user_id: OWNER, role: 'owner', monthly_allowance: 0, held_credits: 900, joined_at: '2026-11-01T00:00:00Z', org_id: ORG }],
+      org_members: [{ user_id: OWNER, role: 'owner', monthly_allowance: 0, held_credits: 900, promo_allowance: 0, held_promo_credits: 0, joined_at: '2026-11-01T00:00:00Z', org_id: ORG }],
       orgs: org, org_packages: [], profiles: [{ credits: 100 }],
     }, { org_customer_counts: [] })
     const view = await readOrgView(OWNER, { db })
@@ -86,11 +105,15 @@ describe('readOrgView for a member', () => {
       org_members: { org_id: ORG, role: 'member', monthly_allowance: 500, held_credits: 80 },
       orgs: org,
       org_credit_ledger: [{ delta: -500 }, { delta: -100 }],
-    }, { org_member_stats: [statsRow], org_customer_counts: [{ member_user_id: STAFF, l1_customers: 1, l2_customers: 0 }] })
+    }, {
+      org_member_stats: [statsRow], org_customer_counts: [{ member_user_id: STAFF, l1_customers: 1, l2_customers: 0 }],
+      org_member_promo_stats: [{ member_user_id: STAFF, promo_allowance: 2000, held_promo: 1750, promo_allocated: '2000', promo_used: '250' }],
+    })
     const now = new Date('2026-11-21T10:00:00Z')
     const view = await readOrgView(STAFF, { db, now })
     expect(view).toEqual({
       kind: 'member', orgName: 'Acme Studio', status: 'active', monthlyAllowance: 500, allocatedThisMonth: 600, heldCredits: 80, customers: 1,
+      promo: { allowance: 2000, held: 1750, allocated: 2000, used: 250 },
       withLevel2: false, period: '2026-11',
       performance: { l1: { customers: 1, signups: 2, paying: 1, paidCents: 4900 }, l2: { customers: 0, signups: 0, paying: 0, paidCents: 0 } },
     })
@@ -110,7 +133,7 @@ describe('readOrgView for a member', () => {
       org_credit_ledger: [],
     }, { org_customer_counts: [{ member_user_id: STAFF, l1_customers: 1, l2_customers: 0 }] })
     const view = await readOrgView(STAFF, { db, now: new Date('2026-11-21T10:00:00Z') })
-    expect(view).toMatchObject({ kind: 'member', withLevel2: true, performance: null, customers: 1 })
+    expect(view).toMatchObject({ kind: 'member', withLevel2: true, performance: null, promo: null, customers: 1 })
   })
 })
 

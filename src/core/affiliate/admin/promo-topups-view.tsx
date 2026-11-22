@@ -5,6 +5,8 @@ import { Section } from './parts'
 import { PROMO_COPY as P } from './promo-copy'
 import type { PromoPartner, PromoSheet } from './promo-read'
 import { TOPUP_COPY as T } from './promo-topup-copy'
+import { PromoMoveForm } from './promo-move-form'
+import type { MovePreview } from './promo-move-copy'
 import { PromoTopupForm } from './promo-topup-form'
 import { topupsOf, type PromoTopup } from './promo-topup-read'
 
@@ -43,9 +45,9 @@ function TopupList({ list }: { list: PromoTopup[] }) {
   )
 }
 
-type CardProps = { partner: PromoPartner; sheet?: PromoSheet; topups: PromoTopup[]; period: string; action: SaveAction }
+type CardProps = { partner: PromoPartner; sheet?: PromoSheet; topups: PromoTopup[]; period: string; action: SaveAction; move?: MovePreview | null }
 
-function PartnerTopups({ partner, sheet, topups, period, action }: CardProps) {
+function PartnerTopups({ partner, sheet, topups, period, action, move }: CardProps) {
   const { list, sum } = topupsOf(topups, partner.id, period)
   const granted = sheet?.status === 'granted' ? sheet.total : 0
   return (
@@ -61,14 +63,15 @@ function PartnerTopups({ partner, sheet, topups, period, action }: CardProps) {
       </dl>
       <p className="text-xs text-muted-foreground">{T.monthTotalHint}</p>
       <TopupList list={list} />
+      {move && (move.credits > 0 || move.moved > 0) ? <PromoMoveForm action={action} orgId={partner.id} orgName={partner.name} preview={move} /> : null}
       <PromoTopupForm action={action} orgId={partner.id} orgName={partner.name} recipient={partner.owner_user_id} period={period} />
     </article>
   )
 }
 
-type Props = { partners: PromoPartner[]; sheets: PromoSheet[]; topups: PromoTopup[]; period: string; action: SaveAction }
+type Props = { partners: PromoPartner[]; sheets: PromoSheet[]; topups: PromoTopup[]; period: string; action: SaveAction; moves?: Map<string, MovePreview | null> }
 
-export function PromoTopups({ partners, sheets, topups, period, action }: Props) {
+export function PromoTopups({ partners, sheets, topups, period, action, moves }: Props) {
   const active = partners.filter((p) => p.promo_partner && p.status === 'active')
   return (
     <Section title={`${T.title}（${period}）`}>
@@ -78,7 +81,7 @@ export function PromoTopups({ partners, sheets, topups, period, action }: Props)
       ) : (
         active.map((p) => (
           <PartnerTopups key={p.id} partner={p} sheet={sheets.find((s) => s.org_id === p.id && s.period === period)}
-            topups={topups} period={period} action={action} />
+            topups={topups} period={period} action={action} move={moves?.get(p.id)} />
         ))
       )}
     </Section>

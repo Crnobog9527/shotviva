@@ -31,10 +31,13 @@ export function PoolPanel({ data, actions }: { data: OwnerConsole; actions: Owne
   const suspended = data.org.status === 'suspended'
   return (
     <Panel title={t('title')} hint={t('hint')}>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <Stat label={t('balance')} value={format.number(data.org.poolCredits)} note={t('unit')} />
+        <Stat label={t('promoBalance')} value={format.number(data.org.promoPoolCredits)}
+          note={data.org.promoExpiresAt ? t('promoExpires', { at: format.dateTime(new Date(Date.parse(data.org.promoExpiresAt) - 1), { dateStyle: 'medium', timeZone: 'UTC' }) }) : t('promoNone')} />
         <Stat label={t('yours')} value={format.number(data.depositable)} note={t('yoursNote')} />
       </div>
+      <p className="text-caption text-muted-foreground">{t('promoHint')}</p>
       {suspended ? <p role="status" className="text-label text-destructive">{t('suspended')}</p> : null}
       <form
         className="grid gap-2"

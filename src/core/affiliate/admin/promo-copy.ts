@@ -2,7 +2,7 @@
 export const PROMO_COPY = {
   title: '免费推广积分',
   intro:
-    '每月 1 日（UTC，北京时间 8 点）系统自动给每个渠道商算出发放单：1 万保底 + 上个月确认的一级客户个人购买积分的 10%。只算已过确认期的订单，单个客户最多占 20%，至少 3 个付费客户才有业绩部分；确认后才退款的部分从下个月扣回。积分进渠道商主账号的免费池（带水印、不可商用、不进企业积分池），月底清零。',
+    '每月 1 日（UTC，北京时间 8 点）系统自动给每个渠道商算出发放单：1 万保底 + 上个月确认的一级客户个人购买积分的 10%。只算已过确认期的订单，单个客户最多占 20%，至少 3 个付费客户才有业绩部分；确认后才退款的部分从下个月扣回。确认后积分进这家企业的「推广积分池」（不是主账号个人余额，也不进付费积分池），由企业主管理员分给员工；推广积分带水印、不可商用，企业池和员工手里没用完的月底一起清零。',
   pendingNotice: (n: number) => `有 ${n} 张发放单等待确认，确认前不会发放。`,
   runNow: '立即生成本月发放单',
   runHint: '和每月 1 日的自动计算相同，可以重复点：已确认或已驳回的单不会变，待确认的单会按最新数据重算。',
@@ -12,7 +12,7 @@ export const PROMO_COPY = {
   noSheets: '还没有发放单。先在下面把企业标为渠道商，再点「立即生成本月发放单」。',
   period: (p: string) => `${p} 月发放单`,
   window: '统计的确认时间',
-  recipient: '发放到',
+  recipient: '企业主账号',
   base: '保底',
   bonus: '业绩赠送',
   bonusRule: (bp: number) => `业绩基数 × ${bp / 100}%`,
@@ -36,7 +36,7 @@ export const PROMO_COPY = {
   sources: '扣回来源',
   sourceRow: (period: string, owed: number, applied: number) => `${period} 月发放单：欠 ${owed.toLocaleString('zh-CN')}，本月扣 ${applied.toLocaleString('zh-CN')}`,
   confirm: '确认发送',
-  confirmAsk: (total: number) => `确认给渠道商主账号发放 ${total.toLocaleString('zh-CN')} 免费积分？发放后不能撤回。`,
+  confirmAsk: (total: number) => `确认把 ${total.toLocaleString('zh-CN')} 推广积分发进这家企业的推广积分池？发放后不能撤回。`,
   reject: '驳回（本月不发）',
   rejectNote: '驳回原因（必填）',
   recompute: '按最新数据重算',

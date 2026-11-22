@@ -32,6 +32,14 @@ export async function setAllowanceAction(input: unknown) {
   return applied(await orgCommands.setAllowance(await deps(), input))
 }
 
+export async function allocatePromoAction(input: unknown) {
+  return applied(await orgCommands.allocatePromo(await deps(), input))
+}
+
+export async function setPromoAllowanceAction(input: unknown) {
+  return applied(await orgCommands.setPromoAllowance(await deps(), input))
+}
+
 export async function removeMemberAction(input: unknown) {
   return applied(await orgCommands.removeMember(await deps(), input))
 }
