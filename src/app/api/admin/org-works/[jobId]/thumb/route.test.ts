@@ -50,12 +50,17 @@ describe('admin org work thumbnails', () => {
     expect(response.headers.get('cache-control')).toContain('no-store')
   })
 
-  it('falls back to the full file for a paid work, never for a free one', async () => {
+  it.each(['paid', 'free'])('never signs the original of a %s work without a small copy', async (pool) => {
     head.mockResolvedValue(null)
-    db.maybeSingle.mockResolvedValue({ data: row(), error: null })
-    expect((await get()).headers.get('location')).toBe(`https://signed.example/outputs/${user}/${job}.png`)
-    db.maybeSingle.mockResolvedValue({ data: row({ credit_pool: 'free' }), error: null })
+    db.maybeSingle.mockResolvedValue({ data: row({ credit_pool: pool }), error: null })
     expect((await get()).status).toBe(404)
+    expect(presignGet).not.toHaveBeenCalled()
+  })
+
+  it('signs the protected small copy of a free (promotion) work', async () => {
+    head.mockResolvedValue({ size: 1, contentType: 'image/webp' })
+    db.maybeSingle.mockResolvedValue({ data: row({ credit_pool: 'free' }), error: null })
+    expect((await get()).headers.get('location')).toBe(`https://signed.example/outputs/${user}/${job}-thumb-p1.webp`)
   })
 
   it.each([

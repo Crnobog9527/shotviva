@@ -9,7 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 import type { Page } from '../cursor'
 import { formatBeijing } from '../shell/format'
-import { JobActions, type JobSupportActions } from '../support-ui'
+import { JobActions } from '../support-ui'
+import type { WorkLinks } from '../support/view-work'
+import type { ActionValue } from '../templates/types'
 import { UserLink } from '../users-ui/user-link'
 import { ORG_WORKS_COPY as COPY } from './copy'
 import { ORG_WORK_STATUSES, orgWorksHref, workFilter, type OrgWorkFilters } from './filters'
@@ -17,18 +19,22 @@ import type { AdminOrgWork } from './repository'
 import { OrgWorkThumbImage, OrgWorkThumbPlaceholder } from './thumb-image'
 
 // 企业作品 on /admin/orgs/[id]: a GET filter form (member, status, work id) and one page of the
-// org's works. 查看 / 补偿 are the jobs list's own actions (audited view_work dialog, T25); the
+// org's works. 查看 is the jobs list's own audited view_work dialog (T25); 补偿 is not offered here:
+// it credits the member's own balance for credits the org paid (control, #862). The
 // reference links to the same work in 出图记录 for model, resolution and error code. Provider
 // cost is never shown here.
 
 export type OrgWorksMember = { userId: string; label: string }
+
+// Viewing only: see above for why there is no compensate here.
+export type OrgWorksActions = { view: (input: { jobId: string }) => Promise<ActionValue<WorkLinks>> }
 
 type Props = {
   orgId: string
   filters: OrgWorkFilters
   page: Page<AdminOrgWork>
   members: OrgWorksMember[]
-  actions: JobSupportActions
+  actions: OrgWorksActions
 }
 
 const SELECT = 'h-9 w-full min-w-0 truncate rounded-md border border-input bg-transparent px-3 text-base md:text-sm dark:bg-input/30'
@@ -115,7 +121,7 @@ function Status({ work }: { work: AdminOrgWork }) {
   )
 }
 
-function WorkRow({ work, label, actions }: { work: AdminOrgWork; label: string; actions: JobSupportActions }) {
+function WorkRow({ work, label, actions }: { work: AdminOrgWork; label: string; actions: OrgWorksActions }) {
   return (
     <TableRow>
       <TableCell><Thumb work={work} /></TableCell>
@@ -143,7 +149,7 @@ function WorkRow({ work, label, actions }: { work: AdminOrgWork; label: string; 
 }
 
 // Below 640px the table would hide member and status behind a sideways scroll: one card per work.
-function WorkCard({ work, label, actions }: { work: AdminOrgWork; label: string; actions: JobSupportActions }) {
+function WorkCard({ work, label, actions }: { work: AdminOrgWork; label: string; actions: OrgWorksActions }) {
   return (
     <li className="grid gap-3 border-b border-border py-3 last:border-b-0">
       <div className="flex gap-3">

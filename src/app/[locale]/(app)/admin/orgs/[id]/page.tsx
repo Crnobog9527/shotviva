@@ -3,12 +3,12 @@ import { notFound } from 'next/navigation'
 
 import { AdminPage, StatCard } from '@/core/admin'
 import { listOrgWorks, OrgWorksSection, parseOrgWorkFilters } from '@/core/admin/org-works'
-import { loadOrgDetail, ORGS_COPY as COPY } from '@/core/admin/orgs'
-import { AddMemberForm, AffiliateCard, GrantForm, LedgerTable, MemberTable, num, OrgEditForm, OrgStatusBadge, SignupBonusForm, TransferOwnerForm } from '@/core/admin/orgs-ui'
+import { loadOrgDetail, loadOrgInviteToken, ORGS_COPY as COPY } from '@/core/admin/orgs'
+import { AddMemberForm, AffiliateCard, GrantForm, LedgerTable, MemberTable, num, OrgEditForm, OrgStatusBadge, SignupBonusForm, StaffLinkCard, TransferOwnerForm } from '@/core/admin/orgs-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { ORG_SIGNUP_BONUS_MAX } from '@/core/org'
 
-import { compensateJobAction, viewWorkAction } from '../../jobs/actions'
+import { viewWorkAction } from '../../jobs/actions'
 import { addMemberAction, grantOrgAction, saveOrgAction, saveSignupBonusAction, searchUsersAction, transferOwnerAction } from '../actions'
 
 export const instant = false
@@ -27,7 +27,7 @@ export default async function OrgPage({ params, searchParams }: PageProps<'/[loc
   if (!detail) notFound()
   const { org, caps, packages } = detail
   const workFilters = parseOrgWorkFilters(await searchParams)
-  const works = await listOrgWorks(db, org.id, workFilters)
+  const [works, inviteToken] = await Promise.all([listOrgWorks(db, org.id, workFilters), loadOrgInviteToken(db, org.id)])
   const workMembers = detail.members.map((m) => ({ userId: m.userId, label: m.account ?? m.userId.slice(0, 8) }))
   return (
     <AdminPage title={org.name} actions={<OrgStatusBadge status={org.status} />}>
@@ -37,6 +37,7 @@ export default async function OrgPage({ params, searchParams }: PageProps<'/[loc
         <StatCard title={COPY.pool} value={num(org.poolCredits)} />
         <StatCard title={COPY.owner} value={detail.ownerAccount ?? '—'} />
       </div>
+      <StaffLinkCard token={inviteToken} suspended={org.status !== 'active'} />
       <TransferOwnerForm
         key={`owner-${org.ownerUserId}`}
         orgId={org.id}
@@ -53,7 +54,7 @@ export default async function OrgPage({ params, searchParams }: PageProps<'/[loc
       <LedgerTable rows={detail.ledger} />
       <AddMemberForm orgId={org.id} suspended={org.status !== 'active'} search={searchUsersAction} add={addMemberAction} />
       <MemberTable orgId={org.id} rows={detail.members} total={detail.memberTotal} />
-      <OrgWorksSection orgId={org.id} filters={workFilters} page={works} members={workMembers} actions={{ view: viewWorkAction, compensate: compensateJobAction }} />
+      <OrgWorksSection orgId={org.id} filters={workFilters} page={works} members={workMembers} actions={{ view: viewWorkAction }} />
     </AdminPage>
   )
 }

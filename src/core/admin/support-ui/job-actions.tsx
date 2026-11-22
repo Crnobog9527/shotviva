@@ -20,13 +20,17 @@ export type SupportJob = { id: string; status: 'running' | 'succeeded' | 'failed
 
 // Per-job buttons for the jobs list and the user detail: view the work (writes view_work to
 // the audit log on the server) and, for a succeeded job, compensate it once.
-export function JobActions({ job, actions }: { job: SupportJob; actions: JobSupportActions }) {
+// Without `compensate` only 查看 is offered (企业作品: compensating would credit the member's own
+// balance for credits the org paid).
+export function JobActions({ job, actions }: { job: SupportJob; actions: Pick<JobSupportActions, 'view'> & Partial<Pick<JobSupportActions, 'compensate'>> }) {
   const [open, setOpen] = useState<'compensate' | null>(null)
   const [links, setLinks] = useState<WorkLinks | null>(null)
   const { pending, error, notice, run, clearError } = useAdminAction()
+  const compensateAction = actions.compensate
   const compensate = () =>
+    compensateAction &&
     run(
-      () => actions.compensate({ jobId: job.id }),
+      () => compensateAction({ jobId: job.id }),
       (result) => {
         setOpen(null)
         return result.applied ? SUPPORT_COPY.compensate.done : SUPPORT_COPY.compensate.already
@@ -37,7 +41,7 @@ export function JobActions({ job, actions }: { job: SupportJob; actions: JobSupp
       <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => actions.view({ jobId: job.id }), setLinks)}>
         {SUPPORT_COPY.view.button}
       </Button>
-      {job.status === 'succeeded' ? (
+      {job.status === 'succeeded' && compensateAction ? (
         <Button
           size="sm"
           variant="ghost"

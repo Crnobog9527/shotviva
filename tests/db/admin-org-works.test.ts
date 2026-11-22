@@ -4,13 +4,14 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { listOrgWorks } from '@/core/admin/org-works'
+import { loadOrgInviteToken } from '@/core/admin/orgs'
 import { refundJob, reserveJob } from '@/core/jobs'
 import { allocateOrgCredits, removeOrgMember } from '@/core/org'
 
 import { seedTemplate } from './generation-fixtures'
 import { connectAdmin, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
-import { account, adminAccount, member, orgWith } from './org-fixtures'
+import { account, adminAccount, inviteToken, member, orgWith } from './org-fixtures'
 
 // 企业作品 in the admin (/admin/orgs/[id]): every work stamped with the org, failed and running
 // ones included, newest first; filters by member, status and work id; the paying pool read from
@@ -121,5 +122,12 @@ describe('admin 企业作品', () => {
     expect(byId.get(ok)).toMatchObject({ deletedByUser: true, makerLeft: true })
     expect(byId.get(failed)).toMatchObject({ deletedByUser: false, makerLeft: true })
     expect(byId.get(running)).toMatchObject({ makerLeft: false })
+  })
+})
+
+describe('admin 员工专用链接', () => {
+  it("reads the org's own staff link token, the one the owner's workspace shows, and null for no org", async () => {
+    expect(await loadOrgInviteToken(rest, orgId)).toBe(await inviteToken(db, orgId))
+    expect(await loadOrgInviteToken(rest, randomUUID())).toBeNull()
   })
 })
