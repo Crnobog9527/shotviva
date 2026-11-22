@@ -38,10 +38,13 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   { key: 'features', href: '/admin/features' },
 ]
 
-export type NavCounts = { tickets?: number; inquiries?: number; gallery?: number }
+const COUNTED: ReadonlySet<AdminNavKey> = new Set(['tickets', 'inquiries', 'gallery', 'affiliates'])
+
+export type NavCounts = { tickets?: number; inquiries?: number; gallery?: number; affiliates?: number }
 
 // The review entry only exists while the wishlist does (ARCHITECTURE §15.6). Tickets carry the
-// open count (ARCHITECTURE §10 「站内工单」), inquiries the new ones (§10.c).
+// open count (ARCHITECTURE §10 「站内工单」), inquiries the new ones (§10.c), the affiliate program the
+// promotion grant sheets waiting for a confirm (§6.5 渠道商推广积分).
 export function adminNavItems(
   flags: { wishlist: boolean; affiliate?: boolean; gallery?: boolean },
   counts: NavCounts = {},
@@ -50,7 +53,7 @@ export function adminNavItems(
     .filter((item) => item.key !== 'requests' || flags.wishlist)
     .filter((item) => item.key !== 'gallery' || flags.gallery)
   return visible.map((item) => {
-    const count = item.key === 'tickets' || item.key === 'inquiries' || item.key === 'gallery' ? counts[item.key] : undefined
+    const count = COUNTED.has(item.key) ? counts[item.key as keyof NavCounts] : undefined
     return { ...item, label: SHELL_COPY.nav[item.key], ...(count ? { count } : {}) }
   })
 }

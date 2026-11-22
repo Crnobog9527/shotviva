@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const tabs = ['overview', 'applications', 'affiliates', 'commissions', 'payouts', 'attribution', 'settings', 'fees', 'errors'] as const
+export const tabs = ['overview', 'applications', 'affiliates', 'commissions', 'payouts', 'attribution', 'settings', 'fees', 'promo', 'errors'] as const
 export const dossierSections = ['commissions', 'bonuses', 'team', 'payouts', 'referrals', 'audit', 'adjustments'] as const
 export const categories = ['pack', 'monthly', 'yearly'] as const
 const blank = (value: unknown) => (value === '' ? undefined : value)
