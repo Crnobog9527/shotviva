@@ -41,8 +41,8 @@ describe('createWithBillingDetail', () => {
     expect(waffo.createCheckoutSession.mock.calls[1]![0]).not.toHaveProperty('billingDetail')
   })
 
-  it('a 5xx or a timeout is not retried (a session may exist)', async () => {
-    for (const error of [new WaffoHttpError('create-session', 502), new Error('timeout')]) {
+  it('a 5xx, a timeout, auth, conflict or rate limit is not retried (a session may exist)', async () => {
+    for (const error of [new WaffoHttpError('create-session', 502), new Error('timeout'), new WaffoHttpError('create-session', 401), new WaffoHttpError('create-session', 409), new WaffoHttpError('create-session', 429)]) {
       const waffo = waffoWith(error, SESSION)
       await expect(createWithBillingDetail(waffo, REQUEST, BILLING)).rejects.toBe(error)
       expect(waffo.createCheckoutSession).toHaveBeenCalledTimes(1)

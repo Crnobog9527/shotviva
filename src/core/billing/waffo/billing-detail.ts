@@ -38,7 +38,7 @@ export async function buyerBillingDetail(db: RpcClient, userId: string): Promise
 }
 
 // Sends a create-session request with the buyer's company title added. A title Waffo refuses must
-// never stop an owner from paying: on a 4xx (Waffo created no session, so a second create cannot
+// never stop an owner from paying: on a 400 or 422 (Waffo created no session, so a second create cannot
 // leave two payable sessions) it logs the status and tries once more without billingDetail. Any
 // other failure is thrown as before. The title is added here, at send time, and never stored in
 // a bound checkout's saved params.

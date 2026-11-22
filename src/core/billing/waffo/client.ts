@@ -83,7 +83,9 @@ export class WaffoHttpError extends AppError {
   }
 }
 
-export const isWaffoRejection = (error: unknown) => error instanceof WaffoHttpError && error.httpStatus >= 400 && error.httpStatus < 500
+// Only Waffo's validation answers (400, 422) count as a refused request; auth, rate-limit,
+// conflict or timeout statuses do not prove that no session exists.
+export const isWaffoRejection = (error: unknown) => error instanceof WaffoHttpError && (error.httpStatus === 400 || error.httpStatus === 422)
 
 // Waffo's error codes only, never its message text: a message can echo what we sent (buyer
 // company name, tax ID).
