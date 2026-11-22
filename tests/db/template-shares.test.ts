@@ -122,3 +122,20 @@ describe('revoking', () => {
     expect(await readTemplateShare(service, id)).toBeNull()
   })
 })
+
+describe('admin stats (/admin/analytics)', () => {
+  it('counts links, creators and revoked in a window, for the service role only', async () => {
+    const start = ((await db.query<{ t: Date }>('select clock_timestamp() as t')).rows[0] as { t: Date }).t.toISOString()
+    const [a, b] = [await createTemplateShare(service, alice.id, { items: pick(liveA) }), await createTemplateShare(service, alice.id, { items: pick(liveB) })]
+    await createTemplateShare(service, bob.id, { items: pick(liveA) })
+    await revokeTemplateShare(service, alice.id, a)
+    const end = new Date(Date.now() + 60_000).toISOString()
+    const { data, error } = await service.rpc('admin_template_share_stats', { p_start: start, p_end: end })
+    expect(error).toBeNull()
+    expect(data).toEqual([{ links: 3, creators: 2, revoked: 1 }])
+    const later = await service.rpc('admin_template_share_stats', { p_start: end, p_end: new Date(Date.now() + 120_000).toISOString() })
+    expect(later.data).toEqual([{ links: 0, creators: 0, revoked: 0 }])
+    expect((await aliceClient.rpc('admin_template_share_stats', { p_start: start, p_end: end })).error).not.toBeNull()
+    expect(b).toMatch(/^[a-z0-9]{12}$/)
+  })
+})

@@ -11661,6 +11661,19 @@ $$;
 ALTER FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_template_share_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone) RETURNS TABLE("links" bigint, "creators" bigint, "revoked" bigint)
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select count(*), count(distinct s.user_id), count(*) filter (where s.revoked_at is not null)
+    from public.template_shares s
+   where s.created_at >= p_start and s.created_at < p_end
+$$;
+
+
+ALTER FUNCTION "public"."admin_template_share_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_template_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone, "p_redraw_minutes" integer DEFAULT 30) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -22197,6 +22210,10 @@ CREATE INDEX "template_series_category_idx" ON "public"."template_series" USING 
 
 
 
+CREATE INDEX "template_shares_created_idx" ON "public"."template_shares" USING "btree" ("created_at");
+
+
+
 CREATE INDEX "template_shares_user_created_idx" ON "public"."template_shares" USING "btree" ("user_id", "created_at" DESC, "id" DESC);
 
 
@@ -25762,6 +25779,11 @@ GRANT ALL ON FUNCTION "public"."admin_template_profile_scope"("p_scope" "text", 
 
 REVOKE ALL ON FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_template_series_detail"("p_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_template_share_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_template_share_stats"("p_start" timestamp with time zone, "p_end" timestamp with time zone) TO "service_role";
 
 
 

@@ -27,6 +27,8 @@ create table public.template_shares (
 -- "My share links" newest first, keyset (created_at, id); also the creation rate limit's count
 -- and the account-deletion cascade.
 create index template_shares_user_created_idx on public.template_shares (user_id, created_at desc, id desc);
+-- The admin analytics count of links made in a period (admin_template_share_stats, 1862).
+create index template_shares_created_idx on public.template_shares (created_at);
 
 alter table public.template_shares enable row level security;
 
