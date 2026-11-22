@@ -21,11 +21,11 @@ const MEMBER = '00000000-0000-4000-8000-0000000000b2'
 const owner = (over: Partial<OwnerConsole['org']> = {}, extra: Partial<OwnerConsole> = {}): OwnerConsole => ({
   kind: 'owner',
   org: { id: ORG, name: 'Acme Studio', refCode: 'SV-K7M2PX', status: 'active', poolCredits: 120000, affiliateEnabled: true, affiliateLevels: 1,
-    promoPoolCredits: 4321, promoExpiresAt: '2026-12-01T00:00:00Z', ...over },
+    promoPoolCredits: 4321, promoExpiresAt: '2026-12-01T00:00:00Z', defaultPaidAllowance: 200, defaultPromoAllowance: 500, ...over },
   inviteToken: 'a'.repeat(32),
   members: [
-    { userId: '00000000-0000-4000-8000-0000000000a1', account: 'owner@acme.test', role: 'owner', monthlyAllowance: 0, heldCredits: 0, promoAllowance: 0, heldPromoCredits: 0, customers: 0, joinedAt: '2026-11-01T00:00:00Z' },
-    { userId: MEMBER, account: 'ann@acme.test', role: 'member', monthlyAllowance: 500, heldCredits: 320, promoAllowance: 2000, heldPromoCredits: 1750, customers: 3, joinedAt: '2026-11-02T00:00:00Z' },
+    { userId: '00000000-0000-4000-8000-0000000000a1', account: 'owner@acme.test', role: 'owner', monthlyAllowance: 0, heldCredits: 0, promoAllowance: 500, heldPromoCredits: 0, paidFollowsDefault: true, promoFollowsDefault: true, customers: 0, joinedAt: '2026-11-01T00:00:00Z' },
+    { userId: MEMBER, account: 'ann@acme.test', role: 'member', monthlyAllowance: 500, heldCredits: 320, promoAllowance: 2000, heldPromoCredits: 1750, paidFollowsDefault: false, promoFollowsDefault: false, customers: 3, joinedAt: '2026-11-02T00:00:00Z' },
   ],
   memberTotal: 2,
   packages: [{ id: ORG, name: 'Starter', priceUsdCents: 123400, credits: 98765 }],
@@ -44,6 +44,8 @@ const ownerActions = {
   setAllowance: async () => ({ ok: true as const, allowance: 1 }), removeMember: async () => ({ ok: true as const, reclaimed: 1 }),
   resetInvite: async () => ({ ok: true as const, token: 'b'.repeat(32) }),
   allocatePromo: async () => ({ ok: true as const, pool: 1 }), setPromoAllowance: async () => ({ ok: true as const, allowance: 1 }),
+  setDefaults: async () => ({ ok: true as const, paid: 1, promo: 1 }), bulkSetAllowance: async () => ({ ok: true as const, members: 1 }),
+  bulkGrant: async () => ({ ok: true as const, members: 1, total: 1, pool: 1 }),
 }
 
 type Messages = typeof en
@@ -188,6 +190,21 @@ describe.each(['en', 'zh'] as const)('pool choice picker (%s)', (locale) => {
     expect(text).toContain('1,200')
     expect(html.match(/checked=""/g)).toHaveLength(1)
     expect(render(locale, createElement(PoolChoiceSlot, { choice: null })).html).toBe('')
+  })
+})
+
+describe.each(['en', 'zh'] as const)('defaults and bulk (%s)', (locale) => {
+  it('shows the default allowances, marks who follows them, offers use-default to personal ones and the selection entry', () => {
+    const { text, html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, report: null, affiliate: true }))
+    expect(errors).toEqual([])
+    expect(text).toContain(locale === 'en' ? 'Default monthly allowances' : '默认月额度')
+    expect(html).toContain('value="200"')
+    expect(html).toContain('value="500"')
+    // The owner follows both defaults; ann has personal values (two use-default buttons).
+    expect(text.split(locale === 'en' ? '(default)' : '（默认）').length - 1).toBe(2)
+    expect(html.match(locale === 'en' ? /<button[^>]*>Use default<\/button>/g : /<button[^>]*>恢复默认<\/button>/g)).toHaveLength(2)
+    expect(text).toContain(locale === 'en' ? 'Select members' : '批量选择')
+    expect(html).not.toContain('data-slot="org-bulk-bar"') // only in selection mode
   })
 })
 

@@ -40,3 +40,4 @@ export {
   type PromoMove,
 } from './promo-actions'
 export { readPoolChoiceOffer } from './pool-choice'
+export { bulkGrantOrgCredits, bulkSetOrgAllowance, setOrgDefaultAllowances } from './bulk-actions'

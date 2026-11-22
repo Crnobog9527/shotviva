@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { monthStart, readInviteOrg, readOrgView, readPaymentAccounts, readSeatOrgId } from './reads'
+import { allowances, monthStart, readInviteOrg, readOrgView, readPaymentAccounts, readSeatOrgId } from './reads'
 
 const ORG = '11111111-1111-4111-8111-111111111111'
 const OWNER = '00000000-0000-4000-8000-0000000000a1'
@@ -164,5 +164,19 @@ describe('readPaymentAccounts', () => {
     expect(await readPaymentAccounts(ok as never, OWNER)).toEqual([{ kind: 'overseas_us', details: { account_name: 'Sample Holdings' } }])
     const broken = { rpc: async () => ({ data: null, error: { message: 'NOT_ORG_OWNER' } }) }
     expect(await readPaymentAccounts(broken as never, OWNER)).toBeNull()
+  })
+})
+
+describe('allowances in force', () => {
+  const org = { default_paid_allowance: 200, default_promo_allowance: 500 }
+  const row = (monthly: number, promo: number, paid: boolean | null, promoCustom: boolean | null) =>
+    ({ monthly_allowance: monthly, promo_allowance: promo, paid_allowance_custom: paid, promo_allowance_custom: promoCustom })
+  it('follows the org default without a personal setting, an unset 0 included', () => {
+    expect(allowances(row(0, 0, null, null), org)).toEqual({ monthlyAllowance: 200, paidFollowsDefault: true, promoAllowance: 500, promoFollowsDefault: true })
+    expect(allowances(row(900, 0, false, false), org)).toMatchObject({ monthlyAllowance: 200, promoAllowance: 500 })
+  })
+  it('keeps a personal value, an old nonzero allowance included', () => {
+    expect(allowances(row(300, 40, null, true), org)).toEqual({ monthlyAllowance: 300, paidFollowsDefault: false, promoAllowance: 40, promoFollowsDefault: false })
+    expect(allowances(row(0, 0, true, true), org)).toMatchObject({ monthlyAllowance: 0, promoAllowance: 0 })
   })
 })

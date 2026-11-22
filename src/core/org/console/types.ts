@@ -19,6 +19,10 @@ export type ConsoleMember = {
   // promotion credits still in their free pool (expire at month end).
   promoAllowance: number
   heldPromoCredits: number
+  // Whether that allowance is the org default (no personal setting); the numbers above are the
+  // allowance in force either way (migration 1899).
+  paidFollowsDefault: boolean
+  promoFollowsDefault: boolean
   // Level-1 customers this member brought (profiles.referred_member).
   customers: number
   joinedAt: string
@@ -35,6 +39,8 @@ export type OwnerConsole = {
     id: string; name: string; refCode: string; status: OrgStatus; poolCredits: number; affiliateEnabled: boolean; affiliateLevels: 1 | 2
     // The promotion pool (channel partner grants): balance and when it expires (null: nothing live).
     promoPoolCredits: number; promoExpiresAt: string | null
+    // The default monthly allowance of each kind for members without a personal setting.
+    defaultPaidAllowance: number; defaultPromoAllowance: number
   }
   inviteToken: string
   members: ConsoleMember[]

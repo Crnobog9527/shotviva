@@ -7,7 +7,10 @@ import { maskPhone } from '@/core/auth/phone'
 import { readOwnerReport } from '@/core/org/console'
 import { EnterpriseFrame, OwnerConsoleView, type OwnerActions } from '@/core/org/ui'
 
-import { allocateAction, allocatePromoAction, depositAction, removeMemberAction, resetInviteAction, setAllowanceAction, setPromoAllowanceAction } from '../org-actions'
+import {
+  allocateAction, allocatePromoAction, bulkGrantAction, bulkSetAllowanceAction, depositAction, removeMemberAction, resetInviteAction, setAllowanceAction,
+  setDefaultsAction, setPromoAllowanceAction,
+} from '../org-actions'
 import { readOwnerArea } from './owner-area'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -20,6 +23,9 @@ const actions: OwnerActions = {
   setAllowance: setAllowanceAction,
   allocatePromo: allocatePromoAction,
   setPromoAllowance: setPromoAllowanceAction,
+  setDefaults: setDefaultsAction,
+  bulkSetAllowance: bulkSetAllowanceAction,
+  bulkGrant: bulkGrantAction,
   removeMember: removeMemberAction,
   resetInvite: resetInviteAction,
 }
