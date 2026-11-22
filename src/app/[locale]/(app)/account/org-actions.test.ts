@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const spies = vi.hoisted(() => ({ user: vi.fn(), db: vi.fn(), command: vi.fn(), refresh: vi.fn(), clearIntent: vi.fn() }))
-vi.mock('@/core/org/join-intent', () => ({ clearJoinIntent: spies.clearIntent }))
+const spies = vi.hoisted(() => ({ user: vi.fn(), db: vi.fn(), command: vi.fn(), refresh: vi.fn() }))
 vi.mock('@/core/auth', () => ({ createAdminSupabase: spies.db, requireUser: spies.user }))
 vi.mock('next/cache', () => ({ refresh: spies.refresh }))
 vi.mock('@/core/org/console', () => ({
@@ -60,7 +59,5 @@ describe('enterprise server actions', () => {
     await actions.joinOrgAction('c'.repeat(32))
     expect(spies.user).toHaveBeenCalledWith(`/join/org/${'c'.repeat(32)}`)
     expect(spies.command).toHaveBeenCalledWith(expect.objectContaining({ user: USER }), 'c'.repeat(32))
-    // The sign-up mark is spent by the join attempt.
-    expect(spies.clearIntent).toHaveBeenCalled()
   })
 })

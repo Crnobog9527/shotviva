@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { Link } from '@/core/i18n/ui'
@@ -12,19 +12,11 @@ import { useConsoleAction } from './use-console-action'
 
 // The confirm button of /join/org/[token]. Joining the same org twice is a no-op in the SQL, so a
 // double click or a retry cannot seat anyone twice; after success the page shows where to go.
-// `auto` (back from sign-up or sign-in) presses it once after hydration: never during the server
-// render, so a link preview or prefetch cannot join anyone.
-export function JoinForm({ join, orgName, auto = false }: { join: JoinAction; orgName: string; auto?: boolean }) {
+export function JoinForm({ join, orgName }: { join: JoinAction; orgName: string }) {
   const t = useTranslations('app.org.join')
   const [joined, setJoined] = useState(false)
   const { pending, outcome, run } = useConsoleAction()
   const submit = () => run(join, t('done', { org: orgName }), () => setJoined(true))
-  const started = useRef(false)
-  useEffect(() => {
-    if (!auto || started.current) return
-    started.current = true
-    submit()
-  })
   if (joined) {
     return (
       <div className="space-y-3" role="status">

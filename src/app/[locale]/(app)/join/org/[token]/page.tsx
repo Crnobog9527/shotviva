@@ -5,11 +5,10 @@ import { getTranslations } from 'next-intl/server'
 import { AppPage } from '@/core/app-shell'
 import { redirect } from 'next/navigation'
 
-import { createAdminSupabase, getSessionUser, requireUser } from '@/core/auth'
-import { currentLocale } from '@/core/i18n/server'
+import { createAdminSupabase, getSessionUser, requireUser, signupPath } from '@/core/auth'
+import { localized } from '@/core/i18n/server'
 import { Link } from '@/core/i18n/ui'
 import { readInviteOrg, readSeatOrgId } from '@/core/org/console'
-import { readJoinIntent, shouldAutoJoin } from '@/core/org/join-intent'
 import { JoinForm } from '@/core/org/ui'
 
 import { joinOrgAction } from '../../../account/org-actions'
@@ -30,21 +29,20 @@ function Notice({ title, body, children }: { title: string; body: string; childr
 
 const linkClass = 'inline-flex min-h-11 items-center text-label font-medium text-primary underline underline-offset-4'
 
-// Staff opening the link signed out usually have no account yet: the join-intent route marks this
-// browser and sends them to sign-up (its "sign in" link keeps `next`); they come back with ?auto=1
-// and the join finishes without another click, only when that mark names this token.
+// Staff opening the link signed out usually have no account yet: they go to sign-up (its "sign in"
+// link keeps `next`) and come back here to confirm. Joining always takes that one click: nothing
+// in a link or a cookie may join an account by itself (review of #829).
 async function joiningUser(token: string) {
   const path = `/join/org/${encodeURIComponent(token)}`
-  if (!(await getSessionUser())) redirect(`/api${path}?locale=${await currentLocale()}`)
+  if (!(await getSessionUser())) redirect(await localized(signupPath(await localized(path))))
   return requireUser(path)
 }
 
 // /join/org/[token] (ARCHITECTURE §6.5, card E4): needs a signed-in account, shows the org, and
-// joins on one confirmation (automatic on the way back from sign-up or sign-in). The token is only
-// ever matched against orgs.invite_token on the server; a wrong or reset one is the same "no
-// longer valid" page.
-async function Join({ params, searchParams }: Pick<PageProps<'/[locale]/join/org/[token]'>, 'params' | 'searchParams'>) {
-  const [{ token }, query, intent] = await Promise.all([params, searchParams, readJoinIntent()])
+// joins on one confirmation. The token is only ever matched against orgs.invite_token on the
+// server; a wrong or reset one is the same "no longer valid" page.
+async function Join({ params }: Pick<PageProps<'/[locale]/join/org/[token]'>, 'params'>) {
+  const { token } = await params
   const user = await joiningUser(token)
   const t = await getTranslations('app.org.join')
   const db = createAdminSupabase()
@@ -55,16 +53,16 @@ async function Join({ params, searchParams }: Pick<PageProps<'/[locale]/join/org
   if (seat) return <Notice title={t('otherTitle')} body={t('otherBody')}><Link href="/account" className={linkClass}>{t('toAccount')}</Link></Notice>
   return (
     <Notice title={t('title', { org: org.name })} body={t('body')}>
-      <JoinForm join={joinOrgAction.bind(null, token)} orgName={org.name} auto={shouldAutoJoin({ auto: query.auto, cookie: intent, token })} />
+      <JoinForm join={joinOrgAction.bind(null, token)} orgName={org.name} />
     </Notice>
   )
 }
 
-export default async function JoinOrgPage({ params, searchParams }: PageProps<'/[locale]/join/org/[token]'>) {
+export default async function JoinOrgPage({ params }: PageProps<'/[locale]/join/org/[token]'>) {
   return (
     <AppPage>
       <Suspense fallback={null}>
-        <Join params={params} searchParams={searchParams} />
+        <Join params={params} />
       </Suspense>
     </AppPage>
   )
