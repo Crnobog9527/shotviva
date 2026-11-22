@@ -7,9 +7,11 @@
 -- credits are spent first), only for this org's rows of the current UTC month still in an owner's
 -- pool, and taken from the account each row was granted to (recipient_user_id, not today's owner:
 -- the owner may have changed since), never more than that account's free balance outside what it
--- holds of the org's promotion share. Those rows are marked moved and their expiry basis is set to what was moved, so the
--- month-end pass takes back only what later refunds of earlier jobs add (as it already does after an
--- expiry), never the moved credits a second time. Only the service role may call these.
+-- holds of the org's promotion share. Those rows are marked moved (moved_at, moved_credits); from
+-- then on the bucket (1921) gives a moved row only what refunds landing after the move give back of
+-- reserves made before it, so the month-end pass takes exactly that (basis 0), never the moved
+-- credits a second time, and spending after the move cannot hide such a refund. Only the service
+-- role may call these.
 
 -- This org's moveable rows: {period, credits, recipients: [{user, credits}], rows: [{source, id, user, left}]}. Read only.
 create function public._partner_promo_moveable(p_org uuid) returns jsonb
@@ -119,10 +121,10 @@ begin
   for r in select * from jsonb_to_recordset(v_calc->'rows') as x(source text, id bigint, "left" integer) loop
     if r.source = 'grant' then
       update public.partner_promo_grants set moved_at = now(), moved_credits = r."left",
-             expired_at = now(), expired_credits = 0, expired_basis = r."left" where id = r.id;
+             expired_at = now(), expired_credits = 0, expired_basis = 0 where id = r.id;
     else
       update public.partner_promo_topups set moved_at = now(), moved_credits = r."left",
-             expired_at = now(), expired_credits = 0, expired_basis = r."left" where id = r.id;
+             expired_at = now(), expired_credits = 0, expired_basis = 0 where id = r.id;
     end if;
   end loop;
   if v_credits > 0 then
