@@ -110,6 +110,19 @@ it('holds the org owner to the same rule: org shares only, own credits frozen', 
   expect((await db.query('select credits, free_credits from profiles where id=$1', [owner])).rows[0]).toEqual({ credits: 100, free_credits: 130 })
 })
 
+it('lets the owner deposit their own (frozen) paid credits into the pool, then use them as an org share', async () => {
+  await seed()
+  const { orgId, owner } = await member(0, 0)
+  await db.query('update profiles set credits=300 where id=$1', [owner]) // bought on their own account
+  await refused(db, () => generate(owner), 'ORG_CREDITS_INSUFFICIENT')
+  const pool = Number((await row(db, 'select pool_credits from orgs where id=$1', [orgId])).pool_credits)
+  expect((await row(db, "select org_deposit($1,300,'dep-own') r", [owner])).r).toMatchObject({ applied: true, pool_credits: pool + 300 })
+  expect(await balances(owner)).toMatchObject({ credits: 0 })
+  await db.query("select org_allocate($1,$1,50,'self-paid')", [owner])
+  expect(await generate(owner)).toMatchObject({ credit_pool: 'paid' })
+  expect(await balances(owner)).toMatchObject({ credits: 40 })
+})
+
 it('charges poster photo extraction from the org shares too', async () => {
   await db.query("insert into system_settings(key, value) values ('poster_photo_credits', '1'::jsonb) on conflict (key) do update set value = excluded.value")
   const { orgId, staff } = await member(0, 50, { credits: 500 })
