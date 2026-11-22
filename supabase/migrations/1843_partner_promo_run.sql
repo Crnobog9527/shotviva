@@ -1,52 +1,93 @@
--- The monthly run of channel partner promotion grants (ARCHITECTURE §6.5 渠道商推广积分): month-end
--- expiry of last month's credits, then one pending sheet per partner for the new month. Called by
--- the cron route on the 1st (UTC) and by an admin's "generate now"; safe to repeat.
+-- The runs of channel partner promotion grants (ARCHITECTURE §6.5 渠道商推广积分): the daily expiry
+-- pass (month-end expiry of granted credits) and the monthly run (one pending sheet per partner for
+-- the new month, called on the 1st (UTC) and by an admin's "generate now"). Both safe to repeat.
 
--- Takes back what is left of every granted sheet whose month is over. Promotion credits are taken
+-- What is left of a granted sheet's credits at the end of its month. Promotion credits are taken
 -- to be spent before the owner's other free credits (they are the ones that expire): what is left
--- is the grant minus the free-pool spending (reserve, less refund) booked between the grant and the
--- end of its month, never more than the free balance now. One ledger row per sheet
--- (partner_promo_expire:<sheet>), so a repeat takes nothing twice. Each sheet in its own
--- subtransaction; the ones that failed are returned and retried by the next run.
+-- is the grant minus the free-pool reserves made between the grant and the expiry, each less the
+-- refunds of that same job. A refund is paired with its reserve through the idempotency key
+-- (`<job>:<anything>` belongs to `<job>:reserve`, as _org_held_follows_ledger pairs them) and counts
+-- at the reserve's time, whenever it lands: a refund after the grant for a job reserved before it
+-- frees nothing of the grant, and a job reserved before the expiry and refunded after it gives its
+-- credits back to the grant (so they expire too).
+create function public._partner_promo_left(g public.partner_promo_grants) returns integer
+language sql stable security definer set search_path = '' as $$
+  with reserves as (
+    select r.idempotency_key, -r.delta as spent from public.credit_ledger r
+     where r.user_id = g.recipient_user_id and r.pool = 'free' and r.kind = 'reserve'
+       and r.created_at >= g.decided_at and r.created_at < g.expires_at
+  ),
+  refunds as (
+    select regexp_replace(f.idempotency_key, ':[^:]+$', ':reserve') as reserve_key, sum(f.delta) as back
+      from public.credit_ledger f
+     where f.user_id = g.recipient_user_id and f.pool = 'free' and f.kind = 'refund' and f.created_at >= g.decided_at
+     group by 1
+  )
+  select greatest(0, g.total - coalesce(sum(greatest(0, r.spent - least(r.spent, coalesce(f.back, 0)))), 0))::integer
+    from reserves r left join refunds f on f.reserve_key = r.idempotency_key;
+$$;
+revoke all on function public._partner_promo_left(public.partner_promo_grants) from public, anon, authenticated, service_role;
+
+-- Takes back what is left of every granted sheet whose month is over, never more than the free
+-- balance now. The first pass books partner_promo_expire:<sheet>; for a week after the expiry each
+-- later pass measures again and takes back only what refunds landed since (a job still running at
+-- midnight), keyed partner_promo_expire:<sheet>:<basis>, so a repeat takes nothing twice. A
+-- shortfall (credits spent after the expiry, before the pass) is not chased from later free credits.
+-- Each sheet in its own subtransaction; the failed ones are returned and retried by the next pass.
+-- `overdue`: sheets more than an hour past their expiry still not taken back after this pass.
 create function public._partner_promo_expire() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   g public.partner_promo_grants;
-  v_spent bigint;
+  v_left integer;
   v_free integer;
   v_take integer;
+  v_key text;
   v_expired integer := 0;
   v_taken bigint := 0;
   v_failed jsonb := '[]'::jsonb;
 begin
   for g in select * from public.partner_promo_grants
-            where status = 'granted' and expired_at is null and expires_at <= now() order by id loop
+            where status = 'granted' and expires_at <= now() and (expired_at is null or expires_at > now() - interval '7 days')
+            order by id loop
   begin
-    select * into g from public.partner_promo_grants where id = g.id and expired_at is null for update;
-    continue when not found;
-    v_take := 0;
-    if g.total > 0 then
-      select free_credits into v_free from public.profiles where id = g.recipient_user_id for update;
-      select coalesce(-sum(l.delta), 0) into v_spent from public.credit_ledger l
-       where l.user_id = g.recipient_user_id and l.pool = 'free' and l.kind in ('reserve', 'refund')
-         and l.created_at >= g.decided_at and l.created_at < g.expires_at;
-      v_take := least(coalesce(v_free, 0), greatest(0, g.total - greatest(v_spent, 0)))::integer;
-      if v_take > 0 then
-        perform public._apply_credit_change(g.recipient_user_id, 'free', 'partner_promo_expire', -v_take,
-          'Channel partner promotion credits expired ' || g.period, 'partner_promo_expire:' || g.id);
-      end if;
+    select * into g from public.partner_promo_grants where id = g.id for update;
+    select free_credits into v_free from public.profiles where id = g.recipient_user_id for update;
+    v_left := case when g.total > 0 then public._partner_promo_left(g) else 0 end;
+    v_take := least(coalesce(v_free, 0), greatest(0, v_left - coalesce(g.expired_basis, 0)))::integer;
+    v_key := 'partner_promo_expire:' || g.id || case when g.expired_at is null then '' else ':' || g.expired_basis end;
+    if v_take > 0 then
+      perform public._apply_credit_change(g.recipient_user_id, 'free', 'partner_promo_expire', -v_take,
+        'Channel partner promotion credits expired ' || g.period, v_key);
     end if;
-    update public.partner_promo_grants set expired_at = now(), expired_credits = v_take where id = g.id;
-    v_expired := v_expired + 1;
+    if g.expired_at is null or v_left > g.expired_basis then
+      update public.partner_promo_grants
+         set expired_at = coalesce(expired_at, now()), expired_credits = coalesce(expired_credits, 0) + v_take,
+             expired_basis = greatest(coalesce(expired_basis, 0), v_left)
+       where id = g.id;
+    end if;
+    if g.expired_at is null then v_expired := v_expired + 1; end if;
     v_taken := v_taken + v_take;
   exception when others then
     v_failed := v_failed || jsonb_build_array(jsonb_build_object('grant_id', g.id, 'error', sqlerrm));
   end;
   end loop;
-  return jsonb_build_object('expired', v_expired, 'taken', v_taken, 'failed', v_failed);
+  return jsonb_build_object('expired', v_expired, 'taken', v_taken, 'failed', v_failed,
+    'overdue', (select count(*) from public.partner_promo_grants
+                 where status = 'granted' and expired_at is null and expires_at <= now() - interval '1 hour')::integer);
 end;
 $$;
 revoke all on function public._partner_promo_expire() from public, anon, authenticated, service_role;
+
+-- The daily expiry pass (cron at 00:00 UTC, so a month's credits stop being usable right at its end
+-- rather than after the monthly run; daily also retries a failed pass and settles late refunds).
+-- Returns {expired, taken, failed, overdue}; the route alerts on failed or overdue.
+create function public.partner_promo_expire_run() returns jsonb
+language sql security definer set search_path = '' as $$
+  select public._partner_promo_expire();
+$$;
+revoke all on function public.partner_promo_expire_run() from public, anon, authenticated, service_role;
+grant execute on function public.partner_promo_expire_run() to service_role;
 
 -- The run for grant month p_period (`YYYY-MM`, the current UTC month): expires what is due, closes
 -- sheets of earlier months nobody decided (status lapsed: their month is over, nothing can be

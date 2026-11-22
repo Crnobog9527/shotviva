@@ -27,3 +27,18 @@ export async function runPartnerPromo(client: RpcClient, period: string): Promis
   const parsed = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).parse(period)
   return callRpc(client, 'partner_promo_run', { p_period: parsed }, summary)
 }
+
+const expiry = z.object({
+  expired: z.number().int(),
+  taken: z.number().int(),
+  overdue: z.number().int(),
+  failed: z.array(z.object({ grant_id: z.number(), error: z.string() })),
+})
+
+export type PromoExpirySummary = z.infer<typeof expiry>
+
+// The daily expiry pass (migration 1843 partner_promo_expire_run): takes back what is left of every
+// grant whose month is over, and for a week after settles refunds that landed late.
+export async function expirePartnerPromo(client: RpcClient): Promise<PromoExpirySummary> {
+  return callRpc(client, 'partner_promo_expire_run', {}, expiry)
+}

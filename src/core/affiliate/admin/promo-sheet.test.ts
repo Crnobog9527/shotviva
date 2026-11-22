@@ -41,3 +41,10 @@ it('says when the minimum is not met, and offers no decision once decided or pas
   }
   expect(render({ ...sheet, status: 'granted', decided_at: '2026-12-02T00:00:00Z' })).toContain(P.status.granted)
 })
+
+it('flags a granted sheet past its month that the expiry pass has not taken back yet', () => {
+  const late = { ...sheet, status: 'granted', decided_at: '2026-12-02T00:00:00Z', expires_at: '2026-12-01T00:00:00Z' }
+  expect(render(late)).toContain(P.expiryOverdue)
+  expect(render({ ...late, expired_credits: 500 })).toContain(P.expired(500))
+  expect(render({ ...late, expired_credits: 500 })).not.toContain(P.expiryOverdue)
+})

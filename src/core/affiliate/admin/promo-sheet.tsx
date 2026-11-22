@@ -14,6 +14,12 @@ import type { PromoSheet } from './promo-read'
 const n = (value: number) => value.toLocaleString('zh-CN')
 const short = (id: string) => id.slice(0, 8)
 
+// After the month: how much was taken back, or that it is still waiting for the daily expiry pass.
+function expiryNote(s: PromoSheet, now: Date): string {
+  if (s.expired_credits !== null) return ` · ${P.expired(s.expired_credits)}`
+  return s.status === 'granted' && new Date(s.expires_at) <= now ? ` · ${P.expiryOverdue}` : ''
+}
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <>
@@ -23,7 +29,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function Numbers({ s }: { s: PromoSheet }) {
+function Numbers({ s, now }: { s: PromoSheet; now: Date }) {
   const d = s.detail
   const short_ = s.customers < d.min_customers
   return (
@@ -40,7 +46,7 @@ function Numbers({ s }: { s: PromoSheet }) {
       <Row label={P.clawbackApplied}>{n(s.clawback_applied)}</Row>
       <Row label={P.carry}>{n(s.clawback_owed - s.clawback_applied)}</Row>
       <Row label={P.total}><strong className="text-base">{n(s.total)}</strong></Row>
-      <Row label={P.expires}>{formatBeijing(s.expires_at)}{s.expired_credits !== null && ` · ${P.expired(s.expired_credits)}`}</Row>
+      <Row label={P.expires}>{formatBeijing(s.expires_at)}{expiryNote(s, now)}</Row>
       <Row label={P.computedAt}>{formatBeijing(s.computed_at)}</Row>
       {s.decided_at && <Row label={P.decidedBy}>{formatBeijing(s.decided_at)}{s.decision_note && ` · ${s.decision_note}`}</Row>}
     </dl>
@@ -103,7 +109,7 @@ export function PromoSheetCard({ sheet: s, action, now }: { sheet: PromoSheet; a
         <span className="text-sm text-muted-foreground">{P.period(s.period)}</span>
         <Badge variant={s.status === 'pending' ? 'default' : 'outline'}>{P.status[s.status] ?? s.status}</Badge>
       </header>
-      <Numbers s={s} />
+      <Numbers s={s} now={now} />
       <Breakdown s={s} />
       {open && <Decisions s={s} action={action} />}
     </article>

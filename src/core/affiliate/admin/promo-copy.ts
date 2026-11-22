@@ -42,6 +42,7 @@ export const PROMO_COPY = {
   recompute: '按最新数据重算',
   decidedBy: '处理时间',
   expired: (n: number) => `月底已清零 ${n.toLocaleString('zh-CN')}`,
+  expiryOverdue: '已到期，还没清零（每天 0 点 UTC 自动处理；超过 1 小时仍未清零会报警）',
   status: { pending: '待确认', granted: '已发放', rejected: '已驳回', lapsed: '过期未处理' } as Record<string, string>,
   answers: {
     granted: '已发放。',

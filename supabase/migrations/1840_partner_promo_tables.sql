@@ -84,13 +84,16 @@ create table public.partner_promo_grants (
   decision_note text check (length(decision_note) <= 500),
   expired_at timestamptz,
   expired_credits integer check (expired_credits >= 0),
+  -- What was left of the grant when it was last measured after expiry (1843): a refund that lands
+  -- later for a job reserved before the expiry raises it, and only that rise is taken back again.
+  expired_basis integer check (expired_basis >= 0),
   created_at timestamptz not null default now(),
   unique (org_id, period),
   check ((status = 'pending') = (decided_at is null))
 );
--- The pending badge (admin nav and tab) and the month-end expiry run.
+-- The pending badge (admin nav and tab) and the daily expiry run (due ones, and the week after).
 create index partner_promo_grants_pending_idx on public.partner_promo_grants(created_at) where status = 'pending';
-create index partner_promo_grants_expiry_idx on public.partner_promo_grants(expires_at) where status = 'granted' and expired_at is null;
+create index partner_promo_grants_expiry_idx on public.partner_promo_grants(expires_at) where status = 'granted';
 create index partner_promo_grants_list_idx on public.partner_promo_grants(period desc, id desc);
 alter table public.partner_promo_grants enable row level security;
 revoke all on public.partner_promo_grants from public, anon, authenticated, service_role;

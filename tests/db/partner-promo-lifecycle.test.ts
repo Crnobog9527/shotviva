@@ -22,6 +22,24 @@ beforeEach(async () => {
 afterEach(async () => { await db.query('rollback') })
 afterAll(async () => { await db.end() })
 
+// A free-pool reserve (amount > 0) or a refund (amount < 0) of job `job`, booked `ago` before now.
+async function spend(user: string, job: string, amount: number, ago: string) {
+  const key = job + (amount > 0 ? ':reserve' : ':refund')
+  await db.query("select _apply_credit_change($1,'free',$2,$3,'job',$4)", [user, amount > 0 ? 'reserve' : 'refund', -amount, key])
+  await db.query('update credit_ledger set created_at=now()-$2::interval where idempotency_key=$1', [key, ago])
+}
+const expirePass = async () => (await row(db, 'select partner_promo_expire_run() as r')).r
+
+// A granted base-only sheet for this month whose grant was `granted` ago and which expired `expired` ago.
+async function grantedThenExpired(granted: string, expired: string) {
+  const { orgId, owner } = await partner(db, actor)
+  await run(db, m.current)
+  const s = await sheet(db, orgId, m.current)
+  await confirm(db, actor, s)
+  await db.query('update partner_promo_grants set decided_at=now()-$2::interval, expires_at=now()-$3::interval where id=$1', [s.id, granted, expired])
+  return { owner, s }
+}
+
 // Last month's sheet, confirmed as if within its month (its window is the month before it; the
 // expiry is moved forward only so the confirm is allowed).
 async function grantedLastMonth(orgId: string): Promise<Sheet> {
@@ -76,9 +94,8 @@ it('expires what is left at month end; promotion credits are spent first, other 
   const s = await sheet(db, orgId, m.current)
   await confirm(db, actor, s) // 20,000
   // 3,000 spent (reserve 3,500, a failed job's 500 refunded) during the month.
-  await db.query("select _apply_credit_change($1,'free','reserve',-3500,'job','t:r')", [owner])
-  await db.query("select _apply_credit_change($1,'free','refund',500,'job','t:f')", [owner])
-  await db.query("update credit_ledger set created_at=now()-interval '1 minute' where idempotency_key in ('t:r','t:f')")
+  await spend(owner, 'job:t1', 3500, '1 minute')
+  await spend(owner, 'job:t1', -500, '1 minute')
   await db.query("update partner_promo_grants set decided_at=now()-interval '2 minutes', expires_at=now() where id=$1", [s.id])
   expect(await freeOf(db, owner)).toBe(700 + 20000 - 3000)
 
@@ -125,4 +142,47 @@ it("grants to the owner's own free pool only: the org pool, held credits and org
   expect(await row(db, 'select credits,free_credits from profiles where id=$1', [owner])).toEqual({ credits: 0, free_credits: 40000 })
   await refused(db, () => db.query("select org_allocate($1,$2,40000,'promo-move')", [owner, staff]), 'ORG_POOL_INSUFFICIENT')
   expect(await row(db, 'select free_credits,credits from profiles where id=$1', [staff])).toEqual({ free_credits: 0, credits: 0 })
+})
+
+it('counts a refund at its own reserve: one for a job reserved before the grant frees nothing of it', async () => {
+  const { orgId, owner } = await partner(db, actor)
+  await db.query('update profiles set free_credits=1000 where id=$1', [owner])
+  await spend(owner, 'job:before', 600, '1 hour') // reserved before the grant, from the owner's own credits
+  await run(db, m.current)
+  const s = await sheet(db, orgId, m.current)
+  await confirm(db, actor, s) // 10,000
+  await db.query("update partner_promo_grants set decided_at=now()-interval '30 minutes', expires_at=now() where id=$1", [s.id])
+  await spend(owner, 'job:inside', 3000, '10 minutes') // spent from the grant
+  await spend(owner, 'job:before', -600, '5 minutes') // the earlier job fails after the grant
+  expect(await freeOf(db, owner)).toBe(1000 - 600 + 10000 - 3000 + 600)
+  expect(await expirePass()).toMatchObject({ expired: 1, taken: 7000, overdue: 0, failed: [] })
+  expect(await freeOf(db, owner)).toBe(1000)
+})
+
+it('takes back a refund that lands after the expiry for a job reserved before it, once', async () => {
+  const { owner, s } = await grantedThenExpired('30 minutes', '1 minute')
+  await spend(owner, 'job:late', 4000, '10 minutes')
+  expect(await expirePass()).toMatchObject({ expired: 1, taken: 6000 })
+  expect(await freeOf(db, owner)).toBe(0)
+  await db.query("select _apply_credit_change($1,'free','refund',4000,'job','job:late:refund')", [owner]) // the job failed after midnight
+  expect(await expirePass()).toMatchObject({ expired: 0, taken: 4000 })
+  expect(await expirePass()).toMatchObject({ expired: 0, taken: 0 })
+  expect(await freeOf(db, owner)).toBe(0)
+  expect(await row(db, 'select expired_credits,expired_basis from partner_promo_grants where id=$1', [s.id])).toEqual({ expired_credits: 10000, expired_basis: 10000 })
+  expect(await row(db, "select count(*)::int n from credit_ledger where kind='partner_promo_expire' and user_id=$1", [owner])).toEqual({ n: 2 })
+})
+
+it('reports a failed expiry and flags it overdue an hour after the month ended; the next pass retries', async () => {
+  const { owner } = await grantedThenExpired('3 hours', '2 hours')
+  await db.query(`create function pg_temp.fail_expiry() returns trigger language plpgsql as $$
+    begin if new.kind = 'partner_promo_expire' then raise exception 'forced'; end if; return new; end $$`)
+  await db.query('create trigger fail_expiry before insert on credit_ledger for each row execute function pg_temp.fail_expiry()')
+  const failed = await expirePass()
+  expect(failed).toMatchObject({ expired: 0, taken: 0, overdue: 1 })
+  expect(failed.failed).toHaveLength(1)
+  await db.query('drop trigger fail_expiry on credit_ledger')
+  expect(await expirePass()).toMatchObject({ expired: 1, taken: 10000, overdue: 0, failed: [] })
+  expect(await freeOf(db, owner)).toBe(0)
+  expect(await row(db, "select has_function_privilege('authenticated','public.partner_promo_expire_run()','execute') u, has_function_privilege('service_role','public.partner_promo_expire_run()','execute') s"))
+    .toEqual({ u: false, s: true })
 })
