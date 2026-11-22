@@ -2641,7 +2641,17 @@
     },
     "enterprise": {
       "pill": "Company account",
-      "title": "Company partner dashboard"
+      "title": "Company partner dashboard",
+      "promo": {
+        "title": "This month's promotion credits",
+        "granted": "Granted",
+        "monthly": "Monthly grant",
+        "topups": "Top-ups",
+        "remaining": "Remaining",
+        "validThrough": "Valid through (UTC)",
+        "note": "They are free credits in your own account. Whatever is left is taken back at the end of the month.",
+        "none": "No promotion credits have been granted this month yet."
+      }
     },
     "orderFees": {
       "paid": "Paid (USD)",

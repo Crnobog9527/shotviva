@@ -6,6 +6,7 @@ import { date, money } from './format'
 import { CopyLink } from '../copy-link'
 import { payoutThreshold, type Account, type Settings } from './models'
 import { FeePanel } from './fee-panel'
+import { PromoMonthCard } from './promo-month'
 import { readFees, readSummary } from './repository'
 
 export async function Overview({
@@ -65,6 +66,8 @@ export async function Overview({
         <CopyLink url={consumerReferralUrl(account.slug, locale)} copy={t('copy')} copied={t('copied')} />
         <p className="af-hint">{t('anyPage', { suffix: '?ref=' + account.slug })}</p>
       </section>
+
+      {account.org_id ? <PromoMonthCard orgId={account.org_id} locale={locale} /> : null}
 
       <FeePanel fees={fees} threshold={threshold} locale={locale} t={t} />
 
