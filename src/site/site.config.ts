@@ -126,7 +126,7 @@ export const site = defineSite({
   // The China region manager enterprise customers agree the exchange rate and the transfer with
   // (Owner 2026-11-22, verbatim). Shown on /account/enterprise/purchasing only.
   enterprise: {
-    transferContact: { name: '倪十三', email: 'simonlee@shotviva.com', wechat: 'crnobogkin' },
+    transferContact: { name: 'Simon Lee', email: 'simonlee@shotviva.com', wechat: 'crnobogkin' },
   },
   partners: {
     graylum: {
