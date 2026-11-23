@@ -29,7 +29,13 @@ describe('shared wall first page (wall.ts)', () => {
 
   it('a vote and an admin review expire it', () => {
     expect(read('src/core/wishlist/requests.ts')).toMatch(/voteRowsSchema,\s*\)\s*\/\/[^\n]*\n\s*expireWallCache\(\)/)
-    expect(read('src/core/wishlist/admin.ts')).toMatch(/'admin_review_template_request'[^\n]*\n\s*\/\/[^\n]*\n\s*expireWallCache\(\)/)
+    // A review expires it only after the dropped images are deleted (review of #886).
+    expect(read('src/core/wishlist/admin.ts')).toMatch(/'admin_review_template_request'[\s\S]*?deleteImages\(deps\.store, dropped\)[\s\S]*?\n\s*expireWallCache\(\)\n\}/)
+  })
+
+  it('names a shipped card’s template only as a signed-in viewer sees it (anonymous client, RLS)', () => {
+    expect(shared).toMatch(/const rows = await withVisibleTemplateNames\(raw\)/)
+    expect(read('src/core/wishlist/wall.ts')).toMatch(/createClient\(publicEnv\.NEXT_PUBLIC_SUPABASE_URL, publicEnv\.NEXT_PUBLIC_SUPABASE_ANON_KEY/)
   })
 })
 

@@ -60,11 +60,11 @@ export async function reviewRequest(deps: WishlistDeps, input: unknown): Promise
     p_template_id: review.action === 'ship' ? review.templateId : null,
   }
   const dropped = await wishlistRpc(deps.db, 'admin_review_template_request', args, z.array(z.string()))
-  // A review moves requests onto or off the shared wall (wall.ts).
-  expireWallCache()
   await deleteImages(deps.store, dropped).catch((error: unknown) =>
     logger.error('wishlist.review.images_not_deleted', { requestId: review.id, keys: dropped, error }),
   )
+  // A review moves requests onto or off the shared wall (wall.ts); after the images, never throws.
+  expireWallCache()
 }
 
 // Templates a shipped request can link to: every template, published or not, since the Owner
