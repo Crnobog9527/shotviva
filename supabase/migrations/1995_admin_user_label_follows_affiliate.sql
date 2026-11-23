@@ -1,8 +1,8 @@
 -- Follow-up to 1994: an account tagged on /admin/users before it became an affiliate kept its tag
 -- in admin_user_labels, so the affiliate admin (which reads affiliates.admin_label) showed none.
 -- From now on a new affiliate row picks the tag up when it has no label of its own, and the old
--- row is removed, so the tag lives in one place. Existing affiliates are moved over once below.
--- Expand-only: a new trigger and a one-off move; nothing the deployed code reads changes shape.
+-- row is removed, so the tag lives in one place. Expand-only: a new trigger, no data rewritten
+-- (the users list already shows an affiliate's own label first, then this table's).
 
 create function public._affiliate_adopt_user_label() returns trigger
 language plpgsql security definer set search_path='' as $$
@@ -19,6 +19,3 @@ revoke all on function public._affiliate_adopt_user_label() from public, anon, a
 create trigger affiliates_adopt_user_label before insert on public.affiliates
   for each row execute function public._affiliate_adopt_user_label();
 
-update public.affiliates a set admin_label=l.label
-  from public.admin_user_labels l where l.user_id=a.user_id and a.admin_label is null;
-delete from public.admin_user_labels l where exists(select from public.affiliates a where a.user_id=l.user_id);
