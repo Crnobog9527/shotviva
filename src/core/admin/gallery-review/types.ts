@@ -5,6 +5,8 @@ export type ReviewTab = (typeof REVIEW_TABS)[number]
 
 export type ReviewWork = {
   id: string
+  // Who made it: a click on the card opens their user dialog (Owner 2026-11-23).
+  userId: string
   // A 10-minute signed URL of the finished image; null when it could not be signed.
   imageUrl: string | null
   templateId: string
