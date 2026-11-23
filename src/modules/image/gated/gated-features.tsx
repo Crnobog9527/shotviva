@@ -43,6 +43,16 @@ export function GatedFeatures({ tier, batch }: { tier: MembershipTier | null; ba
   )
 }
 
+// The card's place while the account's tier is on its way (Create streams it): the card itself,
+// drawn as for no plan and inert, so nothing moves when the real one replaces it.
+export function GatedFeaturesPending() {
+  return (
+    <div aria-hidden="true" inert className="pointer-events-none opacity-60">
+      <GatedFeatures tier={null} batch={null} />
+    </div>
+  )
+}
+
 function Entry({ tier, batch }: { tier: MembershipTier | null; batch?: BatchLimits | null }) {
   const t = useTranslations('app.gated.create')
   const title = <b className="block text-body leading-[1.25] font-semibold">{t('title')}</b>

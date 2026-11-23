@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 
 import { trackTemplateFavorite } from '@/core/analytics/browser'
 import type { EventProps } from '@/core/analytics/events'
@@ -15,6 +15,10 @@ type Target = { id: string; category: string }
 
 type Favorites = {
   ids: readonly string[]
+  // The list is still on its way (Create streams it after the page): `hinted` says this browser
+  // last saw a non-empty list, so the Saved chip can hold its place meanwhile.
+  pending?: boolean
+  hinted?: boolean
   isSaved(id: string): boolean
   toggle(template: Target, surface: FavoriteSurface): void
   // Saves without toggling (the sign-in return); a no-op when it is already saved.
@@ -27,8 +31,9 @@ const FavoritesContext = createContext<Favorites | null>(null)
 export const useFavorites = () => useContext(FavoritesContext)
 
 type Props = {
-  // The account's saved template ids, newest first (core/favorites listFavoriteIds), or [] when signed out.
-  initialIds: readonly string[]
+  // The account's saved template ids, newest first (core/favorites listFavoriteIds), or [] when
+  // signed out; a promise when the page streams them after its first paint (Create).
+  initialIds: readonly string[] | Promise<readonly string[]>
   // Signed out, a tap goes to sign-in and comes back to `returnTo` to save it there.
   signedIn: boolean
   returnTo?: string
@@ -42,12 +47,52 @@ async function send(templateId: string, saved: boolean): Promise<SendResult> {
   return { ok: false, code: typeof body?.code === 'string' ? body.code : null }
 }
 
+// Whether this browser last saw saved templates (per-viewer convenience; storage may be blocked).
+const HINT_KEY = 'sv_has_saved'
+function readHint(): boolean {
+  try {
+    return localStorage.getItem(HINT_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+function writeHint(saved: boolean) {
+  try {
+    localStorage.setItem(HINT_KEY, saved ? '1' : '0')
+  } catch {
+    // Blocked storage: the chip simply waits for the list.
+  }
+}
+const noSubscribe = () => () => undefined
+
+// A streamed list (a promise) seeds the store when it arrives; until then the store is empty.
+function useArrived(initialIds: Props['initialIds'], seed: (ids: readonly string[]) => void) {
+  const streamed = initialIds instanceof Promise
+  const [arrived, setArrived] = useState(!streamed)
+  useEffect(() => {
+    if (!(initialIds instanceof Promise)) return
+    let live = true
+    initialIds.then((ids) => {
+      if (!live) return
+      seed(ids)
+      writeHint(ids.length > 0)
+      setArrived(true)
+    }, () => live && setArrived(true))
+    return () => {
+      live = false
+    }
+  }, [initialIds, seed])
+  // Read on the client only; the server's first paint never claims a saved list.
+  const hinted = useSyncExternalStore(noSubscribe, readHint, () => false)
+  return { pending: !arrived, hinted }
+}
+
 // onFailed must be stable (a state setter): the store keeps the first one.
-function useStore(initialIds: readonly string[], onFailed: (failure: FavoriteFailure) => void) {
+function useStore(initialIds: Props['initialIds'], onFailed: (failure: FavoriteFailure) => void) {
   // Category and surface of the latest tap per template, for the event once the server has it.
   const [meta] = useState(() => new Map<string, { category: string; surface: FavoriteSurface }>())
   const [store] = useState(() =>
-    createFavoritesStore(initialIds, send, {
+    createFavoritesStore(initialIds instanceof Promise ? [] : initialIds, send, {
       onSynced(id, saved) {
         const tap = meta.get(id)
         if (tap) trackTemplateFavorite({ id, category: tap.category }, saved ? 'add' : 'remove', tap.surface)
@@ -65,6 +110,8 @@ export function FavoritesProvider({ initialIds, signedIn, returnTo, children }: 
   const router = useRouter()
   const [failure, setFailure] = useState<FavoriteFailure | null>(null)
   const { store, ids, meta } = useStore(initialIds, setFailure)
+  const seed = useCallback((list: readonly string[]) => store.seed(list), [store])
+  const { pending, hinted } = useArrived(initialIds, seed)
   const dismiss = useCallback(() => setFailure(null), [])
   const set = useCallback(
     (template: Target, surface: FavoriteSurface, saved: boolean) => {
@@ -84,11 +131,13 @@ export function FavoritesProvider({ initialIds, signedIn, returnTo, children }: 
     const saved = new Set(ids)
     return {
       ids,
+      pending,
+      hinted,
       isSaved: (id) => saved.has(id),
       toggle: (template, surface) => set(template, surface, !saved.has(template.id)),
       save: (template, surface) => (saved.has(template.id) ? undefined : set(template, surface, true)),
     }
-  }, [ids, set])
+  }, [ids, set, pending, hinted])
   return (
     <FavoritesContext value={value}>
       {children}

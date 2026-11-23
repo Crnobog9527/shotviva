@@ -3,7 +3,7 @@
 export { ActionBar, ActionNotice } from './action-bar'
 export { AdminLink } from './admin-link'
 export { AppFrame, AppPage, TabBarSlot } from './app-frame'
-export { BalanceChip } from './balance-chip'
+export { BalanceChip, BalanceChipSlot } from './balance-chip'
 export { balanceChipLabel, balanceSentence } from './balance-copy'
 export { FlowNav } from './flow-nav'
 export { adminEntryFor, type AdminEntry } from './admin-entry'
