@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
-import { connection } from 'next/server'
+import { prefetch } from 'next/cache'
 import { Suspense } from 'react'
 
 import { AppPage, TabRootHeader } from '@/core/app-shell'
@@ -34,7 +34,9 @@ function Header() {
 // 2026-11-10), which marks itself seen.
 async function Wall() {
   const user = await requireUser('/wishlist')
-  await connection()
+  // Out of the App Shell, but rendered by the tab bar's per-link prefetch before the tap
+  // (core/app-shell/tab-bar.tsx), so the wall opens at once.
+  await prefetch()
   const [first, eligible] = await Promise.all([
     listWall(await createServerSupabase(), r2Store()),
     // wishlist_eligible() is service-role only; the user's own id comes from the session.
