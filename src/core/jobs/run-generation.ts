@@ -10,6 +10,7 @@ import { screenIdentityText, type IdentityJudge } from '../identity-guard'
 import { isOwnInputKey, loadInputImage, outputKeyFor, writeInputPreview } from '../storage'
 import {
   DEFAULT_RESOLUTION,
+  FOOD_COPY_KEYS,
   FOOD_TOGGLE_KEYS,
   loadGenerationTemplate,
   allowedWebAspects,
@@ -116,9 +117,10 @@ async function finishPoster(deps: GenerationDeps, poster: Prepared['poster'], jo
 }
 
 // Everything that can be rejected without touching credits: template, fields, key
-// 优化摆盘 / 优化器皿 while the site-wide switch is off (food_toggles_enabled, 1848).
-async function forcedOffToggles(deps: GenerationDeps): Promise<readonly string[]> {
-  return (await deps.foodTogglesEnabled?.()) ? [] : FOOD_TOGGLE_KEYS
+// 优化摆盘 / 优化器皿, and the dish name only their flow reads, while the site-wide switch is off
+// (food_toggles_enabled, 1848): toggles rendered off, the dish name left out of the inputs.
+async function switchedOff(deps: GenerationDeps): Promise<{ forceOff: readonly string[]; dropCopy: readonly string[] }> {
+  return (await deps.foodTogglesEnabled?.()) ? { forceOff: [], dropCopy: [] } : { forceOff: FOOD_TOGGLE_KEYS, dropCopy: FOOD_COPY_KEYS }
 }
 
 // ownership, tier limits (batch size, rate limit), then the user's words (ARCHITECTURE §5.1a:
@@ -143,7 +145,7 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
     imageCount: req.inputKey ? 1 : 0,
     ...(inputSlots ? { slots: inputSlots } : {}),
     aspects: requestAspects(req, template),
-    forceOff: await forcedOffToggles(deps),
+    ...(await switchedOff(deps)),
   })
   const { inputs, poster, qr } = withPoster(validated, await posterPart(deps, req, template, validated))
   const keys = uploadKeys(req, inputs)
@@ -193,7 +195,8 @@ export function toggleInputs(inputs: GenerationInputs, now: Date) {
 // reserve_credits charges templates.credits_cost[resolution] from this very object.
 function jobInputs(req: GenerationRequest, prepared: Prepared, resolution: Resolution, attemptId: string, now: Date) {
   const { inputs, prompt, template } = prepared
-  const shown = publicCopyKeys(template.fields.copy)
+  // A field left out of the inputs (the dish name while the switch is off) is not public either.
+  const shown = publicCopyKeys(template.fields.copy).filter((key) => Object.hasOwn(inputs.copy, key))
   return {
     copy: inputs.copy,
     // Which fields were public at this moment (§5.1d); none for most templates, so their jobs look as before.
