@@ -9,6 +9,7 @@ import {
   batchSetBanned,
   loadUserDetail,
   runAdminQuery,
+  setUserLabel,
   unbanUser,
   type ActionValue,
   type BatchOutcome,
@@ -68,4 +69,10 @@ export async function batchAdjustCreditsAction(input: unknown): Promise<ActionVa
 export async function batchSetBannedAction(input: unknown): Promise<ActionValue<BatchOutcome>> {
   const admin = await requireAdmin()
   return run(() => batchSetBanned(createAdminSupabase(), admin.id, input))
+}
+
+// The admin's tag next to an account on the list (Owner 2026-11-23); an affiliate's is its admin_label.
+export async function setUserLabelAction(input: unknown): Promise<ActionValue<string | null>> {
+  const admin = await requireAdmin()
+  return run(() => setUserLabel(createAdminSupabase(), admin.id, input))
 }

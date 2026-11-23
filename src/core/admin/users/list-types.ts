@@ -39,6 +39,16 @@ export type UserListRow = {
   // more, shown red. Banning stays the Owner's call.
   refusals24h: number
   refusalFlag: boolean
+  // Who the account is (Owner 2026-11-23); null when it could not be read.
+  identity: UserIdentity | null
+}
+
+// The admin's tag for the account (an affiliate's admin_label, else admin_user_labels), its
+// affiliate status and admin note, and its org seat.
+export type UserIdentity = {
+  label: string | null
+  affiliate: { status: string; note: string | null } | null
+  org: { role: 'owner' | 'member'; name: string | null } | null
 }
 
 // unavailable: the database has no admin_list_users yet (this code deployed before migration
