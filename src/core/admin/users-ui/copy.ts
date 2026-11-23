@@ -45,7 +45,7 @@ export const USERS_COPY = {
     owner: (org: string) => `企业主管理员 · ${org}`,
     member: (org: string) => `企业员工 · ${org}`,
     unknownOrg: '企业',
-    affiliate: (status: string) => `联盟会员 · ${({ active: '已通过', pending: '待审核', rejected: '已拒绝', suspended: '已暂停' } as Record<string, string>)[status] ?? status}`,
+    affiliate: (status: string) => `联盟会员 · ${({ active: '已通过', pending: '待审核', rejected: '已拒绝', suspended: '已暂停', banned: '已封禁' } as Record<string, string>)[status] ?? status}`,
     affiliateNote: '联盟备注',
   },
   columns: {

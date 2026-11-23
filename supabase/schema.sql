@@ -3312,6 +3312,23 @@ $$;
 ALTER FUNCTION "public"."_affiliate_accept_invite"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_adopt_user_label"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if new.admin_label is null then
+    select l.label into new.admin_label from public.admin_user_labels l where l.user_id=new.user_id;
+  end if;
+  delete from public.admin_user_labels where user_id=new.user_id;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_adopt_user_label"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_allocate_payout"("p_owner" "uuid", "p_face" bigint, "p_at" timestamp with time zone DEFAULT NULL::timestamp with time zone) RETURNS TABLE("commission_id" bigint, "prior_amount" bigint, "issue_amount" bigint)
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -24684,6 +24701,10 @@ CREATE OR REPLACE TRIGGER "affiliate_payment_update" AFTER UPDATE OF "status", "
 
 
 
+CREATE OR REPLACE TRIGGER "affiliates_adopt_user_label" BEFORE INSERT ON "public"."affiliates" FOR EACH ROW EXECUTE FUNCTION "public"."_affiliate_adopt_user_label"();
+
+
+
 CREATE OR REPLACE TRIGGER "ai_providers_check_references" BEFORE UPDATE OF "module" ON "public"."ai_providers" FOR EACH ROW WHEN ((("old"."module" = 'image'::"text") AND ("new"."module" <> 'image'::"text"))) EXECUTE FUNCTION "public"."check_referenced_provider_module"();
 
 
@@ -27184,6 +27205,10 @@ GRANT ALL ON FUNCTION "admin"."write_synced_profile"("v_id" "text", "v_active_pr
 
 
 REVOKE ALL ON FUNCTION "public"."_affiliate_accept_invite"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_adopt_user_label"() FROM PUBLIC;
 
 
 

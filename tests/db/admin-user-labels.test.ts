@@ -64,3 +64,11 @@ it("writes an affiliate's tag to its admin_label, the value the affiliate admin 
 it('refuses an unknown account', async () => {
   expect((await set(actor, randomUUID(), 'ghost')).error?.message).toBe('USER_NOT_FOUND')
 })
+
+it('hands a tag set before the account became an affiliate over to its admin_label', async () => {
+  const later = await account()
+  expect((await set(actor, later, 'KOC 小李')).data).toBe('KOC 小李')
+  await db.query("insert into affiliates(user_id,slug,status) values ($1,$2,'pending')", [later, 'late-' + token])
+  expect((await db.query('select admin_label from affiliates where user_id=$1', [later])).rows[0].admin_label).toBe('KOC 小李')
+  expect((await db.query('select 1 from admin_user_labels where user_id=$1', [later])).rowCount).toBe(0)
+})
