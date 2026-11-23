@@ -35,7 +35,7 @@ export function useEditForm({ source, balance, creditsCost, imageOptions, draft:
   const resolution = closestResolution(requested.resolution, imageOptions)
   const aspect = chosenAspect(requested.aspect, imageOptions, photoRatio)
   const draft = { ...requested, resolution: resolution ?? requested.resolution, aspect: selectedAspect(requested.aspect, imageOptions) }
-  const cta = editCta(balance, creditsCost[draft.resolution], draft.text)
+  const cta = editCta(balance, creditsCost[draft.resolution], draft.resolution, draft.text)
   const change = (next: Partial<EditDraft>) => {
     if (next.text?.trim()) setShowRequired(false)
     onDraft(next)

@@ -715,7 +715,14 @@
         "name": "4K",
         "use": "Printed menus, posters & big screens"
       },
-      "notEnough": "(not enough credits)"
+      "notEnough": "(not enough credits)",
+      "pool": {
+        "free": "Free credits · watermarked",
+        "paid": "Paid credits · no watermark"
+      },
+      "freeOnly": "1K uses free credits only (promotion credits for company members), and they don’t cover this one. Pick 2K or 4K to use paid credits.",
+      "paidOnly": "Batches and Remove watermark use paid credits only, and 1K uses free credits only. Pick 2K or 4K.",
+      "paidShort": "2K and 4K use paid credits only, and yours don’t cover this set."
     },
     "poster": {
       "dialogHint": "Paste your event notice, check every line, then make the whole set.",
@@ -1064,7 +1071,8 @@
         "joiner": ", "
       },
       "orgNeedsCredits": "Your company's credits don't cover this one. Ask your admin to allocate more; your own credits can't be used while you're a member.",
-      "orgShortCta": "Not enough company credits"
+      "orgShortCta": "Not enough company credits",
+      "tierPoolCta": "Pick another resolution"
     },
     "errors": {
       "NETWORK": "Couldn't reach Shotviva. Check your connection and try again.",
@@ -2202,14 +2210,6 @@
       "copiedHint": "Link copied. Paste it into WeChat or any chat to send it.",
       "copyByHand": "Copy this link to share it:",
       "shareTitle": "Photos I made on Shotviva"
-    },
-    "poolChoice": {
-      "title": "Which company credits to use",
-      "promo": "Promotion credits (watermarked, demo only)",
-      "paid": "Paid credits (no watermark, commercial use)",
-      "left": "{count, number} left",
-      "hint": "If the chosen kind runs short, the other kind is never used instead.",
-      "short": "{count, number} left, not enough for this one"
     }
   },
   "paywall": {

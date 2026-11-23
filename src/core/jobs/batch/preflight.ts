@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { MAX_BATCH_SIZE, readBalance } from '../../billing'
+import { tierPool } from '../../billing/pools'
 import { accountLimits } from '../account-limits'
 import { AppError } from '../../errors'
 import { isOwnInputKey } from '../../storage'
@@ -30,6 +31,9 @@ function checkGrid(userId: string, cells: Selected[]) {
   if (new Set(cells.map(c => JSON.stringify([c.inputs.resolution ?? '1k', c.inputs.aspect_ratio ?? 'original']))).size > 1) {
     throw new AppError('INVALID_INPUT', 'Use one resolution and aspect ratio across the batch')
   }
+  // A batch is paid credits only and 1K is free credits only (1996): reserve_credits would refuse
+  // every cell, so say so before anything is quoted.
+  if (tierPool(cells[0]?.inputs.resolution ?? '1k') === 'free') throw new AppError('INVALID_INPUT', 'A batch is paid credits only: pick 2K or 4K')
 }
 
 function quote(userId: string, selected: Selected, template: Template, position: number,

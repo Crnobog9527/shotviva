@@ -30,7 +30,6 @@ import { useSubmitOnce } from './use-submit-once'
 import { useWarmRoute } from './use-warm-route'
 import { useWorkspaceDraft } from './use-workspace-draft'
 import { WorkspaceForm } from './workspace-form'
-import { PoolChoiceMount } from './pool-choice-mount'
 
 
 type Props = CreateContext & { series: CatalogueSeries | null; onClose(): void }
@@ -117,7 +116,6 @@ function SeriesForm({ series, open, onClose, forms, ...context }: BodyProps & { 
           detailsStatus={template.formDeferred && <CatalogueFormStatus failed={forms.failed} retry={forms.retry} />}
           photoExtra={batch ? <BatchLink templateId={template.id} onGo={onClose} /> : null}
         />
-        <PoolChoiceMount choice={draft.choice.picker} />
       </>}
       bar={<FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} placement="sheet" limit={context.concurrency.limit} privateOnly={template.privateOnly} examplesLeft={draft.examplesLeft} orgOnly={draft.choice.orgOnly} />}
     />

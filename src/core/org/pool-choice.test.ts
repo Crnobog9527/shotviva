@@ -4,7 +4,7 @@ vi.mock('server-only', () => ({}))
 vi.mock('@/core/logger', () => ({ logger: { warn: vi.fn() } }))
 
 const { offerOf } = await import('./pool-choice')
-const { bothKinds, chosenBalance, orgBalance } = await import('@/core/billing/pools')
+const { chargePool, creditsNeeded, defaultTier, orgBalance, tierPool } = await import('@/core/billing/pools')
 const { choiceInput } = await import('@/core/jobs/run-generation')
 const { generateBodySchema, toGenerationRequest } = await import('@/core/jobs/generation-request')
 
@@ -23,17 +23,32 @@ describe('offerOf', () => {
     expect(offerOf({ held_credits: 100, held_promo_credits: 40, orgs: { promo_expires_at: null } }, { credits: 100, free_credits: 40, org_pool_choice: null }, now)).toMatchObject({ promo: 0 })
     expect(offerOf({ held_credits: 100, held_promo_credits: 40, ...live }, { credits: 30, free_credits: 10, org_pool_choice: null }, now)).toMatchObject({ paid: 30, promo: 10 })
   })
-  it('shows the picker only with both kinds', () => {
-    expect(bothKinds({ paid: 1, promo: 1, last: 'paid' })).toBe(true)
-    expect(bothKinds({ paid: 0, promo: 9, last: 'paid' })).toBe(false)
+  it('spends the promotion share as the free pool and the paid share as the paid pool', () => {
     expect(orgBalance({ paid: 3, promo: 4, last: 'paid' })).toEqual({ paid: 3, free: 4 })
   })
 })
 
-describe('chosenBalance', () => {
-  it('lets the chosen kind pay from its own pool only', () => {
-    expect(chosenBalance({ paid: 30, free: 70 }, 'paid')).toEqual({ paid: 30, free: 0 })
-    expect(chosenBalance({ paid: 30, free: 70 }, 'promo')).toEqual({ paid: 0, free: 70 })
+// The tier decides the pool (Owner 2026-11-23, 1996), mirroring _reserve_pool_for_tier.
+describe('tier pools', () => {
+  it('pays 1K from the free pool only and 2K / 4K from the paid pool only, never the other one', () => {
+    expect([tierPool('1k'), tierPool('2k'), tierPool('4k')]).toEqual(['free', 'paid', 'paid'])
+    expect(chargePool({ paid: 100, free: 0 }, 10, '1k')).toBeNull()
+    expect(chargePool({ paid: 0, free: 100 }, 10, '2k')).toBeNull()
+    expect(chargePool({ paid: 0, free: 10 }, 10, '1k')).toBe('free')
+    expect(chargePool({ paid: 10, free: 0 }, 10, '4k')).toBe('paid')
+  })
+  it('counts only paid credits still to buy, and none for 1K (buying never pays it)', () => {
+    expect(creditsNeeded({ paid: 3, free: 100 }, 10, '2k')).toBe(7)
+    expect(creditsNeeded({ paid: 30, free: 0 }, 10, '2k')).toBe(0)
+    expect(creditsNeeded({ paid: 0, free: 0 }, 10, '1k')).toBe(0)
+  })
+  it('starts on 2K when paid credits cover it, else 1K when free credits do, else nothing', () => {
+    const costs = { '1k': 10, '2k': 10, '4k': 20 }
+    const all = ['1k', '2k', '4k'] as const
+    expect(defaultTier({ paid: 10, free: 100 }, costs, all)).toBe('2k')
+    expect(defaultTier({ paid: 9, free: 10 }, costs, all)).toBe('1k')
+    expect(defaultTier({ paid: 9, free: 9 }, costs, all)).toBeNull()
+    expect(defaultTier({ paid: 100, free: 100 }, costs, ['1k', '4k'] as const)).toBe('1k') // 2K not offered
   })
 })
 
@@ -63,15 +78,5 @@ describe('spendableBalance', () => {
     const profile = { credits: 500, free_credits: 80, org_pool_choice: null }
     expect(await spendableBalance(db(seat, profile), 'u', { paid: 500, free: 80 })).toEqual({ paid: 30, free: 70 })
     expect(await spendableBalance(db(null, profile), 'u', { paid: 500, free: 80 })).toEqual({ paid: 500, free: 80 })
-  })
-})
-
-describe('coveringChoice', () => {
-  it('keeps the pick when it covers the job, else takes the kind that does, else keeps the pick', async () => {
-    const { coveringChoice } = await import('@/core/billing/pools')
-    const offer = { paid: 30, promo: 100, last: 'paid' as const }
-    expect(coveringChoice(offer, 'paid', 20)).toBe('paid')
-    expect(coveringChoice(offer, 'paid', 50)).toBe('promo') // paid short, promotion covers
-    expect(coveringChoice(offer, 'promo', 200)).toBe('promo') // neither covers: the page asks the admin
   })
 })

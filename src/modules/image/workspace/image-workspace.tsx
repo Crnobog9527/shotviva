@@ -20,7 +20,6 @@ import { FailureView, SuccessView } from './settled-views'
 import { useWorkspaceDraft, type DraftInput } from './use-workspace-draft'
 import { WorkspaceForm } from './workspace-form'
 import { WorkspaceStage } from './workspace-stage'
-import { PoolChoiceMount } from './pool-choice-mount'
 import type { CreateShareAction } from '../work-share/share-types'
 
 
@@ -78,7 +77,6 @@ export function ImageWorkspace({ shareText, editable, shareLink, ...input }: Wor
           examples={draft.fromExamples}
           photoExtra={<MatrixLink template={template} tier={tier} />}
         />
-        <PoolChoiceMount choice={draft.choice.picker} />
         <FormAction
           state={draft.state}
           resolution={draft.values.resolution}

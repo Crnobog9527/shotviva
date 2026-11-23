@@ -11,7 +11,7 @@ import type { PosterStudioState, StudioTemplate } from '../use-poster-studio'
 import type { PhotoSort } from '../use-photo-sort'
 import type { PosterWeekly } from '../use-poster-weekly'
 import { BlockTabs } from './block-tabs'
-import { GenerateButton, GeneratePanel, waitsOnReview } from './generate-panel'
+import { GenerateButton, GeneratePanel, TierShortNote, waitsOnReview } from './generate-panel'
 import { ReviewNudge } from './review-check'
 import { pagePhotos } from './page-slots'
 import { PasteStep, SortButton } from './paste-step'
@@ -56,6 +56,7 @@ export function StudioBar({ studio, template, balance }: Props) {
     <div className="grid w-full gap-2">
       {left ? <p role="status" className="text-caption text-primary">{t('sample.contactsLeft')}</p> : null}
       {waitsOnReview(studio, balance, template) ? <ReviewNudge studio={studio} /> : null}
+      <TierShortNote studio={studio} template={template} balance={balance} />
       <GenerateButton studio={studio} template={template} balance={balance} />
     </div>
   )

@@ -715,7 +715,14 @@
         "name": "4K",
         "use": "打印菜单、海报、大屏"
       },
-      "notEnough": "（积分不够）"
+      "notEnough": "（积分不够）",
+      "pool": {
+        "free": "免费积分 · 带水印",
+        "paid": "付费积分 · 无水印"
+      },
+      "freeOnly": "1K 只用免费积分（企业成员用推广积分），不够这一张。可以改选 2K 或 4K，用付费积分。",
+      "paidOnly": "批量和去水印只用付费积分，1K 只用免费积分。请改选 2K 或 4K。",
+      "paidShort": "2K 和 4K 只用付费积分，付费积分不够这一组。"
     },
     "poster": {
       "dialogHint": "粘贴活动通知，逐行核对后一次生成整套海报。",
@@ -1064,7 +1071,8 @@
         "joiner": "、"
       },
       "orgNeedsCredits": "企业分给你的积分不够这一张，请找管理员分配额度。在企业期间不能用你自己的积分。",
-      "orgShortCta": "企业积分不够"
+      "orgShortCta": "企业积分不够",
+      "tierPoolCta": "换个清晰度"
     },
     "errors": {
       "NETWORK": "连不上 Shotviva，请检查网络后再试。",
@@ -2202,14 +2210,6 @@
       "copiedHint": "链接已复制，打开微信粘贴发送",
       "copyByHand": "复制这个链接去分享：",
       "shareTitle": "我在 Shotviva 做的作品"
-    },
-    "poolChoice": {
-      "title": "用哪种企业积分",
-      "promo": "推广积分（带水印，仅供演示）",
-      "paid": "付费积分（无水印，可商用）",
-      "left": "剩余 {count, number}",
-      "hint": "选的那种不够时不会改用另一种。",
-      "short": "剩余 {count, number}，不够这一张"
     }
   },
   "paywall": {
