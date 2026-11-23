@@ -2,16 +2,17 @@
 
 import { useEffect } from 'react'
 
-import { CACHE_PREFIX, SERVICE_WORKER_ENABLED } from './sw'
+import { CACHE_PREFIX } from './sw'
 
 // Registers /sw.js once the page has loaded and gone idle, so it never competes with the page's own
-// first load. `production`: a production build (the root layout says, core/offline/server.ts); `next
-// dev` never registers. With the kill switch off it unregisters any worker instead.
-export function ServiceWorkerSlot({ production }: { production: boolean }) {
+// first load. `production`: a production build (`next dev` never registers); `enabled`: the admin
+// switch system_settings service_worker_enabled (both read by the root layout). Switched off, it
+// unregisters any worker instead (the kill switch, with /sw.js itself unregistering).
+export function ServiceWorkerSlot({ production, enabled }: { production: boolean; enabled: boolean }) {
   useEffect(() => {
     if (!production || !('serviceWorker' in navigator)) return
     const container = navigator.serviceWorker
-    if (!SERVICE_WORKER_ENABLED) {
+    if (!enabled) {
       void container.getRegistrations().then((all) => Promise.all(all.map((registration) => registration.unregister())))
       return
     }
@@ -19,7 +20,7 @@ export function ServiceWorkerSlot({ production }: { production: boolean }) {
     const idle = () => ('requestIdleCallback' in window ? window.requestIdleCallback(register, { timeout: 5000 }) : globalThis.setTimeout(register, 2000))
     if (document.readyState === 'complete') idle()
     else window.addEventListener('load', idle, { once: true })
-  }, [production])
+  }, [production, enabled])
   return null
 }
 

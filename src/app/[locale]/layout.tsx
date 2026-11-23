@@ -12,7 +12,7 @@ import { registersServiceWorker } from '@/core/offline/server'
 import { htmlLang, isLocale, publicClientMessages } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata, ShortcutTitleSync } from '@/core/seo'
-import { foodTogglesEnabled } from '@/core/system-settings'
+import { foodTogglesEnabled, serviceWorkerEnabled } from '@/core/system-settings'
 import { FoodTogglesProvider } from '@/core/templates/offered-toggles'
 import { GeistFonts } from '@/core/ui/geist-fonts'
 import { MiSansStylesheet } from '@/core/ui/misans-stylesheet'
@@ -49,7 +49,7 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
   const messages = publicClientMessages(await getMessages())
   const lang = isLocale(locale) ? locale : site.locales.default
   // 优化摆盘 / 优化器皿 are offered only while this site-wide switch is on (cached, own tag).
-  const foodToggles = await foodTogglesEnabled()
+  const [foodToggles, serviceWorker] = await Promise.all([foodTogglesEnabled(), serviceWorkerEnabled()])
   return (
     <html lang={htmlLang(lang)} className="h-full antialiased">
       <body className="flex min-h-full flex-col">
@@ -68,7 +68,7 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
               <SignupCodeResult />
               <UpdateSlot />
               {/* Content-hashed scripts, styles and fonts kept on the phone (core/offline). */}
-              <ServiceWorkerSlot production={registersServiceWorker()} />
+              <ServiceWorkerSlot production={registersServiceWorker()} enabled={serviceWorker} />
             </Suspense>
             {/* Huawei Browser names a home-screen shortcut after the live page title (core/seo/shortcut-title.ts). */}
             <ShortcutTitleSync name={site.brand.name} />
