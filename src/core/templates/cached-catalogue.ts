@@ -9,12 +9,27 @@ import type { Locale } from '../i18n/locales'
 import { logger } from '../logger'
 import { PROVIDERS_CACHE_TAG } from '../providers/cache-tag'
 import { TEMPLATES_CACHE_TAG } from './cache'
-import { listTemplatesIn } from './list-templates'
+import { listTemplates, listTemplatesIn, webTemplatesIn } from './list-templates'
 import { applyLocaleDisplay } from './locale-display'
 import { readLocaleDisplay } from './locale-display-read'
 import type { LocalizedTemplate } from './localize'
+import type { Template } from './types'
 
 export const CATALOGUE_LIFE = { revalidate: 3600, expire: 86_400 } as const
+
+// The live web rows, series members and poster templates included, read once for every server
+// instance and both languages. web_templates() checks each template's sale floor and takes
+// 0.4-0.75 s on average, up to 6-8 s, on production (pg_stat_statements, 2026-11-23); under a plain
+// 'use cache' every new instance read it again for each language and each list below (up to six
+// reads), and concurrent reads ran into the statement timeout (listTemplates, 2026-11-23 and
+// 2026-11-11). 'use cache: remote' keeps one copy for the region (Next allows a remote cache inside
+// a regular one, so the callers stay prerenderable). A failed read throws and is not cached.
+async function sharedWebTemplates(): Promise<Template[]> {
+  'use cache: remote'
+  cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
+  cacheLife(CATALOGUE_LIFE)
+  return listTemplates(createAdminSupabase(), 'web', { includeSeriesMembers: true })
+}
 
 type Read = (locale: Locale) => Promise<LocalizedTemplate[]>
 // Every live web template, series members included (T102): these pages look templates up by id
@@ -22,7 +37,8 @@ type Read = (locale: Locale) => Promise<LocalizedTemplate[]>
 // facts, the paywall's photo estimate); a member is as live and as priced as any other template.
 export const readCatalogue: Read = async (locale) => {
   const db = createAdminSupabase()
-  const [live, display] = await Promise.all([listTemplatesIn(db, locale, { includeSeriesMembers: true }), readLocaleDisplay(db)])
+  const [rows, display] = await Promise.all([sharedWebTemplates(), readLocaleDisplay(db)])
+  const live = webTemplatesIn(rows, locale)
   // This language's category order and featured list (migration 1575); the shared ones until set.
   return applyLocaleDisplay(live, display, locale)
 }
@@ -64,7 +80,8 @@ export async function cachedWebTemplates(locale: Locale, includeSeriesMembers: b
   'use cache'
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   cacheLife(CATALOGUE_LIFE)
-  return listTemplatesIn(createAdminSupabase(), locale, { includeSeriesMembers })
+  if (!includeSeriesMembers) return listTemplatesIn(createAdminSupabase(), locale, { includeSeriesMembers })
+  return webTemplatesIn(await sharedWebTemplates(), locale)
 }
 
 // The dense-text poster templates (ARCHITECTURE §5.3), which the catalogue above leaves out:
@@ -73,7 +90,7 @@ export async function cachedPosterTemplates(locale: Locale): Promise<LocalizedTe
   'use cache'
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   cacheLife(CATALOGUE_LIFE)
-  return listTemplatesIn(createAdminSupabase(), locale, { posters: true, includeSeriesMembers: true })
+  return webTemplatesIn(await sharedWebTemplates(), locale, { posters: true })
 }
 
 type TemplateReads = {
