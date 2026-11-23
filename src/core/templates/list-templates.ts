@@ -70,9 +70,16 @@ export async function listTemplates(db: SupabaseClient, surface: TemplateSurface
   return surface === 'partner' ? rows.flatMap(partnerRow) : rows.map(toTemplate)
 }
 
-// Passing an id opens a visible series member in the workspace even when its series hides individual cards.
-export async function listTemplatesIn(db: SupabaseClient, locale: Locale, lookup: WebLookup = {}): Promise<LocalizedTemplate[]> {
-  return (await listTemplates(db, 'web', lookup))
+// The web rows a page shows, in its language: no system templates, and either the poster templates
+// or the rest (a lookup by id finds either kind). The rows do not depend on the language or on
+// `posters`, so one read can serve every caller (cached-catalogue.ts).
+export function webTemplatesIn(templates: readonly Template[], locale: Locale, lookup: Pick<WebLookup, 'id' | 'posters'> = {}): LocalizedTemplate[] {
+  return templates
     .filter(template => !template.categoryInfo.isSystem && (lookup.id !== undefined || Boolean(template.fields.poster) === Boolean(lookup.posters)))
     .map(template => localizeTemplate(template, locale))
+}
+
+// Passing an id opens a visible series member in the workspace even when its series hides individual cards.
+export async function listTemplatesIn(db: SupabaseClient, locale: Locale, lookup: WebLookup = {}): Promise<LocalizedTemplate[]> {
+  return webTemplatesIn(await listTemplates(db, 'web', lookup), locale, lookup)
 }
