@@ -39,7 +39,7 @@ describe('app messages (en)', () => {
     expect(t('app.units.sizeApprox', { width: 1360, height: 768 })).toBe('≈ 1360×768')
     expect(t('app.credits', { count: 1 })).toBe('1 credit')
     expect(t('app.template.fromCredits', { count: 2 })).toBe('from 2 credits')
-    expect(t('app.result.longPress')).toBe('Long-press to save')
+    expect(t('app.result.longPress')).toBe('Long-press to save to your photos (JPG, same quality); tap Download for the lossless PNG')
     const tags = { cost: (chunks: string) => `[${chunks}]`, mono: (chunks: string) => chunks }
     expect(rich('app.workspace.generateCta', { ...tags, count: 2 })).toBe('Generate [· 2 credits]')
     expect(rich('app.workspace.getCreditsCta', { ...tags, count: 6 })).toBe('Get credits [· 6 needed]')

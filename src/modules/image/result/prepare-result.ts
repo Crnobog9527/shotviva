@@ -1,6 +1,7 @@
 import { hasTransparentPixel, isJpeg, isPng, pngMayHaveAlpha } from './transparency'
 
-// shareBlob: the JPEG on white Share hands over by default. original: the bytes as served, which
+// shareBlob: what Share hands over: an opaque PNG up to SHARE_PNG_MAX_BYTES as served, else the
+// JPEG on white. original: the bytes as served, which
 // for a cut-out's 透明底 choice is the PNG with its alpha (MOBILE_UI_rules §1.8.1 rule 4 allows a
 // PNG when transparency is the point).
 export type PreparedResult = { shareBlob: Blob; original: Blob; transparent: boolean }
@@ -13,6 +14,13 @@ const JPEG_QUALITY = 0.92
 // fill the cut-out lands on black. White matches how the app shows it. Output pixels, not UI.
 const SHARE_FILL = '#FFFFFF'
 const HEAD_BYTES = 4096
+// An opaque PNG up to this size is handed over as served (Owner 2026-11-23: 存入相册 should keep
+// the PNG original). Larger files (4K) still go as JPEG: some apps drop shares over ~10 MB.
+export const SHARE_PNG_MAX_BYTES = 8 * 1024 * 1024
+
+export function shareAsServed(png: boolean, bytes: number, transparent: boolean): boolean {
+  return png && !transparent && bytes <= SHARE_PNG_MAX_BYTES
+}
 
 function canvasOf(width: number, height: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
@@ -52,6 +60,7 @@ export async function prepareResult(blob: Blob): Promise<PreparedResult> {
     const bitmap = await createImageBitmap(blob)
     try {
       const transparent = mayHaveAlpha && sampleIsTransparent(bitmap)
+      if (shareAsServed(isPng(head), blob.size, transparent)) return { shareBlob: blob, original: blob, transparent }
       return { shareBlob: (await flattenToJpeg(bitmap)) ?? blob, original: blob, transparent }
     } finally {
       bitmap.close()

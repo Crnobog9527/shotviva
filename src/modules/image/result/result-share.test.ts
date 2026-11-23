@@ -34,6 +34,6 @@ describe('「分享」 on the finished result (Owner 2026-11-23)', () => {
   it('is absent before the file is ready where no link can be made (unchanged)', () => {
     const html = render('zh', {})
     expect(html).not.toContain('分享')
-    expect(text(html)).toContain('长按保存')
+    expect(text(html)).toContain('长按图片直接存进相册')
   })
 })

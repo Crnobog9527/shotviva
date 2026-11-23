@@ -705,15 +705,15 @@
     "tiers": {
       "1k": {
         "name": "1K",
-        "use": "Social & delivery apps"
+        "use": "Phones, social & delivery apps"
       },
       "2k": {
         "name": "2K",
-        "use": "Websites & online stores"
+        "use": "iPad menus, websites & stores"
       },
       "4k": {
         "name": "4K",
-        "use": "Print & zoom"
+        "use": "Printed menus, posters & big screens"
       },
       "notEnough": "(not enough credits)"
     },
@@ -1156,7 +1156,7 @@
       "saveToPhotosHint": "Choose “Save Image” in the menu that opens.",
       "preparingPhoto": "Preparing photo…",
       "holdPhotoHint": "Touch and hold the photo, then choose “Save Image”.",
-      "longPress": "Long-press to save",
+      "longPress": "Long-press to save to your photos (JPG, same quality); tap Download for the lossless PNG",
       "photosHint": "To save to Photos, tap Share, then Save Image",
       "makeAnotherWith": "Make another with {name}",
       "shareText": "Made with {brand} {url}",
