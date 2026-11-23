@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { CataloguePayload } from './catalogue-payload'
 import type { CatalogueTemplate } from './catalogue-template'
-import { CATALOGUE_SCHEMA, isPublicCatalogue, PUBLIC_TEMPLATE_KEYS, toPublicPayload } from './public-catalogue'
+import { CATALOGUE_SCHEMA, isPublicCatalogue, openToEveryone, PUBLIC_TEMPLATE_KEYS, toPublicPayload } from './public-catalogue'
 
 // A template as it may come from the source, with fields that must never reach the public file.
 const template = (id: string, extra: Record<string, unknown> = {}) => ({
@@ -65,5 +65,31 @@ describe('device copy check', () => {
     expect(isPublicCatalogue({ ...file, payload: { templates: 'x' } }, 'zh')).toBe(false)
     expect(isPublicCatalogue('{"schema":1}', 'zh')).toBe(false)
     expect(isPublicCatalogue(null, 'zh')).toBe(false)
+  })
+})
+
+// Poster templates join the public file only while the feature is open to every account, by the
+// rules featureAllowed uses (review of #883: invite-only and a future open_to_all_at are gates).
+describe('open to every account', () => {
+  const now = Date.parse('2026-11-24T00:00:00Z')
+  const past = '2026-11-01T00:00:00Z'
+  const future = '2026-12-01T00:00:00Z'
+
+  it('no access row, or no tier gate: open', () => {
+    expect(openToEveryone(false, undefined, now)).toBe(true)
+    expect(openToEveryone(false, { minTier: null, openToAllAt: null }, now)).toBe(true)
+  })
+
+  it('a tier gate: gated until open_to_all_at has passed', () => {
+    expect(openToEveryone(false, { minTier: 'pro', openToAllAt: null }, now)).toBe(false)
+    expect(openToEveryone(false, { minTier: 'pro', openToAllAt: future }, now)).toBe(false)
+    expect(openToEveryone(false, { minTier: 'pro', openToAllAt: past }, now)).toBe(true)
+  })
+
+  it('invite-only: gated, with or without a tier, until open_to_all_at has passed', () => {
+    expect(openToEveryone(true, undefined, now)).toBe(false)
+    expect(openToEveryone(true, { minTier: null, openToAllAt: null }, now)).toBe(false)
+    expect(openToEveryone(true, { minTier: null, openToAllAt: future }, now)).toBe(false)
+    expect(openToEveryone(true, { minTier: null, openToAllAt: past }, now)).toBe(true)
   })
 })

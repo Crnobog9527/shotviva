@@ -37,6 +37,7 @@ describe('Create: grid from the device, the account streamed', () => {
   })
 
   it('an entitlement-gated catalogue comes from the account, never from the public file', () => {
-    expect(source).toMatch(/return gated && posters \? loadCataloguePayload\(locale, Promise\.resolve\(true\)\) : null/)
+    expect(source).toMatch(/const publicPosters = \(await cachedPublicCatalogue\(locale\)\)\?\.posters === true/)
+    expect(source).toMatch(/return posters && !publicPosters \? loadCataloguePayload\(locale, Promise\.resolve\(true\)\) : null/)
   })
 })

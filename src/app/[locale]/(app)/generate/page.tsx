@@ -6,7 +6,8 @@ import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
 
-import { AppPage, BalanceChip, BalanceChipSlot, TabRootHeader } from '@/core/app-shell'
+import { AppPage, BalanceChip, TabRootHeader } from '@/core/app-shell'
+import { BalanceChipSlot } from '@/core/app-shell/balance-chip-slot'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
 import { batchLimitsOf, effectiveLimits, featureTierOf } from '@/core/billing'
 import { featureAllowed } from '@/core/features'
@@ -16,7 +17,7 @@ import { listRunningJobIds } from '@/core/jobs'
 import { POSTER_FEATURE } from '@/core/poster/sets'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
-import { loadCataloguePayload, type CataloguePayload } from '@/modules/image/create-data'
+import { cachedPublicCatalogue, loadCataloguePayload, type CataloguePayload } from '@/modules/image/create-data'
 import { createReturnPath, DeviceCatalogue, FavoritesProvider, GatedFeatures, GatedFeaturesPending, GeneratingPill, TEMPLATES_ANCHOR, type CreateContext } from '@/modules/image/create-page'
 import { site } from '@/site/site.config'
 
@@ -76,15 +77,16 @@ async function readPersonal(searchParams: Search) {
 }
 type Personal = Awaited<ReturnType<typeof readPersonal>>
 
-// The poster templates are in the public file while dense_poster is open to every account. With a
-// tier gate set (/admin/features) they are entitlement-specific: an entitled account gets its own
-// catalogue here, poster templates included; everyone else uses the public file.
+// The poster templates are in the public file while dense_poster is open to every account. When
+// they are not (a tier gate, invite-only, not yet opened to all), they are entitlement-specific: an
+// entitled account gets its own catalogue here, poster templates included. The public file's own
+// answer decides, so the two never disagree.
 async function entitledCatalogue(personal: Promise<Personal>): Promise<CataloguePayload | null> {
   // The account first: it is request-time, so the reads below never run while the shell is built.
   const { posters } = await personal
-  const [access, locale] = await Promise.all([sharedCreateFeatureAccess(), currentLocale()])
-  const gated = Boolean(access.find((row) => row.key === POSTER_FEATURE)?.minTier)
-  return gated && posters ? loadCataloguePayload(locale, Promise.resolve(true)) : null
+  const locale = await currentLocale()
+  const publicPosters = (await cachedPublicCatalogue(locale))?.posters === true
+  return posters && !publicPosters ? loadCataloguePayload(locale, Promise.resolve(true)) : null
 }
 
 async function Balance({ personal }: { personal: Promise<Personal> }) {

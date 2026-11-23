@@ -8,6 +8,7 @@ import { createAdminSupabase } from '@/core/auth/supabase-admin'
 import { FAILED_READ_LIFE } from '@/core/cache-life'
 import { serverEnv } from '@/core/env'
 import { FEATURES_CACHE_TAG, loadFeatureAccess } from '@/core/features/read'
+import { FEATURES, findFeature } from '@/core/features/registry'
 import type { Locale } from '@/core/i18n/locales'
 import { logger } from '@/core/logger'
 import { POSTER_FEATURE } from '@/core/poster/sets'
@@ -16,16 +17,17 @@ import { TEMPLATES_CACHE_TAG } from '@/core/templates/cache'
 import { CATALOGUE_LIFE } from '@/core/templates/cached-catalogue'
 
 import { loadCataloguePayload } from './load-catalogue-view'
-import { CATALOGUE_SCHEMA, toPublicPayload, type PublicCatalogue } from './public-catalogue'
+import { CATALOGUE_SCHEMA, openToEveryone, toPublicPayload, type PublicCatalogue } from './public-catalogue'
 
 export type PublicCatalogueFile = { version: string; body: string; posters: boolean }
 
-// Whether the poster templates are for every account: dense_poster has no tier gate (it is not
-// invite-only in the registry). Read here, not through the shared remote cache, so a failed read
-// stays inside this function's own cache scope.
+// Whether the poster templates are for every account (openToEveryone: no tier gate, not invite-only,
+// or opened to all). Read here, not through the shared remote cache, so a failed read stays inside
+// this function's own cache scope. Inside a cache scope the clock is allowed; the answer is kept
+// with the file, and the page asks the file (cachedPublicCatalogue().posters), never decides again.
 async function postersForAll(): Promise<boolean> {
   const access = (await loadFeatureAccess(createAdminSupabase())).find((row) => row.key === POSTER_FEATURE)
-  return !access?.minTier
+  return openToEveryone(findFeature(FEATURES, POSTER_FEATURE)?.inviteOnly === true, access, Date.now())
 }
 
 // The file for one language, built from the shared catalogue cache and kept under the same tags,

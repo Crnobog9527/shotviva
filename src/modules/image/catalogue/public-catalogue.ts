@@ -68,6 +68,17 @@ export function toPublicPayload(payload: CataloguePayload, { posters }: { poster
   return { browse: { ...browse, entries }, templates }
 }
 
+// Whether a gated feature is open to every account right now, by the same rules as featureAllowed
+// (core/features/require-feature.ts): an invite-only feature only once open_to_all_at has passed;
+// any other feature when it has no tier gate, or its open_to_all_at has passed. Anything else
+// depends on the account, so its templates stay out of the public file.
+export type FeatureGate = { minTier: string | null; openToAllAt: string | null } | null | undefined
+export function openToEveryone(inviteOnly: boolean, access: FeatureGate, now: number): boolean {
+  const opened = access?.openToAllAt != null && Date.parse(access.openToAllAt) <= now
+  if (inviteOnly) return opened
+  return !access?.minTier || opened
+}
+
 // The version a device copy is checked against: 16 hex characters of the body's SHA-256.
 export const VERSION_PATTERN = /^[0-9a-f]{16}$/
 
