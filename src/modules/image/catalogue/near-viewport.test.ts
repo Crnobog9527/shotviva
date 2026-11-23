@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }))
 
-const { DeferCoversUntilNear } = await import('./near-viewport')
+const { DeferCoversUntilNear, scrollingRail } = await import('./near-viewport')
 const { PairMedia } = await import('./pair-media')
 const { LoopPlate } = await import('./card-media')
 
@@ -44,5 +44,26 @@ describe('animated covers', () => {
     const html = renderToStaticMarkup(createElement(LoopPlate, { template: template as never, alt: 'M', sizes: '100vw' }))
     expect(html).not.toContain('loop.webp')
     expect(html).toContain('poster')
+  })
+})
+
+// A card inside a sideways scroller (a phone category rail, the member picker's row) is watched
+// against that scroller: the viewport's margin does not reach past its clip (review of #884).
+describe('the scroller a card sits in', () => {
+  type Node = { parentElement: Node | null; overflowX: string; scrollWidth: number; clientWidth: number }
+  const node = (overflowX: string, scrollWidth: number, clientWidth: number, parentElement: Node | null = null): Node => ({ parentElement, overflowX, scrollWidth, clientWidth })
+  const style = (element: Element) => ({ overflowX: (element as unknown as Node).overflowX })
+
+  it('finds the nearest ancestor that scrolls sideways', () => {
+    const page = node('visible', 390, 390)
+    const rail = node('auto', 1400, 390, page)
+    const card = node('visible', 280, 280, node('visible', 280, 280, rail))
+    expect(scrollingRail(card as unknown as Element, style)).toBe(rail)
+  })
+
+  it('ignores a scroller with nothing to scroll (the picker as a grid from md) and plain columns', () => {
+    const grid = node('auto', 600, 600, node('visible', 1000, 1000))
+    expect(scrollingRail(node('visible', 100, 100, grid) as unknown as Element, style)).toBeNull()
+    expect(scrollingRail(node('visible', 100, 100, node('hidden', 900, 390)) as unknown as Element, style)).toBeNull()
   })
 })

@@ -14,8 +14,45 @@ export function DeferCoversUntilNear({ children }: { children: ReactNode }) {
 
 export const useDeferCovers = () => useContext(DeferCovers)
 
-// About a card and a half ahead, down a column or along a rail.
+// About a card and a half ahead: vertical, then horizontal (along a rail).
 const NEAR = '400px 400px'
+
+type Style = (element: Element) => { overflowX: string }
+
+// The nearest ancestor that scrolls sideways (a phone category rail, the member picker's row), or
+// null. A viewport observer's margin does not reach past such a scroller's clip, so a card inside
+// one is watched against the scroller itself (review of #884).
+export function scrollingRail(element: Element, style: Style = getComputedStyle): HTMLElement | null {
+  const stop = typeof document === 'undefined' ? null : document.body
+  for (let node = element.parentElement; node && node !== stop; node = node.parentElement) {
+    const x = style(node).overflowX
+    if ((x === 'auto' || x === 'scroll') && node.scrollWidth > node.clientWidth) return node
+  }
+  return null
+}
+
+// Calls `onNear` once the element is within `margin` of the screen (`threshold` of it in view).
+// Inside a sideways scroller both must hold: the scroller near the screen (vertical margin), and
+// the element near the scroller's visible part (horizontal margin). Returns the cleanup.
+function watchNear(element: Element, margin: string, threshold: number, onNear: () => void): () => void {
+  const rail = scrollingRail(element)
+  if (!rail) {
+    const observer = new IntersectionObserver(([entry]) => entry?.isIntersecting && onNear(), { rootMargin: margin, threshold })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }
+  const [vertical, horizontal = vertical] = margin.split(' ')
+  const state = { railNear: false, inRail: false }
+  const check = () => state.railNear && state.inRail && onNear()
+  const outer = new IntersectionObserver(([entry]) => { state.railNear = entry?.isIntersecting === true; check() }, { rootMargin: `${vertical} 0px` })
+  const inner = new IntersectionObserver(([entry]) => { state.inRail = entry?.isIntersecting === true; check() }, { root: rail, rootMargin: `0px ${horizontal}`, threshold })
+  outer.observe(rail)
+  inner.observe(element)
+  return () => {
+    outer.disconnect()
+    inner.disconnect()
+  }
+}
 
 // True once the element has come within `margin` of the screen (`threshold` of it in view), or
 // at once when `immediate`; it stays true. Without IntersectionObserver it turns true right away.
@@ -29,11 +66,7 @@ export function useNearViewport<T extends Element>(immediate: boolean, margin = 
       queueMicrotask(() => setNear(true))
       return
     }
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry?.isIntersecting) setNear(true)
-    }, { rootMargin: margin, threshold })
-    observer.observe(element)
-    return () => observer.disconnect()
+    return watchNear(element, margin, threshold, () => setNear(true))
   }, [near, margin, threshold])
   return [ref, near]
 }
