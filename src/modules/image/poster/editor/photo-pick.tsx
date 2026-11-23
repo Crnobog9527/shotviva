@@ -4,7 +4,7 @@ import { Camera } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useRef } from 'react'
 
-import type { Balance } from '@/core/billing/pools'
+import { chargeAnyPool, type Balance } from '@/core/billing/pools'
 import { Link } from '@/core/i18n/ui'
 import { Button } from '@/core/ui/button'
 
@@ -22,7 +22,7 @@ export function PhotoPick({ photo, credits, balance }: { photo: PhotoSort; credi
   const t = useTranslations('app.weekly.photo')
   const input = useRef<HTMLInputElement>(null)
   // Photo extraction is not an image tier: either pool pays it, as before (_reserve_pool, 1897).
-  const afford = balance.paid >= credits || balance.free >= credits
+  const afford = chargeAnyPool(balance, credits) !== null
   return (
     <div className="grid gap-2 rounded-control bg-wash-faint p-3 text-caption">
       <p className="text-muted-foreground">{t('hint')}</p>

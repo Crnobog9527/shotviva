@@ -8,8 +8,10 @@
 -- remembered profiles.org_pool_choice no longer pick the pool of a web job; a malformed choice is
 -- still INVALID_INPUT. Prices are data and are not touched here.
 --
--- Scope: web jobs (the site: single photos, edits, posters and batch cells, which reach this
--- through reserve_batch_cell; it still refuses a free cell, so a 1K batch is refused as a whole).
+-- Scope: web jobs (the site: single photos, posters and batch cells, which reach this through
+-- reserve_batch_cell; it still refuses a free cell, so a 1K batch is refused as a whole).
+-- 作品编辑 (the `edit` template) is exempt (Owner 2026-11-23: only 2K is sold, open to both pools):
+-- it keeps the 1897 rule, paid first then free, and a free-pool edit stays a free work.
 -- Partner calls (source graylum, which send no resolution and so are always 1K) keep the 1897
 -- rule unchanged, as does poster photo extraction (start_poster_photo, a 1-credit text step, not
 -- an image tier), which keeps calling _reserve_pool.
@@ -131,7 +133,10 @@ begin
     raise exception 'TEMPLATE_UNAVAILABLE';
   end if;
   -- The tier decides the pool (1996): 1K from free credits only, 2K/4K from paid credits only.
-  v_pool := public._reserve_pool_for_tier(v_profile, v_cost, p_source, p_inputs->>'pool_choice', v_resolution);
+  -- An edit keeps the 1897 rule (paid first, then free; org members from org shares only).
+  v_pool := case when p_template_id = 'edit'
+    then public._reserve_pool(v_profile, v_cost, p_source, p_inputs->>'pool_choice')
+    else public._reserve_pool_for_tier(v_profile, v_cost, p_source, p_inputs->>'pool_choice', v_resolution) end;
 
   perform public._apply_credit_change(
     p_user_id, v_pool, 'reserve', -v_cost, 'generation reserve',

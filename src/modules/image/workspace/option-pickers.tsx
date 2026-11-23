@@ -3,7 +3,7 @@
 import { useFormatter, useTranslations } from 'next-intl'
 
 import type { ImageOptions } from '@/core/templates/image-options'
-import { tierPool, type Balance } from '@/core/billing/pools'
+import { chargeAnyPool, tierPool, type Balance } from '@/core/billing/pools'
 import type { CreditsCost } from '@/core/templates/pricing'
 import type { OutputAspect, Resolution } from '@/core/templates/output-options'
 import { setCredits } from '@/core/templates/set-price'
@@ -49,20 +49,22 @@ type ResolutionProps = {
   aspect?: OutputAspect; photoRatio?: number | null
   // Images one run makes (a poster set's pages): each card then shows that set's total.
   images?: number
+  // 作品编辑 is exempt from the tier → pool rule (1996): either pool pays any tier, no pool note.
+  anyPool?: boolean
 }
 
 // Resolution (DESIGN §4.3 step 3b): 1K / 2K / 4K as stacked cards with the output size and this
 // template's credits on the right, and the pool it is paid from (1K free credits, watermarked;
 // 2K / 4K paid credits, clean: 1996); a tier its pool cannot cover shows its credits greyed. Only
 // the tiers the template's model supports are offered.
-export function ResolutionPicker({ value, costs, balance, onChange, options, aspect = 'original', photoRatio, images = 1 }: ResolutionProps) {
+export function ResolutionPicker({ value, costs, balance, onChange, options, aspect = 'original', photoRatio, images = 1, anyPool = false }: ResolutionProps) {
   const t = useTranslations('app')
   const format = useFormatter()
   return (
     <div role="radiogroup" aria-labelledby="res-h" className="grid gap-2">
       {TIER_OPTIONS.filter(({ id }) => options.resolutions.includes(id)).map((tier) => {
         const cost = setCredits(costs[tier.id], images)
-        const affordable = canAfford(balance, cost, tier.id)
+        const affordable = anyPool ? chargeAnyPool(balance, cost) !== null : canAfford(balance, cost, tier.id)
         const size = tierSize(tier.id, aspect, photoRatio)
         return (
           <label key={tier.id} className="relative cursor-pointer">
@@ -78,7 +80,7 @@ export function ResolutionPicker({ value, costs, balance, onChange, options, asp
               </span>
               <span className="col-start-1 text-caption text-muted-foreground">
                 {t(`tiers.${tier.id}.use`)}
-                <span className="block">{t(`tiers.pool.${tierPool(tier.id)}`)}</span>
+                {anyPool ? null : <span className="block">{t(`tiers.pool.${tierPool(tier.id)}`)}</span>}
                 {affordable ? null : <span className="sr-only"> {t('tiers.notEnough')}</span>}
               </span>
             </span>

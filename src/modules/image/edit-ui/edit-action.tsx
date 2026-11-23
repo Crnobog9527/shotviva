@@ -33,9 +33,8 @@ export function EditAction({ cta, tier, privateOnly, onGenerate, onEmpty }: Prop
         <button
           type="button"
           aria-disabled={cta.kind === 'empty'}
-          disabled={cta.kind === 'free-only'}
           onClick={cta.kind === 'empty' ? onEmpty : onGenerate}
-          className={cn(buttonVariants({ variant: 'cta', size: 'cta' }), cta.kind !== 'generate' && 'opacity-50')}
+          className={cn(buttonVariants({ variant: 'cta', size: 'cta' }), cta.kind === 'empty' && 'opacity-50')}
         >
           <span>{t.rich('workspace.generateCta', { cost: rich.cost, count: cta.cost })}</span>
         </button>
@@ -46,7 +45,6 @@ export function EditAction({ cta, tier, privateOnly, onGenerate, onEmpty }: Prop
 
 function notice(cta: EditCta, tier: string, privateOnly: boolean, t: ReturnType<typeof useTranslations<'app'>>): ReactNode {
   if (cta.kind === 'get-credits') return t.rich('workspace.needsCredits', { ...rich, tier, count: cta.cost })
-  if (cta.kind === 'free-only') return <span role="status">{t('tiers.freeOnly')}</span>
   if (cta.kind === 'empty') return t.rich('edit.noticeEmpty', rich)
   if (cta.pool !== 'free') return t('edit.noticeReady')
   return t.rich(privateOnly ? 'edit.noticeFreePrivate' : 'edit.noticeFree', rich)

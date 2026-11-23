@@ -98,10 +98,12 @@ describe('activated template prices', () => {
     await refuses(() => db.query('select admin.rollback_template_price_catalog_v2()'),'TEMPLATE_CATALOG_HAS_NEW_JOBS')
   })
 
-  it('sells edit at the approved 15 / 20 and still refuses anything under it', async () => {
+  // 1997: edit's tariff is 15 / 15, and on this GPT route it no longer skips the route floor.
+  // Unverified locally: assumes this fixture route's floor stays at or under the prices saved here.
+  it('holds edit to its 15 / 15 tariff and refuses anything under it', async () => {
     await activate()
     const tariffs = (await db.query('select admin.template_catalog_minimums() m')).rows[0].m
-    expect(tariffs.edit.costs).toEqual({ '1k': 15, '2k': 20, '4k': 58 })
+    expect(tariffs.edit.costs).toEqual({ '1k': 15, '2k': 15, '4k': 58 })
     // Only the edit row moved: the other tariffs are the ones the cutover shipped with.
     expect(tariffs.freeform.costs).toEqual(costs)
     expect((await db.query("select credits_cost c from public.templates where id='edit'")).rows[0].c).toEqual(tariffs.edit.costs)
@@ -119,7 +121,7 @@ describe('activated template prices', () => {
     await activate()
     const tariffs = (await db.query('select admin.template_catalog_minimums() m')).rows[0].m
     expect(tariffs['white-background'].costs).toEqual({ '1k': 18, '2k': 37, '4k': 55 })
-    expect(tariffs.edit.costs).toEqual({ '1k': 15, '2k': 20, '4k': 58 })
+    expect(tariffs.edit.costs).toEqual({ '1k': 15, '2k': 15, '4k': 58 })
     expect(tariffs.freeform.costs).toEqual(costs)
     const others = (await db.query("select id,costs from admin.template_tariffs_v2 where id<>all('{white-background,edit,promo-poster,pet-studio,freeform}')")).rows
     expect(others.length).toBe(4)

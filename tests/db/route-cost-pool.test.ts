@@ -81,19 +81,20 @@ it("samples the pool's jobs at the template's quality", async () => {
   expect(await floor(routedTag)).toMatchObject({ basis: 'catalog', samples: 3 })
 })
 
+// freeform: edit no longer takes an approval (1997), so another batch template shows the mechanics.
 it('lets a BYOK line sell at the official line\'s approved price and keeps that line from deletion', async () => {
   const batch = (await db.query('insert into admin.template_price_batches default values returning id')).rows[0].id
   await db.query(`insert into admin.template_price_snapshots(batch_id,template_id,previous,applied,provider_id,provider_endpoint_hash)
-    values($1,'edit','{}','{}',$2,md5('https://api.openai.com/v1'))`, [batch, official])
+    values($1,'freeform','{}','{}',$2,md5('https://api.openai.com/v1'))`, [batch, official])
   const approved = async () => (await db.query('select admin.template_approved_price($1,$2) a, admin.template_approved_prices($1)->$2 m',
-    [routed, 'edit'])).rows[0]
-  const tariff = { quality: 'medium', costs: { '1k': 15, '2k': 20, '4k': 58 } }
+    [routed, 'freeform'])).rows[0]
+  const tariff = { quality: 'medium', costs: { '1k': 45, '2k': 120, '4k': 190 } }
   expect(await approved()).toEqual({ a: tariff, m: tariff })
   const catalog = (await db.query("select public.admin_image_pricing_catalog('x')->'providers' p")).rows[0].p as Array<Record<string, unknown>>
-  expect(catalog.find(p => p.provider_id === routed)).toMatchObject({ list_priced: true, approved: { edit: tariff } })
-  await db.query("update public.templates set quality='medium', credits_cost='{\"1k\":15,\"2k\":20,\"4k\":58}' where id='edit'")
+  expect(catalog.find(p => p.provider_id === routed)).toMatchObject({ list_priced: true, approved: { freeform: tariff } })
+  await db.query("update public.templates set quality='medium', credits_cost='{\"1k\":45,\"2k\":120,\"4k\":190}' where id='freeform'")
   const sells = async () => (await db.query(
-    "select admin.reservation_route_allowed(t,$1,'1k',15,false,true) ok from public.templates t where id='edit'", [routedTag])).rows[0].ok
+    "select admin.reservation_route_allowed(t,$1,'1k',45,false,true) ok from public.templates t where id='freeform'", [routedTag])).rows[0].ok
   expect(await sells()).toBe(true)
   await byok(false)
   expect(await approved()).toEqual({ a: null, m: null })
@@ -101,6 +102,29 @@ it('lets a BYOK line sell at the official line\'s approved price and keeps that 
   await db.query('savepoint del')
   await expect(db.query('select public.admin_delete_provider($1)', [official])).rejects.toThrow('PROVIDER_REFERENCED')
   await db.query('rollback to del')
+})
+
+// 1997 (Owner 2026-11-23): edit's tariff is 2K 15, and it never stands in for a route's floor: on
+// the GPT lines 2K at 15 meets the GPT floor and is refused; on a cheap Seedream line it sells.
+it('sells edit 2K at 15 on a cheap Seedream line, never on GPT under its floor', async () => {
+  const batch = (await db.query('insert into admin.template_price_batches default values returning id')).rows[0].id
+  await db.query(`insert into admin.template_price_snapshots(batch_id,template_id,previous,applied,provider_id,provider_endpoint_hash)
+    values($1,'edit','{}','{}',$2,md5('https://api.openai.com/v1'))`, [batch, official])
+  expect((await db.query("select costs from admin.template_tariffs_v2 where id='edit'")).rows[0].costs).toEqual({ '1k': 15, '2k': 15, '4k': 58 })
+  expect((await db.query("select admin.template_approved_price($1,'edit') a, admin.template_approved_prices($1) ? 'edit' m", [routed])).rows[0])
+    .toEqual({ a: null, m: false })
+  await db.query("update public.templates set quality='medium', credits_cost='{\"1k\":15,\"2k\":15,\"4k\":58}' where id='edit'")
+  const sells = async (tag: string) => (await db.query(
+    "select admin.reservation_route_allowed(t,$1,'2k',15,false,true) ok from public.templates t where id='edit'", [tag])).rows[0].ok
+  expect((await floor(routedTag, 'medium', '2k')).credits).toBeGreaterThan(15)
+  expect(await sells(routedTag)).toBe(false)
+  expect(await sells(officialTag)).toBe(false)
+  const ark = randomUUID()
+  await db.query(`insert into public.ai_providers(id,label,adapter,model,resolutions,capabilities,estimated_image_costs)
+    values($1,'Ark Seedream','ark_images','doubao-seedream-test','{1k,2k,4k}',$2,'{"1k":0.01,"2k":0.01,"4k":0.02}')`, [ark, caps({})])
+  const arkTag = ark + '/doubao-seedream-test'
+  expect((await floor(arkTag, 'medium', '2k')).credits).toBeLessThanOrEqual(15)
+  expect(await sells(arkTag)).toBe(true)
 })
 
 it('saves the setting for admins only', async () => {

@@ -120,6 +120,21 @@ it('keeps a batch paid only: a 2K cell from paid credits, a 1K cell refused with
   expect(await jobs(user)).toBe(1)
 })
 
+// 作品编辑 is exempt (Owner 2026-11-23): paid first, then free, at any tier; a free-pool edit is a free work.
+it('pays a 2K edit from paid credits first, then free credits', async () => {
+  const user = await createUser(db, { credits: PRICE['2k'] })
+  const parent = randomUUID()
+  await db.query("select reserve_credits($1,$2,'image',$3,$4,'web',$5)", [parent, user, template, PRICE['2k'], { resolution: '2k', attempt_id: randomUUID() }])
+  await db.query("update generation_jobs set status='succeeded', output_key='t1996/x', finished_at=now() where id=$1", [parent])
+  const cost = Number((await row(db, "select (credits_cost->>'2k')::int c from templates where id='edit'")).c)
+  const edit = (tier: '2k') => row(db, "select credit_pool, visibility from reserve_credits($1,$2,'image','edit',$3,'web',$4,null,null,null,$5)",
+    [randomUUID(), user, cost, { resolution: tier, attempt_id: randomUUID() }, parent])
+  await db.query('update profiles set credits=$2, free_credits=$2 where id=$1', [user, cost])
+  expect(await edit('2k')).toEqual({ credit_pool: 'paid', visibility: 'private' })
+  expect(await edit('2k')).toEqual({ credit_pool: 'free', visibility: 'public' }) // paid gone: free, a free work
+  await refused(db, () => edit('2k'), 'CREDITS_INSUFFICIENT')
+})
+
 it('keeps the new helper private', async () => {
   const fn = 'public._reserve_pool_for_tier(public.profiles,integer,text,text,text)'
   expect(await row(db, `select has_function_privilege('service_role',$1,'execute') s, has_function_privilege('authenticated',$1,'execute') u,

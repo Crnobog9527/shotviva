@@ -25,6 +25,14 @@ export function creditsNeeded(balance: Balance, cost: number, tier: string): num
   return tierPool(tier) === 'paid' && balance.paid < cost ? cost - balance.paid : 0
 }
 
+// Jobs the tier does not decide (1996 exemptions): 作品编辑 (the edit template, open to both pools)
+// and poster photo extraction. Paid first, then free, never split: the 1897 _reserve_pool rule.
+export function chargeAnyPool(balance: Balance, cost: number): CreditPool | null {
+  if (balance.paid >= cost) return 'paid'
+  if (balance.free >= cost) return 'free'
+  return null
+}
+
 // The tier a fresh form starts on: 2K when paid credits cover it, else 1K when free credits cover
 // it, else null (the caller keeps its own default). Only tiers the template offers count.
 export function defaultTier<T extends string>(balance: Balance, costs: Partial<Record<T, number>>, tiers: readonly T[]): T | null {
