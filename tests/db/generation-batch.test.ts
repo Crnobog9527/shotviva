@@ -158,14 +158,16 @@ describe('T107 preflight and independent jobs', () => {
     await expect(preflightBatch(db, userId, Array(31).fill(cells[0]), deps.provider)).rejects.toMatchObject({ code: 'TIER_REQUIRED' })
     // A batch is paid credits only and so 2K / 4K (1996): 2K prices 2 + 3.
     expect(batch).toMatchObject({ total_credits: 5, batch_templates: 2, batch_size: 2 })
-    await sql.query('update public.profiles set credits=2,free_credits=70 where id=$1', [userId])
+    // 4 paid: short of the batch's 5, enough for the first cell (2) and for the repeat to reach
+    // the duplicate check (the reserve debits before it), never for the second cell (3).
+    await sql.query('update public.profiles set credits=4,free_credits=70 where id=$1', [userId])
     await expect(preflightBatch(db, userId, cells, deps.provider)).rejects.toMatchObject({ code: 'CREDITS_INSUFFICIENT' })
     const run = (i: number) => runGeneration(deps, toGenerationRequest(userId, { ...cells[i], ...batch, ...batch.cells[i] }))
     const first = await run(0)
     expect(first).toMatchObject({ batch_id: batch.batch_id, credit_pool: 'paid' })
     await expect(run(0)).rejects.toMatchObject({ code: 'CONFLICT' })
     await expect(run(1)).rejects.toMatchObject({ code: 'CREDITS_INSUFFICIENT' })
-    expect(await profileOf(sql, userId)).toMatchObject({ credits: 0, free_credits: 70 })
+    expect(await profileOf(sql, userId)).toMatchObject({ credits: 2, free_credits: 70 })
     const files = await batchArchive(db, userId, batch.batch_id)
     expect(files.files.map(f => f.jobId)).toEqual([first.id])
     await expect(batchArchive(db, randomUUID(), batch.batch_id)).rejects.toMatchObject({ code: 'NOT_FOUND' })
