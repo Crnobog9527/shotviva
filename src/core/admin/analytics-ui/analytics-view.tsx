@@ -28,13 +28,14 @@ export function RangeTabs({ query }: { query: AnalyticsQuery }) {
   return <LinkTabs label={COPY.rangeLabel} tabs={tabs} current={query.range} preserveDim />
 }
 
-// PostHog is off by choice, not by a missing key: say where the numbers are now.
-export function PostHogOff() {
+// PostHog is off by choice, not by a missing key: say where the numbers are now. `pvuv`: the PVUV
+// read token is set, so the overview and 「漏斗」 read PVUV themselves.
+export function PostHogOff({ pvuv = false }: { pvuv?: boolean }) {
   const off = COPY.off
   return (
     <div role="status" className="grid gap-3 rounded-lg border border-dashed border-border p-6">
-      <h2 className="font-semibold">{off.title}</h2>
-      <p className="text-sm text-muted-foreground">{off.body}</p>
+      <h2 className="font-semibold">{pvuv ? off.pvuvTitle : off.title}</h2>
+      <p className="text-sm text-muted-foreground">{pvuv ? off.pvuvBody : off.body}</p>
       <p>
         <a href={off.href} target="_blank" rel="noreferrer" className="text-sm font-medium underline underline-offset-4">
           {off.link}

@@ -16,6 +16,9 @@ export const GROWTH_COPY = {
   scope: (admins: number) =>
     `只算真实用户：已去掉管理员账号（${admins} 个）、测试站和爬虫。管理员没登录时的访问认不出来，可能还算在访客里。`,
   freshness: '所有数字每 5 分钟更新一次，数据库和 PostHog 截到同一时刻。',
+  // PostHog off (2026-11-21), PVUV.ai read instead.
+  freshnessPvuv:
+    'PostHog 已关闭：访客来自 PVUV.ai（已去掉机器人和爬虫，没登录的管理员访问可能还算在内，按 PVUV 站点的时区算天）；注册、出图和付款来自数据库，每 5 分钟更新一次。',
   headline: {
     chain: (p: { period: string; visitors: string | null; signups: string; images: string; paid: string }) =>
       `${p.period}：${p.visitors === null ? '' : `${p.visitors} 位访客 → `}${p.signups} 人注册 → ${p.images} 人出了第一张图 → ${p.paid} 人付款`,
@@ -42,7 +45,8 @@ export const GROWTH_COPY = {
     desc: '这段时间新注册的人，到这段时间结束为止各走到了哪一步。步骤不要求按顺序，一个人只算一次。',
     visitors: { label: '访客', help: '这段时间打开过 shotviva.com 页面的真人，同一个人只算一次。不含管理员和爬虫。' },
     visitorRate: (rate: string) => `访客里 ${rate} 注册了`,
-    visitorRateHidden: '访客数比注册数还少（PostHog 少记了），比例先不显示',
+    visitorsPvuv: { label: '访客', help: 'PVUV.ai 认定的真人访客，同一个人只算一次；机器人和爬虫不算。没登录的管理员访问可能还算在内。' },
+    visitorRateHidden: '访客数比注册数还少（统计少记了），比例先不显示',
     visitorRateHelp: '注册人数 ÷ 访客数。注册的人不一定是这段时间第一次来，所以这是一个比例，不是同一批人。',
     steps: {
       signup: { label: '注册', help: '这段时间新注册的账号数（以数据库为准）。' },
@@ -57,6 +61,11 @@ export const GROWTH_COPY = {
     missing: '这一步的数来自 PostHog，现在没有读到',
     loading: '正在从 PostHog 读取…',
     notConnected: 'PostHog 还没连上',
+    pvuvLoading: '正在从 PVUV.ai 读取…',
+    pvuvMissing: 'PVUV.ai 暂时读不到',
+    pvuvNotConnected: 'PVUV.ai 还没接上读取',
+    pvuvSteps: '「上传照片」「看到付费墙」「开始结账」这几步原来来自 PostHog，现在改看 PVUV.ai 自己的漏斗：',
+    pvuvStepsLink: '去「漏斗」页',
     returningTitle: '老用户',
     returningDesc: '这段时间之前注册的人。',
     returning: {
