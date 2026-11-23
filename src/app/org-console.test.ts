@@ -9,6 +9,7 @@ import zh from '@/site/messages/zh.json'
 import { CONSOLE_ERRORS, type OwnerConsole, type OwnerReport, type PaymentAccountGroup } from '@/core/org/console/types'
 
 vi.mock('@/core/i18n/ui', () => ({ Link: ({ href, children, ...rest }: { href: string; children: unknown }) => createElement('a', { href, ...rest }, children as never) }))
+vi.mock('next/navigation', async (original) => ({ ...(await original<object>()), useRouter: () => ({ refresh: () => undefined }) }))
 vi.mock('@/core/analytics/replay', () => ({ REPLAY_BLOCK_CLASS: 'sv-replay-block' }))
 
 const { OwnerConsoleView, OwnerEntryRow, PurchasingView } = await import('@/core/org/ui/owner-console')
