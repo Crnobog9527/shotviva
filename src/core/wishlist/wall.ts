@@ -1,8 +1,9 @@
 import 'server-only'
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { cacheLife, cacheTag, revalidateTag } from 'next/cache'
 
+import { bearerClient } from '../auth/bearer-client'
 import { createAdminSupabase } from '../auth/supabase-admin'
 import { serverEnv } from '../env'
 import { AppError } from '../errors'
@@ -104,7 +105,7 @@ export async function cachedWallFirstPage(): Promise<SharedWall | null> {
 async function withVisibleTemplateNames(rows: WallRow[]): Promise<WallRow[]> {
   const ids = [...new Set(rows.flatMap((row) => (row.template_id ? [row.template_id] : [])))]
   if (ids.length === 0) return rows
-  const anon = createClient(publicEnv.NEXT_PUBLIC_SUPABASE_URL, publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+  const anon = bearerClient({ url: publicEnv.NEXT_PUBLIC_SUPABASE_URL, anonKey: publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY }, null)
   const { data, error } = await anon.from('templates').select('id, name').in('id', ids).returns<{ id: string; name: string }[]>()
   if (error) throw new AppError('INTERNAL', `wall template names failed: ${error.message}`)
   const names = new Map(data.map((row) => [row.id, row.name]))
