@@ -18,7 +18,8 @@ let db: Client
 let template: string
 const service = serviceSupabase()
 
-async function job(userId: string, inputKey: string | null = null) {
+// 2K is paid from paid credits only, 1K from free credits only (1996).
+async function job(userId: string, inputKey: string | null = null, resolution: '1k' | '2k' = '2k') {
   const jobId = randomUUID()
   await reserveJob(service, {
     jobId,
@@ -26,7 +27,7 @@ async function job(userId: string, inputKey: string | null = null) {
     module: 'image',
     templateId: template,
     source: 'web',
-    inputs: { resolution: '2k', input_key: inputKey },
+    inputs: { resolution, input_key: inputKey },
   })
   return jobId
 }
@@ -80,14 +81,14 @@ describe('stuck jobs', () => {
 describe('compensate one job', () => {
   it('pays the job cost back to its pool exactly once', async () => {
     const user = await createUser(db, { freeCredits: 6 })
-    const jobId = await job(user)
+    const jobId = await job(user, null, '1k')
     await confirmJob(service, { jobId, outputKey: `outputs/${user}/${jobId}.png` })
-    expect((await profileOf(db, user)).free_credits).toBe(4)
-    expect(await compensateJob(service, jobId)).toEqual({ applied: true, credits: 2, pool: 'free' })
-    expect(await compensateJob(service, jobId)).toEqual({ applied: false, credits: 2, pool: 'free' })
+    expect((await profileOf(db, user)).free_credits).toBe(5)
+    expect(await compensateJob(service, jobId)).toEqual({ applied: true, credits: 1, pool: 'free' })
+    expect(await compensateJob(service, jobId)).toEqual({ applied: false, credits: 1, pool: 'free' })
     expect((await profileOf(db, user)).free_credits).toBe(6)
     const rows = (await ledgerOf(db, user)).filter((row) => row.kind === 'admin_adjust')
-    expect(rows).toEqual([{ kind: 'admin_adjust', pool: 'free', delta: 2, idempotency_key: `comp:${jobId}` }])
+    expect(rows).toEqual([{ kind: 'admin_adjust', pool: 'free', delta: 1, idempotency_key: `comp:${jobId}` }])
   })
 
   it('refuses a job that has not succeeded', async () => {
@@ -137,7 +138,7 @@ describe('view work', () => {
   })
 
   it('shows what the user typed: template text boxes, note and options, exactly as entered', async () => {
-    const user = await createUser(db, { credits: 5 })
+    const user = await createUser(db, { freeCredits: 5 })
     const jobId = randomUUID()
     const typed = '<b>Fake dish</b>\nline two'
     // The template's own labels: dish has a Chinese one, price only an English one, plating a Chinese toggle label.
@@ -176,7 +177,7 @@ describe('view work', () => {
     const user = await createUser(db, { credits: 10 })
     const other = await createUser(db, { credits: 5 })
     const parentId = randomUUID()
-    await reserveJob(service, { jobId: parentId, userId: user, module: 'image', templateId: template, source: 'web', inputs: { resolution: '1k' } })
+    await reserveJob(service, { jobId: parentId, userId: user, module: 'image', templateId: template, source: 'web', inputs: { resolution: '2k' } })
     await confirmJob(service, { jobId: parentId, outputKey: `outputs/${user}/${parentId}.png` })
     const editId = randomUUID()
     await reserveJob(service, {

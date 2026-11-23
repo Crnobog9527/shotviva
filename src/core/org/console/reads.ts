@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
@@ -61,10 +62,13 @@ function ok<T>(result: { data: T; error: { message: string } | null }, what: str
 // `YYYY-MM-01T00:00:00.000Z` of the month `now` is in: the month the monthly top-up counts in.
 export const monthStart = (now: Date) => `${now.toISOString().slice(0, 7)}-01T00:00:00.000Z`
 
+// One auth lookup per account per request: the workspace's member list and its monthly report
+// both label the same members (React's cache, keyed on the client and the id).
+const authUser = cache(async (db: SupabaseClient, id: string) => (await db.auth.admin.getUserById(id)).data.user)
+
 export async function accountLabels(db: SupabaseClient, ids: readonly string[], mask: (phone: string) => string): Promise<Map<string, string | null>> {
   const labels = await Promise.all([...new Set(ids)].map(async (id) => {
-    const { data } = await db.auth.admin.getUserById(id)
-    const user = data.user
+    const user = await authUser(db, id)
     return [id, user?.email || (user?.phone ? mask(user.phone) : null)] as const
   }))
   return new Map(labels)

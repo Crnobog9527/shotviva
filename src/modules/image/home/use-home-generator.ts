@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { defaultTier, type Balance } from '@/core/billing/pools'
 import { useRouter } from '@/core/i18n'
-import type { OutputAspect } from '@/core/templates/output-options'
+import type { OutputAspect, Resolution } from '@/core/templates/output-options'
 
 import { allowsNoPhoto, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { enqueueJobs, setWorkspaceJobs } from '../generation/job-store'
@@ -74,13 +75,13 @@ function useStart(viewer: HomeViewer | null, template: CatalogueTemplate | null,
   // useWarmRoute asks nothing while the tab is in the background.
   useWarmRoute(`/generate/${template?.id ?? ''}`, viewer !== null && template !== null)
   return useCallback(
-    (aspect: OutputAspect | null, note: string) => {
-      if (!viewer || !template || !aspect) return
+    (aspect: OutputAspect | null, resolution: Resolution | null, note: string) => {
+      if (!viewer || !template || !aspect || !resolution) return
       const ready = readyHomePhoto(photo)
       if (!ready.length && !(allowsNoPhoto(template) && photo.status === 'none')) return
       // No template toggles here: they are only offered once the template itself is open (its
       // create page or dialog), so a photo started from the home bar has them all off (Owner 2026-11-12).
-      const ids = enqueueJobs(startInputs(template, { aspect, resolution: '1k', note, copy: {}, toggles: {} }, ready), viewer.concurrency.limit)
+      const ids = enqueueJobs(startInputs(template, { aspect, resolution, note, copy: {}, toggles: {} }, ready), viewer.concurrency.limit)
       setWorkspaceJobs(template.id, ids)
       // The workspace page's pending view draws this template's full head (thumbnail, name,
       // category and use) until the server's page takes over, as after a dialog's Generate.
@@ -126,8 +127,8 @@ export function useHomeGenerator({ templates, defaultId, viewer, find }: Args) {
   )
   useRestoreDraft({ signedIn: viewer !== null, apply, pick: photo.pick })
   const running = useRunning(viewer?.concurrency.runningIds ?? [])
-  const { options, photoRatio, outputAspect, cost } = useHomeOutput(template, aspect, photo)
-  const cta = generatorCta(template, viewer, photo, running, cost, outputAspect)
+  const { options, photoRatio, outputAspect, resolution, cost } = useHomeOutput(template, aspect, photo, viewer?.balance ?? null)
+  const cta = generatorCta(template, viewer, photo, running, { cost, resolution }, outputAspect)
   const start = useStart(viewer, template, photo)
   return {
     template,
@@ -140,26 +141,35 @@ export function useHomeGenerator({ templates, defaultId, viewer, find }: Args) {
     setNote,
     photo,
     cta,
-    generate: () => start(outputAspect, note.trim()),
+    generate: () => start(outputAspect, resolution, note.trim()),
     // Before the sign-up prompt: what to bring back afterwards.
     keepDraft: () => (template ? saveDraft({ templateId: template.id, aspect, note }, photo.file) : Promise.resolve()),
   }
 }
 
-function useHomeOutput(template: CatalogueTemplate | null, aspect: OutputAspect, photo: HomePhoto) {
+// The tier the home bar makes (it has no picker): signed in, 2K when paid credits cover it, else
+// 1K when free credits do (1996), else 2K so a shortfall opens the paywall; signed out, 1K (what
+// the signup gift pays for).
+function homeTier(template: CatalogueTemplate | null, options: ReturnType<typeof templateOptions>, balance: Balance | null) {
+  const picked = balance && template ? defaultTier(balance, template.creditsCost, options.resolutions) : null
+  return closestResolution(picked ?? (balance ? '2k' : '1k'), options)
+}
+
+function useHomeOutput(template: CatalogueTemplate | null, aspect: OutputAspect, photo: HomePhoto, balance: Balance | null) {
   const options = templateOptions(template)
   const measured = useOriginalRatio(!options.originalRatio ? photo.url : null)
   const photoRatio = photo.status === 'none' && allowsNoPhoto(template) ? 1 : measured
   const outputAspect = chosenAspect(aspect, options, photoRatio)
-  const resolution = closestResolution('1k', options)
+  const resolution = homeTier(template, options, balance)
   const cost = template && resolution && hasOutputOptions(options) ? template.creditsCost[resolution] : null
-  return { options, photoRatio, outputAspect, cost }
+  return { options, photoRatio, outputAspect, resolution, cost }
 }
 
-function generatorCta(template: CatalogueTemplate | null, viewer: HomeViewer | null, photo: HomePhoto, running: number, cost: number | null, outputAspect: OutputAspect | null): HomeCta {
+function generatorCta(template: CatalogueTemplate | null, viewer: HomeViewer | null, photo: HomePhoto, running: number,
+  { cost, resolution }: { cost: number | null; resolution: Resolution | null }, outputAspect: OutputAspect | null): HomeCta {
   if (template && cost === null) return { kind: 'no-options' }
   if (photo.status === 'ready' && !outputAspect) return { kind: 'need-size' }
-  return homeCta({ viewer, cost, photo: photo.status, photoOptional: allowsNoPhoto(template), running, needsCopy: template?.copyFields.some((field) => field.required) ?? false })
+  return homeCta({ viewer, cost, tier: resolution ?? '1k', photo: photo.status, photoOptional: allowsNoPhoto(template), running, needsCopy: template?.copyFields.some((field) => field.required) ?? false })
 }
 
 export type HomeGeneratorState = ReturnType<typeof useHomeGenerator>

@@ -4,7 +4,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 
 import { pagesReady } from '@/core/poster'
 
-import type { Balance } from '@/core/billing/pools'
+import { tierPool, type Balance } from '@/core/billing/pools'
 import { setCredits } from '@/core/templates/set-price'
 import { Button } from '@/core/ui/button'
 
@@ -57,7 +57,7 @@ const slotsReady = (studio: PosterStudioState) => studio.photos.status !== 'uplo
 // Valid text that makes every page, flagged lines confirmed, credits enough for all.
 function canStart(studio: PosterStudioState, balance: Balance, total: number, reviewed = studio.draft.reviewed) {
   const mustReview = studio.draft.unverified.length > 0 && !reviewed
-  return studio.valid && pagesReady(studio.parts) && slotsReady(studio) && !mustReview && canAfford(balance, total)
+  return studio.valid && pagesReady(studio.parts) && slotsReady(studio) && !mustReview && canAfford(balance, total, studio.resolution)
 }
 
 // 生成 is off for one reason only, the unticked 我已核对 box: the bar says so, with 去核对.
@@ -66,3 +66,12 @@ export function waitsOnReview(studio: PosterStudioState, balance: Balance, templ
   return !studio.busy && !canStart(studio, balance, total) && canStart(studio, balance, total, true)
 }
 
+
+// Why 生成 is off when the tier's own pool cannot pay for the set (1996): 1K is free credits
+// only, 2K / 4K paid credits only; the other pool is never used instead.
+export function TierShortNote({ studio, template, balance }: Props) {
+  const t = useTranslations('app.tiers')
+  const total = setCredits(template.creditsCost[studio.resolution], studio.parts.length)
+  if (canAfford(balance, total, studio.resolution)) return null
+  return <p role="status" className="text-caption text-primary">{t(tierPool(studio.resolution) === 'free' ? 'freeOnly' : 'paidShort')}</p>
+}

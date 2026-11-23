@@ -84,7 +84,7 @@ export function HomeCtaButton({ cta, templateId, onPhotoPicked, onSignUp, onGene
 function DisabledCta({ kind }: { kind: HomeCta['kind'] }) {
   const t = useTranslations('app.workspace')
   const home = useTranslations('home.generator')
-  const labels = { wait: 'wait', uploading: 'uploadingCta', 'need-size': 'pickSize', 'no-options': 'noOptions' } as const
+  const labels = { wait: 'wait', uploading: 'uploadingCta', 'need-size': 'pickSize', 'no-options': 'noOptions', 'tier-pool': 'tierPoolCta' } as const
   const key = labels[kind as keyof typeof labels]
   return <button type="button" className={cn(PRIMARY, 'mk-cta-idle')} disabled>{key ? t(key) : home('noTemplates')}</button>
 }

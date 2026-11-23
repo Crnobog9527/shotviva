@@ -24,7 +24,8 @@ export function canShareFile(sharer: FileSharer | undefined, file: File): boolea
   }
 }
 
-// The File carries its real type: a JPEG normally, the original bytes if re-encoding failed.
+// The File carries its real type: the PNG as served (up to 8 MB, opaque), else a JPEG, or the
+// original bytes if re-encoding failed.
 export function shareFileFor(blob: Blob, name: string): File {
   const type = blob.type || 'image/png'
   const extension = type === 'image/jpeg' ? 'jpg' : type.replace('image/', '')

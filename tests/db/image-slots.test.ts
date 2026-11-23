@@ -32,7 +32,7 @@ const SLOTS = [
 beforeAll(async () => {
   db = await connectAdmin()
   templateId = await seedTemplate(db, {
-    credits: { '1k': 40, '2k': 80, '3k': 120 }, 
+    credits: { '1k': 40, '2k': 40, '3k': 120 }, 
     images: { min: 1, max: 3, slots: SLOTS },
     copy: [{ key: 'venue', label: 'Venue name', required: true, maxLength: 16 }, { key: 'prize_1_note', label: '1st prize details', maxLength: 60 }],
     body: 'WRAPPED prize poster. {{image_slots}}',
@@ -43,6 +43,7 @@ afterAll(async () => {
   await db.end()
 })
 
+// Paid credits pay 2K / 4K only (1996): the jobs are 2K, priced 40 like the 1K tier.
 async function setup(slots: readonly string[] = ['logo', 'prize_1', 'prize_2']) {
   const userId = await createUser(db, { credits: 100 })
   const r2 = createMemoryStore()
@@ -54,13 +55,13 @@ async function setup(slots: readonly string[] = ['logo', 'prize_1', 'prize_2']) 
   const fake = fakeProvider()
   const deps = { db: service, store: r2.store, provider: fake.provider, providerTimeoutMs: 200 }
   const request: GenerationRequest = {
-    userId, source: 'web', templateId, inputSlots: uploads, copy: { venue: 'Night Flight', prize_1_note: 'amber whisky' }, aspectRatio: '1:1', resolution: '1k',
+    userId, source: 'web', templateId, inputSlots: uploads, copy: { venue: 'Night Flight', prize_1_note: 'amber whisky' }, aspectRatio: '1:1', resolution: '2k',
   }
   return { userId, r2, deps, request, uploads, fake }
 }
 
 const template = (): CatalogueTemplate => ({
-  id: templateId, name: 'Slots', creditsCost: { '1k': 40, '2k': 80, '3k': 120 }, photoInput: 'required', toggles: [],
+  id: templateId, name: 'Slots', creditsCost: { '1k': 40, '2k': 40, '3k': 120 }, photoInput: 'required', toggles: [],
   copyFields: [{ key: 'venue', label: 'Venue name', type: 'short', required: true, maxLength: 16, public: false }],
   imageSlots: SLOTS.map(({ key, label, required }) => ({ key, label, required })),
 }) as unknown as CatalogueTemplate
@@ -136,7 +137,7 @@ describe('slot order survives jsonb (keys jsonb would re-sort)', () => {
     // jsonb orders object keys shorter-first: an object { venue_logo, prize_1 } reads back as
     // { prize_1, venue_logo }. The order is stored as an array, so Make again maps -in-1 to the logo.
     const id = await seedTemplate(db, {
-      credits: { '1k': 40, '2k': 80, '3k': 120 }, 
+      credits: { '1k': 40, '2k': 40, '3k': 120 }, 
       images: { min: 0, max: 2, slots: [{ key: 'venue_logo', label: 'Venue logo', required: false }, { key: 'prize_1', label: '1st prize photo', required: false }] },
       copy: [], body: 'WRAPPED poster {{image_slots}}',
     })
@@ -148,7 +149,7 @@ describe('slot order survives jsonb (keys jsonb would re-sort)', () => {
     r2.upload(prize, await jpeg(900, 600), 'image/jpeg')
     const fake = fakeProvider()
     const deps = { db: service, store: r2.store, provider: fake.provider, providerTimeoutMs: 200 }
-    const view = await runGeneration(deps, { userId, source: 'web', templateId: id, inputSlots: { prize_1: prize, venue_logo: logo }, copy: {}, aspectRatio: '1:1', resolution: '1k' })
+    const view = await runGeneration(deps, { userId, source: 'web', templateId: id, inputSlots: { prize_1: prize, venue_logo: logo }, copy: {}, aspectRatio: '1:1', resolution: '2k' })
     expect(fake.calls[0]!.images.map((image) => image.width)).toEqual([700, 900])
     const tpl = { ...template(), id, imageSlots: [{ key: 'venue_logo', label: 'Venue logo', required: false }, { key: 'prize_1', label: '1st prize photo', required: false }] } as unknown as CatalogueTemplate
     const again = await loadAgain({ db: service, store: () => r2.store }, { userId, jobId: view.id, template: tpl })
@@ -161,7 +162,7 @@ describe('slot order survives jsonb (keys jsonb would re-sort)', () => {
 describe('the database reference check counts slots (0943)', () => {
   it('refuses more slots than the model takes', async () => {
     const five = Array.from({ length: 4 }, (_, i) => ({ key: `s${i}`, label: `S${i}`, required: false }))
-    const id = await seedTemplate(db, { credits: { '1k': 40, '2k': 80, '3k': 120 }, images: { min: 0, max: 4, slots: five } })
+    const id = await seedTemplate(db, { credits: { '1k': 40, '2k': 40, '3k': 120 }, images: { min: 0, max: 4, slots: five } })
     await expect(db.query(`update public.templates set fields = jsonb_set(fields, '{images,max}', '5') where id = $1`, [id])).rejects.toThrow(/MODEL_REFERENCE_LIMIT/)
   })
 })

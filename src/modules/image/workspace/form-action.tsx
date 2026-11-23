@@ -9,8 +9,9 @@ import { buttonVariants } from '@/core/ui/button'
 import type { CtaState } from './cta-state'
 import { tierName } from './workspace-options'
 
-const LABELS: Record<'wait' | 'need-photo' | 'uploading' | 'need-copy' | 'no-options' | 'need-size' | 'checking', string> = {
+const LABELS: Record<'wait' | 'need-photo' | 'uploading' | 'need-copy' | 'no-options' | 'need-size' | 'checking' | 'tier-pool', string> = {
   checking: 'checkingCta',
+  'tier-pool': 'tierPoolCta',
   wait: 'wait',
   'need-photo': 'needPhoto',
   uploading: 'uploadingCta',
@@ -143,6 +144,14 @@ function Notice({ state, resolution, limit, privateOnly }: { state: CtaState; re
   if (state.kind === 'get-credits') {
     return <ActionNotice>{t.rich('workspace.needsCredits', { ...rich, tier: tierName(resolution, t), count: state.cost })}</ActionNotice>
   }
+  return <HoldNotice state={state} />
+}
+
+// Why the bar holds: the tier's pool cannot pay (1996: 1K is free credits only, a batch or Remove
+// watermark paid only), or the concurrency limit.
+function HoldNotice({ state }: { state: CtaState }) {
+  const t = useTranslations('app')
+  if (state.kind === 'tier-pool') return <ActionNotice><span role="status">{t(state.reason === 'free-only' ? 'tiers.freeOnly' : 'tiers.paidOnly')}</span></ActionNotice>
   if (state.kind === 'wait') return <ActionNotice>{t('workspace.waitNotice', { count: state.limit })}</ActionNotice>
   return null
 }

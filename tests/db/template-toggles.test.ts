@@ -62,8 +62,9 @@ async function inputsOf(jobId: string) {
   return rows[0]?.inputs
 }
 
+// 1K jobs, which free credits pay (1996); the paid credits show a refusal moves nothing.
 async function setup() {
-  const userId = await createUser(db, { credits: 3 })
+  const userId = await createUser(db, { credits: 3, freeCredits: 3 })
   const r2 = createMemoryStore()
   const inputKey = newInputKey(userId, 'image/jpeg')
   r2.upload(inputKey, await jpeg(1600, 1200), 'image/jpeg')

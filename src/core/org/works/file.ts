@@ -5,21 +5,22 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { AppError } from '../../errors'
 import { workThumbKeyFor, type ObjectStore } from '../../storage'
 import { archiveThumbKey } from './archive'
-import { orgOwnerWork, type OrgWorkFile } from './reads'
+import { findOrgWork, type OrgWorkFile } from './reads'
 
 // Same short life as the member's own file routes (core/jobs/job-file.ts).
 const SIGNED_GET_SECONDS = 300
 
 export type OrgWorkSize = 'thumb' | 'full'
-type Request = { owner: string; jobId: string; size: OrgWorkSize; download: boolean }
+type Request = { user: string; jobId: string; size: OrgWorkSize; download: boolean }
 
-// The 企业作品 file route's logic: where to redirect the org owner for one of the org's works.
-// Anything that is not a finished org work of the org they own is the same 404 as a missing one.
+// The 企业作品 file route's logic: where to redirect an active member of the org (the owner or
+// staff) for one of its works. Anything that is not a finished work of the org they are an active
+// member of is the same 404 as a missing one.
 // A list asks for the small copy and falls back to the full file when there is none. The full
 // file is the clean original; a free-pool work (none is expected: org credits are paid) only ever
 // gets its protected small copy, as everywhere else no clean free work is signed.
 export async function resolveOrgWorkFile(deps: { db: SupabaseClient; store: ObjectStore }, req: Request): Promise<string> {
-  const found = await orgOwnerWork(deps.db, req.owner, req.jobId)
+  const found = await findOrgWork(deps.db, req.user, req.jobId)
   if (!found) throw new AppError('NOT_FOUND', 'Not found')
   const work = await servedCopy(deps.store, found)
   // A work of a deleted account (no maker), or one already copied for it, has its small copy in

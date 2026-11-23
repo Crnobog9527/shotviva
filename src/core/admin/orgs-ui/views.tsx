@@ -6,6 +6,8 @@ import { Input } from '@/core/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/core/ui/table'
 
 import { formatBeijing } from '../shell/format'
+import { ORG_WORKS_COPY } from '../org-works/copy'
+import { orgWorksHref } from '../org-works/filters'
 import { ORGS_COPY as COPY } from '../orgs/copy'
 import type { LedgerRow, MemberRow, OrgListItem } from '../orgs/types'
 import { Card } from './fields'
@@ -117,7 +119,8 @@ export function LedgerTable({ rows }: { rows: LedgerRow[] }) {
   )
 }
 
-export function MemberTable({ rows, total }: { rows: MemberRow[]; total: number }) {
+// Each row links to that member's 企业作品 further down the same page.
+export function MemberTable({ orgId, rows, total }: { orgId: string; rows: MemberRow[]; total: number }) {
   return (
     <Card title={COPY.membersTitle} hint={total > rows.length ? COPY.membersLimit(rows.length, total) : undefined}>
       {rows.length === 0 ? <p className="text-sm text-muted-foreground">{COPY.membersEmpty}</p> : (
@@ -129,6 +132,7 @@ export function MemberTable({ rows, total }: { rows: MemberRow[]; total: number 
               <TableHead className="text-right">{COPY.colAllowance}</TableHead>
               <TableHead className="text-right">{COPY.colHeld}</TableHead>
               <TableHead>{COPY.colJoined}</TableHead>
+              <TableHead><span className="sr-only">{ORG_WORKS_COPY.memberWorksHint}</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -144,6 +148,11 @@ export function MemberTable({ rows, total }: { rows: MemberRow[]; total: number 
                 <TableCell className="text-right font-mono tabular-nums">{num(row.monthlyAllowance)}</TableCell>
                 <TableCell className="text-right font-mono tabular-nums">{num(row.heldCredits)}</TableCell>
                 <TableCell className="whitespace-nowrap">{formatBeijing(row.joinedAt)}</TableCell>
+                <TableCell>
+                  <Link className="inline-flex min-h-11 items-center text-primary underline-offset-4 hover:underline" href={orgWorksHref(orgId, { member: row.userId })} title={ORG_WORKS_COPY.memberWorksHint}>
+                    {ORG_WORKS_COPY.memberWorks}
+                  </Link>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

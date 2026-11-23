@@ -176,6 +176,15 @@ export const ORGS_COPY = {
   paySave: '保存账户',
   paySaved: '已保存收款账户',
   payRequired: '启用前请填写账户名称、银行名称和账号',
+  // 员工专用链接
+  staffLinkTitle: '员工专用链接',
+  staffLinkHint: '和企业主在工作台里看到的是同一条。员工打开后注册或登录，就会作为员工加入这家企业。只发给企业自己的员工，不要发给它的客户。',
+  staffLinkCopy: '复制链接',
+  staffLinkCopied: '已复制',
+  staffLinkCopyFailed: '复制失败，请选中链接手动复制',
+  staffLinkSuspended: '企业已停用，现在打开这条链接加不进来。',
+  staffLinkMissing: '这家企业还没有员工链接。',
+  staffLinkReset: '要换链接只能由企业主在工作台里重置。',
   // 错误
   notFound: '未找到这个企业',
   noAccount: '未找到这个账号',

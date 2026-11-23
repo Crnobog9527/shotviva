@@ -8,7 +8,7 @@ import { AppError } from '@/core/errors'
 import { screenIdentityText, type IdentityJudge } from '@/core/identity-guard'
 import { flowExtraImages, foodPlanOf, foodStep, screenCost, templateCall, typedWords, type FoodDeps, type FoodPlan, type SettleDeps, type TemplateProvider } from '@/core/jobs'
 import { loadInputImage } from '@/core/storage'
-import { DEFAULT_RESOLUTION, FOOD_TOGGLE_KEYS, loadTestTemplate, OUTPUT_ASPECTS, validateGenerationInputs } from '@/core/templates'
+import { DEFAULT_RESOLUTION, FOOD_COPY_KEYS, FOOD_TOGGLE_KEYS, loadTestTemplate, OUTPUT_ASPECTS, validateGenerationInputs } from '@/core/templates'
 
 import { testRunEstimateUsd } from './provider-estimate'
 import { continueTestRun } from './test-ledger'
@@ -46,8 +46,9 @@ async function slotPhotos(db: FirstRunDeps['db'], given: Record<string, string> 
   return Object.fromEntries(found.map(([slot, photo]) => [slot, photo!.objectKey]))
 }
 
-// 优化摆盘 / 优化器皿 while the site-wide switch is off (food_toggles_enabled, 1848).
-const forcedOff = async (deps: FirstRunDeps): Promise<readonly string[]> => ((await deps.foodTogglesEnabled?.()) ? [] : FOOD_TOGGLE_KEYS)
+// 优化摆盘 / 优化器皿 and the dish name while the site-wide switch is off (food_toggles_enabled, 1848).
+const switchedOff = async (deps: FirstRunDeps) =>
+  (await deps.foodTogglesEnabled?.()) ? { forceOff: [], dropCopy: [] } : { forceOff: FOOD_TOGGLE_KEYS, dropCopy: FOOD_COPY_KEYS }
 
 async function prepare(deps: FirstRunDeps, { body }: TestGenerateRequest) {
   const loaded = await loadTestTemplate(deps.db, body.template_id)
@@ -64,7 +65,7 @@ async function prepare(deps: FirstRunDeps, { body }: TestGenerateRequest) {
     imageCount: photo ? 1 : 0,
     ...(slots ? { slots } : {}),
     aspects: OUTPUT_ASPECTS,
-    forceOff: await forcedOff(deps),
+    ...(await switchedOff(deps)),
   })
   const keys = inputs.slots ? inputs.slots.map((slot) => slot.upload) : photo ? [photo.objectKey] : []
   const images = await Promise.all(keys.map((key) => loadInputImage(deps.store, key)))

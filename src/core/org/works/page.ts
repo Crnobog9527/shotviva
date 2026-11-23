@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 import { accountLabels } from '../console/reads'
 import { DELETED_MAKERS } from './makers'
-import { ORG_WORKS_PAGE, orgOwnerWorkMembers, orgOwnerWorks, type OrgWork, type OrgWorkMember } from './reads'
+import { ORG_WORKS_PAGE, orgWorkMakers, orgWorks, type OrgWork, type OrgWorkMember } from './reads'
 
 export type OrgWorksPage = {
   members: (OrgWorkMember & { label: string | null })[]
@@ -26,19 +26,19 @@ function parseCursor(value: string | undefined): { at: string; id: string } | un
   return Number.isNaN(Date.parse(at)) ? undefined : { at, id: value.slice(value.lastIndexOf(',') + 1) }
 }
 
-// The 企业作品 page for the signed-in owner: who made org works (to filter by), and one page of
+// The 企业作品 page for the signed-in member of the org (owner or staff): who made org works (to filter by), and one page of
 // works, each with its maker's account label. A member id that is not one of them shows all;
 // DELETED_MAKERS shows the works of deleted accounts.
 export async function readOrgWorksPage(
   db: SupabaseClient,
-  owner: string,
+  user: string,
   query: { member?: string; before?: string },
   maskPhone: (phone: string) => string,
 ): Promise<OrgWorksPage> {
-  const members = await orgOwnerWorkMembers(db, owner)
+  const members = await orgWorkMakers(db, user)
   const known = (m: OrgWorkMember) => (m.userId ?? DELETED_MAKERS) === query.member
   const member = members.some(known) ? (query.member as string) : null
-  const page = await orgOwnerWorks(db, owner, { ...(member ? { member } : {}), limit: ORG_WORKS_PAGE + 1, before: parseCursor(query.before) })
+  const page = await orgWorks(db, user, { ...(member ? { member } : {}), limit: ORG_WORKS_PAGE + 1, before: parseCursor(query.before) })
   const works = page.slice(0, ORG_WORKS_PAGE)
   const labels = await accountLabels(db, members.flatMap((m) => (m.userId ? [m.userId] : [])), maskPhone)
   const label = (id: string | null) => (id ? (labels.get(id) ?? null) : null)

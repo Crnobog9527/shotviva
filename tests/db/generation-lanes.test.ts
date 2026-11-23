@@ -164,9 +164,10 @@ describe('sweep_stale_generation_jobs', () => {
   // As if the feature had shipped two days ago; each test narrows it where it needs to.
   beforeEach(() => sweepSince("now() - interval '2 days'"))
 
+  // Paid credits pay 2K / 4K only (1996): the jobs are 2K, priced 3 like the 1K tier.
   const runningJob = async (user: string, templateId: string, age: string) => {
     const jobId = randomUUID()
-    await reserveJob(service, { jobId, userId: user, module: 'image', templateId, source: 'web', inputs: { resolution: '1k' } })
+    await reserveJob(service, { jobId, userId: user, module: 'image', templateId, source: 'web', inputs: { resolution: '2k' } })
     await db.query(`update public.generation_jobs set created_at = now() - interval '${age}' where id = $1`, [jobId])
     return jobId
   }
@@ -175,7 +176,7 @@ describe('sweep_stale_generation_jobs', () => {
 
   it('never refunds jobs older than 24 hours or started before the feature shipped', async () => {
     const user = await createUser(db, { credits: 30 })
-    const templateId = await createPricedTemplate(db, { '1k': 3, '2k': 4, '4k': 5 })
+    const templateId = await createPricedTemplate(db, { '1k': 3, '2k': 3, '4k': 5 })
     const ancient = await runningJob(user, templateId, '30 hours')
     const beforeShip = await runningJob(user, templateId, '3 hours')
     await sweepSince("now() - interval '2 hours'")
@@ -195,11 +196,11 @@ describe('sweep_stale_generation_jobs', () => {
 
   it('refunds a job left running past the limit exactly once and leaves recent ones', async () => {
     const user = await createUser(db, { credits: 10 })
-    const templateId = await createPricedTemplate(db, { '1k': 3, '2k': 4, '4k': 5 })
+    const templateId = await createPricedTemplate(db, { '1k': 3, '2k': 3, '4k': 5 })
     const stale = randomUUID()
     const fresh = randomUUID()
     for (const jobId of [stale, fresh]) {
-      await reserveJob(service, { jobId, userId: user, module: 'image', templateId, source: 'web', inputs: { resolution: '1k' } })
+      await reserveJob(service, { jobId, userId: user, module: 'image', templateId, source: 'web', inputs: { resolution: '2k' } })
     }
     expect((await profileOf(db, user)).credits).toBe(4)
     await db.query("update public.generation_jobs set created_at = now() - interval '20 minutes' where id = $1", [stale])

@@ -19,8 +19,15 @@ const stats = (prev = previous): Block<GrowthStats> => ({
 const ok: PeopleState = { status: 'ok', window, data: { current: PEOPLE, previous: { ...PEOPLE, visitors: 160 } } }
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
 
-function render(people: PeopleState, db = stats()) {
-  return text(renderToStaticMarkup(createElement(GrowthPanel, { range: '7d', db, people })))
+function render(people: PeopleState, db = stats(), pvuv: Parameters<typeof GrowthPanel>[0]['pvuv'] = null) {
+  return text(renderToStaticMarkup(createElement(GrowthPanel, { range: '7d', db, people, pvuv })))
+}
+
+const totals = (uv: number, pv: number) => ({ pv, uv, sessions: null, bounceRate: 0.42, avgDurationMs: 95_000 })
+const pvuvOk = {
+  overview: { status: 'ok' as const, data: { current: totals(400, 1200), previous: totals(200, 1000) } },
+  sources: { status: 'ok' as const, data: { ready: true, rows: [{ value: 'google.com', visitors: 120, events: null }, { value: '', visitors: 90, events: null }] } },
+  pages: { status: 'ok' as const, data: { ready: true, rows: [{ value: '/pricing', visitors: 80, events: 140 }] } },
 }
 
 describe('overview panel', () => {
@@ -96,5 +103,58 @@ describe('overview panel without PostHog numbers', () => {
     const broken = render({ status: 'error' }, { status: 'error' })
     expect(broken).toContain('暂时读不到')
     expect(broken).not.toContain('位访客')
+  })
+})
+
+describe('overview panel with PostHog off and PVUV.ai read instead', () => {
+  const off: PeopleState = { status: 'unconfigured' }
+
+  it('takes visitors and the comparison from PVUV', () => {
+    const html = render(off, stats(), pvuvOk)
+    expect(html).toContain('近 7 天：400 位访客 → 18 人注册')
+    expect(html).toMatch(/访客 400 多了 100%/)
+    expect(html).toContain('访客里 4.5% 注册了')
+    expect(html).toContain('PostHog 已关闭：访客来自 PVUV.ai')
+    expect(html).not.toContain('PostHog 还没连上')
+  })
+
+  it('moves the PostHog-only steps to 「漏斗」 and keeps the database steps', () => {
+    const html = render(off, stats(), pvuvOk)
+    expect(html).toContain('现在改看 PVUV.ai 自己的漏斗')
+    expect(html).toContain('去「漏斗」页')
+    expect(html).not.toMatch(/上传照片 \?/)
+    expect(html).not.toMatch(/看到付费墙 \?/)
+    expect(html).not.toMatch(/开始结账 \?/)
+    expect(html).toMatch(/出第一张图 .* 11/)
+    expect(html).toMatch(/付款成功 .* 2/)
+  })
+
+  it('adds the PVUV block: totals, top sources and top pages, with the note and link', () => {
+    const html = render(off, stats(), pvuvOk)
+    expect(html).toContain('访客与来源（PVUV.ai）')
+    expect(html).toMatch(/浏览量 \? .* 1,200 比上期多 \+20%/)
+    expect(html).toMatch(/跳出率 \? .* 42%/)
+    expect(html).toContain('1 分 35 秒')
+    expect(html).toMatch(/google\.com 120/)
+    expect(html).toMatch(/直接访问 \/ 没有来路 90/)
+    expect(html).toMatch(/\/pricing 80 140/)
+    expect(html).toContain('数据来自 PVUV.ai，已去掉机器人和爬虫')
+    expect(html).toContain('在 PVUV.ai 里看')
+  })
+
+  it('says why, never zero, when PVUV fails or is not set up; each read on its own', () => {
+    const failed = render(off, stats(), { ...pvuvOk, overview: { status: 'failed' } })
+    expect(failed).toContain('PVUV.ai 暂时读不到')
+    expect(failed).not.toContain('位访客')
+    expect(failed).toMatch(/google\.com 120/)
+    const unset = render(off, stats(), { overview: { status: 'unconfigured' }, sources: { status: 'unconfigured' }, pages: { status: 'unconfigured' } })
+    expect(unset).toContain('还没接 PVUV 读取')
+    expect(unset).toContain('$59.80')
+    const waiting = render(off, stats(), { overview: { status: 'loading' }, sources: { status: 'loading' }, pages: { status: 'loading' } })
+    expect(waiting).toContain('正在从 PVUV.ai 读取')
+  })
+
+  it('does not show the PVUV block while PostHog is read', () => {
+    expect(render(ok)).not.toContain('PVUV')
   })
 })

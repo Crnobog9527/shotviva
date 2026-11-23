@@ -36,7 +36,9 @@ async function finishedJob(profile: TestProfile) {
   const inputKey = newInputKey(userId, 'image/jpeg')
   r2.upload(inputKey, await jpeg(1024, 1024), 'image/jpeg')
   const deps = { db: serviceSupabase(), store: r2.store }
-  const view = await runGeneration({ ...deps, provider: fakeProvider().provider }, { userId, source: 'web', templateId, inputKey })
+  // The tier decides the pool (1996): paid credits make a 2K work, free credits a 1K one.
+  const resolution = profile.credits ? '2k' : '1k'
+  const view = await runGeneration({ ...deps, provider: fakeProvider().provider }, { userId, source: 'web', templateId, inputKey, resolution })
   const thumbKey = workThumbKeyFor(userId, view.id, view.credit_pool)
   return { userId, jobId: view.id, view, deps, r2, thumbKey, signed: `memory://get/${thumbKey}?expires=300` }
 }

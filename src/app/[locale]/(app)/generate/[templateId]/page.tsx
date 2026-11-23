@@ -16,6 +16,8 @@ import { r2Store } from '@/core/storage'
 import { ImageWorkspace, loadAgain, loadReuse, posterHref, TemplateUnavailable, toCatalogueTemplate, WorkspaceHead, WorkspacePending } from '@/modules/image'
 import { site } from '@/site/site.config'
 
+import { createWorkShareAction } from '../../photos/share-actions'
+
 function Nav({ title, aside }: { title: string; aside?: ReactNode }) {
   const t = useTranslations('app.workspace')
   return <FlowNav back={{ href: '/generate', label: t('back') }} title={title} aside={aside} />
@@ -81,6 +83,7 @@ async function Workspace({ params, searchParams }: RouteProps) {
         poolChoice={poolChoice}
         again={again && query.clean === '1' ? { ...again, paidOnly: true } : (again ?? reuse)}
         editable={editOffer !== null}
+        shareLink={createWorkShareAction}
         shareText={t('shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}
       />
     </>

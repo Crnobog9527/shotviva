@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { deleteOwnJob, findOwnJob, listOwnJobs, reserveJob, setJobVisibility } from '@/core/jobs'
 import { allocateOrgCredits, joinOrg, leaveOrg, removeOrgMember } from '@/core/org'
-import { orgOwnerDeleteWork, orgOwnerWork, orgOwnerWorkMembers, orgOwnerWorks } from '@/core/org/works'
+import { findOrgWork, orgOwnerDeleteWork, orgWorkMakers, orgWorks } from '@/core/org/works'
 import { createWorkShare, listWorkShares, readWorkShare } from '@/core/work-share'
 
 import { createMemoryStore } from '../fakes/memory-store'
@@ -15,9 +15,9 @@ import { connectAdmin, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
 import { account, creditsOf, adminAccount, member, orgWith } from './org-fixtures'
 
-// 企业作品 (migrations 1941–1943, Owner 2026-11-22): a work an active member pays for with org
-// credits belongs to the org. It is stamped at reserve, never public, listed for the org's owner
-// (removed members included), and hidden from the maker, their shares and downloads once they
+// 企业作品 (migrations 1941–1943, 1992, Owner 2026-11-22/23): a work an active member pays for with
+// org credits belongs to the org. It is stamped at reserve, never public, listed for every active
+// member of the org (removed makers' works included), and hidden from the maker, their shares and downloads once they
 // leave. Works paid with the person's own credits stay personal.
 
 const service = serviceClient()
@@ -31,7 +31,8 @@ beforeAll(async () => {
   db = await connectAdmin()
   actor = await adminAccount(db, service)
   template = await seedTemplate(db)
-  cost = (await db.query(`select (credits_cost->>'1k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
+  // 2K: the org paid share (and a person's own paid credits) pay it; 1K is free credits only (1996).
+  cost = (await db.query(`select (credits_cost->>'2k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
 }, 60_000)
 
 afterAll(async () => {
@@ -42,7 +43,7 @@ async function made(userId: string, extra: { visibility?: 'public' | 'private'; 
   const jobId = randomUUID()
   await reserveJob(rest, {
     jobId, userId, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
-    inputs: { resolution: '1k', attempt_id: randomUUID(), ...(extra.againOf ? { again_of: extra.againOf } : {}) },
+    inputs: { resolution: '2k', attempt_id: randomUUID(), ...(extra.againOf ? { again_of: extra.againOf } : {}) },
     ...(extra.visibility ? { visibility: extra.visibility } : {}),
   })
   await db.query("select public.confirm_job($1, $2)", [jobId, `outputs/${userId}/${jobId}.png`])
@@ -120,7 +121,7 @@ describe('never public', () => {
     await db.query(backfillSql())
     expect(await job(id)).toMatchObject({ org_id: orgId, org_access_ended_at: null, visibility: 'private', gallery_excluded: true })
     expect((await job(old)).org_access_ended_at).not.toBeNull()
-    expect((await orgOwnerWorks(service, owner)).map((w) => w.id)).toContain(id)
+    expect((await orgWorks(service, owner)).map((w) => w.id)).toContain(id)
   })
 })
 
@@ -172,7 +173,7 @@ describe('leaving the org', () => {
     expect((await job(await made(staff, { againOf: orgWork }))).again_of).toBeNull()
     // A replay of the same job (web job id, partner key) does not hand the old work back either.
     await expect(reserveJob(rest, { jobId: orgWork, userId: staff, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
-      inputs: { resolution: '1k', attempt_id: randomUUID() } })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+      inputs: { resolution: '2k', attempt_id: randomUUID() } })).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 
   it('hides them from the member’s own session reads (RLS)', async () => {
@@ -244,30 +245,30 @@ describe('the owner’s 企业作品', () => {
     const b = await made(second)
     await removeOrgMember(service, owner, staff, randomUUID())
 
-    const works = await orgOwnerWorks(service, owner)
+    const works = await orgWorks(service, owner)
     expect(works.map((w) => w.id).sort()).toEqual([a, b].sort())
     expect(works.find((w) => w.id === a)).toMatchObject({ userId: staff, memberActive: false })
-    expect((await orgOwnerWorks(service, owner, { member: second })).map((w) => w.id)).toEqual([b])
-    const members = await orgOwnerWorkMembers(service, owner)
+    expect((await orgWorks(service, owner, { member: second })).map((w) => w.id)).toEqual([b])
+    const members = await orgWorkMakers(service, owner)
     expect(members).toEqual([
       expect.objectContaining({ userId: second, status: 'active', works: 1 }),
       expect.objectContaining({ userId: staff, status: 'removed', works: 1 }),
     ])
-    expect(await orgOwnerWork(service, owner, a)).toMatchObject({ id: a, outputKey: `outputs/${staff}/${a}.png` })
+    expect(await findOrgWork(service, owner, a)).toMatchObject({ id: a, outputKey: `outputs/${staff}/${a}.png` })
 
     const stranger = await staffed()
-    expect(await orgOwnerWorks(service, stranger.owner)).toHaveLength(0)
-    expect(await orgOwnerWork(service, stranger.owner, a)).toBeNull()
-    expect(await orgOwnerWork(service, staff, a)).toBeNull()
+    expect(await orgWorks(service, stranger.owner)).toHaveLength(0)
+    expect(await findOrgWork(service, stranger.owner, a)).toBeNull()
+    expect(await findOrgWork(service, staff, a)).toBeNull()
     void orgId
   })
 
   it('pages newest first with the (created_at, id) cursor', async () => {
     const { owner, staff } = await staffed(cost * 4)
     const ids = [await made(staff), await made(staff), await made(staff)]
-    const first = await orgOwnerWorks(service, owner, { limit: 2 })
+    const first = await orgWorks(service, owner, { limit: 2 })
     expect(first.map((w) => w.id)).toEqual([ids[2], ids[1]])
-    const next = await orgOwnerWorks(service, owner, { limit: 2, before: { at: first[1]!.createdAt, id: first[1]!.id } })
+    const next = await orgWorks(service, owner, { limit: 2, before: { at: first[1]!.createdAt, id: first[1]!.id } })
     expect(next.map((w) => w.id)).toEqual([ids[0]])
   })
 })
@@ -303,7 +304,7 @@ describe('deleting', () => {
     await orgOwnerDeleteWork({ db: rest, store }, { owner, jobId: orgWork })
     expect(await store.head(`outputs/${staff}/${orgWork}.png`)).toBeNull()
     expect(await audits(orgWork)).toEqual([{ org_id: orgId, maker_user_id: staff, deleted_by: owner }])
-    expect((await orgOwnerWorks(service, owner)).map((w) => w.id)).not.toContain(orgWork)
+    expect((await orgWorks(service, owner)).map((w) => w.id)).not.toContain(orgWork)
   })
 
   it('moves deleting and the 企业作品 view with the org when the primary admin changes', async () => {
@@ -314,8 +315,66 @@ describe('deleting', () => {
     // What #840's transfer does to the org row; the works never move.
     await db.query('update public.orgs set owner_user_id = $2 where owner_user_id = $1', [owner, next])
     await expect(deleteOwnJob(service, { jobId: ownersWork, userId: owner })).rejects.toMatchObject({ message: 'ORG_WORK_DELETE_FORBIDDEN' })
-    expect(await orgOwnerWorks(service, owner)).toHaveLength(0)
-    expect((await orgOwnerWorks(service, next)).map((w) => w.id)).toEqual([ownersWork])
+    await expect(orgOwnerDeleteWork({ db: rest, store: createMemoryStore().store }, { owner, jobId: ownersWork })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    // Still an active member, the former owner keeps seeing the org's works (1992), as staff do.
+    expect((await orgWorks(service, owner)).map((w) => w.id)).toEqual([ownersWork])
+    expect((await orgWorks(service, next)).map((w) => w.id)).toEqual([ownersWork])
+  })
+})
+
+describe('企业作品 for every active member (1992, Owner 2026-11-23)', () => {
+  it('shows staff all of the org’s works, filterable and downloadable, but not to anyone outside it', async () => {
+    const { owner, token, staff } = await staffed()
+    const second = await member(db, service, token)
+    await allocateOrgCredits(service, owner, owner, cost, randomUUID())
+    const mine = await made(staff)
+    const ownersWork = await made(owner)
+    // A colleague who made nothing still sees everything, exactly as the owner does.
+    expect((await orgWorks(service, second)).map((w) => w.id)).toEqual((await orgWorks(service, owner)).map((w) => w.id))
+    expect((await orgWorks(service, second)).map((w) => w.id).sort()).toEqual([mine, ownersWork].sort())
+    expect((await orgWorks(service, second, { member: staff })).map((w) => w.id)).toEqual([mine])
+    expect(await orgWorkMakers(service, second)).toEqual(await orgWorkMakers(service, owner))
+    expect(await findOrgWork(service, second, ownersWork)).toMatchObject({ id: ownersWork, outputKey: `outputs/${owner}/${ownersWork}.png` })
+    expect(await findOrgWork(service, staff, ownersWork)).toMatchObject({ id: ownersWork })
+
+    const stranger = await staffed()
+    const outsider = await account(db, service)
+    for (const user of [stranger.owner, stranger.staff, outsider]) {
+      expect(await orgWorks(service, user)).toHaveLength(0)
+      expect(await orgWorkMakers(service, user)).toHaveLength(0)
+      expect(await findOrgWork(service, user, mine)).toBeNull()
+    }
+  })
+
+  it('takes it away from a member the moment they are removed', async () => {
+    const { owner, token, staff } = await staffed()
+    const second = await member(db, service, token)
+    const work = await made(staff)
+    expect(await findOrgWork(service, second, work)).not.toBeNull()
+    await removeOrgMember(service, owner, second, randomUUID())
+    expect(await orgWorks(service, second)).toHaveLength(0)
+    expect(await orgWorkMakers(service, second)).toHaveLength(0)
+    expect(await findOrgWork(service, second, work)).toBeNull()
+  })
+
+  it('keeps read access while the org is suspended; deleting stays the owner’s', async () => {
+    const { orgId, owner, staff } = await staffed()
+    const work = await made(staff)
+    await db.query("update public.orgs set status = 'suspended' where id = $1", [orgId])
+    expect((await orgWorks(service, staff)).map((w) => w.id)).toEqual([work])
+    expect(await findOrgWork(service, staff, work)).not.toBeNull()
+    await expect(orgOwnerDeleteWork({ db: rest, store: createMemoryStore().store }, { owner: staff, jobId: work })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    expect((await orgWorks(service, owner)).map((w) => w.id)).toEqual([work])
+  })
+
+  it('cannot be called by signed-in clients directly', async () => {
+    for (const fn of ['org_member_work_makers(uuid)', 'org_member_work_list(uuid, uuid, boolean, integer, timestamptz, uuid)', 'org_member_work_file(uuid, uuid)']) {
+      const { rows } = await db.query(
+        `select has_function_privilege('anon', $1, 'execute') as anon, has_function_privilege('authenticated', $1, 'execute') as auth`,
+        [`public.${fn}`],
+      )
+      expect(rows[0]).toEqual({ anon: false, auth: false })
+    }
   })
 })
 

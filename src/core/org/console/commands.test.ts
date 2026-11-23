@@ -13,7 +13,7 @@ vi.mock('../bulk-actions', () => ({ bulkGrantOrgCredits: bulk.grant, bulkSetOrgA
 vi.mock('../promo-actions', () => ({ allocateOrgPromoCredits: promo.allocate, setOrgPromoAllowance: promo.allowance }))
 vi.mock('@/core/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn() } }))
 
-const { allocate, allocatePromo, bulkGrant, pools, bulkSetAllowance, setDefaults, deposit, join, leave, removeMember, resetInvite, setAllowance, setPromoAllowance } = await import('./commands')
+const { allocate, allocatePromo, bulkGrant, pools, bulkSetAllowance, setDefaults, deposit, join, removeMember, resetInvite, setAllowance, setPromoAllowance } = await import('./commands')
 const { AppError } = await import('@/core/errors')
 
 const USER = '00000000-0000-4000-8000-0000000000a1'
@@ -142,16 +142,9 @@ describe('owner command answers', () => {
 })
 
 describe('member commands', () => {
-  it('leave uses the signed-in account only and a per-form request id', async () => {
-    sql.leave.mockResolvedValue(40)
-    const result = await leave({ db: db(null), user: USER }, { requestId: FORM, user: MEMBER })
-    expect(result).toEqual({ ok: true, reclaimed: 40 })
-    expect(sql.leave).toHaveBeenCalledWith(expect.anything(), USER, `console:leave:${USER}:${FORM}`)
-  })
-
-  it('leave by the owner is refused by the SQL function and reported as such', async () => {
-    sql.leave.mockRejectedValue(sqlError('ORG_OWNER_CANNOT_LEAVE'))
-    expect(await leave(owner(), { requestId: FORM })).toEqual({ ok: false, error: 'OWNER_CANNOT_LEAVE' })
+  it('has no leave command: staff cannot leave an org by themselves (Owner 2026-11-23)', async () => {
+    const commands = await import('./commands')
+    expect(Object.keys(commands).filter((name) => /leave/i.test(name))).toEqual([])
   })
 
   it.each([

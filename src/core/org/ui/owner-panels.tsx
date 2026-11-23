@@ -10,7 +10,7 @@ import { Button } from '@/core/ui/button'
 
 import type { ConsolePackage, OwnerConsole, PaymentAccountGroup } from '../console/types'
 import { unitPricePer100Credits } from '../unit-price'
-import { PAYMENT_FIELD_LABELS, PAYMENT_FIELDS, PAYMENT_KIND_LABELS } from '../payment-labels'
+import { PAYMENT_FIELD_LABELS, PAYMENT_FIELDS, PAYMENT_KIND_LABELS, PAYMENT_KINDS } from '../payment-labels'
 import type { OwnerActions } from './actions'
 import { RefCodeBox } from './ref-code-box'
 import { TransferContactButton } from './transfer-contact'
@@ -98,21 +98,26 @@ export function PackagesPanel({ packages, contact }: { packages: readonly Consol
   )
 }
 
-// How to pay: bank transfer to one of the enabled accounts (never a card). Labels come from the
-// shared tables (PAYMENT_*), in the page's language; empty values are skipped. With no groups (or a
-// failed read) the panel says to contact us for the details.
+// How to pay: bank transfer to one of the enabled accounts (never a card). The enterprise number
+// and the after-transfer note sit in their own panel; each account group gets a panel of its own,
+// in PAYMENT_KINDS order (US company first, Owner 2026-11-23). Labels come from the shared tables
+// (PAYMENT_*), in the page's language; empty values are skipped. With no groups (or a failed read)
+// the panel says to contact us for the details.
 export function PaymentAccountsPanel({ groups, orgName, refCode }: { groups: readonly PaymentAccountGroup[] | null; orgName: string; refCode: string }) {
   const t = useTranslations('app.org.payment')
   const lang = useLocale() === 'zh' ? 'zh' : 'en'
-  const shown = groups?.filter((group) => group.details && Object.keys(group.details).length > 0) ?? []
+  const shown = [...(groups?.filter((group) => group.details && Object.keys(group.details).length > 0) ?? [])]
+    .sort((a, b) => PAYMENT_KINDS.indexOf(a.kind) - PAYMENT_KINDS.indexOf(b.kind))
   return (
-    <Panel title={t('title')} hint={t('hint', { org: orgName })}>
-      <RefCodeBox code={refCode} />
-      {shown.length === 0 ? <p data-slot="org-payment-accounts-pending" className="text-label text-muted-foreground">{t('pending')}</p> : null}
+    <>
+      <Panel title={t('title')} hint={t('hint', { org: orgName })}>
+        <RefCodeBox code={refCode} />
+        {shown.length === 0 ? <p data-slot="org-payment-accounts-pending" className="text-label text-muted-foreground">{t('pending')}</p> : null}
+        <p className="text-label text-muted-foreground">{t('after')}</p>
+      </Panel>
       {shown.map((group) => (
-        <div key={group.kind} className="space-y-2">
-          <h3 className="font-medium">{PAYMENT_KIND_LABELS[group.kind][lang]}</h3>
-          <dl className="grid gap-x-3 gap-y-1 sm:grid-cols-[max-content_1fr]">
+        <Panel key={group.kind} title={PAYMENT_KIND_LABELS[group.kind][lang]}>
+          <dl data-slot="org-payment-account" data-kind={group.kind} className="grid gap-x-3 gap-y-1 sm:grid-cols-[max-content_1fr]">
             {PAYMENT_FIELDS[group.kind].filter((field) => group.details[field]).map((field) => (
               <div key={field} className="contents">
                 <dt className="text-label text-muted-foreground">{PAYMENT_FIELD_LABELS[field]?.[lang] ?? field}</dt>
@@ -120,9 +125,8 @@ export function PaymentAccountsPanel({ groups, orgName, refCode }: { groups: rea
               </div>
             ))}
           </dl>
-        </div>
+        </Panel>
       ))}
-      <p className="text-label text-muted-foreground">{t('after')}</p>
-    </Panel>
+    </>
   )
 }

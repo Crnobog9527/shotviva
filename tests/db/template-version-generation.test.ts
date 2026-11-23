@@ -13,7 +13,8 @@ it('sends the selected version to both adapters and preserves each completed job
   const pg = await connectAdmin(), db = serviceSupabase()
   const unlock = await holdTestBudget(pg)
   try {
-    const admin = await createUser(pg,{credits:100})
+    // Its web jobs are 1K, which free credits pay (1996).
+    const admin = await createUser(pg,{credits:100,freeCredits:100})
     await pg.query("update public.profiles set role='admin' where id=$1",[admin])
     await saveTestBudget(db,admin,1000)
     const id = await seedTemplate(pg,{images:{min:0,max:1}})

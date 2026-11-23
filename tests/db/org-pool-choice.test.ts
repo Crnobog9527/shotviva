@@ -7,9 +7,9 @@ import { seedTemplate } from './generation-fixtures'
 import { connectAdmin, createUser } from './helpers'
 import { adminActor, months, partner, refused } from './partner-promo-fixtures'
 
-// 出图时让员工自选 (ARCHITECTURE §6.5, migrations 1896–1897): a member holding BOTH kinds of org
-// credits picks which kind pays; the server honours it, refuses when the chosen kind is short
-// (never falls back), ignores it for everyone else and for non-web sources, and remembers it.
+// 在职成员只用企业积分 (ARCHITECTURE §6.5, migrations 1896–1897): an active member pays only from the
+// org's shares. Since 1996 the tier picks which share pays a web job (1K the promotion share, 2K /
+// 4K the paid share) and the member's choice no longer does; tier-decides-pool.test.ts covers that.
 let db: Client
 let actor: string
 let template: string | undefined
@@ -36,55 +36,16 @@ async function member(paid: number, promo: number, own: { credits?: number; free
   return { orgId, owner, staff }
 }
 
-// A 1k job of a template costing 10, with an optional choice and source.
+// A job of a template costing 10 / 20 / 30 (1k / 2k / 4k), 1k by default, with an optional choice and source.
+const PRICE = { '1k': 10, '2k': 20 } as const
 const seed = async () => (template ??= await seedTemplate(db, { visibleIn: ['web', 'partner'], credits: { '1k': 10, '2k': 20, '3k': 30 } }))
-async function generate(user: string, choice?: string, source = 'web', visibility: string | null = null) {
+async function generate(user: string, choice?: string, source = 'web', visibility: string | null = null, tier: keyof typeof PRICE = '1k') {
   await seed()
-  const inputs = { resolution: '1k', attempt_id: randomUUID(), ...(choice ? { pool_choice: choice } : {}) }
-  return row(db, "select credit_pool, visibility, gallery_excluded, org_id from reserve_credits($1,$2,'image',$3,10,$4,$5,null,null,$6)",
-    [randomUUID(), user, template, source, inputs, visibility]) as Promise<{ credit_pool: string; visibility: string; gallery_excluded: boolean; org_id: string | null }>
+  const inputs = { resolution: tier, attempt_id: randomUUID(), ...(choice ? { pool_choice: choice } : {}) }
+  return row(db, "select credit_pool, visibility, gallery_excluded, org_id from reserve_credits($1,$2,'image',$3,$4,$5,$6,null,null,$7)",
+    [randomUUID(), user, template, PRICE[tier], source, inputs, visibility]) as Promise<{ credit_pool: string; visibility: string; gallery_excluded: boolean; org_id: string | null }>
 }
 const balances = (user: string) => row(db, 'select credits, free_credits, org_pool_choice from profiles where id=$1', [user])
-
-it('honours promo: the free pool, org promotion share first, a free work; and remembers it', async () => {
-  const { orgId, staff } = await member(100, 100, { free: 50 })
-  expect(await generate(staff, 'promo')).toMatchObject({ credit_pool: 'free' }) // a free work: watermarked (privacy: org works stamping)
-  expect(await balances(staff)).toEqual({ credits: 100, free_credits: 140, org_pool_choice: 'promo' })
-  expect(await row(db, 'select held_credits, held_promo_credits from org_members where org_id=$1 and user_id=$2', [orgId, staff]))
-    .toEqual({ held_credits: 100, held_promo_credits: 90 })
-})
-
-it('honours paid: the org paid share pays the whole job, the member’s own credits stay untouched', async () => {
-  const { orgId, staff } = await member(100, 100, { credits: 5 })
-  expect(await generate(staff, 'paid')).toMatchObject({ credit_pool: 'paid' })
-  expect(await balances(staff)).toEqual({ credits: 95, free_credits: 100, org_pool_choice: 'paid' })
-  expect(await row(db, 'select held_credits, held_promo_credits from org_members where org_id=$1 and user_id=$2', [orgId, staff]))
-    .toEqual({ held_credits: 90, held_promo_credits: 100 }) // own 5 still there
-})
-
-it('refuses a chosen kind that cannot cover the price, never falling back to the other kind', async () => {
-  await seed() // outside the refused savepoints, which roll back
-  const { staff } = await member(100, 5)
-  await refused(db, () => generate(staff, 'promo'), 'POOL_CHOICE_INSUFFICIENT')
-  const short = await member(5, 100)
-  await refused(db, () => generate(short.staff, 'paid'), 'POOL_CHOICE_INSUFFICIENT')
-  expect(await balances(staff)).toMatchObject({ credits: 100, free_credits: 5 })
-  expect(await balances(short.staff)).toMatchObject({ credits: 5, free_credits: 100 })
-  expect(await row(db, 'select count(*)::int n from generation_jobs where user_id in ($1,$2)', [staff, short.staff])).toEqual({ n: 0 })
-})
-
-it('ignores the choice with only one kind held, outside an org, and for partner calls: org paid first, then org promotion', async () => {
-  const onlyPromo = await member(0, 100, { credits: 50 })
-  expect(await generate(onlyPromo.staff, 'paid')).toMatchObject({ credit_pool: 'free' }) // the org promotion share, never own paid
-  expect(await balances(onlyPromo.staff)).toMatchObject({ credits: 50, free_credits: 90 })
-  const outsider = await createUser(db, { credits: 50, freeCredits: 50 })
-  expect(await generate(outsider, 'promo')).toMatchObject({ credit_pool: 'paid' })
-  const both = await member(100, 100)
-  expect(await generate(both.staff, 'promo', 'graylum')).toMatchObject({ credit_pool: 'paid' })
-  expect(await generate(both.staff)).toMatchObject({ credit_pool: 'paid' }) // no choice sent: as before
-  expect((await balances(both.staff)).org_pool_choice).toBeNull()
-  await refused(db, () => generate(both.staff, 'gift'), 'INVALID_INPUT') // template already seeded above
-})
 
 it('never charges an active member’s own credits: refuses when the org shares cannot cover the job', async () => {
   await seed()
@@ -96,8 +57,8 @@ it('never charges an active member’s own credits: refuses when the org shares 
   expect(await balances(small.staff)).toMatchObject({ credits: 505, free_credits: 505 })
   // Once they leave, their own credits are theirs to use again.
   await db.query("select org_leave($1,'leave-own')", [staff])
-  expect(await generate(staff)).toMatchObject({ credit_pool: 'paid' })
-  expect(await balances(staff)).toMatchObject({ credits: 490 })
+  expect(await generate(staff, undefined, 'web', null, '2k')).toMatchObject({ credit_pool: 'paid' })
+  expect(await balances(staff)).toMatchObject({ credits: 480 })
 })
 
 it('holds the org owner to the same rule: org shares only, own credits frozen', async () => {
@@ -119,14 +80,14 @@ it('lets the owner deposit their own (frozen) paid credits into the pool, then u
   expect((await row(db, "select org_deposit($1,300,'dep-own') r", [owner])).r).toMatchObject({ applied: true, pool_credits: pool + 300 })
   expect(await balances(owner)).toMatchObject({ credits: 0 })
   await db.query("select org_allocate($1,$1,50,'self-paid')", [owner])
-  expect(await generate(owner)).toMatchObject({ credit_pool: 'paid' })
-  expect(await balances(owner)).toMatchObject({ credits: 40 })
+  expect(await generate(owner, undefined, 'web', null, '2k')).toMatchObject({ credit_pool: 'paid' })
+  expect(await balances(owner)).toMatchObject({ credits: 30 })
 })
 
 it('makes every org-funded work private and out of the gallery, promotion-funded ones included, whatever visibility was asked', async () => {
   const { orgId, staff } = await member(100, 100)
   expect(await generate(staff, 'promo', 'web', 'public')).toEqual({ credit_pool: 'free', visibility: 'private', gallery_excluded: true, org_id: orgId })
-  expect(await generate(staff, 'paid', 'web', 'public')).toEqual({ credit_pool: 'paid', visibility: 'private', gallery_excluded: true, org_id: orgId })
+  expect(await generate(staff, 'paid', 'web', 'public', '2k')).toEqual({ credit_pool: 'paid', visibility: 'private', gallery_excluded: true, org_id: orgId })
   const outsider = await createUser(db, { freeCredits: 50 })
   expect(await generate(outsider)).toMatchObject({ credit_pool: 'free', visibility: 'public', org_id: null }) // a personal free work, as before
 })
@@ -139,10 +100,12 @@ it('charges poster photo extraction from the org shares too', async () => {
   expect(await row(db, 'select held_promo_credits from org_members where org_id=$1 and user_id=$2', [orgId, staff])).toEqual({ held_promo_credits: 49 })
 })
 
-it('ignores the choice once the promotion month is over', async () => {
+it('refuses 1K once the promotion month is over, while 2K still pays from the paid share', async () => {
+  await seed()
   const { orgId, staff } = await member(100, 100)
   await db.query("update orgs set promo_expires_at=now()-interval '1 second' where id=$1", [orgId])
-  expect(await generate(staff, 'promo')).toMatchObject({ credit_pool: 'paid' })
+  await refused(db, () => generate(staff, 'promo'), 'ORG_CREDITS_INSUFFICIENT')
+  expect(await generate(staff, 'promo', 'web', null, '2k')).toMatchObject({ credit_pool: 'paid' })
 })
 
 it('keeps the helper private', async () => {

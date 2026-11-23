@@ -15,8 +15,4 @@ export type OwnerActions = {
   resetInvite: () => Promise<ConsoleResult<{ token: string }>>
 }
 
-export type StaffActions = {
-  leave: (input: { requestId: string }) => Promise<ConsoleResult<{ reclaimed: number }>>
-}
-
 export type JoinAction = () => Promise<ConsoleResult>

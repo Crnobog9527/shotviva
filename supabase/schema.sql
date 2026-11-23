@@ -2726,7 +2726,7 @@ CREATE OR REPLACE FUNCTION "admin"."template_approved_price"("p_provider" "uuid"
   join admin.template_tariffs_v2 c on c.id=s.template_id
   join public.ai_providers sp on sp.id=s.provider_id
   join public.ai_providers p on p.id=p_provider
-  where b.reverted_at is null and admin.is_template_catalog_v2() and s.template_id=p_template
+  where b.reverted_at is null and admin.is_template_catalog_v2() and s.template_id=p_template and s.template_id<>'edit'
     and sp.module='image' and sp.adapter='openai_images' and sp.model='gpt-image-2.6-sunburst'
     and md5(sp.base_url) is not distinct from s.provider_endpoint_hash
     and (sp.capabilities->'resolutions') ?& array['1k','2k','4k']
@@ -2748,7 +2748,7 @@ CREATE OR REPLACE FUNCTION "admin"."template_approved_prices"("p_provider" "uuid
   join admin.template_tariffs_v2 c on c.id=s.template_id
   join public.ai_providers sp on sp.id=s.provider_id
   join public.ai_providers p on p.id=p_provider
-  where b.reverted_at is null and admin.is_template_catalog_v2()
+  where b.reverted_at is null and admin.is_template_catalog_v2() and s.template_id<>'edit'
     and sp.module='image' and sp.adapter='openai_images' and sp.model='gpt-image-2.6-sunburst'
     and md5(sp.base_url) is not distinct from s.provider_endpoint_hash
     and (sp.capabilities->'resolutions') ?& array['1k','2k','4k']
@@ -3312,6 +3312,23 @@ $$;
 ALTER FUNCTION "public"."_affiliate_accept_invite"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_adopt_user_label"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if new.admin_label is null then
+    select l.label into new.admin_label from public.admin_user_labels l where l.user_id=new.user_id;
+  end if;
+  delete from public.admin_user_labels where user_id=new.user_id;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_adopt_user_label"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_allocate_payout"("p_owner" "uuid", "p_face" bigint, "p_at" timestamp with time zone DEFAULT NULL::timestamp with time zone) RETURNS TABLE("commission_id" bigint, "prior_amount" bigint, "issue_amount" bigint)
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -3570,7 +3587,8 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_has_history"("p_user" "uuid") RE
       or exists(select from public.affiliate_commissions where affiliate_user_id = p_user)
       or exists(select from public.affiliate_payouts where affiliate_user_id = p_user)
       or exists(select from public.affiliate_adjustments where affiliate_user_id = p_user)
-      or exists(select from public.affiliate_rate_overrides where user_id = p_user)
+      or exists(select from public.affiliate_rate_overrides
+                 where user_id = p_user and (l1_bp is not null or l2_bp is not null))
       or exists(select from public.profiles where referred_by = p_user)
       or exists(select from public.affiliates where parent_user_id = p_user)
       or exists(select from public.affiliate_recompute_errors e
@@ -3645,8 +3663,12 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_overrides"("p_user" "uuid", "p_v
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+  delete from public.affiliate_rate_overrides o
+   using jsonb_to_recordset(coalesce(p_values,'[]'::jsonb)) r(product_kind text,l1_bp integer,l2_bp integer)
+   where o.user_id=p_user and o.product_kind=r.product_kind and r.l1_bp is null and r.l2_bp is null;
   insert into public.affiliate_rate_overrides(user_id,product_kind,l1_bp,l2_bp)
     select p_user,r.product_kind,r.l1_bp,r.l2_bp from jsonb_to_recordset(p_values) r(product_kind text,l1_bp integer,l2_bp integer)
+     where r.l1_bp is not null or r.l2_bp is not null
     on conflict(user_id,product_kind) do update set l1_bp=excluded.l1_bp,l2_bp=excluded.l2_bp;
 $$;
 
@@ -5998,6 +6020,42 @@ $$;
 
 
 ALTER FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text", "p_resolution" "text") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_pool text := case when p_resolution = '1k' then 'free' else 'paid' end;
+  v_member boolean := false;
+  v_paid integer;
+  v_promo integer;
+begin
+  if p_source <> 'web' then
+    return public._reserve_pool(p_profile, p_cost, p_source, p_choice);
+  end if;
+  if p_choice is not null and p_choice not in ('paid', 'promo') then
+    raise exception 'INVALID_INPUT' using detail = 'pool_choice must be paid or promo';
+  end if;
+  -- Same org shares as _reserve_pool (1897): the paid share, and the promotion share while the
+  -- org's promotion month is live.
+  select true, least(m.held_credits, p_profile.credits),
+         case when o.promo_expires_at > now() then least(m.held_promo_credits, p_profile.free_credits) else 0 end
+    into v_member, v_paid, v_promo
+    from public.org_members m join public.orgs o on o.id = m.org_id
+   where m.user_id = p_profile.id and m.status = 'active';
+  if not coalesce(v_member, false) then
+    if (case when v_pool = 'paid' then p_profile.credits else p_profile.free_credits end) >= p_cost then return v_pool; end if;
+    raise exception 'CREDITS_INSUFFICIENT';
+  end if;
+  if (case when v_pool = 'paid' then v_paid else v_promo end) >= p_cost then return v_pool; end if;
+  raise exception 'ORG_CREDITS_INSUFFICIENT';
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text", "p_resolution" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) RETURNS boolean
@@ -10374,6 +10432,8 @@ begin
     v_has_personal := found;
     if v_has_personal then
       perform 1 from public.affiliate_click_days where affiliate_user_id = v_new order by day for update nowait;
+      -- 1991: its override rows go with it too; an all-null one is not history.
+      perform 1 from public.affiliate_rate_overrides where user_id = v_new order by product_kind for update nowait;
     end if;
     perform 1 from public.profiles
      where id in (select v_old union all select v_new union all
@@ -12294,14 +12354,15 @@ begin
       and (p_key not in ('code_gift_policy','code_inviter_window_days','gallery_enabled','gallery_auto_approve',
                          'signup_gift_daily_cap','signup_gift_paused','signup_gift_per_ip',
                          'signup_gift_claim_phone','signup_gift_claim_google','poster_photo_credits',
-                         'catalog_economics_policy','food_toggles_enabled')
+                         'catalog_economics_policy','food_toggles_enabled','service_worker_enabled')
            or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
 
   case p_key
     when 'wishlist_enabled', 'gallery_enabled', 'gallery_auto_approve', 'signup_gift_paused',
-         'signup_gift_claim_phone', 'signup_gift_claim_google', 'food_toggles_enabled' then
+         'signup_gift_claim_phone', 'signup_gift_claim_google', 'food_toggles_enabled',
+         'service_worker_enabled' then
       if p_value is null or jsonb_typeof(p_value) <> 'boolean' then
         raise exception 'INVALID_INPUT' using detail = p_key || ' must be a boolean';
       end if;
@@ -12683,6 +12744,33 @@ $_$;
 
 
 ALTER FUNCTION "public"."admin_set_test_run_cover"("p_actor" "uuid", "p_run_id" "uuid", "p_before_url" "text", "p_after_url" "text", "p_locale" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_user_label"("p_actor" "uuid", "p_user" "uuid", "p_label" "text") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_label text:=nullif(btrim(p_label),'');
+begin
+  perform public._affiliate_require_admin(p_actor);
+  if p_user is null or char_length(v_label)>60 then raise exception 'INVALID_INPUT'; end if;
+  if not exists(select from auth.users where id=p_user) then raise exception 'USER_NOT_FOUND'; end if;
+  update public.affiliates set admin_label=v_label where user_id=p_user;
+  if found then
+    perform public._affiliate_audit(p_actor,'set',p_user::text,'annotate');
+    delete from public.admin_user_labels where user_id=p_user;
+  elsif v_label is null then
+    delete from public.admin_user_labels where user_id=p_user;
+  else
+    insert into public.admin_user_labels(user_id,label,updated_by) values (p_user,v_label,p_actor)
+    on conflict (user_id) do update set label=excluded.label, updated_at=now(), updated_by=excluded.updated_by;
+  end if;
+  return v_label;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_set_user_label"("p_actor" "uuid", "p_user" "uuid", "p_label" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) RETURNS TABLE("signup_ip" "inet", "accounts" integer, "last_signup_at" timestamp with time zone, "members" "jsonb")
@@ -14957,6 +15045,7 @@ declare
   v_note text := nullif(btrim(coalesce(p_note, '')), '');
   v_id text;
 begin
+  -- The profile row lock serializes one owner's creates, so the live count below is exact.
   select banned_at into v_banned from public.profiles where id = p_user_id for update;
   if not found then
     raise exception 'PROFILE_NOT_FOUND';
@@ -14983,9 +15072,14 @@ begin
     raise exception 'WORK_SHARE_RATE_LIMITED';
   end if;
 
-  if (select count(*) from public.work_shares where user_id = p_user_id and revoked_at is null) >= 200 then
-    raise exception 'WORK_SHARE_LIMIT';
-  end if;
+  -- At most 200 live links: keep the newest 199, revoke the rest, then add this one.
+  update public.work_shares s set revoked_at = now()
+   where s.id in (
+     select l.id from public.work_shares l
+      where l.user_id = p_user_id and l.revoked_at is null
+      order by l.created_at desc, l.id desc
+      offset 199
+   );
 
   insert into public.work_shares (user_id, job_ids, show_before, title, note)
   values (p_user_id, p_job_ids, coalesce(p_show_before, false), v_title, v_note)
@@ -16398,6 +16492,53 @@ $_$;
 
 
 ALTER FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_member_work_file"("p_user" "uuid", "p_job_id" "uuid") RETURNS TABLE("id" "uuid", "user_id" "uuid", "credit_pool" "text", "output_key" "text", "archive_key" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select w.id, w.user_id, w.credit_pool, w.output_key, w.archive_key
+    from public.org_members m
+    join public.orgs o on o.id = m.org_id
+   cross join lateral public.org_owner_work_file(o.owner_user_id, p_job_id) w
+   where m.user_id = p_user and m.status = 'active';
+$$;
+
+
+ALTER FUNCTION "public"."org_member_work_file"("p_user" "uuid", "p_job_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_member_work_list"("p_user" "uuid", "p_member" "uuid" DEFAULT NULL::"uuid", "p_archived" boolean DEFAULT false, "p_limit" integer DEFAULT 30, "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "user_id" "uuid", "template_id" "text", "template_name" "text", "created_at" timestamp with time zone, "aspect_ratio" "text", "member_active" boolean)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select w.id, w.user_id, w.template_id, w.template_name, w.created_at, w.aspect_ratio, w.member_active
+    from public.org_members m
+    join public.orgs o on o.id = m.org_id
+   cross join lateral public.org_owner_work_list(o.owner_user_id, p_member, p_archived, p_limit, p_before_at, p_before_id) with ordinality w
+   where m.user_id = p_user and m.status = 'active'
+   order by w.ordinality;
+$$;
+
+
+ALTER FUNCTION "public"."org_member_work_list"("p_user" "uuid", "p_member" "uuid", "p_archived" boolean, "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_member_work_makers"("p_user" "uuid") RETURNS TABLE("user_id" "uuid", "role" "text", "status" "text", "removed_at" timestamp with time zone, "works" integer)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select w.user_id, w.role, w.status, w.removed_at, w.works
+    from public.org_members m
+    join public.orgs o on o.id = m.org_id
+   cross join lateral public.org_owner_work_makers(o.owner_user_id) with ordinality w
+   where m.user_id = p_user and m.status = 'active'
+   order by w.ordinality;
+$$;
+
+
+ALTER FUNCTION "public"."org_member_work_makers"("p_user" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."org_monthly_topup"("p_period" "text") RETURNS "jsonb"
@@ -18646,8 +18787,11 @@ begin
       coalesce(p_inputs->>'fallback_route'='true',false),v_v2) then
     raise exception 'TEMPLATE_UNAVAILABLE';
   end if;
-  -- Paid first, then free, unless a member holding both kinds of org credits chose one (1897).
-  v_pool := public._reserve_pool(v_profile, v_cost, p_source, p_inputs->>'pool_choice');
+  -- The tier decides the pool (1996): 1K from free credits only, 2K/4K from paid credits only.
+  -- An edit keeps the 1897 rule (paid first, then free; org members from org shares only).
+  v_pool := case when p_template_id = 'edit'
+    then public._reserve_pool(v_profile, v_cost, p_source, p_inputs->>'pool_choice')
+    else public._reserve_pool_for_tier(v_profile, v_cost, p_source, p_inputs->>'pool_choice', v_resolution) end;
 
   perform public._apply_credit_change(
     p_user_id, v_pool, 'reserve', -v_cost, 'generation reserve',
@@ -20941,8 +21085,8 @@ CREATE OR REPLACE VIEW "admin"."template_tariffs_v2" AS
  SELECT "id",
     'medium'::"text" AS "quality",
         CASE
-            WHEN ("id" = 'edit'::"text") THEN '{"1k": 15, "2k": 20, "4k": 58}'::"jsonb"
-            WHEN ("id" = 'white-background'::"text") THEN '{"1k": 18, "2k": 37, "4k": 55}'::"jsonb"
+            WHEN ("id" = 'edit'::"text") THEN '{"1k": 15, "2k": 15, "4k": 58}'::"jsonb"
+            WHEN ("id" = 'white-background'::"text") THEN '{"1k": 20, "2k": 20, "4k": 35}'::"jsonb"
             WHEN ("id" = ANY (ARRAY['promo-poster'::"text", 'pet-studio'::"text", 'freeform'::"text"])) THEN '{"1k": 45, "2k": 120, "4k": 190}'::"jsonb"
             ELSE '{"1k": 74, "2k": 150, "4k": 225}'::"jsonb"
         END AS "costs",
@@ -21141,6 +21285,18 @@ CREATE TABLE IF NOT EXISTS "public"."admin_test_spend" (
 
 
 ALTER TABLE "public"."admin_test_spend" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."admin_user_labels" (
+    "user_id" "uuid" NOT NULL,
+    "label" "text" NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid" NOT NULL,
+    CONSTRAINT "admin_user_labels_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 60)))
+);
+
+
+ALTER TABLE "public"."admin_user_labels" OWNER TO "postgres";
 
 
 ALTER TABLE "public"."affiliate_adjustments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
@@ -22984,6 +23140,11 @@ ALTER TABLE ONLY "public"."admin_test_spend"
 
 
 
+ALTER TABLE ONLY "public"."admin_user_labels"
+    ADD CONSTRAINT "admin_user_labels_pkey" PRIMARY KEY ("user_id");
+
+
+
 ALTER TABLE ONLY "public"."affiliate_adjustments"
     ADD CONSTRAINT "affiliate_adjustments_pkey" PRIMARY KEY ("id");
 
@@ -24580,6 +24741,10 @@ CREATE OR REPLACE TRIGGER "affiliate_payment_update" AFTER UPDATE OF "status", "
 
 
 
+CREATE OR REPLACE TRIGGER "affiliates_adopt_user_label" BEFORE INSERT ON "public"."affiliates" FOR EACH ROW EXECUTE FUNCTION "public"."_affiliate_adopt_user_label"();
+
+
+
 CREATE OR REPLACE TRIGGER "ai_providers_check_references" BEFORE UPDATE OF "module" ON "public"."ai_providers" FOR EACH ROW WHEN ((("old"."module" = 'image'::"text") AND ("new"."module" <> 'image'::"text"))) EXECUTE FUNCTION "public"."check_referenced_provider_module"();
 
 
@@ -25013,6 +25178,11 @@ ALTER TABLE ONLY "public"."admin_test_runs"
 
 ALTER TABLE ONLY "public"."admin_test_runs"
     ADD CONSTRAINT "admin_test_runs_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."admin_user_labels"
+    ADD CONSTRAINT "admin_user_labels_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
 
 
@@ -26009,6 +26179,9 @@ ALTER TABLE "public"."admin_test_runs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."admin_test_spend" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."admin_user_labels" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."affiliate_adjustments" ENABLE ROW LEVEL SECURITY;
@@ -27075,6 +27248,10 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_accept_invite"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."_affiliate_adopt_user_label"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_affiliate_allocate_payout"("p_owner" "uuid", "p_face" bigint, "p_at" timestamp with time zone) FROM PUBLIC;
 
 
@@ -27443,6 +27620,10 @@ GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
 
 
 REVOKE ALL ON FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text", "p_resolution" "text") FROM PUBLIC;
 
 
 
@@ -28305,6 +28486,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_test_run_cover"("p_actor" "uuid", "p_r
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_set_user_label"("p_actor" "uuid", "p_user" "uuid", "p_label" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_user_label"("p_actor" "uuid", "p_user" "uuid", "p_label" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) TO "service_role";
 
@@ -28889,6 +29075,21 @@ GRANT ALL ON FUNCTION "public"."org_member_promo_stats"("p_caller" "uuid", "p_or
 
 REVOKE ALL ON FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_member_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_member_work_file"("p_user" "uuid", "p_job_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_member_work_file"("p_user" "uuid", "p_job_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_member_work_list"("p_user" "uuid", "p_member" "uuid", "p_archived" boolean, "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_member_work_list"("p_user" "uuid", "p_member" "uuid", "p_archived" boolean, "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_member_work_makers"("p_user" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_member_work_makers"("p_user" "uuid") TO "service_role";
 
 
 
@@ -29578,6 +29779,10 @@ GRANT ALL ON TABLE "public"."admin_test_runs" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."admin_test_spend" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."admin_user_labels" TO "service_role";
 
 
 

@@ -74,6 +74,24 @@ describe('an empty personal affiliate account of the new owner', () => {
     expect(JSON.parse(audit.reason)).toMatchObject({ from: owner, to: user, removed_personal: { slug, status: 'suspended', clicks: 2 } })
   })
 
+  // Production 2026-11-23 (1991): the admin cleared 单独佣金比例, which left all-null override rows.
+  it('is deleted when its only overrides are cleared (both rates null)', async () => {
+    const { orgId } = await channelOrg()
+    const { user, slug } = await emptyPersonal()
+    await db.query("insert into affiliate_rate_overrides(user_id,product_kind,l1_bp,l2_bp) select $1,k,null,null from unnest(array['pack','monthly','yearly']) k", [user])
+    expect(await transfer(orgId, user)).toMatchObject({ applied: true, removed_personal: { slug, status: 'suspended' } })
+    // The org's own override (pack 2000/700, moved with its account) is all that is left on the key.
+    expect((await db.query('select product_kind,l1_bp,l2_bp from affiliate_rate_overrides where user_id=$1 order by 1', [user])).rows)
+      .toEqual([{ product_kind: 'pack', l1_bp: 2000, l2_bp: 700 }])
+  })
+
+  it('is still refused when one cleared-looking override keeps a rate', async () => {
+    const { orgId } = await channelOrg()
+    const { user } = await emptyPersonal()
+    await db.query("insert into affiliate_rate_overrides(user_id,product_kind,l1_bp,l2_bp) values($1,'pack',null,null),($1,'monthly',null,300)", [user])
+    await refused(() => transfer(orgId, user), 'ORG_NEW_OWNER_AFFILIATE_HISTORY')
+  })
+
   it('is deleted whatever its status short of banned, pending and active included', async () => {
     for (const status of ['pending', 'active', 'rejected']) {
       const { orgId } = await channelOrg()
@@ -151,6 +169,25 @@ describe('a personal affiliate account with history', () => {
     const { id: user } = await promoter(db)
     await histories.payout!(user)
     await refused(() => transfer(plainOrg, user), 'ORG_PERSONAL_AFFILIATE')
+  })
+})
+
+describe('saving rate overrides (1991)', () => {
+  const overrides = async (user: string) =>
+    (await db.query('select product_kind,l1_bp,l2_bp from affiliate_rate_overrides where user_id=$1 order by 1', [user])).rows
+  it('removes a kind whose two rates are cleared and stores the others', async () => {
+    const { id: user } = await promoter(db)
+    await db.query('select _affiliate_overrides($1,$2)', [user, JSON.stringify([
+      { product_kind: 'pack', l1_bp: 2000, l2_bp: 700 }, { product_kind: 'monthly', l1_bp: null, l2_bp: 400 }, { product_kind: 'yearly', l1_bp: 900, l2_bp: null }])])
+    expect(await overrides(user)).toEqual([
+      { product_kind: 'monthly', l1_bp: null, l2_bp: 400 }, { product_kind: 'pack', l1_bp: 2000, l2_bp: 700 }, { product_kind: 'yearly', l1_bp: 900, l2_bp: null }])
+    await db.query('select _affiliate_overrides($1,$2)', [user, JSON.stringify([
+      { product_kind: 'pack', l1_bp: null, l2_bp: null }, { product_kind: 'monthly', l1_bp: null, l2_bp: 400 }, { product_kind: 'yearly', l1_bp: null, l2_bp: null }])])
+    expect(await overrides(user)).toEqual([{ product_kind: 'monthly', l1_bp: null, l2_bp: 400 }])
+    await db.query('select _affiliate_overrides($1,$2)', [user, JSON.stringify([{ product_kind: 'monthly', l1_bp: null, l2_bp: null }])])
+    expect(await overrides(user)).toEqual([])
+    await db.query('select _affiliate_overrides($1,null)', [user])
+    expect(await overrides(user)).toEqual([])
   })
 })
 

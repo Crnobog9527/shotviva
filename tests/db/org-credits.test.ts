@@ -300,13 +300,14 @@ describe('refunds give the org share back', () => {
   let cost: number
   beforeAll(async () => {
     template = await seedTemplate(db)
-    cost = (await db.query(`select (credits_cost->>'1k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
+    // The paid share pays 2K (1K is the promotion share's, 1996).
+    cost = (await db.query(`select (credits_cost->>'2k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
   })
 
   const reserve = (userId: string) => {
     const jobId = randomUUID()
     return reserveJob(serviceSupabase(), { jobId, userId, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
-      inputs: { resolution: '1k', attempt_id: randomUUID() } }).then(() => jobId)
+      inputs: { resolution: '2k', attempt_id: randomUUID() } }).then(() => jobId)
   }
   const fail = (jobId: string) => db.query("select public.refund_job($1, 'TEST_FAILED')", [jobId])
 
@@ -355,12 +356,13 @@ describe('refunds after leaving', () => {
   let cost: number
   beforeAll(async () => {
     template = await seedTemplate(db)
-    cost = (await db.query(`select (credits_cost->>'1k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
+    // The paid share pays 2K (1K is the promotion share's, 1996).
+    cost = (await db.query(`select (credits_cost->>'2k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
   })
   const reserve = async (userId: string) => {
     const jobId = randomUUID()
     await reserveJob(serviceSupabase(), { jobId, userId, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
-      inputs: { resolution: '1k', attempt_id: randomUUID() } })
+      inputs: { resolution: '2k', attempt_id: randomUUID() } })
     return jobId
   }
   const fail = (jobId: string) => db.query("select public.refund_job($1, 'TEST_FAILED')", [jobId])

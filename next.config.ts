@@ -47,6 +47,10 @@ const nextConfig: NextConfig = {
   // forwards those paths to this site and caches them; core/public-env-schema.ts). Vercel already
   // answers them with Access-Control-Allow-Origin: *, which the cross-origin font files need.
   assetPrefix: publicEnvAtBuild.NEXT_PUBLIC_ASSET_CDN_URL,
+  // The scripts Next writes into pages are fetched in CORS mode, so the service worker (core/offline)
+  // can keep a readable copy of the CDN's files (which already send Access-Control-Allow-Origin: *)
+  // instead of an opaque one. No credentials either way: these are public files.
+  crossOrigin: 'anonymous',
   cacheComponents: true,
   // Vercel builds skip next build's type-check step: only main and validation/preview deploy, and
   // both receive code only through PRs whose required CI check ("lint · typecheck · test · build")
@@ -64,7 +68,15 @@ const nextConfig: NextConfig = {
   // 2.68 -> 1.10 s, /login 2.96 -> 1.20 s (local A/B, PR #622). Global in Next 16.4 (no per-route
   // switch): a signed-in page's first full load carries the app's sheet in its HTML (~28 KB br)
   // instead of a cached file; moves inside the app are unchanged (Next uses <link> for those).
-  experimental: { globalNotFound: true, inlineCss: true },
+  // staleTimes.dynamic: a page's streamed, per-request part (the Photos grid, the Create catalogue)
+  // is kept in the browser for 30 s after a visit, so going back to a tab within that time shows it
+  // at once instead of asking the server again. From mainland China every such request crosses to
+  // the functions in sfo1 and back: about 1 s more than a file the edge answers (17CE, 2026-11-23),
+  // before the proxy (p75 ~270 ms) and the render (p75 0.3-0.85 s) run. Nothing goes stale for
+  // longer than it should: a server action's revalidation, router.refresh() (a finished generation,
+  // a payment) and a full load all drop this cache; data changed elsewhere shows within 30 s.
+  // Next's default before 15.0 was 30 s.
+  experimental: { globalNotFound: true, inlineCss: true, staleTimes: { dynamic: 30 } },
   // Search crawlers and Lighthouse get the cached page like a browser; only link-preview bots
   // keep Next's blocking-metadata render (src/core/seo/html-limited-bots.ts).
   htmlLimitedBots: HTML_LIMITED_BOTS,

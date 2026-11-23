@@ -108,6 +108,7 @@ export {
   unbanUser,
   batchAdjustCredits,
   batchSetBanned,
+  setUserLabel,
   hasListFilters,
   listUsers,
   loadUserDetail,
@@ -122,6 +123,7 @@ export {
   type UserFilters,
   type UserJob,
   type UserListPage,
+  type UserIdentity,
   type UserListRow,
 } from './users'
 export {
@@ -187,6 +189,7 @@ export {
   FEATURES_COPY,
   FeaturesEditor,
   FoodTogglesCard,
+  ServiceWorkerCard,
   PosterPhotoCard,
   SignupGiftCard,
   WISHLIST_SWITCH_COPY,
@@ -224,8 +227,8 @@ export {
   type CostKeyActions,
   type CostSettingsInput,
 } from './costs'
-export { parseFunnelDim, parsePageSort, parseRange, posthogOn, posthogProjectId, type FunnelDim, type PageSort, type Range } from './analytics'
-export { ANALYTICS_COPY, AnalyticsView, DetailsView, parseView, PostHogOff, RangeTabs, Unconfigured, ViewTabs, type AnalyticsQuery } from './analytics-ui'
+export { parseFunnelDim, parsePageSort, parseRange, posthogOn, posthogProjectId, pvuvConnected, type FunnelDim, type PageSort, type Range } from './analytics'
+export { ANALYTICS_COPY, AnalyticsView, DetailsView, parseView, PostHogOff, PvuvFunnelsView, RangeTabs, Unconfigured, ViewTabs, type AnalyticsQuery } from './analytics-ui'
 export { GROWTH_COPY, GrowthView } from './growth-ui'
 export { cheapestCreditUsd } from './insights'
 export { INSIGHTS_COPY, InsightsPanel } from './insights-ui'

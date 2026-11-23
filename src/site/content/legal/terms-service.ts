@@ -59,7 +59,7 @@ export const termsServiceSections: readonly [LegalSection, ...LegalSection[]] = 
           'Paid credits: the credits you get from a membership plan or a credit pack. They create paid works.',
         ],
       },
-      'When you create an image, we use paid credits first. If you do not have enough paid credits for that image, we use free credits instead, and the image is a free work. We never split one image between both kinds.',
+      'When you create an image, its size decides which credits are used: 1K images use free credits (including promotional credits) only and are free works; 2K and 4K images use paid credits only. Photo edits use paid credits first, and free credits if you do not have enough paid credits. We never split one image between both kinds.',
       [
         'How many credits an image uses depends on the template and the resolution you choose, and is shown before you create it. Membership credits and credit pack sizes are shown on our ',
         pricingLink,

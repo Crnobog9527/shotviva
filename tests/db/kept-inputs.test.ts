@@ -91,7 +91,7 @@ describe('confirm_job kept inputs', () => {
     const userId = await createUser(db, { credits: 5 })
     const stranger = await createUser(db)
     const jobId = randomUUID()
-    await reserveJob(service, { jobId, userId, module: 'image', templateId, source: 'web', inputs: { resolution: '1k' } })
+    await reserveJob(service, { jobId, userId, module: 'image', templateId, source: 'web', inputs: { resolution: '2k' } })
     const own = `outputs/${userId}/${jobId}-in-1.jpg`
     const outputKey = `outputs/${userId}/${jobId}.png`
     const keptInputs = [`outputs/${stranger}/${jobId}-in-1.jpg`, own, `outputs/${userId}/${randomUUID()}-in-1.jpg`, `inputs/${userId}/${jobId}-in-1.jpg`]
@@ -104,7 +104,7 @@ describe('confirm_job kept inputs', () => {
   it('leaves inputs alone when nothing was kept', async () => {
     const userId = await createUser(db, { credits: 5 })
     const jobId = randomUUID()
-    await reserveJob(service, { jobId, userId, module: 'image', templateId, source: 'web', inputs: { resolution: '1k' } })
+    await reserveJob(service, { jobId, userId, module: 'image', templateId, source: 'web', inputs: { resolution: '2k' } })
     const job = await confirmJob(service, { jobId, outputKey: `outputs/${userId}/${jobId}.png`, keptInputs: [`outputs/${userId}/x-in-1.jpg`] })
     expect(job.inputs).not.toHaveProperty('kept_inputs')
   })

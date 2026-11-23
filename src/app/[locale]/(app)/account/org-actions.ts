@@ -25,8 +25,10 @@ export async function depositAction(input: unknown) {
   return applied(await orgCommands.deposit(await deps(), input))
 }
 
+// The two gives answer at once and the form refreshes the page in the background (Owner
+// 2026-11-23: a give sat on 「划拨中…」 while the whole workspace re-rendered inside the action).
 export async function allocateAction(input: unknown) {
-  return applied(await orgCommands.allocate(await deps(), input))
+  return orgCommands.allocate(await deps(), input)
 }
 
 export async function setAllowanceAction(input: unknown) {
@@ -34,7 +36,7 @@ export async function setAllowanceAction(input: unknown) {
 }
 
 export async function allocatePromoAction(input: unknown) {
-  return applied(await orgCommands.allocatePromo(await deps(), input))
+  return orgCommands.allocatePromo(await deps(), input)
 }
 
 export async function setPromoAllowanceAction(input: unknown) {
@@ -66,10 +68,6 @@ export async function removeMemberAction(input: unknown) {
 
 export async function resetInviteAction() {
   return applied(await orgCommands.resetInvite(await deps()))
-}
-
-export async function leaveOrgAction(input: unknown) {
-  return applied(await orgCommands.leave(await deps(), input))
 }
 
 export async function joinOrgAction(token: string) {

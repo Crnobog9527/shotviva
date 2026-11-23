@@ -18,6 +18,9 @@ export type FavoritesStore = {
   ids(): readonly string[]
   subscribe(listener: () => void): () => void
   set(templateId: string, saved: boolean): void
+  // The server's list, when it arrives after the page (Create streams it): taps made before it
+  // arrived stay on top of it.
+  seed(ids: readonly string[]): void
 }
 
 export function failureOf(code: string | null): FavoriteFailure {
@@ -73,6 +76,10 @@ export function createFavoritesStore(initial: readonly string[], send: Send, eve
     subscribe(listener) {
       listeners.add(listener)
       return () => listeners.delete(listener)
+    },
+    seed(ids) {
+      confirmed = [...ids]
+      publish()
     },
     set(id, saved) {
       // Re-inserted so the latest tap counts as the newest.

@@ -658,6 +658,7 @@
       "formLoading": "Loading template settings…",
       "formLoadFailed": "Couldn’t load the template settings.",
       "formRetry": "Try again",
+      "catalogueLoadFailed": "Couldn’t load the templates.",
       "templates": "Templates",
       "filter": "Filter templates",
       "filterWithin": "Filter within {name}",
@@ -705,17 +706,24 @@
     "tiers": {
       "1k": {
         "name": "1K",
-        "use": "Social & delivery apps"
+        "use": "Phones, social & delivery apps"
       },
       "2k": {
         "name": "2K",
-        "use": "Websites & online stores"
+        "use": "iPad menus, websites & stores"
       },
       "4k": {
         "name": "4K",
-        "use": "Print & zoom"
+        "use": "Printed menus, posters & big screens"
       },
-      "notEnough": "(not enough credits)"
+      "notEnough": "(not enough credits)",
+      "pool": {
+        "free": "Free credits · watermarked",
+        "paid": "Paid credits · no watermark"
+      },
+      "freeOnly": "1K uses free credits only (promotion credits for company members), and they don’t cover this one. Pick 2K or 4K to use paid credits.",
+      "paidOnly": "Batches and Remove watermark use paid credits only, and 1K uses free credits only. Pick 2K or 4K.",
+      "paidShort": "2K and 4K use paid credits only, and yours don’t cover this set."
     },
     "poster": {
       "dialogHint": "Paste your event notice, check every line, then make the whole set.",
@@ -1064,7 +1072,8 @@
         "joiner": ", "
       },
       "orgNeedsCredits": "Your company's credits don't cover this one. Ask your admin to allocate more; your own credits can't be used while you're a member.",
-      "orgShortCta": "Not enough company credits"
+      "orgShortCta": "Not enough company credits",
+      "tierPoolCta": "Pick another resolution"
     },
     "errors": {
       "NETWORK": "Couldn't reach Shotviva. Check your connection and try again.",
@@ -1156,7 +1165,7 @@
       "saveToPhotosHint": "Choose “Save Image” in the menu that opens.",
       "preparingPhoto": "Preparing photo…",
       "holdPhotoHint": "Touch and hold the photo, then choose “Save Image”.",
-      "longPress": "Long-press to save",
+      "longPress": "Long-press to save to your photos (JPG, same quality); tap Download for the lossless PNG",
       "photosHint": "To save to Photos, tap Share, then Save Image",
       "makeAnotherWith": "Make another with {name}",
       "shareText": "Made with {brand} {url}",
@@ -1798,8 +1807,10 @@
           "affiliate": "Affiliate",
           "console": "Workspace",
           "works": "Works",
-          "purchasing": "Purchasing"
-        }
+          "purchasing": "Purchasing",
+          "mine": "Mine"
+        },
+        "mine": "My company"
       },
       "entry": {
         "title": "Company",
@@ -1857,7 +1868,7 @@
       },
       "members": {
         "title": "Members",
-        "hint": "Each kind is set separately. The paid monthly allowance tops a person up to that number on the 1st (UTC). The promotion allowance is the most they get automatically each month, given when promotion credits arrive or the allowance changes. Give now moves credits from that pool straight away.",
+        "hint": "Each kind is set separately. The paid monthly allowance tops a person up to that number on the 1st (UTC). The promotion allowance is the most they get automatically each month, given when promotion credits arrive or the allowance changes. Top up paid credits manually and Top up promotion credits manually move credits from that pool straight away.",
         "unknown": "Account",
         "owner": "Main admin",
         "held": "{count, plural, one {# paid credit left} other {# paid credits left}}",
@@ -1866,7 +1877,7 @@
         "allowanceFor": "Monthly allowance for {who}",
         "allowanceSaved": "Allowance saved.",
         "save": "Save",
-        "giveNow": "Give now",
+        "giveNow": "Top up paid credits manually",
         "giveFor": "Credits to give {who}",
         "given": "Gave {count, plural, one {# credit} other {# credits}}.",
         "give": "Give",
@@ -1884,7 +1895,10 @@
         "promoKind": "Promotion credits (watermarked, expire at month end)",
         "promoAllowance": "Monthly promotion allowance",
         "promoAllowanceFor": "Monthly promotion allowance for {who}",
-        "promoGiveNow": "Give promotion credits now",
+        "promoGiveNow": "Top up promotion credits manually",
+        "showMore": "Show {count} more ({shown} of {total} shown)",
+        "listTitle": "{count, plural, one {Staff (#)} other {Staff (#)}}",
+        "noMatch": "No members match.",
         "promoGiveFor": "Promotion credits to give {who}",
         "isDefault": "(default)",
         "useDefault": "Use default",
@@ -1916,26 +1930,14 @@
         "definition": "Given: credits the company gave the member (monthly top-up and hand allocations). Used: company credits they spent, after refunds. Sign-ups: customers who joined through them this month. Paying: customers who paid this month. Spend: what those customers paid this month in USD, before tax and after refunds. A member who left keeps the customers they brought. Customers appear only as a masked email or phone."
       },
       "staff": {
-        "title": "My company: {org}",
-        "hint": "Credits your company gives you each month, and your promo link.",
         "suspended": "Your company account is paused. Your own credits are unaffected.",
         "allowance": "Monthly allowance",
         "allocated": "Given this month",
         "remaining": "Company credits left",
         "promoTitle": "My promo link",
         "promoHint": "Customers who sign up with your link count for your company.",
-        "showLink": "Show my link",
-        "loading": "Loading…",
-        "retry": "Try again",
-        "linkFailed": "Couldn't load your link.",
         "customers": "Customers",
         "spend": "Spend this month",
-        "leave": "Leave company",
-        "leaveTitle": "Leave {org}?",
-        "leaveBody": "The company's unspent paid and promotion credits go back to its pools. Credits of your own stay with you, and customers you brought stay with the company.",
-        "leaveConfirm": "Leave",
-        "left": "You left the company.",
-        "cancel": "Cancel",
         "level1": "My customers",
         "level1Hint": "Signed up with your link. This month: {month}.",
         "level2": "Their customers (level 2)",
@@ -1947,7 +1949,14 @@
         "promoCredits": "Promotion credits",
         "promoCreditsHint": "Promotion credits from your company: images are watermarked, public and not for commercial use. They are used only when paid credits can't cover a generation, before your own free credits, and whatever is left goes at the end of the month (UTC).",
         "used": "Used this month",
-        "promoLeft": "Left"
+        "promoLeft": "Left",
+        "metaTitle": "My company",
+        "open": "View",
+        "entryHint": "My customers and this month in detail",
+        "paidLeft": "Paid credits left",
+        "promoLeftLabel": "Promotion credits left",
+        "monthly": "{count} a month",
+        "pageIntro": "Credits your company gives you each month, and the customers who signed up with your link. Only your own numbers are shown here."
       },
       "join": {
         "metaTitle": "Join a company",
@@ -2005,7 +2014,8 @@
         "workspaceIntro": "Where you run Shotviva as a production tool: manage the credit pool, your staff and what they make each month, for image work at scale.",
         "purchasingIntro": "Company package prices and bank transfer details. Top up the credit pool offline, the way described here.",
         "affiliateIntro": "Bring in customers and follow commissions and payouts. Sign-ups and purchases through your referral link count toward the company.",
-        "worksIntro": "Everything staff make with company credits belongs to the company. It shows only here and is never public. When someone leaves, their company works stay here and leave their own account."
+        "worksIntro": "Everything staff make with company credits belongs to the company. It shows only here and is never public. When someone leaves, their company works stay here and leave their own account.",
+        "worksIntroMember": "Everything the company made with its credits, for every colleague to view and download for work. Visible inside the company only, never public."
       },
       "contact": {
         "open": "Contact us to arrange a transfer",
@@ -2159,25 +2169,16 @@
         "failed": "The link couldn’t be made. Try again."
       },
       "readyTitle": "Your link is ready",
-      "readyText": "Send it to your client. Anyone with the link can see these templates; you can revoke it any time in Account.",
+      "readyText": "Send it to your client. Anyone with the link can see these templates.",
       "linkLabel": "Share link",
-      "send": "Send link",
       "copied": "Link copied",
       "copyByHand": "Copy this link to share it:",
       "sendText": "{title}: templates picked for you on Shotviva",
       "defaultTitle": "Templates picked for you",
       "done": "Done",
-      "mine": "See all my share links",
-      "listTitle": "Template share links",
-      "listLede": "Links you made with Share templates on Create. Revoke one and your client sees “not available”.",
-      "listEmpty": "No share links yet. On Create, tap Share templates, pick some, and make a link.",
-      "itemCount": "{count, plural, one {# pick} other {# picks}}",
-      "revoked": "Revoked",
-      "revoke": "Revoke link",
-      "revokeConfirm": "Revoke this link? Your client will no longer see these templates.",
-      "revokeFailed": "Couldn’t revoke it. Try again.",
-      "older": "Older links",
-      "back": "Account"
+      "copy": "Copy link",
+      "shareLink": "Share link",
+      "copiedHint": "Link copied. Paste it into WeChat or any chat to send it."
     },
     "workShare": {
       "start": "Share",
@@ -2187,7 +2188,7 @@
       "cancel": "Cancel",
       "next": "Create link",
       "select": "Select {name}",
-      "title": "Share these photos",
+      "title": "{count, plural, one {Share this photo} other {Share these photos}}",
       "lede": "Anyone with the link can see the {count, plural, one {photo} other {# photos}}. Photos made with free credits keep their watermark.",
       "titleLabel": "Title",
       "titlePlaceholder": "e.g. Spring menu, first draft",
@@ -2199,39 +2200,17 @@
       "create": "Create link",
       "creating": "Creating…",
       "readyTitle": "Link ready",
-      "readyText": "Send it to anyone. You can turn it off any time in Share links.",
+      "readyText": "Anyone with the link can see these photos.",
       "copy": "Copy link",
       "copied": "Link copied",
-      "shareNative": "Share…",
-      "manage": "Share links",
       "done": "Done",
       "errorGone": "One of these photos can’t be shared (deleted or removed after review). Pick again.",
-      "errorLimit": "You have too many live links. Turn some off in Share links first.",
       "errorBusy": "You made many links in a short time. Try again in an hour.",
       "errorOther": "Could not create the link. Try again.",
-      "listTitle": "Share links",
-      "listMeta": "Share links",
-      "listLede": "Links you made from your photos. Turning one off stops it working at once for everyone.",
-      "listEmpty": "No share links yet. In Photos, tap Share and pick a few photos.",
-      "listBack": "Photos",
-      "untitled": "Untitled collection",
-      "rowMeta": "{when} · {count, plural, one {# photo} other {# photos}}{before, select, yes { · with originals} other {}}",
-      "live": "Live",
-      "revoked": "Turned off",
-      "open": "Open",
-      "revoke": "Turn off",
-      "revokeConfirm": "Turn this link off? Anyone who has it will no longer see the photos. This can’t be undone.",
-      "revokeYes": "Turn off",
-      "revokeFailed": "Could not turn the link off. Try again.",
-      "more": "Show more"
-    },
-    "poolChoice": {
-      "title": "Which company credits to use",
-      "promo": "Promotion credits (watermarked, demo only)",
-      "paid": "Paid credits (no watermark, commercial use)",
-      "left": "{count, number} left",
-      "hint": "If the chosen kind runs short, the other kind is never used instead.",
-      "short": "{count, number} left, not enough for this one"
+      "shareLink": "Share link",
+      "copiedHint": "Link copied. Paste it into WeChat or any chat to send it.",
+      "copyByHand": "Copy this link to share it:",
+      "shareTitle": "Photos I made on Shotviva"
     }
   },
   "paywall": {

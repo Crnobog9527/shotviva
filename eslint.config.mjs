@@ -56,7 +56,7 @@ const coreUpwardImport = {
 // Narrow public entries keep route bundles from pulling in unrelated parts of a module.
 const deepModuleImport = {
   group: [
-    '@/modules/*/**', '!@/modules/*/marketing', '!@/modules/*/posters', '!@/modules/*/template-preview', '!@/modules/*/share-page', '!@/modules/*/template-collection-page', '!@/modules/*/template-shares-page', '!@/modules/*/work-share-page', '!@/modules/*/share-links',
+    '@/modules/*/**', '!@/modules/*/marketing', '!@/modules/*/posters', '!@/modules/*/template-preview', '!@/modules/*/share-page', '!@/modules/*/template-collection-page', '!@/modules/*/work-share-page',
     '!@/modules/image/app-shell', '!@/modules/image/create-data', '!@/modules/image/create-page',
   ],
   message: "Import a module through its index.ts ('@/modules/<id>') or a public entry, not its internals.",

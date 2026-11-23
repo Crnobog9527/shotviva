@@ -4,27 +4,27 @@ import { biggestDrop, newUserSteps } from '../growth/funnel'
 import type { GrowthStats } from '../growth/stats'
 import { usd } from '../orders/money'
 import { GROWTH_COPY as COPY } from './copy'
-import { peopleData, type PeopleState } from './people-state'
+import { peopleData, visitorsOf, type PeopleState, type PvuvOverviewState } from './people-state'
 
-type Props = { range: Range; db: GrowthStats; people: PeopleState }
+type Props = { range: Range; db: GrowthStats; people: PeopleState; pvuv?: PvuvOverviewState | null }
 type Trend = { key: string; label: string; current: number | null; previous: number | null; format: (value: number) => string }
 
 // The sentence the Owner reads first, the four numbers against the previous period, and the one
 // step where new users stopped most.
-export function Headline({ range, db, people }: Props) {
+export function Headline({ range, db, people, pvuv = null }: Props) {
   const cur = db.periods.current
   const prev = db.periods.previous
-  const seen = peopleData(people)
+  const seen = visitorsOf(people, pvuv)
   const chain = COPY.headline.chain({
     period: COPY.period[range],
-    visitors: seen ? n(seen.current.visitors) : null,
+    visitors: seen ? n(seen.current) : null,
     signups: n(cur.signups),
     images: n(cur.new_users.first_image),
     paid: n(cur.new_users.paid),
   })
   const money = (value: number) => usd.format(value)
   const trends: Trend[] = [
-    { key: 'visitors', label: COPY.trend.visitors, current: seen?.current.visitors ?? null, previous: seen?.previous.visitors ?? null, format: n },
+    { key: 'visitors', label: COPY.trend.visitors, current: seen?.current ?? null, previous: seen?.previous ?? null, format: n },
     { key: 'signups', label: COPY.trend.signups, current: cur.signups, previous: prev.signups, format: n },
     { key: 'payers', label: COPY.trend.payers, current: cur.payers, previous: prev.payers, format: n },
     { key: 'net', label: COPY.trend.net, current: cur.money.net_usd, previous: prev.money.net_usd, format: money },

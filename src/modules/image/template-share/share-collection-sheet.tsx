@@ -4,7 +4,6 @@ import { useTranslations } from 'next-intl'
 import { useId, useState } from 'react'
 
 import { TEMPLATE_SHARE_NOTE_MAX, TEMPLATE_SHARE_TITLE_MAX, type TemplateShareItem } from '@/core/template-shares/rules'
-import { Link } from '@/core/i18n/ui'
 import { Button } from '@/core/ui/button'
 import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
 
@@ -40,8 +39,7 @@ export function ShareCollectionSheet({ open, items, onClose, onDone }: Props) {
       {state.status === 'done' ? (
         <div className="grid gap-3 pt-4 pb-2">
           <ShareLinkActions url={state.url} title={title.trim() || t('defaultTitle')} />
-          <Button variant="glass" size="touch" onClick={finish}>{t('done')}</Button>
-          <Link href="/account/template-shares" prefetch={false} className="justify-self-center text-caption font-medium text-foreground underline underline-offset-4">{t('mine')}</Link>
+          <Button variant="cta" size="cta" onClick={finish}>{t('done')}</Button>
         </div>
       ) : (
         <form className="grid gap-4 pt-4 pb-2" onSubmit={(event) => { event.preventDefault(); void create(items, title, note) }}>

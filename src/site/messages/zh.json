@@ -658,6 +658,7 @@
       "formLoading": "正在加载模板设置…",
       "formLoadFailed": "模板设置加载失败。",
       "formRetry": "重试",
+      "catalogueLoadFailed": "模板加载失败。",
       "templates": "模板",
       "filter": "筛选模板",
       "filterWithin": "在「{name}」里筛选",
@@ -705,17 +706,24 @@
     "tiers": {
       "1k": {
         "name": "1K",
-        "use": "社交媒体、外卖平台"
+        "use": "手机、朋友圈、外卖平台"
       },
       "2k": {
         "name": "2K",
-        "use": "官网、网店"
+        "use": "iPad 点单屏、电子菜单、网店"
       },
       "4k": {
         "name": "4K",
-        "use": "印刷、放大查看"
+        "use": "打印菜单、海报、大屏"
       },
-      "notEnough": "（积分不够）"
+      "notEnough": "（积分不够）",
+      "pool": {
+        "free": "免费积分 · 带水印",
+        "paid": "付费积分 · 无水印"
+      },
+      "freeOnly": "1K 只用免费积分（企业成员用推广积分），不够这一张。可以改选 2K 或 4K，用付费积分。",
+      "paidOnly": "批量和去水印只用付费积分，1K 只用免费积分。请改选 2K 或 4K。",
+      "paidShort": "2K 和 4K 只用付费积分，付费积分不够这一组。"
     },
     "poster": {
       "dialogHint": "粘贴活动通知，逐行核对后一次生成整套海报。",
@@ -1064,7 +1072,8 @@
         "joiner": "、"
       },
       "orgNeedsCredits": "企业分给你的积分不够这一张，请找管理员分配额度。在企业期间不能用你自己的积分。",
-      "orgShortCta": "企业积分不够"
+      "orgShortCta": "企业积分不够",
+      "tierPoolCta": "换个清晰度"
     },
     "errors": {
       "NETWORK": "连不上 Shotviva，请检查网络后再试。",
@@ -1156,7 +1165,7 @@
       "saveToPhotosHint": "在弹出的菜单中选择「存储图像」。",
       "preparingPhoto": "正在准备图片…",
       "holdPhotoHint": "长按图片，再选择「存储图像」。",
-      "longPress": "长按保存",
+      "longPress": "长按图片直接存进相册（JPG，画质不变）；要无损 PNG 原图请点「下载」",
       "photosHint": "存进相册：点右边的分享，再选「存储图像」",
       "makeAnotherWith": "用 {name} 再做一张",
       "shareText": "用 {brand} 制作 {url}",
@@ -1798,8 +1807,10 @@
           "affiliate": "企业联盟",
           "console": "工作台",
           "works": "企业作品",
-          "purchasing": "集采信息"
-        }
+          "purchasing": "集采信息",
+          "mine": "我的"
+        },
+        "mine": "我的企业"
       },
       "entry": {
         "title": "企业",
@@ -1857,7 +1868,7 @@
       },
       "members": {
         "title": "成员",
-        "hint": "两种积分分开设：付费月额度每月 1 日（UTC）补到这个数；推广月额度是每月最多自动分到的推广积分，推广积分到账或改额度时就分。立即划拨：马上从对应的池划给成员。",
+        "hint": "两种积分分开设：付费月额度每月 1 日（UTC）补到这个数；推广月额度是每月最多自动分到的推广积分，推广积分到账或改额度时就分。手动补充付费积分、手动补充推广积分：马上从对应的池划给成员。",
         "unknown": "账号",
         "owner": "主管理员",
         "held": "付费积分剩 {count, number}",
@@ -1866,7 +1877,7 @@
         "allowanceFor": "{who} 的月额度",
         "allowanceSaved": "月额度已保存。",
         "save": "保存",
-        "giveNow": "立即划拨",
+        "giveNow": "手动补充付费积分",
         "giveFor": "划给 {who} 的积分",
         "given": "已划拨 {count, number} 积分。",
         "give": "划拨",
@@ -1884,7 +1895,10 @@
         "promoKind": "推广积分（带水印，月底清零）",
         "promoAllowance": "推广月额度",
         "promoAllowanceFor": "{who} 的推广月额度",
-        "promoGiveNow": "立即划拨推广积分",
+        "promoGiveNow": "手动补充推广积分",
+        "showMore": "再显示 {count} 位（已显示 {shown} / {total}）",
+        "listTitle": "员工（{count, number}）",
+        "noMatch": "没有符合条件的成员。",
         "promoGiveFor": "划给 {who} 的推广积分",
         "isDefault": "（默认）",
         "useDefault": "恢复默认",
@@ -1916,26 +1930,14 @@
         "definition": "分到：企业分给成员的积分（月额度补发和手动划拨）。用掉：他花掉的企业积分，退款后净值。注册：本月通过他注册的客户。付费人数：本月付过款的客户。实付：这些客户本月付的钱，美元，不含税、扣除退款。离开的成员带来的客户仍归企业。客户只显示脱敏后的邮箱或手机号。"
       },
       "staff": {
-        "title": "我的企业：{org}",
-        "hint": "企业每月分给你的积分，以及你的推广链接。",
         "suspended": "企业账号已暂停，你自己的积分不受影响。",
         "allowance": "月额度",
         "allocated": "本月已分到",
         "remaining": "企业积分剩余",
         "promoTitle": "我的推广链接",
         "promoHint": "用你的链接注册的客户，都算作企业的客户。",
-        "showLink": "显示我的链接",
-        "loading": "加载中…",
-        "retry": "重试",
-        "linkFailed": "链接加载失败。",
         "customers": "客户数",
         "spend": "本月消费",
-        "leave": "退出企业",
-        "leaveTitle": "退出 {org}？",
-        "leaveBody": "企业没用完的付费积分和推广积分会回到各自的积分池；你自己的积分仍归你；你带来的客户仍归企业。",
-        "leaveConfirm": "退出",
-        "left": "你已退出企业。",
-        "cancel": "取消",
         "level1": "我的客户",
         "level1Hint": "通过你的链接注册。本月：{month}。",
         "level2": "客户带来的客户（二级）",
@@ -1947,7 +1949,14 @@
         "promoCredits": "推广积分",
         "promoCreditsHint": "企业分给你的推广积分：出的图带水印、公开、不可商用；付费积分不够时才用，先于你自己的免费积分扣，月底（UTC）没用完的清零。",
         "used": "本月已用",
-        "promoLeft": "剩余"
+        "promoLeft": "剩余",
+        "metaTitle": "我的企业",
+        "open": "查看",
+        "entryHint": "我的客户和本月明细",
+        "paidLeft": "付费积分剩余",
+        "promoLeftLabel": "推广积分剩余",
+        "monthly": "月额度 {count}",
+        "pageIntro": "企业每月分给你的积分，以及通过你的链接注册的客户。这里只显示你自己的数据。"
       },
       "join": {
         "metaTitle": "加入企业",
@@ -2005,7 +2014,8 @@
         "workspaceIntro": "把 Shotviva 当作生产力工具批量出图时的数据管理台：积分池、员工和每月产出都在这里管理。",
         "purchasingIntro": "企业套餐价格和对公转账信息。需要给积分池充值时，按这里的方式线下办理。",
         "affiliateIntro": "推广客户、查看佣金和结算。客户通过你的推广链接注册和付费，佣金记在企业名下。",
-        "worksIntro": "员工用企业积分生成的作品都归企业所有，只在这里展示，永远不会公开。员工离开企业后，这些作品仍留在这里，员工自己的账号里不再能看到。"
+        "worksIntro": "员工用企业积分生成的作品都归企业所有，只在这里展示，永远不会公开。员工离开企业后，这些作品仍留在这里，员工自己的账号里不再能看到。",
+        "worksIntroMember": "全公司用企业积分生成的作品，所有员工都能查看和下载，用在工作里。作品只在企业内部可见，永远不会公开。"
       },
       "contact": {
         "open": "联系我们转账",
@@ -2103,7 +2113,7 @@
         "select": "批量选择",
         "search": "搜索账号",
         "joinedFrom": "加入日期从",
-        "selectAll": "全选（当前筛选）",
+        "selectAll": "全选（当前显示）",
         "selected": "已选 {count} 人",
         "open": "批量设置",
         "cancel": "取消",
@@ -2159,25 +2169,16 @@
         "failed": "链接没能生成，请再试一次。"
       },
       "readyTitle": "链接已生成",
-      "readyText": "把它发给客户。拿到链接的人都能看到这些模板；你随时可以在「账户」里撤销。",
+      "readyText": "把它发给客户。拿到链接的人都能看到这些模板。",
       "linkLabel": "分享链接",
-      "send": "发送链接",
       "copied": "已复制链接",
       "copyByHand": "复制这个链接去分享：",
       "sendText": "{title}：在 Shotviva 为你挑选的模板",
       "defaultTitle": "为你挑选的模板",
       "done": "完成",
-      "mine": "查看我的全部分享链接",
-      "listTitle": "模板分享链接",
-      "listLede": "你在「创作」页用「分享模板」生成的链接。撤销后，客户打开会看到「已经看不到了」。",
-      "listEmpty": "还没有分享链接。在「创作」页点「分享模板」，挑几个，生成一个链接。",
-      "itemCount": "{count} 个所选",
-      "revoked": "已撤销",
-      "revoke": "撤销链接",
-      "revokeConfirm": "确定撤销这个链接吗？客户将不再能看到这些模板。",
-      "revokeFailed": "没能撤销，请再试一次。",
-      "older": "更早的链接",
-      "back": "账户"
+      "copy": "复制链接",
+      "shareLink": "分享链接",
+      "copiedHint": "链接已复制，打开微信粘贴发送"
     },
     "workShare": {
       "start": "分享",
@@ -2187,7 +2188,7 @@
       "cancel": "取消",
       "next": "生成链接",
       "select": "选择 {name}",
-      "title": "分享这些作品",
+      "title": "{count, plural, =1 {分享这张作品} other {分享这些作品}}",
       "lede": "拿到链接的人都能看到这 {count} 张作品。用免费积分做的作品会保留水印。",
       "titleLabel": "标题",
       "titlePlaceholder": "例如：春季菜单初稿",
@@ -2199,39 +2200,17 @@
       "create": "生成链接",
       "creating": "正在生成…",
       "readyTitle": "链接已生成",
-      "readyText": "发给任何人都能看。随时可以在「分享链接」里关闭。",
+      "readyText": "拿到链接的人都能看到这些作品。",
       "copy": "复制链接",
       "copied": "链接已复制",
-      "shareNative": "分享…",
-      "manage": "分享链接",
       "done": "完成",
       "errorGone": "其中有作品不能分享（已删除或未通过审核），请重新选择。",
-      "errorLimit": "有效链接太多了，请先在「分享链接」里关闭一些。",
       "errorBusy": "短时间内生成的链接太多了，请一小时后再试。",
       "errorOther": "没能生成链接，请再试一次。",
-      "listTitle": "分享链接",
-      "listMeta": "分享链接",
-      "listLede": "你用作品生成的链接。关闭后，所有拿到链接的人马上就看不到了。",
-      "listEmpty": "还没有分享链接。在「作品」里点「分享」，选几张作品就行。",
-      "listBack": "作品",
-      "untitled": "未命名作品集",
-      "rowMeta": "{when} · {count} 张{before, select, yes { · 含原图} other {}}",
-      "live": "有效",
-      "revoked": "已关闭",
-      "open": "打开",
-      "revoke": "关闭链接",
-      "revokeConfirm": "确定关闭这个链接？拿到链接的人将看不到这些作品，关闭后不能恢复。",
-      "revokeYes": "关闭",
-      "revokeFailed": "没能关闭链接，请再试一次。",
-      "more": "加载更多"
-    },
-    "poolChoice": {
-      "title": "用哪种企业积分",
-      "promo": "推广积分（带水印，仅供演示）",
-      "paid": "付费积分（无水印，可商用）",
-      "left": "剩余 {count, number}",
-      "hint": "选的那种不够时不会改用另一种。",
-      "short": "剩余 {count, number}，不够这一张"
+      "shareLink": "分享链接",
+      "copiedHint": "链接已复制，打开微信粘贴发送",
+      "copyByHand": "复制这个链接去分享：",
+      "shareTitle": "我在 Shotviva 做的作品"
     }
   },
   "paywall": {

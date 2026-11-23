@@ -35,7 +35,8 @@ async function setup(behaviour: FakeBehaviour = 'ok') {
   r2.upload(inputKey, await jpeg(2048, 1536, { exif: true }), 'image/jpeg')
   const fake = fakeProvider(behaviour)
   const deps = { db: serviceSupabase(), store: r2.store, provider: fake.provider, providerTimeoutMs: 200 }
-  const request: GenerationRequest = { userId, source: 'web', templateId, inputKey, copy: { dish: 'ramen' }, aspectRatio: '4:5' }
+  // Paid credits pay 2K / 4K only (1996): 2K costs 2 of the 3.
+  const request: GenerationRequest = { userId, source: 'web', templateId, inputKey, copy: { dish: 'ramen' }, aspectRatio: '4:5', resolution: '2k' }
   return { userId, r2, deps, request }
 }
 
@@ -62,7 +63,7 @@ describe('input preview at settle', () => {
     const view = await runGeneration({ ...deps, store }, request)
     expect(view.status).toBe('succeeded')
     expect(await jobRow(db, view.id)).toMatchObject({ status: 'succeeded' })
-    expect((await profileOf(db, userId)).credits).toBe(2)
+    expect((await profileOf(db, userId)).credits).toBe(1)
     expect(r2.objects.has(inputPreviewKeyFor(userId, view.id))).toBe(false)
   })
 

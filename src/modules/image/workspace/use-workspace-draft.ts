@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { bothKinds, chosenBalance, coveringChoice, orgBalance, type Balance, type PoolChoice, type PoolChoiceOffer } from '@/core/billing/pools'
+import { defaultTier, orgBalance, type Balance, type PoolChoiceOffer } from '@/core/billing/pools'
 import { batchMaxFor, type BatchLimits } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 
@@ -51,16 +51,17 @@ const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', c
 // jobs, so the workspace page shows them developing (and after a refresh).
 export function useWorkspaceDraft({ template, balance, tier, batch, concurrency, again = null, single = false, poolChoice }: DraftInput) {
   const { photos, slots, slotted } = useDraftPhotos(template, batchMaxFor(tier, batch), single, again)
-  const { options, values, change } = useOutputValues(template, again)
+  const choice = orgSpend(poolChoice, balance)
+  const { options, values, change } = useOutputValues(template, again, choice.balance)
   useAgainOpensForm(template.id, again?.jobId)
   const running = useRunningCount(concurrency.runningIds)
   const { summary } = photos
   const run = useDraftStart(template, concurrency.limit, again, photos.photos.map((photo) => photo.id).join(','))
-  const choice = usePoolChoice(poolChoice, summary.ready.length <= 1, again, balance, template.creditsCost[values.resolution])
   const needsRatio = summary.ready.some(({ photo }) => !chosenAspect(values.aspect, options, photo.originalRatio))
   const ready = (): CtaState => ctaState({
     balance: choice.balance,
     cost: template.creditsCost[values.resolution],
+    tier: values.resolution,
     running,
     limit: concurrency.limit,
     ...photoCta(template, photos, slots, again),
@@ -73,8 +74,8 @@ export function useWorkspaceDraft({ template, balance, tier, batch, concurrency,
     // A dialog that starts here then moves to the template's workspace page, whose pending view
     // draws this template's head before the server answers (pending-template.ts).
     rememberTemplate(template)
-    if (slotted) return run.start(withChoice(withAgainOf(slotInputs(template, values, slots), again), choice.value), [])
-    return run.start(withChoice(withAgainOf(startInputs(template, values, summary.ready), again), choice.value), summary.ready)
+    if (slotted) return run.start(withAgainOf(slotInputs(template, values, slots), again), [])
+    return run.start(withAgainOf(startInputs(template, values, summary.ready), again), summary.ready)
   }
   const changeValues = (next: Partial<FormValues>) => {
     run.clearError()
@@ -88,21 +89,11 @@ export function useWorkspaceDraft({ template, balance, tier, batch, concurrency,
   }
 }
 
-// An org member spends the org's shares only (their own credits are frozen); holding both kinds,
-// they pick one (default: their last choice), except for a batch (paid only, §6.2) and Remove
-// watermark (paid). `balance` is what the action bar checks.
-function usePoolChoice(offer: PoolChoiceOffer | null | undefined, single: boolean, again: AgainStart | null, balance: Balance, cost: number) {
-  const [picked, set] = useState<PoolChoice>(offer?.last ?? 'paid')
-  if (!offer) return { picker: null, balance, value: undefined, orgOnly: false }
-  const org = orgBalance(offer)
-  if (!bothKinds(offer) || !single || again?.paidOnly === true) return { picker: null, balance: org, value: undefined, orgOnly: true }
-  // The pick (or the remembered one) when it covers this job, else the kind that does.
-  const value = coveringChoice(offer, picked, cost)
-  return { picker: { offer, value, set, cost }, balance: chosenBalance(org, value), value, orgOnly: true }
+// An org member spends the org's shares only (their own credits are frozen, §6.5); the tier picks
+// which share pays (1996), so there is no kind to choose. `balance` is what the action bar checks.
+function orgSpend(offer: PoolChoiceOffer | null | undefined, balance: Balance) {
+  return offer ? { balance: orgBalance(offer), orgOnly: true } : { balance, orgOnly: false }
 }
-
-const withChoice = (inputs: StartInput[], choice: PoolChoice | undefined): StartInput[] =>
-  choice ? inputs.map((input) => ({ ...input, body: { ...input.body, pool_choice: choice } })) : inputs
 
 // Generate: one photo is queued at once, as it always was. Two or more go through the batch
 // preflight first (T107); resolves to its refusal (the caller opens the paywall or says why),
@@ -142,8 +133,8 @@ function useDraftStart(template: CatalogueTemplate, limit: number, again: AgainS
   return { checking, error, start, clearError: () => setError(null) }
 }
 
-function useOutputValues(template: CatalogueTemplate, again: AgainStart | null) {
-  const [requested, setValues] = useState(() => again?.values ?? { ...DEFAULTS, copy: copyExamples(template.copyFields) })
+function useOutputValues(template: CatalogueTemplate, again: AgainStart | null, balance: Balance) {
+  const [requested, setValues] = useState(() => (again ? againValues(again) : freshValues(template, balance)))
   const waitingFor = template.formDeferred ? template.id : null
   const [pendingTemplate, setPendingTemplate] = useState(waitingFor)
   if (pendingTemplate !== waitingFor) {
@@ -160,6 +151,17 @@ function useOutputValues(template: CatalogueTemplate, again: AgainStart | null) 
   const change = (next: Partial<FormValues>) => setValues((current) => ({ ...current, ...next }))
   return { options, values, change }
 }
+
+// A fresh form starts on 2K when paid credits cover it, else 1K when free credits do (1996).
+function freshValues(template: CatalogueTemplate, balance: Balance): FormValues {
+  const resolution = defaultTier(balance, template.creditsCost, templateOptions(template).resolutions) ?? DEFAULTS.resolution
+  return { ...DEFAULTS, resolution, copy: copyExamples(template.copyFields) }
+}
+
+// Make again keeps the work's settings; Remove watermark (paid credits only) cannot run at 1K,
+// which free credits alone pay, so it moves up to 2K.
+const againValues = (again: AgainStart): FormValues =>
+  again.paidOnly === true && again.values.resolution === '1k' ? { ...again.values, resolution: '2k' } : again.values
 
 const draftBatchMax = (template: CatalogueTemplate, batchMax: number, single: boolean) =>
   template.photoInput === 'none' ? 0 : single ? 1 : batchMax

@@ -37,7 +37,8 @@ export function CompareSlider({ before, after, afterAlt, afterGround = 'white', 
   const [x, setX] = useState(50)
   const t = useTranslations('app.template')
   const tap = useTap(x, setX, onTap)
-  const media = (url: string) => (cover ? { ...coverImage(url, cover.sizes), loading: cover.lazy ? ('lazy' as const) : undefined } : { src: url })
+  // Lazy covers (off the first screen) also go at low priority, behind the account's own data.
+  const media = (url: string) => (cover ? { ...coverImage(url, cover.sizes), ...(cover.lazy ? { loading: 'lazy' as const, fetchPriority: 'low' as const } : {}) } : { src: url })
   const avif = (url: string) => (cover ? coverAvif(url, cover.sizes) : undefined)
   return (
     <div

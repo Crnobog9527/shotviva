@@ -53,7 +53,8 @@ async function refusals(userId: string) {
 }
 
 async function webSetup(judge: IdentityJudge | null = fakeJudge(false)) {
-  const userId = await createUser(db, { credits: 3 })
+  // These runs are 1K, which free credits pay (1996); the paid ones show nothing moves on a refusal.
+  const userId = await createUser(db, { credits: 3, freeCredits: 3 })
   const r2 = createMemoryStore()
   const inputKey = newInputKey(userId, 'image/jpeg')
   r2.upload(inputKey, await jpeg(1600, 2000), 'image/jpeg')
