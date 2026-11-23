@@ -49,6 +49,11 @@ describe('proxy matcher', () => {
     expect(runsOn('/api/versions')).toBe(true)
   })
 
+  it('skips the service worker script (public, no cookies) but not lookalikes', () => {
+    expect(runsOn('/sw.js')).toBe(false)
+    expect(runsOn('/sw.json')).toBe(true)
+  })
+
   it('skips the public catalogue file (edge-cached: no session work, no cookies) but not its siblings', () => {
     expect(runsOn('/api/catalogue/public/zh/latest')).toBe(false)
     expect(runsOn('/api/catalogue/forms')).toBe(true)

@@ -7,6 +7,7 @@ import {
   FEATURES_COPY,
   FeaturesEditor,
   FoodTogglesCard,
+  ServiceWorkerCard,
   listFeatureSettings,
   loadPosterPhotoPrice,
   loadSettingSwitch,
@@ -27,6 +28,7 @@ import {
   saveAffiliateSwitchAction,
   saveFeatureAccessAction,
   saveFoodTogglesAction,
+  saveServiceWorkerAction,
   setFeatureInviteAction,
   saveGallerySwitchAction,
   saveSignupGiftPausedAction,
@@ -55,9 +57,9 @@ async function galleryState(db: ReturnType<typeof createAdminSupabase>): Promise
 export default async function AdminFeaturesPage() {
   await requireAdmin()
   const db = createAdminSupabase()
-  const [settings, wishlist, gallery, affiliate, signupGift, photoPrice, foodToggles] = await Promise.all([
+  const [settings, wishlist, gallery, affiliate, signupGift, photoPrice, foodToggles, serviceWorker] = await Promise.all([
     listFeatureSettings(db), wishlistState(db), galleryState(db), isAffiliateEnabled(), loadSignupGift(db), loadPosterPhotoPrice(db),
-    loadSettingSwitch(db, 'food_toggles_enabled'),
+    loadSettingSwitch(db, 'food_toggles_enabled'), loadSettingSwitch(db, 'service_worker_enabled'),
   ])
   return (
     <AdminPage title={FEATURES_COPY.title}>
@@ -66,6 +68,7 @@ export default async function AdminFeaturesPage() {
         <SignupGiftCard state={signupGift} savePaused={saveSignupGiftPausedAction} saveRules={saveSignupGiftRulesAction} />
         <PosterPhotoCard credits={photoPrice} save={savePosterPhotoPriceAction} />
         <FoodTogglesCard value={foodToggles} save={saveFoodTogglesAction} />
+        <ServiceWorkerCard value={serviceWorker} save={saveServiceWorkerAction} />
       </div>
       <FeaturesEditor
         settings={settings}

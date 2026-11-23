@@ -3,6 +3,7 @@ import { useTranslations } from 'next-intl'
 import { DeleteAccountPanel } from '../../auth/ui/delete-account'
 import { cn } from '../../ui/cn'
 import { Chevron, RowsPanel, rowClass } from './rows'
+import { SignOutForm } from './sign-out-form'
 
 // Sign out and Delete account as the last two rows, Delete in red, with one line on what
 // deleting removes. Live subscriptions are cancelled before anything is deleted (§13).
@@ -12,11 +13,11 @@ export function SessionRows({ signOut }: { signOut: () => Promise<void> }) {
   return (
     <>
       <RowsPanel>
-        <form action={signOut}>
+        <SignOutForm action={signOut}>
           <button type="submit" className={rowClass}>
             {t('signOut')}
           </button>
-        </form>
+        </SignOutForm>
         <DeleteAccountPanel className={cn(rowClass, 'text-destructive')}>
           {t('dangerZone')}
           <Chevron className="text-destructive" />

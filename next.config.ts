@@ -47,6 +47,10 @@ const nextConfig: NextConfig = {
   // forwards those paths to this site and caches them; core/public-env-schema.ts). Vercel already
   // answers them with Access-Control-Allow-Origin: *, which the cross-origin font files need.
   assetPrefix: publicEnvAtBuild.NEXT_PUBLIC_ASSET_CDN_URL,
+  // The scripts Next writes into pages are fetched in CORS mode, so the service worker (core/offline)
+  // can keep a readable copy of the CDN's files (which already send Access-Control-Allow-Origin: *)
+  // instead of an opaque one. No credentials either way: these are public files.
+  crossOrigin: 'anonymous',
   cacheComponents: true,
   // Vercel builds skip next build's type-check step: only main and validation/preview deploy, and
   // both receive code only through PRs whose required CI check ("lint · typecheck · test · build")

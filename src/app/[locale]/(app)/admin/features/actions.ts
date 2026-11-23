@@ -8,7 +8,7 @@ import { AppError } from '@/core/errors'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { FEATURES_CACHE_TAG } from '@/core/features'
 import { GALLERY_SWITCH_TAG } from '@/core/gallery'
-import { FOOD_TOGGLES_SWITCH_TAG, SYSTEM_SETTINGS_CACHE_TAG } from '@/core/system-settings'
+import { FOOD_TOGGLES_SWITCH_TAG, SERVICE_WORKER_SWITCH_TAG, SYSTEM_SETTINGS_CACHE_TAG } from '@/core/system-settings'
 import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 // Server actions are public endpoints, so each re-checks the admin role itself. A save expires
@@ -100,4 +100,15 @@ export async function saveFoodTogglesAction(input: unknown): Promise<ActionResul
     settingsChanged()
   }
   return runAdminAction(() => saveSettingSwitch({ db: createAdminSupabase(), invalidate }, admin.id, 'food_toggles_enabled', input))
+}
+
+// 1999: the home-screen app's service worker, and its kill switch. The root layout and /sw.js read
+// it through its own tag.
+export async function saveServiceWorkerAction(input: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  const invalidate = () => {
+    updateTag(SERVICE_WORKER_SWITCH_TAG)
+    settingsChanged()
+  }
+  return runAdminAction(() => saveSettingSwitch({ db: createAdminSupabase(), invalidate }, admin.id, 'service_worker_enabled', input))
 }

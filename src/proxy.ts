@@ -109,6 +109,7 @@ export async function proxy(request: NextRequest, event?: NextFetchEvent) {
 // the image CDN fetches with its header: like the other static files, never a page.
 // api/version is the open tabs' version check (T90): no session work, no locale routing.
 // api/catalogue/public/ is Create's public catalogue file: edge-cached, so never a cookie on it.
+// sw.js is the service worker (core/offline): public, no session work, no cookies.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|presized/|api/version$|api/catalogue/public/|fonts/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest|mp4|webm)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|presized/|api/version$|api/catalogue/public/|sw\\.js$|fonts/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest|mp4|webm)$).*)'],
 }

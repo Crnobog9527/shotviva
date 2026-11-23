@@ -25,6 +25,9 @@ type SettingTypes = {
   // 1848: whether food templates offer 优化摆盘 / 优化器皿 (fields.toggles plating, tableware). Off
   // (no row): neither is shown and the server renders both off; the templates' data stays.
   food_toggles_enabled: boolean
+  // 1999: whether pages register the home-screen app's service worker (core/offline). Off (no row):
+  // /sw.js empties its caches and unregisters, and pages unregister any worker (the kill switch).
+  service_worker_enabled: boolean
 }
 
 export type SystemSettingKey = keyof SettingTypes
@@ -42,6 +45,7 @@ export const SYSTEM_SETTINGS: { [K in SystemSettingKey]: SettingDefinition<Setti
   signup_gift_claim_google: { schema: z.boolean(), fallback: true },
   poster_photo_credits: { schema: z.number().int().min(1).max(1000), fallback: 0 },
   food_toggles_enabled: { schema: z.boolean(), fallback: false },
+  service_worker_enabled: { schema: z.boolean(), fallback: false },
 }
 
 export function isSystemSettingKey(key: string): key is SystemSettingKey {
