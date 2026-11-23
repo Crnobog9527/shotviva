@@ -1,11 +1,12 @@
 'use client'
 
 import { useLocale, useTranslations } from 'next-intl'
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 
 import type { TemplatePreviewProps } from '@/core/admin'
 import type { Locale } from '@/core/i18n/locales'
 import { localizeTemplate } from '@/core/templates/localize'
+import { offeredTemplate, useFoodTogglesEnabled } from '@/core/templates/offered-toggles'
 import type { Template } from '@/core/templates/types'
 import { cn } from '@/core/ui/cn'
 
@@ -54,8 +55,11 @@ function formShape(card: CatalogueTemplate): string {
 
 type BodyProps = { draftId: string; members: CatalogueTemplate[]; seriesName: string | null; width: TemplatePreviewProps['width'] }
 
-function PreviewBody({ draftId, members, seriesName, width }: BodyProps) {
+function PreviewBody({ draftId, members: given, seriesName, width }: BodyProps) {
   const t = useTranslations('app')
+  // As users see it: no dish name while the food switch is off (offered-toggles.tsx).
+  const foodEnabled = useFoodTogglesEnabled()
+  const members = useMemo(() => given.map((member) => offeredTemplate(member, foodEnabled)), [given, foodEnabled])
   // The series strip switches members as in the user's dialog; it opens on the template being edited.
   const [memberId, setMemberId] = useState(draftId)
   const template = members.find(member => member.id === memberId) ?? members[0]!

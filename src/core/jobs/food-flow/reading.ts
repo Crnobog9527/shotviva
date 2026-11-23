@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { DISH_READ_CATEGORIES } from '../../templates/food-flow'
+import { DISH_NAME_COPY } from '../../templates/food-toggle-keys'
 import type { ProviderPrices } from '../provider'
 
 // The dish reading of a food template's flow (ARCHITECTURE §5.1c「餐饮开关的出图流程」): one
@@ -53,7 +54,7 @@ export function dishText(reading: DishReading): string {
 }
 
 // The template's optional copy field the user may type the dish's name into (Owner 2026-11-15).
-export const DISH_NAME_FIELD = 'dish_name'
+export const DISH_NAME_FIELD = DISH_NAME_COPY
 export const DISH_NAME_MAX = 60
 
 // The typed name as the reader may see it: one line, no control characters, at most 60

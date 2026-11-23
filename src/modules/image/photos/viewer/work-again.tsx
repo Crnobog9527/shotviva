@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
 import { Link } from '@/core/i18n/ui'
+import { useOfferedTemplate } from '@/core/templates/offered-toggles'
 import { STATE_GHOST } from '@/core/ui/empty-state'
 
 import type { AgainContext } from '../../again/again-context'
@@ -54,8 +55,11 @@ export function WorkAgain({ item, onBack }: { item: PhotoItem; onBack(): void })
   )
 }
 
-function AgainForm({ context }: { context: AgainContext }) {
+function AgainForm({ context: given }: { context: AgainContext }) {
   const viewer = useViewer()
+  // No dish name while the food switch is off (offered-toggles.tsx).
+  const template = useOfferedTemplate(given.template)
+  const context = { ...given, template }
   const draft = useWorkspaceDraft({ ...context, single: true })
   const generate = () => {
     void draft.start()

@@ -148,3 +148,29 @@ describe('forceOff (food_toggles_enabled off)', () => {
     expect(validateGenerationInputs(toggled, { ...asked, forceOff: [] })).toEqual(validateGenerationInputs(toggled, asked))
   })
 })
+
+// 1848 too: the dish name only the food flows read is left out while the switch is off.
+describe('dropCopy (food_toggles_enabled off)', () => {
+  const food = templateFieldsSchema.parse({
+    images: { min: 1, max: 1 },
+    copy: [{ key: 'dish_name', label: 'Dish name', public: true }, { key: 'price', label: 'Price' }],
+    aspectRatios: ['1:1'],
+  })
+
+  it('ignores what the request sends for a dropped field and leaves it out of copy and labels', () => {
+    const inputs = validateGenerationInputs(food, { imageCount: 1, copy: { dish_name: 'Mapo tofu', price: '$9' }, dropCopy: ['dish_name'] })
+    expect(inputs.copy).toEqual({ price: '$9' })
+    expect(inputs.labels).toEqual({ price: 'Price' })
+    expect(renderPrompt('Shot of {{dish_name}}.', inputs)).toBe('Shot of .\n\nPrice: $9')
+  })
+
+  it('never refuses a dropped key, even one the template lacks', () => {
+    expect(validateGenerationInputs(food, { imageCount: 1, copy: { gone: 'x' }, dropCopy: ['gone'] }).copy).toEqual({ dish_name: '', price: '' })
+  })
+
+  it('keeps every field as before when nothing is dropped', () => {
+    const asked = { imageCount: 1, copy: { dish_name: 'Mapo tofu' } }
+    expect(validateGenerationInputs(food, { ...asked, dropCopy: [] })).toEqual(validateGenerationInputs(food, asked))
+    expect(validateGenerationInputs(food, asked).copy).toEqual({ dish_name: 'Mapo tofu', price: '' })
+  })
+})

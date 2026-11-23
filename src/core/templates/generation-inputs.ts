@@ -48,11 +48,16 @@ export type RawGenerationInputs = {
   // Toggles switched off site-wide (food_toggles_enabled off): rendered off whatever the request
   // says, never refused, so an open tab or Make again still runs, at the price of the off result.
   forceOff?: readonly string[]
+  // Copy fields switched off with them (the dish name, FOOD_COPY_KEYS): whatever the request
+  // sends for them is ignored and they are left out of the inputs, as if the template lacked them.
+  dropCopy?: readonly string[]
 }
 
 const invalid = (message: string) => new AppError('INVALID_INPUT', message)
 
-function checkCopy(fields: TemplateFields, raw: Record<string, unknown>): Pick<GenerationInputs, 'copy' | 'labels'> {
+function checkCopy(fields: TemplateFields, given: Record<string, unknown>, drop: readonly string[] = []): Pick<GenerationInputs, 'copy' | 'labels'> {
+  const dropped = new Set(drop)
+  const raw = Object.fromEntries(Object.entries(given).filter(([key]) => !dropped.has(key)))
   const known = new Set(fields.copy.map((field) => field.key))
   const unknown = Object.keys(raw).find((key) => !known.has(key))
   if (unknown) throw invalid(`Unknown field: ${unknown}`)
@@ -60,6 +65,7 @@ function checkCopy(fields: TemplateFields, raw: Record<string, unknown>): Pick<G
   const copy: Record<string, string> = {}
   const labels: Record<string, string> = {}
   for (const field of fields.copy) {
+    if (dropped.has(field.key)) continue
     copy[field.key] = checkCopyValue(field, raw[field.key])
     labels[field.key] = field.label
   }
@@ -109,7 +115,7 @@ function checkToggles(fields: TemplateFields, raw: RawGenerationInputs): Pick<Ge
 
 // Checks what the user filled in against the template's field definitions (ARCHITECTURE §5).
 export function validateGenerationInputs(fields: TemplateFields, raw: RawGenerationInputs): GenerationInputs {
-  const base = () => ({ ...checkCopy(fields, raw.copy ?? {}), aspectRatio: checkAspect(fields, raw), note: checkNote(raw), ...checkToggles(fields, raw) })
+  const base = () => ({ ...checkCopy(fields, raw.copy ?? {}, raw.dropCopy), aspectRatio: checkAspect(fields, raw), note: checkNote(raw), ...checkToggles(fields, raw) })
   return slotsOf(fields).length > 0 ? { ...base(), ...checkSlots(fields, raw) } : { ...checkImageCount(fields, raw), ...base() }
 }
 

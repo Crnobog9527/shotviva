@@ -4,6 +4,7 @@
 import { useEffect } from 'react'
 
 import { trackTemplateView } from '@/core/analytics/browser'
+import { useOfferedTemplate } from '@/core/templates/offered-toggles'
 import { useReveal } from '@/core/ui/reveal'
 
 import { isSlotTemplate } from '../catalogue/catalogue-template'
@@ -33,8 +34,11 @@ export type WorkspaceProps = DraftInput & { shareText: string; editable: boolean
 // stop them; Photos shows them. Which jobs this workspace shows lives there too, so a browser
 // refresh, or Generate in the dialog, lands on the developing view or result, not the form.
 // From lg up the form is the left column and the stage the right (B comp workspace.html).
-export function ImageWorkspace({ shareText, editable, shareLink, ...input }: WorkspaceProps) {
-  const { template, tier, concurrency } = input
+export function ImageWorkspace({ shareText, editable, shareLink, ...given }: WorkspaceProps) {
+  // No dish name while the food switch is off (offered-toggles.tsx).
+  const template = useOfferedTemplate(given.template)
+  const input = { ...given, template }
+  const { tier, concurrency } = input
   const draft = useWorkspaceDraft(input)
   const jobIds = useWorkspaceJobs(template.id)
   const single = useJob(jobIds.length === 1 ? (jobIds[0] ?? null) : null)
