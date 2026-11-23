@@ -5,21 +5,18 @@ import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 
-// First tap on a tab, and Open app from the home page (the home-screen icon starts there): the
-// tab's own content is fetched before the tap. The pages keep it out of the App Shell (embedded
-// in every page's HTML) with prefetch(), which a per-link prefetch renders and connection() would
-// not: with connection() the content waited for the tap and a request to the server.
-describe('tabs open with their content', () => {
-  it('prefetches each tab and Open app per link', () => {
-    expect(read('src/core/app-shell/tab-bar.tsx')).toMatch(/<Link\s+href=\{item\.href\}\s+prefetch/)
+// The home-screen icon starts on the home page; a signed-in person's next tap is Open app. That
+// link is prefetched in full (marketing pages use Next's full per-link prefetch), Create's grid
+// included: on the #881 preview, Open app → grid 1.5 → 0.2 s under both throttles. Inside the app
+// a per-link prefetch carries only cached content, so the tab bar is left on the default.
+describe('Open app arrives with Create prefetched', () => {
+  it('prefetches Open app per link', () => {
     expect(read('src/core/content/blocks/nav-account.tsx')).toMatch(/<Link href="\/generate" className="mk-open" prefetch>/)
   })
 
-  it('Create and the wall defer their content with prefetch(), not connection()', () => {
-    for (const page of ['src/app/[locale]/(app)/generate/page.tsx', 'src/app/[locale]/(app)/wishlist/page.tsx']) {
-      const source = read(page)
-      expect(source, page).toMatch(/await prefetch\(\)/)
-      expect(source, page).not.toMatch(/await connection\(\)/)
-    }
+  it('Create defers its catalogue with prefetch(), which a full prefetch renders', () => {
+    const source = read('src/app/[locale]/(app)/generate/page.tsx')
+    expect(source).toMatch(/await prefetch\(\)/)
+    expect(source).not.toMatch(/await connection\(\)/)
   })
 })

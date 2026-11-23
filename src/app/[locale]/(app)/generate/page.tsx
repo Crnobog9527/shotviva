@@ -41,9 +41,9 @@ type Search = Promise<Record<string, string | string[] | undefined>>
 // page's own fallback, and it keeps an open series (?series=) or poster editor (?poster=) too.
 async function Create({ searchParams }: { searchParams: Search }) {
   // Keep the header in the App Shell, and the signed-in catalogue out of it: the shell is embedded
-  // in every page's HTML, and the catalogue would double it. The tab bar's per-link prefetch
-  // (core/app-shell/tab-bar.tsx) renders it before the tap, so Create opens with its grid at once
-  // instead of a cross-border request after it; a plain navigation still renders it as before.
+  // in every page's HTML, and the catalogue would double it. Unlike connection(), prefetch() lets
+  // a full prefetch render it: the marketing bar's Open app (content/blocks/nav-account.tsx), so
+  // Create opens from the home page with its grid at once; a plain navigation renders it as before.
   await prefetch()
   const user = await requireUser(async () => {
     const { series, poster } = await searchParams

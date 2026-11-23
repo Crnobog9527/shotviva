@@ -73,15 +73,10 @@ export function TabBar({ items, rootsUnder = [], shellPages = [], admin }: Props
   )
 }
 
-// prefetch: each tab's own content too, not only its shell (Next's per-link prefetch). The
-// pages keep their per-account parts out of the shell with prefetch() (Create's catalogue, the
-// wall), so without this the first tap on a tab waited for a request to the server, a cross-border
-// round trip and more from mainland China.
 function TabLink({ item, current }: { item: TabItem; current: boolean }) {
   return (
     <Link
       href={item.href}
-      prefetch
       aria-current={current ? 'page' : undefined}
       className={cn(
         'press relative flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-1 px-1 text-center text-caption leading-tight font-medium break-words',
