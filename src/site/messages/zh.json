@@ -705,15 +705,15 @@
     "tiers": {
       "1k": {
         "name": "1K",
-        "use": "社交媒体、外卖平台"
+        "use": "手机、朋友圈、外卖平台"
       },
       "2k": {
         "name": "2K",
-        "use": "官网、网店"
+        "use": "iPad 点单屏、电子菜单、网店"
       },
       "4k": {
         "name": "4K",
-        "use": "印刷、放大查看"
+        "use": "打印菜单、海报、大屏"
       },
       "notEnough": "（积分不够）"
     },
@@ -1156,7 +1156,7 @@
       "saveToPhotosHint": "在弹出的菜单中选择「存储图像」。",
       "preparingPhoto": "正在准备图片…",
       "holdPhotoHint": "长按图片，再选择「存储图像」。",
-      "longPress": "长按保存",
+      "longPress": "长按图片直接存进相册（JPG，画质不变）；要无损 PNG 原图请点「下载」",
       "photosHint": "存进相册：点右边的分享，再选「存储图像」",
       "makeAnotherWith": "用 {name} 再做一张",
       "shareText": "用 {brand} 制作 {url}",
