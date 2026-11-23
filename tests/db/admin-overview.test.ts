@@ -29,7 +29,8 @@ beforeAll(async () => {
     [user],
   )
   const service = serviceClient()
-  await grantCredits(service, { userId: user, amount: 3, reason: 'overview test', idempotencyKey: randomUUID(), pool: 'free' })
+  // 1K is paid from free credits only (1996): enough free credits for both 1K reservations.
+  await grantCredits(service, { userId: user, amount: 4, reason: 'overview test', idempotencyKey: randomUUID(), pool: 'free' })
   for (let i = 0; i < 2; i++) {
     await reserveJob(service, {
       jobId: randomUUID(),
@@ -99,8 +100,8 @@ describe('admin.users_overview', () => {
       generation_count: 2,
       banned_at: null,
     })
-    // Two 2-credit reservations against 7 paid + 3 free.
-    expect(row.credits + row.free_credits).toBe(6)
+    // Two 2-credit 1K reservations from the 4 free credits; the 7 paid stay.
+    expect(row.credits + row.free_credits).toBe(7)
     expect(row.paid_until).toEqual(new Date('2027-01-01T00:00:00Z'))
     expect(row.created_at).toBeInstanceOf(Date)
     expect(row.last_generation_at).toBeInstanceOf(Date)

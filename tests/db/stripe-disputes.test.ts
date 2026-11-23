@@ -73,7 +73,9 @@ async function buyPack(method: 'card' | 'cn_card', options: { managed?: boolean;
 async function makeWork(userId: string, source: 'web' | 'graylum' = 'web', ip = '203.0.113.7') {
   const jobId = randomUUID()
   const { error } = await serviceSupabase().rpc('reserve_credits', {
-    p_job_id: jobId, p_user_id: userId, p_module: 'image', p_template_id: template, p_credits_cost: null, p_source: source, p_inputs: {},
+    p_job_id: jobId, p_user_id: userId, p_module: 'image', p_template_id: template, p_credits_cost: null, p_source: source,
+    // A paid work: 2K / 4K are paid from paid credits (1996); partner calls keep paid first.
+    p_inputs: source === 'web' ? { resolution: '2k' } : {},
   })
   expect(error).toBeNull()
   await serviceSupabase().rpc('record_job_client_ip', { p_job_id: jobId, p_user_id: userId, p_ip: ip })

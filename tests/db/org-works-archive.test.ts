@@ -32,7 +32,8 @@ beforeAll(async () => {
   db = await connectAdmin()
   actor = await adminAccount(db, service)
   template = await seedTemplate(db)
-  cost = (await db.query(`select (credits_cost->>'1k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
+  // 2K: the org paid share (and a person's own paid credits) pay it; 1K is free credits only (1996).
+  cost = (await db.query(`select (credits_cost->>'2k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
 }, 60_000)
 
 afterAll(async () => {
@@ -42,7 +43,7 @@ afterAll(async () => {
 async function made(userId: string, inputs: Record<string, unknown> = {}) {
   const jobId = randomUUID()
   await reserveJob(rest, { jobId, userId, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
-    inputs: { resolution: '1k', attempt_id: randomUUID(), ...inputs } })
+    inputs: { resolution: '2k', attempt_id: randomUUID(), ...inputs } })
   await db.query('select public.confirm_job($1, $2)', [jobId, `outputs/${userId}/${jobId}.png`])
   return jobId
 }
@@ -182,7 +183,7 @@ describe('account deletion', () => {
     await expect(archiveOrgWorksOf({ db: rest, store }, owner)).rejects.toMatchObject({ code: 'ACCOUNT_OWNS_ORG' })
     const running = randomUUID()
     await reserveJob(rest, { jobId: running, userId: staff, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
-      inputs: { resolution: '1k', attempt_id: randomUUID() } })
+      inputs: { resolution: '2k', attempt_id: randomUUID() } })
     await expect(archiveOrgWorksOf({ db: rest, store }, staff)).rejects.toMatchObject({ code: 'CONFLICT' })
     expect(await archiveRow(running)).toBeUndefined()
     // A row left running past the sweeper's day is dead and no longer blocks.

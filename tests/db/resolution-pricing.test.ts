@@ -37,14 +37,15 @@ const reserve = (userId: string, templateId: string, inputs: Record<string, unkn
 
 describe('reserve_credits by resolution', () => {
   it('charges the template price for each tier: freeform (high) 2 / 4 / 6, medium 1 / 2 / 3', async () => {
-    const userId = await createUser(db, { credits: 30 })
+    // 1996: 1K is paid from free credits, 2K / 4K from paid credits.
+    const userId = await createUser(db, { credits: 30, freeCredits: 30 })
     const charged = []
     for (const resolution of ['1k', '2k', '3k']) {
       charged.push((await reserve(userId, 'freeform', { resolution })).creditsCost)
       charged.push((await reserve(userId, medium, { resolution })).creditsCost)
     }
     expect(charged).toEqual([2, 1, 4, 2, 6, 3])
-    expect((await profileOf(db, userId)).credits).toBe(30 - 18)
+    expect(await profileOf(db, userId)).toMatchObject({ credits: 30 - 15, free_credits: 30 - 3 })
   })
 
   it("throws on '8k' and charges nothing", async () => {
@@ -66,9 +67,9 @@ describe('reserve_credits by resolution', () => {
   })
 
   it("treats a missing resolution as '1k' and records it on the job", async () => {
-    const userId = await createUser(db, { credits: 5 })
+    const userId = await createUser(db, { freeCredits: 5 })
     const job = await reserve(userId, medium, { copy: {} })
-    expect(job).toMatchObject({ creditsCost: 1, inputs: { resolution: '1k' } })
+    expect(job).toMatchObject({ creditsCost: 1, creditPool: 'free', inputs: { resolution: '1k' } })
   })
 
   it('rejects a malformed price object or half-set motion cover at the table', async () => {
@@ -87,7 +88,7 @@ describe('reserve_credits by resolution', () => {
 describe('runGeneration by resolution', () => {
   async function setup() {
     const templateId = await seedTemplate(db)
-    const userId = await createUser(db, { credits: 20 })
+    const userId = await createUser(db, { credits: 20, freeCredits: 20 })
     const r2 = createMemoryStore()
     const inputKey = newInputKey(userId, 'image/jpeg')
     r2.upload(inputKey, await jpeg(2048, 1536), 'image/jpeg')
@@ -104,7 +105,9 @@ describe('runGeneration by resolution', () => {
     const views = []
     for (const resolution of ['1k', '2k', '4k'] as const) views.push(await runGeneration(deps, request({ resolution })))
     expect(views.map((view) => view.credits_cost)).toEqual([1, 2, 3])
-    expect((await profileOf(db, userId)).credits).toBe(14)
+    // 1K from free credits, 2K and 4K from paid credits (1996).
+    expect(views.map((view) => view.credit_pool)).toEqual(['free', 'paid', 'paid'])
+    expect(await profileOf(db, userId)).toMatchObject({ credits: 15, free_credits: 19 })
     expect(fake.calls.map((call) => [call.resolution, call.quality, call.aspectRatio])).toEqual([
       ['1k', 'medium', 'original'],
       ['2k', 'medium', 'original'],

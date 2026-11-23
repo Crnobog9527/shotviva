@@ -25,7 +25,7 @@ beforeAll(async () => {
   user = await createUser(db, { credits: 5 })
   email = (await db.query<{ email: string }>('select email from auth.users where id = $1', [user])).rows[0]!.email
   jobId = randomUUID()
-  await reserveJob(service, { jobId, userId: user, module: 'image', templateId: await createPricedTemplate(db), source: 'web', inputs: { resolution: '1k' } })
+  await reserveJob(service, { jobId, userId: user, module: 'image', templateId: await createPricedTemplate(db), source: 'web', inputs: { resolution: '2k' } })
   await db.query(
     `insert into public.payments (user_id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, amount_total, amount_tax, currency, method)
      values ($1, 'pack_s', 'stripe', $2, null, $3, 990, 0, 'usd', 'card'),
