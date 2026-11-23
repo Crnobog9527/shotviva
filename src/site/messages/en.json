@@ -658,6 +658,7 @@
       "formLoading": "Loading template settings…",
       "formLoadFailed": "Couldn’t load the template settings.",
       "formRetry": "Try again",
+      "catalogueLoadFailed": "Couldn’t load the templates.",
       "templates": "Templates",
       "filter": "Filter templates",
       "filterWithin": "Filter within {name}",
