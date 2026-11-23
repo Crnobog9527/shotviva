@@ -21085,7 +21085,7 @@ CREATE OR REPLACE VIEW "admin"."template_tariffs_v2" AS
     'medium'::"text" AS "quality",
         CASE
             WHEN ("id" = 'edit'::"text") THEN '{"1k": 15, "2k": 15, "4k": 58}'::"jsonb"
-            WHEN ("id" = 'white-background'::"text") THEN '{"1k": 18, "2k": 37, "4k": 55}'::"jsonb"
+            WHEN ("id" = 'white-background'::"text") THEN '{"1k": 20, "2k": 20, "4k": 35}'::"jsonb"
             WHEN ("id" = ANY (ARRAY['promo-poster'::"text", 'pet-studio'::"text", 'freeform'::"text"])) THEN '{"1k": 45, "2k": 120, "4k": 190}'::"jsonb"
             ELSE '{"1k": 74, "2k": 150, "4k": 225}'::"jsonb"
         END AS "costs",
