@@ -32,9 +32,13 @@ export const ANALYTICS_COPY = {
     vars: ['POSTHOG_PERSONAL_API_KEY：PostHog 个人 API 密钥（只给 Query Read 权限）', 'POSTHOG_PROJECT_ID：712352'],
   },
   // PostHog is switched off (NEXT_PUBLIC_POSTHOG_ENABLED); visitors are counted in PVUV.ai instead.
+  // `pvuv*` while the PVUV read token is set (the page then reads PVUV itself).
   off: {
     title: 'PostHog 已关闭，访客数据在 PVUV.ai',
-    body: '2026-11-21 起网站不再向 PostHog 发数据，这一页读 PostHog 的部分因此不显示。访客、来源（含 AI 爬虫和 AI 引荐）、热门页面请到 PVUV.ai 的看板看；注册、出图和付款仍来自数据库，在「总览」里。',
+    body: '2026-11-21 起网站不再向 PostHog 发数据，这一页读 PostHog 的部分因此不显示。访客、来源（含 AI 爬虫和 AI 引荐）、热门页面请到 PVUV.ai 的看板看；注册、出图和付款仍来自数据库，在「总览」里。在 Vercel 加服务端变量 PVUV_SITE 和 PVUV_READ_TOKEN 后，这一页会直接读 PVUV。',
+    pvuvTitle: 'PostHog 已关闭，访客数据改从 PVUV.ai 读',
+    pvuvBody:
+      '2026-11-21 起网站不再向 PostHog 发数据。「总览」的访客、浏览量、来源和热门页面，以及「漏斗」页的漏斗，现在都读 PVUV.ai（已去掉机器人和爬虫）；注册、出图和付款仍来自数据库。「模板」页和「明细（旧版）」里读 PostHog 的块不再显示。',
     link: '打开 PVUV.ai 看板',
     href: 'https://pvuv.ai/sites',
     back: '想重新打开 PostHog：把环境变量 NEXT_PUBLIC_POSTHOG_ENABLED 设为 true 并重新部署即可，密钥都还在。',
