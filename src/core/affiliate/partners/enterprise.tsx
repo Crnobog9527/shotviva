@@ -21,7 +21,7 @@ import { Dashboard } from './screen'
 // the program page.
 export async function EnterpriseScreen({ search }: { search: Promise<SearchParams> }) {
   const [{ user, account, orgId }, raw] = await Promise.all([orgAccount(), search])
-  const query = searchSchema.parse(raw)
+  const query = { ...searchSchema.parse(raw), base: '/partners/enterprise' as const }
   const [t, orgName] = await Promise.all([getTranslations('app.org.area'), readOrgName(orgId)])
   return (
     <EnterpriseFrame
@@ -54,7 +54,7 @@ async function elsewhere(user: string | null) {
 }
 
 // The dashboard's own views: a chip rail under the sections on a phone, a list under 「企业联盟」
-// in the side column from lg up. The referral code sits under it, where the old header had it.
+// in the side column from lg up. The referral code sits with the link on the overview.
 async function DashboardNav({ view, account }: { view: View; account: Account }) {
   const t = await getTranslations('affiliate')
   const views = dashboardViews.filter((v) => v !== 'team' || account.team_enabled)
@@ -65,7 +65,7 @@ async function DashboardNav({ view, account }: { view: View; account: Account })
           {views.map((v) => (
             <li key={v} className="shrink-0">
               <Link
-                href={viewHref({ view: v })}
+                href={viewHref({ view: v, base: '/partners/enterprise' })}
                 aria-current={view === v ? 'page' : undefined}
                 className={cn(
                   'inline-flex min-h-10 items-center rounded-full px-4 text-label font-medium whitespace-nowrap transition-[color,background-color,scale] active:scale-[0.975]',
@@ -81,9 +81,6 @@ async function DashboardNav({ view, account }: { view: View; account: Account })
           ))}
         </ul>
       </nav>
-      <p className="hidden text-caption text-muted-foreground lg:block lg:pl-3.5">
-        {t('codeLabel')} <code className="font-mono text-bone-dim">{account.slug}</code>
-      </p>
     </div>
   )
 }

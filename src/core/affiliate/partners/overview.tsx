@@ -3,7 +3,7 @@ import { currentLocale } from '@/core/i18n/server'
 import { ENTERPRISE_LINK_LOCALE } from '@/core/i18n/locales'
 import { consumerReferralUrl } from '../consumer-link'
 import { Link } from '@/core/i18n/ui'
-import { date, money } from './format'
+import { date, money, viewHref } from './format'
 import { CopyLink } from '../copy-link'
 import { payoutThreshold, type Account, type Settings } from './models'
 import { FeePanel } from './fee-panel'
@@ -57,7 +57,7 @@ export async function Overview({
           </div>
         </dl>
         <p className={eligible ? 'af-success' : 'af-note'}>{eligible ? t('eligible') : account.payout_method ? t('notEligible') : t('needMethod')}</p>
-        <Link href="/partners?view=settings" className="af-link">
+        <Link href={settingsHref(account)} className="af-link">
           {account.payout_method ? t('hasMethod') : t('addMethod')}
         </Link>
       </section>
@@ -66,6 +66,8 @@ export async function Overview({
         <h2 id="af-mylink">{t('myLink')}</h2>
         <CopyLink url={consumerReferralUrl(account.slug, account.org_id ? ENTERPRISE_LINK_LOCALE : locale)} copy={t('copy')} copied={t('copied')} />
         <p className="af-hint">{t('anyPage', { suffix: '?ref=' + account.slug })}</p>
+        {/* The org dashboard has no header line for the code, so it sits with the link (Owner 2026-11-23). */}
+        <CodeLine account={account} label={t('codeLabel')} />
       </section>
 
       {account.org_id ? <PromoMonthCard orgId={account.org_id} locale={locale} /> : null}
@@ -81,5 +83,17 @@ export async function Overview({
         ))}
       </section>
     </div>
+  )
+}
+
+// The payout settings of this account's own dashboard: an org's stays on /partners/enterprise.
+const settingsHref = (account: Account) => viewHref({ view: 'settings', base: account.org_id ? '/partners/enterprise' : '/partners' })
+
+function CodeLine({ account, label }: { account: Account; label: string }) {
+  if (!account.org_id) return null
+  return (
+    <p className="af-hint af-code-line">
+      {label} <code className="af-code">{account.slug}</code>
+    </p>
   )
 }

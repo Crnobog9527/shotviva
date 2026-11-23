@@ -122,4 +122,8 @@ export const searchSchema = z.object({
     .catch(undefined),
   changes: z.string().max(640).optional().catch(undefined),
 })
-export type Query = z.infer<typeof searchSchema>
+// `base` is not read from the address: the enterprise dashboard sets it so every link it renders
+// stays on /partners/enterprise instead of bouncing through /partners (whose marketing layout
+// loads a second stylesheet that broke the enterprise frame's desktop navigation).
+export type Query = z.infer<typeof searchSchema> & { base?: DashboardBase }
+export type DashboardBase = '/partners' | '/partners/enterprise'

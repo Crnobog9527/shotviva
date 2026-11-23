@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useFormatter, useTranslations } from 'next-intl'
 
 import { Button } from '@/core/ui/button'
@@ -73,6 +74,7 @@ function UseDefault({ member, actions, kind, suspended }: Pick<FormProps, 'membe
 // a lost answer is the same request to the database.
 function GiveForm({ member, actions, suspended, label, kind }: FormProps) {
   const t = useTranslations('app.org.members')
+  const router = useRouter()
   const format = useFormatter()
   const [give, setGive] = useKeptState(`${member.userId}:${kind}:give:amount`, () => '')
   const [requestId, setRequestId] = useKeptState(`${member.userId}:${kind}:give:id`, newRequestId)
@@ -86,7 +88,10 @@ function GiveForm({ member, actions, suspended, label, kind }: FormProps) {
         event.preventDefault()
         if (pending || !valid || suspended) return
         const allocate = kind === 'paid' ? actions.allocate : actions.allocatePromo
-        run(() => allocate({ requestId, member: member.userId, credits: value }), t('given', { count: value }), () => { setRequestId(newRequestId()); setGive('') })
+        // The action answers without re-rendering the page; the numbers catch up in the background
+        // (after a refused give too: the pool shown may have been stale).
+        run(() => allocate({ requestId, member: member.userId, credits: value }), t('given', { count: value }),
+          () => { setRequestId(newRequestId()); setGive(''); router.refresh() }, () => router.refresh())
       }}
     >
       <label className="grid gap-1 text-label">
