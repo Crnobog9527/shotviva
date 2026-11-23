@@ -31,6 +31,7 @@ import { ShareModeButton } from '../template-share/share-mode-button'
 import { ShareSelectionProvider, useShareSelectionState, type ShareSelection } from '../template-share/share-selection'
 import { useSeeAllLanding } from './use-see-all-landing'
 import { useCatalogueQuery } from './use-catalogue-query'
+import { useSettled } from './use-settled'
 import { browseView, slimBrowse } from './picker-browse'
 
 // The series panel is only fetched once a series is opened (scripts/js-budget.json).
@@ -45,21 +46,6 @@ const SeriesCreateDialog = dynamic(() => import('../workspace/series-create-dial
 // its dialog when it does, so nothing can be generated against a balance not yet known.
 type Props = { payload: CataloguePayload; create: CreateContext | Promise<CreateContext>; endCard?: ReactNode }
 
-// The value, or null while its promise is on its way (a rejected one stays null: the page's own
-// error handling, a redirect to sign-in, takes over).
-function useSettled<T>(value: T | Promise<T>): T | null {
-  const [settled, setSettled] = useState<{ from: Promise<T>; value: T } | null>(null)
-  useEffect(() => {
-    if (!(value instanceof Promise)) return
-    let live = true
-    value.then((result) => live && setSettled({ from: value, value: result }), () => undefined)
-    return () => {
-      live = false
-    }
-  }, [value])
-  if (!(value instanceof Promise)) return value
-  return settled?.from === value ? settled.value : null
-}
 
 // Create's catalogue (B comp create.html): the featured card, a sticky chip bar of up to three
 // category levels (T102), the grid of side-by-side pair cards and series cards (one column on

@@ -1,7 +1,6 @@
 import { orgBalance } from '@/core/billing/pools'
 import type { Metadata } from 'next'
 import { readPoolChoiceOffer } from '@/core/org'
-import { unstable_rethrow } from 'next/navigation'
 import { connection } from 'next/server'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
@@ -14,12 +13,11 @@ import { featureAllowed } from '@/core/features'
 import { sharedCreateFeatureAccess } from '@/core/features/read'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
-import { logger } from '@/core/logger'
 import { POSTER_FEATURE } from '@/core/poster/sets'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { WishCard } from '@/core/wishlist/ui/wish-card'
-import { loadCataloguePayload } from '@/modules/image/create-data'
-import { createReturnPath, FavoritesProvider, GatedFeatures, GatedFeaturesPending, GeneratingPill, TEMPLATES_ANCHOR, TemplateCatalogue, type CreateContext } from '@/modules/image/create-page'
+import { loadCataloguePayload, type CataloguePayload } from '@/modules/image/create-data'
+import { createReturnPath, DeviceCatalogue, FavoritesProvider, GatedFeatures, GatedFeaturesPending, GeneratingPill, TEMPLATES_ANCHOR, type CreateContext } from '@/modules/image/create-page'
 import { site } from '@/site/site.config'
 
 import { readCreatePersonalData } from './personal-data'
@@ -38,13 +36,12 @@ function Header({ aside }: { aside?: ReactNode }) {
 // needs: the tier (batch size) and the photos already developing (concurrency), and the user's
 // saved templates, read per request on their own session (never in the shared catalogue cache).
 //
-// Shown first, then filled in (Owner 2026-11-24, 方案 A): the header, the grid and the wish card
-// need nothing about the account, so they are in the route's App Shell, which a tab-bar link
-// prefetches; the first tap on Create shows them at once instead of after a request to the server
-// (from mainland China a cross-border round trip and more). The account's part (balance, saved
-// templates, tier, photos developing, the org pool offer) is one request-time read that streams in
-// behind same-sized placeholders; the creation dialogs wait for it, and reserve_credits still
-// checks every charge on the server.
+// Drawn from the phone first, then filled in (Owner 2026-11-24, after Higgsfield and Lovart): the
+// grid comes from the public catalogue file kept on the device (modules/image DeviceCatalogue), so
+// a tap on Create shows it at once instead of after a cross-border request; the page's HTML carries
+// no catalogue. The account's part (balance, saved templates, tier, photos developing, the org
+// pool offer) is one request-time read that streams in behind same-sized placeholders; the
+// creation dialogs wait for it, and reserve_credits still checks every charge on the server.
 type Search = Promise<Record<string, string | string[] | undefined>>
 
 async function readPersonal(searchParams: Search) {
@@ -79,6 +76,17 @@ async function readPersonal(searchParams: Search) {
 }
 type Personal = Awaited<ReturnType<typeof readPersonal>>
 
+// The poster templates are in the public file while dense_poster is open to every account. With a
+// tier gate set (/admin/features) they are entitlement-specific: an entitled account gets its own
+// catalogue here, poster templates included; everyone else uses the public file.
+async function entitledCatalogue(personal: Promise<Personal>): Promise<CataloguePayload | null> {
+  // The account first: it is request-time, so the reads below never run while the shell is built.
+  const { posters } = await personal
+  const [access, locale] = await Promise.all([sharedCreateFeatureAccess(), currentLocale()])
+  const gated = Boolean(access.find((row) => row.key === POSTER_FEATURE)?.minTier)
+  return gated && posters ? loadCataloguePayload(locale, Promise.resolve(true)) : null
+}
+
 async function Balance({ personal }: { personal: Promise<Personal> }) {
   return <BalanceChip balance={(await personal).chip} />
 }
@@ -88,45 +96,15 @@ async function Gated({ personal }: { personal: Promise<Personal> }) {
   return <GatedFeatures tier={tier} batch={batch} />
 }
 
-// The poster templates join the grid when the account may use the editor (feature dense_poster).
-// While the feature has no tier gate it is open to every account, so the grid is the same for
-// everyone and stays in the App Shell; with a gate set (/admin/features) it waits for the account.
-async function postersFor(personal: Promise<Personal>): Promise<boolean> {
-  const access = (await sharedCreateFeatureAccess()).find((row) => row.key === POSTER_FEATURE)
-  return access?.minTier ? (await personal).posters : true
-}
-
-// The grid's read, from the shared catalogue cache. When it fails while the App Shell is built (a
-// slow database during a deploy: the 8 s deadline in core/templates/create-catalogue.ts), the
-// grid falls back to request time, as before this page streamed, instead of failing the build.
-async function cataloguePayload(personal: Promise<Personal>) {
-  const locale = await currentLocale()
-  try {
-    return await loadCataloguePayload(locale, postersFor(personal))
-  } catch (error) {
-    // Next's own signals (a part that turns out to need the request) pass through untouched.
-    unstable_rethrow(error)
-    logger.warn('create.catalogue_shell_read_failed', { error })
-    await connection()
-    return loadCataloguePayload(locale, postersFor(personal))
-  }
-}
-
-async function Catalogue({ personal }: { personal: Promise<Personal> }) {
-  const [payload, wishlistLive] = await Promise.all([
-    cataloguePayload(personal),
-    // The grid ends on "Not finding it? Make a wish" while the wishlist is open (cached read).
-    isWishlistEnabled(site),
-  ])
-  return (
-    <FavoritesProvider initialIds={personal.then((p) => p.favoriteIds)} signedIn>
-      <TemplateCatalogue payload={payload} create={personal.then((p) => p.create)} endCard={wishlistLive ? <WishCard /> : undefined} />
-    </FavoritesProvider>
-  )
+// "Not finding it? Make a wish" while the wishlist is open (a cached setting).
+async function WishEnd() {
+  return (await isWishlistEnabled(site)) ? <WishCard /> : null
 }
 
 export default function CreatePage({ searchParams }: { searchParams: Search }) {
   const personal = readPersonal(searchParams)
+  // Rejections reach the parts that await them; these copies only must not go unhandled.
+  const entitled = entitledCatalogue(personal).catch(() => null)
   return (
     <AppPage wide>
       <Header
@@ -148,9 +126,9 @@ export default function CreatePage({ searchParams }: { searchParams: Search }) {
         </Suspense>
       </div>
       <div id={TEMPLATES_ANCHOR} className="scroll-mt-[calc(var(--sat)+8px)] md:scroll-mt-16">
-        <Suspense>
-          <Catalogue personal={personal} />
-        </Suspense>
+        <FavoritesProvider initialIds={personal.then((p) => p.favoriteIds)} signedIn>
+          <DeviceCatalogue create={personal.then((p) => p.create)} entitled={entitled} endCard={<Suspense><WishEnd /></Suspense>} />
+        </FavoritesProvider>
       </div>
     </AppPage>
   )

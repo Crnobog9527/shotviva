@@ -658,6 +658,7 @@
       "formLoading": "正在加载模板设置…",
       "formLoadFailed": "模板设置加载失败。",
       "formRetry": "重试",
+      "catalogueLoadFailed": "模板加载失败。",
       "templates": "模板",
       "filter": "筛选模板",
       "filterWithin": "在「{name}」里筛选",

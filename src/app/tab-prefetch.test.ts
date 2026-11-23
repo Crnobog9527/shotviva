@@ -14,9 +14,10 @@ describe('Open app arrives with Create prefetched', () => {
   })
 })
 
-// Create shows first, then fills in (Owner 2026-11-24, 方案 A): the grid is in the App Shell a tab
-// link prefetches; the account's part is one request-time read behind placeholders.
-describe('Create: grid in the App Shell, the account streamed', () => {
+// Create from the phone first, then filled in (Owner 2026-11-24, after Higgsfield and Lovart): the
+// grid comes from the public catalogue file kept on the device, the HTML carries no catalogue, and
+// the account's part is one request-time read behind placeholders.
+describe('Create: grid from the device, the account streamed', () => {
   const source = read(CREATE)
 
   it('reads the account at request time only', () => {
@@ -24,18 +25,18 @@ describe('Create: grid in the App Shell, the account streamed', () => {
     expect(source).not.toMatch(/await prefetch\(\)/)
   })
 
-  it('a grid read that fails while the shell is built falls back to request time', () => {
-    expect(source).toMatch(/catch \(error\) \{[\s\S]*?unstable_rethrow\(error\)\s*logger\.warn\('create\.catalogue_shell_read_failed'[\s\S]*?await connection\(\)/)
+  it('draws the grid from the device copy, not from a catalogue in the page', () => {
+    expect(source).toMatch(/<DeviceCatalogue create=\{personal\.then\(\(p\) => p\.create\)\} entitled=\{entitled\}/)
+    expect(source).not.toMatch(/<TemplateCatalogue/)
   })
 
   it('gives every account-dependent part a placeholder', () => {
     expect(source).toMatch(/<Suspense fallback=\{<BalanceChipSlot \/>\}>/)
     expect(source).toMatch(/<Suspense fallback=\{<GatedFeaturesPending \/>\}>/)
     expect(source).toMatch(/initialIds=\{personal\.then\(\(p\) => p\.favoriteIds\)\}/)
-    expect(source).toMatch(/create=\{personal\.then\(\(p\) => p\.create\)\}/)
   })
 
-  it('keeps the grid the same for everyone unless the poster feature has a tier gate', () => {
-    expect(source).toMatch(/access\?\.minTier \? \(await personal\)\.posters : true/)
+  it('an entitlement-gated catalogue comes from the account, never from the public file', () => {
+    expect(source).toMatch(/return gated && posters \? loadCataloguePayload\(locale, Promise\.resolve\(true\)\) : null/)
   })
 })

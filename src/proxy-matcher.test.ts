@@ -47,6 +47,11 @@ describe('proxy matcher', () => {
   it('skips /api/version but not the other API routes', () => {
     expect(runsOn('/api/version')).toBe(false)
     expect(runsOn('/api/versions')).toBe(true)
+  })
+
+  it('skips the public catalogue file (edge-cached: no session work, no cookies) but not its siblings', () => {
+    expect(runsOn('/api/catalogue/public/zh/latest')).toBe(false)
+    expect(runsOn('/api/catalogue/forms')).toBe(true)
     expect(runsOn('/api/generate')).toBe(true)
   })
 
