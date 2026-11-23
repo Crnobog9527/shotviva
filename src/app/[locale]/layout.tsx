@@ -7,6 +7,8 @@ import { locale as rootLocale } from 'next/root-params'
 import { ConsentSlot } from '@/core/analytics/browser'
 import { SignupCodeResult } from '@/core/auth/signup-result'
 import { UpdateSlot } from '@/core/app-update'
+import { ServiceWorkerSlot } from '@/core/offline'
+import { registersServiceWorker } from '@/core/offline/server'
 import { htmlLang, isLocale, publicClientMessages } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata, ShortcutTitleSync } from '@/core/seo'
@@ -65,6 +67,8 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
             <Suspense fallback={null}>
               <SignupCodeResult />
               <UpdateSlot />
+              {/* Content-hashed scripts, styles and fonts kept on the phone (core/offline). */}
+              <ServiceWorkerSlot production={registersServiceWorker()} />
             </Suspense>
             {/* Huawei Browser names a home-screen shortcut after the live page title (core/seo/shortcut-title.ts). */}
             <ShortcutTitleSync name={site.brand.name} />
