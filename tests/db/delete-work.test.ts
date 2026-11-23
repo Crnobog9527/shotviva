@@ -49,8 +49,9 @@ afterAll(async () => {
   await db.end()
 })
 
+// 1K works are paid from free credits only (1996), so the user holds both kinds.
 async function work(note = 'keep the chain gold') {
-  const userId = await createUser(db, { credits: 5 })
+  const userId = await createUser(db, { credits: 5, freeCredits: 5 })
   const r2 = createMemoryStore()
   const inputKey = newInputKey(userId, 'image/jpeg')
   r2.upload(inputKey, await jpeg(800, 1000), 'image/jpeg')
@@ -146,7 +147,7 @@ describe('deleting a work', () => {
   })
 
   it('deletes a failed work too', async () => {
-    const userId = await createUser(db, { credits: 5 })
+    const userId = await createUser(db, { credits: 5, freeCredits: 5 })
     const r2 = createMemoryStore()
     const inputKey = newInputKey(userId, 'image/jpeg')
     r2.upload(inputKey, await jpeg(640, 480), 'image/jpeg')

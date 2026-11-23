@@ -9,7 +9,8 @@ describe('generation_jobs.template_id foreign key', () => {
 
   beforeAll(async () => {
     db = await connectAdmin()
-    userId = await createUser(db, { credits: 5 })
+    // The reserves below are 1K, which free credits pay (1996).
+    userId = await createUser(db, { freeCredits: 5 })
   })
 
   afterAll(async () => {

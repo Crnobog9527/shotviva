@@ -50,12 +50,14 @@ const allocate = (owner: string, member: string, n: number, id: string = randomU
 const allocatePromo = (owner: string, member: string, n: number, id: string = randomUUID()) =>
   row(db, 'select org_allocate_promo($1,$2,$3,$4) r', [owner, member, n, id]).then((x) => x.r)
 
-// A 1k generation of the seeded template (cost 10) and its failure refund.
-async function generate(user: string) {
+// A generation of the seeded template (1k 10, 2k 20) and its failure refund. Since 1996 the tier
+// picks the member's share: 1K the promotion share, 2K the paid share.
+const PRICE = { '1k': 10, '2k': 20 } as const
+async function generate(user: string, tier: keyof typeof PRICE = '1k') {
   template ??= await seedTemplate(db, { credits: { '1k': 10, '2k': 20, '3k': 30 } })
   const job = randomUUID()
-  const r = await row(db, "select credit_pool, visibility from reserve_credits($1,$2,'image',$3,10,'web',$4)",
-    [job, user, template, { resolution: '1k', attempt_id: randomUUID() }])
+  const r = await row(db, "select credit_pool, visibility from reserve_credits($1,$2,'image',$3,$4,'web',$5)",
+    [job, user, template, PRICE[tier], { resolution: tier, attempt_id: randomUUID() }])
   return { job, ...r } as { job: string; credit_pool: string; visibility: string }
 }
 const fail = (job: string) => db.query("select refund_job($1,'TEST_FAILED')", [job])
@@ -105,33 +107,33 @@ it("gives each member this month's promotion allowance once, the rest when more 
   expect(await row(db, 'select monthly_allowance from org_members where org_id=$1 and user_id=$2', [orgId, staff])).toEqual({ monthly_allowance: 0 })
 })
 
-it('spends the org paid share, then the org promotion share, never the member’s own credits; rights follow the pool', async () => {
+it('spends the org paid share on 2K and the promotion share on 1K, never the member’s own credits; rights follow the pool', async () => {
   const { orgId, owner, staff } = await org(1000, 1000)
   await db.query('update profiles set free_credits=50 where id=$1', [staff]) // the member's own free credits stay frozen
-  await allocate(owner, staff, 15)
-  await allocatePromo(owner, staff, 25)
-  expect(await generate(staff)).toMatchObject({ credit_pool: 'paid' })
-  expect(await balances(staff)).toEqual({ credits: 5, free_credits: 75 })
-  expect(await generate(staff)).toMatchObject({ credit_pool: 'free' }) // 5 paid left: the promotion share pays the whole job
-  expect(await seat(orgId, staff)).toMatchObject({ held_credits: 5, held_promo_credits: 15 })
-  await generate(staff)
-  await refused(db, () => generate(staff), 'ORG_CREDITS_INSUFFICIENT') // 5 + 5 left: never mixed, never own credits
+  await allocate(owner, staff, 25)
+  await allocatePromo(owner, staff, 15)
+  expect(await generate(staff, '2k')).toMatchObject({ credit_pool: 'paid' })
+  expect(await balances(staff)).toEqual({ credits: 5, free_credits: 65 })
+  expect(await generate(staff)).toMatchObject({ credit_pool: 'free' }) // the promotion share pays the whole 1K job
+  expect(await seat(orgId, staff)).toMatchObject({ held_credits: 5, held_promo_credits: 5 })
+  await refused(db, () => generate(staff, '2k'), 'ORG_CREDITS_INSUFFICIENT') // 5 + 5 left: never mixed, never own credits
+  await refused(db, () => generate(staff), 'ORG_CREDITS_INSUFFICIENT')
   expect(await seat(orgId, staff)).toMatchObject({ held_credits: 5, held_promo_credits: 5 })
   expect(await freeOf(db, staff)).toBe(55)
 })
 
 it('refunds a failed job to the pool kind it came from and restores the org share', async () => {
   const { orgId, owner, staff } = await org(1000, 1000)
-  await allocate(owner, staff, 10)
+  await allocate(owner, staff, 20)
   await allocatePromo(owner, staff, 30)
-  const paid = await generate(staff)
+  const paid = await generate(staff, '2k')
   const free = await generate(staff)
   expect(await seat(orgId, staff)).toMatchObject({ held_credits: 0, held_promo_credits: 20 })
   await fail(paid.job)
   await fail(free.job)
   await fail(free.job) // a repeat refunds nothing
-  expect(await balances(staff)).toEqual({ credits: 10, free_credits: 30 })
-  expect(await seat(orgId, staff)).toMatchObject({ held_credits: 10, held_promo_credits: 30 })
+  expect(await balances(staff)).toEqual({ credits: 20, free_credits: 30 })
+  expect(await seat(orgId, staff)).toMatchObject({ held_credits: 20, held_promo_credits: 30 })
   expect(await row(db, 'select drawn, restored, period from org_promo_draws where debit_key=$1', ['job:' + free.job + ':reserve']))
     .toEqual({ drawn: 10, restored: 10, period: m.current })
 })
@@ -141,7 +143,7 @@ it('expires the promo pool and member-held promotion credits at month end, once,
   await db.query('update profiles set free_credits=70 where id=$1', [staff])
   await allocate(owner, staff, 500)
   await allocatePromo(owner, staff, 2000)
-  await generate(staff) // paid
+  await generate(staff, '2k') // paid
   await db.query('update profiles set credits=0 where id=$1', [staff]) // (test shortcut: no paid left)
   await db.query('update org_members set held_credits=0 where org_id=$1 and user_id=$2', [orgId, staff])
   await generate(staff) // 10 of the promotion share

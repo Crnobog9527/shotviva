@@ -33,7 +33,8 @@ afterAll(async () => {
 
 async function fixture() {
   const templateId = await seedTemplate(pg, { visibleIn: ['web', 'partner'], images: { min: 0, max: 1 } })
-  const userId = await createUser(pg, { credits: 10 })
+  // The line makes 1K only, which free credits pay on the web (1996); edits pay paid credits first.
+  const userId = await createUser(pg, { credits: 10, freeCredits: 10 })
   const bucket = createMemoryStore()
   const inputKey = newInputKey(userId, 'image/jpeg')
   bucket.upload(inputKey, await jpeg(64, 64), 'image/jpeg')

@@ -79,7 +79,8 @@ async function jobRow(id: string) {
 describe('T92 per-template generation routing', () => {
   it('runs eligible web requests on the saved model, rejects HD without charging, and preserves partner routing', async () => {
     const { deps, fetch, openai } = await setup()
-    const userId = await createUser(pg, { credits: 5 })
+    // The router line makes 1K only, which free credits pay on the web (1996); the partner call too.
+    const userId = await createUser(pg, { freeCredits: 5 })
     const request = { userId, templateId, aspectRatio: '4:5', source: 'web' as const }
     const standard = await runGeneration(deps, { ...request, resolution: '1k' })
     await expect(runGeneration(deps, { ...request, resolution: '2k' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
@@ -87,7 +88,7 @@ describe('T92 per-template generation routing', () => {
     const partner = await runGeneration(deps, { ...request, source: 'graylum', idempotencyKey: randomUUID() })
     expect(await jobRow(standard.id)).toMatchObject({ provider: routerTag, provider_usage: usage, cost_usd: chargedUsd, status: 'succeeded', credits_cost: 1 })
     expect(await jobRow(partner.id)).toMatchObject({ provider: defaultTag, status: 'succeeded', credits_cost: 1 })
-    expect((await profileOf(pg, userId)).credits).toBe(3)
+    expect((await profileOf(pg, userId)).free_credits).toBe(3)
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(openai).toHaveBeenCalledTimes(1)
   })
@@ -124,23 +125,23 @@ describe('T92 per-template generation routing', () => {
 
   it('refunds the failed request and retains its reported OpenRouter cost', async () => {
     const { deps, fetch } = await setup()
-    const userId = await createUser(pg, { credits: 2 })
+    const userId = await createUser(pg, { freeCredits: 2 })
     const jobId = randomUUID()
     fetch.mockResolvedValueOnce(Response.json({ data: [], usage }))
     await expect(runGeneration(deps, { jobId, userId, templateId, source: 'web' })).rejects.toMatchObject({ refunded: true })
     expect(await jobRow(jobId)).toMatchObject({ provider: routerTag, status: 'failed', provider_usage: usage, cost_usd: chargedUsd })
-    expect((await profileOf(pg, userId)).credits).toBe(2)
+    expect((await profileOf(pg, userId)).free_credits).toBe(2)
   })
 
   it('returns the held credits while retaining a pending OpenRouter receipt on a failed request', async () => {
     const { deps, fetch } = await setup()
-    const userId = await createUser(pg, { credits: 2 })
+    const userId = await createUser(pg, { freeCredits: 2 })
     const jobId = randomUUID()
     fetch.mockResolvedValueOnce(Response.json({ id: 'gen-pending', data: [] }))
     fetch.mockResolvedValueOnce(new Response(null, { status: 404 }))
     await expect(runGeneration(deps, { jobId, userId, templateId, source: 'web' })).rejects.toMatchObject({ refunded: true })
     expect(await jobRow(jobId)).toMatchObject({ status: 'failed', provider_usage: { generation_id: 'gen-pending', cost: null }, cost_usd: null })
-    expect((await profileOf(pg, userId)).credits).toBe(2)
+    expect((await profileOf(pg, userId)).free_credits).toBe(2)
   })
 
   it('admin trials can temporarily use the global default, then follow the saved model again', async () => {
@@ -167,12 +168,12 @@ describe('OpenRouter catalogue fallback', () => {
   it('finishes a catalogue fallback with one debit, the actual default model and its token pricing', async () => {
     const { deps, fetch, openai, parameters } = await setup()
     parameters.mockRejectedValueOnce(new ProviderSettingError('openrouter_catalog_unavailable', 'Catalogue unavailable'))
-    const userId = await createUser(pg, { credits: 2 })
+    const userId = await createUser(pg, { freeCredits: 2 })
     const job = await runGeneration(deps, { userId, templateId, source: 'web', aspectRatio: '4:5', resolution: '1k' })
     expect(await jobRow(job.id)).toMatchObject({
       provider: defaultTag, status: 'succeeded', provider_usage: openAiUsage, cost_usd: 0.002, credits_cost: 1,
     })
-    expect((await profileOf(pg, userId)).credits).toBe(1)
+    expect((await profileOf(pg, userId)).free_credits).toBe(1)
     expect(openai).toHaveBeenCalledTimes(1)
     expect(fetch).not.toHaveBeenCalled()
   })
@@ -181,12 +182,12 @@ describe('OpenRouter catalogue fallback', () => {
     const { deps, fetch, openai, parameters } = await setup()
     parameters.mockRejectedValueOnce(new ProviderSettingError('openrouter_catalog_unavailable', 'Catalogue unavailable'))
     openai.mockRejectedValueOnce(new Error('Default provider unavailable'))
-    const userId = await createUser(pg, { credits: 2 })
+    const userId = await createUser(pg, { freeCredits: 2 })
     const jobId = randomUUID()
     await expect(runGeneration(deps, { jobId, userId, templateId, source: 'web', resolution: '1k' }))
       .rejects.toMatchObject({ jobId, refunded: true })
     expect(await jobRow(jobId)).toMatchObject({ provider: defaultTag, status: 'failed', provider_usage: null, cost_usd: null })
-    expect((await profileOf(pg, userId)).credits).toBe(2)
+    expect((await profileOf(pg, userId)).free_credits).toBe(2)
     expect(openai).toHaveBeenCalledTimes(1)
     expect(fetch).not.toHaveBeenCalled()
   })

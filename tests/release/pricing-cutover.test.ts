@@ -30,6 +30,15 @@ beforeAll(async () => {
     insert into public.template_prompts(template_id,body) select t.id,'fixture'
       from public.templates t join admin.template_tariffs_v2 c on c.id=t.id
       on conflict(template_id) do update set provider_id=null;`)
+  // 作品编辑 runs on Seedream (Owner 2026-11-23): its tariff (2K 15) no longer waives the GPT floor
+  // (1997), so on the GPT line activation would rightly refuse it. Bind it to a cheap Seedream line.
+  await release.query(`with ark as (
+      insert into public.ai_providers(label,model,adapter,is_active,resolutions,capabilities,estimated_image_costs)
+      values('cutover seedream','doubao-seedream-test','ark_images',false,'{1k,2k,4k}',
+        '{"resolutions":["1k","2k","4k"],"aspectRatios":["1:1","4:5"],"originalRatio":true,"minReferences":0,"maxReferences":10,"fetchedAt":"2026-11-01T00:00:00Z"}',
+        '{"1k":0.01,"2k":0.01,"4k":0.02}')
+      returning id)
+    update public.template_prompts set provider_id=(select id from ark) where template_id='edit'`)
   buyer = await createUser(release)
 }, 30000)
 

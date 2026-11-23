@@ -36,7 +36,7 @@ let foreign: string
 async function reserve(userId: string) {
   const jobId = randomUUID()
   await reserveJob(rest, { jobId, userId, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
-    inputs: { resolution: '1k', attempt_id: randomUUID() } })
+    inputs: { resolution: '2k', attempt_id: randomUUID() } })
   return jobId
 }
 
@@ -50,7 +50,8 @@ beforeAll(async () => {
   db = await connectAdmin()
   const actor = await adminAccount(db, service)
   template = await seedTemplate(db)
-  cost = (await db.query(`select (credits_cost->>'1k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
+  // 2K: the org paid share pays it (1K is the promotion share's, 1996).
+  cost = (await db.query(`select (credits_cost->>'2k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
   const org = await orgWith(db, service, actor, { pool: cost * 10 })
   orgId = org.orgId
   owner = org.owner

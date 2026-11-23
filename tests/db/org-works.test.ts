@@ -31,7 +31,8 @@ beforeAll(async () => {
   db = await connectAdmin()
   actor = await adminAccount(db, service)
   template = await seedTemplate(db)
-  cost = (await db.query(`select (credits_cost->>'1k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
+  // 2K: the org paid share (and a person's own paid credits) pay it; 1K is free credits only (1996).
+  cost = (await db.query(`select (credits_cost->>'2k')::int as cost from public.templates where id = $1`, [template])).rows[0].cost
 }, 60_000)
 
 afterAll(async () => {
@@ -42,7 +43,7 @@ async function made(userId: string, extra: { visibility?: 'public' | 'private'; 
   const jobId = randomUUID()
   await reserveJob(rest, {
     jobId, userId, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
-    inputs: { resolution: '1k', attempt_id: randomUUID(), ...(extra.againOf ? { again_of: extra.againOf } : {}) },
+    inputs: { resolution: '2k', attempt_id: randomUUID(), ...(extra.againOf ? { again_of: extra.againOf } : {}) },
     ...(extra.visibility ? { visibility: extra.visibility } : {}),
   })
   await db.query("select public.confirm_job($1, $2)", [jobId, `outputs/${userId}/${jobId}.png`])
@@ -172,7 +173,7 @@ describe('leaving the org', () => {
     expect((await job(await made(staff, { againOf: orgWork }))).again_of).toBeNull()
     // A replay of the same job (web job id, partner key) does not hand the old work back either.
     await expect(reserveJob(rest, { jobId: orgWork, userId: staff, module: 'image', templateId: template, expectedCredits: cost, source: 'web',
-      inputs: { resolution: '1k', attempt_id: randomUUID() } })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+      inputs: { resolution: '2k', attempt_id: randomUUID() } })).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 
   it('hides them from the member’s own session reads (RLS)', async () => {

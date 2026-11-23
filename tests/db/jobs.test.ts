@@ -28,6 +28,7 @@ const job = (userId: string, overrides: Partial<ReserveJobInput> = {}): ReserveJ
   module: 'image',
   templateId,
   source: 'web',
+  // 1K: free credits pay it (1996), so the web users below hold free credits.
   inputs: { aspect_ratio: '1:1', resolution: '1k' },
   provider: 'openai',
   ...overrides,
@@ -36,7 +37,7 @@ const job = (userId: string, overrides: Partial<ReserveJobInput> = {}): ReserveJ
 // Pool selection, refunds per pool and the visibility toggle: credit-pools.test.ts.
 describe('reserve_credits', () => {
   it('lets only as many of 10 concurrent reserves through as the balance allows', async () => {
-    const userId = await createUser(db, { credits: 3 })
+    const userId = await createUser(db, { freeCredits: 3 })
     const results = await Promise.allSettled(Array.from({ length: 10 }, () => reserveJob(service, job(userId))))
 
     const ok = results.filter((r) => r.status === 'fulfilled')
@@ -44,16 +45,16 @@ describe('reserve_credits', () => {
     expect(ok).toHaveLength(3)
     expect(failed).toHaveLength(7)
     for (const failure of failed) expect(failure.reason).toMatchObject({ code: 'CREDITS_INSUFFICIENT' })
-    expect((await profileOf(db, userId)).credits).toBe(0)
+    expect((await profileOf(db, userId)).free_credits).toBe(0)
     expect(await ledgerOf(db, userId)).toHaveLength(3)
   })
 
   it('charges a replayed job id once', async () => {
-    const userId = await createUser(db, { credits: 5 })
+    const userId = await createUser(db, { freeCredits: 5 })
     const input = job(userId)
     const results = await Promise.all(Array.from({ length: 5 }, () => reserveJob(service, input)))
     expect(new Set(results.map((r) => r.id))).toEqual(new Set([input.jobId]))
-    expect((await profileOf(db, userId)).credits).toBe(4)
+    expect((await profileOf(db, userId)).free_credits).toBe(4)
   })
 
   it('returns the first job for a repeated partner idempotency key', async () => {
@@ -84,7 +85,7 @@ describe('reserve_credits', () => {
 
 describe('confirm_job and refund_job', () => {
   it('confirms once and keeps the charge', async () => {
-    const userId = await createUser(db, { credits: 2 })
+    const userId = await createUser(db, { freeCredits: 2 })
     const { id } = await reserveJob(service, job(userId))
     const confirmed = await Promise.all([
       confirmJob(service, { jobId: id, outputKey: `outputs/${id}.png` }),
@@ -92,7 +93,7 @@ describe('confirm_job and refund_job', () => {
     ])
     expect(confirmed.map((j) => j.status)).toEqual(['succeeded', 'succeeded'])
     expect(confirmed[0]?.finishedAt).toBeInstanceOf(Date)
-    expect((await profileOf(db, userId)).credits).toBe(1)
+    expect((await profileOf(db, userId)).free_credits).toBe(1)
   })
 
   it('refunds once even when called repeatedly and concurrently', async () => {
@@ -107,7 +108,7 @@ describe('confirm_job and refund_job', () => {
   })
 
   it('settles a job only one way', async () => {
-    const userId = await createUser(db, { credits: 2 })
+    const userId = await createUser(db, { freeCredits: 2 })
     const succeeded = await reserveJob(service, job(userId))
     const failed = await reserveJob(service, job(userId))
     await confirmJob(service, { jobId: succeeded.id, outputKey: 'outputs/a.png' })
@@ -119,7 +120,7 @@ describe('confirm_job and refund_job', () => {
     await expect(confirmJob(service, { jobId: failed.id, outputKey: 'outputs/b.png' })).rejects.toMatchObject({
       code: 'CONFLICT',
     })
-    expect((await profileOf(db, userId)).credits).toBe(1)
+    expect((await profileOf(db, userId)).free_credits).toBe(1)
   })
 
   it('reports unknown jobs as NOT_FOUND', async () => {
@@ -132,7 +133,7 @@ describe('confirm_job and refund_job', () => {
   })
 
   it('cascades jobs and ledger rows when the account is deleted', async () => {
-    const userId = await createUser(db, { credits: 1 })
+    const userId = await createUser(db, { freeCredits: 1 })
     const { id } = await reserveJob(service, job(userId))
     await db.query('delete from auth.users where id = $1', [userId])
     const { rows } = await db.query('select 1 from public.generation_jobs where id = $1', [id])
@@ -145,8 +146,8 @@ describe('confirm_job and refund_job', () => {
 // flight, not finished ones, not a 'running' row its function outlived, not someone else's.
 describe('listRunningJobIds', () => {
   it('lists the fresh running jobs of one user', async () => {
-    const userId = await createUser(db, { credits: 10 })
-    const otherId = await createUser(db, { credits: 10 })
+    const userId = await createUser(db, { freeCredits: 10 })
+    const otherId = await createUser(db, { freeCredits: 10 })
     const fresh = await reserveJob(service, job(userId))
     const stale = await reserveJob(service, job(userId))
     const done = await reserveJob(service, job(userId))

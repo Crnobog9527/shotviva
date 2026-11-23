@@ -79,8 +79,9 @@ function food(reading: DishReading | Error): FoodDeps {
 }
 
 // switchOn: the site-wide food_toggles_enabled (1848); these flows only run while it is on.
+// A 1K job, which free credits pay (1996).
 async function generate(toggles: { plating: boolean; tableware: boolean }, reading: DishReading | Error = READING, switchOn: boolean | 'absent' = true) {
-  const userId = await createUser(db, { credits: 3 })
+  const userId = await createUser(db, { freeCredits: 3 })
   const inputKey = newInputKey(userId, 'image/jpeg')
   const photo = await jpeg(1200, 1600)
   r2.upload(inputKey, photo, 'image/jpeg')

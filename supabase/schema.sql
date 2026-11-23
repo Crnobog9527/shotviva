@@ -2726,7 +2726,7 @@ CREATE OR REPLACE FUNCTION "admin"."template_approved_price"("p_provider" "uuid"
   join admin.template_tariffs_v2 c on c.id=s.template_id
   join public.ai_providers sp on sp.id=s.provider_id
   join public.ai_providers p on p.id=p_provider
-  where b.reverted_at is null and admin.is_template_catalog_v2() and s.template_id=p_template
+  where b.reverted_at is null and admin.is_template_catalog_v2() and s.template_id=p_template and s.template_id<>'edit'
     and sp.module='image' and sp.adapter='openai_images' and sp.model='gpt-image-2.6-sunburst'
     and md5(sp.base_url) is not distinct from s.provider_endpoint_hash
     and (sp.capabilities->'resolutions') ?& array['1k','2k','4k']
@@ -2748,7 +2748,7 @@ CREATE OR REPLACE FUNCTION "admin"."template_approved_prices"("p_provider" "uuid
   join admin.template_tariffs_v2 c on c.id=s.template_id
   join public.ai_providers sp on sp.id=s.provider_id
   join public.ai_providers p on p.id=p_provider
-  where b.reverted_at is null and admin.is_template_catalog_v2()
+  where b.reverted_at is null and admin.is_template_catalog_v2() and s.template_id<>'edit'
     and sp.module='image' and sp.adapter='openai_images' and sp.model='gpt-image-2.6-sunburst'
     and md5(sp.base_url) is not distinct from s.provider_endpoint_hash
     and (sp.capabilities->'resolutions') ?& array['1k','2k','4k']
@@ -6020,6 +6020,42 @@ $$;
 
 
 ALTER FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text", "p_resolution" "text") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_pool text := case when p_resolution = '1k' then 'free' else 'paid' end;
+  v_member boolean := false;
+  v_paid integer;
+  v_promo integer;
+begin
+  if p_source <> 'web' then
+    return public._reserve_pool(p_profile, p_cost, p_source, p_choice);
+  end if;
+  if p_choice is not null and p_choice not in ('paid', 'promo') then
+    raise exception 'INVALID_INPUT' using detail = 'pool_choice must be paid or promo';
+  end if;
+  -- Same org shares as _reserve_pool (1897): the paid share, and the promotion share while the
+  -- org's promotion month is live.
+  select true, least(m.held_credits, p_profile.credits),
+         case when o.promo_expires_at > now() then least(m.held_promo_credits, p_profile.free_credits) else 0 end
+    into v_member, v_paid, v_promo
+    from public.org_members m join public.orgs o on o.id = m.org_id
+   where m.user_id = p_profile.id and m.status = 'active';
+  if not coalesce(v_member, false) then
+    if (case when v_pool = 'paid' then p_profile.credits else p_profile.free_credits end) >= p_cost then return v_pool; end if;
+    raise exception 'CREDITS_INSUFFICIENT';
+  end if;
+  if (case when v_pool = 'paid' then v_paid else v_promo end) >= p_cost then return v_pool; end if;
+  raise exception 'ORG_CREDITS_INSUFFICIENT';
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text", "p_resolution" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) RETURNS boolean
@@ -18750,8 +18786,11 @@ begin
       coalesce(p_inputs->>'fallback_route'='true',false),v_v2) then
     raise exception 'TEMPLATE_UNAVAILABLE';
   end if;
-  -- Paid first, then free, unless a member holding both kinds of org credits chose one (1897).
-  v_pool := public._reserve_pool(v_profile, v_cost, p_source, p_inputs->>'pool_choice');
+  -- The tier decides the pool (1996): 1K from free credits only, 2K/4K from paid credits only.
+  -- An edit keeps the 1897 rule (paid first, then free; org members from org shares only).
+  v_pool := case when p_template_id = 'edit'
+    then public._reserve_pool(v_profile, v_cost, p_source, p_inputs->>'pool_choice')
+    else public._reserve_pool_for_tier(v_profile, v_cost, p_source, p_inputs->>'pool_choice', v_resolution) end;
 
   perform public._apply_credit_change(
     p_user_id, v_pool, 'reserve', -v_cost, 'generation reserve',
@@ -21045,7 +21084,7 @@ CREATE OR REPLACE VIEW "admin"."template_tariffs_v2" AS
  SELECT "id",
     'medium'::"text" AS "quality",
         CASE
-            WHEN ("id" = 'edit'::"text") THEN '{"1k": 15, "2k": 20, "4k": 58}'::"jsonb"
+            WHEN ("id" = 'edit'::"text") THEN '{"1k": 15, "2k": 15, "4k": 58}'::"jsonb"
             WHEN ("id" = 'white-background'::"text") THEN '{"1k": 18, "2k": 37, "4k": 55}'::"jsonb"
             WHEN ("id" = ANY (ARRAY['promo-poster'::"text", 'pet-studio'::"text", 'freeform'::"text"])) THEN '{"1k": 45, "2k": 120, "4k": 190}'::"jsonb"
             ELSE '{"1k": 74, "2k": 150, "4k": 225}'::"jsonb"
@@ -27580,6 +27619,10 @@ GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
 
 
 REVOKE ALL ON FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text", "p_resolution" "text") FROM PUBLIC;
 
 
 

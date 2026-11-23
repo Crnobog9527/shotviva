@@ -26,8 +26,10 @@ export type HomeCta =
 
 type Input = {
   viewer: HomeViewer | null
-  // Credits for one Standard photo of the chosen template; null when no template is live.
+  // Credits for one photo of the chosen template at `tier` (it decides the pool, 1996); null when
+  // no template is live.
   cost: number | null
+  tier: string
   photo: HomePhotoStatus
   photoOptional?: boolean
   running: number
@@ -35,7 +37,7 @@ type Input = {
   needsCopy: boolean
 }
 
-export function homeCta({ viewer, cost, photo: status, photoOptional, running, needsCopy }: Input): HomeCta {
+export function homeCta({ viewer, cost, tier, photo: status, photoOptional, running, needsCopy }: Input): HomeCta {
   const photo = status === 'none' && photoOptional ? 'ready' : status
   if (cost === null) return { kind: 'no-template' }
   if (!viewer) return photo === 'none' || photo === 'error' ? { kind: 'pick-photo', cost } : { kind: 'sign-up', cost }
@@ -43,6 +45,7 @@ export function homeCta({ viewer, cost, photo: status, photoOptional, running, n
   const state = ctaState({
     balance: viewer.balance,
     cost,
+    tier,
     running,
     limit: viewer.concurrency.limit,
     photo: photo === 'error' ? 'none' : photo,

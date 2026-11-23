@@ -224,7 +224,8 @@ describe('provider keys in Supabase Vault', () => {
 
 describe('generation through the active provider', () => {
   async function generate(provider: GenerationProvider, templateId: string) {
-    const userId = await createUser(pg, { credits: 3 })
+    // A 1K job, which free credits pay (1996).
+    const userId = await createUser(pg, { freeCredits: 3 })
     const r2 = createMemoryStore()
     const inputKey = newInputKey(userId, 'image/jpeg')
     r2.upload(inputKey, await jpeg(1024, 1024), 'image/jpeg')
