@@ -7,6 +7,7 @@ import { Button } from '@/core/ui/button'
 
 import type { CreateContext } from '../workspace/create-dialog'
 import type { CataloguePayload } from './catalogue-payload'
+import { DeferCoversUntilNear } from './near-viewport'
 import { TemplateCatalogue } from './template-catalogue'
 import { useDeviceCatalogue } from './use-device-catalogue'
 import { useSettled } from './use-settled'
@@ -26,7 +27,15 @@ export function DeviceCatalogue({ create, entitled, endCard }: Props) {
   const locale = useLocale()
   const device = useDeviceCatalogue(locale)
   const payload = useSettled(entitled) ?? device.payload
-  if (payload) return <TemplateCatalogue payload={payload} create={create} endCard={endCard} />
+  // Covers off the first screen wait until their card nears it (near-viewport.tsx), so they do not
+  // take the link from the account's own data.
+  if (payload) {
+    return (
+      <DeferCoversUntilNear>
+        <TemplateCatalogue payload={payload} create={create} endCard={endCard} />
+      </DeferCoversUntilNear>
+    )
+  }
   if (device.failed) return <CatalogueFailed onRetry={device.retry} />
   return <CatalogueSkeleton />
 }

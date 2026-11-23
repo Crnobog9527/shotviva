@@ -9,6 +9,7 @@ import { coverAvif, coverImage } from '@/core/ui/cover-image'
 import { Picture } from '@/core/ui/picture'
 
 import { LoopPlate } from './card-media'
+import { useCardCovers } from './near-viewport'
 import { hasStills, isMotion, pairedMember } from './catalogue-template'
 import type { CatalogueSeries } from './catalogue-view'
 import { COVER_SIZES } from './cover-sizes'
@@ -61,9 +62,28 @@ function PrintEdge({ className }: { className: string }) {
   return <span aria-hidden="true" className={cn('absolute inset-0 rounded-control shadow-[inset_0_0_0_1px_var(--input)]', className)} />
 }
 
+// The whole artwork, never cropped to the 8:5 frame (Owner 2026-11-13: 画风迁移 lost heads and
+// hands): it is contained, and the same picture, blurred and dimmed, fills the bands a cover of
+// another shape leaves. One download: both use the same srcset. Inside Create's grid it waits until
+// the card nears the screen (near-viewport.tsx).
+function SeriesArtwork({ src, alt, eager }: { src: string; alt: string; eager: boolean }) {
+  const { ref, show, img } = useCardCovers<HTMLSpanElement>(eager)
+  const cover = coverImage(src, COVER_SIZES.cardFrame)
+  const avif = coverAvif(src, COVER_SIZES.cardFrame)
+  return (
+    <span ref={ref} className="hairline relative isolate block aspect-[8/5] overflow-hidden rounded-control bg-muted">
+      {show ? (
+        <>
+          <Picture avif={avif}><img {...cover} alt="" aria-hidden="true" {...img} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" /></Picture>
+          <Picture avif={avif}><img {...cover} alt={alt} {...img} decoding="async" className="absolute inset-0 size-full object-contain" /></Picture>
+        </>
+      ) : null}
+    </span>
+  )
+}
+
 function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boolean }) {
   const alt = useTranslations('app.series')('coverAlt', { name: series.name })
-  const loading = eager ? 'eager' : 'lazy'
   if (series.cover) {
     // The artwork is one member's after cover: show it as that member's Phone / AI split, so the
     // card tells the difference at a glance, like a series without artwork (Owner 2026-11-16).
@@ -72,14 +92,7 @@ function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boole
     // The whole artwork, never cropped to the 8:5 frame (Owner 2026-11-13: 画风迁移 lost heads and
     // hands): it is contained, and the same picture, blurred and dimmed, fills the bands a cover
     // of another shape leaves. One download: both use the same srcset.
-    const cover = coverImage(series.cover, COVER_SIZES.cardFrame)
-    const avif = coverAvif(series.cover, COVER_SIZES.cardFrame)
-    return (
-      <span className="hairline relative isolate block aspect-[8/5] overflow-hidden rounded-control bg-muted">
-        <Picture avif={avif}><img {...cover} alt="" aria-hidden="true" loading={loading} decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" /></Picture>
-        <Picture avif={avif}><img {...cover} alt={alt} loading={loading} decoding="async" className="absolute inset-0 size-full object-contain" /></Picture>
-      </span>
-    )
+    return <SeriesArtwork src={series.cover} alt={alt} eager={eager === true} />
   }
   const split = series.members.find(hasStills)
   if (split) return <PairMedia before={split.cover.before as string} after={split.cover.after as string} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} />
