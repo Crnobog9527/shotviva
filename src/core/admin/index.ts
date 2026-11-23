@@ -108,6 +108,7 @@ export {
   unbanUser,
   batchAdjustCredits,
   batchSetBanned,
+  setUserLabel,
   hasListFilters,
   listUsers,
   loadUserDetail,
@@ -122,6 +123,7 @@ export {
   type UserFilters,
   type UserJob,
   type UserListPage,
+  type UserIdentity,
   type UserListRow,
 } from './users'
 export {

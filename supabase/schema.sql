@@ -12692,6 +12692,33 @@ $_$;
 ALTER FUNCTION "public"."admin_set_test_run_cover"("p_actor" "uuid", "p_run_id" "uuid", "p_before_url" "text", "p_after_url" "text", "p_locale" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_user_label"("p_actor" "uuid", "p_user" "uuid", "p_label" "text") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_label text:=nullif(btrim(p_label),'');
+begin
+  perform public._affiliate_require_admin(p_actor);
+  if p_user is null or char_length(v_label)>60 then raise exception 'INVALID_INPUT'; end if;
+  if not exists(select from auth.users where id=p_user) then raise exception 'USER_NOT_FOUND'; end if;
+  update public.affiliates set admin_label=v_label where user_id=p_user;
+  if found then
+    perform public._affiliate_audit(p_actor,'set',p_user::text,'annotate');
+    delete from public.admin_user_labels where user_id=p_user;
+  elsif v_label is null then
+    delete from public.admin_user_labels where user_id=p_user;
+  else
+    insert into public.admin_user_labels(user_id,label,updated_by) values (p_user,v_label,p_actor)
+    on conflict (user_id) do update set label=excluded.label, updated_at=now(), updated_by=excluded.updated_by;
+  end if;
+  return v_label;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_set_user_label"("p_actor" "uuid", "p_user" "uuid", "p_label" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) RETURNS TABLE("signup_ip" "inet", "accounts" integer, "last_signup_at" timestamp with time zone, "members" "jsonb")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -21203,6 +21230,18 @@ CREATE TABLE IF NOT EXISTS "public"."admin_test_spend" (
 ALTER TABLE "public"."admin_test_spend" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."admin_user_labels" (
+    "user_id" "uuid" NOT NULL,
+    "label" "text" NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_by" "uuid" NOT NULL,
+    CONSTRAINT "admin_user_labels_label_check" CHECK ((("char_length"("label") >= 1) AND ("char_length"("label") <= 60)))
+);
+
+
+ALTER TABLE "public"."admin_user_labels" OWNER TO "postgres";
+
+
 ALTER TABLE "public"."affiliate_adjustments" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "public"."affiliate_adjustments_id_seq"
     START WITH 1
@@ -23041,6 +23080,11 @@ ALTER TABLE ONLY "public"."admin_test_runs"
 
 ALTER TABLE ONLY "public"."admin_test_spend"
     ADD CONSTRAINT "admin_test_spend_pkey" PRIMARY KEY ("run_id");
+
+
+
+ALTER TABLE ONLY "public"."admin_user_labels"
+    ADD CONSTRAINT "admin_user_labels_pkey" PRIMARY KEY ("user_id");
 
 
 
@@ -25076,6 +25120,11 @@ ALTER TABLE ONLY "public"."admin_test_runs"
 
 
 
+ALTER TABLE ONLY "public"."admin_user_labels"
+    ADD CONSTRAINT "admin_user_labels_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."affiliate_adjustments"
     ADD CONSTRAINT "affiliate_adjustments_affiliate_user_id_fkey" FOREIGN KEY ("affiliate_user_id") REFERENCES "public"."affiliates"("user_id") ON DELETE CASCADE;
 
@@ -26069,6 +26118,9 @@ ALTER TABLE "public"."admin_test_runs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."admin_test_spend" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."admin_user_labels" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."affiliate_adjustments" ENABLE ROW LEVEL SECURITY;
@@ -28365,6 +28417,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_test_run_cover"("p_actor" "uuid", "p_r
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_set_user_label"("p_actor" "uuid", "p_user" "uuid", "p_label" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_user_label"("p_actor" "uuid", "p_user" "uuid", "p_label" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_signup_ip_clusters"("p_days" integer) TO "service_role";
 
@@ -29653,6 +29710,10 @@ GRANT ALL ON TABLE "public"."admin_test_runs" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."admin_test_spend" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."admin_user_labels" TO "service_role";
 
 
 
