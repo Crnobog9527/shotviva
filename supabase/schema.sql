@@ -12354,7 +12354,8 @@ begin
       and (p_key not in ('code_gift_policy','code_inviter_window_days','gallery_enabled','gallery_auto_approve',
                          'signup_gift_daily_cap','signup_gift_paused','signup_gift_per_ip',
                          'signup_gift_claim_phone','signup_gift_claim_google','poster_photo_credits',
-                         'catalog_economics_policy','food_toggles_enabled','service_worker_enabled')
+                         'catalog_economics_policy','food_toggles_enabled','service_worker_enabled',
+                         'service_worker_shell_enabled')
            or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
@@ -12362,7 +12363,7 @@ begin
   case p_key
     when 'wishlist_enabled', 'gallery_enabled', 'gallery_auto_approve', 'signup_gift_paused',
          'signup_gift_claim_phone', 'signup_gift_claim_google', 'food_toggles_enabled',
-         'service_worker_enabled' then
+         'service_worker_enabled', 'service_worker_shell_enabled' then
       if p_value is null or jsonb_typeof(p_value) <> 'boolean' then
         raise exception 'INVALID_INPUT' using detail = p_key || ' must be a boolean';
       end if;
