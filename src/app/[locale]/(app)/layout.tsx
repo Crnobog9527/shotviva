@@ -9,6 +9,7 @@ import { Suspense, type ReactNode } from 'react'
 
 import { isStaffAccount } from '@/core/analytics'
 import { AnalyticsIdentify } from '@/core/analytics/browser'
+import { WebVitalsSlot } from '@/core/analytics/vitals'
 import { AnnouncementBanner } from '@/core/announcements'
 import { AdminLink, adminEntryFor, AppFrame, BrandProvider, TabBar, TabBarSlot, type TabItem } from '@/core/app-shell'
 import { getSessionUser } from '@/core/auth'
@@ -156,6 +157,8 @@ export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
             </main>
             <GenerationRunner />
             <WishlistHintSlot />
+            {/* Anonymous speed numbers (Owner 2026-11-24: numbers only); app tab roots only, never /admin. */}
+            <WebVitalsSlot />
           </BrandProvider>
           {/* DESIGN §5 「全站流动背景」 (T54); it renders nothing on /admin. */}
           <LivingBackground />
