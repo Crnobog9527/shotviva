@@ -4,7 +4,7 @@ import { refresh } from 'next/cache'
 
 import { updateCatalogueTag } from '@/core/templates/catalogue-invalidation'
 import { runAdminAction } from '@/core/admin'
-import { setLocaleCategoryOrder, setLocaleFeatured } from '@/core/admin/locale-display'
+import { saveLocaleDisplay } from '@/core/admin/locale-display'
 import { moveTemplateCategory } from '@/core/admin/template-categories'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { TEMPLATES_CACHE_TAG } from '@/core/templates'
@@ -21,22 +21,13 @@ export async function moveTemplateCategoryAction(input: unknown) {
   })
 }
 
-// Per-language display rules (migration 1575): the home page, its featured list and Create's
-// category bar read these on the next load of each language.
-export async function setLocaleCategoryOrderAction(input: unknown) {
+// Per-language display rules (migrations 1575, 2003): the admin arranges one language's draft and
+// saves it once; the home page, its featured list and rail, and Create's category bar read it on
+// the next load of that language.
+export async function saveLocaleDisplayAction(input: unknown) {
   const admin = await requireAdmin()
   return runAdminAction(async () => {
-    await setLocaleCategoryOrder(createAdminSupabase(), admin.id, input)
-    await updateCatalogueTag(TEMPLATES_CACHE_TAG)
-    warmPublicPagesSoon()
-    refresh()
-  })
-}
-
-export async function setLocaleFeaturedAction(input: unknown) {
-  const admin = await requireAdmin()
-  return runAdminAction(async () => {
-    await setLocaleFeatured(createAdminSupabase(), admin.id, input)
+    await saveLocaleDisplay(createAdminSupabase(), admin.id, input)
     await updateCatalogueTag(TEMPLATES_CACHE_TAG)
     warmPublicPagesSoon()
     refresh()

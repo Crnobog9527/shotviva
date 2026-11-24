@@ -15,7 +15,9 @@ import { thumbImage } from './thumb-image'
 import type { HomeGeneratorState } from './use-home-generator'
 
 function useFormats(): string {
-  return useTranslations('app.workspace')('formats', { formats: useFormatter().list(UPLOAD_FORMAT_NAMES, { type: 'disjunction' }), mb: UPLOAD_MAX_MB })
+  // Chinese lists join with 「或」 and no space (「PNG或WebP」); a space goes between Chinese and Latin.
+  const formats = useFormatter().list(UPLOAD_FORMAT_NAMES, { type: 'disjunction' }).replace(/([A-Za-z0-9])或([A-Za-z0-9])/g, '$1 或 $2')
+  return useTranslations('app.workspace')('formats', { formats, mb: UPLOAD_MAX_MB })
 }
 
 // The first step, the obvious one: a card that asks for the phone photo, then shows it. While

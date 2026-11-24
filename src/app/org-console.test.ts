@@ -175,7 +175,7 @@ describe.each(['en', 'zh'] as const)('org member action bar (%s)', (locale) => {
     const state = { kind: 'get-credits' as const, cost: 20, needed: 10, count: 1 }
     const member = render(locale, createElement(FormAction, { state, resolution: '2k', batch: false, onGenerate: () => {}, orgOnly: true }))
     expect(member.errors).toEqual([])
-    expect(member.text).toContain(locale === 'en' ? 'Ask your admin to allocate more' : '请找管理员分配额度')
+    expect(member.text).toContain(locale === 'en' ? 'Ask your admin to allocate more' : '请联系管理员分配额度')
     expect(member.html).toContain('disabled')
   })
 

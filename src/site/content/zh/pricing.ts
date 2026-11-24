@@ -22,11 +22,11 @@ const creditBuys: CreditBuysBlock = {
 const business: BusinessBlock = {
   heading: '企业合作',
   tag: '按需定制',
-  who: '适合品牌、电商卖家、餐饮连锁和代运营公司这类需要大批量出图的团队。告诉我们你需要什么，我们来为你安排：',
+  who: '适合品牌、电商卖家、餐饮连锁和代运营公司这类需要大批量出图的团队。告诉我们你的需求，我们为你量身安排：',
   items: [
     { title: '批量价格和发票付款', detail: '按每月出图量给更低的单张价，可签年度合同、按发票付款。' },
     { title: '专属模板', detail: '按你的品牌规范、产品线和平台规格定制，整个商品目录风格统一。' },
-    { title: '更大的并发和批量', detail: '一次处理整个商品目录，不用一张一张来。' },
+    { title: '更大的并发和批量', detail: '一次处理整个商品目录，无需逐张操作。' },
     { title: 'API 接入', detail: `把 ${brand} 接进你的商品系统或店铺，自动出图。` },
     { title: '隐私和数据条款', detail: '作品保持私密，需要时可以签数据处理协议。' },
     { title: '专人对接', detail: '一位专人负责上手培训和优先支持。' },
@@ -52,8 +52,8 @@ function faqs(products: readonly SiteProduct[]) {
     },
     {
       question: '不订阅能单买积分吗？',
-      answer: site.billing.pricingVersion ? `积分包是一次性付款，所有人都能买，得到的付费积分和套餐里的一样。积分包按标价折算，每 100 积分约 ${perHundredCredits('pack_s', products)}。小包按原价购买。${zhMemberPacksSentence(products)}会员折扣只影响价格，各积分包的积分数量固定。`
-        : '积分包是一次性付款，所有人都能买，得到的付费积分和套餐里的一样。',
+      answer: site.billing.pricingVersion ? `不订阅也可以单买积分包：一次性付款，所有人都能购买，得到的付费积分和套餐里的一样。按标价计算，每 100 积分约 ${perHundredCredits('pack_s', products)}，小包按原价购买。${zhMemberPacksSentence(products)}会员折扣只影响价格，各积分包的积分数量固定。`
+        : '不订阅也可以单买积分包：一次性付款，所有人都能购买，得到的付费积分和套餐里的一样。',
     },
     {
       question: ALIPAY_QUESTION,

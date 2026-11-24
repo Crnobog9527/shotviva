@@ -10,13 +10,15 @@ const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)'
 
 // Runs `then` once the page has loaded and the main thread is idle, so the later scenes never
 // compete with the hero's first paint (Lighthouse mobile ≥ 0.85, slow links to mainland China).
+// The wait is short (Owner 2026-11-25: a dot click lagged): the first pair is long painted by
+// `load`, and the sooner the later pairs are fetched, the likelier a click finds them ready.
 function afterLoadAndIdle(then: () => void): () => void {
   let idle = 0
   let timer = 0
   const schedule = () => {
     // Safari has no requestIdleCallback.
-    if (typeof window.requestIdleCallback === 'function') idle = window.requestIdleCallback(then, { timeout: 3000 })
-    else timer = window.setTimeout(then, 1500)
+    if (typeof window.requestIdleCallback === 'function') idle = window.requestIdleCallback(then, { timeout: 800 })
+    else timer = window.setTimeout(then, 300)
   }
   if (document.readyState === 'complete') schedule()
   else window.addEventListener('load', schedule, { once: true })
@@ -27,40 +29,53 @@ function afterLoadAndIdle(then: () => void): () => void {
   }
 }
 
-// The hero's rotating AI scenes. Only the first scene is in the server HTML; the others are
-// rendered (`armed`) after load + idle, or at once when someone picks one. The timer only moves
-// to a scene whose image has loaded, so a slow link never fades to an empty plate. Hover or
-// focus inside the hero holds it; a manual pick stops it for good (WCAG 2.2.2), and under
-// prefers-reduced-motion it never starts.
-export function useSceneRotation(count: number) {
+// The hero's rotating scenes. Only the first scene is in the server HTML; the others are
+// rendered (`armed`, so fetched and decoded) right after load + idle, also under
+// prefers-reduced-motion, where the timer never starts. The timer only moves to a scene whose
+// `parts` images (1, or 2 when the phone photo turns too) are loaded and decoded, so a slow link
+// never fades to an empty plate. A pick switches at once: if that scene is not ready yet,
+// `waiting` hides every other picture (hero-scenes.tsx, marketing.css .mk-wait) so its two
+// plates fill in together and never sit next to another scene's. Hover or focus inside the
+// hero holds the timer; a manual pick stops it for good (WCAG 2.2.2).
+export function useSceneRotation(count: number, parts = 1) {
   const [{ active, previous }, setShown] = useState({ active: 0, previous: -1 })
   const [armed, setArmed] = useState(false)
   const [auto, setAuto] = useState(true)
   const [held, setHeld] = useState(false)
-  const loaded = useRef<boolean[]>([true])
+  const [waiting, setWaiting] = useState(-1)
+  const loaded = useRef<number[]>([parts])
 
-  useEffect(() => (reducedMotion() ? undefined : afterLoadAndIdle(() => setArmed(true))), [])
+  useEffect(() => afterLoadAndIdle(() => setArmed(true)), [])
 
   useEffect(() => {
-    if (!auto || held || !armed) return
+    if (!auto || held || !armed || reducedMotion()) return
     const id = window.setInterval(() => {
       if (document.hidden) return
       setShown((shown) => {
         const next = (shown.active + 1) % count
-        return loaded.current[next] ? { active: next, previous: shown.active } : shown
+        return (loaded.current[next] ?? 0) >= parts ? { active: next, previous: shown.active } : shown
       })
     }, SCENE_MS)
     return () => window.clearInterval(id)
-  }, [auto, held, armed, count])
+  }, [auto, held, armed, count, parts])
 
-  const pick = useCallback((index: number) => {
-    setAuto(false)
-    setArmed(true)
-    setShown((shown) => (shown.active === index ? shown : { active: index, previous: shown.active }))
-  }, [])
-  const markLoaded = useCallback((index: number) => {
-    loaded.current[index] = true
-  }, [])
+  const pick = useCallback(
+    (index: number) => {
+      setAuto(false)
+      setArmed(true)
+      const now = (loaded.current[index] ?? 0) >= parts
+      setWaiting(now ? -1 : index)
+      setShown((shown) => (shown.active === index ? shown : { active: index, previous: now ? shown.active : -1 }))
+    },
+    [parts],
+  )
+  const markLoaded = useCallback(
+    (index: number) => {
+      loaded.current[index] = (loaded.current[index] ?? 0) + 1
+      if ((loaded.current[index] ?? 0) >= parts) setWaiting((was) => (was === index ? -1 : was))
+    },
+    [parts],
+  )
 
-  return { active, previous, armed, pick, markLoaded, hold: setHeld }
+  return { active, previous, armed, waiting, pick, markLoaded, hold: setHeld }
 }

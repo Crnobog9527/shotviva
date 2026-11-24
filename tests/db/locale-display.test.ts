@@ -1,14 +1,14 @@
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { setLocaleCategoryOrder, setLocaleFeatured } from '@/core/admin/locale-display'
+import { saveLocaleDisplay, setLocaleCategoryOrder, setLocaleFeatured } from '@/core/admin/locale-display'
 import { saveTemplateCategory } from '@/core/admin/template-categories'
 import { readLocaleDisplay } from '@/core/templates/locale-display-read'
 
 import { connectAdmin, createUser, publishFixture } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
-// Migration 1575: each language's own category order and featured list, written only by the
+// Migrations 1575 and 2003: each language's own category order and featured list, written only by the
 // admin functions and read back by the public pages through the service role.
 const api = serviceSupabase()
 let pg: Client
@@ -127,5 +127,55 @@ describe('per-language featured list', () => {
     expect(await featured('en')).toEqual([])
     await setLocaleFeatured(api, admin, { locale: 'zh', ids: [] })
     expect(await featured('zh')).toEqual([])
+  })
+})
+
+// Migration 2003: the 分语言展示 editor saves one language's whole draft in one call.
+describe('saving a language in one go', () => {
+  const ours = async (locale: 'en' | 'zh') => {
+    const display = await readLocaleDisplay(api)
+    return { order: await saved(locale), featured: display.featured[locale] ?? [] }
+  }
+  const save = (input: object, actor = admin) => saveLocaleDisplay(api, actor, { locale: 'en', groups: [], featured: null, ...input })
+
+  it('applies every changed group and the featured list together', async () => {
+    await save({ groups: [{ parent: null, keys: await siblings(null, [third, second, first]) }, { parent: first, keys: [child] }], featured: ['ld-live-a'] })
+    const display = await readLocaleDisplay(api)
+    expect(Object.keys(display.categoryOrder.en ?? {})).toContain(child)
+    expect((await ours('en')).featured).toEqual(['ld-live-a'])
+    const top = (await saved('en')).filter((key) => key !== child)
+    expect(top).toEqual([third, second, first])
+  })
+
+  it('keeps nothing when the featured list is refused', async () => {
+    const before = await ours('en')
+    await expect(save({ groups: [{ parent: null, keys: [] }], featured: ['ld-off'] })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    expect(await ours('en')).toEqual(before)
+  })
+
+  it('keeps nothing when a group no longer matches the tree', async () => {
+    const before = await ours('en')
+    await expect(save({ groups: [{ parent: null, keys: [first, second] }], featured: [] })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    expect(await ours('en')).toEqual(before)
+  })
+
+  it('leaves the featured list alone when it did not change, and clears what is sent empty', async () => {
+    await save({ groups: [{ parent: first, keys: [] }] })
+    expect((await ours('en')).featured).toEqual(['ld-live-a'])
+    expect(Object.keys((await readLocaleDisplay(api)).categoryOrder.en ?? {})).not.toContain(child)
+    await save({ groups: [{ parent: null, keys: [] }], featured: [] })
+    expect(await ours('en')).toEqual({ order: [], featured: [] })
+  })
+
+  it('refuses non-admins, unknown languages and a group sent twice, and stays away from clients', async () => {
+    await expect(save({ featured: ['ld-live-a'] }, user)).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    await expect(saveLocaleDisplay(api, admin, { locale: 'fr', groups: [], featured: null })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(save({ groups: [{ parent: first, keys: [] }, { parent: first, keys: [child] }] })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    const twice = await api.rpc('admin_set_locale_display', {
+      p_locale: 'en', p_groups: [{ parent: null, keys: [] }, { parent: null, keys: [] }], p_featured: null, p_actor: admin })
+    expect(twice.error?.message).toBe('INVALID_INPUT')
+    const rpc = await anonSupabase().rpc('admin_set_locale_display', { p_locale: 'en', p_groups: [], p_featured: ['ld-live-a'], p_actor: admin })
+    expect(rpc.error).not.toBeNull()
+    expect((await ours('en')).featured).toEqual([])
   })
 })

@@ -46,6 +46,18 @@ describe('homePanelTemplates', () => {
     expect(opening?.id).toBe('featured')
   })
 
+  it('follows the featured order (featured_rank), skipping slot templates, and fills from catalogue order', () => {
+    const ranked = (id: string, rank: number, slot = false) => ({ ...template(id, slot), featuredRank: rank })
+    const live = [template('one'), template('two'), ranked('lobby', 0), ranked('slot-featured', 1, true), ranked('dish', 2), template('three')]
+    const { templates, opening } = homePanelTemplates(live, 'lobby')
+    expect(templates.map(({ id }) => id)).toEqual(['lobby', 'dish', 'one', 'two'])
+    expect(opening?.id).toBe('lobby')
+    const many = [template('one'), ranked('d', 3), ranked('a', 0), ranked('c', 2), ranked('b', 1), ranked('e', 4)]
+    expect(homePanelTemplates(many, 'a').templates.map(({ id }) => id)).toEqual(['a', 'b', 'c', 'd'])
+    // A default outside the rail (an experiment's template) still joins it.
+    expect(homePanelTemplates(many, 'one').templates.map(({ id }) => id)).toEqual(['a', 'b', 'c', 'd', 'one'])
+  })
+
   it('falls back to the first usable template when the default is a slot template or is missing', () => {
     for (const defaultId of ['slot', 'missing', null]) {
       const { templates, opening } = homePanelTemplates(catalogue, defaultId)

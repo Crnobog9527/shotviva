@@ -20,6 +20,7 @@ import {
 } from './offer'
 import { steps, tote, useCases } from './home-explainers'
 import { textEdits } from './home-edits'
+import { homeSpaces } from './home-spaces'
 import { homeWishlist } from './home-wishlist'
 import { withFirstFrame } from './landing-shared'
 import { sharedFacts } from './shared'
@@ -141,6 +142,7 @@ const copy = {
   },
   shoot,
   edits: textEdits,
+  spaces: homeSpaces,
   steps,
   templateGrid: {
     heading: 'Img to Img Templates: No Prompts to Write',
@@ -149,7 +151,7 @@ const copy = {
   },
   topics: useCases,
   wishlist: homeWishlist,
-  factsIntro: `Most AI image to image tools hand you a new picture. What you wanted was your picture, only better: the same product, the same dish, the same room, with nicer light and a cleaner scene. That is what ${brand} is built for. The prices and sizes below are the same on every page of this site.`,
+  factsIntro: `Most AI image to image tools hand you a new picture. What you wanted was your picture, only better: the same product, the same dish, the same room, with nicer light and a cleaner scene. That is what ${brand} is built for.`,
   related: [
     {
       href: '/ai-restaurant-menu',
@@ -174,7 +176,7 @@ const copy = {
     {
       href: '/pricing',
       anchor: 'Pricing',
-      note: 'For shops, sellers and hosts comparing monthly plans, yearly plans and one-time credit packs.',
+      note: 'Monthly plans, yearly plans and one-time credit packs, side by side.',
     },
   ],
   headings: {
@@ -247,7 +249,7 @@ export const makeHomePage = (offers: OfferFacts, plans = homePlans(offers.produc
       {
         // SEO PATCH v4.1 (2026-11-11): the free credits are no heading of their own and no photo count.
         heading: 'Try It Before You Pay',
-        text: `New accounts get ${site.billing.freeCredits} credits to test a template, once; they do not refill. Free photos are public, watermarked and for personal, non-commercial use.`,
+        text: `New accounts get ${site.billing.freeCredits} credits to test a template. They are given once and do not refill.`,
       },
       {
         heading: 'Free Photos Are Public and Watermarked, Paid Photos Are Private',

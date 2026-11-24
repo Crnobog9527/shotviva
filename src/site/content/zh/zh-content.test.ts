@@ -109,6 +109,6 @@ describe('/zh home title, description and white-background guide', () => {
 
   it('adds the 「白底图、电商主图怎么做」 H2 with three cards', () => {
     expect(zhHomePage.topics?.heading).toBe('白底图、电商主图怎么做')
-    expect(zhHomePage.topics?.cards.map((card) => card.heading)).toEqual(['选「纯白底图」模板', '商品主体保持原样', '3 档导出尺寸'])
+    expect(zhHomePage.topics?.cards.map((card) => card.heading)).toEqual(['选「纯白底图」模板', '商品本身不变', '3 档导出尺寸'])
   })
 })

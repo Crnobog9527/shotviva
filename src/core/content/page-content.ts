@@ -21,20 +21,24 @@ export type HeroBlock = {
   after: ImageRef
   caption: string
   cta: { label: string; href: string }
-  // Home only: several AI results of the same phone photo that take turns on the AI side, each
-  // with its own caption. `after` and `caption` stay the first scene's, so anything that reads
-  // the plain pair still shows one consistent result. `label` names the scene switcher.
+  // Home only: several AI results that take turns on the AI side, each with its own caption.
+  // `after` and `caption` stay the first scene's, so anything that reads the plain pair still
+  // shows one consistent result. `label` names the scene switcher.
   scenes?: { label: string; items: readonly [HeroScene, HeroScene, ...HeroScene[]] }
 }
 
-export type HeroScene = { image: ImageRef; caption: string }
+// `before`: the scene's own phone photo, when each scene is a different dish (the /zh hero, Owner
+// 2026-11-24); without it every scene is a result of the hero's one phone photo. The first
+// scene's phone photo is always the hero's `before` (the server-rendered, preloaded plate).
+export type HeroScene = { image: ImageRef; caption: string; before?: ImageRef }
 
 // More real before/after pairs of one A/B hero option, in a row right under the first screen
 // (ARCHITECTURE §16.5): small, lazy pictures, never part of the first paint.
 export type HeroStripBlock = { heading: string; items: readonly { before: ImageRef; after: ImageRef; caption: string }[] }
 
 // Block ②: verifiable facts, at least three (建站规格 G4).
-export type Fact = { label: string; value: string }
+// `brief`: one of the few rows a phone shows before the visitor opens the whole table (home facts).
+export type Fact = { label: string; value: string; brief?: boolean }
 
 // Block ④: 3–5 questions in the user's own words (the home page has nine, 建站规格 G6). `link`
 // renders after the answer text (e.g. FAQ D on the home page points to
@@ -237,6 +241,9 @@ export type HomePage = Omit<PageBasics, 'related'> & {
   // "Edit text in an image with one sentence" (Owner 2026-11-11, shotviva-docs#7): before/after
   // pairs in which only the words change; right after the shoot demo.
   edits?: EditCases
+  // Hotels and stays (Owner 2026-11-24): 16:9 phone photo and result pairs of the hotel
+  // templates, right after the dish strip.
+  spaces?: EditCases
   // Intro paragraph above the facts table.
   factsIntro: string
   // H2-4: free credits, free vs paid works, then plans.

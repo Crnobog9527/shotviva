@@ -9,7 +9,7 @@ import { caseImage, CATEGORY, SIZE_COUNT, withFirstFrame } from '../../landing-s
 import { zhPricingRelated } from '../shared'
 import { foodShootUsd, MENU_DISHES, photoSeconds, usd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
-import { planLabel, ZH_TIERS, zhFreeImages, zhPlansSentence, zhTierList } from '../offer'
+import { planLabel, ZH_TIERS, zhFreeImages, zhPlansSentence, zhTierList, zhTierNames } from '../offer'
 
 // /zh/ai-restaurant-menu (T44, ARCHITECTURE §17): noindex (中文口径主词表: 「暂不建」, keyword
 // ai菜单). For restaurant owners who put dishes on delivery apps; the US apps' figures are kept
@@ -22,7 +22,7 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
   const plan = planFrom ? usd(planFrom.priceUsd) : '暂无月付套餐'
   return {
     heading: `菜单配图要花多少钱：请美食摄影师和用 ${brand} 对比`,
-    intro: `${MENU_DISHES} 道菜，做菜单和外卖平台用。同样的活，两张账单。`,
+    intro: `以 ${MENU_DISHES} 道菜的菜单和外卖平台配图为例，对比请美食摄影师和使用 ${brand} 的实际花费。`,
     photographer: {
       title: '美食摄影师报价',
       total: { amount: usdRange(foodShootUsd), when: '拍一次，另加修图' },
@@ -52,7 +52,7 @@ const fishDark = caseImage('menu-fish-dark', '真实案例：同一份酸菜鱼�
 // 一道菜做成三种成图：菜不变，换碗、换场景、换光。
 const shoot: ShootDemo = {
   heading: { lead: '一张菜品手机照 → ', emphasis: '一整套菜单大片' },
-  intro: '鲜椒牛蛙，在后厨出菜口用不锈钢盆随手一拍。做成三张成图，每张都是同一道菜：牛蛙、青红鲜椒、青花椒都没变。',
+  intro: '在后厨出菜口随手拍的一盆鲜椒牛蛙，做出三张成图，牛蛙、青红鲜椒和青花椒都保持原样。',
   phone: {
     image: caseImage('menu-frog-phone', '真实手机照：不锈钢盆装的鲜椒牛蛙放在后厨台面上，日光灯，后面是单据和碗'),
     file: 'IMG_2706.jpg',
@@ -86,8 +86,8 @@ const copy = {
   title: `AI菜单配图：手机拍的菜直接做成外卖图（2026） | ${brand}`,
   description: `AI菜单配图：用你已经拍好的菜品照片，做成菜单、外卖平台和促销图，盘里的菜保持原样。新用户送 ${zhFreeImages}。`,
   h1: 'AI菜单配图：手机拍一张，菜单图就有了',
-  subtitle: '用你真实拍的菜品照片，换碗、换光线、换环境，不会生成你店里没有的菜。',
-  answerBlock: `AI菜单配图从你真实拍的菜品照片出发，菜保持原样，只换碗、光线和环境，不会凭空生成不存在的菜。在 ${brand} 上传一张手机照片，选「外卖菜单」「暗调氛围」或「促销海报」模板，就能下载${zhTierList}的成图。新用户送 ${zhFreeImages}。`,
+  subtitle: '用你自己拍的菜品照片，更换器皿、光线和环境，不会生成店里没有的菜。',
+  answerBlock: `AI菜单配图，一键将你手机里随手拍的菜品图变成专业的美食大片，菜品始终是你实际出餐的那一道，无需担心走样或变形。在 ${brand} 上传一张手机照片，选择「外卖菜单」「暗调氛围」或「促销海报」模板，即可下载 ${zhTierList} 的成图。新用户赠送 ${zhFreeImages}。`,
   hero: {
     before: withFirstFrame(fishPhone),
     after: fishDark,
@@ -97,7 +97,7 @@ const copy = {
   facts: [
     {
       label: `DoorDash：横版 ${doordash.ratio}，至少 ${px(doordash.minW)} × ${px(doordash.minH)} px`,
-      value: `DoorDash 要求横版 ${doordash.ratio}、至少 ${px(doordash.minW)} × ${px(doordash.minH)} px，而且必须是实际出餐的那道菜。横幅 16:9 选${hd?.name ?? ''}是 ${px(hd?.px ?? 0)} × ${px(Math.round(((hd?.px ?? 0) * 9) / 16))} px。`,
+      value: `DoorDash 要求横版 ${doordash.ratio}、至少 ${px(doordash.minW)} × ${px(doordash.minH)} px，而且必须是实际出餐的那道菜。16:9 横版选择${hd?.name ?? ''}时为 ${px(hd?.px ?? 0)} × ${px(Math.round(((hd?.px ?? 0) * 9) / 16))} px。`,
     },
     {
       label: 'Uber Eats 和 Grubhub',
@@ -105,7 +105,7 @@ const copy = {
     },
     {
       label: '菜还是那道菜',
-      value: `外卖平台要的是你实际卖的菜。${brand} 从你自己的手机照片出发，换碗、换光线和背景，不改菜本身。`,
+      value: `外卖平台要的是你实际卖的菜。${brand} 在你拍的原图上修改，只更换器皿、光线和背景，菜品本身不变。`,
     },
   ],
   headings: {
@@ -118,7 +118,7 @@ const copy = {
     shoot,
     templates: {
       heading: '菜单配图模板：外卖平台、菜单和海报',
-      intro: `每个模板都从你的菜品手机照片开始，到一张能上菜单的图结束。`,
+      intro: '上传一张菜品手机照，选中模板，点生成，即可得到能直接上菜单的美食大片。',
       categoryKeys: [CATEGORY.food],
     },
   },
@@ -130,15 +130,15 @@ export const makeZhAiRestaurantMenu = (offers: OfferFacts) => defineContentPage(
   faq: [
     {
       question: '外卖平台的菜单能用 AI 图吗？',
-      answer: `外卖平台要求图片展示你实际出餐的菜。${brand} 从你自己的手机照片出发，菜保持原样，只换碗、光线和背景，所以图里还是你的菜。上传前请查看平台当下的图片规定。`,
+      answer: `外卖平台的菜单可以用 AI 图，前提是图里是你实际出餐的菜。${brand} 在你自己拍的照片上修改，菜品保持不变，只更换器皿、光线和背景，所以图里始终是你的菜。上传前请确认平台最新的图片规定。`,
     },
     {
       question: '菜单图片要多大尺寸？',
-      answer: `DoorDash 要横版 ${doordash.ratio}、至少 ${px(doordash.minW)} × ${px(doordash.minH)} px，Uber Eats 是 ${uberEats.ratio}，Grubhub 用方图。印刷菜单和社交媒体常用 4:5 或 1:1。${brand} 导出 PNG，分${zhTierList}三档，${SIZE_COUNT} 种尺寸。`,
+      answer: `DoorDash 要横版 ${doordash.ratio}、至少 ${px(doordash.minW)} × ${px(doordash.minH)} px，Uber Eats 是 ${uberEats.ratio}，Grubhub 用方图。印刷菜单和社交媒体常用 4:5 或 1:1。${brand} 导出 PNG，分 ${zhTierNames} 三档，共 ${SIZE_COUNT} 种尺寸。`,
     },
     {
       question: '请美食摄影师要多少钱？',
-      answer: `按美国的公开报价，拍一次大约 ${usdRange(foodShootUsd)}，造型、道具和授权常常另外收费。${brand} 用你的手机照片，大约 ${photoSeconds} 秒做好一张菜单图。${zhPlansSentence(offers)}`,
+      answer: `请美食摄影师，按美国的公开报价，拍一次大约 ${usdRange(foodShootUsd)}，造型、道具和授权常常另外收费。${brand} 用你的手机照片，大约 ${photoSeconds} 秒做好一张菜单图。${zhPlansSentence(offers)}`,
     },
     {
       question: '要自己写提示词吗？',
@@ -147,13 +147,13 @@ export const makeZhAiRestaurantMenu = (offers: OfferFacts) => defineContentPage(
     },
     {
       question: '能直接做整张菜单吗？',
-      answer: `${brand} 做的是菜单里的照片，不排菜单版面。专业版一批最多上传 ${TIER_LIMITS.pro.batchMax} 张菜品照，旗舰版一批最多出 ${TIER_LIMITS.max.batchMax} 张、可同时用 ${MAX_BATCH_TEMPLATES} 个模板，40 道菜的菜单用同一个模板在旗舰版分两批就能做完。海报模板可以在生成前填好标题、菜名和价格；出来的是一整张图片，不是能再改字的设计文件，菜单排版请用你自己的排版工具。`,
+      answer: `${brand} 做的是菜单里的照片，不排菜单版面。专业版一批最多上传 ${TIER_LIMITS.pro.batchMax} 张菜品照，旗舰版一批最多出 ${TIER_LIMITS.max.batchMax} 张、可同时用 ${MAX_BATCH_TEMPLATES} 个模板，40 道菜的菜单用同一个模板在旗舰版分两批就能做完。海报模板可以在生成前填好标题、菜名和价格；生成的是一整张图片，不是可再编辑文字的设计文件，菜单排版仍需用你自己的排版工具完成。`,
     },
   ],
   related: [
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
-    { href: '/commercial-photography', anchor: '商业摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
-    { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '想看看图生图对一张照片能做什么。' },
+    { href: '/commercial-photography', anchor: '商业摄影', note: '网店卖家无需聘请摄影师，也能做出专业级商品图。' },
+    { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '看看图生图能把一张照片做成什么样。' },
     zhPricingRelated(brand, offers),
   ],
 })

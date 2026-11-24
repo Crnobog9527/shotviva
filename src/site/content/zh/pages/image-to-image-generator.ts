@@ -22,7 +22,7 @@ const catAnime = caseImage('pet-anime', '真实案例：同一只猫、同样的
 
 const catStyles: ShootDemo = {
   heading: { lead: '一张猫咪照片 → ', emphasis: '三种画风' },
-  intro: '在沙发扶手上用手机随手拍了一张。做出三种画风，每张里都是同一只猫：虎斑花纹、鼻梁上的白条、绿眼睛和趴着的姿势都没变。',
+  intro: '沙发扶手上随手拍的一张手机照，一次做出三种画风，虎斑花纹、鼻梁上的白条、绿眼睛和趴着的姿势都保持原样。',
   phone: { image: catPhone, file: 'IMG_0921.jpg', caption: '真实手机照：晚上的台灯光，毯子和遥控器都入镜了。' },
   arrow: '三种画风，同一只猫',
   results: [
@@ -34,7 +34,7 @@ const catStyles: ShootDemo = {
 
 const edits: EditCases = {
   heading: '改一处，其余不动',
-  intro: '说清楚要改什么，就只动那一处。主体、版式和其他文字都保持原样。',
+  intro: '用一句话说明要改的内容，只修改那一处，画面里的商品、版式和其他文字都不受影响。',
   labels: { before: '改前', after: '改后', reference: '参考图' },
   items: [
     {
@@ -45,7 +45,7 @@ const edits: EditCases = {
     },
     {
       title: '海报上改五处文字',
-      change: '改了主题、一款饮品、它的价格、日期和优惠。手写字的风格、照片和其他文字都没动。',
+      change: '主题、一款饮品及其价格、日期和优惠都已修改，手写字体、照片和其他文字保持不变。',
       before: caseImage('poster-zh-before', '真实案例：森系风格的「小蕨咖啡」海报，手写大字「你好，秋天！」「抹茶和枫糖的季节」，下面是三款饮品的菜单和价格'),
       after: caseImage('poster-zh-after', '真实案例：同一张海报改了五处：抹茶和栗子的季节、栗子燕麦拿铁和它的新价格、每天都有、买二送一'),
     },
@@ -73,8 +73,8 @@ const copy = {
   title: `图生图在线工具：上传照片选模板，不写提示词（2026） | ${site.brand.name}`,
   description: `图生图在线工具：不用装软件、不用写提示词，上传一张照片选个模板就出图，主体保持原样。新用户送 ${zhFreeImages}。`,
   h1: '图生图：上传一张照片，选个模板就出图',
-  subtitle: '从你自己的照片出发，而不是一个空白的输入框。主体保持原样。',
-  answerBlock: `图生图就是用你上传的照片生成一张新图。${brand} 的图生图在线工具用模板出图：不用装软件，也不用写提示词，选一个餐饮、商品、美妆、房间、宠物或画风模板，光线、场景或画风就由模板定好。主体保持原样，新用户送 ${zhFreeImages}。`,
+  subtitle: '无需写提示词，以你自己的照片为基础，一键出图。',
+  answerBlock: `图生图，就是以你上传的照片为基础生成一张新图。${brand} 的图生图在线工具用模板出图：不用装软件，也不用写提示词，选择餐饮、商品、美妆、房间、宠物或画风模板，光线、场景和画风由模板设定好，照片主体保持原样。新用户赠送 ${zhFreeImages}。`,
   hero: {
     before: withFirstFrame(catPhone),
     after: catAnime,
@@ -82,8 +82,8 @@ const copy = {
     cta: { label: '上传照片', href: '/generate' },
   },
   facts: [
-    { label: `一张照片：${zhUploadLimits}`, value: '手机拍的就行。不用抠图，不用白底，也不用先修图。' },
-    { label: '选模板，不用描述', value: '光线、场景或画风都由模板决定。只有一行选填的「有什么想改的？」，写一句小要求就行。' },
+    { label: `一张照片：${zhUploadLimits}`, value: '手机拍摄即可，无需抠图、白底或提前修图。' },
+    { label: '选模板，不用描述', value: '光线、场景或画风都由模板决定。只有一行选填的「有什么想改的？」，可补充一句简单要求。' },
     { label: `${zhTierList}，导出 PNG`, value: `方图边长 ${zhTierPixels}，${SIZE_COUNT} 种尺寸，从方形主图到 9:16 竖版。${brand} 每张图大约 ${photoSeconds} 秒出图。` },
   ],
   headings: {
@@ -93,7 +93,7 @@ const copy = {
   },
   landing: {
     // GEO (03-S3): one platform rule with the date it was checked.
-    factsNote: `这些是 ${brand} 自己的上传限制和出图尺寸，本站每一页都一样。Shopify 说方形商品图用 ${px(PLATFORM_SPECS.shopify.squarePx)} × ${px(PLATFORM_SPECS.shopify.squarePx)} px 显示效果通常最好，Amazon 建议最长边超过 ${px(PLATFORM_SPECS.amazon.zoomPx)} px，买家才能放大看（均为 ${PLATFORM_SPECS_CHECKED.zh}核对）。`,
+    factsNote: `以上是 ${brand} 的上传限制和出图尺寸。Shopify 建议方形商品图使用 ${px(PLATFORM_SPECS.shopify.squarePx)} × ${px(PLATFORM_SPECS.shopify.squarePx)} px，显示效果通常最好，Amazon 建议最长边超过 ${px(PLATFORM_SPECS.amazon.zoomPx)} px，买家才能放大看（均为 ${PLATFORM_SPECS_CHECKED.zh}核对）。`,
     shoot: catStyles,
     edits,
   },
@@ -101,7 +101,7 @@ const copy = {
 
 export const makeZhImageToImageGenerator = (offers: OfferFacts) => defineContentPage({
   ...copy,
-  costBills: productBills(offers,`${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用图生图对比`, `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`),
+  costBills: productBills(offers,`${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用图生图对比`, `以一个商品拍 ${SET_PHOTOS} 张精修造型图为例，对比请摄影师和使用 ${brand} 的实际花费。`),
   // In the builder so the price answer reads the live plans (03-S3: a starting price per page).
   faq: [
     {
@@ -110,7 +110,7 @@ export const makeZhImageToImageGenerator = (offers: OfferFacts) => defineContent
     },
     {
       question: '以图生图用哪个 AI 工具好？',
-      answer: `看你要什么。想自己调模型、写提示词，可以用开源模型和工作流；想上传一张照片直接出能用的图，${brand} 用现成的模板，不用写提示词，主体保持原样。`,
+      answer: `以图生图工具的选择取决于你的需求：想自己调模型、写提示词，可以用开源模型和工作流；想上传一张照片直接出可用的图，${brand} 提供现成的模板，无需写提示词，商品和菜品始终与原图一致。`,
     },
     {
       question: '有没有在线图生图网站，不用装软件？',
@@ -118,18 +118,18 @@ export const makeZhImageToImageGenerator = (offers: OfferFacts) => defineContent
     },
     {
       question: '图生图需要写提示词吗？',
-      answer: `${brand} 不需要写提示词，选模板就行，剩下的交给我们。个别模板会让你填一行字，比如海报上的标题和价格。`,
+      answer: `${brand} 不需要写提示词，选择模板即可，其余由模板完成。个别模板会让你填一行字，比如海报上的标题和价格。`,
       link: { href: '/', anchor: '看看 AI改图 的全部模板。' },
     },
     {
       question: '图生图会把我的商品、菜品或房间改掉吗？',
-      answer: '模板专门保留你拍的主体：形状、颜色、标签、菜品本身或房间布局，改的是光线、背景、场景或画风；餐饮模板还可能换盘子或碗。',
+      answer: `${brand} 的模板会完整保留你拍摄的商品、菜品或房间：形状、颜色、标签和布局都与原图一致，只改变光线、背景、场景或画风；餐饮模板可能会更换盘子或碗。`,
     },
   ],
   related: [
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
-    { href: '/commercial-photography', anchor: '商业摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
-    { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
+    { href: '/commercial-photography', anchor: '商业摄影', note: '网店卖家无需聘请摄影师，也能做出专业级商品图。' },
+    { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍的菜品照，直接做成菜单和外卖平台配图。' },
     zhPricingRelated(brand, offers),
   ],
 })

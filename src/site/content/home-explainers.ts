@@ -1,6 +1,6 @@
 import type { HomePage, ImageRef } from '@/core/content'
 
-import { caseImage, homeImage } from './landing-shared'
+import { caseImage, dishImage, homeImage } from './landing-shared'
 import { OUTPUT_TIERS, tierList, uploadLimits } from './offer'
 
 // The home page's how-to blocks, each point led by a picture (Owner 2026-11-12): the steps and
@@ -15,6 +15,15 @@ export const tote = {
   promo: homeImage('hero-set-promo', 'The same tote on a promo poster headed New Season Tote, bright studio light (real example)'),
 } as const satisfies Record<string, ImageRef>
 
+// The steps' pictures (Owner 2026-11-24): a dish shot on the kitchen counter and three food
+// templates, the first of them the one picked.
+const dish = {
+  phone: dishImage('food-1-photo', 'Real phone photo: spaghetti carbonara on a white plate on a steel kitchen counter'),
+  slate: dishImage('food-1-ai', 'Real example: the same carbonara on a slate table in dappled sunlight'),
+  dark: dishImage('food-2-ai', 'Real example: spaghetti bolognese on a dark table', true),
+  board: dishImage('food-3-ai', 'Real example: a steak plate on a rustic wooden board', true),
+}
+
 const [standard, hd, max] = OUTPUT_TIERS
 const phoneTag = 'Real phone photo'
 
@@ -24,7 +33,7 @@ export const steps = {
     {
       heading: 'Upload One Photo',
       text: `A phone photo is enough: ${uploadLimits}. Keep the whole subject in the frame.`,
-      visual: { kind: 'upload', image: tote.phone, file: 'IMG_2047.jpg' },
+      visual: { kind: 'upload', image: dish.phone, file: 'IMG_3108.jpg' },
     },
     {
       heading: 'Pick a Template',
@@ -32,12 +41,12 @@ export const steps = {
       visual: {
         kind: 'picker',
         tiles: [
-          { image: tote.listing, name: 'White Background' },
-          { image: tote.lifestyle, name: 'Lifestyle Table' },
-          { image: tote.promo, name: 'Promo Poster' },
+          { image: dish.slate, name: 'Dappled Slate' },
+          { image: dish.dark, name: 'Dark Flat Lay' },
+          { image: dish.board, name: 'Rustic Board' },
         ],
-        picked: 1,
-        caption: 'The Lifestyle Table template picked from the template list',
+        picked: 0,
+        caption: 'The Dappled Slate template picked from the template list',
       },
     },
     {
@@ -45,7 +54,7 @@ export const steps = {
       text: `${standard.name} for ${standard.use}, ${hd.name} for ${hd.use}, ${max.name} for ${max.use}.`,
       visual: {
         kind: 'sizes',
-        image: { ...tote.lifestyle, alt: `The tote lifestyle photo at its three export sizes: ${standard.px}, ${hd.px} and ${max.px} px` },
+        image: { ...dish.slate, alt: `The carbonara photo at its three export sizes: ${standard.px}, ${hd.px} and ${max.px} px` },
         tiers: [standard, hd, max],
       },
     },
