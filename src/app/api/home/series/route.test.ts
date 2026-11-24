@@ -46,7 +46,7 @@ describe('series cards\' later pairs', () => {
     vi.mocked(cachedPublicSeries).mockResolvedValue([])
     vi.mocked(cachedFeaturedBundles).mockResolvedValue([{ id: 'k', name: 'K', memberIds: ['c', 'gone', 'a'] }])
     const body = await (await GET(request('?locale=en'))).json()
-    expect(body).toEqual({ 'bundle-k': [['https://shotviva.com/assets/covers/a/b.webp', 'https://shotviva.com/assets/covers/a/a.webp']] })
+    expect(body).toEqual({ 'bundle-k': [['https://shotviva.com/assets/covers/a/b.webp', 'https://shotviva.com/assets/covers/a/a.webp', 'a']] })
     expect(cachedFeaturedBundles).toHaveBeenLastCalledWith('en')
   })
 

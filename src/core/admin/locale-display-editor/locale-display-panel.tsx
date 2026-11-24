@@ -2,7 +2,7 @@
 
 import { ChevronDown } from 'lucide-react'
 
-import type { LocaleDisplay } from '@/core/templates/locale-display'
+import type { FeaturedBundles, LocaleDisplay } from '@/core/templates/locale-display'
 import { Button } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
 
@@ -24,6 +24,8 @@ type Props = {
   categories: AdminCategoryNode[]
   templates: AdminTemplate[]
   display: LocaleDisplay
+  // 精选组合 (read apart from the display rules); undefined: none, or not readable now.
+  bundles: FeaturedBundles | undefined
   actions: LocaleDisplayActions
   // 精选组合: making one from the 分语言展示 draft saves it at once.
   saveBundle: FeaturedBundleActions['save']
@@ -33,12 +35,12 @@ type Props = {
 // (and the generator rail under it), set separately for the English and the Chinese site. Closed
 // and read-only by default (Owner 2026-11-25); 编辑 opens a draft for one language that 保存
 // applies in one go. Closing only hides the body, so an open draft survives it.
-export function LocaleDisplayPanel({ categories: all, templates, display, actions, saveBundle }: Props) {
+export function LocaleDisplayPanel({ categories: all, templates, display, bundles, actions, saveBundle }: Props) {
   const [open, setOpen] = usePanelOpen()
   const categories = all.filter((category) => !category.isSystem)
   const summary = DISPLAY_LOCALES.map((code) => COPY.summary(COPY.locales[code],
     siblingGroups(categories, display, code).filter((group) => group.own).length, featuredState(templates, display, code).own,
-    (display.bundles?.locale[code] ?? []).length > 0)).join('；')
+    (bundles?.locale[code] ?? []).length > 0)).join('；')
   return (
     <section aria-labelledby="locale-display-h" className="grid gap-4 rounded-md border p-4">
       <h2 id="locale-display-h" className="font-medium">
@@ -51,17 +53,17 @@ export function LocaleDisplayPanel({ categories: all, templates, display, action
           </span>
         </button>
       </h2>
-      <PanelBody hidden={!open} categories={categories} templates={templates} display={display} actions={actions} saveBundle={saveBundle} />
+      <PanelBody hidden={!open} categories={categories} templates={templates} display={display} bundles={bundles} actions={actions} saveBundle={saveBundle} />
     </section>
   )
 }
 
-function PanelBody({ hidden, categories, templates, display, actions, saveBundle }: Props & { hidden: boolean }) {
-  const editor = useLocaleDisplayEditor({ categories, templates, display, actions })
+function PanelBody({ hidden, categories, templates, display, bundles, actions, saveBundle }: Props & { hidden: boolean }) {
+  const editor = useLocaleDisplayEditor({ categories, templates, display, bundles, actions })
   const { locale, shown, shared, update } = editor
   const label = COPY.locales[locale]
   const nameOf = (key: string) => categories.find((category) => category.key === key)?.nameZh ?? key
-  const bundleContext = { bundles: display.bundles?.list ?? [], templates, categories, save: saveBundle }
+  const bundleContext = { bundles: bundles?.list ?? [], templates, categories, save: saveBundle }
   return (
     <div id="locale-display-body" hidden={hidden} className="grid gap-4">
       <p className="max-w-prose text-sm text-muted-foreground">{COPY.body}</p>

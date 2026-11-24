@@ -2,7 +2,7 @@ import { useTranslations } from 'next-intl'
 
 import type { TemplateCard } from '../page-content'
 import { SeriesPairs } from './series-card'
-import { BUNDLE_IDS_ATTR } from './series-layers'
+import { BUNDLE_FIRST_ATTR, BUNDLE_LABEL_ATTR } from './series-layers'
 import type { TemplateLookup } from './template-grid'
 
 type Props = { card: TemplateCard; media: TemplateLookup; sizes: string }
@@ -14,10 +14,15 @@ type Props = { card: TemplateCard; media: TemplateLookup; sizes: string }
 export function BundleCard({ card, media, sizes }: Props) {
   const t = useTranslations('marketing.home')
   const bundle = card.bundle
-  if (!bundle?.members[0]) return null
+  const first = bundle?.members[0]
+  if (!bundle || !first) return null
+  // The accessible name says which template a press picks; the crossfade keeps it current.
+  const label = (template: string) => t('bundleAria', { name: card.name, template })
+  const firstName = bundle.templates.find((template) => template.id === first)?.name ?? ''
   return (
     <div className="mk-bundle">
-      <button type="button" className="mk-tpl mk-series" data-pick-template={bundle.members[0]} {...{ [BUNDLE_IDS_ATTR]: bundle.members.join(' ') }}>
+      <button type="button" className="mk-tpl mk-series" data-pick-template={first} aria-label={label(firstName)}
+        {...{ [BUNDLE_FIRST_ATTR]: first, [BUNDLE_LABEL_ATTR]: label('%s') }}>
         <span className="mk-sstack" aria-hidden>
           <span className="mk-sprint mk-sprint-back" aria-hidden />
           <span className="mk-sprint mk-sprint-mid" aria-hidden />

@@ -26,8 +26,8 @@ describe('精选组合 on the home page', () => {
     expect(bundleSection(catalogue, [{ id: 'b', name: '组合', memberIds: ['cake', 'steak'] }], 'zh').category?.name).toBe('精选组合')
   })
 
-  it('gives the later pairs in the card\'s order', () => {
+  it('gives the later pairs in the card\'s order, each with its template', () => {
     expect(bundleLayerPairs(catalogue, [{ id: 'b1', name: 'W', memberIds: ['cake', 'fries', 'steak', 'soup'] }]))
-      .toEqual({ 'bundle-b1': [['/b/steak.webp', '/a/steak.webp'], ['/b/soup.webp', '/a/soup.webp']] })
+      .toEqual({ 'bundle-b1': [['/b/steak.webp', '/a/steak.webp', 'steak'], ['/b/soup.webp', '/a/soup.webp', 'soup']] })
   })
 })

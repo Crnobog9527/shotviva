@@ -12,21 +12,25 @@ import { capSrcSet } from '../../ui/srcset-cap'
 // addresses come from /api/home/series, one cached request, when a card first plays
 // (series-layers-source.ts).
 
-export type LayerPair = readonly [before: string, after: string]
+// A bundle's pairs carry the template they show as a third item.
+export type LayerPair = readonly [before: string, after: string] | readonly [before: string, after: string, templateId: string]
 
 // On a frame with later pairs: the card's key in /api/home/series (TemplateCard.id).
 export const MORE_ATTR = 'data-series-more'
 export const SIZES_ATTR = 'data-series-sizes'
-// A bundle card's templates, one per pair in order: the crossfade moves the card's
-// data-pick-template to the one on show (bundle-card.tsx, series-motion-mount.tsx).
-export const BUNDLE_IDS_ATTR = 'data-bundle-ids'
+// A bundle card (bundle-card.tsx): its first pair's template, and the label pattern ('%s' for
+// the template on show). Each later layer carries its own template id (LAYER_TEMPLATE_ATTR), so
+// the crossfade moves the card's data-pick-template and label to the template actually on show.
+export const BUNDLE_FIRST_ATTR = 'data-bundle-first'
+export const BUNDLE_LABEL_ATTR = 'data-bundle-label'
+export const LAYER_TEMPLATE_ATTR = 'data-layer-template'
 const BUILT_ATTR = 'data-series-built'
 const SIZE = { width: 900, height: 1125 }
 
 // Only well-formed before/after pairs from what the API sent.
 export function pairsIn(value: unknown): LayerPair[] {
   if (!Array.isArray(value)) return []
-  return value.filter((pair): pair is LayerPair => Array.isArray(pair) && pair.length === 2 && pair.every((url) => typeof url === 'string'))
+  return value.filter((pair): pair is LayerPair => Array.isArray(pair) && (pair.length === 2 || pair.length === 3) && pair.every((item) => typeof item === 'string'))
 }
 
 // The <img> SiteImage renders for a lazy cover (site-image.tsx: next/image's attributes, its
@@ -85,10 +89,11 @@ function pane(doc: Document, url: string, sizes: string, after: boolean): HTMLEl
 
 // One extra pair, stacked over the first (series-motion.ts fades them; marketing.css keeps a
 // layer display: none until it is its turn, so its lazy pictures are not fetched before then).
-export function layerOf(doc: Document, [before, after]: LayerPair, sizes: string): HTMLElement {
+export function layerOf(doc: Document, [before, after, templateId]: LayerPair, sizes: string): HTMLElement {
   const layer = doc.createElement('span')
   layer.className = 'mk-sl'
   layer.setAttribute('aria-hidden', 'true')
+  if (templateId) layer.setAttribute(LAYER_TEMPLATE_ATTR, templateId)
   layer.append(pane(doc, before, sizes, false), pane(doc, after, sizes, true))
   return layer
 }

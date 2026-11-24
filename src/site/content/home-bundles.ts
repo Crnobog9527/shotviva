@@ -14,8 +14,8 @@ export const BUNDLE_MAX = 8
 export const BUNDLE_KEY = (id: string) => `bundle-${id}`
 
 export const BUNDLE_GROUP: Record<Locale, { name: string; intro: string }> = {
-  en: { name: 'Featured sets', intro: 'Templates hand-picked from different categories, shown together on one card. Click the card to use the one on show, or pick any name below it.' },
-  zh: { name: '精选组合', intro: '从不同分类挑出的模板放在一张卡里轮播。点卡片就用当前显示的那个，也可以点下面的名字直接用。' },
+  en: { name: 'Featured sets', intro: 'Templates hand-picked from different categories, shown together on one card. Choose the card to use the template on show, or pick any name below it.' },
+  zh: { name: '精选组合', intro: '从不同分类精选的模板，在一张卡片里轮播展示。点击卡片即可使用当前显示的模板，也可以点下方名称直接选用。' },
 }
 
 const live = (bundle: PublicBundle, byId: ReadonlyMap<string, Live>): Live[] => bundle.memberIds.flatMap((id) => byId.get(id) ?? [])
@@ -49,12 +49,12 @@ export function bundleSection(catalogue: readonly Live[], bundles: readonly Publ
   return { category, media }
 }
 
-// The later pairs of each bundle card, by card key, for /api/home/series (the same members and
-// order as the card, so the n-th pair is the n-th id the card carries).
-export function bundleLayerPairs(catalogue: readonly Live[], bundles: readonly PublicBundle[]): Record<string, [before: string, after: string][]> {
+// The later pairs of each bundle card, by card key, for /api/home/series, each with the template
+// it shows, so the card picks by id whatever order a cached answer arrives in.
+export function bundleLayerPairs(catalogue: readonly Live[], bundles: readonly PublicBundle[]): Record<string, [before: string, after: string, templateId: string][]> {
   const byId = new Map(catalogue.map((template) => [template.id, template]))
   return Object.fromEntries(bundles.flatMap((bundle) => {
     const later = pairedMembers(bundle, byId).slice(1)
-    return later.length > 0 ? [[BUNDLE_KEY(bundle.id), later.map((member) => [member.coverBeforeUrl ?? '', member.coverAfterUrl ?? ''] as [string, string])]] : []
+    return later.length > 0 ? [[BUNDLE_KEY(bundle.id), later.map((member) => [member.coverBeforeUrl ?? '', member.coverAfterUrl ?? '', member.id] as [string, string, string])]] : []
   }))
 }

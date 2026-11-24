@@ -2482,6 +2482,7 @@
       "seriesBadge": "Series",
       "bundleBadge": "Set",
       "bundleCount": "{count, plural, one {# template} other {# templates}}",
+      "bundleAria": "{name}, showing {template}. Use this template",
       "seriesOpen": "Open the series",
       "freeTag": "Free · public",
       "paidTag": "Paid · private",

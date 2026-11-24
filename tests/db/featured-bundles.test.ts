@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { deleteFeaturedBundle, saveFeaturedBundle, setDefaultFeaturedBundles } from '@/core/admin/featured-bundles'
 import { saveLocaleDisplay } from '@/core/admin/locale-display'
 import { localeBundles } from '@/core/templates/locale-display'
-import { readLocaleDisplay } from '@/core/templates/locale-display-read'
+import { readFeaturedBundles, readLocaleDisplay } from '@/core/templates/locale-display-read'
 
 import { connectAdmin, createUser, publishFixture } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
@@ -16,7 +16,7 @@ let admin: string
 let user: string
 const live = ['fb-a', 'fb-b', 'fb-c']
 const save = (input: object, actor = admin) => saveFeaturedBundle(api, actor, { id: null, nameEn: 'Set', nameZh: '组合', templateIds: ['fb-a', 'fb-b'], ...input })
-const ours = async () => ((await readLocaleDisplay(api)).bundles?.list ?? []).filter((bundle) => bundle.templateIds.some((id) => id.startsWith('fb-')))
+const ours = async () => ((await readFeaturedBundles(api))?.list ?? []).filter((bundle) => bundle.templateIds.some((id) => id.startsWith('fb-')))
 
 beforeAll(async () => {
   pg = await connectAdmin()
@@ -66,7 +66,7 @@ describe('精选组合', () => {
     const first = await save({ nameEn: 'First' })
     const second = await save({ nameEn: 'Second', templateIds: ['fb-b', 'fb-c'] })
     await setDefaultFeaturedBundles(api, admin, [second, first])
-    const display = await readLocaleDisplay(api)
+    const display = await readFeaturedBundles(api)
     expect(localeBundles(display, 'en').map((bundle) => bundle.id).filter((id) => [first, second].includes(id))).toEqual([second, first])
     await setDefaultFeaturedBundles(api, admin, [first])
     expect((await ours()).find((bundle) => bundle.id === second)?.featuredRank).toBeNull()
@@ -76,20 +76,19 @@ describe('精选组合', () => {
   it('gives a language its own bundles, all or nothing with the rest of its draft', async () => {
     const [bundle] = await ours()
     await saveLocaleDisplay(api, admin, { locale: 'zh', groups: [], featured: ['fb-a'], bundles: [bundle.id] })
-    expect((await readLocaleDisplay(api)).bundles?.locale.zh).toEqual([bundle.id])
-    expect(localeBundles(await readLocaleDisplay(api), 'zh').map((one) => one.id)).toEqual([bundle.id])
+    expect((await readFeaturedBundles(api))?.locale.zh).toEqual([bundle.id])
+    expect(localeBundles(await readFeaturedBundles(api), 'zh').map((one) => one.id)).toEqual([bundle.id])
     const missing = '00000000-0000-4000-8000-000000000000'
     await expect(saveLocaleDisplay(api, admin, { locale: 'zh', groups: [], featured: ['fb-b'], bundles: [missing] })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
-    const after = await readLocaleDisplay(api)
-    expect(after.featured.zh).toEqual(['fb-a'])
-    expect(after.bundles?.locale.zh).toEqual([bundle.id])
+    expect((await readLocaleDisplay(api)).featured.zh).toEqual(['fb-a'])
+    expect((await readFeaturedBundles(api))?.locale.zh).toEqual([bundle.id])
   })
 
   it('keeps a language\'s bundles when only its templates change, and follows the default again when emptied', async () => {
     await saveLocaleDisplay(api, admin, { locale: 'zh', groups: [], featured: [] })
-    expect((await readLocaleDisplay(api)).bundles?.locale.zh?.length).toBe(1)
+    expect((await readFeaturedBundles(api))?.locale.zh?.length).toBe(1)
     await saveLocaleDisplay(api, admin, { locale: 'zh', groups: [], featured: null, bundles: [] })
-    expect((await readLocaleDisplay(api)).bundles?.locale.zh ?? []).toEqual([])
+    expect((await readFeaturedBundles(api))?.locale.zh ?? []).toEqual([])
   })
 
   it('leaves a deleted template out of its bundles, and a deleted bundle out of every list', async () => {

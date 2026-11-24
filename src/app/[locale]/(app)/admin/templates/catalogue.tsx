@@ -8,7 +8,7 @@ import { readPricingOptions } from '@/site/template-pricing'
 import { ModelSyncProvider } from '@/core/admin/image-provider-field/model-sync'
 import { listAdminCategoryTree } from '@/core/admin/template-categories'
 import { listAdminSeriesOptions, OrderHelp, seriesCopy } from '@/core/admin/template-series'
-import { readLocaleDisplay } from '@/core/templates/locale-display-read'
+import { readFeaturedBundles, readLocaleDisplay } from '@/core/templates/locale-display-read'
 import { deleteFeaturedBundleAction, saveFeaturedBundleAction, setDefaultFeaturedBundlesAction } from './bundle-actions'
 import { moveTemplateCategoryAction, saveLocaleDisplayAction } from './category-actions'
 import { AdminTemplatePreview } from './preview-provider'
@@ -41,11 +41,11 @@ async function previewMessages() {
 }
 
 export function loadCatalogue(db: SupabaseClient) {
-  return Promise.all([listAdminTemplates(db), listAdminCategoryTree(db), listAdminSeriesOptions(db), readPricingOptions(db), previewMessages(), readLocaleDisplay(db)])
+  return Promise.all([listAdminTemplates(db), listAdminCategoryTree(db), listAdminSeriesOptions(db), readPricingOptions(db), previewMessages(), readLocaleDisplay(db), readFeaturedBundles(db)])
 }
 
 export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCatalogue>; edit?: string }) {
-  const [templates, categories, series, providers, zhMessages, display] = await data
+  const [templates, categories, series, providers, zhMessages, display, bundles] = await data
   return (
     <div className="mx-auto grid w-full min-w-0 max-w-6xl grid-cols-1 gap-6 p-6">
       <div className="flex flex-wrap items-center gap-3">
@@ -63,11 +63,11 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
         actions={{ save: saveTemplateCategoryAction, move: moveTemplateCategoryAction, remove: deleteTemplateCategoryAction }}
       />
       <BundlesPanel
-        bundles={display.bundles?.list ?? []} templates={templates} categories={categories}
+        bundles={bundles?.list ?? []} templates={templates} categories={categories}
         actions={{ save: saveFeaturedBundleAction, remove: deleteFeaturedBundleAction, setDefault: setDefaultFeaturedBundlesAction }}
       />
       <LocaleDisplayPanel
-        categories={categories} templates={templates} display={display}
+        categories={categories} templates={templates} display={display} bundles={bundles}
         actions={{ save: saveLocaleDisplayAction }} saveBundle={saveFeaturedBundleAction}
       />
       <ModelSyncProvider action={syncTemplateModel}>

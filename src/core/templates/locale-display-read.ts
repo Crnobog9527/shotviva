@@ -61,8 +61,19 @@ export function toFeaturedBundles(bundles: readonly BundleRow[], items: readonly
   }
 }
 
-// 精选组合 (migrations 2004, 2005), or undefined on a database without them yet.
-async function readBundles(db: SupabaseClient): Promise<FeaturedBundles | undefined> {
+// 精选组合 (migrations 2004, 2005), read apart from the catalogue's display rules so the
+// catalogue never waits on them or fails with them: a database without the tables or any failed
+// read gives undefined (no bundles shown), logged.
+export async function readFeaturedBundles(db: SupabaseClient): Promise<FeaturedBundles | undefined> {
+  try {
+    return await readBundleTables(db)
+  } catch (error) {
+    logger.warn('templates.bundles_read_failed', { error })
+    return undefined
+  }
+}
+
+async function readBundleTables(db: SupabaseClient): Promise<FeaturedBundles | undefined> {
   const [bundles, items, places] = await Promise.all([
     readAll<BundleRow>((from, to) => db.from('featured_bundles').select('id,name_en,name_zh,featured_rank')
       .order('created_at').order('id').range(from, to).returns<BundleRow[]>()),
@@ -78,11 +89,6 @@ async function readBundles(db: SupabaseClient): Promise<FeaturedBundles | undefi
 }
 
 export async function readLocaleDisplay(db: SupabaseClient): Promise<LocaleDisplay> {
-  const [display, bundles] = await Promise.all([readOrderAndFeatured(db), readBundles(db)])
-  return bundles ? { ...display, bundles } : display
-}
-
-async function readOrderAndFeatured(db: SupabaseClient): Promise<LocaleDisplay> {
   const [order, featured] = await Promise.all([
     readAll<OrderRow>((from, to) => db.from('template_category_locale_order').select('locale,category_key,sort_order')
       .order('locale').order('category_key').range(from, to).returns<OrderRow[]>()),
