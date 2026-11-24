@@ -37,6 +37,16 @@ export function clearOfflineCaches(): void {
   }
 }
 
+// A newer build is out (the version check, core/app-update): the worker stops answering with an
+// older build's app shell (ARCHITECTURE §18.3). `build` is this page's own. Never throws.
+export function dropAppShell(build: string): void {
+  try {
+    navigator.serviceWorker?.controller?.postMessage({ type: 'sv-drop-shell', build })
+  } catch {
+    // No worker.
+  }
+}
+
 // One screen's first-screen template covers (LCP plan 1; `screen` names it: All, a category): the
 // worker keeps these in place of that screen's earlier set, so the next launch paints them from the
 // phone. Sent to the active worker once there is one (on a first visit, after it installs); without

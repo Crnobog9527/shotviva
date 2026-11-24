@@ -12,6 +12,8 @@ import { captureCodeLink } from '@/core/codes/link'
 import { isBadGalleryPage } from '@/core/gallery/page-number'
 import { galleryWorkIdOf, liveGalleryGate } from '@/core/gallery/proxy-gate'
 import { serverEnv } from '@/core/env'
+import { shellProxyAnswer } from '@/core/offline/shell-proxy'
+import { publicEnv } from '@/core/public-env'
 import { experimentRoute, isBotRequest, OPTION_PAGES, toOptionPage, withExperimentCookie, type RouteOutcome } from '@/core/experiments/server'
 import { viaImageCdn } from '@/core/storage/image-cdn-guard'
 import { routing } from '@/core/i18n/routing'
@@ -35,8 +37,14 @@ const localeRouter = createMiddleware(routing)
 // region cookie (T70).
 // Pages and APIs never answer through the image CDN (core/storage/image-cdn-guard.ts); then the
 // canonical-host redirect.
+// Then Create's app shell and its navigation preload (ARCHITECTURE §18.3), before any session work
+// or cookie (core/offline/shell-proxy.ts).
 function earlyResponse(request: NextRequest) {
-  return viaImageCdn(request.headers) ? notFoundResponse() : canonicalRedirectResponse(request, hosts)
+  if (viaImageCdn(request.headers)) return notFoundResponse()
+  const redirect = canonicalRedirectResponse(request, hosts)
+  if (redirect) return redirect
+  const shell = shellProxyAnswer(request, publicEnv.NEXT_PUBLIC_APP_VERSION)
+  return shell ? withHostNoindex(shell, request, hosts.canonicalHost) : null
 }
 
 // /gallery?page= outside 1–20 (T108): a real 404 here, since the page reads the number inside a

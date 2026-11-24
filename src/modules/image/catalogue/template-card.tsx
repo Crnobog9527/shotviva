@@ -38,6 +38,7 @@ function PairCard({ template, onOpen, eager, priority, sizes }: Props) {
         ref={ref}
         type="button"
         aria-haspopup="dialog"
+        data-card={template.id}
         onClick={() => onOpen(template.id)}
         className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house active:scale-[.97]"
       >
@@ -63,7 +64,7 @@ function PairCard({ template, onOpen, eager, priority, sizes }: Props) {
 function ArtCard({ template, onOpen, eager, sizes }: Props) {
   const t = useTranslations('app.template')
   return (
-    <div className="relative flex h-full flex-col rounded-tile">
+    <div data-card={template.id} className="relative flex h-full flex-col rounded-tile">
       <PickMark item={{ type: 'template', id: template.id }}>
         <FavoriteButton template={template} surface="create_card" className="top-0.5 right-0.5" />
       </PickMark>
