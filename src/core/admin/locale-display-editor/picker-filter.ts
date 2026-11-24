@@ -20,6 +20,7 @@ export function categoryOptions(categories: readonly AdminCategoryNode[]): Categ
 }
 
 // The category and all its ancestors, so filtering by 餐饮 also finds a template filed under 火锅.
+// A template keeps its root in `category` and its deepest level in `subcategoryKey`.
 function lineage(key: string, categories: readonly AdminCategoryNode[]): Set<string> {
   const byKey = new Map(categories.map((category) => [category.key, category]))
   const keys = new Set<string>()
@@ -37,7 +38,7 @@ export type PickerQuery = { text: string; category: string | null }
 export function pickerResults(templates: readonly AdminTemplate[], categories: readonly AdminCategoryNode[], query: PickerQuery): AdminTemplate[] {
   const words = query.text.trim().toLowerCase().split(/\s+/).filter(Boolean)
   return addable(templates, []).filter((template) => {
-    if (query.category && !lineage(template.category, categories).has(query.category)) return false
+    if (query.category && !lineage(template.subcategoryKey ?? template.category, categories).has(query.category)) return false
     const text = searchText(template)
     return words.every((word) => text.includes(word))
   })

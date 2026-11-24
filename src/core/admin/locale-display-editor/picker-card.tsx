@@ -13,6 +13,8 @@ import { PICKER_COPY as COPY } from './picker-copy'
 
 type Props = {
   template: AdminTemplate
+  // Where it is filed, as a path (餐饮 › 甜点).
+  place: string
   locale: DisplayLocale
   // Already in this language's list: shown, not pickable.
   taken: boolean
@@ -22,7 +24,7 @@ type Props = {
 
 // One template in the picker: before and after covers as this language's pages show them, its
 // Chinese name and category. The whole card is the checkbox.
-export function PickerCard({ template, locale, taken, selected, onToggle }: Props) {
+export function PickerCard({ template, place, locale, taken, selected, onToggle }: Props) {
   const name = zhNameOf(template, template.id)
   return (
     <li>
@@ -40,7 +42,7 @@ export function PickerCard({ template, locale, taken, selected, onToggle }: Prop
         </span>
         <span className="min-w-0 px-0.5">
           <span className="block truncate text-sm font-medium" title={name}>{name}</span>
-          <span className="block truncate text-xs text-muted-foreground">{template.categoryInfo.nameZh}</span>
+          <span className="block truncate text-xs text-muted-foreground" title={place}>{place}</span>
         </span>
       </button>
     </li>

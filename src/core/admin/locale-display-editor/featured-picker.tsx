@@ -68,6 +68,8 @@ function PickerBody({ locale, templates, categories, taken, picked, setPicked }:
   const options = useMemo(() => categoryOptions(categories), [categories])
   const results = useMemo(() => pickerResults(templates, categories, { text: query, category }), [templates, categories, query, category])
   const takenSet = new Set(taken)
+  const placeOf = (template: AdminTemplate) =>
+    options.find((option) => option.key === (template.subcategoryKey ?? template.category))?.label ?? template.categoryInfo.nameZh
   const toggle = (id: string) => setPicked((current) => (current.includes(id) ? current.filter((other) => other !== id) : [...current, id]))
   const reset = (apply: () => void) => {
     apply()
@@ -89,7 +91,7 @@ function PickerBody({ locale, templates, categories, taken, picked, setPicked }:
         {results.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">{COPY.none}</p> : null}
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {results.slice(0, limit).map((template) => (
-            <PickerCard key={template.id} template={template} locale={locale} taken={takenSet.has(template.id)}
+            <PickerCard key={template.id} template={template} place={placeOf(template)} locale={locale} taken={takenSet.has(template.id)}
               selected={picked.includes(template.id)} onToggle={() => toggle(template.id)} />
           ))}
         </ul>

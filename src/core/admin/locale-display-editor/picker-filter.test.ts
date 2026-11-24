@@ -11,11 +11,11 @@ const tpl = (id: string, category: string, zh: string, extra: Partial<AdminTempl
 
 const categories = [cat('food', '餐饮', null, 10), cat('cn', '中餐', 'food', 10), cat('hotpot', '火锅', 'cn', 10), cat('art', '画风', null, 20)]
 const templates = [
-  tpl('beef', 'hotpot', '牛肉火锅'),
-  tpl('dumpling', 'cn', '饺子'),
+  tpl('beef', 'food', '牛肉火锅', { subcategoryKey: 'hotpot' }),
+  tpl('dumpling', 'food', '饺子', { subcategoryKey: 'cn' }),
   tpl('manga', 'art', '漫画风'),
-  tpl('hidden', 'cn', '下架饺子', { isActive: false }),
-  tpl('partner', 'cn', '合作饺子', { visibleIn: ['partner'] }),
+  tpl('hidden', 'food', '下架饺子', { isActive: false }),
+  tpl('partner', 'food', '合作饺子', { visibleIn: ['partner'] }),
 ]
 
 describe('featured picker', () => {
