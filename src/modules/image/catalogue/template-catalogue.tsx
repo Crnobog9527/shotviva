@@ -113,7 +113,7 @@ export function TemplateCatalogue({ payload, create: createProp, endCard }: Prop
         <CategoryChips hidden={search.results !== null} filters={view.filters} saved={showSaved(saved.length, active.saved, holdsSaved(favorites))} value={active} onChange={query.select} labels={chipLabels(t)} />
       </div>
       <h2 className="sr-only">{t('templates')}</h2>
-      <CatalogueBody search={search} sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onSeeAll={seeAll} />
+      <CatalogueBody search={search} firstPriority={!featured} sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onSeeAll={seeAll} />
       <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
       <CatalogueDialogs
         create={create}
@@ -236,30 +236,32 @@ const showSaved = (count: number, chosen: boolean, held = false) => count > 0 ||
 
 // A search replaces the sections and the chosen category's grid with its matches; Saved with
 // nothing saved shows its empty state.
-function CatalogueBody({ search, sections, shown, saved, onBrowse, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
+function CatalogueBody({ search, firstPriority, sections, shown, saved, onBrowse, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
   if (search.results) return <SearchResults query={search.query.trim()} results={search.results} endCard={endCard} onOpen={onOpen} />
   if (saved && shown.length === 0) return <SavedEmpty onBrowse={onBrowse} />
-  if (!sections) return <CatalogueGrid entries={shown} endCard={endCard} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
+  if (!sections) return <CatalogueGrid entries={shown} endCard={endCard} firstPriority={firstPriority} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
   return (
     <>
-      <CatalogueSections sections={sections} onOpen={onOpen} onOpenSeries={onOpenSeries} onSeeAll={onSeeAll} />
+      <CatalogueSections sections={sections} firstPriority={firstPriority} onOpen={onOpen} onOpenSeries={onOpenSeries} onSeeAll={onSeeAll} />
       {endCard ? <CatalogueGrid entries={[]} endCard={endCard} className="mt-8 md:mt-10" onOpen={onOpen} onOpenSeries={onOpenSeries} /> : null}
     </>
   )
 }
 
-type GridProps = { entries: readonly GridEntry[]; endCard?: ReactNode; className: string; onOpen(id: string): void; onOpenSeries(slug: string): void }
+// `firstPriority`: the first card is the page's largest paint, so its covers load at high priority;
+// false when the featured card sits above it (that one is the largest, feature-card.tsx).
+type GridProps = { entries: readonly GridEntry[]; endCard?: ReactNode; firstPriority?: boolean; className: string; onOpen(id: string): void; onOpenSeries(slug: string): void }
 
 // The flat grid: a chosen category, Saved, or All with a single category.
-function CatalogueGrid({ entries, endCard, className, onOpen, onOpenSeries }: GridProps) {
+function CatalogueGrid({ entries, endCard, firstPriority = true, className, onOpen, onOpenSeries }: GridProps) {
   return (
     <ul className={cn('grid grid-flow-row-dense grid-cols-1 gap-x-3 gap-y-6 px-(--gutter) md:grid-cols-2 md:gap-x-4 lg:grid-cols-3', className)}>
       {entries.map((entry, index) => (
         <Reveal as="li" key={entryKey(entry)} className={cn(isTall(entry) && 'md:row-span-2')}>
           {entry.type === 'series' ? (
-            <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={index < 3} priority={index === 0} />
+            <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={index < 3} priority={firstPriority && index === 0} />
           ) : (
-            <TemplateCard template={entry.template} onOpen={onOpen} eager={index < 3} priority={index === 0} />
+            <TemplateCard template={entry.template} onOpen={onOpen} eager={index < 3} priority={firstPriority && index === 0} />
           )}
         </Reveal>
       ))}
