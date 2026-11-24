@@ -70,7 +70,7 @@ describe('paywall messages: pack note and yearly saving', () => {
     const o2 = { starter: 0, pro: 5, max: 10 }
     expect(t('packsNoteV2', o2)).toBe('Small packs are full price. On medium and large packs, Pro saves 5% and Max 10%. Each pack includes the same credits for everyone.')
     expect(t('packsNoteV2', { starter: 5, pro: 10, max: 15 })).toContain('Starter saves 5%, Pro 10% and Max 15%.')
-    expect(zh('packsNoteV2', o2)).toBe('小包不打折。中包和大包按当前会员等级计价：入门版原价、专业版省 5%、旗舰版省 10%，各档收到的包内积分相同。')
+    expect(zh('packsNoteV2', o2)).toBe('小包不打折。中包和大包按当前会员等级计价：入门版原价、专业版省 5%、旗舰版省 10%，各会员等级获得的积分数量相同。')
     const markup = (locale: 'en' | 'zh', values: Record<string, unknown>) =>
       createTranslator({ locale, messages: locale === 'en' ? messages : zhMessages, namespace: 'paywall' })
         .markup('savePct', { ...values, b: (chunks: string) => chunks } as never)
