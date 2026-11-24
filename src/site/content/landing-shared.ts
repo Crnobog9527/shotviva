@@ -11,9 +11,9 @@ export const pairImage = (file: string, alt: string): ImageRef => ({ src: `/home
 export const dishImage = (file: string, alt: string, small = false): ImageRef =>
   ({ src: `/home/${file}${small ? '-s' : ''}.webp`, alt, width: small ? 320 : 880, height: small ? 400 : 1100 })
 export const homeImage = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 1080, height: 1350 })
-// The inner pages' own cases (public/cases, 1080 × 1350, Owner 2026-11-11): a sneaker shoot on
-// /commercial-photography; a cat in three art styles and four precise edits on
-// /image-to-image-generator. None of them repeats the home page's tote.
+// The inner pages' own cases (public/cases, 1080 × 1350, Owner 2026-11-11): the tote shoot on
+// the English /commercial-photography (Owner 2026-11-25; /zh keeps the sneaker), a cat in three art
+// styles and four precise edits on /image-to-image-generator.
 export const caseImage = (file: string, alt: string): ImageRef => ({ src: `/cases/${file}.webp`, alt, width: 1080, height: 1350 })
 
 // A hero's phone photo with its first frame (scripts/first-frames.ts). A picture the script does

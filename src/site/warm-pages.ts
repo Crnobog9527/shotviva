@@ -14,4 +14,6 @@ export const PUBLIC_WARM_PATHS = [
   '/transparent-background',
   '/pricing',
   '/zh/pricing',
+  '/template-requests',
+  '/zh/template-requests',
 ] as const

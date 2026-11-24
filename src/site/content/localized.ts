@@ -1,5 +1,6 @@
 import type { PaymentChannel, SiteProduct } from '@/core/config'
 import type { ContentPage, FaqItem, FooterLink, HomePage } from '@/core/content'
+import type { TemplateRequestsText } from '@/core/content/template-requests'
 import type { Locale } from '@/core/i18n'
 
 import { homePage, makeHomePage } from './home'
@@ -10,11 +11,13 @@ import { commercialPhotography, makeCommercialPhotography } from './pages/commer
 import { imageToImageGenerator, makeImageToImageGenerator } from './pages/image-to-image-generator'
 import { makeTransparentBackground, transparentBackground } from './pages/transparent-background'
 import { makePricingPage, pricingPage, type PricingContent } from './pricing'
+import { templateRequestsPage } from './template-requests'
 import { zhHomePage, makeZhHomePage } from './zh/home'
 import { zhAiRestaurantMenu, makeZhAiRestaurantMenu } from './zh/pages/ai-restaurant-menu'
 import { zhCommercialPhotography, makeZhCommercialPhotography } from './zh/pages/commercial-photography'
 import { zhImageToImageGenerator, makeZhImageToImageGenerator } from './zh/pages/image-to-image-generator'
 import { zhFreeImages } from './zh/offer'
+import { zhTemplateRequestsPage } from './zh/template-requests'
 import { ALIPAY_QUESTION, ZH_WECHAT_PAY_FAQ, makeZhPricingPage, zhPricingPage } from './zh/pricing'
 
 // Marketing copy per language (ARCHITECTURE §17: body copy lives in site/content by language).
@@ -47,6 +50,10 @@ const ZH_LEGAL_LABELS: Record<string, string> = {
 export function homePageIn(locale: Locale, products?: readonly SiteProduct[]): HomePage {
   if (!products) return HOME[locale]
   return locale === 'zh' ? makeZhHomePage(offerFacts(products)) : makeHomePage(offerFacts(products))
+}
+// /template-requests (Owner 2026-11-25), both languages.
+export function templateRequestsPageIn(locale: Locale): TemplateRequestsText {
+  return locale === 'zh' ? zhTemplateRequestsPage : templateRequestsPage
 }
 export function pricingPageIn(locale: Locale, products?: readonly SiteProduct[]): PricingContent {
   if (!products) return PRICING[locale]
