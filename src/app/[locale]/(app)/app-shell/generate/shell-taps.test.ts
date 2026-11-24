@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { shellTapKey, tapTarget } from './shell-taps'
+import { REPLAY_WITHIN_MS, replayTap, shellTapKey, tapTarget } from './shell-taps'
 
 // A minimal element: enough of closest/getAttribute/matches/querySelector for the tap queue.
 type Fake = { attrs: Record<string, string>; tag: string; parent: Fake | null; inShell: boolean; click: () => void; children: Fake[] }
@@ -31,11 +31,25 @@ function asElement(node: Fake): Element {
 const root = (nodes: Fake[]) => ({ querySelectorAll: (selector: string) => nodes.filter((n) => matches(n, selector)).map(asElement) }) as unknown as ParentNode
 
 describe('taps on the app shell', () => {
+  it('replays a remembered tap only within 10 s', () => {
+    const real = el('button', { 'data-card': 'tpl-1' })
+    replayTap({ key: 'card:tpl-1', at: 0 }, REPLAY_WITHIN_MS + 1, root([real]))
+    expect(real.click).not.toHaveBeenCalled()
+    replayTap({ key: 'card:tpl-1', at: 0 }, 9_000, root([real]))
+    expect(real.click).toHaveBeenCalledTimes(1)
+  })
+
   it('keys a tap by the card it landed in, else a link or a named button', () => {
     const card = el('button', { 'data-card': 'series:art', 'aria-label': 'Art' })
     const inside = el('span', {}, card)
     expect(shellTapKey(asElement(inside))).toBe('card:series:art')
-    expect(shellTapKey(asElement(el('a', { href: '/photos' })))).toBe('href:/photos')
+    expect(shellTapKey(asElement(el('button', { 'data-open': 'chip:0:food' })))).toBe('open:chip:0:food')
+    // Not on the whitelist: a link, a plain button, a heart inside a card.
+    expect(shellTapKey(asElement(el('a', { href: '/photos' })))).toBeNull()
+    expect(shellTapKey(asElement(el('button', { 'aria-label': 'Buy credits' })))).toBeNull()
+    const art = el('div', { 'data-card': 'tpl-art' })
+    expect(shellTapKey(asElement(el('button', { 'aria-label': 'Save' }, art)))).toBeNull()
+    expect(shellTapKey(asElement(el('span', {}, art)))).toBe('card:tpl-art')
     expect(shellTapKey(asElement(el('div', {})))).toBeNull()
     expect(shellTapKey(null)).toBeNull()
   })

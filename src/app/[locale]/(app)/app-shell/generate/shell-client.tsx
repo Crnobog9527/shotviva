@@ -21,7 +21,7 @@ export function ShellCatalogue() {
 }
 
 declare global {
-  interface Window { __svShell?: { href: string; refreshed?: boolean; tap?: string } }
+  interface Window { __svShell?: { href: string; refreshed?: boolean; tap?: { key: string; at: number } } }
 }
 
 // The worker answered the visitor's address (/generate, /zh/generate) with this shell when the
@@ -34,9 +34,9 @@ function answeredByWorker(): boolean {
 // Once hydrated on the real address: ask the server for that address's page from the root
 // (router.refresh(); router.replace to the address the router already holds does nothing, probe
 // 2026-11-24). The server renders the signed-in page, or sends a signed-out visitor to sign-in.
-// Until then a tap on the shell does nothing visible: it is caught before any card sees it and the
-// last one is replayed on the real page (shell-taps.ts), so no panel opens on the shell and no tap
-// is lost. When the real page takes over, Next keeps this route hidden (Activity) and runs this
+// Until then a tap on the shell does nothing visible: it is caught before anything sees it; the last
+// open action on the whitelist is replayed on the real page within 10 s, anything else is dropped
+// (shell-taps.ts). No panel opens on the shell. When the real page takes over, Next keeps this route hidden (Activity) and runs this
 // effect's cleanup: the shell then renders nothing, so no second catalogue, duplicate id or hidden
 // copy stays on the page. Opened at /app-shell/generate itself, it stays put and inert.
 export function ShellFrame({ children }: { children: ReactNode }) {
@@ -49,7 +49,7 @@ export function ShellFrame({ children }: { children: ReactNode }) {
       event.preventDefault()
       event.stopPropagation()
       const key = shellTapKey(event.target)
-      if (key && window.__svShell) window.__svShell.tap = key
+      if (key && window.__svShell) window.__svShell.tap = { key, at: Date.now() }
     }
     element?.addEventListener('click', hold, true)
     if (answeredByWorker() && window.__svShell && !window.__svShell.refreshed) {
@@ -62,7 +62,7 @@ export function ShellFrame({ children }: { children: ReactNode }) {
       setRetired(true)
       const tap = window.__svShell.tap
       window.__svShell.tap = undefined
-      if (tap) window.requestAnimationFrame(() => replayTap(tap))
+      if (tap) window.requestAnimationFrame(() => replayTap(tap, Date.now()))
     }
   }, [router])
   if (retired) return null

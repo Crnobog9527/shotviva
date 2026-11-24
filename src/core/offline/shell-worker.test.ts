@@ -53,6 +53,7 @@ function network(input: unknown, init?: RequestInit): Response {
 const TREE = encodeURIComponent('["",{"children":[["locale","en","d",null],{"children":["(app)",{"children":["app-shell",{"children":["generate",{}]}]}]}]},null,"refetch"]')
 const nav = (path: string) => ({ request: { url: `${SITE}${path}`, method: 'GET', mode: 'navigate', headers: new Headers() }, preloadResponse: Promise.resolve(undefined) })
 const refresh = (path: string, tree = TREE) => ({ request: { url: `${SITE}${path}${path.includes('?') ? '&' : '?'}_rsc=abc`, method: 'GET', mode: 'cors', headers: new Headers({ rsc: '1', 'next-router-state-tree': tree }) } })
+const early = (path: string, visibilityState = 'visible') => ({ data: { type: 'sv-shell-early', href: `${SITE}${path}` }, source: { visibilityState } })
 const on = serviceWorkerSource({ version: BUILD, cdnOrigins: [], enabled: true, shell: true })
 
 describe('the app shell (switch on)', () => {
@@ -98,6 +99,8 @@ describe('the shell’s refresh (personal content no later)', () => {
     expect(template).toEqual({ en: { rsc: 'abc', tree: TREE } })
     worker.fetch.mockClear()
     await worker.dispatch('fetch', nav('/generate?c=food'))
+    expect(worker.fetch.mock.calls.some((call: unknown[]) => String(call[0]).includes('_rsc'))).toBe(false)
+    await worker.dispatch('message', early('/generate?c=food'))
     expect(worker.fetch).toHaveBeenCalledWith(`${SITE}/generate?c=food&_rsc=abc`, { headers: { rsc: '1', 'next-router-state-tree': TREE }, credentials: 'same-origin' })
     const calls = worker.fetch.mock.calls.length
     const first = await worker.dispatch('fetch', refresh('/generate?c=food'))
@@ -107,11 +110,24 @@ describe('the shell’s refresh (personal content no later)', () => {
     expect(worker.fetch.mock.calls.length).toBe(calls + 1)
   })
 
+  it('starts nothing for a background tab, the shell’s own address or another page', async () => {
+    const worker = runWorker(on)
+    await worker.dispatch('activate', {})
+    await worker.dispatch('fetch', refresh('/generate'))
+    worker.fetch.mockClear()
+    await worker.dispatch('message', early('/generate', 'hidden'))
+    await worker.dispatch('message', early('/app-shell/generate'))
+    await worker.dispatch('message', early('/photos'))
+    await worker.dispatch('message', { data: { type: 'sv-shell-early', href: 'https://evil.example/generate' }, source: { visibilityState: 'visible' } })
+    expect(worker.fetch).not.toHaveBeenCalled()
+  })
+
   it('never keeps the early answer in a cache, and leaves other RSC requests alone', async () => {
     const worker = runWorker(on)
     await worker.dispatch('activate', {})
     await worker.dispatch('fetch', refresh('/generate'))
     await worker.dispatch('fetch', nav('/generate'))
+    await worker.dispatch('message', early('/generate'))
     await worker.dispatch('fetch', refresh('/generate'))
     const kept = [...worker.stores.values()].flatMap((store) => [...store.keys()])
     expect(kept.filter((url) => url.includes('_rsc') || url === `${SITE}/generate`)).toEqual([])

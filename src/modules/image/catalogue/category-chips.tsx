@@ -65,6 +65,8 @@ function ChipRow({ chips, label, depth, onChange }: RowProps) {
           key={chip.key}
           type="button"
           aria-pressed={chip.pressed}
+          // An open action Create's app shell may replay (ARCHITECTURE §18.3).
+          data-open={`chip:${depth}:${chip.key}`}
           onClick={(event) => {
             onChange(chip.select)
             event.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })

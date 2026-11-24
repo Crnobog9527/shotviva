@@ -18,12 +18,17 @@ export async function generateMetadata(): Promise<Metadata> {
 // signed out. The service worker keeps it (fetched without credentials) and answers /generate with
 // it; ShellFrame then asks the server for the real page and drops the shell once it is shown. The
 // template area carries no id here: the real page's anchor must stay the only one.
+// Plain script, run while the shell's HTML is parsed. The worker ignores the message for anything
+// but /generate and /zh/generate, so the shell opened at its own address asks for nothing.
+const SHELL_BOOT = "window.__svShell={href:location.href};try{var c=navigator.serviceWorker&&navigator.serviceWorker.controller;if(c&&document.visibilityState==='visible')c.postMessage({type:'sv-shell-early',href:location.href})}catch(e){}"
+
 export default function CreateShell() {
   const t = useTranslations('app.create')
   return (
     <AppPage wide>
-      {/* The address the visitor opened, read before React hydrates (ShellFrame refreshes it). */}
-      <script dangerouslySetInnerHTML={{ __html: 'window.__svShell={href:location.href}' }} />
+      {/* The address the visitor opened, read before React hydrates (ShellFrame refreshes it). In the
+          foreground, the worker starts that refresh's request now (shell-worker.ts). */}
+      <script dangerouslySetInnerHTML={{ __html: SHELL_BOOT }} />
       <ShellFrame>
         <TabRootHeader title={t('title')} lede={t('lede')} aside={<><GeneratingPill /><BalanceChipSlot /></>} />
         <div className="px-(--gutter) pb-2 md:max-w-[880px]">

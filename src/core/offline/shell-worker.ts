@@ -8,8 +8,9 @@
 //   Cookie header on that path), and keeps only a 200, same-origin answer carrying this build's
 //   X-SV-Shell header, in sv-shell-<build>. A navigation to /generate or /zh/generate is answered
 //   with it at once, and it is fetched again behind. Without one: the network, as before.
-// - Personal content no later than without the shell: while answering with the shell, the worker
-//   starts the RSC request the shell's router.refresh() will make (its headers recorded from the
+// - Personal content no later than without the shell: once the shell page (answered from the
+//   cache) says it is in the foreground (its inline script, before hydration), the worker starts
+//   the RSC request the shell's router.refresh() will make (its headers recorded from the
 //   last refresh under this build: headers only, never an answer), and hands that early answer to
 //   the matching refresh, once, from memory. It carries the account (a same-origin request, with
 //   cookies), so it is never written to any cache and is dropped after EARLY_MS unused.
@@ -83,10 +84,7 @@ async function shellFirst(event, shellUrl) {
     hit = await (await caches.open(SHELL)).match(shellUrl)
   } catch {}
   event.waitUntil(refreshShell(shellUrl))
-  if (hit) {
-    event.waitUntil(startEarly(event.request.url).catch(() => {}))
-    return hit
-  }
+  if (hit) return hit
   try {
     const preloaded = await event.preloadResponse
     if (preloaded && preloaded.status !== 204) return preloaded
@@ -143,6 +141,23 @@ function shellFetch(event) {
   return false
 }
 
+// The shell page, answered from the cache and in the foreground (never a background tab), asks for
+// its refresh to start now. Only for /generate or /zh/generate on this site.
+function shellMessage(event) {
+  const data = event.data
+  if (!data || data.type !== 'sv-shell-early' || typeof data.href !== 'string') return false
+  let url
+  try {
+    url = new URL(data.href)
+  } catch {
+    return true
+  }
+  const source = event.source
+  const foreground = !source || source.visibilityState === undefined || source.visibilityState === 'visible'
+  if (url.origin === self.location.origin && shellPathFor(url.pathname) && foreground) event.waitUntil(startEarly(url.href).catch(() => {}))
+  return true
+}
+
 async function shellActivate() {
   try {
     if (self.registration.navigationPreload) await self.registration.navigationPreload.setHeaderValue(SHELL_PRELOAD)
@@ -160,6 +175,7 @@ async function dropShell() {
 // With the shell switch off: nothing is answered from a shell, preload goes back to its default
 // header, and any shell an earlier build kept is deleted on activation (sw.ts).
 export const NO_SHELL = `const shellFetch = () => false
+const shellMessage = () => false
 async function shellActivate() {
   try {
     if (self.registration.navigationPreload) await self.registration.navigationPreload.setHeaderValue('true')

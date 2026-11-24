@@ -41,7 +41,7 @@ export function CatalogueSections({ sections, firstPriority = true, onOpen, onOp
             <Reveal className="flex items-baseline gap-2 px-(--gutter)">
               <h3 id={headingId} className="shrink-0 text-body leading-[1.25] font-semibold tracking-[-0.015em]">{section.name}</h3>
               {section.intro ? <p className="min-w-0 flex-1 truncate text-caption text-muted-foreground">{section.intro}</p> : <span className="flex-1" />}
-              <button type="button" onClick={() => onSeeAll(section)}
+              <button type="button" onClick={() => onSeeAll(section)} data-open={`see:${section.slug}`}
                 className="press -my-2 inline-flex min-h-11 shrink-0 items-center gap-1 rounded-inner ps-2 text-caption font-medium text-foreground">
                 {t('seeAll')}{' '}
                 <span className="font-mono text-muted-foreground">{section.total}</span>
