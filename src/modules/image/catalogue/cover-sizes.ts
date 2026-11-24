@@ -26,6 +26,10 @@ export const COVER_SIZES = {
   // of drag compares is two columns on phones and three from md (336 px each from lg).
   railPlate: `(min-width: 1024px) 182px, (min-width: 768px) 25vw, ${phone(38)}`,
   railFrame: `(min-width: 1024px) 364px, (min-width: 768px) 50vw, ${phone(75)}`,
+  // A series shelf in a chosen category (Owner 2026-11-25): the phone card is the All rail's; from
+  // md a row shows two and a quarter cards (about 44vw each), from lg three and a quarter (335 px).
+  shelfPlate: `(min-width: 1024px) 168px, (min-width: 768px) 22vw, ${phone(38)}`,
+  shelfFrame: `(min-width: 1024px) 335px, (min-width: 768px) 44vw, ${phone(75)}`,
   artSection: `(min-width: 1024px) 336px, (min-width: 768px) 30vw, ${phone(44)}`,
   featurePlate: `(min-width: 1024px) 560px, ${phone(50)}`,
   featureFrame: `(min-width: 1024px) 1120px, ${phone(100)}`,

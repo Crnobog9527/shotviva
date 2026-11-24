@@ -15,7 +15,9 @@ import { useHoverWipe } from './use-hover-wipe'
 // Cover widths when the card is drawn narrower than the grid's (Create's All sections).
 export type CardSizes = { plate?: string; frame?: string; art?: string }
 
-type Props = { template: CatalogueTemplate; onOpen(id: string): void; eager?: boolean; priority?: boolean; sizes?: CardSizes }
+// `series`: the name of the series the template belongs to, shown as a small label (search results,
+// which list templates only, Owner 2026-11-25).
+type Props = { template: CatalogueTemplate; onOpen(id: string): void; eager?: boolean; priority?: boolean; sizes?: CardSizes; series?: string }
 
 // A template card (DESIGN §4.2 and §6.9 items 1–3, B comp create.html). A 'compare' category
 // (画风) keeps the drag compare; every other template is the side-by-side pair that plays its change on hover.
@@ -27,7 +29,7 @@ export function TemplateCard(props: Props) {
   return <PairCard {...props} />
 }
 
-function PairCard({ template, onOpen, eager, priority, sizes }: Props) {
+function PairCard({ template, onOpen, eager, priority, sizes, series }: Props) {
   const ref = useRef<HTMLButtonElement>(null)
   const alt = useTranslations('app.template')('cardAlt', { name: template.name })
   useHoverWipe(ref)
@@ -49,7 +51,7 @@ function PairCard({ template, onOpen, eager, priority, sizes }: Props) {
         ) : (
           <span className="hairline block aspect-[8/5] rounded-control bg-muted" />
         )}
-        <CardMeta template={template} />
+        <CardMeta template={template} series={series} />
       </button>
       <PickMark item={{ type: 'template', id: template.id }}>
         <FavoriteButton template={template} surface="create_card" className="top-0.5 right-0.5" />
@@ -61,7 +63,7 @@ function PairCard({ template, onOpen, eager, priority, sizes }: Props) {
 // The one card with the drag compare (画风 / Art Styles): a tap on the photo opens the dialog, a drag
 // compares; the name and price below are their own button for the keyboard. From md up it is the
 // tall card spanning two rows (the grid sets the span).
-function ArtCard({ template, onOpen, eager, sizes }: Props) {
+function ArtCard({ template, onOpen, eager, sizes, series }: Props) {
   const t = useTranslations('app.template')
   return (
     <div data-card={template.id} className="relative flex h-full flex-col rounded-tile">
@@ -78,19 +80,21 @@ function ArtCard({ template, onOpen, eager, sizes }: Props) {
         className="hairline rounded-control md:aspect-auto md:min-h-[280px] md:flex-1"
       />
       <button type="button" aria-haspopup="dialog" onClick={() => onOpen(template.id)} className="press block w-full rounded-inner text-left">
-        <CardMeta template={template} />
+        <CardMeta template={template} series={series} />
       </button>
     </div>
   )
 }
 
-function CardMeta({ template }: { template: CatalogueTemplate }) {
+function CardMeta({ template, series }: { template: CatalogueTemplate; series?: string }) {
   const t = useTranslations('app.template')
+  const s = useTranslations('app.series')
   const category = template.categoryName
   const cost = cardPrice(template)
   const kind = isMotion(template) ? t(template.cover.type === 'video' ? 'featureMeta' : 'animatedMeta', { category }) : category
   return (
     <span className="block pt-2">
+      {series ? <span data-series-label="" className="mb-1 block truncate text-caption leading-[1.35] font-medium text-bone-dim">{s('inSeries', { name: series })}</span> : null}
       <span className="block text-body leading-[1.25] font-semibold tracking-[-0.015em]">{template.name}</span>
       <span className="mt-1 block text-caption leading-[1.35] text-muted-foreground">{kind}</span>
       {cost !== null ? <span className="mt-2 inline-block rounded-tag bg-wash px-2 py-1 font-mono text-caption leading-none text-bone-dim">{t(template.imagesPerSet ? 'fromCreditsSet' : 'fromCredits', { count: cost, images: template.imagesPerSet ?? 1 })}</span> : null}

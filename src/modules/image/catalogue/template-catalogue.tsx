@@ -5,7 +5,6 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 
 import { trackCatalogueSeeAll } from '@/core/analytics/browser'
-import { cn } from '@/core/ui/cn'
 import { Reveal } from '@/core/ui/reveal-item'
 
 import { useFavorites } from '../favorites/favorites-provider'
@@ -15,10 +14,12 @@ import { CreateDialog, type CreateContext } from '../workspace/create-dialog'
 import { filterCatalogue } from './catalogue-filter'
 import { buildSearchIndex, searchTemplates } from './catalogue-search'
 import type { CataloguePayload } from './catalogue-payload'
-import { catalogueSections, isTall, sectionsFor, type CatalogueSection } from './catalogue-sections'
+import { CatalogueGrid, type GridProps } from './catalogue-grid'
+import { catalogueSections, sectionsFor, type CatalogueSection } from './catalogue-sections'
+import { seriesNames } from './catalogue-shelves'
 import { CatalogueSections } from './catalogue-sections-view'
 import { batchableTemplates, isMotion, type CatalogueTemplate } from './catalogue-template'
-import { findSeries, type CatalogueView, type GridEntry } from './catalogue-view'
+import { findSeries, type CatalogueView, type FilterNode, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
 import { isPosterIn, PosterDialogSlot } from './poster-dialog-slot'
 import { posterSeriesOf, posterStart } from './poster-series'
@@ -26,8 +27,7 @@ import { SavedEmpty } from './saved-empty'
 import { SearchBox } from './search-box'
 import { FeatureCard } from './feature-card'
 import { FirstScreenCovers } from './near-viewport'
-import { SeriesCard } from './series-card'
-import { TemplateCard } from './template-card'
+import { ShelvedGrid } from './shelved-grid'
 import { ShareModeButton } from '../template-share/share-mode-button'
 import { ShareSelectionProvider, useShareSelectionState, type ShareSelection } from '../template-share/share-selection'
 import { useSeeAllLanding } from './use-see-all-landing'
@@ -115,7 +115,7 @@ export function TemplateCatalogue({ payload, create: createProp, endCard }: Prop
           <CategoryChips hidden={search.results !== null} filters={view.filters} saved={showSaved(saved.length, active.saved, holdsSaved(favorites))} value={active} onChange={query.select} labels={chipLabels(t)} />
         </div>
         <h2 className="sr-only">{t('templates')}</h2>
-        <CatalogueBody search={search} firstPriority={!featured} sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onSeeAll={seeAll} />
+        <CatalogueBody search={search} firstPriority={!featured} sections={sectionsFor(active, sections)} shown={shown} filters={view.filters} path={active.path} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onSeeAll={seeAll} />
         <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
         <CatalogueDialogs
           create={create}
@@ -203,13 +203,15 @@ function useCatalogueSearch(view: CatalogueView) {
   const [query, setQuery] = useState('')
   const index = useMemo(() => buildSearchIndex(view.entries, view.filters), [view])
   const results = useMemo(() => (query.trim() ? searchTemplates(index, query) : null), [index, query])
-  return { query, setQuery, results }
+  const series = useMemo(() => seriesNames(view.entries), [view.entries])
+  return { query, setQuery, results, series }
 }
 
-type ResultsProps = { query: string; results: readonly CatalogueTemplate[]; endCard?: ReactNode; onOpen(id: string): void }
+type ResultsProps = { query: string; results: readonly CatalogueTemplate[]; series: ReadonlyMap<string, string>; endCard?: ReactNode; onOpen(id: string): void }
 
-// Matches as plain template cards; none: a line, and the Wishlist's card when it is open.
-function SearchResults({ query, results, endCard, onOpen }: ResultsProps) {
+// Matches as plain template cards (never series cards; a member names its series); none: a line,
+// and the Wishlist's card when it is open.
+function SearchResults({ query, results, series, endCard, onOpen }: ResultsProps) {
   const t = useTranslations('app.create')
   const entries = results.map((template): GridEntry => ({ type: 'template', template, path: [] }))
   return (
@@ -217,15 +219,18 @@ function SearchResults({ query, results, endCard, onOpen }: ResultsProps) {
       <p aria-live="polite" className="px-(--gutter) pt-2 text-caption text-muted-foreground">
         {results.length ? t('searchResults', { query, count: results.length }) : t('searchEmpty', { query })}
       </p>
-      <CatalogueGrid entries={entries} endCard={endCard} className="mt-3" onOpen={onOpen} onOpenSeries={() => undefined} />
+      <CatalogueGrid entries={entries} endCard={endCard} seriesOf={series} className="mt-3" onOpen={onOpen} onOpenSeries={() => undefined} />
     </>
   )
 }
 
-type BodyProps = Omit<GridProps, 'entries' | 'className'> & {
+type BodyProps = Omit<GridProps, 'entries' | 'className' | 'eagerCount' | 'seriesOf'> & {
   search: ReturnType<typeof useCatalogueSearch>
   sections: CatalogueSection[] | null
   shown: readonly GridEntry[]
+  // The chosen category's place in the chip tree: its series become shelves (shelved-grid.tsx).
+  filters: readonly FilterNode[]
+  path: readonly string[]
   // Saved is chosen: when it holds nothing, its empty state with the way back to All.
   saved: boolean
   onBrowse(): void
@@ -239,37 +244,16 @@ const showSaved = (count: number, chosen: boolean, held = false) => count > 0 ||
 
 // A search replaces the sections and the chosen category's grid with its matches; Saved with
 // nothing saved shows its empty state.
-function CatalogueBody({ search, firstPriority, sections, shown, saved, onBrowse, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
-  if (search.results) return <SearchResults query={search.query.trim()} results={search.results} endCard={endCard} onOpen={onOpen} />
+function CatalogueBody({ search, firstPriority, sections, shown, filters, path, saved, onBrowse, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
+  if (search.results) return <SearchResults query={search.query.trim()} results={search.results} series={search.series} endCard={endCard} onOpen={onOpen} />
   if (saved && shown.length === 0) return <SavedEmpty onBrowse={onBrowse} />
-  if (!sections) return <CatalogueGrid entries={shown} endCard={endCard} firstPriority={firstPriority} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
+  if (saved) return <CatalogueGrid entries={shown} endCard={endCard} firstPriority={firstPriority} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
+  if (!sections) return <ShelvedGrid entries={shown} filters={filters} path={path} endCard={endCard} firstPriority={firstPriority} onOpen={onOpen} onOpenSeries={onOpenSeries} />
   return (
     <>
       <CatalogueSections sections={sections} firstPriority={firstPriority} onOpen={onOpen} onOpenSeries={onOpenSeries} onSeeAll={onSeeAll} />
       {endCard ? <CatalogueGrid entries={[]} endCard={endCard} className="mt-8 md:mt-10" onOpen={onOpen} onOpenSeries={onOpenSeries} /> : null}
     </>
-  )
-}
-
-// `firstPriority`: the first card is the page's largest paint, so its covers load at high priority;
-// false when the featured card sits above it (that one is the largest, feature-card.tsx).
-type GridProps = { entries: readonly GridEntry[]; endCard?: ReactNode; firstPriority?: boolean; className: string; onOpen(id: string): void; onOpenSeries(slug: string): void }
-
-// The flat grid: a chosen category, Saved, or All with a single category.
-function CatalogueGrid({ entries, endCard, firstPriority = true, className, onOpen, onOpenSeries }: GridProps) {
-  return (
-    <ul className={cn('grid grid-flow-row-dense grid-cols-1 gap-x-3 gap-y-6 px-(--gutter) md:grid-cols-2 md:gap-x-4 lg:grid-cols-3', className)}>
-      {entries.map((entry, index) => (
-        <Reveal as="li" key={entryKey(entry)} className={cn(isTall(entry) && 'md:row-span-2')}>
-          {entry.type === 'series' ? (
-            <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={index < 3} priority={firstPriority && index === 0} />
-          ) : (
-            <TemplateCard template={entry.template} onOpen={onOpen} eager={index < 3} priority={firstPriority && index === 0} />
-          )}
-        </Reveal>
-      ))}
-      {endCard ? <Reveal as="li">{endCard}</Reveal> : null}
-    </ul>
   )
 }
 
@@ -286,8 +270,6 @@ function featuredOf(entries: readonly GridEntry[]) {
   for (const entry of entries) if (entry.type === 'template' && isMotion(entry.template) && entry.template.cover.type === 'video') return entry.template
   return null
 }
-
-const entryKey = (entry: GridEntry) => (entry.type === 'series' ? `series-${entry.series.id}` : entry.template.id)
 
 // True once the chip bar has stuck to the top: only then does it pad for the top safe area and
 // take its bar material (chrome-bleed, globals-body.css), so at rest there is no band over the ground (or the living background,

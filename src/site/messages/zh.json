@@ -677,7 +677,13 @@
       "cardAria": "{name}，系列共 {count} 个模板，选一个开始",
       "coverAlt": "{name} 系列效果示例",
       "members": "{name} · {count} 个模板",
-      "badge": "系列"
+      "badge": "系列",
+      "shelfCount": "共 {count} 个",
+      "shelfMore": "+{count} 个",
+      "shelfMoreAria": "查看「{name}」全部 {total} 个模板",
+      "scrollBack": "向前滚动「{name}」",
+      "scrollOn": "向后滚动「{name}」",
+      "inSeries": "系列：{name}"
     },
     "template": {
       "fromCredits": "{count} 积分起",

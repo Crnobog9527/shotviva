@@ -66,8 +66,15 @@ export function buildCatalogueView(index: CatalogueIndex | null, templates: read
     templates: new Map(templates.map((template) => [template.id, template])),
     series: new Map(index.series.map((item) => [item.id, item])),
   }
-  const entries = index.entries.flatMap((entry) => toGridEntry(entry, lookup))
+  const entries = onePlace(index.entries.flatMap((entry) => toGridEntry(entry, lookup)))
   return { filters: trim(index.tree, entries, zh), entries }
+}
+
+// A template shows in one place only (Owner 2026-11-25): a series member lives in its series'
+// shelf, never also as a loose card, whatever the series' old 「成员也在分类中单独展示」 says.
+export function onePlace(entries: readonly GridEntry[]): GridEntry[] {
+  const members = new Set(entries.flatMap((entry) => (entry.type === 'series' ? entry.series.members.map((member) => member.id) : [])))
+  return entries.filter((entry) => entry.type === 'series' || !members.has(entry.template.id))
 }
 
 type Lookup = {

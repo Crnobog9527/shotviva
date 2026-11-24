@@ -73,6 +73,12 @@ describe('Create grid entries (T102)', () => {
     expect(result.filters[0].children[0].slug).toBe('dark')
   })
 
+  it('shows a series member only in its series, even when the series once showed members loose', () => {
+    const loose = { ...index, entries: [index.entries[0], { type: 'template' as const, id: 'm1', categoryKey: 'food-dark' }, index.entries[2]] }
+    const result = buildCatalogueView(loose, templates, false)
+    expect(result.entries.map((entry) => (entry.type === 'series' ? entry.series.id : entry.template.id))).toEqual(['s1', 't2'])
+  })
+
   it('falls back to the flat list by root category when the index read failed', () => {
     const flat = buildCatalogueView(null, [template('t1'), template('t2', 'pets')], false)
     expect(flat.filters.map((f) => f.slug)).toEqual(['food', 'pets'])
