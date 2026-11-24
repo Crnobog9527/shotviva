@@ -113,7 +113,7 @@ export async function saveServiceWorkerAction(input: unknown): Promise<ActionRes
   return runAdminAction(() => saveSettingSwitch({ db: createAdminSupabase(), invalidate }, admin.id, 'service_worker_enabled', input))
 }
 
-// 2000: Create's app shell (ARCHITECTURE §18.3). /sw.js reads it through the same tag.
+// 2001: Create's app shell (ARCHITECTURE §18.3). /sw.js reads it through the same tag.
 export async function saveAppShellAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()
   const invalidate = () => {

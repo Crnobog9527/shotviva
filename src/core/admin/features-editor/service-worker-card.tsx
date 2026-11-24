@@ -35,7 +35,7 @@ export const SERVICE_WORKER_SWITCH_COPY: SwitchCopy = {
   },
 }
 
-// 2000: Create's app shell (system_settings service_worker_shell_enabled, ARCHITECTURE §18.3), apart
+// 2001: Create's app shell (system_settings service_worker_shell_enabled, ARCHITECTURE §18.3), apart
 // from the switch above so it can be turned off alone. Works only while that one is on.
 export const APP_SHELL_SWITCH_COPY: SwitchCopy = {
   title: '创作页秒开（App 外壳）',

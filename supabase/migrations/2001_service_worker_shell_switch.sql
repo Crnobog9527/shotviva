@@ -1,4 +1,4 @@
--- 2000: a separate switch for Create's app shell (ARCHITECTURE §18.3, mobile speed plan 2):
+-- 2001: a separate switch for Create's app shell (ARCHITECTURE §18.3, mobile speed plan 2):
 -- system_settings key service_worker_shell_enabled, boolean; no row means off. On, the service
 -- worker answers /generate with the signed-out shell it keeps and swaps in the real page; off (or
 -- the master switch service_worker_enabled off), it never does and drops the shell it kept. Apart

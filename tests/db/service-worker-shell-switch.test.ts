@@ -6,7 +6,7 @@ import { loadSettingSwitch, saveSettingSwitch } from '@/core/admin'
 import { connectAdmin, createUser } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
-// 2000: service_worker_shell_enabled (Create's app shell, ARCHITECTURE §18.3) through the command the
+// 2001: service_worker_shell_enabled (Create's app shell, ARCHITECTURE §18.3) through the command the
 // /admin/features card calls. Off with no row;
 // only an unbanned admin may save it, and only as a boolean.
 
@@ -28,7 +28,7 @@ afterAll(async () => {
   await db.end()
 })
 
-describe('service_worker_shell_enabled (2000)', () => {
+describe('service_worker_shell_enabled (2001)', () => {
   it('is off until saved, then follows the admin save', async () => {
     expect((await loadSettingSwitch(service, 'service_worker_shell_enabled')).enabled).toBe(false)
     await save(admin, true)
