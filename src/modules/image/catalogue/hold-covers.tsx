@@ -34,4 +34,4 @@ export function useHoldUntilFirst() {
   return { first, held }
 }
 
-export const HoldCovers = ({ held, children }: { held: boolean; children: ReactNode }) => <Held value={held}>{children}</Held>
+export const HoldCovers = ({ held, children }: { held: boolean; children?: ReactNode }) => <Held value={held}>{children}</Held>
