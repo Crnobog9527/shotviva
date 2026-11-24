@@ -12,7 +12,9 @@ import type { AdminTemplate } from '../templates/types'
 import { CategoryGroups } from './category-groups'
 import { LOCALE_DISPLAY_COPY as COPY } from './copy'
 import { featuredState, siblingGroups } from './display-state'
-import { groupKey, reorderGroup, resetFeatured, resetGroup, setFeatured } from './draft'
+import type { FeaturedBundleActions } from '../featured-bundles/types'
+import { groupKey, reorderGroup, resetFeatured, resetGroup, setBundles, setFeatured } from './draft'
+import { LocaleBundles } from './locale-bundles'
 import { EditBar } from './edit-bar'
 import { FeaturedList } from './featured-list'
 import { usePanelOpen } from './use-panel-open'
@@ -23,13 +25,15 @@ type Props = {
   templates: AdminTemplate[]
   display: LocaleDisplay
   actions: LocaleDisplayActions
+  // 精选组合: making one from the 分语言展示 draft saves it at once.
+  saveBundle: FeaturedBundleActions['save']
 }
 
 // 分语言展示: the home page's category groups, Create's category bar and the home featured list
 // (and the generator rail under it), set separately for the English and the Chinese site. Closed
 // and read-only by default (Owner 2026-11-25); 编辑 opens a draft for one language that 保存
 // applies in one go. Closing only hides the body, so an open draft survives it.
-export function LocaleDisplayPanel({ categories: all, templates, display, actions }: Props) {
+export function LocaleDisplayPanel({ categories: all, templates, display, actions, saveBundle }: Props) {
   const [open, setOpen] = usePanelOpen()
   const categories = all.filter((category) => !category.isSystem)
   const summary = DISPLAY_LOCALES.map((code) => COPY.summary(COPY.locales[code],
@@ -46,16 +50,17 @@ export function LocaleDisplayPanel({ categories: all, templates, display, action
           </span>
         </button>
       </h2>
-      <PanelBody hidden={!open} categories={categories} templates={templates} display={display} actions={actions} />
+      <PanelBody hidden={!open} categories={categories} templates={templates} display={display} actions={actions} saveBundle={saveBundle} />
     </section>
   )
 }
 
-function PanelBody({ hidden, categories, templates, display, actions }: Props & { hidden: boolean }) {
+function PanelBody({ hidden, categories, templates, display, actions, saveBundle }: Props & { hidden: boolean }) {
   const editor = useLocaleDisplayEditor({ categories, templates, display, actions })
   const { locale, shown, shared, update } = editor
   const label = COPY.locales[locale]
   const nameOf = (key: string) => categories.find((category) => category.key === key)?.nameZh ?? key
+  const bundleContext = { bundles: display.bundles?.list ?? [], templates, categories, save: saveBundle }
   return (
     <div id="locale-display-body" hidden={hidden} className="grid gap-4">
       <p className="max-w-prose text-sm text-muted-foreground">{COPY.body}</p>
@@ -75,6 +80,8 @@ function PanelBody({ hidden, categories, templates, display, actions }: Props & 
       <FeaturedList locale={locale} label={label} list={shown.featured} templates={templates} categories={categories} editing={editor.editing}
         onChange={(ids) => update((draft) => setFeatured(draft, ids, shared))}
         onReset={() => update((draft) => resetFeatured(draft, shared))} />
+      <LocaleBundles label={label} own={shown.featured.own} ids={shown.bundles} context={bundleContext} editing={editor.editing}
+        onChange={(ids) => update((draft) => setBundles(draft, ids))} />
       {editor.editing ? <EditBar editor={editor} label={label} /> : null}
     </div>
   )

@@ -17,6 +17,9 @@ export type LayerPair = readonly [before: string, after: string]
 // On a frame with later pairs: the card's key in /api/home/series (TemplateCard.id).
 export const MORE_ATTR = 'data-series-more'
 export const SIZES_ATTR = 'data-series-sizes'
+// A bundle card's templates, one per pair in order: the crossfade moves the card's
+// data-pick-template to the one on show (bundle-card.tsx, series-motion-mount.tsx).
+export const BUNDLE_IDS_ATTR = 'data-bundle-ids'
 const BUILT_ATTR = 'data-series-built'
 const SIZE = { width: 900, height: 1125 }
 

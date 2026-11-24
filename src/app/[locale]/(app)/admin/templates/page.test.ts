@@ -16,10 +16,12 @@ vi.mock('@/core/admin', () => ({
   TemplatesEditor: () => null,
   CategoriesPanel: () => null,
   LocaleDisplayPanel: () => null,
+  BundlesPanel: () => null,
 }))
 vi.mock('@/core/templates/locale-display-read', () => ({ readLocaleDisplay: async () => ({ categoryOrder: {}, featured: {} }) }))
 vi.mock('@/core/admin/template-categories', () => ({ listAdminCategoryTree: (db: unknown) => listAdminCategoryTree(db) }))
 vi.mock('@/core/admin/template-series', () => ({ seriesCopy: { title: "系列管理" }, listAdminSeriesOptions: (db: unknown) => listAdminSeriesOptions(db) }))
+vi.mock('./bundle-actions', () => ({ saveFeaturedBundleAction: vi.fn(), deleteFeaturedBundleAction: vi.fn(), setDefaultFeaturedBundlesAction: vi.fn() }))
 vi.mock('./category-actions', () => ({ moveTemplateCategoryAction: vi.fn(), saveLocaleDisplayAction: vi.fn() }))
 vi.mock('@/site/template-pricing', () => ({ readPricingOptions: (client: unknown) => readPricingOptions(client) }))
 vi.mock('./actions', () => ({

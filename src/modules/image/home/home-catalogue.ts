@@ -22,15 +22,18 @@ const isHomeTemplate = (template: LocalizedTemplate) => !template.fields.images.
 // templates by featured_rank, then, with fewer than four featured, the rest in catalogue order.
 // Four, so it still has three alternatives after the visitor picks a template outside it; the
 // opening template (the page's default, featured[0] today) joins it when it is not among them.
-function railTemplates(eligible: readonly LocalizedTemplate[]): LocalizedTemplate[] {
+// 精选组合's templates (`bundled`, in bundle order) come after the featured ones, before the rest.
+function railTemplates(eligible: readonly LocalizedTemplate[], bundled: readonly string[]): LocalizedTemplate[] {
   const featured = eligible.filter((template) => template.featuredRank !== null).sort((a, b) => (a.featuredRank ?? 0) - (b.featuredRank ?? 0))
+  const byId = new Map(eligible.map((template) => [template.id, template]))
+  const fromBundles = bundled.flatMap((id) => byId.get(id) ?? [])
   const rest = eligible.filter((template) => template.featuredRank === null)
-  return [...featured, ...rest].slice(0, HOME_RAIL_SIZE)
+  return [...new Set([...featured, ...fromBundles, ...rest])].slice(0, HOME_RAIL_SIZE)
 }
 
-export function homePanelTemplates(live: readonly LocalizedTemplate[], defaultId: string | null) {
+export function homePanelTemplates(live: readonly LocalizedTemplate[], defaultId: string | null, bundled: readonly string[] = []) {
   const eligible = live.filter(isHomeTemplate)
-  const first = railTemplates(eligible)
+  const first = railTemplates(eligible, bundled)
   const opening = eligible.find((template) => template.id === defaultId) ?? first[0]
   const rows = opening && !first.includes(opening) ? [...first, opening] : first
   return { templates: rows.map((template) => panelSummary(toCatalogueTemplate(template))), opening }

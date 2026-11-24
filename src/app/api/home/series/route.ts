@@ -3,10 +3,11 @@ import { z } from 'zod'
 
 import { LOCALES } from '@/core/i18n'
 import { logger } from '@/core/logger'
+import { cachedFeaturedBundles } from '@/core/templates/cached-bundles'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { cachedPublicSeries } from '@/core/templates/public-series'
 import { HOME_CATALOGUE_CACHE_CONTROL } from '@/modules/image'
-import { seriesLayerPairs } from '@/site/content'
+import { bundleLayerPairs, seriesLayerPairs } from '@/site/content'
 
 const localeSchema = z.enum(LOCALES)
 const NO_STORE = { 'Cache-Control': 'no-store' }
@@ -20,8 +21,9 @@ export async function GET(request: Request) {
   if (!locale.success) return Response.json({ code: 'INVALID_INPUT' }, { status: 400, headers: NO_STORE })
 
   try {
-    const [live, series] = await Promise.all([cachedWebCatalogue(locale.data), cachedPublicSeries(locale.data)])
-    const layers = seriesLayerPairs(live, series)
+    const [live, series, bundles] = await Promise.all([cachedWebCatalogue(locale.data), cachedPublicSeries(locale.data), cachedFeaturedBundles(locale.data)])
+    // Bundle cards (精选组合) play the same way, under their own keys.
+    const layers = { ...seriesLayerPairs(live, series), ...bundleLayerPairs(live, bundles) }
     // An empty answer is what a failed read degrades to (both reads fall back to empty): never shared.
     return Response.json(layers, { headers: Object.keys(layers).length > 0 ? { 'Cache-Control': HOME_CATALOGUE_CACHE_CONTROL } : NO_STORE })
   } catch (error) {

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 
-import { NO_LOCALE_DISPLAY, type LocaleDisplay } from '@/core/templates/locale-display'
+import { localeBundles, NO_LOCALE_DISPLAY, type LocaleDisplay } from '@/core/templates/locale-display'
 
 import type { DisplayLocale, LocaleDisplayActions } from '../locale-display/types'
 import type { AdminCategoryNode } from '../template-categories/types'
@@ -26,8 +26,11 @@ export function useLocaleDisplayEditor({ categories, templates, display, actions
   const [saving, startTransition] = useTransition()
 
   const groups = siblingGroups(categories, display, locale)
-  const saved = toDraft(groups, featuredState(templates, display, locale))
-  const shared = sharedLists(siblingGroups(categories, NO_LOCALE_DISPLAY, locale), featuredState(templates, NO_LOCALE_DISPLAY, locale))
+  const bundleIds = (shown: LocaleDisplay) => localeBundles(shown, locale).map((bundle) => bundle.id)
+  const saved = toDraft(groups, featuredState(templates, display, locale), bundleIds(display))
+  // The default lists: the same display with no language of its own (bundles kept, featured not).
+  const defaults = { ...NO_LOCALE_DISPLAY, bundles: display.bundles }
+  const shared = sharedLists(siblingGroups(categories, NO_LOCALE_DISPLAY, locale), featuredState(templates, NO_LOCALE_DISPLAY, locale), bundleIds(defaults))
   const draft = edit?.locale === locale ? edit.draft : null
   const changes = draft ? draftChanges(saved, draft) : null
   const dirty = changes !== null && hasChanges(changes)

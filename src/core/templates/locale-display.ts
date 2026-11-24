@@ -10,6 +10,37 @@ export type LocaleDisplay = {
   categoryOrder: Partial<Record<Locale, Record<string, number>>>
   // The language's featured template ids in order; absent or empty follows the shared list.
   featured: Partial<Record<Locale, string[]>>
+  // 精选组合 (migrations 2004, 2005); absent on a database without them.
+  bundles?: FeaturedBundles
+}
+
+export type FeaturedBundle = {
+  id: string
+  nameEn: string
+  nameZh: string
+  // In the bundle's order.
+  templateIds: string[]
+  // Place in the default 首页精选's bundles; null: not there.
+  featuredRank: number | null
+}
+
+export type FeaturedBundles = {
+  // Every bundle, placed or not, oldest first.
+  list: FeaturedBundle[]
+  // A language's own bundle ids in order; only read while it has its own featured list.
+  locale: Partial<Record<Locale, string[]>>
+}
+
+// The bundles a language shows, in order: its own while it has its own featured templates (an
+// empty own list shows none), else the default ones by featured_rank.
+export function localeBundles(display: LocaleDisplay, locale: Locale): FeaturedBundle[] {
+  const bundles = display.bundles
+  if (!bundles) return []
+  if ((display.featured[locale] ?? []).length > 0) {
+    const byId = new Map(bundles.list.map((bundle) => [bundle.id, bundle]))
+    return (bundles.locale[locale] ?? []).flatMap((id) => byId.get(id) ?? [])
+  }
+  return bundles.list.filter((bundle) => bundle.featuredRank !== null).sort((a, b) => (a.featuredRank ?? 0) - (b.featuredRank ?? 0))
 }
 
 export const NO_LOCALE_DISPLAY: LocaleDisplay = { categoryOrder: {}, featured: {} }

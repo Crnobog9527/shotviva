@@ -117,7 +117,10 @@ export type HomeFaq = readonly [FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, Faq
 // `series`: a series card (T102; Owner 2026-11-12): where it opens, the members whose pairs it
 // shows (their covers are in the media lookup by template id), and how many templates it holds.
 export type SeriesCardInfo = { href: string; members: readonly string[]; count: number }
-export type TemplateCard = { id: string; name: string; use: string; series?: SeriesCardInfo }
+// `bundle`: a 精选组合 card (Owner 2026-11-25): the members whose pairs it cycles through (a click
+// picks the one on show) and every live template in it, named under the card.
+export type BundleCardInfo = { members: readonly string[]; templates: readonly { id: string; name: string }[] }
+export type TemplateCard = { id: string; name: string; use: string; series?: SeriesCardInfo; bundle?: BundleCardInfo }
 
 // One H3 per category with its featured templates, as rendered (建站规格 §4 H2-2). Name, intro
 // and order come from template_categories, managed in admin (T75); `drag`: its card style is

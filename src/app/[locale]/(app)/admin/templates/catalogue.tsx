@@ -2,13 +2,14 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import type { AbstractIntlMessages } from 'next-intl'
 
-import { CategoriesPanel, listAdminTemplates, LocaleDisplayPanel, TemplatesEditor } from '@/core/admin'
+import { BundlesPanel, CategoriesPanel, listAdminTemplates, LocaleDisplayPanel, TemplatesEditor } from '@/core/admin'
 import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
 import { readPricingOptions } from '@/site/template-pricing'
 import { ModelSyncProvider } from '@/core/admin/image-provider-field/model-sync'
 import { listAdminCategoryTree } from '@/core/admin/template-categories'
 import { listAdminSeriesOptions, OrderHelp, seriesCopy } from '@/core/admin/template-series'
 import { readLocaleDisplay } from '@/core/templates/locale-display-read'
+import { deleteFeaturedBundleAction, saveFeaturedBundleAction, setDefaultFeaturedBundlesAction } from './bundle-actions'
 import { moveTemplateCategoryAction, saveLocaleDisplayAction } from './category-actions'
 import { AdminTemplatePreview } from './preview-provider'
 import { setTemplateSaleAction } from './sale-action'
@@ -61,9 +62,13 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
         categories={categories}
         actions={{ save: saveTemplateCategoryAction, move: moveTemplateCategoryAction, remove: deleteTemplateCategoryAction }}
       />
+      <BundlesPanel
+        bundles={display.bundles?.list ?? []} templates={templates} categories={categories}
+        actions={{ save: saveFeaturedBundleAction, remove: deleteFeaturedBundleAction, setDefault: setDefaultFeaturedBundlesAction }}
+      />
       <LocaleDisplayPanel
         categories={categories} templates={templates} display={display}
-        actions={{ save: saveLocaleDisplayAction }}
+        actions={{ save: saveLocaleDisplayAction }} saveBundle={saveFeaturedBundleAction}
       />
       <ModelSyncProvider action={syncTemplateModel}>
       <AdminTemplatePreview zhMessages={zhMessages}>

@@ -4,7 +4,7 @@ import { useLocale } from 'next-intl'
 import { useEffect } from 'react'
 
 import { useRouter } from '../../i18n/navigation'
-import { buildLayers, MORE_ATTR } from './series-layers'
+import { buildLayers, BUNDLE_IDS_ATTR, MORE_ATTR } from './series-layers'
 import { seriesLayers } from './series-layers-source'
 import { cycler, HOVER_DELAY_MS, HOVER_HOLD_MS, VIEW_HOLD_MS, type Cycler } from './series-motion'
 
@@ -14,7 +14,12 @@ import { cycler, HOVER_DELAY_MS, HOVER_HOLD_MS, VIEW_HOLD_MS, type Cycler } from
 // before hydration (the server draws the first pair).
 function wire(frame: HTMLElement, locale: string, touch: boolean, observer: IntersectionObserver | null, cards: Map<Element, Cycler>) {
   const card = frame.closest('.mk-series') ?? frame
-  const cycle = cycler(frame)
+  // A bundle card picks the template on show (bundle-card.tsx).
+  const ids = card.getAttribute(BUNDLE_IDS_ATTR)?.split(' ')
+  const cycle = cycler(frame, undefined, undefined, (index) => {
+    const id = ids?.[index]
+    if (id) card.setAttribute('data-pick-template', id)
+  })
   const key = frame.getAttribute(MORE_ATTR) ?? ''
   // The later pairs become layers the first time the card plays, not before (series-layers.ts):
   // their addresses arrive with the first play, so the card starts once they are in, unless the
