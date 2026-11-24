@@ -224,6 +224,10 @@
   .mk-pair .mk-scene { z-index: 0; opacity: 0; transition: opacity 0s .4s; }
   .mk-pair .mk-scene.mk-was { z-index: 1; opacity: 1; transition: none; }
   .mk-pair .mk-scene.mk-on { z-index: 2; opacity: 1; transition: opacity .4s var(--ease); }
+  /* Scenes that are different dishes turn the phone photo too (/zh): a layer over the left
+     plate; back at scene 1 the last photo fades out to the server-rendered first one. */
+  .mk-pstack { position: absolute; z-index: 1; top: 0; bottom: 0; left: 0; width: 50%; overflow: hidden; pointer-events: none; }
+  .mk-pair .mk-scene.mk-out { z-index: 1; opacity: 0; transition: opacity .4s var(--ease); }
   .mk-dots {
     position: absolute; z-index: 5; bottom: 8px; left: 75%; transform: translateX(-50%); display: flex; padding: 0 2px;
     border-radius: 999px; background: var(--frost); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
@@ -245,7 +249,7 @@
     .mk-dot:hover::before { background: var(--foreground); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .mk-pair .mk-scene, .mk-pair .mk-scene.mk-on, .mk-scene-caps > .mk-on, .mk-dot::before, .mk-dot::after { transition: none; }
+    .mk-pair .mk-scene, .mk-pair .mk-scene.mk-on, .mk-pair .mk-scene.mk-out, .mk-scene-caps > .mk-on, .mk-dot::before, .mk-dot::after { transition: none; }
   }
 }
 

@@ -23,14 +23,29 @@ describe('home hero options (ARCHITECTURE §16.5)', () => {
     }
   })
 
-  it('shows restaurants one pair first and seven more below it, Western dishes in English and Chinese ones on /zh', () => {
-    for (const [locale, prefix] of [['en', '/home/food-'], ['zh', '/home/cn-food-']] as const) {
+  it('shows restaurants a first screen and seven more pairs below it, Western dishes in English and Chinese ones on /zh', () => {
+    for (const [locale, prefix] of [['en', '/home/food-'], ['zh', '/home/cn-']] as const) {
       const food = heroOptionContent('food', locale)!
-      expect(food.hero.scenes).toBeUndefined()
       expect(food.strip?.items).toHaveLength(7)
       for (const image of [food.hero.before, food.hero.after, ...(food.strip?.items ?? []).flatMap((item) => [item.before, item.after])]) {
         expect(image.src.startsWith(prefix)).toBe(true)
       }
+    }
+    expect(heroOptionContent('food', 'en')!.hero.scenes).toBeUndefined()
+  })
+
+  it('turns four Chinese dishes on /zh, phone photo and result together, the first pair being the preloaded one', () => {
+    const { hero } = heroOptionContent('food', 'zh')!
+    const items = hero.scenes!.items
+    expect(items).toHaveLength(4)
+    expect(items[0].image.src).toBe(hero.after.src)
+    expect(items[0].before?.src).toBe(hero.before.src)
+    expect(hero.before.firstFrame).toBe(FIRST_FRAMES['/home/cn-hero-1-photo.webp'])
+    for (const [index, scene] of items.entries()) {
+      expect(scene.before?.src).toBe(`/home/cn-hero-${index + 1}-photo.webp`)
+      expect(scene.image.src).toBe(`/home/cn-hero-${index + 1}-ai.webp`)
+      expect(picture(scene.before!.src) && picture(scene.image.src)).toBe(true)
+      expect(scene.caption).not.toMatch(/[0-9]|积分|¥|元/)
     }
   })
 
