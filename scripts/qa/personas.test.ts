@@ -35,9 +35,9 @@ describe('needsRecreate', () => {
     expect(needsRecreate(PERSONAS['qa-fresh'], fresh)).toBe(true)
   })
 
-  it('always recreates qa-graylum with the signup credits only, outside the bulk reset', () => {
+  it('always recreates qa-graylum keeping the real signup grant, outside the bulk reset', () => {
     expect(needsRecreate(PERSONAS['qa-graylum'], fresh)).toBe(true)
-    expect(PERSONAS['qa-graylum']).toMatchObject({ freeCredits: SIGNUP_FREE_CREDITS, paidCredits: 0, tier: null, admin: false })
+    expect(PERSONAS['qa-graylum']).toMatchObject({ freeCredits: null, paidCredits: 0, tier: null, admin: false })
     expect(BULK_PERSONA_IDS).not.toContain('qa-graylum')
   })
 

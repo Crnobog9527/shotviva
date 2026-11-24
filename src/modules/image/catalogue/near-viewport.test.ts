@@ -8,7 +8,7 @@ const { DeferCoversUntilNear, scrollingRail } = await import('./near-viewport')
 const { PairMedia } = await import('./pair-media')
 const { LoopPlate } = await import('./card-media')
 
-const pair = (eager: boolean) => createElement(PairMedia, { before: 'https://x/covers/a/before.webp', after: 'https://x/covers/a/after.webp', alt: 'A', eager, sizes: '50vw' })
+const pair = (eager: boolean, priority = false) => createElement(PairMedia, { before: 'https://x/covers/a/before.webp', after: 'https://x/covers/a/after.webp', alt: 'A', eager, priority, sizes: '50vw' })
 const imgs = (html: string) => html.match(/<img\b[^>]*>/g) ?? []
 
 // First render (no effects): what a card puts on the page before IntersectionObserver answers.
@@ -27,6 +27,19 @@ describe('cover loading in Create', () => {
     const tags = imgs(renderToStaticMarkup(createElement(DeferCoversUntilNear, null, pair(true))))
     expect(tags.length).toBeGreaterThan(0)
     for (const tag of tags) expect(tag).not.toMatch(/fetchpriority/i)
+  })
+
+  it('the first card (priority) loads at once, at high priority', () => {
+    const tags = imgs(renderToStaticMarkup(createElement(DeferCoversUntilNear, null, pair(true, true))))
+    expect(tags.length).toBeGreaterThan(0)
+    for (const tag of tags) {
+      expect(tag).toMatch(/loading="eager"/)
+      expect(tag).toMatch(/fetchPriority="high"|fetchpriority="high"/)
+    }
+  })
+
+  it('priority never raises a card that is not on the first screen', () => {
+    for (const tag of imgs(renderToStaticMarkup(pair(false, true)))) expect(tag).toMatch(/fetchPriority="low"|fetchpriority="low"/)
   })
 
   it('lazy covers outside the first screen go at low priority', () => {

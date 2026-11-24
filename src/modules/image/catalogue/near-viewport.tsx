@@ -74,22 +74,49 @@ export function useNearViewport<T extends Element>(immediate: boolean, margin = 
 }
 
 // The covers of one card: eager ones (the first screen) at once; the rest, inside Create's grid,
-// once near the screen, at low priority so they never queue ahead of the account's own data.
-export function useCardCovers<T extends Element>(eager: boolean) {
+// once near the screen, at low priority so they never queue ahead of the account's own data. The
+// first card's (`priority`) are the page's largest paint on a phone: high priority, so the browser
+// fetches them ahead of the other first-screen covers before it has laid the page out.
+export function useCardCovers<T extends Element>(eager: boolean, priority = false) {
   const inCreate = useDeferCovers()
   const defer = inCreate && !eager
   const [ref, near] = useNearViewport<T>(!defer)
   useKeepFirstScreen(ref, inCreate && eager)
-  const img = { loading: eager ? ('eager' as const) : ('lazy' as const), ...(eager ? {} : { fetchPriority: 'low' as const }) }
+  const fetchPriority = eager ? (priority ? { fetchPriority: 'high' as const } : {}) : { fetchPriority: 'low' as const }
+  const img = { loading: eager ? ('eager' as const) : ('lazy' as const), ...fetchPriority }
   return { ref, show: near, img }
 }
 
-// Create's first-screen covers, once the page has loaded and they have: the service worker keeps
-// them for the next launch (core/offline, LCP plan 1). The URLs are the files the browser picked
-// from the srcset, so they are the ones the next launch asks for again.
+// Which Create screen the cards are on (All, a category, Saved), for the first-screen covers the
+// service worker keeps (core/offline, LCP plan 1); null (search results, other pages): none kept.
+const FirstScreen = createContext<string | null>(null)
+
+export function FirstScreenCovers({ screen, children }: { screen: string | null; children: ReactNode }) {
+  return <FirstScreen value={screen}>{children}</FirstScreen>
+}
+
+// The first-screen cards of one screen report their covers as they load; a second after the last
+// one, the whole set goes to the worker in one message, which replaces that screen's earlier set.
+const BATCH_MS = 1000
+const batches = new Map<string, { urls: Set<string>; timer: ReturnType<typeof setTimeout> | undefined }>()
+
+export function addToScreen(screen: string, urls: readonly string[]) {
+  const batch = batches.get(screen) ?? { urls: new Set<string>(), timer: undefined }
+  for (const url of urls) batch.urls.add(url)
+  clearTimeout(batch.timer)
+  batch.timer = setTimeout(() => {
+    batches.delete(screen)
+    keepFirstScreenCovers(screen, [...batch.urls])
+  }, BATCH_MS)
+  batches.set(screen, batch)
+}
+
+// A first-screen card's covers, once the page has loaded and they have. The URLs are the files the
+// browser picked from the srcset, so they are the ones the next launch asks for again.
 function useKeepFirstScreen(ref: RefObject<Element | null>, keep: boolean) {
+  const screen = useContext(FirstScreen)
   useEffect(() => {
-    if (!keep) return
+    if (!keep || screen === null) return
     let cancelled = false
     const loaded = (img: HTMLImageElement) =>
       img.complete && img.naturalWidth > 0 ? Promise.resolve(img.currentSrc) : new Promise<string>((resolve) => {
@@ -98,7 +125,7 @@ function useKeepFirstScreen(ref: RefObject<Element | null>, keep: boolean) {
       })
     const post = async () => {
       const urls = await Promise.all([...(ref.current?.querySelectorAll('img') ?? [])].map(loaded))
-      if (!cancelled) keepFirstScreenCovers([...new Set(urls.filter(Boolean))])
+      if (!cancelled) addToScreen(screen, urls.filter(Boolean))
     }
     const start = () => void post()
     if (document.readyState === 'complete') start()
@@ -107,5 +134,5 @@ function useKeepFirstScreen(ref: RefObject<Element | null>, keep: boolean) {
       cancelled = true
       window.removeEventListener('load', start)
     }
-  }, [ref, keep])
+  }, [ref, keep, screen])
 }

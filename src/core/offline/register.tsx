@@ -37,13 +37,24 @@ export function clearOfflineCaches(): void {
   }
 }
 
-// The first screen's template covers (LCP plan 1): the worker keeps these, and only these, so the
-// next launch paints them from the phone. Sent to the active worker once there is one (on a first
-// visit, after it installs); without a worker (switched off, unsupported) nothing happens.
-export function keepFirstScreenCovers(urls: readonly string[]): void {
+// A newer build is out (the version check, core/app-update): the worker stops answering with an
+// older build's app shell (ARCHITECTURE §18.3). `build` is this page's own. Never throws.
+export function dropAppShell(build: string): void {
+  try {
+    navigator.serviceWorker?.controller?.postMessage({ type: 'sv-drop-shell', build })
+  } catch {
+    // No worker.
+  }
+}
+
+// One screen's first-screen template covers (LCP plan 1; `screen` names it: All, a category): the
+// worker keeps these in place of that screen's earlier set, so the next launch paints them from the
+// phone. Sent to the active worker once there is one (on a first visit, after it installs); without
+// a worker (switched off, unsupported) nothing happens.
+export function keepFirstScreenCovers(screen: string, urls: readonly string[]): void {
   try {
     if (urls.length === 0 || !('serviceWorker' in navigator)) return
-    void navigator.serviceWorker.ready.then((registration) => registration.active?.postMessage({ type: 'sv-keep-covers', urls: [...urls] })).catch(() => undefined)
+    void navigator.serviceWorker.ready.then((registration) => registration.active?.postMessage({ type: 'sv-keep-covers', screen, urls: [...urls] })).catch(() => undefined)
   } catch {
     // Nothing to keep.
   }

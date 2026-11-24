@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { routeFor } from './routes'
-import { COVERS_KEEP, serviceWorkerSource } from './sw'
+import { COVER_SCREENS, COVERS_KEEP, serviceWorkerSource } from './sw'
 
 const SITE = 'https://shotviva.com'
 const CDN = 'https://img-eo.shotviva.com'
@@ -74,7 +74,7 @@ function runWorker(source: string, { fail = null as Fail, cached = new Map<strin
   const store = {
     match: vi.fn(async (request: Key) => (await reject('match')) ?? cached.get(keyOf(request))),
     put: vi.fn(async (request: Key, response: Response) => (await reject('put')) ?? void cached.set(keyOf(request), response)),
-    keys: vi.fn(async () => [...cached.keys()]),
+    keys: vi.fn(async () => [...cached.keys()].map((url) => ({ url }))),
     delete: vi.fn(async (key: Key) => cached.delete(keyOf(key))),
   }
   const caches = { open: vi.fn(async () => (await reject('open')) ?? store), keys: vi.fn(async () => ['sv-static-old', 'sv-catalogue', 'other-app']), delete: vi.fn(async (key: string) => void deleted.push(key)) }
@@ -182,16 +182,19 @@ describe('/sw.js covers across builds and the switch', () => {
   })
 })
 
-const keep = (...ns: number[]) => ({ data: { type: 'sv-keep-covers', urls: ns.map((n) => coverRequest(n).request.url) } })
+const keep = (screen: string, ...ns: number[]) => ({ data: { type: 'sv-keep-covers', screen, urls: ns.map((n) => coverRequest(n).request.url) } })
+const coverUrl = (n: number) => coverRequest(n).request.url
+const coversIn = (cached: Map<string, unknown>) => [...cached.keys()].filter((key) => key.includes('/covers/'))
 
 describe('/sw.js first-screen covers', () => {
   const source = serviceWorkerSource({ version: 'dpl_test', cdnOrigins: [CDN], coverOrigins: [CDN], enabled: true })
+  const answering = (worker: ReturnType<typeof runWorker>) => worker.fetch.mockImplementation(async () => corsAnswer('cover'))
 
-  it('keeps the covers the page names, fetched in CORS mode without credentials, and answers the next launch from them', async () => {
+  it('keeps the covers a screen names, fetched in CORS mode without credentials, and answers the next launch from them', async () => {
     const worker = runWorker(source)
-    worker.fetch.mockResolvedValueOnce(corsAnswer('cover'))
-    await worker.dispatch('message', keep(0))
-    expect(worker.fetch).toHaveBeenCalledWith(coverRequest().request.url, { mode: 'cors', credentials: 'omit' })
+    answering(worker)
+    await worker.dispatch('message', keep('all', 0))
+    expect(worker.fetch).toHaveBeenCalledWith(coverUrl(0), { mode: 'cors', credentials: 'omit' })
     const { response } = await worker.dispatch('fetch', coverRequest())
     expect(await response?.text()).toBe('cover')
     expect(worker.fetch).toHaveBeenCalledTimes(1)
@@ -205,45 +208,75 @@ describe('/sw.js first-screen covers', () => {
     expect(worker.store.put).not.toHaveBeenCalled()
   })
 
-  it('ignores anything named that is not a cover’s pre-sized copy', async () => {
+  it('a screen’s new set replaces its old one whole; another screen’s set stays', async () => {
+    const cached = new Map<string, Response>()
+    const worker = runWorker(source, { cached })
+    answering(worker)
+    await worker.dispatch('message', keep('all', 0, 1, 2, 3))
+    await worker.dispatch('message', keep('c:food', 10, 11))
+    await worker.dispatch('message', keep('all', 2, 3, 4, 5))
+    expect(coversIn(cached).sort()).toEqual([2, 3, 4, 5, 10, 11].map(coverUrl).sort())
+  })
+
+  it(`keeps at most ${COVER_SCREENS} screens and ${COVERS_KEEP} covers, dropping the screens used least recently`, async () => {
+    const cached = new Map<string, Response>()
+    const worker = runWorker(source, { cached })
+    answering(worker)
+    for (let screen = 0; screen < COVER_SCREENS + 2; screen++) await worker.dispatch('message', keep(`c:${screen}`, screen * 10, screen * 10 + 1))
+    expect(coversIn(cached)).toHaveLength(COVER_SCREENS * 2)
+    expect(cached.has(coverUrl(0))).toBe(false)
+    expect(cached.has(coverUrl((COVER_SCREENS + 1) * 10))).toBe(true)
+    const many = Array.from({ length: 12 }, (_, n) => 100 + n)
+    await worker.dispatch('message', keep('all', ...many))
+    await worker.dispatch('message', keep('c:big', ...many.map((n) => n + 100)))
+    expect(coversIn(cached).length).toBeLessThanOrEqual(COVERS_KEEP)
+    expect(cached.has(coverUrl(200))).toBe(true)
+  })
+})
+
+describe('/sw.js first-screen covers: what is never kept', () => {
+  const source = serviceWorkerSource({ version: 'dpl_test', cdnOrigins: [CDN], coverOrigins: [CDN], enabled: true })
+
+  it('ignores anything named that is not a cover’s pre-sized copy, and a message without a screen', async () => {
     const worker = runWorker(source)
-    await worker.dispatch('message', { data: { type: 'sv-keep-covers', urls: [`${SITE}/api/files/x/thumb`, `${CDN}/assets/covers/x/after-0000000000000000.webp`, 'https://evil.example/x.avif', 42] } })
+    await worker.dispatch('message', { data: { type: 'sv-keep-covers', screen: 'all', urls: [`${SITE}/api/files/x/thumb`, `${CDN}/assets/covers/x/after-0000000000000000.webp`, 'https://evil.example/x.avif', 42] } })
+    await worker.dispatch('message', { data: { type: 'sv-keep-covers', urls: [coverUrl(1)] } })
     expect(worker.fetch).not.toHaveBeenCalled()
-    expect(worker.store.put).not.toHaveBeenCalled()
+    expect(worker.store.put.mock.calls.filter(([key]) => String(typeof key === 'string' ? key : key.url).includes('/covers/'))).toEqual([])
   })
 
   it('a host without CORS has nothing kept; after three it is not asked again', async () => {
     const worker = runWorker(source)
     worker.fetch.mockRejectedValue(new TypeError('Failed to fetch'))
-    await worker.dispatch('message', keep(0, 1, 2))
-    await worker.dispatch('message', keep(3))
+    await worker.dispatch('message', keep('all', 0, 1, 2))
+    await worker.dispatch('message', keep('all', 3))
     expect(worker.fetch).toHaveBeenCalledTimes(3)
-    expect(worker.store.put).not.toHaveBeenCalled()
   })
 
-  it('never keeps an opaque or failed answer', async () => {
-    const worker = runWorker(source)
-    const opaque = { status: 0, ok: false, type: 'opaque', clone: () => opaque } as unknown as Response
-    worker.fetch.mockResolvedValueOnce(opaque).mockResolvedValueOnce(new Response('gone', { status: 404 }))
-    await worker.dispatch('message', keep(1, 2))
-    expect(worker.store.put).not.toHaveBeenCalled()
-  })
-
-  it(`keeps only the ${COVERS_KEEP} named most recently; naming one again keeps it`, async () => {
+  it('never keeps an opaque or failed answer, nor a basic one from another host', async () => {
     const cached = new Map<string, Response>()
     const worker = runWorker(source, { cached })
-    worker.fetch.mockImplementation(async () => corsAnswer('c'))
-    await worker.dispatch('message', keep(0))
-    for (let n = 1; n <= COVERS_KEEP + 4; n += 4) await worker.dispatch('message', keep(n, n + 1, n + 2, n + 3, 0))
-    expect(cached.size).toBe(COVERS_KEEP)
-    expect(cached.has(coverRequest(0).request.url)).toBe(true)
-    expect(cached.has(coverRequest(1).request.url)).toBe(false)
+    const opaque = { status: 0, ok: false, type: 'opaque', clone: () => opaque } as unknown as Response
+    const basic = { ...(corsAnswer('x') as unknown as object), type: 'basic' } as unknown as Response
+    worker.fetch.mockResolvedValueOnce(opaque).mockResolvedValueOnce(new Response('gone', { status: 404 })).mockResolvedValueOnce(basic)
+    await worker.dispatch('message', keep('all', 1, 2, 3))
+    expect(coversIn(cached)).toEqual([])
+  })
+
+  it('keeps a cover served by the site itself (a same-origin answer is basic, not cors)', async () => {
+    const cached = new Map<string, Response>()
+    const worker = runWorker(serviceWorkerSource({ version: 'dpl_test', cdnOrigins: [], enabled: true }), { cached })
+    const basic = { ...(corsAnswer('own') as unknown as object), type: 'basic' } as unknown as Response
+    worker.fetch.mockResolvedValueOnce(basic)
+    const url = `${SITE}/assets/presized/v1/w384/covers/x/after-0000000000000001.avif`
+    await worker.dispatch('message', { data: { type: 'sv-keep-covers', screen: 'all', urls: [url] } })
+    expect(cached.has(url)).toBe(true)
   })
 
   it('answers from the network when the cache rejects', async () => {
     const worker = runWorker(source, { fail: 'open' })
     const { response } = await worker.dispatch('fetch', coverRequest())
     expect(await response?.text()).toBe('network')
-    await worker.dispatch('message', keep(0))
+    await worker.dispatch('message', keep('all', 0))
   })
 })

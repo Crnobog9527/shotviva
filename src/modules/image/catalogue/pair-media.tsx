@@ -15,6 +15,8 @@ type Props = {
   after: string
   alt: string
   eager?: boolean
+  // The first card on the page (near-viewport.tsx useCardCovers): its covers load at high priority.
+  priority?: boolean
   // A video template's loop, played on the right plate by useHoverWipe (or the Quiet Loop).
   video?: string
   size?: 'card' | 'pair' | 'feature' | 'thumb'
@@ -33,8 +35,8 @@ const fitImage = (size: Props['size']) => size === 'card'
 // safelight seam for the hover wipe (useHoverWipe finds them by data-wipe).
 // Inside Create's grid a card's pictures wait until it nears the screen (near-viewport.tsx); the
 // frame, the hairline and the tags are there from the start, so nothing moves when they arrive.
-export function PairMedia({ before, after, alt, eager = false, video, size = 'card', sizes, className }: Props) {
-  const { ref, show, img } = useCardCovers<HTMLSpanElement>(eager)
+export function PairMedia({ before, after, alt, eager = false, priority = false, video, size = 'card', sizes, className }: Props) {
+  const { ref, show, img } = useCardCovers<HTMLSpanElement>(eager, eager && priority)
   return (
     <span ref={ref} className={cn('hairline relative isolate grid aspect-[8/5] grid-cols-2 overflow-hidden bg-muted', size === 'card' ? 'rounded-control' : 'rounded-media', className)}>
       {show ? <BeforePlate src={before} sizes={sizes} img={img} /> : <span />}

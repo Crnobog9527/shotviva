@@ -41,7 +41,7 @@ to prepare the separate invitation acceptance account.
 | `qa-fresh` | qa-fresh@shotviva.com | Deleted and recreated every run: no credits, no works, no ledger. Its first sign-in grants the 6 signup credits through the real first-sign-in path |
 | `qa-max` | qa-max@shotviva.com | Max tier from a `max_yearly` purchase (paid until a year after the first run), 6 free + 3360 paid credits |
 | `qa-free` | qa-free@shotviva.com | Signup credits only: 6 free, 0 paid, no tier |
-| `qa-graylum` | qa-graylum@shotviva.com | Graylum connection tests only. Deleted and recreated by its own reset: the configured signup grant in the free pool, 0 paid, no tier, no Graylum link |
+| `qa-graylum` | qa-graylum@shotviva.com | Graylum connection tests only. Deleted and recreated by its own reset: the free pool keeps whatever the real signup grant gives (as for a new account, so a partner generation can succeed), 0 paid, no tier, no Graylum link |
 | `qa-invitee` | qa-invitee@shotviva.com | Created by its own reset with a fixed test signup IP, the configured signup grant in the free pool and no prior payment or invitation |
 
 For Graylum connection tests, use only `qa-graylum`: `pnpm qa:reset qa-graylum`, then
