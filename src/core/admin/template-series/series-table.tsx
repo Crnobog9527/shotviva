@@ -22,7 +22,7 @@ export function SeriesTable({ ids, byId, visible, query, pending, editing, selec
     <Table>
       <TableHeader><TableRow>
         <TableHead><Checkbox aria-label={copy.selectAll} disabled={editing} checked={allChecked} onCheckedChange={on => selection.setAll(on === true)} /></TableHead>
-        {[copy.drag, copy.cover, copy.name_zh, copy.status, copy.selectStatus].map(label => <TableHead key={label}>{label}</TableHead>)}
+        {[copy.drag, copy.cover, copy.name_zh, copy.status].map(label => <TableHead key={label}>{label}</TableHead>)}
         <TableHead className={stickyActionsClass + ' text-right'}>{copy.actions}</TableHead>
       </TableRow></TableHeader>
       <TableBody>

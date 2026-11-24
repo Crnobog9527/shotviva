@@ -67,7 +67,6 @@ export function SeriesRow({ item, checked, pending, editing, onSelect, onDelete 
         <span className="text-muted-foreground block text-xs">{item.slug} · {copy.memberCount(item.memberCount)}</span>
       </TableCell>
       <TableCell>{item.is_active ? copy.published : copy.unpublished}</TableCell>
-      <TableCell>{item.show_members ? copy.separate : copy.onlySeries}</TableCell>
       <DeleteCell item={item} pending={pending || editing} onDelete={onDelete} />
     </TableRow>
   )

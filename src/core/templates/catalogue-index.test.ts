@@ -14,7 +14,7 @@ const { logger } = await import('../logger')
 const { FAILED_READ_LIFE } = await import('../cache-life')
 const { CATALOGUE_LIFE, readCatalogue, cachedPosterTemplates } = await import('./cached-catalogue')
 const { catalogueIndexOrNull } = await import('./cached-taxonomy')
-const { toCatalogueIndex } = await import('./catalogue-index')
+const { onePlace, toCatalogueIndex } = await import('./catalogue-index')
 
 const series = (id: string, slug: string) => ({ id, slug, name_en: `${slug} en`, name_zh: `${slug} 中`, description_en: null, description_zh: '说明', cover_url: null })
 
@@ -36,6 +36,16 @@ describe('catalogue index (T102)', () => {
       { type: 'template', id: 't1', categoryKey: 'pets' },
     ])
     expect(index.series).toEqual([{ id: 's1', slug: 'menu-set', name: 'menu-set en', description: null, coverUrl: null, memberIds: ['m1', 'm0', 'm2'] }])
+  })
+
+  it('drops the loose card of a series member: a template shows in its series only (Owner 2026-11-25)', () => {
+    const loose = [...entries, { type: 'template' as const, entry_key: 'template-m1', sort_order: 5, category_key: 'pets', template_id: 'm1', series_id: null, entry_series: null }]
+    expect(toCatalogueIndex([], loose, members, 'en').entries.map((entry) => entry.id)).toEqual(['s1', 't1'])
+  })
+
+  it('cleans an index cached before the rule the same way', () => {
+    const stale = { tree: [], entries: [{ type: 'series' as const, id: 's1', categoryKey: 'food' }, { type: 'template' as const, id: 'm1', categoryKey: 'pets' }, { type: 'template' as const, id: 't1', categoryKey: 'pets' }], series: [{ id: 's1', slug: 's', name: 'S', description: null, coverUrl: null, memberIds: ['m1'] }] }
+    expect(onePlace(stale).entries.map((entry) => entry.id)).toEqual(['s1', 't1'])
   })
 
   it('names the series in the page language', () => {
