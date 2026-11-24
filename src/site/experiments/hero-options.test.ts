@@ -34,16 +34,17 @@ describe('home hero options (ARCHITECTURE §16.5)', () => {
     expect(heroOptionContent('food', 'en')!.hero.scenes).toBeUndefined()
   })
 
-  it('turns four Chinese dishes on /zh, phone photo and result together, the first pair being the preloaded one', () => {
+  it('turns three Chinese dishes on /zh, phone photo and result together, the first pair being the preloaded one', () => {
     const { hero } = heroOptionContent('food', 'zh')!
     const items = hero.scenes!.items
-    expect(items).toHaveLength(4)
+    expect(items).toHaveLength(3)
     expect(items[0].image.src).toBe(hero.after.src)
     expect(items[0].before?.src).toBe(hero.before.src)
     expect(hero.before.firstFrame).toBe(FIRST_FRAMES['/home/cn-hero-1-photo.webp'])
     for (const [index, scene] of items.entries()) {
-      expect(scene.before?.src).toBe(`/home/cn-hero-${index + 1}-photo.webp`)
-      expect(scene.image.src).toBe(`/home/cn-hero-${index + 1}-ai.webp`)
+      const file = [1, 3, 4][index]
+      expect(scene.before?.src).toBe(`/home/cn-hero-${file}-photo.webp`)
+      expect(scene.image.src).toBe(`/home/cn-hero-${file}-ai.webp`)
       expect(picture(scene.before!.src) && picture(scene.image.src)).toBe(true)
       expect(scene.caption).not.toMatch(/[0-9]|积分|¥|元/)
     }

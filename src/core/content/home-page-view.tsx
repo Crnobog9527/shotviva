@@ -9,7 +9,6 @@ import { RelatedLinks } from './blocks/related-links'
 import { SpacesSection } from './blocks/spaces-section'
 import { TemplateGrid, type FeaturedSections } from './blocks/template-grid'
 import { TopicCards } from './blocks/topic-section'
-import { WishlistLine } from './blocks/wishlist-section'
 import { HeroStrip } from './blocks/hero-strip'
 import type { HeroStripBlock, HomePage } from './page-content'
 
@@ -21,9 +20,6 @@ type Props = {
   templates: FeaturedSections
   // The first-screen generator (modules/image, client), slotted under the hero pair.
   generator: ReactNode
-  // The wishlist section's CTA (signed in or not, a request-time slot); null while the
-  // wishlist is off, which drops the whole section.
-  wishlistCta: ReactNode | null
   // An A/B hero option's line under the direct answer (ARCHITECTURE §16.5).
   heroTagline?: string
   // An A/B hero option's further pairs, in a row under the first screen.
@@ -32,11 +28,11 @@ type Props = {
 
 // Home block order (Owner 2026-11-24: restaurants and hotels first, a shorter phone page): H1 +
 // answer → hero + generator → the real dish pairs → hotels and stays → text edits → the steps → the templates
-// (food and spaces only, home-page.tsx) → one wishlist line → the facts → free offer → the two
+// (food and spaces only, home-page.tsx) → the facts (the wishlist line went 2026-11-25) → free offer → the two
 // bills (block ③, which also carry the plans the JSON-LD offers read) → FAQ → the use-case topic
 // H2 (SEO G5 / S4, kept, now at the end) → related links. The six H2s of 建站规格 §4 keep their
 // order. The "full shoot" demo no longer shows on the home page (/commercial-photography has it).
-export function HomePageView({ page, brand, isLinkEnabled, templates, generator, wishlistCta, heroTagline, heroStrip }: Props) {
+export function HomePageView({ page, brand, isLinkEnabled, templates, generator, heroTagline, heroStrip }: Props) {
   return (
     <article className="mk-home mk-front mk-w">
       <HomeHero page={page} generator={generator} tagline={heroTagline} />
@@ -45,7 +41,6 @@ export function HomePageView({ page, brand, isLinkEnabled, templates, generator,
       {page.edits ? <EditCasesSection edits={page.edits} /> : null}
       <StepsSection steps={page.steps} />
       <TemplateGrid grid={page.templateGrid} sections={templates} isLinkEnabled={isLinkEnabled} />
-      {wishlistCta ? <WishlistLine block={page.wishlist} cta={wishlistCta} /> : null}
       <HomeFacts facts={page.facts} heading={page.headings.facts} intro={page.factsIntro} />
       <FreeOfferSection offer={page.freeOffer} brand={brand} />
       <CostBillsSection bills={page.costBills} plans={page.plans} />

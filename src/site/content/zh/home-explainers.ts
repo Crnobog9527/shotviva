@@ -54,7 +54,7 @@ export const zhSteps = {
     },
     {
       heading: `下载 ${zhTierList}`,
-      text: `${standard.name}适合${standard.use}，${hd.name}适合${hd.use}，${max.name}适合${max.use}。`,
+      text: `${standard.name} 适合${standard.use}，${hd.name} 适合${hd.use}，${max.name} 适合${max.use}。`,
       visual: { kind: 'sizes', image: { ...zhDish.basket, alt: sizesAlt('同一笼大虾的暗调暖光图') }, tiers },
     },
   ],

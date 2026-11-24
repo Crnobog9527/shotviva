@@ -22,6 +22,11 @@ type Props = {
 // of that left them unloaded at opacity 0 in Chrome, so they load as soon as they exist.
 const LOADING = { loading: 'eager', fetchPriority: 'low' } as const
 
+// A picture counts as ready once decoded too, so switching to it paints at once.
+function decoded(image: HTMLImageElement, then: () => void) {
+  image.decode().then(then, then)
+}
+
 type PhoneProps = { items: Props['scenes']['items']; active: number; previous: number; sizes: string; markLoaded: (index: number) => void }
 
 // When every scene is its own dish, its phone photo turns with it: the later photos lie over
@@ -41,7 +46,7 @@ function PhoneScenes({ items, active, previous, sizes, markLoaded }: PhoneProps)
             width={before.width}
             height={before.height}
             sizes={sizes}
-            onLoad={() => markLoaded(index)}
+            onLoad={(event) => decoded(event.currentTarget, () => markLoaded(index))}
             {...LOADING}
           />
         ) : null,
@@ -57,12 +62,12 @@ function PhoneScenes({ items, active, previous, sizes, markLoaded }: PhoneProps)
 export function HeroScenes({ scenes, tags, sizes, phonePane }: Props) {
   const { items } = scenes
   const turnsPhone = items.some((scene) => scene.before)
-  const { active, previous, armed, pick, markLoaded, hold } = useSceneRotation(items.length, turnsPhone ? 2 : 1)
+  const { active, previous, armed, waiting, pick, markLoaded, hold } = useSceneRotation(items.length, turnsPhone ? 2 : 1)
   const onBlur = (event: FocusEvent<HTMLElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget)) hold(false)
   }
   return (
-    <figure className="mk-hero-pair" onPointerEnter={() => hold(true)} onPointerLeave={() => hold(false)} onFocus={() => hold(true)} onBlur={onBlur}>
+    <figure className={cn('mk-hero-pair', waiting !== -1 && 'mk-wait')} onPointerEnter={() => hold(true)} onPointerLeave={() => hold(false)} onFocus={() => hold(true)} onBlur={onBlur}>
       <span className="mk-pair mk-pair-lg">
         {/* While a later dish is up, the first phone photo underneath leaves the accessibility tree,
             so only the pair on screen is announced. */}
@@ -80,7 +85,7 @@ export function HeroScenes({ scenes, tags, sizes, phonePane }: Props) {
                 width={image.width}
                 height={image.height}
                 sizes={sizes}
-                onLoad={() => markLoaded(index)}
+                onLoad={(event) => decoded(event.currentTarget, () => markLoaded(index))}
                 {...LOADING}
               />
             ) : null,
