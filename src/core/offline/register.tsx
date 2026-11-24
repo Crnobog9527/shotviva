@@ -37,11 +37,11 @@ export function clearOfflineCaches(): void {
   }
 }
 
-// A newer build is out (the version check, core/app-update): the worker stops answering with this
-// build's app shell (ARCHITECTURE §18.3). Never throws.
-export function dropAppShell(): void {
+// A newer build is out (the version check, core/app-update): the worker stops answering with an
+// older build's app shell (ARCHITECTURE §18.3). `build` is this page's own. Never throws.
+export function dropAppShell(build: string): void {
   try {
-    navigator.serviceWorker?.controller?.postMessage('sv-drop-shell')
+    navigator.serviceWorker?.controller?.postMessage({ type: 'sv-drop-shell', build })
   } catch {
     // No worker.
   }

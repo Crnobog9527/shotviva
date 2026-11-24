@@ -23,7 +23,7 @@ async function fetchServed(): Promise<string | null> {
   const version = typeof body === 'object' && body !== null ? (body as { version?: unknown }).version : null
   const served = typeof version === 'string' && version.length > 0 && version.length <= 128 ? version : null
   // The kept app shell belongs to this build; the next launch takes the new one (ARCHITECTURE §18.3).
-  if (served && served !== publicEnv.NEXT_PUBLIC_APP_VERSION) dropAppShell()
+  if (served && served !== publicEnv.NEXT_PUBLIC_APP_VERSION) dropAppShell(publicEnv.NEXT_PUBLIC_APP_VERSION)
   return served
 }
 

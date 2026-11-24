@@ -33,9 +33,17 @@ const root = (nodes: Fake[]) => ({ querySelectorAll: (selector: string) => nodes
 describe('taps on the app shell', () => {
   it('replays a remembered tap only within 10 s', () => {
     const real = el('button', { 'data-card': 'tpl-1' })
-    replayTap({ key: 'card:tpl-1', at: 0 }, REPLAY_WITHIN_MS + 1, root([real]))
+    replayTap({ key: 'card:tpl-1', at: 0 }, REPLAY_WITHIN_MS + 1, root([real]), '/generate')
     expect(real.click).not.toHaveBeenCalled()
-    replayTap({ key: 'card:tpl-1', at: 0 }, 9_000, root([real]))
+    replayTap({ key: 'card:tpl-1', at: 0 }, 9_000, root([real]), '/generate')
+    expect(real.click).toHaveBeenCalledTimes(1)
+  })
+
+  it('replays only on Create itself, never on another page the shell gave way to', () => {
+    const real = el('button', { 'data-card': 'tpl-1' })
+    for (const path of ['/photos', '/login', '/zh/wishlist', '/app-shell/generate']) replayTap({ key: 'card:tpl-1', at: 0 }, 1_000, root([real]), path)
+    expect(real.click).not.toHaveBeenCalled()
+    replayTap({ key: 'card:tpl-1', at: 0 }, 1_000, root([real]), '/zh/generate/')
     expect(real.click).toHaveBeenCalledTimes(1)
   })
 

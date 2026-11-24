@@ -50,11 +50,24 @@ async function readTemplates() {
   }
 }
 
+// The RSC request headers Next's router sends, all of which the early request repeats and the
+// match compares (x-deployment-id: skew protection pins the refresh to its deployment).
+const RSC_HEADERS = ['rsc', 'next-router-state-tree', 'next-url', 'x-deployment-id']
+function rscHeaders(headers) {
+  const picked = {}
+  for (const name of RSC_HEADERS) {
+    const value = headers.get(name)
+    if (value !== null) picked[name] = value
+  }
+  return picked
+}
+const sameHeaders = (a, b) => RSC_HEADERS.every((name) => (a[name] ?? null) === (b[name] ?? null))
+
 // The refresh request's headers (no answer, nothing of the account: the router tree is the shell's).
-async function rememberRefresh(locale, rsc, tree) {
+async function rememberRefresh(locale, rsc, headers) {
   const templates = await readTemplates()
-  if (templates[locale] && templates[locale].rsc === rsc && templates[locale].tree === tree) return
-  templates[locale] = { rsc, tree }
+  if (templates[locale] && templates[locale].rsc === rsc && sameHeaders(templates[locale].headers ?? {}, headers)) return
+  templates[locale] = { rsc, headers }
   await (await caches.open(SHELL)).put(SHELL_TEMPLATES, new Response(JSON.stringify(templates), { headers: { 'Content-Type': 'application/json' } }))
 }
 
@@ -65,15 +78,17 @@ function refreshKey(href) {
   return url.pathname + '?' + url.searchParams.toString()
 }
 
+// Early answers by address, each for the one window that asked (its client id): no other window,
+// and no one after sign-out (forgetEarly), ever gets it.
 const early = new Map()
-async function startEarly(href) {
+async function startEarly(href, clientId) {
   const url = new URL(href)
   const template = (await readTemplates())[localeOf(url.pathname)]
-  if (!template || typeof template.rsc !== 'string' || typeof template.tree !== 'string') return
+  if (!template || typeof template.rsc !== 'string' || !template.headers || template.headers.rsc !== '1') return
   url.searchParams.set('_rsc', template.rsc)
-  const answer = fetch(url.href, { headers: { rsc: '1', 'next-router-state-tree': template.tree }, credentials: 'same-origin' })
+  const answer = fetch(url.href, { headers: template.headers, credentials: 'same-origin' })
   const key = refreshKey(url.href)
-  early.set(key, { rsc: template.rsc, tree: template.tree, answer, at: Date.now() })
+  early.set(key, { rsc: template.rsc, headers: template.headers, clientId, answer, at: Date.now() })
   setTimeout(() => early.delete(key), ${EARLY_MS})
   await answer.catch(() => null)
 }
@@ -109,12 +124,13 @@ async function answerRefresh(event) {
   const request = event.request
   const url = new URL(request.url)
   const rsc = url.searchParams.get('_rsc') || ''
-  const tree = request.headers.get('next-router-state-tree') || ''
-  event.waitUntil(rememberRefresh(localeOf(url.pathname), rsc, tree).catch(() => {}))
+  const headers = rscHeaders(request.headers)
+  event.waitUntil(rememberRefresh(localeOf(url.pathname), rsc, headers).catch(() => {}))
   const key = refreshKey(request.url)
   const waiting = early.get(key)
-  early.delete(key)
-  if (waiting && waiting.rsc === rsc && waiting.tree === tree && Date.now() - waiting.at < ${EARLY_MS}) {
+  if (waiting && waiting.clientId === event.clientId) early.delete(key)
+  const fresh = waiting && Date.now() - waiting.at < ${EARLY_MS}
+  if (fresh && waiting.clientId && waiting.clientId === event.clientId && waiting.rsc === rsc && sameHeaders(waiting.headers, headers)) {
     try {
       const answer = await waiting.answer
       // A redirect (a signed-out visitor, the account's language) goes through the router itself.
@@ -152,9 +168,10 @@ function shellMessage(event) {
   } catch {
     return true
   }
+  // From a window of this site, in the foreground, with an id the refresh can be matched to.
   const source = event.source
-  const foreground = !source || source.visibilityState === undefined || source.visibilityState === 'visible'
-  if (url.origin === self.location.origin && shellPathFor(url.pathname) && foreground) event.waitUntil(startEarly(url.href).catch(() => {}))
+  const foreground = source && typeof source.id === 'string' && source.id && (source.visibilityState === undefined || source.visibilityState === 'visible')
+  if (url.origin === self.location.origin && shellPathFor(url.pathname) && foreground) event.waitUntil(startEarly(url.href, source.id).catch(() => {}))
   return true
 }
 
@@ -165,10 +182,19 @@ async function shellActivate() {
   await Promise.all(['/app-shell/generate', '/zh/app-shell/generate'].map((path) => refreshShell(self.location.origin + path)))
 }
 
-// A newer build is out (the page's version check): this build's shell is no longer used.
-async function dropShell() {
+// A newer build is out (a page's version check, which says its own build): every other build's
+// shell goes, and this worker's own only when the page is of this build too (the worker itself is
+// the old one). A tab still on an older build never drops the current worker's shell.
+async function dropShell(build) {
   early.clear()
-  for (const key of await caches.keys()) if (key.startsWith(PREFIX + 'shell-')) await caches.delete(key)
+  for (const key of await caches.keys()) {
+    if (key.startsWith(PREFIX + 'shell-') && (key !== SHELL || build === VERSION)) await caches.delete(key)
+  }
+}
+
+// Sign-out: an early answer carries the account; none may outlive the session.
+function forgetEarly() {
+  early.clear()
 }
 `
 
@@ -182,4 +208,5 @@ async function shellActivate() {
   } catch {}
 }
 async function dropShell() {}
+function forgetEarly() {}
 `

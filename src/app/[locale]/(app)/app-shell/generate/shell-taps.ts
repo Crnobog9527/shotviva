@@ -38,8 +38,13 @@ export function tapTarget(root: ParentNode, key: string): HTMLElement | null {
   return null
 }
 
-// The remembered tap, replayed if still fresh.
-export function replayTap(tap: { key: string; at: number }, now: number, root: ParentNode = document): void {
-  if (now - tap.at > REPLAY_WITHIN_MS) return
+// Create's own addresses: a tap is replayed only there (review of #895). The shell is also hidden
+// when the visitor leaves for another tab, or when sign-in or another page answers the refresh.
+const CREATE = new Set(['/generate', '/zh/generate'])
+export const onCreate = (pathname: string) => CREATE.has(pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname)
+
+// The remembered tap, replayed if still fresh and the page shown is the real Create page.
+export function replayTap(tap: { key: string; at: number }, now: number, root: ParentNode = document, pathname = location.pathname): void {
+  if (now - tap.at > REPLAY_WITHIN_MS || !onCreate(pathname)) return
   tapTarget(root, tap.key)?.click()
 }

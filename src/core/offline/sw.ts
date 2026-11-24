@@ -166,8 +166,9 @@ self.addEventListener('fetch', (event) => {
 // list forgets that screen).
 self.addEventListener('message', (event) => {
   if (shellMessage(event)) return
-  if (event.data === 'sv-drop-shell') event.waitUntil(dropShell().catch(() => {}))
+  if (event.data?.type === 'sv-drop-shell') event.waitUntil(dropShell(typeof event.data.build === 'string' ? event.data.build : '').catch(() => {}))
   else if (event.data === 'sv-clear') event.waitUntil((async () => {
+    forgetEarly()
     for (const key of await caches.keys()) if (key.startsWith(PREFIX)) await caches.delete(key)
   })())
   else if (event.data?.type === 'sv-keep-covers' && typeof event.data.screen === 'string' && Array.isArray(event.data.urls)) {

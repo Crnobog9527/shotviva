@@ -52,8 +52,8 @@ function network(input: unknown, init?: RequestInit): Response {
 
 const TREE = encodeURIComponent('["",{"children":[["locale","en","d",null],{"children":["(app)",{"children":["app-shell",{"children":["generate",{}]}]}]}]},null,"refetch"]')
 const nav = (path: string) => ({ request: { url: `${SITE}${path}`, method: 'GET', mode: 'navigate', headers: new Headers() }, preloadResponse: Promise.resolve(undefined) })
-const refresh = (path: string, tree = TREE) => ({ request: { url: `${SITE}${path}${path.includes('?') ? '&' : '?'}_rsc=abc`, method: 'GET', mode: 'cors', headers: new Headers({ rsc: '1', 'next-router-state-tree': tree }) } })
-const early = (path: string, visibilityState = 'visible') => ({ data: { type: 'sv-shell-early', href: `${SITE}${path}` }, source: { visibilityState } })
+const refresh = (path: string, { tree = TREE, client = 'tab-1', deployment = BUILD } = {}) => ({ clientId: client, request: { url: `${SITE}${path}${path.includes('?') ? '&' : '?'}_rsc=abc`, method: 'GET', mode: 'cors', headers: new Headers({ rsc: '1', 'next-router-state-tree': tree, 'x-deployment-id': deployment }) } })
+const early = (path: string, visibilityState = 'visible', id = 'tab-1') => ({ data: { type: 'sv-shell-early', href: `${SITE}${path}` }, source: { visibilityState, id } })
 const on = serviceWorkerSource({ version: BUILD, cdnOrigins: [], enabled: true, shell: true })
 
 describe('the app shell (switch on)', () => {
@@ -96,12 +96,12 @@ describe('the shell’s refresh (personal content no later)', () => {
     await worker.dispatch('activate', {})
     await worker.dispatch('fetch', refresh('/generate'))
     const template = await worker.stores.get(`sv-shell-${BUILD}`)?.get(`${SITE}/__sv-shell-refresh`)?.clone().json()
-    expect(template).toEqual({ en: { rsc: 'abc', tree: TREE } })
+    expect(template).toEqual({ en: { rsc: 'abc', headers: { rsc: '1', 'next-router-state-tree': TREE, 'x-deployment-id': BUILD } } })
     worker.fetch.mockClear()
     await worker.dispatch('fetch', nav('/generate?c=food'))
     expect(worker.fetch.mock.calls.some((call: unknown[]) => String(call[0]).includes('_rsc'))).toBe(false)
     await worker.dispatch('message', early('/generate?c=food'))
-    expect(worker.fetch).toHaveBeenCalledWith(`${SITE}/generate?c=food&_rsc=abc`, { headers: { rsc: '1', 'next-router-state-tree': TREE }, credentials: 'same-origin' })
+    expect(worker.fetch).toHaveBeenCalledWith(`${SITE}/generate?c=food&_rsc=abc`, { headers: { rsc: '1', 'next-router-state-tree': TREE, 'x-deployment-id': BUILD }, credentials: 'same-origin' })
     const calls = worker.fetch.mock.calls.length
     const first = await worker.dispatch('fetch', refresh('/generate?c=food'))
     expect(await first.response?.text()).toBe('rsc 1')
@@ -118,8 +118,32 @@ describe('the shell’s refresh (personal content no later)', () => {
     await worker.dispatch('message', early('/generate', 'hidden'))
     await worker.dispatch('message', early('/app-shell/generate'))
     await worker.dispatch('message', early('/photos'))
-    await worker.dispatch('message', { data: { type: 'sv-shell-early', href: 'https://evil.example/generate' }, source: { visibilityState: 'visible' } })
+    await worker.dispatch('message', { data: { type: 'sv-shell-early', href: 'https://evil.example/generate' }, source: { visibilityState: 'visible', id: 'tab-1' } })
+    await worker.dispatch('message', { data: { type: 'sv-shell-early', href: `${SITE}/generate` }, source: null })
     expect(worker.fetch).not.toHaveBeenCalled()
+  })
+
+  it('hands the early answer only to the window that asked, and to no one after sign-out', async () => {
+    const worker = runWorker(on)
+    await worker.dispatch('activate', {})
+    await worker.dispatch('fetch', refresh('/generate'))
+    await worker.dispatch('message', early('/generate', 'visible', 'tab-1'))
+    const calls = worker.fetch.mock.calls.length
+    await worker.dispatch('fetch', refresh('/generate', { client: 'tab-2' }))
+    expect(worker.fetch.mock.calls.length).toBe(calls + 1)
+    await worker.dispatch('message', { data: 'sv-clear' })
+    await worker.dispatch('fetch', refresh('/generate', { client: 'tab-1' }))
+    expect(worker.fetch.mock.calls.length).toBe(calls + 2)
+  })
+
+  it('never hands over an early answer pinned to another deployment', async () => {
+    const worker = runWorker(on)
+    await worker.dispatch('activate', {})
+    await worker.dispatch('fetch', refresh('/generate'))
+    await worker.dispatch('message', early('/generate'))
+    const calls = worker.fetch.mock.calls.length
+    await worker.dispatch('fetch', refresh('/generate', { deployment: 'dpl_new' }))
+    expect(worker.fetch.mock.calls.length).toBe(calls + 1)
   })
 
   it('never keeps the early answer in a cache, and leaves other RSC requests alone', async () => {
@@ -131,7 +155,7 @@ describe('the shell’s refresh (personal content no later)', () => {
     await worker.dispatch('fetch', refresh('/generate'))
     const kept = [...worker.stores.values()].flatMap((store) => [...store.keys()])
     expect(kept.filter((url) => url.includes('_rsc') || url === `${SITE}/generate`)).toEqual([])
-    const other = await worker.dispatch('fetch', refresh('/generate', encodeURIComponent('["",{"children":["generate"]}]')))
+    const other = await worker.dispatch('fetch', refresh('/generate', { tree: encodeURIComponent('["",{"children":["generate"]}]') }))
     expect(other.full.respondWith).not.toHaveBeenCalled()
   })
 })
@@ -146,10 +170,16 @@ describe('the app shell (switch off) and dropping it', () => {
     expect(await (await worker.dispatch('fetch', nav('/generate'))).response?.text()).toBe('page')
   })
 
-  it('a newer build (sv-drop-shell) drops the shell', async () => {
+  it('a newer build (sv-drop-shell) drops older shells, and this worker’s own only when it is the old one', async () => {
     const worker = runWorker(on)
     await worker.dispatch('activate', {})
-    await worker.dispatch('message', { data: 'sv-drop-shell' })
+    worker.stores.set('sv-shell-dpl_old', new Map())
+    // A tab still on an older build: only other builds' shells go, never this worker's.
+    await worker.dispatch('message', { data: { type: 'sv-drop-shell', build: 'dpl_old' } })
+    expect(worker.deleted).toEqual(['sv-shell-dpl_old'])
+    expect(await (await worker.dispatch('fetch', nav('/generate'))).response?.text()).toBe('shell')
+    // A page of this worker's own build: the worker itself is the old one.
+    await worker.dispatch('message', { data: { type: 'sv-drop-shell', build: BUILD } })
     expect(worker.deleted).toContain(`sv-shell-${BUILD}`)
     expect(await (await worker.dispatch('fetch', nav('/generate'))).response?.text()).toBe('page')
   })

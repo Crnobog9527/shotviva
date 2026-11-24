@@ -35,7 +35,14 @@ describe('the app shell in the proxy (ARCHITECTURE §18.3)', () => {
     expect(shellProxyAnswer(request('/generate', { 'service-worker-navigation-preload': 'true' }), BUILD)).toBeNull()
     expect(shellProxyAnswer(request('/generate', { 'service-worker-navigation-preload': 'shell-dpl_old' }), BUILD)).toBeNull()
     expect(shellProxyAnswer(request('/photos', { 'service-worker-navigation-preload': `shell-${BUILD}` }), BUILD)).toBeNull()
-    expect(shellProxyAnswer(request('/app-shell/generate/x'), BUILD)).toBeNull()
-    expect(shellProxyAnswer(request('/app-shell/photos'), BUILD)).toBeNull()
+  })
+
+  it('answers any other spelling of a shell address with a 404, never the session path (review of #895)', () => {
+    for (const path of ['/app-shell/generate/', '/zh/app-shell/generate/', '/App-Shell/generate', '/ZH/app-shell/generate', '/app%2Dshell/generate', '/en/app-shell/generate', '/app-shell/generate/x', '/app-shell/photos', '/app-shell', '/zh/app-shell']) {
+      const response = shellProxyAnswer(request(path, { cookie: 'sb-access-token=secret' }), BUILD)
+      expect(response?.status, path).toBe(404)
+      expect(response && forwarded(response, 'cookie')).toBeNull()
+    }
+    expect(shellProxyAnswer(request('/app-shellfish'), BUILD)).toBeNull()
   })
 })

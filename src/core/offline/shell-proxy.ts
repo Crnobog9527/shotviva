@@ -15,6 +15,20 @@ import { SHELL_PRELOAD_PREFIX } from './shell-worker'
 // - A navigation preload of /generate whose header says the worker answers with its shell gets an
 //   empty 204 at once, instead of the page rendered for nothing (shell-worker.ts).
 export const SHELL_PATHS = { en: '/app-shell/generate', zh: '/zh/app-shell/generate' } as const
+
+// Any other spelling of an app-shell address (a trailing slash, which next.config's
+// skipTrailingSlashRedirect leaves alone; percent-encoding; other case; the /en prefix; a deeper
+// path) is a 404 here: it would otherwise reach the page through the session path, with the
+// visitor's cookies (review of #895). Only the two exact addresses above are ever the shell.
+function isShellSpelling(pathname: string): boolean {
+  let decoded = pathname
+  try {
+    decoded = decodeURIComponent(pathname)
+  } catch {
+    return /app-shell/i.test(pathname)
+  }
+  return /^\/(?:(?:en|zh)\/)?app-shell(?:\/|$)/i.test(decoded)
+}
 const CREATE_PATHS = new Set(['/generate', '/generate/', '/zh/generate', '/zh/generate/'])
 
 export function shellProxyAnswer(request: NextRequest, version: string): NextResponse | null {
@@ -24,7 +38,7 @@ export function shellProxyAnswer(request: NextRequest, version: string): NextRes
     return new NextResponse(null, { status: 204, headers: { 'Cache-Control': 'private, no-store' } })
   }
   const locale = pathname === SHELL_PATHS.en ? 'en' : pathname === SHELL_PATHS.zh ? 'zh' : null
-  if (!locale) return null
+  if (!locale) return isShellSpelling(pathname) ? new NextResponse(null, { status: 404, headers: { 'Cache-Control': 'private, no-store' } }) : null
   const headers = new Headers(request.headers)
   headers.delete('cookie')
   headers.delete(IDENTITY_HEADER)
