@@ -47,9 +47,10 @@ describe('landing pages', () => {
     expect(site.indexing.zhIndexablePaths).not.toContain('/transparent-background')
   })
 
-  // Owner 2026-11-11: the inner pages show their own cases (public/cases), never the home tote,
-  // and every case picture is a real file of at most 150 KB, as small as the mainland needs.
-  it('show their own case pictures, not the home tote, each a file of at most 150 KB', () => {
+  // Owner 2026-11-11: the inner pages show their own cases (public/cases), every case picture a
+  // real file of at most 150 KB, as small as the mainland needs. Since 2026-11-25 the English
+  // /commercial-photography shows the tote set again, as its own compressed copies in public/cases.
+  it('show their own case pictures, each a file of at most 150 KB', () => {
     for (const page of [...contentPagesIn('en'), ...contentPagesIn('zh')]) {
       const images = caseImagesOf(page)
       expect(images.length).toBeGreaterThan(2)
