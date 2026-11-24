@@ -24,7 +24,7 @@ function zhCsvLaunchUrls(): string[] {
     .split(/\r?\n/)
     .slice(1)
     .map((line) => line.split(','))
-    .filter(([batch, url]) => (batch?.includes('随 T21') || batch?.includes('补丁 v5')) && url?.startsWith('/zh'))
+    .filter(([batch, url]) => (batch?.includes('随 T21') || /补丁 v\d/.test(batch ?? '')) && url?.startsWith('/zh'))
     .map(([, url]) => url as string)
 }
 

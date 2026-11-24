@@ -5,6 +5,7 @@ import type { HomePage, ImageRef, TemplateCard, TemplateCategory } from '../page
 import { CompareSlider } from './compare-slider'
 import { CoverFills } from './cover-fills'
 import { PhotoPair } from './photo-pair'
+import { BundleCard } from './bundle-card'
 import { SeriesCard } from './series-card'
 import { SeriesMotion } from './series-motion-mount'
 import { phoneSlot } from './phone-sizes'
@@ -154,13 +155,14 @@ function Category({ category, ...rest }: { category: TemplateCategory; media: Te
       </div>
       {category.templates.length === 1 && first.series ? (
         <SoloSeries card={first} media={rest.media} />
-      ) : category.templates.length === 1 ? (
+      ) : category.templates.length === 1 && !first.bundle ? (
         <Solo card={first} media={mediaOf(first)} art={category.drag === true} />
       ) : (
         <ul className="mk-tgrid" data-count={category.templates.length}>
           {category.templates.map((card) => (
             <li key={card.id}>
-              {card.series ? <SeriesCard card={card} media={rest.media} sizes={CARD_SIZES} /> : <PairCard card={card} media={mediaOf(card)} />}
+              {card.bundle ? <BundleCard card={card} media={rest.media} sizes={CARD_SIZES} />
+                : card.series ? <SeriesCard card={card} media={rest.media} sizes={CARD_SIZES} /> : <PairCard card={card} media={mediaOf(card)} />}
             </li>
           ))}
         </ul>
@@ -187,8 +189,8 @@ export function TemplateGrid({ grid, sections, isLinkEnabled, requestLink = fals
       ))}
       {grid.note ? <p className="mk-note">{grid.note}</p> : null}
       {requestLink ? <RequestLink /> : null}
-      {/* Any series card: its click handler (and the crossfade, for a series with more than one pair). */}
-      {categories.some((category) => category.templates.some((card) => card.series)) ? <SeriesMotion /> : null}
+      {/* Any series or bundle card: its click handler (and the crossfade, for more than one pair). */}
+      {categories.some((category) => category.templates.some((card) => card.series || card.bundle)) ? <SeriesMotion /> : null}
       {/* The cards' blurred fills, painted from their pictures (cover-fill.tsx). */}
       <CoverFills />
     </section>

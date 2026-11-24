@@ -11,10 +11,12 @@ export type LocaleDraft = {
   // Sibling groups by parent key ('' is the top level), in the order shown.
   groups: Record<string, DraftList>
   featured: DraftList
+  // 精选组合 in order: the language's own, or the default ones while it follows them.
+  bundles: DraftList
 }
 
 // The shared order each list returns to on 恢复跟随默认.
-export type SharedLists = { groups: Record<string, string[]>; featured: string[] }
+export type SharedLists = { groups: Record<string, string[]>; featured: string[]; bundles: string[] }
 
 const ROOT = ''
 export const groupKey = (parent: string | null) => parent ?? ROOT
@@ -22,15 +24,16 @@ const parentOf = (key: string) => (key === ROOT ? null : key)
 const sameIds = (a: readonly string[], b: readonly string[]) => a.join('\n') === b.join('\n')
 const sameList = (a: DraftList, b: DraftList) => a.own === b.own && sameIds(a.ids, b.ids)
 
-export function toDraft(groups: readonly SiblingGroup[], featured: FeaturedState): LocaleDraft {
+export function toDraft(groups: readonly SiblingGroup[], featured: FeaturedState, bundles: DraftList = { own: false, ids: [] }): LocaleDraft {
   return {
     groups: Object.fromEntries(groups.map((group) => [groupKey(group.parent), { own: group.own, ids: [...group.keys] }])),
     featured: { own: featured.own, ids: [...featured.ids] },
+    bundles: { own: bundles.own, ids: [...bundles.ids] },
   }
 }
 
-export function sharedLists(groups: readonly SiblingGroup[], featured: FeaturedState): SharedLists {
-  return { groups: Object.fromEntries(groups.map((group) => [groupKey(group.parent), [...group.keys]])), featured: [...featured.ids] }
+export function sharedLists(groups: readonly SiblingGroup[], featured: FeaturedState, bundles: readonly string[] = []): SharedLists {
+  return { groups: Object.fromEntries(groups.map((group) => [groupKey(group.parent), [...group.keys]])), featured: [...featured.ids], bundles: [...bundles] }
 }
 
 export function reorderGroup(draft: LocaleDraft, parent: string | null, ids: string[]): LocaleDraft {
@@ -52,6 +55,15 @@ export function resetFeatured(draft: LocaleDraft, shared: SharedLists): LocaleDr
   return { ...draft, featured: { own: false, ids: [...shared.featured] } }
 }
 
+// 精选组合 follow the same rule (migration 2005).
+export function setBundles(draft: LocaleDraft, ids: string[], shared: SharedLists): LocaleDraft {
+  return { ...draft, bundles: ids.length > 0 ? { own: true, ids } : { own: false, ids: [...shared.bundles] } }
+}
+
+export function resetBundles(draft: LocaleDraft, shared: SharedLists): LocaleDraft {
+  return { ...draft, bundles: { own: false, ids: [...shared.bundles] } }
+}
+
 // What 保存 sends: the groups that differ from the saved state and the featured list if it
 // differs; a list back on the shared order is sent empty.
 export function draftChanges(saved: LocaleDraft, draft: LocaleDraft): Omit<SaveLocaleDisplayInput, 'locale'> {
@@ -59,7 +71,9 @@ export function draftChanges(saved: LocaleDraft, draft: LocaleDraft): Omit<SaveL
     .filter(([key, list]) => !saved.groups[key] || !sameList(saved.groups[key], list))
     .map(([key, list]) => ({ parent: parentOf(key), keys: list.own ? list.ids : [] }))
   const featured = sameList(saved.featured, draft.featured) ? null : draft.featured.own ? draft.featured.ids : []
-  return { groups, featured }
+  const bundles = sameList(saved.bundles, draft.bundles) ? null : draft.bundles.own ? draft.bundles.ids : []
+  return { groups, featured, bundles }
 }
 
-export const hasChanges = (changes: Omit<SaveLocaleDisplayInput, 'locale'>) => changes.groups.length > 0 || changes.featured !== null
+export const hasChanges = (changes: Omit<SaveLocaleDisplayInput, 'locale'>) =>
+  changes.groups.length > 0 || changes.featured !== null || (changes.bundles ?? null) !== null

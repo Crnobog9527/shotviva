@@ -43,7 +43,7 @@ export {
   type SaveCategoryPayload,
 } from './template-categories'
 export { CategoriesPanel } from './template-categories-editor'
-export { LocaleDisplayPanel } from './locale-display-editor'
+export { BundlesPanel, LocaleDisplayPanel } from './locale-display-editor'
 export { loadEditTemplateSettings, saveEditTemplate, type EditTemplateSettings, type SaveEditTemplateInput } from './edit-template'
 export { EDIT_TEMPLATE_COPY, EditTemplateEditor } from './edit-template-editor'
 export {
