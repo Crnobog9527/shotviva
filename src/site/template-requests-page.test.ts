@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { votesLabel } from '@/core/content/template-requests'
 import { pageMetadata, pageSitemapUrls, zhSitemapUrls } from '@/core/seo'
-import { toPublicWall } from '@/core/wishlist/public-wall-shape'
+import { shippedTemplates } from '@/core/wishlist/public-wall-shape'
 
 import { PAGE_LASTMOD } from './content/page-dates'
 import { templateRequestsPageIn } from './content'
@@ -78,24 +77,21 @@ describe('/template-requests in the sitemaps', () => {
   })
 })
 
-describe('the public lists', () => {
-  const row = (id: string, status: 'live' | 'shipped', template_id: string | null = null) => ({ id, description: `wish ${id}`, status, votes_count: 3, template_id })
-
-  it('names a shipped request by its template in the page language and drops one whose template is hidden', () => {
-    const wall = toPublicWall(
-      [row('a', 'live')],
-      [row('b', 'shipped', 't1'), row('c', 'shipped', 't-hidden')],
-      [{ id: 't1', name: 'Noodle bowl', translations: { zh: { name: '汤面' } } }],
-      'zh',
-    )
-    expect(wall.wanted).toEqual([{ id: 'a', description: 'wish a', status: 'live', votesCount: 3, template: null }])
-    expect(wall.shipped).toEqual([{ id: 'b', description: 'wish b', status: 'shipped', votesCount: 3, template: { id: 't1', name: '汤面' } }])
-    expect(toPublicWall([], [row('b', 'shipped', 't1')], [{ id: 't1', name: 'Noodle bowl', translations: null }], 'zh').shipped[0].template?.name).toBe('Noodle bowl')
+describe('no real request on the public page (Owner 2026-11-25)', () => {
+  it('shows the eight fictional example wishes, said to be examples', () => {
+    for (const text of [en, zh]) {
+      expect(text.examples.wall.examples).toHaveLength(8)
+      expect(text.examples.wall.note).toMatch(/illustrative|示意/)
+    }
+    expect(en.examples.intro).toMatch(/examples/)
+    expect(zh.examples.intro).toMatch(/示例/)
   })
 
-  it('counts votes in words', () => {
-    expect(votesLabel(en.wanted.votes, 1)).toBe('1 vote')
-    expect(votesLabel(en.wanted.votes, 4)).toBe('4 votes')
-    expect(votesLabel(zh.wanted.votes, 4)).toBe('4 票')
+  it('lists a shipped template by name only, once, in the page language, and drops a hidden one', () => {
+    const rows = [{ template_id: 't1' }, { template_id: 't-hidden' }, { template_id: 't1' }, { template_id: null }]
+    const visible = [{ id: 't1', name: 'Noodle bowl', translations: { zh: { name: '汤面' } } }]
+    expect(shippedTemplates(rows, visible, 'zh')).toEqual([{ id: 't1', name: '汤面' }])
+    expect(shippedTemplates(rows, [{ ...visible[0], translations: null }], 'zh')).toEqual([{ id: 't1', name: 'Noodle bowl' }])
+    expect(shippedTemplates([], visible, 'en')).toEqual([])
   })
 })

@@ -52,13 +52,13 @@ function pages(): Expect[] {
       h1: pricing.h1,
       strings: { intro: pieces(pricing.intro).slice(0, 1), prices: monthlyAndPackPrices(), ...faqStrings(pricing.faq) },
     })
-    // The wishlist's public page (Owner 2026-11-25): its copy is static, the lists may be empty.
+    // The wishlist's public page (Owner 2026-11-25): its copy and example wishes are static.
     const requests = templateRequestsPageIn(locale)
     out.push({
       path: prefix(locale, requests.path),
       locale,
       h1: requests.h1,
-      strings: { intro: [requests.intro], 'section headings': [requests.steps.heading, requests.wanted.heading, requests.good.heading, requests.today.heading], ...faqStrings(requests.faq) },
+      strings: { intro: [requests.intro], 'section headings': [requests.steps.heading, requests.examples.heading, requests.good.heading, requests.today.heading], 'example wishes': requests.examples.wall.examples.map((wish) => wish.text), ...faqStrings(requests.faq) },
     })
     for (const page of contentPagesIn(locale)) {
       out.push({

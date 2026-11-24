@@ -1,6 +1,7 @@
 import { TEMPLATE_REQUESTS_PATH, type TemplateRequestsText } from '@/core/content/template-requests'
 
 import { site } from '../../site.config'
+import { zhHomeWishlist } from './home-wishlist'
 
 const brand = site.brand.name
 
@@ -23,17 +24,14 @@ export const zhTemplateRequestsPage: TemplateRequestsText = {
       { heading: '票数最多的先做', text: '我们按票数从高到低制作。模板上线后，你和所有投过票的用户都会在 Shotviva 收到提醒。' },
     ],
   },
-  wanted: {
-    heading: '当前票数最多的需求',
-    intro: '许愿墙上票数最高的需求。去许愿墙投票，让想要的需求排得更靠前。',
-    empty: '许愿墙上还没有需求，你可以提交第一个。',
-    voting: '投票中',
-    votes: { one: '{count} 票', other: '{count} 票' },
+  examples: {
+    heading: '需求示例',
+    intro: '下面都是示例。真实的需求和票数，登录后在许愿墙里查看。',
+    wall: zhHomeWishlist,
   },
   shipped: {
     heading: '由需求做成的模板',
     intro: '这些模板最早来自许愿墙上的需求。',
-    badge: '已上线',
     open: '打开模板',
   },
   good: {
@@ -71,7 +69,7 @@ export const zhTemplateRequestsPage: TemplateRequestsText = {
     },
     {
       question: '我的照片会公开吗？',
-      answer: '需求通过审核后，你写的文字会出现在本页和许愿墙上。参考图会重新保存并去掉位置信息，只在许愿墙上给已登录用户看，旁边的用户名只显示首字加三个星号。需求被拒、下架或账号注销时，参考图会被删除。',
+      answer: '不会。你的需求、参考图和用户名只在许愿墙里给已登录用户看，不会出现在本页，上面的需求都是示例。参考图会重新保存并去掉位置信息，用户名只显示首字加三个星号；需求被拒、下架或账号注销时，参考图会被删除。',
     },
     {
       question: '做出来的模板会改变照片里的主体吗？',

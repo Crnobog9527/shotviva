@@ -1,6 +1,7 @@
 import { TEMPLATE_REQUESTS_PATH, type TemplateRequestsText } from '@/core/content/template-requests'
 
 import { site } from '../site.config'
+import { homeWishlist } from './home-wishlist'
 
 const brand = site.brand.name
 
@@ -10,6 +11,7 @@ const brand = site.brand.name
 // the wishlist as built (ARCHITECTURE §15): reviewed before it shows, one account one vote, at
 // least one finished image before posting or voting, five requests a day, reference photos
 // re-encoded without location data and shown only on the signed-in wall, a notice when it ships.
+// No real request appears on this public page (Owner 2026-11-25): the wall here is examples.
 export const templateRequestsPage: TemplateRequestsText = {
   path: TEMPLATE_REQUESTS_PATH,
   label: 'Template requests',
@@ -36,17 +38,14 @@ export const templateRequestsPage: TemplateRequestsText = {
       },
     ],
   },
-  wanted: {
-    heading: 'Most-wanted requests right now',
-    intro: 'The requests with the most votes. Vote on the wall to move one up the list.',
-    empty: 'No requests on the wall yet. Yours could be the first.',
-    voting: 'In voting',
-    votes: { one: '{count} vote', other: '{count} votes' },
+  examples: {
+    heading: 'What requests look like',
+    intro: 'These wishes are examples. Real requests and their votes are on the wishlist once you sign in.',
+    wall: homeWishlist,
   },
   shipped: {
     heading: 'Recently built from requests',
-    intro: 'Templates that started as a request on the wall.',
-    badge: 'Live',
+    intro: 'Templates that started as a request on the wishlist.',
     open: 'Open the template',
   },
   good: {
@@ -84,7 +83,7 @@ export const templateRequestsPage: TemplateRequestsText = {
     },
     {
       question: 'Is my photo public?',
-      answer: 'The words of your request can appear on this page and on the wall once we have approved it. Your reference photos are re-saved without location data and shown only to signed-in users on the wall, next to your name as its first letter and three stars. They are deleted if the request is turned down, taken off the wall or your account is closed.',
+      answer: 'No. Your request, its reference photos and your name are shown only to signed-in users on the wishlist, never on this page: the wishes above are examples. Reference photos are re-saved without location data, your name shows as its first letter and three stars, and the photos are deleted if the request is turned down, taken off the wall or your account is closed.',
     },
     {
       question: 'Will the subject of my photo change?',

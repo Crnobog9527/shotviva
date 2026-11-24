@@ -1,16 +1,17 @@
 import type { ReactNode } from 'react'
 
 import { Link } from '../../i18n/ui'
-import type { PublicWall } from '../../wishlist'
+import type { ShippedTemplate } from '../../wishlist'
 import { FaqSection } from '../blocks/faq-section'
 import { RelatedLinks } from '../blocks/related-links'
 import type { TemplateRequestsText } from './page-text'
-import { ShippedList, WantedList } from './request-lists'
+import { ExampleWall } from './example-wall'
+import { ShippedList } from './shipped-list'
 
 type Props = {
   text: TemplateRequestsText
-  // null: the wishlist could not be read (no database at build, an outage): both lists empty.
-  wall: PublicWall | null
+  // Templates built from requests (names only); empty hides the section.
+  shipped: readonly ShippedTemplate[]
   // Whether the wishlist is open (ARCHITECTURE §15.6): closed, the page keeps its copy but offers
   // no way into the wishlist, whose pages then 404.
   open: boolean
@@ -85,10 +86,10 @@ function GoodRequest({ text }: { text: TemplateRequestsText['good'] }) {
   )
 }
 
-// /template-requests: hero with the two ways in → how it works → most-wanted → recently built
+// /template-requests: hero with the two ways in → how it works → example wishes → recently built
 // (only when there is one) → what makes a good request → templates to use today → FAQ.
 // No visible breadcrumbs (DESIGN §8); the BreadcrumbList JSON-LD stays.
-export function TemplateRequestsView({ text, wall, open }: Props) {
+export function TemplateRequestsView({ text, shipped, open }: Props) {
   const voteCta: ReactNode = open ? (
     <Link href="/wishlist" prefetch={false} className="mk-ghost-btn inline-flex">
       {text.cta.vote}
@@ -98,8 +99,8 @@ export function TemplateRequestsView({ text, wall, open }: Props) {
     <article className="mk-w pb-16">
       <Hero text={text} open={open} />
       <Steps text={text.steps} />
-      <WantedList text={text.wanted} items={wall?.wanted ?? []} voteCta={voteCta} />
-      <ShippedList text={text.shipped} items={wall?.shipped ?? []} />
+      <ExampleWall text={text.examples} voteCta={voteCta} />
+      <ShippedList text={text.shipped} items={shipped} />
       <GoodRequest text={text.good} />
       <RelatedLinks heading={text.today.heading} links={text.today.links} variant="cards" />
       <FaqSection faq={text.faq} heading={text.faqHeading} variant="accordion" />

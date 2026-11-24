@@ -32,6 +32,6 @@ export { cachedWallFirstPage, listMyRequests, listWall, ownVotesAmong, WISHLIST_
 export { WishlistTabBadge } from './tab-badge'
 export { listMyWishNotices, markWishNoticesSeen, WISH_NOTICES_TAG, type WishNotice } from './notices'
 export { toNoticeItems, type NoticeItem } from './notice-items'
-// The public /template-requests page's lists (text only, Owner 2026-11-25).
-export { cachedPublicWall } from './public-wall'
-export type { PublicRequest, PublicWall } from './public-wall-shape'
+// The public /template-requests page's "recently built": template names only (Owner 2026-11-25).
+export { cachedShippedTemplates } from './public-wall'
+export type { ShippedTemplate } from './public-wall-shape'
