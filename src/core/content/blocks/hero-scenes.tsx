@@ -63,7 +63,7 @@ function PhoneScenes({ items, active, previous, sizes, markLoaded, markFailed }:
 export function HeroScenes({ scenes, tags, sizes, phonePane }: Props) {
   const { items } = scenes
   const turnsPhone = items.some((scene) => scene.before)
-  const { active, previous, armed, waiting, pick, markLoaded, markFailed, hold } = useSceneRotation(items.length, turnsPhone ? 2 : 1)
+  const { active, previous, armed, waiting, failed, pick, markLoaded, markFailed, hold } = useSceneRotation(items.length, turnsPhone ? 2 : 1)
   const onBlur = (event: FocusEvent<HTMLElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget)) hold(false)
   }
@@ -102,7 +102,7 @@ export function HeroScenes({ scenes, tags, sizes, phonePane }: Props) {
         </span>
         <span className="mk-dots" role="group" aria-label={scenes.label}>
           {items.map((scene, index) => (
-            <button key={scene.image.src} type="button" className="mk-dot" aria-label={scene.caption} aria-pressed={index === active} onClick={() => pick(index)} />
+            <button key={scene.image.src} type="button" className="mk-dot" aria-label={scene.caption} aria-pressed={index === active} hidden={failed.includes(index) || undefined} onClick={() => pick(index)} />
           ))}
         </span>
       </span>

@@ -29,27 +29,56 @@ function afterLoadAndIdle(then: () => void): () => void {
   }
 }
 
+// The next scene the timer may show after `active`: the first ready one going round, so a
+// scene still loading or failed is skipped instead of stalling the rotation. `active` itself
+// when no other is ready.
+export function nextReadyScene(active: number, count: number, isReady: (index: number) => boolean): number {
+  for (let step = 1; step < count; step++) {
+    const index = (active + step) % count
+    if (isReady(index)) return index
+  }
+  return active
+}
+
+// What a pick is waiting for, and the last scene that was shown ready (`settled`): where a pick
+// whose pictures fail goes back to. Picks can overlap (A, then B and C while both load), so the
+// fallback is never the scene a pick came from but the last one actually shown whole.
+export type PickTrack = { waiting: number; settled: number }
+
+export function trackPick(track: PickTrack, index: number, ready: boolean): PickTrack {
+  return ready ? { waiting: -1, settled: index } : { waiting: index, settled: track.settled }
+}
+
+export function trackLoaded(track: PickTrack, index: number, ready: boolean): PickTrack {
+  return track.waiting === index && ready ? { waiting: -1, settled: index } : track
+}
+
+// A failed scene that a pick is waiting on sends the hero back to `settled`.
+export function trackFailed(track: PickTrack, index: number): { track: PickTrack; fallback: number | null } {
+  return track.waiting === index ? { track: { waiting: -1, settled: track.settled }, fallback: track.settled } : { track, fallback: null }
+}
+
 // The hero's rotating scenes. Only the first scene is in the server HTML; the others are
 // rendered (`armed`, so fetched and decoded) right after load + idle, also under
-// prefers-reduced-motion, where the timer never starts. The timer only moves to a scene whose
-// `parts` images (1, or 2 when the phone photo turns too) are loaded and decoded, so a slow link
-// never fades to an empty plate. A pick switches at once: if that scene is not ready yet,
-// `waiting` hides every other picture (hero-scenes.tsx, marketing.css .mk-wait) so its two
-// plates fill in together and never sit next to another scene's. If one of its pictures fails
-// to load, the hero goes back to the scene shown before the pick, and that scene is never picked
-// or shown again. Hover or focus inside the hero holds the timer; a manual pick stops it for
-// good (WCAG 2.2.2).
+// prefers-reduced-motion, where the timer never starts. The timer moves to the next scene whose
+// `parts` images (1, or 2 when the phone photo turns too) are loaded and decoded, skipping any
+// still loading or failed, so a slow link never fades to an empty plate. A pick switches at
+// once: if that scene is not ready yet, `waiting` hides every other picture (hero-scenes.tsx,
+// marketing.css .mk-wait) so its two plates fill in together and never sit next to another
+// scene's. If one of its pictures fails, the hero goes back to the last scene shown whole, and
+// the failed scene's dot goes (`failed`): it is never picked or shown again. Hover or focus
+// inside the hero holds the timer; a manual pick stops it for good (WCAG 2.2.2).
 export function useSceneRotation(count: number, parts = 1) {
   const [{ active, previous }, setShown] = useState({ active: 0, previous: -1 })
   const [armed, setArmed] = useState(false)
   const [auto, setAuto] = useState(true)
   const [held, setHeld] = useState(false)
   const [waiting, setWaiting] = useState(-1)
+  const [failed, setFailed] = useState<readonly number[]>([])
   const loaded = useRef<number[]>([parts])
-  // The scene a pending pick came from, and the scenes whose pictures failed.
-  const from = useRef(0)
-  const waitingFor = useRef(-1)
-  const failed = useRef(new Set<number>())
+  const broken = useRef(new Set<number>())
+  const track = useRef<PickTrack>({ waiting: -1, settled: 0 })
+  const ready = useCallback((index: number) => (loaded.current[index] ?? 0) >= parts && !broken.current.has(index), [parts])
 
   useEffect(() => afterLoadAndIdle(() => setArmed(true)), [])
 
@@ -58,46 +87,47 @@ export function useSceneRotation(count: number, parts = 1) {
     const id = window.setInterval(() => {
       if (document.hidden) return
       setShown((shown) => {
-        const next = (shown.active + 1) % count
-        return (loaded.current[next] ?? 0) >= parts ? { active: next, previous: shown.active } : shown
+        const next = nextReadyScene(shown.active, count, ready)
+        if (next === shown.active) return shown
+        track.current = { ...track.current, settled: next }
+        return { active: next, previous: shown.active }
       })
     }, SCENE_MS)
     return () => window.clearInterval(id)
-  }, [auto, held, armed, count, parts])
+  }, [auto, held, armed, count, ready])
 
   const pick = useCallback(
     (index: number) => {
-      if (failed.current.has(index)) return
+      if (broken.current.has(index)) return
       setAuto(false)
       setArmed(true)
-      const now = (loaded.current[index] ?? 0) >= parts
-      waitingFor.current = now ? -1 : index
-      setWaiting(waitingFor.current)
-      setShown((shown) => {
-        if (shown.active === index) return shown
-        if (waitingFor.current === -1 || shown.active !== waitingFor.current) from.current = shown.active
-        return { active: index, previous: now ? shown.active : -1 }
-      })
+      const now = ready(index)
+      track.current = trackPick(track.current, index, now)
+      setWaiting(track.current.waiting)
+      setShown((shown) => (shown.active === index ? shown : { active: index, previous: now ? shown.active : -1 }))
     },
-    [parts],
+    [ready],
   )
   const markLoaded = useCallback(
     (index: number) => {
       loaded.current[index] = (loaded.current[index] ?? 0) + 1
-      if ((loaded.current[index] ?? 0) >= parts && waitingFor.current === index) {
-        waitingFor.current = -1
-        setWaiting(-1)
-      }
+      const next = trackLoaded(track.current, index, ready(index))
+      if (next === track.current) return
+      track.current = next
+      setWaiting(-1)
     },
-    [parts],
+    [ready],
   )
   const markFailed = useCallback((index: number) => {
-    failed.current.add(index)
-    if (waitingFor.current !== index) return
-    waitingFor.current = -1
+    if (broken.current.has(index)) return
+    broken.current.add(index)
+    setFailed((was) => [...was, index])
+    const { track: next, fallback } = trackFailed(track.current, index)
+    track.current = next
+    if (fallback === null) return
     setWaiting(-1)
-    setShown({ active: from.current, previous: -1 })
+    setShown({ active: fallback, previous: -1 })
   }, [])
 
-  return { active, previous, armed, waiting, pick, markLoaded, markFailed, hold: setHeld }
+  return { active, previous, armed, waiting, failed, pick, markLoaded, markFailed, hold: setHeld }
 }
