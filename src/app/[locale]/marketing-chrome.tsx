@@ -5,6 +5,7 @@ import { cachedHasPublishedPosts } from '@/core/blog'
 import { SiteFooter } from '@/core/content'
 import { NavMenu } from '@/core/content/blocks/nav-menu'
 import { isGalleryEnabled } from '@/core/gallery'
+import { isWishlistEnabled } from '@/core/wishlist'
 import type { Locale } from '@/core/i18n'
 import { FooterLocales, FooterLocalesFallback, Link, LocaleMenu, NavLink } from '@/core/i18n/ui'
 import { footerLinksIn } from '@/site/content'
@@ -93,8 +94,10 @@ async function PhoneNav({ locale }: { locale: Locale }) {
 
 // Footer: contact, copyright, legal links and the text language switch (ARCHITECTURE §17).
 export async function MarketingFooter({ locale, homeOnly = false }: { locale: Locale; homeOnly?: boolean }) {
-  const [t, galleryText, galleryOpen, blogText, hasBlogPosts] = await Promise.all([
+  const [t, footerText, wishlistOpen, galleryText, galleryOpen, blogText, hasBlogPosts] = await Promise.all([
     getTranslations({ locale, namespace: 'affiliate' }),
+    getTranslations({ locale, namespace: 'footer' }),
+    isWishlistEnabled(site),
     getTranslations({ locale, namespace: 'gallery' }),
     isGalleryEnabled(site),
     getTranslations({ locale, namespace: 'blog' }),
@@ -103,7 +106,9 @@ export async function MarketingFooter({ locale, homeOnly = false }: { locale: Lo
   // The public gallery's one site-wide entry (ARCHITECTURE §9 第 1 条): only while it is open.
   const legal = galleryOpen ? [{ href: '/gallery' as const, label: galleryText('footerLink') }, ...footerLinksIn(locale)] : footerLinksIn(locale)
   // The blog's one entry (ARCHITECTURE §12.6): only once this language has a published post.
-  const links = hasBlogPosts ? [{ href: '/blog' as const, label: blogText('footerLink') }, ...legal] : legal
+  const withBlog = hasBlogPosts ? [{ href: '/blog' as const, label: blogText('footerLink') }, ...legal] : legal
+  // The wishlist's public page (Owner 2026-11-25), first in the run: only while the wishlist is open.
+  const links = wishlistOpen ? [{ href: '/template-requests' as const, label: footerText('templateRequests') }, ...withBlog] : withBlog
   return (
     <SiteFooter
       brand={site.brand}

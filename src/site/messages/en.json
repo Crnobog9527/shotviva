@@ -2412,6 +2412,8 @@
     "copyright": "© {year} {name}",
     "language": "Language",
     "cookieSettings": "Cookie settings"
+,
+    "templateRequests": "Template requests"
   },
   "consent": {
     "label": "Cookies",
@@ -2438,6 +2440,10 @@
     "tryTitle": "Three templates to try instead"
   },
   "marketing": {
+    "templateRequests": {
+      "lead": "Not finding a template for your photo?",
+      "link": "Request a custom AI photo template"
+    },
     "appDescription": "AI photo studio",
     "nav": {
       "label": "Main",
