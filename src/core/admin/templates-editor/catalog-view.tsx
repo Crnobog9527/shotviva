@@ -52,7 +52,7 @@ export function CatalogView({ templates: all, deleted: allDeleted, query, onQuer
     <div className="flex flex-wrap items-center gap-2">
       <Input type="search" className="w-full sm:w-72" aria-label={copy.search} placeholder={copy.search} maxLength={120}
         value={query} onChange={e => onQuery(e.target.value)} />
-      <div role="group" aria-label={copy.status} className="flex gap-1">
+      <div role="group" aria-label={copy.status} className="flex min-w-0 flex-wrap gap-1">
         {(Object.keys(tabs) as CatalogStatus[]).map(key => <Button key={key} variant={status === key ? 'secondary' : 'ghost'}
           size="sm" aria-pressed={status === key} onClick={() => setStatus(key)}>{tabs[key]}</Button>)}
       </div>
