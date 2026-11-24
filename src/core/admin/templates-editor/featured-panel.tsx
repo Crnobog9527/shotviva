@@ -1,9 +1,13 @@
 'use client'
 
+import { ChevronDown } from 'lucide-react'
+
 import { Button } from '@/core/ui/button'
+import { cn } from '@/core/ui/cn'
 
 import type { AdminTemplate } from '../templates/types'
 import { SortableList } from '../ui/sortable'
+import { useFoldOpen } from '../ui/use-fold-open'
 import { featuredCopy as copy } from './copy'
 import { FeaturedCard, zhNameOf } from './featured-card'
 import { featuredGroups, withGroupOrder, type FeaturedGroup } from './featured-groups'
@@ -13,8 +17,11 @@ type Props = { featured: Featured; templates: AdminTemplate[]; pending: boolean 
 
 // 首页精选 (T53) laid out like the home template area (2026-11-12): a block of cards per category,
 // in the order the public pages use. The switch in the table, or the bulk bar, adds templates;
-// here they are arranged, removed, and saved in one go.
+// here they are arranged, removed, and saved in one go. Closed by default with a one-line summary
+// (Owner 2026-11-25: the cards took too much room); an unsaved arrangement keeps its 保存 bar in
+// view even while the panel is closed.
 export function FeaturedPanel({ featured, templates, pending }: Props) {
+  const [open, setOpen] = useFoldOpen('featured')
   const { draft, ids } = featured
   const byId = new Map(templates.map((template) => [template.id, template]))
   const groups = featuredGroups(draft.shown, byId)
@@ -25,10 +32,8 @@ export function FeaturedPanel({ featured, templates, pending }: Props) {
   const outOfOrder = !draft.dirty && order.join(',') !== ids.join(',')
   return (
     <section aria-labelledby="featured-h" className="grid gap-3 rounded-md border p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 id="featured-h" className="font-medium">{copy.title}</h2>
-        <span className="text-muted-foreground text-sm tabular-nums">{order.length} 个</span>
-      </div>
+      <FoldHeader open={open} setOpen={setOpen} summary={summaryOf(order, byId, draft.dirty)} />
+      <div id="featured-body" hidden={!open} className="grid gap-3">
       <p className="text-muted-foreground max-w-[75ch] text-sm">{copy.intro}</p>
       {order.length === 0 && !draft.dirty ? <p className="text-muted-foreground text-sm">{copy.empty}</p> : null}
       {order.length > 0 ? <p className="text-muted-foreground max-w-[75ch] text-sm">{copy.dragHint}</p> : null}
@@ -44,6 +49,7 @@ export function FeaturedPanel({ featured, templates, pending }: Props) {
           templateOf={(id) => byId.get(id)} onRemove={(id) => draft.set(order.filter((other) => other !== id))}
           onReorder={(next) => draft.set(withGroupOrder(groups, group.key, next))} />
       ))}
+      </div>
       {draft.dirty ? (
         <div role="status" className="bg-muted sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-2 shadow-lg">
           <span className="text-sm">{copy.dirty}</span>
@@ -54,6 +60,27 @@ export function FeaturedPanel({ featured, templates, pending }: Props) {
         </div>
       ) : null}
     </section>
+  )
+}
+
+// The closed panel's line: how many, which one the generator opens on, anything unsaved.
+function summaryOf(order: readonly string[], byId: ReadonlyMap<string, AdminTemplate>, dirty: boolean) {
+  const first = order[0]
+  return copy.summary(order.length, first ? zhNameOf(byId.get(first), first) : '', dirty)
+}
+
+function FoldHeader({ open, setOpen, summary }: { open: boolean; setOpen: (open: boolean) => void; summary: string }) {
+  return (
+    <h2 id="featured-h" className="font-medium">
+      <button type="button" aria-expanded={open} aria-controls="featured-body" title={open ? copy.collapse : copy.expand}
+        className="hover:bg-muted/50 -m-1 flex w-full items-start gap-2 rounded-md p-1 text-left" onClick={() => setOpen(!open)}>
+        <ChevronDown aria-hidden className={cn('mt-1 size-4 shrink-0 transition-transform', open ? '' : '-rotate-90')} />
+        <span className="grid min-w-0 gap-0.5">
+          <span>{copy.title}</span>
+          <span className="text-muted-foreground text-sm font-normal">{summary}</span>
+        </span>
+      </button>
+    </h2>
   )
 }
 
