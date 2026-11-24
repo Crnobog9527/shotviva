@@ -36,8 +36,10 @@ export const PERSONAS: Record<PersonaId, Persona> = {
   'qa-free': { ...base, id: 'qa-free', email: 'qa-free@shotviva.com' },
   'qa-invitee': { ...base, id: 'qa-invitee', email: 'qa-invitee@shotviva.com', alwaysRecreate: true },
   // Graylum connection tests only (Owner 2026-11-24): recreated on every reset, so each run starts
-  // from a new identity with no Graylum link, no purchases and the signup credits only.
-  'qa-graylum': { ...base, id: 'qa-graylum', email: 'qa-graylum@shotviva.com', alwaysRecreate: true },
+  // from a new identity with no Graylum link and no purchases. Its free pool keeps exactly what the
+  // signup grant gave (null: not reset to a fixed number), like a real new account, so a partner
+  // generation can succeed; 0 paid.
+  'qa-graylum': { ...base, id: 'qa-graylum', email: 'qa-graylum@shotviva.com', alwaysRecreate: true, freeCredits: null },
 }
 
 export function isPersonaId(value: string): value is PersonaId {
