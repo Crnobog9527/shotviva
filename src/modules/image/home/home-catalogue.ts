@@ -18,11 +18,19 @@ export const HOME_CATALOGUE_CACHE_CONTROL = 'public, max-age=0, s-maxage=60, sta
 
 const isHomeTemplate = (template: LocalizedTemplate) => !template.fields.images.slots?.length
 
-// Keep four in catalogue order so the rail still has three alternatives after the visitor
-// picks a template outside it. The opening template itself may be featured further down.
+// The rail follows the admin's 首页精选 order (Owner 2026-11-25: 「改成跟精选走」): the featured
+// templates by featured_rank, then, with fewer than four featured, the rest in catalogue order.
+// Four, so it still has three alternatives after the visitor picks a template outside it; the
+// opening template (the page's default, featured[0] today) joins it when it is not among them.
+function railTemplates(eligible: readonly LocalizedTemplate[]): LocalizedTemplate[] {
+  const featured = eligible.filter((template) => template.featuredRank !== null).sort((a, b) => (a.featuredRank ?? 0) - (b.featuredRank ?? 0))
+  const rest = eligible.filter((template) => template.featuredRank === null)
+  return [...featured, ...rest].slice(0, HOME_RAIL_SIZE)
+}
+
 export function homePanelTemplates(live: readonly LocalizedTemplate[], defaultId: string | null) {
   const eligible = live.filter(isHomeTemplate)
-  const first = eligible.slice(0, HOME_RAIL_SIZE)
+  const first = railTemplates(eligible)
   const opening = eligible.find((template) => template.id === defaultId) ?? first[0]
   const rows = opening && !first.includes(opening) ? [...first, opening] : first
   return { templates: rows.map((template) => panelSummary(toCatalogueTemplate(template))), opening }
