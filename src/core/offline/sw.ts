@@ -139,8 +139,48 @@ async function coverFirst(event) {
   return fetch(event.request)
 }
 
+// PROBE (ARCHITECTURE §18.3): Create's app shell. A navigation to /generate or /zh/generate is
+// answered at once with the shell kept for this build, and the shell is fetched again behind it
+// (without credentials: it never carries the account). Without one it goes to the network as
+// before. Only an answer from the shell's own address, 200, same-origin, with this build's
+// X-SV-Shell header, is kept.
+function shellFor(href) {
+  const url = new URL(href)
+  if (url.origin !== self.location.origin) return null
+  const path = url.pathname.replace(/[/]$/, '')
+  if (path === '/generate') return self.location.origin + '/app-shell/generate'
+  if (path === '/zh/generate') return self.location.origin + '/zh/app-shell/generate'
+  return null
+}
+
+async function refreshShell(shell) {
+  try {
+    const response = await fetch(shell, { credentials: 'omit', cache: 'no-store', redirect: 'manual' })
+    if (response.status !== 200 || response.type !== 'basic' || response.headers.get('x-sv-shell') !== VERSION) return
+    await (await caches.open(SHELL)).put(shell, response)
+  } catch {}
+}
+
+async function shellFirst(event, shell) {
+  try {
+    const hit = await (await caches.open(SHELL)).match(shell)
+    event.waitUntil(refreshShell(shell))
+    if (hit) return hit
+  } catch {}
+  try {
+    const preloaded = await event.preloadResponse
+    if (preloaded) return preloaded
+  } catch {}
+  return fetch(event.request)
+}
+
 self.addEventListener('fetch', (event) => {
   const request = event.request
+  const shell = request.mode === 'navigate' && request.method === 'GET' ? shellFor(request.url) : null
+  if (shell) {
+    event.respondWith(shellFirst(event, shell))
+    return
+  }
   if (request.mode === 'navigate') {
     // Always the network: the preloaded response when there is one, else a plain fetch.
     event.respondWith((async () => {
@@ -181,6 +221,8 @@ const PREFIX = ${prefix}
 const STATIC = PREFIX + 'static-' + ${JSON.stringify(version)}
 const CATALOGUE = PREFIX + 'catalogue'
 const COVERS = PREFIX + 'covers'
+const VERSION = ${JSON.stringify(version)}
+const SHELL = PREFIX + 'shell-' + VERSION
 const ORIGINS = [self.location.origin, ...${JSON.stringify(cdnOrigins)}]
 const COVER_ORIGINS = [self.location.origin, ...${JSON.stringify(coverOrigins)}]
 const routeFor = ${routeFor.toString()}
@@ -192,9 +234,11 @@ self.addEventListener('activate', (event) => event.waitUntil((async () => {
     if (self.registration.navigationPreload) await self.registration.navigationPreload.enable()
   } catch {}
   try {
-    for (const key of await caches.keys()) if (key.startsWith(PREFIX) && key !== STATIC && key !== CATALOGUE && key !== COVERS) await caches.delete(key)
+    for (const key of await caches.keys()) if (key.startsWith(PREFIX) && key !== STATIC && key !== CATALOGUE && key !== COVERS && key !== SHELL) await caches.delete(key)
   } catch {}
   await self.clients.claim()
+  // PROBE: both shells, so the next launch has one.
+  await Promise.all([self.location.origin + '/app-shell/generate', self.location.origin + '/zh/app-shell/generate'].map(refreshShell))
 })()))
 
 ${HANDLERS}`

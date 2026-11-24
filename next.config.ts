@@ -108,6 +108,9 @@ const nextConfig: NextConfig = {
     return [
       ...xRobotsTagRules(indexingIsOpen, SITE_DOMAIN),
       ...assetsHeaders(),
+      // PROBE (ARCHITECTURE §18.3): Create's app shell carries the build it belongs to, the only
+      // answer the service worker keeps for a page.
+      ...['/app-shell/:path*', '/zh/app-shell/:path*'].map((source) => ({ source, headers: [{ key: 'X-SV-Shell', value: appVersion(process.env) }] })),
       {
         source: '/fonts/misans/:asset(.+\\.(?:woff2|css))',
         headers: [

@@ -126,7 +126,7 @@ describe('/sw.js', () => {
   it('answers a navigation from the network (the preloaded response, else a fetch), never from a cache', async () => {
     const worker = runWorker(source)
     const preloaded = new Response('preloaded page', { status: 200 })
-    const nav = await worker.dispatch('fetch', { request: { url: `${SITE}/zh/generate`, method: 'GET', mode: 'navigate' }, preloadResponse: Promise.resolve(preloaded) })
+    const nav = await worker.dispatch('fetch', { request: { url: `${SITE}/zh/photos`, method: 'GET', mode: 'navigate' }, preloadResponse: Promise.resolve(preloaded) })
     expect(await nav.response?.text()).toBe('preloaded page')
     const plain = await worker.dispatch('fetch', { request: { url: `${SITE}/zh/account`, method: 'GET', mode: 'navigate' }, preloadResponse: Promise.resolve(undefined) })
     expect(await plain.response?.text()).toBe('network')
@@ -278,5 +278,41 @@ describe('/sw.js first-screen covers: what is never kept', () => {
     const { response } = await worker.dispatch('fetch', coverRequest())
     expect(await response?.text()).toBe('network')
     await worker.dispatch('message', keep('all', 0))
+  })
+})
+
+// PROBE (ARCHITECTURE §18.3): Create's app shell.
+describe('/sw.js app shell (probe)', () => {
+  const source = serviceWorkerSource({ version: 'dpl_test', cdnOrigins: [], enabled: true })
+  const shellAnswer = (build: string, type = 'basic') => {
+    const answer = { status: 200, ok: true, type, headers: new Headers({ 'x-sv-shell': build }), clone: () => answer, text: async () => 'shell' }
+    return answer as unknown as Response
+  }
+  const nav = (path: string) => ({ request: { url: `${SITE}${path}`, method: 'GET', mode: 'navigate' }, preloadResponse: Promise.resolve(undefined) })
+
+  it('keeps the shell of this build, fetched without credentials, and answers /zh/generate with it', async () => {
+    const cached = new Map<string, Response>()
+    const worker = runWorker(source, { cached })
+    worker.fetch.mockResolvedValueOnce(shellAnswer('dpl_test'))
+    const first = await worker.dispatch('fetch', nav('/zh/generate?x=1'))
+    expect(await first.response?.text()).toBe('network')
+    expect(worker.fetch).toHaveBeenCalledWith(`${SITE}/zh/app-shell/generate`, { credentials: 'omit', cache: 'no-store', redirect: 'manual' })
+    expect(cached.has(`${SITE}/zh/app-shell/generate`)).toBe(true)
+    const again = await worker.dispatch('fetch', nav('/zh/generate'))
+    expect(await again.response?.text()).toBe('shell')
+  })
+
+  it('never keeps a shell of another build or a cross-origin answer, and never answers another page with it', async () => {
+    const cached = new Map<string, Response>()
+    const worker = runWorker(source, { cached })
+    worker.fetch.mockResolvedValueOnce(shellAnswer('dpl_old')).mockResolvedValueOnce(shellAnswer('dpl_test', 'cors'))
+    await worker.dispatch('fetch', nav('/generate'))
+    await worker.dispatch('fetch', nav('/generate'))
+    expect([...cached.keys()]).toEqual([])
+    for (const path of ['/zh/account', '/generate/abc', '/zh/photos', '/login']) {
+      worker.fetch.mockClear()
+      await worker.dispatch('fetch', nav(path))
+      expect(worker.fetch.mock.calls.some((call: unknown[]) => String(call[0]).includes('app-shell'))).toBe(false)
+    }
   })
 })

@@ -55,6 +55,8 @@ export const site = defineSite({
       '/reset',
       '/reset/update',
       '/generate',
+      // PROBE (ARCHITECTURE §18.3): Create's app shell, which the service worker keeps.
+      '/app-shell/generate',
       '/generate/[templateId]',
       '/photos',
       '/photos/[jobId]',
