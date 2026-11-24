@@ -5,12 +5,15 @@ import type { ActionResult } from '../templates/types'
 export const DISPLAY_LOCALES = ['en', 'zh'] as const
 export type DisplayLocale = (typeof DISPLAY_LOCALES)[number]
 
-export type SetCategoryOrderInput = { locale: DisplayLocale; parent: string | null; keys: string[] }
-export type SetFeaturedInput = { locale: DisplayLocale; ids: string[] }
+// One language's draft (migration 2003). groups: only the sibling groups that changed, each the
+// whole group in the new order, or empty to follow the shared order again. featured: the whole
+// list, empty to follow the shared list, or null when the list did not change.
+export type SaveLocaleDisplayInput = {
+  locale: DisplayLocale
+  groups: { parent: string | null; keys: string[] }[]
+  featured: string[] | null
+}
 
 export type LocaleDisplayActions = {
-  // keys: the whole sibling group in the new order; empty goes back to following the shared order.
-  setCategoryOrder: (input: SetCategoryOrderInput) => Promise<ActionResult>
-  // ids: the whole featured list; empty goes back to following the shared list.
-  setFeatured: (input: SetFeaturedInput) => Promise<ActionResult>
+  save: (input: SaveLocaleDisplayInput) => Promise<ActionResult>
 }
