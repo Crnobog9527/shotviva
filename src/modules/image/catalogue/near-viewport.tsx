@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 
+import { keepFirstScreenCovers } from '@/core/offline'
+
 // Create's grid loads a card's pictures only when the card comes near the screen (after Higgsfield
 // and Lovart): the browser's own lazy loading starts far ahead on a slow link (Chrome: about 2500 px),
 // so a tap on Create pulled some 30 covers, ~850 KB, before the account's balance arrived (slow 4G,
@@ -74,8 +76,36 @@ export function useNearViewport<T extends Element>(immediate: boolean, margin = 
 // The covers of one card: eager ones (the first screen) at once; the rest, inside Create's grid,
 // once near the screen, at low priority so they never queue ahead of the account's own data.
 export function useCardCovers<T extends Element>(eager: boolean) {
-  const defer = useDeferCovers() && !eager
+  const inCreate = useDeferCovers()
+  const defer = inCreate && !eager
   const [ref, near] = useNearViewport<T>(!defer)
+  useKeepFirstScreen(ref, inCreate && eager)
   const img = { loading: eager ? ('eager' as const) : ('lazy' as const), ...(eager ? {} : { fetchPriority: 'low' as const }) }
   return { ref, show: near, img }
+}
+
+// Create's first-screen covers, once the page has loaded and they have: the service worker keeps
+// them for the next launch (core/offline, LCP plan 1). The URLs are the files the browser picked
+// from the srcset, so they are the ones the next launch asks for again.
+function useKeepFirstScreen(ref: RefObject<Element | null>, keep: boolean) {
+  useEffect(() => {
+    if (!keep) return
+    let cancelled = false
+    const loaded = (img: HTMLImageElement) =>
+      img.complete && img.naturalWidth > 0 ? Promise.resolve(img.currentSrc) : new Promise<string>((resolve) => {
+        img.addEventListener('load', () => resolve(img.currentSrc), { once: true })
+        img.addEventListener('error', () => resolve(''), { once: true })
+      })
+    const post = async () => {
+      const urls = await Promise.all([...(ref.current?.querySelectorAll('img') ?? [])].map(loaded))
+      if (!cancelled) keepFirstScreenCovers([...new Set(urls.filter(Boolean))])
+    }
+    const start = () => void post()
+    if (document.readyState === 'complete') start()
+    else window.addEventListener('load', start, { once: true })
+    return () => {
+      cancelled = true
+      window.removeEventListener('load', start)
+    }
+  }, [ref, keep])
 }

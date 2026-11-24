@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '../errors'
+import { expireWallCache } from './wall'
 import { logger } from '../logger'
 import { deleteImages, signImages } from './images'
 import type { WishlistDeps } from './requests'
@@ -62,6 +63,8 @@ export async function reviewRequest(deps: WishlistDeps, input: unknown): Promise
   await deleteImages(deps.store, dropped).catch((error: unknown) =>
     logger.error('wishlist.review.images_not_deleted', { requestId: review.id, keys: dropped, error }),
   )
+  // A review moves requests onto or off the shared wall (wall.ts); after the images, never throws.
+  expireWallCache()
 }
 
 // Templates a shipped request can link to: every template, published or not, since the Owner
