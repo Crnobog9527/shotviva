@@ -61,7 +61,15 @@ export function toCatalogueIndex(tree: CategoryNode[], entryRows: EntryRow[], me
     entries.push({ type: row.type, id, categoryKey: row.category_key })
     if (row.type === 'series' && row.entry_series) series.push(toSeries(row.entry_series, members.get(id) ?? [], locale))
   }
-  return { tree, entries, series }
+  return onePlace({ tree, entries, series })
+}
+
+// A template shows in one place only (Owner 2026-11-25): a member of a series on the page lives in
+// that series (Create's shelf), never also as a loose card, whatever the series' old show_members
+// says. Also applied to an index read from the cache, which may predate this rule.
+export function onePlace(index: CatalogueIndex): CatalogueIndex {
+  const inSeries = new Set(index.series.flatMap((item) => item.memberIds))
+  return { ...index, entries: index.entries.filter((entry) => entry.type === 'series' || !inSeries.has(entry.id)) }
 }
 
 function toSeries(row: SeriesRow, members: MemberRow[], locale: Locale): IndexSeries {

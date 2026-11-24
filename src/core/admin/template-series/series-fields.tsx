@@ -42,9 +42,6 @@ export function SeriesFields({ fields, patch, choices }: Props) {
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={fields.is_active} onChange={e => patch({ is_active: e.target.checked })} />{copy.active}
         </label>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={fields.show_members} onChange={e => patch({ show_members: e.target.checked })} />{copy.showMembers}
-        </label>
         <p className="text-muted-foreground text-xs">{copy.publicationHint}</p>
       </div>
     </div>

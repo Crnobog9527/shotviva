@@ -1,4 +1,4 @@
-import type { CatalogueTemplate } from './catalogue-template'
+import { isMotion, type CatalogueTemplate } from './catalogue-template'
 import { pathStartsWith, type FilterNode, type GridEntry } from './catalogue-view'
 
 // Create's filter lives in the address so a filtered view can be shared (T102):
@@ -90,3 +90,8 @@ export function openableTemplates(entries: readonly GridEntry[]): CatalogueTempl
   }
   return [...seen.values()]
 }
+
+// Create's featured card (the page's largest paint): the first video template in the catalogue's
+// order, a series member included, so a series of videos can never take the card away.
+export const featuredVideo = (entries: readonly GridEntry[]): CatalogueTemplate | null =>
+  openableTemplates(entries).find((template) => isMotion(template) && template.cover.type === 'video') ?? null

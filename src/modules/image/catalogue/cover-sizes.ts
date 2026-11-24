@@ -13,7 +13,7 @@ import { phoneSlot } from '../../../core/content/blocks/phone-sizes'
 // where the 384 w one is about 13 KB, and the first screen's four covers fell from about 107 KB to
 // 48 KB (2026-11-24). A 1× or 2× phone and every tablet or desktop keep their exact slots.
 const PHONE_3X = '(min-resolution: 2.5dppx)'
-const phone = (vw: number) => `${PHONE_3X} ${phoneSlot(vw)}, ${vw}vw`
+export const phone = (vw: number) => `${PHONE_3X} ${phoneSlot(vw)}, ${vw}vw`
 
 export const COVER_SIZES = {
   cardPlate: `(min-width: 1024px) 182px, (min-width: 768px) 25vw, ${phone(50)}`,
