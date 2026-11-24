@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { routeFor } from './routes'
-import { serviceWorkerSource } from './sw'
+import { COVERS_KEEP, serviceWorkerSource } from './sw'
 
 const SITE = 'https://shotviva.com'
 const CDN = 'https://img-eo.shotviva.com'
@@ -39,18 +39,43 @@ describe('what the service worker answers', () => {
   })
 })
 
+const BUCKET = 'https://pub-0123.r2.dev'
+const COVER_FILE = 'covers/manhwa-energy-copy-228c2c7d/after-8c988390aa621eda.avif'
+const cover = (href: string, origins = [CDN, BUCKET]) => routeFor(href, 'GET', 'no-cors', ORIGINS, origins)
+
+describe('which covers the service worker keeps', () => {
+  it('a cover’s pre-sized copy, through the image CDN, the site or the bucket itself', () => {
+    expect(cover(`${CDN}/assets/presized/v1/w384/${COVER_FILE}`)).toBe('cover')
+    expect(cover(`${SITE}/assets/presized/v1/w640/${COVER_FILE.replace('.avif', '.webp')}`, [SITE])).toBe('cover')
+    expect(cover(`${BUCKET}/presized/v1/w384/covers/x/sync-${'a'.repeat(64)}.webp`)).toBe('cover')
+  })
+
+  it('never a cover’s original, the site’s own pictures, a user’s file, a query string or another host', () => {
+    expect(cover(`${CDN}/assets/covers/x/after-8c988390aa621eda.webp`)).toBeNull()
+    expect(cover(`${CDN}/presized/v1/w384/home/hero-set-phone.avif`)).toBeNull()
+    expect(cover(`${SITE}/api/files/x/thumb`, [SITE])).toBeNull()
+    expect(cover(`${CDN}/assets/presized/v1/w384/${COVER_FILE}?v=1`)).toBeNull()
+    expect(cover(`https://evil.example/assets/presized/v1/w384/${COVER_FILE}`)).toBeNull()
+    expect(cover(`${CDN}/assets/presized/v1/w384/covers/x/after-mine.avif`)).toBeNull()
+    expect(routeFor(`${CDN}/assets/presized/v1/w384/${COVER_FILE}`, 'GET', 'navigate', ORIGINS, [CDN])).toBeNull()
+  })
+})
+
 // The generated /sw.js, run against a stand-in for the worker's globals. `fail` makes the cache
 // API reject at one step, as Cache Storage can (a quota, an eviction race, an internal error).
 type Fail = 'open' | 'match' | 'put' | null
+// The cache takes a request or a URL, as Cache Storage does.
+type Key = string | { url: string }
+const keyOf = (key: Key) => (typeof key === 'string' ? key : key.url)
 function runWorker(source: string, { fail = null as Fail, cached = new Map<string, Response>() } = {}) {
   const handlers: Record<string, (event: unknown) => void> = {}
   const deleted: string[] = []
   const reject = (step: Fail) => (fail === step ? Promise.reject(new Error(`cache ${step} failed`)) : null)
   const store = {
-    match: vi.fn(async (request: { url: string }) => (await reject('match')) ?? cached.get(request.url)),
-    put: vi.fn(async (request: { url: string }, response: Response) => (await reject('put')) ?? void cached.set(request.url, response)),
-    keys: vi.fn(async () => []),
-    delete: vi.fn(),
+    match: vi.fn(async (request: Key) => (await reject('match')) ?? cached.get(keyOf(request))),
+    put: vi.fn(async (request: Key, response: Response) => (await reject('put')) ?? void cached.set(keyOf(request), response)),
+    keys: vi.fn(async () => [...cached.keys()]),
+    delete: vi.fn(async (key: Key) => cached.delete(keyOf(key))),
   }
   const caches = { open: vi.fn(async () => (await reject('open')) ?? store), keys: vi.fn(async () => ['sv-static-old', 'sv-catalogue', 'other-app']), delete: vi.fn(async (key: string) => void deleted.push(key)) }
   const preload = { enable: vi.fn(async () => undefined) }
@@ -71,7 +96,7 @@ function runWorker(source: string, { fail = null as Fail, cached = new Map<strin
 const asset = (path: string) => ({ request: { url: `${CDN}${path}`, method: 'GET', mode: 'cors' } })
 
 describe('/sw.js', () => {
-  const source = serviceWorkerSource({ version: 'dpl_test', cdnOrigins: [CDN], enabled: true })
+  const source = serviceWorkerSource({ version: 'dpl_test', cdnOrigins: [CDN], coverOrigins: [CDN], enabled: true })
 
   it('answers a static file from the network the first time and keeps a copy after, under waitUntil', async () => {
     const worker = runWorker(source)
@@ -129,5 +154,90 @@ describe('/sw.js', () => {
     await worker.dispatch('activate', {})
     expect(worker.deleted).toEqual(['sv-static-old', 'sv-catalogue'])
     expect(worker.self.registration.unregister).toHaveBeenCalled()
+  })
+})
+
+// A readable (CORS) answer, as the image CDN gives once it sends Access-Control-Allow-Origin.
+const corsAnswer = (body: string) => {
+  const answer = { status: 200, ok: true, type: 'cors', body, clone: () => answer, text: async () => body }
+  return answer as unknown as Response
+}
+const coverRequest = (n = 0) => ({ request: { url: `${CDN}/assets/presized/v1/w384/covers/x/after-${n.toString(16).padStart(16, '0')}.avif`, method: 'GET', mode: 'no-cors', destination: 'image' } })
+
+describe('/sw.js covers across builds and the switch', () => {
+  const source = serviceWorkerSource({ version: 'dpl_test', cdnOrigins: [CDN], coverOrigins: [CDN], enabled: true })
+
+  it('keeps the covers across builds', async () => {
+    const worker = runWorker(source)
+    worker.caches.keys.mockResolvedValueOnce(['sv-static-old', 'sv-covers', 'sv-catalogue'])
+    await worker.dispatch('activate', {})
+    expect(worker.deleted).toEqual(['sv-static-old'])
+  })
+
+  it('switched off (the admin switch, also the kill switch) drops the covers too', async () => {
+    const worker = runWorker(serviceWorkerSource({ version: 'dpl_test', cdnOrigins: [CDN], coverOrigins: [CDN], enabled: false }))
+    worker.caches.keys.mockResolvedValueOnce(['sv-static-x', 'sv-covers'])
+    await worker.dispatch('activate', {})
+    expect(worker.deleted).toEqual(['sv-static-x', 'sv-covers'])
+  })
+})
+
+describe('/sw.js covers', () => {
+  const source = serviceWorkerSource({ version: 'dpl_test', cdnOrigins: [CDN], coverOrigins: [CDN], enabled: true })
+
+  it('asks for a cover in CORS mode, without credentials, keeps that copy and answers the next launch from it', async () => {
+    const worker = runWorker(source)
+    worker.fetch.mockResolvedValueOnce(corsAnswer('cover'))
+    const first = await worker.dispatch('fetch', coverRequest())
+    expect(await first.response?.text()).toBe('cover')
+    expect(worker.fetch).toHaveBeenCalledWith(coverRequest().request.url, { mode: 'cors', credentials: 'omit' })
+    expect(worker.store.put).toHaveBeenCalledTimes(1)
+    const again = await worker.dispatch('fetch', coverRequest())
+    expect(await again.response?.text()).toBe('cover')
+    expect(worker.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('a host without CORS gets the browser’s own request, kept nowhere; after three it is not asked in CORS mode again', async () => {
+    const worker = runWorker(source)
+    for (let n = 0; n < 3; n++) {
+      worker.fetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      const { response } = await worker.dispatch('fetch', coverRequest(n))
+      expect(await response?.text()).toBe('network')
+    }
+    expect(worker.fetch).toHaveBeenCalledTimes(6)
+    worker.fetch.mockClear()
+    await worker.dispatch('fetch', coverRequest(9))
+    expect(worker.fetch).toHaveBeenCalledTimes(1)
+    expect(worker.fetch).toHaveBeenCalledWith(coverRequest(9).request)
+    expect(worker.store.put).not.toHaveBeenCalled()
+  })
+
+  it('never keeps an opaque or failed answer', async () => {
+    const worker = runWorker(source)
+    const opaque = { status: 0, ok: false, type: 'opaque', clone: () => opaque } as unknown as Response
+    worker.fetch.mockResolvedValueOnce(opaque)
+    await worker.dispatch('fetch', coverRequest(1))
+    worker.fetch.mockResolvedValueOnce(new Response('gone', { status: 404 }))
+    await worker.dispatch('fetch', coverRequest(2))
+    expect(worker.store.put).not.toHaveBeenCalled()
+  })
+
+  it(`keeps only the ${COVERS_KEEP} covers shown most recently`, async () => {
+    const cached = new Map<string, Response>()
+    const worker = runWorker(source, { cached })
+    for (let n = 0; n <= COVERS_KEEP + 4; n++) {
+      worker.fetch.mockResolvedValueOnce(corsAnswer(`c${n}`))
+      await worker.dispatch('fetch', coverRequest(n))
+    }
+    expect(cached.size).toBe(COVERS_KEEP)
+    expect(cached.has(coverRequest(0).request.url)).toBe(false)
+    expect(cached.has(coverRequest(COVERS_KEEP + 4).request.url)).toBe(true)
+  })
+
+  it('falls back to the network when the cache rejects', async () => {
+    const worker = runWorker(source, { fail: 'open' })
+    worker.fetch.mockResolvedValueOnce(corsAnswer('cover'))
+    const { response } = await worker.dispatch('fetch', coverRequest())
+    expect(await response?.text()).toBe('cover')
   })
 })
