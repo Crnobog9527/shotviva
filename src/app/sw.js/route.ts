@@ -1,7 +1,7 @@
 import { connection } from 'next/server'
 
 import { serviceWorkerResponse } from '@/core/offline/server'
-import { serviceWorkerEnabled } from '@/core/system-settings'
+import { serviceWorkerEnabled, serviceWorkerShellEnabled } from '@/core/system-settings'
 
 // The service worker (core/offline): public by nature (AGENTS §6), served at the site root so its
 // scope is the whole site. It answers only content-hashed static files and the catalogue file at a
@@ -11,5 +11,7 @@ import { serviceWorkerEnabled } from '@/core/system-settings'
 // skips this path.
 export async function GET() {
   await connection()
-  return serviceWorkerResponse(await serviceWorkerEnabled())
+  // Create's app shell (ARCHITECTURE §18.3) is its own switch, and only with the worker on.
+  const [enabled, shell] = await Promise.all([serviceWorkerEnabled(), serviceWorkerShellEnabled()])
+  return serviceWorkerResponse(enabled, shell)
 }

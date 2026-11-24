@@ -17,7 +17,7 @@ import { PairMedia } from './pair-media'
 import { SeriesBadge } from './series-badge'
 import { PickMark } from '../template-share/pick-mark'
 
-type Props = { series: CatalogueSeries; onOpen(id: string): void; eager?: boolean }
+type Props = { series: CatalogueSeries; onOpen(id: string): void; eager?: boolean; priority?: boolean }
 
 // A series card (T102): the same 8:5 frame and meta as a template card, on two prints stacked
 // behind it whose corners show past its own, plus a 「系列」 badge on the picture,
@@ -25,12 +25,13 @@ type Props = { series: CatalogueSeries; onOpen(id: string): void; eager?: boolea
 // series' own artwork, or, without one, its first member's Phone / AI split with both tags (The
 // Always-Visible Split Rule). A tap opens the series panel (its members and the chosen one's
 // form, one step). No save heart: favourites are per template.
-export function SeriesCard({ series, onOpen, eager }: Props) {
+export function SeriesCard({ series, onOpen, eager, priority }: Props) {
   const t = useTranslations('app.series')
   return (
     <button
       type="button"
       aria-haspopup="dialog"
+      data-card={`series:${series.slug}`}
       aria-label={t('cardAria', { name: series.name, count: series.members.length })}
       onClick={() => onOpen(series.id)}
       className="group relative block w-full rounded-tile text-left transition-transform duration-250 ease-house hover:-translate-y-0.5 active:scale-[.97]"
@@ -40,7 +41,7 @@ export function SeriesCard({ series, onOpen, eager }: Props) {
         <PrintEdge className="translate-x-[3px] translate-y-[5px] rotate-[2.8deg] bg-secondary" />
         <PrintEdge className="-translate-x-[2px] translate-y-[2px] -rotate-[2deg] bg-accent" />
         <span className="relative block rounded-control shadow-[0_6px_16px_-8px_rgba(0,0,0,.75)]">
-          <SeriesFrame series={series} eager={eager} />
+          <SeriesFrame series={series} eager={eager} priority={priority} />
           <SeriesBadge className="absolute top-2 left-2 z-5" />
         </span>
       </span>
@@ -66,8 +67,8 @@ function PrintEdge({ className }: { className: string }) {
 // hands): it is contained, and the same picture, blurred and dimmed, fills the bands a cover of
 // another shape leaves. One download: both use the same srcset. Inside Create's grid it waits until
 // the card nears the screen (near-viewport.tsx).
-function SeriesArtwork({ src, alt, eager }: { src: string; alt: string; eager: boolean }) {
-  const { ref, show, img } = useCardCovers<HTMLSpanElement>(eager)
+function SeriesArtwork({ src, alt, eager, priority }: { src: string; alt: string; eager: boolean; priority?: boolean }) {
+  const { ref, show, img } = useCardCovers<HTMLSpanElement>(eager, eager && priority === true)
   const cover = coverImage(src, COVER_SIZES.cardFrame)
   const avif = coverAvif(src, COVER_SIZES.cardFrame)
   return (
@@ -82,20 +83,20 @@ function SeriesArtwork({ src, alt, eager }: { src: string; alt: string; eager: b
   )
 }
 
-function SeriesFrame({ series, eager }: { series: CatalogueSeries; eager?: boolean }) {
+function SeriesFrame({ series, eager, priority }: { series: CatalogueSeries; eager?: boolean; priority?: boolean }) {
   const alt = useTranslations('app.series')('coverAlt', { name: series.name })
   if (series.cover) {
     // The artwork is one member's after cover: show it as that member's Phone / AI split, so the
     // card tells the difference at a glance, like a series without artwork (Owner 2026-11-16).
     const paired = pairedMember(series.cover, series.members)
-    if (paired) return <PairMedia before={paired.cover.before as string} after={series.cover} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} />
+    if (paired) return <PairMedia before={paired.cover.before as string} after={series.cover} alt={alt} eager={eager} priority={priority} sizes={COVER_SIZES.cardPlate} />
     // The whole artwork, never cropped to the 8:5 frame (Owner 2026-11-13: 画风迁移 lost heads and
     // hands): it is contained, and the same picture, blurred and dimmed, fills the bands a cover
     // of another shape leaves. One download: both use the same srcset.
-    return <SeriesArtwork src={series.cover} alt={alt} eager={eager === true} />
+    return <SeriesArtwork src={series.cover} alt={alt} eager={eager === true} priority={priority} />
   }
   const split = series.members.find(hasStills)
-  if (split) return <PairMedia before={split.cover.before as string} after={split.cover.after as string} alt={alt} eager={eager} sizes={COVER_SIZES.cardPlate} />
+  if (split) return <PairMedia before={split.cover.before as string} after={split.cover.after as string} alt={alt} eager={eager} priority={priority} sizes={COVER_SIZES.cardPlate} />
   const loop = series.members.find(isMotion)
   if (loop) return <LoopPlate template={loop} alt={alt} sizes={COVER_SIZES.cardFrame} />
   return <span className="hairline block aspect-[8/5] rounded-control bg-muted" />

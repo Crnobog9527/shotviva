@@ -63,3 +63,24 @@ describe('qa-invitee reset', () => {
     expect(resetPool).not.toHaveBeenCalled()
   })
 })
+
+describe('qa-graylum reset', () => {
+  const graylum = PERSONAS['qa-graylum']
+
+  beforeEach(() => {
+    vi.mocked(createPersonaUser).mockResolvedValue(qaUser('new-graylum', { qa_persona: graylum.id }))
+  })
+
+  it('keeps the real signup grant in the free pool instead of resetting it', async () => {
+    vi.mocked(readProfile).mockResolvedValue({ credits: 0, paid_until: null, role: 'user', free_credits: 100, banned_at: null })
+    expect((await setupPersona(ctx, graylum)).outcome).toBe('created')
+    expect(grantSignup).toHaveBeenCalledWith(ctx.db, 'new-graylum')
+    expect(resetPool).not.toHaveBeenCalledWith(ctx.db, 'new-graylum', 'free', expect.anything())
+  })
+
+  it('fails loudly when the signup grant left no free credits', async () => {
+    vi.mocked(grantSignup).mockResolvedValue(false)
+    vi.mocked(readProfile).mockResolvedValue({ credits: 0, paid_until: null, role: 'user', free_credits: 0, banned_at: null })
+    await expect(setupPersona(ctx, graylum)).rejects.toThrow(/did not receive the signup grant/)
+  })
+})

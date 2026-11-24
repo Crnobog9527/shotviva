@@ -49,6 +49,13 @@ describe('proxy matcher', () => {
     expect(runsOn('/api/versions')).toBe(true)
   })
 
+  // The app's anonymous speed numbers: no session refresh, so no cookie is read or set for them.
+  it('skips /api/vitals but not lookalikes', () => {
+    expect(runsOn('/api/vitals')).toBe(false)
+    expect(runsOn('/api/vitals/x')).toBe(true)
+    expect(runsOn('/api/vitalsx')).toBe(true)
+  })
+
   it('skips the service worker script (public, no cookies) but not lookalikes', () => {
     expect(runsOn('/sw.js')).toBe(false)
     expect(runsOn('/sw.json')).toBe(true)

@@ -41,7 +41,12 @@ to prepare the separate invitation acceptance account.
 | `qa-fresh` | qa-fresh@shotviva.com | Deleted and recreated every run: no credits, no works, no ledger. Its first sign-in grants the 6 signup credits through the real first-sign-in path |
 | `qa-max` | qa-max@shotviva.com | Max tier from a `max_yearly` purchase (paid until a year after the first run), 6 free + 3360 paid credits |
 | `qa-free` | qa-free@shotviva.com | Signup credits only: 6 free, 0 paid, no tier |
+| `qa-graylum` | qa-graylum@shotviva.com | Graylum connection tests only. Deleted and recreated by its own reset: the free pool keeps whatever the real signup grant gives (as for a new account, so a partner generation can succeed), 0 paid, no tier, no Graylum link |
 | `qa-invitee` | qa-invitee@shotviva.com | Created by its own reset with a fixed test signup IP, the configured signup grant in the free pool and no prior payment or invitation |
+
+For Graylum connection tests, use only `qa-graylum`: `pnpm qa:reset qa-graylum`, then
+`pnpm qa:login qa-graylum`. Every reset gives it a new identity, so a rerun starts unlinked.
+Keep `qa-free` for the enterprise and affiliate checks that already use it.
 
 For invitation acceptance, reset `qa-invitee` before the first purchase and use
 `pnpm qa:login qa-invitee`. Resetting recreates this test identity, records `192.0.2.94`
@@ -122,7 +127,7 @@ lands on `next` (default `/account`).
 > From the repo root, which has the preview `.env.local`. For each browser window, run
 > `pnpm qa:login <persona>` (add `--next /path` to land on a specific page) and open the
 > printed link in that window only. Personas: `qa-admin`, `qa-creator`, `qa-fresh`, `qa-max`,
-> `qa-free`, `qa-invitee`. Never paste the links anywhere; each works once. The window must already be through
+> `qa-free`, `qa-invitee`, `qa-graylum` (Graylum connection tests only). Never paste the links anywhere; each works once. The window must already be through
 > Vercel's deployment protection.
 >
 > If your persona is not in its starting state, run `pnpm qa:reset <persona>` for **your own
