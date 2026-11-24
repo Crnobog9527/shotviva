@@ -20,7 +20,8 @@ export type PublicBundle = { id: string; name: string; memberIds: string[] }
 export async function cachedFeaturedBundles(locale: Locale): Promise<PublicBundle[]> {
   'use cache'
   cacheTag(TEMPLATES_CACHE_TAG)
-  const bundles = await readFeaturedBundles(createAdminSupabase())
+  // No database client at all (a build without the service key) is a failed read too.
+  const bundles = await Promise.resolve().then(() => readFeaturedBundles(createAdminSupabase())).catch(() => undefined)
   cacheLife(bundles ? CATALOGUE_LIFE : FAILED_READ_LIFE)
   return localeBundles(bundles, locale).map((bundle) => ({
     id: bundle.id, name: locale === 'zh' ? bundle.nameZh : bundle.nameEn, memberIds: bundle.templateIds,
