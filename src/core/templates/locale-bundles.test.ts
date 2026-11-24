@@ -8,13 +8,13 @@ const display = (featured: LocaleDisplay['featured'], locale: Record<string, str
   ({ categoryOrder: {}, featured, bundles: { list, locale } })
 
 describe('localeBundles', () => {
-  it('follows the default bundles while the language follows the default featured list', () => {
-    expect(localeBundles(display({}, { zh: ['unplaced'] }), 'zh').map((b) => b.id)).toEqual(['first', 'late'])
+  it('follows the default bundles until the language has its own, whatever its featured templates do', () => {
+    expect(localeBundles(display({}), 'zh').map((b) => b.id)).toEqual(['first', 'late'])
+    expect(localeBundles(display({ en: ['t'] }), 'en').map((b) => b.id)).toEqual(['first', 'late'])
   })
 
-  it('shows a language\'s own bundles, possibly none, beside its own featured list', () => {
-    expect(localeBundles(display({ zh: ['t'] }, { zh: ['unplaced', 'gone', 'late'] }), 'zh').map((b) => b.id)).toEqual(['unplaced', 'late'])
-    expect(localeBundles(display({ en: ['t'] }), 'en')).toEqual([])
+  it('shows a language\'s own bundles in its order', () => {
+    expect(localeBundles(display({}, { zh: ['unplaced', 'gone', 'late'] }), 'zh').map((b) => b.id)).toEqual(['unplaced', 'late'])
   })
 
   it('has none on a database without bundles', () => {

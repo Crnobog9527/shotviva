@@ -73,10 +73,11 @@ describe('精选组合', () => {
     await expect(setDefaultFeaturedBundles(api, user, [first])).rejects.toMatchObject({ code: 'FORBIDDEN' })
   })
 
-  it('gives a language with its own featured list its own bundles, all or nothing with the rest', async () => {
+  it('gives a language its own bundles, all or nothing with the rest of its draft', async () => {
     const [bundle] = await ours()
     await saveLocaleDisplay(api, admin, { locale: 'zh', groups: [], featured: ['fb-a'], bundles: [bundle.id] })
     expect((await readLocaleDisplay(api)).bundles?.locale.zh).toEqual([bundle.id])
+    expect(localeBundles(await readLocaleDisplay(api), 'zh').map((one) => one.id)).toEqual([bundle.id])
     const missing = '00000000-0000-4000-8000-000000000000'
     await expect(saveLocaleDisplay(api, admin, { locale: 'zh', groups: [], featured: ['fb-b'], bundles: [missing] })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     const after = await readLocaleDisplay(api)
@@ -84,8 +85,10 @@ describe('精选组合', () => {
     expect(after.bundles?.locale.zh).toEqual([bundle.id])
   })
 
-  it('drops a language\'s own bundles when it goes back to following the default', async () => {
+  it('keeps a language\'s bundles when only its templates change, and follows the default again when emptied', async () => {
     await saveLocaleDisplay(api, admin, { locale: 'zh', groups: [], featured: [] })
+    expect((await readLocaleDisplay(api)).bundles?.locale.zh?.length).toBe(1)
+    await saveLocaleDisplay(api, admin, { locale: 'zh', groups: [], featured: null, bundles: [] })
     expect((await readLocaleDisplay(api)).bundles?.locale.zh ?? []).toEqual([])
   })
 

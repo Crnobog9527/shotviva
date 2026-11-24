@@ -27,9 +27,10 @@ export function useLocaleDisplayEditor({ categories, templates, display, actions
 
   const groups = siblingGroups(categories, display, locale)
   const bundleIds = (shown: LocaleDisplay) => localeBundles(shown, locale).map((bundle) => bundle.id)
-  const saved = toDraft(groups, featuredState(templates, display, locale), bundleIds(display))
-  // The default lists: the same display with no language of its own (bundles kept, featured not).
-  const defaults = { ...NO_LOCALE_DISPLAY, bundles: display.bundles }
+  // The default bundles: the same bundles with no language list of its own.
+  const defaults = { ...NO_LOCALE_DISPLAY, bundles: display.bundles && { ...display.bundles, locale: {} } }
+  const ownBundles = (display.bundles?.locale[locale] ?? []).length > 0
+  const saved = toDraft(groups, featuredState(templates, display, locale), { own: ownBundles, ids: bundleIds(display) })
   const shared = sharedLists(siblingGroups(categories, NO_LOCALE_DISPLAY, locale), featuredState(templates, NO_LOCALE_DISPLAY, locale), bundleIds(defaults))
   const draft = edit?.locale === locale ? edit.draft : null
   const changes = draft ? draftChanges(saved, draft) : null

@@ -27,16 +27,16 @@ export type FeaturedBundle = {
 export type FeaturedBundles = {
   // Every bundle, placed or not, oldest first.
   list: FeaturedBundle[]
-  // A language's own bundle ids in order; only read while it has its own featured list.
+  // A language's own bundle ids in order; absent or empty follows the default ones.
   locale: Partial<Record<Locale, string[]>>
 }
 
-// The bundles a language shows, in order: its own while it has its own featured templates (an
-// empty own list shows none), else the default ones by featured_rank.
+// The bundles a language shows, in order: its own list when it has one, else the default ones by
+// featured_rank (the same rule as its featured templates).
 export function localeBundles(display: LocaleDisplay, locale: Locale): FeaturedBundle[] {
   const bundles = display.bundles
   if (!bundles) return []
-  if ((display.featured[locale] ?? []).length > 0) {
+  if ((bundles.locale[locale] ?? []).length > 0) {
     const byId = new Map(bundles.list.map((bundle) => [bundle.id, bundle]))
     return (bundles.locale[locale] ?? []).flatMap((id) => byId.get(id) ?? [])
   }

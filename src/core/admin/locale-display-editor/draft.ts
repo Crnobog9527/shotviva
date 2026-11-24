@@ -11,8 +11,8 @@ export type LocaleDraft = {
   // Sibling groups by parent key ('' is the top level), in the order shown.
   groups: Record<string, DraftList>
   featured: DraftList
-  // 精选组合 ids in order; the language's own while `featured.own`, else the default ones.
-  bundles: string[]
+  // 精选组合 in order: the language's own, or the default ones while it follows them.
+  bundles: DraftList
 }
 
 // The shared order each list returns to on 恢复跟随默认.
@@ -24,11 +24,11 @@ const parentOf = (key: string) => (key === ROOT ? null : key)
 const sameIds = (a: readonly string[], b: readonly string[]) => a.join('\n') === b.join('\n')
 const sameList = (a: DraftList, b: DraftList) => a.own === b.own && sameIds(a.ids, b.ids)
 
-export function toDraft(groups: readonly SiblingGroup[], featured: FeaturedState, bundles: readonly string[] = []): LocaleDraft {
+export function toDraft(groups: readonly SiblingGroup[], featured: FeaturedState, bundles: DraftList = { own: false, ids: [] }): LocaleDraft {
   return {
     groups: Object.fromEntries(groups.map((group) => [groupKey(group.parent), { own: group.own, ids: [...group.keys] }])),
     featured: { own: featured.own, ids: [...featured.ids] },
-    bundles: [...bundles],
+    bundles: { own: bundles.own, ids: [...bundles.ids] },
   }
 }
 
@@ -46,19 +46,22 @@ export function resetGroup(draft: LocaleDraft, parent: string | null, shared: Sh
 }
 
 // Any change makes the list the language's own; emptying it follows the shared list again, as
-// the server does with an empty list, and the bundles with it.
+// the server does with an empty list.
 export function setFeatured(draft: LocaleDraft, ids: string[], shared: SharedLists): LocaleDraft {
-  return ids.length > 0 ? { ...draft, featured: { own: true, ids } } : resetFeatured(draft, shared)
+  return { ...draft, featured: ids.length > 0 ? { own: true, ids } : { own: false, ids: [...shared.featured] } }
 }
 
 export function resetFeatured(draft: LocaleDraft, shared: SharedLists): LocaleDraft {
-  return { ...draft, featured: { own: false, ids: [...shared.featured] }, bundles: [...shared.bundles] }
+  return { ...draft, featured: { own: false, ids: [...shared.featured] } }
 }
 
-// A language keeps its own bundles only beside its own featured list (migration 2005), so
-// arranging them makes the featured templates its own too, starting from what it shows now.
-export function setBundles(draft: LocaleDraft, ids: string[]): LocaleDraft {
-  return { ...draft, bundles: ids, featured: draft.featured.own ? draft.featured : { own: true, ids: [...draft.featured.ids] } }
+// 精选组合 follow the same rule (migration 2005).
+export function setBundles(draft: LocaleDraft, ids: string[], shared: SharedLists): LocaleDraft {
+  return { ...draft, bundles: ids.length > 0 ? { own: true, ids } : { own: false, ids: [...shared.bundles] } }
+}
+
+export function resetBundles(draft: LocaleDraft, shared: SharedLists): LocaleDraft {
+  return { ...draft, bundles: { own: false, ids: [...shared.bundles] } }
 }
 
 // What 保存 sends: the groups that differ from the saved state and the featured list if it
@@ -68,9 +71,7 @@ export function draftChanges(saved: LocaleDraft, draft: LocaleDraft): Omit<SaveL
     .filter(([key, list]) => !saved.groups[key] || !sameList(saved.groups[key], list))
     .map(([key, list]) => ({ parent: parentOf(key), keys: list.own ? list.ids : [] }))
   const featured = sameList(saved.featured, draft.featured) ? null : draft.featured.own ? draft.featured.ids : []
-  // Own bundles are written when they changed or the language just got its own list (it had no
-  // rows yet); going back to following clears them on the server by itself.
-  const bundles = draft.featured.own && (!saved.featured.own || !sameIds(saved.bundles, draft.bundles)) ? draft.bundles : null
+  const bundles = sameList(saved.bundles, draft.bundles) ? null : draft.bundles.own ? draft.bundles.ids : []
   return { groups, featured, bundles }
 }
 

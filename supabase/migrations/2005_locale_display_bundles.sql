@@ -1,7 +1,6 @@
--- 精选组合 per language (Owner 2026-11-25), next to 1575's per-language featured templates. A
--- language with its own featured list (template_featured_locale rows) shows its own bundles from
--- here, possibly none; a language that follows the default list follows the default bundles
--- (featured_bundles.featured_rank, migration 2004) too.
+-- 精选组合 per language (Owner 2026-11-25), next to 1575's per-language featured templates and
+-- with the same rule: a language with rows here shows its own bundles in this order; with none it
+-- follows the default ones (featured_bundles.featured_rank, migration 2004).
 -- Expand-only: a new table and a new five-argument admin_set_locale_display beside 2003's
 -- four-argument one, which keeps working unchanged for code deployed before this.
 
@@ -18,8 +17,8 @@ revoke all on public.bundle_featured_locale from public, anon, authenticated;
 grant all on public.bundle_featured_locale to service_role;
 
 -- 2003's save plus the language's bundles: p_bundles null leaves them alone; otherwise the whole
--- list in order. Bundles only stay on a language that has its own featured list once the rest is
--- applied, as above. One call, so it is all or nothing like 2003.
+-- list in order, and an empty one goes back to following the default. One call, so it is all or
+-- nothing like 2003.
 create function public.admin_set_locale_display(p_locale text, p_groups jsonb, p_featured text[], p_bundles uuid[], p_actor uuid)
 returns void language plpgsql set search_path = '' as $$
 declare
@@ -37,9 +36,6 @@ begin
     delete from public.bundle_featured_locale where locale = p_locale;
     insert into public.bundle_featured_locale (locale, bundle_id, rank)
     select p_locale, o.id, o.position::int from unnest(v_bundles) with ordinality as o(id, position);
-  end if;
-  if not exists (select 1 from public.template_featured_locale f where f.locale = p_locale) then
-    delete from public.bundle_featured_locale where locale = p_locale;
   end if;
 end $$;
 

@@ -13,7 +13,7 @@ import { CategoryGroups } from './category-groups'
 import { LOCALE_DISPLAY_COPY as COPY } from './copy'
 import { featuredState, siblingGroups } from './display-state'
 import type { FeaturedBundleActions } from '../featured-bundles/types'
-import { groupKey, reorderGroup, resetFeatured, resetGroup, setBundles, setFeatured } from './draft'
+import { groupKey, reorderGroup, resetBundles, resetFeatured, resetGroup, setBundles, setFeatured } from './draft'
 import { LocaleBundles } from './locale-bundles'
 import { EditBar } from './edit-bar'
 import { FeaturedList } from './featured-list'
@@ -37,7 +37,8 @@ export function LocaleDisplayPanel({ categories: all, templates, display, action
   const [open, setOpen] = usePanelOpen()
   const categories = all.filter((category) => !category.isSystem)
   const summary = DISPLAY_LOCALES.map((code) => COPY.summary(COPY.locales[code],
-    siblingGroups(categories, display, code).filter((group) => group.own).length, featuredState(templates, display, code).own)).join('；')
+    siblingGroups(categories, display, code).filter((group) => group.own).length, featuredState(templates, display, code).own,
+    (display.bundles?.locale[code] ?? []).length > 0)).join('；')
   return (
     <section aria-labelledby="locale-display-h" className="grid gap-4 rounded-md border p-4">
       <h2 id="locale-display-h" className="font-medium">
@@ -80,8 +81,8 @@ function PanelBody({ hidden, categories, templates, display, actions, saveBundle
       <FeaturedList locale={locale} label={label} list={shown.featured} templates={templates} categories={categories} editing={editor.editing}
         onChange={(ids) => update((draft) => setFeatured(draft, ids, shared))}
         onReset={() => update((draft) => resetFeatured(draft, shared))} />
-      <LocaleBundles label={label} own={shown.featured.own} ids={shown.bundles} context={bundleContext} editing={editor.editing}
-        onChange={(ids) => update((draft) => setBundles(draft, ids))} />
+      <LocaleBundles label={label} list={shown.bundles} context={bundleContext} editing={editor.editing}
+        onChange={(ids) => update((draft) => setBundles(draft, ids, shared))} onReset={() => update((draft) => resetBundles(draft, shared))} />
       {editor.editing ? <EditBar editor={editor} label={label} /> : null}
     </div>
   )
