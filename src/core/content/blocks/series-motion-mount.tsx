@@ -4,7 +4,7 @@ import { useLocale } from 'next-intl'
 import { useEffect } from 'react'
 
 import { useRouter } from '../../i18n/navigation'
-import { buildLayers, BUNDLE_FIRST_ATTR, BUNDLE_LABEL_ATTR, LAYER_TEMPLATE_ATTR, MORE_ATTR } from './series-layers'
+import { buildLayers, BUNDLE_FIRST_ATTR, bundlePairs, BUNDLE_LABEL_ATTR, LAYER_TEMPLATE_ATTR, MORE_ATTR } from './series-layers'
 import { seriesLayers } from './series-layers-source'
 import { cycler, HOVER_DELAY_MS, HOVER_HOLD_MS, VIEW_HOLD_MS, type Cycler } from './series-motion'
 
@@ -26,7 +26,8 @@ function wire(frame: HTMLElement, locale: string, touch: boolean, observer: Inte
       wanted = true
       seriesLayers(locale).then(
         (layers) => {
-          buildLayers(frame, layers.get(key) ?? [])
+          const pairs = layers.get(key) ?? []
+          buildLayers(frame, bundle ? bundlePairs(pairs) : pairs)
           if (wanted) cycle.start(delay, hold)
         },
         () => undefined,

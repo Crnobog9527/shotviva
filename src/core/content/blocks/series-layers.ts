@@ -27,6 +27,13 @@ export const LAYER_TEMPLATE_ATTR = 'data-layer-template'
 const BUILT_ATTR = 'data-series-built'
 const SIZE = { width: 900, height: 1125 }
 
+// A bundle card shows only pairs that say which template they are, so what it picks and names
+// is what is on show; an answer cached before bundles carried ids is left out (the card stays
+// on its first pair). Series cards take any pair.
+export function bundlePairs(pairs: readonly LayerPair[]): LayerPair[] {
+  return pairs.filter((pair) => pair.length === 3 && pair[2] !== '')
+}
+
 // Only well-formed before/after pairs from what the API sent.
 export function pairsIn(value: unknown): LayerPair[] {
   if (!Array.isArray(value)) return []
