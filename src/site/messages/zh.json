@@ -2406,6 +2406,8 @@
     "copyright": "© {year} {name}",
     "language": "语言",
     "cookieSettings": "Cookie 设置"
+,
+    "templateRequests": "模板许愿墙"
   },
   "consent": {
     "label": "Cookie 提示",
@@ -2432,6 +2434,10 @@
     "tryTitle": "换这三个模板试试"
   },
   "marketing": {
+    "templateRequests": {
+      "lead": "没有适合你照片的模板？",
+      "link": "提交模板需求"
+    },
     "appDescription": "AI 影棚",
     "nav": {
       "label": "主导航",
