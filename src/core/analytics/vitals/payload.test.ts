@@ -28,7 +28,7 @@ describe('vitalsRouteRoot', () => {
   })
 })
 
-const page: PageFacts = { href: 'https://shotviva.com/zh/photos/abc123?x=1', standalone: true, sw: true, net: '4g' }
+const page: PageFacts = { href: 'https://shotviva.com/zh/photos/abc123?x=1', standalone: true, sw: true, shell: false, net: '4g' }
 const lcp = { name: 'LCP', value: 1234.56, rating: 'needs-improvement', navigationType: 'navigate', id: 'v5-1' }
 
 describe('vitalsPayload', () => {
@@ -42,6 +42,7 @@ describe('vitalsPayload', () => {
       nav: 'navigate',
       standalone: true,
       sw: true,
+      shell: false,
       net: '4g',
     })
     expect(vitalsPayload({ name: 'CLS', value: 0.123456, rating: 'poor' }, { ...page, net: undefined })).toMatchObject({ value: 0.1235, nav: 'navigate', net: null })

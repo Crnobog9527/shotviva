@@ -27,6 +27,8 @@ const reportSchema = z
     nav: z.enum(VITAL_NAV_TYPES),
     standalone: z.boolean(),
     sw: z.boolean(),
+    // Optional: a page of the build before this field reports without it (read as false).
+    shell: z.boolean().default(false),
     net: z.enum(VITAL_EFFECTIVE_TYPES).nullable(),
   })
   .refine((r) => r.value <= (r.metric === 'CLS' ? MAX_VITAL_CLS : MAX_VITAL_MS))

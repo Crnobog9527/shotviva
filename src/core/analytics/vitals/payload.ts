@@ -19,7 +19,7 @@ export type MetricLike = {
 }
 
 // What the page knows about itself, read once by the reporter (browser.ts) and passed in.
-export type PageFacts = { href: string; standalone: boolean; sw: boolean; net: unknown }
+export type PageFacts = { href: string; standalone: boolean; sw: boolean; shell: boolean; net: unknown }
 
 // web-vitals' navigation types onto the five kept. A bfcache restore is a back/forward visit;
 // soft navigations (an experimental Chrome signal) are dropped, their URL is a client route change.
@@ -57,6 +57,7 @@ export function vitalsPayload(metric: MetricLike, page: PageFacts): VitalReport 
     nav,
     standalone: page.standalone,
     sw: page.sw,
+    shell: page.shell,
     net: isOneOf(VITAL_EFFECTIVE_TYPES, page.net) ? page.net : null,
   }
 }
