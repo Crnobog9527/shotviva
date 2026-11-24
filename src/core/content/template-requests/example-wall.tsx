@@ -57,7 +57,7 @@ export function ExampleWall({ text, voteCta }: { text: TemplateRequestsText['exa
         ))}
       </ul>
       <p className="mk-cap mk-wish-note">{wall.note}</p>
-      {voteCta ? <div className="mt-4">{voteCta}</div> : null}
+      {voteCta ? <div className="tr-after">{voteCta}</div> : null}
     </section>
   )
 }

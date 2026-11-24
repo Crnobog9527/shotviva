@@ -46,3 +46,34 @@
   }
   @media (prefers-reduced-motion: reduce) { .mk-wish-wall > li { transform: none; } }
 }
+
+/* The page's own layout (kept out of the shared public Tailwind sheet, which has a size budget). */
+@layer components {
+  .tr-page { padding-bottom: 64px; }
+  .tr-hero { padding: 16px var(--gutter) 0; }
+  .tr-h1 { font: 400 var(--text-h1)/1.05 var(--font-display); letter-spacing: -0.02em; text-wrap: balance; }
+  .tr-lede { margin-top: 12px; font-size: 16px; line-height: 1.5; text-wrap: pretty; color: var(--bone-dim); }
+  .tr-actions { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .tr-closed { margin-top: 20px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
+  .tr-inline { display: inline-flex; }
+  .tr-after { margin-top: 16px; }
+  .tr-grid { margin-top: 20px; display: grid; gap: 12px; }
+  .tr-points { gap: 16px; }
+  .tr-card { padding: 16px; border-radius: var(--radius-tile); background: var(--card); box-shadow: inset 0 0 0 1px var(--input); }
+  .tr-num { display: block; font: 400 28px/1 var(--font-display); color: var(--primary); }
+  .tr-strong { font-size: 16px; font-weight: 600; }
+  .tr-h3 { margin-top: 12px; font-size: 16px; font-weight: 600; }
+  .tr-gap { margin-top: 28px; }
+  .tr-dim { margin-top: 6px; font-size: 16px; line-height: 1.45; text-wrap: pretty; color: var(--bone-dim); }
+  .tr-quotes { margin-top: 12px; display: grid; gap: 12px; list-style: none; padding: 0; }
+  .tr-quote { padding: 12px 16px; border-left: 2px solid var(--primary); border-radius: var(--radius-tile); background: var(--card); font-size: 16px; line-height: 1.45; text-wrap: pretty; }
+  @media (min-width: 768px) {
+    .tr-hero { max-width: 720px; padding-top: 40px; }
+    .tr-h1 { font-size: var(--text-title); }
+    .tr-cta { width: auto; }
+    .tr-grid { gap: 16px; }
+    .tr-card { padding: 20px; }
+  }
+  @media (min-width: 1024px) { .tr-hero { padding-top: 48px; } }
+  @media (min-width: 1280px) { .tr-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+}

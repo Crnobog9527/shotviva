@@ -19,12 +19,12 @@ type Props = {
 
 function Hero({ text, open }: Pick<Props, 'text' | 'open'>) {
   return (
-    <header className="px-(--gutter) pt-4 md:max-w-[720px] md:pt-10 lg:pt-12">
-      <h1 className="font-display text-h1 leading-[1.05] tracking-[-0.02em] text-balance md:text-title">{text.h1}</h1>
-      <p className="mt-3 text-body text-pretty text-bone-dim">{text.intro}</p>
+    <header className="tr-hero">
+      <h1 className="tr-h1">{text.h1}</h1>
+      <p className="tr-lede">{text.intro}</p>
       {open ? (
-        <p className="mt-5 flex flex-wrap gap-3">
-          <Link href="/wishlist/new" prefetch={false} className="mk-cta md:w-auto">
+        <p className="tr-actions">
+          <Link href="/wishlist/new" prefetch={false} className="mk-cta tr-cta">
             {text.cta.submit}
           </Link>
           <Link href="/wishlist" prefetch={false} className="mk-ghost-btn">
@@ -32,7 +32,7 @@ function Hero({ text, open }: Pick<Props, 'text' | 'open'>) {
           </Link>
         </p>
       ) : (
-        <p className="mt-5 text-body text-bone-dim">{text.closed}</p>
+        <p className="tr-closed">{text.closed}</p>
       )}
     </header>
   )
@@ -44,14 +44,14 @@ function Steps({ text }: { text: TemplateRequestsText['steps'] }) {
       <h2 className="mk-h2" id="steps-h">
         {text.heading}
       </h2>
-      <ol className="mt-5 grid gap-3 md:gap-4 xl:grid-cols-3">
+      <ol className="tr-grid">
         {text.items.map((step, i) => (
-          <li key={step.heading} className="rounded-tile bg-card p-4 shadow-[inset_0_0_0_1px_var(--input)] md:p-5">
-            <span className="font-display text-h2 leading-none text-primary" aria-hidden>
+          <li key={step.heading} className="tr-card">
+            <span className="tr-num" aria-hidden>
               {i + 1}
             </span>
-            <h3 className="mt-3 text-body font-semibold">{step.heading}</h3>
-            <p className="mt-1.5 text-body leading-[1.45] text-pretty text-bone-dim">{step.text}</p>
+            <h3 className="tr-h3">{step.heading}</h3>
+            <p className="tr-dim">{step.text}</p>
           </li>
         ))}
       </ol>
@@ -66,18 +66,18 @@ function GoodRequest({ text }: { text: TemplateRequestsText['good'] }) {
         {text.heading}
       </h2>
       <p className="mk-intro">{text.intro}</p>
-      <dl className="mt-5 grid gap-4 xl:grid-cols-3">
+      <dl className="tr-grid tr-points">
         {text.points.map((point) => (
           <div key={point.heading}>
-            <dt className="text-body font-semibold">{point.heading}</dt>
-            <dd className="mt-1 text-body leading-[1.45] text-pretty text-bone-dim">{point.text}</dd>
+            <dt className="tr-strong">{point.heading}</dt>
+            <dd className="tr-dim">{point.text}</dd>
           </div>
         ))}
       </dl>
-      <h3 className="mt-7 text-body font-semibold">{text.examplesHeading}</h3>
-      <ul className="mt-3 grid gap-3">
+      <h3 className="tr-h3 tr-gap">{text.examplesHeading}</h3>
+      <ul className="tr-quotes">
         {text.examples.map((example) => (
-          <li key={example} className="rounded-tile border-l-2 border-primary bg-card px-4 py-3 text-body leading-[1.45] text-pretty">
+          <li key={example} className="tr-quote">
             {example}
           </li>
         ))}
@@ -91,12 +91,12 @@ function GoodRequest({ text }: { text: TemplateRequestsText['good'] }) {
 // No visible breadcrumbs (DESIGN §8); the BreadcrumbList JSON-LD stays.
 export function TemplateRequestsView({ text, shipped, open }: Props) {
   const voteCta: ReactNode = open ? (
-    <Link href="/wishlist" prefetch={false} className="mk-ghost-btn inline-flex">
+    <Link href="/wishlist" prefetch={false} className="mk-ghost-btn tr-inline">
       {text.cta.vote}
     </Link>
   ) : null
   return (
-    <article className="mk-w pb-16">
+    <article className="mk-w tr-page">
       <Hero text={text} open={open} />
       <Steps text={text.steps} />
       <ExampleWall text={text.examples} voteCta={voteCta} />
