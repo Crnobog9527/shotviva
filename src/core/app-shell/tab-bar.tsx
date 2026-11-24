@@ -47,7 +47,9 @@ type Props = {
 // stays fixed on desktop over the page's top, and a flow page's action bar covers its bottom.
 // With max-md: classes there is no bare `.fixed` on the element for such a rule to match.
 export function TabBar({ items, rootsUnder = [], shellPages = [], admin }: Props) {
-  const pathname = usePathname()
+  // PROBE (ARCHITECTURE §18.3): Create's app shell is drawn as Create, so the server's render (at
+  // /app-shell/generate) and the browser's (at /generate, where the worker answered) match.
+  const pathname = usePathname().replace(/^\/app-shell(?=\/)/, '')
   const t = useTranslations('app.tabs')
   const root = isRoot(pathname, items) || shellPages.some((page) => pathname === page || pathname === `${page}/`) || rootsUnder.some((prefix) => pathname.startsWith(prefix))
   if (!root) return null
