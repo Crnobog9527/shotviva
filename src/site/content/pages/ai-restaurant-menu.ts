@@ -62,29 +62,30 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
 const steakPhone = caseImage('menu-steak-phone', 'Real phone photo: sliced sirloin steak with fries and asparagus on a white plate on a steel kitchen pass, plate stacks and squeeze bottles behind')
 const steakBoard = caseImage('menu-steak-board', 'Real example: the same sliced sirloin, fries and asparagus on the same white plate on a dark wooden board, warm side light, herbs and a fork beside it')
 
-// One dish through three looks. The food stays the same; the plate or bowl, the set and the light change.
+// One dish through three looks (Owner 2026-11-25: a fine-dining steak on the English page). The
+// food stays the same; the set, the light and the props change.
 const shoot: ShootDemo = {
   heading: { lead: 'One phone photo of a dish → ', emphasis: 'a full menu shoot' },
-  intro: 'Fresh chili bullfrog, shot on the kitchen pass in a steel basin. Three finished pictures, the same dish in every one: the bullfrog, the green and red chilies, the green peppercorns.',
+  intro: 'Aged beef fillet, shot on the kitchen pass during service. Three finished pictures, the same plate in every one: the three slices, the charred leek, the pommes purée, the bone-marrow jus.',
   phone: {
-    image: caseImage('menu-frog-phone', 'Real phone photo: fresh chili bullfrog in a steel basin on a kitchen counter, fluorescent light, tickets and bowls behind'),
+    image: caseImage('menu-finesteak-phone', 'Real phone photo: sliced aged beef fillet with pommes purée, a charred leek and jus on a grey stone plate on a steel kitchen pass, order tickets behind'),
     file: 'IMG_2706.jpg',
-    caption: 'Real phone photo. Fluorescent light, a steel basin, order tickets behind.',
+    caption: 'Real phone photo. Steel pass, heat-lamp glow, order tickets behind.',
   },
   arrow: 'Three looks, same dish',
   results: [
     {
-      image: caseImage('menu-frog-dark', 'Real example: the same bullfrog dish in a charcoal stone bowl on slate, dark painted backdrop, warm side light'),
+      image: caseImage('menu-finesteak-hero', 'Real example: the same beef fillet plate on a dark linen table in a candlelit dining room, warm side light'),
       title: 'Menu hero',
-      template: 'Dark set, sculpted side light',
+      template: 'Dark dining room, sculpted side light',
     },
     {
-      image: caseImage('menu-frog-pour', 'Real example: hot oil poured from a white jug onto the same dish in a white bowl on raw timber, steam caught mid-air'),
+      image: caseImage('menu-finesteak-pour', 'Real example: jus poured from a small copper pan onto the same beef fillet plate, the stream caught mid-air'),
       title: 'Sizzle shot',
-      template: 'Hot oil poured, steam caught mid-air',
+      template: 'Jus poured, caught mid-air',
     },
     {
-      image: caseImage('menu-frog-poster-en', 'Real example: a menu poster of the same dish on a warm brown backdrop, headed Chef\'s Signature, Fresh Chili Bullfrog'),
+      image: caseImage('menu-finesteak-poster-en', "Real example: a menu poster of the same plate on a warm brown backdrop, headed Chef's Tasting Menu, Aged Beef Fillet"),
       title: 'Menu poster',
       template: 'Dish name, one line and the price',
     },

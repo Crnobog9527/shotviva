@@ -118,7 +118,7 @@ describe('the AI restaurant menu page', () => {
       const text = [page.hero.caption, ...caseImagesOf(page).map((image) => image.alt)].join(' ')
       expect(text).not.toMatch(/illustrative|示意/i)
     }
-    expect(aiRestaurantMenu.landing.shoot?.results[2].image.src).toBe('/cases/menu-frog-poster-en.webp')
+    expect(aiRestaurantMenu.landing.shoot?.results[2].image.src).toBe('/cases/menu-finesteak-poster-en.webp')
     expect(zhAiRestaurantMenu.landing.shoot?.results[2].image.src).toBe('/cases/menu-frog-poster-zh.webp')
   })
 })
