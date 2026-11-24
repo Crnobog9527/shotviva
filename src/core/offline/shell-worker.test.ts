@@ -123,6 +123,9 @@ describe('the shell’s refresh (personal content no later)', () => {
     expect(worker.fetch).not.toHaveBeenCalled()
   })
 
+})
+
+describe('the early answer stays with one window and one deployment', () => {
   it('hands the early answer only to the window that asked, and to no one after sign-out', async () => {
     const worker = runWorker(on)
     await worker.dispatch('activate', {})
