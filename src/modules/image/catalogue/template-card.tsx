@@ -15,7 +15,7 @@ import { useHoverWipe } from './use-hover-wipe'
 // Cover widths when the card is drawn narrower than the grid's (Create's All sections).
 export type CardSizes = { plate?: string; frame?: string; art?: string }
 
-type Props = { template: CatalogueTemplate; onOpen(id: string): void; eager?: boolean; sizes?: CardSizes }
+type Props = { template: CatalogueTemplate; onOpen(id: string): void; eager?: boolean; priority?: boolean; sizes?: CardSizes }
 
 // A template card (DESIGN §4.2 and §6.9 items 1–3, B comp create.html). A 'compare' category
 // (画风) keeps the drag compare; every other template is the side-by-side pair that plays its change on hover.
@@ -27,7 +27,7 @@ export function TemplateCard(props: Props) {
   return <PairCard {...props} />
 }
 
-function PairCard({ template, onOpen, eager, sizes }: Props) {
+function PairCard({ template, onOpen, eager, priority, sizes }: Props) {
   const ref = useRef<HTMLButtonElement>(null)
   const alt = useTranslations('app.template')('cardAlt', { name: template.name })
   useHoverWipe(ref)
@@ -42,7 +42,7 @@ function PairCard({ template, onOpen, eager, sizes }: Props) {
         className="group block w-full rounded-tile text-left transition-transform duration-250 ease-house active:scale-[.97]"
       >
         {before && after ? (
-          <PairMedia before={before} after={after} alt={alt} eager={eager} sizes={sizes?.plate ?? COVER_SIZES.cardPlate} video={type === 'video' && motion ? motion : undefined} className="transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]" />
+          <PairMedia before={before} after={after} alt={alt} eager={eager} priority={priority} sizes={sizes?.plate ?? COVER_SIZES.cardPlate} video={type === 'video' && motion ? motion : undefined} className="transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]" />
         ) : isMotion(template) ? (
           <LoopPlate template={template} alt={alt} sizes={sizes?.frame ?? COVER_SIZES.cardFrame} />
         ) : (
