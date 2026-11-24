@@ -22929,6 +22929,52 @@ CREATE OR REPLACE VIEW "public"."web_template_members" WITH ("security_invoker"=
 ALTER VIEW "public"."web_template_members" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."web_vitals" (
+    "id" bigint NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "metric" "text" NOT NULL,
+    "value" double precision NOT NULL,
+    "rating" "text" NOT NULL,
+    "route" "text" NOT NULL,
+    "locale" "text" NOT NULL,
+    "nav_type" "text" NOT NULL,
+    "standalone" boolean NOT NULL,
+    "sw" boolean NOT NULL,
+    "effective_type" "text",
+    "country" "text",
+    CONSTRAINT "web_vitals_check" CHECK ((("value" >= (0)::double precision) AND ("value" <= (
+CASE
+    WHEN ("metric" = 'CLS'::"text") THEN 100
+    ELSE 120000
+END)::double precision))),
+    CONSTRAINT "web_vitals_country_check" CHECK (("country" ~ '^[A-Z]{2}$'::"text")),
+    CONSTRAINT "web_vitals_effective_type_check" CHECK (("effective_type" = ANY (ARRAY['slow-2g'::"text", '2g'::"text", '3g'::"text", '4g'::"text"]))),
+    CONSTRAINT "web_vitals_locale_check" CHECK (("locale" = ANY (ARRAY['en'::"text", 'zh'::"text"]))),
+    CONSTRAINT "web_vitals_metric_check" CHECK (("metric" = ANY (ARRAY['LCP'::"text", 'FCP'::"text", 'TTFB'::"text", 'INP'::"text", 'CLS'::"text"]))),
+    CONSTRAINT "web_vitals_nav_type_check" CHECK (("nav_type" = ANY (ARRAY['navigate'::"text", 'reload'::"text", 'back-forward'::"text", 'prerender'::"text", 'restore'::"text"]))),
+    CONSTRAINT "web_vitals_rating_check" CHECK (("rating" = ANY (ARRAY['good'::"text", 'needs-improvement'::"text", 'poor'::"text"]))),
+    CONSTRAINT "web_vitals_route_check" CHECK (("route" = ANY (ARRAY['generate'::"text", 'photos'::"text", 'posters'::"text", 'account'::"text", 'wishlist'::"text"])))
+);
+
+
+ALTER TABLE "public"."web_vitals" OWNER TO "postgres";
+
+
+CREATE SEQUENCE IF NOT EXISTS "public"."web_vitals_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE "public"."web_vitals_id_seq" OWNER TO "postgres";
+
+
+ALTER SEQUENCE "public"."web_vitals_id_seq" OWNED BY "public"."web_vitals"."id";
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."work_reports" (
     "id" bigint NOT NULL,
     "job_id" "uuid" NOT NULL,
@@ -22973,6 +23019,10 @@ CREATE TABLE IF NOT EXISTS "public"."work_shares" (
 
 
 ALTER TABLE "public"."work_shares" OWNER TO "postgres";
+
+
+ALTER TABLE ONLY "public"."web_vitals" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."web_vitals_id_seq"'::"regclass");
+
 
 
 ALTER TABLE ONLY "admin"."batch_zip_requests"
@@ -23830,6 +23880,11 @@ ALTER TABLE ONLY "public"."templates"
 
 
 
+ALTER TABLE ONLY "public"."web_vitals"
+    ADD CONSTRAINT "web_vitals_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."work_reports"
     ADD CONSTRAINT "work_reports_once_per_reporter" UNIQUE ("job_id", "reporter_id");
 
@@ -24654,6 +24709,10 @@ CREATE INDEX "templates_series_member_idx" ON "public"."templates" USING "btree"
 
 
 CREATE INDEX "templates_subcategory_idx" ON "public"."templates" USING "btree" ("subcategory_key") WHERE ("subcategory_key" IS NOT NULL);
+
+
+
+CREATE INDEX "web_vitals_route_metric_created_idx" ON "public"."web_vitals" USING "btree" ("route", "metric", "created_at");
 
 
 
@@ -26597,6 +26656,9 @@ CREATE POLICY "templates_public_category" ON "public"."templates" AS RESTRICTIVE
 
 CREATE POLICY "templates_select_active" ON "public"."templates" FOR SELECT TO "authenticated", "anon" USING ("is_active");
 
+
+
+ALTER TABLE "public"."web_vitals" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."work_reports" ENABLE ROW LEVEL SECURITY;
@@ -30263,6 +30325,14 @@ GRANT SELECT,INSERT ON TABLE "public"."template_sync_history" TO "service_role";
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."web_template_members" TO "service_role";
 GRANT SELECT ON TABLE "public"."web_template_members" TO "anon";
 GRANT SELECT ON TABLE "public"."web_template_members" TO "authenticated";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."web_vitals" TO "service_role";
+
+
+
+GRANT USAGE,UPDATE ON SEQUENCE "public"."web_vitals_id_seq" TO "service_role";
 
 
 
