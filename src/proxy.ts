@@ -15,7 +15,7 @@ import { serverEnv } from '@/core/env'
 import { experimentRoute, isBotRequest, OPTION_PAGES, toOptionPage, withExperimentCookie, type RouteOutcome } from '@/core/experiments/server'
 import { viaImageCdn } from '@/core/storage/image-cdn-guard'
 import { routing } from '@/core/i18n/routing'
-import { canonicalRedirectResponse, withHostNoindex } from '@/core/seo'
+import { canonicalRedirectResponse, isRoutePlaceholderPath, withHostNoindex } from '@/core/seo'
 import { experimentRegistry } from '@/site/experiments/registry'
 import { site } from '@/site/site.config'
 
@@ -41,9 +41,12 @@ function earlyResponse(request: NextRequest) {
 
 // /gallery?page= outside 1–20 (T108): a real 404 here, since the page reads the number inside a
 // Suspense boundary, after its status is sent. The experiments' prerendered option pages
-// (ARCHITECTURE §16.5) are reached only through the rewrite in experimentForward.
+// (ARCHITECTURE §16.5) are reached only through the rewrite in experimentForward. An address with a
+// route placeholder such as /join/org/[token] would render the route's fallback shell and throw
+// (core/seo/route-placeholder.ts).
 function closedAddress(request: NextRequest): boolean {
-  return isBadGalleryPage(request.nextUrl) || OPTION_PAGES.test(request.nextUrl.pathname)
+  const { pathname } = request.nextUrl
+  return isBadGalleryPage(request.nextUrl) || OPTION_PAGES.test(pathname) || isRoutePlaceholderPath(pathname)
 }
 
 // The locale router, handed the A/B option's page instead of the address when there is one.
