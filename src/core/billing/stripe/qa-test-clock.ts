@@ -21,6 +21,7 @@ export const QA_PERSONA_EMAILS: ReadonlySet<string> = new Set([
   'qa-max@shotviva.com',
   'qa-free@shotviva.com',
   'qa-invitee@shotviva.com',
+  'qa-graylum@shotviva.com',
 ])
 
 export type ClockGuardEnv = { VERCEL_ENV?: string; STRIPE_SECRET_KEY?: string }
