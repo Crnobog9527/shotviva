@@ -35,12 +35,12 @@ export const zhSteps = {
   items: [
     {
       heading: '上传一张照片',
-      text: `手机拍一张，或者从相册里选：${zhUploadLimits}。让主体完整地留在画面里。`,
+      text: `用手机拍一张，或从相册选择：${zhUploadLimits}。拍摄时请让菜品或商品完整入镜。`,
       visual: { kind: 'upload', image: zhDish.phone, file: 'IMG_3112.jpg' },
     },
     {
       heading: '选一个模板',
-      text: '餐饮、商品、美妆、房间、宠物或画风，光线和场景由模板决定，什么都不用写。',
+      text: '餐饮、商品、美妆、房间、宠物或画风，光线和场景由模板设定好，无需输入任何文字。',
       visual: {
         kind: 'picker',
         tiles: [
@@ -89,13 +89,13 @@ export const whiteBackgroundGuide = {
       },
     },
     {
-      heading: '商品主体保持原样',
+      heading: '商品本身不变',
       text: '形状、颜色、标签和文字按你拍的样子保留，只换背景和光线。',
       visual: { kind: 'pair', before: sneaker.phone, after: sneaker.listing, tags: { before: '真实手机照', after: '纯白底图' } },
     },
     {
       heading: `${ZH_TIERS.length} 档导出尺寸`,
-      text: '每张图导出为 PNG。主图需要放大看细节时，选更高一档。',
+      text: '每张图都导出 PNG。主图需要放大看细节时，选择更高一档即可。',
       visual: { kind: 'sizes', image: { ...sneaker.listing, alt: sizesAlt('同一只鞋的纯白底电商主图') }, tiers },
     },
   ],

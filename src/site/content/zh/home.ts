@@ -69,7 +69,7 @@ export const shoot: ShootDemo = {
   ],
   bill: {
     photographer: { who: '摄影师', amount: '一整场拍摄', note: '预约、影棚、造型和精修' },
-    site: { who: brand, amount: '无需重新实拍', note: '一张手机照，做出主图、场景图和促销海报' },
+    site: { who: brand, amount: '无需重新拍摄', note: '一张手机照，即可做出主图、场景图和促销海报' },
     line: '换个模板，就能把同一张商品照用在不同地方。',
   },
 }
@@ -100,7 +100,7 @@ export function productBills({ planFrom }: OfferFacts, heading: string, intro: s
       title: brand,
       total: { amount: plan, suffix: planFrom ? '/月起' : '', when: `每张 ${photoSeconds} 秒左右` },
       lines: planLine ? [{ label: planLabel(planFrom), value: plan }, ...shared] : shared,
-      fine: `造型和精修都在模板里，主体保持你拍的样子。先用 ${zhFreeImages}试试，不用绑卡。`,
+      fine: `造型和精修由模板完成，商品始终与原图一致。先用 ${zhFreeImages}体验，无需绑卡。`,
     },
   }
 }
@@ -116,8 +116,8 @@ const copy = {
   title: 'AI改图·AI修图：主体不变，更换光线、场景或画风',
   description: `AI改图 / AI修图：上传手机照片选模板，换光线、场景或画风，主体保持原样。可做白底商品图、电商主图和菜单图，不用写提示词，新用户送 ${zhFreeImages}。`,
   h1: 'AI改图：主体不变，换光线、场景或画风',
-  subtitle: '从你拍的真实照片出发的 AI 影棚。',
-  answerBlock: `AI改图就是把你拍好的照片换一种光线、场景或画风，照片里的主体保持原样。上传一张手机照片，选一个餐饮、商品、美妆、房间、宠物或画风模板就能出图，不用写提示词。新用户送 ${zhFreeImages}。`,
+  subtitle: '把手机拍的照片变成专业级的图片。',
+  answerBlock: `AI改图，就是给你拍好的照片更换光线、场景或画风，照片里的主体保持原样。上传一张手机照片，选择餐饮、商品、美妆、房间、宠物或画风模板，即可出图，不用写提示词。新用户赠送 ${zhFreeImages}。`,
   hero: {
     before: withFirstFrame(phoneShot),
     after: heroScenes[0].image,
@@ -131,17 +131,17 @@ const copy = {
   steps: zhSteps,
   templateGrid: {
     heading: 'AI改图模板：不用写提示词',
-    intro: `每个模板都从你的手机照片开始，到一张成品图结束。选一个，剩下的交给 ${brand}。`,
+    intro: '上传一张手机照，选中模板，点生成，大片触手可得。',
     note: '模板图片都是用 Shotviva 模板真实生成的。',
   },
   topics: whiteBackgroundGuide,
   wishlist: zhHomeWishlist,
-  factsIntro: `很多 AI改图工具给你的是一张新图。你要的其实是自己那张图，只是更好看：还是那件商品、那道菜、那个房间，光线更好，画面更干净。${brand} 就是为这个做的。下面的价格和尺寸在本站每一页都一样。`,
+  factsIntro: `通用的 AI改图工具很难保证原图文字、产品和环境的一致性，成片往往和原图相差甚远，无法用于商业用途。${brand} 可以用自然语言对图片做精准修改，即使多轮编辑，也不会出现变形、扭曲或字体乱码。套用模板时，一次就能得到可对外展示的专业成片。`,
   related: [
     { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
     { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
-    { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '想看看图生图对菜品、商品、房间和宠物照片的效果。' },
-    { href: '/pricing', anchor: `${brand} 价格`, note: '店主、卖家和房东在月付、年付套餐和一次性积分包之间比较。' },
+    { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '看看图生图如何处理菜品、商品、房间和宠物照片。' },
+    { href: '/pricing', anchor: `${brand} 价格`, note: '月付、年付套餐和一次性积分包，价格一目了然。' },
   ],
   headings: {
     facts: `AI改图为什么选 ${brand}`,
@@ -155,13 +155,13 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   // Owner 2026-11-08: Chinese visitors first need to know what Shotviva is). English keeps it last.
   {
     question: `${brand} 是什么？`,
-    answer: `${brand} 是一个网页版的 AI 照片工作室：用一张手机照片，套上菜品、商品、房间、宠物或画风模板，做出成品图。和凭提示词生成整张图的 AI 生图工具不同，${brand} 从你真实拍的照片出发，主体保持原样。新用户送 ${zhFreeImages}。`,
+    answer: `${brand} 是一个网页版 AI改图工具，能把手机拍的照片变成专业级的菜品图、商品图和空间图，也能一键转换画风。与凭提示词从零生成的 AI 生图工具不同，${brand} 在你的原图上修改，菜品、商品和环境始终与原图一致。新用户赠送 ${zhFreeImages}。`,
   },
   // A–H follow 建站规格 G6 in order, asked the way Chinese users ask (G13, 中文用户真实问法).
   // A's first sentence is the Chinese form of G6's fixed sentence: brand and keyword together.
   {
     question: '怎么把自己的照片变成 AI 图？',
-    answer: `${brand} 是一个 AI改图工具：把你已有的照片换个样子，主体保持原样，只要 ${STEP_COUNT} 步——上传一张手机照片、选一个模板、选${zhTierList}。AI改图从你的照片出发，不是从一段文字描述开始，所以变的是光线、场景或画风，商品、菜品、房间或宠物还是你拍的那个。`,
+    answer: `${brand} 是一个 AI改图工具：把你已有的照片换个样子，主体保持原样，只要 ${STEP_COUNT} 步——上传一张手机照片、选一个模板、选${zhTierList}。AI改图以原图为基础，只改变光线、场景或画风，商品、菜品、房间或宠物始终与原图一致。`,
   },
   {
     question: 'AI改图免费吗？',
@@ -223,7 +223,7 @@ export const makeZhHomePage = (offers: OfferFacts, plans = zhHomePlans(offers.pr
       {
         // SEO PATCH v4.1 (2026-11-11): the free credits are no heading of their own and no photo count.
         heading: '先试效果再付费',
-        text: `新账号一次性获得 ${site.billing.freeCredits} 个积分，用来试一个模板，不会每天或每月刷新。免费生成的图公开展示、带水印，仅限个人非商业用途。`,
+        text: `新用户注册即赠 ${site.billing.freeCredits} 个积分，可用于体验模板，仅赠送一次，不会按天或按月刷新。`,
       },
       {
         heading: '免费图公开带水印，付费图私密无水印',

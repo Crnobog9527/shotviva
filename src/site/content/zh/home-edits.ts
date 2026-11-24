@@ -6,7 +6,7 @@ import { caseImage } from '../landing-shared'
 // 每组的引号里是用户会写的那句话；店名和品牌都是虚构的。
 export const zhTextEdits: EditCases = {
   heading: 'AI 修改图片文字：写一句话，字体不变',
-  intro: '上传一张图，或打开在这里做好的作品，写一句话，比如「日期改成 11 月 22 日到 24 日」。只改你说的那几个字：字体和字号不变，不变形、不乱码，画面其他地方保持原样。',
+  intro: '上传一张图片，或打开你在 Shotviva 生成的作品，用一句话说明要改的内容，例如「日期改成 11 月 22 日到 24 日」。只修改指定的文字，字体、字号保持不变，不会出现变形或乱码，画面其余部分不受影响。',
   labels: { before: '改前', after: '改后', reference: '参考图' },
   items: [
     {
