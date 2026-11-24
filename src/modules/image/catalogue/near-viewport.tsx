@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode,
 
 import { keepFirstScreenCovers } from '@/core/offline'
 
+import { useCoversHeld } from './hold-covers'
+
 // Create's grid loads a card's pictures only when the card comes near the screen (after Higgsfield
 // and Lovart): the browser's own lazy loading starts far ahead on a slow link (Chrome: about 2500 px),
 // so a tap on Create pulled some 30 covers, ~850 KB, before the account's balance arrived (slow 4G,
@@ -81,10 +83,11 @@ export function useCardCovers<T extends Element>(eager: boolean, priority = fals
   const inCreate = useDeferCovers()
   const defer = inCreate && !eager
   const [ref, near] = useNearViewport<T>(!defer)
+  const held = useCoversHeld() && !eager
   useKeepFirstScreen(ref, inCreate && eager)
   const fetchPriority = eager ? (priority ? { fetchPriority: 'high' as const } : {}) : { fetchPriority: 'low' as const }
   const img = { loading: eager ? ('eager' as const) : ('lazy' as const), ...fetchPriority }
-  return { ref, show: near, img }
+  return { ref, show: near && !held, img }
 }
 
 // Which Create screen the cards are on (All, a category, Saved), for the first-screen covers the

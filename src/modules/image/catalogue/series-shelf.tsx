@@ -15,8 +15,9 @@ import { TemplateCard } from './template-card'
 
 type Props = {
   series: CatalogueSeries
-  // The page's first shelf: its first cards load at once, the very first at high priority unless
-  // the featured card sits above (`priority` false).
+  // The page's first shelf: its first card loads at once, at high priority unless the featured card
+  // sits above (`priority` false). Only that one: on a slow phone the peeking second card's covers
+  // shared the line with it and the page's largest paint came later (2026-11-25).
   first: boolean
   priority: boolean
   onOpen(id: string): void
@@ -48,7 +49,7 @@ export function SeriesShelf({ series, first, priority, onOpen, onOpenSeries }: P
       <ul ref={rail} className={compare ? COMPARE_LIST : RAIL_LIST}>
         {shown.map((template, index) => (
           <li key={template.id} className={compare ? undefined : RAIL_ITEM}>
-            <TemplateCard template={template} onOpen={onOpen} eager={first && index < 2} priority={priority && index === 0} sizes={compare ? COMPARE_SIZES : RAIL_SIZES} />
+            <TemplateCard template={template} onOpen={onOpen} eager={first && index === 0} priority={priority && index === 0} sizes={compare ? COMPARE_SIZES : RAIL_SIZES} />
           </li>
         ))}
         {more > 0 ? (
