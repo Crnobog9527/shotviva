@@ -16,25 +16,25 @@ const brand = site.brand.name
 const [, hd, max] = OUTPUT_TIERS
 const { amazon, etsy, shopify } = PLATFORM_SPECS
 
-// The sneaker set (public/cases, Owner 2026-11-11): one phone snapshot in a hallway and three
-// deliverables made from it, so this page no longer repeats the home page's tote.
-const sneakerPhone = caseImage('sneaker-phone', 'Real phone photo: an off-white leather sneaker with a sage-green heel tab on a hallway floor, hard morning sun, keys and an open shoe box in frame')
-const sneakerLifestyle = caseImage('sneaker-lifestyle', 'Real example: the same sneaker on a sunlit concrete step outside a café, a linen jacket blurred behind it')
+// The tote set (Owner 2026-11-25): the woven leather tote shot on a phone on a kitchen counter
+// and three deliverables made from it, the same set as the home page's.
+const bagPhone = caseImage('bag-phone', 'Real phone photo: a woven tan leather tote with a gold chain on a marble kitchen counter, keys, a mug and a parcel beside it')
+const bagLifestyle = caseImage('bag-lifestyle', 'Real example: the same tote on a café chair by a window, a coffee and a croissant on the table, warm morning light')
 
 const shoot: ShootDemo = {
   heading: { lead: 'One phone photo → ', emphasis: 'a full shoot' },
-  intro: 'Shot on a phone on a hallway floor. Three deliverables, and the same sneaker in every one: the perforated toe, the green heel tab, the gum sole.',
-  phone: { image: sneakerPhone, file: 'IMG_3184.jpg', caption: 'Real phone photo. Hard morning sun, a doormat, keys and the shoe box in frame.' },
-  arrow: 'Three looks, same sneaker',
+  intro: 'Shot on a phone on a kitchen counter. Three deliverables, and the same tote in every one: the woven leather, the stitching, the gold chain.',
+  phone: { image: bagPhone, file: 'IMG_3184.jpg', caption: 'Real phone photo. Window light, keys, a mug and a parcel on the counter.' },
+  arrow: 'Three looks, same tote',
   results: [
     {
-      image: caseImage('sneaker-listing', 'Real example: the same sneaker on a pure white background, soft studio light, a marketplace main image'),
+      image: caseImage('bag-listing', 'Real example: the same tote face-on on a pure white background, soft studio light, a marketplace main image'),
       title: 'Marketplace listing',
       template: 'Studio Product Shot',
     },
-    { image: sneakerLifestyle, title: 'Lifestyle scene', template: 'Lifestyle Scene' },
+    { image: bagLifestyle, title: 'Lifestyle scene', template: 'Lifestyle Scene' },
     {
-      image: caseImage('sneaker-promo-en', 'Real example: the same sneaker floating over a sage-green backdrop on a poster headed New In, The everyday sneaker'),
+      image: caseImage('bag-promo-en', 'Real example: the same tote on a warm tan studio backdrop on a poster headed New Season Tote'),
       title: 'Promo poster',
       template: 'Promo Poster',
     },
@@ -89,9 +89,9 @@ const copy = {
   subtitle: 'Listing shots, lifestyle scenes and promo posters from the product photo you already took.',
   answerBlock: `Commercial photography for a small brand usually means a studio day, a photographer and a retoucher. ${brand} does the same job from one phone photo: upload it, pick a template such as White Background or Lifestyle Table, and download a styled, retouched product shot in ${tierList}. New users get ${freeImagesLabel}.`,
   hero: {
-    before: withFirstFrame(sneakerPhone),
-    after: sneakerLifestyle,
-    caption: 'Your phone photo → a lifestyle scene: the same sneaker on a sunlit café step',
+    before: withFirstFrame(bagPhone),
+    after: bagLifestyle,
+    caption: 'Your phone photo → a lifestyle scene: the same tote on a café chair by the window',
     cta: { label: 'Upload photo', href: '/generate' },
   },
   facts: [
