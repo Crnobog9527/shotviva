@@ -11,3 +11,9 @@ export function formatAdminPhone(phone: string | null | undefined): string | nul
 export function accountLabel(account: { id: string; email: string | null; phone?: string | null }): string {
   return account.email || formatAdminPhone(account.phone) || account.id
 }
+
+// Email, else phone, else null: for places that show the id themselves when nobody is named.
+// Auth gives "" (not null) for a phone sign-up's email, so this tests for empty, not null.
+export function accountContact(account: { email?: string | null; phone?: string | null }): string | null {
+  return account.email || formatAdminPhone(account.phone) || null
+}
