@@ -38,6 +38,11 @@ describe('catalogue index (T102)', () => {
     expect(index.series).toEqual([{ id: 's1', slug: 'menu-set', name: 'menu-set en', description: null, coverUrl: null, memberIds: ['m1', 'm0', 'm2'] }])
   })
 
+  it('drops the loose card of a series member: a template shows in its series only (Owner 2026-11-25)', () => {
+    const loose = [...entries, { type: 'template' as const, entry_key: 'template-m1', sort_order: 5, category_key: 'pets', template_id: 'm1', series_id: null, entry_series: null }]
+    expect(toCatalogueIndex([], loose, members, 'en').entries.map((entry) => entry.id)).toEqual(['s1', 't1'])
+  })
+
   it('names the series in the page language', () => {
     expect(toCatalogueIndex([], entries, members, 'zh').series[0]).toMatchObject({ name: 'menu-set 中', description: '说明' })
   })

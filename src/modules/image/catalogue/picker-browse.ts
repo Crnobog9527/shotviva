@@ -1,7 +1,7 @@
 import type { CatalogueIndex } from '@/core/templates'
 
 import type { CatalogueTemplate } from './catalogue-template'
-import { buildCatalogueView, onePlace, type CatalogueSeries, type CatalogueView, type FilterNode, type GridEntry } from './catalogue-view'
+import { buildCatalogueView, type CatalogueSeries, type CatalogueView, type FilterNode, type GridEntry } from './catalogue-view'
 
 // The home picker's browsing data (Owner 2026-11-13): Create's category tree and card order,
 // series as one card each, built on the server from the same cached index Create reads. Templates
@@ -49,7 +49,7 @@ export function browseView(browse: PickerBrowse | null, templates: readonly Cata
     return members.length ? [{ type: 'series', series: { ...series, members }, path: entry.path }] : []
   })
   const rest = templates.filter((template) => !placed.has(template.id)).map((template): GridEntry => ({ type: 'template', template, path: [] }))
-  return { filters: browse.filters, entries: onePlace([...entries, ...rest]) }
+  return { filters: browse.filters, entries: [...entries, ...rest] }
 }
 
 export type EntryGroup = { key: string; name: string | null; entries: GridEntry[] }

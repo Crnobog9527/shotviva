@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { CatalogueTemplate } from './catalogue-template'
-import { categoryNameAt, sameName, seriesNames, shelfMembers, shelveEntries, SHELF_LIMIT } from './catalogue-shelves'
+import { categoryNameAt, sameName, shelfMembers, shelveEntries, SHELF_LIMIT } from './catalogue-shelves'
 import type { CatalogueSeries, FilterNode, GridEntry } from './catalogue-view'
 
 const template = (id: string) => ({ id, name: id }) as CatalogueTemplate
@@ -49,11 +49,10 @@ describe('Create category shelves (Owner 2026-11-25)', () => {
     expect(shelfMembers(series('big', 'Big', SHELF_LIMIT + 3))).toHaveLength(SHELF_LIMIT)
   })
 
-  it('names the category a path chooses, and its series for search', () => {
+  it('names the category a path chooses', () => {
     const filters: FilterNode[] = [{ slug: 'food', name: '餐饮', children: [{ slug: 'chinese', name: '中餐', children: [] }] }]
     expect(categoryNameAt(filters, ['food', 'chinese'])).toBe('中餐')
     expect(categoryNameAt(filters, [])).toBeNull()
     expect(categoryNameAt(filters, ['food', 'nope'])).toBeNull()
-    expect(seriesNames([card(series('dark', 'Dark', 1)), loose('t1')])).toEqual(new Map([['dark-0', 'Dark']]))
   })
 })

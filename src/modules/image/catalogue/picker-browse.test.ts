@@ -37,16 +37,16 @@ describe('picker browse', () => {
     expect(browseView(null, all, false).entries).toHaveLength(5)
   })
 
-  it('shows a series member only in its series, even with an old loose placement (Owner 2026-11-25)', () => {
+  it('keeps a series member in each of its placements and searchable through both paths', () => {
     const browse = pickerBrowse(index, all, false)!
     browse.entries.push({ type: 'template', id: 'm1', path: ['art'] })
     const view = browseView(browse, all, false)
     const inPath = (path: string[]) => openableTemplates(filterCatalogue(view.entries, [], { saved: false, path }).shown).map((item) => item.id)
     expect(inPath(['food', 'menu'])).toEqual(['m1', 'm2'])
-    expect(inPath(['art'])).toEqual(['t2'])
+    expect(inPath(['art'])).toEqual(['t2', 'm1'])
     const search = buildSearchIndex(view.entries, view.filters)
     expect(searchTemplates(search, 'menu').map((item) => item.id)).toContain('m1')
-    expect(searchTemplates(search, 'art').map((item) => item.id)).not.toContain('m1')
+    expect(searchTemplates(search, 'art').map((item) => item.id)).toContain('m1')
     expect(searchTemplates(search, 'loose').map((item) => item.id)).toEqual(['loose'])
   })
 

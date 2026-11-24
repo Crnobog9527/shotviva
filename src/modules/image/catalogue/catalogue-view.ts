@@ -1,6 +1,6 @@
 import type { CatalogueIndex, CategoryNode, IndexEntry, IndexSeries } from '@/core/templates'
 
-import { categoriesOf, isMotion, type CatalogueTemplate } from './catalogue-template'
+import { categoriesOf, type CatalogueTemplate } from './catalogue-template'
 
 // What Create's grid is made of (T102): single template cards and series cards, each with the
 // category path (slugs from the root) it sits under, and the category tree for the filter chips,
@@ -66,15 +66,8 @@ export function buildCatalogueView(index: CatalogueIndex | null, templates: read
     templates: new Map(templates.map((template) => [template.id, template])),
     series: new Map(index.series.map((item) => [item.id, item])),
   }
-  const entries = onePlace(index.entries.flatMap((entry) => toGridEntry(entry, lookup)))
+  const entries = index.entries.flatMap((entry) => toGridEntry(entry, lookup))
   return { filters: trim(index.tree, entries, zh), entries }
-}
-
-// A template shows in one place only (Owner 2026-11-25): a series member lives in its series'
-// shelf, never also as a loose card, whatever the series' old 「成员也在分类中单独展示」 says.
-export function onePlace(entries: readonly GridEntry[]): GridEntry[] {
-  const members = new Set(entries.flatMap((entry) => (entry.type === 'series' ? entry.series.members.map((member) => member.id) : [])))
-  return entries.filter((entry) => entry.type === 'series' || !members.has(entry.template.id))
 }
 
 type Lookup = {
@@ -98,17 +91,6 @@ function toGridEntry(entry: IndexEntry, { places, templates, series }: Lookup): 
   if (members.length === 0) return []
   const { id, slug, name, description, coverUrl } = found
   return [{ type: 'series', series: { id, slug, name, description, cover: coverUrl, categoryName: place.name, members }, path: place.path }]
-}
-
-// Create's featured card (the page's largest paint): the first video template in the catalogue's
-// order, a series member included, so a series of videos can never take the card away.
-export function featuredVideo(entries: readonly GridEntry[]): CatalogueTemplate | null {
-  for (const entry of entries) {
-    for (const template of entry.type === 'series' ? entry.series.members : [entry.template]) {
-      if (isMotion(template) && template.cover.type === 'video') return template
-    }
-  }
-  return null
 }
 
 export const seriesOf = (entries: readonly GridEntry[]) => entries.flatMap((entry) => (entry.type === 'series' ? [entry.series] : []))

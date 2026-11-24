@@ -15,8 +15,8 @@ import { useHoverWipe } from './use-hover-wipe'
 // Cover widths when the card is drawn narrower than the grid's (Create's All sections).
 export type CardSizes = { plate?: string; frame?: string; art?: string }
 
-// `series`: the name of the series the template belongs to, shown as a small label (search results,
-// which list templates only, Owner 2026-11-25).
+// `series`: a small label naming the template's series (search results, which list templates only,
+// Owner 2026-11-25), already in the page's language.
 type Props = { template: CatalogueTemplate; onOpen(id: string): void; eager?: boolean; priority?: boolean; sizes?: CardSizes; series?: string }
 
 // A template card (DESIGN §4.2 and §6.9 items 1–3, B comp create.html). A 'compare' category
@@ -88,13 +88,12 @@ function ArtCard({ template, onOpen, eager, sizes, series }: Props) {
 
 function CardMeta({ template, series }: { template: CatalogueTemplate; series?: string }) {
   const t = useTranslations('app.template')
-  const s = useTranslations('app.series')
   const category = template.categoryName
   const cost = cardPrice(template)
   const kind = isMotion(template) ? t(template.cover.type === 'video' ? 'featureMeta' : 'animatedMeta', { category }) : category
   return (
     <span className="block pt-2">
-      {series ? <span data-series-label="" className="mb-1 block truncate text-caption leading-[1.35] font-medium text-bone-dim">{s('inSeries', { name: series })}</span> : null}
+      {series ? <span data-series-label="" className="mb-1 block truncate text-caption leading-[1.35] font-medium text-bone-dim">{series}</span> : null}
       <span className="block text-body leading-[1.25] font-semibold tracking-[-0.015em]">{template.name}</span>
       <span className="mt-1 block text-caption leading-[1.35] text-muted-foreground">{kind}</span>
       {cost !== null ? <span className="mt-2 inline-block rounded-tag bg-wash px-2 py-1 font-mono text-caption leading-none text-bone-dim">{t(template.imagesPerSet ? 'fromCreditsSet' : 'fromCredits', { count: cost, images: template.imagesPerSet ?? 1 })}</span> : null}

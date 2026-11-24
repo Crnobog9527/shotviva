@@ -10,7 +10,7 @@ import { Reveal } from '@/core/ui/reveal-item'
 import { hasStills, isCompareCategory } from './catalogue-template'
 import { shelfMembers } from './catalogue-shelves'
 import type { CatalogueSeries } from './catalogue-view'
-import { COVER_SIZES } from './cover-sizes'
+import { COVER_SIZES, phone } from './cover-sizes'
 import { TemplateCard } from './template-card'
 
 type Props = {
@@ -102,5 +102,11 @@ const RAIL_LIST = cn(
 const RAIL_ITEM = 'w-[calc(100%-4rem)] max-w-96 flex-none snap-start md:w-[calc((100%-1rem)/2.25)] md:max-w-none lg:w-[calc((100%-2rem)/3.25)]'
 const COMPARE_LIST = 'mt-2 grid grid-cols-2 gap-3 px-(--gutter) md:mt-3 md:grid-cols-3 md:gap-4'
 
-const RAIL_SIZES = { plate: COVER_SIZES.shelfPlate, frame: COVER_SIZES.shelfFrame }
+// Cover widths in a shelf (kept here, not in cover-sizes.ts, so they load with the shelves): the
+// phone card is the All rail's; from md a row shows two and a quarter cards (about 44vw each), from
+// lg three and a quarter (335 px).
+const RAIL_SIZES = {
+  plate: `(min-width: 1024px) 168px, (min-width: 768px) 22vw, ${phone(38)}`,
+  frame: `(min-width: 1024px) 335px, (min-width: 768px) 44vw, ${phone(75)}`,
+}
 const COMPARE_SIZES = { art: COVER_SIZES.artSection }

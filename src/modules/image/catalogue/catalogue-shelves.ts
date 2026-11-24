@@ -46,11 +46,4 @@ export function categoryNameAt(filters: readonly FilterNode[], path: readonly st
   return name
 }
 
-// Search lists templates only (Owner 2026-11-25); a series member's card names its series.
-export function seriesNames(entries: readonly GridEntry[]): ReadonlyMap<string, string> {
-  const names = new Map<string, string>()
-  for (const entry of entries) if (entry.type === 'series') for (const member of entry.series.members) names.set(member.id, entry.series.name)
-  return names
-}
-
 export const shelfMembers = (series: CatalogueSeries): CatalogueTemplate[] => series.members.slice(0, SHELF_LIMIT)

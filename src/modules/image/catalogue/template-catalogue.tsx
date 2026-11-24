@@ -5,29 +5,29 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 
 import { trackCatalogueSeeAll } from '@/core/analytics/browser'
+import { cn } from '@/core/ui/cn'
 import { Reveal } from '@/core/ui/reveal-item'
 
 import { useFavorites } from '../favorites/favorites-provider'
 import { savedIn } from '../favorites/favorites-store'
 import { BatchDialogSlot } from '../matrix/batch-dialog-slot'
 import { CreateDialog, type CreateContext } from '../workspace/create-dialog'
-import { filterCatalogue } from './catalogue-filter'
+import { featuredVideo, filterCatalogue } from './catalogue-filter'
 import { buildSearchIndex, searchTemplates } from './catalogue-search'
 import type { CataloguePayload } from './catalogue-payload'
-import { CatalogueGrid, type GridProps } from './catalogue-grid'
-import { catalogueSections, sectionsFor, type CatalogueSection } from './catalogue-sections'
-import { seriesNames } from './catalogue-shelves'
+import { catalogueSections, isTall, sectionsFor, type CatalogueSection } from './catalogue-sections'
 import { CatalogueSections } from './catalogue-sections-view'
 import { batchableTemplates, type CatalogueTemplate } from './catalogue-template'
-import { featuredVideo, findSeries, type CatalogueView, type FilterNode, type GridEntry } from './catalogue-view'
+import { findSeries, seriesOf, type CatalogueView, type FilterNode, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
 import { isPosterIn, PosterDialogSlot } from './poster-dialog-slot'
 import { posterSeriesOf, posterStart } from './poster-series'
 import { SavedEmpty } from './saved-empty'
 import { SearchBox } from './search-box'
+import { SeriesCard } from './series-card'
+import { TemplateCard } from './template-card'
 import { FeatureCard } from './feature-card'
 import { FirstScreenCovers } from './near-viewport'
-import { ShelvedGrid } from './shelved-grid'
 import { ShareModeButton } from '../template-share/share-mode-button'
 import { ShareSelectionProvider, useShareSelectionState, type ShareSelection } from '../template-share/share-selection'
 import { useSeeAllLanding } from './use-see-all-landing'
@@ -39,6 +39,9 @@ import { browseView, slimBrowse } from './picker-browse'
 // Share mode's bar and sheet (§5.1g) only once share mode is turned on.
 const ShareModeChrome = dynamic(() => import('../template-share/share-mode').then((m) => m.ShareModeChrome), { ssr: false })
 const SeriesCreateDialog = dynamic(() => import('../workspace/series-create-dialog').then((m) => m.SeriesCreateDialog), { ssr: false })
+// A chosen category's shelves (shelf-list.tsx) load on their own: Photos shares this module's chunk
+// group but never opens a category, so it does not carry them (scripts/js-budget.json).
+const ShelvedGrid = dynamic(() => import('./shelf-list'))
 
 // `endCard`: the grid's last card, after every filter's cards (the Wishlist's "Not finding it?",
 // passed in by the page while the wishlist is open).
@@ -203,7 +206,9 @@ function useCatalogueSearch(view: CatalogueView) {
   const [query, setQuery] = useState('')
   const index = useMemo(() => buildSearchIndex(view.entries, view.filters), [view])
   const results = useMemo(() => (query.trim() ? searchTemplates(index, query) : null), [index, query])
-  const series = useMemo(() => seriesNames(view.entries), [view.entries])
+  // Search lists templates only (Owner 2026-11-25): a member's card names its series.
+  const s = useTranslations('app.series')
+  const series = useMemo(() => new Map(seriesOf(view.entries).flatMap((one) => one.members.map((member) => [member.id, s('inSeries', { name: one.name })] as const))), [view.entries, s])
   return { query, setQuery, results, series }
 }
 
@@ -228,7 +233,7 @@ type BodyProps = Omit<GridProps, 'entries' | 'className' | 'eagerCount' | 'serie
   search: ReturnType<typeof useCatalogueSearch>
   sections: CatalogueSection[] | null
   shown: readonly GridEntry[]
-  // The chosen category's place in the chip tree: its series become shelves (shelved-grid.tsx).
+  // The chosen category's place in the chip tree: its series become shelves (shelf-list.tsx).
   filters: readonly FilterNode[]
   path: readonly string[]
   // Saved is chosen: when it holds nothing, its empty state with the way back to All.
@@ -251,7 +256,7 @@ function CatalogueBody({ search, firstPriority, sections, shown, filters, path, 
   if (search.results) return <SearchResults query={search.query.trim()} results={search.results} series={search.series} endCard={endCard} onOpen={onOpen} />
   if (saved && shown.length === 0) return <SavedEmpty onBrowse={onBrowse} />
   if (saved) return <CatalogueGrid entries={shown} endCard={endCard} firstPriority={firstPriority} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
-  if (!sections) return <ShelvedGrid entries={shown} filters={filters} path={path} endCard={endCard} firstPriority={firstPriority} onOpen={onOpen} onOpenSeries={onBrowseSeries} />
+  if (!sections) return <ShelvedGrid entries={shown} filters={filters} path={path} endCard={endCard} firstPriority={firstPriority} Grid={CatalogueGrid} onOpen={onOpen} onOpenSeries={onBrowseSeries} />
   return (
     <>
       <CatalogueSections sections={sections} firstPriority={firstPriority} onOpen={onOpen} onOpenSeries={onOpenSeries} onSeeAll={onSeeAll} />
@@ -284,3 +289,38 @@ function useStuck() {
   }, [])
   return { sentinel, stuck }
 }
+
+// `firstPriority`: the first card is the page's largest paint, so its covers load at high priority;
+// false when the featured card or a shelf sits above it.
+// `seriesOf`: search results name each member's series on its card (template id → label).
+export type GridProps = {
+  entries: readonly GridEntry[]
+  endCard?: ReactNode
+  firstPriority?: boolean
+  // Cards drawn at once (not waiting to come near the screen); none when shelves sit above.
+  eagerCount?: number
+  seriesOf?: ReadonlyMap<string, string>
+  className: string
+  onOpen(id: string): void
+  onOpenSeries(slug: string): void
+}
+
+// The flat grid: a chosen category's loose templates, Saved, search results, or All with a single category.
+function CatalogueGrid({ entries, endCard, firstPriority = true, eagerCount = 3, seriesOf, className, onOpen, onOpenSeries }: GridProps) {
+  return (
+    <ul className={cn('grid grid-flow-row-dense grid-cols-1 gap-x-3 gap-y-6 px-(--gutter) md:grid-cols-2 md:gap-x-4 lg:grid-cols-3', className)}>
+      {entries.map((entry, index) => (
+        <Reveal as="li" key={entryKey(entry)} className={cn(isTall(entry) && 'md:row-span-2')}>
+          {entry.type === 'series' ? (
+            <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={index < eagerCount} priority={firstPriority && index === 0} />
+          ) : (
+            <TemplateCard template={entry.template} onOpen={onOpen} eager={index < eagerCount} priority={firstPriority && index === 0} series={seriesOf?.get(entry.template.id)} />
+          )}
+        </Reveal>
+      ))}
+      {endCard ? <Reveal as="li">{endCard}</Reveal> : null}
+    </ul>
+  )
+}
+
+const entryKey = (entry: GridEntry) => (entry.type === 'series' ? `series-${entry.series.id}` : entry.template.id)

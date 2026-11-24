@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import type { CatalogueIndex, CategoryNode } from '@/core/templates'
 
 import type { CatalogueTemplate } from './catalogue-template'
-import { buildCatalogueView, featuredVideo, findSeries, type GridEntry } from './catalogue-view'
+import { featuredVideo } from './catalogue-filter'
+import { buildCatalogueView, findSeries, type GridEntry } from './catalogue-view'
 
 function category(key: string, path: string[], children: CategoryNode[] = []): CategoryNode {
   const intro = key === 'food' ? { introEn: 'Dishes', introZh: '菜品' } : { introEn: null, introZh: null }
@@ -71,12 +72,6 @@ describe('Create grid entries (T102)', () => {
     expect(result.entries).toHaveLength(1)
     expect(result.entries[0]).toMatchObject({ type: 'series', series: { members: [{ id: 'm2' }, { id: 'm1' }] } })
     expect(result.filters[0].children[0].slug).toBe('dark')
-  })
-
-  it('shows a series member only in its series, even when the series once showed members loose', () => {
-    const loose = { ...index, entries: [index.entries[0], { type: 'template' as const, id: 'm1', categoryKey: 'food-dark' }, index.entries[2]] }
-    const result = buildCatalogueView(loose, templates, false)
-    expect(result.entries.map((entry) => (entry.type === 'series' ? entry.series.id : entry.template.id))).toEqual(['s1', 't2'])
   })
 
   it('features the first video template, a series member included', () => {

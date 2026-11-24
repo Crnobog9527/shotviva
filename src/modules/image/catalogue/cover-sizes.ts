@@ -13,7 +13,7 @@ import { phoneSlot } from '../../../core/content/blocks/phone-sizes'
 // where the 384 w one is about 13 KB, and the first screen's four covers fell from about 107 KB to
 // 48 KB (2026-11-24). A 1× or 2× phone and every tablet or desktop keep their exact slots.
 const PHONE_3X = '(min-resolution: 2.5dppx)'
-const phone = (vw: number) => `${PHONE_3X} ${phoneSlot(vw)}, ${vw}vw`
+export const phone = (vw: number) => `${PHONE_3X} ${phoneSlot(vw)}, ${vw}vw`
 
 export const COVER_SIZES = {
   cardPlate: `(min-width: 1024px) 182px, (min-width: 768px) 25vw, ${phone(50)}`,
@@ -26,10 +26,6 @@ export const COVER_SIZES = {
   // of drag compares is two columns on phones and three from md (336 px each from lg).
   railPlate: `(min-width: 1024px) 182px, (min-width: 768px) 25vw, ${phone(38)}`,
   railFrame: `(min-width: 1024px) 364px, (min-width: 768px) 50vw, ${phone(75)}`,
-  // A series shelf in a chosen category (Owner 2026-11-25): the phone card is the All rail's; from
-  // md a row shows two and a quarter cards (about 44vw each), from lg three and a quarter (335 px).
-  shelfPlate: `(min-width: 1024px) 168px, (min-width: 768px) 22vw, ${phone(38)}`,
-  shelfFrame: `(min-width: 1024px) 335px, (min-width: 768px) 44vw, ${phone(75)}`,
   artSection: `(min-width: 1024px) 336px, (min-width: 768px) 30vw, ${phone(44)}`,
   featurePlate: `(min-width: 1024px) 560px, ${phone(50)}`,
   featureFrame: `(min-width: 1024px) 1120px, ${phone(100)}`,
