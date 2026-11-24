@@ -56,6 +56,15 @@
   @media (min-width: 1024px) {
     .mk-brand-tag, .mk-brand-tag:lang(zh) { max-width: none; font-size: 14px; line-height: 1.15; white-space: nowrap; margin-right: 16px; }
   }
+  /* Phones: the inner pages in one row under the bar (marketing-chrome PhoneNav); scrolls away. */
+  .mk-mnav { display: flex; gap: 4px; padding: 0 calc(var(--gutter) - 10px); overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--border); }
+  .mk-mnav::-webkit-scrollbar { display: none; }
+  .mk-mnav a {
+    flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px;
+    font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; white-space: nowrap;
+  }
+  .mk-mnav a:active { color: var(--foreground); }
+  @media (min-width: 768px) { .mk-mnav { display: none; } }
   .mk-nav { display: flex; align-items: center; gap: 4px; }
   .mk-nl, .mk-start { display: none; }
   .mk-ghost-pill {
@@ -124,6 +133,12 @@
   .mk-hero h1 em { font-style: italic; }
   .mk-lede, .mk-answer { margin-top: 12px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
   /* An A/B hero option's one line (ARCHITECTURE §16.5), a step stronger than the answer above it. */
+  /* Below 1024 the "who it is for" line reads before the long direct answer (Owner 2026-11-24:
+     a phone visitor should see what it does for them first); the source order stays. */
+  @media (max-width: 1023px) {
+    .mk-hero-copy { display: flex; flex-direction: column; }
+    .mk-hero-copy > .mk-answer { order: 1; }
+  }
   .mk-hero-tagline { margin-top: 12px; font-size: 15px; line-height: 1.5; color: var(--foreground); font-weight: 500; }
   .mk-hero-pair { margin: 20px 0 0; }
   /* An A/B hero option's further pairs (hero-strip.tsx): a sideways row on a phone, a grid from 768. */

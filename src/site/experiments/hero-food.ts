@@ -45,14 +45,14 @@ const COPY = {
     before: 'Real phone photo: spaghetti carbonara on a white plate on a steel kitchen counter, stacked plates behind',
     after: 'Real example: the same carbonara on its white plate on a slate table in dappled sunlight, olive oil and herbs beside it',
     caption: 'Same plate, now ready for the menu',
-    tagline: 'For restaurants and cafés: shoot a dish on the kitchen counter, get a menu-ready photo. Your plain white plate stays your plate.',
+    tagline: 'For restaurants and hotels: snap a dish on the kitchen counter or a room on your phone, and get a photo ready for your menu, delivery apps or booking sites in about 30 seconds. No photographer, and the dish and the room stay yours.',
     strip: 'More real dishes, each shot on a kitchen counter',
   },
   zh: {
     before: '真实手机照：后厨不锈钢台面上，白盘里的培根蛋酱意面，身后摞着盘子',
     after: '真实案例：同一盘意面还在白盘里，放在斑驳阳光下的石板桌上，旁边是橄榄油和香草',
     caption: '同一盘菜，直接能上菜单',
-    tagline: '给餐厅和咖啡店：在后厨台面上随手拍一道菜，就能出可以上菜单的照片。你的白盘还是你的白盘。',
+    tagline: '给餐厅和酒店：后厨随手拍一道菜，或用手机拍一张大堂、客房，约 30 秒就出能上菜单、外卖平台和订房网站的图。不用请摄影师，菜和房间还是你自己的。',
     strip: '更多真实菜品，都是在后厨台面上拍的',
   },
 } as const

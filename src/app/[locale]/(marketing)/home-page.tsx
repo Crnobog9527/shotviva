@@ -16,6 +16,8 @@ import { heroOptionContent } from '@/site/experiments'
 import { site } from '@/site/site.config'
 
 import { HomeGeneratorSlot } from './home-generator-slot'
+
+const DEFAULT_HERO = 'food'
 import { HomeWishCtaSlot } from './home-wish-cta-slot'
 
 // The home page, shared by `/` (today's hero) and the A/B hero options the proxy rewrites `/` to
@@ -43,11 +45,16 @@ export async function homeMetadata(): Promise<Metadata> {
 // only the generator's visitor half waits for the request.
 export async function HomeContent({ heroOption }: { heroOption?: string }) {
   const { locale, live, series, products, page, wishlistOpen, free, meta } = await load()
-  const option = heroOption ? heroOptionContent(heroOption, locale) : null
+  // Restaurants and hotels lead (Owner 2026-11-24): with no experiment the page shows the food
+  // option's pictures, line and strip; an experiment's option still replaces them.
+  const option = heroOptionContent(heroOption ?? DEFAULT_HERO, locale)
   const ldMeta = { ...meta, path: localizePath(meta.path, locale) }
   // Series show as one card each, in the admin's order (T102, Owner 2026-11-12).
   const { defaultId: featuredId, ...sections } = featuredSections(live, undefined, series)
-  const defaultId = option && live.some((template) => template.id === option.generatorTemplate) ? option.generatorTemplate : featuredId
+  // Without an experiment the generator keeps the admin's first featured template (a hotel one
+  // today), so the first screen shows a dish above and a hotel below.
+  const opens = heroOption ? option?.generatorTemplate : undefined
+  const defaultId = opens && live.some((template) => template.id === opens) ? opens : featuredId
   const { templates, opening } = homePanelTemplates(live, defaultId)
   const initialCovers = await openingCovers(opening)
   const shown = option ? { ...page, hero: { ...page.hero, ...option.hero } } : page

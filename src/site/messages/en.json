@@ -2435,6 +2435,7 @@
     "appDescription": "AI photo studio",
     "nav": {
       "label": "Main",
+      "phoneLabel": "Pages",
       "pricing": "Pricing",
       "tagline": "AI edits, true to your photo",
       "useCases": "Use Cases",
@@ -2442,6 +2443,7 @@
       "useCaseCommercial": "Commercial photography",
       "useCaseGenerator": "Image to image generator",
       "useCaseTransparent": "Transparent PNG maker",
+      "menuShort": "Menu photos",
       "templates": "Templates",
       "login": "Log in",
       "startFree": "Start free",
