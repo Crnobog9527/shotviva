@@ -62,7 +62,7 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
 const steakPhone = caseImage('menu-steak-phone', 'Real phone photo: sliced sirloin steak with fries and asparagus on a white plate on a steel kitchen pass, plate stacks and squeeze bottles behind')
 const steakBoard = caseImage('menu-steak-board', 'Real example: the same sliced sirloin, fries and asparagus on the same white plate on a dark wooden board, warm side light, herbs and a fork beside it')
 
-// One dish through three looks. The food stays the same; the bowl, the set and the light change.
+// One dish through three looks. The food stays the same; the plate or bowl, the set and the light change.
 const shoot: ShootDemo = {
   heading: { lead: 'One phone photo of a dish → ', emphasis: 'a full menu shoot' },
   intro: 'Fresh chili bullfrog, shot on the kitchen pass in a steel basin. Three finished pictures, the same dish in every one: the bullfrog, the green and red chilies, the green peppercorns.',
@@ -118,7 +118,7 @@ const copy = {
     },
     {
       label: 'The Dish Stays the Dish',
-      value: `Delivery apps want photos of the food you actually serve. ${brand} starts from your own phone photo and changes the bowl, the light and the background, not the food.`,
+      value: `Delivery apps want photos of the food you actually serve. ${brand} starts from your own phone photo and changes the plate or bowl, the light and the setting, not the food.`,
     },
   ],
   headings: {
@@ -144,7 +144,7 @@ export const makeAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
   faq: [
     {
       question: 'Can I use AI photos on my delivery-app menu?',
-      answer: `Delivery apps ask for photos that show the dish you actually serve. ${brand} starts from your own phone photo and keeps the food as served, changing the bowl, the light and the background, so the photo is still of your food. Check your app's current photo rules before you upload.`,
+      answer: `Delivery apps ask for photos that show the dish you actually serve. ${brand} starts from your own phone photo and keeps the food as served, changing the plate or bowl, the light and the setting, so the photo is still of your food. Check your app's current photo rules before you upload.`,
     },
     {
       question: 'What size should restaurant menu photos be?',
