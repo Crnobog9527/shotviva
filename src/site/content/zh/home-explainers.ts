@@ -1,6 +1,6 @@
 import type { HomePage, ImageRef } from '@/core/content'
 
-import { caseImage, homeImage } from '../landing-shared'
+import { caseImage, dishImage, homeImage } from '../landing-shared'
 import { ZH_TIERS, zhTierList, zhUploadLimits } from './offer'
 
 // /zh 首页的两个「怎么做」区块，每一点先给图、再用一行字说明（Owner 2026-11-12：看图比读大段文字快）：
@@ -15,6 +15,16 @@ export const zhTote = {
   promo: homeImage('hero-set-promo', '同一只包做成新品促销海报，明亮影棚光（真实案例）'),
 } as const satisfies Record<string, ImageRef>
 
+// The steps' pictures (Owner 2026-11-24: Chinese dishes on /zh): a dish shot on the kitchen
+// counter and three published 中餐 templates (cn-branch-prawn-basket, cn-pedestal-fog,
+// cn-ring-lotus-oval), the first of them the one picked.
+const zhDish = {
+  phone: dishImage('cn-food-1-photo', '真实手机照：后厨不锈钢台面上，竹笼里码着一排大虾'),
+  basket: dishImage('cn-food-1-ai', '真实案例：同一笼大虾放在暗调木桌上，暖光'),
+  fog: { src: '/home/cn-step-fog-s.webp', alt: '真实案例：一道中餐放在高台上，四周是烟雾', width: 320, height: 400 },
+  lotus: { src: '/home/cn-step-lotus-s.webp', alt: '真实案例：一盘藕卷放在年轮木块上', width: 320, height: 400 },
+}
+
 const [standard, hd, max] = ZH_TIERS
 const tiers = [standard, hd, max] as const
 const sizesAlt = (subject: string) => `${subject}，${tiers.map((tier) => `${tier.name} ${tier.px}`).join('、')} px 三档尺寸对比`
@@ -26,7 +36,7 @@ export const zhSteps = {
     {
       heading: '上传一张照片',
       text: `手机拍一张，或者从相册里选：${zhUploadLimits}。让主体完整地留在画面里。`,
-      visual: { kind: 'upload', image: zhTote.phone, file: 'IMG_2047.jpg' },
+      visual: { kind: 'upload', image: zhDish.phone, file: 'IMG_3112.jpg' },
     },
     {
       heading: '选一个模板',
@@ -34,18 +44,18 @@ export const zhSteps = {
       visual: {
         kind: 'picker',
         tiles: [
-          { image: zhTote.listing, name: '纯白底图' },
-          { image: zhTote.lifestyle, name: '生活场景' },
-          { image: zhTote.promo, name: '促销海报' },
+          { image: zhDish.basket, name: '中餐 · 鳌虾竹笼' },
+          { image: zhDish.fog, name: '中餐 · 高台烟雾' },
+          { image: zhDish.lotus, name: '中餐 · 年轮木块藕卷盘' },
         ],
-        picked: 1,
-        caption: picked('生活场景'),
+        picked: 0,
+        caption: picked('中餐 · 鳌虾竹笼'),
       },
     },
     {
       heading: `下载 ${zhTierList}`,
       text: `${standard.name}适合${standard.use}，${hd.name}适合${hd.use}，${max.name}适合${max.use}。`,
-      visual: { kind: 'sizes', image: { ...zhTote.lifestyle, alt: sizesAlt('同一只包的生活场景图') }, tiers },
+      visual: { kind: 'sizes', image: { ...zhDish.basket, alt: sizesAlt('同一笼大虾的暗调暖光图') }, tiers },
     },
   ],
 } as const satisfies HomePage['steps']

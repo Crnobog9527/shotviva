@@ -2435,6 +2435,7 @@
     "appDescription": "AI 影棚",
     "nav": {
       "label": "主导航",
+      "phoneLabel": "页面导航",
       "pricing": "价格",
       "tagline": "保留真实照片细节，AI 一键出大片",
       "useCases": "使用场景",
@@ -2442,6 +2443,7 @@
       "useCaseCommercial": "商业产品摄影",
       "useCaseGenerator": "图生图在线工具",
       "useCaseTransparent": "透明 PNG 制作",
+      "menuShort": "餐厅菜单",
       "templates": "模板",
       "login": "登录",
       "startFree": "免费开始",
@@ -2476,7 +2478,9 @@
       "freeTag": "免费 · 公开",
       "paidTag": "付费 · 私密",
       "freeSampleAlt": "带水印的免费图（真实案例）",
-      "paidSampleAlt": "同一张图用付费积分生成，没有水印（真实案例）"
+      "paidSampleAlt": "同一张图用付费积分生成，没有水印（真实案例）",
+      "factsAll": "查看全部 {count} 项",
+      "foldOpen": "展开"
     }
   },
   "pageError": {

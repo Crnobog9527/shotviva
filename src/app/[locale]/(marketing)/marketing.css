@@ -56,6 +56,15 @@
   @media (min-width: 1024px) {
     .mk-brand-tag, .mk-brand-tag:lang(zh) { max-width: none; font-size: 14px; line-height: 1.15; white-space: nowrap; margin-right: 16px; }
   }
+  /* Phones: the inner pages in one row under the bar (marketing-chrome PhoneNav); scrolls away. */
+  .mk-mnav { display: flex; gap: 4px; padding: 0 calc(var(--gutter) - 10px); overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--border); }
+  .mk-mnav::-webkit-scrollbar { display: none; }
+  .mk-mnav a {
+    flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px;
+    font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; white-space: nowrap;
+  }
+  .mk-mnav a:active { color: var(--foreground); }
+  @media (min-width: 768px) { .mk-mnav { display: none; } }
   .mk-nav { display: flex; align-items: center; gap: 4px; }
   .mk-nl, .mk-start { display: none; }
   .mk-ghost-pill {
@@ -124,6 +133,15 @@
   .mk-hero h1 em { font-style: italic; }
   .mk-lede, .mk-answer { margin-top: 12px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
   /* An A/B hero option's one line (ARCHITECTURE §16.5), a step stronger than the answer above it. */
+  /* Below 1024 the first screen is the H1, subtitle, the "who it is for" line, the picture and
+     the generator; the long direct answer follows the generator (Owner 2026-11-24: less text
+     above the picture on a phone). Visual order only: the source order and the text stay. The
+     home page only (.mk-front): the landings that reuse HomeHero keep the answer above. */
+  @media (max-width: 1023px) {
+    .mk-front .mk-hero { display: flex; flex-direction: column; }
+    .mk-front .mk-hero-copy { display: contents; }
+    .mk-front .mk-hero > .mk-hero-copy > .mk-answer { order: 1; }
+  }
   .mk-hero-tagline { margin-top: 12px; font-size: 15px; line-height: 1.5; color: var(--foreground); font-weight: 500; }
   .mk-hero-pair { margin: 20px 0 0; }
   /* An A/B hero option's further pairs (hero-strip.tsx): a sideways row on a phone, a grid from 768. */
@@ -455,6 +473,37 @@
     font: 600 12px/1 var(--font-sans); color: var(--foreground); background: var(--frost); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   }
   .mk-edit-cap { margin-top: 12px; padding: 0 4px; }
+  /* Phone folds (home facts table, the topic cards; Owner 2026-11-24): a visually hidden checkbox
+     and its label as the button. Below 768 the folded rows or body stay hidden until it is
+     checked; the content is always in the HTML. From 768 everything shows and the button goes.
+     The checkbox leaves the tab order and the accessibility tree wherever it does nothing: from
+     768, and once it is checked (the label hides then too). */
+  .mk-ghost-btn.mk-fold-btn, .mk-fold-toggle { display: none; }
+  @media (max-width: 767px) {
+    .mk-fold-toggle { display: inline; }
+    .mk-fold-toggle:checked { display: none; }
+    .mk-ghost-btn.mk-fold-btn { display: inline-flex; margin-top: 16px; cursor: pointer; }
+    .mk-facts tr.mk-fold-row, section .mk-fold-body { display: none; }
+    section:has(> .mk-fold-toggle:checked) .mk-facts tr.mk-fold-row { display: block; }
+    section:has(> .mk-fold-toggle:checked) > .mk-fold-body { display: grid; }
+    section:has(> .mk-fold-toggle:checked) .mk-ghost-btn.mk-fold-btn { display: none; }
+    section:has(> .mk-fold-toggle:focus-visible) .mk-fold-btn { outline: 2px solid var(--ring); outline-offset: 2px; }
+  }
+  /* Hotels and stays (spaces-section.tsx): the phone photo over the result, both 16:9; a rail on
+     phones with the next card peeking, two to a row from 768. */
+  .mk-spaces {
+    margin: 24px calc(var(--gutter) * -1) 0; padding: 0 var(--gutter) 4px; list-style: none;
+    display: grid; grid-auto-flow: column; grid-auto-columns: 82%; gap: 12px;
+    overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--gutter); scrollbar-width: none;
+  }
+  .mk-spaces::-webkit-scrollbar { display: none; }
+  .mk-spaces > li { scroll-snap-align: start; min-width: 0; }
+  .mk-space { margin: 0; display: grid; gap: 6px; }
+  .mk-space-pic { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--radius); background: var(--muted); }
+  .mk-space-pic img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  @media (min-width: 768px) {
+    .mk-spaces { margin: 32px 0 0; padding: 0; overflow: visible; grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 16px; }
+  }
   .mk-edit-cap b { display: block; font: 600 16px/1.25 var(--font-sans); letter-spacing: -0.01em; }
   .mk-edit-cap span { display: block; margin-top: 4px; max-width: 60ch; font-size: 14px; line-height: 1.45; color: var(--muted-foreground); }
 
@@ -479,6 +528,17 @@
   .mk-cat-head a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
   .mk-note { margin-top: 16px; padding: 0 var(--gutter); font: 400 14px/1.4 var(--font-sans); color: var(--muted-foreground); }
   .mk-tgrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 20px 16px; }
+  /* Phones: each category is one sideways rail (Owner 2026-11-24, MOBILE_UI §1.4), the next card
+     peeking at the right edge, instead of a column of full-width pairs. */
+  @media (max-width: 767px) {
+    .mk-tgrid {
+      grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 82%; gap: 12px;
+      margin: 0 calc(var(--gutter) * -1); padding: 0 var(--gutter) 4px; overflow-x: auto;
+      scroll-snap-type: x mandatory; scroll-padding-inline: var(--gutter); scrollbar-width: none;
+    }
+    .mk-tgrid::-webkit-scrollbar { display: none; }
+    .mk-tgrid > li { scroll-snap-align: start; min-width: 0; }
+  }
   .mk-tpl { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: left; font: inherit; border-radius: var(--radius-tile); }
   button.mk-tpl { cursor: pointer; transition: transform .3s var(--ease); }
   button.mk-tpl:active { transform: scale(.97); }
@@ -524,7 +584,18 @@
   .mk-facts tr:first-child th, .mk-facts tr:first-child td { border-top: 0; }
   .mk-facts th { width: 42%; padding-top: 14px; font: 500 14px/1.4 var(--font-sans); color: var(--muted-foreground); }
   .mk-facts td { font-size: 16px; line-height: 1.4; }
-  .mk-facts .mk-key td { font: 400 24px/1.1 var(--font-display); }
+  /* The first two rows, what stays and what changes, stand out by weight only (Owner 2026-11-24:
+     a large display face made those answers look out of step with the rest). */
+  .mk-facts .mk-key td { font-weight: 500; color: var(--foreground); }
+  /* Phones: each row stacks, the question on its own line and the answer under it at full width
+     (Owner 2026-11-24: two narrow columns made the answers a tall, cramped column). */
+  @media (max-width: 767px) {
+    .mk-facts tr { display: block; padding: 14px 16px; border-top: 1px solid var(--hairline); }
+    .mk-facts tr:first-child { border-top: 0; }
+    .mk-facts th, .mk-facts td { display: block; width: auto; padding: 0; border-top: 0; }
+    .mk-facts th { font-size: 14px; }
+    .mk-facts td { margin-top: 4px; }
+  }
 
   /* free */
   .mk-free { display: grid; gap: 8px; margin-top: 24px; }
@@ -850,64 +921,16 @@
   .mk-pair-blank .mk-pane { background: repeating-linear-gradient(135deg, var(--hatch) 0 8px, transparent 8px 16px), var(--recess); }
 }
 
-/* "Can't find your template? Make a wish" (Owner 2026-11-10), under the template grid: three
-   pains on hairline rows, then the Wishlist tab's own prints (tape, lean, stamp) as eight
-   examples, two to a row on phones and four from 768px. Static: no JS, the images lazy. */
+/* "Can't find your template?" (Owner 2026-11-10; one line since 2026-11-24): under the
+   template grid, the question and the Wishlist button on one hairline row. */
 @layer components {
-  /* The tilted prints and the stamp swing a few px past the gutter; clip at the section (full viewport width) so they never widen the page. */
-  .mk-wish { overflow-x: clip; }
-  .mk-wish h2 em { font-style: italic; }
-  .mk-wish h2:lang(zh) em { font-style: normal; }
-  .mk-wish-points { list-style: none; margin: 20px 0 0; padding: 0; }
-  .mk-wish-points li { padding: 14px 0; box-shadow: inset 0 1px 0 var(--hairline); }
-  .mk-wish-points li:last-child { padding-bottom: 0; }
-  .mk-wish-points h3 { font: 600 17px/1.25 var(--font-sans); letter-spacing: -0.015em; }
-  .mk-wish-points p { margin-top: 4px; font-size: 16px; line-height: 1.5; color: var(--muted-foreground); }
-
-  .mk-wish-wall { list-style: none; margin: 32px 0 0; padding: 10px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 10px; }
-  .mk-wish-wall > li { min-width: 0; transform: rotate(var(--r, 0deg)); transform-origin: 50% 0; }
-  /* Pinned at the tape, a print's foot swings h·sin(r) sideways. Odd prints lean one way and even
-     the other, so the phone pairs splay apart and every lean stays inside the 16px gutter; where
-     two four-up neighbours swing together (2|3, 6|7) the angles stay small enough to clear the gap. */
-  .mk-wish-wall > li:nth-child(1) { --r: 1.6deg; }
-  .mk-wish-wall > li:nth-child(2) { --r: -1.2deg; }
-  .mk-wish-wall > li:nth-child(3) { --r: 0.8deg; }
-  .mk-wish-wall > li:nth-child(4) { --r: -2deg; }
-  .mk-wish-wall > li:nth-child(5) { --r: 1.2deg; }
-  .mk-wish-wall > li:nth-child(6) { --r: -1.6deg; }
-  .mk-wish-wall > li:nth-child(7) { --r: 0.6deg; }
-  .mk-wish-wall > li:nth-child(8) { --r: -1.4deg; }
-  .mk-wish-print {
-    position: relative; display: grid; padding: 8px 8px 10px; border-radius: 6px; background: var(--card);
-    box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 var(--edge-highlight), 0 18px 28px -18px var(--photo-fade);
+  .mk-wish-line {
+    margin: 32px var(--gutter) 0; padding: 16px 0 0; box-shadow: inset 0 1px 0 var(--hairline);
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
   }
-  .mk-wish-print::before {
-    content: ""; position: absolute; z-index: 2; left: 50%; top: -9px; width: 64px; height: 20px; border-radius: 2px; pointer-events: none;
-    transform: translateX(-50%) rotate(var(--tape, -3deg));
-    background: linear-gradient(90deg, var(--grab), color-mix(in srgb, var(--foreground) 34%, transparent) 50%, color-mix(in srgb, var(--foreground) 20%, transparent));
-  }
-  .mk-wish-wall > li:nth-child(even) .mk-wish-print { --tape: 3deg; }
-  .mk-wish-print img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 3px; background: var(--muted); }
-  .mk-wish-text { margin-top: 10px; padding: 0 2px; font: italic 400 17px/1.3 var(--font-display); letter-spacing: -0.005em; text-wrap: pretty; overflow-wrap: anywhere; }
-  .mk-wish-text:lang(zh) { font-style: normal; font-size: 16px; line-height: 1.6; letter-spacing: 0; }
-  .mk-wish-votes { margin-top: 8px; padding: 0 2px; display: flex; justify-content: flex-end; }
-  .mk-wish-votes > span[aria-hidden] { display: inline-flex; align-items: center; gap: 5px; font: 500 14px/1 var(--font-mono); color: var(--bone-dim); }
-  .mk-wish-votes svg { width: 16px; height: 16px; }
-  .mk-wish-stamp {
-    position: absolute; z-index: 3; right: -6px; top: 34px; transform: rotate(12deg); padding: 4px 8px; border: 2px solid var(--success); border-radius: 4px;
-    font: 700 14px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--success); background: var(--frost-light);
-  }
-  .mk-wish-stamp:lang(zh) { letter-spacing: .04em; }
-  .mk-wish-note { margin-top: 20px; }
-  .mk-wish-act { margin-top: 16px; }
+  .mk-wish-line p { font-size: 16px; line-height: 1.5; color: var(--muted-foreground); }
   .mk-wish-cta { width: 100%; }
-
   @media (min-width: 768px) {
-    .mk-wish-wall { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 18px; }
     .mk-wish-cta { display: inline-flex; width: auto; min-width: 240px; }
   }
-  @media (min-width: 1024px) {
-    .mk-wish-points { margin-top: 24px; }
-  }
-  @media (prefers-reduced-motion: reduce) { .mk-wish-wall > li { transform: none; } }
 }

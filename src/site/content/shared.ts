@@ -26,7 +26,7 @@ export function sharedFacts(offers: OfferFacts): readonly [Fact, Fact, Fact, ...
     // Why choose Shotviva (Owner 2026-11-08): the two key rows first, then the comparison,
     // who and where, then the numbers every page shares.
     {
-      label: 'Your photo stays your photo',
+      label: 'Your photo stays your photo', brief: true,
       value: 'The product, its label, the food and the room stay as you shot them. The light, background or scene changes; food templates may also swap the plate or bowl.',
     },
     {
@@ -42,18 +42,18 @@ export function sharedFacts(offers: OfferFacts): readonly [Fact, Fact, Fact, ...
       value: `Our own editing engine, built in-house, runs on the world’s top image models. Before every change it works out exactly what you asked for and locks everything else in place.`,
     },
     {
-      label: 'Who it is for',
+      label: 'Who it is for', brief: true,
       value: 'Restaurants and cafés, online sellers, hosts and real-estate agents, small brands, and anyone whose photos have to match what customers actually get',
     },
     {
-      label: 'Where you use it',
+      label: 'Where you use it', brief: true,
       value: 'Menus and delivery apps, marketplace listings, rental and room photos, social posts and ads, or fixing a photo you already like',
     },
     { label: 'What you don’t need', value: 'A studio, a designer or a prompt. Pick a template, or type one line about what to change.' },
-    { label: 'Free to start', value: `${FreeImagesLabel} when you sign up, given once` },
+    { label: 'Free to start', brief: true, value: `${FreeImagesLabel} when you sign up, given once` },
     { label: 'Output sizes', value: tierPixels },
     { label: 'Uploads', value: uploadLimits },
-    { label: 'Prices', value: paidValue(offers) },
+    { label: 'Prices', brief: true, value: paidValue(offers) },
     { label: 'Free vs paid photos', value: 'Free photos are public with a watermark (poster photos stay private); paid photos are private and watermark-free' },
     { label: 'Languages', value: languages },
   ]

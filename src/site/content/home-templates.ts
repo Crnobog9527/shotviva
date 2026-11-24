@@ -2,6 +2,8 @@ import type { TemplateCard, TemplateCategory, TemplateMedia, TryTemplate } from 
 import type { LocalizedTemplate } from '@/core/templates'
 import type { PublicSeries } from '@/core/templates/public-series'
 
+import { CATEGORY } from './landing-shared'
+
 // The home page's (and landing pages') template sections, read from the database (T53,
 // ARCHITECTURE §12 home item 3): the featured templates (featured_rank, chosen in admin) grouped
 // under their categories in the order set in 分类管理 (T75), a category with none hidden. Name
@@ -92,6 +94,10 @@ const mediaOf = (template: Live): TemplateMedia => ({ before: template.coverBefo
 // `keys`: only these categories (a landing page's); the generator opens on the first featured
 // template among them. `series`: the live series (cachedPublicSeries); without them every
 // template keeps its own card.
+// The home template section shows hotels and spaces, then food (Owner 2026-11-24: no posters,
+// products or art styles there); the order on the page is still the admin's category order.
+export const HOME_CATEGORIES: readonly string[] = [CATEGORY.spaces, CATEGORY.food]
+
 export function featuredSections(live: readonly Live[], keys?: readonly string[], series: readonly Series[] = []) {
   const wanted = keys ? new Set(keys) : null
   const featured = featuredTemplates(live).filter((template) => !wanted || wanted.has(template.category))

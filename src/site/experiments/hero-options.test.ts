@@ -9,8 +9,9 @@ import { FIRST_FRAMES } from '../content/first-frames.generated'
 const picture = (src: string) => existsSync(join(process.cwd(), 'public', src))
 
 describe('home hero options (ARCHITECTURE §16.5)', () => {
-  it('has content in both languages for every option but the default, with real files and an inline first frame', () => {
-    for (const { id } of HERO_OPTIONS.filter((option) => option.id !== HERO_DEFAULT_OPTION)) {
+  it('has content in both languages for every option but tote (the page content hero), the default included, with real files and an inline first frame', () => {
+    expect(HERO_DEFAULT_OPTION).toBe('food')
+    for (const { id } of HERO_OPTIONS.filter((option) => option.id !== 'tote')) {
       for (const locale of ['en', 'zh'] as const) {
         const content = heroOptionContent(id, locale)
         expect(content, `${id} ${locale}`).not.toBeNull()
@@ -22,14 +23,18 @@ describe('home hero options (ARCHITECTURE §16.5)', () => {
     }
   })
 
-  it('shows restaurants one pair first and the other seven of the Owner’s eight below it', () => {
-    const food = heroOptionContent('food', 'zh')!
-    expect(food.hero.scenes).toBeUndefined()
-    expect(food.strip?.items).toHaveLength(7)
-    expect(heroOptionContent('food', 'en')!.strip?.items.map((item) => item.after.src)).toEqual(food.strip?.items.map((item) => item.after.src))
+  it('shows restaurants one pair first and seven more below it, Western dishes in English and Chinese ones on /zh', () => {
+    for (const [locale, prefix] of [['en', '/home/food-'], ['zh', '/home/cn-food-']] as const) {
+      const food = heroOptionContent('food', locale)!
+      expect(food.hero.scenes).toBeUndefined()
+      expect(food.strip?.items).toHaveLength(7)
+      for (const image of [food.hero.before, food.hero.after, ...(food.strip?.items ?? []).flatMap((item) => [item.before, item.after])]) {
+        expect(image.src.startsWith(prefix)).toBe(true)
+      }
+    }
   })
 
   it('registers every option on the hero surface', () => {
-    expect(experimentRegistry[0]?.options.map((option) => option.id)).toEqual(['tote', 'art-style', 'food'])
+    expect(experimentRegistry[0]?.options.map((option) => option.id)).toEqual(['food', 'tote', 'art-style'])
   })
 })

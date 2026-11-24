@@ -23,6 +23,7 @@ const zhPaths = site.locales.zhPaths
 export async function MarketingHeader({ locale, homeOnly = false }: { locale: Locale; homeOnly?: boolean }) {
   const t = await getTranslations({ locale, namespace: 'marketing.nav' })
   return (
+    <>
     <header className="mk-appbar">
       <div className="mk-w mk-appbar-row">
         <Link href="/" className="mk-brand" aria-label={`${site.brand.name}, ${t('tagline')}`}>
@@ -66,6 +67,27 @@ export async function MarketingHeader({ locale, homeOnly = false }: { locale: Lo
         </nav>
       </div>
     </header>
+    <PhoneNav locale={locale} />
+    </>
+  )
+}
+
+// Phones only (Owner 2026-11-24): the top bar has room for the globe and Log in alone, and the
+// rules forbid a hamburger, so the inner pages sit in one row of text links under it. Not
+// sticky: it scrolls away with the page. The blog shows once this language has a post.
+async function PhoneNav({ locale }: { locale: Locale }) {
+  const [t, blogText, hasBlogPosts] = await Promise.all([
+    getTranslations({ locale, namespace: 'marketing.nav' }),
+    getTranslations({ locale, namespace: 'blog' }),
+    cachedHasPublishedPosts(locale),
+  ])
+  return (
+    <nav aria-label={t('phoneLabel')} className="mk-mnav mk-w">
+      <Link href="/#templates">{t('templates')}</Link>
+      <Link href="/ai-restaurant-menu">{t('menuShort')}</Link>
+      <Link href="/pricing">{t('pricing')}</Link>
+      {hasBlogPosts ? <Link href="/blog">{blogText('footerLink')}</Link> : null}
+    </nav>
   )
 }
 
