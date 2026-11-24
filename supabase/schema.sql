@@ -22942,6 +22942,7 @@ CREATE TABLE IF NOT EXISTS "public"."web_vitals" (
     "sw" boolean NOT NULL,
     "effective_type" "text",
     "country" "text",
+    "shell" boolean DEFAULT false NOT NULL,
     CONSTRAINT "web_vitals_check" CHECK ((("value" >= (0)::double precision) AND ("value" <= (
 CASE
     WHEN ("metric" = 'CLS'::"text") THEN 100
