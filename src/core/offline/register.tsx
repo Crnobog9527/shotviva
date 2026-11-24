@@ -36,3 +36,16 @@ export function clearOfflineCaches(): void {
     // Nothing to clear.
   }
 }
+
+// One screen's first-screen template covers (LCP plan 1; `screen` names it: All, a category): the
+// worker keeps these in place of that screen's earlier set, so the next launch paints them from the
+// phone. Sent to the active worker once there is one (on a first visit, after it installs); without
+// a worker (switched off, unsupported) nothing happens.
+export function keepFirstScreenCovers(screen: string, urls: readonly string[]): void {
+  try {
+    if (urls.length === 0 || !('serviceWorker' in navigator)) return
+    void navigator.serviceWorker.ready.then((registration) => registration.active?.postMessage({ type: 'sv-keep-covers', screen, urls: [...urls] })).catch(() => undefined)
+  } catch {
+    // Nothing to keep.
+  }
+}

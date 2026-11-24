@@ -25,6 +25,7 @@ import { posterSeriesOf, posterStart } from './poster-series'
 import { SavedEmpty } from './saved-empty'
 import { SearchBox } from './search-box'
 import { FeatureCard } from './feature-card'
+import { FirstScreenCovers } from './near-viewport'
 import { SeriesCard } from './series-card'
 import { TemplateCard } from './template-card'
 import { ShareModeButton } from '../template-share/share-mode-button'
@@ -99,32 +100,34 @@ export function TemplateCatalogue({ payload, create: createProp, endCard }: Prop
   }
   return (
     <ShareSelectionProvider value={share}>
-      {featured ? (
-        <Reveal className="px-(--gutter)">
-          <FeatureCard template={featured} onOpen={open} />
-        </Reveal>
-      ) : null}
-      <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
-      <div ref={bar} data-stuck={stuck || undefined} data-chrome="" className="sticky top-0 z-40 py-2 data-[stuck]:chrome-bleed data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
-        <div className="mb-2 flex items-center gap-2 px-(--gutter)">
-          <SearchBox value={search.query} onChange={search.setQuery} label={t('search')} clear={t('searchClear')} className="min-w-0 flex-1 md:max-w-[420px]" />
-          <ShareModeButton />
+      <FirstScreenCovers screen={firstScreenOf(search.results !== null, active)}>
+        {featured ? (
+          <Reveal className="px-(--gutter)">
+            <FeatureCard template={featured} onOpen={open} />
+          </Reveal>
+        ) : null}
+        <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
+        <div ref={bar} data-stuck={stuck || undefined} data-chrome="" className="sticky top-0 z-40 py-2 data-[stuck]:chrome-bleed data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
+          <div className="mb-2 flex items-center gap-2 px-(--gutter)">
+            <SearchBox value={search.query} onChange={search.setQuery} label={t('search')} clear={t('searchClear')} className="min-w-0 flex-1 md:max-w-[420px]" />
+            <ShareModeButton />
+          </div>
+          <CategoryChips hidden={search.results !== null} filters={view.filters} saved={showSaved(saved.length, active.saved, holdsSaved(favorites))} value={active} onChange={query.select} labels={chipLabels(t)} />
         </div>
-        <CategoryChips hidden={search.results !== null} filters={view.filters} saved={showSaved(saved.length, active.saved, holdsSaved(favorites))} value={active} onChange={query.select} labels={chipLabels(t)} />
-      </div>
-      <h2 className="sr-only">{t('templates')}</h2>
-      <CatalogueBody search={search} firstPriority={!featured} sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onSeeAll={seeAll} />
-      <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
-      <CatalogueDialogs
-        create={create}
-        series={sheetLoaded ? series : undefined}
-        onCloseSeries={query.closeSeries}
-        template={openable.find((item) => item.id === openId) ?? null}
-        onCloseTemplate={() => setOpenId(null)}
-        poster={{ id: query.posterId, templates: openable, series: posterSeriesOf(view.entries, query.posterId), onSwitch: query.openPoster, onClose: query.closePoster }}
-        batch={{ templates: batchable, browse: batchBrowse }}
-      />
-      <ShareModeSlot selection={share} />
+        <h2 className="sr-only">{t('templates')}</h2>
+        <CatalogueBody search={search} firstPriority={!featured} sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onSeeAll={seeAll} />
+        <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
+        <CatalogueDialogs
+          create={create}
+          series={sheetLoaded ? series : undefined}
+          onCloseSeries={query.closeSeries}
+          template={openable.find((item) => item.id === openId) ?? null}
+          onCloseTemplate={() => setOpenId(null)}
+          poster={{ id: query.posterId, templates: openable, series: posterSeriesOf(view.entries, query.posterId), onSwitch: query.openPoster, onClose: query.closePoster }}
+          batch={{ templates: batchable, browse: batchBrowse }}
+        />
+        <ShareModeSlot selection={share} />
+      </FirstScreenCovers>
     </ShareSelectionProvider>
   )
 }
@@ -268,6 +271,14 @@ function CatalogueGrid({ entries, endCard, firstPriority = true, className, onOp
       {endCard ? <Reveal as="li">{endCard}</Reveal> : null}
     </ul>
   )
+}
+
+// The screen whose first-screen covers the service worker keeps (near-viewport.tsx): All, a
+// category path, or Saved; none for search results.
+function firstScreenOf(searching: boolean, active: { saved: boolean; path: readonly string[] }): string | null {
+  if (searching) return null
+  if (active.saved) return 'saved'
+  return active.path.length ? `c:${active.path.join('/')}` : 'all'
 }
 
 // The featured card: the first single video template in the catalogue's order.
