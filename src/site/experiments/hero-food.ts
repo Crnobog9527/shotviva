@@ -2,6 +2,7 @@ import type { HeroScene, ImageRef } from '@/core/content'
 import type { Locale } from '@/core/i18n/locales'
 
 import { withFirstFrame } from '../content/landing-shared'
+import { photoSeconds } from '../content/offer'
 import type { HeroOptionContent } from './hero-options'
 
 // Home hero option C, restaurants (Owner 2026-11-14: 「我选择窗口挑选出来的 8 组候选」). Eight real
@@ -71,12 +72,12 @@ const COPY = {
     before: 'Real phone photo: spaghetti carbonara on a white plate on a steel kitchen counter, stacked plates behind',
     after: 'Real example: the same carbonara on its white plate on a slate table in dappled sunlight, olive oil and herbs beside it',
     caption: 'Same plate, now ready for the menu',
-    tagline: 'For restaurants and hotels: snap a dish or a room on your phone and get menu, delivery-app and booking-site photos in about 30 seconds, no photographer.',
+    tagline: `For restaurants and hotels: snap a dish or a room on your phone and get menu, delivery-app and booking-site photos in about ${photoSeconds} seconds, no photographer.`,
     strip: 'More real dishes, each shot on a kitchen counter',
   },
   zh: {
-    tagline: '给餐厅和酒店：随手拍一道菜或一间客房，约 30 秒出菜单、外卖和订房网站用的图，不用请摄影师。',
-    strip: '更多真实菜品，都是在后厨台面上拍的',
+    tagline: `专为餐厅和酒店打造：手机随手拍下菜品或客房，约 ${photoSeconds} 秒即可生成菜单、外卖平台和订房网站所需的专业图片，无需聘请摄影师。`,
+    strip: '更多真实案例，原图都是在后厨台面上随手拍的',
   },
 } as const
 
