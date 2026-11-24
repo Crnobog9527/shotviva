@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { accountLabel, formatAdminPhone } from './label'
+import { accountContact, accountLabel, formatAdminPhone } from './label'
 
 // T63: an admin row names a phone account by its number when it has no email.
 describe('accountLabel', () => {
@@ -9,5 +9,14 @@ describe('accountLabel', () => {
     expect(accountLabel({ id: 'u1', email: null, phone: '8614000000001' })).toBe('+86 140 0000 0001')
     expect(accountLabel({ id: 'u1', email: '', phone: null })).toBe('u1')
     expect(formatAdminPhone('14155550123')).toBe('+14155550123')
+  })
+})
+
+// /admin/orders: a phone sign-up paid, and Auth returned "" for its email; the payer column was blank.
+describe('accountContact', () => {
+  it('names a phone payer whose email Auth returns as ""', () => {
+    expect(accountContact({ email: '', phone: '8614000000001' })).toBe('+86 140 0000 0001')
+    expect(accountContact({ email: 'mei@example.com', phone: '8614000000001' })).toBe('mei@example.com')
+    expect(accountContact({ email: '', phone: '' })).toBeNull()
   })
 })

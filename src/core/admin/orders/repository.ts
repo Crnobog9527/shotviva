@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { AppError } from '@/core/errors'
 
 import { afterCursor, decodeCursor, PAGE_SIZE, toPage, type Page } from '../cursor'
+import { accountContact } from '../users/label'
 import { paymentSource, type PurchaseSource } from './source'
 
 // /admin/orders reads: payments (T10, what was actually charged) and T9's subscription mirror.
@@ -76,10 +77,16 @@ export type AdminPurchase = PurchaseSource & {
   openDispute: boolean
 }
 
-// Emails come live from Auth, one call per distinct user on the page (≤ 30), never copied.
+// Who paid, named live from Auth (one call per distinct user on the page, ≤ 30, never copied):
+// the email, else the phone (phone sign-ups have no email; Auth returns "" then), else null.
 async function emailsFor(db: SupabaseClient, ids: string[]): Promise<Map<string, string | null>> {
   const unique = [...new Set(ids)]
-  const found = await Promise.all(unique.map(async (id) => [id, (await db.auth.admin.getUserById(id)).data.user?.email ?? null] as const))
+  const found = await Promise.all(
+    unique.map(async (id) => {
+      const user = (await db.auth.admin.getUserById(id)).data.user
+      return [id, user ? accountContact(user) : null] as const
+    }),
+  )
   return new Map(found)
 }
 
