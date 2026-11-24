@@ -24,6 +24,7 @@ export function FeatureCard({ template, onOpen }: { template: CatalogueTemplate;
       ref={ref}
       type="button"
       aria-haspopup="dialog"
+      data-card={template.id}
       aria-label={t('featureAria', { name: template.name, category: template.categoryName })}
       onClick={() => onOpen(template.id)}
       className="group hairline relative mt-4 block w-full overflow-hidden rounded-panel bg-card text-left transition-shadow hover:shadow-[inset_0_0_0_1px_var(--input)] md:mt-6"

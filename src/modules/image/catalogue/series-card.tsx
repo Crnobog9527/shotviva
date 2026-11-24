@@ -31,6 +31,7 @@ export function SeriesCard({ series, onOpen, eager, priority }: Props) {
     <button
       type="button"
       aria-haspopup="dialog"
+      data-card={`series:${series.slug}`}
       aria-label={t('cardAria', { name: series.name, count: series.members.length })}
       onClick={() => onOpen(series.id)}
       className="group relative block w-full rounded-tile text-left transition-transform duration-250 ease-house hover:-translate-y-0.5 active:scale-[.97]"

@@ -28,6 +28,8 @@ type SettingTypes = {
   // 1999: whether pages register the home-screen app's service worker (core/offline). Off (no row):
   // /sw.js empties its caches and unregisters, and pages unregister any worker (the kill switch).
   service_worker_enabled: boolean
+  // 2000: Create's app shell (ARCHITECTURE §18.3), apart from the master switch above.
+  service_worker_shell_enabled: boolean
 }
 
 export type SystemSettingKey = keyof SettingTypes
@@ -46,6 +48,7 @@ export const SYSTEM_SETTINGS: { [K in SystemSettingKey]: SettingDefinition<Setti
   poster_photo_credits: { schema: z.number().int().min(1).max(1000), fallback: 0 },
   food_toggles_enabled: { schema: z.boolean(), fallback: false },
   service_worker_enabled: { schema: z.boolean(), fallback: false },
+  service_worker_shell_enabled: { schema: z.boolean(), fallback: false },
 }
 
 export function isSystemSettingKey(key: string): key is SystemSettingKey {
