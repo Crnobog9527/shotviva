@@ -22931,7 +22931,7 @@ ALTER VIEW "public"."web_template_members" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS "public"."web_vitals" (
     "id" bigint NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "date_trunc"('hour'::"text", "now"(), 'UTC'::"text") NOT NULL,
     "metric" "text" NOT NULL,
     "value" double precision NOT NULL,
     "rating" "text" NOT NULL,
@@ -22948,6 +22948,7 @@ CASE
     ELSE 120000
 END)::double precision))),
     CONSTRAINT "web_vitals_country_check" CHECK (("country" ~ '^[A-Z]{2}$'::"text")),
+    CONSTRAINT "web_vitals_created_at_check" CHECK (("created_at" = "date_trunc"('hour'::"text", "created_at", 'UTC'::"text"))),
     CONSTRAINT "web_vitals_effective_type_check" CHECK (("effective_type" = ANY (ARRAY['slow-2g'::"text", '2g'::"text", '3g'::"text", '4g'::"text"]))),
     CONSTRAINT "web_vitals_locale_check" CHECK (("locale" = ANY (ARRAY['en'::"text", 'zh'::"text"]))),
     CONSTRAINT "web_vitals_metric_check" CHECK (("metric" = ANY (ARRAY['LCP'::"text", 'FCP'::"text", 'TTFB'::"text", 'INP'::"text", 'CLS'::"text"]))),

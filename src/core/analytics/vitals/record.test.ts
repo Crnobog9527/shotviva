@@ -13,7 +13,13 @@ vi.mock('../../auth/supabase-admin', () => ({
 const report: VitalReport = { metric: 'INP', value: 180, rating: 'good', route: 'generate', locale: 'en', nav: 'reload', standalone: false, sw: true, net: null }
 
 function post(body: string, headers: Record<string, string> = {}) {
-  return new Request('https://shotviva.com/api/vitals', { method: 'POST', body, headers: { 'content-type': 'text/plain', ...headers } })
+  return new Request('https://shotviva.com/api/vitals', { method: 'POST', body, headers: { 'content-type': 'text/plain', 'sec-fetch-site': 'same-origin', ...headers } })
+}
+
+function postWithout(name: string, headers: Record<string, string>) {
+  const request = new Request('https://shotviva.com/api/vitals', { method: 'POST', body: JSON.stringify(report), headers: { 'content-type': 'text/plain', ...headers } })
+  request.headers.delete(name)
+  return request
 }
 
 describe('parseVitalReport', () => {
@@ -84,12 +90,27 @@ describe('handleVitals', () => {
     expect((await handleVitals(post(JSON.stringify(report)), failing)).status).toBe(204)
   })
 
-  it('reads only the body, its length and the country, never a cookie', async () => {
+  it('stores only reports from its own pages', async () => {
+    const insert = vi.fn<(row: VitalRow) => Promise<void>>().mockResolvedValue()
+    for (const site of ['cross-site', 'same-site', 'none']) {
+      expect((await handleVitals(post(JSON.stringify(report), { 'sec-fetch-site': site, origin: 'https://shotviva.com' }), insert)).status).toBe(204)
+    }
+    // Without Sec-Fetch-Site, the Origin decides; no Origin at all is not ours either.
+    for (const origin of ['https://evil.example', 'http://shotviva.com', 'https://shotviva.com.evil.example', 'null']) {
+      expect((await handleVitals(postWithout('sec-fetch-site', { origin }), insert)).status).toBe(204)
+    }
+    await handleVitals(postWithout('sec-fetch-site', {}), insert)
+    expect(insert).not.toHaveBeenCalled()
+    await handleVitals(postWithout('sec-fetch-site', { origin: 'https://shotviva.com' }), insert)
+    expect(insert).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads only the body, its length, where it came from and the country, never a cookie', async () => {
     const request = post(JSON.stringify(report), { cookie: 'sb-access-token=secret', 'x-forwarded-for': '1.2.3.4', 'user-agent': 'UA' })
     const get = vi.spyOn(request.headers, 'get')
     const insert = vi.fn<(row: VitalRow) => Promise<void>>().mockResolvedValue()
     await handleVitals(request, insert)
-    expect(get.mock.calls.map(([name]) => name.toLowerCase()).sort()).toEqual(['content-length', 'x-vercel-ip-country'])
+    expect(get.mock.calls.map(([name]) => name.toLowerCase()).sort()).toEqual(['content-length', 'sec-fetch-site', 'x-vercel-ip-country'])
     expect(JSON.stringify(insert.mock.calls)).not.toMatch(/secret|1\.2\.3\.4|UA/)
   })
 })

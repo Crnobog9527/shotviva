@@ -5,11 +5,14 @@
 -- Never granted to clients: RLS on with no policies; only service_role inserts and reads.
 -- Expand-only: a new table, nothing existing changes. The checks match
 -- src/core/analytics/vitals/fields.ts one for one.
+-- created_at is the server's receive time cut to the hour, and only that (the check): a p75 over a
+-- window needs nothing finer, and an exact time plus country could be lined up with identified
+-- analytics of the same moment. The handler never sends it.
 -- Retention: rows are only useful as recent p75s. A later migration adds the p75 read path and a
--- cleanup of rows older than about 90 days; no cron yet.
+-- cleanup of rows older than about 90 days (that role will need DELETE); no cron yet.
 create table public.web_vitals (
   id bigserial primary key,
-  created_at timestamptz not null default now(),
+  created_at timestamptz not null default date_trunc('hour', now(), 'UTC') check (created_at = date_trunc('hour', created_at, 'UTC')),
   metric text not null check (metric in ('LCP','FCP','TTFB','INP','CLS')),
   value double precision not null check (value >= 0 and value <= case when metric = 'CLS' then 100 else 120000 end),
   rating text not null check (rating in ('good','needs-improvement','poor')),

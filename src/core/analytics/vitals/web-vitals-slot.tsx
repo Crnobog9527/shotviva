@@ -1,39 +1,22 @@
 'use client'
 
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { useEffect } from 'react'
 
-import { vitalsRouteRoot } from './route-root'
+import { afterLoad } from '../browser/sdk'
 
-const WebVitalsReporter = lazy(() => import('./web-vitals-reporter'))
-
-// After the load event, on idle: the reporter never competes with the page it measures.
-function afterLoadIdle(start: () => void): () => void {
-  let handle: number | undefined
-  const idle = () => {
-    handle = typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(start, { timeout: 3000 }) : window.setTimeout(start, 1)
-  }
-  if (document.readyState === 'complete') idle()
-  else window.addEventListener('load', idle, { once: true })
-  return () => {
-    window.removeEventListener('load', idle)
-    if (handle === undefined) return
-    if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(handle)
-    else window.clearTimeout(handle)
-  }
-}
+// Everything else (route-root, the report, web-vitals) is in the lazy chunk (start-vitals.ts),
+// so the app's first-load JS carries only this test, which must agree with fields.ts
+// VITAL_ROUTES (web-vitals-slot.test.ts).
+export const APP_ROOT_PATH = /^(\/zh)?\/(generate|photos|posters|account|wishlist)(\/|$)/
 
 // Anonymous speed numbers for the signed-in app pages (ARCHITECTURE §16, Owner 2026-11-24:
 // numbers only). Mounted once in the (app) layout; starts only when the page loaded on one of the
-// allowlisted roots, so /admin, /checkout and the rest send nothing. Draws nothing.
+// allowlisted roots, so /admin, /checkout and the rest send nothing. After the load event, on
+// idle (the analytics SDKs' own scheduler, already in every page), so it never competes with the
+// page it measures. Importing start-vitals starts it. Draws nothing.
 export function WebVitalsSlot() {
-  const [on, setOn] = useState(false)
   useEffect(() => {
-    if (!vitalsRouteRoot(window.location.pathname)) return
-    return afterLoadIdle(() => setOn(true))
+    if (APP_ROOT_PATH.test(location.pathname)) afterLoad(() => void import('./start-vitals').catch(() => {}))
   }, [])
-  return on ? (
-    <Suspense fallback={null}>
-      <WebVitalsReporter />
-    </Suspense>
-  ) : null
+  return null
 }

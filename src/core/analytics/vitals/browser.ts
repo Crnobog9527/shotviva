@@ -30,15 +30,34 @@ export function sendVitals(report: VitalReport, win: Window = window): void {
   }
 }
 
-// One report per metric per page load: CLS and INP may be handed over again as they grow, and a
-// remounted reporter is handed the buffered entries anew.
+// One report per metric per page view: CLS and INP may be handed over again as they grow, and a
+// remounted reporter is handed the buffered entries anew. A back/forward-cache restore is a new
+// page view with new metrics, so it gets its own key: Safari and Firefox expose no navigationId
+// (web-vitals uses 0), and the navigation type alone would not tell two restores apart.
 const sent = new Set<string>()
+let restores = 0
+const watched = new WeakSet<Window>()
 
-export function reportVital(metric: MetricLike & { id?: unknown; navigationId?: unknown }, win: Window = window): void {
+// Counts bfcache restores. Called when the reporter loads, before web-vitals adds its own
+// pageshow listener, so the count is current when a restore's metrics arrive.
+export function watchRestores(win: Window = window): void {
+  if (watched.has(win)) return
+  watched.add(win)
+  win.addEventListener('pageshow', (event) => {
+    if ((event as PageTransitionEvent).persisted) restores += 1
+  })
+}
+
+type ReportedMetric = MetricLike & { id?: unknown; navigationId?: unknown }
+
+const keyOf = (metric: ReportedMetric) =>
+  [metric.name, metric.navigationId ?? metric.id ?? '', metric.navigationType ?? '', restores].map(String).join(':')
+
+export function reportVital(metric: ReportedMetric, win: Window = window): void {
   // Admin and QA accounts stay out of the real-user numbers in production; the test site keeps
   // them, so the validation there can see reports arrive.
   if (publicEnv.NEXT_PUBLIC_VERCEL_ENV === 'production' && isStaffBrowser(win.document.cookie)) return
-  const key = `${String(metric.name)}:${String(metric.navigationId ?? metric.id ?? '')}`
+  const key = keyOf(metric)
   if (sent.has(key)) return
   const report = vitalsPayload(metric, pageFacts(win))
   if (!report) return
@@ -49,4 +68,5 @@ export function reportVital(metric: MetricLike & { id?: unknown; navigationId?: 
 // Tests only.
 export function resetSentVitalsForTest(): void {
   sent.clear()
+  restores = 0
 }

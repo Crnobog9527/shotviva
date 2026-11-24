@@ -56,15 +56,31 @@ function parseBody(text: string): VitalReport | null {
   }
 }
 
-// POST /api/vitals. Reads the body and the country header, nothing else: no cookie, no session,
-// no IP, no user agent. Answers 204 whatever happens, so a report never learns anything back.
+// Only our own pages may report: text/plain POSTs need no preflight, so another site could make
+// its visitors' browsers send forged numbers from many IPs. Sec-Fetch-Site decides where the
+// browser sends it; otherwise the Origin must be this request's own origin. Neither header names
+// anyone.
+function fromOwnPage(request: Request): boolean {
+  const site = request.headers.get('sec-fetch-site')
+  if (site !== null) return site === 'same-origin'
+  return request.headers.get('origin') === new URL(request.url).origin
+}
+
+// POST /api/vitals. Reads the body, its length, where it came from and the country header,
+// nothing else: no cookie, no session, no IP, no user agent. Answers 204 whatever happens, so a
+// report never learns anything back.
 export async function handleVitals(request: Request, insert: InsertVital = insertWithServiceRole): Promise<Response> {
   try {
+    if (!fromOwnPage(request)) return noContent()
     const text = await readSmallBody(request)
     const report = text === null ? null : parseBody(text)
     if (report) await insert(toRow(report, countryOf(request.headers.get('x-vercel-ip-country'))))
   } catch (error) {
     logger.warn('web vitals report not stored', { error: error instanceof Error ? error.message : 'unknown' })
   }
+  return noContent()
+}
+
+function noContent(): Response {
   return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
 }

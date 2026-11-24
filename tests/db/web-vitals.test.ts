@@ -37,7 +37,11 @@ it('takes a checked row from the service role', async () => {
   const { data, error } = await api.from('web_vitals').insert(row).select('id, created_at').single()
   expect(error).toBeNull()
   ids.push(data!.id)
-  expect(new Date(data!.created_at).getTime()).toBeGreaterThan(Date.now() - 60_000)
+  // The receive time, cut to the hour (UTC).
+  const created = new Date(data!.created_at)
+  const hour = new Date()
+  hour.setUTCMinutes(0, 0, 0)
+  expect([hour.getTime(), hour.getTime() - 3_600_000]).toContain(created.getTime())
   const cls = await api.from('web_vitals').insert({ ...row, metric: 'CLS', value: 0.0123, effective_type: null, country: null }).select('id').single()
   expect(cls.error).toBeNull()
   ids.push(cls.data!.id)
@@ -68,6 +72,8 @@ it.each([
   { effective_type: '5g' },
   { country: 'cn' },
   { country: 'USA' },
+  { created_at: '2026-11-24T10:15:00Z' },
+  { created_at: '2026-11-24T10:00:00.5Z' },
 ])('rejects an out-of-range row %o', async (change) => {
   const { error } = await api.from('web_vitals').insert({ ...row, ...change })
   expect(error?.code).toBe('23514')

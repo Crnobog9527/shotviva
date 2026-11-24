@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { reportVital, resetSentVitalsForTest, VITALS_ENDPOINT } from './browser'
+import { reportVital, resetSentVitalsForTest, VITALS_ENDPOINT, watchRestores } from './browser'
 
 function fakeWindow(path: string, { cookie = '', fetchThrows = false } = {}) {
   const fetch = vi.fn(() => {
@@ -33,6 +33,30 @@ describe('reportVital', () => {
     expect(init).toMatchObject({ method: 'POST', keepalive: true, credentials: 'omit' })
     expect(JSON.parse(init.body as string)).toEqual({ metric: 'LCP', value: 900, rating: 'good', route: 'photos', locale: 'zh', nav: 'navigate', standalone: false, sw: true, net: '3g' })
     expect(init.body).not.toMatch(/123|token|abc|secret|UA/)
+  })
+
+  it('reports each bfcache restore once, also where navigationId is 0 (Safari, Firefox)', () => {
+    const { win, fetch } = fakeWindow('/generate')
+    const listeners: Array<(event: Event) => void> = []
+    win.addEventListener = ((type: string, listener: (event: Event) => void) => {
+      if (type === 'pageshow') listeners.push(listener)
+    }) as Window['addEventListener']
+    watchRestores(win)
+    watchRestores(win)
+    const restore = () => listeners.forEach((listener) => listener({ persisted: true } as unknown as Event))
+    const first = { ...lcp, navigationId: 0 }
+    const restored = { ...first, navigationType: 'back-forward-cache' }
+    reportVital(first, win)
+    reportVital(first, win)
+    restore()
+    reportVital(restored, win)
+    reportVital(restored, win)
+    restore()
+    reportVital(restored, win)
+    listeners.forEach((listener) => listener({ persisted: false } as unknown as Event))
+    reportVital(restored, win)
+    const navs = fetch.mock.calls.map((call) => JSON.parse((call as unknown as [string, RequestInit])[1].body as string).nav)
+    expect(navs).toEqual(['navigate', 'back-forward', 'back-forward'])
   })
 
   it('falls back to sendBeacon when keepalive fetch throws', () => {
