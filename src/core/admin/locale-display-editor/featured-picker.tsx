@@ -58,9 +58,15 @@ export function FeaturedPicker({ locale, label, templates, categories, taken, on
   )
 }
 
-type BodyProps = Omit<Props, 'label' | 'onAdd'> & { picked: string[]; setPicked: (update: (current: string[]) => string[]) => void }
+export type PickerBodyProps = Omit<Props, 'label' | 'onAdd'> & {
+  picked: string[]
+  setPicked: (update: (current: string[]) => string[]) => void
+  // At most this many picks (a bundle's eight); further ticks are ignored.
+  max?: number
+}
 
-function PickerBody({ locale, templates, categories, taken, picked, setPicked }: BodyProps) {
+// The searchable grid of covers, shared with the 精选组合 window (bundle-dialog.tsx).
+export function PickerBody({ locale, templates, categories, taken, picked, setPicked, max = Infinity }: PickerBodyProps) {
   const [text, setText] = useState('')
   const [category, setCategory] = useState<string | null>(null)
   const [limit, setLimit] = useState(PAGE)
@@ -70,7 +76,8 @@ function PickerBody({ locale, templates, categories, taken, picked, setPicked }:
   const takenSet = new Set(taken)
   const placeOf = (template: AdminTemplate) =>
     options.find((option) => option.key === (template.subcategoryKey ?? template.category))?.label ?? template.categoryInfo.nameZh
-  const toggle = (id: string) => setPicked((current) => (current.includes(id) ? current.filter((other) => other !== id) : [...current, id]))
+  const toggle = (id: string) => setPicked((current) =>
+    current.includes(id) ? current.filter((other) => other !== id) : current.length >= max ? current : [...current, id])
   const reset = (apply: () => void) => {
     apply()
     setLimit(PAGE)

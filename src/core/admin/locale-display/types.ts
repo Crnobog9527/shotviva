@@ -12,6 +12,8 @@ export type SaveLocaleDisplayInput = {
   locale: DisplayLocale
   groups: { parent: string | null; keys: string[] }[]
   featured: string[] | null
+  // 精选组合 (migration 2005): the language's whole bundle list, or null when it did not change.
+  bundles?: string[] | null
 }
 
 export type LocaleDisplayActions = {

@@ -300,6 +300,10 @@ export const featuredCopy = {
   empty: '还没有精选模板，首页现在显示最新上架的 6 个。在下表「首页精选」一列打开，或勾选后用「批量设为首页精选」。',
   dragHint: '拖动卡片调整同一分类内的先后（手机上长按卡片再拖），排好后点「保存」，首页才会更新。保存后数字按页面从上到下、从左到右排，第一张卡片就是默认模板。',
   dirty: '有未保存的改动，首页还是原来的样子。',
+  expand: '展开首页精选',
+  collapse: '收起首页精选',
+  summary: (count: number, first: string, dirty: boolean, outOfOrder = false) =>
+    `${count ? `${count} 个精选模板，默认选中「${first}」` : '还没有精选模板'}${dirty ? '；有未保存的改动' : ''}${outOfOrder ? '；默认模板不是第一张卡片，展开后可以整理' : ''}`,
   save: '保存',
   discard: '放弃改动',
   saved: '首页精选已保存，首页随后更新',

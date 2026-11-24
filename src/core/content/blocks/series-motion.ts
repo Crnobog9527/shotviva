@@ -38,6 +38,8 @@ export function cycler(
   frame: HTMLElement,
   schedule: Schedule = (run, ms) => window.setTimeout(run, ms),
   cancel: Cancel = (id) => window.clearTimeout(id),
+  // Told after each change which layer is on show (undefined: the server-drawn pair).
+  onShow: (layer: HTMLElement | undefined) => void = () => undefined,
 ): Cycler {
   // Read when the card starts: its layers are drawn in the browser just before (series-layers.ts).
   let layers: HTMLElement[] = []
@@ -62,6 +64,7 @@ export function cycler(
       incoming.classList.add('mk-on')
     } else current?.classList.remove('mk-on')
     index = next
+    onShow(incoming)
   }
 
   const step = async (hold: number, token: number) => {

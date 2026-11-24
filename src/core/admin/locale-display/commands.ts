@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
+import { bundleRpcError } from '../featured-bundles/errors'
 import { categoryRpcError } from '../template-categories/errors'
 import { DISPLAY_LOCALES } from './types'
 
@@ -32,6 +33,8 @@ const saveSchema = z.object({
   groups: z.array(orderSchema.pick({ parent: true, keys: true })).max(200)
     .refine((groups) => unique(groups.map((group) => group.parent ?? ''))),
   featured: featuredSchema.shape.ids.nullable(),
+  // 精选组合 (migration 2005): the language's whole bundle list, or null to leave it alone.
+  bundles: z.array(z.string().uuid()).max(100).refine(unique).nullable().default(null),
 })
 
 function parse<T>(schema: z.ZodType<T>, input: unknown): T {
@@ -57,8 +60,10 @@ export async function setLocaleFeatured(client: SupabaseClient, adminId: string,
 // All or nothing: one SQL call, so a failed check (a tree that moved, a template taken off the
 // site) leaves the language exactly as it was.
 export async function saveLocaleDisplay(client: SupabaseClient, adminId: string, input: unknown): Promise<void> {
-  const { locale: lang, groups, featured } = parse(saveSchema, input)
-  const { error } = await client.rpc('admin_set_locale_display', { p_locale: lang, p_groups: groups, p_featured: featured, p_actor: adminId })
-  if (error) throw categoryRpcError('admin_set_locale_display', error)
-  logger.info('admin.locale_display.saved', { adminId, locale: lang, groups: groups.length, featured: featured?.length ?? null })
+  const { locale: lang, groups, featured, bundles } = parse(saveSchema, input)
+  const { error } = await client.rpc('admin_set_locale_display', {
+    p_locale: lang, p_groups: groups, p_featured: featured, p_bundles: bundles, p_actor: adminId,
+  })
+  if (error) throw (error.message.startsWith('BUNDLE_') ? bundleRpcError(error) : null) ?? categoryRpcError('admin_set_locale_display', error)
+  logger.info('admin.locale_display.saved', { adminId, locale: lang, groups: groups.length, featured: featured?.length ?? null, bundles: bundles?.length ?? null })
 }

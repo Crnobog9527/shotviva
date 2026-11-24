@@ -4,10 +4,10 @@ export const LOCALE_DISPLAY_COPY = {
   body: '英文站和中文站可以各用一套首页模板分组顺序、创作页分类顺序和首页精选（首页生成器下方的模板也按它排）。没单独设置时，两边都跟着上面「分类管理」的顺序和下面的「首页精选」。改某一边只影响这一边，保存后大约一分钟内生效。SEO 页面和分类网址不受影响。',
   expand: '展开分语言展示',
   collapse: '收起分语言展示',
-  summary: (locale: string, groups: number, featured: boolean) =>
-    groups === 0 && !featured
+  summary: (locale: string, groups: number, featured: boolean, bundles = false) =>
+    groups === 0 && !featured && !bundles
       ? `${locale}：全部跟随默认`
-      : `${locale}：${[groups ? `${groups} 组分类单独排序` : '', featured ? '精选单独设置' : ''].filter(Boolean).join('，')}`,
+      : `${locale}：${[groups ? `${groups} 组分类单独排序` : '', featured ? '精选单独设置' : '', bundles ? '组合单独设置' : ''].filter(Boolean).join('，')}`,
   locales: { en: '英文站', zh: '中文站' },
   following: '跟随默认',
   own: '已单独设置',

@@ -12,6 +12,34 @@ export type LocaleDisplay = {
   featured: Partial<Record<Locale, string[]>>
 }
 
+export type FeaturedBundle = {
+  id: string
+  nameEn: string
+  nameZh: string
+  // In the bundle's order.
+  templateIds: string[]
+  // Place in the default 首页精选's bundles; null: not there.
+  featuredRank: number | null
+}
+
+export type FeaturedBundles = {
+  // Every bundle, placed or not, oldest first.
+  list: FeaturedBundle[]
+  // A language's own bundle ids in order; absent or empty follows the default ones.
+  locale: Partial<Record<Locale, string[]>>
+}
+
+// The bundles a language shows, in order: its own list when it has one, else the default ones by
+// featured_rank (the same rule as its featured templates).
+export function localeBundles(bundles: FeaturedBundles | undefined, locale: Locale): FeaturedBundle[] {
+  if (!bundles) return []
+  if ((bundles.locale[locale] ?? []).length > 0) {
+    const byId = new Map(bundles.list.map((bundle) => [bundle.id, bundle]))
+    return (bundles.locale[locale] ?? []).flatMap((id) => byId.get(id) ?? [])
+  }
+  return bundles.list.filter((bundle) => bundle.featuredRank !== null).sort((a, b) => (a.featuredRank ?? 0) - (b.featuredRank ?? 0))
+}
+
 export const NO_LOCALE_DISPLAY: LocaleDisplay = { categoryOrder: {}, featured: {} }
 
 type Sibling = { key: string; sortOrder: number }

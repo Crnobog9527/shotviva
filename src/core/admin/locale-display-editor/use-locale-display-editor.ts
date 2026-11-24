@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 
-import { NO_LOCALE_DISPLAY, type LocaleDisplay } from '@/core/templates/locale-display'
+import { localeBundles, NO_LOCALE_DISPLAY, type FeaturedBundles, type LocaleDisplay } from '@/core/templates/locale-display'
 
 import type { DisplayLocale, LocaleDisplayActions } from '../locale-display/types'
 import type { AdminCategoryNode } from '../template-categories/types'
@@ -12,22 +12,26 @@ import { featuredState, siblingGroups } from './display-state'
 import { draftChanges, hasChanges, sharedLists, toDraft, type LocaleDraft } from './draft'
 import { useUnsavedGuard } from './use-unsaved-guard'
 
-type Inputs = { categories: AdminCategoryNode[]; templates: AdminTemplate[]; display: LocaleDisplay; actions: LocaleDisplayActions }
+type Inputs = { categories: AdminCategoryNode[]; templates: AdminTemplate[]; display: LocaleDisplay; bundles: FeaturedBundles | undefined; actions: LocaleDisplayActions }
 export type SaveStatus = { kind: 'saved' | 'error'; text: string } | null
 
 const FALLBACK = '保存失败，请稍后重试'
 
 // Read-only until 编辑; then one language's draft that 保存 sends whole (one server call, all or
 // nothing) and 取消 drops. Switching language or leaving with an unsaved draft asks first.
-export function useLocaleDisplayEditor({ categories, templates, display, actions }: Inputs) {
+export function useLocaleDisplayEditor({ categories, templates, display, bundles, actions }: Inputs) {
   const [locale, setLocale] = useState<DisplayLocale>('en')
   const [edit, setEdit] = useState<{ locale: DisplayLocale; draft: LocaleDraft } | null>(null)
   const [status, setStatus] = useState<SaveStatus>(null)
   const [saving, startTransition] = useTransition()
 
   const groups = siblingGroups(categories, display, locale)
-  const saved = toDraft(groups, featuredState(templates, display, locale))
-  const shared = sharedLists(siblingGroups(categories, NO_LOCALE_DISPLAY, locale), featuredState(templates, NO_LOCALE_DISPLAY, locale))
+  const bundleIds = (shown: FeaturedBundles | undefined) => localeBundles(shown, locale).map((bundle) => bundle.id)
+  // The default bundles: the same bundles with no language list of its own.
+  const defaults = bundles && { ...bundles, locale: {} }
+  const ownBundles = (bundles?.locale[locale] ?? []).length > 0
+  const saved = toDraft(groups, featuredState(templates, display, locale), { own: ownBundles, ids: bundleIds(bundles) })
+  const shared = sharedLists(siblingGroups(categories, NO_LOCALE_DISPLAY, locale), featuredState(templates, NO_LOCALE_DISPLAY, locale), bundleIds(defaults))
   const draft = edit?.locale === locale ? edit.draft : null
   const changes = draft ? draftChanges(saved, draft) : null
   const dirty = changes !== null && hasChanges(changes)

@@ -84,3 +84,10 @@ describe('series layer addresses', () => {
   })
 
 })
+
+describe('bundle card pairs', () => {
+  it('keeps only pairs that name their template, so a stale cached answer cannot show one template and pick another', async () => {
+    const { bundlePairs } = await import('./series-layers')
+    expect(bundlePairs([['b1', 'a1'], ['b2', 'a2', 't2'], ['b3', 'a3', '']])).toEqual([['b2', 'a2', 't2']])
+  })
+})
