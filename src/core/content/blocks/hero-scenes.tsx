@@ -1,7 +1,7 @@
 'use client'
 
 import { SiteImage as Image } from '@/core/ui/site-image'
-import type { FocusEvent, ReactNode } from 'react'
+import { cloneElement, isValidElement, type FocusEvent, type ReactNode } from 'react'
 
 import { cn } from '../../ui/cn'
 import type { HeroBlock } from '../page-content'
@@ -64,7 +64,9 @@ export function HeroScenes({ scenes, tags, sizes, phonePane }: Props) {
   return (
     <figure className="mk-hero-pair" onPointerEnter={() => hold(true)} onPointerLeave={() => hold(false)} onFocus={() => hold(true)} onBlur={onBlur}>
       <span className="mk-pair mk-pair-lg">
-        {phonePane}
+        {/* While a later dish is up, the first phone photo underneath leaves the accessibility tree,
+            so only the pair on screen is announced. */}
+        {turnsPhone && active !== 0 && isValidElement<{ 'aria-hidden'?: boolean }>(phonePane) ? cloneElement(phonePane, { 'aria-hidden': true }) : phonePane}
         {turnsPhone && armed ? <PhoneScenes items={items} active={active} previous={previous} sizes={sizes} markLoaded={markLoaded} /> : null}
         <span className="mk-pane">
           {items.map(({ image }, index) =>
