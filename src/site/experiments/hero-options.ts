@@ -58,7 +58,7 @@ const artStyle: Record<Locale, HeroOptionContent> = {
         ],
       },
     },
-    tagline: '把宠物、孩子或朋友的照片变成动漫、3D 或水彩画，长相和姿势还是原来的样子。',
+    tagline: '把宠物、孩子或朋友的照片变成动漫、3D 或水彩画，长相和姿势保持不变。',
     generatorTemplate: 'flat-anime-style',
   },
 }
