@@ -12,7 +12,7 @@ import { useFavorites } from '../favorites/favorites-provider'
 import { savedIn } from '../favorites/favorites-store'
 import { BatchDialogSlot } from '../matrix/batch-dialog-slot'
 import { CreateDialog, type CreateContext } from '../workspace/create-dialog'
-import { featuredVideo, filterCatalogue } from './catalogue-filter'
+import { CATEGORY_PARAM, featuredVideo, filterCatalogue } from './catalogue-filter'
 import { buildSearchIndex, searchTemplates } from './catalogue-search'
 import type { CataloguePayload } from './catalogue-payload'
 import { catalogueSections, isTall, sectionsFor, type CatalogueSection } from './catalogue-sections'
@@ -40,8 +40,12 @@ import { browseView, slimBrowse } from './picker-browse'
 const ShareModeChrome = dynamic(() => import('../template-share/share-mode').then((m) => m.ShareModeChrome), { ssr: false })
 const SeriesCreateDialog = dynamic(() => import('../workspace/series-create-dialog').then((m) => m.SeriesCreateDialog), { ssr: false })
 // A chosen category's shelves (shelf-list.tsx) load on their own: Photos shares this module's chunk
-// group but never opens a category, so it does not carry them (scripts/js-budget.json).
-const ShelvedGrid = dynamic(() => import('./shelf-list'))
+// group but never opens a category, so it does not carry them (scripts/js-budget.json). Create
+// opened on a category fetches them as this module runs, alongside the catalogue and the account's
+// data (waiting for the first render cost 1.8 s of LCP on slow 4G); otherwise once Create is drawn.
+const loadShelves = () => import('./shelf-list')
+const ShelvedGrid = dynamic(loadShelves)
+if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has(CATEGORY_PARAM)) void loadShelves()
 
 // `endCard`: the grid's last card, after every filter's cards (the Wishlist's "Not finding it?",
 // passed in by the page while the wishlist is open).
@@ -64,6 +68,7 @@ export function TemplateCatalogue({ payload, create: createProp, endCard }: Prop
   const create = useSettled(createProp)
   const view = useMemo(() => browseView(payload.browse, payload.templates, false), [payload])
   const query = useCatalogueQuery(view.filters)
+  useEffect(() => { void loadShelves() }, [])
   const [openId, setOpenId] = useState<string | null>(null)
   const openable = payload.templates
   const batchable = useMemo(() => batchableTemplates(openable), [openable])
