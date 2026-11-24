@@ -12170,6 +12170,44 @@ $$;
 ALTER FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_groups jsonb := coalesce(p_groups, '[]'::jsonb);
+  v_group jsonb;
+begin
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin' and p.banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if jsonb_typeof(v_groups) <> 'array' then
+    raise exception 'INVALID_INPUT' using detail = 'groups must be an array';
+  end if;
+  if p_locale is null or p_locale not in ('en', 'zh') then
+    raise exception 'INVALID_INPUT' using detail = 'unknown language';
+  end if;
+  -- '' stands for the top level: category keys are never empty.
+  if (select count(*) <> count(distinct coalesce(e.g->>'parent', '')) from jsonb_array_elements(v_groups) as e(g)) then
+    raise exception 'INVALID_INPUT' using detail = 'a sibling group appears twice';
+  end if;
+  for v_group in select g from jsonb_array_elements(v_groups) as e(g) loop
+    if jsonb_typeof(v_group) <> 'object' or jsonb_typeof(coalesce(v_group->'keys', 'null')) <> 'array' then
+      raise exception 'INVALID_INPUT' using detail = 'each group needs a keys array';
+    end if;
+    perform public.admin_set_category_locale_order(
+      p_locale, v_group->>'parent', array(select t.k from jsonb_array_elements_text(v_group->'keys') with ordinality as t(k, n) order by t.n),
+      p_actor);
+  end loop;
+  if p_featured is not null then
+    perform public.admin_set_featured_locale(p_locale, p_featured, p_actor);
+  end if;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_set_openai_admin_key"("p_key" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -28478,6 +28516,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) 
 
 REVOKE ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") TO "service_role";
 
 
 
