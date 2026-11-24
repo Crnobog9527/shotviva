@@ -9,7 +9,7 @@ import { logger } from '../logger'
 import { PROVIDERS_CACHE_TAG } from '../providers/cache-tag'
 import { CATALOGUE_LIFE } from './cached-catalogue'
 import { TEMPLATES_CACHE_TAG } from './cache'
-import { readCatalogueIndex, type CatalogueIndex } from './catalogue-index'
+import { onePlace, readCatalogueIndex, type CatalogueIndex } from './catalogue-index'
 import type { LocaleDisplay } from './locale-display'
 import { readLocaleDisplay } from './locale-display-read'
 import type { CatalogueCursor } from './taxonomy'
@@ -64,8 +64,15 @@ export async function catalogueIndexOrNull(locale: Locale, read: IndexRead = rea
 }
 
 // Create's cards depend on taxonomy and whether the current image route can sell each template.
-export async function cachedCatalogueIndex(locale: Locale): Promise<CatalogueIndex | null> {
+async function cachedIndexRead(locale: Locale): Promise<CatalogueIndex | null> {
   'use cache'
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   return catalogueIndexOrNull(locale)
+}
+
+// One place per template is applied after the cache too: an entry cached before that rule shipped
+// would otherwise list a series member twice until it expires (review of #917).
+export async function cachedCatalogueIndex(locale: Locale): Promise<CatalogueIndex | null> {
+  const index = await cachedIndexRead(locale)
+  return index && onePlace(index)
 }
