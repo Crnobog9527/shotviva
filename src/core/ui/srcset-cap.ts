@@ -6,25 +6,45 @@
 // the 2× file, the same cap next/image applies to fixed-width images (its getWidths). Phones are
 // unaffected: their `vw` slots are already sized for about 2× (phone-sizes.ts).
 
-// `(min-width: Npx) <length>` entries, widest first, then one bare default length.
-const ENTRY = /^(?:\(min-width:\s*(\d+)px\)\s+)?(\d+(?:\.\d+)?)(px|vw)$/
+// `(min-width: Npx) <length>` entries, widest first, then one bare default length. A
+// `(min-resolution: Ndppx) <length>` entry may come just before the default (cover-sizes.ts: a
+// 3× phone's slot); it is drawn in the same viewport band as the default.
+const ENTRY = /^(?:\((min-width|min-resolution):\s*(\d+(?:\.\d+)?)(px|dppx)\)\s+)?(\d+(?:\.\d+)?)(px|vw)$/
+
+type Entry = { minWidth: number | null; resolution: boolean; slot: (below: number) => number }
+
+function entryOf(text: string): Entry | null {
+  const match = ENTRY.exec(text.trim())
+  if (!match) return null
+  const [, feature, bound, unit, length = '', lengthUnit] = match
+  if ((feature === 'min-width') !== (unit === 'px') && feature !== undefined) return null
+  const value = Number(length)
+  return {
+    minWidth: feature === 'min-width' ? Number(bound) : null,
+    resolution: feature === 'min-resolution',
+    slot: (below) => (lengthUnit === 'px' ? value : (value / 100) * below),
+  }
+}
+
+// Only the last entry is bare, a resolution entry sits right before it, and the min-widths fall.
+function inOrder(entry: Entry, index: number, count: number, below: number): boolean {
+  if ((entry.minWidth === null && !entry.resolution) !== (index === count - 1)) return false
+  if (entry.resolution && index !== count - 2) return false
+  return entry.minWidth === null || entry.minWidth < below
+}
 
 // The widest CSS width the slot is ever drawn at, or null when `sizes` has another shape or a
 // `vw` length with no viewport bound above it (then nothing is dropped).
 export function slotMaxPx(sizes: string): number | null {
-  const entries = sizes.split(',').map((entry) => ENTRY.exec(entry.trim()))
+  const entries = sizes.split(',').map(entryOf)
   let widest = 0
   let below = Number.POSITIVE_INFINITY
-  for (const [index, match] of entries.entries()) {
-    if (!match) return null
-    const minWidth = match[1] === undefined ? null : Number(match[1])
-    const last = index === entries.length - 1
-    if ((minWidth === null) !== last || (minWidth !== null && minWidth >= below)) return null
-    const value = Number(match[2])
-    const slot = match[3] === 'px' ? value : (value / 100) * below
+  for (const [index, entry] of entries.entries()) {
+    if (!entry || !inOrder(entry, index, entries.length, below)) return null
+    const slot = entry.slot(below)
     if (!Number.isFinite(slot)) return null
     widest = Math.max(widest, slot)
-    if (minWidth !== null) below = minWidth
+    if (entry.minWidth !== null) below = entry.minWidth
   }
   return widest
 }
