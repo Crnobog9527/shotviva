@@ -7,7 +7,7 @@ import { zhPricingRelated } from '../shared'
 import { dayRateUsd, packshotUsd, photoSeconds, SET_PHOTOS, styledShotUsd, usdRange } from '../../offer'
 import { PLATFORM_SPECS, px } from '../../platform-specs'
 import { productBills } from '../home'
-import { ZH_TIERS, zhFreeImages, zhPlansSentence, zhTierList } from '../offer'
+import { ZH_TIERS, zhFreeImages, zhPlansSentence, zhTierNames } from '../offer'
 
 // /zh/commercial-photography (T44, ARCHITECTURE §17): noindex until GSC shows Chinese queries
 // (中文口径主词表: 「暂不建」, keyword 商业摄影). Written for sellers who ask 「产品拍照一般多少钱」,
@@ -42,7 +42,7 @@ const shoot: ShootDemo = {
 // 飞发。带透明通道的成图铺在棋盘格上。连衣裙和模特是 AI 示例，品牌都是虚构的。
 const whiteCases: EditCases = {
   heading: '电商白底主图：从易到难三个例子',
-  intro: '平台主图要求商品单独放在白底上，抠图最见功夫。下面三张手机照片从易到难，最后一张最难：逆光下被风吹散的细碎发丝，背后还是一条杂乱的街。',
+  intro: '平台主图要求商品单独放在白底上，抠图最考验功力。下面三张手机照由易到难，最后一张难度最高：逆光下被风吹散的细碎发丝，背景还是一条杂乱的街道。',
   labels: { before: '真实手机照', after: '主图', reference: '参考图' },
   items: [
     {
@@ -77,7 +77,7 @@ const copy = {
   description: `商业摄影的活，用一张手机照片就能做：白底主图、生活场景和促销海报，造型和精修都在模板里。新用户送 ${zhFreeImages}。`,
   h1: '商业摄影：一张手机照片，不用约影棚',
   subtitle: '白底主图、生活场景、促销海报，都从你已经拍好的那张商品照出来。',
-  answerBlock: `商业摄影对小品牌来说，通常意味着订一天影棚、请摄影师和修图师。${brand} 用一张手机照片做同样的活：上传照片，选「纯白底图」或「生活场景」这类模板，就能下载造型好、精修过的商品图，有${zhTierList}三档。新用户送 ${zhFreeImages}。`,
+  answerBlock: `商业摄影通常需要预约影棚、聘请摄影师和修图师，成本高、周期长。${brand} 只需一张手机照片：上传后选择「纯白底图」或「生活场景」等模板，即可下载造型精致、精修完成的商品图，分 ${zhTierNames} 三档。新用户赠送 ${zhFreeImages}。`,
   hero: {
     before: withFirstFrame(sneakerPhone),
     after: sneakerLifestyle,
@@ -95,7 +95,7 @@ const copy = {
     },
     {
       label: '图里还是你的商品',
-      value: `平台都要求图片展示真实的商品，Etsy 现在还要求每个商品至少有一张未经编辑的实拍图。${brand} 从你的照片出发，商品保持原样；上架前请查看各平台当下的规定。`,
+      value: `平台都要求图片展示真实的商品，Etsy 现在还要求每个商品至少有一张未经编辑的实拍图。${brand} 在你的原图上修改，商品始终与原图一致；上架前请确认各平台的最新规定。`,
     },
   ],
   headings: {
@@ -109,7 +109,7 @@ const copy = {
     edits: whiteCases,
     templates: {
       heading: '商品图模板：主图、场景和海报',
-      intro: `每个模板都从你的商品手机照片开始，到一张成品图结束。`,
+      intro: '上传一张商品手机照，选中模板，点生成，即可得到能直接上架的商品图。',
       categoryKeys: [CATEGORY.products, CATEGORY.beauty],
     },
   },
@@ -129,11 +129,11 @@ export const makeZhCommercialPhotography = (offers: OfferFacts) => defineContent
     },
     {
       question: 'AI 能代替产品摄影师吗？',
-      answer: '白底主图、生活场景和促销图这类，只要商品能用手机拍清楚，就可以：造型和精修由模板完成。要请模特、搭道具、做整套创意的广告片，还是值得请摄影师。',
+      answer: 'AI 可以代替大部分日常的产品拍摄：白底主图、生活场景和促销图这类，只要商品能用手机拍清楚，造型和精修都由模板完成。要请模特、搭道具、做整套创意的广告片，还是值得请摄影师。',
     },
     {
       question: 'AI 商品图能用在 Amazon 和 Etsy 上吗？',
-      answer: `两个平台都要求图片如实展示真实的商品，Etsy 现在还要求每个商品至少有一张未经编辑的实拍图。${brand} 从你的照片出发，只换背景、光线和场景。规则会变，上架前请查看平台当下的图片要求。`,
+      answer: `AI 商品图可以用在 Amazon 和 Etsy 上，但两个平台都要求图片如实展示商品，Etsy 现在还要求每个商品至少有一张未经编辑的实拍图。${brand} 在你的原图上修改，只更换背景、光线和场景。平台规则可能调整，上架前请确认最新的图片要求。`,
     },
     {
       question: '生成的图片版权归我吗？',
@@ -147,7 +147,7 @@ export const makeZhCommercialPhotography = (offers: OfferFacts) => defineContent
   ],
   related: [
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
-    { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '想看看图生图对一张照片能做什么。' },
+    { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '看看图生图能把一张照片做成什么样。' },
     { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
     zhPricingRelated(brand, offers),
   ],
