@@ -101,7 +101,7 @@ const copy = {
 
 export const makeZhImageToImageGenerator = (offers: OfferFacts) => defineContentPage({
   ...copy,
-  costBills: productBills(offers,`${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用图生图对比`, `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`),
+  costBills: productBills(offers,`${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用图生图对比`, `以一个商品拍 ${SET_PHOTOS} 张精修造型图为例，对比请摄影师和使用 ${brand} 的实际花费。`),
   // In the builder so the price answer reads the live plans (03-S3: a starting price per page).
   faq: [
     {

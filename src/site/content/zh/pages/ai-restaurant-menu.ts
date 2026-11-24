@@ -22,7 +22,7 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
   const plan = planFrom ? usd(planFrom.priceUsd) : '暂无月付套餐'
   return {
     heading: `菜单配图要花多少钱：请美食摄影师和用 ${brand} 对比`,
-    intro: `${MENU_DISHES} 道菜，做菜单和外卖平台用。同样的活，两张账单。`,
+    intro: `以 ${MENU_DISHES} 道菜的菜单和外卖平台配图为例，对比请美食摄影师和使用 ${brand} 的实际花费。`,
     photographer: {
       title: '美食摄影师报价',
       total: { amount: usdRange(foodShootUsd), when: '拍一次，另加修图' },

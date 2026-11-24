@@ -119,7 +119,7 @@ export const makeZhCommercialPhotography = (offers: OfferFacts) => defineContent
   ...copy,
   costBills: productBills(offers,
     `一次商品拍摄要花多少钱：请摄影师和用 ${brand} 对比`,
-    `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接上架。同样的活，两张账单。`,
+    `以一个商品拍 ${SET_PHOTOS} 张可直接上架的精修造型图为例，对比请摄影师和使用 ${brand} 的实际花费。`,
     `；影棚一天 ${usdRange(dayRateUsd)}（Shopify，2026 年 1 月）`,
   ),
   faq: [
