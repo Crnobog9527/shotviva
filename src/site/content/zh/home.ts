@@ -236,7 +236,7 @@ export const makeZhHomePage = (offers: OfferFacts, plans = zhHomePlans(offers.pr
   ...(plans ? { plans } : {}),
   costBills: productBills(offers,
     `${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用 ${brand} 对比`,
-    `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`,
+    `以一个商品拍 ${SET_PHOTOS} 张精修造型图为例，对比请摄影师和使用 ${brand} 的实际花费。`,
     '',
     { planLine: false },
   ),
