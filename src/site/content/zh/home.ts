@@ -41,7 +41,7 @@ function plansText(offers: OfferFacts): HeadedText {
   const yearly = yearlySaving ? `${zhYearlyClaim(yearlySaving)}。` : ''
   return {
     heading,
-    text: `${zhPlansSentence(offers)}${yearly}付费积分永不过期，用它生成的每张图都私密、无水印。下面和请摄影师、自己拍对比一下。`,
+    text: `${zhPlansSentence(offers)}${yearly}付费积分永不过期，用它生成的每张图都私密、无水印。下方是与请摄影师、自己拍摄的费用对比。`,
   }
 }
 
@@ -59,7 +59,7 @@ const heroScenes = [
 // Also the /zh/commercial-photography demo (T44).
 export const shoot: ShootDemo = {
   heading: { lead: '一张手机照片 → ', emphasis: '一整套图' },
-  intro: '在厨房台面上用手机随手拍了一张。做出三张成品图，每张里都是同一只包：编织纹路、缝线、链条都没变。',
+  intro: '在厨房台面上随手拍的一张手机照，做出三张成品图，包的编织纹路、缝线和链条都保持原样。',
   phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: '真实手机照：窗边光线，台面很乱，钥匙和杯子都入镜了。' },
   arrow: '三个模板，同一只包',
   results: [
@@ -138,8 +138,8 @@ const copy = {
   wishlist: zhHomeWishlist,
   factsIntro: `通用的 AI 改图工具很难保证原图文字、产品和环境的一致性，成片往往和原图相差甚远，无法用于商业用途。${brand} 可以用自然语言对图片做精准修改，即使多轮编辑，也不会出现变形、扭曲或字体乱码。套用模板时，一次就能得到可对外展示的专业成片。`,
   related: [
-    { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
-    { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
+    { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍的菜品照，直接做成菜单和外卖平台配图。' },
+    { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店卖家无需聘请摄影师，也能做出专业级商品图。' },
     { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '看看图生图如何处理菜品、商品、房间和宠物照片。' },
     { href: '/pricing', anchor: `${brand} 价格`, note: '月付、年付套餐和一次性积分包，价格一目了然。' },
   ],
@@ -169,11 +169,11 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: 'AI改图会不会把我照片里的东西改掉？',
-    answer: `${brand} 的模板专门保留你拍的主体：商品和标签、菜品本身、房间布局或宠物都按原样留着，改的是光线、背景、场景或画风；餐饮模板还可能换盘子或碗。不少 AI改图工具会连主体一起重画，用之前最好先看一眼效果。${brand} 不做人像美颜修图。`,
+    answer: `${brand} 的模板专门保留你拍的主体：商品和标签、菜品本身、房间布局或宠物都按原样留着，改的是光线、背景、场景或画风；餐饮模板还可能换盘子或碗。不少 AI改图工具会连主体一起重画，使用前建议先查看效果。${brand} 不做人像美颜修图。`,
   },
   {
     question: 'AI改图和 AI 生图有什么区别？',
-    answer: 'AI改图从你拍的照片出发，只换它的样子；AI 生图从一段提示词出发，整张图都是生成出来的。用 AI改图，主体是真实拍的，也不用你去描述它。',
+    answer: 'AI改图以你拍的照片为基础，只改变光线、场景或画风；AI 生图从一段提示词出发，整张图都是生成出来的。用 AI改图，主体是真实拍的，也不用你去描述它。',
     link: { href: '/image-to-image-generator', anchor: '看看图生图工具怎么用。' },
     table: {
       caption: 'AI改图和 AI 生图对比',
@@ -192,7 +192,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: 'AI改图要自己写提示词吗？',
-    answer: `${brand} 不用写提示词。选一个模板，按提示填几个字就行，光线、场景和画风模板都已经定好了。出图后想调整，用大白话说一句要改哪里，比如「背景换成浅蓝色」。`,
+    answer: `${brand} 不用写提示词。选一个模板，按提示填写几个字即可，光线、场景和画风模板都已经定好了。出图后想调整，用一句话说明要改的地方，比如「背景换成浅蓝色」。`,
     link: { href: '/image-to-image-generator', anchor: '看看图生图工具里有哪些模板。' },
   },
   {
