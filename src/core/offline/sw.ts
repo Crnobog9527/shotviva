@@ -14,11 +14,12 @@ import { routeFor } from './routes'
 // activation deletes every other build's), one for catalogue files across builds (a few kept).
 export const CACHE_PREFIX = 'sv-'
 const CATALOGUE_KEEP = 4
-// First-screen template covers (LCP plan 1): the ones named most recently, a few first screens'
-// worth (Create's All sections and a chosen category's grid), some 0.3 MB of 384 w AVIF. Kept
-// across builds: a cover's name is its hash.
+// First-screen template covers (LCP plan 1): the first screens of the last few Create screens used
+// (All, a category), at most COVERS_KEEP covers, some 0.3 MB of 384 w AVIF. Kept across builds:
+// a cover's name is its hash.
 export const COVERS_KEEP = 24
-const KEEP_PER_MESSAGE = 8
+export const COVER_SCREENS = 4
+const KEEP_PER_SCREEN = 12
 // After this many covers in a row from one host came back without CORS (a CDN copy cached before
 // the header was added), the worker stops asking that host in CORS mode until it restarts.
 const CORS_STRIKES = 3
@@ -64,41 +65,69 @@ async function cacheFirst(event, name, keep) {
   return response
 }
 
-// First-screen covers (LCP plan 1). The page names the covers it shows on its first screen
-// (near-viewport.tsx, through the 'sv-keep-covers' message) once it has loaded; only those are
-// kept, so scrolling through the catalogue never pushes them out. A cover the page shows is a
-// plain <img> (no CORS), whose answer could only be kept opaque: an unreadable copy that Chrome
-// counts as about 7 MB of quota. So the worker fetches each named cover in CORS mode itself (the
-// hosts send Access-Control-Allow-Origin: *; the browser's HTTP cache usually has it already) and
-// keeps only that readable copy. A host that answers without the header gets nothing kept; after
-// three in a row it is not asked again until the worker restarts. Named again, a cover moves to
-// the end; the oldest beyond COVERS_KEEP are dropped.
+// First-screen covers (LCP plan 1). Each screen of Create (All, a category, Saved) names the
+// covers of its first screen in one message once they have loaded (near-viewport.tsx,
+// 'sv-keep-covers' with the screen's key): the new set replaces that screen's old one whole, so a
+// screen whose templates changed drops the ones it no longer shows. The last COVER_SCREENS screens
+// are kept (a chosen category never pushes out All, where the next launch lands), and never more
+// than COVERS_KEEP covers in all: the screens used least recently go first. Scrolling never adds
+// anything. Which covers belong to which screen is a small index kept in the same cache.
+//
+// A cover the page shows is a plain <img> (no CORS), whose answer could only be kept opaque: an
+// unreadable copy that Chrome counts as about 7 MB of quota. So the worker fetches each named cover
+// in CORS mode itself (the hosts send Access-Control-Allow-Origin: *; the browser's HTTP cache
+// usually has it already) and keeps only a readable copy: 'cors' from another host, 'basic' from
+// this site. A host that answers without the header gets nothing kept; after three in a row it is
+// not asked again until the worker restarts.
 const corsStrikes = new Map()
-async function keepCovers(urls) {
-  const cache = await caches.open(COVERS)
-  for (const url of urls) {
-    const hit = await cache.match(url)
-    if (hit) {
-      await cache.delete(url)
-      await cache.put(url, hit)
-      continue
-    }
-    const host = new URL(url).origin
-    if ((corsStrikes.get(host) ?? 0) >= ${CORS_STRIKES}) continue
-    let response
-    try {
-      response = await fetch(url, { mode: 'cors', credentials: 'omit' })
-    } catch {
-      corsStrikes.set(host, (corsStrikes.get(host) ?? 0) + 1)
-      continue
-    }
-    if (response.status !== 200 || response.type !== 'cors') continue
-    corsStrikes.set(host, 0)
-    await cache.put(url, response)
+const INDEX = self.location.origin + '/__sv-covers-index'
+
+async function readIndex(cache) {
+  try {
+    const stored = await cache.match(INDEX)
+    const screens = stored ? await stored.json() : []
+    return Array.isArray(screens) ? screens : []
+  } catch {
+    return []
   }
-  const keys = await cache.keys()
-  for (const old of keys.slice(0, Math.max(0, keys.length - ${COVERS_KEEP}))) await cache.delete(old)
 }
+
+// A readable copy of one cover, from the cache or fetched in CORS mode; null when there is none.
+async function readableCover(cache, url) {
+  const hit = await cache.match(url)
+  if (hit) return url
+  const host = new URL(url).origin
+  if ((corsStrikes.get(host) ?? 0) >= ${CORS_STRIKES}) return null
+  let response
+  try {
+    response = await fetch(url, { mode: 'cors', credentials: 'omit' })
+  } catch {
+    corsStrikes.set(host, (corsStrikes.get(host) ?? 0) + 1)
+    return null
+  }
+  const readable = response.type === 'cors' || (response.type === 'basic' && host === self.location.origin)
+  if (response.status !== 200 || !readable) return null
+  corsStrikes.set(host, 0)
+  await cache.put(url, response)
+  return url
+}
+
+async function keepScreen(screen, urls) {
+  const cache = await caches.open(COVERS)
+  const kept = []
+  for (const url of urls) if (await readableCover(cache, url)) kept.push(url)
+  // Most recently used screen last; this one's new set replaces its old one.
+  const screens = (await readIndex(cache)).filter((entry) => entry && entry.screen !== screen)
+  if (kept.length) screens.push({ screen, urls: kept })
+  while (screens.length > ${COVER_SCREENS} || new Set(screens.flatMap((entry) => entry.urls)).size > ${COVERS_KEEP}) screens.shift()
+  await cache.put(INDEX, new Response(JSON.stringify(screens), { headers: { 'Content-Type': 'application/json' } }))
+  const wanted = new Set([INDEX, ...screens.flatMap((entry) => entry.urls)])
+  for (const request of await cache.keys()) if (!wanted.has(request.url)) await cache.delete(request)
+}
+
+// One screen at a time, so two messages never interleave their index updates.
+let keeping = Promise.resolve()
+const keepCovers = (screen, urls) => (keeping = keeping.then(() => keepScreen(screen, urls)).catch(() => {}))
 
 // A kept cover from the cache; any other cover, or any cache error, goes to the network as the
 // browser asked for it, and nothing is written.
@@ -129,15 +158,17 @@ self.addEventListener('fetch', (event) => {
   else if (route === 'cover') event.respondWith(coverFirst(event))
 })
 
-// Sign-out (and the page's own clear): drop every cache this worker made. 'sv-keep-covers': the
-// first screen's covers (a few at a time; anything that is not a cover's pre-sized copy is ignored).
+// Sign-out (and the page's own clear): drop every cache this worker made. 'sv-keep-covers': one
+// screen's first-screen covers (anything that is not a cover's pre-sized copy is ignored; an empty
+// list forgets that screen).
 self.addEventListener('message', (event) => {
   if (event.data === 'sv-clear') event.waitUntil((async () => {
     for (const key of await caches.keys()) if (key.startsWith(PREFIX)) await caches.delete(key)
   })())
-  else if (event.data?.type === 'sv-keep-covers' && Array.isArray(event.data.urls)) {
-    const urls = event.data.urls.filter((url) => typeof url === 'string' && routeFor(url, 'GET', 'no-cors', ORIGINS, COVER_ORIGINS) === 'cover').slice(0, ${KEEP_PER_MESSAGE})
-    if (urls.length) event.waitUntil(keepCovers(urls).catch(() => {}))
+  else if (event.data?.type === 'sv-keep-covers' && typeof event.data.screen === 'string' && Array.isArray(event.data.urls)) {
+    const screen = event.data.screen.slice(0, 120)
+    const urls = [...new Set(event.data.urls.filter((url) => typeof url === 'string' && routeFor(url, 'GET', 'no-cors', ORIGINS, COVER_ORIGINS) === 'cover'))].slice(0, ${KEEP_PER_SCREEN})
+    event.waitUntil(keepCovers(screen, urls))
   }
 })
 `
