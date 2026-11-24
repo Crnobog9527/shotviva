@@ -139,6 +139,18 @@ describe('the early answer stays with one window and one deployment', () => {
     expect(worker.fetch.mock.calls.length).toBe(calls + 2)
   })
 
+  it('keeps each window’s early answer apart: a second window never takes or replaces the first one’s', async () => {
+    const worker = runWorker(on)
+    await worker.dispatch('activate', {})
+    await worker.dispatch('fetch', refresh('/generate'))
+    await worker.dispatch('message', early('/generate', 'visible', 'tab-1'))
+    await worker.dispatch('message', early('/generate', 'visible', 'tab-2'))
+    const calls = worker.fetch.mock.calls.length
+    await worker.dispatch('fetch', refresh('/generate', { client: 'tab-1' }))
+    await worker.dispatch('fetch', refresh('/generate', { client: 'tab-2' }))
+    expect(worker.fetch.mock.calls.length).toBe(calls)
+  })
+
   it('never hands over an early answer pinned to another deployment', async () => {
     const worker = runWorker(on)
     await worker.dispatch('activate', {})

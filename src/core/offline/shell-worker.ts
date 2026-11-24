@@ -87,9 +87,14 @@ async function startEarly(href, clientId) {
   if (!template || typeof template.rsc !== 'string' || !template.headers || template.headers.rsc !== '1') return
   url.searchParams.set('_rsc', template.rsc)
   const answer = fetch(url.href, { headers: template.headers, credentials: 'same-origin' })
-  const key = refreshKey(url.href)
-  early.set(key, { rsc: template.rsc, headers: template.headers, clientId, answer, at: Date.now() })
-  setTimeout(() => early.delete(key), ${EARLY_MS})
+  // Keyed by window and address: a second window never replaces the first one's answer, and each
+  // timer drops only its own entry.
+  const key = clientId + ' ' + refreshKey(url.href)
+  const entry = { rsc: template.rsc, headers: template.headers, clientId, answer, at: Date.now() }
+  early.set(key, entry)
+  setTimeout(() => {
+    if (early.get(key) === entry) early.delete(key)
+  }, ${EARLY_MS})
   await answer.catch(() => null)
 }
 
@@ -126,9 +131,9 @@ async function answerRefresh(event) {
   const rsc = url.searchParams.get('_rsc') || ''
   const headers = rscHeaders(request.headers)
   event.waitUntil(rememberRefresh(localeOf(url.pathname), rsc, headers).catch(() => {}))
-  const key = refreshKey(request.url)
-  const waiting = early.get(key)
-  if (waiting && waiting.clientId === event.clientId) early.delete(key)
+  const key = (event.clientId || '') + ' ' + refreshKey(request.url)
+  const waiting = event.clientId ? early.get(key) : undefined
+  if (waiting) early.delete(key)
   const fresh = waiting && Date.now() - waiting.at < ${EARLY_MS}
   if (fresh && waiting.clientId && waiting.clientId === event.clientId && waiting.rsc === rsc && sameHeaders(waiting.headers, headers)) {
     try {
