@@ -29,14 +29,17 @@ const DISHES: Record<Locale, readonly Dish[]> = {
     { phone: 'Real phone photo: avocado toast with poached eggs on a white plate in a kitchen', ai: 'Real example: the same avocado toast in soft daylight with green leaves', caption: 'Avocado toast, daylight' },
     { phone: 'Real phone photo: shrimp pad thai with lime on a white plate in a kitchen', ai: 'Real example: the same pad thai on a quiet grey backdrop with a soft shadow', caption: 'Pad thai, quiet grey' },
   ],
+  // Chinese dishes on /zh (Owner 2026-11-24), cut from published 中餐 templates' covers:
+  // cn-camel-char-siu, cn-rattan-iron-wok, cn-warm-crab-plate, cn-ring-lobster-pour,
+  // cn-green-wine-plate, cn-deep-lotus-crab, cn-warm-roast-straw (public/home/cn-food-<n>).
   zh: [
-    { phone: '真实手机照：后厨不锈钢台面上，白盘里的肉酱意面', ai: '真实案例：同一盘意面还在白盘里，深色桌面，旁边是罗勒和番茄', caption: '肉酱意面，深色桌面' },
-    { phone: '真实手机照：后厨里白盘装的切片牛排、薯条和芦笋', ai: '真实案例：同一盘牛排放在原木砧板上，暖光', caption: '牛排，原木砧板' },
-    { phone: '真实手机照：后厨台面上白盘里的班尼迪克蛋', ai: '真实案例：同一份班尼迪克蛋放在格子桌布上，旁边是串番茄', caption: '班尼迪克蛋，格子桌布' },
-    { phone: '真实手机照：白盘里的熔岩巧克力蛋糕，配冰淇淋和莓果', ai: '真实案例：同一份甜品在花园日光下，桌上有树叶的影子', caption: '熔岩蛋糕，花园日光' },
-    { phone: '真实手机照：后厨里白碗装的肉末青菜拌面', ai: '真实案例：同一碗面放在蜜桃色背景上，旁边是小番茄和叉子', caption: '拌面，蜜桃色桌面' },
-    { phone: '真实手机照：后厨里白盘装的牛油果吐司配水波蛋', ai: '真实案例：同一份牛油果吐司在柔和日光里，配绿叶', caption: '牛油果吐司，日光' },
-    { phone: '真实手机照：后厨里白盘装的鲜虾泰式炒河粉，配青柠', ai: '真实案例：同一盘炒河粉放在安静的灰色背景上，柔和的影子', caption: '泰式炒河粉，安静灰' },
+    { phone: '真实手机照：后厨不锈钢台面上，白色长盘里的叉烧', ai: '真实案例：同一盘叉烧放在驼色背景的原木上', caption: '叉烧，驼色原木' },
+    { phone: '真实手机照：后厨台面上，黑铁双柄锅里的番茄牛腩', ai: '真实案例：同一锅番茄牛腩放在雕花木板上，旁边是番茄', caption: '番茄牛腩，雕花木板' },
+    { phone: '真实手机照：后厨台面上，白色宽边盘里的葱姜炒蟹', ai: '真实案例：同一盘炒蟹放在亚麻桌布上，暖光', caption: '葱姜炒蟹，亚麻布' },
+    { phone: '真实手机照：后厨台面上，冰盘里的龙虾刺身', ai: '真实案例：同一盘龙虾刺身放在年轮木块上', caption: '龙虾刺身，年轮木块' },
+    { phone: '真实手机照：后厨台面上，酒红深盘里的一道小炒', ai: '真实案例：同一盘小炒放在暖棕色的绿色台面上', caption: '小炒，酒红深盘' },
+    { phone: '真实手机照：后厨台面上，荷叶上的一只蒸蟹', ai: '真实案例：同一只蟹在荷叶盘里，暖棕色背景', caption: '荷叶蒸蟹，暖棕' },
+    { phone: '真实手机照：后厨台面上，稻草上的两只烤乳鸽', ai: '真实案例：同样的烤乳鸽摆在稻草上，暖棕色背景', caption: '烤乳鸽，稻草暖棕' },
   ],
 }
 
@@ -45,24 +48,28 @@ const COPY = {
     before: 'Real phone photo: spaghetti carbonara on a white plate on a steel kitchen counter, stacked plates behind',
     after: 'Real example: the same carbonara on its white plate on a slate table in dappled sunlight, olive oil and herbs beside it',
     caption: 'Same plate, now ready for the menu',
-    tagline: 'For restaurants and hotels: snap a dish on the kitchen counter or a room on your phone, and get a photo ready for your menu, delivery apps or booking sites in about 30 seconds. No photographer, and the dish and the room stay yours.',
+    tagline: 'For restaurants and hotels: snap a dish or a room on your phone and get menu, delivery-app and booking-site photos in about 30 seconds, no photographer.',
     strip: 'More real dishes, each shot on a kitchen counter',
   },
   zh: {
-    before: '真实手机照：后厨不锈钢台面上，白盘里的培根蛋酱意面，身后摞着盘子',
-    after: '真实案例：同一盘意面还在白盘里，放在斑驳阳光下的石板桌上，旁边是橄榄油和香草',
-    caption: '同一盘菜，直接能上菜单',
-    tagline: '给餐厅和酒店：后厨随手拍一道菜，或用手机拍一张大堂、客房，约 30 秒就出能上菜单、外卖平台和订房网站的图。不用请摄影师，菜和房间还是你自己的。',
+    before: '真实手机照：后厨不锈钢台面上，竹笼里码着一排大虾，旁边是蘸碟',
+    after: '真实案例：同一笼大虾放在暗调木桌上，暖光',
+    caption: '同一笼虾，直接能上菜单',
+    tagline: '给餐厅和酒店：随手拍一道菜或一间客房，约 30 秒出菜单、外卖和订房网站用的图，不用请摄影师。',
     strip: '更多真实菜品，都是在后厨台面上拍的',
   },
 } as const
 
+// The pictures' file prefix: Western dishes on the English page, Chinese ones on /zh.
+const FILES: Record<Locale, string> = { en: 'food', zh: 'cn-food' }
+
 function foodIn(locale: Locale): HeroOptionContent {
   const copy = COPY[locale]
+  const file = FILES[locale]
   return {
     hero: {
-      before: withFirstFrame(big('food-1-photo', copy.before)),
-      after: big('food-1-ai', copy.after),
+      before: withFirstFrame(big(`${file}-1-photo`, copy.before)),
+      after: big(`${file}-1-ai`, copy.after),
       caption: copy.caption,
       // A single pair: the rotating scenes are the tote's (one phone photo, several results).
       scenes: undefined,
@@ -71,7 +78,7 @@ function foodIn(locale: Locale): HeroOptionContent {
     generatorTemplate: 'wd-dappled-slate',
     strip: {
       heading: copy.strip,
-      items: DISHES[locale].map((dish, index) => ({ before: small(`food-${index + 2}-photo`, dish.phone), after: small(`food-${index + 2}-ai`, dish.ai), caption: dish.caption })),
+      items: DISHES[locale].map((dish, index) => ({ before: small(`${file}-${index + 2}-photo`, dish.phone), after: small(`${file}-${index + 2}-ai`, dish.ai), caption: dish.caption })),
     },
   }
 }

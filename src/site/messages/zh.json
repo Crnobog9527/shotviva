@@ -2478,7 +2478,9 @@
       "freeTag": "免费 · 公开",
       "paidTag": "付费 · 私密",
       "freeSampleAlt": "带水印的免费图（真实案例）",
-      "paidSampleAlt": "同一张图用付费积分生成，没有水印（真实案例）"
+      "paidSampleAlt": "同一张图用付费积分生成，没有水印（真实案例）",
+      "factsAll": "查看全部 {count} 项",
+      "foldOpen": "展开"
     }
   },
   "pageError": {

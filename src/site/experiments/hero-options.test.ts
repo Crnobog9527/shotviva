@@ -22,11 +22,15 @@ describe('home hero options (ARCHITECTURE §16.5)', () => {
     }
   })
 
-  it('shows restaurants one pair first and the other seven of the Owner’s eight below it', () => {
-    const food = heroOptionContent('food', 'zh')!
-    expect(food.hero.scenes).toBeUndefined()
-    expect(food.strip?.items).toHaveLength(7)
-    expect(heroOptionContent('food', 'en')!.strip?.items.map((item) => item.after.src)).toEqual(food.strip?.items.map((item) => item.after.src))
+  it('shows restaurants one pair first and seven more below it, Western dishes in English and Chinese ones on /zh', () => {
+    for (const [locale, prefix] of [['en', '/home/food-'], ['zh', '/home/cn-food-']] as const) {
+      const food = heroOptionContent('food', locale)!
+      expect(food.hero.scenes).toBeUndefined()
+      expect(food.strip?.items).toHaveLength(7)
+      for (const image of [food.hero.before, food.hero.after, ...(food.strip?.items ?? []).flatMap((item) => [item.before, item.after])]) {
+        expect(image.src.startsWith(prefix)).toBe(true)
+      }
+    }
   })
 
   it('registers every option on the hero surface', () => {

@@ -2478,7 +2478,9 @@
       "freeTag": "Free · public",
       "paidTag": "Paid · private",
       "freeSampleAlt": "A free photo with the watermark (real example)",
-      "paidSampleAlt": "The same photo made with paid credits, no watermark (real example)"
+      "paidSampleAlt": "The same photo made with paid credits, no watermark (real example)",
+      "factsAll": "Show all {count} rows",
+      "foldOpen": "Show"
     }
   },
   "pageError": {

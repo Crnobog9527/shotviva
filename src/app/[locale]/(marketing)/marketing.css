@@ -133,11 +133,13 @@
   .mk-hero h1 em { font-style: italic; }
   .mk-lede, .mk-answer { margin-top: 12px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
   /* An A/B hero option's one line (ARCHITECTURE §16.5), a step stronger than the answer above it. */
-  /* Below 1024 the "who it is for" line reads before the long direct answer (Owner 2026-11-24:
-     a phone visitor should see what it does for them first); the source order stays. */
+  /* Below 1024 the first screen is the H1, subtitle, the "who it is for" line, the picture and
+     the generator; the long direct answer follows the generator (Owner 2026-11-24: less text
+     above the picture on a phone). Visual order only: the source order and the text stay. */
   @media (max-width: 1023px) {
-    .mk-hero-copy { display: flex; flex-direction: column; }
-    .mk-hero-copy > .mk-answer { order: 1; }
+    .mk-hero { display: flex; flex-direction: column; }
+    .mk-hero-copy { display: contents; }
+    .mk-hero > .mk-hero-copy > .mk-answer { order: 1; }
   }
   .mk-hero-tagline { margin-top: 12px; font-size: 15px; line-height: 1.5; color: var(--foreground); font-weight: 500; }
   .mk-hero-pair { margin: 20px 0 0; }
@@ -470,6 +472,33 @@
     font: 600 12px/1 var(--font-sans); color: var(--foreground); background: var(--frost); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   }
   .mk-edit-cap { margin-top: 12px; padding: 0 4px; }
+  /* Phone folds (home facts table, the topic cards; Owner 2026-11-24): a visually hidden checkbox
+     and its label as the button. Below 768 the folded rows or body stay hidden until it is
+     checked; the content is always in the HTML. From 768 everything shows and the button goes. */
+  .mk-ghost-btn.mk-fold-btn { display: none; }
+  @media (max-width: 767px) {
+    .mk-ghost-btn.mk-fold-btn { display: inline-flex; margin-top: 16px; cursor: pointer; }
+    .mk-facts tr.mk-fold-row, section .mk-fold-body { display: none; }
+    section:has(> .mk-fold-toggle:checked) .mk-facts tr.mk-fold-row { display: block; }
+    section:has(> .mk-fold-toggle:checked) > .mk-fold-body { display: grid; }
+    section:has(> .mk-fold-toggle:checked) .mk-ghost-btn.mk-fold-btn { display: none; }
+    section:has(> .mk-fold-toggle:focus-visible) .mk-fold-btn { outline: 2px solid var(--ring); outline-offset: 2px; }
+  }
+  /* Hotels and stays (spaces-section.tsx): the phone photo over the result, both 16:9; a rail on
+     phones with the next card peeking, two to a row from 768. */
+  .mk-spaces {
+    margin: 24px calc(var(--gutter) * -1) 0; padding: 0 var(--gutter) 4px; list-style: none;
+    display: grid; grid-auto-flow: column; grid-auto-columns: 82%; gap: 12px;
+    overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--gutter); scrollbar-width: none;
+  }
+  .mk-spaces::-webkit-scrollbar { display: none; }
+  .mk-spaces > li { scroll-snap-align: start; min-width: 0; }
+  .mk-space { margin: 0; display: grid; gap: 6px; }
+  .mk-space-pic { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--radius); background: var(--muted); }
+  .mk-space-pic img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  @media (min-width: 768px) {
+    .mk-spaces { margin: 32px 0 0; padding: 0; overflow: visible; grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 16px; }
+  }
   .mk-edit-cap b { display: block; font: 600 16px/1.25 var(--font-sans); letter-spacing: -0.01em; }
   .mk-edit-cap span { display: block; margin-top: 4px; max-width: 60ch; font-size: 14px; line-height: 1.45; color: var(--muted-foreground); }
 
@@ -550,7 +579,18 @@
   .mk-facts tr:first-child th, .mk-facts tr:first-child td { border-top: 0; }
   .mk-facts th { width: 42%; padding-top: 14px; font: 500 14px/1.4 var(--font-sans); color: var(--muted-foreground); }
   .mk-facts td { font-size: 16px; line-height: 1.4; }
-  .mk-facts .mk-key td { font: 400 24px/1.1 var(--font-display); }
+  /* The first two rows, what stays and what changes, stand out by weight only (Owner 2026-11-24:
+     a large display face made those answers look out of step with the rest). */
+  .mk-facts .mk-key td { font-weight: 500; color: var(--foreground); }
+  /* Phones: each row stacks, the question on its own line and the answer under it at full width
+     (Owner 2026-11-24: two narrow columns made the answers a tall, cramped column). */
+  @media (max-width: 767px) {
+    .mk-facts tr { display: block; padding: 14px 16px; border-top: 1px solid var(--hairline); }
+    .mk-facts tr:first-child { border-top: 0; }
+    .mk-facts th, .mk-facts td { display: block; width: auto; padding: 0; border-top: 0; }
+    .mk-facts th { font-size: 14px; }
+    .mk-facts td { margin-top: 4px; }
+  }
 
   /* free */
   .mk-free { display: grid; gap: 8px; margin-top: 24px; }

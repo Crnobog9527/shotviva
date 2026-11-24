@@ -24,6 +24,7 @@ import {
 import { withFirstFrame } from '../landing-shared'
 import { whiteBackgroundGuide, zhSteps, zhTote } from './home-explainers'
 import { zhTextEdits } from './home-edits'
+import { zhHomeSpaces } from './home-spaces'
 import { zhHomeWishlist } from './home-wishlist'
 import { zhSharedFacts } from './shared'
 import { zhHomePlans } from '../plan-strip'
@@ -126,6 +127,7 @@ const copy = {
   },
   shoot,
   edits: zhTextEdits,
+  spaces: zhHomeSpaces,
   steps: zhSteps,
   templateGrid: {
     heading: 'AI改图模板：不用写提示词',

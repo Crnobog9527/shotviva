@@ -20,6 +20,7 @@ import {
 } from './offer'
 import { steps, tote, useCases } from './home-explainers'
 import { textEdits } from './home-edits'
+import { homeSpaces } from './home-spaces'
 import { homeWishlist } from './home-wishlist'
 import { withFirstFrame } from './landing-shared'
 import { sharedFacts } from './shared'
@@ -141,6 +142,7 @@ const copy = {
   },
   shoot,
   edits: textEdits,
+  spaces: homeSpaces,
   steps,
   templateGrid: {
     heading: 'Img to Img Templates: No Prompts to Write',

@@ -6,6 +6,7 @@ import { FaqSection } from './blocks/faq-section'
 import { HomeHero } from './blocks/home-hero'
 import { FreeOfferSection, HomeFacts, StepsSection } from './blocks/home-sections'
 import { RelatedLinks } from './blocks/related-links'
+import { SpacesSection } from './blocks/spaces-section'
 import { TemplateGrid, type FeaturedSections } from './blocks/template-grid'
 import { TopicCards } from './blocks/topic-section'
 import { WishlistLine } from './blocks/wishlist-section'
@@ -30,7 +31,7 @@ type Props = {
 }
 
 // Home block order (Owner 2026-11-24: restaurants and hotels first, a shorter phone page): H1 +
-// answer → hero + generator → the real dish pairs → text edits → the steps → the templates
+// answer → hero + generator → the real dish pairs → hotels and stays → text edits → the steps → the templates
 // (food and spaces only, home-page.tsx) → one wishlist line → the facts → free offer → the two
 // bills (block ③, which also carry the plans the JSON-LD offers read) → FAQ → the use-case topic
 // H2 (SEO G5 / S4, kept, now at the end) → related links. The six H2s of 建站规格 §4 keep their
@@ -40,6 +41,7 @@ export function HomePageView({ page, brand, isLinkEnabled, templates, generator,
     <article className="mk-home mk-w">
       <HomeHero page={page} generator={generator} tagline={heroTagline} />
       {heroStrip ? <HeroStrip strip={heroStrip} /> : null}
+      {page.spaces ? <SpacesSection spaces={page.spaces} /> : null}
       {page.edits ? <EditCasesSection edits={page.edits} /> : null}
       <StepsSection steps={page.steps} />
       <TemplateGrid grid={page.templateGrid} sections={templates} isLinkEnabled={isLinkEnabled} />
