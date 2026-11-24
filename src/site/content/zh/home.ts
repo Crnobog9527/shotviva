@@ -136,7 +136,7 @@ const copy = {
   },
   topics: whiteBackgroundGuide,
   wishlist: zhHomeWishlist,
-  factsIntro: `通用的 AI改图工具很难保证原图文字、产品和环境的一致性，成片往往和原图相差甚远，无法用于商业用途。${brand} 可以用自然语言对图片做精准修改，即使多轮编辑，也不会出现变形、扭曲或字体乱码。套用模板时，一次就能得到可对外展示的专业成片。`,
+  factsIntro: `通用的 AI 改图工具很难保证原图文字、产品和环境的一致性，成片往往和原图相差甚远，无法用于商业用途。${brand} 可以用自然语言对图片做精准修改，即使多轮编辑，也不会出现变形、扭曲或字体乱码。套用模板时，一次就能得到可对外展示的专业成片。`,
   related: [
     { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
     { href: '/commercial-photography', anchor: '商业产品摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
@@ -161,7 +161,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   // A's first sentence is the Chinese form of G6's fixed sentence: brand and keyword together.
   {
     question: '怎么把自己的照片变成 AI 图？',
-    answer: `${brand} 是一个 AI改图工具：把你已有的照片换个样子，主体保持原样，只要 ${STEP_COUNT} 步——上传一张手机照片、选一个模板、选${zhTierList}。AI改图以原图为基础，只改变光线、场景或画风，商品、菜品、房间或宠物始终与原图一致。`,
+    answer: `${brand} 是一个 AI改图工具：把你已有的照片换个样子，主体保持原样，只要 ${STEP_COUNT} 步——上传一张手机照片、选一个模板、选 ${zhTierList}。AI改图以原图为基础，只改变光线、场景或画风，商品、菜品、房间或宠物始终与原图一致。`,
   },
   {
     question: 'AI改图免费吗？',
@@ -236,7 +236,7 @@ export const makeZhHomePage = (offers: OfferFacts, plans = zhHomePlans(offers.pr
   ...(plans ? { plans } : {}),
   costBills: productBills(offers,
     `${SET_PHOTOS} 张商品图要花多少钱：请摄影师和用 ${brand} 对比`,
-    `一个商品，${SET_PHOTOS} 张造型图，精修好、可以直接发。同样的活，两张账单。`,
+    `同一个商品拍 ${SET_PHOTOS} 张精修造型图，可以直接发布。下面是请摄影师和用 ${brand} 各自要花的钱。`,
     '',
     { planLine: false },
   ),

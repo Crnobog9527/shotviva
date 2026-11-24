@@ -228,6 +228,10 @@
      plate; back at scene 1 the last photo fades out to the server-rendered first one. */
   .mk-pstack { position: absolute; z-index: 1; top: 0; bottom: 0; left: 0; width: 50%; overflow: hidden; pointer-events: none; }
   .mk-pair .mk-scene.mk-out { z-index: 1; opacity: 0; transition: opacity .4s var(--ease); }
+  /* A dot picked a scene still loading: it shows at once, every other picture drops (the first
+     phone photo too, under the stack), and its two plates fill in as they arrive. */
+  .mk-wait .mk-pair .mk-scene:not(.mk-on) { opacity: 0; transition: none; }
+  .mk-wait .mk-pstack { background: var(--muted); }
   .mk-dots {
     position: absolute; z-index: 5; bottom: 8px; left: 75%; transform: translateX(-50%); display: flex; padding: 0 2px;
     border-radius: 999px; background: var(--frost); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
@@ -583,7 +587,7 @@
   .mk-compare:has(input:focus-visible) { outline: 2px solid var(--ring); outline-offset: 2px; }
 
   /* facts */
-  .mk-facts { width: 100%; margin-top: 24px; border-collapse: separate; border-spacing: 0; border-radius: var(--radius-media); overflow: hidden; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-facts { width: 100%; margin-top: 32px; border-collapse: separate; border-spacing: 0; border-radius: var(--radius-media); overflow: hidden; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
   .mk-facts th, .mk-facts td { padding: 12px 16px; text-align: left; vertical-align: top; border-top: 1px solid var(--hairline); }
   .mk-facts tr:first-child th, .mk-facts tr:first-child td { border-top: 0; }
   .mk-facts th { width: 42%; padding-top: 14px; font: 500 14px/1.4 var(--font-sans); color: var(--muted-foreground); }
@@ -740,7 +744,7 @@
     .mk-block > :not(h2) { grid-column: 2; }
     .mk-block > .mk-intro, .mk-hd .mk-intro { margin-top: 0; }
     .mk-steps, .mk-facts, .mk-free, .mk-faq, .mk-links { margin-top: 0; }
-    .mk-block > .mk-intro + .mk-facts { margin-top: 24px; }
+    .mk-block > .mk-intro + .mk-facts { margin-top: 32px; }
     .mk-steps { gap: 32px; }
     /* the shoot spans the content width: phone photo as large as a result, the arrow between */
     #shoot > h2, #cost > h2 { grid-row: 1; position: static; }
@@ -925,16 +929,3 @@
   .mk-pair-blank .mk-pane { background: repeating-linear-gradient(135deg, var(--hatch) 0 8px, transparent 8px 16px), var(--recess); }
 }
 
-/* "Can't find your template?" (Owner 2026-11-10; one line since 2026-11-24): under the
-   template grid, the question and the Wishlist button on one hairline row. */
-@layer components {
-  .mk-wish-line {
-    margin: 32px var(--gutter) 0; padding: 16px 0 0; box-shadow: inset 0 1px 0 var(--hairline);
-    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
-  }
-  .mk-wish-line p { font-size: 16px; line-height: 1.5; color: var(--muted-foreground); }
-  .mk-wish-cta { width: 100%; }
-  @media (min-width: 768px) {
-    .mk-wish-cta { display: inline-flex; width: auto; min-width: 240px; }
-  }
-}

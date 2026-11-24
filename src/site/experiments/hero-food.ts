@@ -44,26 +44,26 @@ const DISHES: Record<Locale, readonly Dish[]> = {
   ],
 }
 
-// The /zh first screen: four Chinese dishes taking turns, phone photo and result together, 2 s
+// The /zh first screen: three Chinese dishes taking turns, phone photo and result together, 2 s
 // each (Owner 2026-11-24). The Owner picked templates whose two covers are both portrait, so the
-// 4:5 plates crop little: cn-pedestal-fog, cn-rattan-iron-wok, cn-deep-prawn-green,
-// cn-warm-lobed-runner (public/home/cn-hero-<n>-{photo,ai}.webp, 880 × 1100). The first pair is
+// 4:5 plates crop little: cn-pedestal-fog, cn-deep-prawn-green, cn-warm-lobed-runner
+// (public/home/cn-hero-<file>-{photo,ai}.webp, 880 × 1100; the brisket, file 2, was dropped on
+// 2026-11-25). The first pair is
 // the server-rendered, preloaded one; the others load after load + idle (use-scene-rotation.ts).
 const ZH_SCENES = [
-  { phone: '真实手机照：后厨不锈钢台面上，白色长盘里码着一排浸在红油里的大虾', ai: '真实案例：同一盘大虾放在深色麻布高台上，烟雾缓缓流下，背后一抹暗红光', caption: '同一盘虾，直接能上菜单' },
-  { phone: '真实手机照：后厨台面上，雕花木板上的黑铁双柄锅，锅里是番茄牛腩', ai: '真实案例：同一锅番茄牛腩放在雕花木板上，周围是新鲜番茄', caption: '同一锅牛腩，换上雕花木板' },
-  { phone: '真实手机照：后厨台面上，白盘里摆成一圈的油焖大虾', ai: '真实案例：同一盘油焖大虾放在青绿锦布上，深棕色背景', caption: '同一盘大虾，换上青绿锦布' },
-  { phone: '真实手机照：后厨台面上，白色花边椭圆深盘里的酱烤鱼，旁边一小碟酱', ai: '真实案例：同一盘酱烤鱼放在棕色锦纹桌旗上，年轮木墙做背景', caption: '同一盘烤鱼，换上锦纹桌旗' },
+  { file: 1, phone: '真实手机照：后厨不锈钢台面上，白色长盘里码着一排浸在红油里的大虾', ai: '真实案例：同一盘大虾放在深色麻布高台上，烟雾缓缓流下，背后一抹暗红光', caption: '同一盘虾，直接能上菜单' },
+  { file: 3, phone: '真实手机照：后厨台面上，白盘里摆成一圈的油焖大虾', ai: '真实案例：同一盘油焖大虾放在青绿锦布上，深棕色背景', caption: '同一盘大虾，换上青绿锦布' },
+  { file: 4, phone: '真实手机照：后厨台面上，白色花边椭圆深盘里的酱烤鱼，旁边一小碟酱', ai: '真实案例：同一盘酱烤鱼放在棕色锦纹桌旗上，年轮木墙做背景', caption: '同一盘烤鱼，换上锦纹桌旗' },
 ] as const
 
 function zhHero(): HeroOptionContent['hero'] {
-  const scenes = ZH_SCENES.map((scene, index) => ({ image: big(`cn-hero-${index + 1}-ai`, scene.ai), before: big(`cn-hero-${index + 1}-photo`, scene.phone), caption: scene.caption }))
+  const scenes = ZH_SCENES.map((scene) => ({ image: big(`cn-hero-${scene.file}-ai`, scene.ai), before: big(`cn-hero-${scene.file}-photo`, scene.phone), caption: scene.caption }))
   const [first, second, ...rest] = scenes as [HeroScene, HeroScene, ...HeroScene[]]
   return {
     before: withFirstFrame(first.before!),
     after: first.image,
     caption: first.caption,
-    scenes: { label: '四道菜的手机照和成图', items: [first, second, ...rest] },
+    scenes: { label: '三道菜的手机照和成图', items: [first, second, ...rest] },
   }
 }
 
