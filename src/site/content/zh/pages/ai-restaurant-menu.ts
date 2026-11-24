@@ -52,7 +52,7 @@ const fishDark = caseImage('menu-fish-dark', '真实案例：同一份酸菜鱼�
 // 一道菜做成三种成图：菜不变，换碗、换场景、换光。
 const shoot: ShootDemo = {
   heading: { lead: '一张菜品手机照 → ', emphasis: '一整套菜单大片' },
-  intro: '鲜椒牛蛙，在后厨出菜口用不锈钢盆随手一拍。做成三张成图，每张都是同一道菜：牛蛙、青红鲜椒、青花椒都没变。',
+  intro: '在后厨出菜口随手拍的一盆鲜椒牛蛙，做出三张成图，牛蛙、青红鲜椒和青花椒都保持原样。',
   phone: {
     image: caseImage('menu-frog-phone', '真实手机照：不锈钢盆装的鲜椒牛蛙放在后厨台面上，日光灯，后面是单据和碗'),
     file: 'IMG_2706.jpg',
@@ -97,7 +97,7 @@ const copy = {
   facts: [
     {
       label: `DoorDash：横版 ${doordash.ratio}，至少 ${px(doordash.minW)} × ${px(doordash.minH)} px`,
-      value: `DoorDash 要求横版 ${doordash.ratio}、至少 ${px(doordash.minW)} × ${px(doordash.minH)} px，而且必须是实际出餐的那道菜。横幅 16:9 选${hd?.name ?? ''}是 ${px(hd?.px ?? 0)} × ${px(Math.round(((hd?.px ?? 0) * 9) / 16))} px。`,
+      value: `DoorDash 要求横版 ${doordash.ratio}、至少 ${px(doordash.minW)} × ${px(doordash.minH)} px，而且必须是实际出餐的那道菜。16:9 横版选择${hd?.name ?? ''}时为 ${px(hd?.px ?? 0)} × ${px(Math.round(((hd?.px ?? 0) * 9) / 16))} px。`,
     },
     {
       label: 'Uber Eats 和 Grubhub',
@@ -152,7 +152,7 @@ export const makeZhAiRestaurantMenu = (offers: OfferFacts) => defineContentPage(
   ],
   related: [
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
-    { href: '/commercial-photography', anchor: '商业摄影', note: '网店和卖家不请摄影师，也能做出影棚级商品图。' },
+    { href: '/commercial-photography', anchor: '商业摄影', note: '网店卖家无需聘请摄影师，也能做出专业级商品图。' },
     { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '看看图生图能把一张照片做成什么样。' },
     zhPricingRelated(brand, offers),
   ],
