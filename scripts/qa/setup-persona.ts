@@ -37,6 +37,12 @@ async function applyState({ db, storage }: Ctx, persona: Persona, userId: string
     return true
   }
   const steps: boolean[] = [await grantSignup(db, userId)]
+  // A persona that keeps the real signup grant (free pool not reset, qa-graylum) must actually
+  // have received it: a paused gift or a used-up daily allowance would otherwise leave 0 free
+  // credits behind a "created" row (review of #893).
+  if (persona.freeCredits === null && (await readProfile(db, userId)).free_credits <= 0) {
+    throw new Error(`${persona.id} did not receive the signup grant (gift paused or daily limit reached).`)
+  }
   if (persona.tier === 'max') steps.push(await purchaseMax(db, userId))
   if (persona.succeededWork && persona.paidCredits !== null) {
     steps.push(await ensureCreatorWork(db, storage, userId, persona.paidCredits))
