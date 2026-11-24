@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+
 import { describe, expect, it } from 'vitest'
 
 import { VITAL_ROUTES } from './fields'
@@ -25,8 +28,12 @@ describe('APP_ROOT_PATH', () => {
 })
 
 // start-vitals.ts calls Next's own compiled copy by its internal path: a Next upgrade that moves
-// or renames it fails here, not silently in the field.
-it('finds the web-vitals functions Next ships', async () => {
+// or renames it fails here, not silently in the field. payload.ts files each metric under the URL
+// it was measured on (navigationURL), which only the soft-navigation build sets; a plain
+// web-vitals build at the same path would silently file metrics under the page at report time.
+it('finds the web-vitals functions Next ships, in the build that sets navigationURL', async () => {
   const vitals = await import('next/dist/compiled/web-vitals')
   for (const name of ['onCLS', 'onLCP', 'onINP', 'onFCP', 'onTTFB'] as const) expect(typeof vitals[name]).toBe('function')
+  const source = readFileSync(createRequire(import.meta.url).resolve('next/dist/compiled/web-vitals'), 'utf8')
+  expect(source).toMatch(/navigationURL:/)
 })
