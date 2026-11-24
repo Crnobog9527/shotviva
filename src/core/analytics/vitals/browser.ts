@@ -7,6 +7,19 @@ export const VITALS_ENDPOINT = '/api/vitals'
 
 type NavigatorExtras = Navigator & { standalone?: boolean; connection?: { effectiveType?: unknown } }
 
+// Whether Create's app shell answered this document (ARCHITECTURE §18.3): the shell's inline script
+// records the address it was opened at, before hydration; the real page then replaces the shell in
+// the same document, so the mark stays. Opened at /app-shell/generate itself it is not a launch.
+function answeredByShell(win: Window): boolean {
+  const href = (win as Window & { __svShell?: { href?: unknown } }).__svShell?.href
+  if (typeof href !== 'string') return false
+  try {
+    return !new URL(href).pathname.includes('/app-shell/')
+  } catch {
+    return false
+  }
+}
+
 export function pageFacts(win: Window = window): PageFacts {
   const nav = win.navigator as NavigatorExtras
   return {
@@ -14,6 +27,7 @@ export function pageFacts(win: Window = window): PageFacts {
     // iOS reports a home-screen app through navigator.standalone, others through the media query.
     standalone: nav.standalone === true || win.matchMedia?.('(display-mode: standalone)').matches === true,
     sw: Boolean(nav.serviceWorker?.controller),
+    shell: answeredByShell(win),
     net: nav.connection?.effectiveType,
   }
 }

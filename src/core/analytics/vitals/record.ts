@@ -14,6 +14,7 @@ export type VitalRow = {
   nav_type: string
   standalone: boolean
   sw: boolean
+  shell: boolean
   effective_type: string | null
   country: string | null
 }
@@ -34,6 +35,7 @@ export const toRow = (report: VitalReport, country: string | null): VitalRow => 
   nav_type: report.nav,
   standalone: report.standalone,
   sw: report.sw,
+  shell: report.shell,
   effective_type: report.net,
   country,
 })

@@ -47,6 +47,16 @@ it('takes a checked row from the service role', async () => {
   ids.push(cls.data!.id)
 })
 
+it('2002: says whether the app shell answered the page, false when not given', async () => {
+  const given = await api.from('web_vitals').insert({ ...row, shell: true }).select('id, shell').single()
+  expect(given.error).toBeNull()
+  expect(given.data!.shell).toBe(true)
+  ids.push(given.data!.id)
+  const older = await api.from('web_vitals').insert(row).select('id, shell').single()
+  expect(older.data!.shell).toBe(false)
+  ids.push(older.data!.id)
+})
+
 it('is closed to clients: no read, no write for anon or authenticated', async () => {
   const grants = await db.query(`select r, has_table_privilege(r::name,'public.web_vitals','select') sel,
     has_table_privilege(r::name,'public.web_vitals','insert') ins from unnest(array['anon','authenticated']) r`)

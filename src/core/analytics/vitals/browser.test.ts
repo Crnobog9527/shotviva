@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { reportVital, resetSentVitalsForTest, VITALS_ENDPOINT, watchRestores } from './browser'
 
-function fakeWindow(path: string, { cookie = '', fetchThrows = false } = {}) {
+function fakeWindow(path: string, { cookie = '', fetchThrows = false, shellHref = undefined as string | undefined } = {}) {
   const fetch = vi.fn(() => {
     if (fetchThrows) throw new TypeError('keepalive unsupported')
     return Promise.resolve(new Response(null, { status: 204 }))
@@ -14,6 +14,7 @@ function fakeWindow(path: string, { cookie = '', fetchThrows = false } = {}) {
     matchMedia: () => ({ matches: false }),
     navigator: { serviceWorker: { controller: {} }, connection: { effectiveType: '3g' }, sendBeacon, userAgent: 'Secret UA' },
     fetch,
+    ...(shellHref ? { __svShell: { href: shellHref } } : {}),
   } as unknown as Window
   return { win, fetch, sendBeacon }
 }
@@ -31,8 +32,20 @@ describe('reportVital', () => {
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe(VITALS_ENDPOINT)
     expect(init).toMatchObject({ method: 'POST', keepalive: true, credentials: 'omit' })
-    expect(JSON.parse(init.body as string)).toEqual({ metric: 'LCP', value: 900, rating: 'good', route: 'photos', locale: 'zh', nav: 'navigate', standalone: false, sw: true, net: '3g' })
+    expect(JSON.parse(init.body as string)).toEqual({ metric: 'LCP', value: 900, rating: 'good', route: 'photos', locale: 'zh', nav: 'navigate', standalone: false, sw: true, shell: false, net: '3g' })
     expect(init.body).not.toMatch(/123|token|abc|secret|UA/)
+  })
+
+  it('says whether Create’s app shell answered the page, never where it was opened', () => {
+    const viaShell = fakeWindow('/zh/generate', { shellHref: 'https://shotviva.com/zh/generate?c=food' })
+    reportVital(lcp, viaShell.win)
+    const body = (viaShell.fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string
+    expect(JSON.parse(body)).toMatchObject({ route: 'generate', shell: true })
+    expect(body).not.toMatch(/food/)
+    resetSentVitalsForTest()
+    const direct = fakeWindow('/zh/generate', { shellHref: 'https://shotviva.com/zh/app-shell/generate' })
+    reportVital(lcp, direct.win)
+    expect(JSON.parse((direct.fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toMatchObject({ shell: false })
   })
 
   it('reports each bfcache restore once, also where navigationId is 0 (Safari, Firefox)', () => {

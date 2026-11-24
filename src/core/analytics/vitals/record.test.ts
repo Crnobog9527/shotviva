@@ -10,7 +10,7 @@ vi.mock('../../auth/supabase-admin', () => ({
   },
 }))
 
-const report: VitalReport = { metric: 'INP', value: 180, rating: 'good', route: 'generate', locale: 'en', nav: 'reload', standalone: false, sw: true, net: null }
+const report: VitalReport = { metric: 'INP', value: 180, rating: 'good', route: 'generate', locale: 'en', nav: 'reload', standalone: false, sw: true, shell: true, net: null }
 
 function post(body: string, headers: Record<string, string> = {}) {
   return new Request('https://shotviva.com/api/vitals', { method: 'POST', body, headers: { 'content-type': 'text/plain', 'sec-fetch-site': 'same-origin', ...headers } })
@@ -42,12 +42,21 @@ describe('parseVitalReport', () => {
       { ...report, metric: 'CLS', value: 101 },
       { ...report, value: '180' },
       { ...report, standalone: 'yes' },
+      { ...report, shell: 'yes' },
       null,
       [],
       'x',
     ]) {
       expect(parseVitalReport(bad)).toBeNull()
     }
+  })
+})
+
+describe('a report from the build before the shell field', () => {
+  it('still parses, as not answered by the shell', () => {
+    const older: Record<string, unknown> = { ...report }
+    delete older.shell
+    expect(parseVitalReport(older)).toEqual({ ...report, shell: false })
   })
 })
 
@@ -74,6 +83,7 @@ describe('handleVitals', () => {
       nav_type: 'reload',
       standalone: false,
       sw: true,
+      shell: true,
       effective_type: null,
       country: 'DE',
     })

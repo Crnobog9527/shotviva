@@ -32,6 +32,8 @@ export type VitalReport = {
   nav: VitalNavType
   standalone: boolean
   sw: boolean
+  // Create's app shell answered this page (ARCHITECTURE §18.3): its LCP is the shell's paint.
+  shell: boolean
   net: VitalEffectiveType | null
 }
 
