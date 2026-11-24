@@ -12,6 +12,8 @@ import { serviceWorkerEnabled, serviceWorkerShellEnabled } from '@/core/system-s
 export async function GET() {
   await connection()
   // Create's app shell (ARCHITECTURE §18.3) is its own switch, and only with the worker on.
-  const [enabled, shell] = await Promise.all([serviceWorkerEnabled(), serviceWorkerShellEnabled()])
+  // MEASUREMENT ONLY (perf/app-shell-measure, never merged): the shell is on for previews without
+  // the switch, so the launch gate can be measured before the migration reaches the database.
+  const [enabled, shell] = await Promise.all([serviceWorkerEnabled(), process.env.VERCEL_ENV === 'preview' ? Promise.resolve(true) : serviceWorkerShellEnabled()])
   return serviceWorkerResponse(enabled, shell)
 }
