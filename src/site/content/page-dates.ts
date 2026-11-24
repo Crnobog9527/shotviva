@@ -7,7 +7,7 @@ import { LAST_UPDATED } from './legal/shared'
 // pages show one shared "Last updated" date (legal/shared.ts), so their lastmod is that date.
 export const PAGE_LASTMOD: Readonly<Record<string, string>> = {
   '/': '2026-11-24',
-  '/image-to-image-generator': '2026-11-13',
+  '/image-to-image-generator': '2026-11-24',
   '/commercial-photography': '2026-11-13',
   '/ai-restaurant-menu': '2026-11-20',
   '/transparent-background': '2026-11-20',
@@ -17,8 +17,8 @@ export const PAGE_LASTMOD: Readonly<Record<string, string>> = {
   '/refund-policy': LAST_UPDATED,
   '/acceptable-use': LAST_UPDATED,
   '/zh': '2026-11-24',
-  '/zh/image-to-image-generator': '2026-11-13',
-  '/zh/commercial-photography': '2026-11-13',
-  '/zh/ai-restaurant-menu': '2026-11-20',
-  '/zh/pricing': '2026-11-20',
+  '/zh/image-to-image-generator': '2026-11-24',
+  '/zh/commercial-photography': '2026-11-24',
+  '/zh/ai-restaurant-menu': '2026-11-24',
+  '/zh/pricing': '2026-11-24',
 }

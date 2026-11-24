@@ -106,7 +106,7 @@ const copy = {
   },
   landing: {
     // GEO (03-S3): one platform rule with the date it was checked.
-    factsNote: `These are ${brand}'s own limits and sizes, the same on every page of this site. Shopify says ${px(shopify.squarePx)} × ${px(shopify.squarePx)} px usually displays best for square product images, and Amazon prefers more than ${px(amazon.zoomPx)} px on the longest side for zoom (both checked ${PLATFORM_SPECS_CHECKED.en}).`,
+    factsNote: `These are ${brand}'s own limits and sizes. Shopify says ${px(shopify.squarePx)} × ${px(shopify.squarePx)} px usually displays best for square product images, and Amazon prefers more than ${px(amazon.zoomPx)} px on the longest side for zoom (both checked ${PLATFORM_SPECS_CHECKED.en}).`,
     shoot: catStyles,
     edits,
   },
