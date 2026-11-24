@@ -27,12 +27,12 @@ function decoded(image: HTMLImageElement, then: () => void) {
   image.decode().then(then, then)
 }
 
-type PhoneProps = { items: Props['scenes']['items']; active: number; previous: number; sizes: string; markLoaded: (index: number) => void }
+type PhoneProps = { items: Props['scenes']['items']; active: number; previous: number; sizes: string; markLoaded: (index: number) => void; markFailed: (index: number) => void }
 
 // When every scene is its own dish, its phone photo turns with it: the later photos lie over
 // the server-rendered first one (marketing.css .mk-pstack), so going back to scene 1 fades the
 // last photo out to reveal it. Only rendered once armed, like the later AI scenes.
-function PhoneScenes({ items, active, previous, sizes, markLoaded }: PhoneProps) {
+function PhoneScenes({ items, active, previous, sizes, markLoaded, markFailed }: PhoneProps) {
   return (
     <span className="mk-pstack">
       {items.map(({ before }, index) =>
@@ -47,6 +47,7 @@ function PhoneScenes({ items, active, previous, sizes, markLoaded }: PhoneProps)
             height={before.height}
             sizes={sizes}
             onLoad={(event) => decoded(event.currentTarget, () => markLoaded(index))}
+            onError={() => markFailed(index)}
             {...LOADING}
           />
         ) : null,
@@ -62,7 +63,7 @@ function PhoneScenes({ items, active, previous, sizes, markLoaded }: PhoneProps)
 export function HeroScenes({ scenes, tags, sizes, phonePane }: Props) {
   const { items } = scenes
   const turnsPhone = items.some((scene) => scene.before)
-  const { active, previous, armed, waiting, pick, markLoaded, hold } = useSceneRotation(items.length, turnsPhone ? 2 : 1)
+  const { active, previous, armed, waiting, pick, markLoaded, markFailed, hold } = useSceneRotation(items.length, turnsPhone ? 2 : 1)
   const onBlur = (event: FocusEvent<HTMLElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget)) hold(false)
   }
@@ -72,7 +73,7 @@ export function HeroScenes({ scenes, tags, sizes, phonePane }: Props) {
         {/* While a later dish is up, the first phone photo underneath leaves the accessibility tree,
             so only the pair on screen is announced. */}
         {turnsPhone && active !== 0 && isValidElement<{ 'aria-hidden'?: boolean }>(phonePane) ? cloneElement(phonePane, { 'aria-hidden': true }) : phonePane}
-        {turnsPhone && armed ? <PhoneScenes items={items} active={active} previous={previous} sizes={sizes} markLoaded={markLoaded} /> : null}
+        {turnsPhone && armed ? <PhoneScenes items={items} active={active} previous={previous} sizes={sizes} markLoaded={markLoaded} markFailed={markFailed} /> : null}
         <span className="mk-pane">
           {items.map(({ image }, index) =>
             index === 0 || armed ? (
@@ -86,6 +87,7 @@ export function HeroScenes({ scenes, tags, sizes, phonePane }: Props) {
                 height={image.height}
                 sizes={sizes}
                 onLoad={(event) => decoded(event.currentTarget, () => markLoaded(index))}
+                onError={() => markFailed(index)}
                 {...LOADING}
               />
             ) : null,

@@ -35,8 +35,10 @@ function afterLoadAndIdle(then: () => void): () => void {
 // `parts` images (1, or 2 when the phone photo turns too) are loaded and decoded, so a slow link
 // never fades to an empty plate. A pick switches at once: if that scene is not ready yet,
 // `waiting` hides every other picture (hero-scenes.tsx, marketing.css .mk-wait) so its two
-// plates fill in together and never sit next to another scene's. Hover or focus inside the
-// hero holds the timer; a manual pick stops it for good (WCAG 2.2.2).
+// plates fill in together and never sit next to another scene's. If one of its pictures fails
+// to load, the hero goes back to the scene shown before the pick, and that scene is never picked
+// or shown again. Hover or focus inside the hero holds the timer; a manual pick stops it for
+// good (WCAG 2.2.2).
 export function useSceneRotation(count: number, parts = 1) {
   const [{ active, previous }, setShown] = useState({ active: 0, previous: -1 })
   const [armed, setArmed] = useState(false)
@@ -44,6 +46,10 @@ export function useSceneRotation(count: number, parts = 1) {
   const [held, setHeld] = useState(false)
   const [waiting, setWaiting] = useState(-1)
   const loaded = useRef<number[]>([parts])
+  // The scene a pending pick came from, and the scenes whose pictures failed.
+  const from = useRef(0)
+  const waitingFor = useRef(-1)
+  const failed = useRef(new Set<number>())
 
   useEffect(() => afterLoadAndIdle(() => setArmed(true)), [])
 
@@ -61,21 +67,37 @@ export function useSceneRotation(count: number, parts = 1) {
 
   const pick = useCallback(
     (index: number) => {
+      if (failed.current.has(index)) return
       setAuto(false)
       setArmed(true)
       const now = (loaded.current[index] ?? 0) >= parts
-      setWaiting(now ? -1 : index)
-      setShown((shown) => (shown.active === index ? shown : { active: index, previous: now ? shown.active : -1 }))
+      waitingFor.current = now ? -1 : index
+      setWaiting(waitingFor.current)
+      setShown((shown) => {
+        if (shown.active === index) return shown
+        if (waitingFor.current === -1 || shown.active !== waitingFor.current) from.current = shown.active
+        return { active: index, previous: now ? shown.active : -1 }
+      })
     },
     [parts],
   )
   const markLoaded = useCallback(
     (index: number) => {
       loaded.current[index] = (loaded.current[index] ?? 0) + 1
-      if ((loaded.current[index] ?? 0) >= parts) setWaiting((was) => (was === index ? -1 : was))
+      if ((loaded.current[index] ?? 0) >= parts && waitingFor.current === index) {
+        waitingFor.current = -1
+        setWaiting(-1)
+      }
     },
     [parts],
   )
+  const markFailed = useCallback((index: number) => {
+    failed.current.add(index)
+    if (waitingFor.current !== index) return
+    waitingFor.current = -1
+    setWaiting(-1)
+    setShown({ active: from.current, previous: -1 })
+  }, [])
 
-  return { active, previous, armed, waiting, pick, markLoaded, hold: setHeld }
+  return { active, previous, armed, waiting, pick, markLoaded, markFailed, hold: setHeld }
 }
