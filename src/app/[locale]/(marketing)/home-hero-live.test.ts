@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
-const coverPreview = vi.fn()
-vi.mock('@/core/templates/cover-ratio', () => ({ coverPreview: (...args: unknown[]) => coverPreview(...args) }))
+const plateFrame = vi.fn()
+vi.mock('@/core/templates/cover-ratio', () => ({ plateFrame: (...args: unknown[]) => plateFrame(...args) }))
 
 const { liveHero } = await import('./home-hero-live')
 
@@ -11,8 +11,8 @@ const template = (id: string, before: string | null = `https://a.test/${id}-b.we
 
 describe('liveHero', () => {
   beforeEach(() => {
-    coverPreview.mockReset()
-    coverPreview.mockResolvedValue({ ratio: 0.75, firstFrame: 'data:image/avif;base64,AAA' })
+    plateFrame.mockReset()
+    plateFrame.mockResolvedValue('data:image/avif;base64,AAA')
   })
 
   it('takes each pair from the template current covers, in the listed order, with our words', async () => {
@@ -24,7 +24,7 @@ describe('liveHero', () => {
     ])
     expect(hero?.before).toMatchObject({ src: 'https://a.test/one-b.webp', alt: '手机照 one', firstFrame: 'data:image/avif;base64,AAA' })
     expect(hero?.after).toMatchObject({ src: 'https://a.test/one-a.webp', alt: '成图 one' })
-    expect(coverPreview).toHaveBeenCalledWith('https://a.test/one-b.webp', true)
+    expect(plateFrame).toHaveBeenCalledWith('https://a.test/one-b.webp', 0.8)
   })
 
   it('drops a template that is not live or lacks a cover, and keeps a single pair without scenes', async () => {
@@ -35,7 +35,7 @@ describe('liveHero', () => {
 
   it('gives null when none is live, and no first frame when the cover cannot be read', async () => {
     expect(await liveHero([scene('gone')], '菜', [])).toBeNull()
-    coverPreview.mockResolvedValue({ ratio: null, firstFrame: null })
+    plateFrame.mockResolvedValue(null)
     const hero = await liveHero([scene('one')], '菜', [template('one')])
     expect(hero?.before.firstFrame).toBeUndefined()
   })

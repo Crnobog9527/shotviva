@@ -1,7 +1,7 @@
 import 'server-only'
 
 import type { HeroBlock, HeroScene, ImageRef } from '@/core/content'
-import { coverPreview } from '@/core/templates/cover-ratio'
+import { plateFrame } from '@/core/templates/cover-ratio'
 import type { LiveHeroScene } from '@/site/experiments'
 
 type Covers = { id: string; coverBeforeUrl: string | null; coverAfterUrl: string | null }
@@ -14,8 +14,8 @@ const plate = (src: string, alt: string): ImageRef => ({ src, alt, width: 880, h
 // The hero pairs from the templates' current covers (Owner 2026-11-25), in the listed order. A
 // template that is not live (unpublished, deleted, off the web) or lacks either cover drops out;
 // with none left the page keeps its own hero (null). The first pair is the first paint: its phone
-// photo carries a first frame made from the live cover (cover-ratio.ts, cached per cover URL,
-// which changes with every new upload), so it still paints with the page like the static one did.
+// photo carries a first frame made from the live cover, cut to the 4:5 plate (cover-ratio.ts,
+// cached per cover URL, which changes with every new upload), so it still paints with the page like the static one did.
 export async function liveHero(scenes: readonly LiveHeroScene[], label: string, live: readonly Covers[]): Promise<LiveHero | null> {
   const byId = new Map(live.map((template) => [template.id, template]))
   const pairs: HeroScene[] = scenes.flatMap((scene) => {
@@ -25,7 +25,7 @@ export async function liveHero(scenes: readonly LiveHeroScene[], label: string, 
   })
   const [first, second, ...rest] = pairs
   if (!first?.before) return null
-  const { firstFrame } = await coverPreview(first.before.src, true)
+  const firstFrame = await plateFrame(first.before.src, 4 / 5)
   const before = firstFrame ? { ...first.before, firstFrame } : first.before
   return {
     before,
