@@ -32,7 +32,7 @@ export function FeaturedPanel({ featured, templates, pending }: Props) {
   const outOfOrder = !draft.dirty && order.join(',') !== ids.join(',')
   return (
     <section aria-labelledby="featured-h" className="grid gap-3 rounded-md border p-4">
-      <FoldHeader open={open} setOpen={setOpen} summary={summaryOf(order, byId, draft.dirty)} />
+      <FoldHeader open={open} setOpen={setOpen} summary={summaryOf(ranks, byId, draft.dirty, outOfOrder)} />
       <div id="featured-body" hidden={!open} className="grid gap-3">
       <p className="text-muted-foreground max-w-[75ch] text-sm">{copy.intro}</p>
       {order.length === 0 && !draft.dirty ? <p className="text-muted-foreground text-sm">{copy.empty}</p> : null}
@@ -64,9 +64,11 @@ export function FeaturedPanel({ featured, templates, pending }: Props) {
 }
 
 // The closed panel's line: how many, which one the generator opens on, anything unsaved.
-function summaryOf(order: readonly string[], byId: ReadonlyMap<string, AdminTemplate>, dirty: boolean) {
-  const first = order[0]
-  return copy.summary(order.length, first ? zhNameOf(byId.get(first), first) : '', dirty)
+// and whether the saved order differs from the page's (the notice inside is hidden while closed).
+// `ranks`: the order featured_rank follows, so its first is the generator's default.
+function summaryOf(ranks: readonly string[], byId: ReadonlyMap<string, AdminTemplate>, dirty: boolean, outOfOrder: boolean) {
+  const first = ranks[0]
+  return copy.summary(ranks.length, first ? zhNameOf(byId.get(first), first) : '', dirty, outOfOrder)
 }
 
 function FoldHeader({ open, setOpen, summary }: { open: boolean; setOpen: (open: boolean) => void; summary: string }) {

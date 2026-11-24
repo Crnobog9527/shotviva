@@ -302,8 +302,8 @@ export const featuredCopy = {
   dirty: '有未保存的改动，首页还是原来的样子。',
   expand: '展开首页精选',
   collapse: '收起首页精选',
-  summary: (count: number, first: string, dirty: boolean) =>
-    `${count ? `${count} 个精选模板，默认选中「${first}」` : '还没有精选模板'}${dirty ? '；有未保存的改动' : ''}`,
+  summary: (count: number, first: string, dirty: boolean, outOfOrder = false) =>
+    `${count ? `${count} 个精选模板，默认选中「${first}」` : '还没有精选模板'}${dirty ? '；有未保存的改动' : ''}${outOfOrder ? '；默认模板不是第一张卡片，展开后可以整理' : ''}`,
   save: '保存',
   discard: '放弃改动',
   saved: '首页精选已保存，首页随后更新',
