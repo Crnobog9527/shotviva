@@ -14,9 +14,11 @@ import { routeFor } from './routes'
 // activation deletes every other build's), one for catalogue files across builds (a few kept).
 export const CACHE_PREFIX = 'sv-'
 const CATALOGUE_KEEP = 4
-// Template covers (LCP plan 1): the most recently shown ones, about a screen and a half of the
-// grid plus the home page's, some 0.5 MB of 384 w AVIF. Across builds: a cover's name is its hash.
-export const COVERS_KEEP = 40
+// First-screen template covers (LCP plan 1): the ones named most recently, a few first screens'
+// worth (Create's All sections and a chosen category's grid), some 0.3 MB of 384 w AVIF. Kept
+// across builds: a cover's name is its hash.
+export const COVERS_KEEP = 24
+const KEEP_PER_MESSAGE = 8
 // After this many covers in a row from one host came back without CORS (a CDN copy cached before
 // the header was added), the worker stops asking that host in CORS mode until it restarts.
 const CORS_STRIKES = 3
@@ -62,46 +64,50 @@ async function cacheFirst(event, name, keep) {
   return response
 }
 
-// A cover is shown by a plain <img> (no CORS), whose answer the worker could only keep opaque: an
-// unreadable copy that Chrome counts as about 7 MB of quota. So the worker asks for it in CORS mode
-// itself (the hosts send Access-Control-Allow-Origin: *) and keeps only that readable copy; a host
-// that answers without the header gets the browser's own request, kept nowhere. A hit is moved to
-// the end, and the oldest beyond COVERS_KEEP are dropped, so the covers shown most recently stay.
+// First-screen covers (LCP plan 1). The page names the covers it shows on its first screen
+// (near-viewport.tsx, through the 'sv-keep-covers' message) once it has loaded; only those are
+// kept, so scrolling through the catalogue never pushes them out. A cover the page shows is a
+// plain <img> (no CORS), whose answer could only be kept opaque: an unreadable copy that Chrome
+// counts as about 7 MB of quota. So the worker fetches each named cover in CORS mode itself (the
+// hosts send Access-Control-Allow-Origin: *; the browser's HTTP cache usually has it already) and
+// keeps only that readable copy. A host that answers without the header gets nothing kept; after
+// three in a row it is not asked again until the worker restarts. Named again, a cover moves to
+// the end; the oldest beyond COVERS_KEEP are dropped.
 const corsStrikes = new Map()
-async function coverFirst(event) {
-  const request = event.request
-  const url = request.url
-  try {
-    const cache = await caches.open(COVERS)
+async function keepCovers(urls) {
+  const cache = await caches.open(COVERS)
+  for (const url of urls) {
     const hit = await cache.match(url)
     if (hit) {
-      const copy = hit.clone()
-      event.waitUntil(cache.delete(url).then(() => cache.put(url, copy)).catch(() => {}))
-      return hit
+      await cache.delete(url)
+      await cache.put(url, hit)
+      continue
     }
-  } catch {}
-  const host = new URL(url).origin
-  if ((corsStrikes.get(host) ?? 0) >= ${CORS_STRIKES}) return fetch(request)
-  let response
-  try {
-    response = await fetch(url, { mode: 'cors', credentials: 'omit' })
-  } catch {
-    corsStrikes.set(host, (corsStrikes.get(host) ?? 0) + 1)
-    return fetch(request)
-  }
-  if (response.status === 200 && response.type === 'cors') {
+    const host = new URL(url).origin
+    if ((corsStrikes.get(host) ?? 0) >= ${CORS_STRIKES}) continue
+    let response
+    try {
+      response = await fetch(url, { mode: 'cors', credentials: 'omit' })
+    } catch {
+      corsStrikes.set(host, (corsStrikes.get(host) ?? 0) + 1)
+      continue
+    }
+    if (response.status !== 200 || response.type !== 'cors') continue
     corsStrikes.set(host, 0)
-    const copy = response.clone()
-    event.waitUntil((async () => {
-      try {
-        const cache = await caches.open(COVERS)
-        await cache.put(url, copy)
-        const keys = await cache.keys()
-        for (const old of keys.slice(0, Math.max(0, keys.length - ${COVERS_KEEP}))) await cache.delete(old)
-      } catch {}
-    })())
+    await cache.put(url, response)
   }
-  return response
+  const keys = await cache.keys()
+  for (const old of keys.slice(0, Math.max(0, keys.length - ${COVERS_KEEP}))) await cache.delete(old)
+}
+
+// A kept cover from the cache; any other cover, or any cache error, goes to the network as the
+// browser asked for it, and nothing is written.
+async function coverFirst(event) {
+  try {
+    const hit = await (await caches.open(COVERS)).match(event.request.url)
+    if (hit) return hit
+  } catch {}
+  return fetch(event.request)
 }
 
 self.addEventListener('fetch', (event) => {
@@ -123,11 +129,16 @@ self.addEventListener('fetch', (event) => {
   else if (route === 'cover') event.respondWith(coverFirst(event))
 })
 
-// Sign-out (and the page's own clear): drop every cache this worker made.
+// Sign-out (and the page's own clear): drop every cache this worker made. 'sv-keep-covers': the
+// first screen's covers (a few at a time; anything that is not a cover's pre-sized copy is ignored).
 self.addEventListener('message', (event) => {
   if (event.data === 'sv-clear') event.waitUntil((async () => {
     for (const key of await caches.keys()) if (key.startsWith(PREFIX)) await caches.delete(key)
   })())
+  else if (event.data?.type === 'sv-keep-covers' && Array.isArray(event.data.urls)) {
+    const urls = event.data.urls.filter((url) => typeof url === 'string' && routeFor(url, 'GET', 'no-cors', ORIGINS, COVER_ORIGINS) === 'cover').slice(0, ${KEEP_PER_MESSAGE})
+    if (urls.length) event.waitUntil(keepCovers(urls).catch(() => {}))
+  }
 })
 `
 
