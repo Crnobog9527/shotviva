@@ -38,7 +38,7 @@ type Props = {
 // order. The "full shoot" demo no longer shows on the home page (/commercial-photography has it).
 export function HomePageView({ page, brand, isLinkEnabled, templates, generator, wishlistCta, heroTagline, heroStrip }: Props) {
   return (
-    <article className="mk-home mk-w">
+    <article className="mk-home mk-front mk-w">
       <HomeHero page={page} generator={generator} tagline={heroTagline} />
       {heroStrip ? <HeroStrip strip={heroStrip} /> : null}
       {page.spaces ? <SpacesSection spaces={page.spaces} /> : null}

@@ -9,8 +9,8 @@ export { HERO_DEFAULT_OPTION, HERO_OPTIONS } from './registry'
 // The home hero's options for A/B experiments (ARCHITECTURE §16.5, Owner 2026-11-14). Each is a
 // real before/after set made with a published template, plus one short line; the H1, subtitle and
 // direct answer never change (建站规格 §4, G1), so search engines and every group read the same
-// page copy. `tote` is today's hero (the e-commerce case) and needs nothing here.
-// Not here yet: food (the Owner picks the pictures first) and hotels (no template exists).
+// page copy. `tote` (the e-commerce case) is the page content's own hero and needs nothing here;
+// `food` is the default, shown at `/`.
 
 export type HeroOptionContent = {
   hero: Pick<HeroBlock, 'before' | 'after' | 'caption' | 'scenes'>

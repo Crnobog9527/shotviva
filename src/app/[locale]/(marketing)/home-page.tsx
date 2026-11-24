@@ -12,12 +12,11 @@ import { cachedPublicSeries } from '@/core/templates/public-series'
 import { homePanelTemplates } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
 import { HOME_CATEGORIES, creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
-import { heroOptionContent } from '@/site/experiments'
+import { HERO_DEFAULT_OPTION, heroOptionContent } from '@/site/experiments'
 import { site } from '@/site/site.config'
 
 import { HomeGeneratorSlot } from './home-generator-slot'
 
-const DEFAULT_HERO = 'food'
 import { HomeWishCtaSlot } from './home-wish-cta-slot'
 
 // The home page, shared by `/` (today's hero) and the A/B hero options the proxy rewrites `/` to
@@ -41,12 +40,13 @@ export async function homeMetadata(): Promise<Metadata> {
   return pageMetadata(site, meta, locale)
 }
 
-// Restaurants and hotels lead (Owner 2026-11-24): with no experiment the page shows the food
-// option's pictures, line and strip, and the generator keeps the admin's first featured template
-// (a hotel one today), so the first screen shows a dish above and a hotel below. An experiment's
-// option replaces the pictures and opens the generator on its own template.
+// Restaurants and hotels lead (Owner 2026-11-24): `/` is the registry's default option (food), its
+// pictures, line and strip, and the generator keeps the admin's first featured template (a hotel
+// one today), so the first screen shows a dish above and a hotel below. Another option's page
+// (/x/hero/…) shows its own pictures and opens the generator on its template; `tote` has none
+// here, so it shows the page content's own hero.
 function heroFor(heroOption: string | undefined, locale: Locale, live: readonly { id: string }[], featuredId: string | null) {
-  const option = heroOptionContent(heroOption ?? DEFAULT_HERO, locale)
+  const option = heroOptionContent(heroOption ?? HERO_DEFAULT_OPTION, locale)
   const opens = heroOption ? option?.generatorTemplate : undefined
   return { option, defaultId: opens && live.some((template) => template.id === opens) ? opens : featuredId }
 }
