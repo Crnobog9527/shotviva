@@ -208,7 +208,7 @@ describe('account Plan card after an upgrade by a one-time method', () => {
     const oldStarter = row({ ...ids('waffo'), productId: 'starter_monthly', currentPeriodEnd: days(9) })
     const { html, text } = await render(summarize([oldStarter], days(69), 'pro'), 'zh', 38, last)
     expect(html).toContain('data-tier="pro"')
-    expect(text).toContain('你之前的入门版卡订阅仍会在 2026年11月15日 自动续费。')
+    expect(text).toContain('你之前通过银行卡订阅的入门版，仍会在 2026年11月15日 自动续费。')
     expect(buttons(html)).toContain('取消订阅')
   })
 })

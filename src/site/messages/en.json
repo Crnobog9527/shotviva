@@ -11,7 +11,7 @@
       "yourPhoto": "Your photo",
       "originalPhotoAlt": "Your original photo before editing",
       "photoReady": "Photo ready",
-      "photoReadyHint": "It now stands in for the example photo",
+      "photoReadyHint": "Your photo replaces the example",
       "stageAlt": "{name}: an example of the finished photo",
       "changeTemplate": "Template: {name}. Change template",
       "changeSize": "Size: {name}. Change size",
@@ -36,7 +36,7 @@
       "pickerSeries": "Series · {count, plural, one {# template} other {# templates}}",
       "pickerBack": "Back",
       "signup": {
-        "title": "Make a free account to develop it",
+        "title": "Create a free account to make it",
         "text": "Your photo and template stay as you set them.",
         "giftNote": "Shown publicly with a watermark",
         "phone": "Continue with phone",
@@ -670,7 +670,7 @@
       "seeAll": "See all",
       "seeAllWhich": "in {name}",
       "seeAllCount": "{count} in all",
-      "illustrative": "Every card shows the real phone photo on the left and the AI result on the right. Template images are real results made with these templates."
+      "illustrative": "Each card shows the phone photo on the left and the AI result on the right, made with that template."
     },
     "series": {
       "count": "{count, plural, one {# template} other {# templates}}",
@@ -1081,7 +1081,7 @@
       "IDENTITY_SWAP_REFUSED": "Shotviva can't swap faces or turn a person into someone else, to protect everyone's likeness. You can change the expression, makeup, lighting and background.",
       "REFERENCE_IMAGE_LIMIT": "This model accepts fewer reference images. Remove some photos or choose another template.",
       "TEMPLATE_UNAVAILABLE": "This template is temporarily unavailable. Please try again later.",
-      "TEMPLATE_QUOTE_CHANGED": "The price or template has changed. Refresh to see the current offer.",
+      "TEMPLATE_QUOTE_CHANGED": "The price or template has changed. Refresh to see the current price.",
       "MODEL_INPUT_UNSUPPORTED": "Check the reference photos, resolution and aspect ratio, or choose another template.",
       "GENERATION_FAILED": "The studio couldn't finish this photo. It usually works on a second try.",
       "PROVIDER_FAILED": "The studio couldn't finish this photo. It usually works on a second try.",
@@ -1096,7 +1096,7 @@
       "UNAUTHORIZED": "Please sign in again.",
       "fallback": "Something went wrong. Please try again.",
       "refunded": "Your credits were refunded.",
-      "onHold": "Your credits are on hold. We'll return them, or contact support.",
+      "onHold": "Your credits are on hold. We'll return them; you can also contact support.",
       "notCharged": "No credits were used.",
       "TIER_REQUIRED": "This needs the {tier} plan."
     },
@@ -1666,7 +1666,7 @@
     "share": {
       "button": "Share",
       "copied": "Link copied",
-      "text": "A phone photo made into this with the {name} template on Shotviva:",
+      "text": "Made from a phone photo with the {name} template on Shotviva:",
       "copyByHand": "Copy this link to share it:"
     },
     "giftClaim": {
@@ -2354,13 +2354,13 @@
     "payNotePacks": "Credit packs are always a one-time payment.",
     "cancelled": "<b>Checkout cancelled.</b> Nothing was charged.",
     "cancelledClose": "Dismiss",
-    "downgradeRefused": "Plans only go up while yours runs.",
+    "downgradeRefused": "You can upgrade during your plan, but not downgrade.",
     "goToAccount": "Go to Account",
     "yourPlan": "Your plan",
     "notAvailable": "Not available",
     "lockLower": "Can't switch down. Cancel, then buy it after your plan ends.",
     "lockCurrentNote": "This is your plan. Manage or cancel it in Account.",
-    "upgradeNote": "Starts now, all its credits at once; your credits stay.",
+    "upgradeNote": "Starts now. You get all its credits at once and keep the ones you have.",
     "upgradeNoteCancels": "Starts now, all its credits at once; your current subscription ends today and your credits stay.",
     "guestDiscount": "Sign up to use your code.",
     "waffoNoDiscount": "Promo codes are unavailable with this payment provider. Your discount is saved for later.",

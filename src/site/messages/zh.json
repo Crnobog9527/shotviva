@@ -11,7 +11,7 @@
       "yourPhoto": "你的照片",
       "originalPhotoAlt": "你的原图，处理前",
       "photoReady": "照片已选好",
-      "photoReadyHint": "已替换模板的示例原图",
+      "photoReadyHint": "已换成你的照片",
       "stageAlt": "{name}模板成品示例",
       "changeTemplate": "模板：{name}，点击更换",
       "changeSize": "尺寸：{name}，点击更换",
@@ -24,7 +24,7 @@
       "pickerTitle": "选一个模板",
       "pickerLoading": "正在加载模板…",
       "pickerLoadFailed": "模板加载失败。",
-      "pickerText": "每个模板都保留你拍的主体，只换光线、场景或画风。",
+      "pickerText": "模板只改变光线、场景或画风，照片内容始终与原图一致。",
       "pickTemplate": "选用{name}",
       "pickerSearch": "搜索模板：名称、用途、分类",
       "pickerClear": "清空搜索",
@@ -36,7 +36,7 @@
       "pickerSeries": "系列 · {count, number} 个模板",
       "pickerBack": "返回",
       "signup": {
-        "title": "注册一个免费账号来出图",
+        "title": "免费注册，立即出图",
         "text": "你选好的照片和模板都会保留。",
         "giftNote": "公开展示，带水印",
         "phone": "手机号登录/注册",
@@ -147,7 +147,7 @@
       "submit": "发送重设链接",
       "back": "返回登录",
       "sentTitle": "请查收邮件",
-      "sent": "如果 <addr>{email}</addr> 注册过账号，重设链接已经在路上了，{hours} 小时内有效。"
+      "sent": "如果 <addr>{email}</addr> 注册过账号，重设链接已发送，{hours} 小时内有效。"
     },
     "expired": {
       "title": "这个链接已经失效",
@@ -184,7 +184,7 @@
     },
     "errors": {
       "UNAUTHORIZED": "请重新登录。",
-      "FORBIDDEN": "你没有权限进行这个操作。",
+      "FORBIDDEN": "你没有执行这个操作的权限。",
       "NOT_FOUND": "没有找到。",
       "INVALID_INPUT": "请检查邮箱和密码。",
       "CREDITS_INSUFFICIENT": "积分不够了。",
@@ -210,7 +210,7 @@
       "signOut": "退出登录",
       "dangerZone": "注销账号",
       "delete": "注销我的账号",
-      "deleteWarning": "注销后，你的账号、剩余积分和所有作品都会被永久删除。订阅会先被取消。注销后无法恢复。",
+      "deleteWarning": "注销后将先取消订阅，随后永久删除账号、剩余积分和全部作品，且无法恢复。",
       "deleteTypeLabel": "输入 DELETE 确认",
       "deleteConfirm": "永久注销",
       "deleting": "正在注销…",
@@ -339,8 +339,8 @@
     "gated": {
       "heading": "更多做法",
       "badge": {
-        "pro": "Pro",
-        "max": "Max"
+        "pro": "专业版",
+        "max": "旗舰版"
       },
       "lockedSr": "（需要 {tier}）",
       "replay": "再看一遍",
@@ -363,25 +363,25 @@
         "samplesNote": "示例",
         "done": "知道了",
         "cta": {
-          "pro": "开通 Pro · 一次 {pro, number} 张",
-          "max": "开通 Max · {templates, number} 个模板、一次 {max, number} 张"
+          "pro": "开通专业版 · 一次 {pro, number} 张",
+          "max": "开通旗舰版 · {templates, number} 个模板、一次 {max, number} 张"
         },
         "quiet": {
-          "pro": "开通 Pro · 一次 {pro, number} 张",
-          "max": "要一次 {max, number} 张或多个模板？看看 Max"
+          "pro": "开通专业版 · 一次 {pro, number} 张",
+          "max": "要一次 {max, number} 张或多个模板？看看旗舰版"
         }
       },
       "batch": {
         "title": "批量处理",
         "lede": "一次传一批商品照，选一个模板，整批一起出图，做好后打包下载。适合一次上新很多商品的网店。",
-        "step1": "一次上传：Pro 最多 {pro, number} 张，Max 最多 {max, number} 张。",
+        "step1": "一次上传：专业版最多 {pro, number} 张，旗舰版最多 {max, number} 张。",
         "step2": "选一个模板，整批用同一个尺寸和清晰度。",
-        "step3": "一起生成。每张单独扣积分，哪张失败就退回哪张。",
+        "step3": "一起生成。按张扣积分，失败的那张自动退回。",
         "step4": "全部做好后，一个按钮打包下载。",
         "note": "批量只用付费积分。",
         "demo": {
           "label": "演示：{count, number} 张商品照套用同一个白底图模板，一起出图，最后打包成一个 ZIP。",
-          "caption": "演示按 Max 一次 {count, number} 张；图片是示例。",
+          "caption": "演示按旗舰版一次 {count, number} 张；图片是示例。",
           "photos": "{count, number} 张商品照",
           "template": "白底商品图",
           "more": "+{count, number}",
@@ -401,7 +401,7 @@
         "step2": "加照片：每张照片都会套用每一个模板。",
         "step3": "出图前先核对每一张和总积分，不要的点一下去掉。",
         "step4": "结果可以按模板看，也可以按照片看，还能打包下载。",
-        "note": "一次用多个模板是 Max 的功能，只用付费积分。",
+        "note": "一次用多个模板是旗舰版的功能，只用付费积分。",
         "demo": {
           "photo": "照片",
           "names": {
@@ -424,7 +424,7 @@
     "matrix": {
       "lede": "选 1 个模板就是批量出图；最多 {templates, number} 个模板一起套，一批最多 {max, number} 张。",
       "ledeOne": "一个模板一次最多 {max, number} 张照片，一起出图、打包下载。",
-      "ledeLocked": "一个模板批量出图（Pro，一次 {pro, number} 张），或最多 {templates, number} 个模板 × 多张照片（Max，一次 {max, number} 张）。",
+      "ledeLocked": "一个模板批量出图（专业版，一次 {pro, number} 张），或最多 {templates, number} 个模板 × 多张照片（旗舰版，一次 {max, number} 张）。",
       "metaTitle": "批量创作",
       "title": "批量创作",
       "entryLink": "这些照片再多套几个模板",
@@ -434,7 +434,7 @@
       "addTemplate": "再加一个模板",
       "templatesLeft": "还能加 {count, number} 个",
       "moreTemplates": "再加模板",
-      "morePhotos": "Max 一次最多 {count, number} 张",
+      "morePhotos": "旗舰版一次最多 {count, number} 张",
       "removeTemplate": "去掉{name}",
       "swap": "换模板",
       "swapTemplate": "换掉{name}",
@@ -462,7 +462,7 @@
       "overrideHint": "选一张照片单独改文字，其他照片仍用上面的文字。",
       "overrideReset": "改回共用的文字",
       "resolutionAside": "整批统一",
-      "noticeGenerate": "<b>只用付费积分。</b>每张单独扣费，失败的单独退回。",
+      "noticeGenerate": "<b>只用付费积分。</b>按张扣费，失败的自动退回。",
       "noticeCredits": "批量只用付费积分：{count, number} 张需要 <b>{total, number} 积分</b>。",
       "noticeTooMany": "<b>一批最多 {max, number} 张。</b>去掉一些格子或者去掉一个模板。",
       "generate": "生成 {count, number} 张 · <mono>{total, number} 积分</mono>",
@@ -492,11 +492,11 @@
       "openPhotos": "打开作品",
       "backToCreate": "返回创作",
       "closeWhileRunning": "关闭（继续在后台出图）",
-      "lockedTitle": "批量创作是 Pro 和 Max 的功能",
+      "lockedTitle": "批量创作是专业版和旗舰版的功能",
       "lockedPro": "一个模板一次最多 {count, number} 张照片。",
       "lockedMax": "最多 {templates, number} 个模板一起套，一批最多 {count, number} 张。",
-      "lockedCta": "开通 Pro · 一次 {count, number} 张",
-      "lockedSeeMax": "要一次用多个模板？看看 Max",
+      "lockedCta": "开通专业版 · 一次 {count, number} 张",
+      "lockedSeeMax": "要一次用多个模板？看看旗舰版",
       "lockedDemo": "看看怎么用",
       "lockedDrawing": "竖着三张照片、横着三个模板：一批出九张"
     },
@@ -533,16 +533,16 @@
         "repeating": "订阅的前 {months} 个月有效。",
         "forever": "订阅续费也享受折扣。"
       },
-      "received": "兑换码已为你的账号添加 {credits} 个{pool, select, paid {付费} other {免费}}积分。",
-      "saved": "你的 {percent} 优惠已可使用。",
+      "received": "兑换成功，{credits} 个{pool, select, paid {付费} other {免费}}积分已到账。",
+      "saved": "{percent} 优惠已生效。",
       "dismiss": "关闭",
       "products": {
-        "starter_monthly": "Starter 月付",
-        "pro_monthly": "Pro 月付",
-        "max_monthly": "Max 月付",
-        "starter_yearly": "Starter 年付",
-        "pro_yearly": "Pro 年付",
-        "max_yearly": "Max 年付",
+        "starter_monthly": "入门版月付",
+        "pro_monthly": "专业版月付",
+        "max_monthly": "旗舰版月付",
+        "starter_yearly": "入门版年付",
+        "pro_yearly": "专业版年付",
+        "max_yearly": "旗舰版年付",
         "pack_s": "小积分包",
         "pack_m": "中积分包",
         "pack_l": "大积分包"
@@ -591,9 +591,9 @@
           "newOnly": "这个码只限新用户。",
           "own": "不能使用自己的邀请码。",
           "invited": "你已经用过邀请码了。",
-          "checkout": "当前折扣正在结账，请先完成或取消该笔结账，再替换折扣。",
+          "checkout": "当前折扣有一笔未完成的结账，请先完成付款或取消，再更换折扣。",
           "ineligible": "这个账号不符合邀请奖励条件。",
-          "orgMember": "企业员工账号使用企业分配的积分，如需更多请联系企业管理员",
+          "orgMember": "企业员工账号使用企业分配的积分，如需更多积分，请联系企业管理员。",
           "forbidden": "这个账号暂时无法兑换。",
           "auth": "请重新登录后兑换。",
           "rate": "尝试次数过多，请稍后再试。",
@@ -609,12 +609,12 @@
         "oneTime": "单次付款",
         "expires": "{date} 前有效",
         "products": {
-          "starter_monthly": "Starter 月付",
-          "starter_yearly": "Starter 年付",
-          "pro_monthly": "Pro 月付",
-          "pro_yearly": "Pro 年付",
-          "max_monthly": "Max 月付",
-          "max_yearly": "Max 年付",
+          "starter_monthly": "入门版月付",
+          "starter_yearly": "入门版年付",
+          "pro_monthly": "专业版月付",
+          "pro_yearly": "专业版年付",
+          "max_monthly": "旗舰版月付",
+          "max_yearly": "旗舰版年付",
           "pack_s": "小积分包",
           "pack_m": "中积分包",
           "pack_l": "大积分包"
@@ -645,14 +645,14 @@
       "paid": "你有 {paid} 积分。",
       "getCredits": "获取积分",
       "panelTitle": "积分",
-      "signupGiftRefused": "这个账号还没领到注册赠分：同一网络 24 小时内领取的账号已满，可以在下面验证手机号或 Google 账号领取。",
-      "signupGiftRefusedCap": "这个账号没有领到注册赠分：当天的注册赠分名额已经发完。",
-      "signupGiftRefusedPaused": "这个账号没有领到注册赠分：注册时赠分暂停发放。",
-      "signupGiftRefusedStaff": "这个账号没有注册赠分：它是通过企业员工链接注册的。"
+      "signupGiftRefused": "同一网络 24 小时内领取注册赠分的账号已达上限，这个账号暂未领到。在下方验证手机号或 Google 账号即可领取。",
+      "signupGiftRefusedCap": "这个账号注册当天，注册赠分名额已全部发完。",
+      "signupGiftRefusedPaused": "这个账号注册时，注册赠分暂停发放，因此未能领取。",
+      "signupGiftRefusedStaff": "通过企业员工链接注册的账号不享有注册赠分。"
     },
     "create": {
       "title": "创作",
-      "lede": "选一个风格，照片主体保持原样。",
+      "lede": "选择一个风格，照片内容始终与原图一致。",
       "metaTitle": "创作",
       "empty": "模板马上就到，请稍后再来看看。",
       "formLoading": "正在加载模板设置…",
@@ -670,7 +670,7 @@
       "seeAll": "查看全部",
       "seeAllWhich": "「{name}」",
       "seeAllCount": "共 {count} 个",
-      "illustrative": "每张卡片左边是真实手机照，右边是 AI 出图。模板图片都是用这些模板真实生成的。"
+      "illustrative": "每张卡片左边是手机原图，右边是 AI 成图，均由该模板实际生成。"
     },
     "series": {
       "count": "{count} 个模板",
@@ -723,7 +723,7 @@
       },
       "freeOnly": "1K 只用免费积分（企业成员用推广积分），不够这一张。可以改选 2K 或 4K，用付费积分。",
       "paidOnly": "批量和去水印只用付费积分，1K 只用免费积分。请改选 2K 或 4K。",
-      "paidShort": "2K 和 4K 只用付费积分，付费积分不够这一组。"
+      "paidShort": "2K 和 4K 只能使用付费积分，你的付费积分不足以生成这一组。"
     },
     "poster": {
       "dialogHint": "粘贴活动通知，逐行核对后一次生成整套海报。",
@@ -858,7 +858,7 @@
         "error": "出了点问题，请重试。"
       },
       "slotHint": "可不传。不传的话，按奖品文字画出奖品。",
-      "qrHint": "可不传。传了的话，两页都会把这张二维码原样贴上去，保证扫得出来。请传清晰的二维码图片（PNG / JPG）。",
+      "qrHint": "选填。上传后，两页都会原样贴上这张二维码，确保可以扫描。请上传清晰的二维码图片（PNG / JPG）。",
       "qrChecking": "正在识别二维码…",
       "qrUnreadable": "这张图里认不出二维码，请换一张清晰、完整的二维码图片。",
       "folds": {
@@ -976,9 +976,9 @@
       "retryCost": "重试 <cost>· {count} 积分</cost>",
       "generateCta": "生成 <cost>· {count} 积分</cost>",
       "getCreditsCta": "获取积分 <cost>· 需要 <mono>{count, number}</mono></cost>",
-      "freeNotice": "这张图用的是免费积分：会公开展示，并带水印。<b>用付费积分生成的图是私密的，没有水印。</b>",
+      "freeNotice": "这张图使用免费积分：会公开展示，并带水印。<b>付费积分生成的图私密、无水印。</b>",
       "freeNoticePrivate": "这张图用的是免费积分，会带水印。<b>海报类作品只自己可见，不会进入公开创作库。</b>",
-      "needsCredits": "{tier} 需要 {count} 积分。<b>用付费积分生成的图是私密的，没有水印。</b>",
+      "needsCredits": "{tier} 需要 {count} 积分。<b>付费积分生成的图私密、无水印。</b>",
       "counter": "{count, number} / {max, number}",
       "developingSize": "{tier}{px, plural, =0 {} other { · <mono>{px, number, ::group-off}</mono>}}",
       "yourPhotos": "你的照片",
@@ -987,7 +987,7 @@
       "photoN": "第 {index, number} 张",
       "removePhoto": "删除第 {index, number} 张",
       "waitingUpload": "等待中",
-      "batchOnTier": "已保留第一张。批量上传（一次最多 {count, number} 张）是{tier}的权益。",
+      "batchOnTier": "已保留第一张。批量上传（一次最多 {count, number} 张）需开通{tier}。",
       "batchKept": "已保留前 {max, number} 张，一批最多 {max, number} 张。",
       "seeTier": "看看{tier} · 一次 {count, number} 张",
       "needPhotos": "先添加照片",
@@ -1001,17 +1001,17 @@
       "getTier": "开通{tier}",
       "stageLabel": "预览",
       "stageYours": "你的照片",
-      "stageYoursCaption": "这是你拍的原图。模板会保留主体，只换光线和背景。",
+      "stageYoursCaption": "这是你拍的原图。模板只更换光线和背景，内容保持不变。",
       "stageSampleCaption": "模板示例：左边是真实手机照，右边是 AI 出图。",
       "again": {
-        "optionsChanged": "此模板的出图选项已更改，请确认当前尺寸和清晰度。",
+        "optionsChanged": "这个模板的出图选项已更新，请确认当前尺寸和清晰度。",
         "note": "<b>再做一张：</b>{summary}，沿用 <day></day> 那张的设置。",
         "reuseNote": "<b>和创作库里那张设置一样：</b>{summary}。换上你自己的照片。",
         "noteKept": "保留补充说明",
         "kept": "原图，随作品保留",
         "keptFrom": "<day></day> · {size}",
         "missingTitle": "原图不可用",
-        "missingOld": "这张作品是在我们开始保留原图之前做的。把同一张照片再加一次，其余设置都和原来一样。",
+        "missingOld": "这张作品生成时尚未保存原图。重新上传同一张照片即可，其余设置保持不变。",
         "missingFailed": "暂时没能取回原图。把同一张照片再加一次，其余设置都和原来一样。",
         "addFirst": "先添加照片。<b>之后和其他照片一样，扣 {count} 积分。</b>"
       },
@@ -1023,7 +1023,7 @@
         "trayUploading": "<b>{count, number} 张</b> · 上传中",
         "trayLimit": "{tier}：一次最多 {count, number} 张",
         "uploadFailed": "第 {index, number} 张：{reason}",
-        "notice": "{count, number} 张，<b>每张 {each, number} 积分</b>。每张单独扣费，失败的那张单独退回。同时生成 {limit, number} 张。",
+        "notice": "{count, number} 张，<b>每张 {each, number} 积分</b>。按张扣费，失败的那张自动退回。同时生成 {limit, number} 张。",
         "sum": "已完成 {done, number}/{count, number}",
         "counts": "{developing, number} 张生成中 · {queued, number} 张排队{failed, plural, =0 {} other { · # 张失败}}",
         "leave": "同时生成 {count, number} 张，每张 30 秒左右。可以离开这个页面，每张生成好就会出现在「作品」里。",
@@ -1071,17 +1071,17 @@
         "left": "{fields}还是示例内容，确认要用吗？",
         "joiner": "、"
       },
-      "orgNeedsCredits": "企业分给你的积分不够这一张，请找管理员分配额度。在企业期间不能用你自己的积分。",
+      "orgNeedsCredits": "企业分配给你的积分不足以生成这一张，请联系管理员分配额度。加入企业期间，不能使用你个人的积分。",
       "orgShortCta": "企业积分不够",
       "tierPoolCta": "换个清晰度"
     },
     "errors": {
       "NETWORK": "连不上 Shotviva，请检查网络后再试。",
-      "CONTENT_REJECTED": "出图模型这次没能使用这张照片或这段说明，有的模型不接受清晰的真人照片。可以换一张照片、改一下说明，或换个模板再试。",
-      "IDENTITY_SWAP_REFUSED": "为保护每个人的肖像权，Shotviva 不能把人换成另一个人或换脸。可以改表情、妆容、光线和背景。",
+      "CONTENT_REJECTED": "出图模型这次未能处理这张照片或这段说明，部分模型不接受清晰的真人照片。你可以换一张照片、修改说明，或换个模板再试。",
+      "IDENTITY_SWAP_REFUSED": "Shotviva 不支持换脸或把人换成另一个人，以保护每个人的肖像权。表情、妆容、光线和背景都可以修改。",
       "REFERENCE_IMAGE_LIMIT": "参考图超过模型上限，请减少照片或换个模板。",
       "TEMPLATE_UNAVAILABLE": "这个模板暂时不可用，请稍后再试。",
-      "TEMPLATE_QUOTE_CHANGED": "模板或积分价格已更新，请刷新页面查看最新报价。",
+      "TEMPLATE_QUOTE_CHANGED": "模板或积分价格已更新，请刷新页面查看最新价格。",
       "MODEL_INPUT_UNSUPPORTED": "请检查参考图、清晰度和尺寸，或换个模板。",
       "GENERATION_FAILED": "这张照片没能生成，通常再试一次就好。",
       "PROVIDER_FAILED": "这张照片没能生成，通常再试一次就好。",
@@ -1092,13 +1092,13 @@
       "IMAGE_TOO_LARGE": "这张照片超过 20MB，请换一张小一点的。",
       "IMAGE_UNSUPPORTED": "请上传 JPG、PNG 或 WebP 格式的照片。",
       "UPLOAD_FAILED": "上传失败，请检查网络后重试。",
-      "INVALID_INPUT": "表单里有内容需要再检查一下，请核对照片和填写的内容后重试。",
+      "INVALID_INPUT": "部分内容需要修改，请检查照片和填写的内容后重试。",
       "UNAUTHORIZED": "请重新登录。",
       "fallback": "出了点问题，请再试一次。",
       "refunded": "积分已退回。",
-      "onHold": "你的积分暂时冻结中，我们会退回给你，也可以联系客服。",
+      "onHold": "你的积分暂时被冻结，我们会退回给你；如有疑问，可以联系客服。",
       "notCharged": "没有扣积分。",
-      "TIER_REQUIRED": "这需要{tier}套餐。"
+      "TIER_REQUIRED": "需要开通{tier}才能使用。"
     },
     "photos": {
       "batch": {
@@ -1114,7 +1114,7 @@
       "done": "已完成",
       "newest": "最新的在前",
       "count": "{running, plural, =0 {} other {# 张生成中 · }}{done} 张已完成",
-      "footnote": "用免费积分生成的图会公开并带水印（海报类作品只自己可见）；用付费积分生成的图是私密的，没有水印。",
+      "footnote": "免费积分生成的图公开并带水印（海报类作品仅自己可见）；付费积分生成的图私密、无水印。",
       "photoAlt": "{name} 作品",
       "empty": "选一个模板，上传一张手机照片，第一张作品 30 秒左右就会出现在这里。",
       "emptyCta": "做第一张图",
@@ -1171,7 +1171,7 @@
       "shareText": "用 {brand} 制作 {url}",
       "makeAgain": "再做一张",
       "removeWatermark": "去水印：用付费积分重新生成",
-      "removeWatermarkNote": "免费积分作品仅供演示，未授权商用。",
+      "removeWatermarkNote": "免费积分生成的作品仅供演示，不可商用。",
       "tierPx": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off}}}",
       "when": {
         "today": "今天",
@@ -1188,7 +1188,7 @@
       },
       "originalAlt": "你为 {name} 上传的照片",
       "originalDeleted": "原图不可用",
-      "originalDeletedBody": "这张作品是在开始随作品保留原图之前做的，生成的图片不受影响。",
+      "originalDeletedBody": "这张作品生成时尚未保存原图，成图不受影响。",
       "yourNote": "你的补充说明",
       "showMore": "展开",
       "showLess": "收起",
@@ -1211,7 +1211,7 @@
         "originalWithWork": "随这张作品保留",
         "originalKept": "已保留，{px} px 预览",
         "originalEdited": "你改的那张照片",
-        "originalDeleted": "早于原图保留功能",
+        "originalDeleted": "生成时未保存原图",
         "made": "生成时间",
         "reference": "编号",
         "copyReference": "复制编号",
@@ -1352,7 +1352,7 @@
         "pastDueEndedWhy": "上一次扣款没有成功，会员已结束。请更新银行卡：扣款成功后会员会重新生效。积分仍可正常使用。",
         "updatePayment": "更新付款方式",
         "walletWhy": "这是一次性付款，不会自动续费：{date, date, medium} 前续费可以保留会员；不续费的话，积分仍可使用。",
-        "stillBills": "你之前的{tier}卡订阅仍会在 {date, date, medium} 自动续费。",
+        "stillBills": "你之前通过银行卡订阅的{tier}，仍会在 {date, date, medium} 自动续费。",
         "renew": "续费",
         "paused": "已暂停",
         "pausedWhy": "订阅已暂停。恢复之前不会扣款，也不会发放积分。",
@@ -1428,7 +1428,7 @@
       },
       "session": {
         "title": "登录",
-        "deleteNote": "注销会删除你的作品和剩余积分。订阅会先被取消。"
+        "deleteNote": "注销将先取消订阅，再删除你的作品和剩余积分。"
       },
       "strip": {
         "heading": "本月 · {count} 张作品",
@@ -1509,7 +1509,7 @@
         "addLabel": "补充内容",
         "add": "发送",
         "adding": "发送中…",
-        "closedNote": "这个工单已关闭。如还有问题，请新建一个工单。",
+        "closedNote": "这个工单已关闭。如有其他问题，请新建工单。",
         "newTicket": "新建工单",
         "errors": {
           "INVALID_INPUT": "请写下不超过 2,000 字的内容。",
@@ -1531,7 +1531,7 @@
       "loadError": "没能加载工单",
       "loadErrorBody": "请检查网络后重试。",
       "retry": "重试",
-      "notFoundBody": "它可能已被删除，或者属于另一个账号。",
+      "notFoundBody": "内容可能已被删除，或属于另一个账号。",
       "images": {
         "label": "图片（选填）",
         "hint": "截图或照片，最多 3 张，每张不超过 10 MB。",
@@ -1588,7 +1588,7 @@
       "sourceDeleted": "原作品已删除",
       "requestSent": "请求已发送",
       "leave": "一般 30 秒左右。可以离开这个页面，新照片完成后会出现在「作品」里。",
-      "developingCaption": "修改正在原图上生成。",
+      "developingCaption": "正在原图上修改…",
       "failTitleRefunded": "修改失败，积分已退回。",
       "failKept": "你的要求还在。可以重试，或者改一下要求。",
       "metaDeveloping": "{size} · {tier} · {count} 积分 · 修改",
@@ -1597,7 +1597,7 @@
     "states": {
       "photoMissing": {
         "title": "这张作品不在这里",
-        "body": "它可能已经被删除，或者这个链接属于别人的账号。",
+        "body": "照片可能已被删除，或这个链接属于其他账号。",
         "back": "回到作品"
       },
       "error": {
@@ -2155,7 +2155,7 @@
       "cancel": "取消",
       "shareSelected": "分享所选（{count}）",
       "sheetTitle": "分享给客户",
-      "sheetText": "{count} 个所选放进一个链接。客户只会看到这些，按这个顺序，点任何一个都能直接开始用。",
+      "sheetText": "选中的 {count} 个模板会放进同一个链接。客户只能看到这些模板，顺序与你选择的一致，点击任意一个即可直接使用。",
       "titleLabel": "标题",
       "noteLabel": "给客户的话",
       "optional": "（选填）",
@@ -2182,7 +2182,7 @@
     },
     "workShare": {
       "start": "分享",
-      "startAria": "选择要用一个链接分享的作品",
+      "startAria": "选择作品，用一个链接分享",
       "selected": "{count, plural, =0 {选择作品} other {已选 # 张}}",
       "max": "每个链接最多 {max} 张",
       "cancel": "取消",
@@ -2215,9 +2215,9 @@
   },
   "paywall": {
     "moments": {
-      "watermark": "免费生成的图带水印。用付费积分生成的图没有水印，而且是私密的。",
-      "photos": "{tier}可以一次把一个模板用到最多 {count, number} 张照片上。",
-      "templates": "Max 可以一次把最多 {templates, number} 个模板用到同一批照片上，一批最多 {count, number} 张。"
+      "watermark": "免费生成的图带水印；付费积分生成的图私密、无水印。",
+      "photos": "{tier}一次可以用一个模板处理最多 {count, number} 张照片。",
+      "templates": "旗舰版一次可以为同一批照片套用最多 {templates, number} 个模板，每批最多 {count, number} 张。"
     },
     "example": {
       "caption": {
@@ -2236,19 +2236,19 @@
       "planTitle": "{tier} · 每月 {count, number} 积分",
       "planPrice": "每月 {price}",
       "verdict": {
-        "pack": "积分包更便宜，按总价和每积分都是。",
-        "plan": "{tier}更便宜，按总价和每积分都是。这是按月的会员。",
+        "pack": "积分包更划算，总价和单价都更低。",
+        "plan": "{tier}更划算，总价和单价都更低。这是按月付费的会员。",
         "same": "两者价格一样。",
-        "packNowPlanLater": "现在买积分包花得少；如果每个月都要出图，{tier}每积分更便宜。",
-        "planNowPackLater": "{tier}现在花得少；积分包每积分更便宜。",
-        "packNowSameRate": "现在买积分包花得少；按每积分算两者一样。",
-        "planNowSameRate": "{tier}现在花得少；按每积分算两者一样。",
-        "sameNowPackRate": "现在两者花得一样；积分包每积分更便宜。",
-        "sameNowPlanRate": "现在两者花得一样；如果每个月都要出图，{tier}每积分更便宜。"
+        "packNowPlanLater": "现在买积分包花得更少；如果每月都要出图，{tier}的单价更低。",
+        "planNowPackLater": "现在选{tier}花得更少；积分包的单价更低。",
+        "packNowSameRate": "现在买积分包花得更少；两者单价相同。",
+        "planNowSameRate": "现在选{tier}花得更少；两者单价相同。",
+        "sameNowPackRate": "两者现在花费相同；积分包的单价更低。",
+        "sameNowPlanRate": "两者现在花费相同；如果每月都要出图，{tier}的单价更低。"
       }
     },
     "title": "继续出图",
-    "intro": "用付费积分生成的图是私密的，没有水印。",
+    "intro": "付费积分生成的图私密、无水印。",
     "introNeedsCredits": "这张图需要的积分比你现有的多。",
     "billingLabel": "付费周期",
     "monthly": "按月",
@@ -2270,7 +2270,7 @@
     "positioning": {
       "starter": "适合偶尔需要做图的小店。",
       "pro": "适合每周都上新的卖家。",
-      "max": "适合电商卖家、团队和多门店商家：商品多、一次处理一大批，白底图和场景图批量出。"
+      "max": "适合电商卖家、团队和连锁门店：商品数量多，白底图和场景图可以批量生成。"
     },
     "photoEstimate": "每月约可出 <n>{range}</n> 张图",
     "photoEstimateNote": "实际张数以生成为准：模型、清晰度、模板不同，消耗的积分也不同。",
@@ -2344,7 +2344,7 @@
     "savingAmount": "{amount} · {about, select, true {约省} other {省}} {pct}%",
     "mostPopular": "最受欢迎",
     "memberPrice": "会员价",
-    "memberCodeKept": "已选会员价，优惠码留待下次使用。",
+    "memberCodeKept": "已按会员价计算，优惠码保留到下次使用。",
     "packsNote": "一次性买积分，不用订阅",
     "packsNoteV2": "小包不打折。中包和大包按当前会员等级计价：{starter, plural, =0 {入门版原价} other {入门版省 {starter}%}}、专业版省 {pro}%、旗舰版省 {max}%，各档收到的包内积分相同。",
     "buy": "购买",
@@ -2372,7 +2372,7 @@
     "codeMonths": "前 {months} 个月",
     "codeEvery": "每期",
     "codeCheckoutFloor": "按当前价格，这个商品不能使用此优惠。请选择其他适用商品。",
-    "orgMemberCheckout": "企业员工账号使用企业分配的积分，如需更多请联系企业管理员",
+    "orgMemberCheckout": "企业员工账号使用企业分配的积分，如需更多积分，请联系企业管理员。",
     "codeCheckoutChanged": "价格或优惠已更新，请确认最新价格后重试。",
     "codeCheckoutInUse": "这份优惠正在另一个结账页面使用。请返回原页面完成或取消付款，再重试。",
     "fineDiscount": "{term} {price}，之后每{period, select, year {年} other {月}} {original} · 可随时取消 · 美元"
@@ -2410,7 +2410,7 @@
   "consent": {
     "label": "Cookie 提示",
     "settingsTitle": "Cookie 设置",
-    "body": "<lead>帮我们把 Shotviva 做得更好。</lead>统计 Cookie 让我们看到大家在网站上怎么走，从不用于广告。<link>隐私政策</link>",
+    "body": "<lead>帮我们把 Shotviva 做得更好。</lead>统计 Cookie 只用于了解大家如何使用网站，从不用于广告。<link>隐私政策</link>",
     "accept": "接受",
     "necessary": "仅必要",
     "close": "关闭 Cookie 设置"
@@ -2426,7 +2426,7 @@
     "title": "页面不存在",
     "heading": "这一页",
     "headingEm": "没有显影出来。",
-    "body": "页面不存在，或者已经搬走了。首页和模板都还在原来的地方。",
+    "body": "页面不存在，或已经迁移。可以回到首页或模板页继续浏览。",
     "home": "回首页",
     "templates": "看看模板",
     "tryTitle": "换这三个模板试试"
@@ -2610,9 +2610,9 @@
     "tier": {
       "none": "无门槛",
       "any_paid": "任意付费会员",
-      "starter": "Starter 或以上",
-      "pro": "Pro 或以上",
-      "max": "Max 会员"
+      "starter": "入门版或以上",
+      "pro": "专业版或以上",
+      "max": "旗舰版会员"
     },
     "status": {
       "pending": "待确认",
@@ -2646,12 +2646,12 @@
       "confirmed_fee_estimate": "按预估手续费确认"
     },
     "product": {
-      "starter_monthly": "Starter 月付",
-      "pro_monthly": "Pro 月付",
-      "max_monthly": "Max 月付",
-      "starter_yearly": "Starter 年付",
-      "pro_yearly": "Pro 年付",
-      "max_yearly": "Max 年付",
+      "starter_monthly": "入门版月付",
+      "pro_monthly": "专业版月付",
+      "max_monthly": "旗舰版月付",
+      "starter_yearly": "入门版年付",
+      "pro_yearly": "专业版年付",
+      "max_yearly": "旗舰版年付",
       "pack_s": "小积分包",
       "pack_m": "中积分包",
       "pack_l": "大积分包"
@@ -2887,7 +2887,7 @@
       "text": "照片上的文字",
       "reuse": "做一张同款",
       "reuseNote": "会打开同一个模板，设置也一样。照片换成你自己的，不会用这张图。",
-      "watermark": "这张是用免费积分做的：带水印，仅供演示，未授权商用。",
+      "watermark": "这张作品使用免费积分生成：带水印，仅供演示，不可商用。",
       "alt": "用 Shotviva 做的{template}照片"
     },
     "report": {
@@ -2966,7 +2966,7 @@
     "metaDescription": "为你挑选的一组 Shotviva 模板。选一个，把手机照片做成精修图。",
     "title": "为你挑选的模板",
     "kicker": "共 {count} 个模板可选",
-    "hint": "每张图左边是真实的手机照片，右边是 AI 出图。选一个喜欢的，直接用它开始。",
+    "hint": "每张图左边是手机原图，右边是 AI 成图。选一个喜欢的模板，直接开始制作。",
     "use": "用这个模板",
     "alt": "手机照片和 AI 出图（示意图）",
     "seriesCount": "{count} 个模板",
@@ -2974,7 +2974,7 @@
     "hide": "收起",
     "illustrative": "模板图片均为示意图。",
     "missingTitle": "这个链接已经看不到了",
-    "missingText": "可能已被撤销，或者里面的模板已下架。看看其他模板吧。",
+    "missingText": "链接可能已撤回，或其中的模板已下架。看看其他模板吧。",
     "missingBrowse": "看看其他模板",
     "badge": "系列"
   },
@@ -2992,7 +2992,7 @@
     "emptyTitle": "这个作品集里已经没有作品了",
     "emptyText": "分享的人删除了里面的作品。",
     "missingTitle": "这个链接已失效",
-    "missingText": "可能已被分享的人关闭。",
+    "missingText": "分享者可能已关闭这个链接。",
     "ctaTitle": "做出这样的作品",
     "ctaText": "上传一张手机照片，约 30 秒拿到成品。",
     "cta": "免费试试 Shotviva",

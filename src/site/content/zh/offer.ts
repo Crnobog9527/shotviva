@@ -18,6 +18,8 @@ export const ZH_TIERS = OUTPUT_TIERS.map((tier, i) => ({
 
 // 「1K、2K 或 4K」
 export const zhTierList = `${ZH_TIERS.slice(0, -1).map((t) => t.name).join('、')} 或 ${ZH_TIERS.at(-1)?.name}`
+// 「1K、2K、4K」, for 「分 1K、2K、4K 三档」 where 「或」 would not read.
+export const zhTierNames = ZH_TIERS.map((t) => t.name).join('、')
 
 // 「1K 1024 px、2K 2048 px、4K 2880 px」（方图边长）
 export const zhTierPixels = ZH_TIERS.map((tier) => `${tier.name} ${tier.px} px`).join('、')
