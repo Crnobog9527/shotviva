@@ -3,23 +3,27 @@
 import { Button } from '@/core/ui/button'
 
 import { zhNameOf } from '../templates-editor/featured-card'
+import type { DisplayLocale } from '../locale-display/types'
+import type { AdminCategoryNode } from '../template-categories/types'
 import type { AdminTemplate } from '../templates/types'
 import { SortableList } from '../ui/sortable'
 import { LOCALE_DISPLAY_COPY as COPY } from './copy'
-import { addable } from './display-state'
 import type { DraftList } from './draft'
+import { FeaturedPicker } from './featured-picker'
 import { OwnBadge, SortableRow, StaticRow } from './rows'
 
 type Props = {
+  locale: DisplayLocale
   label: string
   list: DraftList
   templates: AdminTemplate[]
+  categories: AdminCategoryNode[]
   editing: boolean
   onChange: (ids: string[]) => void
   onReset: () => void
 }
 
-export function FeaturedList({ label, list, templates, editing, onChange, onReset }: Props) {
+export function FeaturedList({ locale, label, list, templates, categories, editing, onChange, onReset }: Props) {
   const templateOf = (id: string) => templates.find((template) => template.id === id)
   const nameOf = (id: string) => zhNameOf(templateOf(id), id)
   const detailOf = (id: string) => templateOf(id)?.categoryInfo.nameZh
@@ -44,16 +48,8 @@ export function FeaturedList({ label, list, templates, editing, onChange, onRese
               </ol>
             )}
           </SortableList>
-          <label className="grid max-w-sm gap-1 text-sm">
-            {COPY.addLabel}
-            <select className="h-9 rounded-md border bg-background px-2" value=""
-              onChange={(event) => event.target.value && onChange([...list.ids, event.target.value])}>
-              <option value="">{COPY.addPlaceholder}</option>
-              {addable(templates, list.ids).map((template) => (
-                <option key={template.id} value={template.id}>{zhNameOf(template, template.id)}</option>
-              ))}
-            </select>
-          </label>
+          <FeaturedPicker locale={locale} label={label} templates={templates} categories={categories} taken={list.ids}
+            onAdd={(ids) => onChange([...list.ids, ...ids.filter((id) => !list.ids.includes(id))])} />
         </>
       ) : (
         <ol className="grid gap-1">

@@ -72,7 +72,7 @@ function PanelBody({ hidden, categories, templates, display, actions }: Props & 
         listOf={(parent) => shown.groups[groupKey(parent)] ?? { own: false, ids: [] }}
         onReorder={(parent, keys) => update((draft) => reorderGroup(draft, parent, keys))}
         onReset={(parent) => update((draft) => resetGroup(draft, parent, shared))} />
-      <FeaturedList label={label} list={shown.featured} templates={templates} editing={editor.editing}
+      <FeaturedList locale={locale} label={label} list={shown.featured} templates={templates} categories={categories} editing={editor.editing}
         onChange={(ids) => update((draft) => setFeatured(draft, ids, shared))}
         onReset={() => update((draft) => resetFeatured(draft, shared))} />
       {editor.editing ? <EditBar editor={editor} label={label} /> : null}

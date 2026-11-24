@@ -29,8 +29,6 @@ export const LOCALE_DISPLAY_COPY = {
   featuredHint: '这一边有自己的精选列表。列表清空后回到跟随默认。',
   featuredFollowing: (count: number) => `现在跟随默认精选（${count} 个）。编辑后会以当前内容为起点，保存为这一边自己的列表。`,
   featuredEmpty: '还没有精选模板。',
-  addLabel: '添加精选模板',
-  addPlaceholder: '选择一个已上架的模板…',
   remove: (name: string) => `从精选移除 ${name}`,
   saved: (locale: string) => `已保存${locale}的设置`,
   failed: '这次的修改都没有生效，草稿还在，可以改好后再保存。',
