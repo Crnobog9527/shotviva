@@ -1,6 +1,6 @@
 import type { CatalogueIndex, CategoryNode, IndexEntry, IndexSeries } from '@/core/templates'
 
-import { categoriesOf, type CatalogueTemplate } from './catalogue-template'
+import { categoriesOf, isMotion, type CatalogueTemplate } from './catalogue-template'
 
 // What Create's grid is made of (T102): single template cards and series cards, each with the
 // category path (slugs from the root) it sits under, and the category tree for the filter chips,
@@ -98,6 +98,17 @@ function toGridEntry(entry: IndexEntry, { places, templates, series }: Lookup): 
   if (members.length === 0) return []
   const { id, slug, name, description, coverUrl } = found
   return [{ type: 'series', series: { id, slug, name, description, cover: coverUrl, categoryName: place.name, members }, path: place.path }]
+}
+
+// Create's featured card (the page's largest paint): the first video template in the catalogue's
+// order, a series member included, so a series of videos can never take the card away.
+export function featuredVideo(entries: readonly GridEntry[]): CatalogueTemplate | null {
+  for (const entry of entries) {
+    for (const template of entry.type === 'series' ? entry.series.members : [entry.template]) {
+      if (isMotion(template) && template.cover.type === 'video') return template
+    }
+  }
+  return null
 }
 
 export const seriesOf = (entries: readonly GridEntry[]) => entries.flatMap((entry) => (entry.type === 'series' ? [entry.series] : []))

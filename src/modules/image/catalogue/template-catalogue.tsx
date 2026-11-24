@@ -18,8 +18,8 @@ import { CatalogueGrid, type GridProps } from './catalogue-grid'
 import { catalogueSections, sectionsFor, type CatalogueSection } from './catalogue-sections'
 import { seriesNames } from './catalogue-shelves'
 import { CatalogueSections } from './catalogue-sections-view'
-import { batchableTemplates, isMotion, type CatalogueTemplate } from './catalogue-template'
-import { findSeries, type CatalogueView, type FilterNode, type GridEntry } from './catalogue-view'
+import { batchableTemplates, type CatalogueTemplate } from './catalogue-template'
+import { featuredVideo, findSeries, type CatalogueView, type FilterNode, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
 import { isPosterIn, PosterDialogSlot } from './poster-dialog-slot'
 import { posterSeriesOf, posterStart } from './poster-series'
@@ -69,7 +69,7 @@ export function TemplateCatalogue({ payload, create: createProp, endCard }: Prop
   // old /posters/<id> links land too); every other card opens the creation dialog.
   const share = useShareSelectionState()
   const { open, openSeries } = useOpeners(share, view, query, (id) => (isPosterIn(openable, id) ? query.openPoster(id) : setOpenId(id)))
-  const featured = featuredOf(view.entries)
+  const featured = featuredVideo(view.entries)
   const favorites = useFavorites()
   const favoriteIds = favorites?.ids
   const saved = useMemo(() => (favoriteIds ? savedIn(favoriteIds, openable) : []), [favoriteIds, openable])
@@ -115,7 +115,7 @@ export function TemplateCatalogue({ payload, create: createProp, endCard }: Prop
           <CategoryChips hidden={search.results !== null} filters={view.filters} saved={showSaved(saved.length, active.saved, holdsSaved(favorites))} value={active} onChange={query.select} labels={chipLabels(t)} />
         </div>
         <h2 className="sr-only">{t('templates')}</h2>
-        <CatalogueBody search={search} firstPriority={!featured} sections={sectionsFor(active, sections)} shown={shown} filters={view.filters} path={active.path} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onSeeAll={seeAll} />
+        <CatalogueBody search={search} firstPriority={!featured} sections={sectionsFor(active, sections)} shown={shown} filters={view.filters} path={active.path} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onBrowseSeries={query.openSeries} onSeeAll={seeAll} />
         <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
         <CatalogueDialogs
           create={create}
@@ -234,6 +234,9 @@ type BodyProps = Omit<GridProps, 'entries' | 'className' | 'eagerCount' | 'serie
   // Saved is chosen: when it holds nothing, its empty state with the way back to All.
   saved: boolean
   onBrowse(): void
+  // A shelf's 「查看全部」 and 「+N 个」 open the series even in share mode: they are the way into
+  // it, not a pick (the shelf has no picked state to show). Series cards keep onOpenSeries.
+  onBrowseSeries(slug: string): void
   onSeeAll(section: CatalogueSection): void
 }
 
@@ -244,11 +247,11 @@ const showSaved = (count: number, chosen: boolean, held = false) => count > 0 ||
 
 // A search replaces the sections and the chosen category's grid with its matches; Saved with
 // nothing saved shows its empty state.
-function CatalogueBody({ search, firstPriority, sections, shown, filters, path, saved, onBrowse, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
+function CatalogueBody({ search, firstPriority, sections, shown, filters, path, saved, onBrowse, endCard, onOpen, onOpenSeries, onBrowseSeries, onSeeAll }: BodyProps) {
   if (search.results) return <SearchResults query={search.query.trim()} results={search.results} series={search.series} endCard={endCard} onOpen={onOpen} />
   if (saved && shown.length === 0) return <SavedEmpty onBrowse={onBrowse} />
   if (saved) return <CatalogueGrid entries={shown} endCard={endCard} firstPriority={firstPriority} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
-  if (!sections) return <ShelvedGrid entries={shown} filters={filters} path={path} endCard={endCard} firstPriority={firstPriority} onOpen={onOpen} onOpenSeries={onOpenSeries} />
+  if (!sections) return <ShelvedGrid entries={shown} filters={filters} path={path} endCard={endCard} firstPriority={firstPriority} onOpen={onOpen} onOpenSeries={onBrowseSeries} />
   return (
     <>
       <CatalogueSections sections={sections} firstPriority={firstPriority} onOpen={onOpen} onOpenSeries={onOpenSeries} onSeeAll={onSeeAll} />
@@ -265,11 +268,6 @@ function firstScreenOf(searching: boolean, active: { saved: boolean; path: reado
   return active.path.length ? `c:${active.path.join('/')}` : 'all'
 }
 
-// The featured card: the first single video template in the catalogue's order.
-function featuredOf(entries: readonly GridEntry[]) {
-  for (const entry of entries) if (entry.type === 'template' && isMotion(entry.template) && entry.template.cover.type === 'video') return entry.template
-  return null
-}
 
 // True once the chip bar has stuck to the top: only then does it pad for the top safe area and
 // take its bar material (chrome-bleed, globals-body.css), so at rest there is no band over the ground (or the living background,

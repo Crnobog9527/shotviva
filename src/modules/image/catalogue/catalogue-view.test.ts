@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { CatalogueIndex, CategoryNode } from '@/core/templates'
 
 import type { CatalogueTemplate } from './catalogue-template'
-import { buildCatalogueView, findSeries } from './catalogue-view'
+import { buildCatalogueView, featuredVideo, findSeries, type GridEntry } from './catalogue-view'
 
 function category(key: string, path: string[], children: CategoryNode[] = []): CategoryNode {
   const intro = key === 'food' ? { introEn: 'Dishes', introZh: '菜品' } : { introEn: null, introZh: null }
@@ -77,6 +77,14 @@ describe('Create grid entries (T102)', () => {
     const loose = { ...index, entries: [index.entries[0], { type: 'template' as const, id: 'm1', categoryKey: 'food-dark' }, index.entries[2]] }
     const result = buildCatalogueView(loose, templates, false)
     expect(result.entries.map((entry) => (entry.type === 'series' ? entry.series.id : entry.template.id))).toEqual(['s1', 't2'])
+  })
+
+  it('features the first video template, a series member included', () => {
+    const video = template('v1', 'food', { cover: { type: 'video', before: 'b', after: 'a', motion: 'm.mp4', poster: 'p.webp' } } as Partial<CatalogueTemplate>)
+    const still: GridEntry = { type: 'template', template: template('t1'), path: ['food'] }
+    const inSeries: GridEntry = { type: 'series', path: ['food'], series: { id: 's', slug: 's', name: 'S', description: null, cover: null, categoryName: 'food', members: [template('m1'), video] } }
+    expect(featuredVideo([still, inSeries])?.id).toBe('v1')
+    expect(featuredVideo([still])).toBeNull()
   })
 
   it('falls back to the flat list by root category when the index read failed', () => {
