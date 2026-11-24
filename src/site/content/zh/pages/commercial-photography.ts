@@ -23,7 +23,7 @@ const sneakerLifestyle = caseImage('sneaker-lifestyle', '真实案例：同一�
 
 const shoot: ShootDemo = {
   heading: { lead: '一张手机照片 → ', emphasis: '一整套图' },
-  intro: '在玄关地板上用手机随手拍了一张。做出三张成品图，每张里都是同一只鞋：鞋头的透气孔、绿色后跟、生胶底都没变。',
+  intro: '在玄关地板上随手拍的一张手机照，做出三张成品图，鞋头的透气孔、绿色后跟和生胶底都保持原样。',
   phone: { image: sneakerPhone, file: 'IMG_3184.jpg', caption: '真实手机照：早晨阳光很硬，门垫、钥匙和鞋盒都入镜了。' },
   arrow: '三种用途，同一只鞋',
   results: [
@@ -47,7 +47,7 @@ const whiteCases: EditCases = {
   items: [
     {
       title: '桌上的音箱',
-      change: '线、桌垫和房间都去掉了，音箱的网罩、高音单元和外壳质感都没变。出图是透明底的 PNG，放到哪个平台的背景上都行。',
+      change: '线、桌垫和房间都去掉了，音箱的网罩、高音单元和外壳质感都没变。导出透明底 PNG，可直接放到任意平台的背景上。',
       before: caseImage('white-speaker-before', '真实手机照：深灰色监听音箱放在绿色桌垫上，后面是线和椅子'),
       after: caseImage('white-speaker-after', '真实案例：同一只音箱抠成透明底，底下带一点柔和阴影'),
       transparent: true,
@@ -87,11 +87,11 @@ const copy = {
   facts: [
     {
       label: `Amazon：主图纯白底，${px(amazon.zoomPx)} px 以上可放大`,
-      value: `Amazon 要求主图是纯白背景，最长边 ${px(amazon.minPx)}～${px(amazon.maxPx)} px，超过 ${px(amazon.zoomPx)} px 买家才能放大看。纯白底图选${hd?.name ?? ''}是 ${px(hd?.px ?? 0)} px。`,
+      value: `Amazon 要求主图是纯白背景，最长边 ${px(amazon.minPx)}～${px(amazon.maxPx)} px，超过 ${px(amazon.zoomPx)} px 买家才能放大看。纯白底图选择${hd?.name ?? ''}时为 ${px(hd?.px ?? 0)} px。`,
     },
     {
       label: `Etsy 和 Shopify：${px(etsy.minPx)} px 起`,
-      value: `Etsy 要求图片宽高都至少 ${px(etsy.minPx)} px；Shopify 说方图用 ${px(shopify.squarePx)} × ${px(shopify.squarePx)} px 显示效果通常最好。${hd?.name ?? ''}（${px(hd?.px ?? 0)} px）和${max?.name ?? ''}（${px(max?.px ?? 0)} px）都够。`,
+      value: `Etsy 要求图片宽高都至少 ${px(etsy.minPx)} px；Shopify 建议方图使用 ${px(shopify.squarePx)} × ${px(shopify.squarePx)} px，显示效果通常最好。${hd?.name ?? ''}（${px(hd?.px ?? 0)} px）和${max?.name ?? ''}（${px(max?.px ?? 0)} px）都能满足要求。`,
     },
     {
       label: '图里还是你的商品',
@@ -125,7 +125,7 @@ export const makeZhCommercialPhotography = (offers: OfferFacts) => defineContent
   faq: [
     {
       question: '产品拍照一般多少钱？',
-      answer: `按美国 2026 年的公开报价，白底产品图每张 ${usdRange(packshotUsd)}，造型图每张 ${usdRange(styledShotUsd)}，影棚一天 ${usdRange(dayRateUsd)}。${brand} 用你自己的手机照片，大约 ${photoSeconds} 秒做好一张造型、精修好的商品图。${zhPlansSentence(offers)}`,
+      answer: `按美国 2026 年的公开报价，白底产品图每张 ${usdRange(packshotUsd)}，造型图每张 ${usdRange(styledShotUsd)}，影棚一天 ${usdRange(dayRateUsd)}。${brand} 用你自己的手机照片，大约 ${photoSeconds} 秒即可做出一张精修完成的商品图。${zhPlansSentence(offers)}`,
     },
     {
       question: 'AI 能代替产品摄影师吗？',
@@ -141,14 +141,14 @@ export const makeZhCommercialPhotography = (offers: OfferFacts) => defineContent
     },
     {
       question: '手机照片要怎么拍？',
-      answer: '白天光线，商品对上焦，前面别有东西挡着。背景乱一点没关系，模板会换掉它。',
+      answer: '用手机拍商品时，尽量在白天自然光下拍，对准商品对焦，前面不要有遮挡。背景杂乱也没关系，模板会替换掉。',
       link: { href: '/', anchor: '用 AI改图 试试你的手机照片。' },
     },
   ],
   related: [
     { href: '/', anchor: 'AI改图', note: '全部模板，按餐饮、商品、美妆、房间、宠物和画风分类。' },
     { href: '/image-to-image-generator', anchor: '图生图在线工具', note: '看看图生图能把一张照片做成什么样。' },
-    { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍菜，直接做成菜单和外卖平台的图。' },
+    { href: '/ai-restaurant-menu', anchor: 'AI菜单配图', note: '餐厅用手机拍的菜品照，直接做成菜单和外卖平台配图。' },
     zhPricingRelated(brand, offers),
   ],
 })

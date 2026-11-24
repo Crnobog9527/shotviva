@@ -12,8 +12,8 @@ export const zhTextEdits: EditCases = {
     {
       title: '海报一次改四处',
       change: '「改成一周年店庆，7 折，11 月 22 日到 24 日，门牌 26 号。」四行字用海报原来的字体重写，照片和版式都没动。',
-      before: caseImage('text-poster-zh-before', '真实案例：「青岚茶事」茶饮店海报，写着新店开业、全场饮品 8 折、11月15日—11月17日、梧桐路 18 号，下面是两杯水果冰茶'),
-      after: caseImage('text-poster-zh-after', '真实案例：同一张海报改成一周年店庆、全场饮品 7 折、11月22日—11月24日、梧桐路 26 号，字体没变'),
+      before: caseImage('text-poster-zh-before', '真实案例：「青岚茶事」茶饮店海报，写着新店开业、全场饮品 8 折、11 月 15 日—11 月 17 日、梧桐路 18 号，下面是两杯水果冰茶'),
+      after: caseImage('text-poster-zh-after', '真实案例：同一张海报改成一周年店庆、全场饮品 7 折、11 月 22 日—11 月 24 日、梧桐路 26 号，字体没变'),
     },
     {
       title: '包装标签换规格',
