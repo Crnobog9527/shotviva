@@ -15,6 +15,7 @@ import {
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
+import { isWishlistEnabled } from '@/core/wishlist'
 import { homePanelTemplates } from '@/modules/image/marketing'
 import { contentPagesIn, creditFacts, featuredSections, fillCredits, findContentPageIn, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
 import { displayProducts } from '@/site/billing/display-products'
@@ -46,11 +47,11 @@ export function generateStaticParams({ params }: { params: { locale: string } })
 async function load(params: Promise<{ slug: string }>) {
   const locale = await currentLocale()
   const slug = (await params).slug
-  const [products, live, series] = await Promise.all([displayProducts(), cachedWebCatalogue(locale), cachedPublicSeries(locale)])
+  const [products, live, series, wishlistOpen] = await Promise.all([displayProducts(), cachedWebCatalogue(locale), cachedPublicSeries(locale), isWishlistEnabled(site)])
   const found = findContentPageIn(slug, locale, products)
   if (!found || !isEnabled(found)) notFound()
   const facts = creditFacts(live)
-  return { locale, live, series, products, page: fillCredits(found, facts), free: fillCredits(freeImagesIn(locale), facts) }
+  return { locale, live, series, products, wishlistOpen, page: fillCredits(found, facts), free: fillCredits(freeImagesIn(locale), facts) }
 }
 
 export async function generateMetadata({ params }: PageProps<'/[locale]/[slug]'>): Promise<Metadata> {
@@ -59,7 +60,7 @@ export async function generateMetadata({ params }: PageProps<'/[locale]/[slug]'>
 }
 
 export default async function ContentRoute({ params }: PageProps<'/[locale]/[slug]'>) {
-  const { locale, live, series, products, page, free } = await load(params)
+  const { locale, live, series, products, wishlistOpen, page, free } = await load(params)
   const path = pagePath(page)
   const crumbs = [
     { name: homePageIn(locale).label, path: '/' },
@@ -84,7 +85,7 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   return (
     <>
       <JsonLdScript data={ld} />
-      <ContentPageView page={page} isLinkEnabled={isLinkEnabled} templates={sections} generator={generator} />
+      <ContentPageView page={page} isLinkEnabled={isLinkEnabled} templates={sections} generator={generator} requestLink={wishlistOpen} />
     </>
   )
 }
