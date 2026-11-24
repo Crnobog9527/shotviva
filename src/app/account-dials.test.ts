@@ -67,7 +67,7 @@ describe('credit dials', () => {
   it('says why: the daily cap and the pause have their own note (1350)', async () => {
     expect((await render(dials(0, 0, null, 'daily_cap'), 'zh')).text).toContain('注册赠分名额已全部发完')
     expect((await render(dials(0, 0, null, 'paused'), 'zh')).text).toContain('赠分暂停发放')
-    expect((await render(dials(0, 0, null, 'same_ip_pending'), 'zh')).text).toContain('同一网络 24 小时内领取的账号已满')
+    expect((await render(dials(0, 0, null, 'same_ip_pending'), 'zh')).text).toContain('同一网络 24 小时内领取注册赠分的账号已达上限')
   })
 
   it('dialFigures: what each ring is measured against', () => {

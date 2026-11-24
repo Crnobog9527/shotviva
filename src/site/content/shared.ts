@@ -39,7 +39,7 @@ export function sharedFacts(offers: OfferFacts): readonly [Fact, Fact, Fact, ...
     },
     {
       label: 'Why your photo holds up here',
-      value: `Our own editing engine, built in-house, runs on the world’s top image models. Before every change it works out exactly what you asked for and locks everything else in place.`,
+      value: `Our own editing engine runs on the leading image models. Before every change it works out exactly what you asked for and locks everything else in place.`,
     },
     {
       label: 'Who it is for', brief: true,

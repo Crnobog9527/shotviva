@@ -4,6 +4,7 @@ import { signupGrantKey } from '../../src/core/billing/credits'
 import { site } from '../../src/site/site.config'
 import { creatorJobId } from './creator-work'
 import {
+  BULK_PERSONA_IDS,
   MAX_PRODUCT_CREDITS,
   MAX_PRODUCT_ID,
   needsRecreate,
@@ -32,6 +33,12 @@ describe('persona constants', () => {
 describe('needsRecreate', () => {
   it('always recreates qa-fresh', () => {
     expect(needsRecreate(PERSONAS['qa-fresh'], fresh)).toBe(true)
+  })
+
+  it('always recreates qa-graylum keeping the real signup grant, outside the bulk reset', () => {
+    expect(needsRecreate(PERSONAS['qa-graylum'], fresh)).toBe(true)
+    expect(PERSONAS['qa-graylum']).toMatchObject({ freeCredits: null, paidCredits: 0, tier: null, admin: false })
+    expect(BULK_PERSONA_IDS).not.toContain('qa-graylum')
   })
 
   it('recreates qa-free once it has paid for anything', () => {

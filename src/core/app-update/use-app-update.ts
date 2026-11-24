@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 
 import { track } from '../analytics/browser'
+import { dropAppShell } from '../offline'
 import { publicEnv } from '../public-env'
 import { getHolds, subscribeHolds } from './holds'
 import { onStaleBuild } from './stale-build'
@@ -20,7 +21,10 @@ async function fetchServed(): Promise<string | null> {
   if (!response.ok) return null
   const body: unknown = await response.json()
   const version = typeof body === 'object' && body !== null ? (body as { version?: unknown }).version : null
-  return typeof version === 'string' && version.length > 0 && version.length <= 128 ? version : null
+  const served = typeof version === 'string' && version.length > 0 && version.length <= 128 ? version : null
+  // The kept app shell belongs to this build; the next launch takes the new one (ARCHITECTURE §18.3).
+  if (served && served !== publicEnv.NEXT_PUBLIC_APP_VERSION) dropAppShell(publicEnv.NEXT_PUBLIC_APP_VERSION)
+  return served
 }
 
 function readDismissed(): string | null {
