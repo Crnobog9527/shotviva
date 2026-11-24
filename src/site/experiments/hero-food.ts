@@ -34,12 +34,13 @@ const DISHES: Record<Locale, readonly Dish[]> = {
   ],
   // Chinese dishes on /zh (Owner 2026-11-24), cut from published 中餐 templates' covers:
   // cn-camel-char-siu, cn-dark-claypot-walnut (it replaced cn-rattan-iron-wok, now a first-screen dish,
-  // Owner 2026-11-25), cn-warm-crab-plate, cn-ring-lobster-pour,
-  // cn-green-wine-plate, cn-deep-lotus-crab, cn-warm-roast-straw (public/home/cn-food-<n>, the claypot cn-food-claypot).
+  // Owner 2026-11-25), cn-deep-maw-bowl (it replaced cn-warm-crab-plate, whose result was
+  // landscape, Owner 2026-11-25), cn-ring-lobster-pour,
+  // cn-green-wine-plate, cn-deep-lotus-crab, cn-warm-roast-straw (public/home/cn-food-<n>; the replacements cn-food-claypot and cn-food-crabmaw).
   zh: [
     { phone: '真实手机照：后厨不锈钢台面上，白色长盘里的叉烧', ai: '真实案例：同一盘叉烧放在驼色背景的原木上', caption: '叉烧，驼色原木' },
     { phone: '真实手机照：后厨台面上，木板上的白砂锅，锅里是红油焖菜', ai: '真实案例：同一锅放在胡桃木板上，深色背景，热气升起', caption: '红油砂锅，胡桃木板', file: 'cn-food-claypot' },
-    { phone: '真实手机照：后厨台面上，白色宽边盘里的葱姜炒蟹', ai: '真实案例：同一盘炒蟹放在亚麻桌布上，暖光', caption: '葱姜炒蟹，亚麻布' },
+    { phone: '真实手机照：后厨台面上，白色宽边汤盘里的蟹黄鱼肚，配两棵小青菜', ai: '真实案例：同一盘蟹黄鱼肚放在暖棕色桌上，热气升起', caption: '蟹黄鱼肚，暖棕', file: 'cn-food-crabmaw' },
     { phone: '真实手机照：后厨台面上，冰盘里的龙虾刺身', ai: '真实案例：同一盘龙虾刺身放在年轮木块上', caption: '龙虾刺身，年轮木块' },
     { phone: '真实手机照：后厨台面上，酒红深盘里的一道小炒', ai: '真实案例：同一盘小炒放在暖棕色的绿色台面上', caption: '小炒，酒红深盘' },
     { phone: '真实手机照：后厨台面上，荷叶上的一只蒸蟹', ai: '真实案例：同一只蟹在荷叶盘里，暖棕色背景', caption: '荷叶蒸蟹，暖棕' },
