@@ -1,6 +1,6 @@
 import type { HomePage, ImageRef } from '@/core/content'
 
-import { caseImage, homeImage } from '../landing-shared'
+import { caseImage, dishImage, homeImage } from '../landing-shared'
 import { ZH_TIERS, zhTierList, zhUploadLimits } from './offer'
 
 // /zh 首页的两个「怎么做」区块，每一点先给图、再用一行字说明（Owner 2026-11-12：看图比读大段文字快）：
@@ -15,6 +15,15 @@ export const zhTote = {
   promo: homeImage('hero-set-promo', '同一只包做成新品促销海报，明亮影棚光（真实案例）'),
 } as const satisfies Record<string, ImageRef>
 
+// The steps' pictures (Owner 2026-11-24): a dish shot on the kitchen counter and three food
+// templates, the first of them the one picked.
+const zhDish = {
+  phone: dishImage('food-1-photo', '真实手机照：后厨不锈钢台面上，白盘里的培根蛋酱意面'),
+  slate: dishImage('food-1-ai', '真实案例：同一盘意面放在斑驳阳光下的石板桌上'),
+  dark: dishImage('food-2-ai', '真实案例：一盘肉酱意面放在深色桌面上', true),
+  board: dishImage('food-3-ai', '真实案例：一盘牛排放在原木砧板上', true),
+}
+
 const [standard, hd, max] = ZH_TIERS
 const tiers = [standard, hd, max] as const
 const sizesAlt = (subject: string) => `${subject}，${tiers.map((tier) => `${tier.name} ${tier.px}`).join('、')} px 三档尺寸对比`
@@ -26,7 +35,7 @@ export const zhSteps = {
     {
       heading: '上传一张照片',
       text: `手机拍一张，或者从相册里选：${zhUploadLimits}。让主体完整地留在画面里。`,
-      visual: { kind: 'upload', image: zhTote.phone, file: 'IMG_2047.jpg' },
+      visual: { kind: 'upload', image: zhDish.phone, file: 'IMG_3108.jpg' },
     },
     {
       heading: '选一个模板',
@@ -34,18 +43,18 @@ export const zhSteps = {
       visual: {
         kind: 'picker',
         tiles: [
-          { image: zhTote.listing, name: '纯白底图' },
-          { image: zhTote.lifestyle, name: '生活场景' },
-          { image: zhTote.promo, name: '促销海报' },
+          { image: zhDish.slate, name: '西餐石板光斑' },
+          { image: zhDish.dark, name: '西餐暗调俯拍' },
+          { image: zhDish.board, name: '西餐深木炙烤' },
         ],
-        picked: 1,
-        caption: picked('生活场景'),
+        picked: 0,
+        caption: picked('西餐石板光斑'),
       },
     },
     {
       heading: `下载 ${zhTierList}`,
       text: `${standard.name}适合${standard.use}，${hd.name}适合${hd.use}，${max.name}适合${max.use}。`,
-      visual: { kind: 'sizes', image: { ...zhTote.lifestyle, alt: sizesAlt('同一只包的生活场景图') }, tiers },
+      visual: { kind: 'sizes', image: { ...zhDish.slate, alt: sizesAlt('同一盘意面的石板光斑图') }, tiers },
     },
   ],
 } as const satisfies HomePage['steps']

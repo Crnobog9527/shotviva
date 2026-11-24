@@ -6,6 +6,10 @@ import { FIRST_FRAMES } from './first-frames.generated'
 // Shared bits of the three landing pages (T44): the illustrative hero pairs in public/home
 // (example-*, 900 × 1125) and the size count.
 export const pairImage = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 900, height: 1125 })
+// The restaurant pairs of the home hero (public/home/food-*: 880 × 1100, the -s copies 320 × 400),
+// also the steps' pictures since 2026-11-24 (restaurants and hotels lead the home page).
+export const dishImage = (file: string, alt: string, small = false): ImageRef =>
+  ({ src: `/home/${file}${small ? '-s' : ''}.webp`, alt, width: small ? 320 : 880, height: small ? 400 : 1100 })
 export const homeImage = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 1080, height: 1350 })
 // The inner pages' own cases (public/cases, 1080 × 1350, Owner 2026-11-11): a sneaker shoot on
 // /commercial-photography; a cat in three art styles and four precise edits on
