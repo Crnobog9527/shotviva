@@ -9,7 +9,7 @@ import { ModelSyncProvider } from '@/core/admin/image-provider-field/model-sync'
 import { listAdminCategoryTree } from '@/core/admin/template-categories'
 import { listAdminSeriesOptions, OrderHelp, seriesCopy } from '@/core/admin/template-series'
 import { readLocaleDisplay } from '@/core/templates/locale-display-read'
-import { moveTemplateCategoryAction, setLocaleCategoryOrderAction, setLocaleFeaturedAction } from './category-actions'
+import { moveTemplateCategoryAction, saveLocaleDisplayAction } from './category-actions'
 import { AdminTemplatePreview } from './preview-provider'
 import { setTemplateSaleAction } from './sale-action'
 import { deleteTemplatesAction, setTemplatesSaleAction, setTemplatesSeriesAction } from './bulk-actions'
@@ -63,7 +63,7 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
       />
       <LocaleDisplayPanel
         categories={categories} templates={templates} display={display}
-        actions={{ setCategoryOrder: setLocaleCategoryOrderAction, setFeatured: setLocaleFeaturedAction }}
+        actions={{ save: saveLocaleDisplayAction }}
       />
       <ModelSyncProvider action={syncTemplateModel}>
       <AdminTemplatePreview zhMessages={zhMessages}>
