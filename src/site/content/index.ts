@@ -39,5 +39,6 @@ export {
   homePageIn,
   pricingFaqIn,
   pricingPageIn,
+  templateRequestsPageIn,
 } from './localized'
 export type { PricingContent } from './pricing'

@@ -45,6 +45,8 @@ export const site = defineSite({
       '/commercial-photography',
       '/ai-restaurant-menu',
       '/pricing',
+      // The wishlist's public page (Owner 2026-11-25), indexable in both languages.
+      '/template-requests',
       '/partners',
       '/partners/apply',
       '/partners/join',
@@ -158,6 +160,9 @@ export const site = defineSite({
       // SEO launch handbook 04-P1 (Owner 2026-11-13), English only.
       '/transparent-background',
       '/pricing',
+      // The wishlist's public page (Owner 2026-11-25 SEO plan: "custom ai photo template"). Left
+      // out of both sitemaps and noindex while the wishlist is switched off (template-requests-gate).
+      '/template-requests',
       '/terms',
       '/privacy',
       '/refund-policy',
@@ -168,7 +173,7 @@ export const site = defineSite({
     // seo资料/Shotviva 页面与主词映射（中文口径）.csv: the indexable /zh pages. The two vertical
     // pages joined on 2026-11-12 (SEO patch v5 item 1, Owner): each English vertical and its /zh
     // twin carry hreflang to each other.
-    zhIndexablePaths: ['/', '/image-to-image-generator', '/commercial-photography', '/ai-restaurant-menu', '/pricing'],
+    zhIndexablePaths: ['/', '/image-to-image-generator', '/commercial-photography', '/ai-restaurant-menu', '/pricing', '/template-requests'],
   },
   // The home page's two bills (DESIGN §6.9 item 6), Owner 2026-11-06: styled product photos
   // $50–$350 per image (Shopify, "Product photography pricing", Jan 2026); white-background

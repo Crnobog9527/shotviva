@@ -20,6 +20,8 @@ type Props = {
   templates: FeaturedSections
   // The first-screen generator (modules/image), opening on the page's template.
   generator: ReactNode
+  // The wishlist is open: the template section ends with the way to request one (Owner 2026-11-25).
+  requestLink?: boolean
 }
 
 // One skeleton for every SEO landing page (design/comps-v3-b/landing.html, ARCHITECTURE §12,
@@ -27,7 +29,7 @@ type Props = {
 // edit cases → the page's template categories → facts → the two bills → the optional comparison
 // table → FAQ → related pages.
 // No visible breadcrumbs (DESIGN §8); the BreadcrumbList JSON-LD stays.
-export function ContentPageView({ page, isLinkEnabled, templates, generator }: Props) {
+export function ContentPageView({ page, isLinkEnabled, templates, generator, requestLink = false }: Props) {
   const t = useTranslations('marketing')
   const headings = page.headings ?? {}
   const { landing } = page
@@ -36,7 +38,7 @@ export function ContentPageView({ page, isLinkEnabled, templates, generator }: P
       <HomeHero page={page} generator={generator} />
       {landing.shoot ? <ShootSection shoot={landing.shoot} /> : null}
       {landing.edits ? <EditCasesSection edits={landing.edits} /> : null}
-      {landing.templates ? <TemplateGrid grid={landing.templates} sections={templates} isLinkEnabled={isLinkEnabled} /> : null}
+      {landing.templates ? <TemplateGrid grid={landing.templates} sections={templates} isLinkEnabled={isLinkEnabled} requestLink={requestLink} /> : null}
       <FactCards facts={page.facts} heading={headings.facts ?? t('facts')} note={landing.factsNote} />
       <CostBillsSection bills={page.costBills} />
       {landing.compare ? <CompareSection compare={landing.compare} /> : null}
