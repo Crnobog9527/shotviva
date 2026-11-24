@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 import { ExperimentBeacon } from '@/core/analytics/browser'
 import { HomePageView } from '@/core/content'
-import { localizePath } from '@/core/i18n'
+import { localizePath, type Locale } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, faqPageLd, organizationLd, pageMetadata, softwareApplicationLd } from '@/core/seo'
 import { isWishlistEnabled } from '@/core/wishlist'
@@ -11,7 +11,7 @@ import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
 import { homePanelTemplates } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
-import { creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
+import { HOME_CATEGORIES, creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
 import { heroOptionContent } from '@/site/experiments'
 import { site } from '@/site/site.config'
 
@@ -41,20 +41,25 @@ export async function homeMetadata(): Promise<Metadata> {
   return pageMetadata(site, meta, locale)
 }
 
+// Restaurants and hotels lead (Owner 2026-11-24): with no experiment the page shows the food
+// option's pictures, line and strip, and the generator keeps the admin's first featured template
+// (a hotel one today), so the first screen shows a dish above and a hotel below. An experiment's
+// option replaces the pictures and opens the generator on its own template.
+function heroFor(heroOption: string | undefined, locale: Locale, live: readonly { id: string }[], featuredId: string | null) {
+  const option = heroOptionContent(heroOption ?? DEFAULT_HERO, locale)
+  const opens = heroOption ? option?.generatorTemplate : undefined
+  return { option, defaultId: opens && live.some((template) => template.id === opens) ? opens : featuredId }
+}
+
 // The live catalogue is a cached read (expired by every admin save, featured list included);
 // only the generator's visitor half waits for the request.
 export async function HomeContent({ heroOption }: { heroOption?: string }) {
   const { locale, live, series, products, page, wishlistOpen, free, meta } = await load()
-  // Restaurants and hotels lead (Owner 2026-11-24): with no experiment the page shows the food
-  // option's pictures, line and strip; an experiment's option still replaces them.
-  const option = heroOptionContent(heroOption ?? DEFAULT_HERO, locale)
   const ldMeta = { ...meta, path: localizePath(meta.path, locale) }
-  // Series show as one card each, in the admin's order (T102, Owner 2026-11-12).
-  const { defaultId: featuredId, ...sections } = featuredSections(live, undefined, series)
-  // Without an experiment the generator keeps the admin's first featured template (a hotel one
-  // today), so the first screen shows a dish above and a hotel below.
-  const opens = heroOption ? option?.generatorTemplate : undefined
-  const defaultId = opens && live.some((template) => template.id === opens) ? opens : featuredId
+  // Series show as one card each, in the admin's order (T102, Owner 2026-11-12). Only food and
+  // spaces (hotels) on the home page (Owner 2026-11-24); the generator still offers every template.
+  const { defaultId: featuredId, ...sections } = featuredSections(live, HOME_CATEGORIES, series)
+  const { option, defaultId } = heroFor(heroOption, locale, live, featuredId)
   const { templates, opening } = homePanelTemplates(live, defaultId)
   const initialCovers = await openingCovers(opening)
   const shown = option ? { ...page, hero: { ...page.hero, ...option.hero } } : page

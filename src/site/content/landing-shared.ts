@@ -23,4 +23,4 @@ export const sizeCountWord = (['zero', 'one', 'two', 'three', 'four', 'five', 's
 // The category keys a landing page's template section shows (template_categories.key, which
 // never changes, T75); the templates in them are the admin's featured ones (T53). A key the
 // Owner deletes in admin simply shows nothing.
-export const CATEGORY = { food: 'food-drink', products: 'products-resale', beauty: 'beauty-skincare' } as const
+export const CATEGORY = { food: 'food-drink', products: 'products-resale', beauty: 'beauty-skincare', spaces: 'rooms-spaces' } as const

@@ -20,7 +20,7 @@ export function findContentPage(slug: string): ContentPage | undefined {
 export { homePage }
 export { pricingFaq, pricingPage } from './pricing'
 export { type CreditFacts } from './offer'
-export { featuredSections, featuredTemplates, seriesLayerPairs, tryTemplates } from './home-templates'
+export { HOME_CATEGORIES, featuredSections, featuredTemplates, seriesLayerPairs, tryTemplates } from './home-templates'
 export { creditFacts, fillCredits } from './credits'
 export { offersShownIn } from './shown-offers'
 
