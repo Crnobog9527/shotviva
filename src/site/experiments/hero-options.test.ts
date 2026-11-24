@@ -9,8 +9,9 @@ import { FIRST_FRAMES } from '../content/first-frames.generated'
 const picture = (src: string) => existsSync(join(process.cwd(), 'public', src))
 
 describe('home hero options (ARCHITECTURE §16.5)', () => {
-  it('has content in both languages for every option but the default, with real files and an inline first frame', () => {
-    for (const { id } of HERO_OPTIONS.filter((option) => option.id !== HERO_DEFAULT_OPTION)) {
+  it('has content in both languages for every option but tote (the page content hero), the default included, with real files and an inline first frame', () => {
+    expect(HERO_DEFAULT_OPTION).toBe('food')
+    for (const { id } of HERO_OPTIONS.filter((option) => option.id !== 'tote')) {
       for (const locale of ['en', 'zh'] as const) {
         const content = heroOptionContent(id, locale)
         expect(content, `${id} ${locale}`).not.toBeNull()
@@ -34,6 +35,6 @@ describe('home hero options (ARCHITECTURE §16.5)', () => {
   })
 
   it('registers every option on the hero surface', () => {
-    expect(experimentRegistry[0]?.options.map((option) => option.id)).toEqual(['tote', 'art-style', 'food'])
+    expect(experimentRegistry[0]?.options.map((option) => option.id)).toEqual(['food', 'tote', 'art-style'])
   })
 })

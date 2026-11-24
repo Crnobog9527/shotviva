@@ -14,6 +14,8 @@ import { TemplateCard, type CardSizes } from './template-card'
 
 type Props = {
   sections: readonly CatalogueSection[]
+  // The first card's covers load at high priority, unless the featured card sits above (false).
+  firstPriority?: boolean
   onOpen(id: string): void
   onOpenSeries(slug: string): void
   onSeeAll(section: CatalogueSection): void
@@ -25,7 +27,7 @@ type Props = {
 // 「查看全部」 card; from md up it is the grid, at most six cards (SECTION_LIMIT). Cards keep the
 // catalogue's own order. A section of drag compares (画风) is a two-column grid of four on phones
 // instead: the compare takes horizontal drags, so it cannot sit in a rail that scrolls sideways.
-export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: Props) {
+export function CatalogueSections({ sections, firstPriority = true, onOpen, onOpenSeries, onSeeAll }: Props) {
   const t = useTranslations('app.create')
   return (
     <div className="mt-2 grid gap-8 md:mt-3 md:gap-10">
@@ -39,7 +41,7 @@ export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: 
             <Reveal className="flex items-baseline gap-2 px-(--gutter)">
               <h3 id={headingId} className="shrink-0 text-body leading-[1.25] font-semibold tracking-[-0.015em]">{section.name}</h3>
               {section.intro ? <p className="min-w-0 flex-1 truncate text-caption text-muted-foreground">{section.intro}</p> : <span className="flex-1" />}
-              <button type="button" onClick={() => onSeeAll(section)}
+              <button type="button" onClick={() => onSeeAll(section)} data-open={`see:${section.slug}`}
                 className="press -my-2 inline-flex min-h-11 shrink-0 items-center gap-1 rounded-inner ps-2 text-caption font-medium text-foreground">
                 {t('seeAll')}{' '}
                 <span className="font-mono text-muted-foreground">{section.total}</span>
@@ -51,7 +53,7 @@ export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: 
               <ul className="mt-2 grid grid-cols-2 gap-3 px-(--gutter) md:mt-3 md:grid-cols-3 md:gap-4">
                 {section.entries.map((entry, index) => (
                   <li key={entryKey(entry)} className={cn(index >= COMPARE_PHONE && 'hidden md:block')}>
-                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} sizes={COMPARE_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
+                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} priority={firstPriority && sectionIndex === 0 && index === 0} sizes={COMPARE_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
                   </li>
                 ))}
               </ul>
@@ -65,7 +67,7 @@ export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: 
               )}>
                 {section.entries.map((entry, index) => (
                   <li key={entryKey(entry)} className="w-[calc(100%-4rem)] max-w-96 flex-none snap-start md:w-auto md:max-w-none">
-                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} sizes={RAIL_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
+                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} priority={firstPriority && sectionIndex === 0 && index === 0} sizes={RAIL_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
                   </li>
                 ))}
                 {section.total > section.entries.length ? (
@@ -96,9 +98,9 @@ const COMPARE_PHONE = 4
 const RAIL_SIZES = { plate: COVER_SIZES.railPlate, frame: COVER_SIZES.railFrame }
 const COMPARE_SIZES = { art: COVER_SIZES.artSection }
 
-type CardProps = { entry: GridEntry; eager: boolean; sizes: CardSizes; onOpen(id: string): void; onOpenSeries(slug: string): void }
+type CardProps = { entry: GridEntry; eager: boolean; priority: boolean; sizes: CardSizes; onOpen(id: string): void; onOpenSeries(slug: string): void }
 
-function Card({ entry, eager, sizes, onOpen, onOpenSeries }: CardProps) {
-  if (entry.type === 'series') return <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={eager} />
-  return <TemplateCard template={entry.template} onOpen={onOpen} eager={eager} sizes={sizes} />
+function Card({ entry, eager, priority, sizes, onOpen, onOpenSeries }: CardProps) {
+  if (entry.type === 'series') return <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={eager} priority={priority} />
+  return <TemplateCard template={entry.template} onOpen={onOpen} eager={eager} priority={priority} sizes={sizes} />
 }

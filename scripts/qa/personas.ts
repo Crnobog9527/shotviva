@@ -1,8 +1,8 @@
 import { site } from '../../src/site/site.config'
 
-// Keep the dedicated payment acceptance account outside the shared bulk reset.
+// Keep the dedicated payment acceptance and Graylum connection accounts outside the shared bulk reset.
 export const BULK_PERSONA_IDS = ['qa-admin', 'qa-creator', 'qa-fresh', 'qa-max', 'qa-free'] as const
-export const PERSONA_IDS = [...BULK_PERSONA_IDS, 'qa-invitee'] as const
+export const PERSONA_IDS = [...BULK_PERSONA_IDS, 'qa-invitee', 'qa-graylum'] as const
 export const INVITEE_SIGNUP_IP = '192.0.2.94' // TEST-NET-1, reserved for documentation.
 export type PersonaId = (typeof PERSONA_IDS)[number]
 
@@ -35,6 +35,11 @@ export const PERSONAS: Record<PersonaId, Persona> = {
   'qa-max': { ...base, id: 'qa-max', email: 'qa-max@shotviva.com', paidCredits: MAX_PRODUCT_CREDITS, tier: 'max' },
   'qa-free': { ...base, id: 'qa-free', email: 'qa-free@shotviva.com' },
   'qa-invitee': { ...base, id: 'qa-invitee', email: 'qa-invitee@shotviva.com', alwaysRecreate: true },
+  // Graylum connection tests only (Owner 2026-11-24): recreated on every reset, so each run starts
+  // from a new identity with no Graylum link and no purchases. Its free pool keeps exactly what the
+  // signup grant gave (null: not reset to a fixed number), like a real new account, so a partner
+  // generation can succeed; 0 paid.
+  'qa-graylum': { ...base, id: 'qa-graylum', email: 'qa-graylum@shotviva.com', alwaysRecreate: true, freeCredits: null },
 }
 
 export function isPersonaId(value: string): value is PersonaId {

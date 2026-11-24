@@ -25,6 +25,7 @@ import { posterSeriesOf, posterStart } from './poster-series'
 import { SavedEmpty } from './saved-empty'
 import { SearchBox } from './search-box'
 import { FeatureCard } from './feature-card'
+import { FirstScreenCovers } from './near-viewport'
 import { SeriesCard } from './series-card'
 import { TemplateCard } from './template-card'
 import { ShareModeButton } from '../template-share/share-mode-button'
@@ -99,32 +100,34 @@ export function TemplateCatalogue({ payload, create: createProp, endCard }: Prop
   }
   return (
     <ShareSelectionProvider value={share}>
-      {featured ? (
-        <Reveal className="px-(--gutter)">
-          <FeatureCard template={featured} onOpen={open} />
-        </Reveal>
-      ) : null}
-      <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
-      <div ref={bar} data-stuck={stuck || undefined} data-chrome="" className="sticky top-0 z-40 py-2 data-[stuck]:chrome-bleed data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
-        <div className="mb-2 flex items-center gap-2 px-(--gutter)">
-          <SearchBox value={search.query} onChange={search.setQuery} label={t('search')} clear={t('searchClear')} className="min-w-0 flex-1 md:max-w-[420px]" />
-          <ShareModeButton />
+      <FirstScreenCovers screen={firstScreenOf(search.results !== null, active)}>
+        {featured ? (
+          <Reveal className="px-(--gutter)">
+            <FeatureCard template={featured} onOpen={open} />
+          </Reveal>
+        ) : null}
+        <div ref={sentinel} aria-hidden="true" className="mt-4 h-px md:mt-6" />
+        <div ref={bar} data-stuck={stuck || undefined} data-chrome="" className="sticky top-0 z-40 py-2 data-[stuck]:chrome-bleed data-[stuck]:pt-[calc(var(--sat)+8px)] md:top-14 md:data-[stuck]:pt-2">
+          <div className="mb-2 flex items-center gap-2 px-(--gutter)">
+            <SearchBox value={search.query} onChange={search.setQuery} label={t('search')} clear={t('searchClear')} className="min-w-0 flex-1 md:max-w-[420px]" />
+            <ShareModeButton />
+          </div>
+          <CategoryChips hidden={search.results !== null} filters={view.filters} saved={showSaved(saved.length, active.saved, holdsSaved(favorites))} value={active} onChange={query.select} labels={chipLabels(t)} />
         </div>
-        <CategoryChips hidden={search.results !== null} filters={view.filters} saved={showSaved(saved.length, active.saved, holdsSaved(favorites))} value={active} onChange={query.select} labels={chipLabels(t)} />
-      </div>
-      <h2 className="sr-only">{t('templates')}</h2>
-      <CatalogueBody search={search} sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onSeeAll={seeAll} />
-      <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
-      <CatalogueDialogs
-        create={create}
-        series={sheetLoaded ? series : undefined}
-        onCloseSeries={query.closeSeries}
-        template={openable.find((item) => item.id === openId) ?? null}
-        onCloseTemplate={() => setOpenId(null)}
-        poster={{ id: query.posterId, templates: openable, series: posterSeriesOf(view.entries, query.posterId), onSwitch: query.openPoster, onClose: query.closePoster }}
-        batch={{ templates: batchable, browse: batchBrowse }}
-      />
-      <ShareModeSlot selection={share} />
+        <h2 className="sr-only">{t('templates')}</h2>
+        <CatalogueBody search={search} firstPriority={!featured} sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onSeeAll={seeAll} />
+        <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
+        <CatalogueDialogs
+          create={create}
+          series={sheetLoaded ? series : undefined}
+          onCloseSeries={query.closeSeries}
+          template={openable.find((item) => item.id === openId) ?? null}
+          onCloseTemplate={() => setOpenId(null)}
+          poster={{ id: query.posterId, templates: openable, series: posterSeriesOf(view.entries, query.posterId), onSwitch: query.openPoster, onClose: query.closePoster }}
+          batch={{ templates: batchable, browse: batchBrowse }}
+        />
+        <ShareModeSlot selection={share} />
+      </FirstScreenCovers>
     </ShareSelectionProvider>
   )
 }
@@ -236,36 +239,46 @@ const showSaved = (count: number, chosen: boolean, held = false) => count > 0 ||
 
 // A search replaces the sections and the chosen category's grid with its matches; Saved with
 // nothing saved shows its empty state.
-function CatalogueBody({ search, sections, shown, saved, onBrowse, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
+function CatalogueBody({ search, firstPriority, sections, shown, saved, onBrowse, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
   if (search.results) return <SearchResults query={search.query.trim()} results={search.results} endCard={endCard} onOpen={onOpen} />
   if (saved && shown.length === 0) return <SavedEmpty onBrowse={onBrowse} />
-  if (!sections) return <CatalogueGrid entries={shown} endCard={endCard} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
+  if (!sections) return <CatalogueGrid entries={shown} endCard={endCard} firstPriority={firstPriority} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
   return (
     <>
-      <CatalogueSections sections={sections} onOpen={onOpen} onOpenSeries={onOpenSeries} onSeeAll={onSeeAll} />
+      <CatalogueSections sections={sections} firstPriority={firstPriority} onOpen={onOpen} onOpenSeries={onOpenSeries} onSeeAll={onSeeAll} />
       {endCard ? <CatalogueGrid entries={[]} endCard={endCard} className="mt-8 md:mt-10" onOpen={onOpen} onOpenSeries={onOpenSeries} /> : null}
     </>
   )
 }
 
-type GridProps = { entries: readonly GridEntry[]; endCard?: ReactNode; className: string; onOpen(id: string): void; onOpenSeries(slug: string): void }
+// `firstPriority`: the first card is the page's largest paint, so its covers load at high priority;
+// false when the featured card sits above it (that one is the largest, feature-card.tsx).
+type GridProps = { entries: readonly GridEntry[]; endCard?: ReactNode; firstPriority?: boolean; className: string; onOpen(id: string): void; onOpenSeries(slug: string): void }
 
 // The flat grid: a chosen category, Saved, or All with a single category.
-function CatalogueGrid({ entries, endCard, className, onOpen, onOpenSeries }: GridProps) {
+function CatalogueGrid({ entries, endCard, firstPriority = true, className, onOpen, onOpenSeries }: GridProps) {
   return (
     <ul className={cn('grid grid-flow-row-dense grid-cols-1 gap-x-3 gap-y-6 px-(--gutter) md:grid-cols-2 md:gap-x-4 lg:grid-cols-3', className)}>
       {entries.map((entry, index) => (
         <Reveal as="li" key={entryKey(entry)} className={cn(isTall(entry) && 'md:row-span-2')}>
           {entry.type === 'series' ? (
-            <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={index < 3} />
+            <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={index < 3} priority={firstPriority && index === 0} />
           ) : (
-            <TemplateCard template={entry.template} onOpen={onOpen} eager={index < 3} />
+            <TemplateCard template={entry.template} onOpen={onOpen} eager={index < 3} priority={firstPriority && index === 0} />
           )}
         </Reveal>
       ))}
       {endCard ? <Reveal as="li">{endCard}</Reveal> : null}
     </ul>
   )
+}
+
+// The screen whose first-screen covers the service worker keeps (near-viewport.tsx): All, a
+// category path, or Saved; none for search results.
+function firstScreenOf(searching: boolean, active: { saved: boolean; path: readonly string[] }): string | null {
+  if (searching) return null
+  if (active.saved) return 'saved'
+  return active.path.length ? `c:${active.path.join('/')}` : 'all'
 }
 
 // The featured card: the first single video template in the catalogue's order.

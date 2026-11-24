@@ -12,6 +12,8 @@ import { captureCodeLink } from '@/core/codes/link'
 import { isBadGalleryPage } from '@/core/gallery/page-number'
 import { galleryWorkIdOf, liveGalleryGate } from '@/core/gallery/proxy-gate'
 import { serverEnv } from '@/core/env'
+import { shellProxyAnswer } from '@/core/offline/shell-proxy'
+import { publicEnv } from '@/core/public-env'
 import { experimentRoute, isBotRequest, OPTION_PAGES, toOptionPage, withExperimentCookie, type RouteOutcome } from '@/core/experiments/server'
 import { viaImageCdn } from '@/core/storage/image-cdn-guard'
 import { routing } from '@/core/i18n/routing'
@@ -35,8 +37,14 @@ const localeRouter = createMiddleware(routing)
 // region cookie (T70).
 // Pages and APIs never answer through the image CDN (core/storage/image-cdn-guard.ts); then the
 // canonical-host redirect.
+// Then Create's app shell and its navigation preload (ARCHITECTURE §18.3), before any session work
+// or cookie (core/offline/shell-proxy.ts).
 function earlyResponse(request: NextRequest) {
-  return viaImageCdn(request.headers) ? notFoundResponse() : canonicalRedirectResponse(request, hosts)
+  if (viaImageCdn(request.headers)) return notFoundResponse()
+  const redirect = canonicalRedirectResponse(request, hosts)
+  if (redirect) return redirect
+  const shell = shellProxyAnswer(request, publicEnv.NEXT_PUBLIC_APP_VERSION)
+  return shell ? withHostNoindex(shell, request, hosts.canonicalHost) : null
 }
 
 // /gallery?page= outside 1–20 (T108): a real 404 here, since the page reads the number inside a
@@ -111,8 +119,9 @@ export async function proxy(request: NextRequest, event?: NextFetchEvent) {
 // presized/ holds the build's fixed-width AVIF / WebP copies of public pictures (core/presized), which
 // the image CDN fetches with its header: like the other static files, never a page.
 // api/version is the open tabs' version check (T90): no session work, no locale routing.
+// api/vitals takes the app pages' anonymous speed numbers: no session work, no cookies set or read.
 // api/catalogue/public/ is Create's public catalogue file: edge-cached, so never a cookie on it.
 // sw.js is the service worker (core/offline): public, no session work, no cookies.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|presized/|api/version$|api/catalogue/public/|sw\\.js$|fonts/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest|mp4|webm)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|presized/|api/version$|api/vitals$|api/catalogue/public/|sw\\.js$|fonts/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest|mp4|webm)$).*)'],
 }
