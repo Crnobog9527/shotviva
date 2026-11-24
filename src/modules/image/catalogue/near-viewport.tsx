@@ -72,10 +72,13 @@ export function useNearViewport<T extends Element>(immediate: boolean, margin = 
 }
 
 // The covers of one card: eager ones (the first screen) at once; the rest, inside Create's grid,
-// once near the screen, at low priority so they never queue ahead of the account's own data.
-export function useCardCovers<T extends Element>(eager: boolean) {
+// once near the screen, at low priority so they never queue ahead of the account's own data. The
+// first card's (`priority`) are the page's largest paint on a phone: high priority, so the browser
+// fetches them ahead of the other first-screen covers before it has laid the page out.
+export function useCardCovers<T extends Element>(eager: boolean, priority = false) {
   const defer = useDeferCovers() && !eager
   const [ref, near] = useNearViewport<T>(!defer)
-  const img = { loading: eager ? ('eager' as const) : ('lazy' as const), ...(eager ? {} : { fetchPriority: 'low' as const }) }
+  const fetchPriority = eager ? (priority ? { fetchPriority: 'high' as const } : {}) : { fetchPriority: 'low' as const }
+  const img = { loading: eager ? ('eager' as const) : ('lazy' as const), ...fetchPriority }
   return { ref, show: near, img }
 }

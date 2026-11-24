@@ -51,7 +51,7 @@ export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: 
               <ul className="mt-2 grid grid-cols-2 gap-3 px-(--gutter) md:mt-3 md:grid-cols-3 md:gap-4">
                 {section.entries.map((entry, index) => (
                   <li key={entryKey(entry)} className={cn(index >= COMPARE_PHONE && 'hidden md:block')}>
-                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} sizes={COMPARE_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
+                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} priority={sectionIndex === 0 && index === 0} sizes={COMPARE_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
                   </li>
                 ))}
               </ul>
@@ -65,7 +65,7 @@ export function CatalogueSections({ sections, onOpen, onOpenSeries, onSeeAll }: 
               )}>
                 {section.entries.map((entry, index) => (
                   <li key={entryKey(entry)} className="w-[calc(100%-4rem)] max-w-96 flex-none snap-start md:w-auto md:max-w-none">
-                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} sizes={RAIL_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
+                    <Card entry={entry} eager={sectionIndex === 0 && index < 2} priority={sectionIndex === 0 && index === 0} sizes={RAIL_SIZES} onOpen={onOpen} onOpenSeries={onOpenSeries} />
                   </li>
                 ))}
                 {section.total > section.entries.length ? (
@@ -96,9 +96,9 @@ const COMPARE_PHONE = 4
 const RAIL_SIZES = { plate: COVER_SIZES.railPlate, frame: COVER_SIZES.railFrame }
 const COMPARE_SIZES = { art: COVER_SIZES.artSection }
 
-type CardProps = { entry: GridEntry; eager: boolean; sizes: CardSizes; onOpen(id: string): void; onOpenSeries(slug: string): void }
+type CardProps = { entry: GridEntry; eager: boolean; priority: boolean; sizes: CardSizes; onOpen(id: string): void; onOpenSeries(slug: string): void }
 
-function Card({ entry, eager, sizes, onOpen, onOpenSeries }: CardProps) {
-  if (entry.type === 'series') return <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={eager} />
-  return <TemplateCard template={entry.template} onOpen={onOpen} eager={eager} sizes={sizes} />
+function Card({ entry, eager, priority, sizes, onOpen, onOpenSeries }: CardProps) {
+  if (entry.type === 'series') return <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={eager} priority={priority} />
+  return <TemplateCard template={entry.template} onOpen={onOpen} eager={eager} priority={priority} sizes={sizes} />
 }

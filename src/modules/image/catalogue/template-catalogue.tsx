@@ -257,9 +257,9 @@ function CatalogueGrid({ entries, endCard, className, onOpen, onOpenSeries }: Gr
       {entries.map((entry, index) => (
         <Reveal as="li" key={entryKey(entry)} className={cn(isTall(entry) && 'md:row-span-2')}>
           {entry.type === 'series' ? (
-            <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={index < 3} />
+            <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={index < 3} priority={index === 0} />
           ) : (
-            <TemplateCard template={entry.template} onOpen={onOpen} eager={index < 3} />
+            <TemplateCard template={entry.template} onOpen={onOpen} eager={index < 3} priority={index === 0} />
           )}
         </Reveal>
       ))}
