@@ -13,7 +13,6 @@ export {
   type EditCases,
   type SpaceCase,
   type SpaceCases,
-  type SpaceViewerLabels,
   type ExplainedText,
   type Fact,
   type FaqItem,

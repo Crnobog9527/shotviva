@@ -90,8 +90,7 @@ describe('/zh marketing copy (建站规格 §6.1, G13)', () => {
     // So is a hotel case's template id (home-spaces.ts).
     const noCaseIds = (page: object) => ('spaces' in page && page.spaces ? { ...page, spaces: { ...(page.spaces as object), items: (page.spaces as { items: object[] }).items.map((item) => ({ ...item, template: '' })) } } : page)
     const pages = Object.values(PAGES).map((page) => ({ ...noCaseIds(noIds(fillCredits(page, FALLBACK_CREDITS))), hero: undefined, path: undefined }))
-    // A {placeholder} the page fills in (the hotel viewer's counter) is not copy either.
-    const words = pages.flatMap(strings).flatMap((text) => text.replace(/\{\w+\}/g, '').match(/[A-Za-z][A-Za-z']*/g) ?? [])
+    const words = pages.flatMap(strings).flatMap((text) => text.match(/[A-Za-z][A-Za-z']*/g) ?? [])
     expect([...new Set(words.filter((word) => !LATIN_OK.has(word)))]).toEqual([])
   })
 })
