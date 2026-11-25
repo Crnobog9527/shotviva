@@ -651,13 +651,16 @@
       "signupGiftRefusedPaused": "这个账号注册时，注册赠分暂停发放，因此未能领取。",
       "signupGiftRefusedStaff": "通过企业员工链接注册的账号不享有注册赠分。"
     },
+    "form": {
+      "formLoading": "正在加载模板设置…",
+      "formLoadFailed": "模板设置加载失败。",
+      "formRetry": "重试"
+    },
     "create": {
       "title": "创作",
       "lede": "选择一个风格，照片内容始终与原图一致。",
       "metaTitle": "创作",
       "empty": "模板即将上线，请稍后再来查看。",
-      "formLoading": "正在加载模板设置…",
-      "formLoadFailed": "模板设置加载失败。",
       "formRetry": "重试",
       "catalogueLoadFailed": "模板加载失败。",
       "templates": "模板",

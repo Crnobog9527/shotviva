@@ -651,13 +651,16 @@
       "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up.",
       "signupGiftRefusedStaff": "No sign-up credits for this account: it was created through an organisation's staff link."
     },
+    "form": {
+      "formLoading": "Loading template settings…",
+      "formLoadFailed": "Couldn’t load the template settings.",
+      "formRetry": "Try again"
+    },
     "create": {
       "title": "Create",
       "lede": "Pick a look. Your photo stays as shot.",
       "metaTitle": "Create",
       "empty": "Templates are on their way. Check back soon.",
-      "formLoading": "Loading template settings…",
-      "formLoadFailed": "Couldn’t load the template settings.",
       "formRetry": "Try again",
       "catalogueLoadFailed": "Couldn’t load the templates.",
       "templates": "Templates",
