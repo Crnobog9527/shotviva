@@ -2457,6 +2457,7 @@
       "useCaseTransparent": "透明 PNG 制作",
       "templates": "模板",
       "requestTemplate": "定制模板",
+      "requestTemplateShort": "定制模板",
       "login": "登录",
       "startFree": "免费开始",
       "uploadPhoto": "上传照片",

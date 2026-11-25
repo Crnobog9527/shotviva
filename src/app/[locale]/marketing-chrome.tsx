@@ -108,11 +108,21 @@ async function PhoneNav({ locale, wishlistOpen }: { locale: Locale; wishlistOpen
       <Link href="/#templates" className="mk-mnav-dup">
         {t('templates')}
       </Link>
-      {wishlistOpen ? <Link href="/template-requests">{t('requestTemplate')}</Link> : null}
+      {wishlistOpen ? <RowRequestLink short={t('requestTemplateShort')} full={t('requestTemplate')} /> : null}
       <Link href="/pricing" className="mk-mnav-dup">
         {t('pricing')}
       </Link>
     </nav>
+  )
+}
+
+// The row's Request a template: English shortens it to "Custom" so the row fits one line at 375px
+// (Owner 2026-11-25); its accessible name starts with that visible word and says the rest.
+function RowRequestLink({ short, full }: { short: string; full: string }) {
+  return (
+    <Link href="/template-requests" aria-label={short === full ? undefined : `${short}, ${full.toLowerCase()}`}>
+      {short}
+    </Link>
   )
 }
 
