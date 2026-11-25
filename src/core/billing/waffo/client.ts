@@ -41,7 +41,8 @@ export type WaffoSessionRequest = {
   metadata: Record<string, string>
   orderMerchantExternalId: string
   language: 'en' | 'zh-Hans'
-  // A card subscription offers cards only (T50); one-time sessions offer what the currency has.
+  // Always sent (checkout.ts waffoMethods): Waffo refuses a method the product type and currency
+  // do not take (a subscription with Alipay: 400), so the paywall row decides what the page shows.
   includePaymentMethods?: readonly string[]
   // A blacklist (mutually exclusive with the whitelist); methods the currency lacks are ignored.
   excludePaymentMethods?: readonly string[]
