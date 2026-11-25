@@ -43,6 +43,14 @@ describe('featured templates from the database', () => {
     expect(featuredTemplates(rows).map((t) => t.id)).toEqual(['t7', 't6', 't5', 't4', 't3', 't2'].slice(0, FALLBACK_COUNT))
   })
 
+  it('shows no featured sections when nothing is featured, and still opens the generator on a template', () => {
+    const rows = Array.from({ length: 8 }, (_, i) => live(`t${i}`, 'food-drink'))
+    const { categories, media, defaultId } = featuredSections(rows, ['food-drink'])
+    expect(categories).toEqual([])
+    expect(media).toEqual({})
+    expect(defaultId).toBe('t0')
+  })
+
   // T75: names, intros and order come from 分类管理; the drag compare follows card_style.
   it('groups in the admin\'s category order with the stored names and intros, hiding empty ones', () => {
     const rows = [live('new', 'fresh', { rank: 1 }), live('pet', 'pets', { rank: 2 }), live('art', 'art-styles', { rank: 3 }), live('dish', 'food-drink', { rank: 4 })]
@@ -112,7 +120,7 @@ describe('series on the template sections', () => {
 
   it('gives the browser each series card\'s later pairs under the card\'s key, as the card pictures them', () => {
     const ids = Array.from({ length: SERIES_PAIRS + 2 }, (_, i) => `m${i}`)
-    const rows = ids.map((id, i) => live(id, 'pets', { covers: i !== 1 }))
+    const rows = ids.map((id, i) => live(id, 'pets', { rank: i + 1, covers: i !== 1 }))
     const one = live('one', 'pets')
     const layers = seriesLayerPairs([...rows, one], [series('s', ids), series('lone', ['one', 'gone'])])
     const { categories } = featuredSections(rows, undefined, [series('s', ids)])
