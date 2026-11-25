@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { CatalogueTemplate } from '../../catalogue/catalogue-template'
 import type { HomeCatalogue } from '../home-catalogue'
-import { browsePath, panelReturnPath, parseSetRef, readPanelQuery, resolvePanel, withoutPanelQuery } from './panel-request'
+import { browsePath, parseSetRef, readPanelQuery, withoutPanelQuery } from './panel-request'
+import { panelReturnPath, resolvePanel } from './panel-resolve'
 
 const template = (id: string, extra: Partial<CatalogueTemplate> = {}) => ({ id, name: `${id} name`, fields: {}, ...extra }) as unknown as CatalogueTemplate
 const slot = template('poster', { hasDeferredSlots: true })

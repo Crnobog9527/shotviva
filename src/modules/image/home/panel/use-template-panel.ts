@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { HomeCatalogue } from '../home-catalogue'
 import { bundleOnPage, PICK_SELECTOR, requestFromTarget } from './panel-dom'
-import { browsePath, readPanelQuery, resolvePanel, withoutPanelQuery, type OpenPanel, type PanelRequest } from './panel-request'
+import { browsePath, readPanelQuery, withoutPanelQuery, type OpenPanel, type PanelRequest } from './panel-request'
 
 // The panel's code and its sheet: fetched on the first sign of interest (a pointer or focus on a
 // card or the generator, or the click itself), never in the page's first load (scripts/js-budget).
@@ -27,10 +27,10 @@ export function useTemplatePanel({ load, onMissing }: Args) {
   const open = useCallback((request: PanelRequest, opener: Element | null = document.activeElement) => {
     const current = ++latest.current
     const back = opener instanceof HTMLElement ? opener : null
-    void Promise.all([load(), loadPanel()]).then(([catalogue]) => {
+    void Promise.all([load(), loadPanel()]).then(([catalogue, panelCode]) => {
       if (current !== latest.current) return
       const bundle = request.set?.kind === 'bundle' ? bundleOnPage(request.set.id) : null
-      const resolved = resolvePanel(request, catalogue, bundle)
+      const resolved = panelCode.resolvePanel(request, catalogue, bundle)
       if (!resolved) return onMissing(request.templateId)
       setPanel({ ...resolved, set: { ...resolved.set, id: `${resolved.set.id}#${current}` }, file: request.file ?? null, opener: back })
     }).catch(() => {

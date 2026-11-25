@@ -8,7 +8,11 @@ import { SetCreateDialog, type SetFrame } from '../../workspace/set-create-dialo
 import type { HomeViewer } from '../home-cta'
 import { GuestBar } from './guest-bar'
 import { panelContext } from './panel-context'
-import { panelReturnPath, type OpenPanel } from './panel-request'
+import type { OpenPanel } from './panel-request'
+import { panelReturnPath } from './panel-resolve'
+
+// Resolving what opened it is the panel's own code too, not the page's first load.
+export { resolvePanel } from './panel-resolve'
 
 type Props = {
   panel: OpenPanel | null
