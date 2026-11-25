@@ -17,12 +17,13 @@ import './(marketing)/marketing.css'
 const zhPaths = site.locales.zhPaths
 
 // The marketing top bar (DESIGN §6.9 item 4, design/comps-v3-b/home.html): wordmark, then
-// Use Cases (the three landing pages, SEO launch handbook G5) · Templates (the home template section; v1 has no /templates page) · Pricing · the globe ·
+// Use Cases (the three landing pages, SEO launch handbook G5) · Templates (the home template section; v1 has no /templates page) ·
+// Request a template (/template-requests, only while the wishlist is open; Owner 2026-11-25) · Pricing · the globe ·
 // Log in · Start free (signed in: Open app · account), phones keep the globe and Log in (or
 // Open app · account). Shared by the marketing layout and
 // the 404 pages, which render outside it. `locale` is explicit for the global 404.
 export async function MarketingHeader({ locale, homeOnly = false }: { locale: Locale; homeOnly?: boolean }) {
-  const t = await getTranslations({ locale, namespace: 'marketing.nav' })
+  const [t, wishlistOpen] = await Promise.all([getTranslations({ locale, namespace: 'marketing.nav' }), isWishlistEnabled(site)])
   return (
     <>
     <header className="mk-appbar">
@@ -48,6 +49,19 @@ export async function MarketingHeader({ locale, homeOnly = false }: { locale: Lo
           <Link href="/#templates" className="mk-nl">
             {t('templates')}
           </Link>
+          {wishlistOpen ? (
+            <Suspense
+              fallback={
+                <Link href="/template-requests" className="mk-nl mk-nl-wide">
+                  {t('requestTemplate')}
+                </Link>
+              }
+            >
+              <NavLink href="/template-requests" className="mk-nl mk-nl-wide">
+                {t('requestTemplate')}
+              </NavLink>
+            </Suspense>
+          ) : null}
           {/* aria-current on /pricing; until the path resolves, the plain link. */}
           <Suspense
             fallback={
@@ -68,15 +82,16 @@ export async function MarketingHeader({ locale, homeOnly = false }: { locale: Lo
         </nav>
       </div>
     </header>
-    <PhoneNav locale={locale} />
+    <PhoneNav locale={locale} wishlistOpen={wishlistOpen} />
     </>
   )
 }
 
 // Phones only (Owner 2026-11-24): the top bar has room for the globe and Log in alone, and the
 // rules forbid a hamburger, so the inner pages sit in one row of text links under it. Not
-// sticky: it scrolls away with the page. The blog shows once this language has a post.
-async function PhoneNav({ locale }: { locale: Locale }) {
+// sticky: it scrolls away with the page. The blog shows once this language has a post; Request a
+// template while the wishlist is open.
+async function PhoneNav({ locale, wishlistOpen }: { locale: Locale; wishlistOpen: boolean }) {
   const [t, blogText, hasBlogPosts] = await Promise.all([
     getTranslations({ locale, namespace: 'marketing.nav' }),
     getTranslations({ locale, namespace: 'blog' }),
@@ -87,6 +102,8 @@ async function PhoneNav({ locale }: { locale: Locale }) {
       <Link href="/#templates">{t('templates')}</Link>
       <Link href="/ai-restaurant-menu">{t('menuShort')}</Link>
       <Link href="/pricing">{t('pricing')}</Link>
+      {/* After Pricing here (unlike the desktop bar): at 375px the English row would push Pricing off screen. */}
+      {wishlistOpen ? <Link href="/template-requests">{t('requestTemplate')}</Link> : null}
       {hasBlogPosts ? <Link href="/blog">{blogText('footerLink')}</Link> : null}
     </nav>
   )

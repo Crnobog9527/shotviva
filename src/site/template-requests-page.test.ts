@@ -95,3 +95,17 @@ describe('no real request on the public page (Owner 2026-11-25)', () => {
     expect(shippedTemplates([], visible, 'en')).toEqual([])
   })
 })
+
+// Owner 2026-11-25: a top-level nav item (desktop bar and the phone row) and the footer link carry
+// the same label in each language.
+describe('the way in from the nav and the footer', () => {
+  it('reads "Request a template" / 「定制模板」 in the nav and the footer', async () => {
+    const { loadMessages } = await import('./i18n/messages')
+    const labels = { en: 'Request a template', zh: '定制模板' } as const
+    for (const locale of ['en', 'zh'] as const) {
+      const messages = (await loadMessages(locale)) as { marketing: { nav: Record<string, string> }; footer: Record<string, string> }
+      expect(messages.marketing.nav.requestTemplate).toBe(labels[locale])
+      expect(messages.footer.templateRequests).toBe(labels[locale])
+    }
+  })
+})
