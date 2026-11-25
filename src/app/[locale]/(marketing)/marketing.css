@@ -245,6 +245,7 @@
     border-radius: 999px; background: var(--frost); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   }
   .mk-dot { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: none; cursor: pointer; }
+  .mk-dot[hidden] { display: none; }
   .mk-dot::before, .mk-dot::after { content: ""; grid-area: 1 / 1; height: 6px; border-radius: 999px; }
   .mk-dot::before { width: 6px; background: var(--bone-dim); transition: opacity .3s var(--ease); }
   .mk-dot::after { width: 14px; background: var(--primary); opacity: 0; transform: scaleX(.43); transition: opacity .3s var(--ease), transform .3s var(--ease); }

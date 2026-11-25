@@ -17,7 +17,9 @@ import type { HeroOptionContent } from './hero-options'
 const big = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 880, height: 1100 })
 const small = (file: string, alt: string): ImageRef => ({ src: `/home/${file}-s.webp`, alt, width: 320, height: 400 })
 
-type Dish = { phone: string; ai: string; caption: string }
+// `file`: the pictures' own name when the dish replaced another (a new name, so no cache keeps
+// the old picture); otherwise `<prefix>-<n>`.
+type Dish = { phone: string; ai: string; caption: string; file?: string }
 
 // Pairs 2–8, in the order the Owner saw them.
 const DISHES: Record<Locale, readonly Dish[]> = {
@@ -31,14 +33,16 @@ const DISHES: Record<Locale, readonly Dish[]> = {
     { phone: 'Real phone photo: shrimp pad thai with lime on a white plate in a kitchen', ai: 'Real example: the same pad thai on a quiet grey backdrop with a soft shadow', caption: 'Pad thai, quiet grey' },
   ],
   // Chinese dishes on /zh (Owner 2026-11-24), cut from published 中餐 templates' covers:
-  // cn-camel-char-siu, cn-rattan-iron-wok, cn-warm-crab-plate, cn-ring-lobster-pour,
-  // cn-green-wine-plate, cn-deep-lotus-crab, cn-warm-roast-straw (public/home/cn-food-<n>).
+  // cn-camel-char-siu, cn-dark-claypot-walnut (it replaced cn-rattan-iron-wok, now a first-screen dish,
+  // Owner 2026-11-25), cn-deep-maw-bowl (it replaced cn-warm-crab-plate, whose result was
+  // landscape, Owner 2026-11-25), cn-ring-lobster-pour,
+  // cn-green-wine-plate, cn-deep-lotus-crab, cn-warm-roast-straw (public/home/cn-food-<n>; the replacements cn-food-claypot and cn-food-crabmaw).
   zh: [
     { phone: '真实手机照：后厨不锈钢台面上，白色长盘里的叉烧', ai: '真实案例：同一盘叉烧放在驼色背景的原木上', caption: '叉烧，驼色原木' },
-    { phone: '真实手机照：后厨台面上，黑铁双柄锅里的番茄牛腩', ai: '真实案例：同一锅番茄牛腩放在雕花木板上，旁边是番茄', caption: '番茄牛腩，雕花木板' },
-    { phone: '真实手机照：后厨台面上，白色宽边盘里的葱姜炒蟹', ai: '真实案例：同一盘炒蟹放在亚麻桌布上，暖光', caption: '葱姜炒蟹，亚麻布' },
+    { phone: '真实手机照：后厨台面上，木板上的白砂锅，锅里是红油焖菜', ai: '真实案例：同一锅放在胡桃木板上，深色背景，热气升起', caption: '红油砂锅，胡桃木板', file: 'cn-food-claypot' },
+    { phone: '真实手机照：后厨台面上，白色宽边汤盘里的蟹黄鱼肚，配两棵小青菜', ai: '真实案例：同一盘蟹黄鱼肚放在暖棕色桌上，热气升起', caption: '蟹黄鱼肚，暖棕', file: 'cn-food-crabmaw' },
     { phone: '真实手机照：后厨台面上，冰盘里的龙虾刺身', ai: '真实案例：同一盘龙虾刺身放在年轮木块上', caption: '龙虾刺身，年轮木块' },
-    { phone: '真实手机照：后厨台面上，酒红深盘里的一道小炒', ai: '真实案例：同一盘小炒放在暖棕色的绿色台面上', caption: '小炒，酒红深盘' },
+    { phone: '真实手机照：后厨台面上，酒红深盘里的一道小炒', ai: '真实案例：同一盘小炒放在绿色桌面上，暖棕色背景，旁边一枝绿叶', caption: '小炒，酒红深盘' },
     { phone: '真实手机照：后厨台面上，荷叶上的一只蒸蟹', ai: '真实案例：同一只蟹在荷叶盘里，暖棕色背景', caption: '荷叶蒸蟹，暖棕' },
     { phone: '真实手机照：后厨台面上，稻草上的两只烤乳鸽', ai: '真实案例：同样的烤乳鸽摆在稻草上，暖棕色背景', caption: '烤乳鸽，稻草暖棕' },
   ],
@@ -100,7 +104,10 @@ function foodIn(locale: Locale): HeroOptionContent {
     generatorTemplate: 'wd-dappled-slate',
     strip: {
       heading: copy.strip,
-      items: DISHES[locale].map((dish, index) => ({ before: small(`${file}-${index + 2}-photo`, dish.phone), after: small(`${file}-${index + 2}-ai`, dish.ai), caption: dish.caption })),
+      items: DISHES[locale].map((dish, index) => {
+        const name = dish.file ?? `${file}-${index + 2}`
+        return { before: small(`${name}-photo`, dish.phone), after: small(`${name}-ai`, dish.ai), caption: dish.caption }
+      }),
     },
   }
 }
