@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { cachedFeaturedBundles } from '@/core/templates/cached-bundles'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { cachedPublicSeries } from '@/core/templates/public-series'
 
@@ -7,6 +8,7 @@ import { GET } from './route'
 
 vi.mock('@/core/templates/cached-catalogue', () => ({ cachedWebCatalogue: vi.fn() }))
 vi.mock('@/core/templates/public-series', () => ({ cachedPublicSeries: vi.fn() }))
+vi.mock('@/core/templates/cached-bundles', () => ({ cachedFeaturedBundles: vi.fn(async () => []) }))
 vi.mock('@/modules/image', () => ({ HOME_CATALOGUE_CACHE_CONTROL: 'public, max-age=0, s-maxage=60, stale-while-revalidate=60' }))
 vi.mock('@/core/logger', () => ({ logger: { error: vi.fn() } }))
 
@@ -14,7 +16,10 @@ const request = (query: string) => new Request(`https://shotviva.test/api/home/s
 const member = (id: string) => ({ id, coverBeforeUrl: `https://shotviva.com/assets/covers/${id}/b.webp`, coverAfterUrl: `https://shotviva.com/assets/covers/${id}/a.webp` })
 const series = { id: 's', slug: 's-set', name: 'S', description: null, showMembers: false, memberIds: ['a', 'b'] }
 
-beforeEach(() => vi.resetAllMocks())
+beforeEach(() => {
+  vi.resetAllMocks()
+  vi.mocked(cachedFeaturedBundles).mockResolvedValue([])
+})
 
 describe('series cards\' later pairs', () => {
   it('rejects unsupported or missing locales before reading anything', async () => {
@@ -34,6 +39,15 @@ describe('series cards\' later pairs', () => {
       expect(cachedWebCatalogue).toHaveBeenLastCalledWith(locale)
       expect(cachedPublicSeries).toHaveBeenLastCalledWith(locale)
     }
+  })
+
+  it('answers bundle cards (精选组合) under their own key, in bundle order', async () => {
+    vi.mocked(cachedWebCatalogue).mockResolvedValue([member('a'), member('b'), member('c')] as never)
+    vi.mocked(cachedPublicSeries).mockResolvedValue([])
+    vi.mocked(cachedFeaturedBundles).mockResolvedValue([{ id: 'k', name: 'K', memberIds: ['c', 'gone', 'a'] }])
+    const body = await (await GET(request('?locale=en'))).json()
+    expect(body).toEqual({ 'bundle-k': [['https://shotviva.com/assets/covers/a/b.webp', 'https://shotviva.com/assets/covers/a/a.webp', 'a']] })
+    expect(cachedFeaturedBundles).toHaveBeenLastCalledWith('en')
   })
 
   it('never shares an empty answer (what a failed read degrades to) or a failure', async () => {

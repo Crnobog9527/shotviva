@@ -5,6 +5,7 @@ import type { HomePage, ImageRef, TemplateCard, TemplateCategory } from '../page
 import { CompareSlider } from './compare-slider'
 import { CoverFills } from './cover-fills'
 import { PhotoPair } from './photo-pair'
+import { BundleCard } from './bundle-card'
 import { SeriesCard } from './series-card'
 import { SeriesMotion } from './series-motion-mount'
 import { phoneSlot } from './phone-sizes'
@@ -20,7 +21,18 @@ export type FeaturedSections = { categories: readonly TemplateCategory[]; media:
 // database (T53). No price on the cards (DESIGN, Owner 2026-11-08): prices live on /pricing, the
 // paywall and the generate button. The landing pages show a subset with their own heading; no `note`.
 type Grid = Pick<HomePage['templateGrid'], 'heading' | 'intro' | 'note'>
-type Props = { grid: Pick<Grid, 'heading' | 'intro'> & Partial<Pick<Grid, 'note'>>; sections: FeaturedSections; isLinkEnabled: (href: string) => boolean }
+// `requestLink`: the landing pages end the grid with the way to request a template (Owner
+// 2026-11-25), passed only while the wishlist is open; never on the home page.
+type Props = { grid: Pick<Grid, 'heading' | 'intro'> & Partial<Pick<Grid, 'note'>>; sections: FeaturedSections; isLinkEnabled: (href: string) => boolean; requestLink?: boolean }
+
+function RequestLink() {
+  const t = useTranslations('marketing.templateRequests')
+  return (
+    <p className="mk-note">
+      {t('lead')} <Link href="/template-requests">{t('link')}</Link>
+    </p>
+  )
+}
 
 // One plate of a card's pair: 172 px on a 375 px phone, 174 px at 800, 274 px at 1280.
 const CARD_SIZES = `(min-width: 1024px) 276px, (min-width: 768px) 25vw, ${phoneSlot(50)}`
@@ -143,13 +155,14 @@ function Category({ category, ...rest }: { category: TemplateCategory; media: Te
       </div>
       {category.templates.length === 1 && first.series ? (
         <SoloSeries card={first} media={rest.media} />
-      ) : category.templates.length === 1 ? (
+      ) : category.templates.length === 1 && !first.bundle ? (
         <Solo card={first} media={mediaOf(first)} art={category.drag === true} />
       ) : (
         <ul className="mk-tgrid" data-count={category.templates.length}>
           {category.templates.map((card) => (
             <li key={card.id}>
-              {card.series ? <SeriesCard card={card} media={rest.media} sizes={CARD_SIZES} /> : <PairCard card={card} media={mediaOf(card)} />}
+              {card.bundle ? <BundleCard card={card} media={rest.media} sizes={CARD_SIZES} />
+                : card.series ? <SeriesCard card={card} media={rest.media} sizes={CARD_SIZES} /> : <PairCard card={card} media={mediaOf(card)} />}
             </li>
           ))}
         </ul>
@@ -160,7 +173,7 @@ function Category({ category, ...rest }: { category: TemplateCategory; media: Te
 
 // H2-2: one H3 per category, Art Styles first; every template name and use is in the HTML
 // source (建站规格 R5, §4 H2-2). Nothing published yet: no section.
-export function TemplateGrid({ grid, sections, isLinkEnabled }: Props) {
+export function TemplateGrid({ grid, sections, isLinkEnabled, requestLink = false }: Props) {
   const { categories, media } = sections
   if (categories.length === 0) return null
   return (
@@ -175,8 +188,9 @@ export function TemplateGrid({ grid, sections, isLinkEnabled }: Props) {
         <Category key={category.name} category={category} media={media} isLinkEnabled={isLinkEnabled} />
       ))}
       {grid.note ? <p className="mk-note">{grid.note}</p> : null}
-      {/* Any series card: its click handler (and the crossfade, for a series with more than one pair). */}
-      {categories.some((category) => category.templates.some((card) => card.series)) ? <SeriesMotion /> : null}
+      {requestLink ? <RequestLink /> : null}
+      {/* Any series or bundle card: its click handler (and the crossfade, for more than one pair). */}
+      {categories.some((category) => category.templates.some((card) => card.series || card.bundle)) ? <SeriesMotion /> : null}
       {/* The cards' blurred fills, painted from their pictures (cover-fill.tsx). */}
       <CoverFills />
     </section>

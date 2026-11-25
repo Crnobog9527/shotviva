@@ -12,6 +12,7 @@ export const PAGE_LASTMOD: Readonly<Record<string, string>> = {
   '/ai-restaurant-menu': '2026-11-20',
   '/transparent-background': '2026-11-20',
   '/pricing': '2026-11-20',
+  '/template-requests': '2026-11-24',
   '/terms': LAST_UPDATED,
   '/privacy': LAST_UPDATED,
   '/refund-policy': LAST_UPDATED,
@@ -21,4 +22,5 @@ export const PAGE_LASTMOD: Readonly<Record<string, string>> = {
   '/zh/commercial-photography': '2026-11-24',
   '/zh/ai-restaurant-menu': '2026-11-24',
   '/zh/pricing': '2026-11-24',
+  '/zh/template-requests': '2026-11-24',
 }

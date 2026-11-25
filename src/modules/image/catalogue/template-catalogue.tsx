@@ -12,22 +12,22 @@ import { useFavorites } from '../favorites/favorites-provider'
 import { savedIn } from '../favorites/favorites-store'
 import { BatchDialogSlot } from '../matrix/batch-dialog-slot'
 import { CreateDialog, type CreateContext } from '../workspace/create-dialog'
-import { filterCatalogue } from './catalogue-filter'
+import { CATEGORY_PARAM, featuredVideo, filterCatalogue } from './catalogue-filter'
 import { buildSearchIndex, searchTemplates } from './catalogue-search'
 import type { CataloguePayload } from './catalogue-payload'
 import { catalogueSections, isTall, sectionsFor, type CatalogueSection } from './catalogue-sections'
 import { CatalogueSections } from './catalogue-sections-view'
-import { batchableTemplates, isMotion, type CatalogueTemplate } from './catalogue-template'
-import { findSeries, type CatalogueView, type GridEntry } from './catalogue-view'
+import { batchableTemplates, type CatalogueTemplate } from './catalogue-template'
+import { findSeries, seriesOf, type CatalogueView, type FilterNode, type GridEntry } from './catalogue-view'
 import { CategoryChips } from './category-chips'
 import { isPosterIn, PosterDialogSlot } from './poster-dialog-slot'
 import { posterSeriesOf, posterStart } from './poster-series'
 import { SavedEmpty } from './saved-empty'
 import { SearchBox } from './search-box'
-import { FeatureCard } from './feature-card'
-import { FirstScreenCovers } from './near-viewport'
 import { SeriesCard } from './series-card'
 import { TemplateCard } from './template-card'
+import { FeatureCard } from './feature-card'
+import { FirstScreenCovers } from './near-viewport'
 import { ShareModeButton } from '../template-share/share-mode-button'
 import { ShareSelectionProvider, useShareSelectionState, type ShareSelection } from '../template-share/share-selection'
 import { useSeeAllLanding } from './use-see-all-landing'
@@ -39,6 +39,13 @@ import { browseView, slimBrowse } from './picker-browse'
 // Share mode's bar and sheet (§5.1g) only once share mode is turned on.
 const ShareModeChrome = dynamic(() => import('../template-share/share-mode').then((m) => m.ShareModeChrome), { ssr: false })
 const SeriesCreateDialog = dynamic(() => import('../workspace/series-create-dialog').then((m) => m.SeriesCreateDialog), { ssr: false })
+// A chosen category's shelves (shelf-list.tsx) load on their own: Photos shares this module's chunk
+// group but never opens a category, so it does not carry them (scripts/js-budget.json). Create
+// opened on a category fetches them as this module runs, alongside the catalogue and the account's
+// data (waiting for the first render cost 1.8 s of LCP on slow 4G); otherwise once Create is drawn.
+const loadShelves = () => import('./shelf-list')
+const ShelvedGrid = dynamic(loadShelves)
+if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has(CATEGORY_PARAM)) void loadShelves()
 
 // `endCard`: the grid's last card, after every filter's cards (the Wishlist's "Not finding it?",
 // passed in by the page while the wishlist is open).
@@ -61,6 +68,7 @@ export function TemplateCatalogue({ payload, create: createProp, endCard }: Prop
   const create = useSettled(createProp)
   const view = useMemo(() => browseView(payload.browse, payload.templates, false), [payload])
   const query = useCatalogueQuery(view.filters)
+  useEffect(() => { void loadShelves() }, [])
   const [openId, setOpenId] = useState<string | null>(null)
   const openable = payload.templates
   const batchable = useMemo(() => batchableTemplates(openable), [openable])
@@ -69,7 +77,7 @@ export function TemplateCatalogue({ payload, create: createProp, endCard }: Prop
   // old /posters/<id> links land too); every other card opens the creation dialog.
   const share = useShareSelectionState()
   const { open, openSeries } = useOpeners(share, view, query, (id) => (isPosterIn(openable, id) ? query.openPoster(id) : setOpenId(id)))
-  const featured = featuredOf(view.entries)
+  const featured = featuredVideo(view.entries)
   const favorites = useFavorites()
   const favoriteIds = favorites?.ids
   const saved = useMemo(() => (favoriteIds ? savedIn(favoriteIds, openable) : []), [favoriteIds, openable])
@@ -115,7 +123,7 @@ export function TemplateCatalogue({ payload, create: createProp, endCard }: Prop
           <CategoryChips hidden={search.results !== null} filters={view.filters} saved={showSaved(saved.length, active.saved, holdsSaved(favorites))} value={active} onChange={query.select} labels={chipLabels(t)} />
         </div>
         <h2 className="sr-only">{t('templates')}</h2>
-        <CatalogueBody search={search} firstPriority={!featured} sections={sectionsFor(active, sections)} shown={shown} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onSeeAll={seeAll} />
+        <CatalogueBody search={search} firstPriority={!featured} sections={sectionsFor(active, sections)} shown={shown} filters={view.filters} path={active.path} saved={active.saved} onBrowse={() => query.select({ saved: false, path: [] })} endCard={endCard} onOpen={open} onOpenSeries={openSeries} onBrowseSeries={query.openSeries} onSeeAll={seeAll} />
         <p className="px-(--gutter) pt-4 pb-2 text-caption leading-[1.4] text-muted-foreground">{t('illustrative')}</p>
         <CatalogueDialogs
           create={create}
@@ -203,13 +211,17 @@ function useCatalogueSearch(view: CatalogueView) {
   const [query, setQuery] = useState('')
   const index = useMemo(() => buildSearchIndex(view.entries, view.filters), [view])
   const results = useMemo(() => (query.trim() ? searchTemplates(index, query) : null), [index, query])
-  return { query, setQuery, results }
+  // Search lists templates only (Owner 2026-11-25): a member's card names its series.
+  const s = useTranslations('app.series')
+  const series = useMemo(() => new Map(seriesOf(view.entries).flatMap((one) => one.members.map((member) => [member.id, s('inSeries', { name: one.name })] as const))), [view.entries, s])
+  return { query, setQuery, results, series }
 }
 
-type ResultsProps = { query: string; results: readonly CatalogueTemplate[]; endCard?: ReactNode; onOpen(id: string): void }
+type ResultsProps = { query: string; results: readonly CatalogueTemplate[]; series: ReadonlyMap<string, string>; endCard?: ReactNode; onOpen(id: string): void }
 
-// Matches as plain template cards; none: a line, and the Wishlist's card when it is open.
-function SearchResults({ query, results, endCard, onOpen }: ResultsProps) {
+// Matches as plain template cards (never series cards; a member names its series); none: a line,
+// and the Wishlist's card when it is open.
+function SearchResults({ query, results, series, endCard, onOpen }: ResultsProps) {
   const t = useTranslations('app.create')
   const entries = results.map((template): GridEntry => ({ type: 'template', template, path: [] }))
   return (
@@ -217,18 +229,24 @@ function SearchResults({ query, results, endCard, onOpen }: ResultsProps) {
       <p aria-live="polite" className="px-(--gutter) pt-2 text-caption text-muted-foreground">
         {results.length ? t('searchResults', { query, count: results.length }) : t('searchEmpty', { query })}
       </p>
-      <CatalogueGrid entries={entries} endCard={endCard} className="mt-3" onOpen={onOpen} onOpenSeries={() => undefined} />
+      <CatalogueGrid entries={entries} endCard={endCard} seriesOf={series} className="mt-3" onOpen={onOpen} onOpenSeries={() => undefined} />
     </>
   )
 }
 
-type BodyProps = Omit<GridProps, 'entries' | 'className'> & {
+type BodyProps = Omit<GridProps, 'entries' | 'className' | 'eagerCount' | 'seriesOf'> & {
   search: ReturnType<typeof useCatalogueSearch>
   sections: CatalogueSection[] | null
   shown: readonly GridEntry[]
+  // The chosen category's place in the chip tree: its series become shelves (shelf-list.tsx).
+  filters: readonly FilterNode[]
+  path: readonly string[]
   // Saved is chosen: when it holds nothing, its empty state with the way back to All.
   saved: boolean
   onBrowse(): void
+  // A shelf's 「查看全部」 and 「+N 个」 open the series even in share mode: they are the way into
+  // it, not a pick (the shelf has no picked state to show). Series cards keep onOpenSeries.
+  onBrowseSeries(slug: string): void
   onSeeAll(section: CatalogueSection): void
 }
 
@@ -239,37 +257,16 @@ const showSaved = (count: number, chosen: boolean, held = false) => count > 0 ||
 
 // A search replaces the sections and the chosen category's grid with its matches; Saved with
 // nothing saved shows its empty state.
-function CatalogueBody({ search, firstPriority, sections, shown, saved, onBrowse, endCard, onOpen, onOpenSeries, onSeeAll }: BodyProps) {
-  if (search.results) return <SearchResults query={search.query.trim()} results={search.results} endCard={endCard} onOpen={onOpen} />
+function CatalogueBody({ search, firstPriority, sections, shown, filters, path, saved, onBrowse, endCard, onOpen, onOpenSeries, onBrowseSeries, onSeeAll }: BodyProps) {
+  if (search.results) return <SearchResults query={search.query.trim()} results={search.results} series={search.series} endCard={endCard} onOpen={onOpen} />
   if (saved && shown.length === 0) return <SavedEmpty onBrowse={onBrowse} />
-  if (!sections) return <CatalogueGrid entries={shown} endCard={endCard} firstPriority={firstPriority} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
+  if (saved) return <CatalogueGrid entries={shown} endCard={endCard} firstPriority={firstPriority} className="mt-2 md:mt-3" onOpen={onOpen} onOpenSeries={onOpenSeries} />
+  if (!sections) return <ShelvedGrid entries={shown} filters={filters} path={path} endCard={endCard} firstPriority={firstPriority} Grid={CatalogueGrid} onOpen={onOpen} onOpenSeries={onBrowseSeries} />
   return (
     <>
       <CatalogueSections sections={sections} firstPriority={firstPriority} onOpen={onOpen} onOpenSeries={onOpenSeries} onSeeAll={onSeeAll} />
       {endCard ? <CatalogueGrid entries={[]} endCard={endCard} className="mt-8 md:mt-10" onOpen={onOpen} onOpenSeries={onOpenSeries} /> : null}
     </>
-  )
-}
-
-// `firstPriority`: the first card is the page's largest paint, so its covers load at high priority;
-// false when the featured card sits above it (that one is the largest, feature-card.tsx).
-type GridProps = { entries: readonly GridEntry[]; endCard?: ReactNode; firstPriority?: boolean; className: string; onOpen(id: string): void; onOpenSeries(slug: string): void }
-
-// The flat grid: a chosen category, Saved, or All with a single category.
-function CatalogueGrid({ entries, endCard, firstPriority = true, className, onOpen, onOpenSeries }: GridProps) {
-  return (
-    <ul className={cn('grid grid-flow-row-dense grid-cols-1 gap-x-3 gap-y-6 px-(--gutter) md:grid-cols-2 md:gap-x-4 lg:grid-cols-3', className)}>
-      {entries.map((entry, index) => (
-        <Reveal as="li" key={entryKey(entry)} className={cn(isTall(entry) && 'md:row-span-2')}>
-          {entry.type === 'series' ? (
-            <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={index < 3} priority={firstPriority && index === 0} />
-          ) : (
-            <TemplateCard template={entry.template} onOpen={onOpen} eager={index < 3} priority={firstPriority && index === 0} />
-          )}
-        </Reveal>
-      ))}
-      {endCard ? <Reveal as="li">{endCard}</Reveal> : null}
-    </ul>
   )
 }
 
@@ -281,13 +278,6 @@ function firstScreenOf(searching: boolean, active: { saved: boolean; path: reado
   return active.path.length ? `c:${active.path.join('/')}` : 'all'
 }
 
-// The featured card: the first single video template in the catalogue's order.
-function featuredOf(entries: readonly GridEntry[]) {
-  for (const entry of entries) if (entry.type === 'template' && isMotion(entry.template) && entry.template.cover.type === 'video') return entry.template
-  return null
-}
-
-const entryKey = (entry: GridEntry) => (entry.type === 'series' ? `series-${entry.series.id}` : entry.template.id)
 
 // True once the chip bar has stuck to the top: only then does it pad for the top safe area and
 // take its bar material (chrome-bleed, globals-body.css), so at rest there is no band over the ground (or the living background,
@@ -304,3 +294,38 @@ function useStuck() {
   }, [])
   return { sentinel, stuck }
 }
+
+// `firstPriority`: the first card is the page's largest paint, so its covers load at high priority;
+// false when the featured card or a shelf sits above it.
+// `seriesOf`: search results name each member's series on its card (template id → label).
+export type GridProps = {
+  entries: readonly GridEntry[]
+  endCard?: ReactNode
+  firstPriority?: boolean
+  // Cards drawn at once (not waiting to come near the screen); none when shelves sit above.
+  eagerCount?: number
+  seriesOf?: ReadonlyMap<string, string>
+  className: string
+  onOpen(id: string): void
+  onOpenSeries(slug: string): void
+}
+
+// The flat grid: a chosen category's loose templates, Saved, search results, or All with a single category.
+function CatalogueGrid({ entries, endCard, firstPriority = true, eagerCount = 3, seriesOf, className, onOpen, onOpenSeries }: GridProps) {
+  return (
+    <ul className={cn('grid grid-flow-row-dense grid-cols-1 gap-x-3 gap-y-6 px-(--gutter) md:grid-cols-2 md:gap-x-4 lg:grid-cols-3', className)}>
+      {entries.map((entry, index) => (
+        <Reveal as="li" key={entryKey(entry)} className={cn(isTall(entry) && 'md:row-span-2')}>
+          {entry.type === 'series' ? (
+            <SeriesCard series={entry.series} onOpen={() => onOpenSeries(entry.series.slug)} eager={index < eagerCount} priority={firstPriority && index === 0} />
+          ) : (
+            <TemplateCard template={entry.template} onOpen={onOpen} eager={index < eagerCount} priority={firstPriority && index === 0} series={seriesOf?.get(entry.template.id)} />
+          )}
+        </Reveal>
+      ))}
+      {endCard ? <Reveal as="li">{endCard}</Reveal> : null}
+    </ul>
+  )
+}
+
+const entryKey = (entry: GridEntry) => (entry.type === 'series' ? `series-${entry.series.id}` : entry.template.id)

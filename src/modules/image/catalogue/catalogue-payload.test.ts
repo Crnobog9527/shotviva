@@ -29,5 +29,7 @@ it('sends shared template cards once and keeps series membership and category te
   expect(catalogueForm(template).toggles).toEqual(template.toggles)
   const restored = browseView(payload.browse, payload.templates, false)
   expect(restored.filters).toEqual(view.filters)
-  expect(restored.entries[1]).toMatchObject({ type: 'series', series: { members: [payload.templates[0]] } })
+  // The loose copy of the member is dropped: a template shows in its series only (Owner 2026-11-25).
+  expect(restored.entries).toHaveLength(1)
+  expect(restored.entries[0]).toMatchObject({ type: 'series', series: { members: [payload.templates[0]] } })
 })

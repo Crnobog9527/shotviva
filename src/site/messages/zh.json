@@ -677,7 +677,13 @@
       "cardAria": "{name}，系列共 {count} 个模板，选一个开始",
       "coverAlt": "{name} 系列效果示例",
       "members": "{name} · {count} 个模板",
-      "badge": "系列"
+      "badge": "系列",
+      "shelfCount": "共 {count} 个",
+      "shelfMore": "+{count} 个",
+      "shelfMoreAria": "查看「{name}」全部 {total} 个模板",
+      "scrollBack": "向前滚动「{name}」",
+      "scrollOn": "向后滚动「{name}」",
+      "inSeries": "系列：{name}"
     },
     "template": {
       "fromCredits": "{count} 积分起",
@@ -2406,6 +2412,8 @@
     "copyright": "© {year} {name}",
     "language": "语言",
     "cookieSettings": "Cookie 设置"
+,
+    "templateRequests": "模板许愿墙"
   },
   "consent": {
     "label": "Cookie 提示",
@@ -2432,6 +2440,10 @@
     "tryTitle": "换这三个模板试试"
   },
   "marketing": {
+    "templateRequests": {
+      "lead": "没有适合你照片的模板？",
+      "link": "提交模板需求"
+    },
     "appDescription": "AI改图工具",
     "nav": {
       "label": "主导航",
@@ -2474,6 +2486,9 @@
       "seriesCount": "{count} 款",
       "seriesAria": "{name}。{use}共 {count} 款模板，打开这个系列",
       "seriesBadge": "系列",
+      "bundleBadge": "组合",
+      "bundleCount": "{count} 个模板",
+      "bundleAria": "{name}，当前显示：{template}。使用这个模板",
       "seriesOpen": "打开系列",
       "freeTag": "免费 · 公开",
       "paidTag": "付费 · 私密",

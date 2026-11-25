@@ -4,7 +4,7 @@ import { useLocale } from 'next-intl'
 import { useEffect } from 'react'
 
 import { useRouter } from '../../i18n/navigation'
-import { buildLayers, MORE_ATTR } from './series-layers'
+import { buildLayers, BUNDLE_FIRST_ATTR, bundlePairs, BUNDLE_LABEL_ATTR, LAYER_TEMPLATE_ATTR, MORE_ATTR } from './series-layers'
 import { seriesLayers } from './series-layers-source'
 import { cycler, HOVER_DELAY_MS, HOVER_HOLD_MS, VIEW_HOLD_MS, type Cycler } from './series-motion'
 
@@ -14,7 +14,8 @@ import { cycler, HOVER_DELAY_MS, HOVER_HOLD_MS, VIEW_HOLD_MS, type Cycler } from
 // before hydration (the server draws the first pair).
 function wire(frame: HTMLElement, locale: string, touch: boolean, observer: IntersectionObserver | null, cards: Map<Element, Cycler>) {
   const card = frame.closest('.mk-series') ?? frame
-  const cycle = cycler(frame)
+  const bundle = card.hasAttribute(BUNDLE_FIRST_ATTR)
+  const cycle = cycler(frame, undefined, undefined, bundle ? (layer) => showBundleTemplate(card, layer) : undefined)
   const key = frame.getAttribute(MORE_ATTR) ?? ''
   // The later pairs become layers the first time the card plays, not before (series-layers.ts):
   // their addresses arrive with the first play, so the card starts once they are in, unless the
@@ -25,7 +26,8 @@ function wire(frame: HTMLElement, locale: string, touch: boolean, observer: Inte
       wanted = true
       seriesLayers(locale).then(
         (layers) => {
-          buildLayers(frame, layers.get(key) ?? [])
+          const pairs = layers.get(key) ?? []
+          buildLayers(frame, bundle ? bundlePairs(pairs) : pairs)
           if (wanted) cycle.start(delay, hold)
         },
         () => undefined,
@@ -45,14 +47,29 @@ function wire(frame: HTMLElement, locale: string, touch: boolean, observer: Inte
   const stop = () => run.stop()
   card.addEventListener('pointerenter', start)
   card.addEventListener('pointerleave', stop)
-  card.addEventListener('focusin', start)
-  card.addEventListener('focusout', stop)
+  // A bundle card holds still under keyboard focus, so what its label names is what it picks.
+  if (!bundle) {
+    card.addEventListener('focusin', start)
+    card.addEventListener('focusout', stop)
+  }
   return () => {
     card.removeEventListener('pointerenter', start)
     card.removeEventListener('pointerleave', stop)
     card.removeEventListener('focusin', start)
     card.removeEventListener('focusout', stop)
   }
+}
+
+// A bundle card picks the template on show (bundle-card.tsx): the layer's own template id, or the
+// server-drawn pair's; its label names that template (no live region: it changes only on show).
+function showBundleTemplate(card: Element, layer: HTMLElement | undefined) {
+  const id = layer ? layer.getAttribute(LAYER_TEMPLATE_ATTR) : card.getAttribute(BUNDLE_FIRST_ATTR)
+  if (!id) return
+  card.setAttribute('data-pick-template', id)
+  const name = [...(card.parentElement?.querySelectorAll('.mk-bundle-names [data-pick-template]') ?? [])]
+    .find((pick) => pick.getAttribute('data-pick-template') === id)?.textContent
+  const label = card.getAttribute(BUNDLE_LABEL_ATTR)
+  if (name && label) card.setAttribute('aria-label', label.replace('%s', name))
 }
 
 // A series card (and a lone series' "Open" pill) is a <button data-open-series="/generate?series=…">:
