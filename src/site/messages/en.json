@@ -2489,6 +2489,7 @@
       "seriesBadge": "Series",
       "bundleBadge": "Set",
       "bundleCount": "{count, plural, one {# template} other {# templates}}",
+      "stripPick": "{name}. Use this template",
       "bundleAria": "{name}, showing {template}. Use this template",
       "seriesOpen": "Open the series",
       "freeTag": "Free · public",

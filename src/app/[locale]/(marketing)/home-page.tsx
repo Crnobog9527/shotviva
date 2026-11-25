@@ -6,12 +6,13 @@ import { localizePath, type Locale } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, faqPageLd, organizationLd, pageMetadata, softwareApplicationLd } from '@/core/seo'
 import { cachedFeaturedBundles } from '@/core/templates/cached-bundles'
+import { cachedCaseStrip } from '@/core/templates/cached-case-strip'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
 import { homePanelTemplates } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
-import { HOME_CATEGORIES, bundleSection, creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
+import { HOME_CATEGORIES, bundleSection, creditFacts, featuredSections, fillCredits, freeImagesIn, homeCaseStrip, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
 import { HERO_DEFAULT_OPTION, heroOptionContent } from '@/site/experiments'
 import { site } from '@/site/site.config'
 
@@ -26,13 +27,13 @@ import { optionPictures } from './home-hero-live'
 // The copy with "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4).
 async function load() {
   const locale = await currentLocale()
-  const [live, series, products, bundles] = await Promise.all([
-    cachedWebCatalogue(locale), cachedPublicSeries(locale), displayProducts(), cachedFeaturedBundles(locale),
+  const [live, series, products, bundles, cases] = await Promise.all([
+    cachedWebCatalogue(locale), cachedPublicSeries(locale), displayProducts(), cachedFeaturedBundles(locale), cachedCaseStrip(locale),
   ])
   const facts = creditFacts(live)
   const page = fillCredits(homePageIn(locale, products), facts)
   const meta = { path: '/', title: page.title, description: page.description }
-  return { locale, live, series, products, bundles, page, free: fillCredits(freeImagesIn(locale), facts), meta }
+  return { locale, live, series, products, bundles, cases, page, free: fillCredits(freeImagesIn(locale), facts), meta }
 }
 
 export async function homeMetadata(): Promise<Metadata> {
@@ -54,7 +55,7 @@ function heroFor(heroOption: string | undefined, locale: Locale, live: readonly 
 // The live catalogue is a cached read (expired by every admin save, featured list included);
 // only the generator's visitor half waits for the request.
 export async function HomeContent({ heroOption }: { heroOption?: string }) {
-  const { locale, live, series, products, bundles, page, free, meta } = await load()
+  const { locale, live, series, products, bundles, cases, page, free, meta } = await load()
   const ldMeta = { ...meta, path: localizePath(meta.path, locale) }
   // Series show as one card each, in the admin's order (T102, Owner 2026-11-12). Only food and
   // spaces (hotels) on the home page (Owner 2026-11-24); the generator still offers every template.
@@ -78,7 +79,8 @@ export async function HomeContent({ heroOption }: { heroOption?: string }) {
         isLinkEnabled={isLinkEnabled}
         templates={sections}
         heroTagline={option?.tagline}
-        heroStrip={option?.strip}
+        // 「更多真实案例」: the admin's picks for this language, else the option's built-in row.
+        heroStrip={homeCaseStrip(option?.strip, cases, live, locale)}
         generator={
           <HomeGeneratorSlot templates={templates} catalogue={{ locale }} defaultId={opening?.id ?? null} homePath={localizePath('/', locale)} freeImages={free} initialCovers={initialCovers} />
         }

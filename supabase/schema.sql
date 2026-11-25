@@ -12263,6 +12263,58 @@ $$;
 ALTER FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_home_case_strip"("p_locale" "text", "p_entries" "jsonb", "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_entries jsonb := coalesce(p_entries, '[]'::jsonb);
+begin
+  perform admin.require_admin(p_actor);
+  if p_locale is null or p_locale not in ('en', 'zh') or jsonb_typeof(v_entries) <> 'array' then
+    raise exception 'INVALID_INPUT' using detail = 'locale en or zh, entries an array';
+  end if;
+  if jsonb_array_length(v_entries) > 8 then
+    raise exception 'CASE_STRIP_SIZE';
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(v_entries) as e(entry)
+    where jsonb_typeof(e.entry) <> 'object' or e.entry ->> 'kind' is null or e.entry ->> 'kind' not in ('template', 'bundle')
+      or coalesce(e.entry ->> 'id', '') = ''
+  ) then
+    raise exception 'INVALID_INPUT' using detail = 'each entry a kind and an id';
+  end if;
+  if jsonb_array_length(v_entries) <> (select count(distinct (e.entry ->> 'kind', e.entry ->> 'id')) from jsonb_array_elements(v_entries) as e(entry)) then
+    raise exception 'INVALID_INPUT' using detail = 'entries must not repeat';
+  end if;
+  lock table public.templates in share row exclusive mode;
+  lock table public.featured_bundles in share row exclusive mode;
+  if exists (
+    select 1 from jsonb_array_elements(v_entries) as e(entry)
+    where e.entry ->> 'kind' = 'template'
+      and not exists (select 1 from public.templates t where t.id = e.entry ->> 'id' and t.is_active and 'web' = any (t.visible_in))
+  ) then
+    raise exception 'INVALID_INPUT' using detail = 'only published web templates';
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(v_entries) as e(entry)
+    where e.entry ->> 'kind' = 'bundle'
+      and not exists (select 1 from public.featured_bundles b where b.id::text = e.entry ->> 'id')
+  ) then
+    raise exception 'BUNDLE_NOT_FOUND';
+  end if;
+  delete from public.home_case_strip where locale = p_locale;
+  insert into public.home_case_strip (locale, rank, template_id, bundle_id)
+  select p_locale, o.position::int,
+    case when o.entry ->> 'kind' = 'template' then o.entry ->> 'id' end,
+    case when o.entry ->> 'kind' = 'bundle' then (o.entry ->> 'id')::uuid end
+  from jsonb_array_elements(v_entries) with ordinality as o(entry, position);
+end $$;
+
+
+ALTER FUNCTION "public"."admin_set_home_case_strip"("p_locale" "text", "p_entries" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -21997,6 +22049,20 @@ CREATE TABLE IF NOT EXISTS "public"."generation_slots" (
 ALTER TABLE "public"."generation_slots" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."home_case_strip" (
+    "locale" "text" NOT NULL,
+    "rank" integer NOT NULL,
+    "template_id" "text",
+    "bundle_id" "uuid",
+    CONSTRAINT "home_case_strip_locale_check" CHECK (("locale" = ANY (ARRAY['en'::"text", 'zh'::"text"]))),
+    CONSTRAINT "home_case_strip_one_entry_check" CHECK (("num_nonnulls"("template_id", "bundle_id") = 1)),
+    CONSTRAINT "home_case_strip_rank_check" CHECK ((("rank" >= 1) AND ("rank" <= 8)))
+);
+
+
+ALTER TABLE "public"."home_case_strip" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."identity_judge_calls" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -23610,6 +23676,11 @@ ALTER TABLE ONLY "public"."generation_slots"
 
 
 
+ALTER TABLE ONLY "public"."home_case_strip"
+    ADD CONSTRAINT "home_case_strip_pkey" PRIMARY KEY ("locale", "rank");
+
+
+
 ALTER TABLE ONLY "public"."identity_judge_calls"
     ADD CONSTRAINT "identity_judge_calls_pkey" PRIMARY KEY ("id");
 
@@ -24531,6 +24602,14 @@ CREATE INDEX "generation_slots_lane_live" ON "public"."generation_slots" USING "
 
 
 CREATE INDEX "generation_slots_org_live" ON "public"."generation_slots" USING "btree" ("org_id", "expires_at") WHERE (("released_at" IS NULL) AND ("org_id" IS NOT NULL));
+
+
+
+CREATE UNIQUE INDEX "home_case_strip_bundle_key" ON "public"."home_case_strip" USING "btree" ("bundle_id", "locale") WHERE ("bundle_id" IS NOT NULL);
+
+
+
+CREATE UNIQUE INDEX "home_case_strip_template_key" ON "public"."home_case_strip" USING "btree" ("template_id", "locale") WHERE ("template_id" IS NOT NULL);
 
 
 
@@ -25759,6 +25838,16 @@ ALTER TABLE ONLY "public"."generation_slots"
 
 
 
+ALTER TABLE ONLY "public"."home_case_strip"
+    ADD CONSTRAINT "home_case_strip_bundle_id_fkey" FOREIGN KEY ("bundle_id") REFERENCES "public"."featured_bundles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."home_case_strip"
+    ADD CONSTRAINT "home_case_strip_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."identity_judge_calls"
     ADD CONSTRAINT "identity_judge_calls_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
@@ -26608,6 +26697,9 @@ CREATE POLICY "generation_jobs_select_own" ON "public"."generation_jobs" FOR SEL
 
 
 ALTER TABLE "public"."generation_slots" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."home_case_strip" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."identity_judge_calls" ENABLE ROW LEVEL SECURITY;
@@ -28761,6 +28853,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], 
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_set_home_case_strip"("p_locale" "text", "p_entries" "jsonb", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_home_case_strip"("p_locale" "text", "p_entries" "jsonb", "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") TO "service_role";
 
@@ -30313,6 +30410,10 @@ GRANT ALL ON TABLE "public"."featured_bundles" TO "service_role";
 
 
 GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_slots" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."home_case_strip" TO "service_role";
 
 
 

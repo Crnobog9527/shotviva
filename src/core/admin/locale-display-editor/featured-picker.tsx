@@ -22,14 +22,20 @@ type Props = {
   // The draft's current list: those are marked, not offered again.
   taken: readonly string[]
   onAdd: (ids: string[]) => void
+  // At most this many picks (the 「更多真实案例」 slots left); further ticks are ignored.
+  max?: number
+  // The window's words when it adds to another list than 首页精选.
+  text?: PickerText
 }
+
+export type PickerText = { open: string; title: (label: string) => string; description: string; add: (count: number) => string }
 
 // Rendered in pages so a catalogue of hundreds stays quick; covers load lazily at thumbnail size.
 const PAGE = 48
 
 // 添加精选模板 as a window with covers, search and the category tree (Owner 2026-11-25), instead of
 // one dropdown of every name. Picks go into the draft, in the order they were ticked.
-export function FeaturedPicker({ locale, label, templates, categories, taken, onAdd }: Props) {
+export function FeaturedPicker({ locale, label, templates, categories, taken, onAdd, max, text = COPY }: Props) {
   const [open, setOpen] = useState(false)
   const [picked, setPicked] = useState<string[]>([])
   const close = (next: boolean) => {
@@ -38,19 +44,19 @@ export function FeaturedPicker({ locale, label, templates, categories, taken, on
   }
   return (
     <Dialog open={open} onOpenChange={close}>
-      <Button size="sm" variant="outline" className="justify-self-start" onClick={() => setOpen(true)}><Plus aria-hidden />{COPY.open}</Button>
+      <Button size="sm" variant="outline" className="justify-self-start" disabled={max === 0} onClick={() => setOpen(true)}><Plus aria-hidden />{text.open}</Button>
       <DialogContent className="flex max-h-[92dvh] flex-col gap-3 p-4 sm:max-w-5xl sm:p-6">
         <DialogHeader>
-          <DialogTitle>{COPY.title(label)}</DialogTitle>
-          <DialogDescription>{COPY.description}</DialogDescription>
+          <DialogTitle>{text.title(label)}</DialogTitle>
+          <DialogDescription>{text.description}</DialogDescription>
         </DialogHeader>
-        {open ? <PickerBody locale={locale} templates={templates} categories={categories} taken={taken} picked={picked} setPicked={setPicked} /> : null}
+        {open ? <PickerBody locale={locale} templates={templates} categories={categories} taken={taken} picked={picked} setPicked={setPicked} max={max} /> : null}
         <DialogFooter className="flex-row flex-wrap items-center gap-2 sm:justify-between">
           <span className="text-sm text-muted-foreground">{COPY.selected(picked.length)}</span>
           <div className="ml-auto flex gap-2">
             {picked.length ? <Button size="sm" variant="ghost" onClick={() => setPicked([])}>{COPY.clear}</Button> : null}
             <Button size="sm" variant="outline" onClick={() => close(false)}>{COPY.cancel}</Button>
-            <Button size="sm" disabled={!picked.length} onClick={() => { onAdd(picked); close(false) }}>{COPY.add(picked.length)}</Button>
+            <Button size="sm" disabled={!picked.length} onClick={() => { onAdd(picked); close(false) }}>{text.add(picked.length)}</Button>
           </div>
         </DialogFooter>
       </DialogContent>
@@ -58,7 +64,7 @@ export function FeaturedPicker({ locale, label, templates, categories, taken, on
   )
 }
 
-export type PickerBodyProps = Omit<Props, 'label' | 'onAdd'> & {
+export type PickerBodyProps = Omit<Props, 'label' | 'onAdd' | 'max' | 'text'> & {
   picked: string[]
   setPicked: (update: (current: string[]) => string[]) => void
   // At most this many picks (a bundle's eight); further ticks are ignored.
