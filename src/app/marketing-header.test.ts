@@ -19,7 +19,9 @@ type Found = { href: string; className?: string; text: string; links?: readonly 
 type Props = { href?: string; className?: string; children?: ReactNode; label?: string; links?: Found['links']; variant?: string }
 
 // One element's own entry: a link, or a Use Cases menu recorded with its list ('menu:bar' / 'menu:row').
-function entry(props: Props): Found | null {
+function entry(props: Props, type: unknown): Found | null {
+  // The page-links row itself, by its classes ('nav:row').
+  if (type === 'nav' && props.className?.includes('mk-mnav')) return { href: 'nav:row', className: props.className, text: '' }
   if (Array.isArray(props.links)) return { href: `menu:${props.variant ?? 'bar'}`, className: props.className, text: props.label ?? '', links: props.links }
   if (typeof props.href === 'string') return { href: props.href, className: props.className, text: String(props.children ?? '') }
   return null
@@ -33,7 +35,7 @@ async function links(node: ReactNode, out: Found[] = []): Promise<Found[]> {
   }
   if (!isValidElement(node)) return out
   const element = node as ReactElement<Props>
-  const own = entry(element.props)
+  const own = entry(element.props, element.type)
   if (own) out.push(own)
   const phoneNav = typeof element.type === 'function' && element.type.name === 'PhoneNav'
   const children = phoneNav ? await (element.type as (p: unknown) => Promise<ReactNode>)(element.props) : element.props.children
@@ -75,5 +77,21 @@ describe('MarketingHeader: the way in to template requests', () => {
     expect(row.map((link) => link.href)).toEqual(['menu:row', '/#templates', '/template-requests', '/pricing'])
     expect(row[0].links).toEqual(bar?.links)
     expect(row[0].links?.map((link) => link.href)).toEqual(['/ai-restaurant-menu', '/commercial-photography', '/image-to-image-generator', '/transparent-background'])
+  })
+
+  it('gives the zh row the same Use Cases list as the zh bar, without the English-only page', async () => {
+    const all = await links(await MarketingHeader({ locale: 'zh' }))
+    const bar = all.find((link) => link.href === 'menu:bar')
+    const row = all.find((link) => link.href === 'menu:row')
+    expect(row?.links).toEqual(bar?.links)
+    expect(row?.links?.map((link) => link.href)).toEqual(['/ai-restaurant-menu', '/commercial-photography', '/image-to-image-generator'])
+  })
+
+  // With the wishlist off a tablet row would hold nothing visible: it is a phone-only row then.
+  it('keeps the row to phones while the wishlist is off, and on tablets while it is open', async () => {
+    const rowOf = async () => (await links(await MarketingHeader({ locale: 'en' }))).find((link) => link.href === 'nav:row')?.className
+    expect(await rowOf()).toBe('mk-mnav mk-w')
+    wishlist.open = false
+    expect(await rowOf()).toBe('mk-mnav mk-mnav-phone mk-w')
   })
 })

@@ -101,8 +101,9 @@ export async function MarketingHeader({ locale, homeOnly = false }: { locale: Lo
 // room for; the rest is hidden there (mk-mnav-dup). Not sticky: it scrolls away with the page.
 async function PhoneNav({ locale, wishlistOpen }: { locale: Locale; wishlistOpen: boolean }) {
   const t = await getTranslations({ locale, namespace: 'marketing.nav' })
+  // Without Request a template a tablet row has nothing its bar lacks: phones only then (mk-mnav-phone).
   return (
-    <nav aria-label={t('phoneLabel')} className="mk-mnav mk-w">
+    <nav aria-label={t('phoneLabel')} className={wishlistOpen ? 'mk-mnav mk-w' : 'mk-mnav mk-mnav-phone mk-w'}>
       <NavMenu label={t('useCases')} links={menuLinksOfUseCases(t, locale)} variant="row" className="mk-mnav-dup" />
       <Link href="/#templates" className="mk-mnav-dup">
         {t('templates')}

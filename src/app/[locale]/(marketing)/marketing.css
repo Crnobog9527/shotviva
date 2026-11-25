@@ -82,7 +82,7 @@
   @media (prefers-reduced-motion: reduce) { .mk-navmenu-row .mk-navmenu-chev { transition: none; } }
   /* Tablets (768–1023px) keep the row for what the bar has no room for (Request a template, Owner
      2026-11-25), without the links the bar already shows. */
-  @media (min-width: 768px) { .mk-mnav .mk-mnav-dup { display: none; } }
+  @media (min-width: 768px) { .mk-mnav .mk-mnav-dup, .mk-mnav-phone { display: none; } }
   @media (min-width: 1024px) { .mk-mnav { display: none; } }
   .mk-nav { display: flex; align-items: center; gap: 4px; }
   .mk-nl, .mk-start { display: none; }
