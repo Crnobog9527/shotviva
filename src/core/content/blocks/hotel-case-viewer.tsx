@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 
 import { installScrollLockKeeper } from '@/core/ui/scroll-lock-keeper'
 import { SiteImage as Image } from '@/core/ui/site-image'
 
+import { caseNote, pictureStatus, type CaseNote, type PictureStatus } from './hotel-case-state'
 import { readCases, readTags, shownCase, thumbOf, type Thumb, type ViewerTags, type ViewerText } from './hotel-cases-dom'
 import './hotel-case-viewer.css'
 
@@ -16,7 +17,7 @@ import './hotel-case-viewer.css'
 const FULL_SIZES = '(min-width: 1200px) 580px, (min-width: 768px) 48vw, 100vw'
 
 // The viewer's own words live here (`failed` ends where the retry button follows: a space in English, none in Chinese), in its lazily loaded chunk, not in every home page's HTML.
-const LABELS = {
+export const LABELS = {
   en: {
     close: 'Close',
     previous: 'Previous',
@@ -37,7 +38,7 @@ const LABELS = {
   },
 } as const
 
-type Picture = { src: string; alt: string }
+export type Picture = { src: string; alt: string }
 type Pair = { before: Picture; after: Picture }
 
 // The full-size pairs (/api/home/hotels), asked for once per page on the first open. A failed
@@ -76,23 +77,35 @@ function ThumbPicture({ thumb }: { thumb: Thumb }) {
   )
 }
 
-// One side of the case: the list's thumbnail at once, softened, on a pulsing plate; the full-size
-// picture over it, shown once it has loaded (onLoad, or already complete when it mounts).
-function Full(props: { picture: Picture | undefined; thumb: Thumb | null; tag: string; ai?: boolean; waiting: boolean; onShown: (src: string) => void }) {
-  const { picture, thumb, tag, ai, waiting, onShown } = props
+// One side of the case: the list's thumbnail at once, softened, on a plate that pulses while the
+// full-size picture is on its way; that picture over it, shown once it has loaded (onLoad, or
+// already complete when it mounts). If it fails to load, the thumbnail stays and the case's note
+// offers a retry, which mounts the picture again (`attempt` in its key).
+export function Full(props: {
+  picture: Picture | undefined
+  thumb: Thumb | null
+  tag: string
+  ai?: boolean
+  status: PictureStatus
+  attempt: number
+  onShown: (src: string) => void
+  onBroken: (src: string) => void
+}) {
+  const { picture, thumb, tag, ai, status, attempt, onShown, onBroken } = props
   return (
-    <figure className={waiting ? 'hc-full hc-wait' : 'hc-full'}>
+    <figure className={status === 'waiting' ? 'hc-full hc-wait' : 'hc-full'}>
       {thumb ? <ThumbPicture key={thumb.src} thumb={thumb} /> : null}
       {picture ? (
         <Image
-          key={picture.src}
-          className={waiting ? 'hc-big' : 'hc-big hc-on'}
+          key={`${picture.src}#${attempt}`}
+          className={status === 'shown' ? 'hc-big hc-on' : 'hc-big'}
           src={picture.src}
           alt={picture.alt}
           width={1600}
           height={900}
           sizes={FULL_SIZES}
           onLoad={() => onShown(picture.src)}
+          onError={() => onBroken(picture.src)}
           ref={(node: HTMLImageElement | null) => {
             if (node?.complete && node.naturalWidth > 0) onShown(picture.src)
           }}
@@ -105,7 +118,7 @@ function Full(props: { picture: Picture | undefined; thumb: Thumb | null; tag: s
   )
 }
 
-type Labels = (typeof LABELS)[keyof typeof LABELS]
+export type Labels = (typeof LABELS)[keyof typeof LABELS]
 
 // The full-size pairs for an open viewer: null until they arrive; `failed` once a request fails,
 // until "Try again" (retry) asks once more.
@@ -131,16 +144,16 @@ function useFullPairs(opened: boolean, locale: string) {
   return { pairs, failed, retry }
 }
 
-// Under the pictures while they are not the full-size ones: loading, or failed with a retry.
-function PictureNote({ loading, failed, labels, retry }: { loading: boolean; failed: boolean; labels: Labels; retry: () => void }) {
-  if (loading) {
+// Under the pictures while they are not both the full-size ones: loading, or failed with a retry.
+export function PictureNote({ note, labels, retry }: { note: CaseNote; labels: Labels; retry: () => void }) {
+  if (note === 'loading') {
     return (
       <p className="hc-note" role="status">
         {labels.loading}
       </p>
     )
   }
-  if (!failed) return null
+  if (note !== 'failed') return null
   return (
     <p className="hc-note" role="status">
       {labels.failed}
@@ -151,13 +164,24 @@ function PictureNote({ loading, failed, labels, retry }: { loading: boolean; fai
   )
 }
 
-// Full-size pictures that have finished loading: until both of a case's have, it keeps its
-// thumbnails, the pulse and the loading note.
-function useShownPictures() {
-  const [done, setDone] = useState<ReadonlySet<string>>(() => new Set())
-  const onShown = (src: string) => setDone((now) => (now.has(src) ? now : new Set(now).add(src)))
-  const isShown = (picture: Picture | undefined) => Boolean(picture && done.has(picture.src))
-  return { onShown, isShown }
+// Full-size pictures that have loaded, and those that failed to (until a retry clears them and
+// bumps `attempt`, which mounts every picture of the viewer again).
+const add = (src: string) => (now: ReadonlySet<string>) => (now.has(src) ? now : new Set(now).add(src))
+function usePictureLoads() {
+  const [shown, setShown] = useState<ReadonlySet<string>>(() => new Set())
+  const [broken, setBroken] = useState<ReadonlySet<string>>(() => new Set())
+  const [attempt, setAttempt] = useState(0)
+  return {
+    shown,
+    broken,
+    attempt,
+    onShown: (src: string) => setShown(add(src)),
+    onBroken: (src: string) => setBroken(add(src)),
+    reload: () => {
+      setBroken(new Set())
+      setAttempt((n) => n + 1)
+    },
+  }
 }
 
 type CaseProps = {
@@ -175,8 +199,15 @@ type CaseProps = {
 // One case in the viewer: name and counter, the two pictures, the loading or retry note, the line
 // and previous / next.
 function CaseView({ item, at, total, pair, failed, retry, tags, labels, step }: CaseProps) {
-  const { onShown, isShown } = useShownPictures()
-  const waiting = (picture: Picture | undefined) => !failed && !isShown(picture)
+  const loads = usePictureLoads()
+  const seen = { requestFailed: failed, shown: loads.shown, broken: loads.broken }
+  const before = pictureStatus(pair?.before.src, seen)
+  const after = pictureStatus(pair?.after.src, seen)
+  const side = { attempt: loads.attempt, onShown: loads.onShown, onBroken: loads.onBroken }
+  const again = () => {
+    loads.reload()
+    retry()
+  }
   return (
     <>
       <header className="hc-head">
@@ -189,10 +220,10 @@ function CaseView({ item, at, total, pair, failed, retry, tags, labels, step }: 
         </Dialog.Close>
       </header>
       <div className="hc-fulls">
-        <Full picture={pair?.before} thumb={thumbOf(document, at, 0)} tag={tags.before} waiting={waiting(pair?.before)} onShown={onShown} />
-        <Full picture={pair?.after} thumb={thumbOf(document, at, 1)} tag={tags.after} waiting={waiting(pair?.after)} onShown={onShown} ai />
+        <Full picture={pair?.before} thumb={thumbOf(document, at, 0)} tag={tags.before} status={before} {...side} />
+        <Full picture={pair?.after} thumb={thumbOf(document, at, 1)} tag={tags.after} status={after} {...side} ai />
       </div>
-      <PictureNote loading={waiting(pair?.before) || waiting(pair?.after)} failed={failed && !pair} labels={labels} retry={retry} />
+      <PictureNote note={caseNote([before, after])} labels={labels} retry={again} />
       <Dialog.Description className="hc-desc">{item.change}</Dialog.Description>
       <nav className="hc-nav">
         <button type="button" className="hc-step" onClick={() => step(-1)}>
