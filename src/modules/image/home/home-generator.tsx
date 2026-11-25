@@ -98,7 +98,10 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, ho
   usePrefetchPicker()
   const current = state.template?.id ?? null
   const withPhoto = (picked: File) => { if (current) opened.open({ templateId: current, set: null, file: picked }) }
-  const shared = { state, gift: t('gift', { images: freeImages }), onPickPhoto: () => file.current?.click(), onPhotoPicked: withPhoto, fileInputId: fileId,
+  // The new-user gift (site.config freeCredits through the page, 100 with the v2 catalogue): one
+  // line for the small card and the panel's sign-up bar.
+  const gift = t('gift', { images: freeImages })
+  const shared = { state, gift, onPickPhoto: () => file.current?.click(), onPhotoPicked: withPhoto, fileInputId: fileId,
     onOpenPicker: () => { if (current) onPreview(current) }, onSignUp: () => { if (current) opened.open({ templateId: current, set: null }) } }
   // Signed in, the picker's hearts save on the visitor's account; signed out a heart goes to
   // sign-in and comes back here to save it (T83).
@@ -138,7 +141,7 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, ho
         sampleOf={sampleFor}
         thumbOf={thumbFor}
       />
-      {opened.panel !== undefined ? <TemplatePanel panel={opened.panel} viewer={viewer} pagePath={homePath} gift={t('gift', { images: freeImages })} onClose={opened.close} /> : null}
+      {opened.panel !== undefined ? <TemplatePanel panel={opened.panel} viewer={viewer} pagePath={homePath} gift={gift} onClose={opened.close} /> : null}
       <HomeDock show={away && !footer} canStartWithoutPicking={canStartWithoutPicking} onClick={bring} />
     </div>
     </FavoritesProvider>
