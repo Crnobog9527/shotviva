@@ -18,11 +18,14 @@ vi.mock('@/core/admin', () => ({
   LocaleDisplayPanel: () => null,
   BundlesPanel: () => null,
   CaseStripPanel: () => null,
+  HeroPanel: () => null,
 }))
 vi.mock('@/core/templates/locale-display-read', () => ({ readLocaleDisplay: async () => ({ categoryOrder: {}, featured: {} }), readFeaturedBundles: async () => undefined }))
 vi.mock('@/core/admin/template-categories', () => ({ listAdminCategoryTree: (db: unknown) => listAdminCategoryTree(db) }))
 vi.mock('@/core/admin/template-series', () => ({ seriesCopy: { title: "系列管理" }, listAdminSeriesOptions: (db: unknown) => listAdminSeriesOptions(db) }))
 vi.mock('@/core/templates/home-case-strip-read', () => ({ readHomeCaseStrip: async () => ({}) }))
+vi.mock('@/core/templates/home-hero-read', () => ({ readHomeHero: async () => ({}) }))
+vi.mock('./home-hero-action', () => ({ saveHomeHeroAction: vi.fn() }))
 vi.mock('./case-strip-action', () => ({ saveHomeCaseStripAction: vi.fn() }))
 vi.mock('./bundle-actions', () => ({ saveFeaturedBundleAction: vi.fn(), deleteFeaturedBundleAction: vi.fn(), setDefaultFeaturedBundlesAction: vi.fn() }))
 vi.mock('./category-actions', () => ({ moveTemplateCategoryAction: vi.fn(), saveLocaleDisplayAction: vi.fn() }))
