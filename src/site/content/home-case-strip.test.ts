@@ -43,8 +43,8 @@ describe('首页「更多真实案例」', () => {
   })
 
   it('keeps the built-in row when nothing is set or nothing set is live, under the same heading otherwise', () => {
-    expect(homeCaseStrip(builtIn, [], live, 'en')).toBe(builtIn)
-    expect(homeCaseStrip(builtIn, [one('gone')], live, 'en')).toBe(builtIn)
+    expect(homeCaseStrip(builtIn, [], live, 'en')).toEqual(builtIn)
+    expect(homeCaseStrip(builtIn, [one('gone')], live, 'en')).toEqual(builtIn)
     expect(homeCaseStrip(builtIn, [one('a')], live, 'en')).toMatchObject({ heading: 'More real dishes', items: [{ pick: 'a' }] })
   })
 

@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic'
 import { useEffect, useRef, useState } from 'react'
 
-import { HOTEL_OPEN_ATTR } from './hotel-cases-dom'
+import { HOTEL_OPEN_ATTR, wakeThumbs } from './hotel-cases-dom'
 
 // The viewer's code, labels and styles (Radix dialog, the full-size pictures) are not in the home
 // page's first load: they are fetched on the first press of a case, and only then rendered.
@@ -22,6 +22,7 @@ export function HotelCasesMount() {
       const button = (event.target as Element | null)?.closest<HTMLElement>(`[${HOTEL_OPEN_ATTR}]`)
       if (!button || !section.contains(button)) return
       opener.current = button
+      wakeThumbs(section)
       setWanted(true)
       setOpen(Number(button.getAttribute(HOTEL_OPEN_ATTR)))
     }

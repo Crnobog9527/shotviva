@@ -21,13 +21,25 @@ export function readTags(root: ParentNode): ViewerTags {
   return { before: before?.textContent ?? '', after: after?.textContent ?? '' }
 }
 
-// The thumbnail a case shows, as the picture the viewer shows until (or unless) the full-size one
-// arrives. The <img> src attribute, not currentSrc: on phones cases 3 and 4 are hidden and lazy, so
-// their thumbnails never loaded, but the address is in the HTML all the same (the widest candidate
-// of the thumbnail's srcset, which the browser fetches on demand).
-export function thumbSrc(root: ParentNode, index: number, side: 0 | 1): string {
+// The list's own thumbnail of a case, for the viewer to show at once, under the full-size picture
+// until that has loaded (or for good if it never does): the same srcset and sizes, AVIF source
+// included, so the browser picks the same small file the list shows or is already fetching.
+export type Thumb = { src: string; srcSet: string; sizes: string; avif: { srcSet: string; sizes: string } | null }
+
+const attr = (el: Element | null | undefined, name: string) => el?.getAttribute(name) ?? ''
+
+export function thumbOf(root: ParentNode, index: number, side: 0 | 1): Thumb | null {
   const img = root.querySelectorAll(CASES)[index]?.querySelectorAll('img')[side]
-  return img?.currentSrc || img?.getAttribute('src') || ''
+  if (!img) return null
+  const source = img.closest('picture')?.querySelector('source[type="image/avif"]')
+  return { src: attr(img, 'src'), srcSet: attr(img, 'srcset'), sizes: attr(img, 'sizes'), avif: source ? { srcSet: attr(source, 'srcset'), sizes: attr(source, 'sizes') } : null }
+}
+
+// On phones cases 3 and 4 are hidden and their thumbnails lazy, so they never load. Opening the
+// viewer makes every list thumbnail eager: the hidden ones start loading their small file at once,
+// before the viewer's code has even arrived.
+export function wakeThumbs(root: ParentNode) {
+  for (const img of root.querySelectorAll<HTMLImageElement>(`${CASES} img[loading="lazy"]`)) img.loading = 'eager'
 }
 
 // A case's button, if it is on screen (phones show the first two only).
