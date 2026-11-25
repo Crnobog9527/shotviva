@@ -11,6 +11,8 @@ export {
   type CostBills,
   type EditCase,
   type EditCases,
+  type SpaceCase,
+  type SpaceCases,
   type ExplainedText,
   type Fact,
   type FaqItem,

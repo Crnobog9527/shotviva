@@ -12,7 +12,7 @@ import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
 import { homePanelTemplates } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
-import { HOME_CATEGORIES, bundleSection, creditFacts, featuredSections, fillCredits, freeImagesIn, homeCaseStrip, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
+import { HOME_CATEGORIES, bundleSection, creditFacts, featuredSections, fillCredits, freeImagesIn, homeCaseStrip, homePageIn, isLinkEnabled, liveSpaces, offersShownIn } from '@/site/content'
 import { HERO_DEFAULT_OPTION, heroOptionContent } from '@/site/experiments'
 import { site } from '@/site/site.config'
 
@@ -66,7 +66,9 @@ export async function HomeContent({ heroOption }: { heroOption?: string }) {
   const { option, defaultId } = heroFor(heroOption, locale, live, featuredId)
   const { templates, opening } = homePanelTemplates(live, defaultId, bundles.flatMap((bundle) => bundle.memberIds))
   const [initialCovers, optionHero] = await Promise.all([openingCovers(opening), homeHeroPictures(option, heroOption !== undefined, locale, live)])
-  const shown = optionHero ? { ...page, hero: { ...page.hero, ...optionHero } } : page
+  // Hotels: each case shows its template's own covers while that template is live.
+  const spaced = { ...page, spaces: liveSpaces(page.spaces, live) }
+  const shown = optionHero ? { ...spaced, hero: { ...spaced.hero, ...optionHero } } : spaced
   return (
     <>
       {/* Offers: the plans this page shows (the three monthly cards), never the whole catalog (03-S2). */}
