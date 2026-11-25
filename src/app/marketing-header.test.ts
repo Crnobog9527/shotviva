@@ -14,23 +14,30 @@ vi.mock('./[locale]/nav-account-slot', () => ({ NavAccountSlot: () => null }))
 
 const { MarketingHeader } = await import('./[locale]/marketing-chrome')
 
-type Found = { href: string; className?: string; text: string }
+type Found = { href: string; className?: string; text: string; links?: readonly { href: string; label: string }[] }
 
-// Every element with an href, in order; async function components of the header are awaited.
+type Props = { href?: string; className?: string; children?: ReactNode; label?: string; links?: Found['links']; variant?: string }
+
+// One element's own entry: a link, or a Use Cases menu recorded with its list ('menu:bar' / 'menu:row').
+function entry(props: Props): Found | null {
+  if (Array.isArray(props.links)) return { href: `menu:${props.variant ?? 'bar'}`, className: props.className, text: props.label ?? '', links: props.links }
+  if (typeof props.href === 'string') return { href: props.href, className: props.className, text: String(props.children ?? '') }
+  return null
+}
+
+// Every link and menu, in order; the header's async PhoneNav is awaited.
 async function links(node: ReactNode, out: Found[] = []): Promise<Found[]> {
   if (Array.isArray(node)) {
     for (const child of node) await links(child, out)
     return out
   }
   if (!isValidElement(node)) return out
-  const element = node as ReactElement<{ href?: string; className?: string; children?: ReactNode; fallback?: ReactNode }>
-  const { props } = element
-  if (typeof props.href === 'string') out.push({ href: props.href, className: props.className, text: String(props.children ?? '') })
-  if (typeof element.type === 'function' && element.type.name === 'PhoneNav') {
-    await links(await (element.type as (p: unknown) => Promise<ReactNode>)(props), out)
-    return out
-  }
-  return links(props.children, out)
+  const element = node as ReactElement<Props>
+  const own = entry(element.props)
+  if (own) out.push(own)
+  const phoneNav = typeof element.type === 'function' && element.type.name === 'PhoneNav'
+  const children = phoneNav ? await (element.type as (p: unknown) => Promise<ReactNode>)(element.props) : element.props.children
+  return links(children, out)
 }
 
 describe('MarketingHeader: the way in to template requests', () => {
@@ -54,8 +61,19 @@ describe('MarketingHeader: the way in to template requests', () => {
   })
 
   it('hides on tablets only the row links the bar already has', async () => {
-    const row = (await links(await MarketingHeader({ locale: 'en' }))).filter((link) => !link.className?.startsWith('mk-nl'))
+    const all = await links(await MarketingHeader({ locale: 'en' }))
+    const row = all.slice(all.findIndex((link) => link.href === 'menu:row'))
     const dup = row.filter((link) => link.className === 'mk-mnav-dup').map((link) => link.href)
-    expect(dup).toEqual(['/#templates', '/pricing'])
+    expect(dup).toEqual(['menu:row', '/#templates', '/pricing'])
+  })
+
+  // Owner 2026-11-25: the phone row matches the desktop bar.
+  it("gives the page-links row the bar's items, in its order, with the same Use Cases list", async () => {
+    const all = await links(await MarketingHeader({ locale: 'en' }))
+    const bar = all.find((link) => link.href === 'menu:bar')
+    const row = all.slice(all.findIndex((link) => link.href === 'menu:row'))
+    expect(row.map((link) => link.href)).toEqual(['menu:row', '/#templates', '/template-requests', '/pricing'])
+    expect(row[0].links).toEqual(bar?.links)
+    expect(row[0].links?.map((link) => link.href)).toEqual(['/ai-restaurant-menu', '/commercial-photography', '/image-to-image-generator', '/transparent-background'])
   })
 })

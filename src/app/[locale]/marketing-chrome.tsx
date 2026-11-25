@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 
 import { cachedHasPublishedPosts } from '@/core/blog'
 import { SiteFooter } from '@/core/content'
-import { NavMenu } from '@/core/content/blocks/nav-menu'
+import { NavMenu, type NavMenuLink } from '@/core/content/blocks/nav-menu'
 import { isGalleryEnabled } from '@/core/gallery'
 import { isWishlistEnabled } from '@/core/wishlist'
 import type { Locale } from '@/core/i18n'
@@ -15,6 +15,19 @@ import { NavAccountSlot } from './nav-account-slot'
 import './(marketing)/marketing.css'
 
 const zhPaths = site.locales.zhPaths
+
+type NavText = Awaited<ReturnType<typeof getTranslations<'marketing.nav'>>>
+
+// The Use Cases list, one source for the top bar and the phone row so the two never drift.
+function menuLinksOfUseCases(t: NavText, locale: Locale): NavMenuLink[] {
+  return [
+    { href: '/ai-restaurant-menu', label: t('useCaseMenu') },
+    { href: '/commercial-photography', label: t('useCaseCommercial') },
+    { href: '/image-to-image-generator', label: t('useCaseGenerator') },
+    // English only (04-P1): there is no /zh version of this page.
+    ...(locale === 'en' ? [{ href: '/transparent-background' as const, label: t('useCaseTransparent') }] : []),
+  ]
+}
 
 // The marketing top bar (DESIGN §6.9 item 4, design/comps-v3-b/home.html): wordmark, then
 // Use Cases (the three landing pages, SEO launch handbook G5) · Templates (the home template section; v1 has no /templates page) ·
@@ -38,13 +51,7 @@ export async function MarketingHeader({ locale, homeOnly = false }: { locale: Lo
         <nav aria-label={t('label')} className="mk-nav">
           <NavMenu
             label={t('useCases')}
-            links={[
-              { href: '/ai-restaurant-menu', label: t('useCaseMenu') },
-              { href: '/commercial-photography', label: t('useCaseCommercial') },
-              { href: '/image-to-image-generator', label: t('useCaseGenerator') },
-              // English only (04-P1): there is no /zh version of this page.
-              ...(locale === 'en' ? [{ href: '/transparent-background' as const, label: t('useCaseTransparent') }] : []),
-            ]}
+            links={menuLinksOfUseCases(t, locale)}
           />
           <Link href="/#templates" className="mk-nl">
             {t('templates')}
@@ -88,28 +95,22 @@ export async function MarketingHeader({ locale, homeOnly = false }: { locale: Lo
 }
 
 // Phones (Owner 2026-11-24): the top bar has room for the globe and Log in alone, and the rules
-// forbid a hamburger, so the inner pages sit in one row of text links under it. Tablets (768–1023px)
-// keep the row for the links the bar has no room for, the ones it shows hidden (mk-mnav-dup). Not
-// sticky: it scrolls away with the page. The blog shows once this language has a post; Request a
-// template while the wishlist is open.
+// forbid a hamburger, so the pages sit in one row under it, in the desktop bar's order and with
+// its Use Cases list (Owner 2026-11-25): Use Cases ▾ · Templates · Request a template (while the
+// wishlist is open) · Pricing. Tablets (768–1023px) keep the row only for what their bar has no
+// room for; the rest is hidden there (mk-mnav-dup). Not sticky: it scrolls away with the page.
 async function PhoneNav({ locale, wishlistOpen }: { locale: Locale; wishlistOpen: boolean }) {
-  const [t, blogText, hasBlogPosts] = await Promise.all([
-    getTranslations({ locale, namespace: 'marketing.nav' }),
-    getTranslations({ locale, namespace: 'blog' }),
-    cachedHasPublishedPosts(locale),
-  ])
+  const t = await getTranslations({ locale, namespace: 'marketing.nav' })
   return (
     <nav aria-label={t('phoneLabel')} className="mk-mnav mk-w">
+      <NavMenu label={t('useCases')} links={menuLinksOfUseCases(t, locale)} variant="row" className="mk-mnav-dup" />
       <Link href="/#templates" className="mk-mnav-dup">
         {t('templates')}
       </Link>
-      <Link href="/ai-restaurant-menu">{t('menuShort')}</Link>
+      {wishlistOpen ? <Link href="/template-requests">{t('requestTemplate')}</Link> : null}
       <Link href="/pricing" className="mk-mnav-dup">
         {t('pricing')}
       </Link>
-      {/* After Pricing here (unlike the desktop bar): at 375px the English row would push Pricing off screen. */}
-      {wishlistOpen ? <Link href="/template-requests">{t('requestTemplate')}</Link> : null}
-      {hasBlogPosts ? <Link href="/blog">{blogText('footerLink')}</Link> : null}
     </nav>
   )
 }
