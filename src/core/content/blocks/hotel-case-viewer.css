@@ -34,6 +34,13 @@
     .hc-fulls { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   }
   .hc-full { border-radius: 14px; }
+  .hc-thumb { filter: blur(2px); }
+  .hc-wait { animation: hc-pulse 1.4s ease-in-out infinite; }
+  @keyframes hc-pulse { 50% { opacity: 0.7; } }
+  @media (prefers-reduced-motion: reduce) { .hc-wait { animation: none; } }
+  .hc-note { margin: 0; font-size: 14px; color: var(--muted-foreground); }
+  .hc-retry { margin: 0; padding: 0; border: 0; background: none; color: var(--primary); font: inherit; text-decoration: underline; cursor: pointer; }
+  .hc-retry:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
   .hc-full .hc-tag { left: 12px; bottom: 12px; height: 28px; padding: 0 10px; border-radius: 8px; font-size: 14px; }
   .hc-full .hc-ai { left: auto; right: 12px; background: var(--primary); }
   .hc-desc { margin: 0; max-width: 72ch; font-size: 15px; line-height: 1.5; color: var(--muted-foreground); }
