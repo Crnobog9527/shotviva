@@ -50,4 +50,12 @@ describe('Picture', () => {
     expect(html).toContain('<img src="/a.webp" alt=""/>')
     expect(html).not.toContain('<picture')
   })
+
+  // A <source> is inline by default: under display: contents it took the first cell of the
+  // picker's two-column pair, pushing the phone photo under the AI tag (Owner 2026-11-25).
+  it('gives the AVIF <source> no box of its own, so the <img> takes the parent’s cell', () => {
+    const html = renderToString(Picture({ avif: { srcSet: '/a.avif 384w', sizes: '50vw' }, children: createElement('img', { src: '/a.webp', alt: '' }) }) as ReactElement)
+    expect(html).toMatch(/<source[^>]*style="display:none"/)
+    expect(html).toContain('<picture style="display:contents">')
+  })
 })

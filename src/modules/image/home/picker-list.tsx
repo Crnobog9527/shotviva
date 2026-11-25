@@ -29,7 +29,9 @@ const FLUSH = { '--gutter': '0px' } as CSSProperties
 
 // The picker's right column (Owner 2026-11-13): a search box, Create's category chips (root,
 // then sub-categories; Saved first when the visitor has saved templates, T83), and the list
-// under them: templates as radios, a series as one row that opens its members.
+// under them: templates as radios, a series as one row that opens its members. Each chip level is
+// one line that scrolls sideways (rail), so three levels open still leave the list most of the
+// column (Owner 2026-11-25).
 export function PickerBrowser({ view, selected, onSelect, thumbOf, onSearching }: Props) {
   const t = useTranslations('home.generator')
   const ids = useFavorites()?.ids
@@ -53,8 +55,8 @@ export function PickerBrowser({ view, selected, onSelect, thumbOf, onSearching }
           clear={t('pickerClear')}
         />
         {state.results ? null : (
-          <div style={FLUSH}>
-            <CategoryChips filters={view.filters} saved={saved.length > 0} value={state.selection} onChange={state.select} labels={labels} />
+          <div className="mk-pk-chips" style={FLUSH}>
+            <CategoryChips filters={view.filters} saved={saved.length > 0} value={state.selection} onChange={state.select} labels={labels} rail />
           </div>
         )}
       </div>

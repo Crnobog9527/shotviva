@@ -859,6 +859,9 @@
   .mk-pk-go { position: sticky; bottom: 0; margin-top: 4px; padding-top: 12px; background: linear-gradient(transparent, var(--popover) 40%); }
   /* search and chips over the list (Owner 2026-11-13); a series row opens its members in place */
   .mk-pk-tools { display: grid; gap: 10px; margin-top: 16px; }
+  /* chip levels as one-line rails (picker-list.tsx): the right edge fades, a spacer lets the last chip clear it */
+  .mk-pk-chips [role="group"] { mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent); }
+  .mk-pk-chips [role="group"]::after { content: ""; flex: none; width: 16px; }
   .mk-pk-none { padding: 24px 4px; font-size: 14px; color: var(--muted-foreground); }
   .mk-pk-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px 0 4px; border-radius: var(--radius-button); font: 500 14px/1 var(--font-sans); color: var(--bone-dim); align-self: flex-start; }
   .mk-pk-stack { position: relative; flex: none; border-radius: 12px; box-shadow: 3px -3px 0 -1px var(--accent), 6px -6px 0 -2px var(--secondary); margin: 6px 6px 0 0; }
@@ -871,11 +874,14 @@
   @media (min-width: 768px) {
     .mk-picker { max-height: calc(100dvh - 64px); overflow: hidden; }
     .mk-pk-tools { margin-top: 12px; }
-    .mk-pk-body { display: grid; grid-template-columns: 46% minmax(0, 1fr); column-gap: 32px; align-items: start; padding: 24px; }
+    .mk-pk-body { display: grid; grid-template-columns: 40% minmax(0, 1fr); column-gap: 28px; align-items: start; padding: 24px; }
     .mk-pk-sample { margin-top: 0; }
+    .mk-pk-title { font-size: 28px; }
     /* a fixed height, so the dialog does not jump as chips and searches change the list */
-    .mk-pk-side { height: min(640px, calc(100dvh - 112px)); }
+    .mk-pk-side { height: min(720px, calc(100dvh - 112px)); }
     .mk-pk-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+    /* one line per description: the chosen one is in full under the sample on the left */
+    .mk-pk-t small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   }
 
   /* ---------- sign-up prompt ---------- */
