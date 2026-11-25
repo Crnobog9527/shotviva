@@ -21,9 +21,13 @@ export function readTags(root: ParentNode): ViewerTags {
   return { before: before?.textContent ?? '', after: after?.textContent ?? '' }
 }
 
-// The thumbnail a case shows, as the picture the viewer falls back to when its request fails.
+// The thumbnail a case shows, as the picture the viewer shows until (or unless) the full-size one
+// arrives. The <img> src attribute, not currentSrc: on phones cases 3 and 4 are hidden and lazy, so
+// their thumbnails never loaded, but the address is in the HTML all the same (the widest candidate
+// of the thumbnail's srcset, which the browser fetches on demand).
 export function thumbSrc(root: ParentNode, index: number, side: 0 | 1): string {
-  return root.querySelectorAll<HTMLImageElement>(`${CASES}`)[index]?.querySelectorAll('img')[side]?.currentSrc ?? ''
+  const img = root.querySelectorAll(CASES)[index]?.querySelectorAll('img')[side]
+  return img?.currentSrc || img?.getAttribute('src') || ''
 }
 
 // A case's button, if it is on screen (phones show the first two only).
