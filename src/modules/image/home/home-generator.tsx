@@ -36,6 +36,9 @@ export type HomeGeneratorProps = {
   // The opening template's cover shapes, measured on the server, so the preview is drawn in its
   // final shape before any script runs.
   initialCovers: InitialCovers
+  // false: the signed-out stand-in shown while the session streams in; it leaves the address's
+  // ?panel= for the generator that replaces it (use-template-panel.ts).
+  settled?: boolean
 }
 
 // Keep the template picker warm for browsing; the template panel (Create's dialog, with its sheet)
@@ -60,7 +63,7 @@ const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matc
 // hook. Everything that asks for a template (its picture and Change open the browse list; a pick
 // there, any card on the page, its Upload photo) opens the template panel: Create's own dialog,
 // generating as Create does when signed in, the sign-up button when not (Owner 2026-11-25).
-export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, homePath, freeImages, initialCovers }: HomeGeneratorProps) {
+export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, homePath, freeImages, initialCovers, settled }: HomeGeneratorProps) {
   // The panel has one upload card: a template with named image slots (§5.1e) opens in its own
   // workspace instead, never here.
   const templates = useMemo(() => all.filter((template) => !isSlotTemplate(template)), [all])
@@ -94,7 +97,7 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, ho
     openCatalogue()
   }, [openCatalogue])
   useBrowseClicks(onPreview)
-  const opened = useGeneratorPanel({ picker, state, bring })
+  const opened = useGeneratorPanel({ picker, state, bring, settled: settled !== false })
   usePrefetchPicker()
   const current = state.template?.id ?? null
   const withPhoto = (picked: File) => { if (current) opened.open({ templateId: current, set: null, file: picked }) }
@@ -148,13 +151,13 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, ho
   )
 }
 
-type PanelArgs = { picker: ReturnType<typeof useHomeCatalogue>; state: ReturnType<typeof useHomeGenerator>; bring(): void }
+type PanelArgs = { picker: ReturnType<typeof useHomeCatalogue>; state: ReturnType<typeof useHomeGenerator>; bring(): void; settled: boolean }
 
 // The template panel and everything that opens it. A template it cannot show (not live, or a
 // slot template) still goes into the first-screen card, as a card click always did. The first
 // opening mounts the panel; afterwards it stays mounted (undefined: never opened) so it can close
 // with its motion and give focus back.
-function useGeneratorPanel({ picker, state, bring }: PanelArgs) {
+function useGeneratorPanel({ picker, state, bring, settled }: PanelArgs) {
   const { choose } = state
   const onMissing = useCallback((id: string) => {
     void choose(id).then((picked) => {
@@ -173,6 +176,6 @@ function useGeneratorPanel({ picker, state, bring }: PanelArgs) {
     void load().catch(() => undefined)
   }, [load])
   usePanelClicks(open, prefetch)
-  usePanelFromQuery(open)
+  usePanelFromQuery(open, settled)
   return { panel: mounted ? panel : undefined, open, close }
 }

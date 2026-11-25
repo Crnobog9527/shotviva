@@ -65,22 +65,37 @@ export function usePanelClicks(open: (request: PanelRequest, opener?: Element | 
 }
 
 // `?panel=<id>&set=…` (back from sign-up) and `?open=<id>` (the 404's "templates to try"): open the
-// panel once after hydration, then drop the query so a reload does not reopen it.
-export function usePanelFromQuery(open: (request: PanelRequest) => void) {
+// panel once after hydration, then drop the query so a reload does not reopen it. Only a settled
+// generator takes it: the signed-out stand-in shown while the session streams in (Suspense
+// fallback) mounts first after a client-side sign-in and must leave the query for the real one.
+export function usePanelFromQuery(open: (request: PanelRequest) => void, settled: boolean) {
   const done = useRef(false)
   useEffect(() => {
     if (done.current) return
-    done.current = true
-    const search = window.location.search
-    const legacy = new URLSearchParams(search).get('open')
-    const request = readPanelQuery(search) ?? (legacy ? readPanelQuery(`?panel=${encodeURIComponent(legacy)}`) : null)
-    if (!request) return
-    const rest = new URLSearchParams(withoutPanelQuery(search))
-    rest.delete('open')
-    const query = rest.toString()
-    window.history.replaceState(window.history.state, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`)
-    open(request)
-  }, [open])
+    if (takePanelQueryWhen(settled, window.location, window.history, open) !== 'waiting') done.current = true
+  }, [open, settled])
+}
+
+type Place = Pick<Location, 'pathname' | 'search' | 'hash'>
+type Address = Pick<History, 'state' | 'replaceState'>
+
+// One generator's turn at the query: an unsettled one ('waiting') leaves it in the address.
+export function takePanelQueryWhen(settled: boolean, place: Place, history: Address, open: (request: PanelRequest) => void): 'waiting' | 'taken' | 'none' {
+  if (!settled) return 'waiting'
+  return takePanelQuery(place, history, open) ? 'taken' : 'none'
+}
+
+// Reads the panel's query from the address, drops it, then opens; true when there was one.
+export function takePanelQuery(place: Place, history: Address, open: (request: PanelRequest) => void): boolean {
+  const legacy = new URLSearchParams(place.search).get('open')
+  const request = readPanelQuery(place.search) ?? (legacy ? readPanelQuery(`?panel=${encodeURIComponent(legacy)}`) : null)
+  if (!request) return false
+  const rest = new URLSearchParams(withoutPanelQuery(place.search))
+  rest.delete('open')
+  const query = rest.toString()
+  history.replaceState(history.state, '', `${place.pathname}${query ? `?${query}` : ''}${place.hash}`)
+  open(request)
+  return true
 }
 
 // A bundle card's last chip (data-browse-category="<slug path>", empty for every template) opens

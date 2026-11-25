@@ -65,10 +65,11 @@ async function WithViewer(props: Base) {
   )
 }
 
-// While the session streams in, the generator shows as for a signed-out visitor.
+// While the session streams in, the generator shows as for a signed-out visitor; it is not
+// settled, so a ?panel= in the address waits for the generator that replaces it.
 export function HomeGeneratorSlot(props: Base) {
   return (
-    <Suspense fallback={<HomeGenerator {...props} viewer={null} />}>
+    <Suspense fallback={<HomeGenerator {...props} viewer={null} settled={false} />}>
       <WithViewer {...props} />
     </Suspense>
   )

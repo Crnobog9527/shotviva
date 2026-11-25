@@ -103,9 +103,9 @@
     },
     "arrived": {
       "home": {
-        "title": "Your photo and template are kept.",
-        "login": "Log in and they'll be waiting on the home page.",
-        "signup": "Verify your email and they'll be waiting on the home page."
+        "title": "Your template is kept.",
+        "login": "Log in and it opens again on the home page.",
+        "signup": "Verify your email and it opens again on the home page."
       },
       "graylum": {
         "title": "Connecting Graylum.",

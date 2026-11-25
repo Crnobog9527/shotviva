@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 
 export function CatalogueFormStatus({ failed, retry }: { failed: boolean; retry(): void }) {
-  const t = useTranslations('app.create')
+  const t = useTranslations('app.form')
   if (!failed) return <p role="status" className="py-4 text-caption text-muted-foreground">{t('formLoading')}</p>
   return (
     <div className="flex flex-wrap items-center gap-3 py-4 text-caption">

@@ -24,6 +24,7 @@ export const APP_ONLY_APP_KEYS = [
   'photos',
   'edit',
   'checkout',
+  'create',
   'work',
   'wait',
   'notify',
@@ -38,8 +39,8 @@ export const APP_ONLY_APP_KEYS = [
   // 作品集分享 (§6.2): the Photos picker, its dialog and the Share links page.
   'workShare',
 ] as const
-// Not in the list (Owner 2026-11-25): `series`, `create` and `share`, which the public pages'
-// template panel (Create's own dialog, home and landing pages) reads; about 1 KB.
+// Not in the list (Owner 2026-11-25): `series`, `share` and `form` (the creation form's loading
+// line), which the public pages' template panel (Create's own dialog) reads.
 
 type Messages = Record<string, unknown>
 
