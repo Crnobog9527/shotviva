@@ -70,7 +70,7 @@ export function HeroPanel({ hero, templates, categories, actions }: Props) {
       <p className="text-xs text-muted-foreground"><ScopeHint scope={scope} count={shown.length} defaults={(hero[DEFAULT_HERO_SCOPE] ?? []).length} /></p>
       {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-      <HeroList label={label} list={shown} templates={templates} categories={categories} editing={draft !== null} onChange={setDraft} />
+      <HeroList scope={scope} label={label} list={shown} templates={templates} categories={categories} editing={draft !== null} onChange={setDraft} />
     </section>
   )
 }

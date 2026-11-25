@@ -12,6 +12,7 @@ export const HERO_COPY = {
   own: '这一边自己的设置。清空后回到跟随默认。',
   defaultOwn: '默认设置：没有自己设置的语言都用它。清空后显示内置的首屏图。',
   notLive: '已下架，首页不显示',
+  noCovers: '缺封面，不会显示',
   captionLabel: (name: string) => `${name} 的说明`,
   captionHint: (name: string) => `默认：${name}`,
   captionMax: HERO_CAPTION_MAX,
