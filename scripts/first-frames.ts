@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import sharp from 'sharp'
 
 // One entry per hero `before` picture (home and the landing pages, both languages).
-const SOURCES = ['/home/hero-set-phone.webp', '/home/hero-art-photo.webp', '/home/food-1-photo.webp', '/cases/sneaker-phone.webp', '/cases/pet-phone.webp', '/cases/menu-fish-phone.webp', '/cases/white-dress-before.webp', '/cases/bag-phone.webp', '/cases/menu-steak-phone.webp']
+const SOURCES = ['/home/hero-set-phone.webp', '/home/hero-art-photo.webp', '/home/food-1-photo.webp', '/home/cn-hero-1-photo.webp', '/cases/sneaker-phone.webp', '/cases/pet-phone.webp', '/cases/menu-fish-phone.webp', '/cases/white-dress-before.webp', '/cases/bag-phone.webp', '/cases/menu-steak-phone.webp']
 
 // 288 px: at least as many pixels as the plate has CSS pixels on a phone (about 190 wide) and on
 // a desktop (268 wide), so the browser counts the frame, not the later full picture, as the
@@ -21,7 +21,7 @@ const SOURCES = ['/home/hero-set-phone.webp', '/home/hero-art-photo.webp', '/hom
 const WIDTH = 288
 const QUALITY = 45
 // The menu fish photo and the /zh prawn basket are busier (steam, chilies, steel): a lower quality keeps them under 9 KB.
-const QUALITY_FOR: Readonly<Record<string, number>> = { '/cases/menu-fish-phone.webp': 38 }
+const QUALITY_FOR: Readonly<Record<string, number>> = { '/cases/menu-fish-phone.webp': 38, '/home/cn-hero-1-photo.webp': 36 }
 
 async function main() {
   const entries: string[] = []

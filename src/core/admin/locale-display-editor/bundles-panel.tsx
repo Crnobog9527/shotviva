@@ -35,18 +35,18 @@ export function BundlesPanel({ bundles, templates, categories, actions }: Props)
     run(async () => asValue(await actions.remove(bundle.id)), () => COPY.removed)
   }
   return (
-    <section aria-labelledby="bundles-h" className="grid gap-4 rounded-md border p-4">
-      <div className="grid max-w-prose gap-1">
+    <section aria-labelledby="bundles-h" className="grid grid-cols-1 gap-4 rounded-md border p-4">
+      <div className="grid grid-cols-1 max-w-prose gap-1">
         <h2 id="bundles-h" className="font-medium">{COPY.panelTitle}</h2>
         <p className="text-sm text-muted-foreground">{COPY.panelBody}</p>
       </div>
       {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       {bundles.length === 0 ? <p className="text-sm text-muted-foreground">{COPY.none}</p> : null}
-      <ul className="grid gap-1.5">
+      <ul className="grid grid-cols-1 gap-1.5">
         {bundles.map((bundle) => (
           <li key={bundle.id} className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
-            <span className="grid min-w-0 flex-1 gap-0.5">
+            <span className="grid grid-cols-1 min-w-0 flex-1 gap-0.5">
               <span className="truncate text-sm font-medium">{bundle.nameZh} <span className="font-normal text-muted-foreground">/ {bundle.nameEn}</span></span>
               <span className="truncate text-xs text-muted-foreground">
                 {COPY.members(bundle.templateIds.length)}：{bundle.templateIds.map((id) => zhNameOf(templates.find((template) => template.id === id), id)).join('、')}
@@ -76,7 +76,7 @@ function DefaultBundles({ context, saved, setDefault }: DefaultProps) {
     return COPY.defaultSaved
   })
   return (
-    <div className="grid gap-2 border-t pt-3">
+    <div className="grid grid-cols-1 gap-2 border-t pt-3">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-medium">{COPY.defaultTitle}</h3>
         <div className="ml-auto flex gap-2">

@@ -77,9 +77,20 @@ const COPY = {
 // The pictures' file prefix: Western dishes on the English page, Chinese ones on /zh.
 const FILES: Record<Locale, string> = { en: 'food', zh: 'cn-food' }
 
-// English: one static pair (food-1). /zh: the live dishes above.
+// English: one static pair (food-1). /zh: the live dishes above, the static first dish as the fallback.
+// When none of the live templates can be read (a catalogue outage, all of them unpublished, or a
+// build without a database such as CI's), /zh still shows a Chinese dish, never the page's tote:
+// the first dish's covers as they were on 2026-11-24 (public/home/cn-hero-1-*, 880 × 1100), with
+// their first frame (scripts/first-frames.ts).
+const ZH_FALLBACK: NonNullable<HeroOptionContent['hero']> = {
+  before: withFirstFrame(big('cn-hero-1-photo', ZH_LIVE[0]!.phone)),
+  after: big('cn-hero-1-ai', ZH_LIVE[0]!.ai),
+  caption: ZH_LIVE[0]!.caption,
+  scenes: undefined,
+}
+
 function heroIn(locale: Locale): Pick<HeroOptionContent, 'hero' | 'live'> {
-  if (locale === 'zh') return { live: { label: '几道菜的手机照和成图', scenes: ZH_LIVE } }
+  if (locale === 'zh') return { live: { label: '几道菜的手机照和成图', scenes: ZH_LIVE }, hero: ZH_FALLBACK }
   const copy = COPY.en
   return { hero: { before: withFirstFrame(big('food-1-photo', copy.before)), after: big('food-1-ai', copy.after), caption: copy.caption, scenes: undefined } }
 }

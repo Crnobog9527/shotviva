@@ -4,7 +4,7 @@ vi.mock('server-only', () => ({}))
 const plateFrame = vi.fn()
 vi.mock('@/core/templates/cover-ratio', () => ({ plateFrame: (...args: unknown[]) => plateFrame(...args) }))
 
-const { liveHero } = await import('./home-hero-live')
+const { liveHero, optionPictures } = await import('./home-hero-live')
 
 const scene = (templateId: string) => ({ templateId, phone: `手机照 ${templateId}`, ai: `成图 ${templateId}`, caption: `说明 ${templateId}` })
 const template = (id: string, before: string | null = `https://a.test/${id}-b.webp`, after: string | null = `https://a.test/${id}-a.webp`) => ({ id, coverBeforeUrl: before, coverAfterUrl: after })
@@ -38,5 +38,22 @@ describe('liveHero', () => {
     plateFrame.mockResolvedValue(null)
     const hero = await liveHero([scene('one')], '菜', [template('one')])
     expect(hero?.before.firstFrame).toBeUndefined()
+  })
+})
+
+describe('optionPictures', () => {
+  const fallback = { before: { src: '/home/cn-hero-1-photo.webp', alt: '手机照', width: 880, height: 1100, firstFrame: 'data:image/avif;base64,STATIC' }, after: { src: '/home/cn-hero-1-ai.webp', alt: '成图', width: 880, height: 1100 }, caption: '说明', scenes: undefined }
+  const option = { live: { label: '菜', scenes: [scene('one')] }, hero: fallback }
+
+  beforeEach(() => plateFrame.mockResolvedValue('data:image/avif;base64,LIVE'))
+
+  it('shows the live covers when a listed template is live', async () => {
+    expect((await optionPictures(option, [template('one')]))?.before.src).toBe('https://a.test/one-b.webp')
+  })
+
+  it('falls back to the static dish, first frame included, when none is live (an outage, all unpublished, a build without a database)', async () => {
+    expect(await optionPictures(option, [])).toBe(fallback)
+    expect(await optionPictures({ hero: fallback }, [])).toBe(fallback)
+    expect(await optionPictures(null, [])).toBeNull()
   })
 })

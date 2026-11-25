@@ -15,7 +15,8 @@ describe('home hero options (ARCHITECTURE §16.5)', () => {
       for (const locale of ['en', 'zh'] as const) {
         const content = heroOptionContent(id, locale)
         expect(content, `${id} ${locale}`).not.toBeNull()
-        expect(Boolean(content!.hero) !== Boolean(content!.live), `${id} ${locale}: static or live, not both`).toBe(true)
+        // Every option has static pictures: its own, or the fallback for its live templates.
+        expect(content!.hero, `${id} ${locale}`).toBeDefined()
         if (content!.hero) {
           const { before, after } = content!.hero
           expect(picture(before.src) && picture(after.src)).toBe(true)
@@ -38,8 +39,7 @@ describe('home hero options (ARCHITECTURE §16.5)', () => {
   })
 
   it('reads the /zh hero dishes live from the three templates the Owner picked, with Chinese words and no prices', () => {
-    const { live, hero } = heroOptionContent('food', 'zh')!
-    expect(hero).toBeUndefined()
+    const { live } = heroOptionContent('food', 'zh')!
     expect(live!.scenes.map((scene) => scene.templateId)).toEqual(['cn-pedestal-fog', 'cn-deep-prawn-green', 'cn-warm-lobed-runner'])
     for (const scene of live!.scenes) {
       for (const text of [scene.phone, scene.ai, scene.caption]) expect(text).toMatch(/[\u4e00-\u9fff]/)
@@ -49,5 +49,15 @@ describe('home hero options (ARCHITECTURE §16.5)', () => {
 
   it('registers every option on the hero surface', () => {
     expect(experimentRegistry[0]?.options.map((option) => option.id)).toEqual(['food', 'tote', 'art-style'])
+  })
+
+  it('keeps a static Chinese dish with its first frame as the /zh fallback, never the tote', () => {
+    const { hero, live } = heroOptionContent('food', 'zh')!
+    expect(hero?.before.src).toBe('/home/cn-hero-1-photo.webp')
+    expect(hero?.after.src).toBe('/home/cn-hero-1-ai.webp')
+    expect(hero?.before.firstFrame).toBe(FIRST_FRAMES['/home/cn-hero-1-photo.webp'])
+    expect(picture(hero!.before.src) && picture(hero!.after.src)).toBe(true)
+    // The same dish, words and all, as the first live pair.
+    expect([hero?.before.alt, hero?.after.alt, hero?.caption]).toEqual([live!.scenes[0]!.phone, live!.scenes[0]!.ai, live!.scenes[0]!.caption])
   })
 })

@@ -28,7 +28,7 @@ export function FeaturedList({ locale, label, list, templates, categories, editi
   const nameOf = (id: string) => zhNameOf(templateOf(id), id)
   const detailOf = (id: string) => templateOf(id)?.categoryInfo.nameZh
   return (
-    <div className="grid gap-2">
+    <div className="grid grid-cols-1 gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-medium">{label} · {COPY.featuredTitle}</h3>
         <OwnBadge own={list.own} />
@@ -40,7 +40,7 @@ export function FeaturedList({ locale, label, list, templates, categories, editi
         <>
           <SortableList ids={list.ids} labelOf={nameOf} onReorder={async (next) => onChange(next)}>
             {(shown) => (
-              <ol className="grid gap-1">
+              <ol className="grid grid-cols-1 gap-1">
                 {shown.map((id) => (
                   <SortableRow key={id} id={id} name={nameOf(id)} detail={detailOf(id)} removeLabel={COPY.remove(nameOf(id))}
                     onRemove={() => onChange(list.ids.filter((other) => other !== id))} />
@@ -52,7 +52,7 @@ export function FeaturedList({ locale, label, list, templates, categories, editi
             onAdd={(ids) => onChange([...list.ids, ...ids.filter((id) => !list.ids.includes(id))])} />
         </>
       ) : (
-        <ol className="grid gap-1">
+        <ol className="grid grid-cols-1 gap-1">
           {list.ids.map((id, index) => <StaticRow key={id} position={index + 1} name={nameOf(id)} detail={detailOf(id)} />)}
         </ol>
       )}

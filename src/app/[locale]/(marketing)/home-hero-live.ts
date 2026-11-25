@@ -33,3 +33,13 @@ export async function liveHero(scenes: readonly LiveHeroPair[], label: string, l
     scenes: second ? { label, items: [first, second, ...rest] } : undefined,
   }
 }
+
+type Option = { hero?: LiveHero; live?: { label: string; scenes: readonly LiveHeroScene[] } }
+
+// A home hero option's pictures: its live templates' covers when it names templates, else (or
+// when none of them is live: a catalogue outage, all unpublished, a build without a database)
+// its static pictures, so the /zh dishes never fall back to the page's own tote.
+export async function optionPictures(option: Option | null, live: readonly Covers[]): Promise<LiveHero | null> {
+  const fromLive = option?.live ? await liveHero(option.live.scenes, option.live.label, live) : null
+  return fromLive ?? option?.hero ?? null
+}
