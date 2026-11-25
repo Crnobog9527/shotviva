@@ -57,16 +57,32 @@
     .mk-brand-tag, .mk-brand-tag:lang(zh) { max-width: none; font-size: 14px; line-height: 1.15; white-space: nowrap; margin-right: 16px; }
   }
   /* Phones: the inner pages in one row under the bar (marketing-chrome PhoneNav); scrolls away. */
-  .mk-mnav { display: flex; gap: 4px; padding: 0 calc(var(--gutter) - 10px); overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--border); }
-  .mk-mnav::-webkit-scrollbar { display: none; }
-  .mk-mnav a {
-    flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px;
-    font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; white-space: nowrap;
+  /* The desktop bar's items in its order (Owner 2026-11-25). At 14px they fit one line at 375px in
+     both languages (English with about 2px to spare); narrower phones wrap to a second line rather
+     than cut an item off or widen the page. No scrolling, so the Use Cases list can drop below it. */
+  .mk-mnav { position: relative; z-index: 40; display: flex; flex-wrap: wrap; gap: 0; padding: 0 calc(var(--gutter) - 5px); border-bottom: 1px solid var(--border); }
+  .mk-mnav > a, .mk-mnav-btn {
+    flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 5px;
+    font: 500 14px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; white-space: nowrap;
   }
-  .mk-mnav a:active { color: var(--foreground); }
+  .mk-mnav-btn { gap: 2px; border: 0; background: none; cursor: pointer; }
+  .mk-mnav > a:active, .mk-mnav-btn:active, .mk-mnav-btn[aria-expanded="true"] { color: var(--foreground); }
+  .mk-navmenu-row { position: relative; }
+  .mk-navmenu-row .mk-navmenu-chev { width: 14px; height: 14px; transition: transform .2s var(--ease); }
+  .mk-navmenu-row [aria-expanded="true"] .mk-navmenu-chev { transform: rotate(180deg); }
+  .mk-navmenu-row .mk-navmenu-list {
+    position: absolute; top: 100%; left: 0; z-index: 61; min-width: 236px; max-width: calc(100vw - 2 * var(--gutter)); margin: 0; padding: 6px; list-style: none;
+    border-radius: var(--radius-control); background: var(--popover); box-shadow: inset 0 0 0 1px var(--border), 0 24px 48px -16px rgba(0, 0, 0, .7);
+  }
+  .mk-navmenu-row .mk-navmenu-list a {
+    display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 10px;
+    font: 500 15px/1.2 var(--font-sans); color: var(--foreground); text-decoration: none;
+  }
+  .mk-navmenu-row .mk-navmenu-list a:active, .mk-navmenu-row .mk-navmenu-list a:focus-visible { background: var(--wash); }
+  @media (prefers-reduced-motion: reduce) { .mk-navmenu-row .mk-navmenu-chev { transition: none; } }
   /* Tablets (768–1023px) keep the row for what the bar has no room for (Request a template, Owner
      2026-11-25), without the links the bar already shows. */
-  @media (min-width: 768px) { .mk-mnav .mk-mnav-dup { display: none; } }
+  @media (min-width: 768px) { .mk-mnav .mk-mnav-dup, .mk-mnav-phone { display: none; } }
   @media (min-width: 1024px) { .mk-mnav { display: none; } }
   .mk-nav { display: flex; align-items: center; gap: 4px; }
   .mk-nl, .mk-start { display: none; }
