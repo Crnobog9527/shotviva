@@ -12315,6 +12315,48 @@ end $$;
 ALTER FUNCTION "public"."admin_set_home_case_strip"("p_locale" "text", "p_entries" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_home_hero"("p_scope" "text", "p_entries" "jsonb", "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_entries jsonb := coalesce(p_entries, '[]'::jsonb);
+begin
+  perform admin.require_admin(p_actor);
+  if p_scope is null or not (p_scope = 'default' or p_scope ~ '^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$') or jsonb_typeof(v_entries) <> 'array' then
+    raise exception 'INVALID_INPUT' using detail = 'scope default or a language tag, entries an array';
+  end if;
+  if jsonb_array_length(v_entries) > 6 then
+    raise exception 'HERO_SIZE';
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(v_entries) as e(entry)
+    where jsonb_typeof(e.entry) <> 'object' or coalesce(e.entry ->> 'templateId', '') = ''
+      or (e.entry ? 'caption' and jsonb_typeof(e.entry -> 'caption') not in ('string', 'null'))
+      or length(btrim(coalesce(e.entry ->> 'caption', 'x'))) not between 1 and 60
+  ) then
+    raise exception 'INVALID_INPUT' using detail = 'each entry a templateId, a caption of 1-60 characters or null';
+  end if;
+  if jsonb_array_length(v_entries) <> (select count(distinct e.entry ->> 'templateId') from jsonb_array_elements(v_entries) as e(entry)) then
+    raise exception 'INVALID_INPUT' using detail = 'templates must not repeat';
+  end if;
+  lock table public.templates in share row exclusive mode;
+  if exists (
+    select 1 from jsonb_array_elements(v_entries) as e(entry)
+    where not exists (select 1 from public.templates t where t.id = e.entry ->> 'templateId' and t.is_active and 'web' = any (t.visible_in))
+  ) then
+    raise exception 'INVALID_INPUT' using detail = 'only published web templates';
+  end if;
+  delete from public.home_hero_scenes where scope = p_scope;
+  insert into public.home_hero_scenes (scope, position, template_id, caption)
+  select p_scope, o.position::int, o.entry ->> 'templateId', nullif(btrim(coalesce(o.entry ->> 'caption', '')), '')
+  from jsonb_array_elements(v_entries) with ordinality as o(entry, position);
+end $_$;
+
+
+ALTER FUNCTION "public"."admin_set_home_hero"("p_scope" "text", "p_entries" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -22063,6 +22105,20 @@ CREATE TABLE IF NOT EXISTS "public"."home_case_strip" (
 ALTER TABLE "public"."home_case_strip" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."home_hero_scenes" (
+    "scope" "text" NOT NULL,
+    "position" integer NOT NULL,
+    "template_id" "text" NOT NULL,
+    "caption" "text",
+    CONSTRAINT "home_hero_scenes_caption_check" CHECK ((("caption" IS NULL) OR (("length"("btrim"("caption")) >= 1) AND ("length"("btrim"("caption")) <= 60)))),
+    CONSTRAINT "home_hero_scenes_position_check" CHECK ((("position" >= 1) AND ("position" <= 6))),
+    CONSTRAINT "home_hero_scenes_scope_check" CHECK ((("scope" = 'default'::"text") OR ("scope" ~ '^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$'::"text")))
+);
+
+
+ALTER TABLE "public"."home_hero_scenes" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."identity_judge_calls" (
     "id" bigint NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -23678,6 +23734,16 @@ ALTER TABLE ONLY "public"."generation_slots"
 
 ALTER TABLE ONLY "public"."home_case_strip"
     ADD CONSTRAINT "home_case_strip_pkey" PRIMARY KEY ("locale", "rank");
+
+
+
+ALTER TABLE ONLY "public"."home_hero_scenes"
+    ADD CONSTRAINT "home_hero_scenes_pkey" PRIMARY KEY ("scope", "position");
+
+
+
+ALTER TABLE ONLY "public"."home_hero_scenes"
+    ADD CONSTRAINT "home_hero_scenes_template_key" UNIQUE ("template_id", "scope");
 
 
 
@@ -25848,6 +25914,11 @@ ALTER TABLE ONLY "public"."home_case_strip"
 
 
 
+ALTER TABLE ONLY "public"."home_hero_scenes"
+    ADD CONSTRAINT "home_hero_scenes_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."identity_judge_calls"
     ADD CONSTRAINT "identity_judge_calls_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
@@ -26700,6 +26771,9 @@ ALTER TABLE "public"."generation_slots" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."home_case_strip" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."home_hero_scenes" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."identity_judge_calls" ENABLE ROW LEVEL SECURITY;
@@ -28858,6 +28932,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_home_case_strip"("p_locale" "text", "p
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_set_home_hero"("p_scope" "text", "p_entries" "jsonb", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_home_hero"("p_scope" "text", "p_entries" "jsonb", "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") TO "service_role";
 
@@ -30414,6 +30493,10 @@ GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."generation_slots" 
 
 
 GRANT ALL ON TABLE "public"."home_case_strip" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."home_hero_scenes" TO "service_role";
 
 
 

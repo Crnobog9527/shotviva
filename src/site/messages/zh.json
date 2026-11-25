@@ -103,9 +103,9 @@
     },
     "arrived": {
       "home": {
-        "title": "你选好的照片和模板已保留。",
-        "login": "登录后返回首页，照片和模板都还在。",
-        "signup": "验证邮箱后返回首页，照片和模板都还在。"
+        "title": "你选好的模板已保留。",
+        "login": "登录后回到首页，模板会自动打开。",
+        "signup": "验证邮箱后回到首页，模板会自动打开。"
       },
       "graylum": {
         "title": "正在连接 Graylum。",
@@ -2493,6 +2493,7 @@
       "bundleAllIn": "全部{category}模板 {count} 个 →",
       "bundleAll": "全部 {count} 个模板 →",
       "stripPick": "{name}。使用这个模板",
+      "heroScenesLabel": "几个模板的手机照和成图",
       "bundleAria": "{name}，当前显示：{template}。使用这个模板",
       "seriesOpen": "打开系列",
       "freeTag": "免费 · 公开",

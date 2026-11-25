@@ -18,7 +18,7 @@ import { HERO_DEFAULT_OPTION, heroOptionContent } from '@/site/experiments'
 import { site } from '@/site/site.config'
 
 import { HomeGeneratorSlot } from './home-generator-slot'
-import { optionPictures } from './home-hero-live'
+import { homeHeroPictures } from './home-hero-admin'
 
 
 // The home page, shared by `/` (today's hero) and the A/B hero options the proxy rewrites `/` to
@@ -68,7 +68,7 @@ export async function HomeContent({ heroOption }: { heroOption?: string }) {
   const sections = { categories: bundled.category ? [bundled.category, ...featured.categories] : featured.categories, media: { ...featured.media, ...bundled.media } }
   const { option, defaultId } = heroFor(heroOption, locale, live, featuredId)
   const { templates, opening } = homePanelTemplates(live, defaultId, bundles.flatMap((bundle) => bundle.memberIds))
-  const [initialCovers, optionHero] = await Promise.all([openingCovers(opening), optionPictures(option, live)])
+  const [initialCovers, optionHero] = await Promise.all([openingCovers(opening), homeHeroPictures(option, heroOption !== undefined, locale, live)])
   // Hotels: each case shows its template's own covers while that template is live.
   const spaced = { ...page, spaces: liveSpaces(page.spaces, live) }
   const shown = optionHero ? { ...spaced, hero: { ...spaced.hero, ...optionHero } } : spaced
