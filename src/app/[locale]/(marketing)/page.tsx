@@ -4,6 +4,7 @@ import { HomeContent, homeMetadata } from './home-page'
 
 // The pictures of the home how-to blocks (card-visual.tsx); only this page draws them.
 import './explainer.css'
+import './hotel-cases.css'
 
 export function generateMetadata(): Promise<Metadata> {
   return homeMetadata()

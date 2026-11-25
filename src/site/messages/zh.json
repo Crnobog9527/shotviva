@@ -2493,6 +2493,7 @@
       "bundleAllIn": "全部{category}模板 {count} 个 →",
       "bundleAll": "全部 {count} 个模板 →",
       "stripPick": "{name}。使用这个模板",
+      "heroScenesLabel": "几个模板的手机照和成图",
       "bundleAria": "{name}，当前显示：{template}。使用这个模板",
       "seriesOpen": "打开系列",
       "freeTag": "免费 · 公开",

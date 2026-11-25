@@ -87,7 +87,9 @@ describe('/zh marketing copy (建站规格 §6.1, G13)', () => {
   it('writes one language per page', () => {
     // A live hero's template id is an id, not copy.
     const noIds = (page: object) => ('landing' in page && page.landing && typeof page.landing === 'object' && 'liveHero' in page.landing ? { ...page, landing: { ...page.landing, liveHero: { ...(page.landing.liveHero as object), templateId: '' } } } : page)
-    const pages = Object.values(PAGES).map((page) => ({ ...noIds(fillCredits(page, FALLBACK_CREDITS)), hero: undefined, path: undefined }))
+    // So is a hotel case's template id (home-spaces.ts).
+    const noCaseIds = (page: object) => ('spaces' in page && page.spaces ? { ...page, spaces: { ...(page.spaces as object), items: (page.spaces as { items: object[] }).items.map((item) => ({ ...item, template: '' })) } } : page)
+    const pages = Object.values(PAGES).map((page) => ({ ...noCaseIds(noIds(fillCredits(page, FALLBACK_CREDITS))), hero: undefined, path: undefined }))
     const words = pages.flatMap(strings).flatMap((text) => text.match(/[A-Za-z][A-Za-z']*/g) ?? [])
     expect([...new Set(words.filter((word) => !LATIN_OK.has(word)))]).toEqual([])
   })

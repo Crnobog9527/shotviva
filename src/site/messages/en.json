@@ -2493,6 +2493,7 @@
       "bundleAllIn": "All {count} {category} templates →",
       "bundleAll": "All {count} templates →",
       "stripPick": "{name}. Use this template",
+      "heroScenesLabel": "Phone photos and results from a few templates",
       "bundleAria": "{name}, showing {template}. Use this template",
       "seriesOpen": "Open the series",
       "freeTag": "Free · public",
