@@ -2489,6 +2489,7 @@
       "seriesBadge": "系列",
       "bundleBadge": "组合",
       "bundleCount": "{count} 个模板",
+      "stripPick": "{name}。使用这个模板",
       "bundleAria": "{name}，当前显示：{template}。使用这个模板",
       "seriesOpen": "打开系列",
       "freeTag": "免费 · 公开",

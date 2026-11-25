@@ -42,7 +42,7 @@ export type FeaturedState = {
   ids: string[]
 }
 
-const featurable = (template: AdminTemplate | undefined): template is AdminTemplate =>
+export const featurable = (template: AdminTemplate | undefined): template is AdminTemplate =>
   Boolean(template && !template.deletedAt && isFeaturable(template))
 
 // What the language's featured list is now: its own list (templates no longer published are

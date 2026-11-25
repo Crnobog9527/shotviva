@@ -1,0 +1,26 @@
+// 首页「更多真实案例」 on /admin/templates (migration 2006). Admin is Chinese-only (DESIGN §7).
+export const CASE_STRIP_COPY = {
+  title: '首页 · 更多真实案例',
+  body: '首页生成器下方那一排「真实手机照 → AI」小图。每项是一个模板或一个精选组合，图片直接用模板的前图和效果图，标题用模板（或组合）在这一边的名称；访客点一项，就把这个模板放进首屏生成器。组合显示第一个模板的图，点它选用这个模板。英文站和中文站分开设置，最多 8 项；没设置的一边显示内置的案例。保存后大约一分钟内生效。',
+  count: (count: number, max: number) => `${count} / ${max} 项`,
+  builtIn: '没有设置，首页显示内置的案例。',
+  own: '已单独设置',
+  template: '模板',
+  bundle: '组合',
+  members: (count: number) => `${count} 个模板`,
+  notLive: '已下架，首页不显示',
+  missing: '已删除',
+  remove: (name: string) => `从「更多真实案例」移除 ${name}`,
+  addBundle: '添加组合',
+  addBundlePlaceholder: '添加已有组合…',
+  createBundle: '新建组合',
+  full: '已经放满 8 项，先移除一项再添加。',
+  clear: '清空（显示内置案例）',
+  saved: (locale: string) => `已保存${locale}的「更多真实案例」`,
+  picker: {
+    open: '添加模板',
+    title: (locale: string) => `添加到${locale}「更多真实案例」`,
+    description: '只列出已上架、在网站上显示的模板。可以多选，按勾选顺序排在列表后面，再点「保存」一起生效。',
+    add: (count: number) => (count ? `加入（${count}）` : '加入'),
+  },
+} as const

@@ -2,14 +2,16 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import type { AbstractIntlMessages } from 'next-intl'
 
-import { BundlesPanel, CategoriesPanel, listAdminTemplates, LocaleDisplayPanel, TemplatesEditor } from '@/core/admin'
+import { BundlesPanel, CaseStripPanel, CategoriesPanel, listAdminTemplates, LocaleDisplayPanel, TemplatesEditor } from '@/core/admin'
 import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
 import { readPricingOptions } from '@/site/template-pricing'
 import { ModelSyncProvider } from '@/core/admin/image-provider-field/model-sync'
 import { listAdminCategoryTree } from '@/core/admin/template-categories'
 import { listAdminSeriesOptions, OrderHelp, seriesCopy } from '@/core/admin/template-series'
+import { readHomeCaseStrip } from '@/core/templates/home-case-strip-read'
 import { readFeaturedBundles, readLocaleDisplay } from '@/core/templates/locale-display-read'
 import { deleteFeaturedBundleAction, saveFeaturedBundleAction, setDefaultFeaturedBundlesAction } from './bundle-actions'
+import { saveHomeCaseStripAction } from './case-strip-action'
 import { moveTemplateCategoryAction, saveLocaleDisplayAction } from './category-actions'
 import { AdminTemplatePreview } from './preview-provider'
 import { setTemplateSaleAction } from './sale-action'
@@ -41,11 +43,11 @@ async function previewMessages() {
 }
 
 export function loadCatalogue(db: SupabaseClient) {
-  return Promise.all([listAdminTemplates(db), listAdminCategoryTree(db), listAdminSeriesOptions(db), readPricingOptions(db), previewMessages(), readLocaleDisplay(db), readFeaturedBundles(db)])
+  return Promise.all([listAdminTemplates(db), listAdminCategoryTree(db), listAdminSeriesOptions(db), readPricingOptions(db), previewMessages(), readLocaleDisplay(db), readFeaturedBundles(db), readHomeCaseStrip(db)])
 }
 
 export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCatalogue>; edit?: string }) {
-  const [templates, categories, series, providers, zhMessages, display, bundles] = await data
+  const [templates, categories, series, providers, zhMessages, display, bundles, caseStrip] = await data
   return (
     <div className="mx-auto grid w-full min-w-0 max-w-6xl grid-cols-1 gap-6 p-6">
       <div className="flex flex-wrap items-center gap-3">
@@ -69,6 +71,10 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
       <LocaleDisplayPanel
         categories={categories} templates={templates} display={display} bundles={bundles}
         actions={{ save: saveLocaleDisplayAction }} saveBundle={saveFeaturedBundleAction}
+      />
+      <CaseStripPanel
+        strip={caseStrip} templates={templates} categories={categories} bundles={bundles}
+        actions={{ save: saveHomeCaseStripAction }} saveBundle={saveFeaturedBundleAction}
       />
       <ModelSyncProvider action={syncTemplateModel}>
       <AdminTemplatePreview zhMessages={zhMessages}>
