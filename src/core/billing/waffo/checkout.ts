@@ -18,7 +18,7 @@ import { createWithBillingDetail, withoutBillingDetail } from './billing-detail'
 import type { WaffoApi, WaffoBillingDetail, WaffoSessionRequest } from './client'
 
 // Waffo hosted checkout for one product (ARCHITECTURE §6.3, T50). A membership paid by card is a
-// Waffo subscription product that renews every month or year (cards only on the page); paid by
+// Waffo subscription product that renews every month or year (cards, Apple Pay and Google Pay on the page); paid by
 // Alipay it buys one period (+30 / +365 days, same credits) as a one-time product; a pack is
 // always one-time. WeChat Pay appears on one-time pages only, where the store offers it
 // (WAFFO_WECHAT_PAY); a price over its CN¥1,000 cap leaves it out (wechat-limit.ts).
@@ -64,13 +64,13 @@ export function isRecurring(product: SiteProduct, method: CheckoutBody['method']
 }
 
 // Which methods the hosted page shows, by an allow-list only (Waffo takes include or exclude,
-// never both). The paywall's card row is cards (a subscription renews, a pack is one payment); its
-// wallet row is Alipay, plus WeChat Pay while the store offers it (WAFFO_WECHAT_PAY) and the price
-// is under the cap (wechat-limit.ts). Subscriptions are card-only (Waffo: wallets are one-time
-// only); a one-time card payment also takes Apple Pay and Google Pay, which are card payments at
-// the same rate and which the card row's wording names (paywall/copy.ts).
-export function waffoMethods(method: CheckoutBody['method'], recurring: boolean, wechat: boolean): readonly string[] {
-  if (recurring) return ['card']
+// never both). The paywall's card row is cards plus Apple Pay and Google Pay, for a subscription
+// (it renews) and a pack (one payment) alike: Waffo allows the card wallets on USD subscriptions,
+// and they are card payments at the same rate (payment-facts.ts records them as card). Its wallet
+// row is Alipay, plus WeChat Pay while the store offers it (WAFFO_WECHAT_PAY) and the price is
+// under the cap (wechat-limit.ts); those two are one-time only on Waffo, so a wallet row never
+// starts a subscription (isRecurring). The card row's wording names the card wallets (paywall/copy.ts).
+export function waffoMethods(method: CheckoutBody['method'], wechat: boolean): readonly string[] {
   if (method !== 'alipay') return ['card', 'applepay', 'googlepay']
   return wechat ? ['alipay', 'wechat'] : ['alipay']
 }
@@ -95,7 +95,7 @@ export function waffoSessionRequest(
     metadata: { user_id: input.userId, product_id: product.id, method: body.method, locale: body.locale, ...quoteMetadata(input.quote) },
     orderMerchantExternalId: input.quote ? `v2_${input.orderRef}` : input.orderRef,
     language: body.locale === 'zh' ? 'zh-Hans' : 'en',
-    includePaymentMethods: waffoMethods(body.method, recurring, deps.wechatPay === true && !overWechatLimit(cents)),
+    includePaymentMethods: waffoMethods(body.method, deps.wechatPay === true && !overWechatLimit(cents)),
     ...sessionOptions(Boolean(input.quote), recurring, input.billing),
   }
 }

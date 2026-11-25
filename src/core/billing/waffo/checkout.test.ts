@@ -49,7 +49,9 @@ describe('createWaffoCheckout without an email (T63)', () => {
 describe('methods on the Waffo page match the paywall rows', () => {
   // Owner 2026-11-21: methods come from the session's allow-list, never the dashboard. Card row =
   // cards; wallet row = Alipay, plus WeChat Pay when WAFFO_WECHAT_PAY is on and the price is under
-  // its CN¥1,000 cap; subscriptions card-only. Waffo takes include or exclude, never both.
+  // its CN¥1,000 cap. Card row = cards, Apple Pay and Google Pay for a subscription and a pack
+  // (Owner 2026-11-25; Waffo test mode accepts that list on a USD subscription and refuses Alipay
+  // there). Waffo takes include or exclude, never both.
   it('the wallet row offers Alipay and WeChat Pay only while the flag is on and the price is under the cap', async () => {
     const { deps, create } = harness()
     const on = { ...deps, wechatPay: true }
@@ -64,15 +66,15 @@ describe('methods on the Waffo page match the paywall rows', () => {
     expect(off).toMatchObject({ includePaymentMethods: ['alipay'] })
   })
 
-  it('the card row: a subscription is card-only, a pack adds Apple Pay and Google Pay', async () => {
+  it('the card row: a subscription and a pack both offer cards, Apple Pay and Google Pay', async () => {
     const { deps, create } = harness()
     const on = { ...deps, wechatPay: true }
     await createWaffoCheckout(on, { userId: USER, body: body('max_yearly') })
     await createWaffoCheckout(on, { userId: USER, body: body('pack_m') })
     await createWaffoCheckout(deps, { userId: USER, body: body('pack_m') })
     const [sub, pack, packOff] = create.mock.calls.map((call) => call[0] as unknown as Record<string, unknown>)
-    expect(sub).toMatchObject({ includePaymentMethods: ['card'] })
-    for (const request of [pack, packOff]) expect(request).toMatchObject({ includePaymentMethods: ['card', 'applepay', 'googlepay'] })
+    expect(sub).toMatchObject({ productId: 'PROD_submaxyearly' })
+    for (const request of [sub, pack, packOff]) expect(request).toMatchObject({ includePaymentMethods: ['card', 'applepay', 'googlepay'] })
   })
 
   it('never sends a blacklist beside the allow-list', async () => {
@@ -86,7 +88,7 @@ describe('methods on the Waffo page match the paywall rows', () => {
 })
 
 describe('createWaffoCheckout', () => {
-  it('a membership by card is the Waffo subscription product, cards only, priced from site.config (T50)', async () => {
+  it('a membership by card is the Waffo subscription product, cards and card wallets, priced from site.config (T50)', async () => {
     const { deps, create, trackStart } = harness()
     const result = await createWaffoCheckout(deps, { userId: USER, body: body('starter_monthly') })
 
@@ -100,7 +102,7 @@ describe('createWaffoCheckout', () => {
       metadata: { user_id: USER, product_id: 'starter_monthly', method: 'card', locale: 'en' },
       orderMerchantExternalId: 'order-ref-1',
       language: 'en',
-      includePaymentMethods: ['card'],
+      includePaymentMethods: ['card', 'applepay', 'googlepay'],
     })
     expect(trackStart).toHaveBeenCalledWith(USER, {
       product_id: 'starter_monthly',
@@ -180,5 +182,5 @@ it('passes the same member price and signed-service metadata to the hosted sessi
 it('turns off subscription trials explicitly on every new v2 contract', async () => {
   const { deps, create } = harness()
   await createWaffoCheckout(deps, { userId: USER, body: body('starter_monthly'), quote: { credits: 1990, cents: 1990, memberTier: null } })
-  expect(create.mock.calls[0]?.[0]).toMatchObject({ withTrial: false, includePaymentMethods: ['card'], orderMerchantExternalId: 'v2_order-ref-1' })
+  expect(create.mock.calls[0]?.[0]).toMatchObject({ withTrial: false, includePaymentMethods: ['card', 'applepay', 'googlepay'], orderMerchantExternalId: 'v2_order-ref-1' })
 })

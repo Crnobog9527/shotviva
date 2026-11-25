@@ -1,11 +1,8 @@
-import { NextIntlClientProvider } from 'next-intl'
-import { createElement, type ComponentProps } from 'react'
+import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { PricingPayWith } from '@/core/billing/paywall'
 import { BusinessSection } from '@/core/content/business'
-import messages from '@/site/messages/en.json'
 
 import { site } from '../site.config'
 import { pricingPage } from './pricing'
@@ -66,46 +63,11 @@ describe('/pricing page copy', () => {
   })
 })
 
-// DESIGN §4.5 and Stripe's merchant review: the renewal terms are on the page before purchase.
-describe('/pricing "Pay with"', () => {
-  // The provider's props typed in full, as home-faq.test.ts does: children is a required prop.
-  const render = (channel: 'stripe' | 'waffo', wechatPay = false) => {
-    const provider: ComponentProps<typeof NextIntlClientProvider> = { locale: 'en', messages, children: createElement(PricingPayWith, { channel, wechatPay }) }
-    return renderToStaticMarkup(createElement(NextIntlClientProvider, provider))
-  }
-
-  it('Stripe: card renews and can be cancelled, Alipay pays once, packs are one-time', () => {
-    const html = render('stripe')
-    expect(html).toContain('Card · Apple Pay · Google Pay')
-    expect(html).toContain('Plans renew automatically, cancel anytime')
-    expect(html).toContain('One-time payment for 30 days or 1 year, no auto-renew')
-    expect(html).toContain('Credit packs are always a one-time payment.')
-    expect(html).toContain('All prices in USD')
-    // STRIPE_WECHAT_PAY off (default): the wallet row is Alipay alone, as before T73.
-    expect(html).toContain('>Alipay<')
-    expect(html).not.toMatch(/wechat/i)
-  })
-
-  it('Stripe with STRIPE_WECHAT_PAY on: the wallet row is "Alipay / WeChat Pay", terms unchanged (T73)', () => {
-    const html = render('stripe', true)
-    expect(html).toContain('Alipay / WeChat\u00a0Pay')
-    expect(html).toContain('One-time payment for 30 days or 1 year, no auto-renew')
-    expect(html).not.toContain('¥1,000')
-  })
-
-  // Owner 2026-11-21: with WAFFO_WECHAT_PAY on, Waffo names WeChat Pay and states its CN¥1,000 cap.
-  it('Waffo with WeChat Pay on: "Alipay / WeChat Pay" and the ¥1,000 cap; off, no WeChat at all', () => {
-    const html = render('waffo', true)
-    expect(html).toContain('Alipay / WeChat\u00a0Pay')
-    expect(html).toContain('WeChat\u00a0Pay takes up to ¥1,000 per payment and per month. Above that, use Alipay (no limit) or a card.')
-    expect(render('waffo', false)).not.toMatch(/wechat/i)
-  })
-
-  it('Waffo: the same terms (card plans renew since T50), the card group labelled "Card"', () => {
-    const html = render('waffo')
-    expect(html).toContain('Plans renew automatically, cancel anytime')
-    expect(html).toContain('One-time payment for 30 days or 1 year, no auto-renew')
-    expect(html).toContain('>Card<')
-    expect(html).not.toContain('Apple Pay')
+// Owner 2026-11-25: the English page has no "Pay with" block, as the Chinese one never had. Both
+// heroes say prices are in USD; the methods and renewal terms are in the paywall (paywall-channel.test.ts).
+describe('/pricing currency note', () => {
+  it('says prices are in USD in both languages', () => {
+    expect(pricingPage.currencyNote).toBe('All prices in USD.')
+    expect(zhPricingPage.currencyNote).toBe('所有价格以美元计。')
   })
 })
