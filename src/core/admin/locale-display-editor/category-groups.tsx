@@ -22,7 +22,7 @@ type Props = {
 
 export function CategoryGroups({ label, groups, listOf, nameOf, editing, onReorder, onReset }: Props) {
   return (
-    <div className="grid gap-3">
+    <div className="grid grid-cols-1 gap-3">
       <div>
         <h3 className="text-sm font-medium">{label} · {COPY.categoriesTitle}</h3>
         <p className="text-xs text-muted-foreground">{editing ? COPY.categoriesEditHint : COPY.categoriesHint}</p>
@@ -30,7 +30,7 @@ export function CategoryGroups({ label, groups, listOf, nameOf, editing, onReord
       {groups.map((group) => {
         const list = listOf(group.parent)
         return (
-          <div key={group.parent ?? 'root'} className="grid gap-1.5 rounded-md border p-3">
+          <div key={group.parent ?? 'root'} className="grid grid-cols-1 gap-1.5 rounded-md border p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium">{group.title}</span>
               <OwnBadge own={list.own} />
@@ -40,10 +40,10 @@ export function CategoryGroups({ label, groups, listOf, nameOf, editing, onReord
             </div>
             {editing ? (
               <SortableList ids={list.ids} labelOf={nameOf} onReorder={async (next) => onReorder(group.parent, next)}>
-                {(shown) => <ol className="grid gap-1">{shown.map((key) => <SortableRow key={key} id={key} name={nameOf(key)} />)}</ol>}
+                {(shown) => <ol className="grid grid-cols-1 gap-1">{shown.map((key) => <SortableRow key={key} id={key} name={nameOf(key)} />)}</ol>}
               </SortableList>
             ) : (
-              <ol className="grid gap-1">
+              <ol className="grid grid-cols-1 gap-1">
                 {list.ids.map((key, index) => <StaticRow key={key} position={index + 1} name={nameOf(key)} />)}
               </ol>
             )}
