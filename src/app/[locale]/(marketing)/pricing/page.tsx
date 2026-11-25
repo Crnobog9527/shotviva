@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 import { photoPrices } from '@/core/billing'
-import { CheckoutCancelToast, PaywallProvider, PricingPayWith, PricingPlans } from '@/core/billing/paywall'
+import { CheckoutCancelToast, PaywallProvider, PricingPlans } from '@/core/billing/paywall'
 import { walletOffersWechat } from '@/core/billing/wallet'
 import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
@@ -11,7 +11,6 @@ import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, breadcrumbListLd, faqPageLd, pageMetadata, softwareApplicationLd } from '@/core/seo'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
-import { cn } from '@/core/ui/cn'
 import { creditFacts, fillCredits, freeImagesIn, homePageIn, pricingFaqIn, pricingPageIn } from '@/site/content'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { displayProducts } from '@/site/billing/display-products'
@@ -20,7 +19,10 @@ import { site } from '@/site/site.config'
 import { inquiryPrefillAction, submitInquiryAction } from './actions'
 
 // /pricing as comps-v3-b pricing.html (T37): hero, the plans and packs (core/billing/paywall,
-// prices from the published catalog), "For business", what a credit buys, how to pay, then the FAQ.
+// prices from the published catalog), "For business", what a credit buys, then the FAQ. Both
+// languages match: the hero says prices are in USD, and the payment methods and their renewal
+// terms are shown where the method is picked, in the paywall (Owner 2026-11-25: no separate
+// "Pay with" block on the English page either).
 // Stripe's cancel_url lands here (?checkout=cancel) and shows a toast (T43).
 // Everything renders into the static HTML, in US dollars in both languages (建站规格 §6.1, R5).
 // Indexable: /pricing and /zh/pricing are in their keyword map CSVs and in site.indexing.
@@ -72,9 +74,8 @@ export default async function PricingPage() {
         page={path === '/zh/pricing' ? '/zh/pricing' : '/pricing'}
         actions={{ submit: submitInquiryAction, prefill: inquiryPrefillAction }}
       />
-      <div className={cn("mt-6 md:mt-8", locale === 'en' && "grid gap-6 md:grid-cols-2 md:items-start md:gap-8")}>
+      <div className="mt-6 md:mt-8">
         <CreditBuys block={page.creditBuys} />
-        {locale === 'en' && <PricingPayWith channel={channel} wechatPay={wechatPay} />}
       </div>
       {/* The home page's accordion (gap audit B8); every answer stays in the server HTML. */}
       <div className="mk-pricing-faq">
