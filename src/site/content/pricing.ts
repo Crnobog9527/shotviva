@@ -103,6 +103,7 @@ export function makePricingPage(products: readonly SiteProduct[]): PricingConten
     h1: `${brand} Pricing: pay monthly, pay yearly, or buy credits once`,
     h1Em: 'or buy credits once',
     intro: `Every photo made with paid credits is private and watermark-free. ${plansSentence(offers)}${yearly}`,
+    currencyNote: 'All prices in USD.',
     gift: `New users get ${freeImagesLabel}. No card needed.`,
     creditBuys,
     business,
