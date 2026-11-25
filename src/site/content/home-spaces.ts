@@ -19,7 +19,7 @@ export const homeSpaces: SpaceCases = {
   intro:
     'Rooms, restaurants, pools and lobbies shot on a phone often come out grey and flat: upload the phone photo and pick a hotel template. The layout, the furniture and the view stay where they are; the light and the finish become what booking sites and your own website need.',
   labels: { before: 'Real phone photo', after: 'AI', reference: 'Reference' },
-  viewer: { open: 'View {title} full size', close: 'Close', previous: 'Previous', next: 'Next', counter: '{n} of {total}' },
+  more: 'See all 4',
   items: [
     {
       title: 'Guest room',

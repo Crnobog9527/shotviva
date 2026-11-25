@@ -1,5 +1,9 @@
 import type { ImageRef, SpaceCase, SpaceCases } from '@/core/content'
+import type { Locale } from '@/core/i18n'
 import type { LocalizedTemplate } from '@/core/templates'
+
+import { homeSpaces } from './home-spaces'
+import { zhHomeSpaces } from './zh/home-spaces'
 
 // The hotels block from its templates' own covers (Owner 2026-11-25), like the hero and the
 // 「更多真实案例」 row: a case bound to a template that is live with both covers shows its
@@ -22,4 +26,13 @@ export function liveSpaces(spaces: SpaceCases | undefined, live: readonly Live[]
   const byId = new Map(live.map((template) => [template.id, template]))
   const [first, second, ...rest] = spaces.items
   return { ...spaces, items: [liveCase(first, byId), liveCase(second, byId), ...rest.map((item) => liveCase(item, byId))] }
+}
+
+// The viewer's full-size pictures (app/api/home/hotels, read on its first open), in list order:
+// the same pictures the list shows, so they stay out of the page's own HTML a second time.
+export type HotelViewerPair = { before: { src: string; alt: string }; after: { src: string; alt: string } }
+
+export function hotelViewerPairs(locale: Locale, live: readonly Live[]): HotelViewerPair[] {
+  const spaces = liveSpaces(locale === 'zh' ? zhHomeSpaces : homeSpaces, live)
+  return (spaces?.items ?? []).map(({ before, after }) => ({ before: { src: before.src, alt: before.alt }, after: { src: after.src, alt: after.alt } }))
 }

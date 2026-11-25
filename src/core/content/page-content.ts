@@ -200,12 +200,12 @@ export type EditCases = {
 }
 
 // Home: hotels and stays (Owner 2026-11-25). Four cases, each a small phone-photo/result pair that
-// opens a full-size viewer. `template` binds a case to a published template: while that template is
-// live with both covers, the case shows them (cover_before_url / cover_after_url, home-spaces-live.ts)
+// opens a full-size viewer; phones show the first two inline and `more` ("See all 4") opens the
+// viewer on the rest. `template` binds a case to a published template: while that template is live
+// with both covers, the case shows them (cover_before_url / cover_after_url, home-spaces-live.ts)
 // and the pictures here are only the fallback.
 export type SpaceCase = EditCase & { template?: string }
-export type SpaceViewerLabels = { open: string; close: string; previous: string; next: string; counter: string }
-export type SpaceCases = Omit<EditCases, 'items'> & { items: readonly [SpaceCase, SpaceCase, ...SpaceCase[]]; viewer: SpaceViewerLabels }
+export type SpaceCases = Omit<EditCases, 'items'> & { items: readonly [SpaceCase, SpaceCase, ...SpaceCase[]]; more: string }
 
 // Home block ③: what three product photos cost, as two bills (DESIGN §6.9 item 6, Owner
 // 2026-11-06 replaced the table). Every number is read from site.config.

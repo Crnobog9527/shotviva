@@ -9,7 +9,7 @@ export const zhHomeSpaces: SpaceCases = {
   intro:
     '手机拍的客房、餐厅、泳池和大堂，常常光线发灰、颜色发闷：上传手机照，选一个酒店模板。房间布局、家具和窗外景色都留在原位，只把光线和质感调成订房网站和官网要的样子。',
   labels: { before: '真实手机照', after: 'AI', reference: '参考图' },
-  viewer: { open: '查看「{title}」大图', close: '关闭', previous: '上一组', next: '下一组', counter: '第 {n} 组，共 {total} 组' },
+  more: '查看全部 4 个',
   items: [
     {
       title: '客房',
