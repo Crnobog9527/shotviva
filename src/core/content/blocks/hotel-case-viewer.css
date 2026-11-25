@@ -34,7 +34,11 @@
     .hc-fulls { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   }
   .hc-full { border-radius: 14px; }
+  /* The thumbnail and the full-size picture stack in the plate; the full one fades in once loaded. */
+  .hc-full img { position: absolute; inset: 0; }
   .hc-thumb { filter: blur(2px); }
+  .hc-big { opacity: 0; transition: opacity 0.25s ease; }
+  .hc-big.hc-on { opacity: 1; }
   .hc-wait { animation: hc-pulse 1.4s ease-in-out infinite; }
   @keyframes hc-pulse { 50% { opacity: 0.7; } }
   @media (prefers-reduced-motion: reduce) { .hc-wait { animation: none; } }

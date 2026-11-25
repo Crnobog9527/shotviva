@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 
 import { installScrollLockKeeper } from '@/core/ui/scroll-lock-keeper'
 import { SiteImage as Image } from '@/core/ui/site-image'
 
-import { readCases, readTags, shownCase, thumbSrc, type ViewerTags, type ViewerText } from './hotel-cases-dom'
+import { readCases, readTags, shownCase, thumbOf, type Thumb, type ViewerTags, type ViewerText } from './hotel-cases-dom'
 import './hotel-case-viewer.css'
 
 // Half the viewer from 768 (the two pictures side by side, the viewer at most 1200 wide), the
@@ -62,17 +62,41 @@ type Props = {
   opener: RefObject<HTMLElement | null>
 }
 
-// One side of the case: the full-size picture once it has arrived; until then (or if it never
-// does) the list's thumbnail as it is, softened, on a plate that pulses while the request runs.
-function Full({ picture, thumb, tag, ai, loading }: { picture: Picture | undefined; thumb: string; tag: string; ai?: boolean; loading: boolean }) {
+// The list's thumbnail as it is (same srcset, sizes and AVIF source, so the same small file).
+function ThumbPicture({ thumb }: { thumb: Thumb }) {
+  /* eslint-disable @next/next/no-img-element -- the list thumbnail's own, already sized addresses */
+  const img = <img className="hc-thumb" src={thumb.src} srcSet={thumb.srcSet || undefined} sizes={thumb.sizes || undefined} alt="" />
+  /* eslint-enable @next/next/no-img-element */
+  if (!thumb.avif) return img
   return (
-    <figure className={loading ? 'hc-full hc-wait' : 'hc-full'}>
-      {/* keyed by address: a new case starts from its own picture, not the last case's */}
+    <picture style={{ display: 'contents' }}>
+      <source type="image/avif" srcSet={thumb.avif.srcSet} sizes={thumb.avif.sizes} style={{ display: 'none' }} />
+      {img}
+    </picture>
+  )
+}
+
+// One side of the case: the list's thumbnail at once, softened, on a pulsing plate; the full-size
+// picture over it, shown once it has loaded (onLoad, or already complete when it mounts).
+function Full(props: { picture: Picture | undefined; thumb: Thumb | null; tag: string; ai?: boolean; waiting: boolean; onShown: (src: string) => void }) {
+  const { picture, thumb, tag, ai, waiting, onShown } = props
+  return (
+    <figure className={waiting ? 'hc-full hc-wait' : 'hc-full'}>
+      {thumb ? <ThumbPicture key={thumb.src} thumb={thumb} /> : null}
       {picture ? (
-        <Image key={picture.src} src={picture.src} alt={picture.alt} width={1600} height={900} sizes={FULL_SIZES} />
-      ) : thumb ? (
-        // eslint-disable-next-line @next/next/no-img-element -- the thumbnail's own, already sized address
-        <img key={thumb} className="hc-thumb" src={thumb} alt="" />
+        <Image
+          key={picture.src}
+          className={waiting ? 'hc-big' : 'hc-big hc-on'}
+          src={picture.src}
+          alt={picture.alt}
+          width={1600}
+          height={900}
+          sizes={FULL_SIZES}
+          onLoad={() => onShown(picture.src)}
+          ref={(node: HTMLImageElement | null) => {
+            if (node?.complete && node.naturalWidth > 0) onShown(picture.src)
+          }}
+        />
       ) : null}
       <span className={ai ? 'hc-tag hc-ai' : 'hc-tag'} aria-hidden>
         {tag}
@@ -127,15 +151,71 @@ function PictureNote({ loading, failed, labels, retry }: { loading: boolean; fai
   )
 }
 
+// Full-size pictures that have finished loading: until both of a case's have, it keeps its
+// thumbnails, the pulse and the loading note.
+function useShownPictures() {
+  const [done, setDone] = useState<ReadonlySet<string>>(() => new Set())
+  const onShown = (src: string) => setDone((now) => (now.has(src) ? now : new Set(now).add(src)))
+  const isShown = (picture: Picture | undefined) => Boolean(picture && done.has(picture.src))
+  return { onShown, isShown }
+}
+
+type CaseProps = {
+  item: ViewerText
+  at: number
+  total: number
+  pair: Pair | undefined
+  failed: boolean
+  retry: () => void
+  tags: ViewerTags
+  labels: Labels
+  step: (by: number) => void
+}
+
+// One case in the viewer: name and counter, the two pictures, the loading or retry note, the line
+// and previous / next.
+function CaseView({ item, at, total, pair, failed, retry, tags, labels, step }: CaseProps) {
+  const { onShown, isShown } = useShownPictures()
+  const waiting = (picture: Picture | undefined) => !failed && !isShown(picture)
+  return (
+    <>
+      <header className="hc-head">
+        <Dialog.Title className="hc-name">{item.title}</Dialog.Title>
+        <p className="hc-count" aria-live="polite">
+          {labels.counter(at + 1, total)}
+        </p>
+        <Dialog.Close className="hc-close" aria-label={labels.close}>
+          <XIcon aria-hidden />
+        </Dialog.Close>
+      </header>
+      <div className="hc-fulls">
+        <Full picture={pair?.before} thumb={thumbOf(document, at, 0)} tag={tags.before} waiting={waiting(pair?.before)} onShown={onShown} />
+        <Full picture={pair?.after} thumb={thumbOf(document, at, 1)} tag={tags.after} waiting={waiting(pair?.after)} onShown={onShown} ai />
+      </div>
+      <PictureNote loading={waiting(pair?.before) || waiting(pair?.after)} failed={failed && !pair} labels={labels} retry={retry} />
+      <Dialog.Description className="hc-desc">{item.change}</Dialog.Description>
+      <nav className="hc-nav">
+        <button type="button" className="hc-step" onClick={() => step(-1)}>
+          <ChevronLeft aria-hidden />
+          {labels.previous}
+        </button>
+        <button type="button" className="hc-step" onClick={() => step(1)}>
+          {labels.next}
+          <ChevronRight aria-hidden />
+        </button>
+      </nav>
+    </>
+  )
+}
+
 // The hotels viewer (Owner 2026-11-25): one case at a time, the phone photo large on the left and
 // the result large on the right (stacked on a phone), its name and line, previous / next through
 // the four cases (buttons, and the arrow keys), and a close button. Radix gives the modal parts:
 // focus held inside, Esc closes, the page behind inert and still. On close, focus goes back to the
 // case being shown, or to the button that opened the viewer when that case is not on screen.
-// Until the full-size pictures arrive, each side shows the list's thumbnail on a pulsing plate.
+// Each side shows the list's thumbnail at once and the full-size picture once it has loaded.
 export function HotelCaseViewer({ index, onIndex, opener }: Props) {
   const locale = useLocale() === 'zh' ? 'zh' : 'en'
-  const labels = LABELS[locale]
   // Rendered in the browser only (ssr: false), after the list is in the page.
   const [cases] = useState<ViewerText[]>(() => readCases(document))
   const [tags] = useState<ViewerTags>(() => readTags(document))
@@ -149,8 +229,6 @@ export function HotelCaseViewer({ index, onIndex, opener }: Props) {
   const total = cases.length
   const at = index ?? 0
   const item = index !== null ? cases[index] : undefined
-  const pair = pairs?.[at]
-  const loading = !pair && !failed
   const step = (by: number) => {
     if (total > 0) onIndex((at + by + total) % total)
   }
@@ -175,35 +253,7 @@ export function HotelCaseViewer({ index, onIndex, opener }: Props) {
             button.focus()
           }}
         >
-          {item ? (
-            <>
-              <header className="hc-head">
-                <Dialog.Title className="hc-name">{item.title}</Dialog.Title>
-                <p className="hc-count" aria-live="polite">
-                  {labels.counter(at + 1, total)}
-                </p>
-                <Dialog.Close className="hc-close" aria-label={labels.close}>
-                  <XIcon aria-hidden />
-                </Dialog.Close>
-              </header>
-              <div className="hc-fulls">
-                <Full picture={pair?.before} thumb={thumbSrc(document, at, 0)} tag={tags.before} loading={loading} />
-                <Full picture={pair?.after} thumb={thumbSrc(document, at, 1)} tag={tags.after} loading={loading} ai />
-              </div>
-              {pair ? null : <PictureNote loading={loading} failed={failed} labels={labels} retry={retry} />}
-              <Dialog.Description className="hc-desc">{item.change}</Dialog.Description>
-              <nav className="hc-nav">
-                <button type="button" className="hc-step" onClick={() => step(-1)}>
-                  <ChevronLeft aria-hidden />
-                  {labels.previous}
-                </button>
-                <button type="button" className="hc-step" onClick={() => step(1)}>
-                  {labels.next}
-                  <ChevronRight aria-hidden />
-                </button>
-              </nav>
-            </>
-          ) : null}
+          {item ? <CaseView item={item} at={at} total={total} pair={pairs?.[at]} failed={failed} retry={retry} tags={tags} labels={LABELS[locale]} step={step} /> : null}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
