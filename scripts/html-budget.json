@@ -2,112 +2,34 @@
   "note": "HTML bytes per page, raw and gzip level 9, for a desktop browser request (scripts/html-budget.ts). Tightened 2026-11-21 after round two of the home HTML diet (series covers fetched on first play, blurred fills painted from their pictures, MiSans after load): \"build\" is CI's own build without a database, about 4% over what it measured (the zh landing pages and pricing, new here, a little more until CI has measured them); \"live\" is production with its real catalogue, about 6-7% over this change's measured estimate for production, so a few more featured templates or series fit but a regression does not. Until this change is released, \"live\" is red on /, /zh and the restaurant pages (production still serves the old, heavier HTML). Raise a number only with a reason in the PR. 2026-11-24 (#890): home raw +9 KB for the hotels block, the dish strip and the phone folds (Owner's restaurant/hotel restructure); gzip unchanged and the phone page about half as long. Most of the floor is the inlined stylesheet, which is in the HTML twice (<style> and the RSC payload, ~327 KB raw on every marketing page). 2026-11-25: /template-requests and /zh/template-requests added, \"build\" about 4% over this build's 472.6/96.9 KB and 468.3/99.8 KB (eight example wish prints, images lazy); \"live\" leaves room for the built-from-requests list (template names, at most 6). 2026-11-25 (#925, #926): build \"/\" raw 600000 -> 606000; main measured 586.3 KB raw (0.4 KB over) after the admin-chosen 「更多真实案例」 row (pick buttons, set badge) and the picker preview fix; gzip unchanged. 2026-11-25 (#930): /template-requests build raw 491 → 494 KB: every public page now carries the template panel's strings in its RSC payload (app.series, app.share, app.form, about 1 KB, more once escaped); measured 480.1 against main's 477.8 KB, gzip unchanged within budget (98.2 / 98.6).",
   "profiles": {
     "build": {
-      "/": {
-        "raw": 606000,
-        "gzip": 136000
-      },
-      "/zh": {
-        "raw": 596000,
-        "gzip": 143000
-      },
-      "/ai-restaurant-menu": {
-        "raw": 519000,
-        "gzip": 121000
-      },
-      "/zh/ai-restaurant-menu": {
-        "raw": 515000,
-        "gzip": 126000
-      },
-      "/commercial-photography": {
-        "raw": 534000,
-        "gzip": 127000
-      },
-      "/zh/commercial-photography": {
-        "raw": 532000,
-        "gzip": 132000
-      },
-      "/image-to-image-generator": {
-        "raw": 537000,
-        "gzip": 129000
-      },
-      "/zh/image-to-image-generator": {
-        "raw": 534000,
-        "gzip": 134000
-      },
-      "/transparent-background": {
-        "raw": 525000,
-        "gzip": 125000
-      },
-      "/pricing": {
-        "raw": 517000,
-        "gzip": 108000
-      },
-      "/zh/pricing": {
-        "raw": 511000,
-        "gzip": 111000
-      },
-      "/template-requests": {
-        "raw": 494000,
-        "gzip": 101000
-      },
-      "/zh/template-requests": {
-        "raw": 487000,
-        "gzip": 104000
-      }
+      "/": { "raw": 606000, "gzip": 136000 },
+      "/zh": { "raw": 596000, "gzip": 143000 },
+      "/ai-restaurant-menu": { "raw": 519000, "gzip": 121000 },
+      "/zh/ai-restaurant-menu": { "raw": 515000, "gzip": 126000 },
+      "/commercial-photography": { "raw": 534000, "gzip": 127000 },
+      "/zh/commercial-photography": { "raw": 532000, "gzip": 132000 },
+      "/image-to-image-generator": { "raw": 537000, "gzip": 129000 },
+      "/zh/image-to-image-generator": { "raw": 534000, "gzip": 134000 },
+      "/transparent-background": { "raw": 525000, "gzip": 125000 },
+      "/pricing": { "raw": 517000, "gzip": 108000 },
+      "/zh/pricing": { "raw": 511000, "gzip": 111000 },
+      "/template-requests": { "raw": 494000, "gzip": 101000 },
+      "/zh/template-requests": { "raw": 487000, "gzip": 104000 }
     },
     "live": {
-      "/": {
-        "raw": 815000,
-        "gzip": 180000
-      },
-      "/zh": {
-        "raw": 815000,
-        "gzip": 188000
-      },
-      "/ai-restaurant-menu": {
-        "raw": 655000,
-        "gzip": 153000
-      },
-      "/zh/ai-restaurant-menu": {
-        "raw": 650000,
-        "gzip": 160000
-      },
-      "/commercial-photography": {
-        "raw": 615000,
-        "gzip": 150000
-      },
-      "/zh/commercial-photography": {
-        "raw": 610000,
-        "gzip": 155000
-      },
-      "/image-to-image-generator": {
-        "raw": 605000,
-        "gzip": 152000
-      },
-      "/zh/image-to-image-generator": {
-        "raw": 600000,
-        "gzip": 157000
-      },
-      "/transparent-background": {
-        "raw": 605000,
-        "gzip": 148000
-      },
-      "/pricing": {
-        "raw": 540000,
-        "gzip": 115000
-      },
-      "/zh/pricing": {
-        "raw": 535000,
-        "gzip": 118000
-      },
-      "/template-requests": {
-        "raw": 505000,
-        "gzip": 108000
-      },
-      "/zh/template-requests": {
-        "raw": 501000,
-        "gzip": 111000
-      }
+      "/": { "raw": 815000, "gzip": 180000 },
+      "/zh": { "raw": 815000, "gzip": 188000 },
+      "/ai-restaurant-menu": { "raw": 655000, "gzip": 153000 },
+      "/zh/ai-restaurant-menu": { "raw": 650000, "gzip": 160000 },
+      "/commercial-photography": { "raw": 615000, "gzip": 150000 },
+      "/zh/commercial-photography": { "raw": 610000, "gzip": 155000 },
+      "/image-to-image-generator": { "raw": 605000, "gzip": 152000 },
+      "/zh/image-to-image-generator": { "raw": 600000, "gzip": 157000 },
+      "/transparent-background": { "raw": 605000, "gzip": 148000 },
+      "/pricing": { "raw": 540000, "gzip": 115000 },
+      "/zh/pricing": { "raw": 535000, "gzip": 118000 },
+      "/template-requests": { "raw": 505000, "gzip": 108000 },
+      "/zh/template-requests": { "raw": 501000, "gzip": 111000 }
     }
   }
 }
