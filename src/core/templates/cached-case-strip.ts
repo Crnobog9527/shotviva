@@ -21,7 +21,11 @@ export async function cachedCaseStrip(locale: Locale): Promise<PublicCaseEntry[]
   try {
     const db = createAdminSupabase()
     const entries = (await readHomeCaseStrip(db))[locale] ?? []
-    const bundles = entries.some((entry) => entry.kind === 'bundle') ? await readFeaturedBundles(db) : undefined
+    const needsBundles = entries.some((entry) => entry.kind === 'bundle')
+    const bundles = needsBundles ? await readFeaturedBundles(db) : undefined
+    // readFeaturedBundles logs and gives undefined on a failure; here that must not be cached for
+    // an hour with the bundle entries silently gone, so it takes the short failed-read life below.
+    if (needsBundles && !bundles) throw new Error('featured bundles unreadable')
     cacheLife(CATALOGUE_LIFE)
     return publicCaseEntries(entries, bundles, locale)
   } catch (error) {
