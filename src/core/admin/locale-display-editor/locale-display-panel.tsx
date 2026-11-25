@@ -42,12 +42,12 @@ export function LocaleDisplayPanel({ categories: all, templates, display, bundle
     siblingGroups(categories, display, code).filter((group) => group.own).length, featuredState(templates, display, code).own,
     (bundles?.locale[code] ?? []).length > 0)).join('；')
   return (
-    <section aria-labelledby="locale-display-h" className="grid gap-4 rounded-md border p-4">
+    <section aria-labelledby="locale-display-h" className="grid grid-cols-1 gap-4 rounded-md border p-4">
       <h2 id="locale-display-h" className="font-medium">
         <button type="button" aria-expanded={open} aria-controls="locale-display-body" title={open ? COPY.collapse : COPY.expand}
           className="-m-1 flex w-full items-start gap-2 rounded-md p-1 text-left hover:bg-muted/50" onClick={() => setOpen(!open)}>
           <ChevronDown aria-hidden className={cn('mt-1 size-4 shrink-0 transition-transform', open ? '' : '-rotate-90')} />
-          <span className="grid min-w-0 gap-0.5">
+          <span className="grid grid-cols-1 min-w-0 gap-0.5">
             <span>{COPY.title}</span>
             <span className="text-sm font-normal text-muted-foreground">{summary}</span>
           </span>
@@ -65,7 +65,7 @@ function PanelBody({ hidden, categories, templates, display, bundles, actions, s
   const nameOf = (key: string) => categories.find((category) => category.key === key)?.nameZh ?? key
   const bundleContext = { bundles: bundles?.list ?? [], templates, categories, save: saveBundle }
   return (
-    <div id="locale-display-body" hidden={hidden} className="grid gap-4">
+    <div id="locale-display-body" hidden={hidden} className="grid grid-cols-1 gap-4">
       <p className="max-w-prose text-sm text-muted-foreground">{COPY.body}</p>
       <div role="tablist" aria-label={COPY.title} className="flex gap-2">
         {DISPLAY_LOCALES.map((code) => (

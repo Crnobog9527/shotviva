@@ -29,17 +29,17 @@ export function BundleList({ ids, context, editing, onChange }: Props) {
   }
   if (!editing) {
     return (
-      <ol className="grid gap-1">
+      <ol className="grid grid-cols-1 gap-1">
         {shown.map((id, index) => <StaticRow key={id} position={index + 1} name={nameOf(id)} detail={detailOf(id)} />)}
       </ol>
     )
   }
   const others = context.bundles.filter((bundle) => !shown.includes(bundle.id))
   return (
-    <div className="grid gap-2">
+    <div className="grid grid-cols-1 gap-2">
       <SortableList ids={shown} labelOf={nameOf} onReorder={async (next) => onChange(next)}>
         {(order) => (
-          <ol className="grid gap-1">
+          <ol className="grid grid-cols-1 gap-1">
             {order.map((id) => (
               <SortableRow key={id} id={id} name={nameOf(id)} detail={detailOf(id)} removeLabel={COPY.removeFromList(nameOf(id))}
                 onRemove={() => onChange(shown.filter((other) => other !== id))} />

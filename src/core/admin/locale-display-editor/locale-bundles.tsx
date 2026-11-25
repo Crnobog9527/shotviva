@@ -21,7 +21,7 @@ type Props = {
 // One language's 精选组合 in the 分语言展示 draft, saved with the same 保存.
 export function LocaleBundles({ label, list, context, editing, onChange, onReset }: Props) {
   return (
-    <div className="grid gap-2">
+    <div className="grid grid-cols-1 gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-medium">{label} · {COPY.localeTitle}</h3>
         <OwnBadge own={list.own} />
