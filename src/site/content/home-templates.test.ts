@@ -88,7 +88,7 @@ describe('series on the template sections', () => {
     expect(categories[0]?.templates.map((card) => card.id)).toEqual(['solo', 'series-s', 'other'])
     expect(categories[0]?.templates[1]).toEqual({
       id: 'series-s', name: 'Series s', use: 'All of s',
-      series: { href: '/generate?series=s-set', members: ['m1', 'm2', 'm3'], count: 3 },
+      series: { href: '/generate?series=s-set', slug: 's-set', members: ['m1', 'm2', 'm3'], count: 3 },
     })
     // Not in the live catalogue (not on sale): neither pictured nor counted.
     // The pictured members' covers are in the lookup, the unfeatured m3 included.
@@ -126,6 +126,7 @@ describe('series on the template sections', () => {
     const { categories } = featuredSections(rows, undefined, [series('s', ids)])
     const [first, ...later] = categories[0]?.templates[0]?.series?.members ?? []
     expect(first).toBe('m0')
-    expect(layers).toEqual({ 'series-s': later.map((id) => [`https://shotviva.com/assets/covers/${id}/b.webp`, `https://shotviva.com/assets/covers/${id}/a.webp`]) })
+    // Each with the member it shows, so the card opens the panel on that one.
+    expect(layers).toEqual({ 'series-s': later.map((id) => [`https://shotviva.com/assets/covers/${id}/b.webp`, `https://shotviva.com/assets/covers/${id}/a.webp`, id]) })
   })
 })

@@ -21,6 +21,8 @@ type Props = {
   thumbOf(template: CatalogueTemplate): string | null
   gift: string
   onPickPhoto(): void
+  // A photo picked with the primary (its own file input): it opens the template panel with it.
+  onPhotoPicked(file: File): void
   onOpenPicker(): void
   onSignUp(): void
 }
@@ -59,7 +61,7 @@ function PanelHead({ template, onOpenPicker }: { template: CatalogueTemplate | n
 // template's result, whole, with the photo it came from; the upload; the template rail; size and
 // note; Generate. Phones stack it (preview → upload → template → size and note → Generate);
 // from 1024 it is two columns, the preview kept small so the hero pair stays the largest picture.
-export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ state, initialCovers, thumbOf, gift, onPickPhoto, onOpenPicker, onSignUp }, ref) {
+export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ state, initialCovers, thumbOf, gift, onPickPhoto, onPhotoPicked, onOpenPicker, onSignUp }, ref) {
   const t = useTranslations('home.generator')
   const app = useTranslations('app')
   const tags = useTranslations('marketing.home')
@@ -73,7 +75,10 @@ export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ sta
     // A template without a photo (photoInput 'none') has no upload card: its column closes up.
     <section className={template?.photoInput === 'none' ? 'mk-panel mk-panel-noup' : 'mk-panel'} id="gen" aria-label={t('label')} ref={ref}>
       <PanelHead template={template} onOpenPicker={onOpenPicker} />
-      <PanelStage name={template?.name ?? ''} after={after} initial={initial} inset={inset} />
+      {/* The template's picture is a way to the browse list too, as Change is (Owner 2026-11-25). */}
+      <button type="button" className="block w-full cursor-pointer text-left" onClick={onOpenPicker} disabled={!template} aria-haspopup="dialog" aria-label={t('change')}>
+        <PanelStage name={template?.name ?? ''} after={after} initial={initial} inset={inset} />
+      </button>
       {template?.photoInput !== 'none' ? <PanelUpload url={photo.url} onPick={onPickPhoto} /> : null}
       {photo.error ? <p role="alert" className="mk-panel-error">{app(`errors.${photo.error}`)}</p> : null}
       <PanelRail state={state} thumbOf={thumbOf} onOpenPicker={onOpenPicker} />
@@ -87,7 +92,7 @@ export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ sta
         <PanelNote state={state} />
       </div>
       <div className="mk-panel-cta">
-        <HomeCtaButton cta={state.cta} templateId={templateId} onPhotoPicked={photo.pick} onSignUp={onSignUp} onGenerate={state.generate} />
+        <HomeCtaButton cta={state.cta} templateId={templateId} onPhotoPicked={onPhotoPicked} onSignUp={onSignUp} onGenerate={state.generate} />
         <PanelFormats state={state} />
         <p className="mk-panel-gift">
           <GiftIcon className="mk-gift-i" />

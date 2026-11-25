@@ -18,8 +18,8 @@ export type LayerPair = readonly [before: string, after: string] | readonly [bef
 // On a frame with later pairs: the card's key in /api/home/series (TemplateCard.id).
 export const MORE_ATTR = 'data-series-more'
 export const SIZES_ATTR = 'data-series-sizes'
-// A bundle card (bundle-card.tsx): its first pair's template, and the label pattern ('%s' for
-// the template on show). Each later layer carries its own template id (LAYER_TEMPLATE_ATTR), so
+// A bundle card (bundle-card.tsx), and a series card on a page with the template panel: its first
+// pair's template, and (bundles) the label pattern ('%s' for the template on show). Each later layer carries its own template id (LAYER_TEMPLATE_ATTR), so
 // the crossfade moves the card's data-pick-template and label to the template actually on show.
 export const BUNDLE_FIRST_ATTR = 'data-bundle-first'
 export const BUNDLE_LABEL_ATTR = 'data-bundle-label'

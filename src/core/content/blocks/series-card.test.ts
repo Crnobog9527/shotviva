@@ -9,7 +9,7 @@ import { pairsIn, pictureAttrs } from './series-layers'
 // SEO 2026-11-14: a series opens Create, which needs a session and is noindex. The card is a
 // button carrying the address for the page's click handler, never a crawlable <a href>.
 describe('series card', () => {
-  const card = { id: 'series-1', name: 'Bright Daylight', use: 'Western dishes in daylight', series: { href: '/generate?series=western-bright-daylight', members: ['a'], count: 4 } }
+  const card = { id: 'series-1', name: 'Bright Daylight', use: 'Western dishes in daylight', series: { href: '/generate?series=western-bright-daylight', slug: 'western-bright-daylight', members: ['a'], count: 4 } }
   const media = { a: { before: 'https://shotviva.com/a-before.webp', after: 'https://shotviva.com/a-after.webp', live: true } }
   // Only the keys the card reads (core cannot import the site's message files).
   const messages = {

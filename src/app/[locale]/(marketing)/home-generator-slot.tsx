@@ -1,10 +1,9 @@
-import { spendableBalance } from '@/core/org'
+import { readPoolChoiceOffer, spendableBalance } from '@/core/org'
 import { unstable_rethrow } from 'next/navigation'
 import { Suspense } from 'react'
 
-import { googleAction } from '@/app/auth/actions'
 import { createAdminSupabase, createServerSupabase, getSessionUser } from '@/core/auth'
-import { effectiveLimits, readBalance } from '@/core/billing'
+import { batchLimitsOf, effectiveLimits, readBalance } from '@/core/billing'
 import { PaywallProvider } from '@/core/billing/paywall/provider'
 import { walletOffersWechat } from '@/core/billing/wallet'
 import { StandingSlot } from '@/core/billing/standing'
@@ -17,7 +16,7 @@ import { displayProducts } from '@/site/billing/display-products'
 
 import { paywallPerkFacts } from '../paywall-perk-facts'
 
-type Base = Omit<HomeGeneratorProps, 'viewer' | 'googleAction'>
+type Base = Omit<HomeGeneratorProps, 'viewer'>
 
 // The visitor half of the home generator: the only request-time read on the page. Everything
 // else (copy, templates, samples) is in the prerendered shell (建站规格 R5).
@@ -26,15 +25,17 @@ async function viewerOf(): Promise<HomeViewer | null> {
   if (!user?.verified) return null
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
-  const [balance, limits, runningIds, favoriteIds] = await Promise.all([
+  const [balance, limits, runningIds, favoriteIds, poolChoice] = await Promise.all([
     readBalance(supabase, user.id).then((own) => spendableBalance(admin, user.id, own)),
     // effective_limits() (tier, an unbanned admin as Max, plus the org lift) is service-role only; the user's own id comes from the session.
     effectiveLimits(admin, user.id),
     listRunningJobIds(admin, user.id, new Date()),
     // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
     listFavoriteIdsOrEmpty(supabase, user.id),
+    // 出图时让员工自选 (§6.5), as Create reads it: the template panel's form takes it.
+    readPoolChoiceOffer(admin, user.id),
   ])
-  return { balance, concurrency: { limit: limits.concurrency, runningIds }, favoriteIds }
+  return { balance, concurrency: { limit: limits.concurrency, runningIds }, favoriteIds, tier: limits.tier, batch: batchLimitsOf(limits), poolChoice }
 }
 
 // The home page is everyone's first page: an auth or database hiccup shows the signed-out
@@ -52,12 +53,12 @@ async function safeViewer(): Promise<HomeViewer | null> {
 
 async function WithViewer(props: Base) {
   const viewer = await safeViewer()
-  if (!viewer) return <HomeGenerator {...props} viewer={null} googleAction={googleAction} />
+  if (!viewer) return <HomeGenerator {...props} viewer={null} />
   const [perkFacts, products] = await Promise.all([paywallPerkFacts(), displayProducts()])
   // "Get credits · N needed" opens the same paywall as the workspace (DESIGN §6.9 item 9).
   return (
     <PaywallProvider products={products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={walletOffersWechat()}>
-      <HomeGenerator {...props} viewer={viewer} googleAction={googleAction} />
+      <HomeGenerator {...props} viewer={viewer} />
       {/* What the member holds, so the paywall locks lower plans (T66). */}
       <StandingSlot />
     </PaywallProvider>
@@ -67,7 +68,7 @@ async function WithViewer(props: Base) {
 // While the session streams in, the generator shows as for a signed-out visitor.
 export function HomeGeneratorSlot(props: Base) {
   return (
-    <Suspense fallback={<HomeGenerator {...props} viewer={null} googleAction={googleAction} />}>
+    <Suspense fallback={<HomeGenerator {...props} viewer={null} />}>
       <WithViewer {...props} />
     </Suspense>
   )

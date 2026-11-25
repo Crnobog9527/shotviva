@@ -10,6 +10,9 @@ import { compressImage, createTicketPool, putWithProgress, requestTicket, Upload
 
 export type UploadState =
   | { phase: 'idle' }
+  // Signed out on the public template panel: the photo stays in this browser and never uploads
+  // (uploads need an account); its card shows no upload stage.
+  | { phase: 'local' }
   | { phase: UploadPhase; progress: number }
   | { phase: 'done'; inputKey: string }
   | { phase: 'error'; code: UploadErrorCode; message: string }

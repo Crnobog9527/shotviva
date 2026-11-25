@@ -9,10 +9,11 @@ import { seriesOf, type CatalogueView } from '../catalogue/catalogue-view'
 import { groupEntries } from '../catalogue/picker-browse'
 
 // Where the picker's list is: a search (it overrides the chips), an open series, or a chip
-// (All, Saved, or a category up to three levels down). Each opening of the picker starts on All.
-export function usePickerBrowse(view: CatalogueView, saved: readonly CatalogueTemplate[]) {
+// (All, Saved, or a category up to three levels down). Each opening of the picker starts on All,
+// or on `startPath` (a bundle card's "All … templates" chip; an unknown path shows its known part).
+export function usePickerBrowse(view: CatalogueView, saved: readonly CatalogueTemplate[], startPath: readonly string[] = []) {
   const [query, setQuery] = useState('')
-  const [chosen, setChosen] = useState<Selection>(ALL)
+  const [chosen, setChosen] = useState<Selection>(() => (startPath.length ? { saved: false, path: [...startPath] } : ALL))
   const [seriesId, setSeriesId] = useState<string | null>(null)
   const index = useMemo(() => buildSearchIndex(view.entries, view.filters), [view])
   const results = useMemo(() => (query.trim() ? searchTemplates(index, query) : null), [index, query])

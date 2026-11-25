@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { defaultTier, orgBalance, type Balance, type PoolChoiceOffer } from '@/core/billing/pools'
 import { batchMaxFor, type BatchLimits } from '@/core/billing/tier-limits'
@@ -41,7 +41,15 @@ export type DraftInput = {
   single?: boolean
   // 在职成员只用企业积分 (§6.5): an active org member's org shares; null/absent: not a member.
   poolChoice?: PoolChoiceOffer | null
+  // Signed out on the public template panel: picked photos stay in this browser (no upload, no
+  // job; its primary is the sign-up button).
+  local?: boolean
+  // A photo picked before the form opened (the home card's Upload photo): added once, as a pick.
+  initialFile?: File | null
 }
+
+// What a creation dialog knows about the account (the page's request-time read), minus the template.
+export type CreateContext = Omit<DraftInput, 'template'>
 
 const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {}, toggles: {} }
 
@@ -49,8 +57,9 @@ const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', c
 // dialog Create opens and the workspace page. Photos upload as they are picked; start() queues
 // one job per ready photo in the generation store and makes them this template's workspace
 // jobs, so the workspace page shows them developing (and after a refresh).
-export function useWorkspaceDraft({ template, balance, tier, batch, concurrency, again = null, single = false, poolChoice }: DraftInput) {
-  const { photos, slots, slotted } = useDraftPhotos(template, batchMaxFor(tier, batch), single, again)
+export function useWorkspaceDraft({ template, balance, tier, batch, concurrency, again = null, single = false, poolChoice, local, initialFile }: DraftInput) {
+  const { photos, slots, slotted } = useDraftPhotos(template, batchMaxFor(tier, batch), single, again, local === true)
+  useInitialFile(initialFile, photos)
   const choice = orgSpend(poolChoice, balance)
   const { options, values, change } = useOutputValues(template, again, choice.balance)
   useAgainOpensForm(template.id, again?.jobId)
@@ -172,12 +181,24 @@ function draftPhotoStatus(template: CatalogueTemplate, photos: PhotoBatch, again
 }
 
 // A slot template (§5.1e) takes its images by slot, one job at a time; the photo list stays empty.
-function useDraftPhotos(template: CatalogueTemplate, batchMax: number, single: boolean, again: AgainStart | null) {
+function useDraftPhotos(template: CatalogueTemplate, batchMax: number, single: boolean, again: AgainStart | null, local: boolean) {
   const slotted = isSlotTemplate(template)
   const kept = again ? { photos: again.photos, madeAt: again.madeAt } : undefined
-  const photos = usePhotoBatch(slotted ? 0 : draftBatchMax(template, batchMax, single), slotted ? undefined : kept)
+  const photos = usePhotoBatch(slotted ? 0 : draftBatchMax(template, batchMax, single), slotted ? undefined : kept, local)
   const slots = useSlotPhotos(slotsOfTemplate(template), slotted ? kept : undefined)
   return { photos, slots, slotted }
+}
+
+// Once, on mount: the photo picked before the form opened. A template that takes no photo (or
+// takes them by slot) has no room for it and leaves it out.
+function useInitialFile(file: File | null | undefined, photos: PhotoBatch) {
+  const added = useRef(false)
+  const { add, batchMax } = photos
+  useEffect(() => {
+    if (added.current || !file || batchMax < 1) return
+    added.current = true
+    add([file])
+  }, [file, add, batchMax])
 }
 
 // The action bar's photo state and count: a slot template is always one job.

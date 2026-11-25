@@ -44,7 +44,7 @@ export type BatchSummary = {
 export function summarize(photos: readonly BatchPhoto[]): BatchSummary {
   const ready = photos.flatMap((photo) => (photo.upload.phase === 'done' ? [{ photo, inputKey: photo.upload.inputKey }] : []))
   const planned = photos.filter((photo) => photo.upload.phase !== 'error').length
-  const uploading = photos.some((photo) => photo.upload.phase !== 'done' && photo.upload.phase !== 'error')
+  const uploading = photos.some((photo) => photo.upload.phase !== 'done' && photo.upload.phase !== 'error' && photo.upload.phase !== 'local')
   return { photo: uploading ? 'uploading' : ready.length > 0 ? 'ready' : 'none', ready, planned }
 }
 

@@ -241,6 +241,8 @@
     color: var(--bone-dim); background: var(--wash); box-shadow: inset 0 0 0 1px var(--input); cursor: pointer;
   }
   .mk-bundle-names button:hover, .mk-bundle-names button:focus-visible { color: inherit; box-shadow: inset 0 0 0 1px var(--bone-dim); }
+  /* The last chip, the way to the rest of the catalogue: plain ink, no fill, so it reads as a link. */
+  .mk-bundle-names .mk-bundle-more { color: var(--foreground); background: none; font-weight: 500; }
   /* In the large single-series row the Phone tag sits top left; it moves down for the badge. */
   .mk-sstack-lg .mk-tag-l { top: auto; bottom: 12px; }
   .mk-sstack-lg .mk-sbadge { top: 12px; left: 12px; }
