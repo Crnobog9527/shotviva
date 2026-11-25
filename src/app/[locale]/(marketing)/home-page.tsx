@@ -12,7 +12,7 @@ import { cachedPublicSeries } from '@/core/templates/public-series'
 import { homePanelTemplates } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
 import { HOME_CATEGORIES, bundleSection, creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
-import { HERO_DEFAULT_OPTION, heroOptionContent } from '@/site/experiments'
+import { HERO_DEFAULT_OPTION, heroOptionContent, type HeroOptionContent } from '@/site/experiments'
 import { site } from '@/site/site.config'
 
 import { HomeGeneratorSlot } from './home-generator-slot'
@@ -51,6 +51,13 @@ function heroFor(heroOption: string | undefined, locale: Locale, live: readonly 
   return { option, defaultId: opens && live.some((template) => template.id === opens) ? opens : featuredId }
 }
 
+// An option's hero pictures: its live templates' covers when it names templates (null when none
+// is live, so the page keeps its own hero), else its static pictures.
+function optionPictures(option: HeroOptionContent | null, live: Parameters<typeof liveHero>[2]) {
+  if (option?.live) return liveHero(option.live.scenes, option.live.label, live)
+  return option?.hero ?? null
+}
+
 // The live catalogue is a cached read (expired by every admin save, featured list included);
 // only the generator's visitor half waits for the request.
 export async function HomeContent({ heroOption }: { heroOption?: string }) {
@@ -64,8 +71,7 @@ export async function HomeContent({ heroOption }: { heroOption?: string }) {
   const sections = { categories: bundled.category ? [bundled.category, ...featured.categories] : featured.categories, media: { ...featured.media, ...bundled.media } }
   const { option, defaultId } = heroFor(heroOption, locale, live, featuredId)
   const { templates, opening } = homePanelTemplates(live, defaultId, bundles.flatMap((bundle) => bundle.memberIds))
-  const [initialCovers, liveHeroPairs] = await Promise.all([openingCovers(opening), option?.live ? liveHero(option.live.scenes, option.live.label, live) : null])
-  const optionHero = liveHeroPairs ?? option?.hero
+  const [initialCovers, optionHero] = await Promise.all([openingCovers(opening), optionPictures(option, live)])
   const shown = optionHero ? { ...page, hero: { ...page.hero, ...optionHero } } : page
   return (
     <>
