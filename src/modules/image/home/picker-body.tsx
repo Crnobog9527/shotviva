@@ -16,15 +16,17 @@ type Props = {
   sampleOf(template: CatalogueTemplate): TemplateSample | null
 }
 
-// One plate of the sample pair: half the left column (46% of the 1040px dialog, less its 24px
-// padding) from 768, half the drawer on phones (marketing.css .mk-pk-*).
-const PLATE_SIZES = '(min-width: 768px) 230px, 50vw'
+// One plate of the sample pair: half the left column (40% of the 1040px dialog's content) from
+// 768, half the drawer on phones (marketing.css .mk-pk-*).
+const PLATE_SIZES = '(min-width: 768px) 200px, 50vw'
 
 // The left column: the chosen template's phone → AI pair (plain images; the dialog is not the
-// SEO surface) and what it is. The save heart (T83) takes the bottom-right corner: the Phone / AI
-// tags sit along the top here.
+// SEO surface) and what it is: the phone photo (cover_before_url) on the left plate under 「真实手机照
+// / Real phone photo」, the AI cover (cover_after_url) on the right under AI, as every pair on the
+// site. The save heart (T83) takes the bottom-right corner: the tags sit along the top here.
 export function PickerSample({ selected, sampleOf }: Props) {
   const t = useTranslations('app.template')
+  const tags = useTranslations('marketing.home')
   const sample = sampleOf(selected)
   return (
     <div className="mk-pk-sample">
@@ -37,10 +39,10 @@ export function PickerSample({ selected, sampleOf }: Props) {
             <Picture avif={coverAvif(sample.after, PLATE_SIZES)}><GroundedImg className="mk-a" ground="white" {...coverImage(sample.after, PLATE_SIZES)} alt={t('cardAlt', { name: selected.name })} /></Picture>
             <span className="mk-hl" aria-hidden />
             <span className="mk-tag mk-tag-l" aria-hidden>
-              {t('phone')}
+              {tags('phone')}
             </span>
             <span className="mk-tag mk-tag-r" aria-hidden>
-              {t('ai')}
+              {tags('ai')}
             </span>
           </span>
         ) : (
