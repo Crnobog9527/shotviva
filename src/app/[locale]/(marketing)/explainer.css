@@ -67,6 +67,8 @@
     font: inherit; text-align: left; cursor: pointer; border-radius: 16px;
   }
   .mk-hero-strip-pick:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+  /* A span in a button is inline, so the caption's margin-top (.mk-cap) needs it as a block. */
+  .mk-hero-strip-pick .mk-cap { display: block; }
   .mk-hero-strip-pick:hover .mk-cap { color: var(--foreground); }
   .mk-hero-strip-frame { position: relative; display: block; }
   .mk-hero-strip-set {
