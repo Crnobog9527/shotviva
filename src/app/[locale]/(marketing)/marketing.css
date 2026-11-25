@@ -64,7 +64,10 @@
     font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; white-space: nowrap;
   }
   .mk-mnav a:active { color: var(--foreground); }
-  @media (min-width: 768px) { .mk-mnav { display: none; } }
+  /* Tablets (768–1023px) keep the row for what the bar has no room for (Request a template, Owner
+     2026-11-25), without the links the bar already shows. */
+  @media (min-width: 768px) { .mk-mnav .mk-mnav-dup { display: none; } }
+  @media (min-width: 1024px) { .mk-mnav { display: none; } }
   .mk-nav { display: flex; align-items: center; gap: 4px; }
   .mk-nl, .mk-start { display: none; }
   .mk-ghost-pill {
@@ -98,7 +101,7 @@
     }
     .mk-nl[aria-current="page"] { color: var(--foreground); }
     /* Request a template (Owner 2026-11-25): a tablet bar has no room for a fifth item, so it joins
-       from 1024px; below that it is in the phone row (<768) and the footer. */
+       from 1024px; below that it is in the page-links row under the bar (PhoneNav) and the footer. */
     .mk-nl-wide { display: none; }
     /* Use Cases: a disclosure under the nav item, the globe menu's popover look; one above the
        globe's 「切换到中文？」 bubble (z 60), which it would otherwise sit under */

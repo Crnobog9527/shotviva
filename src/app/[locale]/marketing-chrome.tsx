@@ -87,8 +87,9 @@ export async function MarketingHeader({ locale, homeOnly = false }: { locale: Lo
   )
 }
 
-// Phones only (Owner 2026-11-24): the top bar has room for the globe and Log in alone, and the
-// rules forbid a hamburger, so the inner pages sit in one row of text links under it. Not
+// Phones (Owner 2026-11-24): the top bar has room for the globe and Log in alone, and the rules
+// forbid a hamburger, so the inner pages sit in one row of text links under it. Tablets (768–1023px)
+// keep the row for the links the bar has no room for, the ones it shows hidden (mk-mnav-dup). Not
 // sticky: it scrolls away with the page. The blog shows once this language has a post; Request a
 // template while the wishlist is open.
 async function PhoneNav({ locale, wishlistOpen }: { locale: Locale; wishlistOpen: boolean }) {
@@ -99,9 +100,13 @@ async function PhoneNav({ locale, wishlistOpen }: { locale: Locale; wishlistOpen
   ])
   return (
     <nav aria-label={t('phoneLabel')} className="mk-mnav mk-w">
-      <Link href="/#templates">{t('templates')}</Link>
+      <Link href="/#templates" className="mk-mnav-dup">
+        {t('templates')}
+      </Link>
       <Link href="/ai-restaurant-menu">{t('menuShort')}</Link>
-      <Link href="/pricing">{t('pricing')}</Link>
+      <Link href="/pricing" className="mk-mnav-dup">
+        {t('pricing')}
+      </Link>
       {/* After Pricing here (unlike the desktop bar): at 375px the English row would push Pricing off screen. */}
       {wishlistOpen ? <Link href="/template-requests">{t('requestTemplate')}</Link> : null}
       {hasBlogPosts ? <Link href="/blog">{blogText('footerLink')}</Link> : null}
