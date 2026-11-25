@@ -199,6 +199,14 @@ export type EditCases = {
   items: readonly [EditCase, EditCase, ...EditCase[]]
 }
 
+// Home: hotels and stays (Owner 2026-11-25). Four cases, each a small phone-photo/result pair that
+// opens a full-size viewer. `template` binds a case to a published template: while that template is
+// live with both covers, the case shows them (cover_before_url / cover_after_url, home-spaces-live.ts)
+// and the pictures here are only the fallback.
+export type SpaceCase = EditCase & { template?: string }
+export type SpaceViewerLabels = { open: string; close: string; previous: string; next: string; counter: string }
+export type SpaceCases = Omit<EditCases, 'items'> & { items: readonly [SpaceCase, SpaceCase, ...SpaceCase[]]; viewer: SpaceViewerLabels }
+
 // Home block ③: what three product photos cost, as two bills (DESIGN §6.9 item 6, Owner
 // 2026-11-06 replaced the table). Every number is read from site.config.
 export type BillTotal = { prefix?: string; amount: string; suffix?: string; when: string }
@@ -258,7 +266,7 @@ export type HomePage = Omit<PageBasics, 'related'> & {
   edits?: EditCases
   // Hotels and stays (Owner 2026-11-24): 16:9 phone photo and result pairs of the hotel
   // templates, right after the dish strip.
-  spaces?: EditCases
+  spaces?: SpaceCases
   // Intro paragraph above the facts table.
   factsIntro: string
   // H2-4: free credits, free vs paid works, then plans.
