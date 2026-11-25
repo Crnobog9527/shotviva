@@ -88,6 +88,7 @@ const copy = {
   h1: 'AI菜单配图：手机拍一张，菜单图就有了',
   subtitle: '用你自己拍的菜品照片，更换器皿、光线和环境，不会生成店里没有的菜。',
   answerBlock: `AI菜单配图，一键将你手机里随手拍的菜品图变成专业的美食大片，菜品始终是你实际出餐的那一道，无需担心走样或变形。在 ${brand} 上传一张手机照片，选择「外卖菜单」「暗调氛围」或「促销海报」模板，即可下载 ${zhTierList} 的成图。新用户赠送 ${zhFreeImages}。`,
+  // The static fish is the fallback; the first screen is 剁椒鱼头's live covers (landing.liveHero).
   hero: {
     before: withFirstFrame(fishPhone),
     after: fishDark,
@@ -114,6 +115,13 @@ const copy = {
     related: `${brand} 的其他页面`,
   },
   landing: {
+    // Owner 2026-11-25: the first screen follows the 剁椒鱼头 template's covers in admin.
+    liveHero: {
+      templateId: 'cn-rattan-fishhead-basket',
+      phone: '真实手机照：后厨不锈钢台面上，白盘里的剁椒鱼头，铺满红剁椒和葱花',
+      ai: '真实案例：同一盘剁椒鱼头放在竹编垫上，旁边几个小碟，热气升起，暖色侧光',
+      caption: '你的手机照片 → 菜单主图：还是这盘剁椒鱼头，换了布景和光线',
+    },
     factsNote: '以上来自各外卖平台自己的商家帮助页面（DoorDash、Uber Eats、Grubhub），2026 年 11 月核对。平台规则会变，上传前请再确认。',
     shoot,
     templates: {

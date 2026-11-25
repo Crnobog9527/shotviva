@@ -1,4 +1,4 @@
-import type { HeroBlock, HeroStripBlock, ImageRef } from '@/core/content'
+import type { HeroBlock, HeroStripBlock, ImageRef, LiveHeroPair } from '@/core/content'
 import type { Locale } from '@/core/i18n/locales'
 
 import { withFirstFrame } from '../content/landing-shared'
@@ -15,7 +15,7 @@ export { HERO_DEFAULT_OPTION, HERO_OPTIONS } from './registry'
 // A hero pair read live from a published template's covers (home-page.tsx, liveHero): the
 // template's current phone photo and result, so a cover changed in admin shows here once the
 // templates cache refreshes. The words are ours, per dish; the pictures are the template's.
-export type LiveHeroScene = { templateId: string; phone: string; ai: string; caption: string }
+export type LiveHeroScene = LiveHeroPair
 
 export type HeroOptionContent = {
   // Static pictures, or none when `live` gives the pairs (the page's own hero then stays the

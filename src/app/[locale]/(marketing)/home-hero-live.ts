@@ -1,8 +1,7 @@
 import 'server-only'
 
-import type { HeroBlock, HeroScene, ImageRef } from '@/core/content'
+import type { HeroBlock, HeroScene, ImageRef, LiveHeroPair } from '@/core/content'
 import { plateFrame } from '@/core/templates/cover-ratio'
-import type { LiveHeroScene } from '@/site/experiments'
 
 type Covers = { id: string; coverBeforeUrl: string | null; coverAfterUrl: string | null }
 type LiveHero = Pick<HeroBlock, 'before' | 'after' | 'caption' | 'scenes'>
@@ -16,7 +15,7 @@ const plate = (src: string, alt: string): ImageRef => ({ src, alt, width: 880, h
 // with none left the page keeps its own hero (null). The first pair is the first paint: its phone
 // photo carries a first frame made from the live cover, cut to the 4:5 plate (cover-ratio.ts,
 // cached per cover URL, which changes with every new upload), so it still paints with the page like the static one did.
-export async function liveHero(scenes: readonly LiveHeroScene[], label: string, live: readonly Covers[]): Promise<LiveHero | null> {
+export async function liveHero(scenes: readonly LiveHeroPair[], label: string, live: readonly Covers[]): Promise<LiveHero | null> {
   const byId = new Map(live.map((template) => [template.id, template]))
   const pairs: HeroScene[] = scenes.flatMap((scene) => {
     const template = byId.get(scene.templateId)
