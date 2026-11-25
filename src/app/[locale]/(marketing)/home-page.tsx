@@ -16,6 +16,7 @@ import { HERO_DEFAULT_OPTION, heroOptionContent } from '@/site/experiments'
 import { site } from '@/site/site.config'
 
 import { HomeGeneratorSlot } from './home-generator-slot'
+import { optionPictures } from './home-hero-live'
 
 
 // The home page, shared by `/` (today's hero) and the A/B hero options the proxy rewrites `/` to
@@ -63,8 +64,8 @@ export async function HomeContent({ heroOption }: { heroOption?: string }) {
   const sections = { categories: bundled.category ? [bundled.category, ...featured.categories] : featured.categories, media: { ...featured.media, ...bundled.media } }
   const { option, defaultId } = heroFor(heroOption, locale, live, featuredId)
   const { templates, opening } = homePanelTemplates(live, defaultId, bundles.flatMap((bundle) => bundle.memberIds))
-  const initialCovers = await openingCovers(opening)
-  const shown = option ? { ...page, hero: { ...page.hero, ...option.hero } } : page
+  const [initialCovers, optionHero] = await Promise.all([openingCovers(opening), optionPictures(option, live)])
+  const shown = optionHero ? { ...page, hero: { ...page.hero, ...optionHero } } : page
   return (
     <>
       {/* Offers: the plans this page shows (the three monthly cards), never the whole catalog (03-S2). */}
