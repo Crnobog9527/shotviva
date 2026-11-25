@@ -34,7 +34,7 @@ export async function liveHero(scenes: readonly LiveHeroPair[], label: string, l
   }
 }
 
-type Option = { hero?: LiveHero; live?: { label: string; scenes: readonly LiveHeroScene[] } }
+type Option = { hero?: LiveHero; live?: { label: string; scenes: readonly LiveHeroPair[] } }
 
 // A home hero option's pictures: its live templates' covers when it names templates, else (or
 // when none of them is live: a catalogue outage, all unpublished, a build without a database)
