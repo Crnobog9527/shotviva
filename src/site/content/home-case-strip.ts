@@ -56,10 +56,17 @@ export function caseStripItems(entries: readonly PublicCaseEntry[], live: readon
   return entries.flatMap((entry) => itemOf(entry, byId, locale) ?? []).slice(0, CASE_STRIP_MAX)
 }
 
+// A built-in pair opens the template its pictures were cut from while that template is live (a
+// button, like the admin's picks); otherwise it stays a plain picture, never a dead button.
+export function builtInItems(items: readonly HeroStripItem[], live: readonly Live[]): HeroStripItem[] {
+  const ids = new Set(live.filter(paired).map((template) => template.id))
+  return items.map(({ template, ...item }) => (template && ids.has(template) ? { ...item, pick: template } : item))
+}
+
 // The row the page shows: the admin's live entries under the built-in heading, else the built-in
 // row itself. A hero option without a row of its own shows none either way.
 export function homeCaseStrip(builtIn: HeroStripBlock | undefined, entries: readonly PublicCaseEntry[], live: readonly Live[], locale: Locale): HeroStripBlock | undefined {
   if (!builtIn) return undefined
   const items = caseStripItems(entries, live, locale)
-  return items.length > 0 ? { heading: builtIn.heading, items } : builtIn
+  return items.length > 0 ? { heading: builtIn.heading, items } : { heading: builtIn.heading, items: builtInItems(builtIn.items, live) }
 }

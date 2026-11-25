@@ -37,7 +37,9 @@ export type HeroScene = { image: ImageRef; caption: string; before?: ImageRef }
 // An item read from a live template (the admin's 「更多真实案例」, migration 2006) names it in `pick`:
 // pressing the pair loads that template into the first-screen generator. `set`: the 精选组合 it
 // stands for (a badge with its template count; `showing` names the template whose pair is on show).
-export type HeroStripItem = { before: ImageRef; after: ImageRef; caption: string; pick?: string; set?: { count: number; showing: string } }
+// `pick`: the live template a press opens (a button); none, a plain picture. `template`: a built-in
+// pair's source template (the covers it was cut from), which becomes its `pick` while it is live.
+export type HeroStripItem = { before: ImageRef; after: ImageRef; caption: string; pick?: string; template?: string; set?: { count: number; showing: string } }
 export type HeroStripBlock = { heading: string; items: readonly HeroStripItem[] }
 
 // Block ②: verifiable facts, at least three (建站规格 G4).
