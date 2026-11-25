@@ -62,32 +62,32 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
 const steakPhone = caseImage('menu-steak-phone', 'Real phone photo: sliced sirloin steak with fries and asparagus on a white plate on a steel kitchen pass, plate stacks and squeeze bottles behind')
 const steakBoard = caseImage('menu-steak-board', 'Real example: the same sliced sirloin, fries and asparagus on the same white plate on a dark wooden board, warm side light, herbs and a fork beside it')
 
-// One dish through three looks (Owner 2026-11-25: a fine-dining steak on the English page). The
-// food stays the same; the set, the light and the props change.
+// One dish through three looks (Owner 2026-11-25: a three-star wagyu course on the English page).
+// The plate stays as served; the surface, the light and the service change.
 const shoot: ShootDemo = {
   heading: { lead: 'One phone photo of a dish → ', emphasis: 'a full menu shoot' },
-  intro: 'Aged beef fillet, shot on the kitchen pass during service. Three finished pictures, the same plate in every one: the three slices, the charred leek, the pommes purée, the bone-marrow jus.',
+  intro: 'A5 wagyu striploin, shot on the kitchen pass during service. Three finished pictures, the same plate in every one: the two seared slices, the potato tuile, the jus pearls, the black garlic dots.',
   phone: {
-    image: caseImage('menu-finesteak-phone', 'Real phone photo: sliced aged beef fillet with pommes purée, a charred leek and jus on a grey stone plate on a steel kitchen pass, order tickets behind'),
+    image: caseImage('menu-finesteak-phone', 'Real phone photo: two seared slices of A5 wagyu with a potato tuile, jus pearls and black garlic dots on a stoneware plate on a steel kitchen pass'),
     file: 'IMG_2706.jpg',
-    caption: 'Real phone photo. Steel pass, heat-lamp glow, order tickets behind.',
+    caption: 'Real phone photo. Steel pass, flat kitchen light, a cloth at the edge.',
   },
   arrow: 'Three looks, same dish',
   results: [
     {
-      image: caseImage('menu-finesteak-hero', 'Real example: the same beef fillet plate on a dark linen table in a candlelit dining room, warm side light'),
+      image: caseImage('menu-finesteak-hero', 'Real example: the same wagyu plate on dark honed stone, soft window light from the left'),
       title: 'Menu hero',
-      template: 'Dark dining room, sculpted side light',
+      template: 'Dark stone, soft window light',
     },
     {
-      image: caseImage('menu-finesteak-pour', 'Real example: jus poured from a small copper pan onto the same beef fillet plate, the stream caught mid-air'),
-      title: 'Sizzle shot',
-      template: 'Jus poured, caught mid-air',
+      image: caseImage('menu-finesteak-pour', 'Real example: jus poured from a small copper saucier onto the same wagyu plate, the stream caught mid-air'),
+      title: 'Sauce service',
+      template: 'Jus poured at the table',
     },
     {
-      image: caseImage('menu-finesteak-poster-en', "Real example: a menu poster of the same plate on a warm brown backdrop, headed Chef's Tasting Menu, Aged Beef Fillet"),
+      image: caseImage('menu-finesteak-poster-en', 'Real example: a tasting-menu card of the same plate on dark stone, headed Tasting Menu, Sixth Course, A5 Wagyu Striploin'),
       title: 'Menu poster',
-      template: 'Dish name, one line and the price',
+      template: 'Course name, one line and the price',
     },
   ],
 }
