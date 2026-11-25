@@ -2413,7 +2413,7 @@
     "language": "Language",
     "cookieSettings": "Cookie settings"
 ,
-    "templateRequests": "Template requests"
+    "templateRequests": "Request a template"
   },
   "consent": {
     "label": "Cookies",
@@ -2457,6 +2457,7 @@
       "useCaseTransparent": "Transparent PNG maker",
       "menuShort": "Menu photos",
       "templates": "Templates",
+      "requestTemplate": "Request a template",
       "login": "Log in",
       "startFree": "Start free",
       "uploadPhoto": "Upload photo",
