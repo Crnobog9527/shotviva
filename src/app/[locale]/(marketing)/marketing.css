@@ -57,14 +57,33 @@
     .mk-brand-tag, .mk-brand-tag:lang(zh) { max-width: none; font-size: 14px; line-height: 1.15; white-space: nowrap; margin-right: 16px; }
   }
   /* Phones: the inner pages in one row under the bar (marketing-chrome PhoneNav); scrolls away. */
-  .mk-mnav { display: flex; gap: 4px; padding: 0 calc(var(--gutter) - 10px); overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--border); }
-  .mk-mnav::-webkit-scrollbar { display: none; }
-  .mk-mnav a {
-    flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px;
-    font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; white-space: nowrap;
+  /* The desktop bar's items in its order (Owner 2026-11-25). At 14px they fit one line at 375px in
+     both languages (English with about 2px to spare); narrower phones wrap to a second line rather
+     than cut an item off or widen the page. No scrolling, so the Use Cases list can drop below it. */
+  .mk-mnav { position: relative; z-index: 40; display: flex; flex-wrap: wrap; gap: 0; padding: 0 calc(var(--gutter) - 5px); border-bottom: 1px solid var(--border); }
+  .mk-mnav > a, .mk-mnav-btn {
+    flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 5px;
+    font: 500 14px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; white-space: nowrap;
   }
-  .mk-mnav a:active { color: var(--foreground); }
-  @media (min-width: 768px) { .mk-mnav { display: none; } }
+  .mk-mnav-btn { gap: 2px; border: 0; background: none; cursor: pointer; }
+  .mk-mnav > a:active, .mk-mnav-btn:active, .mk-mnav-btn[aria-expanded="true"] { color: var(--foreground); }
+  .mk-navmenu-row { position: relative; }
+  .mk-navmenu-row .mk-navmenu-chev { width: 14px; height: 14px; transition: transform .2s var(--ease); }
+  .mk-navmenu-row [aria-expanded="true"] .mk-navmenu-chev { transform: rotate(180deg); }
+  .mk-navmenu-row .mk-navmenu-list {
+    position: absolute; top: 100%; left: 0; z-index: 61; min-width: 236px; max-width: calc(100vw - 2 * var(--gutter)); margin: 0; padding: 6px; list-style: none;
+    border-radius: var(--radius-control); background: var(--popover); box-shadow: inset 0 0 0 1px var(--border), 0 24px 48px -16px rgba(0, 0, 0, .7);
+  }
+  .mk-navmenu-row .mk-navmenu-list a {
+    display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 10px;
+    font: 500 15px/1.2 var(--font-sans); color: var(--foreground); text-decoration: none;
+  }
+  .mk-navmenu-row .mk-navmenu-list a:active, .mk-navmenu-row .mk-navmenu-list a:focus-visible { background: var(--wash); }
+  @media (prefers-reduced-motion: reduce) { .mk-navmenu-row .mk-navmenu-chev { transition: none; } }
+  /* Tablets (768–1023px) keep the row for what the bar has no room for (Request a template, Owner
+     2026-11-25), without the links the bar already shows. */
+  @media (min-width: 768px) { .mk-mnav .mk-mnav-dup, .mk-mnav-phone { display: none; } }
+  @media (min-width: 1024px) { .mk-mnav { display: none; } }
   .mk-nav { display: flex; align-items: center; gap: 4px; }
   .mk-nl, .mk-start { display: none; }
   .mk-ghost-pill {
@@ -94,9 +113,12 @@
     .mk-nav { gap: 2px; }
     .mk-nl {
       display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 999px;
-      font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; transition: color .18s, background-color .18s;
+      font: 500 15px/1 var(--font-sans); color: var(--bone-dim); text-decoration: none; white-space: nowrap; transition: color .18s, background-color .18s;
     }
     .mk-nl[aria-current="page"] { color: var(--foreground); }
+    /* Request a template (Owner 2026-11-25): a tablet bar has no room for a fifth item, so it joins
+       from 1024px; below that it is in the page-links row under the bar (PhoneNav) and the footer. */
+    .mk-nl-wide { display: none; }
     /* Use Cases: a disclosure under the nav item, the globe menu's popover look; one above the
        globe's 「切换到中文？」 bubble (z 60), which it would otherwise sit under */
     .mk-navmenu { position: relative; }
@@ -117,6 +139,7 @@
     .mk-login { margin-left: 8px; }
     .mk-start { display: inline-grid; margin-left: 8px; }
   }
+  @media (min-width: 1024px) { .mk-nl.mk-nl-wide { display: inline-flex; } }
 
   /* ---------- type ---------- */
   .mk-home h1, .mk-home h2, .mk-home h3 { text-wrap: balance; }
@@ -236,6 +259,9 @@
      plate; back at scene 1 the last photo fades out to the server-rendered first one. */
   .mk-pstack { position: absolute; z-index: 1; top: 0; bottom: 0; left: 0; width: 50%; overflow: hidden; pointer-events: none; }
   .mk-pair .mk-scene.mk-out { z-index: 1; opacity: 0; transition: opacity .4s var(--ease); }
+  /* In the phone stack nothing lies over a photo that stops being shown, so it hides at once:
+     going back to scene 1, the delay let photo 2 show through photo 3's fade-out. */
+  .mk-pstack .mk-scene:not(.mk-on):not(.mk-out) { transition: none; }
   /* A dot picked a scene still loading: it shows at once, every other picture drops (the first
      phone photo too, under the stack), and its two plates fill in as they arrive. */
   .mk-wait .mk-pair .mk-scene:not(.mk-on) { opacity: 0; transition: none; }
@@ -245,6 +271,7 @@
     border-radius: 999px; background: var(--frost); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   }
   .mk-dot { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: none; cursor: pointer; }
+  .mk-dot[hidden] { display: none; }
   .mk-dot::before, .mk-dot::after { content: ""; grid-area: 1 / 1; height: 6px; border-radius: 999px; }
   .mk-dot::before { width: 6px; background: var(--bone-dim); transition: opacity .3s var(--ease); }
   .mk-dot::after { width: 14px; background: var(--primary); opacity: 0; transform: scaleX(.43); transition: opacity .3s var(--ease), transform .3s var(--ease); }

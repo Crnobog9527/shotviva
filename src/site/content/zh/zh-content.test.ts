@@ -85,7 +85,9 @@ describe('/zh marketing copy (建站规格 §6.1, G13)', () => {
   })
 
   it('writes one language per page', () => {
-    const pages = Object.values(PAGES).map((page) => ({ ...fillCredits(page, FALLBACK_CREDITS), hero: undefined, path: undefined }))
+    // A live hero's template id is an id, not copy.
+    const noIds = (page: object) => ('landing' in page && page.landing && typeof page.landing === 'object' && 'liveHero' in page.landing ? { ...page, landing: { ...page.landing, liveHero: { ...(page.landing.liveHero as object), templateId: '' } } } : page)
+    const pages = Object.values(PAGES).map((page) => ({ ...noIds(fillCredits(page, FALLBACK_CREDITS)), hero: undefined, path: undefined }))
     const words = pages.flatMap(strings).flatMap((text) => text.match(/[A-Za-z][A-Za-z']*/g) ?? [])
     expect([...new Set(words.filter((word) => !LATIN_OK.has(word)))]).toEqual([])
   })
@@ -110,5 +112,15 @@ describe('/zh home title, description and white-background guide', () => {
   it('adds the 「白底图、电商主图怎么做」 H2 with three cards', () => {
     expect(zhHomePage.topics?.heading).toBe('白底图、电商主图怎么做')
     expect(zhHomePage.topics?.cards.map((card) => card.heading)).toEqual(['选「纯白底图」模板', '商品本身不变', '3 档导出尺寸'])
+  })
+})
+
+describe('/zh/ai-restaurant-menu first screen (Owner 2026-11-25)', () => {
+  it('follows the 剁椒鱼头 template live, in Chinese, with the static fish kept only as the fallback', () => {
+    const pair = zhAiRestaurantMenu.landing.liveHero
+    expect(pair?.templateId).toBe('cn-rattan-fishhead-basket')
+    for (const text of [pair!.phone, pair!.ai, pair!.caption]) expect(text).toContain('剁椒鱼头')
+    expect(pair!.caption).not.toMatch(/积分|¥|元|\$/)
+    expect(zhAiRestaurantMenu.hero.before.firstFrame).toBeTruthy()
   })
 })

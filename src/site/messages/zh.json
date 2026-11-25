@@ -2413,7 +2413,7 @@
     "language": "语言",
     "cookieSettings": "Cookie 设置"
 ,
-    "templateRequests": "模板许愿墙"
+    "templateRequests": "定制模板"
   },
   "consent": {
     "label": "Cookie 提示",
@@ -2455,8 +2455,9 @@
       "useCaseCommercial": "商业产品摄影",
       "useCaseGenerator": "图生图在线工具",
       "useCaseTransparent": "透明 PNG 制作",
-      "menuShort": "餐厅菜单",
       "templates": "模板",
+      "requestTemplate": "定制模板",
+      "requestTemplateShort": "定制模板",
       "login": "登录",
       "startFree": "免费开始",
       "uploadPhoto": "上传照片",
@@ -2488,6 +2489,7 @@
       "seriesBadge": "系列",
       "bundleBadge": "组合",
       "bundleCount": "{count} 个模板",
+      "stripPick": "{name}。使用这个模板",
       "bundleAria": "{name}，当前显示：{template}。使用这个模板",
       "seriesOpen": "打开系列",
       "freeTag": "免费 · 公开",

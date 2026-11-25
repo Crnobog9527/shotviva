@@ -1,4 +1,4 @@
-import type { HeroBlock, HeroStripBlock, ImageRef } from '@/core/content'
+import type { HeroBlock, HeroStripBlock, ImageRef, LiveHeroPair } from '@/core/content'
 import type { Locale } from '@/core/i18n/locales'
 
 import { withFirstFrame } from '../content/landing-shared'
@@ -12,8 +12,15 @@ export { HERO_DEFAULT_OPTION, HERO_OPTIONS } from './registry'
 // page copy. `tote` (the e-commerce case) is the page content's own hero and needs nothing here;
 // `food` is the default, shown at `/`.
 
+// A hero pair read live from a published template's covers (home-page.tsx, liveHero): the
+// template's current phone photo and result, so a cover changed in admin shows here once the
+// templates cache refreshes. The words are ours, per dish; the pictures are the template's.
+export type LiveHeroScene = LiveHeroPair
+
 export type HeroOptionContent = {
-  hero: Pick<HeroBlock, 'before' | 'after' | 'caption' | 'scenes'>
+  // Static pictures; with `live`, the fallback for when none of those templates is live.
+  hero?: Pick<HeroBlock, 'before' | 'after' | 'caption' | 'scenes'>
+  live?: { label: string; scenes: readonly LiveHeroScene[] }
   // One line under the direct answer that says who this demo is for.
   tagline: string
   // The template the first-screen generator opens on, when it is on sale.
@@ -58,7 +65,7 @@ const artStyle: Record<Locale, HeroOptionContent> = {
         ],
       },
     },
-    tagline: '把宠物、孩子或朋友的照片变成动漫、3D 或水彩画，长相和姿势还是原来的样子。',
+    tagline: '把宠物、孩子或朋友的照片变成动漫、3D 或水彩画，长相和姿势保持不变。',
     generatorTemplate: 'flat-anime-style',
   },
 }

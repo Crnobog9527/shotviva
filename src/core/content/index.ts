@@ -19,6 +19,8 @@ export {
   type HeadedText,
   type HeroBlock,
   type HeroStripBlock,
+  type HeroStripItem,
+  type LiveHeroPair,
   type HeroScene,
   type HomeFaq,
   type HomePage,
@@ -40,7 +42,6 @@ export {
   type WishExample,
   type WishlistPromo,
 } from './page-content'
-export { WishCta } from './blocks/wish-cta'
 export { LIMITS, countWords, validateContentPage } from './validate-page'
 export { ContentPageView } from './content-page-view'
 export { HomePageView } from './home-page-view'

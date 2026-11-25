@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 
 import { cachedHasPublishedPosts } from '@/core/blog'
 import { SiteFooter } from '@/core/content'
-import { NavMenu } from '@/core/content/blocks/nav-menu'
+import { NavMenu, type NavMenuLink } from '@/core/content/blocks/nav-menu'
 import { isGalleryEnabled } from '@/core/gallery'
 import { isWishlistEnabled } from '@/core/wishlist'
 import type { Locale } from '@/core/i18n'
@@ -16,13 +16,27 @@ import './(marketing)/marketing.css'
 
 const zhPaths = site.locales.zhPaths
 
+type NavText = Awaited<ReturnType<typeof getTranslations<'marketing.nav'>>>
+
+// The Use Cases list, one source for the top bar and the phone row so the two never drift.
+function menuLinksOfUseCases(t: NavText, locale: Locale): NavMenuLink[] {
+  return [
+    { href: '/ai-restaurant-menu', label: t('useCaseMenu') },
+    { href: '/commercial-photography', label: t('useCaseCommercial') },
+    { href: '/image-to-image-generator', label: t('useCaseGenerator') },
+    // English only (04-P1): there is no /zh version of this page.
+    ...(locale === 'en' ? [{ href: '/transparent-background' as const, label: t('useCaseTransparent') }] : []),
+  ]
+}
+
 // The marketing top bar (DESIGN §6.9 item 4, design/comps-v3-b/home.html): wordmark, then
-// Use Cases (the three landing pages, SEO launch handbook G5) · Templates (the home template section; v1 has no /templates page) · Pricing · the globe ·
+// Use Cases (the three landing pages, SEO launch handbook G5) · Templates (the home template section; v1 has no /templates page) ·
+// Request a template (/template-requests, only while the wishlist is open; Owner 2026-11-25) · Pricing · the globe ·
 // Log in · Start free (signed in: Open app · account), phones keep the globe and Log in (or
 // Open app · account). Shared by the marketing layout and
 // the 404 pages, which render outside it. `locale` is explicit for the global 404.
 export async function MarketingHeader({ locale, homeOnly = false }: { locale: Locale; homeOnly?: boolean }) {
-  const t = await getTranslations({ locale, namespace: 'marketing.nav' })
+  const [t, wishlistOpen] = await Promise.all([getTranslations({ locale, namespace: 'marketing.nav' }), isWishlistEnabled(site)])
   return (
     <>
     <header className="mk-appbar">
@@ -37,17 +51,24 @@ export async function MarketingHeader({ locale, homeOnly = false }: { locale: Lo
         <nav aria-label={t('label')} className="mk-nav">
           <NavMenu
             label={t('useCases')}
-            links={[
-              { href: '/ai-restaurant-menu', label: t('useCaseMenu') },
-              { href: '/commercial-photography', label: t('useCaseCommercial') },
-              { href: '/image-to-image-generator', label: t('useCaseGenerator') },
-              // English only (04-P1): there is no /zh version of this page.
-              ...(locale === 'en' ? [{ href: '/transparent-background' as const, label: t('useCaseTransparent') }] : []),
-            ]}
+            links={menuLinksOfUseCases(t, locale)}
           />
           <Link href="/#templates" className="mk-nl">
             {t('templates')}
           </Link>
+          {wishlistOpen ? (
+            <Suspense
+              fallback={
+                <Link href="/template-requests" className="mk-nl mk-nl-wide">
+                  {t('requestTemplate')}
+                </Link>
+              }
+            >
+              <NavLink href="/template-requests" className="mk-nl mk-nl-wide">
+                {t('requestTemplate')}
+              </NavLink>
+            </Suspense>
+          ) : null}
           {/* aria-current on /pricing; until the path resolves, the plain link. */}
           <Suspense
             fallback={
@@ -68,27 +89,40 @@ export async function MarketingHeader({ locale, homeOnly = false }: { locale: Lo
         </nav>
       </div>
     </header>
-    <PhoneNav locale={locale} />
+    <PhoneNav locale={locale} wishlistOpen={wishlistOpen} />
     </>
   )
 }
 
-// Phones only (Owner 2026-11-24): the top bar has room for the globe and Log in alone, and the
-// rules forbid a hamburger, so the inner pages sit in one row of text links under it. Not
-// sticky: it scrolls away with the page. The blog shows once this language has a post.
-async function PhoneNav({ locale }: { locale: Locale }) {
-  const [t, blogText, hasBlogPosts] = await Promise.all([
-    getTranslations({ locale, namespace: 'marketing.nav' }),
-    getTranslations({ locale, namespace: 'blog' }),
-    cachedHasPublishedPosts(locale),
-  ])
+// Phones (Owner 2026-11-24): the top bar has room for the globe and Log in alone, and the rules
+// forbid a hamburger, so the pages sit in one row under it, in the desktop bar's order and with
+// its Use Cases list (Owner 2026-11-25): Use Cases ▾ · Templates · Request a template (while the
+// wishlist is open) · Pricing. Tablets (768–1023px) keep the row only for what their bar has no
+// room for; the rest is hidden there (mk-mnav-dup). Not sticky: it scrolls away with the page.
+async function PhoneNav({ locale, wishlistOpen }: { locale: Locale; wishlistOpen: boolean }) {
+  const t = await getTranslations({ locale, namespace: 'marketing.nav' })
+  // Without Request a template a tablet row has nothing its bar lacks: phones only then (mk-mnav-phone).
   return (
-    <nav aria-label={t('phoneLabel')} className="mk-mnav mk-w">
-      <Link href="/#templates">{t('templates')}</Link>
-      <Link href="/ai-restaurant-menu">{t('menuShort')}</Link>
-      <Link href="/pricing">{t('pricing')}</Link>
-      {hasBlogPosts ? <Link href="/blog">{blogText('footerLink')}</Link> : null}
+    <nav aria-label={t('phoneLabel')} className={wishlistOpen ? 'mk-mnav mk-w' : 'mk-mnav mk-mnav-phone mk-w'}>
+      <NavMenu label={t('useCases')} links={menuLinksOfUseCases(t, locale)} variant="row" className="mk-mnav-dup" />
+      <Link href="/#templates" className="mk-mnav-dup">
+        {t('templates')}
+      </Link>
+      {wishlistOpen ? <RowRequestLink short={t('requestTemplateShort')} full={t('requestTemplate')} /> : null}
+      <Link href="/pricing" className="mk-mnav-dup">
+        {t('pricing')}
+      </Link>
     </nav>
+  )
+}
+
+// The row's Request a template: English shortens it to "Custom" so the row fits one line at 375px
+// (Owner 2026-11-25); its accessible name starts with that visible word and says the rest.
+function RowRequestLink({ short, full }: { short: string; full: string }) {
+  return (
+    <Link href="/template-requests" aria-label={short === full ? undefined : `${short}, ${full.toLowerCase()}`}>
+      {short}
+    </Link>
   )
 }
 

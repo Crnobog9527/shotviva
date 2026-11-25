@@ -34,7 +34,11 @@ export type HeroScene = { image: ImageRef; caption: string; before?: ImageRef }
 
 // More real before/after pairs of one A/B hero option, in a row right under the first screen
 // (ARCHITECTURE §16.5): small, lazy pictures, never part of the first paint.
-export type HeroStripBlock = { heading: string; items: readonly { before: ImageRef; after: ImageRef; caption: string }[] }
+// An item read from a live template (the admin's 「更多真实案例」, migration 2006) names it in `pick`:
+// pressing the pair loads that template into the first-screen generator. `set`: the 精选组合 it
+// stands for (a badge with its template count; `showing` names the template whose pair is on show).
+export type HeroStripItem = { before: ImageRef; after: ImageRef; caption: string; pick?: string; set?: { count: number; showing: string } }
+export type HeroStripBlock = { heading: string; items: readonly HeroStripItem[] }
 
 // Block ②: verifiable facts, at least three (建站规格 G4).
 // `brief`: one of the few rows a phone shows before the visitor opens the whole table (home facts).
@@ -96,7 +100,15 @@ export type PageBasics = {
 // `templates.defaultId`: the template the generator opens on when it is live, instead of the first
 // featured one (e.g. /transparent-background opens on the cut-out template). `compare`: an
 // optional H2 with one comparison table, right before the FAQ (SEO launch handbook 04-P1 H2-5).
+// A hero pair read live from a published template's covers (Owner 2026-11-25): the template's
+// current phone photo and result, so a cover changed in admin shows on the page once the
+// templates cache refreshes. The words are the page's, per dish; the pictures are the template's.
+export type LiveHeroPair = { templateId: string; phone: string; ai: string; caption: string }
+
 export type LandingParts = {
+  // The first screen's pair from a template's live covers; the static `hero` pictures stay as the
+  // fallback for when that template is not live.
+  liveHero?: LiveHeroPair
   factsNote: string
   templates?: { heading: string; intro: string; categoryKeys: readonly [string, ...string[]]; defaultId?: string }
   compare?: { heading: string; intro: string; table: FaqTable }
