@@ -24,10 +24,7 @@ export const APP_ONLY_APP_KEYS = [
   'photos',
   'edit',
   'checkout',
-  'create',
-  'series',
   'work',
-  'share',
   'wait',
   'notify',
   // 每周复用 (§5.3): the poster editor, the creation dialogs and the account card only.
@@ -41,6 +38,8 @@ export const APP_ONLY_APP_KEYS = [
   // 作品集分享 (§6.2): the Photos picker, its dialog and the Share links page.
   'workShare',
 ] as const
+// Not in the list (Owner 2026-11-25): `series`, `create` and `share`, which the public pages'
+// template panel (Create's own dialog, home and landing pages) reads; about 1 KB.
 
 type Messages = Record<string, unknown>
 

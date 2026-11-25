@@ -44,7 +44,7 @@ export function SizePicker({ value, onChange, options, photoRatio, name = 'size'
 }
 
 type ResolutionProps = {
-  options: ImageOptions; value: Resolution; costs: CreditsCost; balance: Balance; onChange(next: Resolution): void
+  options: ImageOptions; value: Resolution; costs: CreditsCost; balance: Balance | null; onChange(next: Resolution): void
   // The chosen size and the first photo's ratio, so each card shows the real output pixels.
   aspect?: OutputAspect; photoRatio?: number | null
   // Images one run makes (a poster set's pages): each card then shows that set's total.
@@ -64,7 +64,8 @@ export function ResolutionPicker({ value, costs, balance, onChange, options, asp
     <div role="radiogroup" aria-labelledby="res-h" className="grid gap-2">
       {TIER_OPTIONS.filter(({ id }) => options.resolutions.includes(id)).map((tier) => {
         const cost = setCredits(costs[tier.id], images)
-        const affordable = anyPool ? chargeAnyPool(balance, cost) !== null : canAfford(balance, cost, tier.id)
+        // Signed out (no balance) nothing is greyed: the sign-up gift decides later.
+        const affordable = !balance || (anyPool ? chargeAnyPool(balance, cost) !== null : canAfford(balance, cost, tier.id))
         const size = tierSize(tier.id, aspect, photoRatio)
         return (
           <label key={tier.id} className="relative cursor-pointer">

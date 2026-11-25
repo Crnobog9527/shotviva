@@ -26,11 +26,11 @@ import { FormAction } from './form-action'
 import { PendingCatalogueForm } from './pending-catalogue-form'
 import { useSubmitOnce } from './use-submit-once'
 import { useWarmRoute } from './use-warm-route'
-import { useWorkspaceDraft, type DraftInput } from './use-workspace-draft'
+import { useWorkspaceDraft, type CreateContext } from './use-workspace-draft'
 import { WorkspaceForm } from './workspace-form'
 
 
-export type CreateContext = Omit<DraftInput, 'template'>
+export type { CreateContext }
 
 type Props = CreateContext & { template: CatalogueTemplate | null; onClose(): void }
 

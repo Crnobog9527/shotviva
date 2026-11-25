@@ -6,7 +6,7 @@ import { CompareSlider } from './compare-slider'
 import { CoverFills } from './cover-fills'
 import { PhotoPair } from './photo-pair'
 import { BundleCard } from './bundle-card'
-import { SeriesCard } from './series-card'
+import { SeriesCard, seriesPick } from './series-card'
 import { SeriesMotion } from './series-motion-mount'
 import { phoneSlot } from './phone-sizes'
 
@@ -126,7 +126,7 @@ function SoloSeries({ card, media }: { card: TemplateCard; media: TemplateLookup
         <span className="mk-use">{card.use}</span>
         <span className="mk-scount">{t('seriesCount', { count: card.series?.count ?? 0 })}</span>
         {card.series ? (
-          <button type="button" className="mk-ghost-pill" data-open-series={card.series.href} tabIndex={-1} aria-hidden>
+          <button type="button" className="mk-ghost-pill" data-open-series={card.series.href} {...seriesPick(card.series)} tabIndex={-1} aria-hidden>
             {t('seriesOpen')}
           </button>
         ) : null}

@@ -10,19 +10,20 @@ import { COVER_SIZES } from '../catalogue/cover-sizes'
 import { PairMedia } from '../catalogue/pair-media'
 import { SeriesBadge } from '../catalogue/series-badge'
 
-// `label`: the series' name and size ("Neon Night · 4 templates"), naming the group.
-type Props = { label: string; members: readonly CatalogueTemplate[]; value: string; onChange(id: string): void }
+// `label`: the set's name and size ("Neon Night · 4 templates"), naming the group; `badge`: which
+// kind of set it is (a series, or a 精选组合 on the public pages).
+type Props = { label: string; badge?: 'series' | 'bundle'; members: readonly CatalogueTemplate[]; value: string; onChange(id: string): void }
 
 // The series' members inside its creation panel (Owner 2026-11-12, after Lovart's series
 // panel): each one's before / after as a small split with its name; choosing one swaps the
 // sample and the form beside it, with no second step. A native radio per member keeps it a
 // keyboard and screen-reader choice. Four across under the sample from 768px; on phones one
 // row that scrolls sideways, so the form stays close under it.
-export function MemberPicker({ label, members, value, onChange }: Props) {
+export function MemberPicker({ label, badge = 'series', members, value, onChange }: Props) {
   return (
     <div>
       <p className="mb-2 flex items-center gap-2 text-label leading-[1.3] font-medium">
-        <SeriesBadge onPhoto={false} />
+        <SeriesBadge onPhoto={false} bundle={badge === 'bundle'} />
         <span id="series-members">{label}</span>
       </p>
       <div role="radiogroup" aria-labelledby="series-members"

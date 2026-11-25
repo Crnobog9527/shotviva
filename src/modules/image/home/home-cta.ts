@@ -1,4 +1,6 @@
-import type { Balance } from '@/core/billing/pools'
+import type { Balance, PoolChoiceOffer } from '@/core/billing/pools'
+import type { BatchLimits } from '@/core/billing/tier-limits'
+import type { MembershipTier } from '@/core/config'
 
 import { ctaState, type CtaState } from '../workspace/cta-state'
 
@@ -10,6 +12,12 @@ export type HomeViewer = {
   concurrency: { limit: number; runningIds: string[] }
   // Saved template ids, newest first (T83), read with the visitor's own session.
   favoriteIds: string[]
+  // What Create's dialog reads too, for the template panel (Owner 2026-11-25): effective_tier(),
+  // effective_limits()' batch part and an org member's choice of org credits (§6.5). Optional, so
+  // a page read that has none of them yet treats the visitor as Starter, not as an org member.
+  tier?: MembershipTier | null
+  batch?: BatchLimits | null
+  poolChoice?: PoolChoiceOffer | null
 }
 
 export type HomePhotoStatus = 'none' | 'uploading' | 'ready' | 'error'

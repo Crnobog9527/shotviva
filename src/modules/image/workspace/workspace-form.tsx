@@ -21,7 +21,7 @@ import { PhotoCard } from './photo-card'
 import { PhotoPickers } from './photo-pickers'
 import { CopyFields, NoteField } from './text-fields'
 import { FieldGroups } from './field-groups'
-import { canOpenOnOverPick, useOverPick } from './use-over-pick'
+import { useOverPick } from './use-over-pick'
 import { SlotBoxes } from './slot-boxes'
 import type { PhotoBatch, SlotPhotos } from './use-photo-batch'
 import { chosenAspect, templateOptions } from './output-choice'
@@ -34,7 +34,8 @@ export type FormValues = { aspect: OutputAspect; resolution: Resolution; note: s
 
 type Props = {
   template: CatalogueTemplate
-  balance: Balance
+  // null: signed out (the public template panel): no balance line, every tier offered as is.
+  balance: Balance | null
   tier: MembershipTier | null
   photos: PhotoBatch
   // A slot template's photos by slot (§5.1e); its boxes take the photo section's place.
@@ -88,13 +89,13 @@ export function WorkspaceForm({ template, balance, tier, photos, slots, values, 
       {options.resolutions.length > 1 ? <Section id="res-h" title={t('workspace.resolution')}>
         <ResolutionPicker options={options} aspect={values.aspect} photoRatio={ratioForSize} value={values.resolution} costs={template.creditsCost} balance={balance} onChange={(resolution) => onChange({ resolution })} />
       </Section> : null}
-      <p className="flex items-center gap-2 pt-5 text-caption text-muted-foreground">
+      {balance ? <p className="flex items-center gap-2 pt-5 text-caption text-muted-foreground">
         <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 flex-none text-primary" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round">
           <circle cx="12" cy="12" r="8.5" />
           <path d="M12 8v4.5M12 16h.01" />
         </svg>
         {balanceSentence(balance, balanceT)}
-      </p>
+      </p> : null}
     </>
   )
 }
@@ -181,7 +182,7 @@ function PhotoField({ photos, missing, tier, optional }: { optional: boolean; ph
   if (!first && missing) return <MissingPhoto reason={missing} multiple={photos.batchMax > 1} onPick={pick} />
   if (photos.batchMax <= 1) {
     // Starter may pick several from the gallery: the first is kept and the paywall opens on Pro.
-    return first ? <PhotoCard onRemove={optional ? () => photos.remove(first.id) : undefined} photo={first} upload={first.upload} onPick={(file) => photos.add([file])} /> : <PhotoPickers onPick={pick} multiple={canOpenOnOverPick(tier, photos.batchMax)} />
+    return first ? <PhotoCard onRemove={optional ? () => photos.remove(first.id) : undefined} photo={first} upload={first.upload} onPick={(file) => photos.add([file])} /> : <PhotoPickers onPick={pick} multiple={pick.upsell} />
   }
   if (!first) return <PhotoPickers onPick={pick} multiple />
   return <BatchPhotos photos={photos.photos} max={photos.batchMax} tier={tier} onAdd={pick} onRemove={photos.remove} />

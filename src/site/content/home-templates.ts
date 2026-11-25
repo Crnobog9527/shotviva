@@ -86,7 +86,7 @@ function toCard({ template, series }: Entry, byId: ReadonlyMap<string, Live>): T
     id: `series-${series.id}`,
     name: series.name,
     use: series.description ?? template.description ?? '',
-    series: { href: seriesHref(series.slug), members: pairMembers(series, byId).map((member) => member.id), count: series.memberIds.filter((id) => byId.has(id)).length },
+    series: { href: seriesHref(series.slug), slug: series.slug, members: pairMembers(series, byId).map((member) => member.id), count: series.memberIds.filter((id) => byId.has(id)).length },
   }
 }
 
@@ -119,12 +119,14 @@ export function featuredSections(live: readonly Live[], keys?: readonly string[]
 // series card plays after the first pair the server drew (/api/home/series, the browser's
 // series-layers-source.ts). The same members, order and limit as the card's own, for any page:
 // the home page and the landing pages draw their series from these same two cached reads.
-export function seriesLayerPairs(live: readonly Live[], series: readonly Series[]): Record<string, [before: string, after: string][]> {
+// Each later pair carries the template it shows, as a bundle's do, so a click on the card opens
+// the template panel on the member on show.
+export function seriesLayerPairs(live: readonly Live[], series: readonly Series[]): Record<string, [before: string, after: string, templateId: string][]> {
   const byId = new Map(live.map((template) => [template.id, template]))
   return Object.fromEntries(
     series.flatMap((one) => {
       const later = pairMembers(one, byId).slice(1)
-      return later.length > 0 ? [[`series-${one.id}`, later.map((member) => [member.coverBeforeUrl ?? '', member.coverAfterUrl ?? ''])]] : []
+      return later.length > 0 ? [[`series-${one.id}`, later.map((member) => [member.coverBeforeUrl ?? '', member.coverAfterUrl ?? '', member.id] as [string, string, string])]] : []
     }),
   )
 }

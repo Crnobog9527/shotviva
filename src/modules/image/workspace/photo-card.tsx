@@ -70,6 +70,7 @@ export function PhotoSize({ size, keptFrom, className }: { size: string; keptFro
 export function UploadStage({ upload, kept }: { upload: UploadState; kept?: boolean }) {
   const t = useTranslations('app')
   if (upload.phase === 'done') return <Uploaded kept={kept === true} />
+  if (upload.phase === 'local') return null
   if (upload.phase === 'error') {
     return <p role="alert" className="text-caption leading-[1.4] text-destructive">{t(`errors.${upload.code}`)}</p>
   }

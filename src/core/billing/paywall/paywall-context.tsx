@@ -87,3 +87,9 @@ export function usePaywall(): PaywallApi {
   if (!api) throw new Error("usePaywall needs a PaywallProvider")
   return api
 }
+
+// Null where no PaywallProvider is mounted: the public pages' template panel signed out, which
+// never opens the paywall (its primary is sign-up).
+export function usePaywallIfAny(): PaywallApi | null {
+  return useContext(PaywallContext)
+}

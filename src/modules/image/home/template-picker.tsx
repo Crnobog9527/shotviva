@@ -18,6 +18,8 @@ import { PickerBrowser } from './picker-list'
 type Props = {
   // The template the dialog opens on (the bench's choice, or the card's Preview); null: closed.
   openOn: string | null
+  // The category it opens on (slug path); absent: All.
+  openPath?: readonly string[]
   catalogue: HomeCatalogue | null
   failed: boolean
   onRetry(): void
@@ -44,12 +46,12 @@ function useChosen(openOn: string | null, templates: readonly CatalogueTemplate[
   return { template: templates.find((template) => template.id === chosenId) ?? null, choose: setChosenId }
 }
 
-type BodyProps = { header: ReactNode; chosen: CatalogueTemplate; choose(id: string): void } & Pick<Props, 'onPick' | 'sampleOf' | 'thumbOf'> & {
+type BodyProps = { header: ReactNode; chosen: CatalogueTemplate; choose(id: string): void } & Pick<Props, 'onPick' | 'sampleOf' | 'thumbOf' | 'openPath'> & {
   view: ReturnType<typeof browseView>
 }
 
 // Mounted only while the picker is open, so every opening starts on All with an empty search.
-function PickerBody({ header, chosen, choose, view, onPick, sampleOf, thumbOf }: BodyProps) {
+function PickerBody({ header, chosen, choose, view, onPick, sampleOf, thumbOf, openPath }: BodyProps) {
   const t = useTranslations('home.generator')
   const [searching, setSearching] = useState(false)
   return (
@@ -57,7 +59,7 @@ function PickerBody({ header, chosen, choose, view, onPick, sampleOf, thumbOf }:
       <PickerSample selected={chosen} sampleOf={sampleOf} />
       <div className="mk-pk-side">
         {header}
-        <PickerBrowser view={view} selected={chosen} onSelect={choose} thumbOf={thumbOf} onSearching={setSearching} />
+        <PickerBrowser view={view} selected={chosen} onSelect={choose} thumbOf={thumbOf} onSearching={setSearching} startPath={openPath} />
         <div className="mk-pk-go">
           <button type="button" className="mk-cta" onClick={() => onPick(chosen)}>
             {t('pickTemplate', { name: chosen.name })}
@@ -86,7 +88,7 @@ const EMPTY: readonly CatalogueTemplate[] = []
 // and, on the right, search, category chips and the list (series as one row each, Owner
 // 2026-11-13); on phones a bottom drawer. One primary, "Pick ‹name›"; choosing it sets the
 // generator's template, nothing else (DESIGN §6.9 item 2: no confirm step).
-export function TemplatePicker({ openOn, catalogue, failed, onRetry, onClose, onPick, sampleOf, thumbOf }: Props) {
+export function TemplatePicker({ openOn, openPath, catalogue, failed, onRetry, onClose, onPick, sampleOf, thumbOf }: Props) {
   const desktop = useMediaQuery('(min-width: 768px)')
   const t = useTranslations('home.generator')
   const close = useTranslations('app.sheet')('close')
@@ -99,7 +101,7 @@ export function TemplatePicker({ openOn, catalogue, failed, onRetry, onClose, on
   if (openOn === null || (ready && chosen === null)) return null
   const onOpenChange = (open: boolean) => (open ? undefined : onClose())
   const body = (header: ReactNode) => view && chosen
-    ? <PickerBody header={header} chosen={chosen} choose={choose} view={view} onPick={onPick} sampleOf={sampleOf} thumbOf={thumbOf} />
+    ? <PickerBody header={header} chosen={chosen} choose={choose} view={view} onPick={onPick} sampleOf={sampleOf} thumbOf={thumbOf} openPath={openPath} />
     : <PickerPending header={header} failed={failed} onRetry={onRetry} />
   if (desktop) {
     return (
