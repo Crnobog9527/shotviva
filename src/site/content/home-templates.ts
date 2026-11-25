@@ -8,8 +8,9 @@ import { CATEGORY } from './landing-shared'
 // ARCHITECTURE §12 home item 3): the featured templates (featured_rank, chosen in admin) grouped
 // under their categories in the order set in 分类管理 (T75), a category with none hidden. Name
 // and description in the page's language (T52), category name and intro from
-// template_categories, covers from the template itself. With nothing featured, the six most
-// recently published.
+// template_categories, covers from the template itself. With nothing featured, the home and
+// landing pages show no featured sections (Owner 2026-11-25); only the 404's picks fall back to
+// the six most recently published.
 //
 // Series (系列, T102; Owner 2026-11-12): a featured template that belongs to a live series shows
 // as that series, once, where its first featured member stands; the series card shows its
@@ -28,8 +29,13 @@ type Series = Pick<PublicSeries, 'id' | 'slug' | 'name' | 'description' | 'showM
 // Create opens a series from the address (?series=<slug>, modules/image catalogue-filter.ts).
 export const seriesHref = (slug: string) => `/generate?series=${encodeURIComponent(slug)}`
 
+// Only what admin featured, in rank order.
+export function rankedTemplates<T extends Live>(live: readonly T[]): T[] {
+  return live.filter((template) => template.featuredRank !== null).sort((a, b) => (a.featuredRank ?? 0) - (b.featuredRank ?? 0))
+}
+
 export function featuredTemplates<T extends Live>(live: readonly T[]): T[] {
-  const ranked = live.filter((template) => template.featuredRank !== null).sort((a, b) => (a.featuredRank ?? 0) - (b.featuredRank ?? 0))
+  const ranked = rankedTemplates(live)
   if (ranked.length > 0) return ranked
   return [...live].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, FALLBACK_COUNT)
 }
@@ -100,7 +106,7 @@ export const HOME_CATEGORIES: readonly string[] = [CATEGORY.spaces, CATEGORY.foo
 
 export function featuredSections(live: readonly Live[], keys?: readonly string[], series: readonly Series[] = []) {
   const wanted = keys ? new Set(keys) : null
-  const featured = featuredTemplates(live).filter((template) => !wanted || wanted.has(template.category))
+  const featured = rankedTemplates(live).filter((template) => !wanted || wanted.has(template.category))
   const byId = new Map(live.map((template) => [template.id, template]))
   const entries = featuredEntries(featured, series)
   // Each card's covers, a series' pictured members included.
