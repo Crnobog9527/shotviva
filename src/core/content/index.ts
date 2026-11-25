@@ -19,6 +19,7 @@ export {
   type HeadedText,
   type HeroBlock,
   type HeroStripBlock,
+  type LiveHeroPair,
   type HeroScene,
   type HomeFaq,
   type HomePage,

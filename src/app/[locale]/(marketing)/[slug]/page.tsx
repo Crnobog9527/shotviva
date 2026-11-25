@@ -22,6 +22,7 @@ import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 
 import { HomeGeneratorSlot } from '../home-generator-slot'
+import { liveHero } from '../home-hero-live'
 
 // Every inner SEO page renders through this one route (ARCHITECTURE §12), in each language
 // that has a text for it (site/content/localized.ts; Chinese only for the zh keyword map).
@@ -54,6 +55,13 @@ async function load(params: Promise<{ slug: string }>) {
   return { locale, live, series, products, wishlistOpen, page: fillCredits(found, facts), free: fillCredits(freeImagesIn(locale), facts) }
 }
 
+// A page whose first screen follows a template's live covers (landing.liveHero, Owner 2026-11-25):
+// that pair, or null (the page's own pictures) when the template is not live.
+function pageLiveHero(page: ContentPage, live: Parameters<typeof liveHero>[2]) {
+  const pair = page.landing.liveHero
+  return pair ? liveHero([pair], pair.caption, live) : null
+}
+
 export async function generateMetadata({ params }: PageProps<'/[locale]/[slug]'>): Promise<Metadata> {
   const { locale, page } = await load(params)
   return pageMetadata(site, { ...pageGate(page), title: page.title, description: page.description }, locale)
@@ -78,14 +86,15 @@ export default async function ContentRoute({ params }: PageProps<'/[locale]/[slu
   const defaultId = wanted && live.some((template) => template.id === wanted) ? wanted : firstFeatured
   // As on home: the panel's opening template and rail in the page, the picker's catalogue on demand.
   const { templates, opening } = homePanelTemplates(live, defaultId)
-  const initialCovers = await openingCovers(opening)
+  const [initialCovers, livePair] = await Promise.all([openingCovers(opening), pageLiveHero(page, live)])
+  const shown = livePair ? { ...page, hero: { ...page.hero, ...livePair } } : page
   const generator = (
     <HomeGeneratorSlot templates={templates} catalogue={{ locale }} defaultId={opening?.id ?? null} homePath={localizePath(path, locale)} freeImages={free} initialCovers={initialCovers} />
   )
   return (
     <>
       <JsonLdScript data={ld} />
-      <ContentPageView page={page} isLinkEnabled={isLinkEnabled} templates={sections} generator={generator} requestLink={wishlistOpen} />
+      <ContentPageView page={shown} isLinkEnabled={isLinkEnabled} templates={sections} generator={generator} requestLink={wishlistOpen} />
     </>
   )
 }

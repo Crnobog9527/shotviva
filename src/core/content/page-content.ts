@@ -96,7 +96,15 @@ export type PageBasics = {
 // `templates.defaultId`: the template the generator opens on when it is live, instead of the first
 // featured one (e.g. /transparent-background opens on the cut-out template). `compare`: an
 // optional H2 with one comparison table, right before the FAQ (SEO launch handbook 04-P1 H2-5).
+// A hero pair read live from a published template's covers (Owner 2026-11-25): the template's
+// current phone photo and result, so a cover changed in admin shows on the page once the
+// templates cache refreshes. The words are the page's, per dish; the pictures are the template's.
+export type LiveHeroPair = { templateId: string; phone: string; ai: string; caption: string }
+
 export type LandingParts = {
+  // The first screen's pair from a template's live covers; the static `hero` pictures stay as the
+  // fallback for when that template is not live.
+  liveHero?: LiveHeroPair
   factsNote: string
   templates?: { heading: string; intro: string; categoryKeys: readonly [string, ...string[]]; defaultId?: string }
   compare?: { heading: string; intro: string; table: FaqTable }
