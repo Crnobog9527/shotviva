@@ -2,6 +2,7 @@
   "home": {
     "placeholder": "Coming soon.",
     "generator": {
+      "panelSignUp": "Sign up free to make this photo",
       "label": "Try it on your photo",
       "replace": "Replace",
       "template": "Template",
@@ -102,9 +103,9 @@
     },
     "arrived": {
       "home": {
-        "title": "Your photo and template are kept.",
-        "login": "Log in and they'll be waiting on the home page.",
-        "signup": "Verify your email and they'll be waiting on the home page."
+        "title": "Your template is kept.",
+        "login": "Log in and it opens again on the home page.",
+        "signup": "Verify your email and it opens again on the home page."
       },
       "graylum": {
         "title": "Connecting Graylum.",
@@ -650,13 +651,16 @@
       "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up.",
       "signupGiftRefusedStaff": "No sign-up credits for this account: it was created through an organisation's staff link."
     },
+    "form": {
+      "formLoading": "Loading template settings…",
+      "formLoadFailed": "Couldn’t load the template settings.",
+      "formRetry": "Try again"
+    },
     "create": {
       "title": "Create",
       "lede": "Pick a look. Your photo stays as shot.",
       "metaTitle": "Create",
       "empty": "Templates are on their way. Check back soon.",
-      "formLoading": "Loading template settings…",
-      "formLoadFailed": "Couldn’t load the template settings.",
       "formRetry": "Try again",
       "catalogueLoadFailed": "Couldn’t load the templates.",
       "templates": "Templates",
@@ -678,6 +682,7 @@
       "coverAlt": "{name} series example",
       "members": "{name} · {count, plural, one {# template} other {# templates}}",
       "badge": "Series",
+      "bundleBadge": "Set",
       "shelfCount": "{count, plural, one {# template} other {# templates}}",
       "shelfMore": "+{count} more",
       "shelfMoreAria": "See all {total} templates in {name}",
@@ -696,6 +701,7 @@
       "featureMeta": "{category} · video",
       "compareAria": "Compare the real phone photo and the AI result",
       "phonePhotoAlt": "Real phone photo",
+      "phoneFull": "Real phone photo",
       "resultAlt": "{name} result",
       "loopAria": "{name} example: real phone photo changing into the AI result",
       "hintCompare": "Drag across the photo to compare.",
@@ -2483,7 +2489,9 @@
       "seriesAria": "{name}. {use} A series of {count, plural, one {# template} other {# templates}}. Open this series",
       "seriesBadge": "Series",
       "bundleBadge": "Set",
-      "bundleCount": "{count, plural, one {# template} other {# templates}}",
+      "bundleCount": "{count} picked",
+      "bundleAllIn": "All {count} {category} templates →",
+      "bundleAll": "All {count} templates →",
       "stripPick": "{name}. Use this template",
       "heroScenesLabel": "Phone photos and results from a few templates",
       "bundleAria": "{name}, showing {template}. Use this template",

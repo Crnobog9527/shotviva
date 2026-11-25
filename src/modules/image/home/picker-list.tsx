@@ -22,6 +22,8 @@ type Props = {
   thumbOf(template: CatalogueTemplate): string | null
   // Set while a search is typed, so phones can fold the sample away above the results.
   onSearching(searching: boolean): void
+  // The category chip path the list opens on; empty: All.
+  startPath?: readonly string[]
 }
 
 // The chips sit flush with the list, not the page gutter Create gives them.
@@ -32,12 +34,12 @@ const FLUSH = { '--gutter': '0px' } as CSSProperties
 // under them: templates as radios, a series as one row that opens its members. Each chip level is
 // one line that scrolls sideways (rail), so three levels open still leave the list most of the
 // column (Owner 2026-11-25).
-export function PickerBrowser({ view, selected, onSelect, thumbOf, onSearching }: Props) {
+export function PickerBrowser({ view, selected, onSelect, thumbOf, onSearching, startPath }: Props) {
   const t = useTranslations('home.generator')
   const ids = useFavorites()?.ids
   const openable = useMemo(() => view.entries.flatMap((entry) => (entry.type === 'template' ? [entry.template] : entry.series.members)), [view.entries])
   const saved = ids ? savedIn(ids, openable) : []
-  const state = usePickerBrowse(view, saved)
+  const state = usePickerBrowse(view, saved, startPath)
   const labels = { all: t('pickerAll'), filter: t('pickerFilter'), filterWithin: (name: string) => t('pickerFilterWithin', { name }) }
   const row = (template: CatalogueTemplate) => (
     <PickerRow key={template.id} template={template} chosen={template.id === selected.id} onSelect={onSelect} thumb={thumbOf(template)} />

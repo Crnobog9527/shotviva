@@ -8,7 +8,7 @@ import { useEffect } from 'react'
 export type HeaderCta = 'upload' | 'generate' | null
 
 // The header's Start free is server HTML in core/content and cannot import this module, so it
-// carries `data-generator-upload` (like the template cards' data attributes, use-pick-events).
+// carries `data-generator-upload` (like the template cards' data attributes, panel/panel-dom.ts).
 // While `mode` is set, <html> gets `data-gen-away="<mode>"`: from 768px up the button shows the
 // matching label (marketing.css), and a click runs `onClick` instead of going to /signup. Phones
 // never show that button; their dock does this job. Capture phase, so the link's own navigation

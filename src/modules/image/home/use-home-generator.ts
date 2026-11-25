@@ -15,7 +15,7 @@ import { chosenAspect, closestResolution, hasOutputOptions, selectedAspect, temp
 import { useOriginalRatio } from '../workspace/use-original-ratio'
 import { startInputs } from '../workspace/batch-request'
 import { homeCta, type HomeCta, type HomeViewer } from './home-cta'
-import { clearDraft, loadDraft, saveDraft, type HomeDraft } from './home-draft'
+import { clearDraft, loadDraft, type HomeDraft } from './home-draft'
 import { useHomePhoto, type HomePhoto } from './use-home-photo'
 
 type Args = {
@@ -142,8 +142,6 @@ export function useHomeGenerator({ templates, defaultId, viewer, find }: Args) {
     photo,
     cta,
     generate: () => start(outputAspect, resolution, note.trim()),
-    // Before the sign-up prompt: what to bring back afterwards.
-    keepDraft: () => (template ? saveDraft({ templateId: template.id, aspect, note }, photo.file) : Promise.resolve()),
   }
 }
 

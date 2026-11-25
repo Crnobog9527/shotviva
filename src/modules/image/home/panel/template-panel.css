@@ -1,0 +1,7 @@
+/* The public template panel (template-panel.tsx) is the signed-in Create dialog's frame and form,
+   drawn on the home and landing pages. Its utilities come with the app's own sheet, loaded with
+   the panel's code on first use, so the public pages' first-load sheet (globals-public.css, at its
+   20 KB budget) does not grow; scripts/public-css-sources-lib.ts stops at this file's importer. A
+   page that later enters the app loads the same sheet anyway, and it agrees with the public one
+   rule for rule. */
+@import "../../../../app/globals.css";

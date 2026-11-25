@@ -39,5 +39,5 @@ export function useHomeCatalogue(templates: readonly CatalogueTemplate[], { loca
     if (known || data) return known ?? null
     return (await load()).templates.find((template) => template.id === id) ?? null
   }, [data, load, templates])
-  return { data, failed, open, find }
+  return { data, failed, open, find, load }
 }

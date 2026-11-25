@@ -27,6 +27,19 @@ type Props = {
   picker?: ReactNode
   // The template's share button (share-button.tsx), under its name and description.
   share?: ReactNode
+  // Where focus goes back on close when the opener was not a focused trigger (a card on the
+  // public pages: Safari does not focus a clicked button). Absent or detached: the default.
+  returnFocus?(): HTMLElement | null
+}
+
+// Radix's onCloseAutoFocus, sending focus to the opener when there is one still on the page.
+function closeFocus(returnFocus: Props['returnFocus']) {
+  return (event: Event) => {
+    const target = returnFocus?.()
+    if (!target?.isConnected) return
+    event.preventDefault()
+    target.focus({ preventScroll: true })
+  }
 }
 
 // The creation dialog's frame (DESIGN §6.9 item 2, B comp create.html .cd): from 768px a 1040px
@@ -44,7 +57,7 @@ function DesktopSheet(props: Props) {
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="scrim-motion fixed inset-0 z-90 bg-[var(--scrim)] backdrop-blur-[2px]" />
-        <DialogPrimitive.Content className={cn('dialog-motion shadow-sheet fixed top-1/2 left-1/2 z-100 h-[min(calc(100dvh-64px),880px)] w-[min(1040px,calc(100%-32px))] -translate-1/2 outline-none', DESKTOP_FRAME)}>
+        <DialogPrimitive.Content onCloseAutoFocus={closeFocus(props.returnFocus)} className={cn('dialog-motion shadow-sheet fixed top-1/2 left-1/2 z-100 h-[min(calc(100dvh-64px),880px)] w-[min(1040px,calc(100%-32px))] -translate-1/2 outline-none', DESKTOP_FRAME)}>
           <DesktopPanes {...props} Title={DialogPrimitive.Title} Description={DialogPrimitive.Description} />
           <CloseButton Close={DialogPrimitive.Close} className="top-4 right-4" />
         </DialogPrimitive.Content>
@@ -83,8 +96,10 @@ export function DesktopPanes({ Title, Description, title, description, hint, sam
 function PhoneSheet(props: Props) {
   const { open, onOpenChange } = props
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[calc(100dvh-var(--sat)-12px)]">
+    // autoFocus: vaul leaves focus on the page behind by default, so its focus trap never engages
+    // and Tab walks the page under the sheet; the sheet takes focus like the desktop dialog.
+    <Drawer open={open} onOpenChange={onOpenChange} autoFocus>
+      <DrawerContent className="h-[calc(100dvh-var(--sat)-12px)]" onCloseAutoFocus={closeFocus(props.returnFocus)}>
         <PhonePanes {...props} Title={DrawerTitle} Description={DrawerDescription} />
         <CloseButton Close={DrawerClose} className="top-3 right-3" />
       </DrawerContent>

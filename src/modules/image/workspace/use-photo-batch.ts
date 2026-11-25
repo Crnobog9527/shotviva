@@ -62,7 +62,8 @@ function useBatchUploads(entries: Entry[], patch: (id: string, change: Partial<E
 // each cancellable. With batchMax 1 (Starter, no tier) a new pick replaces the photo, as the
 // single-photo workspace always did. `dropped` is how many of the last pick did not fit.
 // `kept` starts the list with photos kept from an earlier work (Make again), ready to generate.
-export function usePhotoBatch(batchMax: number, kept?: KeptStart) {
+// `local`: signed out (the public template panel), photos stay in the browser and never upload.
+export function usePhotoBatch(batchMax: number, kept?: KeptStart, local = false) {
   const [entries, setEntries] = useState<Entry[]>(() => keptEntries(kept, batchMax))
   const [dropped, setDropped] = useState(0)
   const patch = useCallback((id: string, change: Partial<Entry>) => {
@@ -79,7 +80,7 @@ export function usePhotoBatch(batchMax: number, kept?: KeptStart) {
     const kept = replacing ? [] : entries
     const { accepted, dropped: over } = takeBatch(files, batchMax - kept.length)
     setDropped(over)
-    setEntries([...kept, ...accepted.map((file) => newEntry(file, patch))])
+    setEntries([...kept, ...accepted.map((file) => newEntry(file, patch, local))])
   }
 
   const remove = (id: string) => {
@@ -147,14 +148,14 @@ function useKeptRatios(entries: Entry[], patch: (id: string, change: Partial<Ent
   }, [entries, patch])
 }
 
-function newEntry(file: File, patch: (id: string, change: Partial<Entry>) => void): Entry {
+function newEntry(file: File, patch: (id: string, change: Partial<Entry>) => void, local = false): Entry {
   const id = crypto.randomUUID()
   const url = URL.createObjectURL(file)
   // The ratio readout fills in once the browser has decoded the photo; upload does not wait.
   void naturalSize(url)
     .then(({ width, height }) => patch(id, { ratio: nearestRatio(width, height), originalRatio: width / height }))
     .catch(() => undefined)
-  return { id, file, url, bytes: file.size, name: file.name, ratio: null, upload: { phase: 'idle' } }
+  return { id, file, url, bytes: file.size, name: file.name, ratio: null, upload: local ? { phase: 'local' } : { phase: 'idle' } }
 }
 
 // The new-version banner (T90) waits while a photo uploads, and says a refresh drops the picked

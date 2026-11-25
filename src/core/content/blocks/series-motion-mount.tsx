@@ -80,6 +80,8 @@ function useOpenSeries() {
   const router = useRouter()
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
+      // The page's template panel took it (modules/image/home: it opens the series right here).
+      if (event.defaultPrevented) return
       const target = event.target instanceof Element ? event.target.closest('[data-open-series]') : null
       const href = target?.getAttribute('data-open-series')
       if (href?.startsWith('/generate')) router.push(href)

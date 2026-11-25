@@ -2,6 +2,7 @@
   "home": {
     "placeholder": "即将上线。",
     "generator": {
+      "panelSignUp": "免费注册，生成这张图",
       "label": "用你的照片试一下",
       "replace": "更换",
       "template": "模板",
@@ -102,9 +103,9 @@
     },
     "arrived": {
       "home": {
-        "title": "你选好的照片和模板已保留。",
-        "login": "登录后返回首页，照片和模板都还在。",
-        "signup": "验证邮箱后返回首页，照片和模板都还在。"
+        "title": "你选好的模板已保留。",
+        "login": "登录后回到首页，模板会自动打开。",
+        "signup": "验证邮箱后回到首页，模板会自动打开。"
       },
       "graylum": {
         "title": "正在连接 Graylum。",
@@ -650,13 +651,16 @@
       "signupGiftRefusedPaused": "这个账号注册时，注册赠分暂停发放，因此未能领取。",
       "signupGiftRefusedStaff": "通过企业员工链接注册的账号不享有注册赠分。"
     },
+    "form": {
+      "formLoading": "正在加载模板设置…",
+      "formLoadFailed": "模板设置加载失败。",
+      "formRetry": "重试"
+    },
     "create": {
       "title": "创作",
       "lede": "选择一个风格，照片内容始终与原图一致。",
       "metaTitle": "创作",
       "empty": "模板即将上线，请稍后再来查看。",
-      "formLoading": "正在加载模板设置…",
-      "formLoadFailed": "模板设置加载失败。",
       "formRetry": "重试",
       "catalogueLoadFailed": "模板加载失败。",
       "templates": "模板",
@@ -678,6 +682,7 @@
       "coverAlt": "{name} 系列效果示例",
       "members": "{name} · {count} 个模板",
       "badge": "系列",
+      "bundleBadge": "组合",
       "shelfCount": "共 {count} 个",
       "shelfMore": "+{count} 个",
       "shelfMoreAria": "查看「{name}」全部 {total} 个模板",
@@ -696,6 +701,7 @@
       "featureMeta": "{category} · 视频",
       "compareAria": "对比真实手机照和 AI 出图",
       "phonePhotoAlt": "真实手机照",
+      "phoneFull": "真实手机照",
       "resultAlt": "{name} 出图效果",
       "loopAria": "{name} 示例：真实手机照变成 AI 出图的过程",
       "hintCompare": "在图片上左右拖动，对比前后效果。",
@@ -2483,7 +2489,9 @@
       "seriesAria": "{name}。{use}共 {count} 款模板，打开这个系列",
       "seriesBadge": "系列",
       "bundleBadge": "组合",
-      "bundleCount": "{count} 个模板",
+      "bundleCount": "精选 {count} 个",
+      "bundleAllIn": "全部{category}模板 {count} 个 →",
+      "bundleAll": "全部 {count} 个模板 →",
       "stripPick": "{name}。使用这个模板",
       "heroScenesLabel": "几个模板的手机照和成图",
       "bundleAria": "{name}，当前显示：{template}。使用这个模板",
