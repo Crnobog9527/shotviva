@@ -243,6 +243,9 @@
      plate; back at scene 1 the last photo fades out to the server-rendered first one. */
   .mk-pstack { position: absolute; z-index: 1; top: 0; bottom: 0; left: 0; width: 50%; overflow: hidden; pointer-events: none; }
   .mk-pair .mk-scene.mk-out { z-index: 1; opacity: 0; transition: opacity .4s var(--ease); }
+  /* In the phone stack nothing lies over a photo that stops being shown, so it hides at once:
+     going back to scene 1, the delay let photo 2 show through photo 3's fade-out. */
+  .mk-pstack .mk-scene:not(.mk-on):not(.mk-out) { transition: none; }
   /* A dot picked a scene still loading: it shows at once, every other picture drops (the first
      phone photo too, under the stack), and its two plates fill in as they arrive. */
   .mk-wait .mk-pair .mk-scene:not(.mk-on) { opacity: 0; transition: none; }
