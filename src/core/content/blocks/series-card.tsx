@@ -11,9 +11,9 @@ import type { TemplateLookup } from './template-grid'
 const SIZE = { width: 900, height: 1125 }
 type Pair = { id: string; before: string; after: string }
 
-// The pictured members' covers, in series order.
+// The pictured members' covers, in series (or bundle) order.
 function pairsOf(card: TemplateCard, media: TemplateLookup): Pair[] {
-  return (card.series?.members ?? []).flatMap((id) => {
+  return (card.series?.members ?? card.bundle?.members ?? []).flatMap((id) => {
     const cover = media[id]
     return cover?.before && cover.after ? [{ id, before: cover.before, after: cover.after }] : []
   })
@@ -25,7 +25,7 @@ type PairsProps = { card: TemplateCard; media: TemplateLookup; size: 'lg' | 'car
 // server; the others' covers become layers above it in the browser when the card first plays,
 // their addresses fetched then under the card's key (series-layers.ts). With one pair (or none)
 // it is a still card.
-function SeriesPairs({ card, media, size, sizes }: PairsProps) {
+export function SeriesPairs({ card, media, size, sizes }: PairsProps) {
   const t = useTranslations('marketing.home')
   const [first, ...rest] = pairsOf(card, media)
   if (!first) {

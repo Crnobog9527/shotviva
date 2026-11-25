@@ -2186,6 +2186,20 @@ $$;
 ALTER FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "admin"."require_admin"("p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin' and p.banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+end $$;
+
+
+ALTER FUNCTION "admin"."require_admin"("p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "admin"."require_blog_admin"("p_actor" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -8731,6 +8745,20 @@ $$;
 ALTER FUNCTION "public"."admin_delete_dishware"("p_id" "uuid", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_delete_featured_bundle"("p_id" "uuid", "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform admin.require_admin(p_actor);
+  delete from public.featured_bundles where id = p_id;
+  if not found then raise exception 'BUNDLE_NOT_FOUND'; end if;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_delete_featured_bundle"("p_id" "uuid", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_delete_provider"("p_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -11508,6 +11536,47 @@ $$;
 ALTER FUNCTION "public"."admin_save_dishware"("p_item" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_save_featured_bundle"("p_id" "uuid", "p_name_en" "text", "p_name_zh" "text", "p_template_ids" "text"[], "p_actor" "uuid") RETURNS "uuid"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_ids text[] := coalesce(p_template_ids, '{}');
+  v_id uuid := p_id;
+begin
+  perform admin.require_admin(p_actor);
+  if length(btrim(coalesce(p_name_en, ''))) not between 1 and 80 or length(btrim(coalesce(p_name_zh, ''))) not between 1 and 80 then
+    raise exception 'INVALID_INPUT' using detail = 'both names, up to 80 characters';
+  end if;
+  if cardinality(v_ids) not between 2 and 8 then
+    raise exception 'BUNDLE_SIZE';
+  end if;
+  if cardinality(v_ids) <> (select count(distinct id) from unnest(v_ids) as u(id)) then
+    raise exception 'INVALID_INPUT' using detail = 'templates must not repeat';
+  end if;
+  lock table public.templates in share row exclusive mode;
+  if exists (
+    select 1 from unnest(v_ids) as u(id)
+    where not exists (select 1 from public.templates t where t.id = u.id and t.is_active and 'web' = any (t.visible_in))
+  ) then
+    raise exception 'INVALID_INPUT' using detail = 'only published web templates';
+  end if;
+  if v_id is null then
+    insert into public.featured_bundles (name_en, name_zh, created_by) values (btrim(p_name_en), btrim(p_name_zh), p_actor) returning id into v_id;
+  else
+    update public.featured_bundles set name_en = btrim(p_name_en), name_zh = btrim(p_name_zh), updated_at = now() where id = v_id;
+    if not found then raise exception 'BUNDLE_NOT_FOUND'; end if;
+    delete from public.featured_bundle_items where bundle_id = v_id;
+  end if;
+  insert into public.featured_bundle_items (bundle_id, template_id, position)
+  select v_id, o.id, o.position::int from unnest(v_ids) with ordinality as o(id, position);
+  return v_id;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_save_featured_bundle"("p_id" "uuid", "p_name_en" "text", "p_name_zh" "text", "p_template_ids" "text"[], "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -12085,6 +12154,30 @@ $_$;
 ALTER FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_key" "text", "p_account" "text", "p_granted" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_featured_bundles"("p_ids" "uuid"[], "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_ids uuid[] := coalesce(p_ids, '{}');
+begin
+  perform admin.require_admin(p_actor);
+  if cardinality(v_ids) <> (select count(distinct id) from unnest(v_ids) as u(id)) then
+    raise exception 'INVALID_INPUT' using detail = 'bundles must not repeat';
+  end if;
+  lock table public.featured_bundles in share row exclusive mode;
+  if exists (select 1 from unnest(v_ids) as u(id) where not exists (select 1 from public.featured_bundles b where b.id = u.id)) then
+    raise exception 'BUNDLE_NOT_FOUND';
+  end if;
+  update public.featured_bundles set featured_rank = null where featured_rank is not null;
+  update public.featured_bundles b set featured_rank = o.position::int
+  from unnest(v_ids) with ordinality as o(id, position) where b.id = o.id;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_set_featured_bundles"("p_ids" "uuid"[], "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_set_featured_locale"("p_locale" "text", "p_ids" "text"[], "p_actor" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -12168,6 +12261,70 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_groups jsonb := coalesce(p_groups, '[]'::jsonb);
+  v_group jsonb;
+begin
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin' and p.banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if jsonb_typeof(v_groups) <> 'array' then
+    raise exception 'INVALID_INPUT' using detail = 'groups must be an array';
+  end if;
+  if p_locale is null or p_locale not in ('en', 'zh') then
+    raise exception 'INVALID_INPUT' using detail = 'unknown language';
+  end if;
+  -- '' stands for the top level: category keys are never empty.
+  if (select count(*) <> count(distinct coalesce(e.g->>'parent', '')) from jsonb_array_elements(v_groups) as e(g)) then
+    raise exception 'INVALID_INPUT' using detail = 'a sibling group appears twice';
+  end if;
+  for v_group in select g from jsonb_array_elements(v_groups) as e(g) loop
+    if jsonb_typeof(v_group) <> 'object' or jsonb_typeof(coalesce(v_group->'keys', 'null')) <> 'array' then
+      raise exception 'INVALID_INPUT' using detail = 'each group needs a keys array';
+    end if;
+    perform public.admin_set_category_locale_order(
+      p_locale, v_group->>'parent', array(select t.k from jsonb_array_elements_text(v_group->'keys') with ordinality as t(k, n) order by t.n),
+      p_actor);
+  end loop;
+  if p_featured is not null then
+    perform public.admin_set_featured_locale(p_locale, p_featured, p_actor);
+  end if;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_bundles" "uuid"[], "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_bundles uuid[] := p_bundles;
+begin
+  perform public.admin_set_locale_display(p_locale, p_groups, p_featured, p_actor);
+  if v_bundles is not null then
+    if cardinality(v_bundles) <> (select count(distinct id) from unnest(v_bundles) as u(id)) then
+      raise exception 'INVALID_INPUT' using detail = 'bundles must not repeat';
+    end if;
+    lock table public.featured_bundles in share row exclusive mode;
+    if exists (select 1 from unnest(v_bundles) as u(id) where not exists (select 1 from public.featured_bundles b where b.id = u.id)) then
+      raise exception 'BUNDLE_NOT_FOUND';
+    end if;
+    delete from public.bundle_featured_locale where locale = p_locale;
+    insert into public.bundle_featured_locale (locale, bundle_id, rank)
+    select p_locale, o.id, o.position::int from unnest(v_bundles) with ordinality as o(id, position);
+  end if;
+end $$;
+
+
+ALTER FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_bundles" "uuid"[], "p_actor" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_openai_admin_key"("p_key" "text") RETURNS "void"
@@ -21533,6 +21690,18 @@ CREATE TABLE IF NOT EXISTS "public"."blog_posts" (
 ALTER TABLE "public"."blog_posts" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."bundle_featured_locale" (
+    "locale" "text" NOT NULL,
+    "bundle_id" "uuid" NOT NULL,
+    "rank" integer NOT NULL,
+    CONSTRAINT "bundle_featured_locale_locale_check" CHECK (("locale" = ANY (ARRAY['en'::"text", 'zh'::"text"]))),
+    CONSTRAINT "bundle_featured_locale_rank_check" CHECK (("rank" >= 1))
+);
+
+
+ALTER TABLE "public"."bundle_featured_locale" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."business_inquiries" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
@@ -21781,6 +21950,34 @@ CREATE TABLE IF NOT EXISTS "public"."feature_user_grants" (
 
 
 ALTER TABLE "public"."feature_user_grants" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."featured_bundle_items" (
+    "bundle_id" "uuid" NOT NULL,
+    "template_id" "text" NOT NULL,
+    "position" integer NOT NULL,
+    CONSTRAINT "featured_bundle_items_position_check" CHECK ((("position" >= 1) AND ("position" <= 8)))
+);
+
+
+ALTER TABLE "public"."featured_bundle_items" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."featured_bundles" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "name_en" "text" NOT NULL,
+    "name_zh" "text" NOT NULL,
+    "featured_rank" integer,
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "featured_bundles_featured_rank_check" CHECK (("featured_rank" >= 1)),
+    CONSTRAINT "featured_bundles_name_en_check" CHECK ((("length"("btrim"("name_en")) >= 1) AND ("length"("btrim"("name_en")) <= 80))),
+    CONSTRAINT "featured_bundles_name_zh_check" CHECK ((("length"("btrim"("name_zh")) >= 1) AND ("length"("btrim"("name_zh")) <= 80)))
+);
+
+
+ALTER TABLE "public"."featured_bundles" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."generation_slots" (
@@ -23303,6 +23500,16 @@ ALTER TABLE ONLY "public"."blog_posts"
 
 
 
+ALTER TABLE ONLY "public"."bundle_featured_locale"
+    ADD CONSTRAINT "bundle_featured_locale_pkey" PRIMARY KEY ("locale", "bundle_id");
+
+
+
+ALTER TABLE ONLY "public"."bundle_featured_locale"
+    ADD CONSTRAINT "bundle_featured_locale_rank_key" UNIQUE ("locale", "rank");
+
+
+
 ALTER TABLE ONLY "public"."business_inquiries"
     ADD CONSTRAINT "business_inquiries_pkey" PRIMARY KEY ("id");
 
@@ -23370,6 +23577,26 @@ ALTER TABLE ONLY "public"."feature_access"
 
 ALTER TABLE ONLY "public"."feature_user_grants"
     ADD CONSTRAINT "feature_user_grants_pkey" PRIMARY KEY ("feature_key", "user_id");
+
+
+
+ALTER TABLE ONLY "public"."featured_bundle_items"
+    ADD CONSTRAINT "featured_bundle_items_pkey" PRIMARY KEY ("bundle_id", "template_id");
+
+
+
+ALTER TABLE ONLY "public"."featured_bundle_items"
+    ADD CONSTRAINT "featured_bundle_items_position_key" UNIQUE ("bundle_id", "position");
+
+
+
+ALTER TABLE ONLY "public"."featured_bundles"
+    ADD CONSTRAINT "featured_bundles_featured_rank_key" UNIQUE ("featured_rank");
+
+
+
+ALTER TABLE ONLY "public"."featured_bundles"
+    ADD CONSTRAINT "featured_bundles_pkey" PRIMARY KEY ("id");
 
 
 
@@ -24216,6 +24443,10 @@ CREATE INDEX "experiments_ended_surface_idx" ON "public"."experiments" USING "bt
 
 
 CREATE UNIQUE INDEX "experiments_live_surface_idx" ON "public"."experiments" USING "btree" ("surface") WHERE ("status" = ANY (ARRAY['running'::"text", 'paused'::"text"]));
+
+
+
+CREATE INDEX "featured_bundle_items_template_idx" ON "public"."featured_bundle_items" USING "btree" ("template_id");
 
 
 
@@ -25358,6 +25589,11 @@ ALTER TABLE ONLY "public"."blog_posts"
 
 
 
+ALTER TABLE ONLY "public"."bundle_featured_locale"
+    ADD CONSTRAINT "bundle_featured_locale_bundle_id_fkey" FOREIGN KEY ("bundle_id") REFERENCES "public"."featured_bundles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."business_inquiries"
     ADD CONSTRAINT "business_inquiries_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -25465,6 +25701,21 @@ ALTER TABLE ONLY "public"."feature_user_grants"
 
 ALTER TABLE ONLY "public"."feature_user_grants"
     ADD CONSTRAINT "feature_user_grants_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."featured_bundle_items"
+    ADD CONSTRAINT "featured_bundle_items_bundle_id_fkey" FOREIGN KEY ("bundle_id") REFERENCES "public"."featured_bundles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."featured_bundle_items"
+    ADD CONSTRAINT "featured_bundle_items_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "public"."templates"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."featured_bundles"
+    ADD CONSTRAINT "featured_bundles_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
 
 
 
@@ -26298,6 +26549,9 @@ CREATE POLICY "blog_posts_read_published" ON "public"."blog_posts" FOR SELECT TO
 
 
 
+ALTER TABLE "public"."bundle_featured_locale" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."business_inquiries" ENABLE ROW LEVEL SECURITY;
 
 
@@ -26330,6 +26584,12 @@ ALTER TABLE "public"."feature_access" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."feature_user_grants" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."featured_bundle_items" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."featured_bundles" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."generation_jobs" ENABLE ROW LEVEL SECURITY;
@@ -27055,6 +27315,11 @@ REVOKE ALL ON FUNCTION "admin"."remove_unpublished_series_members"() FROM PUBLIC
 
 
 REVOKE ALL ON FUNCTION "admin"."renewal_terms"("p_v2" boolean, "p_user_id" "uuid", "p_product_id" "text", "p_invoice_id" "text", "p_period_end" timestamp with time zone, "p_amount_total" integer, "p_currency" "text", "p_amount_tax" integer, "p_method" "text", "p_charge_id" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "admin"."require_admin"("p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "admin"."require_admin"("p_actor" "uuid") TO "service_role";
 
 
 
@@ -28036,6 +28301,11 @@ GRANT ALL ON FUNCTION "public"."admin_delete_dishware"("p_id" "uuid", "p_actor" 
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_delete_featured_bundle"("p_id" "uuid", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_delete_featured_bundle"("p_id" "uuid", "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_delete_provider"("p_id" "uuid") TO "service_role";
 
@@ -28391,6 +28661,11 @@ GRANT ALL ON FUNCTION "public"."admin_save_dishware"("p_item" "jsonb", "p_actor"
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_save_featured_bundle"("p_id" "uuid", "p_name_en" "text", "p_name_zh" "text", "p_template_ids" "text"[], "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_save_featured_bundle"("p_id" "uuid", "p_name_en" "text", "p_name_zh" "text", "p_template_ids" "text"[], "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_save_invite_rewards"("p_actor" "uuid", "p_invitee" integer, "p_inviter" integer, "p_expected" "jsonb") TO "service_role";
 
@@ -28466,6 +28741,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_feature_grant"("p_actor" "uuid", "p_ke
 
 
 
+REVOKE ALL ON FUNCTION "public"."admin_set_featured_bundles"("p_ids" "uuid"[], "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_featured_bundles"("p_ids" "uuid"[], "p_actor" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."admin_set_featured_locale"("p_locale" "text", "p_ids" "text"[], "p_actor" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_featured_locale"("p_locale" "text", "p_ids" "text"[], "p_actor" "uuid") TO "service_role";
 
@@ -28478,6 +28758,16 @@ GRANT ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) 
 
 REVOKE ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_actor" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_bundles" "uuid"[], "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_locale_display"("p_locale" "text", "p_groups" "jsonb", "p_featured" "text"[], "p_bundles" "uuid"[], "p_actor" "uuid") TO "service_role";
 
 
 
@@ -29956,6 +30246,10 @@ GRANT SELECT("updated_at") ON TABLE "public"."blog_posts" TO "authenticated";
 
 
 
+GRANT ALL ON TABLE "public"."bundle_featured_locale" TO "service_role";
+
+
+
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."business_inquiries" TO "service_role";
 
 
@@ -30007,6 +30301,14 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 
 
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."feature_user_grants" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."featured_bundle_items" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."featured_bundles" TO "service_role";
 
 
 

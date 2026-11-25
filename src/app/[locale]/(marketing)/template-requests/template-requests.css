@@ -1,0 +1,79 @@
+@layer properties, theme, base, components, utilities;
+
+/* The example wishes on /template-requests (Owner 2026-11-25): the prints of the home page's former
+   wishlist section (removed from home in #890/#905), restored here as illustrations. Static: no JS,
+   the images lazy. Fictional examples only; real requests stay on the signed-in wishlist. */
+@layer components {
+  /* The tilted prints and the stamp swing a few px past the gutter; clip at the section (full viewport width) so they never widen the page. */
+  .mk-wish { overflow-x: clip; }
+  .mk-wish-wall { list-style: none; margin: 32px 0 0; padding: 10px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 10px; }
+  .mk-wish-wall > li { min-width: 0; transform: rotate(var(--r, 0deg)); transform-origin: 50% 0; }
+  /* Pinned at the tape, a print's foot swings h·sin(r) sideways. Odd prints lean one way and even
+     the other, so the phone pairs splay apart and every lean stays inside the 16px gutter; where
+     two four-up neighbours swing together (2|3, 6|7) the angles stay small enough to clear the gap. */
+  .mk-wish-wall > li:nth-child(1) { --r: 1.6deg; }
+  .mk-wish-wall > li:nth-child(2) { --r: -1.2deg; }
+  .mk-wish-wall > li:nth-child(3) { --r: 0.8deg; }
+  .mk-wish-wall > li:nth-child(4) { --r: -2deg; }
+  .mk-wish-wall > li:nth-child(5) { --r: 1.2deg; }
+  .mk-wish-wall > li:nth-child(6) { --r: -1.6deg; }
+  .mk-wish-wall > li:nth-child(7) { --r: 0.6deg; }
+  .mk-wish-wall > li:nth-child(8) { --r: -1.4deg; }
+  .mk-wish-print {
+    position: relative; display: grid; padding: 8px 8px 10px; border-radius: 6px; background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 var(--edge-highlight), 0 18px 28px -18px var(--photo-fade);
+  }
+  .mk-wish-print::before {
+    content: ""; position: absolute; z-index: 2; left: 50%; top: -9px; width: 64px; height: 20px; border-radius: 2px; pointer-events: none;
+    transform: translateX(-50%) rotate(var(--tape, -3deg));
+    background: linear-gradient(90deg, var(--grab), color-mix(in srgb, var(--foreground) 34%, transparent) 50%, color-mix(in srgb, var(--foreground) 20%, transparent));
+  }
+  .mk-wish-wall > li:nth-child(even) .mk-wish-print { --tape: 3deg; }
+  .mk-wish-print img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 3px; background: var(--muted); }
+  .mk-wish-text { margin-top: 10px; padding: 0 2px; font: italic 400 17px/1.3 var(--font-display); letter-spacing: -0.005em; text-wrap: pretty; overflow-wrap: anywhere; }
+  .mk-wish-text:lang(zh) { font-style: normal; font-size: 16px; line-height: 1.6; letter-spacing: 0; }
+  .mk-wish-votes { margin-top: 8px; padding: 0 2px; display: flex; justify-content: flex-end; }
+  .mk-wish-votes > span[aria-hidden] { display: inline-flex; align-items: center; gap: 5px; font: 500 14px/1 var(--font-mono); color: var(--bone-dim); }
+  .mk-wish-votes svg { width: 16px; height: 16px; }
+  .mk-wish-stamp {
+    position: absolute; z-index: 3; right: -6px; top: 34px; transform: rotate(12deg); padding: 4px 8px; border: 2px solid var(--success); border-radius: 4px;
+    font: 700 14px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--success); background: var(--frost-light);
+  }
+  .mk-wish-stamp:lang(zh) { letter-spacing: .04em; }
+  .mk-wish-note { margin-top: 20px; }
+  @media (min-width: 768px) {
+    .mk-wish-wall { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .mk-wish-wall > li { transform: none; } }
+}
+
+/* The page's own layout (kept out of the shared public Tailwind sheet, which has a size budget). */
+@layer components {
+  .tr-page { padding-bottom: 64px; }
+  .tr-hero { padding: 16px var(--gutter) 0; }
+  .tr-h1 { font: 400 var(--text-h1)/1.05 var(--font-display); letter-spacing: -0.02em; text-wrap: balance; }
+  .tr-lede { margin-top: 12px; font-size: 16px; line-height: 1.5; text-wrap: pretty; color: var(--bone-dim); }
+  .tr-actions { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .tr-closed { margin-top: 20px; font-size: 16px; line-height: 1.5; color: var(--bone-dim); }
+  .tr-inline { display: inline-flex; }
+  .tr-after { margin-top: 16px; }
+  .tr-grid { margin-top: 20px; display: grid; gap: 12px; }
+  .tr-points { gap: 16px; }
+  .tr-card { padding: 16px; border-radius: var(--radius-tile); background: var(--card); box-shadow: inset 0 0 0 1px var(--input); }
+  .tr-num { display: block; font: 400 28px/1 var(--font-display); color: var(--primary); }
+  .tr-strong { font-size: 16px; font-weight: 600; }
+  .tr-h3 { margin-top: 12px; font-size: 16px; font-weight: 600; }
+  .tr-gap { margin-top: 28px; }
+  .tr-dim { margin-top: 6px; font-size: 16px; line-height: 1.45; text-wrap: pretty; color: var(--bone-dim); }
+  .tr-quotes { margin-top: 12px; display: grid; gap: 12px; list-style: none; padding: 0; }
+  .tr-quote { padding: 12px 16px; border-left: 2px solid var(--primary); border-radius: var(--radius-tile); background: var(--card); font-size: 16px; line-height: 1.45; text-wrap: pretty; }
+  @media (min-width: 768px) {
+    .tr-hero { max-width: 720px; padding-top: 40px; }
+    .tr-h1 { font-size: var(--text-title); }
+    .tr-cta { width: auto; }
+    .tr-grid { gap: 16px; }
+    .tr-card { padding: 20px; }
+  }
+  @media (min-width: 1024px) { .tr-hero { padding-top: 48px; } }
+  @media (min-width: 1280px) { .tr-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+}

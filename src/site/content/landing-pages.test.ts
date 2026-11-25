@@ -12,6 +12,7 @@ import { commercialPhotography } from './pages/commercial-photography'
 import { PLATFORM_SPECS } from './platform-specs'
 import { zhCommercialPhotography } from './zh/pages/commercial-photography'
 import { zhAiRestaurantMenu } from './zh/pages/ai-restaurant-menu'
+import { zhHomePage } from './zh/home'
 
 // Every picture a landing page shows: the hero pair, the shoot and the edit cases.
 function caseImagesOf(page: ContentPage): ImageRef[] {
@@ -47,9 +48,10 @@ describe('landing pages', () => {
     expect(site.indexing.zhIndexablePaths).not.toContain('/transparent-background')
   })
 
-  // Owner 2026-11-11: the inner pages show their own cases (public/cases), never the home tote,
-  // and every case picture is a real file of at most 150 KB, as small as the mainland needs.
-  it('show their own case pictures, not the home tote, each a file of at most 150 KB', () => {
+  // Owner 2026-11-11: the inner pages show their own cases (public/cases), every case picture a
+  // real file of at most 150 KB, as small as the mainland needs. Since 2026-11-25 the English
+  // /commercial-photography shows the tote set again, as its own compressed copies in public/cases.
+  it('show their own case pictures, each a file of at most 150 KB', () => {
     for (const page of [...contentPagesIn('en'), ...contentPagesIn('zh')]) {
       const images = caseImagesOf(page)
       expect(images.length).toBeGreaterThan(2)
@@ -93,6 +95,17 @@ describe('landing pages', () => {
       const text = [...page.faq.map((item) => item.answer), ...page.facts.map((fact) => fact.value)].join(' ')
       expect(text).not.toMatch(/(allowed|approved|accepted) (on|by) (Amazon|Etsy|DoorDash|Uber Eats|Grubhub)/i)
       expect(text).toMatch(/check/i)
+    }
+  })
+})
+
+describe('the /zh pages', () => {
+  // Owner 2026-11-25: the tote and the Western steak are the English pages' cases; /zh keeps
+  // its own (the sneaker, Chinese dishes), so no /zh page or the /zh home may show them.
+  it('keep the English-only tote and steak cases off every /zh page', () => {
+    for (const page of [...contentPagesIn('zh'), zhHomePage]) {
+      const json = JSON.stringify(page)
+      expect(json).not.toMatch(/\/cases\/(bag-|menu-steak-)/)
     }
   })
 })

@@ -58,6 +58,12 @@ describe('homePanelTemplates', () => {
     expect(homePanelTemplates(many, 'one').templates.map(({ id }) => id)).toEqual(['a', 'b', 'c', 'd', 'one'])
   })
 
+  it('takes 精选组合 templates after the featured ones and before the rest, once each', () => {
+    const live = [template('one'), template('two'), { ...template('lobby'), featuredRank: 0 }, template('cake'), template('slot', true)]
+    const { templates } = homePanelTemplates(live, 'lobby', ['cake', 'lobby', 'slot', 'gone'])
+    expect(templates.map(({ id }) => id)).toEqual(['lobby', 'cake', 'one', 'two'])
+  })
+
   it('falls back to the first usable template when the default is a slot template or is missing', () => {
     for (const defaultId of ['slot', 'missing', null]) {
       const { templates, opening } = homePanelTemplates(catalogue, defaultId)

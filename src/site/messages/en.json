@@ -677,7 +677,13 @@
       "cardAria": "{name}, a series of {count, plural, one {# template} other {# templates}}. Pick one",
       "coverAlt": "{name} series example",
       "members": "{name} · {count, plural, one {# template} other {# templates}}",
-      "badge": "Series"
+      "badge": "Series",
+      "shelfCount": "{count, plural, one {# template} other {# templates}}",
+      "shelfMore": "+{count} more",
+      "shelfMoreAria": "See all {total} templates in {name}",
+      "scrollBack": "Scroll back through {name}",
+      "scrollOn": "Scroll on through {name}",
+      "inSeries": "Series: {name}"
     },
     "template": {
       "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
@@ -2406,6 +2412,8 @@
     "copyright": "© {year} {name}",
     "language": "Language",
     "cookieSettings": "Cookie settings"
+,
+    "templateRequests": "Template requests"
   },
   "consent": {
     "label": "Cookies",
@@ -2432,6 +2440,10 @@
     "tryTitle": "Three templates to try instead"
   },
   "marketing": {
+    "templateRequests": {
+      "lead": "Not finding a template for your photo?",
+      "link": "Request a custom AI photo template"
+    },
     "appDescription": "AI photo studio",
     "nav": {
       "label": "Main",
@@ -2474,6 +2486,9 @@
       "seriesCount": "{count, plural, one {# look} other {# looks}}",
       "seriesAria": "{name}. {use} A series of {count, plural, one {# template} other {# templates}}. Open this series",
       "seriesBadge": "Series",
+      "bundleBadge": "Set",
+      "bundleCount": "{count, plural, one {# template} other {# templates}}",
+      "bundleAria": "{name}, showing {template}. Use this template",
       "seriesOpen": "Open the series",
       "freeTag": "Free · public",
       "paidTag": "Paid · private",

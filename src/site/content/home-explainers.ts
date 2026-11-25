@@ -75,8 +75,8 @@ export const useCases = {
       after: '.',
       visual: {
         kind: 'pair',
-        before: caseImage('menu-fish-phone', 'Real phone photo: pickled mustard fish in a white enamel bowl on a steel kitchen pass, harsh green-tinted overhead light'),
-        after: caseImage('menu-fish-dark', 'Real example: the same pickled mustard fish re-plated in a white porcelain bowl on dark rough timber, warm side light and rising steam'),
+        before: caseImage('menu-steak-phone', 'Real phone photo: sliced sirloin steak with fries and asparagus on a white plate on a steel kitchen pass, plate stacks and squeeze bottles behind'),
+        after: caseImage('menu-steak-board', 'Real example: the same sliced sirloin, fries and asparagus on the same white plate on a dark wooden board, warm side light, herbs and a fork beside it'),
         tags: { before: phoneTag, after: 'Menu photo' },
       },
     },
@@ -87,8 +87,8 @@ export const useCases = {
       after: '.',
       visual: {
         kind: 'pair',
-        before: caseImage('sneaker-phone', 'Real phone photo: an off-white leather sneaker with a sage-green heel tab on a hallway floor, hard morning sun, keys and an open shoe box in frame'),
-        after: caseImage('sneaker-listing', 'Real example: the same sneaker on a pure white background, soft studio light, a marketplace main image'),
+        before: caseImage('bag-phone', 'Real phone photo: a woven tan leather tote with a gold chain on a marble kitchen counter, keys, a mug and a parcel beside it'),
+        after: caseImage('bag-listing', 'Real example: the same tote face-on on a pure white background, soft studio light, a marketplace main image'),
         tags: { before: phoneTag, after: 'Listing' },
       },
     },

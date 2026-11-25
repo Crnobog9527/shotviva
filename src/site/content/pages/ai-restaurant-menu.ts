@@ -57,10 +57,12 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
   }
 }
 
-const fishPhone = caseImage('menu-fish-phone', 'Real phone photo: pickled mustard fish in a white enamel bowl on a steel kitchen pass, harsh green-tinted overhead light')
-const fishDark = caseImage('menu-fish-dark', 'Real example: the same pickled mustard fish re-plated in a white porcelain bowl on dark rough timber, warm side light and rising steam')
+// The hero (Owner 2026-11-25: Western dishes on the English pages): the Rustic Board template's
+// own cover pair, a sirloin plate shot on the kitchen pass and the same plate on a wooden board.
+const steakPhone = caseImage('menu-steak-phone', 'Real phone photo: sliced sirloin steak with fries and asparagus on a white plate on a steel kitchen pass, plate stacks and squeeze bottles behind')
+const steakBoard = caseImage('menu-steak-board', 'Real example: the same sliced sirloin, fries and asparagus on the same white plate on a dark wooden board, warm side light, herbs and a fork beside it')
 
-// One dish through three looks. The food stays the same; the bowl, the set and the light change.
+// One dish through three looks. The food stays the same; the plate or bowl, the set and the light change.
 const shoot: ShootDemo = {
   heading: { lead: 'One phone photo of a dish → ', emphasis: 'a full menu shoot' },
   intro: 'Fresh chili bullfrog, shot on the kitchen pass in a steel basin. Three finished pictures, the same dish in every one: the bullfrog, the green and red chilies, the green peppercorns.',
@@ -97,12 +99,12 @@ const copy = {
   title: `AI Restaurant Menu Photos From Your Phone (2026) | ${brand}`,
   description: `AI restaurant menu photos from the dish photo you already took: delivery-app, menu and promo shots with the plate kept as served. ${FreeImagesShort}.`,
   h1: 'AI Restaurant Menu Photos From One Phone Shot',
-  subtitle: 'Your real phone photo of a dish you serve, with a new bowl, light and setting. No dish is invented.',
-  answerBlock: `AI restaurant menu photos start from your own photo of a dish you serve: the food stays as served; only the bowl, light and setting change. With ${brand} you upload one phone photo, pick Delivery Menu, Dark Dining or Promo Poster, and download it in ${tierList}. New users get ${freeImagesLabel}.`,
+  subtitle: 'Your real phone photo of a dish you serve, with new light and a new setting. No dish is invented.',
+  answerBlock: `AI restaurant menu photos start from your own photo of a dish you serve: the food stays as served; only the light, the setting and sometimes the plate change. With ${brand} you upload one phone photo, pick Delivery Menu, Dark Dining or Promo Poster, and download it in ${tierList}. New users get ${freeImagesLabel}.`,
   hero: {
-    before: withFirstFrame(fishPhone),
-    after: fishDark,
-    caption: 'Your phone photo → a menu hero: the same fish, a new bowl and set',
+    before: withFirstFrame(steakPhone),
+    after: steakBoard,
+    caption: 'Your phone photo → a menu hero: the same steak, a new table and light',
     cta: { label: 'Upload photo', href: '/generate' },
   },
   facts: [
@@ -116,7 +118,7 @@ const copy = {
     },
     {
       label: 'The Dish Stays the Dish',
-      value: `Delivery apps want photos of the food you actually serve. ${brand} starts from your own phone photo and changes the bowl, the light and the background, not the food.`,
+      value: `Delivery apps want photos of the food you actually serve. ${brand} starts from your own phone photo and changes the plate or bowl, the light and the setting, not the food.`,
     },
   ],
   headings: {
@@ -142,7 +144,7 @@ export const makeAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
   faq: [
     {
       question: 'Can I use AI photos on my delivery-app menu?',
-      answer: `Delivery apps ask for photos that show the dish you actually serve. ${brand} starts from your own phone photo and keeps the food as served, changing the bowl, the light and the background, so the photo is still of your food. Check your app's current photo rules before you upload.`,
+      answer: `Delivery apps ask for photos that show the dish you actually serve. ${brand} starts from your own phone photo and keeps the food as served, changing the plate or bowl, the light and the setting, so the photo is still of your food. Check your app's current photo rules before you upload.`,
     },
     {
       question: 'What size should restaurant menu photos be?',

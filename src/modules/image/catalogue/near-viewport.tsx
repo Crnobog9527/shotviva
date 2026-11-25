@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode,
 
 import { keepFirstScreenCovers } from '@/core/offline'
 
+
 // Create's grid loads a card's pictures only when the card comes near the screen (after Higgsfield
 // and Lovart): the browser's own lazy loading starts far ahead on a slow link (Chrome: about 2500 px),
 // so a tap on Create pulled some 30 covers, ~850 KB, before the account's balance arrived (slow 4G,
@@ -15,6 +16,12 @@ export function DeferCoversUntilNear({ children }: { children: ReactNode }) {
 }
 
 export const useDeferCovers = () => useContext(DeferCovers)
+
+// A chosen category's shelves put two rows of cards inside the near-screen margin at once, so a
+// phone on slow 4G fetched twelve covers together and the first one (the page's largest paint)
+// came 0.8 s later than in the old grid (2026-11-25). While held, covers past the first screen
+// wait (shelf-list.tsx releases them); every other view and page leaves this off.
+export const HoldCovers = createContext(false)
 
 // About a card and a half ahead: vertical, then horizontal (along a rail).
 const NEAR = '400px 400px'
@@ -81,10 +88,11 @@ export function useCardCovers<T extends Element>(eager: boolean, priority = fals
   const inCreate = useDeferCovers()
   const defer = inCreate && !eager
   const [ref, near] = useNearViewport<T>(!defer)
+  const held = useContext(HoldCovers) && !eager
   useKeepFirstScreen(ref, inCreate && eager)
   const fetchPriority = eager ? (priority ? { fetchPriority: 'high' as const } : {}) : { fetchPriority: 'low' as const }
   const img = { loading: eager ? ('eager' as const) : ('lazy' as const), ...fetchPriority }
-  return { ref, show: near, img }
+  return { ref, show: near && !held, img }
 }
 
 // Which Create screen the cards are on (All, a category, Saved), for the first-screen covers the

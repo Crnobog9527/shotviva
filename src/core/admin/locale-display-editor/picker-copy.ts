@@ -1,0 +1,21 @@
+// The 首页精选 picker on 分语言展示. Admin is Chinese-only (DESIGN §7).
+export const PICKER_COPY = {
+  open: '添加精选模板',
+  title: (locale: string) => `添加${locale}首页精选`,
+  description: '只列出已上架、在网站上显示的模板。可以多选，选好后点「加入精选」，再在下方点「保存」一起生效。',
+  search: '搜索模板名称或标识',
+  category: '分类',
+  allCategories: '全部分类',
+  count: (shown: number, total: number) => (shown < total ? `显示 ${shown} / ${total} 个` : `共 ${total} 个`),
+  more: '显示更多',
+  none: '没有符合条件的模板。',
+  before: '前图',
+  after: '效果图',
+  noCover: '无封面',
+  taken: '已在精选',
+  picked: '已选',
+  selected: (count: number) => (count ? `已选 ${count} 个` : '还没有选择'),
+  clear: '清空选择',
+  cancel: '取消',
+  add: (count: number) => (count ? `加入精选（${count}）` : '加入精选'),
+} as const
