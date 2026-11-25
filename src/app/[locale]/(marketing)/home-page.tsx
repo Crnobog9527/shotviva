@@ -12,11 +12,11 @@ import { cachedPublicSeries } from '@/core/templates/public-series'
 import { homePanelTemplates } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
 import { HOME_CATEGORIES, bundleSection, creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
-import { HERO_DEFAULT_OPTION, heroOptionContent, type HeroOptionContent } from '@/site/experiments'
+import { HERO_DEFAULT_OPTION, heroOptionContent } from '@/site/experiments'
 import { site } from '@/site/site.config'
 
 import { HomeGeneratorSlot } from './home-generator-slot'
-import { liveHero } from './home-hero-live'
+import { optionPictures } from './home-hero-live'
 
 
 // The home page, shared by `/` (today's hero) and the A/B hero options the proxy rewrites `/` to
@@ -49,13 +49,6 @@ function heroFor(heroOption: string | undefined, locale: Locale, live: readonly 
   const option = heroOptionContent(heroOption ?? HERO_DEFAULT_OPTION, locale)
   const opens = heroOption ? option?.generatorTemplate : undefined
   return { option, defaultId: opens && live.some((template) => template.id === opens) ? opens : featuredId }
-}
-
-// An option's hero pictures: its live templates' covers when it names templates (null when none
-// is live, so the page keeps its own hero), else its static pictures.
-function optionPictures(option: HeroOptionContent | null, live: Parameters<typeof liveHero>[2]) {
-  if (option?.live) return liveHero(option.live.scenes, option.live.label, live)
-  return option?.hero ?? null
 }
 
 // The live catalogue is a cached read (expired by every admin save, featured list included);

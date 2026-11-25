@@ -18,8 +18,7 @@ export { HERO_DEFAULT_OPTION, HERO_OPTIONS } from './registry'
 export type LiveHeroScene = { templateId: string; phone: string; ai: string; caption: string }
 
 export type HeroOptionContent = {
-  // Static pictures, or none when `live` gives the pairs (the page's own hero then stays the
-  // fallback for when none of those templates is live).
+  // Static pictures; with `live`, the fallback for when none of those templates is live.
   hero?: Pick<HeroBlock, 'before' | 'after' | 'caption' | 'scenes'>
   live?: { label: string; scenes: readonly LiveHeroScene[] }
   // One line under the direct answer that says who this demo is for.
