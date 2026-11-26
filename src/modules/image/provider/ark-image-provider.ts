@@ -134,7 +134,9 @@ export function networkCode(error: unknown): string {
 // generated or billed: safe to try again. ECONNRESET and socket errors are not here, since the
 // request may already have reached Ark. On 2026-11-26 four jobs in four minutes failed with
 // UND_ERR_CONNECT_TIMEOUT on the cross-border route; each was refunded, none retried.
-const CONNECT_FAILURES = new Set(['UND_ERR_CONNECT_TIMEOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ENETUNREACH', 'EHOSTUNREACH'])
+// ENETUNREACH/EHOSTUNREACH are left out: Linux also raises them on an established connection whose
+// retransmits fail, after the body may have reached Ark.
+const CONNECT_FAILURES = new Set(['UND_ERR_CONNECT_TIMEOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN'])
 // Extra attempts after the first, and the wait before each (ms); all inside the job's deadline.
 export const ARK_CONNECT_RETRY_DELAYS = [1_000, 3_000] as const
 

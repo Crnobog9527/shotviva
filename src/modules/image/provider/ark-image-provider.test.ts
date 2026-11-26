@@ -203,6 +203,6 @@ describe('connection failures are retried', () => {
 
   it('knows which codes mean the connection was never made', () => {
     for (const code of ['UND_ERR_CONNECT_TIMEOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN']) expect(isConnectFailure(code)).toBe(true)
-    for (const code of ['ECONNRESET', 'UND_ERR_SOCKET', 'TypeError', 'unknown']) expect(isConnectFailure(code)).toBe(false)
+    for (const code of ['ECONNRESET', 'UND_ERR_SOCKET', 'EHOSTUNREACH', 'ENETUNREACH', 'TypeError', 'unknown']) expect(isConnectFailure(code)).toBe(false)
   })
 })
