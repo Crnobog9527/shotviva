@@ -25,6 +25,7 @@ async function fetchPool(locale: Locale, signal: AbortSignal): Promise<Catalogue
 
 // Fetches the members, picks one, decodes its result and shows it while the card is untouched.
 export async function runRandomOpening({ locale, currentId, untouched, show, signal }: { locale: Locale; currentId: string | null; untouched(): boolean; show(template: CatalogueTemplate): void; signal: AbortSignal }) {
+  if (!untouched()) return
   const pick = randomOpening(await fetchPool(locale, signal), Math.random)
   if (!pick || pick.id === currentId || !untouched()) return
   await naturalSize(stageImage(pick.cover.after as string).src)

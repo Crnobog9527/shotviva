@@ -11,7 +11,7 @@ import { paymentChannel } from '@/core/billing/waffo'
 import { listFavoriteIdsOrEmpty } from '@/core/favorites'
 import { listRunningJobIds } from '@/core/jobs'
 import { logger } from '@/core/logger'
-import { HomeGenerator, type HomeGeneratorProps, type HomeViewer } from '@/modules/image/marketing'
+import { EARLY_TOUCH_SCRIPT, HomeGenerator, type HomeGeneratorProps, type HomeViewer } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
 
 import { paywallPerkFacts } from '../paywall-perk-facts'
@@ -69,8 +69,13 @@ async function WithViewer(props: Base) {
 // settled, so a ?panel= in the address waits for the generator that replaces it.
 export function HomeGeneratorSlot(props: Base) {
   return (
-    <Suspense fallback={<HomeGenerator {...props} viewer={null} settled={false} />}>
-      <WithViewer {...props} />
-    </Suspense>
+    <>
+      {/* A card that will swap to a random 精选组合 template notes a touch before hydration, so it
+          then stays as the visitor saw it (modules/image/home/early-touch.ts). */}
+      {props.shuffle ? <script dangerouslySetInnerHTML={{ __html: EARLY_TOUCH_SCRIPT }} /> : null}
+      <Suspense fallback={<HomeGenerator {...props} viewer={null} settled={false} />}>
+        <WithViewer {...props} />
+      </Suspense>
+    </>
   )
 }
