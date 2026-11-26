@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
-import { randomOpening } from './use-random-opening'
+import { randomOpening } from './random-opening'
 
 const template = (id: string, covers = true) => ({ id, cover: { before: covers ? `/b/${id}` : null, after: covers ? `/a/${id}` : null } }) as unknown as CatalogueTemplate
 
