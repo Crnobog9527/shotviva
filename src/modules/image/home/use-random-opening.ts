@@ -5,6 +5,7 @@ import { useEffect, type RefObject } from 'react'
 import type { Locale } from '@/core/i18n'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import { touchedEarly } from './early-touch'
 
 // Anything the visitor does inside the card: focusing or typing in the note, changing size or
 // quality, pointing, scrolling or pressing the rail. The first one counts as touching it (#934 review).
@@ -43,11 +44,12 @@ type Args = {
 // The card keeps its frame and crossfades (panel-stage.tsx), so nothing moves on the page.
 export function useRandomOpening({ enabled, card, locale, currentId, untouched, show }: Args) {
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || touchedEarly()) return
     const controller = new AbortController()
     // Touching the card cancels the swap wherever it is: fetching, deciding or decoding.
     const stopWatching = card.current ? watchCardTouches(card.current, () => controller.abort()) : () => undefined
-    const stillUntouched = () => !controller.signal.aborted && untouched()
+    // A touch before hydration (early-touch.ts) counts too: its click was lost, the card must stay.
+    const stillUntouched = () => !controller.signal.aborted && !touchedEarly() && untouched()
     void import('./random-opening')
       .then(({ runRandomOpening }) => runRandomOpening({ locale, currentId, untouched: stillUntouched, show, signal: controller.signal }))
       .catch(() => undefined)
