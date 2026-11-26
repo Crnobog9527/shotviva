@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import dynamic from 'next/dynamic'
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react'
 
 import { trackTemplateView } from '@/core/analytics/browser'
 import type { Locale } from '@/core/i18n'
@@ -106,7 +106,7 @@ export function HomeGenerator({ templates: all, catalogue, defaultId, viewer, ho
   }, [openCatalogue])
   useBrowseClicks(onPreview)
   const opened = useGeneratorPanel({ picker, state, bring, settled, interactedRef })
-  useOpening({ shuffle, settled }, catalogue.locale, state, interactedRef)
+  useOpening({ shuffle, settled, card: panel }, catalogue.locale, state, interactedRef)
   usePrefetchPicker()
   const current = state.template?.id ?? null
   const withPhoto = (picked: File) => { if (current) opened.open({ templateId: current, set: null, file: picked }) }
@@ -191,10 +191,10 @@ function useGeneratorPanel({ picker, state, bring, settled, interactedRef }: Pan
 }
 
 // The random opening (use-random-opening.ts), only while the visitor has done nothing with the
-// card: no template chosen, no panel or browse list opened.
-function useOpening({ shuffle, settled }: { shuffle?: boolean; settled?: boolean }, locale: Locale, state: ReturnType<typeof useHomeGenerator>, interactedRef: { current: boolean }) {
+// card: nothing chosen, typed or changed in it, no panel or browse list opened.
+function useOpening({ shuffle, settled, card }: { shuffle?: boolean; settled?: boolean; card: RefObject<HTMLElement | null> }, locale: Locale, state: ReturnType<typeof useHomeGenerator>, interactedRef: { current: boolean }) {
   const { untouched, show } = state
   // The signed-out stand-in shown while the session streams in never swaps; the real card does.
-  useRandomOpening({ enabled: shuffle === true && settled !== false, locale, currentId: state.template?.id ?? null, untouched: () => untouched() && !interactedRef.current, show })
+  useRandomOpening({ enabled: shuffle === true && settled !== false, card, locale, currentId: state.template?.id ?? null, untouched: () => untouched() && !interactedRef.current, show })
 }
 
