@@ -89,3 +89,19 @@ describe('relay', () => {
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 })
+
+describe('relay timeout', () => {
+  it('answers 504 RelayTimeout when Ark does not answer in time', async () => {
+    const fetchImpl = vi.fn((_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
+      init.signal!.addEventListener('abort', () => reject(init.signal!.reason))
+    }))
+    const handle = createRelay({ secret: SECRET, fetchImpl: fetchImpl as unknown as typeof fetch, timeoutMs: 20 })
+    server = createServer((req, res) => void handle(req, res))
+    await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', resolve))
+    const base = `http://127.0.0.1:${(server!.address() as AddressInfo).port}`
+    const res = await fetch(`${base}/${SECRET}/api/v3/images/generations`, { method: 'POST', body: '{}' })
+    expect(res.status).toBe(504)
+    expect(await res.text()).toContain('RelayTimeout')
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+})

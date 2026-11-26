@@ -12,5 +12,9 @@ const server = createServer((req, res) => {
     res.end('{"error":{"code":"RelayInternal"}}')
   })
 })
-server.requestTimeout = 180_000
+// Above the upstream timeout; keep-alive above common gateway idle timeouts (60 s) so the
+// gateway never reuses a socket the relay already closed.
+server.requestTimeout = 310_000
+server.keepAliveTimeout = 75_000
+server.headersTimeout = 76_000
 server.listen(Number(process.env.PORT ?? 8000), '0.0.0.0')

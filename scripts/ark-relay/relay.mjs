@@ -17,7 +17,8 @@ const FORWARD_RESPONSE = ['content-type', 'x-request-id', 'x-client-request-id']
 // Connect-phase failures only: the body never reached Ark, so one more try cannot bill twice.
 const CONNECT_FAILURES = new Set(['UND_ERR_CONNECT_TIMEOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN'])
 const MAX_BODY = 16 * 1024 * 1024
-const UPSTREAM_TIMEOUT_MS = 170_000
+// Longer than Shotviva's own provider deadline (240 s), so the caller always aborts first.
+export const UPSTREAM_TIMEOUT_MS = 300_000
 
 function sameSecret(given, expected) {
   const a = Buffer.from(given)
@@ -26,7 +27,8 @@ function sameSecret(given, expected) {
 }
 
 function errorCode(error) {
-  return error?.cause?.code ?? error?.code ?? error?.name ?? 'unknown'
+  if (error?.name === 'TimeoutError' || error?.name === 'AbortError') return error.name
+  return error?.cause?.code ?? (typeof error?.code === 'string' ? error.code : undefined) ?? error?.name ?? 'unknown'
 }
 
 function reply(res, status, code) {
@@ -56,7 +58,7 @@ export function routeFor(method, url, secret) {
   return ROUTES.has(`${method} ${arkPath}`) ? arkPath : null
 }
 
-export function createRelay({ secret, origin = ARK_ORIGIN, fetchImpl = fetch, retryDelayMs = 1_000 }) {
+export function createRelay({ secret, origin = ARK_ORIGIN, fetchImpl = fetch, retryDelayMs = 1_000, timeoutMs = UPSTREAM_TIMEOUT_MS }) {
   if (typeof secret !== 'string' || secret.length < 24) throw new Error('RELAY_SECRET must be at least 24 characters')
   return async function handle(req, res) {
     const arkPath = routeFor(req.method ?? '', req.url ?? '/', secret)
@@ -73,7 +75,7 @@ export function createRelay({ secret, origin = ARK_ORIGIN, fetchImpl = fetch, re
     for (let attempt = 0; ; attempt++) {
       try {
         upstream = await fetchImpl(`${origin}/api/v3/${arkPath}`, {
-          method: req.method, headers, body, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+          method: req.method, headers, body, signal: AbortSignal.timeout(timeoutMs),
         })
         break
       } catch (error) {
@@ -83,7 +85,7 @@ export function createRelay({ secret, origin = ARK_ORIGIN, fetchImpl = fetch, re
           continue
         }
         console.error(JSON.stringify({ msg: 'ark upstream failed', path: arkPath, code }))
-        return reply(res, 502, `RelayUpstream_${code}`)
+        return code === 'TimeoutError' ? reply(res, 504, 'RelayTimeout') : reply(res, 502, `RelayUpstream_${code}`)
       }
     }
     const out = {}
