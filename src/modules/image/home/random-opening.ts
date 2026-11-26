@@ -2,7 +2,6 @@ import type { Locale } from '@/core/i18n'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import { naturalSize } from '../workspace/photo-ratio'
-import { touchedEarly } from './early-touch'
 import { stageImage } from './use-stage-cover'
 
 // The random opening's own code (use-random-opening.ts), loaded after the page has hydrated so the
@@ -25,9 +24,7 @@ async function fetchPool(locale: Locale, signal: AbortSignal): Promise<Catalogue
 
 
 // Fetches the members, picks one, decodes its result and shows it while the card is untouched.
-export async function runRandomOpening({ locale, currentId, untouched: card, show, signal }: { locale: Locale; currentId: string | null; untouched(): boolean; show(template: CatalogueTemplate): void; signal: AbortSignal }) {
-  // A touch before hydration (early-touch.ts) counts as much as one after it.
-  const untouched = () => !touchedEarly() && card()
+export async function runRandomOpening({ locale, currentId, untouched, show, signal }: { locale: Locale; currentId: string | null; untouched(): boolean; show(template: CatalogueTemplate): void; signal: AbortSignal }) {
   if (!untouched()) return
   const pick = randomOpening(await fetchPool(locale, signal), Math.random)
   if (!pick || pick.id === currentId || !untouched()) return
