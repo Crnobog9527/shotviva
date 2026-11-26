@@ -343,6 +343,10 @@
   @keyframes mk-stage-in { from { opacity: 0; } to { opacity: 1; } }
   /* Over its first frame the opening picture needs no fade (it would only dim the frame first). */
   .mk-stage-ff + .mk-stage-img { animation: none; }
+  /* Changing template: the picture that was on show lies over the next one and fades out. */
+  .mk-stage-out { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; object-fit: contain; pointer-events: none; animation: mk-stage-out .35s var(--ease) forwards; }
+  @keyframes mk-stage-out { to { opacity: 0; } }
+  .mk-stage-quiet { animation: none; }
   .mk-stage .mk-stage-ai { top: 10px; right: 10px; bottom: auto; z-index: 4; }
   .mk-inset {
     position: absolute; z-index: 4; right: 10px; bottom: 10px; width: 28%; max-width: 112px; aspect-ratio: var(--ir, .8); overflow: hidden; border-radius: 10px;
@@ -448,6 +452,7 @@
   @media (prefers-reduced-motion: reduce) {
     .mk-stage { transition: none; }
     .mk-stage-img { animation: none; }
+    .mk-stage-out { display: none; }
   }
 
   @media (hover: hover) {
