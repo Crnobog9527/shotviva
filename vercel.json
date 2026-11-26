@@ -52,6 +52,13 @@
   "regions": [
     "sfo1"
   ],
+  "functions": {
+    "src/app/api/admin/ark-probe-hkg/route.ts": {
+      "regions": [
+        "hkg1"
+      ]
+    }
+  },
   "git": {
     "deploymentEnabled": {
       "main": false,
