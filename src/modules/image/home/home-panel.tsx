@@ -79,7 +79,9 @@ export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ sta
     <section className={template?.photoInput === 'none' ? 'mk-panel mk-panel-noup' : 'mk-panel'} id="gen" aria-label={t('label')} ref={ref}>
       <PanelHead template={template} onOpenPicker={onOpenPicker} />
       {/* The template's picture is a way to the browse list too, as Change is (Owner 2026-11-25). */}
-      <button type="button" className="block w-full cursor-pointer text-left" onClick={onOpenPicker} disabled={!template} aria-haspopup="dialog" aria-label={t('change')}>
+      {/* The button is the grid item now, so it takes the stage area itself (.mk-stage-wrap's grid-area
+          no longer applies inside it); without it the picture fell into the right column (2026-11-26). */}
+      <button type="button" className="block w-full min-w-0 cursor-pointer text-left" style={{ gridArea: 'stage' }} onClick={onOpenPicker} disabled={!template} aria-haspopup="dialog" aria-label={t('change')}>
         <PanelStage name={template?.name ?? ''} after={after} initial={initial} inset={inset} frameRatio={autoFrame(state, initialCovers)} />
       </button>
       {template?.photoInput !== 'none' ? <PanelUpload url={photo.url} onPick={onPickPhoto} /> : null}
