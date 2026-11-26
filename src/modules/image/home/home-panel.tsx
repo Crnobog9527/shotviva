@@ -42,6 +42,9 @@ function stageOf(state: HomeGeneratorState, initialCovers: InitialCovers) {
   return { after, initial: initialCovers && initialCovers.templateId === template?.id ? initialCovers.after : null }
 }
 
+// The random opening (use-random-opening.ts) keeps the frame the page was drawn with.
+const autoFrame = (state: HomeGeneratorState, initial: InitialCovers) => (state.auto ? initial?.after?.ratio ?? null : null)
+
 // The button's accessible name is its visible word; the template's name is read as its
 // description (WCAG 2.5.3, review of #523).
 function PanelHead({ template, onOpenPicker }: { template: CatalogueTemplate | null; onOpenPicker(): void }) {
@@ -77,7 +80,7 @@ export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ sta
       <PanelHead template={template} onOpenPicker={onOpenPicker} />
       {/* The template's picture is a way to the browse list too, as Change is (Owner 2026-11-25). */}
       <button type="button" className="block w-full cursor-pointer text-left" onClick={onOpenPicker} disabled={!template} aria-haspopup="dialog" aria-label={t('change')}>
-        <PanelStage name={template?.name ?? ''} after={after} initial={initial} inset={inset} />
+        <PanelStage name={template?.name ?? ''} after={after} initial={initial} inset={inset} frameRatio={autoFrame(state, initialCovers)} />
       </button>
       {template?.photoInput !== 'none' ? <PanelUpload url={photo.url} onPick={onPickPhoto} /> : null}
       {photo.error ? <p role="alert" className="mk-panel-error">{app(`errors.${photo.error}`)}</p> : null}

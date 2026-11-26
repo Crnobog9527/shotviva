@@ -112,7 +112,9 @@ export function featuredSections(live: readonly Live[], keys?: readonly string[]
   // Each card's covers, a series' pictured members included.
   const shown = entries.flatMap(({ template, series: one }) => (one ? pairMembers(one, byId) : [template]))
   const media: Record<string, TemplateMedia> = Object.fromEntries(shown.map((template) => [template.id, mediaOf(template)]))
-  return { categories: grouped(entries).map((group) => toCategory(group, byId)), media, defaultId: featured[0]?.id ?? live[0]?.id ?? null }
+  // `featuredId`: the first featured one only (null when 首页精选 has none); `defaultId` falls back
+  // to the catalogue's first, as a landing page's generator still does.
+  return { categories: grouped(entries).map((group) => toCategory(group, byId)), media, featuredId: featured[0]?.id ?? null, defaultId: featured[0]?.id ?? live[0]?.id ?? null }
 }
 
 // The later pairs of every live series card, by the card's key (its TemplateCard id): what a

@@ -94,6 +94,9 @@ function useStart(viewer: HomeViewer | null, template: CatalogueTemplate | null,
 
 function useSelectedTemplate({ templates, defaultId, find }: Omit<Args, 'viewer'>) {
   const [template, setTemplate] = useState(() => templates.find((candidate) => candidate.id === defaultId) ?? templates[0] ?? null)
+  // `auto`: the template on show is the random opening (use-random-opening.ts), not the visitor's
+  // choice; the card keeps the page's frame for it so nothing moves.
+  const [auto, setAuto] = useState(false)
   const intent = useRef(0)
   const choose = useCallback(async (id: string) => {
     const current = ++intent.current
@@ -103,13 +106,19 @@ function useSelectedTemplate({ templates, defaultId, find }: Omit<Args, 'viewer'
     })
     if (current !== intent.current || !picked) return null
     setTemplate(picked)
+    setAuto(false)
     return picked
   }, [find])
-  return { template, choose, intent }
+  const show = useCallback((picked: CatalogueTemplate) => {
+    if (intent.current !== 0) return
+    setTemplate(picked)
+    setAuto(true)
+  }, [])
+  return { template, choose, intent, auto, show }
 }
 
 export function useHomeGenerator({ templates, defaultId, viewer, find }: Args) {
-  const { template, choose, intent } = useSelectedTemplate({ templates, defaultId, find })
+  const { template, choose, intent, auto, show } = useSelectedTemplate({ templates, defaultId, find })
   const [aspect, setAspect] = useState<OutputAspect>('original')
   const [note, setNote] = useState('')
   const pickedPhoto = useHomePhoto(viewer !== null)
@@ -134,6 +143,10 @@ export function useHomeGenerator({ templates, defaultId, viewer, find }: Args) {
     template,
     templates,
     choose,
+    auto, show,
+    // Nothing chosen or brought back yet (a restored draft chooses too): the random opening may
+    // still take the card.
+    untouched: () => intent.current === 0,
     options, photoRatio, cost,
     aspect: selectedAspect(aspect, options),
     setAspect,

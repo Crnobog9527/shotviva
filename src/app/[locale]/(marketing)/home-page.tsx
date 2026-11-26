@@ -13,7 +13,7 @@ import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
 import { homePanelTemplates } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
-import { HOME_CATEGORIES, bundleSection, creditFacts, featuredSections, fillCredits, freeImagesIn, homeCaseStrip, homePageIn, isLinkEnabled, liveSpaces, offersShownIn } from '@/site/content'
+import { HOME_CATEGORIES, bundleOpeningIds, bundleSection, generatorOpening, creditFacts, featuredSections, fillCredits, freeImagesIn, homeCaseStrip, homePageIn, isLinkEnabled, liveSpaces, offersShownIn } from '@/site/content'
 import { HERO_DEFAULT_OPTION, heroOptionContent } from '@/site/experiments'
 import { site } from '@/site/site.config'
 
@@ -45,14 +45,13 @@ export async function homeMetadata(): Promise<Metadata> {
 }
 
 // Restaurants and hotels lead (Owner 2026-11-24): `/` is the registry's default option (food), its
-// pictures, line and strip, and the generator keeps the admin's first featured template (a hotel
-// one today), so the first screen shows a dish above and a hotel below. Another option's page
-// (/x/hero/…) shows its own pictures and opens the generator on its template; `tote` has none
-// here, so it shows the page content's own hero.
-function heroFor(heroOption: string | undefined, locale: Locale, live: readonly { id: string }[], featuredId: string | null) {
+// pictures, line and strip. Another option's page (/x/hero/…) shows its own pictures and opens the
+// generator on its template; `tote` has none here, so it shows the page content's own hero. Which
+// template the generator opens on otherwise: home-opening.ts (Owner 2026-11-26).
+function heroFor(heroOption: string | undefined, locale: Locale, live: readonly { id: string }[]) {
   const option = heroOptionContent(heroOption ?? HERO_DEFAULT_OPTION, locale)
   const opens = heroOption ? option?.generatorTemplate : undefined
-  return { option, defaultId: opens && live.some((template) => template.id === opens) ? opens : featuredId }
+  return { option, heroTemplate: opens && live.some((template) => template.id === opens) ? opens : null }
 }
 
 // The live catalogue is a cached read (expired by every admin save, featured list included);
@@ -62,11 +61,12 @@ export async function HomeContent({ heroOption }: { heroOption?: string }) {
   const ldMeta = { ...meta, path: localizePath(meta.path, locale) }
   // Series show as one card each, in the admin's order (T102, Owner 2026-11-12). Only food and
   // spaces (hotels) on the home page (Owner 2026-11-24); the generator still offers every template.
-  const { defaultId: featuredId, ...featured } = featuredSections(live, HOME_CATEGORIES, series)
+  const { featuredId, ...featured } = featuredSections(live, HOME_CATEGORIES, series)
   // 精选组合 (Owner 2026-11-25): their own group, ahead of the categories.
   const bundled = bundleSection(live, bundles, locale, index)
   const sections = { categories: bundled.category ? [bundled.category, ...featured.categories] : featured.categories, media: { ...featured.media, ...bundled.media } }
-  const { option, defaultId } = heroFor(heroOption, locale, live, featuredId)
+  const { option, heroTemplate } = heroFor(heroOption, locale, live)
+  const { defaultId, shuffle } = generatorOpening({ heroTemplate, featuredId, bundleIds: bundleOpeningIds(live, bundles) })
   const { templates, opening } = homePanelTemplates(live, defaultId, bundles.flatMap((bundle) => bundle.memberIds))
   const [initialCovers, optionHero] = await Promise.all([openingCovers(opening), homeHeroPictures(option, heroOption !== undefined, locale, live)])
   // Hotels: each case shows its template's own covers while that template is live.
@@ -87,7 +87,7 @@ export async function HomeContent({ heroOption }: { heroOption?: string }) {
         // 「更多真实案例」: the admin's picks for this language, else the option's built-in row.
         heroStrip={homeCaseStrip(option?.strip, cases, live, locale)}
         generator={
-          <HomeGeneratorSlot templates={templates} catalogue={{ locale }} defaultId={opening?.id ?? null} homePath={localizePath('/', locale)} freeImages={free} initialCovers={initialCovers} />
+          <HomeGeneratorSlot templates={templates} catalogue={{ locale }} defaultId={opening?.id ?? null} homePath={localizePath('/', locale)} freeImages={free} initialCovers={initialCovers} shuffle={shuffle} />
         }
       />
     </>

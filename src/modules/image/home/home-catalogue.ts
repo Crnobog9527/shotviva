@@ -47,3 +47,15 @@ function panelSummary(template: CatalogueTemplate): CatalogueTemplate {
   delete summary.groups
   return summary
 }
+
+// The first-screen card's random opening (Owner 2026-11-26, /api/home/opening): each candidate as
+// the card reads it, without its on/off options (the card never offers them, use-home-generator.ts),
+// in the order given. Shared by the CDN like the picker's catalogue.
+export function openingCandidates(live: readonly LocalizedTemplate[], ids: readonly string[]): CatalogueTemplate[] {
+  const byId = new Map(live.filter(isHomeTemplate).map((template) => [template.id, template]))
+  return ids.flatMap((id) => {
+    const template = byId.get(id)
+    return template ? [{ ...panelSummary(toCatalogueTemplate(template)), toggles: [] }] : []
+  })
+}
+
