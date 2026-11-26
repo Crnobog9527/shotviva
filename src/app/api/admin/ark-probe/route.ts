@@ -1,7 +1,6 @@
 import { requireAdmin } from '@/core/auth'
 import { probeArk } from '@/core/providers/ark-probe'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 // Can this deployment's default region reach Ark Beijing? Admin only, no key sent (ark-probe.ts).
