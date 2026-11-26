@@ -21,6 +21,7 @@ export { homePage }
 export { pricingFaq, pricingPage } from './pricing'
 export { type CreditFacts } from './offer'
 export { BUNDLE_GROUP, bundleLayerPairs, bundleSection } from './home-bundles'
+export { bundleOpeningIds, generatorOpening, type GeneratorOpening } from './home-opening'
 export { homeCaseStrip } from './home-case-strip'
 export { hotelViewerPairs, liveSpaces, type HotelViewerPair } from './home-spaces-live'
 export { HOME_CATEGORIES, featuredSections, featuredTemplates, seriesLayerPairs, tryTemplates } from './home-templates'
