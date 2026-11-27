@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { schedule } from '../alerts/schedule'
+import { serverEnv } from '../env'
 import { logger } from '../logger'
 import { appOrigin } from '../site-url'
 
@@ -60,8 +61,19 @@ export function isWarmableOrigin(origin: string): boolean {
   return origin.startsWith('https://')
 }
 
+// Production only. The warm is for visitors' first load after a save; the test site has none, so
+// there it was pure extra load: thirteen page renders refilling the expired caches, each with its
+// heavy catalogue reads, landing on the small test database in the same seconds as the editor's
+// own re-render (refresh()). Those were the minutes the test database stalled and the editor's
+// reads hit the statement timeout (PR #963 validation 2026-11-27 12:20Z; earlier stalls followed
+// a save or a sync too, e.g. 11-26 15:54 and 11-27 04:14, 06:34).
+export function isWarmableEnvironment(env: string | undefined = serverEnv().VERCEL_ENV): boolean {
+  return env === 'production'
+}
+
 // After the response is sent (after()); never awaited, never throws.
-export function warmPagesSoon(paths: readonly string[], origin: string = appOrigin): void {
+export function warmPagesSoon(paths: readonly string[], origin: string = appOrigin, env?: string): void {
   if (!isWarmableOrigin(origin) || paths.length === 0) return
+  if (!isWarmableEnvironment(env ?? serverEnv().VERCEL_ENV)) return
   schedule(() => runWarm(origin, paths))
 }
