@@ -30,6 +30,12 @@ describe('the app shell in the proxy (ARCHITECTURE §18.3)', () => {
     }
   })
 
+  it('lets the way out of the shell (sv-net) render the page for its preload', () => {
+    for (const path of ['/generate?sv-net=1', '/zh/generate?c=food&sv-net=1']) {
+      expect(shellProxyAnswer(request(path, { 'service-worker-navigation-preload': `shell-${BUILD}` }), BUILD)).toBeNull()
+    }
+  })
+
   it('leaves everything else to the rest of the proxy', () => {
     expect(shellProxyAnswer(request('/generate'), BUILD)).toBeNull()
     expect(shellProxyAnswer(request('/generate', { 'service-worker-navigation-preload': 'true' }), BUILD)).toBeNull()
