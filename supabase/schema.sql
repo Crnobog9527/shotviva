@@ -4132,6 +4132,18 @@ $$;
 ALTER FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" integer, "p_inflight" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_in_active_org"("p_user" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select exists (select 1 from public.org_members m join public.orgs o on o.id = m.org_id
+                  where m.user_id = p_user and m.status = 'active' and o.status = 'active')
+$$;
+
+
+ALTER FUNCTION "public"."_in_active_org"("p_user" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_invite_code_org"("p_owner" "uuid") RETURNS "uuid"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -5093,7 +5105,7 @@ begin
       v_skip := case
         when not exists(select from public.credit_ledger l where l.user_id=new.id and l.idempotency_key='signup:' || new.id
           and l.kind='grant' and l.pool='free') then 'blocked_no_signup_grant'
-        when exists(select from public.org_members m where m.org_id=v_org and m.user_id=new.id and m.status='active') then 'blocked_org_member'
+        when (public._in_active_org(new.id) or exists(select from public.org_members m where m.org_id=v_org and m.user_id=new.id and m.status='active')) then 'blocked_org_member'
       end;
       if v_skip is not null then
         insert into public.org_signup_bonus_errors(user_id,error) values(new.id,v_skip) on conflict(user_id) do nothing;
@@ -5140,7 +5152,7 @@ begin
       where a.user_id=p.referred_by and a.status='active' and o.status='active' and o.affiliate_enabled;
     if not found or v_now is null or v_now <= 0 then return; end if;
     if exists(select from public.payments where user_id=p_user) then return; end if;
-    if exists(select from public.org_members m where m.org_id=v_org and m.user_id=p_user and m.status='active') then return; end if;
+    if public._in_active_org(p_user) or exists(select from public.org_members m where m.org_id=v_org and m.user_id=p_user and m.status='active') then return; end if;
     v_credits := coalesce((public._org_setting_at(v_org,'signup_bonus_credits',p.referred_at,'0'::jsonb)->>'value')::integer,0);
     if v_credits <= 0 then return; end if;
     insert into public.org_signup_bonuses(user_id,org_id,member_user_id,credits)
@@ -10896,7 +10908,7 @@ begin
       and l.kind='grant' and l.pool='free' and l.created_at<=p.referred_at) then 'no_signup_gift_at_bind'
     -- The 2010 trigger saw this binding and refused it (or failed): not a customer the bug skipped.
     when exists(select from public.org_signup_bonus_errors e where e.user_id=p_user) then 'refused_by_trigger'
-    when exists(select from public.org_members m where m.org_id=v_org and m.user_id=p_user and m.status='active') then 'org_member'
+    when public._in_active_org(p_user) or exists(select from public.org_members m where m.org_id=v_org and m.user_id=p_user and m.status='active') then 'org_member'
   end;
   if v_reason is not null then
     return jsonb_build_object('status','not_eligible','reason',v_reason,'org_id',v_org,
@@ -14783,6 +14795,7 @@ begin
      -- commissions. Marked at redemption since 2032; an earlier one is known by its org_l1
      -- binding to that staff member.
      and not coalesce(v_invite.org_invite, false)
+     and not public._in_active_org(v_invite.inviter_user_id)
      and not exists (select 1 from public.profiles c where c.id = p_user
                       and c.referred_source = 'org_l1' and c.referred_member = v_invite.inviter_user_id)
      and not exists (select 1 from public.payments where user_id = p_user and id < p_payment_id)
@@ -15394,6 +15407,10 @@ begin
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog', 0));
   perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_gift_cap', 0));
   select * into v_profile from public.profiles where id = p_user_id for update;
+  -- 2032: no signup gift claim while an active org member.
+  if found and public._in_active_org(p_user_id) then
+    return 'not_pending';
+  end if;
   -- Pending: over the allowance since 1480, a 1350 'same_ip', or an older same-IP refusal that
   -- stored nothing (an IP, no reason). Never paid already.
   if not found
@@ -16410,6 +16427,11 @@ begin
     perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
     lock table public.profiles in row exclusive mode;
     select * into v_profile from public.profiles where id = p_user_id;
+    -- 2032: no signup gift while an active org member; a pending one waits until they leave.
+    if public._in_active_org(p_user_id)
+       and not exists (select 1 from public.credit_ledger where idempotency_key = p_idempotency_key) then
+      return row(false,v_profile.credits,v_profile.free_credits,v_profile.paid_until)::public.credit_change;
+    end if;
     p_amount := public.signup_gift_amount(v_profile.created_at);
     if p_amount = 0 then
       return row(false,v_profile.credits,v_profile.free_credits,v_profile.paid_until)::public.credit_change;
@@ -19226,6 +19248,8 @@ begin
 
   checked_at := clock_timestamp();
   if profile.banned_at is not null then outcome := 'banned';
+  -- 2032: an active org member gets no personal credits from any code.
+  elsif public._in_active_org(p_user) then outcome := 'org_member';
   elsif not offer.active or offer.starts_at > checked_at or offer.expires_at <= checked_at then outcome := 'expired';
   elsif offer.owner_user_id = p_user then outcome := 'own';
   -- 2025: only a successful redemption uses the code.
@@ -19259,6 +19283,9 @@ begin
 
   -- 2030: reported as new_users_only, so code from before this deploy shows its usual refusal; the
   -- reason tells the current code to say that invite codes are for sign-up only. Nothing is written.
+  if outcome = 'org_member' then
+    return jsonb_build_object('kind', offer.kind, 'status', 'new_users_only');
+  end if;
   if outcome = 'signup_only' then
     return jsonb_build_object('kind', offer.kind, 'status', 'new_users_only', 'reason', 'signup_only');
   end if;
@@ -19313,6 +19340,8 @@ begin
   end if;
 
   -- 2032: an org staff member's code gives no personal invitee reward (the org bonus instead).
+  -- 2032: nor does an active org member's own code, affiliate switch on or off.
+  org_code := org_code or (offer.kind = 'invite' and public._in_active_org(offer.owner_user_id));
   credits := case when offer.kind = 'invite' and org_code then 0
     when offer.kind = 'invite' then
     (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
@@ -20176,6 +20205,7 @@ begin
     select p.id from public.profiles p
      where p.signup_gift_refusal = 'daily_cap' and p.banned_at is null
        and public.signup_gift_amount(p.created_at) > 0
+       and not public._in_active_org(p.id)  -- 2032
        and not exists (select 1 from public.credit_ledger l where l.idempotency_key = 'signup:' || p.id::text)
      order by p.created_at, p.id
      limit p_limit);
@@ -29009,6 +29039,10 @@ REVOKE ALL ON FUNCTION "public"."_enforce_code_gift_policy"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" integer, "p_inflight" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" integer, "p_inflight" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_in_active_org"("p_user" "uuid") FROM PUBLIC;
 
 
 
