@@ -4959,7 +4959,7 @@ CREATE OR REPLACE FUNCTION "public"."_org_signup_bonus"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare v_org uuid; v_credits integer;
+declare v_org uuid; v_credits integer; v_skip text;
 begin
   begin
     select o.id,o.signup_bonus_credits into v_org,v_credits from public.affiliates a
@@ -4968,12 +4968,18 @@ begin
     if not found or v_credits is null or v_credits <= 0 then return null; end if;
     -- A paid account is never a new user (redeem_code refuses it too; this is belt and braces).
     if exists(select from public.payments where user_id=new.id) then return null; end if;
-    -- The org's partner link (2010): the checks redeem_code makes for a staff invite.
-    if new.referred_source='signup' and (
-      not exists(select from public.credit_ledger l where l.user_id=new.id and l.idempotency_key='signup:' || new.id
-        and l.kind='grant' and l.pool='free')
-      or exists(select from public.org_members m where m.org_id=v_org and m.user_id=new.id and m.status='active')) then
-      return null;
+    -- The org's partner link (2010): the checks redeem_code makes for a staff invite. A refusal
+    -- is recorded (like redeem_code's blocked_no_signup_grant) so a skipped customer can be found.
+    if new.referred_source='signup' then
+      v_skip := case
+        when not exists(select from public.credit_ledger l where l.user_id=new.id and l.idempotency_key='signup:' || new.id
+          and l.kind='grant' and l.pool='free') then 'blocked_no_signup_grant'
+        when exists(select from public.org_members m where m.org_id=v_org and m.user_id=new.id and m.status='active') then 'blocked_org_member'
+      end;
+      if v_skip is not null then
+        insert into public.org_signup_bonus_errors(user_id,error) values(new.id,v_skip) on conflict(user_id) do nothing;
+        return null;
+      end if;
     end if;
     insert into public.org_signup_bonuses(user_id,org_id,member_user_id,credits)
       values(new.id,v_org,new.referred_member,v_credits) on conflict(user_id) do nothing;
@@ -10413,7 +10419,7 @@ CREATE OR REPLACE FUNCTION "public"."admin_org_signup_bonus_backfill"("p_actor" 
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare p public.profiles; v_org uuid; v_credits integer; v_reason text;
+declare p public.profiles; v_org uuid; v_credits integer; v_reason text; v_then integer; v_switch boolean;
 begin
   perform public._org_require_admin(p_actor);
   if p_user is null or p_apply is null then raise exception 'INVALID_INPUT'; end if;
@@ -10426,10 +10432,29 @@ begin
   select o.id,o.signup_bonus_credits into v_org,v_credits from public.affiliates a
     join public.orgs o on o.id=a.org_id
     where a.user_id=p.referred_by and a.status='active' and o.status='active' and o.affiliate_enabled;
+  -- What the trigger would have seen at the binding: the org's bonus then (the last audited value
+  -- at or before referred_at; none = never set = 0) and its affiliate switch then (the last
+  -- audited org_update carrying it; none = unchanged since creation = its value now).
+  if v_org is not null then
+    select (r->'signup_bonus_credits'->>'after')::integer into v_then from public.admin_audit_log l
+      cross join lateral (select case when l.reason ~ '^\s*\{' then l.reason::jsonb end r) x
+      where l.action='org_update' and l.target_id=v_org::text and l.created_at<=p.referred_at
+        and r ? 'signup_bonus_credits'
+      order by l.created_at desc, l.id desc limit 1;
+    select (r->>'affiliate_enabled')::boolean into v_switch from public.admin_audit_log l
+      cross join lateral (select case when l.reason ~ '^\s*\{' then l.reason::jsonb end r) x
+      where l.action='org_update' and l.target_id=v_org::text and l.created_at<=p.referred_at
+        and r ? 'affiliate_enabled'
+      order by l.created_at desc, l.id desc limit 1;
+    v_then := coalesce(v_then,0);
+    v_switch := coalesce(v_switch,true);
+  end if;
   v_reason := case
     when p.referred_source is distinct from 'signup' then 'not_bound_by_link'
     when v_org is null then 'not_org_customer'
     when v_credits is null or v_credits <= 0 then 'bonus_off'
+    when v_then <= 0 then 'bonus_off_at_bind'
+    when not v_switch then 'affiliate_off_at_bind'
     when p.banned_at is not null then 'banned'
     when exists(select from public.payments where user_id=p_user) then 'paid'
     when not exists(select from public.credit_ledger l where l.user_id=p_user and l.idempotency_key='signup:' || p_user
@@ -10437,10 +10462,14 @@ begin
     when exists(select from public.org_members m where m.org_id=v_org and m.user_id=p_user and m.status='active') then 'org_member'
   end;
   if v_reason is not null then
-    return jsonb_build_object('status','not_eligible','reason',v_reason,'org_id',v_org);
+    return jsonb_build_object('status','not_eligible','reason',v_reason,'org_id',v_org,
+      'referred_at',p.referred_at,'bonus_at_bind',v_then,'bonus_now',v_credits);
   end if;
+  -- Paid at the amount in force at the binding (the spec's rule), not today's.
+  v_credits := v_then;
   if not p_apply then
-    return jsonb_build_object('status','eligible','org_id',v_org,'credits',v_credits);
+    return jsonb_build_object('status','eligible','org_id',v_org,'credits',v_credits,
+      'referred_at',p.referred_at,'bonus_at_bind',v_then);
   end if;
   insert into public.org_signup_bonuses(user_id,org_id,member_user_id,credits)
     values(p_user,v_org,p.referred_member,v_credits) on conflict(user_id) do nothing;
