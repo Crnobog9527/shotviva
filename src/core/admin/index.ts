@@ -187,7 +187,11 @@ export {
 } from './features'
 export {
   FEATURES_COPY,
-  FeaturesEditor,
+  FeatureGates,
+  FeatureSection,
+  FeaturesOverview,
+  ChildCard,
+  SiteSwitches,
   FoodPlatingCard,
   FoodTablewareCard,
   AppShellCard,
@@ -195,7 +199,6 @@ export {
   PosterPhotoCard,
   SignupGiftCard,
   WISHLIST_SWITCH_COPY,
-  type FeatureAdminActions,
   type GallerySwitchKey,
   type GallerySwitchState,
   type WishlistSwitchState,

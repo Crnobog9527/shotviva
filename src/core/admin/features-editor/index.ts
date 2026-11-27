@@ -1,5 +1,7 @@
 export { FEATURES_COPY } from './copy'
-export { FeaturesEditor, type FeatureAdminActions, type WishlistSwitchState } from './features-editor'
+export { FeatureGates, SiteSwitches, type WishlistSwitchState } from './features-editor'
+export { ChildCard, FeatureSection } from './features-layout'
+export { FeaturesOverview } from './features-overview'
 export type { GallerySwitchKey, GallerySwitchState } from './gallery-switches'
 export { WISHLIST_SWITCH_COPY } from './wishlist-copy'
 export { SignupGiftCard } from './signup-gift-card'

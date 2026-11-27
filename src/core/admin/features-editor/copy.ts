@@ -1,11 +1,29 @@
 // /admin/features copy. The admin UI is Chinese only and is not localised, so its words live
 // here rather than in site/messages (DESIGN §7, AGENTS §9).
 export const FEATURES_COPY = {
-  title: '功能权限',
-  switchesHeading: '功能开关',
-  gatesHeading: '新功能谁能用',
+  title: '功能开关',
+  // The page's sections, in the order the Owner touches them most (Owner 2026-11-27).
+  sections: {
+    signup: { title: '注册与赠送', hint: '新账号第一次登录时送的积分，和防批量注册的限制。' },
+    generation: { title: '出图功能', hint: '创作页和编辑器里可以单独开关的功能。' },
+    site: { title: '前台功能', hint: '用户在网站上能看到的板块。' },
+    speed: { title: '手机速度与缓存', hint: '让手机打开更快的缓存。手机上页面出问题时，先关这里。' },
+    early: { title: '会员抢先用 / 内测', hint: '新功能可以先只给高档位会员用，或只给邀请的账号用（ARCHITECTURE §6.2「新功能抢先用」）。' },
+  },
+  overview: {
+    title: '总览',
+    hint: '每个开关现在的状态。点名字跳到它的卡片；要改请在卡片上改。',
+    columns: { name: '开关', section: '分区', state: '状态' },
+    emergency: '紧急',
+    affiliateSection: '联盟营销页',
+    affiliate: '联盟营销总开关',
+    inviteOnly: '仅邀请的账号',
+    opensOn: (tier: string, date: string) => `${tier}，${date} 起全员`,
+    on: '已开启',
+    off: '已关闭',
+  },
   intro: '新功能可以先只给高档位会员用（ARCHITECTURE §6.2「新功能抢先用」）。这里只管谁能用；功能开不开看上面的开关。',
-  empty: '暂时没有可设置的功能',
+  empty: '目前没有其他新功能',
   emptyBody: '新功能在代码的功能注册表里登记后，会出现在这里。',
   who: '谁能用',
   openAt: '哪天起对所有人开放（北京时间）',

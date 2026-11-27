@@ -66,3 +66,9 @@ export const AUTO_APPROVE_SWITCH_COPY: SwitchCopy = {
     cancel: '取消',
   },
 }
+
+// 自动通过 sits under 公开创作库: it still decides the review queue while the gallery is closed.
+export const GALLERY_DEPENDENCY = {
+  label: '和上面的「公开创作库」一组。',
+  unmet: '公开创作库现在关着：这条只决定作品要不要人工审核，网站上暂时没人看得到这些作品。',
+} as const
