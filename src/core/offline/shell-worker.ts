@@ -159,12 +159,30 @@ async function answerRefresh(event) {
   return fetch(request)
 }
 
+// The shells this worker fetched at install can still be deleted before it takes over: the worker
+// it replaces keeps answering until then (a shell-off worker drops every shell on each navigation,
+// an old page's sv-drop-shell drops its build's). So the first navigation this worker handles
+// checks behind its answer (waitUntil, never before it) and fetches again any shell that is gone,
+// except the one that navigation is about to refresh itself (shellFirst).
+let shellsChecked = false
+async function refillShells(except) {
+  await Promise.all(['/app-shell/generate', '/zh/app-shell/generate'].map(async (path) => {
+    const shellUrl = self.location.origin + path
+    if (shellUrl === except || (await cachedIn(SHELL, shellUrl))) return
+    await refreshShell(shellUrl)
+  }))
+}
+
 // Answers the request when it is the shell's business; false otherwise.
 function shellFetch(event) {
   const request = event.request
   if (request.mode === 'navigate' && request.method === 'GET') {
     const url = new URL(request.url)
     const path = url.origin === self.location.origin && !url.searchParams.has(SHELL_BYPASS) ? shellPathFor(url.pathname) : null
+    if (!shellsChecked) {
+      shellsChecked = true
+      event.waitUntil(refillShells(path ? self.location.origin + path : null).catch(() => {}))
+    }
     if (!path) return false
     event.respondWith(shellFirst(event, self.location.origin + path))
     return true

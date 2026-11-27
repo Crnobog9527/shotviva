@@ -72,7 +72,8 @@ describe('the app shell (switch on)', () => {
     for (const path of ['/zh/account', '/generate/abc', '/photos', '/login', '/zh/generates']) {
       expect(await (await worker.dispatch('fetch', nav(path))).response?.text() ?? 'browser').not.toBe('shell')
     }
-    expect(await (await worker.dispatch('fetch', nav('/generate'))).response?.text()).toBe('page')
+    // A worker whose first navigation is Create, with nothing kept: the network answers.
+    expect(await (await runWorker(on).dispatch('fetch', nav('/generate'))).response?.text()).toBe('page')
   })
 
   it('keeps only a shell of this build, same-origin', async () => {
@@ -106,11 +107,39 @@ describe('the app shell (switch on)', () => {
 
 describe('the app shell never holds up activation (2026-11-28)', () => {
   it('activation never touches the network: a stalled shell fetch holds up neither activation nor any request (2026-11-28)', async () => {
+    vi.useFakeTimers()
+    try {
+      const worker = runWorker(on)
+      // A shell fetch that never answers (only the time limit's abort ends it); pages answer.
+      worker.fetch.mockImplementation((input: unknown, init?: RequestInit) =>
+        String(typeof input === 'string' ? input : (input as { url: string }).url).includes('/app-shell/')
+          ? new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted'))))
+          : Promise.resolve(new Response('page', { status: 200 })),
+      )
+      await worker.dispatch('activate', {})
+      expect(worker.fetch).not.toHaveBeenCalled()
+      const navigated = worker.dispatch('fetch', nav('/zh/generate'))
+      await vi.advanceTimersByTimeAsync(20_000)
+      const { response } = await navigated
+      expect(await response?.text()).toBe('page')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a shell the replaced worker deleted after install is fetched again behind the first navigation, once', async () => {
     const worker = runWorker(on)
-    worker.fetch.mockImplementation((input: unknown) => (String(typeof input === 'string' ? input : (input as { url: string }).url).includes('/app-shell/') ? new Promise<Response>(() => {}) : Promise.resolve(new Response('page', { status: 200 }))))
+    await worker.dispatch('install', {})
+    worker.stores.get(`sv-shell-${BUILD}`)?.delete(`${SITE}/zh/app-shell/generate`)
     await worker.dispatch('activate', {})
-    expect(worker.fetch).not.toHaveBeenCalled()
-    expect(await (await worker.dispatch('fetch', nav('/zh/login'))).response?.text()).toBe('page')
+    const shellFetches = () => worker.fetch.mock.calls.map(([input]) => input).filter((input) => typeof input === 'string' && input.includes('/app-shell/'))
+    worker.fetch.mockClear()
+    await worker.dispatch('fetch', nav('/photos'))
+    expect(shellFetches()).toEqual([`${SITE}/zh/app-shell/generate`])
+    expect(await (await worker.dispatch('fetch', nav('/zh/generate'))).response?.text()).toBe('shell')
+    worker.fetch.mockClear()
+    await worker.dispatch('fetch', nav('/photos'))
+    expect(shellFetches()).toEqual([])
   })
 
   it('a shell fetch that never answers is given up after its time limit, so install ends', async () => {
