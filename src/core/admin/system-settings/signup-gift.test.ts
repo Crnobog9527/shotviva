@@ -14,7 +14,7 @@ function deps() {
   return { rpc, invalidate, deps: { db: { rpc }, invalidate } satisfies SystemSettingDeps }
 }
 
-const rules = { credits: 100, cap: 30, perIp: 5, claimPhone: true, claimGoogle: false }
+const rules = { credits: 100, cap: 30, perIp: 5, perIpPartner: 20, claimPhone: true, claimGoogle: false }
 
 describe('saveSignupGiftRules', () => {
   it('saves every rule with its own key and type, the admin as actor', async () => {
@@ -24,6 +24,7 @@ describe('saveSignupGiftRules', () => {
       ['admin_set_system_setting', { p_key: 'signup_gift_credits', p_value: 100, p_actor: 'admin-1' }],
       ['admin_set_system_setting', { p_key: 'signup_gift_daily_cap', p_value: 30, p_actor: 'admin-1' }],
       ['admin_set_system_setting', { p_key: 'signup_gift_per_ip', p_value: 5, p_actor: 'admin-1' }],
+      ['admin_set_system_setting', { p_key: 'signup_gift_per_ip_partner', p_value: 20, p_actor: 'admin-1' }],
       ['admin_set_system_setting', { p_key: 'signup_gift_claim_phone', p_value: true, p_actor: 'admin-1' }],
       ['admin_set_system_setting', { p_key: 'signup_gift_claim_google', p_value: false, p_actor: 'admin-1' }],
     ])
@@ -32,8 +33,8 @@ describe('saveSignupGiftRules', () => {
 
   it.each([0, 100_000])('accepts the cap at its bounds (%s)', async (cap) => {
     const d = deps()
-    await saveSignupGiftRules(d.deps, 'admin-1', { ...rules, cap, perIp: cap === 0 ? 0 : 1000 })
-    expect(d.rpc).toHaveBeenCalledTimes(5)
+    await saveSignupGiftRules(d.deps, 'admin-1', { ...rules, cap, perIp: cap === 0 ? 0 : 1000, perIpPartner: cap === 0 ? 0 : 1000 })
+    expect(d.rpc).toHaveBeenCalledTimes(6)
   })
 
   // 2008: the amount, 1 to 5000 (the pause, not 0, stops the gift).
@@ -54,6 +55,9 @@ describe('saveSignupGiftRules', () => {
     { ...rules, cap: 100_001 },
     { ...rules, perIp: 1001 },
     { ...rules, perIp: -1 },
+    { ...rules, perIpPartner: 1001 },
+    { ...rules, perIpPartner: -1 },
+    { credits: 100, cap: 30, perIp: 5, claimPhone: true, claimGoogle: false },
     { ...rules, claimPhone: 'yes' },
     { cap: 30 },
     null,
@@ -68,7 +72,7 @@ describe('saveSignupGiftRules', () => {
 // Review P3 on #942: the card loads the stored amount (or the default 200), never the amount in
 // effect, which is 6 on a database without the v2 cutover and would be saved with the next rule.
 describe('loadSignupGift', () => {
-  const today = { granted: 3, cap: 30, per_ip: 5, claim_phone: true, claim_google: true, credits: 6 }
+  const today = { granted: 3, cap: 30, per_ip: 5, per_ip_partner: 20, claim_phone: true, claim_google: true, credits: 6 }
   function db(stored: unknown) {
     // Only the amount row exists; the pause has never been saved.
     const query = (key = '') => ({
@@ -82,5 +86,6 @@ describe('loadSignupGift', () => {
     const state = await loadSignupGift(db(stored))
     expect(state.rules.credits).toBe(expected)
     expect(state.granted).toBe(3)
+    expect(state.rules.perIpPartner).toBe(20)
   })
 })
