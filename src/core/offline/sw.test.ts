@@ -77,7 +77,7 @@ function runWorker(source: string, { fail = null as Fail, cached = new Map<strin
     keys: vi.fn(async () => [...cached.keys()].map((url) => ({ url }))),
     delete: vi.fn(async (key: Key) => cached.delete(keyOf(key))),
   }
-  const caches = { open: vi.fn(async () => (await reject('open')) ?? store), keys: vi.fn(async () => ['sv-static-old', 'sv-catalogue', 'other-app']), delete: vi.fn(async (key: string) => void deleted.push(key)) }
+  const caches = { has: vi.fn(async () => true), open: vi.fn(async () => (await reject('open')) ?? store), keys: vi.fn(async () => ['sv-static-old', 'sv-catalogue', 'other-app']), delete: vi.fn(async (key: string) => void deleted.push(key)) }
   const preload = { enable: vi.fn(async () => undefined) }
   const self = { location: { origin: SITE }, addEventListener: (type: string, handler: (event: unknown) => void) => void (handlers[type] = handler), skipWaiting: vi.fn(), clients: { claim: vi.fn() }, registration: { unregister: vi.fn(), navigationPreload: preload } }
   const fetch = vi.fn(async () => new Response('network', { status: 200 }))
@@ -170,6 +170,16 @@ const corsAnswer = (body: string) => {
   return answer as unknown as Response
 }
 const coverRequest = (n = 0) => ({ request: { url: `${CDN}/assets/presized/v1/w384/covers/x/after-${n.toString(16).padStart(16, '0')}.avif`, method: 'GET', mode: 'no-cors', destination: 'image' } })
+
+describe('/sw.js reads', () => {
+  it('only looking never creates a cache (after sign-out the next page leaves Cache Storage empty)', async () => {
+    const worker = runWorker(serviceWorkerSource({ version: 'dpl_test', cdnOrigins: [CDN], coverOrigins: [CDN], enabled: true }))
+    worker.caches.has.mockResolvedValue(false)
+    const { response } = await worker.dispatch('fetch', { request: { url: `${CDN}/assets/presized/v1/w384/covers/x/after-8c988390aa621eda.avif`, method: 'GET', mode: 'no-cors' } })
+    expect(await response?.text()).toBe('network')
+    expect(worker.caches.open).not.toHaveBeenCalled()
+  })
+})
 
 describe('/sw.js covers across builds and the switch', () => {
   const source = serviceWorkerSource({ version: 'dpl_test', cdnOrigins: [CDN], coverOrigins: [CDN], enabled: true })

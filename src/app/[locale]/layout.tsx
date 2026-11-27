@@ -12,7 +12,7 @@ import { registersServiceWorker } from '@/core/offline/server'
 import { htmlLang, isLocale, publicClientMessages } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata, ShortcutTitleSync } from '@/core/seo'
-import { foodSwitches, serviceWorkerEnabled } from '@/core/system-settings'
+import { foodSwitches, serviceWorkerEnabled, serviceWorkerShellEnabled } from '@/core/system-settings'
 import { foodSwitchedOff } from '@/core/templates/food-toggle-keys'
 import { FoodTogglesProvider } from '@/core/templates/offered-toggles'
 import { GeistFonts } from '@/core/ui/geist-fonts'
@@ -50,7 +50,7 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
   const messages = publicClientMessages(await getMessages())
   const lang = isLocale(locale) ? locale : site.locales.default
   // 优化摆盘 and 优化器皿 are each offered only while its site-wide switch is on (cached, own tag).
-  const [food, serviceWorker] = await Promise.all([foodSwitches(), serviceWorkerEnabled()])
+  const [food, serviceWorker, shell] = await Promise.all([foodSwitches(), serviceWorkerEnabled(), serviceWorkerShellEnabled()])
   // Worked out here, so the switch logic stays off every page's JS (scripts/js-budget.ts).
   const foodOffer = foodSwitchedOff(food)
   return (
@@ -71,7 +71,7 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
               <SignupCodeResult />
               <UpdateSlot />
               {/* Content-hashed scripts, styles and fonts kept on the phone (core/offline). */}
-              <ServiceWorkerSlot production={registersServiceWorker()} enabled={serviceWorker} />
+              <ServiceWorkerSlot production={registersServiceWorker()} enabled={serviceWorker} shell={shell} />
             </Suspense>
             {/* Huawei Browser names a home-screen shortcut after the live page title (core/seo/shortcut-title.ts). */}
             <ShortcutTitleSync name={site.brand.name} />
