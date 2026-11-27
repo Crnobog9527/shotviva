@@ -63,7 +63,7 @@ describe('readOrgView', () => {
     if (view.kind !== 'owner') return
     expect(view.org).toMatchObject({ name: 'Acme Studio', refCode: 'SV-K7M2PX', poolCredits: 1200, status: 'active', promoPoolCredits: 4000, promoExpiresAt: '2026-12-01T00:00:00Z' })
     expect(view.members.map((m) => [m.promoAllowance, m.heldPromoCredits])).toEqual([[0, 0], [2000, 1500]])
-    expect(view.poolMonth).toEqual({ period: '2026-11', paid: { in: 1500, allocated: 300, reclaimed: 0, clawedBack: 30 },
+    expect(view.poolMonth).toEqual({ period: '2026-11', paid: { in: 1500, allocated: 300, reclaimed: 0, clawedBack: 50, restored: 20 },
       promo: { granted: 10000, allocated: 6000, reclaimed: 0, expired: 0, held: 1500 } })
     expect(view.inviteToken).toBe('a'.repeat(32))
     expect(view.members.map((m) => [m.account, m.customers])).toEqual([['owner@acme.test', 0], ['+86****', 2]])

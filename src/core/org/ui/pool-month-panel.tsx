@@ -17,6 +17,7 @@ export function PoolMonthPanel({ month }: { month: PoolMonthView | null }) {
     [t('allocated'), month.paid.allocated, month.promo.allocated],
     [t('reclaimed'), month.paid.reclaimed, month.promo.reclaimed],
     [t('clawedBack'), month.paid.clawedBack, null],
+    [t('restored'), month.paid.restored, null],
     [t('held'), null, month.promo.held],
     [t('expired'), null, month.promo.expired],
   ]

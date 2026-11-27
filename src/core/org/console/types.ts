@@ -60,9 +60,10 @@ export type OwnerConsole = {
 // What came into each pool this month, went out to members, came back and (promotion) expired.
 export type PoolMonthView = {
   period: string
-  // clawedBack: net credits taken back from the pool this month for refunds and disputes of
-  // purchases that went to it (2033), after any dispute won.
-  paid: { in: number; allocated: number; reclaimed: number; clawedBack: number }
+  // clawedBack: credits taken back from the pool this month for refunds and disputes of
+  // purchases that went to it (2033); restored: given back to it for disputes won this month
+  // (whenever the clawback was). Both non-negative, shown as separate rows.
+  paid: { in: number; allocated: number; reclaimed: number; clawedBack: number; restored: number }
   promo: { granted: number; allocated: number; reclaimed: number; expired: number; held: number }
 }
 
