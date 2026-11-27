@@ -5,6 +5,7 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import { logger } from '../logger'
+import { settle, unwrap, type Settled } from '../shared-read'
 import { SETTINGS_LIFE } from './read'
 import { settingValue } from './registry'
 
@@ -22,9 +23,20 @@ const readLive = (key: Key) => async (): Promise<unknown> => {
   return (data as { value?: unknown } | null)?.value
 }
 
+// Shared by every server instance of the region (see sharedSystemSettings in ./read): the root
+// layout and /sw.js read both keys on every request-time render. A failed read is kept a minute only.
+async function sharedRead(key: Key): Promise<Settled<unknown>> {
+  'use cache: remote'
+  cacheTag(SERVICE_WORKER_SWITCH_TAG)
+  const result = await settle(readLive(key))
+  cacheLife(result.ok ? SETTINGS_LIFE : FAILED_READ_LIFE)
+  return result
+}
+const shared = (key: Key): Read => async () => unwrap(await sharedRead(key))
+
 // The cached body, apart for tests. A failed read keeps the worker (or the shell) off, the safe
 // side: /sw.js unregisters itself, or answers no page from a cache. For a minute only, so it heals.
-export async function serviceWorkerOrOff(read: Read = readLive('service_worker_enabled'), key: Key = 'service_worker_enabled'): Promise<boolean> {
+export async function serviceWorkerOrOff(read: Read = shared('service_worker_enabled'), key: Key = 'service_worker_enabled'): Promise<boolean> {
   try {
     const on = settingValue({ [key]: await read() }, key)
     cacheLife(SETTINGS_LIFE)
@@ -49,5 +61,5 @@ export async function serviceWorkerEnabled(): Promise<boolean> {
 export async function serviceWorkerShellEnabled(): Promise<boolean> {
   'use cache'
   cacheTag(SERVICE_WORKER_SWITCH_TAG)
-  return serviceWorkerOrOff(readLive('service_worker_shell_enabled'), 'service_worker_shell_enabled')
+  return serviceWorkerOrOff(shared('service_worker_shell_enabled'), 'service_worker_shell_enabled')
 }

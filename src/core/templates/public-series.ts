@@ -7,6 +7,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import type { Locale } from '../i18n/locales'
 import { logger } from '../logger'
+import { settle, unwrap, type Settled } from '../shared-read'
 import { PROVIDERS_CACHE_TAG } from '../providers/cache-tag'
 import { CATALOGUE_LIFE } from './cached-catalogue'
 import { TEMPLATES_CACHE_TAG } from './cache'
@@ -54,7 +55,16 @@ export async function readPublicSeries(db: SupabaseClient, locale: Locale): Prom
 }
 
 type Read = (locale: Locale) => Promise<PublicSeries[]>
-const read: Read = (locale) => readPublicSeries(createAdminSupabase(), locale)
+// One copy for the region per language (see sharedWebTemplates in ./cached-catalogue). A failed
+// read is kept a minute only.
+async function sharedSeries(locale: Locale): Promise<Settled<PublicSeries[]>> {
+  'use cache: remote'
+  cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
+  const result = await settle(() => readPublicSeries(createAdminSupabase(), locale))
+  cacheLife(result.ok ? CATALOGUE_LIFE : FAILED_READ_LIFE)
+  return result
+}
+const read: Read = async (locale) => unwrap(await sharedSeries(locale))
 
 // The cached body, apart for tests: a failed read (an outage, a database without the T102
 // tables) shows no series for a minute, so members fall back to their own cards and heal.
