@@ -8442,13 +8442,21 @@ begin
   end if;
   return query
     with page as materialized (
-      select r.id, r.code_id, r.user_id, r.inviter_user_id, r.context, r.status,
-        r.credits_granted, r.inviter_rewarded_at, r.inviter_reward_payment_id, r.discount_expires_at,
-        r.discount_used_payment_id, r.discount_void_at, r.created_at
-      from public.code_redemptions r
-      where (r.code_id = p_code_id or (p_code_id is null and r.status = 'blocked_same_ip'))
-        and (p_cursor is null or (r.created_at,r.id) < ((p_cursor->>'created_at')::timestamptz,(p_cursor->>'id')::uuid))
-      order by r.created_at desc, r.id desc limit 30
+      select * from (
+        select r.id, r.code_id, r.user_id, r.inviter_user_id, r.context, r.status,
+          r.credits_granted, r.inviter_rewarded_at, r.inviter_reward_payment_id, r.discount_expires_at,
+          r.discount_used_payment_id, r.discount_void_at, r.created_at
+        from public.code_redemptions r
+        where (r.code_id = p_code_id or (p_code_id is null and r.status = 'blocked_same_ip'))
+          and (p_cursor is null or (r.created_at,r.id) < ((p_cursor->>'created_at')::timestamptz,(p_cursor->>'id')::uuid))
+        union all
+        select b.id, b.code_id, b.user_id, b.inviter_user_id, b.context, b.status,
+          0, null::timestamptz, null::bigint, null::timestamptz, null::bigint, null::timestamptz, b.created_at
+        from public.code_redemption_blocks b
+        where (b.code_id = p_code_id or (p_code_id is null and b.status = 'blocked_same_ip'))
+          and (p_cursor is null or (b.created_at,b.id) < ((p_cursor->>'created_at')::timestamptz,(p_cursor->>'id')::uuid))
+      ) rows
+      order by created_at desc, id desc limit 30
     )
     select to_jsonb(r) || jsonb_build_object('code', c.code,
       'reward_payment_status', reward.status, 'reward_payment_refunded', reward.amount_refunded,
@@ -18875,6 +18883,8 @@ declare
   profile record;
   inviter record;
   pending record;
+  prior_status text;
+  prior_at timestamptz;
   owner_id uuid;
   redemption_id uuid := gen_random_uuid();
   checked_at timestamptz;
@@ -18883,6 +18893,7 @@ declare
   credits int;
   outcome text := 'ok';
   replaced boolean := false;
+  org_code boolean := false;
 begin
   if p_context is null or p_context not in ('signup','account','paywall')
      or p_invite_window_days is null or p_invite_window_days <= 0 then
@@ -18897,7 +18908,8 @@ begin
   -- Lock participants in a consistent order before the code. A reciprocal pair of invites
   -- also touches both profiles via FKs and the existing balance helper's FOR UPDATE.
   perform 1 from public.profiles where id in (p_user, owner_id) order by id for no key update;
-  select banned_at, signup_ip, created_at into profile from public.profiles where id = p_user;
+  -- 2025: referred_by too (the org-code exemption).
+  select banned_at, signup_ip, created_at, referred_by into profile from public.profiles where id = p_user;
   if not found then raise exception 'PROFILE_NOT_FOUND'; end if;
   select id, kind, owner_user_id, invitee_credits, invitee_pool, active, starts_at, expires_at,
          max_redemptions, redemption_count, new_users_only, discount_percent, discount_products,
@@ -18911,16 +18923,27 @@ begin
   if profile.banned_at is not null then outcome := 'banned';
   elsif not offer.active or offer.starts_at > checked_at or offer.expires_at <= checked_at then outcome := 'expired';
   elsif offer.owner_user_id = p_user then outcome := 'own';
-  elsif exists (select 1 from public.code_redemptions where code_id = offer.id and user_id = p_user) then outcome := 'used';
+  -- 2025: only a successful redemption uses the code.
+  elsif exists (select 1 from public.code_redemptions where code_id = offer.id and user_id = p_user and status = 'ok') then outcome := 'used';
   elsif offer.redemption_count >= offer.max_redemptions then outcome := 'full';
   elsif (offer.new_users_only or offer.kind = 'invite')
     and profile.created_at + make_interval(days => p_invite_window_days) <= checked_at then outcome := 'new_users_only';
   elsif offer.kind = 'invite' then
     select signup_ip, banned_at into inviter from public.profiles where id = offer.owner_user_id;
+    -- 2025: a code that binds the customer to the org (the org_l1 branch of _org_attribute_invite).
+    org_code := exists (select from public.org_members m
+      join public.orgs o on o.id = m.org_id
+      join public.affiliates a on a.org_id = o.id
+      where m.user_id = offer.owner_user_id and m.status = 'active' and o.status = 'active' and o.affiliate_enabled
+        and a.status = 'active' and a.user_id <> p_user
+        and (profile.referred_by is null or profile.referred_by = a.user_id)
+        and not exists (select from public.org_members c
+          where c.org_id = o.id and c.user_id = p_user and c.status = 'active'));
     if inviter.banned_at is not null then outcome := 'expired';
-    elsif exists (select 1 from public.code_redemptions where user_id = p_user and kind = 'invite') then outcome := 'already_invited';
+    -- 2025: only a successful invite counts.
+    elsif exists (select 1 from public.code_redemptions where user_id = p_user and kind = 'invite' and status = 'ok') then outcome := 'already_invited';
     elsif exists (select 1 from public.payments where user_id = p_user) then outcome := 'new_users_only';
-    elsif inviter.signup_ip = profile.signup_ip then outcome := 'blocked_same_ip';
+    elsif inviter.signup_ip = profile.signup_ip and not org_code then outcome := 'blocked_same_ip';
     elsif not exists (select 1 from public.credit_ledger l
       where l.idempotency_key = 'signup:' || p_user and l.user_id = p_user and l.kind = 'grant' and l.pool = 'free') then
       outcome := 'blocked_no_signup_grant';
@@ -18929,8 +18952,15 @@ begin
 
   if outcome <> 'ok' then
     if outcome in ('blocked_same_ip', 'blocked_no_signup_grant') then
-      insert into public.code_redemptions(code_id, kind, user_id, inviter_user_id, context, status)
-        values (offer.id, offer.kind, p_user, offer.owner_user_id, p_context, outcome);
+      -- 2025: the latest blocked attempt replaces an earlier one (one invite row per user).
+      -- The replaced row moves to code_redemption_blocks, so the evidence stays.
+      with gone as (
+        delete from public.code_redemptions where user_id = p_user and kind = 'invite' and status <> 'ok'
+        returning id, code_id, kind, user_id, inviter_user_id, context, status, created_at)
+      insert into public.code_redemption_blocks(id, code_id, kind, user_id, inviter_user_id, context, status, created_at, replaced_by)
+        select id, code_id, kind, user_id, inviter_user_id, context, status, created_at, redemption_id from gone;
+      insert into public.code_redemptions(id, code_id, kind, user_id, inviter_user_id, context, status)
+        values (redemption_id, offer.id, offer.kind, p_user, offer.owner_user_id, p_context, outcome);
     end if;
     return jsonb_build_object('kind', offer.kind, 'status', outcome);
   end if;
@@ -18958,13 +18988,26 @@ begin
     deadline := least(offer.expires_at, checked_at + make_interval(days => offer.discount_valid_days));
   end if;
 
+  -- 2025: a successful invite replaces the user's blocked attempt (any invite code), keeping why
+  -- and when it was blocked. A blocked row never granted credits.
+  if offer.kind = 'invite' then
+    with gone as (
+      delete from public.code_redemptions where user_id = p_user and kind = 'invite' and status <> 'ok'
+      returning id, code_id, kind, user_id, inviter_user_id, context, status, created_at)
+    insert into public.code_redemption_blocks(id, code_id, kind, user_id, inviter_user_id, context, status, created_at, replaced_by)
+      select id, code_id, kind, user_id, inviter_user_id, context, status, created_at, redemption_id from gone
+      returning status, created_at into prior_status, prior_at;
+  end if;
+
   credits := case when offer.kind = 'invite' then
     (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
     else coalesce(offer.invitee_credits, 0) end;
   grant_pool := case when offer.kind = 'invite' then 'free' else offer.invitee_pool end;
   insert into public.code_redemptions
-    (id, code_id, kind, user_id, inviter_user_id, context, status, credits_granted, discount_expires_at)
-    values (redemption_id, offer.id, offer.kind, p_user, offer.owner_user_id, p_context, 'ok', credits, deadline);
+    (id, code_id, kind, user_id, inviter_user_id, context, status, credits_granted, discount_expires_at,
+     blocked_status, blocked_at)
+    values (redemption_id, offer.id, offer.kind, p_user, offer.owner_user_id, p_context, 'ok', credits, deadline,
+     prior_status, prior_at);
   update public.codes set redemption_count = redemption_count + 1 where id = offer.id;
   if credits > 0 then
     perform public._apply_credit_change(p_user, grant_pool, 'code_grant', credits, 'Code redemption', 'code:' || redemption_id);
@@ -22224,6 +22267,25 @@ CREATE TABLE IF NOT EXISTS "public"."business_inquiries" (
 ALTER TABLE "public"."business_inquiries" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."code_redemption_blocks" (
+    "id" "uuid" NOT NULL,
+    "code_id" "uuid",
+    "kind" "text" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "inviter_user_id" "uuid",
+    "context" "text" NOT NULL,
+    "status" "text" NOT NULL,
+    "created_at" timestamp with time zone NOT NULL,
+    "replaced_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "replaced_by" "uuid" NOT NULL,
+    CONSTRAINT "code_redemption_blocks_kind_check" CHECK (("kind" = 'invite'::"text")),
+    CONSTRAINT "code_redemption_blocks_status_check" CHECK (("status" = ANY (ARRAY['blocked_same_ip'::"text", 'blocked_no_signup_grant'::"text"])))
+);
+
+
+ALTER TABLE "public"."code_redemption_blocks" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."code_redemptions" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "code_id" "uuid",
@@ -22242,6 +22304,9 @@ CREATE TABLE IF NOT EXISTS "public"."code_redemptions" (
     "checkout_token" "uuid",
     "checkout_expires_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "blocked_status" "text",
+    "blocked_at" timestamp with time zone,
+    CONSTRAINT "code_redemptions_blocked_status_check" CHECK (("blocked_status" = ANY (ARRAY['blocked_same_ip'::"text", 'blocked_no_signup_grant'::"text"]))),
     CONSTRAINT "code_redemptions_check" CHECK ((("checkout_token" IS NULL) = ("checkout_expires_at" IS NULL))),
     CONSTRAINT "code_redemptions_context_check" CHECK (("context" = ANY (ARRAY['signup'::"text", 'account'::"text", 'paywall'::"text"]))),
     CONSTRAINT "code_redemptions_credits_granted_check" CHECK (("credits_granted" >= 0)),
@@ -22251,6 +22316,10 @@ CREATE TABLE IF NOT EXISTS "public"."code_redemptions" (
 
 
 ALTER TABLE "public"."code_redemptions" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."code_redemptions"."blocked_status" IS 'For an ok invite row: the status of the blocked attempt it replaced (2025), else null.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."credit_ledger" (
@@ -24019,6 +24088,11 @@ ALTER TABLE ONLY "public"."business_inquiries"
 
 
 
+ALTER TABLE ONLY "public"."code_redemption_blocks"
+    ADD CONSTRAINT "code_redemption_blocks_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."code_redemptions"
     ADD CONSTRAINT "code_redemptions_code_id_user_id_key" UNIQUE ("code_id", "user_id");
 
@@ -24878,6 +24952,22 @@ CREATE INDEX "business_inquiries_status_created_at_idx" ON "public"."business_in
 
 
 CREATE INDEX "business_inquiries_user_id_idx" ON "public"."business_inquiries" USING "btree" ("user_id") WHERE ("user_id" IS NOT NULL);
+
+
+
+CREATE INDEX "code_redemption_blocks_code_created_idx" ON "public"."code_redemption_blocks" USING "btree" ("code_id", "created_at" DESC, "id" DESC);
+
+
+
+CREATE INDEX "code_redemption_blocks_inviter_idx" ON "public"."code_redemption_blocks" USING "btree" ("inviter_user_id") WHERE ("inviter_user_id" IS NOT NULL);
+
+
+
+CREATE INDEX "code_redemption_blocks_same_ip_idx" ON "public"."code_redemption_blocks" USING "btree" ("created_at" DESC, "id" DESC) WHERE ("status" = 'blocked_same_ip'::"text");
+
+
+
+CREATE INDEX "code_redemption_blocks_user_idx" ON "public"."code_redemption_blocks" USING "btree" ("user_id");
 
 
 
@@ -26135,6 +26225,21 @@ ALTER TABLE ONLY "public"."business_inquiries"
 
 
 
+ALTER TABLE ONLY "public"."code_redemption_blocks"
+    ADD CONSTRAINT "code_redemption_blocks_code_id_fkey" FOREIGN KEY ("code_id") REFERENCES "public"."codes"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."code_redemption_blocks"
+    ADD CONSTRAINT "code_redemption_blocks_inviter_user_id_fkey" FOREIGN KEY ("inviter_user_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."code_redemption_blocks"
+    ADD CONSTRAINT "code_redemption_blocks_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."code_redemptions"
     ADD CONSTRAINT "code_redemptions_code_id_fkey" FOREIGN KEY ("code_id") REFERENCES "public"."codes"("id") ON DELETE SET NULL;
 
@@ -27111,6 +27216,9 @@ ALTER TABLE "public"."business_inquiries" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "category_public_read" ON "public"."template_categories" AS RESTRICTIVE FOR SELECT TO "authenticated", "anon" USING ((("kind" = 'template'::"text") AND "is_visible" AND (("parent_id" IS NULL) OR ("parent_id" IN ( SELECT "admin"."visible_template_category_keys"() AS "visible_template_category_keys")))));
 
+
+
+ALTER TABLE "public"."code_redemption_blocks" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."code_redemptions" ENABLE ROW LEVEL SECURITY;
@@ -30858,6 +30966,10 @@ GRANT ALL ON TABLE "public"."bundle_featured_locale" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."business_inquiries" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."code_redemption_blocks" TO "service_role";
 
 
 
