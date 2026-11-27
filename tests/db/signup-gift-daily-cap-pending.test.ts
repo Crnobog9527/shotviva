@@ -34,7 +34,20 @@ const gift = async (user: string) => (await row(db, "select (grant_credits($1::u
 const refusalOf = async (user: string) => (await row(db, 'select signup_gift_refusal r from profiles where id=$1', [user])).r
 const giftRows = async (user: string) =>
   (await db.query("select delta from credit_ledger where idempotency_key='signup:'||$1::text", [user])).rows.map((r) => r.delta as number)
-const catchUp = async (limit = 50) => (await row(db, 'select signup_gift_catch_up($1) r', [limit])).r as Record<string, unknown>
+const queue = async (limit = 50) => (await row(db, 'select signup_gift_catch_up_queue($1) q', [limit])).q as string[]
+const catchUpOne = async (user: string) => (await row(db, 'select signup_gift_catch_up_one($1) r', [user])).r as string
+// The cron's loop (core/auth/signup-gift-catch-up.ts), in this test's transaction.
+async function catchUp(limit = 50) {
+  const ids = await queue(limit)
+  const out = { paid: 0, tried: 0, stopped: null as string | null }
+  for (const id of ids) {
+    out.tried += 1
+    const r = await catchUpOne(id)
+    if (r === 'paid') out.paid += 1
+    if (r === 'paused' || r === 'daily_cap') { out.stopped = r; break }
+  }
+  return { ...out, remaining: (await queue(500)).length }
+}
 const amountFor = async (user: string) => (await row(db, 'select signup_gift_amount(created_at) a from profiles where id=$1', [user])).a as number
 
 // A sign-up on a fresh network on a day with no room left: pending for the daily cap. `ageSeconds`
@@ -67,7 +80,8 @@ it('the catch-up pays the oldest pending accounts first and stops at today\'s ca
   const oldest = await capped(30)
   const middle = await capped(20)
   await roomFor(2)
-  expect(await catchUp()).toEqual({ paid: 2, tried: 2, failed: 0, stopped: 'daily_cap', remaining: 1 })
+  expect(await queue()).toEqual([oldest, middle, newest])
+  expect(await catchUp()).toEqual({ paid: 2, tried: 3, stopped: 'daily_cap', remaining: 1 })
   expect(await giftRows(oldest)).toHaveLength(1)
   expect(await giftRows(middle)).toHaveLength(1)
   expect(await giftRows(newest)).toEqual([])
@@ -81,10 +95,10 @@ it('the catch-up pays the oldest pending accounts first and stops at today\'s ca
 it('the catch-up is bounded by its limit', async () => {
   for (let i = 0; i < 3; i++) await capped(i)
   await roomFor(10)
-  expect(await catchUp(2)).toEqual({ paid: 2, tried: 2, failed: 0, stopped: null, remaining: 1 })
+  expect(await catchUp(2)).toEqual({ paid: 2, tried: 2, stopped: null, remaining: 1 })
   for (const bad of [0, 501]) {
     await db.query('savepoint bad')
-    await expect(db.query('select signup_gift_catch_up($1)', [bad])).rejects.toThrow('INVALID_INPUT')
+    await expect(db.query('select signup_gift_catch_up_queue($1)', [bad])).rejects.toThrow('INVALID_INPUT')
     await db.query('rollback to savepoint bad')
   }
 })
@@ -95,7 +109,7 @@ it('the pause holds a pending account back without ending it; a new sign-up duri
   await setSetting('signup_gift_paused', true)
   expect(await gift(user)).toBe(false)
   expect(await refusalOf(user)).toBe('daily_cap')
-  expect(await catchUp()).toMatchObject({ paid: 0, tried: 0, stopped: 'paused', remaining: 1 })
+  expect(await catchUp()).toMatchObject({ paid: 0, tried: 1, stopped: 'paused', remaining: 1 })
   const during = await createUser(db)
   expect(await gift(during)).toBe(false)
   expect(await refusalOf(during)).toBe('paused')
@@ -112,7 +126,9 @@ it('a banned account is never paid; a deleted one is gone from the queue', async
   await db.query('delete from auth.users where id=$1', [deleted])
   await roomFor(5)
   expect(await gift(banned)).toBe(false)
-  expect(await catchUp()).toEqual({ paid: 0, tried: 0, failed: 0, stopped: null, remaining: 0 })
+  expect(await catchUp()).toEqual({ paid: 0, tried: 0, stopped: null, remaining: 0 })
+  expect(await catchUpOne(banned)).toBe('skipped')
+  expect(await catchUpOne(deleted)).toBe('skipped')
   expect(await giftRows(banned)).toEqual([])
 })
 
@@ -125,9 +141,28 @@ it('the per-network allowance is counted again when it is paid: over it, the acc
     await db.query('update profiles set signup_ip=$2 where id=$1', [other, address])
     expect(await gift(other)).toBe(true)
   }
-  expect(await catchUp()).toMatchObject({ paid: 0, tried: 1, failed: 0, remaining: 0 })
+  expect(await catchUpOne(user)).toBe('same_ip_pending')
   expect(await refusalOf(user)).toBe('same_ip_pending')
   expect(await giftRows(user)).toEqual([])
+  expect(await queue()).toEqual([])
+})
+
+it('the per-network count for a catch-up is the 24 hours before payment, not from its own sign-up on', async () => {
+  const address = uniqueIp()
+  // Sign-ups from three days ago still get the gift (signup_gift_amount's v2 cutoff before that).
+  await db.query("update system_settings set updated_at=now()-interval '10 days' where key='pricing_catalog_version'")
+  // Signed up three days ago; five gifts on its network two days ago: inside the 24 hours before
+  // its sign-up-to-now span, outside the 24 hours before now.
+  const user = await capped(3 * 86400, address)
+  await roomFor(10)
+  for (let i = 0; i < 5; i++) {
+    const other = await createUser(db)
+    await db.query('update profiles set signup_ip=$2 where id=$1', [other, address])
+    expect(await gift(other)).toBe(true)
+    await db.query("update credit_ledger set created_at=now()-interval '2 days' where idempotency_key='signup:'||$1::text", [other])
+  }
+  expect(await catchUpOne(user)).toBe('paid')
+  expect(await giftRows(user)).toHaveLength(1)
 })
 
 it('an org ?ref customer caught up gets the org bonus with the gift', async () => {
@@ -148,12 +183,14 @@ it('an org ?ref customer caught up gets the org bonus with the gift', async () =
   expect((await db.query('select error from org_signup_bonus_errors where user_id=$1', [user])).rows[0]?.error).toBe('blocked_no_signup_grant')
 
   await roomFor(1)
-  expect((await catchUp()).paid).toBe(1)
+  expect(await catchUpOne(user)).toBe('paid')
   expect((await db.query("select delta from credit_ledger where user_id=$1 and kind='org_signup_bonus'", [user])).rows.map((r) => r.delta)).toEqual([350])
   expect((await db.query('select 1 from org_signup_bonus_errors where user_id=$1', [user])).rowCount).toBe(0)
 })
 
 it('only the service role runs the catch-up', async () => {
-  expect(await row(db, "select has_function_privilege('authenticated','public.signup_gift_catch_up(integer)','execute') u, has_function_privilege('anon','public.signup_gift_catch_up(integer)','execute') a, has_function_privilege('service_role','public.signup_gift_catch_up(integer)','execute') s"))
-    .toEqual({ u: false, a: false, s: true })
+  for (const fn of ['public.signup_gift_catch_up_queue(integer)', 'public.signup_gift_catch_up_one(uuid)']) {
+    expect(await row(db, "select has_function_privilege('authenticated',$1,'execute') u, has_function_privilege('anon',$1,'execute') a, has_function_privilege('service_role',$1,'execute') s", [fn]))
+      .toEqual({ u: false, a: false, s: true })
+  }
 })

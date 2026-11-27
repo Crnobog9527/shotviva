@@ -8,7 +8,8 @@ vi.mock('@/core/env', () => ({ serverEnv: () => ({ CRON_SECRET: 'local-cron-fixt
 const { GET } = await import('./route')
 
 const req = (value: string) => new Request('https://site.test/api/cron/signup-gift-catch-up', { headers: { authorization: value } })
-const ok = { paid: 3, tried: 3, failed: 0, stopped: null, remaining: 0 }
+vi.mock('@/core/logger', () => ({ logger: { info: vi.fn(), error: vi.fn() } }))
+const ids = ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003']
 beforeEach(() => vi.clearAllMocks())
 
 it('refuses missing and incorrect credentials without running', async () => {
@@ -16,14 +17,25 @@ it('refuses missing and incorrect credentials without running', async () => {
   expect(rpc).not.toHaveBeenCalled()
 })
 
-it('runs one bounded batch, 500 when a grant failed or the call fails', async () => {
-  rpc.mockResolvedValueOnce({ data: ok, error: null })
+it('reads one bounded queue and pays each account in its own call, stopping at the cap', async () => {
+  rpc.mockResolvedValueOnce({ data: ids, error: null })
+  rpc.mockResolvedValueOnce({ data: 'paid', error: null })
+  rpc.mockResolvedValueOnce({ data: 'daily_cap', error: null })
   expect((await GET(req('Bearer local-cron-fixture'))).status).toBe(204)
-  expect(rpc).toHaveBeenCalledWith('signup_gift_catch_up', { p_limit: 50 })
-  rpc.mockResolvedValueOnce({ data: { ...ok, stopped: 'daily_cap', remaining: 7 }, error: null })
-  expect((await GET(req('Bearer local-cron-fixture'))).status).toBe(204)
-  rpc.mockResolvedValueOnce({ data: { ...ok, failed: 1 }, error: null })
+  expect(rpc.mock.calls).toEqual([
+    ['signup_gift_catch_up_queue', { p_limit: 50 }],
+    ['signup_gift_catch_up_one', { p_user_id: ids[0] }],
+    ['signup_gift_catch_up_one', { p_user_id: ids[1] }],
+  ])
+})
+
+it('a failed account does not stop the others, but answers 500; so does a failed queue read', async () => {
+  rpc.mockResolvedValueOnce({ data: ids, error: null })
+  rpc.mockResolvedValueOnce({ data: null, error: { message: 'boom' } })
+  rpc.mockResolvedValueOnce({ data: 'same_ip_pending', error: null })
+  rpc.mockResolvedValueOnce({ data: 'paid', error: null })
   expect((await GET(req('Bearer local-cron-fixture'))).status).toBe(500)
+  expect(rpc).toHaveBeenCalledTimes(4)
   rpc.mockResolvedValueOnce({ data: null, error: { message: 'boom' } })
   expect((await GET(req('Bearer local-cron-fixture'))).status).toBe(500)
 })
