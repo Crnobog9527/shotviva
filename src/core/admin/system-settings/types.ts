@@ -13,5 +13,5 @@ export type SwitchKey = 'wishlist_enabled' | 'gallery_enabled' | 'gallery_auto_a
 
 // 1350 + 1480 + 2008: the signup gift card on /admin/features. Today is the Beijing day the cap
 // counts; credits is what one new account gets.
-export type SignupGiftRules = { credits: number; cap: number; perIp: number; claimPhone: boolean; claimGoogle: boolean }
+export type SignupGiftRules = { credits: number; cap: number; perIp: number; perIpPartner: number; claimPhone: boolean; claimGoogle: boolean }
 export type SignupGiftState = { granted: number; rules: SignupGiftRules; paused: WishlistSwitch }

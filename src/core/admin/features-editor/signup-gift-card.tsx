@@ -28,11 +28,12 @@ export function SignupGiftCard({ state, savePaused, saveRules }: Props) {
   const [credits, setCredits] = useState(String(state.rules.credits))
   const [cap, setCap] = useState(String(state.rules.cap))
   const [perIp, setPerIp] = useState(String(state.rules.perIp))
+  const [perIpPartner, setPerIpPartner] = useState(String(state.rules.perIpPartner))
   const [claimPhone, setClaimPhone] = useState(state.rules.claimPhone)
   const [claimGoogle, setClaimGoogle] = useState(state.rules.claimGoogle)
   const { pending, error, notice, run } = useAdminAction()
-  const valid = validCredits(credits) && whole(cap, 100_000) && whole(perIp, 1000)
-  const rules: SignupGiftRules = { credits: Number(credits), cap: Number(cap), perIp: Number(perIp), claimPhone, claimGoogle }
+  const valid = validCredits(credits) && whole(cap, 100_000) && whole(perIp, 1000) && whole(perIpPartner, 1000)
+  const rules: SignupGiftRules = { credits: Number(credits), cap: Number(cap), perIp: Number(perIp), perIpPartner: Number(perIpPartner), claimPhone, claimGoogle }
   const changed = JSON.stringify(rules) !== JSON.stringify(state.rules)
 
   const submit = () =>
@@ -71,6 +72,7 @@ export function SignupGiftCard({ state, savePaused, saveRules }: Props) {
           <NumberRule copy={COPY.credits} value={credits} onChange={setCredits} valid={validCredits(credits)} />
           <NumberRule copy={COPY.cap} value={cap} onChange={setCap} valid={whole(cap, 100_000)} />
           <NumberRule copy={COPY.perIp} value={perIp} onChange={setPerIp} valid={whole(perIp, 1000)} />
+          <NumberRule copy={COPY.perIpPartner} value={perIpPartner} onChange={setPerIpPartner} valid={whole(perIpPartner, 1000)} />
           <fieldset className="grid gap-2">
             <legend className="text-sm font-medium">{COPY.claim.label}</legend>
             <label className="flex items-center gap-2 text-sm">

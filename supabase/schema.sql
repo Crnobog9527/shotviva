@@ -12900,7 +12900,7 @@ begin
                          'signup_gift_daily_cap','signup_gift_paused','signup_gift_per_ip',
                          'signup_gift_claim_phone','signup_gift_claim_google','poster_photo_credits',
                          'catalog_economics_policy','food_toggles_enabled','service_worker_enabled',
-                         'service_worker_shell_enabled','signup_gift_credits')
+                         'service_worker_shell_enabled','signup_gift_credits','signup_gift_per_ip_partner')
            or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
@@ -12926,6 +12926,11 @@ begin
       if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[0-9]+$'
          or (p_value #>> '{}')::numeric > 1000 then
         raise exception 'INVALID_INPUT' using detail = 'signup_gift_per_ip must be an integer from 0 to 1000';
+      end if;
+    when 'signup_gift_per_ip_partner' then
+      if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[0-9]+$'
+         or (p_value #>> '{}')::numeric > 1000 then
+        raise exception 'INVALID_INPUT' using detail = 'signup_gift_per_ip_partner must be an integer from 0 to 1000';
       end if;
     -- 2008: the signup gift's amount (ARCHITECTURE §7). 0 is not offered: the pause stops the gift.
     when 'signup_gift_credits' then
@@ -16097,6 +16102,7 @@ declare
   v_profile public.profiles;
   v_today jsonb;
   v_per_ip integer;
+  v_partner integer;
   v_change public.credit_change;
 begin
   if p_amount is null or p_amount <= 0 then
@@ -16120,6 +16126,15 @@ begin
       end if;
 
       v_per_ip := public.signup_gift_setting_int('signup_gift_per_ip', 5);
+      -- 2024: an account already bound through an org account's ?ref link at this sign-in gets the
+      -- partner allowance; never stricter than the site-wide one (0 = no limit wins).
+      if v_profile.referred_source = 'signup' and exists (
+           select 1 from public.affiliates a join public.orgs o on o.id = a.org_id
+            where a.user_id = v_profile.referred_by and a.status = 'active'
+              and o.status = 'active' and o.affiliate_enabled) then
+        v_partner := public.signup_gift_setting_int('signup_gift_per_ip_partner', 20);
+        v_per_ip := case when v_per_ip = 0 or v_partner = 0 then 0 else greatest(v_per_ip, v_partner) end;
+      end if;
       if v_profile.signup_ip is not null and v_per_ip > 0 then
         perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
         if (select count(*)
@@ -16150,6 +16165,9 @@ begin
         insert into public.signup_gift_claims (key_hash, method, user_id)
         select k.key_hash, k.method, p_user_id from public.signup_gift_identity_keys(p_user_id) k
         on conflict (key_hash) do nothing;
+        -- 2024: the org ?ref binding now comes before the gift (2010 recorded blocked_no_signup_grant);
+        -- the org bonus follows the gift as it does for a later claim (2023).
+        perform public._org_signup_bonus_after_gift(p_user_id);
       end if;
       return v_change;
     end if;
@@ -19749,6 +19767,7 @@ CREATE OR REPLACE FUNCTION "public"."signup_gift_today"() RETURNS "jsonb"
     'cap', public.signup_gift_setting_int('signup_gift_daily_cap', 30),
     'paused', public.signup_gift_setting_bool('signup_gift_paused', false),
     'per_ip', public.signup_gift_setting_int('signup_gift_per_ip', 5),
+    'per_ip_partner', public.signup_gift_setting_int('signup_gift_per_ip_partner', 20),
     'claim_phone', public.signup_gift_setting_bool('signup_gift_claim_phone', true),
     'claim_google', public.signup_gift_setting_bool('signup_gift_claim_google', true),
     'credits', public.signup_gift_amount(now())
