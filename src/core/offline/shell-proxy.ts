@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { IDENTITY_HEADER } from '../auth/forwarded-identity'
-import { SHELL_BYPASS_PARAM } from './shell-fallback'
+import { CREATE_PATHS as CREATE_ADDRESSES, SHELL_BYPASS_PARAM } from './shell-fallback'
 import { SHELL_PRELOAD_PREFIX } from './shell-worker'
 
 // The proxy's part in Create's app shell (ARCHITECTURE §18.3), ahead of every session step.
@@ -31,7 +31,7 @@ function isShellSpelling(pathname: string): boolean {
   }
   return /^\/(?:(?:en|zh)\/)?app-shell(?:\/|$)/i.test(decoded)
 }
-const CREATE_PATHS = new Set(['/generate', '/generate/', '/zh/generate', '/zh/generate/'])
+const CREATE_PATHS = new Set(CREATE_ADDRESSES)
 
 export function shellProxyAnswer(request: NextRequest, version: string): NextResponse | null {
   const { pathname, search } = request.nextUrl

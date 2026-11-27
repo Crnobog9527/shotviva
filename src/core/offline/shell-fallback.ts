@@ -9,6 +9,8 @@
 // shell, the proxy never answers its navigation preload with the empty 204 (shell-proxy.ts), and
 // the page drops the parameter from the address bar once loaded (register.tsx).
 export const SHELL_BYPASS_PARAM = 'sv-net'
+// Create's addresses whose navigation preload the proxy may answer with an empty 204 (shell-proxy.ts).
+export const CREATE_PATHS: readonly string[] = ['/generate', '/generate/', '/zh/generate', '/zh/generate/']
 export const SHELL_FALLBACK_MS = 8_000
 export const SHELL_LOOP_MS = 20_000
 // sessionStorage: when this tab was last answered with the shell, cleared once the shell goes.
