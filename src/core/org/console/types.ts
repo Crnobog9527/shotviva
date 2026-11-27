@@ -82,8 +82,6 @@ export type StaffCard = {
   customers: number
   // Whether the org has level 2 on (the card shows the level-2 line only then).
   withLevel2: boolean
-  // The org's affiliate switch: on, the member's invite code is an org code (2032).
-  affiliateEnabled: boolean
   // 'YYYY-MM' (UTC) the figures below are for; performance is null when they could not be read.
   period: string
   performance: { l1: StaffLevel; l2: StaffLevel } | null

@@ -114,7 +114,7 @@ describe('readOrgView for a member', () => {
     expect(view).toEqual({
       kind: 'member', orgName: 'Acme Studio', status: 'active', monthlyAllowance: 500, allocatedThisMonth: 600, heldCredits: 80, customers: 1,
       promo: { allowance: 2000, held: 1750, allocated: 2000, used: 250 },
-      withLevel2: false, affiliateEnabled: true, period: '2026-11',
+      withLevel2: false, period: '2026-11',
       performance: { l1: { customers: 1, signups: 2, paying: 1, paidCents: 4900 }, l2: { customers: 0, signups: 0, paying: 0, paidCents: 0 } },
     })
     expect(calls).toContain(`org_credit_ledger.gte(created_at,${monthStart(now)})`)

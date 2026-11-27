@@ -100,3 +100,77 @@ it('the sign-up preview shows the org bonus for a staff code, nothing extra with
   expect(await preview(await codeOf(without.staff))).toEqual({ credits: 0, org: true })
   expect(await preview(await codeOf(await createUser(db)))).toEqual({ credits: REWARDS.inviteeCredits, org: false })
 })
+
+// Broadened rule (same day): an active member (staff or the main admin) of an active org gets
+// personal credits only from the org's allocations, admin adjustments and their own job refunds.
+async function member() {
+  const { orgId, staff } = await orgTeam(0)
+  return { orgId, user: staff }
+}
+const leave = (user: string) => db.query("update org_members set status='removed', removed_at=now() where user_id=$1 and role<>'owner'", [user])
+
+it('an active member redeems no code at all (gift codes included); nothing is written', async () => {
+  const { user } = await member()
+  const gift = 'GIFT' + user.slice(0, 8).toUpperCase().replace(/[^A-Z0-9]/g, '0')
+  await db.query("insert into codes(code,kind,invitee_credits,invitee_pool) values($1,'campaign',30,'free')", [gift])
+  expect((await row(db, "select redeem_code($1,$2,'account',null,$3) as r", [user, gift, invite.windowDays])).r).toEqual({ kind: 'campaign', status: 'new_users_only' })
+  expect(await ledger(user, 'code_grant')).toEqual([])
+  expect((await row(db, 'select count(*)::int n from code_redemptions where user_id=$1', [user])).n).toBe(0)
+  await leave(user)
+  expect((await row(db, "select redeem_code($1,$2,'account',null,$3) as r", [user, gift, invite.windowDays])).r).toMatchObject({ status: 'ok' })
+})
+
+it('a member\'s own code is an org code even with the affiliate switch off: no personal rewards, also after they leave', async () => {
+  const owner = await createUser(db)
+  const orgId = (await row(db, 'select admin_org_create($1,$2) as id', [actor, { owner_user_id: owner, name: 'Org ' + owner.slice(0, 8), affiliate_enabled: false }])).id as string
+  const { invite_token } = await row(db, 'select invite_token from orgs where id=$1', [orgId])
+  const staff = await createUser(db)
+  await db.query('select org_join($1,$2)', [staff, invite_token])
+  for (const inviter of [staff, owner]) {
+    const { customer, result } = await invitedBy(inviter)
+    expect(result).toMatchObject({ status: 'ok', credits_granted: 0 })
+    expect(await row(db, 'select org_invite from code_redemptions where user_id=$1', [customer])).toEqual({ org_invite: true })
+    // The staff member leaves before the payment (the owner cannot leave): still nothing.
+    await leave(inviter)
+    expect(await firstPayment(customer)).toMatchObject({ rewarded: false })
+    expect(await ledger(inviter, 'invite_reward')).toEqual([])
+  }
+})
+
+it('an inviter who joins an org before the invitee\'s first payment gets no personal reward', async () => {
+  const friend = await createUser(db)
+  const { customer, result } = await invitedBy(friend)
+  expect(result.credits_granted).toBe(REWARDS.inviteeCredits)
+  const { orgId } = await member()
+  const { invite_token } = await row(db, 'select invite_token from orgs where id=$1', [orgId])
+  await db.query('select org_join($1,$2)', [friend, invite_token])
+  expect(await firstPayment(customer)).toMatchObject({ rewarded: false })
+  expect(await ledger(friend, 'invite_reward')).toEqual([])
+})
+
+it('no signup gift (grant, claim or catch-up) while an active member; a pending gift follows personal rules after leaving', async () => {
+  const { user } = await member()
+  await db.query("update profiles set signup_gift_refusal='daily_cap' where id=$1", [user])
+  const gift = async () => (await row(db, "select (grant_credits($1::uuid,1,'signup',$2,'free')).applied as ok", [user, 'signup:' + user])).ok as boolean
+  expect(await gift()).toBe(false)
+  expect((await row(db, "select claim_signup_gift($1,'phone') r", [user])).r).toBe('not_pending')
+  expect((await row(db, 'select $1 = any(signup_gift_catch_up_queue(500)) as queued', [user])).queued).toBe(false)
+  expect(await ledger(user, 'grant')).toEqual([])
+  await leave(user)
+  await db.query("insert into system_settings(key,value) values('signup_gift_daily_cap','1000000') on conflict(key) do update set value=excluded.value")
+  expect(await gift()).toBe(true)
+})
+
+it('no org signup bonus for a customer who is an active member of another org', async () => {
+  const { staff } = await orgTeam(300)
+  const { user } = await member()
+  await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [user, 'signup:' + user])
+  expect((await row(db, "select redeem_code($1,$2,'signup',null,$3) as r", [user, await codeOf(staff), invite.windowDays])).r.status).toBe('new_users_only')
+  expect(await ledger(user, 'org_signup_bonus')).toEqual([])
+})
+
+it('a platform admin adjustment still reaches an active member', async () => {
+  const { user } = await member()
+  await db.query("select admin_adjust_credits($1::uuid,25,'support','free',$2)", [user, 'adjust:' + user])
+  expect(await ledger(user, 'admin_adjust')).toEqual([25])
+})

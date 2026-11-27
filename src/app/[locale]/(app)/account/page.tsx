@@ -88,11 +88,12 @@ async function Account() {
   )
 }
 
-// With the org's affiliate switch on, a member's (and the owner's) invite code is an org code: no
-// personal invitee or inviter reward (2032), so the personal invite card would promise rewards that
-// do not come. They promote with the org's links instead.
+// An active member's (and the owner's) own invite code earns no personal invitee or inviter reward
+// while the org is active (2032), so the personal invite card would promise rewards that do not
+// come. They promote with the org's links instead.
 function orgInvites(view: Awaited<ReturnType<typeof readOrgView>>) {
-  return (view.kind === 'member' || view.kind === 'owner') && (view.kind === 'member' ? view.affiliateEnabled : view.org.affiliateEnabled)
+  if (view.kind === 'member') return view.status === 'active'
+  return view.kind === 'owner' && view.org.status === 'active'
 }
 
 // The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a
