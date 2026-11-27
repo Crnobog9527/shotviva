@@ -10212,6 +10212,80 @@ $$;
 ALTER FUNCTION "public"."admin_org_create"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_org_customers"("p_org_id" "uuid", "p_limit" integer, "p_offset" integer) RETURNS TABLE("user_id" "uuid", "contact" "text", "level" smallint, "source" "text", "member_user_id" "uuid", "member_contact" "text", "via_user_id" "uuid", "via_contact" "text", "signed_up_at" timestamp with time zone, "referred_at" timestamp with time zone, "bonus_credits" integer, "bonus_at" timestamp with time zone, "bonus_error" "text", "paid_before" boolean, "has_signup_gift" boolean, "paid_cents" bigint, "commission_cents" bigint, "promo_credits" bigint, "total" bigint, "total_l2" bigint)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    SET "TimeZone" TO 'UTC'
+    AS $$
+#variable_conflict use_column
+declare
+  v_account uuid;
+begin
+  if p_org_id is null or p_limit is null or p_limit < 1 or p_limit > 200 or p_offset is null or p_offset < 0 then
+    raise exception 'INVALID_INPUT';
+  end if;
+  select a.user_id into v_account from public.affiliates a where a.org_id = p_org_id;
+  if v_account is null then return; end if;
+
+  return query
+  with page as (
+    select c.id, c.referred_source, c.referred_member, c.referred_via, c.referred_at, c.created_at,
+           count(*) over () as total,
+           count(*) filter (where c.referred_source = 'org_l2') over () as total_l2
+      from public.profiles c
+     where c.referred_by = v_account
+       and not exists(select from public.org_members m where m.org_id = p_org_id and m.user_id = c.id and m.status = 'active')
+     order by c.referred_at desc nulls last, c.id desc
+     limit p_limit offset p_offset
+  ),
+  promo as (
+    select l.customer_user_id as id, sum(l.credits)::bigint as credits
+      from public.partner_promo_grants g
+      join public.partner_promo_grant_lines l on l.grant_id = g.id
+     where g.org_id = p_org_id and g.status = 'granted' and l.customer_user_id in (select id from page)
+     group by l.customer_user_id
+  )
+  select pg.id,
+         coalesce(nullif(u.email, ''), u.phone),
+         case pg.referred_source when 'org_l2' then 2::smallint else 1::smallint end,
+         pg.referred_source,
+         pg.referred_member, coalesce(nullif(mu.email, ''), mu.phone),
+         pg.referred_via, coalesce(nullif(vu.email, ''), vu.phone),
+         pg.created_at, pg.referred_at,
+         b.credits, b.created_at, e.error,
+         exists(select from public.payments p where p.user_id = pg.id and p.created_at < pg.referred_at),
+         exists(select from public.credit_ledger l where l.user_id = pg.id and l.idempotency_key = 'signup:' || pg.id
+                  and l.kind = 'grant' and l.pool = 'free'),
+         coalesce((
+           select sum(case when p.amount_total = 0 or coalesce(ds.is_lost, false) then 0 else
+                    div((p.amount_total - p.amount_tax)::numeric * (p.amount_total - p.amount_refunded), p.amount_total::numeric) end)
+             from public.payments p
+             left join lateral public._affiliate_dispute_state(p) ds on true
+            where p.user_id = pg.id and p.currency = 'usd' and p.created_at >= pg.referred_at
+         ), 0)::bigint,
+         coalesce((
+           select sum(ac.amount)
+             from public.payments p
+             join public.affiliate_commissions ac on ac.payment_id = p.id
+            where p.user_id = pg.id and ac.affiliate_user_id = v_account and ac.status <> 'void'
+         ), 0)::bigint,
+         coalesce(pr.credits, 0),
+         pg.total, pg.total_l2
+    from page pg
+    left join auth.users u on u.id = pg.id
+    left join auth.users mu on mu.id = pg.referred_member
+    left join auth.users vu on vu.id = pg.referred_via
+    left join public.org_signup_bonuses b on b.user_id = pg.id and b.org_id = p_org_id
+    left join public.org_signup_bonus_errors e on e.user_id = pg.id
+    left join promo pr on pr.id = pg.id
+   order by pg.referred_at desc nulls last, pg.id desc;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_org_customers"("p_org_id" "uuid", "p_limit" integer, "p_offset" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_org_grant"("p_actor" "uuid", "p_input" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -28713,6 +28787,11 @@ GRANT ALL ON FUNCTION "public"."admin_org_add_member"("p_actor" "uuid", "p_input
 
 REVOKE ALL ON FUNCTION "public"."admin_org_create"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_org_create"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_org_customers"("p_org_id" "uuid", "p_limit" integer, "p_offset" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_org_customers"("p_org_id" "uuid", "p_limit" integer, "p_offset" integer) TO "service_role";
 
 
 
