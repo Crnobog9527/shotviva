@@ -128,11 +128,11 @@ it('is gone with the account', async () => {
   expect(await rows()).toBe(0)
 })
 
-it('only the service role can read or write it', async () => {
-  const table = await row(db, `select has_table_privilege('anon','public.affiliate_signup_refs','select') anon,
+it('only the service role can call the functions, and nobody can touch the table directly', async () => {
+  const table = await row(db, `select has_table_privilege('anon','public.affiliate_signup_refs','select,insert,update,delete') anon,
     has_table_privilege('authenticated','public.affiliate_signup_refs','select,insert,update,delete') signed,
     has_table_privilege('service_role','public.affiliate_signup_refs','select,insert,update,delete') service`)
-  expect(table).toEqual({ anon: false, signed: false, service: true })
+  expect(table).toEqual({ anon: false, signed: false, service: false })
   for (const fn of ['public.affiliate_signup_ref_store(uuid,text)', 'public.affiliate_signup_ref_take(uuid)']) {
     const grants = await row(db, `select has_function_privilege('anon',$1,'execute') anon,
       has_function_privilege('authenticated',$1,'execute') signed, has_function_privilege('service_role',$1,'execute') service`, [fn])

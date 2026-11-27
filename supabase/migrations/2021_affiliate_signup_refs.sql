@@ -28,7 +28,7 @@
 --
 -- Rules kept: affiliate_bind still resolves the slug, checks the switch, the active status, that
 -- it is not the account's own, and one binding per account. The row is single use (take deletes
--- it). Service role only. Expand-only: a new table and two new functions, nothing existing changes.
+-- it). The functions are service role only; the table has no direct grants. Expand-only: a new table and two new functions, nothing existing changes.
 
 create table public.affiliate_signup_refs (
   user_id uuid primary key references auth.users (id) on delete cascade,
@@ -37,8 +37,10 @@ create table public.affiliate_signup_refs (
 );
 
 alter table public.affiliate_signup_refs enable row level security;
-revoke all on table public.affiliate_signup_refs from public, anon, authenticated;
-grant select, insert, update, delete on table public.affiliate_signup_refs to service_role;
+-- No direct access for anyone, service role included (like the other affiliate tables): writes
+-- and reads only through the two security-definer functions below, so the rules above cannot be
+-- skipped.
+revoke all on table public.affiliate_signup_refs from public, anon, authenticated, service_role;
 
 -- After a successful sign-up form for `p_user`: replaces its row with `p_slug`, or clears it.
 -- true when a row was stored; false when the row was cleared or nothing was stored (no slug, a
