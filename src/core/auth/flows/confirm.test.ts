@@ -65,7 +65,18 @@ describe('GET /auth/confirm: signup links', () => {
     expect(response.status).toBe(307)
     expect(target(response)).toBe('/account')
     expect(response.headers.get('set-cookie')).toContain('sb-access-token=session')
-    expect(mocks.onVerifiedSignIn).toHaveBeenCalledExactlyOnceWith('u1', benefits, 'email', 'en', null)
+    // A signup confirmation: the partner stored at sign-up may bind (2021).
+    expect(mocks.onVerifiedSignIn).toHaveBeenCalledExactlyOnceWith('u1', benefits, 'email', 'en', null, true)
+  })
+
+  // Review on #961: a recovery or magic link can also be an unconfirmed account's first
+  // verification; it must not bind the partner stored by whoever submitted the sign-up form.
+  it('a recovery or magic link runs the first sign-in path without the stored partner', async () => {
+    await confirm(`next=%2Faccount&token_hash=${TOKEN}&type=recovery`)
+    expect(mocks.onVerifiedSignIn).toHaveBeenLastCalledWith('u1', benefits, 'email', 'en', null, false)
+    singleUseToken()
+    await confirm(`next=%2Faccount&token_hash=${TOKEN}&type=magiclink`)
+    expect(mocks.onVerifiedSignIn).toHaveBeenLastCalledWith('u1', benefits, 'email', 'en', null, false)
   })
 
   it('lets an invited promoter choose a password when the program is open', async () => {

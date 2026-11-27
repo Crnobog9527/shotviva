@@ -76,15 +76,17 @@ async function bindSlug(user: string, value: string, source: 'signup' | 'first_c
 }
 
 // The account's first verified sign-in (core/auth/first-sign-in.ts). The stored slug is taken on
-// every first sign-in, also one that does not bind (`bind` false: a staff sign-up), so it can never
-// bind later. This browser's current cookie wins; the stored slug is only the fallback when there
-// is none (the verification link opened on another device). The cookie's own timestamp is never
-// compared with anything: it is unsigned (review on #961).
-export async function bindSignupReferral(user: string, bind: boolean, cookie: string | undefined) {
+// every first sign-in, also one that does not bind (`bind` false: a staff sign-up) or may not use
+// it (`useStored` false: anything but the click on a signup confirmation link, such as a password
+// reset on an unconfirmed account or Google), so it can never bind later. This browser's current
+// cookie wins; the stored slug is only the fallback when there is none (the confirmation link
+// opened on another device). The cookie's own timestamp is never compared with anything: it is
+// unsigned (review on #961).
+export async function bindSignupReferral(user: string, bind: boolean, cookie: string | undefined, useStored: boolean) {
   const stored = await takeSignupReferral(user)
   if (!bind) return
   const own = current(cookie)
-  const value = own?.slug ?? stored
+  const value = own?.slug ?? (useStored ? stored : undefined)
   if (value) await bindSlug(user, value, 'signup')
 }
 

@@ -74,35 +74,45 @@ describe('bindSignupReferral', () => {
 
   it('binds this browser\'s current cookie over the stored partner, however old the cookie says it is', async () => {
     stored('bob')
-    await bindSignupReferral('u1', true, 'anna.' + (time() - 5183000))
+    await bindSignupReferral('u1', true, 'anna.' + (time() - 5183000), true)
     expect(mocks.rpc).toHaveBeenCalledWith('affiliate_signup_ref_take', { p_user: 'u1' })
     expect(binds()).toEqual([['affiliate_bind', { p_user: 'u1', p_slug: 'anna', p_source: 'signup' }]])
   })
 
   it('falls back to the stored partner when the cookie is missing, malformed or expired', async () => {
     stored('bob')
-    for (const cookie of [undefined, 'bad', 'anna.' + (time() - 5184000)]) await bindSignupReferral('u1', true, cookie)
+    for (const cookie of [undefined, 'bad', 'anna.' + (time() - 5184000)]) await bindSignupReferral('u1', true, cookie, true)
     expect(binds()).toEqual(Array(3).fill(['affiliate_bind', { p_user: 'u1', p_slug: 'bob', p_source: 'signup' }]))
+  })
+
+  // Review on #961: a squatter's row must not bind a first verification that is not the signup
+  // confirmation click (a password reset on the unconfirmed account, Google).
+  it('ignores the stored partner when the sign-in may not use it, and still binds the cookie', async () => {
+    stored('squatter')
+    await bindSignupReferral('u1', true, undefined, false)
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('affiliate_signup_ref_take', { p_user: 'u1' })
+    await bindSignupReferral('u1', true, 'anna.' + time(), false)
+    expect(binds()).toEqual([['affiliate_bind', { p_user: 'u1', p_slug: 'anna', p_source: 'signup' }]])
   })
 
   it('takes the stored partner without binding when the sign-up must not bind (staff)', async () => {
     stored('bob')
-    await bindSignupReferral('u1', false, 'anna.' + time())
+    await bindSignupReferral('u1', false, 'anna.' + time(), true)
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('affiliate_signup_ref_take', { p_user: 'u1' })
   })
 
   it('binds nothing from an empty, malformed or failed take, and still binds the cookie', async () => {
     for (const [value, error] of [[null, null], ['BAD SLUG', null], [null, { code: 'XX000' }]]) {
       stored(value, error)
-      await bindSignupReferral('u1', true, undefined)
+      await bindSignupReferral('u1', true, undefined, true)
     }
     mocks.rpc.mockImplementation(async (fn: string) => {
       if (fn === 'affiliate_signup_ref_take') throw new Error('down')
       return { error: null }
     })
-    await bindSignupReferral('u1', true, undefined)
+    await bindSignupReferral('u1', true, undefined, true)
     expect(binds()).toEqual([])
-    await bindSignupReferral('u1', true, 'anna.' + time())
+    await bindSignupReferral('u1', true, 'anna.' + time(), true)
     expect(binds()).toEqual([['affiliate_bind', { p_user: 'u1', p_slug: 'anna', p_source: 'signup' }]])
   })
 })

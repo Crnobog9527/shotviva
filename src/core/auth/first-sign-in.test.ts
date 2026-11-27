@@ -62,7 +62,7 @@ describe('onVerifiedSignIn', () => {
     mocks.grantSignupCredits.mockResolvedValue(true)
     mocks.claim.mockResolvedValueOnce('invite')
     await onVerifiedSignIn('u1', benefits, 'google', 'en')
-    expect(mocks.bind).toHaveBeenCalledWith('u1', true, 'partner')
+    expect(mocks.bind).toHaveBeenCalledWith('u1', true, 'partner', false)
     // The partner link binds first, so an org member's invite code cannot take the customer (§6.5).
     expect(mocks.bind.mock.invocationCallOrder[0]).toBeLessThan(mocks.claim.mock.invocationCallOrder[0])
     expect(mocks.track).toHaveBeenCalledWith('signup', { method: 'google', code_kind: 'invite' }, { distinctId: 'u1', locale: 'en' })
@@ -107,8 +107,8 @@ describe('onVerifiedSignIn: partner binding', () => {
     mocks.cookie = undefined
     mocks.recordSignupIp.mockResolvedValue(true)
     mocks.grantSignupCredits.mockResolvedValue(true)
-    await onVerifiedSignIn('u1', benefits, 'email', 'zh')
-    expect(mocks.bind).toHaveBeenCalledExactlyOnceWith('u1', true, undefined)
+    await onVerifiedSignIn('u1', benefits, 'email', 'zh', null, true)
+    expect(mocks.bind).toHaveBeenCalledExactlyOnceWith('u1', true, undefined, true)
   })
 
   it('a later sign-in does not run it', async () => {
@@ -145,7 +145,7 @@ describe('onVerifiedSignIn: staff-link signups', () => {
     expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', 0)
     expect(mocks.claimQuietly).not.toHaveBeenCalled()
     // Runs without binding: the referral stored at sign-up is still taken, so it never binds later.
-    expect(mocks.bind).toHaveBeenCalledExactlyOnceWith('u1', false, 'partner')
+    expect(mocks.bind).toHaveBeenCalledExactlyOnceWith('u1', false, 'partner', false)
     expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', false, benefits.invite, 'zh')
     // 1950 reads "no signup IP yet" as the first verified sign-in: the mark comes before the IP.
     expect(mocks.staff.mock.invocationCallOrder[0]).toBeLessThan(mocks.recordSignupIp.mock.invocationCallOrder[0])
@@ -176,7 +176,7 @@ describe('onVerifiedSignIn: staff-link signups', () => {
     await onVerifiedSignIn('u1', benefits, 'email', 'en', null)
     expect(mocks.staff).toHaveBeenCalledWith({}, 'u1', null)
     expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', benefits.freeCredits)
-    expect(mocks.bind).toHaveBeenCalledWith('u1', true, 'partner')
+    expect(mocks.bind).toHaveBeenCalledWith('u1', true, 'partner', false)
     expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', true, benefits.invite, 'en')
   })
 })

@@ -15,8 +15,14 @@
 --   * A row is taken only if it was written after the account's latest confirmation email was
 --     sent (auth.users.confirmation_sent_at). A resent email (login page, "send again") makes it
 --     stale, so the link clicked always belongs to the attempt that wrote the row.
---   * A row is taken only within the cookie's 60-day lifetime, by the row's own server time, never
---     the timestamp inside the (unsigned) cookie. Older rows are deleted unused.
+--   * The row only stands in for the cookie on the click of that signup confirmation link (the app
+--     passes it only from /auth/confirm type signup/email; second review on #961): any other
+--     first verification of an unconfirmed account takes and drops it. Here too, in case: it is
+--     refused when a password-reset or email-change email was sent after it (recovery_sent_at,
+--     email_change_sent_at), when the account has any identity other than email (Google linked),
+--     and when it is older than a day, the longest a confirmation link lives (otp_expiry, at most
+--     86400 seconds), by the row's own server time, never the timestamp inside the unsigned
+--     cookie. Refused rows are deleted unused.
 --   * Only an account the Auth API has just created (≤ 10 minutes, unconfirmed, never signed in)
 --     gets a row, so a form for someone else's existing address can only clear one.
 --
@@ -53,16 +59,20 @@ begin
 end;
 $$;
 
--- The stored slug, removed as it is read; null when there is none, it is older than 60 days or
--- it predates the account's latest confirmation email.
+-- The stored slug, removed as it is read; null when there is none, or it no longer belongs to
+-- the account's latest signup confirmation email (see above).
 create function public.affiliate_signup_ref_take(p_user uuid) returns text
 language plpgsql security definer set search_path = '' as $$
-declare v_slug text; v_at timestamptz; v_sent timestamptz;
+declare v_slug text; v_at timestamptz;
 begin
   delete from public.affiliate_signup_refs where user_id = p_user returning slug, created_at into v_slug, v_at;
-  if v_slug is null then return null; end if;
-  select u.confirmation_sent_at into v_sent from auth.users u where u.id = p_user;
-  if v_at < now() - interval '60 days' or v_sent is null or v_at < v_sent then return null; end if;
+  if v_slug is null or v_at < now() - interval '1 day' then return null; end if;
+  perform 1 from auth.users u
+   where u.id = p_user and u.confirmation_sent_at <= v_at
+     and (u.recovery_sent_at is null or u.recovery_sent_at < v_at)
+     and (u.email_change_sent_at is null or u.email_change_sent_at < v_at)
+     and not exists (select 1 from auth.identities i where i.user_id = p_user and i.provider <> 'email');
+  if not found then return null; end if;
   return v_slug;
 end;
 $$;

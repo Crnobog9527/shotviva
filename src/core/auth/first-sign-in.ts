@@ -46,8 +46,8 @@ const isSecure = (head: Headers) => head.get('x-forwarded-proto') !== 'http'
 
 // Only a first sign-in (a new account) binds a partner's link: this browser's cookie, else the one
 // stored at email sign-up when the link is verified on another device (2021, core/affiliate/referral).
-async function bindFirstReferral(userId: string, first: boolean, fresh: boolean, cookie: string | undefined) {
-  if (first) await bindSignupReferral(userId, fresh, cookie)
+async function bindFirstReferral(userId: string, first: boolean, fresh: boolean, cookie: string | undefined, signupConfirmation: boolean) {
+  if (first) await bindSignupReferral(userId, fresh, cookie, signupConfirmation)
 }
 
 // The signup gift (0 for a staff sign-up). 1480: an account over the per-network allowance is
@@ -72,6 +72,10 @@ export async function onVerifiedSignIn(
   locale: Locale,
   // The staff link this sign-up came from (core/auth/staff-signup staffOriginFor), if any.
   staffOrigin?: StaffOrigin | null,
+  // The sign-in is the click on a signup confirmation link: only then may the partner stored at
+  // email sign-up bind (2021). Any other first verification (a password reset or magic link on an
+  // unconfirmed account, Google) only clears it.
+  signupConfirmation?: boolean,
 ): Promise<void> {
   const admin = createAdminSupabase()
   const address = clientIp(await headers())
@@ -89,7 +93,7 @@ export async function onVerifiedSignIn(
   // invite code binds the customer to the org only when nobody else already has (§6.5).
   // A staff sign-up skips both; the code cookie is still cleared.
   const fresh = first && !staff
-  await bindFirstReferral(userId, first, fresh, jar.get('sv_ref')?.value)
+  await bindFirstReferral(userId, first, fresh, jar.get('sv_ref')?.value, signupConfirmation === true)
   const kind = await consumeSignupCode(admin, userId, fresh, benefits.invite, locale)
   // A/B variants onto the account, and the account's back into the cookie (ARCHITECTURE §16.5).
   const experiments = await syncExperimentsAtSignIn(admin, userId, first, jar, isSecure(await headers()))

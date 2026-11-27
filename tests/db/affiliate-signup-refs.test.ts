@@ -74,14 +74,40 @@ it('a row from before the latest confirmation email (a resend) is dropped unused
   expect(await rows()).toBe(0)
 })
 
-// P2: the cookie's 60-day lifetime, by the row's server time.
-it('a row older than 60 days is dropped unused', async () => {
+// P2 and the second review: a row lives at most as long as a confirmation link (one day).
+it('a row older than a day is dropped unused', async () => {
   const user = await justCreated()
   await store(user, 'qa-anna')
-  await db.query("update affiliate_signup_refs set created_at=now()-interval '61 days' where user_id=$1", [user])
-  await db.query("update auth.users set confirmation_sent_at=now()-interval '62 days' where id=$1", [user])
+  await db.query("update affiliate_signup_refs set created_at=now()-interval '25 hours' where user_id=$1", [user])
+  await db.query("update auth.users set confirmation_sent_at=now()-interval '26 hours' where id=$1", [user])
   expect(await take(user)).toBeNull()
   expect(await rows()).toBe(0)
+})
+
+// Second review on #961: other first verifications of a squatted, unconfirmed account.
+it('a password reset or email change sent after the row, or a linked Google account, drops it unused', async () => {
+  const cases = [
+    "update auth.users set recovery_sent_at=now()+interval '1 second' where id=$1",
+    "update auth.users set email_change_sent_at=now()+interval '1 second' where id=$1",
+    `insert into auth.identities (provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+     values ($1::text, $1::uuid, jsonb_build_object('sub', $1::text), 'google', now(), now(), now())`,
+  ]
+  for (const change of cases) {
+    const user = await justCreated()
+    expect(await store(user, 'qa-squatter')).toBe(true)
+    await db.query(change, [user])
+    expect(await take(user)).toBeNull()
+  }
+  expect(await rows()).toBe(0)
+})
+
+it('an email identity, or a reset sent before the row, does not stop it', async () => {
+  const user = await justCreated()
+  await db.query(`insert into auth.identities (provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+    values ($1::text, $1::uuid, jsonb_build_object('sub', $1::text), 'email', null, now(), now())`, [user])
+  await db.query("update auth.users set recovery_sent_at=now()-interval '1 minute' where id=$1", [user])
+  await store(user, 'qa-anna')
+  expect(await take(user)).toBe('qa-anna')
 })
 
 it('the taken slug binds through affiliate_bind as the cookie would, with its checks intact', async () => {
