@@ -7,8 +7,10 @@ import { CACHE_PREFIX, withoutBypass } from './client-names'
 // Registers /sw.js once the page has loaded and gone idle, so it never competes with the page's own
 // first load. `production`: a production build (`next dev` never registers); `enabled`: the admin
 // switch system_settings service_worker_enabled (both read by the root layout). Switched off, it
-// unregisters any worker instead (the kill switch, with /sw.js itself unregistering).
-export function ServiceWorkerSlot({ production, enabled }: { production: boolean; enabled: boolean }) {
+// unregisters any worker instead (the kill switch, with /sw.js itself unregistering). `shell`: the
+// switch service_worker_shell_enabled; off, a Create shell still on the phone goes at once and the
+// worker is asked to update, not left to the browser's own update check (Part B 2026-11-27).
+export function ServiceWorkerSlot({ production, enabled, shell }: { production: boolean; enabled: boolean; shell: boolean }) {
   // Loaded past Create's app shell (shell-fallback.ts): the address bar shows the plain address
   // again, so a reload, a share or a bookmark is the normal one.
   useEffect(() => {
@@ -26,12 +28,25 @@ export function ServiceWorkerSlot({ production, enabled }: { production: boolean
       void container.getRegistrations().then((all) => Promise.all(all.map((registration) => registration.unregister())))
       return
     }
+    if (!shell) void dropStaleShell(container)
     const register = () => void container.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(() => undefined)
     const idle = () => ('requestIdleCallback' in window ? window.requestIdleCallback(register, { timeout: 5000 }) : globalThis.setTimeout(register, 2000))
     if (document.readyState === 'complete') idle()
     else window.addEventListener('load', idle, { once: true })
-  }, [production, enabled])
+  }, [production, enabled, shell])
   return null
+}
+
+// The shell switch is off but this phone still holds a shell: delete it and fetch the new worker.
+export async function dropStaleShell(container: ServiceWorkerContainer): Promise<void> {
+  try {
+    const stale = (await caches.keys()).filter((key) => key.startsWith(`${CACHE_PREFIX}shell-`))
+    if (!stale.length) return
+    await Promise.all(stale.map((key) => caches.delete(key)))
+    await (await container.getRegistration())?.update()
+  } catch {
+    // The worker's own activation deletes it too.
+  }
 }
 
 // Sign-out: drop every cache the worker made (they hold public files only, but nothing of the

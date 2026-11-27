@@ -22,7 +22,7 @@ function runWorker(source: string) {
     }
   }
   const deleted: string[] = []
-  const caches = { open: vi.fn(async (name: string) => storeFor(name)), keys: vi.fn(async () => [...stores.keys()]), delete: vi.fn(async (name: string) => void (deleted.push(name), stores.delete(name))) }
+  const caches = { has: vi.fn(async (name: string) => stores.has(name)), open: vi.fn(async (name: string) => storeFor(name)), keys: vi.fn(async () => [...stores.keys()]), delete: vi.fn(async (name: string) => void (deleted.push(name), stores.delete(name))) }
   const preload = { enable: vi.fn(async () => undefined), setHeaderValue: vi.fn(async () => undefined) }
   const self = { location: { origin: SITE }, addEventListener: (type: string, handler: (event: unknown) => void) => void (handlers[type] = handler), skipWaiting: vi.fn(), clients: { claim: vi.fn() }, registration: { unregister: vi.fn(), navigationPreload: preload } }
   const fetch = vi.fn(async (input: unknown, init?: RequestInit) => network(input, init))
@@ -195,6 +195,21 @@ describe('the app shell (switch off) and dropping it', () => {
     expect(worker.deleted).toContain(`sv-shell-${BUILD}`)
     expect(worker.preload.setHeaderValue).toHaveBeenCalledWith('true')
     expect(await (await worker.dispatch('fetch', nav('/generate'))).response?.text()).toBe('page')
+  })
+
+  it('off: a shell the replaced worker kept after this one activated goes on the next navigation (Part B Step 13)', async () => {
+    const worker = runWorker(serviceWorkerSource({ version: BUILD, cdnOrigins: [], enabled: true, shell: false }))
+    await worker.dispatch('activate', {})
+    worker.stores.set(`sv-shell-${BUILD}`, new Map([['x', new Response('shell')]]))
+    expect(await (await worker.dispatch('fetch', nav('/'))).response?.text()).toBe('page')
+    expect(worker.stores.has(`sv-shell-${BUILD}`)).toBe(false)
+  })
+
+  it('on: opening Create without a kept shell creates no empty shell cache before the refresh', async () => {
+    const worker = runWorker(on)
+    worker.fetch.mockImplementation(async () => new Response('page', { status: 200 }))
+    expect(await (await worker.dispatch('fetch', nav('/generate'))).response?.text()).toBe('page')
+    expect(worker.stores.has(`sv-shell-${BUILD}`)).toBe(false)
   })
 
   it('a newer build (sv-drop-shell) drops older shells, and this worker’s own only when it is the old one', async () => {
