@@ -78,16 +78,19 @@ function food(reading: DishReading | Error): FoodDeps {
   return { reader: async () => reader, vessels: async () => { touched.vessels += 1; return [vessel] }, random: () => 0 }
 }
 
-// switchOn: the site-wide food_toggles_enabled (1848); these flows only run while it is on.
-// A 1K job, which free credits pay (1996).
-async function generate(toggles: { plating: boolean; tableware: boolean }, reading: DishReading | Error = READING, switchOn: boolean | 'absent' = true) {
+// switches: the site-wide food_plating_enabled / food_tableware_enabled (2009); a flow runs only
+// for a toggle whose switch is on. A 1K job, which free credits pay (1996).
+type Switches = { plating: boolean; tableware: boolean }
+const BOTH_ON: Switches = { plating: true, tableware: true }
+const BOTH_OFF: Switches = { plating: false, tableware: false }
+async function generate(toggles: { plating: boolean; tableware: boolean }, reading: DishReading | Error = READING, switches: Switches | 'absent' = BOTH_ON) {
   const userId = await createUser(db, { freeCredits: 3 })
   const inputKey = newInputKey(userId, 'image/jpeg')
   const photo = await jpeg(1200, 1600)
   r2.upload(inputKey, photo, 'image/jpeg')
   const fake = fakeProvider()
   const deps = { db: serviceSupabase(), store: r2.store, provider: fake.provider, providerTimeoutMs: 2000, now: () => NOW, food: food(reading),
-    ...(switchOn === 'absent' ? {} : { foodTogglesEnabled: async () => switchOn }) }
+    ...(switches === 'absent' ? {} : { foodSwitches: async () => switches }) }
   const view = await runGeneration(deps, { userId, source: 'web', templateId, inputKey, toggles })
   const { rows } = await db.query('select status, credits_cost, provider_usage, inputs from public.generation_jobs where id = $1', [view.id])
   return { call: fake.calls[0]!, job: rows[0], images: fake.calls[0]!.images.map((image) => image.bytes.length) }
@@ -126,9 +129,9 @@ describe('food toggle flows (§5.1c)', () => {
   })
 })
 
-describe('the site-wide switch off (1848)', () => {
-  for (const switchOn of [false, 'absent'] as const) {
-    it(`renders both off, reads no dish and no vessel, at the same price (switch ${String(switchOn)})`, async () => {
+describe('both site-wide switches off (2009)', () => {
+  for (const switchOn of [BOTH_OFF, 'absent'] as const) {
+    it(`renders both off, reads no dish and no vessel, at the same price (switches ${JSON.stringify(switchOn)})`, async () => {
       await saveDishware({ db: serviceSupabase(), store: r2.store }, admin, vessel)
       const before = { ...touched }
       const off = await generate({ plating: false, tableware: false }, READING, switchOn)
@@ -152,20 +155,51 @@ describe('the site-wide switch off (1848)', () => {
   })
 })
 
-// Admin test runs (§10.b) follow the same switch: off, both render off and nothing is read.
-describe('admin test runs and the switch (1848)', () => {
+// The Owner's setting after release (2026-11-27): 优化器皿 on, 优化摆盘 off.
+describe('one switch on, the other off (2009)', () => {
+  it('only 优化器皿 on: tableware runs with its vessel, plating is rendered off, at the template price', async () => {
+    await saveDishware({ db: serviceSupabase(), store: r2.store }, admin, vessel)
+    const tablewareOnly = { plating: false, tableware: true }
+    const off = await generate({ plating: false, tableware: false }, READING, tablewareOnly)
+    for (const asked of [{ plating: false, tableware: true }, { plating: true, tableware: true }]) {
+      const run = await generate(asked, READING, tablewareOnly)
+      expect(run.call.prompt).toBe('DISHWARE')
+      expect(run.call.images[1]?.bytes).toEqual(vesselBytes)
+      expect(run.call.images).toHaveLength(3)
+      expect(run.job).toMatchObject({ status: 'succeeded', credits_cost: off.job.credits_cost })
+      expect(run.job.inputs.toggles).toEqual({ plating: false, tableware: true })
+    }
+    // Plating asked alone, with its switch off: the ordinary call, nothing read.
+    const before = { ...touched }
+    const plating = await generate({ plating: true, tableware: false }, READING, tablewareOnly)
+    expect(plating.call.prompt).toBe('ORDINARY P-OFF T-OFF')
+    expect(plating.job.inputs.toggles).toEqual({ plating: false, tableware: false })
+    expect(touched).toEqual(before)
+  })
+
+  it('only 优化摆盘 on: plating runs, tableware is rendered off and no vessel is read', async () => {
+    const before = touched.vessels
+    const run = await generate({ plating: true, tableware: true }, READING, { plating: true, tableware: false })
+    expect(run.call.prompt).toBe('PLATING Fish')
+    expect(run.job.inputs.toggles).toEqual({ plating: true, tableware: false })
+    expect(touched.vessels).toBe(before)
+  })
+})
+
+// Admin test runs (§10.b) follow the same switches: off, a toggle renders off and nothing is read.
+describe('admin test runs and the switches (2009)', () => {
   let release: () => Promise<void>
   beforeAll(async () => { release = await holdTestBudget(db) }, 120_000)
   afterAll(async () => { await release() })
 
-  async function testRun(switchOn: boolean) {
+  async function testRun(switches: Switches) {
     await saveTestBudget(serviceSupabase(), admin, 1000)
     const photoId = randomUUID()
     const key = `admin-tests/photos/${photoId}.jpg`
     r2.upload(key, await jpeg(1200, 1600), 'image/jpeg')
     await confirmTestPhoto({ db: serviceSupabase(), store: r2.store }, admin, photoId, key)
     const fake = fakeProvider()
-    const deps = { db: serviceSupabase(), store: r2.store, provider: fake.provider, providerTimeoutMs: 2000, food: food(READING), foodTogglesEnabled: async () => switchOn }
+    const deps = { db: serviceSupabase(), store: r2.store, provider: fake.provider, providerTimeoutMs: 2000, food: food(READING), foodSwitches: async () => switches }
     const run = await runTestGenerate(deps, { actorId: admin, body: {
       run_id: randomUUID(), batch_id: randomUUID(), template_id: templateId, photo_id: photoId,
       inputs: { copy: {}, resolution: '1k', aspect_ratio: '2:3', toggles: { plating: true, tableware: false } },
@@ -173,13 +207,13 @@ describe('admin test runs and the switch (1848)', () => {
     return { prompt: fake.calls[0]?.prompt, run }
   }
 
-  it('renders both off with the switch off, and runs the flow with it on', async () => {
+  it('renders plating off with its switch off, and runs the flow with it on', async () => {
     const before = { ...touched }
-    const off = await testRun(false)
+    const off = await testRun({ plating: false, tableware: true })
     expect(off.prompt).toBe('ORDINARY P-OFF T-OFF')
     expect(off.run.inputs.toggles).toEqual({ plating: false, tableware: false })
     expect(touched).toEqual(before)
-    expect((await testRun(true)).prompt).toBe('PLATING Fish')
+    expect((await testRun({ plating: true, tableware: false })).prompt).toBe('PLATING Fish')
   })
 })
 

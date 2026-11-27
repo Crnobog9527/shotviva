@@ -45,10 +45,10 @@ export type RawGenerationInputs = {
   // Sizes this entry point may ask for, default first. The web offers the eight output sizes
   // (DESIGN §4.3); the partner route keeps the template's own list (its contract, §14.6).
   aspects?: readonly string[]
-  // Toggles switched off site-wide (food_toggles_enabled off): rendered off whatever the request
+  // Toggles switched off site-wide (food_plating_enabled / food_tableware_enabled off): rendered off whatever the request
   // says, never refused, so an open tab or Make again still runs, at the price of the off result.
   forceOff?: readonly string[]
-  // Copy fields switched off with them (the dish name, FOOD_COPY_KEYS): whatever the request
+  // Copy fields switched off with them (the dish name, FOOD_COPY_KEYS, once both are off): whatever the request
   // sends for them is ignored and they are left out of the inputs, as if the template lacked them.
   dropCopy?: readonly string[]
 }

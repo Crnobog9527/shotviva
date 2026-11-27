@@ -6,7 +6,7 @@ import { AppError } from '@/core/errors'
 import { localeOfReferer } from '@/core/i18n'
 import { generateBodySchema, runGeneration, toGenerationRequest } from '@/core/jobs'
 import { r2Store } from '@/core/storage'
-import { foodTogglesEnabled } from '@/core/system-settings'
+import { foodSwitches } from '@/core/system-settings'
 import { foodDeps, identityJudge, imageProvider, schedulePosterCheck } from '@/modules/image'
 
 // Synchronous generation (ARCHITECTURE §4); the provider gets 240s of these 300 so a timeout
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     if (!body.success) throw new AppError('INVALID_INPUT', 'template_id is required')
     // The private template selects the image model; the decision provider screens user text.
     const judge = await identityJudge()
-    const deps = { db: createAdminSupabase(), store: r2Store(), provider: imageProvider, identityJudge: judge, afterPoster: schedulePosterCheck, food: foodDeps(), foodTogglesEnabled }
+    const deps = { db: createAdminSupabase(), store: r2Store(), provider: imageProvider, identityJudge: judge, afterPoster: schedulePosterCheck, food: foodDeps(), foodSwitches }
     // The `generate` event's locale: the workspace page's language, else the account's.
     const locale = localeOfReferer(request.headers.get('referer')) ?? user.locale ?? undefined
     // The IP is kept on the job as dispute evidence (T82).

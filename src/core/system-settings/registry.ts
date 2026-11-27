@@ -25,9 +25,11 @@ type SettingTypes = {
   // 1521: 拍照识别's price per run in credits (§5.3「每周复用」); 0 (no row) keeps the feature off.
   // start_poster_photo reads the row itself.
   poster_photo_credits: number
-  // 1848: whether food templates offer 优化摆盘 / 优化器皿 (fields.toggles plating, tableware). Off
-  // (no row): neither is shown and the server renders both off; the templates' data stays.
-  food_toggles_enabled: boolean
+  // 2009: whether food templates offer 优化摆盘 (fields.toggles plating) and 优化器皿 (tableware),
+  // one switch each. Off (no row): that toggle is not shown and the server renders it off; the
+  // templates' data stays. (1848's combined food_toggles_enabled is only read by older releases.)
+  food_plating_enabled: boolean
+  food_tableware_enabled: boolean
   // 1999: whether pages register the home-screen app's service worker (core/offline). Off (no row):
   // /sw.js empties its caches and unregisters, and pages unregister any worker (the kill switch).
   service_worker_enabled: boolean
@@ -55,7 +57,8 @@ export const SYSTEM_SETTINGS: { [K in SystemSettingKey]: SettingDefinition<Setti
   signup_gift_claim_phone: { schema: z.boolean(), fallback: true },
   signup_gift_claim_google: { schema: z.boolean(), fallback: true },
   poster_photo_credits: { schema: z.number().int().min(1).max(1000), fallback: 0 },
-  food_toggles_enabled: { schema: z.boolean(), fallback: false },
+  food_plating_enabled: { schema: z.boolean(), fallback: false },
+  food_tableware_enabled: { schema: z.boolean(), fallback: false },
   service_worker_enabled: { schema: z.boolean(), fallback: false },
   service_worker_shell_enabled: { schema: z.boolean(), fallback: false },
 }

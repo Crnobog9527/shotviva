@@ -4,7 +4,8 @@ import {
   AdminPage,
   FEATURES_COPY,
   FeaturesEditor,
-  FoodTogglesCard,
+  FoodPlatingCard,
+  FoodTablewareCard,
   AppShellCard,
   ServiceWorkerCard,
   listFeatureSettings,
@@ -25,7 +26,8 @@ import { site } from '@/site/site.config'
 
 import {
   saveFeatureAccessAction,
-  saveFoodTogglesAction,
+  saveFoodPlatingAction,
+  saveFoodTablewareAction,
   saveAppShellAction,
   saveServiceWorkerAction,
   setFeatureInviteAction,
@@ -56,16 +58,17 @@ async function galleryState(db: ReturnType<typeof createAdminSupabase>): Promise
 export default async function AdminFeaturesPage() {
   await requireAdmin()
   const db = createAdminSupabase()
-  const [settings, wishlist, gallery, signupGift, photoPrice, foodToggles, serviceWorker, appShell] = await Promise.all([
+  const [settings, wishlist, gallery, signupGift, photoPrice, foodPlating, foodTableware, serviceWorker, appShell] = await Promise.all([
     listFeatureSettings(db), wishlistState(db), galleryState(db), loadSignupGift(db), loadPosterPhotoPrice(db),
-    loadSettingSwitch(db, 'food_toggles_enabled'), loadSettingSwitch(db, 'service_worker_enabled'), loadSettingSwitch(db, 'service_worker_shell_enabled'),
+    loadSettingSwitch(db, 'food_plating_enabled'), loadSettingSwitch(db, 'food_tableware_enabled'), loadSettingSwitch(db, 'service_worker_enabled'), loadSettingSwitch(db, 'service_worker_shell_enabled'),
   ])
   return (
     <AdminPage title={FEATURES_COPY.title}>
       <div className="mb-6 grid gap-4">
         <SignupGiftCard state={signupGift} savePaused={saveSignupGiftPausedAction} saveRules={saveSignupGiftRulesAction} />
         <PosterPhotoCard credits={photoPrice} save={savePosterPhotoPriceAction} />
-        <FoodTogglesCard value={foodToggles} save={saveFoodTogglesAction} />
+        <FoodTablewareCard value={foodTableware} save={saveFoodTablewareAction} />
+        <FoodPlatingCard value={foodPlating} save={saveFoodPlatingAction} />
         <ServiceWorkerCard value={serviceWorker} save={saveServiceWorkerAction} />
         <AppShellCard value={appShell} save={saveAppShellAction} />
       </div>

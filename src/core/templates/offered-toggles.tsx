@@ -4,49 +4,54 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react'
 
 import { FOOD_COPY_KEYS, FOOD_TOGGLE_KEYS } from './food-toggle-keys'
 
-// The site-wide switch for 优化摆盘 / 优化器皿 (system_settings food_toggles_enabled), handed to
-// the browser by the root layout. Without a provider it reads off, the safe side.
-const FoodTogglesContext = createContext(false)
+// What the site-wide switches for 优化摆盘 and 优化器皿 (system_settings food_plating_enabled,
+// food_tableware_enabled) hide, worked out on the server (foodSwitchedOff) and handed to the browser
+// by the root layout, so no switch logic ships in every page. Without a provider everything food
+// is hidden, the safe side.
+export type FoodOffer = { readonly forceOff: readonly string[]; readonly dropCopy: readonly string[] }
+const ALL_OFF: FoodOffer = { forceOff: FOOD_TOGGLE_KEYS, dropCopy: FOOD_COPY_KEYS }
+const FoodTogglesContext = createContext<FoodOffer>(ALL_OFF)
 
-export function FoodTogglesProvider({ enabled, children }: { enabled: boolean; children?: ReactNode }) {
-  return <FoodTogglesContext.Provider value={enabled}>{children}</FoodTogglesContext.Provider>
+export function FoodTogglesProvider({ offer, children }: { offer: FoodOffer; children?: ReactNode }) {
+  return <FoodTogglesContext.Provider value={offer}>{children}</FoodTogglesContext.Provider>
 }
 
-// A template's toggles as offered now: without the food ones while the switch is off. The
-// template's own data keeps them, so turning the switch on brings them back unchanged.
-export function offeredToggles<T extends { key: string }>(toggles: readonly T[], foodEnabled: boolean): readonly T[] {
-  return foodEnabled ? toggles : toggles.filter((toggle) => !FOOD_TOGGLE_KEYS.includes(toggle.key))
+// A template's toggles as offered now: without each food toggle whose switch is off. The template's
+// own data keeps them, so turning a switch on brings that toggle back unchanged.
+export function offeredToggles<T extends { key: string }>(toggles: readonly T[], offer: FoodOffer): readonly T[] {
+  const off = offer.forceOff
+  return off.length === 0 ? toggles : toggles.filter((toggle) => !off.includes(toggle.key))
 }
 
-// A template's copy fields as offered now: without the dish name while the switch is off (only the
-// toggle flows read it). The same array when nothing is hidden.
-export function offeredCopyFields<F extends { key: string }>(fields: readonly F[], foodEnabled: boolean): F[] {
-  const hidden = (field: F) => FOOD_COPY_KEYS.includes(field.key)
-  return foodEnabled || !fields.some(hidden) ? (fields as F[]) : fields.filter((field) => !hidden(field))
+// A template's copy fields as offered now: without the dish name while both switches are off (only
+// the toggle flows read it). The same array when nothing is hidden.
+export function offeredCopyFields<F extends { key: string }>(fields: readonly F[], offer: FoodOffer): F[] {
+  const hidden = (field: F) => offer.dropCopy.includes(field.key)
+  return !fields.some(hidden) ? (fields as F[]) : fields.filter((field) => !hidden(field))
 }
 
 // A browser template (CatalogueTemplate) with offeredCopyFields applied; the same object when
 // nothing is hidden, so identity checks and memos downstream keep working.
-export function offeredTemplate<T extends { copyFields: { key: string }[] }>(template: T, foodEnabled: boolean): T {
-  const copyFields = offeredCopyFields(template.copyFields ?? [], foodEnabled)
+export function offeredTemplate<T extends { copyFields: { key: string }[] }>(template: T, offer: FoodOffer): T {
+  const copyFields = offeredCopyFields(template.copyFields ?? [], offer)
   return copyFields === template.copyFields || copyFields.length === (template.copyFields ?? []).length ? template : { ...template, copyFields }
 }
 
-export function useFoodTogglesEnabled(): boolean {
+export function useFoodOffer(): FoodOffer {
   return useContext(FoodTogglesContext)
 }
 
 export function useOfferedToggles<T extends { key: string }>(toggles: readonly T[]): readonly T[] {
-  const enabled = useFoodTogglesEnabled()
-  return useMemo(() => offeredToggles(toggles, enabled), [toggles, enabled])
+  const offer = useFoodOffer()
+  return useMemo(() => offeredToggles(toggles, offer), [toggles, offer])
 }
 
 export function useOfferedCopyFields<F extends { key: string }>(fields: readonly F[]): F[] {
-  const enabled = useFoodTogglesEnabled()
-  return useMemo(() => offeredCopyFields(fields, enabled), [fields, enabled])
+  const offer = useFoodOffer()
+  return useMemo(() => offeredCopyFields(fields, offer), [fields, offer])
 }
 
 export function useOfferedTemplate<T extends { copyFields: { key: string }[] }>(template: T): T {
-  const enabled = useFoodTogglesEnabled()
-  return useMemo(() => offeredTemplate(template, enabled), [template, enabled])
+  const offer = useFoodOffer()
+  return useMemo(() => offeredTemplate(template, offer), [template, offer])
 }
