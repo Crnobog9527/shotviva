@@ -16121,7 +16121,10 @@ begin
     -- Already paid: the ledger's idempotency key makes this a no-op; never refuse it now.
     if not exists (select 1 from public.credit_ledger where idempotency_key = p_idempotency_key) then
       -- A stored refusal stands; a pending account is paid only through claim_signup_gift.
-      if v_profile.signup_gift_refusal is not null then
+      -- 2026: except 'daily_cap', which is pending and decided again below (never for a banned
+      -- account).
+      if v_profile.signup_gift_refusal is not null
+         and (v_profile.signup_gift_refusal <> 'daily_cap' or v_profile.banned_at is not null) then
         return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
       end if;
 
@@ -16152,7 +16155,9 @@ begin
       perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_gift_cap', 0));
       v_today := public.signup_gift_today();
       if (v_today->>'paused')::boolean then
-        update public.profiles set signup_gift_refusal = 'paused' where id = p_user_id;
+        -- 2026: a pending 'daily_cap' account waits out the pause; a new one is refused for good.
+        update public.profiles set signup_gift_refusal = 'paused'
+         where id = p_user_id and signup_gift_refusal is null;
         return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
       end if;
       if (v_today->>'granted')::integer >= (v_today->>'cap')::integer then
@@ -16162,6 +16167,10 @@ begin
 
       v_change := public._apply_credit_change(p_user_id, p_pool, 'grant', p_amount, p_reason, p_idempotency_key);
       if v_change.applied then
+        -- 2026: a caught-up account is no longer pending.
+        if v_profile.signup_gift_refusal = 'daily_cap' then
+          update public.profiles set signup_gift_refusal = null where id = p_user_id;
+        end if;
         insert into public.signup_gift_claims (key_hash, method, user_id)
         select k.key_hash, k.method, p_user_id from public.signup_gift_identity_keys(p_user_id) k
         on conflict (key_hash) do nothing;
@@ -19701,6 +19710,67 @@ $$;
 
 
 ALTER FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_gift_catch_up"("p_limit" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_user uuid;
+  v_today jsonb;
+  v_change public.credit_change;
+  v_paid integer := 0;
+  v_tried integer := 0;
+  v_failed integer := 0;
+  v_stopped text := null;
+begin
+  if p_limit is null or p_limit < 1 or p_limit > 500 then
+    raise exception 'INVALID_INPUT' using detail = 'limit must be from 1 to 500';
+  end if;
+
+  for v_user in
+    select p.id from public.profiles p
+     where p.signup_gift_refusal = 'daily_cap' and p.banned_at is null
+       and public.signup_gift_amount(p.created_at) > 0
+       and not exists (select 1 from public.credit_ledger l where l.idempotency_key = 'signup:' || p.id::text)
+     order by p.created_at, p.id
+     limit p_limit
+  loop
+    v_today := public.signup_gift_today();
+    if (v_today->>'paused')::boolean then
+      v_stopped := 'paused';
+      exit;
+    end if;
+    if (v_today->>'granted')::integer >= (v_today->>'cap')::integer then
+      v_stopped := 'daily_cap';
+      exit;
+    end if;
+    v_tried := v_tried + 1;
+    begin
+      v_change := public.grant_credits(v_user, 1, 'signup', 'signup:' || v_user::text, 'free');
+      if v_change.applied then
+        v_paid := v_paid + 1;
+      end if;
+    exception when others then
+      v_failed := v_failed + 1;
+    end;
+  end loop;
+
+  return jsonb_build_object(
+    'paid', v_paid,
+    'tried', v_tried,
+    'failed', v_failed,
+    'stopped', v_stopped,
+    'remaining', (select count(*) from public.profiles p
+                   where p.signup_gift_refusal = 'daily_cap' and p.banned_at is null
+                     and public.signup_gift_amount(p.created_at) > 0
+                     and not exists (select 1 from public.credit_ledger l where l.idempotency_key = 'signup:' || p.id::text)));
+end;
+$$;
+
+
+ALTER FUNCTION "public"."signup_gift_catch_up"("p_limit" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."signup_gift_day_start"() RETURNS timestamp with time zone
@@ -25257,6 +25327,10 @@ CREATE INDEX "profiles_referred_via_idx" ON "public"."profiles" USING "btree" ("
 
 
 
+CREATE INDEX "profiles_signup_gift_daily_cap_idx" ON "public"."profiles" USING "btree" ("created_at", "id") WHERE ("signup_gift_refusal" = 'daily_cap'::"text");
+
+
+
 CREATE INDEX "profiles_signup_ip_created_at_idx" ON "public"."profiles" USING "btree" ("signup_ip", "created_at");
 
 
@@ -30483,6 +30557,11 @@ GRANT ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_
 
 REVOKE ALL ON FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_catch_up"("p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_catch_up"("p_limit" integer) TO "service_role";
 
 
 
