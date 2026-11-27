@@ -93,7 +93,7 @@ export default async function OrgPage({ params, searchParams }: PageProps<'/[loc
   return (
     <AdminPage title={org.name} actions={<OrgStatusBadge status={org.status} />}>
       <Link href="/admin/orgs" className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 hover:underline">← {COPY.back}</Link>
-      <nav className="-mx-1 flex gap-1 overflow-x-auto border-b border-border px-1" aria-label={org.name}>
+      <nav className="flex flex-wrap gap-1 border-b border-border pb-1" aria-label={org.name}>
         {ORG_DETAIL_TABS.map((t) => (
           <Link key={t.key} href={orgDetailTabHref(org.id, t.key)} aria-current={t.key === tab ? 'page' : undefined} className={cn(TAB, t.key === tab ? 'bg-accent' : 'text-muted-foreground')}>{t.label}</Link>
         ))}
