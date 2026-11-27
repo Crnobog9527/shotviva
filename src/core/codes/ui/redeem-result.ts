@@ -10,7 +10,7 @@ const issue = z.object({ code: z.string(), currentCode: z.string().optional() })
 
 const messages: Record<string, string> = {
   CODE_NOT_FOUND: 'notFound', CODE_EXPIRED: 'expired', CODE_FULL: 'full', CODE_USED: 'used',
-  CODE_NEW_USERS_ONLY: 'newOnly', CODE_OWN: 'own', CODE_ALREADY_INVITED: 'invited',
+  CODE_NEW_USERS_ONLY: 'newOnly', CODE_INVITE_SIGNUP_ONLY: 'signupOnly', CODE_OWN: 'own', CODE_ALREADY_INVITED: 'invited',
   CODE_CHECKOUT_IN_PROGRESS: 'checkout', CODE_INVITE_INELIGIBLE: 'ineligible',
   FORBIDDEN: 'forbidden', ORG_MEMBER_CHECKOUT: 'orgMember', RATE_LIMITED: 'rate', UNAUTHORIZED: 'auth', INVALID_INPUT: 'invalid',
 }

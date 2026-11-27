@@ -126,13 +126,13 @@ it('never rebinds an already bound customer, and skips the org\'s own members', 
   await signupGrant(b)
   // The partner link binds first (signup, or /api/codes/redeem since #780), then the code is redeemed.
   expect(await bind(db, b, personal.slug)).toBe(true)
-  expect((await redeem(b, a, 'account')).status).toBe('ok')
+  expect((await redeem(b, a)).status).toBe('ok')
   expect(await referral(b)).toMatchObject({ referred_by: personal.id, referred_source: 'signup', referred_member: null, referred_via: null })
 
   const colleague = await createUser(db)
   await joinOrg(colleague, orgId)
   await signupGrant(colleague)
-  await redeem(colleague, a, 'account')
+  await redeem(colleague, a)
   expect((await referral(colleague)).referred_by).toBeNull()
 })
 

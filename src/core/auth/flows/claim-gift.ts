@@ -1,11 +1,12 @@
 import 'server-only'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
 import { noteSignupGift } from '../../alerts'
 import type { ErrorCode } from '../../errors'
 import { localized } from '../../i18n/server'
+import { referralSlug } from '../../affiliate/referral'
 import { logger } from '../../logger'
 import { currentOrigin } from '../../request-origin'
 import { phoneKey } from '../phone/phone-key'
@@ -55,7 +56,8 @@ export async function sendClaimPhoneCode(form: FormData): Promise<ClaimState> {
 
   const admin = createAdminSupabase()
   const key = phoneKey(phone)
-  const status = await requestSmsSend(admin, key, clientIp(await headers()))
+  // The sv_ref slug only lets the database apply the looser org-link IP limit when it is one (2027).
+  const status = await requestSmsSend(admin, key, clientIp(await headers()), referralSlug((await cookies()).get('sv_ref')?.value))
   if (status !== 'ok') return failed(limitError(status))
 
   // Supabase sends the code through the Send SMS hook to the new number (phone_change).

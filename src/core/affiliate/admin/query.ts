@@ -13,7 +13,7 @@ const filter = z
     id: optional(z.uuid()),
     affiliate: optional(z.uuid()),
     status: optional(z.enum(['confirmed', 'pending', 'on_hold', 'void', 'paid', 'due', 'held'])),
-    flag: optional(z.enum(['yes', 'no'])),
+    flag: optional(z.enum(['yes', 'no', 'paused'])),
     period: optional(z.iso.date()),
     from: optional(z.iso.date()),
     until: optional(z.iso.date()),

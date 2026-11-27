@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { refresh, updateTag } from 'next/cache'
 
-import { runAdminAction, saveFeatureAccess, setFeatureInvite, savePosterPhotoPrice, saveSettingSwitch, saveSignupGiftRules, saveWishlistSwitch, WISHLIST_SWITCH_COPY, type ActionResult } from '@/core/admin'
+import { runAdminAction, saveFeatureAccess, setFeatureInvite, savePosterPhotoPrice, saveSettingSwitch, saveSignupGiftRules, saveSignupLimits, saveWishlistSwitch, WISHLIST_SWITCH_COPY, type ActionResult } from '@/core/admin'
 import { AppError } from '@/core/errors'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { FEATURES_CACHE_TAG } from '@/core/features'
@@ -70,6 +70,15 @@ export async function saveSignupGiftPausedAction(input: unknown): Promise<Action
 export async function saveSignupGiftRulesAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()
   const result = await runAdminAction(() => saveSignupGiftRules({ db: createAdminSupabase(), invalidate: settingsChanged }, admin.id, input))
+  if (result.ok) refresh()
+  return result
+}
+
+// 2027: the per-IP sign-up and SMS limits. signup_request and the SMS functions read the rows
+// themselves; the page reads again so the card shows what is stored.
+export async function saveSignupLimitsAction(input: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  const result = await runAdminAction(() => saveSignupLimits({ db: createAdminSupabase(), invalidate: settingsChanged }, admin.id, input))
   if (result.ok) refresh()
   return result
 }

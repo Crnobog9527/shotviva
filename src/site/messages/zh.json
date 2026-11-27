@@ -573,7 +573,7 @@
       "redeem": {
         "inviteLinked": "已绑定邀请，本次无额外注册赠分。",
         "title": "兑换码",
-        "label": "邀请码、优惠码或赠分码",
+        "label": "优惠码或赠分码",
         "button": "兑换",
         "working": "兑换中…",
         "paidGift": "已到账 {credits} 个付费积分。",
@@ -590,6 +590,7 @@
           "full": "这个码已经被领完了。",
           "used": "你已经用过这个码了。",
           "newOnly": "这个码只限新用户。",
+          "signupOnly": "邀请码只能在注册时填写，已注册的账号不能再补填。",
           "own": "不能使用自己的邀请码。",
           "invited": "你已经用过邀请码了。",
           "checkout": "当前折扣有一笔未完成的结账，请先完成付款或取消，再更换折扣。",
@@ -647,7 +648,7 @@
       "getCredits": "获取积分",
       "panelTitle": "积分",
       "signupGiftRefused": "同一网络 24 小时内领取注册赠分的账号已达上限，这个账号暂未领到。在下方验证手机号或 Google 账号即可领取。",
-      "signupGiftRefusedCap": "这个账号注册当天，注册赠分名额已全部发完。",
+      "signupGiftRefusedCap": "这个账号注册当天，注册赠分名额已全部发完，赠分暂未到账。之后有名额时会自动补发到这个账号，通常在之后几天内到账。",
       "signupGiftRefusedPaused": "这个账号注册时，注册赠分暂停发放，因此未能领取。",
       "signupGiftRefusedStaff": "通过企业员工链接注册的账号不享有注册赠分。"
     },
@@ -2660,6 +2661,8 @@
       "dispute_won": "争议胜诉",
       "same_ip": "注册网络相同",
       "affiliate_inactive": "付款时推广员未启用",
+      "affiliate_paused": "企业联盟暂停中，佣金冻结",
+      "affiliate_resumed": "企业联盟已恢复，佣金解冻",
       "org_member": "客户是本企业成员",
       "confirmed": "确认期已满",
       "admin_release": "审核后已放行",
@@ -2884,7 +2887,8 @@
         "refund_fee": "退款手续费",
         "other": "其他"
       },
-      "confirmsOn": "预计确认 {date}"
+      "confirmsOn": "预计确认 {date}",
+      "pausedHold": "企业联盟暂停中，恢复后解冻"
     }
   },
   "gallery": {

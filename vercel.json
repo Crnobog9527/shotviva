@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/partner-promo",
       "schedule": "40 0 1 * *"
+    },
+    {
+      "path": "/api/cron/signup-gift-catch-up",
+      "schedule": "5 16 * * *"
     }
   ],
   "regions": [

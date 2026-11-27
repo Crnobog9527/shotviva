@@ -48,9 +48,9 @@ export async function POST(request: NextRequest) {
       const spent = await spendAttempt()
       return redemptionResponse(spent.status === 'rate_limited' ? spent : { status: 'new_users_only' })
     }
-    // A partner's link (sv_ref) binds before the code: an org member's invite code may bind the
-    // customer to the org only when nobody else already has (ARCHITECTURE §6.5). This is the same
-    // late binding checkout does; affiliate_bind refuses once the account has paid.
+    // A partner's link (sv_ref) binds before the code. This is the same late binding checkout
+    // does; affiliate_bind refuses once the account has paid. Invite codes are refused here: they
+    // are for sign-up only (2030); a customer who joined without one is bound by an admin.
     await bindReferral(user.id, request.cookies.get('sv_ref')?.value, 'first_checkout')
     const result = await redeemCode(admin, { userId: user.id, code, context, replace, invite, locale })
     return redemptionResponse(result)

@@ -45,7 +45,7 @@ async function reject(work: () => Promise<unknown>, message: string) {
 }
 
 async function redeem(user: string, code: string) {
-  const result = await db.query("select public.redeem_code($1,$2,'account',$3,$4) as claim",
+  const result = await db.query("select public.redeem_code($1,$2,'signup',$3,$4) as claim",
     [user, code, null, invite.windowDays])
   return result.rows[0].claim
 }

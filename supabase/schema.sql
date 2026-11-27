@@ -3712,6 +3712,27 @@ $$;
 ALTER FUNCTION "public"."_affiliate_overrides"("p_user" "uuid", "p_values" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_paused_settle"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_payment bigint;
+begin
+  for v_payment in select distinct c.payment_id from public.affiliate_commissions c
+      where c.paused_hold and exists(select from public.affiliate_commissions l1
+        where l1.payment_id=c.payment_id and l1.level=1 and l1.affiliate_user_id=new.user_id)
+      order by c.payment_id loop
+    -- Locks the payment, then its commissions; a failure is recorded for affiliate_daily to retry.
+    perform public.affiliate_recompute_payment(v_payment);
+  end loop;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_paused_settle"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_payment_event"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -3798,6 +3819,7 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."
     SET "TimeZone" TO 'UTC'
     AS $$
   select jsonb_build_object('owner',a.user_id,'org',a.org_id,'inactive',a.status<>'active',
+    'paused',a.status='suspended' and a.org_id is not null,
     'parent',case when a.status='active' and parent.team_enabled and parent.status='active' then parent.user_id end,
     'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,r.org_l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
     'bonus',coalesce(po.l2_bp,r.l2_bp),
@@ -3852,6 +3874,7 @@ declare
   v_owner uuid; v_rate integer; v_confirm timestamptz; v_flags text[]; v_void text;
   v_fee integer := case when p_payment.fee_status is not null then p_payment.fee_cents end;
   v_net bigint; v_fallback boolean := false;
+  v_paused boolean := false; v_resumed boolean := false; v_l1 uuid; v_l1_status text;
 begin
   select c.* into v_old from public.affiliate_commissions c where c.payment_id=p_payment.id and c.level=p_level for update;
   if not found then
@@ -3860,11 +3883,28 @@ begin
     v_rate:=(p_snapshot->>case p_level when 1 then 'rate' else 'bonus' end)::integer;
     v_confirm:=(p_snapshot->>'confirm_after')::timestamptz;
     v_flags:=case when (p_snapshot->>'same_ip')::boolean then array['same_ip'] else '{}' end;
-    if p_level=1 and (p_snapshot->>'inactive')::boolean then v_void:='affiliate_inactive';
-    elsif p_level=1 and p_snapshot->>'void'='org_member' then v_void:='org_member'; end if;
+    if p_level=1 and p_snapshot->>'void'='org_member' then v_void:='org_member';
+    elsif coalesce((p_snapshot->>'paused')::boolean,false) then v_paused:=true; v_l1:=(p_snapshot->>'owner')::uuid;
+    elsif p_level=1 and (p_snapshot->>'inactive')::boolean then v_void:='affiliate_inactive'; end if;
   else
     v_owner:=v_old.affiliate_user_id; v_rate:=v_old.rate_bp; v_confirm:=v_old.confirm_after; v_flags:=v_old.flags;
-    if v_old.void_reason in ('affiliate_inactive','admin_void','org_member') then v_void:=v_old.void_reason; end if;
+    if v_old.void_reason in ('affiliate_inactive','admin_void','org_member') then v_void:=v_old.void_reason;
+    elsif v_old.paused_hold then
+      v_paused:=true;
+      v_l1:=case when p_level=1 then v_old.affiliate_user_id else
+        (select c.affiliate_user_id from public.affiliate_commissions c where c.payment_id=p_payment.id and c.level=1) end;
+    end if;
+  end if;
+  -- A pause hold follows the level-1 account as it is now: still suspended -> held, active again ->
+  -- normal rules, closed for good (banned, rejected, gone) -> void as before 2028.
+  if v_paused then
+    -- FOR SHARE conflicts with the status UPDATE (FOR NO KEY UPDATE; KEY SHARE would not): a payment
+    -- written while the switch is being turned on waits for that commit and reads the new status,
+    -- so it cannot be held after the settle trigger has already run. That trigger never needs this
+    -- payment (its commission row is not committed yet), so the wait cannot deadlock.
+    select a.status into v_l1_status from public.affiliates a where a.user_id=v_l1 for share;
+    if v_l1_status='active' then v_paused:=false; v_resumed:=v_old.id is not null;
+    elsif v_l1_status is distinct from 'suspended' then v_paused:=false; v_void:='affiliate_inactive'; end if;
   end if;
   if public._affiliate_fee_missing(p_payment) and now() >= v_confirm
      + make_interval(days => (select s.fee_final_grace_days from public.affiliate_settings s where s.singleton)) then
@@ -3880,13 +3920,30 @@ begin
   elsif v_amount=0 then
     v_void:=case when p_payment.amount_refunded=p_payment.amount_total then 'refunded' else 'zero' end;
   end if;
-  v_status:=case when v_amount=0 then 'void' when p_open or (cardinality(v_flags)>0 and v_old.released_by is null and not p_release)
+  -- A void row is final; it no longer waits for the account.
+  if v_amount=0 then v_paused:=false; end if;
+  v_status:=case when v_amount=0 then 'void' when p_open or v_paused or (cardinality(v_flags)>0 and v_old.released_by is null and not p_release)
     then 'on_hold' when now()>=v_confirm and (v_old.status='confirmed' or v_fallback or public._affiliate_fee_ready(p_payment,v_confirm,now()))
     then 'confirmed' else 'pending' end;
   if not p_release and v_old.id is not null and (v_amount,v_status,v_void,v_fee::bigint,v_net)
-    is not distinct from (v_old.amount,v_old.status,v_old.void_reason,v_old.fee_cents,v_old.net_base_usd) then return; end if;
+    is not distinct from (v_old.amount,v_old.status,v_old.void_reason,v_old.fee_cents,v_old.net_base_usd) then
+    if v_paused is not distinct from v_old.paused_hold then return; end if;
+    -- Only the marker changes on a row that was already void (e.g. an admin void while held): no change row.
+    if v_status='void' then
+      update public.affiliate_commissions set paused_hold=v_paused,updated_at=now() where id=v_old.id;
+      return;
+    end if;
+  end if;
   v_reason:=case when p_release then 'admin_release' when v_void is not null then v_void
-    when p_open then 'dispute_open' when v_status='on_hold' then 'same_ip'
+    when p_open then 'dispute_open'
+    when v_resumed then 'affiliate_resumed'
+    when v_paused then case
+      when not coalesce(v_old.paused_hold,false) then 'affiliate_paused'
+      when v_fee::bigint is distinct from v_old.fee_cents
+        then case when p_payment.fee_status='final' then 'fee_final' else 'fee_adjusted' end
+      when v_amount<v_old.amount then 'partial_refund'
+      else 'affiliate_paused' end
+    when v_status='on_hold' then 'same_ip'
     when v_old.status='on_hold' then 'dispute_won'
     when v_status='confirmed' and v_old.status<>'confirmed' and public._affiliate_fee_era(p_payment)
       and p_payment.fee_status is distinct from 'final' then 'confirmed_fee_estimate'
@@ -3896,13 +3953,13 @@ begin
     when v_status='confirmed' and v_old.id is not null then 'confirmed'
     else 'payment' end;
   insert into public.affiliate_commissions(payment_id,affiliate_user_id,level,product_id,rate_bp,base_usd,amount,status,
-    confirm_after,confirmed_at,void_reason,flags,created_at,fee_cents,net_base_usd)
+    confirm_after,confirmed_at,void_reason,flags,created_at,fee_cents,net_base_usd,paused_hold)
   values(p_payment.id,v_owner,p_level,p_payment.product_id,v_rate,p_payment.amount_total-p_payment.amount_tax,v_amount,v_status,
-    v_confirm,case when v_status='confirmed' then now() end,v_void,v_flags,p_payment.created_at,v_fee,v_net)
+    v_confirm,case when v_status='confirmed' then now() end,v_void,v_flags,p_payment.created_at,v_fee,v_net,v_paused)
   on conflict(payment_id,level) do update set amount=excluded.amount,status=excluded.status,
     confirmed_at=case when excluded.status='confirmed' then coalesce(affiliate_commissions.confirmed_at,now()) end,
     void_reason=excluded.void_reason,fee_cents=excluded.fee_cents,net_base_usd=excluded.net_base_usd,
-    updated_at=now() returning id into v_id;
+    paused_hold=excluded.paused_hold,updated_at=now() returning id into v_id;
   insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
     values(v_id,v_old.amount,v_amount,v_old.status,v_status,v_reason);
   -- Every path that confirms on the fallback (recompute, daily run, admin release) leaves the alert.
@@ -5463,7 +5520,9 @@ begin
         join public.profiles cu on cu.id = p.user_id
        where v_account is not null and c.affiliate_user_id = v_account and c.level = 1 and c.status = 'confirmed'
          and c.confirmed_at >= v_start and c.confirmed_at < v_end
-         and cu.referred_by = v_account and cu.referred_source in ('org_l1', 'signup', 'first_checkout')
+         and cu.referred_by = v_account
+         and cu.referred_source in ('org_l1', 'signup', 'first_checkout', 'admin')
+         and p.created_at >= cu.referred_at
          and not exists(select from public.partner_promo_grant_lines l join public.partner_promo_grants g on g.id = l.grant_id
                          where l.payment_id = c.payment_id and g.status = 'granted' and g.period <> p_period)
     ) x
@@ -6174,6 +6233,52 @@ $$;
 ALTER FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text", "p_resolution" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_signup_gift_invite_retry"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_code text;
+begin
+  select c.code into v_code from public.code_redemptions r join public.codes c on c.id = r.code_id
+   where r.user_id = new.user_id and r.kind = 'invite' and r.status = 'blocked_no_signup_grant' and r.context = 'signup';
+  if v_code is null then return null; end if;
+  begin
+    -- The code was entered at sign-up; only the gift came late, so no 7-day window here.
+    perform public.redeem_code(new.user_id, v_code, 'signup', null, 36500);
+    delete from public.signup_invite_retry_errors where user_id = new.user_id;
+  exception when others or query_canceled or assert_failure then
+    begin
+      insert into public.signup_invite_retry_errors(user_id, error)
+        values (new.user_id, sqlstate || ': ' || left(sqlerrm, 300))
+        on conflict (user_id) do update set error = excluded.error, at = now();
+    exception when others or query_canceled or assert_failure then
+      -- Even an unavailable error sink must never undo the gift.
+      return null;
+    end;
+  end;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_signup_gift_invite_retry"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_signup_org_ref"("p_slug" "text") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+  select coalesce(p_slug ~ '^[a-z0-9-]{3,24}$' and exists (
+    select 1 from public.affiliates a
+      join public.orgs o on o.id = a.org_id
+      join public.affiliate_settings s on s.singleton and s.enabled
+     where a.slug = p_slug and a.status = 'active' and o.status = 'active' and o.affiliate_enabled), false)
+$_$;
+
+
+ALTER FUNCTION "public"."_signup_org_ref"("p_slug" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -6623,6 +6728,95 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_affiliate_annotate"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_affiliate_bind_customer"("p_actor" "uuid", "p_input" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_user uuid; v_owner uuid; v_reason text := nullif(trim(p_input->>'reason'), ''); v_days integer;
+  v_profile public.profiles; v_account public.affiliates; v_changed boolean; v_bound_at timestamptz;
+  v_payment bigint; v_created integer := 0; v_already integer := 0; v_taken integer := 0; v_missed integer := 0;
+begin
+  perform public._affiliate_require_admin(p_actor);
+  if p_input is null or jsonb_typeof(p_input) <> 'object' or v_reason is null or length(v_reason) > 2000
+     or coalesce(p_input->>'user_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     or coalesce(p_input->>'affiliate_user_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     or coalesce(p_input->>'backdate_days', '0') !~ '^[0-9]{1,2}$' then
+    raise exception 'INVALID_INPUT';
+  end if;
+  v_user := (p_input->>'user_id')::uuid;
+  v_owner := (p_input->>'affiliate_user_id')::uuid;
+  v_days := coalesce(p_input->>'backdate_days', '0')::integer;
+  if v_days > 90 or v_user = v_owner then raise exception 'INVALID_INPUT'; end if;
+  if v_days > 0 and not (select s.enabled from public.affiliate_settings s where s.singleton) then
+    raise exception 'AFFILIATE_PROGRAM_OFF';
+  end if;
+
+  -- Payment rows first, then the profile: the order billing writes take them.
+  if v_days > 0 then
+    perform 1 from public.payments p where p.user_id = v_user and p.created_at >= now() - make_interval(days => v_days)
+      order by p.id for update;
+  end if;
+  select * into v_profile from public.profiles where id = v_user for update;
+  if not found then raise exception 'USER_NOT_FOUND'; end if;
+  if v_profile.banned_at is not null then raise exception 'USER_BANNED'; end if;
+  select * into v_account from public.affiliates where user_id = v_owner;
+  if not found or v_account.status <> 'active' then raise exception 'AFFILIATE_NOT_ACTIVE'; end if;
+  if v_account.org_id is not null and exists(select from public.org_members m
+       where m.org_id = v_account.org_id and m.user_id = v_user and m.status = 'active') then
+    raise exception 'AFFILIATE_ORG_MEMBER';
+  end if;
+
+  v_changed := v_profile.referred_by is distinct from v_owner;
+  if v_changed then
+    update public.profiles set referred_by = v_owner, referred_source = 'admin', referred_at = now(),
+      referred_member = null, referred_via = null where id = v_user;
+    v_bound_at := now();
+  else
+    -- Already this partner's customer: keep how and when (the commission term runs from referred_at).
+    -- Back-dating only extends an admin binding; a customer this partner got through a link or an
+    -- invite code is not back-dated (its pre-binding payments were never this partner's sale).
+    if v_days > 0 and v_profile.referred_source is distinct from 'admin' then
+      raise exception 'AFFILIATE_BACKDATE_NOT_ADMIN';
+    end if;
+    v_bound_at := coalesce(v_profile.referred_at, now());
+  end if;
+
+  if v_days > 0 then
+    for v_payment in select p.id from public.payments p
+       where p.user_id = v_user and p.created_at >= now() - make_interval(days => v_days)
+         and p.created_at < v_bound_at and p.amount_total > 0 and p.currency = 'usd'
+       order by p.id loop
+      if exists(select from public.affiliate_commissions c where c.payment_id = v_payment and c.level = 1 and c.affiliate_user_id = v_owner) then
+        v_already := v_already + 1;
+      elsif exists(select from public.affiliate_commissions c where c.payment_id = v_payment) then
+        v_taken := v_taken + 1;
+      else
+        perform public.affiliate_recompute_payment(v_payment, true);
+        if exists(select from public.affiliate_commissions c where c.payment_id = v_payment and c.level = 1 and c.affiliate_user_id = v_owner) then
+          v_created := v_created + 1;
+        else
+          v_missed := v_missed + 1;
+        end if;
+      end if;
+    end loop;
+  end if;
+
+  perform public._affiliate_audit(p_actor, 'rebind', v_user::text,
+    concat(coalesce(v_profile.referred_by::text, '∅'), ' → ', v_owner::text,
+      case when v_changed then '' else ' (unchanged)' end,
+      case when v_days > 0 then concat(' backdate ', v_days, 'd: created ', v_created, ', already ', v_already,
+        ', other partner ', v_taken, ', failed ', v_missed) else '' end,
+      ' ', v_reason));
+  return jsonb_build_object('changed', v_changed, 'previous', v_profile.referred_by, 'bound_at', v_bound_at,
+    'backdate_days', v_days, 'created', v_created, 'already', v_already, 'other_partner', v_taken, 'failed', v_missed);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_affiliate_bind_customer"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_affiliate_commission_history"("p_actor" "uuid", "p_user" "uuid", "p_commission" bigint, "p_level" smallint, "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("id" bigint, "at" timestamp with time zone, "old_amount" bigint, "new_amount" bigint, "old_status" "text", "new_status" "text", "reason" "text")
@@ -8442,13 +8636,21 @@ begin
   end if;
   return query
     with page as materialized (
-      select r.id, r.code_id, r.user_id, r.inviter_user_id, r.context, r.status,
-        r.credits_granted, r.inviter_rewarded_at, r.inviter_reward_payment_id, r.discount_expires_at,
-        r.discount_used_payment_id, r.discount_void_at, r.created_at
-      from public.code_redemptions r
-      where (r.code_id = p_code_id or (p_code_id is null and r.status = 'blocked_same_ip'))
-        and (p_cursor is null or (r.created_at,r.id) < ((p_cursor->>'created_at')::timestamptz,(p_cursor->>'id')::uuid))
-      order by r.created_at desc, r.id desc limit 30
+      select * from (
+        select r.id, r.code_id, r.user_id, r.inviter_user_id, r.context, r.status,
+          r.credits_granted, r.inviter_rewarded_at, r.inviter_reward_payment_id, r.discount_expires_at,
+          r.discount_used_payment_id, r.discount_void_at, r.created_at
+        from public.code_redemptions r
+        where (r.code_id = p_code_id or (p_code_id is null and r.status = 'blocked_same_ip'))
+          and (p_cursor is null or (r.created_at,r.id) < ((p_cursor->>'created_at')::timestamptz,(p_cursor->>'id')::uuid))
+        union all
+        select b.id, b.code_id, b.user_id, b.inviter_user_id, b.context, b.status,
+          0, null::timestamptz, null::bigint, null::timestamptz, null::bigint, null::timestamptz, b.created_at
+        from public.code_redemption_blocks b
+        where (b.code_id = p_code_id or (p_code_id is null and b.status = 'blocked_same_ip'))
+          and (p_cursor is null or (b.created_at,b.id) < ((p_cursor->>'created_at')::timestamptz,(p_cursor->>'id')::uuid))
+      ) rows
+      order by created_at desc, id desc limit 30
     )
     select to_jsonb(r) || jsonb_build_object('code', c.code,
       'reward_payment_status', reward.status, 'reward_payment_refunded', reward.amount_refunded,
@@ -12900,7 +13102,9 @@ begin
                          'signup_gift_daily_cap','signup_gift_paused','signup_gift_per_ip',
                          'signup_gift_claim_phone','signup_gift_claim_google','poster_photo_credits',
                          'catalog_economics_policy','food_toggles_enabled','service_worker_enabled',
-                         'service_worker_shell_enabled','signup_gift_credits','signup_gift_per_ip_partner')
+                         'service_worker_shell_enabled','signup_gift_credits','signup_gift_per_ip_partner',
+                         'signup_request_ip_hourly','signup_request_ip_daily','signup_request_ip_hourly_partner',
+                         'signup_request_ip_daily_partner','sms_ip_daily','sms_ip_daily_partner')
            or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
@@ -12931,6 +13135,13 @@ begin
       if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[0-9]+$'
          or (p_value #>> '{}')::numeric > 1000 then
         raise exception 'INVALID_INPUT' using detail = 'signup_gift_per_ip_partner must be an integer from 0 to 1000';
+      end if;
+    -- 2027: per-IP limits on sign-up requests and SMS codes. 0 (no limit) is not offered.
+    when 'signup_request_ip_hourly', 'signup_request_ip_daily', 'signup_request_ip_hourly_partner',
+         'signup_request_ip_daily_partner', 'sms_ip_daily', 'sms_ip_daily_partner' then
+      if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[1-9][0-9]*$'
+         or (p_value #>> '{}')::numeric > 10000 then
+        raise exception 'INVALID_INPUT' using detail = p_key || ' must be an integer from 1 to 10000';
       end if;
     -- 2008: the signup gift's amount (ARCHITECTURE §7). 0 is not offered: the pause stops the gift.
     when 'signup_gift_credits' then
@@ -14125,6 +14336,14 @@ begin
   -- Serialize payout decisions and issuance; payment writes do not take this lock.
   perform pg_advisory_xact_lock(hashtextextended('affiliate_settlement',0));
   for v_payment in select payment_id from public.affiliate_recompute_errors where resolved_at is null order by payment_id loop
+    perform public.affiliate_recompute_payment(v_payment);
+  end loop;
+  -- 2028: pause holds whose level-1 account is no longer suspended (released or closed), bounded.
+  for v_payment in select c.payment_id from public.affiliate_commissions c
+      left join public.affiliate_commissions l1 on l1.payment_id=c.payment_id and l1.level=1
+      left join public.affiliates a on a.user_id=l1.affiliate_user_id
+     where c.paused_hold and a.status is distinct from 'suspended'
+     group by c.payment_id order by c.payment_id limit 500 loop
     perform public.affiliate_recompute_payment(v_payment);
   end loop;
   -- Mark the scheduled evaluation even when disabled or nobody qualifies.
@@ -16104,6 +16323,7 @@ declare
   v_per_ip integer;
   v_partner integer;
   v_change public.credit_change;
+  v_since timestamptz;
 begin
   if p_amount is null or p_amount <= 0 then
     raise exception 'INVALID_INPUT' using detail = 'amount must be positive';
@@ -16121,7 +16341,10 @@ begin
     -- Already paid: the ledger's idempotency key makes this a no-op; never refuse it now.
     if not exists (select 1 from public.credit_ledger where idempotency_key = p_idempotency_key) then
       -- A stored refusal stands; a pending account is paid only through claim_signup_gift.
-      if v_profile.signup_gift_refusal is not null then
+      -- 2026: except 'daily_cap', which is pending and decided again below (never for a banned
+      -- account).
+      if v_profile.signup_gift_refusal is not null
+         and (v_profile.signup_gift_refusal <> 'daily_cap' or v_profile.banned_at is not null) then
         return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
       end if;
 
@@ -16136,13 +16359,17 @@ begin
         v_per_ip := case when v_per_ip = 0 or v_partner = 0 then 0 else greatest(v_per_ip, v_partner) end;
       end if;
       if v_profile.signup_ip is not null and v_per_ip > 0 then
+        -- 2026: a pending 'daily_cap' account is counted over the 24 hours before now, as a new
+        -- sign-up paid now would be; a new sign-up keeps 1480's window (its created_at is now).
+        v_since := case when v_profile.signup_gift_refusal = 'daily_cap' then now() else v_profile.created_at end
+                   - interval '24 hours';
         perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
         if (select count(*)
               from public.profiles other
               join public.credit_ledger l on l.idempotency_key = 'signup:' || other.id::text
              where other.signup_ip = v_profile.signup_ip
                and other.id <> p_user_id
-               and l.created_at > v_profile.created_at - interval '24 hours') >= v_per_ip then
+               and l.created_at > v_since) >= v_per_ip then
           update public.profiles set signup_gift_refusal = 'same_ip_pending' where id = p_user_id;
           return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
         end if;
@@ -16152,7 +16379,9 @@ begin
       perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_gift_cap', 0));
       v_today := public.signup_gift_today();
       if (v_today->>'paused')::boolean then
-        update public.profiles set signup_gift_refusal = 'paused' where id = p_user_id;
+        -- 2026: a pending 'daily_cap' account waits out the pause; a new one is refused for good.
+        update public.profiles set signup_gift_refusal = 'paused'
+         where id = p_user_id and signup_gift_refusal is null;
         return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
       end if;
       if (v_today->>'granted')::integer >= (v_today->>'cap')::integer then
@@ -16162,6 +16391,10 @@ begin
 
       v_change := public._apply_credit_change(p_user_id, p_pool, 'grant', p_amount, p_reason, p_idempotency_key);
       if v_change.applied then
+        -- 2026: a caught-up account is no longer pending.
+        if v_profile.signup_gift_refusal = 'daily_cap' then
+          update public.profiles set signup_gift_refusal = null where id = p_user_id;
+        end if;
         insert into public.signup_gift_claims (key_hash, method, user_id)
         select k.key_hash, k.method, p_user_id from public.signup_gift_identity_keys(p_user_id) k
         on conflict (key_hash) do nothing;
@@ -18875,6 +19108,8 @@ declare
   profile record;
   inviter record;
   pending record;
+  prior_status text;
+  prior_at timestamptz;
   owner_id uuid;
   redemption_id uuid := gen_random_uuid();
   checked_at timestamptz;
@@ -18883,6 +19118,7 @@ declare
   credits int;
   outcome text := 'ok';
   replaced boolean := false;
+  org_code boolean := false;
 begin
   if p_context is null or p_context not in ('signup','account','paywall')
      or p_invite_window_days is null or p_invite_window_days <= 0 then
@@ -18897,7 +19133,8 @@ begin
   -- Lock participants in a consistent order before the code. A reciprocal pair of invites
   -- also touches both profiles via FKs and the existing balance helper's FOR UPDATE.
   perform 1 from public.profiles where id in (p_user, owner_id) order by id for no key update;
-  select banned_at, signup_ip, created_at into profile from public.profiles where id = p_user;
+  -- 2025: referred_by too (the org-code exemption).
+  select banned_at, signup_ip, created_at, referred_by into profile from public.profiles where id = p_user;
   if not found then raise exception 'PROFILE_NOT_FOUND'; end if;
   select id, kind, owner_user_id, invitee_credits, invitee_pool, active, starts_at, expires_at,
          max_redemptions, redemption_count, new_users_only, discount_percent, discount_products,
@@ -18911,26 +19148,52 @@ begin
   if profile.banned_at is not null then outcome := 'banned';
   elsif not offer.active or offer.starts_at > checked_at or offer.expires_at <= checked_at then outcome := 'expired';
   elsif offer.owner_user_id = p_user then outcome := 'own';
-  elsif exists (select 1 from public.code_redemptions where code_id = offer.id and user_id = p_user) then outcome := 'used';
+  -- 2025: only a successful redemption uses the code.
+  elsif exists (select 1 from public.code_redemptions where code_id = offer.id and user_id = p_user and status = 'ok') then outcome := 'used';
+  -- 2030: an invite code is only redeemable at sign-up (the first verified sign-in).
+  elsif offer.kind = 'invite' and p_context <> 'signup' then outcome := 'signup_only';
   elsif offer.redemption_count >= offer.max_redemptions then outcome := 'full';
   elsif (offer.new_users_only or offer.kind = 'invite')
     and profile.created_at + make_interval(days => p_invite_window_days) <= checked_at then outcome := 'new_users_only';
   elsif offer.kind = 'invite' then
     select signup_ip, banned_at into inviter from public.profiles where id = offer.owner_user_id;
+    -- 2025: a code that binds the customer to the org (the org_l1 branch of _org_attribute_invite).
+    org_code := exists (select from public.org_members m
+      join public.orgs o on o.id = m.org_id
+      join public.affiliates a on a.org_id = o.id
+      where m.user_id = offer.owner_user_id and m.status = 'active' and o.status = 'active' and o.affiliate_enabled
+        and a.status = 'active' and a.user_id <> p_user
+        and (profile.referred_by is null or profile.referred_by = a.user_id)
+        and not exists (select from public.org_members c
+          where c.org_id = o.id and c.user_id = p_user and c.status = 'active'));
     if inviter.banned_at is not null then outcome := 'expired';
-    elsif exists (select 1 from public.code_redemptions where user_id = p_user and kind = 'invite') then outcome := 'already_invited';
+    -- 2025: only a successful invite counts.
+    elsif exists (select 1 from public.code_redemptions where user_id = p_user and kind = 'invite' and status = 'ok') then outcome := 'already_invited';
     elsif exists (select 1 from public.payments where user_id = p_user) then outcome := 'new_users_only';
-    elsif inviter.signup_ip = profile.signup_ip then outcome := 'blocked_same_ip';
+    elsif inviter.signup_ip = profile.signup_ip and not org_code then outcome := 'blocked_same_ip';
     elsif not exists (select 1 from public.credit_ledger l
       where l.idempotency_key = 'signup:' || p_user and l.user_id = p_user and l.kind = 'grant' and l.pool = 'free') then
       outcome := 'blocked_no_signup_grant';
     end if;
   end if;
 
+  -- 2030: reported as new_users_only, so code from before this deploy shows its usual refusal; the
+  -- reason tells the current code to say that invite codes are for sign-up only. Nothing is written.
+  if outcome = 'signup_only' then
+    return jsonb_build_object('kind', offer.kind, 'status', 'new_users_only', 'reason', 'signup_only');
+  end if;
+
   if outcome <> 'ok' then
     if outcome in ('blocked_same_ip', 'blocked_no_signup_grant') then
-      insert into public.code_redemptions(code_id, kind, user_id, inviter_user_id, context, status)
-        values (offer.id, offer.kind, p_user, offer.owner_user_id, p_context, outcome);
+      -- 2025: the latest blocked attempt replaces an earlier one (one invite row per user).
+      -- The replaced row moves to code_redemption_blocks, so the evidence stays.
+      with gone as (
+        delete from public.code_redemptions where user_id = p_user and kind = 'invite' and status <> 'ok'
+        returning id, code_id, kind, user_id, inviter_user_id, context, status, created_at)
+      insert into public.code_redemption_blocks(id, code_id, kind, user_id, inviter_user_id, context, status, created_at, replaced_by)
+        select id, code_id, kind, user_id, inviter_user_id, context, status, created_at, redemption_id from gone;
+      insert into public.code_redemptions(id, code_id, kind, user_id, inviter_user_id, context, status)
+        values (redemption_id, offer.id, offer.kind, p_user, offer.owner_user_id, p_context, outcome);
     end if;
     return jsonb_build_object('kind', offer.kind, 'status', outcome);
   end if;
@@ -18958,13 +19221,26 @@ begin
     deadline := least(offer.expires_at, checked_at + make_interval(days => offer.discount_valid_days));
   end if;
 
+  -- 2025: a successful invite replaces the user's blocked attempt (any invite code), keeping why
+  -- and when it was blocked. A blocked row never granted credits.
+  if offer.kind = 'invite' then
+    with gone as (
+      delete from public.code_redemptions where user_id = p_user and kind = 'invite' and status <> 'ok'
+      returning id, code_id, kind, user_id, inviter_user_id, context, status, created_at)
+    insert into public.code_redemption_blocks(id, code_id, kind, user_id, inviter_user_id, context, status, created_at, replaced_by)
+      select id, code_id, kind, user_id, inviter_user_id, context, status, created_at, redemption_id from gone
+      returning status, created_at into prior_status, prior_at;
+  end if;
+
   credits := case when offer.kind = 'invite' then
     (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
     else coalesce(offer.invitee_credits, 0) end;
   grant_pool := case when offer.kind = 'invite' then 'free' else offer.invitee_pool end;
   insert into public.code_redemptions
-    (id, code_id, kind, user_id, inviter_user_id, context, status, credits_granted, discount_expires_at)
-    values (redemption_id, offer.id, offer.kind, p_user, offer.owner_user_id, p_context, 'ok', credits, deadline);
+    (id, code_id, kind, user_id, inviter_user_id, context, status, credits_granted, discount_expires_at,
+     blocked_status, blocked_at)
+    values (redemption_id, offer.id, offer.kind, p_user, offer.owner_user_id, p_context, 'ok', credits, deadline,
+     prior_status, prior_at);
   update public.codes set redemption_count = redemption_count + 1 where id = offer.id;
   if credits > 0 then
     perform public._apply_credit_change(p_user, grant_pool, 'code_grant', credits, 'Code redemption', 'code:' || redemption_id);
@@ -19685,6 +19961,49 @@ $$;
 ALTER FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+begin
+  if p_user is null then return false; end if;
+  delete from public.signup_code_refs where user_id = p_user;
+  if p_code is null or p_code collate "C" !~ '^[A-Z0-9]{4,20}$' then return false; end if;
+  perform 1 from auth.users u
+   where u.id = p_user and u.email_confirmed_at is null and u.phone_confirmed_at is null
+     and u.last_sign_in_at is null and u.created_at >= now() - interval '10 minutes';
+  if not found then return false; end if;
+  insert into public.signup_code_refs (user_id, code) values (p_user, p_code);
+  return true;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_code_take"("p_user" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_code text; v_at timestamptz;
+begin
+  delete from public.signup_code_refs where user_id = p_user returning code, created_at into v_code, v_at;
+  if v_code is null or v_at < now() - interval '1 day' then return null; end if;
+  perform 1 from auth.users u
+   where u.id = p_user and u.confirmation_sent_at <= v_at
+     and (u.recovery_sent_at is null or u.recovery_sent_at < v_at)
+     and (u.email_change_sent_at is null or u.email_change_sent_at < v_at)
+     and not exists (select 1 from auth.identities i where i.user_id = p_user and i.provider <> 'email');
+  if not found then return null; end if;
+  return v_code;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."signup_code_take"("p_user" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) RETURNS integer
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -19701,6 +20020,67 @@ $$;
 
 
 ALTER FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_gift_catch_up_one"("p_user_id" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_refusal text;
+  v_banned timestamptz;
+  v_today jsonb;
+begin
+  if p_user_id is null then
+    raise exception 'INVALID_INPUT' using detail = 'user is required';
+  end if;
+  select signup_gift_refusal, banned_at into v_refusal, v_banned from public.profiles where id = p_user_id;
+  if not found or v_refusal is distinct from 'daily_cap' or v_banned is not null
+     or exists (select 1 from public.credit_ledger where idempotency_key = 'signup:' || p_user_id::text) then
+    return 'skipped';
+  end if;
+  if (public.grant_credits(p_user_id, 1, 'signup', 'signup:' || p_user_id::text, 'free')).applied then
+    return 'paid';
+  end if;
+  select signup_gift_refusal into v_refusal from public.profiles where id = p_user_id;
+  if v_refusal = 'same_ip_pending' then
+    return 'same_ip_pending';
+  end if;
+  v_today := public.signup_gift_today();
+  if (v_today->>'paused')::boolean then
+    return 'paused';
+  end if;
+  if (v_today->>'granted')::integer >= (v_today->>'cap')::integer then
+    return 'daily_cap';
+  end if;
+  return 'skipped';
+end;
+$$;
+
+
+ALTER FUNCTION "public"."signup_gift_catch_up_one"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_gift_catch_up_queue"("p_limit" integer) RETURNS "uuid"[]
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_limit is null or p_limit < 1 or p_limit > 500 then
+    raise exception 'INVALID_INPUT' using detail = 'limit must be from 1 to 500';
+  end if;
+  return array(
+    select p.id from public.profiles p
+     where p.signup_gift_refusal = 'daily_cap' and p.banned_at is null
+       and public.signup_gift_amount(p.created_at) > 0
+       and not exists (select 1 from public.credit_ledger l where l.idempotency_key = 'signup:' || p.id::text)
+     order by p.created_at, p.id
+     limit p_limit);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."signup_gift_catch_up_queue"("p_limit" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."signup_gift_day_start"() RETURNS timestamp with time zone
@@ -19778,22 +20158,62 @@ $$;
 ALTER FUNCTION "public"."signup_gift_today"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."signup_ip_limits"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object(
+    'signup_hourly', greatest(1, public.signup_gift_setting_int('signup_request_ip_hourly', 5)),
+    'signup_daily', greatest(1, public.signup_gift_setting_int('signup_request_ip_daily', 20)),
+    'signup_hourly_partner', greatest(1, public.signup_gift_setting_int('signup_request_ip_hourly_partner', 20)),
+    'signup_daily_partner', greatest(1, public.signup_gift_setting_int('signup_request_ip_daily_partner', 100)),
+    'sms_daily', greatest(1, public.signup_gift_setting_int('sms_ip_daily', 50)),
+    'sms_daily_partner', greatest(1, public.signup_gift_setting_int('sms_ip_daily_partner', 200))
+  )
+$$;
+
+
+ALTER FUNCTION "public"."signup_ip_limits"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") RETURNS "text"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  select public.signup_request(p_email_key, p_ip, null::text)
+$$;
+
+
+ALTER FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text") RETURNS "text"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $_$
+declare
+  v_limits jsonb;
+  v_hourly integer;
+  v_daily integer;
 begin
   if p_email_key is null or p_email_key !~ '^[0-9a-f]{64}$' then
     raise exception 'INVALID_INPUT' using detail = 'email_key must be a sha256 hex digest';
   end if;
   if p_ip is not null then
     perform pg_advisory_xact_lock(hashtextextended('signup:ip:' || host(p_ip), 0));
+    v_limits := public.signup_ip_limits();
+    v_hourly := (v_limits->>'signup_hourly')::integer;
+    v_daily := (v_limits->>'signup_daily')::integer;
+    if public._signup_org_ref(p_ref_slug) then
+      v_hourly := greatest(v_hourly, (v_limits->>'signup_hourly_partner')::integer);
+      v_daily := greatest(v_daily, (v_limits->>'signup_daily_partner')::integer);
+    end if;
     if (select count(*) from public.signup_requests r
-         where r.ip = p_ip and r.requested_at > now() - interval '1 hour') >= 5 then
+         where r.ip = p_ip and r.requested_at > now() - interval '1 hour') >= v_hourly then
       return 'ip_hourly';
     end if;
     if (select count(*) from public.signup_requests r
-         where r.ip = p_ip and r.requested_at > now() - interval '24 hours') >= 20 then
+         where r.ip = p_ip and r.requested_at > now() - interval '24 hours') >= v_daily then
       return 'ip_daily';
     end if;
   end if;
@@ -19809,7 +20229,7 @@ end;
 $_$;
 
 
-ALTER FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") OWNER TO "postgres";
+ALTER FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") RETURNS "text"
@@ -19819,6 +20239,8 @@ CREATE OR REPLACE FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") R
 declare
   v_since timestamptz := now() - interval '24 hours';
   v_request public.sms_sends;
+  v_limits jsonb;
+  v_ip_daily integer;
 begin
   if p_phone_key is null or p_phone_key !~ '^[0-9a-f]{64}$' then
     raise exception 'INVALID_INPUT' using detail = 'phone_key must be a sha256 hex digest';
@@ -19843,9 +20265,16 @@ begin
        where s.phone_key = p_phone_key and s.sent_at > v_since) >= 5 then
     return 'phone_daily';
   end if;
-  if v_request.ip is not null and (select count(*) from public.sms_sends s
-                                    where s.ip = v_request.ip and s.sent_at > v_since) >= 20 then
-    return 'ip_daily';
+  if v_request.ip is not null then
+    v_limits := public.signup_ip_limits();
+    v_ip_daily := (v_limits->>'sms_daily')::integer;
+    if v_request.org_ref then
+      v_ip_daily := greatest(v_ip_daily, (v_limits->>'sms_daily_partner')::integer);
+    end if;
+    if (select count(*) from public.sms_sends s
+         where s.ip = v_request.ip and s.sent_at > v_since) >= v_ip_daily then
+      return 'ip_daily';
+    end if;
   end if;
 
   update public.sms_sends set sent_at = now() where id = v_request.id;
@@ -19874,11 +20303,25 @@ ALTER FUNCTION "public"."sms_release_send"("p_phone_key" "text") OWNER TO "postg
 
 
 CREATE OR REPLACE FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") RETURNS "text"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  select public.sms_request_send(p_phone_key, p_ip, null::text)
+$$;
+
+
+ALTER FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") RETURNS "text"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $_$
 declare
   v_since timestamptz := now() - interval '24 hours';
+  v_limits jsonb;
+  v_org boolean := false;
+  v_ip_daily integer;
 begin
   if p_phone_key is null or p_phone_key !~ '^[0-9a-f]{64}$' then
     raise exception 'INVALID_INPUT' using detail = 'phone_key must be a sha256 hex digest';
@@ -19896,12 +20339,20 @@ begin
        where s.phone_key = p_phone_key and s.requested_at > v_since) >= 5 then
     return 'phone_daily';
   end if;
-  if p_ip is not null and (select count(*) from public.sms_sends s
-                            where s.ip = p_ip and s.requested_at > v_since) >= 20 then
-    return 'ip_daily';
+  if p_ip is not null then
+    v_limits := public.signup_ip_limits();
+    v_ip_daily := (v_limits->>'sms_daily')::integer;
+    v_org := public._signup_org_ref(p_ref_slug);
+    if v_org then
+      v_ip_daily := greatest(v_ip_daily, (v_limits->>'sms_daily_partner')::integer);
+    end if;
+    if (select count(*) from public.sms_sends s
+         where s.ip = p_ip and s.requested_at > v_since) >= v_ip_daily then
+      return 'ip_daily';
+    end if;
   end if;
 
-  insert into public.sms_sends (phone_key, ip) values (p_phone_key, p_ip);
+  insert into public.sms_sends (phone_key, ip, org_ref) values (p_phone_key, p_ip, v_org);
   -- The rows have done their job after a day; keep two, then let them go.
   delete from public.sms_sends s
    where s.id in (select o.id from public.sms_sends o
@@ -19913,7 +20364,7 @@ end;
 $_$;
 
 
-ALTER FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") OWNER TO "postgres";
+ALTER FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."snapshot_test_spend_provider"() RETURNS "trigger"
@@ -21293,6 +21744,7 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_commissions" (
     "payout_retained" "int8multirange",
     "fee_cents" bigint,
     "net_base_usd" bigint,
+    "paused_hold" boolean DEFAULT false NOT NULL,
     CONSTRAINT "affiliate_commissions_amount_check" CHECK (("amount" >= 0)),
     CONSTRAINT "affiliate_commissions_base_usd_check" CHECK (("base_usd" >= 0)),
     CONSTRAINT "affiliate_commissions_fee_cents_check" CHECK (("fee_cents" >= 0)),
@@ -21311,6 +21763,10 @@ COMMENT ON COLUMN "public"."affiliate_commissions"."fee_cents" IS 'Payment fees 
 
 
 COMMENT ON COLUMN "public"."affiliate_commissions"."net_base_usd" IS 'Commission base after tax, refunds and fees: max(0, unrefunded pre-tax paid − fee_cents). NULL = old formula.';
+
+
+
+COMMENT ON COLUMN "public"."affiliate_commissions"."paused_hold" IS 'on_hold because the level-1 org account was paused (suspended) at payment time; released when it is active again, voided affiliate_inactive when it is closed (2028).';
 
 
 
@@ -22224,6 +22680,25 @@ CREATE TABLE IF NOT EXISTS "public"."business_inquiries" (
 ALTER TABLE "public"."business_inquiries" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."code_redemption_blocks" (
+    "id" "uuid" NOT NULL,
+    "code_id" "uuid",
+    "kind" "text" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "inviter_user_id" "uuid",
+    "context" "text" NOT NULL,
+    "status" "text" NOT NULL,
+    "created_at" timestamp with time zone NOT NULL,
+    "replaced_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "replaced_by" "uuid" NOT NULL,
+    CONSTRAINT "code_redemption_blocks_kind_check" CHECK (("kind" = 'invite'::"text")),
+    CONSTRAINT "code_redemption_blocks_status_check" CHECK (("status" = ANY (ARRAY['blocked_same_ip'::"text", 'blocked_no_signup_grant'::"text"])))
+);
+
+
+ALTER TABLE "public"."code_redemption_blocks" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."code_redemptions" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "code_id" "uuid",
@@ -22242,6 +22717,9 @@ CREATE TABLE IF NOT EXISTS "public"."code_redemptions" (
     "checkout_token" "uuid",
     "checkout_expires_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "blocked_status" "text",
+    "blocked_at" timestamp with time zone,
+    CONSTRAINT "code_redemptions_blocked_status_check" CHECK (("blocked_status" = ANY (ARRAY['blocked_same_ip'::"text", 'blocked_no_signup_grant'::"text"]))),
     CONSTRAINT "code_redemptions_check" CHECK ((("checkout_token" IS NULL) = ("checkout_expires_at" IS NULL))),
     CONSTRAINT "code_redemptions_context_check" CHECK (("context" = ANY (ARRAY['signup'::"text", 'account'::"text", 'paywall'::"text"]))),
     CONSTRAINT "code_redemptions_credits_granted_check" CHECK (("credits_granted" >= 0)),
@@ -22251,6 +22729,10 @@ CREATE TABLE IF NOT EXISTS "public"."code_redemptions" (
 
 
 ALTER TABLE "public"."code_redemptions" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."code_redemptions"."blocked_status" IS 'For an ok invite row: the status of the blocked attempt it replaced (2025), else null.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."credit_ledger" (
@@ -23286,6 +23768,17 @@ CREATE TABLE IF NOT EXISTS "public"."reference_template_sources" (
 ALTER TABLE "public"."reference_template_sources" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."signup_code_refs" (
+    "user_id" "uuid" NOT NULL,
+    "code" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "signup_code_refs_code_check" CHECK (("code" ~ '^[A-Z0-9]{4,20}$'::"text"))
+);
+
+
+ALTER TABLE "public"."signup_code_refs" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."signup_gift_claims" (
     "key_hash" "text" NOT NULL,
     "method" "text" NOT NULL,
@@ -23297,6 +23790,16 @@ CREATE TABLE IF NOT EXISTS "public"."signup_gift_claims" (
 
 
 ALTER TABLE "public"."signup_gift_claims" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."signup_invite_retry_errors" (
+    "user_id" "uuid" NOT NULL,
+    "error" "text" NOT NULL,
+    "at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."signup_invite_retry_errors" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."signup_requests" (
@@ -23358,6 +23861,7 @@ CREATE TABLE IF NOT EXISTS "public"."sms_sends" (
     "ip" "inet",
     "requested_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "sent_at" timestamp with time zone,
+    "org_ref" boolean DEFAULT false NOT NULL,
     CONSTRAINT "sms_sends_phone_key_check" CHECK (("phone_key" ~ '^[0-9a-f]{64}$'::"text"))
 );
 
@@ -24019,6 +24523,11 @@ ALTER TABLE ONLY "public"."business_inquiries"
 
 
 
+ALTER TABLE ONLY "public"."code_redemption_blocks"
+    ADD CONSTRAINT "code_redemption_blocks_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."code_redemptions"
     ADD CONSTRAINT "code_redemptions_code_id_user_id_key" UNIQUE ("code_id", "user_id");
 
@@ -24474,8 +24983,18 @@ ALTER TABLE ONLY "public"."reference_template_sources"
 
 
 
+ALTER TABLE ONLY "public"."signup_code_refs"
+    ADD CONSTRAINT "signup_code_refs_pkey" PRIMARY KEY ("user_id");
+
+
+
 ALTER TABLE ONLY "public"."signup_gift_claims"
     ADD CONSTRAINT "signup_gift_claims_pkey" PRIMARY KEY ("key_hash");
+
+
+
+ALTER TABLE ONLY "public"."signup_invite_retry_errors"
+    ADD CONSTRAINT "signup_invite_retry_errors_pkey" PRIMARY KEY ("user_id");
 
 
 
@@ -24777,6 +25296,10 @@ CREATE INDEX "affiliate_commissions_owner_idx" ON "public"."affiliate_commission
 
 
 
+CREATE INDEX "affiliate_commissions_paused_idx" ON "public"."affiliate_commissions" USING "btree" ("payment_id") WHERE "paused_hold";
+
+
+
 CREATE INDEX "affiliate_commissions_status_idx" ON "public"."affiliate_commissions" USING "btree" ("status", "confirm_after");
 
 
@@ -24878,6 +25401,22 @@ CREATE INDEX "business_inquiries_status_created_at_idx" ON "public"."business_in
 
 
 CREATE INDEX "business_inquiries_user_id_idx" ON "public"."business_inquiries" USING "btree" ("user_id") WHERE ("user_id" IS NOT NULL);
+
+
+
+CREATE INDEX "code_redemption_blocks_code_created_idx" ON "public"."code_redemption_blocks" USING "btree" ("code_id", "created_at" DESC, "id" DESC);
+
+
+
+CREATE INDEX "code_redemption_blocks_inviter_idx" ON "public"."code_redemption_blocks" USING "btree" ("inviter_user_id") WHERE ("inviter_user_id" IS NOT NULL);
+
+
+
+CREATE INDEX "code_redemption_blocks_same_ip_idx" ON "public"."code_redemption_blocks" USING "btree" ("created_at" DESC, "id" DESC) WHERE ("status" = 'blocked_same_ip'::"text");
+
+
+
+CREATE INDEX "code_redemption_blocks_user_idx" ON "public"."code_redemption_blocks" USING "btree" ("user_id");
 
 
 
@@ -25257,6 +25796,10 @@ CREATE INDEX "profiles_referred_via_idx" ON "public"."profiles" USING "btree" ("
 
 
 
+CREATE INDEX "profiles_signup_gift_daily_cap_idx" ON "public"."profiles" USING "btree" ("created_at", "id") WHERE ("signup_gift_refusal" = 'daily_cap'::"text");
+
+
+
 CREATE INDEX "profiles_signup_ip_created_at_idx" ON "public"."profiles" USING "btree" ("signup_ip", "created_at");
 
 
@@ -25549,6 +26092,10 @@ CREATE OR REPLACE TRIGGER "affiliate_dispute_update" AFTER UPDATE OF "closed_at"
 
 
 
+CREATE OR REPLACE TRIGGER "affiliate_paused_settle" AFTER UPDATE OF "status" ON "public"."affiliates" FOR EACH ROW WHEN ((("old"."status" = 'suspended'::"text") AND ("new"."status" IS DISTINCT FROM 'suspended'::"text"))) EXECUTE FUNCTION "public"."_affiliate_paused_settle"();
+
+
+
 CREATE OR REPLACE TRIGGER "affiliate_payment_fee_update" AFTER UPDATE OF "fee_cents", "fee_status" ON "public"."payments" FOR EACH ROW WHEN ((("old"."fee_cents" IS DISTINCT FROM "new"."fee_cents") OR ("old"."fee_status" IS DISTINCT FROM "new"."fee_status"))) EXECUTE FUNCTION "public"."_affiliate_payment_event"();
 
 
@@ -25726,6 +26273,10 @@ CREATE OR REPLACE TRIGGER "series_category" BEFORE INSERT OR UPDATE OF "category
 
 
 CREATE OR REPLACE TRIGGER "series_deleted_guard" BEFORE UPDATE OF "deleted_at", "is_active" ON "public"."template_series" FOR EACH ROW EXECUTE FUNCTION "admin"."guard_deleted_series"();
+
+
+
+CREATE OR REPLACE TRIGGER "signup_gift_invite_retry" AFTER INSERT ON "public"."credit_ledger" FOR EACH ROW WHEN ((("new"."kind" = 'grant'::"text") AND ("new"."pool" = 'free'::"text") AND ("new"."idempotency_key" = ('signup:'::"text" || ("new"."user_id")::"text")))) EXECUTE FUNCTION "public"."_signup_gift_invite_retry"();
 
 
 
@@ -26132,6 +26683,21 @@ ALTER TABLE ONLY "public"."bundle_featured_locale"
 
 ALTER TABLE ONLY "public"."business_inquiries"
     ADD CONSTRAINT "business_inquiries_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."code_redemption_blocks"
+    ADD CONSTRAINT "code_redemption_blocks_code_id_fkey" FOREIGN KEY ("code_id") REFERENCES "public"."codes"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."code_redemption_blocks"
+    ADD CONSTRAINT "code_redemption_blocks_inviter_user_id_fkey" FOREIGN KEY ("inviter_user_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."code_redemption_blocks"
+    ADD CONSTRAINT "code_redemption_blocks_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -26765,8 +27331,18 @@ ALTER TABLE ONLY "public"."reference_template_sources"
 
 
 
+ALTER TABLE ONLY "public"."signup_code_refs"
+    ADD CONSTRAINT "signup_code_refs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."signup_gift_claims"
     ADD CONSTRAINT "signup_gift_claims_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."signup_invite_retry_errors"
+    ADD CONSTRAINT "signup_invite_retry_errors_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -27113,6 +27689,9 @@ CREATE POLICY "category_public_read" ON "public"."template_categories" AS RESTRI
 
 
 
+ALTER TABLE "public"."code_redemption_blocks" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."code_redemptions" ENABLE ROW LEVEL SECURITY;
 
 
@@ -27339,7 +27918,13 @@ CREATE POLICY "series_read" ON "public"."template_series" FOR SELECT TO "authent
 
 
 
+ALTER TABLE "public"."signup_code_refs" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."signup_gift_claims" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."signup_invite_retry_errors" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."signup_requests" ENABLE ROW LEVEL SECURITY;
@@ -28218,6 +28803,10 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_overrides"("p_user" "uuid", "p_value
 
 
 
+REVOKE ALL ON FUNCTION "public"."_affiliate_paused_settle"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_affiliate_payment_event"() FROM PUBLIC;
 
 
@@ -28529,6 +29118,15 @@ REVOKE ALL ON FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."p
 
 
 
+REVOKE ALL ON FUNCTION "public"."_signup_gift_invite_retry"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_signup_org_ref"("p_slug" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."_signup_org_ref"("p_slug" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) TO "service_role";
 
@@ -28594,6 +29192,11 @@ GRANT ALL ON FUNCTION "public"."admin_affiliate_allow_reapply"("p_actor" "uuid",
 
 REVOKE ALL ON FUNCTION "public"."admin_affiliate_annotate"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_affiliate_annotate"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_affiliate_bind_customer"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_affiliate_bind_customer"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
 
 
@@ -30481,8 +31084,28 @@ GRANT ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_code_take"("p_user" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_code_take"("p_user" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_catch_up_one"("p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_catch_up_one"("p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_catch_up_queue"("p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_catch_up_queue"("p_limit" integer) TO "service_role";
 
 
 
@@ -30511,8 +31134,18 @@ GRANT ALL ON FUNCTION "public"."signup_gift_today"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."signup_ip_limits"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_ip_limits"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text") TO "service_role";
 
 
 
@@ -30528,6 +31161,11 @@ GRANT ALL ON FUNCTION "public"."sms_release_send"("p_phone_key" "text") TO "serv
 
 REVOKE ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") TO "service_role";
 
 
 
@@ -30861,6 +31499,10 @@ GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public
 
 
 
+GRANT SELECT ON TABLE "public"."code_redemption_blocks" TO "service_role";
+
+
+
 GRANT SELECT ON TABLE "public"."code_redemptions" TO "service_role";
 
 
@@ -31142,6 +31784,10 @@ GRANT ALL ON TABLE "public"."reference_template_sources" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."signup_gift_claims" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."signup_invite_retry_errors" TO "service_role";
 
 
 

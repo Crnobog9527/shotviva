@@ -2,12 +2,14 @@ import 'server-only'
 
 import { cookies, headers } from 'next/headers'
 
-import { storeSignupReferral } from '../../affiliate/referral'
+import { referralSlug, storeSignupReferral } from '../../affiliate/referral'
+import { CODE_COOKIE, normalizeCode } from '../../codes'
 import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { currentOrigin } from '../../request-origin'
 import { nextIn } from '../redirect-target'
 import { clientIp } from '../signup-ip'
+import { storeSignupCode } from '../signup-code'
 import { requestSignup } from '../signup-request'
 import { staffSignupData } from '../staff-signup'
 import { createAdminSupabase } from '../supabase-admin'
@@ -32,6 +34,16 @@ async function rememberReferral(userId: string | undefined, staff: Record<string
   await storeSignupReferral(userId, cookie)
 }
 
+// The code typed in the form, or else the one a ?code= link left in this browser, onto the new
+// account (2030): an invite code is for sign-up only, so it must survive a confirmation opened on
+// another device. An emptied field clears it (as saveSignupCode does); a staff link's sign-up
+// takes no code, so it only clears.
+async function rememberCode(userId: string | undefined, staff: Record<string, string>, form: FormData) {
+  const code = Object.keys(staff).length ? null
+    : form.has('signupCode') ? normalizeCode(form.get('signupCode')) : normalizeCode((await cookies()).get(CODE_COOKIE)?.value)
+  await storeSignupCode(createAdminSupabase(), userId, code)
+}
+
 // The verification link lands on `next` (the home draft, the Graylum connect page) when it is a
 // same-site path that passes sanitizeNext, else the account page of the form's language.
 export async function signUpWithPassword(form: FormData): Promise<FormState> {
@@ -39,8 +51,10 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   if (!parsed.success) return failed('INVALID_INPUT')
   const { email, password, captchaToken, next } = parsed.data
 
-  // Our per-IP limit first; it also leaves the row the Before User Created hook needs (1350).
-  if ((await requestSignup(createAdminSupabase(), email, clientIp(await headers()))) !== 'ok') return failed('AUTH_SIGNUP_LIMITED')
+  // Our per-IP limit first; it also leaves the row the Before User Created hook needs (1350). The
+  // sv_ref slug only lets the database apply the looser org-link limit when it is one (2027).
+  const ref = referralSlug((await cookies()).get('sv_ref')?.value)
+  if ((await requestSignup(createAdminSupabase(), email, clientIp(await headers()), ref)) !== 'ok') return failed('AUTH_SIGNUP_LIMITED')
 
   const supabase = await createSessionSupabase()
   const locale = await currentLocale()
@@ -61,7 +75,9 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
     if (code === 'INTERNAL') logger.warn('sign-up failed', { code: error.code })
     return failed(code)
   }
-  await rememberReferral(created?.user?.id, staff)
+  const userId = created?.user?.id
+  await rememberReferral(userId, staff)
+  await rememberCode(userId, staff, form)
   return { status: 'sent' }
 }
 

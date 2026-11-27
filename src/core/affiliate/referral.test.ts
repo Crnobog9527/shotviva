@@ -20,15 +20,24 @@ async function visit(query: string, cookie = '') {
   return response.cookies.get('sv_ref')
 }
 
-it('sets a secure, host-only 60-day cookie and counts exactly the first touch after responding', async () => {
+it('sets a secure, host-only 15-day cookie and counts exactly the first touch after responding', async () => {
   const cookie = await visit('?ref=qa-anna')
-  expect(cookie).toMatchObject({ value: expect.stringMatching(/^qa-anna\.\d+$/), secure: true, httpOnly: true, maxAge: 5184000, sameSite: 'lax', path: '/' })
+  expect(cookie).toMatchObject({ value: expect.stringMatching(/^qa-anna\.\d+$/), secure: true, httpOnly: true, maxAge: 1296000, sameSite: 'lax', path: '/' })
   expect(cookie?.domain).toBeUndefined()
   expect(await visit('?ref=second', 'sv_ref=' + cookie?.value)).toBeUndefined()
   expect(mocks.after).toHaveBeenCalledTimes(1)
   expect(mocks.rpc).not.toHaveBeenCalled()
   await mocks.after.mock.calls[0][0]()
   expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('affiliate_count_click', { p_slug: 'qa-anna' })
+})
+
+it('lets a new link replace a cookie past the 15-day window or a malformed one, but not a current one', async () => {
+  const time = Math.floor(Date.now() / 1000)
+  // Set under the old 60-day lifetime: the browser still sends it, but it binds nothing now.
+  for (const stale of ['anna.' + (time - 1296000), 'anna.' + (time - 40 * 86400), 'bad']) {
+    expect((await visit('?ref=qa-ben', 'sv_ref=' + stale))?.value).toMatch(/^qa-ben\.\d+$/)
+  }
+  expect(await visit('?ref=qa-ben', 'sv_ref=anna.' + (time - 1295000))).toBeUndefined()
 })
 
 it('ignores absent, malformed and disabled referrals', async () => {
@@ -41,7 +50,7 @@ it('ignores absent, malformed and disabled referrals', async () => {
 
 it('binds only a current cookie and isolates a failed RPC from auth and checkout', async () => {
   const time = Math.floor(Date.now() / 1000)
-  for (const cookie of [undefined, 'bad', 'ABC.' + time, 'anna.' + (time - 5184000), 'anna.' + (time + 60)]) {
+  for (const cookie of [undefined, 'bad', 'ABC.' + time, 'anna.' + (time - 1296000), 'anna.' + (time + 60)]) {
     await bindReferral('buyer', cookie, 'signup')
   }
   expect(mocks.rpc).not.toHaveBeenCalled()
@@ -55,7 +64,7 @@ it('stores the current cookie\'s slug, clears the row without one, and never fai
   const time = Math.floor(Date.now() / 1000)
   await storeSignupReferral(undefined, 'anna.' + time)
   expect(mocks.rpc).not.toHaveBeenCalled()
-  for (const cookie of [undefined, 'bad', 'anna.' + (time - 5184000)]) await storeSignupReferral('u1', cookie)
+  for (const cookie of [undefined, 'bad', 'anna.' + (time - 1296000)]) await storeSignupReferral('u1', cookie)
   expect(mocks.rpc.mock.calls).toEqual(Array(3).fill(['affiliate_signup_ref_store', { p_user: 'u1', p_slug: null }]))
   mocks.rpc.mockClear()
   await storeSignupReferral('u1', 'anna.' + time)
@@ -74,14 +83,14 @@ describe('bindSignupReferral', () => {
 
   it('binds this browser\'s current cookie over the stored partner, however old the cookie says it is', async () => {
     stored('bob')
-    await bindSignupReferral('u1', true, 'anna.' + (time() - 5183000), true)
+    await bindSignupReferral('u1', true, 'anna.' + (time() - 1295000), true)
     expect(mocks.rpc).toHaveBeenCalledWith('affiliate_signup_ref_take', { p_user: 'u1' })
     expect(binds()).toEqual([['affiliate_bind', { p_user: 'u1', p_slug: 'anna', p_source: 'signup' }]])
   })
 
   it('falls back to the stored partner when the cookie is missing, malformed or expired', async () => {
     stored('bob')
-    for (const cookie of [undefined, 'bad', 'anna.' + (time() - 5184000)]) await bindSignupReferral('u1', true, cookie, true)
+    for (const cookie of [undefined, 'bad', 'anna.' + (time() - 1296000)]) await bindSignupReferral('u1', true, cookie, true)
     expect(binds()).toEqual(Array(3).fill(['affiliate_bind', { p_user: 'u1', p_slug: 'bob', p_source: 'signup' }]))
   })
 

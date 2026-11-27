@@ -22,7 +22,9 @@ function cells({ orders, locale, t }: Props, row: Commission) {
     <strong key="a" className="af-num">{money(locale, row.amount)}</strong>,
     <span key="s" className="af-state">
       <StatusPill status={row.status} t={t} />
-      <small className="af-hint">{t('orderFees.confirmsOn', { date: date(locale, row.confirm_after) })}</small>
+      <small className="af-hint">
+        {row.paused_hold ? t('orderFees.pausedHold') : t('orderFees.confirmsOn', { date: date(locale, row.confirm_after) })}
+      </small>
     </span>,
   ]
 }

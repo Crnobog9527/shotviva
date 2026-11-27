@@ -1,11 +1,12 @@
 import 'server-only'
 import type { SignupBenefits } from '../signup-code'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
 import type { ErrorCode } from '../../errors'
 import { currentLocale } from '../../i18n/server'
+import { referralSlug } from '../../affiliate/referral'
 import { logger } from '../../logger'
 import { onVerifiedSignIn } from '../first-sign-in'
 import { staffOriginFor, staffSignupData } from '../staff-signup'
@@ -39,7 +40,8 @@ export async function sendPhoneCode(form: FormData): Promise<FormState> {
 
   const admin = createAdminSupabase()
   const key = phoneKey(phone)
-  const status = await requestSmsSend(admin, key, clientIp(await headers()))
+  // The sv_ref slug only lets the database apply the looser org-link IP limit when it is one (2027).
+  const status = await requestSmsSend(admin, key, clientIp(await headers()), referralSlug((await cookies()).get('sv_ref')?.value))
   if (status !== 'ok') return failed(limitError(status))
 
   const locale = await currentLocale()

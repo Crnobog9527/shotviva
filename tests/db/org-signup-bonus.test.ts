@@ -47,13 +47,13 @@ async function orgTeam(bonus: number) {
 }
 
 // A new account that redeems `inviter`'s personal invite code at signup (or later from the
-// account page, within the invite window, when `context` is 'account').
+// account page when `context` is 'account', which 2030 refuses).
 async function invitedBy(inviter: string, opts: { context?: 'signup' | 'account'; customer?: string } = {}) {
   const customer = opts.customer ?? await createUser(db)
   if (!opts.customer) await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [customer, 'signup:' + customer])
   const { code } = await row(db, 'select get_or_create_invite_code($1) as code', [inviter])
   const result = (await row(db, 'select redeem_code($1,$2,$3,null,$4) as r', [customer, code, opts.context ?? 'signup', invite.windowDays])).r
-  return { customer, result: result as { status: string; credits_granted: number } }
+  return { customer, result: result as { status: string; credits_granted: number; reason?: string } }
 }
 
 const bonusLedger = (user: string) =>
@@ -111,19 +111,14 @@ it('gives nothing while the org is suspended, its affiliate switch is off or its
   expect(await bonusLedger((await invitedBy(staff)).customer)).toHaveLength(1)
 })
 
-it('covers a late redemption within the 7-day window and nothing after it, or after a payment', async () => {
+it('gives no late redemption at all: an invite code after sign-up is refused even inside 7 days (2030)', async () => {
   const { staff } = await orgTeam(300)
   const late = await createUser(db)
   await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [late, 'signup:' + late])
   await db.query("update profiles set created_at=now()-interval '3 days' where id=$1", [late])
-  expect((await invitedBy(staff, { customer: late, context: 'account' })).result.status).toBe('ok')
-  expect((await bonusLedger(late))[0].delta).toBe(300)
-
-  const old = await createUser(db)
-  await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [old, 'signup:' + old])
-  await db.query("update profiles set created_at=now()-make_interval(days => $2) where id=$1", [old, invite.windowDays + 1])
-  expect((await invitedBy(staff, { customer: old, context: 'account' })).result.status).toBe('new_users_only')
-  expect(await bonusLedger(old)).toEqual([])
+  expect((await invitedBy(staff, { customer: late, context: 'account' })).result).toMatchObject({ status: 'new_users_only', reason: 'signup_only' })
+  expect(await bonusLedger(late)).toEqual([])
+  expect((await row(db, 'select referred_by from profiles where id=$1', [late])).referred_by).toBeNull()
 
   const payer = await createUser(db)
   await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [payer, 'signup:' + payer])
@@ -132,17 +127,17 @@ it('covers a late redemption within the 7-day window and nothing after it, or af
   expect(await bonusLedger(payer)).toEqual([])
 })
 
-it('keeps the invite anti-abuse rules: a blocked same-IP invite and a second invite give no bonus', async () => {
+it('keeps the invite anti-abuse rules: an invite without the gift and a second invite give no bonus', async () => {
   const { staff } = await orgTeam(300)
+  // A staff code on the customer's network is no longer refused (2025); a missing gift still is.
   const sameIp = await createUser(db)
-  await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [sameIp, 'signup:' + sameIp])
   await db.query("update profiles set signup_ip='203.0.113.9' where id in ($1,$2)", [staff, sameIp])
-  expect((await invitedBy(staff, { customer: sameIp })).result.status).toBe('blocked_same_ip')
+  expect((await invitedBy(staff, { customer: sameIp })).result.status).toBe('blocked_no_signup_grant')
   expect(await bonusLedger(sameIp)).toEqual([])
 
   const twice = (await invitedBy(staff)).customer
   const other = await orgTeam(500)
-  expect((await invitedBy(other.staff, { customer: twice, context: 'account' })).result.status).toBe('already_invited')
+  expect((await invitedBy(other.staff, { customer: twice })).result.status).toBe('already_invited')
   expect(await bonusLedger(twice)).toHaveLength(1)
   expect((await bonusLedger(twice))[0].delta).toBe(300)
 })
@@ -171,7 +166,7 @@ it('gives nothing to a level-2 binding, a personal affiliate\'s customer or a pl
   expect(await bind(db, customer, personal.slug)).toBe(true)
   expect(await bonusLedger(customer)).toEqual([])
   // Already bound to a personal affiliate: the staff invite still pays its normal reward, no bonus.
-  expect((await invitedBy(staff, { customer, context: 'account' })).result.status).toBe('ok')
+  expect((await invitedBy(staff, { customer })).result.status).toBe('ok')
   expect(await bonusLedger(customer)).toEqual([])
 
   const friend = await createUser(db)

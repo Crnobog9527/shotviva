@@ -45,12 +45,14 @@ it('the eleventh request cannot grant a valid gift, while signup remains indepen
   expect(granted.data).toMatchObject({ status: 'ok', credits_granted: 50 })
 })
 
+// Invite codes are refused here since 2030 (sign-up only), but only after redeem_code has locked both
+// profiles, so the lock order still matters.
 it('handles simultaneous reciprocal invites without taking the quota profile locks in the wrong order', async () => {
   const users = [await createUser(db), await createUser(db)]
   for (const user of users) await db.query("select public.grant_credits($1,$3,'signup',$2,'free')", [user, 'signup:' + user, benefits.freeCredits])
   const codes = await Promise.all(users.map((user) => serviceClient().rpc('get_or_create_invite_code', { p_user: user })))
   const results = await Promise.all(users.map((user, i) => attempt(user, String(codes[1 - i].data))))
-  expect(results).toEqual([expect.objectContaining({ status: 'ok' }), expect.objectContaining({ status: 'ok' })])
+  expect(results).toEqual(Array(2).fill(expect.objectContaining({ status: 'new_users_only', reason: 'signup_only' })))
 })
 
 it('exposes the budget to the service role alone and excludes the signup context', async () => {

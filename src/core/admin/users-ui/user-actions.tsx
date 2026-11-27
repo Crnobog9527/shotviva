@@ -10,6 +10,7 @@ import { useAdminAction } from '../shell/use-admin-action'
 import type { ActionValue } from '../templates/types'
 import { AdjustDialog, type AdjustInput, type PoolBalances } from './adjust-dialog'
 import { BanDialog } from './ban-dialog'
+import type { BindActions } from './bind-partner-button'
 import { USERS_COPY } from './copy'
 
 const COPY = USERS_COPY.actions
@@ -18,7 +19,7 @@ export type UserAdminActions = {
   adjust: (input: AdjustInput & { userId: string }) => Promise<ActionValue<null>>
   ban: (input: { userId: string; reason: string }) => Promise<ActionValue<null>>
   unban: (input: { userId: string; reason: string }) => Promise<ActionValue<null>>
-}
+} & Partial<BindActions>
 
 type Open = 'adjust' | 'ban' | 'unban' | null
 
