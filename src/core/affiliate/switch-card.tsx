@@ -1,18 +1,23 @@
 'use client'
 
-import { useActionState } from 'react'
-import { switchCopy } from './switch-copy'
+import { SettingSwitchCard } from '@/core/admin/features-editor/setting-switch-card'
+import type { WishlistSwitchInput } from '@/core/admin/system-settings/types'
+import type { ActionResult } from '@/core/admin/templates/types'
 
+import { AFFILIATE_OFF_NOTE, AFFILIATE_SWITCH_COPY } from './switch-copy'
+
+// The program's master switch on 联盟营销: the same card and confirmation as the other switches.
+// affiliate_settings keeps no editor or time for it, so the card says so instead of a last change.
 export function AffiliateSwitchCard({ enabled, save }: {
   enabled: boolean
-  save: (value: boolean) => Promise<boolean>
+  save: (input: WishlistSwitchInput) => Promise<ActionResult>
 }) {
-  const [failed, submit, pending] = useActionState(async () => !(await save(!enabled)), false)
   return (
-    <form action={submit} className="my-6 grid justify-items-start gap-3 rounded-lg border p-4">
-      <h2 className="font-medium">{switchCopy.heading}</h2>
-      <button disabled={pending} className="rounded-md border px-3 py-2">{enabled ? switchCopy.disable : switchCopy.enable}</button>
-      {failed && <p role="alert">{switchCopy.failed}</p>}
-    </form>
+    <SettingSwitchCard
+      copy={AFFILIATE_SWITCH_COPY}
+      value={{ enabled, updatedAt: null, updatedByEmail: null }}
+      note={enabled ? null : AFFILIATE_OFF_NOTE}
+      save={save}
+    />
   )
 }

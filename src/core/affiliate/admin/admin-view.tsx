@@ -10,7 +10,8 @@ import { OverviewView, ErrorsView, AttributionView, SettingsView } from './overv
 import { LinkTo } from './parts'
 import { tabs } from './query'
 
-type Props = ViewProps & { actor: string }
+// master: the program's on/off switch, shown above the tabs.
+type Props = ViewProps & { actor: string; master?: ReactNode }
 const VIEWS: Record<Props['filters']['tab'], (props: Props) => ReactNode> = {
   overview: (p) => <OverviewView {...p} />,
   applications: (p) => <MembersView {...p} />,
@@ -36,6 +37,7 @@ export async function AffiliateAdminView(props: Props) {
   const pending = await pendingPromoCount(props.db)
   return (
     <AdminPage title={COPY.title}>
+      {props.master}
       <nav aria-label={COPY.title} className="flex flex-wrap gap-x-5 gap-y-3 border-b pb-3 text-sm">
         {tabs.map((tab) =>
           tab === props.filters.tab ? (
