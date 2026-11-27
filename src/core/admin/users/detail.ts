@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import { loadUserExtras } from './detail-reads'
 import type { UserDetailData } from './detail-types'
+import { readReferrerDetail } from './referrer'
 import { ledgerPage, loadUser, recentJobs } from './repository'
 
 // Everything the user detail dialog shows (ARCHITECTURE §10.a, T77), read the way the old
@@ -25,8 +26,8 @@ export async function loadUserDetail(db: SupabaseClient, input: unknown, affilia
   const parsed = inputSchema.safeParse(input)
   if (!parsed.success) return null
   const { userId, jobId, cursor } = parsed.data
-  const [user, jobs, ledger] = await Promise.all([loadUser(db, userId, affiliate), recentJobs(db, userId, jobId), ledgerPage(db, userId, cursor)])
+  const [user, jobs, ledger, referrer] = await Promise.all([loadUser(db, userId, affiliate), recentJobs(db, userId, jobId), ledgerPage(db, userId, cursor), readReferrerDetail(db, userId)])
   if (!user) return null
   const extras = await loadUserExtras(db, user, parsed.data.codesCursor)
-  return { user, jobs, ledger, ledgerPaged: Boolean(cursor), extras }
+  return { user: { ...user, referrer }, jobs, ledger, ledgerPaged: Boolean(cursor), extras }
 }

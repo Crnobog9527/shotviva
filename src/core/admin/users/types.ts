@@ -1,5 +1,6 @@
 import type { Enrollment } from '@/core/affiliate/enrollment'
 import type { JobToggle } from '../jobs/job-toggles-row'
+import type { UserReferrer } from './list-types'
 
 // /admin/users data shapes (ARCHITECTURE §10). credits = paid pool, freeCredits = free pool.
 
@@ -38,7 +39,8 @@ export type UserDetail = {
   paidUntil: string | null
   bannedAt: string | null
   membership?: Enrollment | null
-  referrer?: string | null
+  // Who brought the account in; filled by loadUserDetail, null when nobody did.
+  referrer?: UserReferrer | null
   signupIp: string | null
 }
 

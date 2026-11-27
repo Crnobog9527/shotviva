@@ -1,7 +1,10 @@
-// 分语言展示 on /admin/templates (migrations 1575, 2003). Admin is Chinese-only (DESIGN §7).
+// 分语言展示 on 首页展示's language tabs (migrations 1575, 2003). Admin is Chinese-only (DESIGN §7).
 export const LOCALE_DISPLAY_COPY = {
   title: '分语言展示',
-  body: '英文站和中文站可以各用一套首页模板分组顺序、创作页分类顺序和首页精选（首页生成器下方的模板也按它排）。没单独设置时，两边都跟着上面「分类管理」的顺序和下面的「首页精选」。改某一边只影响这一边，保存后大约一分钟内生效。SEO 页面和分类网址不受影响。',
+  body: '英文站和中文站可以各用一套首页模板分组顺序、创作页分类顺序和首页精选（首页生成器下方的模板也按它排）。没单独设置时，两边都跟着「模板与系列 › 分类」的顺序和「首页展示 › 默认」里的首页精选。改某一边只影响这一边，保存后大约一分钟内生效。SEO 页面和分类网址不受影响。',
+  // On a 首页展示 language page (Owner 2026-11-27).
+  titleFor: (locale: string) => `${locale}：分类顺序、首页精选和精选组合`,
+  bodyFor: '这一边自己的首页分组和创作页分类顺序、首页精选（首页生成器下方的模板也按它排）和精选组合。没单独设置的部分跟随默认：分类顺序在「模板与系列 › 分类」，精选和组合在「默认」标签。改这一边只影响这一边，「编辑」后点「保存」一次生效，大约一分钟内更新。SEO 页面和分类网址不受影响。',
   expand: '展开分语言展示',
   collapse: '收起分语言展示',
   summary: (locale: string, groups: number, featured: boolean, bundles = false) =>

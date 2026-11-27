@@ -47,6 +47,8 @@ export const USERS_COPY = {
     unknownOrg: '企业',
     affiliate: (status: string) => `联盟会员 · ${({ active: '已通过', pending: '待审核', rejected: '已拒绝', suspended: '已暂停', banned: '已封禁' } as Record<string, string>)[status] ?? status}`,
     affiliateNote: '联盟备注',
+    referrer: '推荐人',
+    referrerTitle: (name: string) => `推荐人：${name}，点开看这位联盟会员`,
   },
   columns: {
     select: '选择',
@@ -88,6 +90,18 @@ export const USERS_COPY = {
       ban: (changed: number, skipped: number) => (skipped > 0 ? `已封禁 ${changed} 人，${skipped} 人原本已封禁` : `已封禁 ${changed} 人`),
       unban: (changed: number, skipped: number) => (skipped > 0 ? `已解封 ${changed} 人，${skipped} 人原本没有封禁` : `已解封 ${changed} 人`),
     },
+  },
+  referral: {
+    sources: { signup: '注册时通过推荐链接', first_checkout: '首次付款前通过推荐链接', admin: '后台指定', org_l1: '企业一级客户', org_l2: '企业二级客户' } as Record<string, string>,
+    unknownSource: '来源未记录',
+    enterprise: '企业联盟',
+    personal: '个人联盟',
+    code: '推荐码',
+    boundAt: '绑定时间',
+    kind: '联盟类型',
+    via: '经由一级客户',
+    member: '邀请的员工',
+    gone: (status: string) => (status === 'active' ? null : `联盟状态：${({ pending: '待审核', rejected: '已拒绝', suspended: '已暂停', banned: '已封禁' } as Record<string, string>)[status] ?? status}`),
   },
   dialog: {
     referrer: '推荐人',

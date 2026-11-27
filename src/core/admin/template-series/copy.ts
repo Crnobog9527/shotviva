@@ -1,5 +1,5 @@
 export const seriesCopy = {
-  title: '系列管理', create: '新建系列', edit: '编辑系列', templates: '返回模板列表', back: '返回系列列表',
+  title: '系列管理', create: '新建系列', edit: '编辑系列', back: '返回系列列表',
   empty: '还没有系列', name_zh: '中文名称', name_en: '英文名称', slug: '系列网址标识',
   description_zh: '中文说明', description_en: '英文说明', category: '所属分类', sort_order: '显示顺序',
   sortHint: '数值小的排在前面', active: '上架系列', published: '已上架', unpublished: '已下架',

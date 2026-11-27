@@ -8,6 +8,7 @@ import type { UserDetailData } from '../users/detail-types'
 import { USER_TIERS, type UserTier } from '../users/list-types'
 import { RefusalFlag, TierBadge, UserStatus } from './badges'
 import { USERS_COPY } from './copy'
+import { ReferrerFacts } from './referrer'
 
 const COPY = USERS_COPY.dialog
 
@@ -31,7 +32,7 @@ export function UserDialogHeader({ userId, data }: { userId: string; data: UserD
             <Fact term={COPY.email} value={user ? (user.email ?? COPY.none) : '…'} />
             <Fact term={COPY.phone} value={user ? (formatAdminPhone(user.phone) ?? COPY.none) : '…'} />
             <Fact term={COPY.id} value={userId} />
-            <ReferrerFact user={user} />
+            <ReferrerFacts referrer={user?.referrer} />
             <RefusalFact data={data} />
           </dl>
         </DialogPrimitive.Description>
@@ -41,11 +42,6 @@ export function UserDialogHeader({ userId, data }: { userId: string; data: UserD
       </DialogPrimitive.Close>
     </header>
   )
-}
-
-function ReferrerFact({ user }: { user: UserDetailData['user'] | undefined }) {
-  if (user?.referrer === undefined) return null
-  return <Fact term={COPY.referrer} value={user.referrer ?? COPY.none} />
 }
 
 function Fact({ term, value }: { term: string; value: string }) {

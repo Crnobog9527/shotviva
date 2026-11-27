@@ -11,7 +11,6 @@ import { BulkPublish } from './bulk-publish'
 import type { CategoryOption } from './category-field'
 import { deleteCopy, orderCopy } from './copy'
 import { DeleteDialog } from './delete-dialog'
-import { FeaturedPanel } from './featured-panel'
 import { selectedInOrder, toggleId, toggleVisible } from './selection-state'
 import { TemplateFormDialog, type EditTarget } from './template-form-dialog'
 import type { SeriesOption } from './catalog-groups'
@@ -94,7 +93,6 @@ export function TemplatesEditor({ providers, templates: all, categories, series,
           {error}
         </p>
       ) : null}
-      <FeaturedPanel featured={featured} templates={templates} pending={pending} />
       <BulkPublish providers={providers}
         selected={selectedInOrder(templates, selected)}
         all={templates}

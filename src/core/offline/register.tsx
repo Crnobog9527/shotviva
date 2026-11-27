@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 
+import { withoutBypass } from './shell-fallback'
 import { CACHE_PREFIX } from './sw'
 
 // Registers /sw.js once the page has loaded and gone idle, so it never competes with the page's own
@@ -9,6 +10,16 @@ import { CACHE_PREFIX } from './sw'
 // switch system_settings service_worker_enabled (both read by the root layout). Switched off, it
 // unregisters any worker instead (the kill switch, with /sw.js itself unregistering).
 export function ServiceWorkerSlot({ production, enabled }: { production: boolean; enabled: boolean }) {
+  // Loaded past Create's app shell (shell-fallback.ts): the address bar shows the plain address
+  // again, so a reload, a share or a bookmark is the normal one.
+  useEffect(() => {
+    try {
+      const plain = withoutBypass(window.location.href)
+      if (plain) window.history.replaceState(null, '', plain)
+    } catch {
+      // Leave the address as it is.
+    }
+  }, [])
   useEffect(() => {
     if (!production || !('serviceWorker' in navigator)) return
     const container = navigator.serviceWorker

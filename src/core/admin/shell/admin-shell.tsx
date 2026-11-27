@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 
 import { AdminMobileNav, AdminSidebar } from './admin-nav'
 import { SHELL_COPY } from './copy'
+import { ModuleTabBar } from './module-tab-bar'
 import type { AdminNavItem } from './nav-items'
 
 type Props = { items: readonly AdminNavItem[]; email: string | null; children: ReactNode }
@@ -25,7 +26,10 @@ export function AdminShell({ items, email, children }: Props) {
       <AdminMobileNav items={items} />
       <div className="flex flex-1">
         <AdminSidebar items={items} />
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="min-w-0 flex-1">
+          <ModuleTabBar />
+          {children}
+        </div>
       </div>
     </div>
   )

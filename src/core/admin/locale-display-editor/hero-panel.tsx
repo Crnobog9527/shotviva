@@ -17,7 +17,8 @@ import { HeroList } from './hero-list'
 import { OwnBadge } from './rows'
 import { useUnsavedGuard } from './use-unsaved-guard'
 
-type Props = { hero: HomeHeroSettings; templates: AdminTemplate[]; categories: AdminCategoryNode[]; actions: HomeHeroActions }
+// scope: one scope only (a 首页展示 tab), with no scope switch.
+type Props = { hero: HomeHeroSettings; templates: AdminTemplate[]; categories: AdminCategoryNode[]; actions: HomeHeroActions; scope?: HeroScope }
 
 // A language's tab: its site name when the admin copy has one (英文站, 中文站), else the language's
 // Chinese name, so a language added to the site shows up here with no change.
@@ -30,8 +31,8 @@ const asValue = (result: { ok: true } | { ok: false; code: string; message: stri
 
 // 首页首屏大图 (Owner 2026-11-25): per scope (默认 and each site language), one to six templates for
 // the pair beside the home H1. Read-only until 编辑; 保存 sends the scope's whole list.
-export function HeroPanel({ hero, templates, categories, actions }: Props) {
-  const [scope, setScope] = useState<HeroScope>(DEFAULT_HERO_SCOPE)
+export function HeroPanel({ hero, templates, categories, actions, scope: only }: Props) {
+  const [scope, setScope] = useState<HeroScope>(only ?? DEFAULT_HERO_SCOPE)
   const [draft, setDraft] = useState<HeroSceneEntry[] | null>(null)
   const { pending, error, notice, run } = useAdminAction()
   const label = scopeLabel(scope)
@@ -56,7 +57,7 @@ export function HeroPanel({ hero, templates, categories, actions }: Props) {
         <h2 id="home-hero-h" className="font-medium">{COPY.title}</h2>
         <p className="text-sm text-muted-foreground">{COPY.body}</p>
       </div>
-      <div role="tablist" aria-label={COPY.title} className="flex flex-wrap gap-2">
+      <div role="tablist" aria-label={COPY.title} hidden={Boolean(only)} className="flex flex-wrap gap-2">
         {HERO_SCOPES.map((code) => (
           <Button key={code} role="tab" aria-selected={code === scope} size="sm" disabled={pending}
             variant={code === scope ? 'default' : 'outline'} onClick={() => switchTo(code)}>{scopeLabel(code)}</Button>
