@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '@/core/errors'
 
 import type { SystemSettingDeps } from './commands'
-import { saveSignupGiftRules } from './signup-gift'
+import { loadSignupGift, saveSignupGiftRules } from './signup-gift'
 
 // 1350 + 1480: the signup gift's rules on /admin/features. One RPC per rule (the database checks
 // the admin, the key and the range again), then the settings cache.
@@ -62,5 +62,25 @@ describe('saveSignupGiftRules', () => {
     const error = await saveSignupGiftRules(d.deps, 'admin-1', input).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(AppError)
     expect(d.rpc).not.toHaveBeenCalled()
+  })
+})
+
+// Review P3 on #942: the card loads the stored amount (or the default 200), never the amount in
+// effect, which is 6 on a database without the v2 cutover and would be saved with the next rule.
+describe('loadSignupGift', () => {
+  const today = { granted: 3, cap: 30, per_ip: 5, claim_phone: true, claim_google: true, credits: 6 }
+  function db(stored: unknown) {
+    // Only the amount row exists; the pause has never been saved.
+    const query = (key = '') => ({
+      select: () => query(key),
+      eq: (_column: string, value: string) => query(value),
+      maybeSingle: async () => ({ data: key === 'signup_gift_credits' && stored !== undefined ? { value: stored } : null, error: null }),
+    })
+    return { rpc: async () => ({ data: today, error: null }), from: () => query() } as unknown as Parameters<typeof loadSignupGift>[0]
+  }
+  it.each([[300, 300], [undefined, 200], [0, 200], ['300', 200]])('stored %o loads as %s, not the 6 in effect', async (stored, expected) => {
+    const state = await loadSignupGift(db(stored))
+    expect(state.rules.credits).toBe(expected)
+    expect(state.granted).toBe(3)
   })
 })

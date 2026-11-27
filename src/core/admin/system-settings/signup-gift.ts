@@ -7,7 +7,7 @@ import { callRpc } from '@/core/billing'
 import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 
-import { SIGNUP_GIFT_CREDITS_MAX, SIGNUP_GIFT_CREDITS_MIN } from '@/core/system-settings/registry'
+import { settingValue, SIGNUP_GIFT_CREDITS_MAX, SIGNUP_GIFT_CREDITS_MIN } from '@/core/system-settings/registry'
 
 import { SIGNUP_GIFT_COPY } from '../features-editor/signup-gift-copy'
 import { loadSettingSwitch, type SystemSettingDeps } from './commands'
@@ -25,16 +25,24 @@ const todaySchema = z.object({
   per_ip: z.number().int(),
   claim_phone: z.boolean(),
   claim_google: z.boolean(),
-  credits: z.number().int(),
 })
 
+// The stored amount (or its default, 200), never the one in effect: signup_gift_today().credits is 6
+// on a database without the v2 cutover, and the form saves every rule at once, so pre-filling it
+// would store 6 the first time another rule is saved.
+async function storedGiftCredits(db: SupabaseClient): Promise<number> {
+  const { data, error } = await db.from('system_settings').select('value').eq('key', 'signup_gift_credits').maybeSingle<{ value: unknown }>()
+  if (error) throw new AppError('INTERNAL', 'signup_gift_credits read failed', { cause: new Error(error.message) })
+  return settingValue({ signup_gift_credits: data?.value }, 'signup_gift_credits')
+}
+
 export async function loadSignupGift(db: SupabaseClient): Promise<SignupGiftState> {
-  const [today, paused] = await Promise.all([db.rpc('signup_gift_today'), loadSettingSwitch(db, 'signup_gift_paused')])
+  const [today, paused, credits] = await Promise.all([db.rpc('signup_gift_today'), loadSettingSwitch(db, 'signup_gift_paused'), storedGiftCredits(db)])
   if (today.error) throw new AppError('INTERNAL', 'signup_gift_today failed', { cause: new Error(today.error.message) })
   const row = todaySchema.parse(today.data)
   return {
     granted: row.granted,
-    rules: { credits: row.credits, cap: row.cap, perIp: row.per_ip, claimPhone: row.claim_phone, claimGoogle: row.claim_google },
+    rules: { credits, cap: row.cap, perIp: row.per_ip, claimPhone: row.claim_phone, claimGoogle: row.claim_google },
     paused,
   }
 }
