@@ -1,5 +1,5 @@
 import { createTranslator, NextIntlClientProvider } from 'next-intl'
-import { createElement } from 'react'
+import { createElement, type FunctionComponent } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
@@ -49,6 +49,8 @@ describe('org-pool purchases in the refund picker', () => {
     { id: '10', productId: 'pack_s', amountTotal: 990, currency: 'usd', method: 'card', createdAt: '2026-11-03T12:00:00Z', channel: 'stripe', status: 'paid', hasInvoice: false },
   ] as const
   const choices = paymentChoices(options, site.billing.products, t, { money: formatMoney('en') })
+  // children as createElement's third argument (react/no-children-prop) needs it optional here.
+  const Intl = NextIntlClientProvider as unknown as FunctionComponent<{ locale: string; messages: unknown }>
 
   it('marks the org-pool payment, and only it', () => {
     expect(choices.map((choice) => choice.noRefund ?? false)).toEqual([true, false])
@@ -58,7 +60,7 @@ describe('org-pool purchases in the refund picker', () => {
     expect(offeredPayments('refund', choices).map((choice) => choice.value)).toEqual(['10'])
     expect(offeredPayments('billing', choices).map((choice) => choice.value)).toEqual(['9', '10'])
     const html = (type: 'refund' | 'billing', payments: typeof choices) => renderToStaticMarkup(
-      createElement(NextIntlClientProvider, { locale: 'en', messages, children: createElement(AttachmentField, { type, payments, works: [] }) }))
+      createElement(Intl, { locale: 'en', messages }, createElement(AttachmentField, { type, payments, works: [] })))
     // Rendered HTML escapes the apostrophes; compare the escaped note.
     const note = t('new.orgPoolNoRefund').replaceAll("'", '&#x27;')
     const refund = html('refund', choices)
