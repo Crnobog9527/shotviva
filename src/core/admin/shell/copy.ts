@@ -24,7 +24,6 @@ export const SHELL_COPY = {
     templates: '模板与系列',
     home: '首页展示',
     generation: '出图设置',
-    references: '素材参考库',
     requests: '需求审核',
     gallery: '创作库审核',
     announcements: '公告横幅',
