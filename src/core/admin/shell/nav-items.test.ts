@@ -84,6 +84,7 @@ describe('admin nav counts', () => {
     expect(at('/admin/providers')).toBe('generation')
     expect(at('/admin/references/lab/x')).toBe('references')
     expect(at('/admin/home')).toBe('home')
+    expect(at('/admin/home/zh')).toBe('home')
     expect(at('/admin/templates/categories')).toBe('templates')
   })
 })
