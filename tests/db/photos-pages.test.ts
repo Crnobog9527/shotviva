@@ -88,4 +88,28 @@ describe('Photos pages (listOwnJobs with a cursor)', () => {
     expect(ids).toHaveLength(PHOTOS_PAGE + 10)
     expect(second.next).toBeNull()
   })
+
+  it('slides past the window above the cursor and still reaches the oldest work, each once', async () => {
+    const userId = await createUser(db)
+    const start = Date.UTC(2026, 7, 1)
+    const made: string[] = []
+    for (let i = 0; i < PHOTOS_PAGE * 4 + 3; i++) made.push(await seed(userId, new Date(start - i * 60_000).toISOString()))
+    const window = PHOTOS_PAGE + 5
+    const order: string[] = []
+    let until: OwnJobsCursor | null = null
+    let pages = 0
+    do {
+      const page = await listOwnJobs(service, userId, new Date(), until, window)
+      const ids = page.done.map((job) => job.id)
+      expect(ids.length).toBeLessThanOrEqual(window + PHOTOS_PAGE)
+      // What this page adds below the cursor joins on with no gap or repeat.
+      const added = until ? ids.slice(ids.indexOf(until.id) + 1) : ids
+      expect(until === null || ids.includes(until.id)).toBe(true)
+      order.push(...added)
+      until = page.next
+      pages++
+    } while (until && pages < 10)
+    expect(pages).toBe(5)
+    expect(order).toEqual(made)
+  })
 })

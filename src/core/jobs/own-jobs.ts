@@ -19,7 +19,8 @@ export type OwnJobs = { running: Job[]; done: Job[]; total: number; next: OwnJob
 export type OwnJobsCursor = { createdAt: string; id: string }
 
 export const PHOTOS_PAGE = 48
-// A list built from a cursor this far down is cut there; Load more then carries on from the cut.
+// At most this many works above the cursor are listed again: past it the list slides (the
+// newest drop off the top, read nearest the cursor first), so Load more always moves on.
 const MAX_WINDOW = 1000
 // Far above any tier's concurrency (TIER_LIMITS): only the count matters.
 const RUNNING_LIMIT = 30
@@ -32,30 +33,31 @@ const before = (c: OwnJobsCursor) => `created_at.lt."${c.createdAt}",and(created
 
 type Row = Record<string, unknown> & { id: string; created_at: string }
 
-export async function listOwnJobs(client: SupabaseClient, userId: string, now: Date, until: OwnJobsCursor | null = null): Promise<OwnJobs> {
-  const base = () =>
+export async function listOwnJobs(client: SupabaseClient, userId: string, now: Date, until: OwnJobsCursor | null = null, window = MAX_WINDOW): Promise<OwnJobs> {
+  const base = (ascending = false) =>
     client
       .from('generation_jobs')
       .select(JOB_COLUMNS)
       .eq('user_id', userId)
       .in('status', LISTED)
       .is('deleted_at', null).is('org_access_ended_at', null)
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false })
+      .order('created_at', { ascending })
+      .order('id', { ascending })
   const read = async (query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<Row[]> => {
     const { data, error } = await query
     if (error) throw new AppError('INTERNAL', `listOwnJobs failed: ${error.message}`)
     return data as Row[]
   }
-  const [shown, page, total] = await Promise.all([
-    until ? read(base().or(atOrAfter(until)).limit(MAX_WINDOW)) : Promise.resolve([] as Row[]),
+  const [above, page, total] = await Promise.all([
+    until ? read(base(true).or(atOrAfter(until)).limit(window)) : Promise.resolve([] as Row[]),
     read((until ? base().or(before(until)) : base()).limit(PHOTOS_PAGE + 1)),
     countDone(client, userId),
   ])
-  const more = page.length > PHOTOS_PAGE || shown.length >= MAX_WINDOW
-  const rows = [...shown, ...page.slice(0, shown.length >= MAX_WINDOW ? 0 : PHOTOS_PAGE)]
-  const last = rows.at(-1)
-  const next = more && last ? { createdAt: last.created_at, id: last.id } : null
+  // next always comes from the page below the cursor, so each Load more moves one page on.
+  const below = page.slice(0, PHOTOS_PAGE)
+  const rows = [...above.reverse(), ...below]
+  const last = below.at(-1)
+  const next = page.length > PHOTOS_PAGE && last ? { createdAt: last.created_at, id: last.id } : null
   const listed = rows.map((row) => jobRowSchema.parse(row))
   const jobs = next ? await withWholeBatches(client, userId, listed) : listed
   const live = (job: Job) => isLiveRunning({ status: job.status, created_at: job.createdAt.toISOString() }, now)
