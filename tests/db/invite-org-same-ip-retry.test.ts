@@ -119,9 +119,9 @@ it('lets a customer refused for a missing gift redeem the same code after the gi
   expect((await db.query('select status from code_redemption_blocks where user_id=$1', [customer])).rows)
     .toEqual([{ status: 'blocked_no_signup_grant' }])
 
+  // Since 2030 the gift itself re-runs the blocked sign-up redemption (signup_gift_invite_retry).
   await giveGift(customer)
-  const result = await redeem(customer, code, 'signup')
-  expect(result.status).toBe('ok')
+  const result = (await row(db, 'select credits_granted from code_redemptions where user_id=$1', [customer])) as { credits_granted: number }
   expect(await rowsOf(customer)).toEqual([expect.objectContaining({
     status: 'ok', blocked_status: 'blocked_no_signup_grant', had_block: true, credits_granted: result.credits_granted,
   })])
@@ -177,18 +177,21 @@ it('lets a customer blocked on one personal code use another inviter\'s code; on
   expect(await rewarded(friend)).toBeLessThanOrEqual(1)
 })
 
-it('pays a customer once when two retries race after the gift arrives', async () => {
+it('pays a customer once when retries race the gift that re-runs the redemption (2030)', async () => {
   const inviter = await createUser(db)
   const customer = await createUser(db)
   const code = await codeOf(inviter)
   expect((await redeem(customer, code)).status).toBe('blocked_no_signup_grant')
-  await giveGift(customer)
   const attempt = () => serviceClient().rpc('redeem_code', {
     p_user: customer, p_code: code, p_context: 'signup', p_invitee_credits: null, p_invite_window_days: invite.windowDays,
   })
-  const results = await Promise.all([attempt(), attempt(), attempt()])
-  expect(results.map((r) => (r.data as { status: string }).status).sort()).toEqual(['ok', 'used', 'used'])
-  expect(await rowsOf(customer)).toHaveLength(1)
+  const gift = () => serviceClient().rpc('grant_credits', {
+    p_user_id: customer, p_amount: 6, p_reason: 'signup', p_idempotency_key: 'signup:' + customer, p_pool: 'free',
+  })
+  const results = await Promise.all([attempt(), gift(), attempt()])
+  for (const r of results) expect(r.error).toBeNull()
+  expect(await rowsOf(customer)).toEqual([expect.objectContaining({ status: 'ok' })])
+  expect((await redeem(customer, code)).status).toBe('used')
   const granted = (await row(db, 'select credits_granted from code_redemptions where user_id=$1', [customer])).credits_granted
   expect(await codeGrants(customer)).toHaveLength(granted ? 1 : 0)
 })

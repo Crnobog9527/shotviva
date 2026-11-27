@@ -26,6 +26,20 @@
 --   * the app lets it stand in for the cookie only on the click of the signup confirmation link,
 --     and takes it (unused) on any other first verification; this browser's cookie wins.
 --
+-- A sign-up redemption refused only because the signup gift was not paid yet (blocked_no_signup_grant:
+-- the gift was pending for the daily cap, 2026, or for the network's allowance, 1480) is re-run
+-- once, automatically, when that gift is finally paid (review on #977). Without it, the code typed
+-- at sign-up could never apply: the account page and the paywall no longer take invite codes. The
+-- trigger signup_gift_invite_retry fires on the signup gift's ledger row (key signup:<user>), so
+-- every late path is covered: a later sign-in's grant_credits, the daily catch-up, and
+-- claim_signup_gift by phone or Google. It redeems the blocked row's code in the signup context,
+-- through redeem_code, so every other rule still applies (the code still active, the inviter not
+-- banned, no payment yet, one invite per user) and a success replaces the blocked row as in 2025.
+-- The 7-day window is not applied (the code was entered at sign-up; only the gift was late). It
+-- pays at most once: the gift row is written once per account (one idempotency key), a success
+-- leaves no blocked row, and redeem_code's keys are per redemption. A failure (including a lock
+-- conflict) never undoes the gift: it is caught and recorded in signup_invite_retry_errors.
+--
 -- Expand-only: create or replace with the same signature; body = 2025 plus the marked lines. The
 -- reported status already exists, so code from before this deploy keeps working (it shows its
 -- "new accounts only" message); the reason field is new and only read by the new code. The table
@@ -232,3 +246,42 @@ revoke execute on function public.signup_code_store(uuid, text) from public, ano
 revoke execute on function public.signup_code_take(uuid) from public, anon, authenticated;
 grant execute on function public.signup_code_store(uuid, text) to service_role;
 grant execute on function public.signup_code_take(uuid) to service_role;
+
+create table public.signup_invite_retry_errors (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  error text not null,
+  at timestamptz not null default now()
+);
+alter table public.signup_invite_retry_errors enable row level security;
+revoke all on public.signup_invite_retry_errors from public, anon, authenticated, service_role;
+grant select on public.signup_invite_retry_errors to service_role;
+
+create function public._signup_gift_invite_retry() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare v_code text;
+begin
+  select c.code into v_code from public.code_redemptions r join public.codes c on c.id = r.code_id
+   where r.user_id = new.user_id and r.kind = 'invite' and r.status = 'blocked_no_signup_grant' and r.context = 'signup';
+  if v_code is null then return null; end if;
+  begin
+    -- The code was entered at sign-up; only the gift came late, so no 7-day window here.
+    perform public.redeem_code(new.user_id, v_code, 'signup', null, 36500);
+    delete from public.signup_invite_retry_errors where user_id = new.user_id;
+  exception when others or query_canceled or assert_failure then
+    begin
+      insert into public.signup_invite_retry_errors(user_id, error)
+        values (new.user_id, sqlstate || ': ' || left(sqlerrm, 300))
+        on conflict (user_id) do update set error = excluded.error, at = now();
+    exception when others or query_canceled or assert_failure then
+      -- Even an unavailable error sink must never undo the gift.
+      return null;
+    end;
+  end;
+  return null;
+end;
+$$;
+revoke all on function public._signup_gift_invite_retry() from public, anon, authenticated, service_role;
+
+create trigger signup_gift_invite_retry after insert on public.credit_ledger
+  for each row when (new.kind = 'grant' and new.pool = 'free' and new.idempotency_key = 'signup:' || new.user_id::text)
+  execute function public._signup_gift_invite_retry();
