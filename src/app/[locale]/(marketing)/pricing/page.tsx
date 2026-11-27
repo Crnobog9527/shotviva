@@ -14,6 +14,7 @@ import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { creditFacts, fillCredits, freeImagesIn, homePageIn, pricingFaqIn, pricingPageIn } from '@/site/content'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { displayProducts } from '@/site/billing/display-products'
+import { signupGiftCreditsForSite } from '@/site/billing/signup-gift'
 import { site } from '@/site/site.config'
 
 import { inquiryPrefillAction, submitInquiryAction } from './actions'
@@ -33,16 +34,17 @@ import { inquiryPrefillAction, submitInquiryAction } from './actions'
 // plus a redeploy, which re-renders this page with the matching payment copy.
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await currentLocale()
-  const [catalogue, products] = await Promise.all([cachedWebCatalogue(locale), displayProducts()])
-  const page = fillCredits(pricingPageIn(locale, products), creditFacts(catalogue))
+  const [catalogue, products, gift] = await Promise.all([cachedWebCatalogue(locale), displayProducts(), signupGiftCreditsForSite()])
+  const page = fillCredits(pricingPageIn(locale, products), creditFacts(catalogue, gift))
   return pageMetadata(site, page, locale)
 }
 
 export default async function PricingPage() {
   const locale = await currentLocale()
-  // "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4).
-  const [catalogue, wishlistLive, products] = await Promise.all([cachedWebCatalogue(locale), isWishlistEnabled(site), displayProducts()])
-  const credits = creditFacts(catalogue)
+  // "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4); the
+  // signup gift from its setting (2008).
+  const [catalogue, wishlistLive, products, gift] = await Promise.all([cachedWebCatalogue(locale), isWishlistEnabled(site), displayProducts(), signupGiftCreditsForSite()])
+  const credits = creditFacts(catalogue, gift)
   const page = fillCredits(pricingPageIn(locale, products), credits)
   const channel = paymentChannel()
   const wechatPay = walletOffersWechat()

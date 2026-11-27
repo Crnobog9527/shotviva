@@ -11,7 +11,7 @@ import { makePricingPage, pricingPage } from './pricing'
 import { makeZhPricingPage } from './zh/pricing'
 import { zhHomePage } from './zh/home'
 
-const LIVE = { from: 1, same: false }
+const LIVE = { from: 1, same: false, gift: 100 }
 
 // The copy fills in from the nine products in site.config (ARCHITECTURE §6.2) without anyone
 // typing a number into it (建站规格 G3).

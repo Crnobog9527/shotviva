@@ -10,7 +10,7 @@ import { freeImagesLabel, fromCredits, tierList, tierPixels, uploadLimits } from
 import { zhHomePage } from './zh/home'
 
 // The live catalogue on 2026-11-09: Standard costs 1 credit on the cheapest template, more on others.
-const LIVE = { from: 1, same: false }
+const LIVE = { from: 1, same: false, gift: 100 }
 const home = fillCredits(homePage, LIVE)
 
 const allPages = [homePage, ...contentPages]

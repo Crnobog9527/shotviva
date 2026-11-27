@@ -5,6 +5,7 @@ import { site } from '../site.config'
 import {
   freeImagesLabel,
   FreeImagesShort,
+  giftCredits,
   packshotUsd,
   photoSeconds,
   plansSentence,
@@ -194,7 +195,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: 'Is image to image AI free?',
-    answer: `${brand} gives new accounts ${site.billing.freeCredits} credits to try a template. Each photo uses credits based on template and size, shown on the Generate button. Free photos are public and watermarked; ${offers.planFrom ? `paid plans start at ${usd(offers.planFrom.priceUsd)}/month.` : plansSentence(offers)}`,
+    answer: `${brand} gives new accounts ${giftCredits} credits to try a template. Each photo uses credits based on template and size, shown on the Generate button. Free photos are public and watermarked; ${offers.planFrom ? `paid plans start at ${usd(offers.planFrom.priceUsd)}/month.` : plansSentence(offers)}`,
   },
   {
     question: "Does image to image AI keep my photo's subject the same?",
@@ -249,7 +250,7 @@ export const makeHomePage = (offers: OfferFacts, plans = homePlans(offers.produc
       {
         // SEO PATCH v4.1 (2026-11-11): the free credits are no heading of their own and no photo count.
         heading: 'Try It Before You Pay',
-        text: `New accounts get ${site.billing.freeCredits} credits to test a template. They are given once and do not refill.`,
+        text: `New accounts get ${giftCredits} credits to test a template. They are given once and do not refill.`,
       },
       {
         heading: 'Free Photos Are Public and Watermarked, Paid Photos Are Private',

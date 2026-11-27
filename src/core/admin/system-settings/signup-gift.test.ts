@@ -14,13 +14,14 @@ function deps() {
   return { rpc, invalidate, deps: { db: { rpc }, invalidate } satisfies SystemSettingDeps }
 }
 
-const rules = { cap: 30, perIp: 5, claimPhone: true, claimGoogle: false }
+const rules = { credits: 100, cap: 30, perIp: 5, claimPhone: true, claimGoogle: false }
 
 describe('saveSignupGiftRules', () => {
   it('saves every rule with its own key and type, the admin as actor', async () => {
     const d = deps()
     await saveSignupGiftRules(d.deps, 'admin-1', rules)
     expect(d.rpc.mock.calls).toEqual([
+      ['admin_set_system_setting', { p_key: 'signup_gift_credits', p_value: 100, p_actor: 'admin-1' }],
       ['admin_set_system_setting', { p_key: 'signup_gift_daily_cap', p_value: 30, p_actor: 'admin-1' }],
       ['admin_set_system_setting', { p_key: 'signup_gift_per_ip', p_value: 5, p_actor: 'admin-1' }],
       ['admin_set_system_setting', { p_key: 'signup_gift_claim_phone', p_value: true, p_actor: 'admin-1' }],
@@ -32,10 +33,22 @@ describe('saveSignupGiftRules', () => {
   it.each([0, 100_000])('accepts the cap at its bounds (%s)', async (cap) => {
     const d = deps()
     await saveSignupGiftRules(d.deps, 'admin-1', { ...rules, cap, perIp: cap === 0 ? 0 : 1000 })
-    expect(d.rpc).toHaveBeenCalledTimes(4)
+    expect(d.rpc).toHaveBeenCalledTimes(5)
+  })
+
+  // 2008: the amount, 1 to 5000 (the pause, not 0, stops the gift).
+  it.each([1, 5000])('accepts the amount at its bounds (%s)', async (credits) => {
+    const d = deps()
+    await saveSignupGiftRules(d.deps, 'admin-1', { ...rules, credits })
+    expect(d.rpc).toHaveBeenCalledWith('admin_set_system_setting', { p_key: 'signup_gift_credits', p_value: credits, p_actor: 'admin-1' })
   })
 
   it.each([
+    { ...rules, credits: 0 },
+    { ...rules, credits: 5001 },
+    { ...rules, credits: 2.5 },
+    { ...rules, credits: '300' },
+    { cap: 30, perIp: 5, claimPhone: true, claimGoogle: false },
     { ...rules, cap: -1 },
     { ...rules, cap: 1.5 },
     { ...rules, cap: 100_001 },

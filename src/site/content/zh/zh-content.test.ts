@@ -60,7 +60,7 @@ const PAGES = {
 describe('/zh marketing copy (建站规格 §6.1, G13)', () => {
   it('passes the TDK / direct-answer rules, measured in Chinese', () => {
     // Measured as served, with 「最多 6 张」 (the longest) and the no-catalogue 「3 张」 (T91).
-    for (const facts of [{ from: 1, same: false }, FALLBACK_CREDITS]) {
+    for (const facts of [{ from: 1, same: false, gift: 100 }, FALLBACK_CREDITS]) {
       expect(validateContentPage(fillCredits(zhHomePage, facts), 'zh')).toEqual([])
       expect(validateContentPage(fillCredits(zhImageToImageGenerator, facts), 'zh')).toEqual([])
       expect(fillCredits(zhPricingPage.description, facts).length).toBeLessThanOrEqual(80)
