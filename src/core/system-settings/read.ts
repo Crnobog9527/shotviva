@@ -7,6 +7,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import { AppError } from '../errors'
 import { logger } from '../logger'
+import { settle, unwrap, type Settled } from '../shared-read'
 import { SYSTEM_SETTINGS, type SystemSettingValues } from './registry'
 
 // The admin save expires this tag (updateTag), so a switch changes without a deploy.
@@ -28,7 +29,20 @@ export async function loadSystemSettings(db: Db): Promise<SystemSettingValues> {
 }
 
 type Load = () => Promise<SystemSettingValues>
-const loadLive: Load = () => loadSystemSettings(createAdminSupabase())
+
+// One copy for the region, not one per server instance: a plain 'use cache' lives in the memory of
+// each function instance, and every new instance read the table again (system_settings was the
+// test database's most-read table, ~7k reads a day, 2026-11-27). A failed read is kept a minute
+// only (../shared-read); settingsOrDefaults below falls back as before. Same tag, so a save still
+// expires it at once (updateTag reaches every cache handler).
+async function sharedSystemSettings(): Promise<Settled<SystemSettingValues>> {
+  'use cache: remote'
+  cacheTag(SYSTEM_SETTINGS_CACHE_TAG)
+  const result = await settle(() => loadSystemSettings(createAdminSupabase()))
+  cacheLife(result.ok ? SETTINGS_LIFE : FAILED_READ_LIFE)
+  return result
+}
+const loadLive: Load = async () => unwrap(await sharedSystemSettings())
 
 // The cached body, apart for tests. A failed read (an outage, a database without the table
 // yet) leaves every setting at its default, which closes the wishlist, and that is only kept

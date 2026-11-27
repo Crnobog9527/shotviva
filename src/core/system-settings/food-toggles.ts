@@ -5,6 +5,7 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import { logger } from '../logger'
+import { settle, unwrap, type Settled } from '../shared-read'
 import { FOOD_SWITCHES_OFF, type FoodSwitches } from '../templates/food-toggle-keys'
 import { SETTINGS_LIFE } from './read'
 import { settingValue } from './registry'
@@ -24,9 +25,20 @@ async function readLive(): Promise<Partial<Record<string, unknown>>> {
   return Object.fromEntries(((data ?? []) as { key: string; value: unknown }[]).map((row) => [row.key, row.value]))
 }
 
+// Shared by every server instance of the region (see sharedSystemSettings in ./read); a failed
+// read is kept a minute only.
+async function sharedRead(): Promise<Settled<Partial<Record<string, unknown>>>> {
+  'use cache: remote'
+  cacheTag(FOOD_TOGGLES_SWITCH_TAG)
+  const result = await settle(readLive)
+  cacheLife(result.ok ? SETTINGS_LIFE : FAILED_READ_LIFE)
+  return result
+}
+const shared: Read = async () => unwrap(await sharedRead())
+
 // The cached body, apart for tests. A failed read keeps both options off (the safe side), for a
 // minute only, so it heals by itself.
-export async function foodSwitchesOrOff(read: Read = readLive): Promise<FoodSwitches> {
+export async function foodSwitchesOrOff(read: Read = shared): Promise<FoodSwitches> {
   try {
     const values = await read()
     const switches = { plating: settingValue(values, 'food_plating_enabled'), tableware: settingValue(values, 'food_tableware_enabled') }

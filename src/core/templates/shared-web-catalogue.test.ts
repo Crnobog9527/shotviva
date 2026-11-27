@@ -33,9 +33,10 @@ describe('cached catalogue reads (cached-catalogue.ts)', () => {
   const source = readFileSync(join(process.cwd(), 'src/core/templates/cached-catalogue.ts'), 'utf8')
 
   it('reads the web rows from the database in one place, a remote (shared) cache', () => {
-    const shared = /async function sharedWebTemplates\(\)[^{]*\{\s*'use cache: remote'[\s\S]*?\n\}/.exec(source)?.[0]
+    const shared = /async function settledWebTemplates\(\)[^{]*\{\s*'use cache: remote'[\s\S]*?\n\}/.exec(source)?.[0]
     expect(shared).toContain("listTemplates(createAdminSupabase(), 'web', { includeSeriesMembers: true })")
     expect(source.match(/listTemplates\(/g)).toHaveLength(1)
+    expect(source).toContain('const sharedWebTemplates = async (): Promise<Template[]> => unwrap(await settledWebTemplates())')
   })
 
   it('the catalogue, the app list and the poster list all go through it', () => {

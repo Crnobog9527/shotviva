@@ -6,7 +6,7 @@ import { phases, review, safeFailure } from '@/core/admin/products/workflow'
 import { saveDraft } from '@/core/admin/products/editor-data'
 import { productIdSchema } from '@/core/config/product-id'
 import { bindSeededWaffo } from '@/core/admin/products/waffo-seeded'
-import { currentProducts } from '@/site/billing/display-products'
+import { BILLING_PRODUCTS_TAG, currentProducts } from '@/site/billing/display-products'
 import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 export async function catalogAction(form: FormData) {
@@ -23,7 +23,7 @@ export async function catalogAction(form: FormData) {
       if (phase === 'prepare' && form.get('confirmed') !== 'on') throw new Error('Confirmation required')
       await review(db,actor.id,sku.data,phase,form)
       if (phase === 'publish' || phase === 'waffo') {
-        updateTag('billing-products')
+        updateTag(BILLING_PRODUCTS_TAG)
         warmPublicPagesSoon()
       }
     }
@@ -45,7 +45,7 @@ export async function waffoSeededAction(form: FormData) {
     const db = createAdminSupabase()
     const outcomes = await bindSeededWaffo(db, actor.id, await currentProducts(db))
     if (outcomes.some(o => o.status === 'bound')) {
-      updateTag('billing-products')
+      updateTag(BILLING_PRODUCTS_TAG)
       warmPublicPagesSoon()
     }
     revalidatePath('/[locale]/admin/products','page')

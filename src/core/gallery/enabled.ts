@@ -7,6 +7,7 @@ import { FAILED_READ_LIFE } from '../cache-life'
 import type { SiteConfig } from '../config'
 import { AppError } from '../errors'
 import { logger } from '../logger'
+import { settle, unwrap, type Settled } from '../shared-read'
 import { SETTINGS_LIFE } from '../system-settings/read'
 import { settingValue } from '../system-settings/registry'
 import { decideGallery } from './switch'
@@ -21,11 +22,21 @@ async function readGalleryOpen(): Promise<boolean> {
   return settingValue({ gallery_enabled: (data as { value?: unknown } | null)?.value }, 'gallery_enabled')
 }
 
+// One copy for the region (see sharedSystemSettings in ../system-settings/read). A failed read is
+// kept a minute only.
+async function sharedGalleryOpen(): Promise<Settled<boolean>> {
+  'use cache: remote'
+  cacheTag(GALLERY_SWITCH_TAG)
+  const result = await settle(readGalleryOpen)
+  cacheLife(result.ok ? SETTINGS_LIFE : FAILED_READ_LIFE)
+  return result
+}
+
 async function cachedGalleryOpen(): Promise<boolean> {
   'use cache'
   cacheTag(GALLERY_SWITCH_TAG)
   try {
-    const open = await readGalleryOpen()
+    const open = unwrap(await sharedGalleryOpen())
     cacheLife(SETTINGS_LIFE)
     return open
   } catch (error) {

@@ -12,6 +12,10 @@ import { Versions } from './versions'
 
 type Props = { sessionId: string; assetId: string; archived: boolean; initial: LabState
   models: LabModels; summary: Pick<TestPanelData, 'budget' | 'recentPhotos'>; publish: LabPublishOptions }
+// 5 s for the first few polls, then up to 20 s.
+export function pollDelay(polls: number) {
+  return polls < 4 ? 5000 : Math.min(20_000, 5000 * (polls - 2))
+}
 function append<T extends { id: string }>(page: LabPage<T>, next: LabPage<T>) {
   const known = new Set(page.items.map(r => r.id))
   return { items: [...page.items, ...next.items.filter(r => !known.has(r.id))], next: next.next }
@@ -27,16 +31,22 @@ export function PromptLab({ sessionId, assetId, archived, initial, models, summa
     setRuns(result.runs); setBudget(result.budget); setError('')
   }, [sessionId])
   const pending = runs.items.some(r => r.status === 'queued' || r.status === 'running')
+  // Polls only while a run is queued or running and the tab is visible, slower the longer it waits
+  // (a run takes tens of seconds; each poll reads the runs and the budget).
   useEffect(() => {
     if (!pending) return
-    let reading = false
+    let timer = 0
+    let polls = 0
+    let stopped = false
     async function tick() {
-      if (document.hidden || reading) return
-      reading = true
-      try { await refresh() } catch (e) { setError(labError(e)) } finally { reading = false }
+      if (!document.hidden) {
+        polls += 1
+        try { await refresh() } catch (e) { setError(labError(e)) }
+      }
+      if (!stopped) timer = window.setTimeout(() => void tick(), pollDelay(polls))
     }
-    const timer = window.setInterval(() => void tick(), 5000)
-    return () => window.clearInterval(timer)
+    timer = window.setTimeout(() => void tick(), pollDelay(0))
+    return () => { stopped = true; window.clearTimeout(timer) }
   }, [pending, refresh])
   const refreshVersions = async () => {
     setVersions(await labRequest<LabPage<LabVersion>>(path + 'versions'))

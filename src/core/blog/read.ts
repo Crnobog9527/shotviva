@@ -8,6 +8,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import { LOCALES, type Locale } from '../i18n/locales'
 import { logger } from '../logger'
+import { settle, unwrap, type Settled } from '../shared-read'
 import { BLOG_CACHE_TAG, BLOG_FOOTER_TAG, type Post, type PostSummary } from './rules'
 
 // The public blog's reads (AGENTS §5.1 items 5 and 6): published rows only, the columns a page
@@ -108,23 +109,43 @@ async function orFallback<T>(read: () => Promise<T>, fallback: T): Promise<T> {
   }
 }
 
+// The reads below, one copy for the region rather than one per server instance (the footer asks
+// on every marketing page). A failed read is kept a minute only; orFallback below falls back.
+async function settledPosts(locale: Locale, limit?: number): Promise<Settled<PostSummary[]>> {
+  'use cache: remote'
+  cacheTag(limit === 1 ? BLOG_FOOTER_TAG : BLOG_CACHE_TAG)
+  const result = await settle(() => readPublishedPosts(createAdminSupabase(), locale, limit))
+  cacheLife(result.ok ? BLOG_LIFE : FAILED_READ_LIFE)
+  return result
+}
+const sharedPosts = async (locale: Locale, limit?: number) => unwrap(await settledPosts(locale, limit))
+
+async function settledPost(locale: Locale, slug: string): Promise<Settled<Post | null>> {
+  'use cache: remote'
+  cacheTag(BLOG_CACHE_TAG)
+  const result = await settle(() => readPublishedPost(createAdminSupabase(), locale, slug))
+  cacheLife(result.ok ? BLOG_LIFE : FAILED_READ_LIFE)
+  return result
+}
+const sharedPost = async (locale: Locale, slug: string) => unwrap(await settledPost(locale, slug))
+
 export async function cachedPublishedPosts(locale: Locale): Promise<PostSummary[]> {
   'use cache'
   cacheTag(BLOG_CACHE_TAG)
-  return orFallback(() => readPublishedPosts(createAdminSupabase(), locale), [])
+  return orFallback(() => sharedPosts(locale), [])
 }
 
 export async function cachedPublishedPost(locale: Locale, slug: string): Promise<Post | null> {
   'use cache'
   cacheTag(BLOG_CACHE_TAG)
-  return orFallback(() => readPublishedPost(createAdminSupabase(), locale, slug), null)
+  return orFallback(() => sharedPost(locale, slug), null)
 }
 
 // For the footer link on every marketing page: only whether the language has a published post.
 export async function cachedHasPublishedPosts(locale: Locale): Promise<boolean> {
   'use cache'
   cacheTag(BLOG_FOOTER_TAG)
-  return orFallback(async () => (await readPublishedPosts(createAdminSupabase(), locale, 1)).length > 0, false)
+  return orFallback(async () => (await sharedPosts(locale, 1)).length > 0, false)
 }
 
 export async function cachedSitemapPosts(): Promise<Pick<PostSummary, 'locale' | 'slug' | 'updatedAt' | 'authorName'>[]> {
