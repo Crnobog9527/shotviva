@@ -20,8 +20,9 @@ describe('admin nav', () => {
       'trace',
       'costs',
       'templates',
+      'home',
+      'generation',
       'references',
-      'providers',
       'requests',
       'announcements',
       'blog',
@@ -70,5 +71,18 @@ describe('admin nav counts', () => {
     const items = adminNavItems({ wishlist: false, affiliate: true }, { affiliates: 2 })
     expect(items.find((item) => item.key === 'affiliates')?.count).toBe(2)
     expect(adminNavItems({ wishlist: false, affiliate: true }, { affiliates: 0 }).find((item) => item.key === 'affiliates')?.count).toBeUndefined()
+  })
+
+  it('marks the template module pages under the right entry (Owner 2026-11-27)', () => {
+    const items = adminNavItems({ wishlist: false })
+    const at = (path: string) => currentItem(path, items)?.key
+    expect(at('/admin/templates')).toBe('templates')
+    expect(at('/admin/templates/series')).toBe('templates')
+    expect(at('/admin/templates/profiles')).toBe('generation')
+    expect(at('/admin/templates/dishware')).toBe('generation')
+    expect(at('/admin/templates/edit')).toBe('generation')
+    expect(at('/admin/providers')).toBe('generation')
+    expect(at('/admin/references/lab/x')).toBe('references')
+    expect(items.find((item) => item.key === 'home')?.href).toBe('/admin/templates#home-display')
   })
 })
