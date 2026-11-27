@@ -4,9 +4,8 @@
 // shotviva-preview, the project behind the validation preview deployment.
 export const PREVIEW_REF = 'pnzkiqvktkzznfbyhphe'
 
-// Refused even when listed in QA_EXTRA_SUPABASE_REFS. The production project does not exist
-// yet (LAUNCH_CHECKLIST); its ref goes here the day it is created.
-export const PRODUCTION_REFS: readonly string[] = []
+// Refused even when listed in QA_EXTRA_SUPABASE_REFS: the production project.
+export const PRODUCTION_REFS: readonly string[] = ['irbqamjuazkkyvnnzupf']
 
 export const DEFAULT_SITE_URL = 'https://shotviva-git-validation-preview-simons-projects-bfe3e99f.vercel.app'
 
