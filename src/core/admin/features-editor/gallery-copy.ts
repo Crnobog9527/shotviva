@@ -13,6 +13,11 @@ export const GALLERY_SWITCH_COPY: SwitchCopy = {
   ...shared,
   title: '公开创作库',
   key: 'gallery_enabled',
+  summary: {
+    purpose: '所有人能看的作品墙（/gallery），只展示审核通过的公开作品。',
+    whenOn: '作品墙、作品页和页脚入口出现',
+    whenOff: '作品墙和作品页打不开，入口消失；作品和审核结果保留',
+  },
   body: '/gallery 作品墙和 /g 作品页。只展示审核通过的公开作品。保存后马上生效，不用重新部署。',
   neverChanged: '还没改过，默认关闭',
   turnOn: '开启创作库',
@@ -37,6 +42,11 @@ export const AUTO_APPROVE_SWITCH_COPY: SwitchCopy = {
   ...shared,
   title: '未被标记的作品自动通过',
   key: 'gallery_auto_approve',
+  summary: {
+    purpose: '自动审核没标记的公开作品，要不要还等人工点通过。',
+    whenOn: '没被标记的作品直接进创作库',
+    whenOff: '每张都要在「创作库审核」人工通过',
+  },
   body: '公开作品先由 OpenAI 自动审核。关着时，没被标记的作品也要人工点通过才会出现在创作库；开着时直接通过。被标记的作品始终自动拒绝。',
   neverChanged: '还没改过，默认关闭（每张都要人工通过）',
   turnOn: '开启自动通过',
