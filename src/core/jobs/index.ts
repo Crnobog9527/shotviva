@@ -37,7 +37,7 @@ export {
 } from './provider'
 export { RATE_LIMIT, assertWithinRateLimit, countsAgainst, isLiveRunning, rateLimitVerdict, type ReplayOf } from './rate-limit'
 export { accountLimits } from './account-limits'
-export { listMonthWorks, listOwnJobs, listRunningJobIds, type MonthWorks, type OwnJobs } from './own-jobs'
+export { decodeOwnJobsCursor, encodeOwnJobsCursor, listMonthWorks, listOwnJobs, listRunningJobIds, PHOTOS_PAGE, type MonthWorks, type OwnJobs, type OwnJobsCursor } from './own-jobs'
 export { ENV_PROVIDER_SOURCE, modelFromTag, providerTag } from './provider-tag'
 export { runGeneration, type GenerationDeps } from './run-generation'
 // Shared with the admin test run (T85): the same provider call and screening cost.

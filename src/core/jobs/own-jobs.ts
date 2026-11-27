@@ -1,6 +1,7 @@
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { z } from 'zod'
 
 import { AppError } from '../errors'
 import { JOB_COLUMNS, jobRowSchema, type Job } from './job-schema'
@@ -9,32 +10,95 @@ import { isLiveRunning, RATE_LIMIT } from './rate-limit'
 // Photos reads on the server: the raw row may contain private template references.
 // Scope every query to the signed-in owner and undeleted works. A 'running' row older
 // than the function limit died with its function and is left out too (v1 has no sweeper).
-export type OwnJobs = { running: Job[]; done: Job[] }
+// Photos shows the newest PHOTOS_PAGE works and pages back from there (2026-11-27: the list
+// used to stop at the newest 60). `until` is the last row the page already showed: the list is
+// everything from the newest down to it plus the next page, keyset on (created_at, id) desc, no
+// OFFSET. Served by generation_jobs_user_id_created_at_idx (user_id, created_at desc).
+// next: the cursor for "Load more", null at the oldest work. total: every finished work.
+export type OwnJobs = { running: Job[]; done: Job[]; total: number; next: OwnJobsCursor | null }
+export type OwnJobsCursor = { createdAt: string; id: string }
 
-const PHOTOS_LIMIT = 60
+export const PHOTOS_PAGE = 48
+// At most this many works above the cursor are listed again: past it the list slides (the
+// newest drop off the top, read nearest the cursor first), so Load more always moves on.
+const MAX_WINDOW = 1000
 // Far above any tier's concurrency (TIER_LIMITS): only the count matters.
 const RUNNING_LIMIT = 30
 
-export async function listOwnJobs(client: SupabaseClient, userId: string, now: Date): Promise<OwnJobs> {
-  const { data, error } = await client
-    .from('generation_jobs')
-    .select(JOB_COLUMNS)
-    .eq('user_id', userId)
-    .in('status', ['running', 'succeeded'])
-    .is('deleted_at', null).is('org_access_ended_at', null)
-    .order('created_at', { ascending: false })
-    .limit(PHOTOS_LIMIT)
-  if (error) throw new AppError('INTERNAL', `listOwnJobs failed: ${error.message}`)
-  const jobs = await withWholeBatches(client, userId, data.map((row) => jobRowSchema.parse(row)))
+const LISTED = ['running', 'succeeded']
+// created_at is matched as the raw timestamptz text the row came with (microseconds; a JS Date
+// keeps milliseconds only), quoted for PostgREST's or().
+const atOrAfter = (c: OwnJobsCursor) => `created_at.gt."${c.createdAt}",and(created_at.eq."${c.createdAt}",id.gte.${c.id})`
+const before = (c: OwnJobsCursor) => `created_at.lt."${c.createdAt}",and(created_at.eq."${c.createdAt}",id.lt.${c.id})`
+
+type Row = Record<string, unknown> & { id: string; created_at: string }
+
+export async function listOwnJobs(client: SupabaseClient, userId: string, now: Date, until: OwnJobsCursor | null = null, window = MAX_WINDOW): Promise<OwnJobs> {
+  const base = (ascending = false) =>
+    client
+      .from('generation_jobs')
+      .select(JOB_COLUMNS)
+      .eq('user_id', userId)
+      .in('status', LISTED)
+      .is('deleted_at', null).is('org_access_ended_at', null)
+      .order('created_at', { ascending })
+      .order('id', { ascending })
+  const read = async (query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<Row[]> => {
+    const { data, error } = await query
+    if (error) throw new AppError('INTERNAL', `listOwnJobs failed: ${error.message}`)
+    return data as Row[]
+  }
+  const [above, page, total] = await Promise.all([
+    until ? read(base(true).or(atOrAfter(until)).limit(window)) : Promise.resolve([] as Row[]),
+    read((until ? base().or(before(until)) : base()).limit(PHOTOS_PAGE + 1)),
+    countDone(client, userId),
+  ])
+  // next always comes from the page below the cursor, so each Load more moves one page on.
+  const below = page.slice(0, PHOTOS_PAGE)
+  const rows = [...above.reverse(), ...below]
+  const last = below.at(-1)
+  const next = page.length > PHOTOS_PAGE && last ? { createdAt: last.created_at, id: last.id } : null
+  const listed = rows.map((row) => jobRowSchema.parse(row))
+  // Cut at either end (more below, or the window full above): a batch may straddle the cut.
+  const cut = next !== null || above.length >= window
+  const jobs = cut ? await withWholeBatches(client, userId, listed) : listed
   const live = (job: Job) => isLiveRunning({ status: job.status, created_at: job.createdAt.toISOString() }, now)
-  return { running: jobs.filter(live), done: jobs.filter((job) => job.status === 'succeeded') }
+  return { running: jobs.filter(live), done: jobs.filter((job) => job.status === 'succeeded'), total, next }
 }
 
-// A batch cut by the 60-row window (its older photos past the limit) would show fewer photos and
+async function countDone(client: SupabaseClient, userId: string): Promise<number> {
+  const { count, error } = await client
+    .from('generation_jobs')
+    .select('id', { count: 'exact' })
+    .eq('user_id', userId)
+    .eq('status', 'succeeded')
+    .is('deleted_at', null).is('org_access_ended_at', null)
+    .limit(1)
+  if (error) throw new AppError('INTERNAL', `listOwnJobs count failed: ${error.message}`)
+  return count ?? 0
+}
+
+// "Load more"'s address carries the cursor: base64url of `<created_at>|<id>`. Anything that does
+// not decode to a timestamp and a uuid is no cursor (the first page).
+const CURSOR_ID = z.uuid()
+const CURSOR_AT = z.iso.datetime({ offset: true })
+
+export function encodeOwnJobsCursor(cursor: OwnJobsCursor): string {
+  return Buffer.from(`${cursor.createdAt}|${cursor.id}`).toString('base64url')
+}
+
+export function decodeOwnJobsCursor(value: unknown): OwnJobsCursor | null {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 200) return null
+  const [createdAt, id, ...rest] = Buffer.from(value, 'base64url').toString('utf8').split('|')
+  if (rest.length > 0 || !CURSOR_AT.safeParse(createdAt).success || !CURSOR_ID.safeParse(id).success) return null
+  return { createdAt: createdAt!, id: id!.toLowerCase() }
+}
+
+// A batch cut by the page window (its older photos past the cut) would show fewer photos and
 // a smaller ZIP count than it has (T107): its missing finished photos are read in too, one
-// query over generation_jobs_batch_slot. A batch is at most 30 photos.
+// query over generation_jobs_batch_slot. A batch is at most 30 photos. The next page then
+// leaves them out (Photos drops a work it already shows).
 async function withWholeBatches(client: SupabaseClient, userId: string, jobs: Job[]): Promise<Job[]> {
-  if (jobs.length < PHOTOS_LIMIT) return jobs
   const batchIds = [...new Set(jobs.flatMap((job) => (job.batchId ? [job.batchId] : [])))]
   if (batchIds.length === 0) return jobs
   const { data, error } = await client
