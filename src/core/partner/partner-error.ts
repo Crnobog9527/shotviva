@@ -40,6 +40,7 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   CODE_USED: 'internal',
   CODE_NEW_USERS_ONLY: 'internal',
   CODE_INVITE_SIGNUP_ONLY: 'internal',
+  CODE_ORG_MEMBER: 'internal',
   CODE_OWN: 'internal',
   CODE_ALREADY_INVITED: 'internal',
   CODE_NEEDS_CONFIRM: 'internal',

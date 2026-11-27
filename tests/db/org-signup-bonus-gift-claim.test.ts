@@ -94,7 +94,7 @@ it('pays the amount set at the binding, not a later one', async () => {
   expect(await bonusLedger(customer)).toEqual([{ delta: 350, idempotency_key: 'org_signup_bonus:' + customer }])
 })
 
-it('no bonus at the claim for a customer who paid, became staff, or whose org turned the bonus off; the gift is still paid', async () => {
+it('no bonus at the claim for a customer who paid, became staff (no gift either, 2032), or whose org turned the bonus off', async () => {
   const { orgId, slug } = await org(350)
   const paid = await pendingOnNetwork()
   const staff = await pendingOnNetwork()
@@ -103,13 +103,16 @@ it('no bonus at the claim for a customer who paid, became staff, or whose org tu
   await sale(db, paid, 'pack_m', 2490)
   const { invite_token } = await row(db, 'select invite_token from orgs where id=$1', [orgId])
   await db.query('select org_join($1,$2)', [staff, invite_token])
-  for (const u of [paid, staff]) {
-    await confirmPhone(u)
-    expect(await claim(u)).toBe('granted')
-    expect(await signupGifts(u)).toBe(1)
-    expect(await bonusLedger(u)).toEqual([])
-    expect(await errorOf(u)).toBe('blocked_no_signup_grant')
-  }
+  await confirmPhone(paid)
+  expect(await claim(paid)).toBe('granted')
+  expect(await signupGifts(paid)).toBe(1)
+  expect(await bonusLedger(paid)).toEqual([])
+  expect(await errorOf(paid)).toBe('blocked_no_signup_grant')
+  // 2032: an active org member gets no signup gift (and so no bonus) while a member.
+  await confirmPhone(staff)
+  expect(await claim(staff)).toBe('not_pending')
+  expect(await signupGifts(staff)).toBe(0)
+  expect(await bonusLedger(staff)).toEqual([])
 
   const off = await pendingOnNetwork()
   expect(await bind(db, off, slug)).toBe(true)
