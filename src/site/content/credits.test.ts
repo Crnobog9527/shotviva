@@ -18,7 +18,7 @@ describe('from N credits', () => {
   })
 
   it('falls back to the standard template price with no catalogue', () => {
-    expect(creditFacts([], 100)).toEqual(FALLBACK_CREDITS)
+    expect(creditFacts([], 200)).toEqual(FALLBACK_CREDITS)
     expect(creditFacts([], 350)).toEqual({ ...FALLBACK_CREDITS, gift: 350 })
     expect(fillCredits(fromCredits, FALLBACK_CREDITS)).toBe('credits as shown on the template')
   })
@@ -52,9 +52,9 @@ describe('from N credits', () => {
 // T91: the signup gift and the bills count Standard images at the catalogue's cheapest price.
 describe('image counts from the catalogue', () => {
   it('shows the signup grant even if the catalogue is empty or its price changes', () => {
-    for (const facts of [MIXED, FALLBACK_CREDITS, { from: 74, same: true, gift: 100 }]) {
+    for (const facts of [{ ...MIXED, gift: 200 }, FALLBACK_CREDITS, { from: 74, same: true, gift: 200 }]) {
       expect([freeImagesLabel, FreeImagesLabel, FreeImagesTitle, FreeImagesShort, zhFreeImages].map((label) => fillCredits(label, facts)))
-        .toEqual(['100 free credits', '100 free credits', '100 Free Credits', '100 free credits', '100 个免费积分'])
+        .toEqual(['200 free credits', '200 free credits', '200 Free Credits', '200 free credits', '200 个免费积分'])
     }
   })
 })

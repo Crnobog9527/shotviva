@@ -1,9 +1,10 @@
 -- 2008: the signup gift's amount is a setting the Owner changes in the admin (「注册赠送规则」 on
 -- /admin/features), not a number in a migration (ARCHITECTURE §7). Owner, 2026-11-27: 100 credits
--- is too few for a new account to try editing.
+-- is too few for a new account to try editing; the gift becomes 200.
 --
 -- system_settings key signup_gift_credits, an integer from 1 to 5000; no row (or a row outside that
--- range) means 100, the amount 1480 hard-coded, so this migration alone changes nothing. 0 is not
+-- range) means 200 (Owner 2026-11-27), so from this migration on a new account gets 200 until the
+-- admin saves another amount (1480 hard-coded 100). 0 is not
 -- accepted: signup_gift_paused already stops the gift, and an amount of 0 would make grant_credits
 -- skip without storing a refusal, so a later raise would pay those accounts on their next sign-in.
 --
@@ -15,7 +16,8 @@
 -- cutover exists (a local database without the v2 catalogue).
 --
 -- Expand-only: the deployed code passes its own amount to grant_credits, which the function has
--- always replaced with signup_gift_amount (1480); signup_gift_today gains a 'credits' field the
+-- always replaced with signup_gift_amount (1480), so between this migration and the release the
+-- live site already grants 200 while its pages still say 100 (accepted by the Owner); signup_gift_today gains a 'credits' field the
 -- deployed code ignores; admin_set_system_setting accepts one more key (unbanned admins only),
 -- every other key checked exactly as in 2001, whose body this is.
 
@@ -29,8 +31,8 @@ as $$
   select case
            when cutoff is null then 6
            when p_created_at < cutoff then 0
-           else (select case when n between 1 and 5000 then n else 100 end
-                   from (select public.signup_gift_setting_int('signup_gift_credits', 100) as n) s)
+           else (select case when n between 1 and 5000 then n else 200 end
+                   from (select public.signup_gift_setting_int('signup_gift_credits', 200) as n) s)
          end
     from (select (select s.updated_at from public.system_settings s
                    where s.key = 'pricing_catalog_version' and s.value = '"v2"'::jsonb) as cutoff) c

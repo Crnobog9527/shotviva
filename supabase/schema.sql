@@ -19335,8 +19335,8 @@ CREATE OR REPLACE FUNCTION "public"."signup_gift_amount"("p_created_at" timestam
   select case
            when cutoff is null then 6
            when p_created_at < cutoff then 0
-           else (select case when n between 1 and 5000 then n else 100 end
-                   from (select public.signup_gift_setting_int('signup_gift_credits', 100) as n) s)
+           else (select case when n between 1 and 5000 then n else 200 end
+                   from (select public.signup_gift_setting_int('signup_gift_credits', 200) as n) s)
          end
     from (select (select s.updated_at from public.system_settings s
                    where s.key = 'pricing_catalog_version' and s.value = '"v2"'::jsonb) as cutoff) c

@@ -76,7 +76,7 @@ describe('home FAQ, English (建站规格 G6)', () => {
     const b = fillCredits(byLetter(faq, 'B').answer, FALLBACK_CREDITS)
     // SEO PATCH v4.1: the free credits, how photos are charged (on the Generate button, never a
     // count here), and where paid plans start.
-    expect(b).toBe(`Shotviva gives new accounts 100 credits to try a template. Each photo uses credits based on template and size, shown on the Generate button. Free photos are public and watermarked; paid plans start at ${usd(planFrom?.priceUsd ?? 0)}/month.`)
+    expect(b).toBe(`Shotviva gives new accounts 200 credits to try a template. Each photo uses credits based on template and size, shown on the Generate button. Free photos are public and watermarked; paid plans start at ${usd(planFrom?.priceUsd ?? 0)}/month.`)
     expect(b).not.toContain(fromCredits)
     expect(planFrom).toBeDefined()
     expect(hundredCreditsFrom).toBe(perHundredCredits('max_yearly'))
@@ -163,7 +163,7 @@ describe('home FAQ, Chinese (建站规格 G6, G13)', () => {
   })
 
   it('uses the same numbers as the English FAQ and /zh/pricing', () => {
-    expect(fillCredits(byLetter(faq, 'B').answer, FALLBACK_CREDITS)).toContain('给新账号 100 个积分，用来试一个模板')
+    expect(fillCredits(byLetter(faq, 'B').answer, FALLBACK_CREDITS)).toContain('给新账号 200 个积分，用来试一个模板')
     expect(byLetter(faq, 'B').answer).toContain('生成按钮上会显示')
     expect(byLetter(faq, 'B').answer).not.toContain(zhFromCredits)
     expect(byLetter(faq, 'B').answer).toContain(`付费套餐每月 ${usd(planFrom?.priceUsd ?? 0)} 起`)

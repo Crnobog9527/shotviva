@@ -9,7 +9,7 @@ import { connectAdmin, createUser, profileOf } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
 // 2008 (ARCHITECTURE §7): the signup gift's amount is system_settings signup_gift_credits (1–5000,
-// default 100), read in SQL when the gift is paid, never taken from the caller. The idempotency key
+// default 200, Owner 2026-11-27), read in SQL when the gift is paid, never taken from the caller. The idempotency key
 // is unchanged, so an account is paid once at the amount of that moment.
 
 let db: Client
@@ -48,10 +48,10 @@ afterAll(async () => {
 })
 
 describe('signup gift amount (2008)', () => {
-  it('pays 100 with no setting, as before', async () => {
+  it('pays the default 200 with no setting', async () => {
     const id = await createUser(db)
     expect(await grantSignupCredits(billingGrant(service), id, 100)).toBe(true)
-    expect(await signupRows(id)).toEqual([100])
+    expect(await signupRows(id)).toEqual([200])
   })
 
   it('pays the saved amount, whatever amount the caller passes', async () => {
@@ -71,11 +71,11 @@ describe('signup gift amount (2008)', () => {
     expect(await signupRows(id)).toEqual([300])
   })
 
-  it.each([0, 5001, -5, '300', true])('falls back to 100 for a stored %o outside the range', async (value) => {
+  it.each([0, 5001, -5, '300', true])('falls back to 200 for a stored %o outside the range', async (value) => {
     await setAmount(value)
     const id = await createUser(db)
     expect(await grantSignupCredits(billingGrant(service), id, 100)).toBe(true)
-    expect(await signupRows(id)).toEqual([100])
+    expect(await signupRows(id)).toEqual([200])
   })
 
   it('pays a pending account the amount of the moment it claims', async () => {

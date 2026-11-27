@@ -106,7 +106,8 @@ export const site = defineSite({
   billing: {
     currency: 'usd',
     pricingVersion: pricingV2 ? 'v2' : undefined,
-    freeCredits: pricingV2 ? 100 : 6,
+    // The signup gift's default (Owner 2026-11-27: 200); the admin setting signup_gift_credits wins.
+    freeCredits: pricingV2 ? 200 : 6,
     // The nine products, prices final (Owner 2026-11-05, ARCHITECTURE §6.2). Credits and days
     // also live in the products table for apply_purchase; tests/db/stripe-catalog.test.ts keeps
     // them equal. Stripe Prices are looked up by lookup_key, never stored here.

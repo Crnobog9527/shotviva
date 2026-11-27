@@ -13,12 +13,12 @@ describe('signupGiftCredits', () => {
     expect(await signupGiftCredits(async () => ({ signup_gift_credits: 5000 }))).toBe(5000)
   })
 
-  // As signup_gift_amount grants: no row, or a value outside 1–5000, means 100.
-  it.each([undefined, 0, 5001, 2.5, '300', null])('falls back to 100 for %o', async (value) => {
-    expect(await signupGiftCredits(async () => ({ signup_gift_credits: value }))).toBe(100)
+  // As signup_gift_amount grants: no row, or a value outside 1–5000, means 200 (Owner 2026-11-27).
+  it.each([undefined, 0, 5001, 2.5, '300', null])('falls back to 200 for %o', async (value) => {
+    expect(await signupGiftCredits(async () => ({ signup_gift_credits: value }))).toBe(200)
   })
 
-  it('falls back to 100 when the settings read failed (the cached read returns no values)', async () => {
-    expect(await signupGiftCredits(async () => ({}))).toBe(100)
+  it('falls back to 200 when the settings read failed (the cached read returns no values)', async () => {
+    expect(await signupGiftCredits(async () => ({}))).toBe(200)
   })
 })

@@ -24,7 +24,7 @@ describe('home page skeleton', () => {
     expect(home.description).toBe(
       'Image to image AI turns a phone photo into a studio shot or a new art style. Pick a template, no prompts, the subject stays as shot. 100 free credits.',
     )
-    expect(fillCredits(homePage.description, FALLBACK_CREDITS)).toMatch(/ 100 free credits\.$/)
+    expect(fillCredits(homePage.description, FALLBACK_CREDITS)).toMatch(/ 200 free credits\.$/)
     expect(homePage.h1).toBe('Image to Image AI: Restyle a Photo, Keep the Subject')
     expect(homePage.subtitle).toBe(
       'The AI photo studio that starts from your real photo. What you shot stays; the template changes the light, the scene or the art style.',
@@ -68,7 +68,7 @@ describe('home page skeleton', () => {
 
 describe('public numbers', () => {
   it('counts the 6 free credits in Standard images at the catalogue price (建站规格 G3, T91)', () => {
-    expect(site.billing.freeCredits).toBe(100)
+    expect(site.billing.freeCredits).toBe(200)
     // Filled from the catalogue at render time (credits.test.ts).
     expect(fillCredits(freeImagesLabel, LIVE)).toBe('100 free credits')
     expect(fillCredits(fromCredits, LIVE)).toBe('from 1 credit')
