@@ -130,6 +130,13 @@ describe('/sw.js', () => {
     expect(await nav.response?.text()).toBe('preloaded page')
     const plain = await worker.dispatch('fetch', { request: { url: `${SITE}/zh/account`, method: 'GET', mode: 'navigate' }, preloadResponse: Promise.resolve(undefined) })
     expect(await plain.response?.text()).toBe('network')
+    // An empty 204 preload is dropped only on Create (the proxy's shell-era answer); elsewhere it is the page.
+    const empty = () => Promise.resolve(new Response(null, { status: 204 }))
+    const create = await worker.dispatch('fetch', { request: { url: `${SITE}/zh/generate?sv-net=1`, method: 'GET', mode: 'navigate' }, preloadResponse: empty() })
+    expect(await create.response?.text()).toBe('network')
+    const other = await worker.dispatch('fetch', { request: { url: `${SITE}/account`, method: 'GET', mode: 'navigate' }, preloadResponse: empty() })
+    expect(other.response?.status).toBe(204)
+    expect(worker.fetch).toHaveBeenCalledTimes(2)
     expect(worker.caches.open).not.toHaveBeenCalled()
     expect(worker.store.match).not.toHaveBeenCalled()
   })

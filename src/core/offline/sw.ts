@@ -1,4 +1,6 @@
+import { CACHE_PREFIX } from './client-names'
 import { routeFor } from './routes'
+import { CREATE_PATHS } from './shell-fallback'
 import { NO_SHELL, SHELL_HANDLERS } from './shell-worker'
 
 // The site's service worker (/sw.js), for the home-screen app above all (after Lovart): a launch
@@ -13,7 +15,7 @@ import { NO_SHELL, SHELL_HANDLERS } from './shell-worker'
 
 // Cache names: one per build for the static files (a deploy's files live under its own name, and
 // activation deletes every other build's), one for catalogue files across builds (a few kept).
-export const CACHE_PREFIX = 'sv-'
+export { CACHE_PREFIX }
 const CATALOGUE_KEEP = 4
 // First-screen template covers (LCP plan 1): the first screens of the last few Create screens used
 // (All, a category), at most COVERS_KEEP covers, some 0.3 MB of 384 w AVIF. Kept across builds:
@@ -141,15 +143,20 @@ async function coverFirst(event) {
   return fetch(event.request)
 }
 
+// Create's addresses, as the proxy matches them for its 204 (shell-fallback.ts).
+const CREATE_PATHS = ${JSON.stringify(CREATE_PATHS)}
+
 self.addEventListener('fetch', (event) => {
   const request = event.request
   if (shellFetch(event)) return
   if (request.mode === 'navigate') {
-    // Always the network: the preloaded response when there is one, else a plain fetch.
+    // Always the network: the preloaded response when there is one, else a plain fetch. On Create's
+    // two addresses an empty 204 preload is the proxy's answer to a shell-era preload
+    // (shell-proxy.ts), never the page; anywhere else a 204 is the page's own answer.
     event.respondWith((async () => {
       try {
         const preloaded = await event.preloadResponse
-        if (preloaded) return preloaded
+        if (preloaded && !(preloaded.status === 204 && CREATE_PATHS.includes(new URL(request.url).pathname))) return preloaded
       } catch {}
       return fetch(request)
     })())
