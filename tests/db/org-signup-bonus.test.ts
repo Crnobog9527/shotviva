@@ -61,14 +61,16 @@ const bonusLedger = (user: string) =>
 const freeCredits = async (user: string) => (await row(db, 'select free_credits from profiles where id=$1', [user])).free_credits as number
 const bonusRow = (user: string) => row(db, 'select org_id,member_user_id,credits from org_signup_bonuses where user_id=$1', [user])
 
-it('gives a staff member\'s new invitee the org\'s bonus once, in the free pool, on top of the invite reward', async () => {
+it('gives a staff member\'s new invitee the org\'s bonus once, in the free pool, instead of the personal invite reward (2032)', async () => {
   const { orgId, staff } = await orgTeam(300)
   const { customer, result } = await invitedBy(staff)
   expect(result.status).toBe('ok')
   expect(await bonusLedger(customer)).toEqual([{ delta: 300, pool: 'free', idempotency_key: 'org_signup_bonus:' + customer }])
   expect(await freeCredits(customer)).toBe(6 + result.credits_granted + 300)
   expect(await bonusRow(customer)).toEqual({ org_id: orgId, member_user_id: staff, credits: 300 })
-  expect(await row(db, "select count(*)::int n from credit_ledger where user_id=$1 and kind='code_grant'", [customer])).toEqual({ n: 1 })
+  // 2032: no personal invitee reward for a staff code.
+  expect(result.credits_granted).toBe(0)
+  expect(await row(db, "select count(*)::int n from credit_ledger where user_id=$1 and kind='code_grant'", [customer])).toEqual({ n: 0 })
 
   // Nothing re-fires it: another profile update, a rebind and back, or a replayed binding.
   await db.query('update profiles set free_credits=free_credits where id=$1', [customer])

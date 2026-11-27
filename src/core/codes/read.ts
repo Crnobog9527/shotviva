@@ -2,6 +2,8 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import { isInActiveOrg } from '../billing/org-member-guard'
+
 const terms = z.object({
   code: z.string(), discount_percent: z.number().nullable(), discount_products: z.array(z.string()).nullable(),
   discount_duration: z.enum(['once', 'repeating', 'forever']).nullable(), discount_months: z.number().nullable(),
@@ -15,28 +17,44 @@ function available(offer: z.infer<typeof terms>, now: number) {
 
 const preview = terms.extend({
   kind: z.enum(['invite', 'campaign']), code_preview_credits: z.number().int().nonnegative(), invitee_pool: z.enum(['free', 'paid']).nullable(),
+  // 2032: an org staff member's invite code: credits are the org's signup bonus, not the personal reward.
+  code_preview_org: z.boolean().default(false),
   max_redemptions: z.number().nullable(), redemption_count: z.number(),
   owner: z.object({ banned_at: z.string().nullable() }).nullable(),
 })
 
-export async function previewCode(admin: SupabaseClient, code: string) {
+// `refSlug`: the visitor's partner link (sv_ref), which binds before the code. An org member's code
+// shows the org bonus only when this customer would be bound to that org (2032).
+export async function previewCode(admin: SupabaseClient, code: string, refSlug: string | null = null) {
   const { data, error } = await admin.from('codes')
-    .select('code,kind,active,starts_at,expires_at,max_redemptions,redemption_count,code_preview_credits,invitee_pool,discount_percent,discount_products,discount_duration,discount_months,owner:profiles!codes_owner_user_id_fkey(banned_at)')
+    .select('code,kind,active,starts_at,expires_at,max_redemptions,redemption_count,code_preview_credits,code_preview_org,invitee_pool,discount_percent,discount_products,discount_duration,discount_months,owner:profiles!codes_owner_user_id_fkey(banned_at)')
     .eq('code', code).maybeSingle()
   if (error) throw error
   if (!data) return null
   const c = preview.parse(data)
   if (!available(c, Date.now()) || c.owner?.banned_at || (c.max_redemptions !== null && c.redemption_count >= c.max_redemptions)) return null
-  return describeOffer(c)
+  return describeOffer(c.code_preview_org ? { ...c, code_preview_credits: await visitorCredits(admin, code, refSlug) } : c)
+}
+
+// An org member's code for this visitor: the org bonus if they would be bound to that org, else 0.
+async function visitorCredits(admin: SupabaseClient, code: string, refSlug: string | null) {
+  const own = await admin.rpc('code_preview_invite_credits', { p_code: code, p_ref_slug: refSlug })
+  if (own.error) throw own.error
+  return z.number().int().nonnegative().parse(own.data)
 }
 
 function describeOffer(c: z.infer<typeof preview>) {
-  return { kind: c.kind, credits: c.code_preview_credits,
+  return { kind: c.kind, credits: c.code_preview_credits, org: c.code_preview_org,
     pool: c.kind === 'invite' ? 'free' as const : c.invitee_pool, percent: c.discount_percent, products: c.discount_products ?? [],
     duration: c.discount_duration, months: c.discount_months }
 }
 
+// 2032: an active org member (the primary admin too) uses no discount, as checkout_discount says.
 export async function readPendingDiscount(admin: SupabaseClient, userId: string) {
+  return (await isInActiveOrg(admin, userId)) ? null : readOwnPendingDiscount(admin, userId)
+}
+
+async function readOwnPendingDiscount(admin: SupabaseClient, userId: string) {
   const { data, error } = await admin.from('code_redemptions')
     .select('discount_expires_at,codes!inner(code,discount_percent,discount_products,discount_duration,discount_months,starts_at,expires_at,active)')
     .eq('user_id', userId).eq('status', 'ok').is('discount_used_payment_id', null).is('discount_void_at', null)

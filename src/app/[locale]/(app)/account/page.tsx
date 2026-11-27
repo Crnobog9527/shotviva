@@ -79,12 +79,21 @@ async function Account() {
         {claimOptions ? <GiftClaimCard credits={claimCredits} options={claimOptions} actions={claimActions} /> : null}
         <OrgBlock view={org} memberLink={org.kind === 'member' ? <Suspense fallback={null}><MemberLink user={user.id} /></Suspense> : null} customerLink={org.kind === 'owner' && org.org.affiliateEnabled && affiliate ? <Suspense fallback={null}><OwnerCustomerLink user={user.id} /></Suspense> : null} />
         <StoreCard actions={storeActions} />
-        <InviteCard load={loadMyInvites} />
+        {/* 2032: an org staff code earns no personal invite rewards; members promote with the org link above. */}
+        {!orgInvites(org) && <InviteCard load={loadMyInvites} />}
         <RedeemCard pending={discount} />
       </AccountView>
       <AccountHelp actions={helpActions} payments={purchases} replyTime={<ReplyTime userId={user.id} />} brand={site.brand.name} unread={helpUnread} />
     </>
   )
+}
+
+// An active member's (and the owner's) own invite code earns no personal invitee or inviter reward
+// while the org is active (2032), so the personal invite card would promise rewards that do not
+// come. They promote with the org's links instead.
+function orgInvites(view: Awaited<ReturnType<typeof readOrgView>>) {
+  if (view.kind === 'member') return view.status === 'active'
+  return view.kind === 'owner' && view.org.status === 'active'
 }
 
 // The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a
