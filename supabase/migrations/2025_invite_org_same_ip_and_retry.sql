@@ -18,7 +18,10 @@
 --    after a pending cap) could never be invited. Now only an 'ok' row counts as used / invited.
 --    A later attempt that passes replaces the user's blocked row with the 'ok' row (keeping when
 --    and why it was blocked in blocked_status / blocked_at); an attempt that is blocked again
---    replaces the old blocked row with the new one. The user's profile lock (taken first, as
+--    replaces the old blocked row with the new one. A replaced blocked row is not lost: it moves,
+--    with its id, code, inviter, context, status and time, to code_redemption_blocks (replaced_by =
+--    the row that took its place), and admin_code_redemptions keeps listing it (the same-IP list
+--    and each code's redemptions), with the same row shape as before. The user's profile lock (taken first, as
 --    before) serializes attempts, and the unique index on (user_id) where kind = 'invite' still
 --    allows one invite row per user, so the invitee credits (code:<redemption>) and the inviter
 --    reward (invite:<redemption>, only for 'ok' rows) are paid at most once. Blocked rows never
@@ -31,6 +34,29 @@
 alter table public.code_redemptions
   add column blocked_status text check (blocked_status in ('blocked_same_ip','blocked_no_signup_grant')),
   add column blocked_at timestamptz;
+
+-- Blocked invite attempts replaced by a later attempt (2025). Private like code_redemptions.
+create table public.code_redemption_blocks (
+  id uuid primary key,
+  code_id uuid references public.codes(id) on delete set null,
+  kind text not null check (kind = 'invite'),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  inviter_user_id uuid references public.profiles(id) on delete set null,
+  context text not null,
+  status text not null check (status in ('blocked_same_ip','blocked_no_signup_grant')),
+  created_at timestamptz not null,
+  replaced_at timestamptz not null default now(),
+  replaced_by uuid not null
+);
+alter table public.code_redemption_blocks enable row level security;
+revoke all on public.code_redemption_blocks from public, anon, authenticated, service_role;
+grant select on public.code_redemption_blocks to service_role;
+create index code_redemption_blocks_code_created_idx on public.code_redemption_blocks (code_id, created_at desc, id desc);
+create index code_redemption_blocks_same_ip_idx on public.code_redemption_blocks (created_at desc, id desc)
+  where status = 'blocked_same_ip';
+create index code_redemption_blocks_user_idx on public.code_redemption_blocks (user_id);
+create index code_redemption_blocks_inviter_idx on public.code_redemption_blocks (inviter_user_id)
+  where inviter_user_id is not null;
 
 comment on column public.code_redemptions.blocked_status is
   'For an ok invite row: the status of the blocked attempt it replaced (2025), else null.';
@@ -114,9 +140,14 @@ begin
   if outcome <> 'ok' then
     if outcome in ('blocked_same_ip', 'blocked_no_signup_grant') then
       -- 2025: the latest blocked attempt replaces an earlier one (one invite row per user).
-      delete from public.code_redemptions where user_id = p_user and kind = 'invite' and status <> 'ok';
-      insert into public.code_redemptions(code_id, kind, user_id, inviter_user_id, context, status)
-        values (offer.id, offer.kind, p_user, offer.owner_user_id, p_context, outcome);
+      -- The replaced row moves to code_redemption_blocks, so the evidence stays.
+      with gone as (
+        delete from public.code_redemptions where user_id = p_user and kind = 'invite' and status <> 'ok'
+        returning id, code_id, kind, user_id, inviter_user_id, context, status, created_at)
+      insert into public.code_redemption_blocks(id, code_id, kind, user_id, inviter_user_id, context, status, created_at, replaced_by)
+        select id, code_id, kind, user_id, inviter_user_id, context, status, created_at, redemption_id from gone;
+      insert into public.code_redemptions(id, code_id, kind, user_id, inviter_user_id, context, status)
+        values (redemption_id, offer.id, offer.kind, p_user, offer.owner_user_id, p_context, outcome);
     end if;
     return jsonb_build_object('kind', offer.kind, 'status', outcome);
   end if;
@@ -147,7 +178,11 @@ begin
   -- 2025: a successful invite replaces the user's blocked attempt (any invite code), keeping why
   -- and when it was blocked. A blocked row never granted credits.
   if offer.kind = 'invite' then
-    delete from public.code_redemptions where user_id = p_user and kind = 'invite' and status <> 'ok'
+    with gone as (
+      delete from public.code_redemptions where user_id = p_user and kind = 'invite' and status <> 'ok'
+      returning id, code_id, kind, user_id, inviter_user_id, context, status, created_at)
+    insert into public.code_redemption_blocks(id, code_id, kind, user_id, inviter_user_id, context, status, created_at, replaced_by)
+      select id, code_id, kind, user_id, inviter_user_id, context, status, created_at, redemption_id from gone
       returning status, created_at into prior_status, prior_at;
   end if;
 
@@ -167,5 +202,44 @@ begin
   return jsonb_build_object('status', 'ok', 'kind', offer.kind, 'credits_granted', credits, 'pool', grant_pool,
     'discount_percent', offer.discount_percent, 'discount_products', offer.discount_products,
     'discount_expires_at', deadline, 'replaced', replaced);
+end;
+$$;
+
+-- 0893's admin list, now also listing the archived blocked attempts (same row shape; an archived
+-- row has no rewards or discounts). Paging by (created_at, id) spans both tables: ids are unique
+-- across them because a row is moved, never copied.
+create or replace function public.admin_code_redemptions(p_actor uuid, p_code_id uuid default null, p_cursor jsonb default null)
+returns setof jsonb language plpgsql stable set search_path = '' as $$
+begin
+  if not exists (select 1 from public.profiles where id = p_actor and role = 'admin' and banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  return query
+    with page as materialized (
+      select * from (
+        select r.id, r.code_id, r.user_id, r.inviter_user_id, r.context, r.status,
+          r.credits_granted, r.inviter_rewarded_at, r.inviter_reward_payment_id, r.discount_expires_at,
+          r.discount_used_payment_id, r.discount_void_at, r.created_at
+        from public.code_redemptions r
+        where (r.code_id = p_code_id or (p_code_id is null and r.status = 'blocked_same_ip'))
+          and (p_cursor is null or (r.created_at,r.id) < ((p_cursor->>'created_at')::timestamptz,(p_cursor->>'id')::uuid))
+        union all
+        select b.id, b.code_id, b.user_id, b.inviter_user_id, b.context, b.status,
+          0, null::timestamptz, null::bigint, null::timestamptz, null::bigint, null::timestamptz, b.created_at
+        from public.code_redemption_blocks b
+        where (b.code_id = p_code_id or (p_code_id is null and b.status = 'blocked_same_ip'))
+          and (p_cursor is null or (b.created_at,b.id) < ((p_cursor->>'created_at')::timestamptz,(p_cursor->>'id')::uuid))
+      ) rows
+      order by created_at desc, id desc limit 30
+    )
+    select to_jsonb(r) || jsonb_build_object('code', c.code,
+      'reward_payment_status', reward.status, 'reward_payment_refunded', reward.amount_refunded,
+      'discount_conflict_payments', coalesce((
+        select jsonb_agg(p.id order by p.id) from public.payments p
+        where p.code_id = r.code_id and p.user_id = r.user_id and p.code_discount_conflict
+      ), '[]'::jsonb))
+    from page r left join public.codes c on c.id = r.code_id
+    left join public.payments reward on reward.id = r.inviter_reward_payment_id
+    order by r.created_at desc, r.id desc;
 end;
 $$;
