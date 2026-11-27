@@ -5159,7 +5159,10 @@ CREATE OR REPLACE FUNCTION "public"."_org_staff_code"("p_code" "text", "p_user" 
       join public.orgs o on o.id = m.org_id and o.status = 'active' and o.affiliate_enabled
       join public.affiliates a on a.org_id = o.id and a.status = 'active'
       join public.affiliate_settings s on s.singleton and s.enabled
+      -- As redeem_code: a banned owner's code is expired, and a full one cannot be redeemed.
+      join public.profiles owner on owner.id = c.owner_user_id and owner.banned_at is null
      where c.code = upper(p_code) and c.kind = 'invite' and c.active
+       and (c.max_redemptions is null or c.redemption_count < c.max_redemptions)
        and (c.starts_at is null or c.starts_at <= now()) and (c.expires_at is null or c.expires_at > now())
        and (p_user is null or (
          a.user_id <> p_user
