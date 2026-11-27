@@ -19922,6 +19922,49 @@ $$;
 ALTER FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+begin
+  if p_user is null then return false; end if;
+  delete from public.signup_code_refs where user_id = p_user;
+  if p_code is null or p_code collate "C" !~ '^[A-Z0-9]{4,20}$' then return false; end if;
+  perform 1 from auth.users u
+   where u.id = p_user and u.email_confirmed_at is null and u.phone_confirmed_at is null
+     and u.last_sign_in_at is null and u.created_at >= now() - interval '10 minutes';
+  if not found then return false; end if;
+  insert into public.signup_code_refs (user_id, code) values (p_user, p_code);
+  return true;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_code_take"("p_user" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_code text; v_at timestamptz;
+begin
+  delete from public.signup_code_refs where user_id = p_user returning code, created_at into v_code, v_at;
+  if v_code is null or v_at < now() - interval '1 day' then return null; end if;
+  perform 1 from auth.users u
+   where u.id = p_user and u.confirmation_sent_at <= v_at
+     and (u.recovery_sent_at is null or u.recovery_sent_at < v_at)
+     and (u.email_change_sent_at is null or u.email_change_sent_at < v_at)
+     and not exists (select 1 from auth.identities i where i.user_id = p_user and i.provider <> 'email');
+  if not found then return null; end if;
+  return v_code;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."signup_code_take"("p_user" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) RETURNS integer
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -23686,6 +23729,17 @@ CREATE TABLE IF NOT EXISTS "public"."reference_template_sources" (
 ALTER TABLE "public"."reference_template_sources" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."signup_code_refs" (
+    "user_id" "uuid" NOT NULL,
+    "code" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "signup_code_refs_code_check" CHECK (("code" ~ '^[A-Z0-9]{4,20}$'::"text"))
+);
+
+
+ALTER TABLE "public"."signup_code_refs" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."signup_gift_claims" (
     "key_hash" "text" NOT NULL,
     "method" "text" NOT NULL,
@@ -24877,6 +24931,11 @@ ALTER TABLE ONLY "public"."reference_template_sources"
 
 ALTER TABLE ONLY "public"."reference_template_sources"
     ADD CONSTRAINT "reference_template_sources_run_id_key" UNIQUE ("run_id");
+
+
+
+ALTER TABLE ONLY "public"."signup_code_refs"
+    ADD CONSTRAINT "signup_code_refs_pkey" PRIMARY KEY ("user_id");
 
 
 
@@ -27214,6 +27273,11 @@ ALTER TABLE ONLY "public"."reference_template_sources"
 
 
 
+ALTER TABLE ONLY "public"."signup_code_refs"
+    ADD CONSTRAINT "signup_code_refs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."signup_gift_claims"
     ADD CONSTRAINT "signup_gift_claims_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
 
@@ -27789,6 +27853,9 @@ CREATE POLICY "series_read" ON "public"."template_series" FOR SELECT TO "authent
      JOIN "public"."template_category_paths" "c" ON (("c"."key" = COALESCE("t"."subcategory_key", "t"."category_key"))))
   WHERE (("t"."series_id" = "template_series"."id") AND "t"."is_active" AND ('web'::"text" = ANY ("t"."visible_in")) AND "c"."web_visible")))));
 
+
+
+ALTER TABLE "public"."signup_code_refs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."signup_gift_claims" ENABLE ROW LEVEL SECURITY;
@@ -30944,6 +31011,16 @@ GRANT ALL ON FUNCTION "public"."settle_waffo_order_v2"("p_user_id" "uuid", "p_pr
 
 REVOKE ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_code_take"("p_user" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_code_take"("p_user" "uuid") TO "service_role";
 
 
 
