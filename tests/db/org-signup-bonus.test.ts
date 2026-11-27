@@ -345,10 +345,72 @@ it('back-fills one partner-link customer once at the amount in force when bound;
 
   expect(await backfill(early, true)).toMatchObject({ status: 'not_eligible', reason: 'bonus_off_at_bind', bonus_at_bind: 0, bonus_now: 500 })
   expect(await backfill(offAtBind, true)).toMatchObject({ status: 'not_eligible', reason: 'affiliate_off_at_bind' })
-  expect(await backfill(noGift, true)).toMatchObject({ status: 'not_eligible', reason: 'no_signup_gift' })
+  expect(await backfill(noGift, true)).toMatchObject({ status: 'not_eligible', reason: 'no_signup_gift_at_bind' })
   expect(await backfill(strangerCustomer, true)).toMatchObject({ status: 'not_eligible', reason: 'not_org_customer' })
   expect(await backfill(stranger, true)).toMatchObject({ status: 'not_eligible', reason: 'not_bound_by_link' })
   for (const u of [early, offAtBind, noGift, strangerCustomer]) expect(await bonusLedger(u)).toEqual([])
+})
+
+it('back-fill refuses when it cannot tell, or when the org, the gift or the trigger said no at the binding', async () => {
+  const backfill = async (user: string) =>
+    (await row(db, 'select admin_org_signup_bonus_backfill($1,$2,true) as r', [actor, user])).r
+  const backdate = (orgId: string, ago: string) =>
+    db.query(`update admin_audit_log set created_at=now()-interval '${ago}' where target_id=$1 and created_at=now()`, [orgId])
+  const boundAgo = async (slug: string, user: string, ago: string) => {
+    await db.query('alter table profiles disable trigger org_signup_bonus_ref')
+    expect(await bind(db, user, slug)).toBe(true)
+    await db.query('alter table profiles enable trigger org_signup_bonus_ref')
+    await db.query(`update profiles set referred_at=now()-interval '${ago}' where id=$1`, [user])
+  }
+  // Each org has its own timeline; the bonus is set (audited) three hours ago.
+  async function org() {
+    const t = await orgTeam(350)
+    await backdate(t.orgId, '3 hours')
+    return { ...t, slug: await orgSlug(t.owner) }
+  }
+  const giftedAgo = async (ago: string) => {
+    const u = await createUser(db)
+    await db.query(`select grant_credits($1::uuid,6,'signup',$2,'free')`, [u, 'signup:' + u])
+    await db.query(`update credit_ledger set created_at=now()-interval '${ago}' where idempotency_key=$1`, ['signup:' + u])
+    return u
+  }
+
+  // The switch: off without an audit row (as an org created with it off), turned on (audited) only
+  // after the binding. Nothing tells what it was then: refuse.
+  const a = await org()
+  await db.query('update orgs set affiliate_enabled=false where id=$1', [a.orgId])
+  await setOrg(a.orgId, { affiliate_enabled: true })
+  const unknownSwitch = await giftedAgo('2 hours')
+  await boundAgo(a.slug, unknownSwitch, '1 hour')
+  expect(await backfill(unknownSwitch)).toMatchObject({ status: 'not_eligible', reason: 'affiliate_unknown_at_bind' })
+
+  // The org was suspended at the binding (audited), active again now.
+  const b = await org()
+  await setOrg(b.orgId, { status: 'suspended' })
+  await backdate(b.orgId, '2 hours')
+  await setOrg(b.orgId, { status: 'active' })
+  const whileSuspended = await giftedAgo('2 hours')
+  await boundAgo(b.slug, whileSuspended, '1 hour')
+  expect(await backfill(whileSuspended)).toMatchObject({ status: 'not_eligible', reason: 'org_inactive_at_bind' })
+
+  // The gift came only after the binding.
+  const c = await org()
+  const giftLater = await giftedAgo('10 minutes')
+  await boundAgo(c.slug, giftLater, '1 hour')
+  expect(await backfill(giftLater)).toMatchObject({ status: 'not_eligible', reason: 'no_signup_gift_at_bind' })
+
+  // The trigger saw the binding and refused it (no gift then); the gift arriving later changes nothing.
+  const refusedThen = await createUser(db)
+  expect(await bind(db, refusedThen, c.slug)).toBe(true)
+  expect(await row(db, 'select error from org_signup_bonus_errors where user_id=$1', [refusedThen])).toEqual({ error: 'blocked_no_signup_grant' })
+  await db.query(`select grant_credits($1::uuid,6,'signup',$2,'free')`, [refusedThen, 'signup:' + refusedThen])
+  expect(await backfill(refusedThen)).toMatchObject({ status: 'not_eligible', reason: 'refused_by_trigger' })
+
+  // Control: the same org, a customer who did qualify then, is paid.
+  const ok = await giftedAgo('2 hours')
+  await boundAgo(c.slug, ok, '1 hour')
+  expect(await backfill(ok)).toMatchObject({ status: 'granted', credits: 350 })
+  for (const u of [unknownSwitch, whileSuspended, giftLater, refusedThen]) expect(await bonusLedger(u)).toEqual([])
 })
 
 it('keeps the back-fill away from clients', async () => {
