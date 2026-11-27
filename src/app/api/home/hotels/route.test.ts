@@ -34,6 +34,7 @@ describe('hotels viewer pictures', () => {
         })),
       )
       expect(response.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=60, stale-while-revalidate=60')
+      expect(response.headers.get('Vercel-Cache-Tag')).toBe('templates,providers,features')
       expect(response.headers.get('Set-Cookie')).toBeNull()
       expect(cachedWebCatalogue).toHaveBeenLastCalledWith(locale)
     }

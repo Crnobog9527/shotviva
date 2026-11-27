@@ -32,6 +32,7 @@ describe('/api/home/opening', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ templates: [{ id: 'steak' }, { id: 'cake' }] })
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=60, stale-while-revalidate=60')
+    expect(response.headers.get('Vercel-Cache-Tag')).toBe('templates,providers,features')
     expect(response.headers.get('Set-Cookie')).toBeNull()
   })
 
