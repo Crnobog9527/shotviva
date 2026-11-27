@@ -80,7 +80,7 @@ export function PickerBody({ locale, templates, categories, taken, picked, setPi
   const options = useMemo(() => categoryOptions(categories), [categories])
   const results = useMemo(() => pickerResults(templates, categories, { text: query, category, series, seriesNames }),
     [templates, categories, query, category, series, seriesNames])
-  const shelves = useMemo(() => (series ? null : seriesShelves(results, seriesNames, COPY.notInSeries)), [results, series, seriesNames])
+  const shelves = useMemo(() => seriesShelves(results, seriesNames, COPY.notInSeries), [results, seriesNames])
   const placeOf = (template: AdminTemplate) =>
     options.find((option) => option.key === (template.subcategoryKey ?? template.category))?.label ?? template.categoryInfo.nameZh
   const toggle = (id: string) => setPicked((current) =>
@@ -98,32 +98,33 @@ export function PickerBody({ locale, templates, categories, taken, picked, setPi
           <option value="">{COPY.allCategories}</option>
           {options.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
         </select>
-        <span className="text-xs text-muted-foreground">{COPY.total(results.length, seriesCount(shelves))}</span>
+        <span className="text-xs text-muted-foreground">{COPY.total(results.length, series ? null : seriesCount(shelves))}</span>
       </div>
       <PickerResults key={view} results={results} shelves={shelves} series={series} seriesNames={seriesNames} cards={cards} setSeries={setSeries} />
     </div>
   )
 }
 
-const seriesCount = (shelves: SeriesShelf[] | null) => shelves && shelves.filter((shelf) => shelf.id !== NOT_IN_SERIES).length
+const seriesCount = (shelves: SeriesShelf[]) => shelves.filter((shelf) => shelf.id !== NOT_IN_SERIES).length
 
 type ResultsProps = {
   results: AdminTemplate[]
-  shelves: SeriesShelf[] | null
+  shelves: SeriesShelf[]
   series: string | null
   seriesNames: ReadonlyMap<string, string>
   cards: CardsProps
   setSeries: (id: string | null) => void
 }
 
-// An opened series, the shelves, or one plain grid when every match sits on the same shelf.
+// The shelves, or one plain grid (in the series' own order) when every match sits on the same
+// shelf: an opened series, or a category without series.
 function PickerResults({ results, shelves, series, seriesNames, cards, setSeries }: ResultsProps) {
   const name = series === NOT_IN_SERIES ? COPY.notInSeries : series && (seriesNames.get(series) ?? series)
   return (
     <div className="min-h-0 overflow-y-auto overscroll-contain pr-1">
       {name ? <SeriesHeader name={name} count={results.length} onBack={() => setSeries(null)} /> : null}
       {results.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">{COPY.none}</p> : null}
-      {shelves && shelves.length > 1 ? <PickerShelves shelves={shelves} cards={cards} onOpen={setSeries} /> : <PickerGrid templates={results} cards={cards} />}
+      {shelves.length > 1 ? <PickerShelves shelves={shelves} cards={cards} onOpen={setSeries} /> : <PickerGrid templates={shelves[0]?.templates ?? []} cards={cards} />}
     </div>
   )
 }
