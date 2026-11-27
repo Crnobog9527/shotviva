@@ -22,8 +22,12 @@ export function emailKey(email: string): string {
   return createHash('sha256').update(email.trim().toLowerCase()).digest('hex')
 }
 
-export async function requestSignup(db: Pick<SupabaseClient, 'rpc'>, email: string, ip: string | null, refSlug: string | null = null): Promise<SignupRequestStatus> {
-  const { data, error } = await db.rpc('signup_request', { p_email_key: emailKey(email), p_ip: ip, p_ref_slug: refSlug })
+// `code` is the sign-up code the form submits (2031): an org staff member's invite code gets the
+// org link's looser limits too, decided in SQL.
+export async function requestSignup(
+  db: Pick<SupabaseClient, 'rpc'>, email: string, ip: string | null, refSlug: string | null = null, code: string | null = null,
+): Promise<SignupRequestStatus> {
+  const { data, error } = await db.rpc('signup_request', { p_email_key: emailKey(email), p_ip: ip, p_ref_slug: refSlug, p_code: code })
   if (error) throw new AppError('INTERNAL', 'signup_request failed', { cause: new Error(error.message) })
   return statusSchema.parse(data)
 }

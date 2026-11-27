@@ -47,7 +47,7 @@ beforeEach(() => {
 describe('sendPhoneCode', () => {
   it('records the request with the visitor IP, then asks Supabase for an SMS code in +86 form', async () => {
     expect(await sendPhoneCode(form(ok))).toEqual({ status: 'sent' })
-    expect(mocks.rpc).toHaveBeenCalledWith('sms_request_send', { p_phone_key: expect.stringMatching(/^[0-9a-f]{64}$/), p_ip: '203.0.113.7', p_ref_slug: null })
+    expect(mocks.rpc).toHaveBeenCalledWith('sms_request_send', { p_phone_key: expect.stringMatching(/^[0-9a-f]{64}$/), p_ip: '203.0.113.7', p_ref_slug: null, p_code: null })
     expect(mocks.signInWithOtp).toHaveBeenCalledWith({
       phone: '+8614000000001',
       options: expect.objectContaining({ channel: 'sms', shouldCreateUser: true, captchaToken: 'tok', data: expect.objectContaining({ locale: 'zh' }) }),

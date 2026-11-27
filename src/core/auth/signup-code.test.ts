@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { invite, seededRewards } from '../../../tests/t94-config'
 
-import { consumeSignupCode } from './signup-code'
+import { consumeSignupCode, prepareSignupCode, submittedSignupCode } from './signup-code'
 
 const mocks = vi.hoisted(() => ({
   jar: { get: vi.fn(), set: vi.fn(), delete: vi.fn() }, redeem: vi.fn(), rpc: vi.fn(),
@@ -74,4 +74,35 @@ it('ignores a failed take and still applies the browser\'s code', async () => {
   mocks.rpc.mockRejectedValue(new Error('down'))
   mocks.redeem.mockResolvedValue({ status: 'ok', kind: 'invite', credits: 6, pool: 'free', percent: null })
   expect(await run()).toBe('invite')
+})
+
+// 2031: the code is resolved and staged before the gift, then redeemed after it.
+it('prepares the code before the gift (staging it) and redeems the prepared one, clearing the stage', async () => {
+  mocks.rpc.mockResolvedValue({ data: null, error: null })
+  const prepared = await prepareSignupCode(admin, 'user', true)
+  expect(prepared).toBe('FRIEND')
+  expect(mocks.rpc).toHaveBeenCalledWith('signup_code_take', { p_user: 'user' })
+  expect(mocks.rpc).toHaveBeenCalledWith('signup_code_stage', { p_user: 'user', p_code: 'FRIEND' })
+  expect(mocks.jar.delete).toHaveBeenCalledWith('sv_code')
+
+  mocks.rpc.mockClear()
+  mocks.redeem.mockResolvedValue({ status: 'ok', kind: 'invite', credits: 6, pool: 'free', percent: null })
+  expect(await consumeSignupCode(admin, 'user', { first: true, fresh: true, useStored: true, prepared }, invite, 'zh')).toBe('invite')
+  expect(mocks.redeem).toHaveBeenCalledWith(admin, expect.objectContaining({ code: 'FRIEND', context: 'signup' }))
+  expect(mocks.rpc.mock.calls).toEqual([['signup_code_stage', { p_user: 'user', p_code: null }]])
+})
+
+it('does not redeem a prepared code when the sign-in turned out not fresh, but still clears its stage', async () => {
+  expect(await consumeSignupCode(admin, 'user', { first: true, fresh: false, useStored: true, prepared: 'FRIEND' }, invite, 'zh')).toBeNull()
+  expect(mocks.redeem).not.toHaveBeenCalled()
+  expect(mocks.rpc).toHaveBeenCalledWith('signup_code_stage', { p_user: 'user', p_code: null })
+})
+
+it('reads the submitted code from the form field, else the ?code= cookie', async () => {
+  const form = new FormData()
+  form.set('signupCode', 'staff001')
+  expect(await submittedSignupCode(form)).toBe('STAFF001')
+  form.set('signupCode', '')
+  expect(await submittedSignupCode(form)).toBeNull()
+  expect(await submittedSignupCode(new FormData())).toBe('FRIEND')
 })
