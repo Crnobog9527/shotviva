@@ -40,6 +40,8 @@ export type PaymentOption = {
   channel: 'stripe' | 'waffo'
   status: 'paid' | 'refunded' | 'partially_refunded' | 'disputed'
   hasInvoice: boolean
+  // Its credits went to an org pool (2033): no self-service refund (Owner 2026-11-28).
+  orgPool?: boolean
 }
 export type WorkOption = { id: string; templateName: string; createdAt: string }
 
@@ -87,6 +89,9 @@ export type RefundEligibility = {
   within7Days: boolean
   noCreditsUsed: boolean
   suggestedCents: number
+  // The credits went to an org pool (payment_refund_block, 2033): no self-service refund (Owner
+  // 2026-11-28). The admin may still decide and refund by hand; the panel says so.
+  orgPool?: boolean
 }
 
 export type AdminTicket = {

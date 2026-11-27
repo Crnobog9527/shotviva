@@ -1503,6 +1503,7 @@
         "paymentLabel": "Which payment?",
         "paymentOptional": "Payment (optional)",
         "noPayments": "There are no payments on this account yet.",
+        "orgPoolNoRefund": "Purchases that went into your organisation's credit pool can't be refunded by yourself. To ask about one, choose Billing.",
         "workLabel": "Work (optional)",
         "workOption": "{template} · {date, date, medium} · {ref}",
         "workRef": "Photo ID {ref}",
@@ -1516,7 +1517,8 @@
           "NOT_FOUND": "That payment or work isn't on your account.",
           "generic": "Couldn't send your message. Please try again.",
           "IMAGE_TOO_LARGE": "An image is larger than 10 MB. Remove it and send again.",
-          "IMAGE_UNSUPPORTED": "An image couldn't be read. Remove it and send again."
+          "IMAGE_UNSUPPORTED": "An image couldn't be read. Remove it and send again.",
+          "ORG_POOL_REFUND": "This purchase went into your organisation's credit pool and can't be refunded by yourself. To ask about it, choose Billing."
         }
       },
       "thread": {
@@ -1640,6 +1642,8 @@
       "subPlan": "{count, plural, one {# credit is} other {# credits are}} in your account. Make something.",
       "subPack": "They're in your account now. Make something.",
       "added": "Added",
+      "addedOrg": "Added to your organisation's credit pool",
+      "subOrgPool": "They're in your organisation's credit pool. Give them to your team, yourself included, under Company in Account.",
       "balance": "Balance",
       "unit": "credits",
       "renews": "Renews",
@@ -1849,7 +1853,7 @@
         "suspended": "The company is paused: deposits are off.",
         "depositLabel": "Deposit your own paid credits",
         "depositPlaceholder": "Number of credits",
-        "depositHint": "Moves credits you bought into the pool. Pool credits can't be refunded or moved back.",
+        "depositHint": "What you buy while the company is active goes straight into the pool. These purchases can't be refunded by yourself; for a refund, contact support. This moves paid credits you already hold: credits you deposit here can't be refunded or moved back.",
         "deposit": "Deposit",
         "depositing": "Depositing…",
         "deposited": "Deposited into the pool.",
@@ -2110,6 +2114,8 @@
         "in": "Into the pool",
         "allocated": "Given to members",
         "reclaimed": "Back to the pool",
+        "clawedBack": "Taken back for refunds",
+        "restored": "Returned after a won dispute",
         "held": "Still with members",
         "expired": "Expired at month end"
       },
@@ -2385,6 +2391,7 @@
     "codeEvery": "Every billing period",
     "codeCheckoutFloor": "This discount is unavailable for this item at its current price. Choose another eligible item.",
     "orgMemberCheckout": "Enterprise staff accounts use the credits their organisation allocates. For more, contact your organisation's admin.",
+    "orgPoolNote": "These credits will be added to your organisation's credit pool.",
     "codeCheckoutChanged": "The price or your discount has changed. Check the updated price before trying again.",
     "codeCheckoutInUse": "This discount is in use in another checkout. Return to that checkout to finish or cancel it, then try again.",
     "fineDiscount": "{term} at {price}, then {original} per {period, select, year {year} other {month}} · cancel anytime · USD"

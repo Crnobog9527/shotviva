@@ -20,6 +20,9 @@ export type ClawbackPreview = {
   balance: number
   // What a clawback would take now: least(paid balance, granted − settled).
   available: number
+  // The purchase's credits went to this org's paid pool (migration 2033): balance is that pool,
+  // and a clawback takes from it. null = the buyer's own balance.
+  orgName: string | null
 }
 
 export type ClawbackResult = { taken: number; clawedBack: number; shortfall: number }
@@ -34,6 +37,7 @@ const previewSchema = z.object({
   clawback_shortfall: z.number().int(),
   balance: z.number().int(),
   available: z.number().int(),
+  org_name: z.string().nullable().optional(),
 })
 
 const resultSchema = z.object({ taken: z.number().int(), credits_clawed_back: z.number().int(), clawback_shortfall: z.number().int() })
@@ -54,6 +58,7 @@ export async function previewClawback(db: RpcClient, id: unknown): Promise<Clawb
     shortfall: row.clawback_shortfall,
     balance: row.balance,
     available: row.available,
+    orgName: row.org_name ?? null,
   }
 }
 

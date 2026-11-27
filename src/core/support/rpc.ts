@@ -16,6 +16,7 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   TICKET_CLOSED: 'TICKET_CLOSED',
   PAYMENT_NOT_FOUND: 'NOT_FOUND',
   JOB_NOT_FOUND: 'NOT_FOUND',
+  ORG_POOL_REFUND: 'ORG_POOL_REFUND',
 }
 
 // Service-role calls only: every ticket function is revoked from client roles. The SQL message

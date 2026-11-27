@@ -35,12 +35,19 @@ export function PaywallCheckout({ resolved, period }: { resolved: ResolvedPick; 
   const price = money(quote.priceUsd)
   const plan = resolved.kind === "plan" ? resolved : null
   const member = plan ? planStanding(standing, plan.offer.tier, period, plan.product.id) : { upgrade: false, lock: null }
-  const note = member.upgrade ? t(standing.subscription ? "upgradeNoteCancels" : "upgradeNote") : null
+  const note = checkoutNote(t, standing, member.upgrade)
   const label = plan
     ? t(member.upgrade ? "ctaUpgrade" : "ctaPlan", { tier: offerLabel(plan.product, locale, t(`tiers.${plan.offer.tier}`)), price, period })
     : t("ctaPack", { count: resolved.product.credits, price })
   const locked = standing.orgMember ? t("orgMemberCheckout") : member.lock === "current" ? t("lockCurrentNote") : member.lock ? t("lockLower") : null
   return <PaymentMethodCheckout purchase={{ resolved, period, quote, label, note, locked }} />
+}
+
+// The upgrade note, and where the credits land: an active org's main admin buys into the org
+// pool (Owner 2026-11-27, migration 2033).
+function checkoutNote(t: ReturnType<typeof useTranslations<"paywall">>, standing: ReturnType<typeof useStanding>, upgrade: boolean): string | null {
+  const upgradeNote = upgrade ? t(standing.subscription ? "upgradeNoteCancels" : "upgradeNote") : null
+  return [upgradeNote, standing.orgPool ? t("orgPoolNote") : null].filter(Boolean).join(" ") || null
 }
 
 function PaymentMethodCheckout({ purchase }: { purchase: Purchase }) {

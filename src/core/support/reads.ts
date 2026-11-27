@@ -1,4 +1,4 @@
-import { paymentGrantKey, paymentGrants } from '../billing/payment-grants'
+import { orgPoolGrantKeys, paymentGrantKey, paymentGrants } from '../billing/payment-grants'
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -137,9 +137,10 @@ export async function listPaymentOptions(db: SupabaseClient, userId: string): Pr
   if (error) readFailed('listPaymentOptions', error)
   const rows = paymentRow.array().parse(data)
   const keys = rows.map(paymentGrantKey)
-  const grants = await paymentGrants(db, userId, keys)
+  const [grants, orgPool] = await Promise.all([paymentGrants(db, userId, keys), orgPoolGrantKeys(db, userId, keys)])
   return rows.map((row, index) => ({
     grantedCredits: grants.get(keys[index] ?? '') ?? null,
+    orgPool: orgPool.has(keys[index] ?? ''),
     id: row.id,
     productId: row.product_id,
     amountTotal: row.amount_total,

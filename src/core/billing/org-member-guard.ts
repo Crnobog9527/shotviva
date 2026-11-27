@@ -18,6 +18,16 @@ export async function isActiveOrgMember(admin: SupabaseClient, userId: string): 
   return data.length > 0
 }
 
+// The main admin of an active org (Owner 2026-11-27, migration 2033): what they buy is settled into
+// the org's paid pool, not their own. The paywall says so before checkout; the settlement decides
+// again in the database at payment time (admin.purchase_terms, _org_purchase_pool).
+export async function isActiveOrgOwner(admin: SupabaseClient, userId: string): Promise<boolean> {
+  const { data, error } = await admin.from('org_members').select('org_id, orgs!inner(status, owner_user_id)')
+    .eq('user_id', userId).eq('status', 'active').eq('role', 'owner').eq('orgs.status', 'active').eq('orgs.owner_user_id', userId).limit(1)
+  if (error) throw new AppError('INTERNAL', 'org owner check failed', { cause: new Error(error.message) })
+  return data.length > 0
+}
+
 // Any active member of an active org, the primary admin included (Owner 2026-11-28, 2032): while
 // they are one, they can use no redemption or discount code at all.
 export async function isInActiveOrg(admin: SupabaseClient, userId: string): Promise<boolean> {

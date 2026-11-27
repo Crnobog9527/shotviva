@@ -10,7 +10,8 @@ type Row = Record<string, unknown> | null
 
 // A payments table that records the filters asked of it and answers one row (or none).
 // `row` answers payments; `mirror` answers subscriptions (the Waffo renewal date, T50).
-function fakeDb(row: Row, mirror: Row = null) {
+// `deposit` answers the settlement's org_deposit row (migration 2033) on credit_ledger.
+function fakeDb(row: Row, mirror: Row = null, deposit = false) {
   const calls: unknown[][] = []
   let table = ''
   const query = {
@@ -18,7 +19,8 @@ function fakeDb(row: Row, mirror: Row = null) {
     eq: (...args: unknown[]) => (calls.push(['eq', ...args]), query),
     gte: (...args: unknown[]) => (calls.push(['gte', ...args]), query),
     order: (...args: unknown[]) => (calls.push(['order', ...args]), query),
-    limit: (...args: unknown[]) => (calls.push(['limit', ...args]), query),
+    limit: (...args: unknown[]) => (calls.push(['limit', ...args]),
+      table === 'credit_ledger' ? Promise.resolve({ data: deposit ? [{ id: 1 }] : [], error: null }) : query),
     in: () => query,
     returns: async () => ({ data: [{ idempotency_key: 'purchase:PAY_first', delta: 135 }], error: null }),
     maybeSingle: async () => ({ data: table === 'subscriptions' ? mirror : row, error: null }),
@@ -61,6 +63,7 @@ describe('checkout return facts (read only)', () => {
       productId: 'pro_monthly',
       settled: true,
       grantedCredits: null,
+      orgPool: false,
       abandoned: false,
       method: 'card',
       amount: { minor: 4990, currency: 'usd' },
@@ -125,5 +128,15 @@ describe('checkout return facts, Waffo', () => {
     // activated not in yet: still a subscription, date unknown.
     const early = await readCheckoutFacts({ stripe, db: fakeDb(payment, null).db }, USER, { channel: 'waffo', productId: 'pro_monthly' })
     expect(early).toMatchObject({ recurring: true, renewsAt: null })
+  })
+
+  it('an org main admin’s purchase reads as added to the org pool (2033)', async () => {
+    const { stripe } = fakeStripe(null)
+    const payment = { amount_total: 990, currency: 'usd', method: 'alipay', stripe_charge_id: null, waffo_order_id: 'ORD_p', waffo_payment_id: 'PAY_org' }
+    const { db, calls } = fakeDb(payment, null, true)
+    expect(await readCheckoutFacts({ stripe, db }, USER, { channel: 'waffo', productId: 'pack_s' })).toMatchObject({ settled: true, orgPool: true })
+    expect(calls).toContainEqual(['eq', 'kind', 'org_deposit'])
+    expect(calls).toContainEqual(['eq', 'idempotency_key', 'org:pay:purchase:PAY_org'])
+    expect(await readCheckoutFacts({ stripe, db: fakeDb(payment).db }, USER, { channel: 'waffo', productId: 'pack_s' })).toMatchObject({ orgPool: false })
   })
 })

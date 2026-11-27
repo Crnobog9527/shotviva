@@ -81,6 +81,7 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   TEST_BUDGET_EXCEEDED: 'internal',
   // Support tickets are web-only; no partner route writes to one.
   TICKET_CLOSED: 'internal',
+  ORG_POOL_REFUND: 'internal',
   // The partner API does not use user sessions (§14.3).
   AUTH_UNAVAILABLE: 'internal',
   INTERNAL: 'internal',

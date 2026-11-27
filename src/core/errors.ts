@@ -76,6 +76,9 @@ export const ERROR_CODES = [
   'TEST_BUDGET_EXCEEDED',
   // The Owner closed this support ticket: its author can no longer add to it (start a new one).
   'TICKET_CLOSED',
+  // A refund request for a purchase whose credits went to an org pool (2033, Owner 2026-11-28): no
+  // self-service refund; the buyer contacts support and the admin handles it by hand.
+  'ORG_POOL_REFUND',
   // Auth or the database could not say who is signed in (an outage, not a sign-out); retry
   // (ARCHITECTURE §7「会话校验」).
   'AUTH_UNAVAILABLE',
@@ -136,6 +139,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   FAVORITES_LIMIT: 409,
   TEST_BUDGET_EXCEEDED: 429,
   TICKET_CLOSED: 409,
+  ORG_POOL_REFUND: 409,
   AUTH_UNAVAILABLE: 503,
   INTERNAL: 500,
 }

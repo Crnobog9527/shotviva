@@ -29,8 +29,12 @@ const balance = { paid: 135, free: 3 }
 describe('checkout return view', () => {
   it('adds the product credits and shows the whole balance', () => {
     const view = returnView(settled(), product('pro_monthly'), balance)
-    expect(view).toMatchObject({ state: 'success', kind: 'plan', tier: 'pro', credits: 135, balance: 138, fine: 'fineMonthly' })
+    expect(view).toMatchObject({ state: 'success', kind: 'plan', tier: 'pro', credits: 135, balance: 138, fine: 'fineMonthly', orgPool: false })
     expect(view.state === 'success' && view.renews).toEqual({ at: '2026-12-06T00:00:00.000Z' })
+  })
+
+  it('marks credits that went to the org pool (2033)', () => {
+    expect(returnView(settled({ orgPool: true }), product('pro_monthly'), balance)).toMatchObject({ state: 'success', credits: 135, orgPool: true })
   })
 
   it.each([

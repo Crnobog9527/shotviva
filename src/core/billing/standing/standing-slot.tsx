@@ -6,7 +6,7 @@ import { Suspense } from 'react'
 import { getSessionUser } from '../../auth/session'
 import { createAdminSupabase } from '../../auth/supabase-admin'
 import { logger } from '../../logger'
-import { isActiveOrgMember } from '../org-member-guard'
+import { isActiveOrgMember, isActiveOrgOwner } from '../org-member-guard'
 import { StandingFeed } from '../paywall/standing-context'
 import { readStanding } from '../subscription/guard'
 import type { MemberStanding } from '../subscription/standing'
@@ -21,8 +21,10 @@ async function standingOf(): Promise<MemberStanding | null> {
     const user = await getSessionUser()
     if (!user?.verified) return null
     const admin = createAdminSupabase()
-    const [standing, orgMember] = await Promise.all([readStanding(admin, user.id), memberRead(admin, user.id)])
-    return orgMember ? { ...standing, orgMember } : standing
+    const [standing, orgMember, orgPool] = await Promise.all([
+      readStanding(admin, user.id), memberRead(admin, user.id), ownerRead(admin, user.id),
+    ])
+    return { ...standing, ...(orgMember ? { orgMember } : {}), ...(orgPool ? { orgPool } : {}) }
   } catch (error) {
     // Next's own control flow (prerender bail-outs, redirects) must pass through.
     unstable_rethrow(error)
@@ -37,6 +39,16 @@ async function memberRead(admin: ReturnType<typeof createAdminSupabase>, userId:
     return await isActiveOrgMember(admin, userId)
   } catch (error) {
     logger.warn('paywall.org_member_read_failed', { error })
+    return false
+  }
+}
+
+// Fail-soft too: a failed read only drops the "goes to your organisation's pool" note.
+async function ownerRead(admin: ReturnType<typeof createAdminSupabase>, userId: string): Promise<boolean> {
+  try {
+    return await isActiveOrgOwner(admin, userId)
+  } catch (error) {
+    logger.warn('paywall.org_owner_read_failed', { error })
     return false
   }
 }

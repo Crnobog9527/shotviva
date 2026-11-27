@@ -11,12 +11,15 @@ export function PoolMonthPanel({ month }: { month: PoolMonthView | null }) {
   const t = useTranslations('app.org.poolMonth')
   const format = useFormatter()
   if (!month) return null
-  const rows: [string, number, number | null][] = [
+  // null: the row does not apply to that pool.
+  const rows: [string, number | null, number | null][] = [
     [t('in'), month.paid.in, month.promo.granted],
     [t('allocated'), month.paid.allocated, month.promo.allocated],
     [t('reclaimed'), month.paid.reclaimed, month.promo.reclaimed],
-    [t('held'), 0, month.promo.held],
-    [t('expired'), 0, month.promo.expired],
+    [t('clawedBack'), month.paid.clawedBack, null],
+    [t('restored'), month.paid.restored, null],
+    [t('held'), null, month.promo.held],
+    [t('expired'), null, month.promo.expired],
   ]
   const cell = (value: number | null) => (value === null ? '—' : format.number(value))
   return (
@@ -30,10 +33,10 @@ export function PoolMonthPanel({ month }: { month: PoolMonthView | null }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-hairline">
-          {rows.map(([label, paid, promo], index) => (
+          {rows.map(([label, paid, promo]) => (
             <tr key={label}>
               <th scope="row" className="py-2 text-left font-normal">{label}</th>
-              <td className="py-2 text-right">{index >= 3 ? '—' : cell(paid)}</td>
+              <td className="py-2 text-right">{cell(paid)}</td>
               <td className="py-2 text-right">{cell(promo)}</td>
             </tr>
           ))}
