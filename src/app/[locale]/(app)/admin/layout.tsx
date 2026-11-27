@@ -14,7 +14,7 @@ import { isWishlistEnabled } from '@/core/wishlist'
 import { site } from '@/site/site.config'
 
 import { compensateJobAction, viewWorkAction } from './jobs/actions'
-import { adjustCreditsAction, banUserAction, unbanUserAction, userDetailAction } from './users/actions'
+import { adjustCreditsAction, banUserAction, bindPartnerAction, searchPartnersAction, unbanUserAction, userDetailAction } from './users/actions'
 
 // One admin gate for every /admin/* route (T23). The proxy already answers non-admins with a
 // 404 before rendering. A layout does not stop its pages from rendering and is not re-run on
@@ -67,7 +67,7 @@ async function promoCount(): Promise<number> {
 // The user detail dialog (T77) opens over whichever admin page has ?user=<id>.
 const userDialogActions = {
   load: userDetailAction,
-  user: { adjust: adjustCreditsAction, ban: banUserAction, unban: unbanUserAction },
+  user: { adjust: adjustCreditsAction, ban: banUserAction, unban: unbanUserAction, bind: bindPartnerAction, searchPartners: searchPartnersAction },
   jobs: { view: viewWorkAction, compensate: compensateJobAction },
 }
 
