@@ -9,6 +9,7 @@ import {
 import type { ImageProviderOption } from '../image-provider-field'
 import { resolutionSchema } from '@/core/templates/db-resolution'
 import type { ImageCapabilities } from '@/core/templates/image-capabilities'
+import { retryStatementTimeout } from './timeout-retry'
 
 const tariffs = z.record(z.string(), z.object({ quality: z.enum(TEMPLATE_QUALITIES), costs: creditsCostSchema, style_sale_approved: z.boolean().optional() }))
 const fallbackTiers = z.record(z.enum(RESOLUTIONS), z.number().int().positive().nullable())
@@ -81,7 +82,7 @@ function pricingUnavailable(): never {
 }
 
 export async function readImageProviderQuote(client: SupabaseClient, legacyBudget: number, envModel: string) {
-  const { data, error } = await client.rpc('template_sync_pricing_input', { p_env_model: envModel })
+  const { data, error } = await retryStatementTimeout(() => client.rpc('template_sync_pricing_input', { p_env_model: envModel }))
   if (error) pricingUnavailable()
   const { input, receipt } = quoteSchema.parse(data)
   return { envModel, receipt, options: optionsFromInput(input, legacyBudget) }
@@ -95,11 +96,11 @@ export async function listImageProviderOptions(client: SupabaseClient, budgetOrM
   const envModel = typeof budgetOrModel === 'string' ? budgetOrModel : legacyModel
   const args = { p_env_model: envModel }
   if (typeof budgetOrModel === 'number') {
-    const quote = await client.rpc('template_sync_pricing_input', args)
+    const quote = await retryStatementTimeout(() => client.rpc('template_sync_pricing_input', args))
     if (!quote.error) return optionsFromInput(quoteSchema.parse(quote.data).input, budgetOrModel)
     if (quote.error.code !== 'PGRST202') pricingUnavailable()
   }
-  const catalog = await client.rpc('admin_image_pricing_catalog', args)
+  const catalog = await retryStatementTimeout(() => client.rpc('admin_image_pricing_catalog', args))
   if (!catalog.error) return optionsFromInput(catalog.data)
   if (catalog.error.code !== 'PGRST202' || typeof budgetOrModel !== 'number') pricingUnavailable()
   const legacy = await client.rpc('admin_image_provider_pricing', args)

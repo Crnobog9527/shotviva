@@ -5050,6 +5050,48 @@ $$;
 ALTER FUNCTION "public"."_org_signup_bonus"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_signup_bonus_after_gift"("p_user" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare p public.profiles; v_org uuid; v_now integer; v_credits integer;
+begin
+  begin
+    if not exists(select from public.org_signup_bonus_errors e where e.user_id=p_user and e.error='blocked_no_signup_grant') then
+      return;
+    end if;
+    -- claim_signup_gift holds this row's lock (as do the trigger and the back-fill).
+    select * into p from public.profiles where id=p_user;
+    if not found or p.referred_source is distinct from 'signup' or p.banned_at is not null then return; end if;
+    select o.id,o.signup_bonus_credits into v_org,v_now from public.affiliates a
+      join public.orgs o on o.id=a.org_id
+      where a.user_id=p.referred_by and a.status='active' and o.status='active' and o.affiliate_enabled;
+    if not found or v_now is null or v_now <= 0 then return; end if;
+    if exists(select from public.payments where user_id=p_user) then return; end if;
+    if exists(select from public.org_members m where m.org_id=v_org and m.user_id=p_user and m.status='active') then return; end if;
+    v_credits := coalesce((public._org_setting_at(v_org,'signup_bonus_credits',p.referred_at,'0'::jsonb)->>'value')::integer,0);
+    if v_credits <= 0 then return; end if;
+    insert into public.org_signup_bonuses(user_id,org_id,member_user_id,credits)
+      values(p_user,v_org,p.referred_member,v_credits) on conflict(user_id) do nothing;
+    if not found then return; end if;
+    perform public._apply_credit_change(p_user,'free','org_signup_bonus',v_credits,
+      'Enterprise invite signup bonus','org_signup_bonus:' || p_user);
+    delete from public.org_signup_bonus_errors where user_id=p_user;
+  exception when others or query_canceled or assert_failure then
+    -- Keep no exception DETAIL/CONTEXT (it can contain a whole row).
+    begin
+      update public.org_signup_bonus_errors set error=sqlstate || ': ' || left(sqlerrm,300), at=now() where user_id=p_user;
+    exception when others or query_canceled or assert_failure then
+      return;
+    end;
+  end;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_org_signup_bonus_after_gift"("p_user" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_work_forget_maker"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -15106,6 +15148,8 @@ begin
     insert into public.signup_gift_claims (key_hash, method, user_id)
     select k.key_hash, k.method, p_user_id from public.signup_gift_identity_keys(p_user_id) k
     on conflict (key_hash) do nothing;
+    -- An org ?ref customer the 2010 trigger skipped for want of this gift gets the org bonus now.
+    perform public._org_signup_bonus_after_gift(p_user_id);
     return 'granted';
   end loop;
 
@@ -28333,6 +28377,10 @@ REVOKE ALL ON FUNCTION "public"."_org_settle_returns"("p_org" "uuid") FROM PUBLI
 
 
 REVOKE ALL ON FUNCTION "public"."_org_signup_bonus"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_signup_bonus_after_gift"("p_user" "uuid") FROM PUBLIC;
 
 
 
