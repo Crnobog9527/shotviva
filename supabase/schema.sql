@@ -4968,6 +4968,13 @@ begin
     if not found or v_credits is null or v_credits <= 0 then return null; end if;
     -- A paid account is never a new user (redeem_code refuses it too; this is belt and braces).
     if exists(select from public.payments where user_id=new.id) then return null; end if;
+    -- The org's partner link (2010): the checks redeem_code makes for a staff invite.
+    if new.referred_source='signup' and (
+      not exists(select from public.credit_ledger l where l.user_id=new.id and l.idempotency_key='signup:' || new.id
+        and l.kind='grant' and l.pool='free')
+      or exists(select from public.org_members m where m.org_id=v_org and m.user_id=new.id and m.status='active')) then
+      return null;
+    end if;
     insert into public.org_signup_bonuses(user_id,org_id,member_user_id,credits)
       values(new.id,v_org,new.referred_member,v_credits) on conflict(user_id) do nothing;
     if not found then return null; end if;
@@ -10400,6 +10407,54 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_org_signup_bonus_backfill"("p_actor" "uuid", "p_user" "uuid", "p_apply" boolean) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare p public.profiles; v_org uuid; v_credits integer; v_reason text;
+begin
+  perform public._org_require_admin(p_actor);
+  if p_user is null or p_apply is null then raise exception 'INVALID_INPUT'; end if;
+  -- The profile lock serializes with the trigger and with another back-fill of the same user.
+  select * into p from public.profiles where id=p_user for update;
+  if not found then return jsonb_build_object('status','not_eligible','reason','no_profile'); end if;
+  if exists(select from public.org_signup_bonuses where user_id=p_user) then
+    return jsonb_build_object('status','already');
+  end if;
+  select o.id,o.signup_bonus_credits into v_org,v_credits from public.affiliates a
+    join public.orgs o on o.id=a.org_id
+    where a.user_id=p.referred_by and a.status='active' and o.status='active' and o.affiliate_enabled;
+  v_reason := case
+    when p.referred_source is distinct from 'signup' then 'not_bound_by_link'
+    when v_org is null then 'not_org_customer'
+    when v_credits is null or v_credits <= 0 then 'bonus_off'
+    when p.banned_at is not null then 'banned'
+    when exists(select from public.payments where user_id=p_user) then 'paid'
+    when not exists(select from public.credit_ledger l where l.user_id=p_user and l.idempotency_key='signup:' || p_user
+      and l.kind='grant' and l.pool='free') then 'no_signup_gift'
+    when exists(select from public.org_members m where m.org_id=v_org and m.user_id=p_user and m.status='active') then 'org_member'
+  end;
+  if v_reason is not null then
+    return jsonb_build_object('status','not_eligible','reason',v_reason,'org_id',v_org);
+  end if;
+  if not p_apply then
+    return jsonb_build_object('status','eligible','org_id',v_org,'credits',v_credits);
+  end if;
+  insert into public.org_signup_bonuses(user_id,org_id,member_user_id,credits)
+    values(p_user,v_org,p.referred_member,v_credits) on conflict(user_id) do nothing;
+  if not found then return jsonb_build_object('status','already'); end if;
+  perform public._apply_credit_change(p_user,'free','org_signup_bonus',v_credits,
+    'Enterprise invite signup bonus','org_signup_bonus:' || p_user);
+  perform public._org_audit(p_actor,'org_update',v_org::text,
+    jsonb_build_object('signup_bonus_backfill',jsonb_build_object('user',p_user,'credits',v_credits))::text);
+  return jsonb_build_object('status','granted','org_id',v_org,'credits',v_credits);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_org_signup_bonus_backfill"("p_actor" "uuid", "p_user" "uuid", "p_apply" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_org_transfer_owner"("p_actor" "uuid", "p_input" "jsonb") RETURNS "jsonb"
@@ -25330,6 +25385,10 @@ CREATE OR REPLACE TRIGGER "org_signup_bonus" AFTER UPDATE OF "referred_source" O
 
 
 
+CREATE OR REPLACE TRIGGER "org_signup_bonus_ref" AFTER UPDATE OF "referred_source" ON "public"."profiles" FOR EACH ROW WHEN ((("new"."referred_source" = 'signup'::"text") AND ("old"."referred_source" IS NULL) AND ("old"."referred_by" IS NULL) AND ("new"."referred_by" IS NOT NULL))) EXECUTE FUNCTION "public"."_org_signup_bonus"();
+
+
+
 CREATE OR REPLACE TRIGGER "orgs_ref_code_guard" BEFORE INSERT OR UPDATE ON "public"."orgs" FOR EACH ROW EXECUTE FUNCTION "public"."_orgs_ref_code_guard"();
 
 
@@ -28738,6 +28797,11 @@ GRANT ALL ON FUNCTION "public"."admin_org_picker_affiliate_history"("p_users" "u
 
 REVOKE ALL ON FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_org_set_signup_bonus"("p_actor" "uuid", "p_org_id" "uuid", "p_credits" integer, "p_expected_updated_at" timestamp with time zone) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_org_signup_bonus_backfill"("p_actor" "uuid", "p_user" "uuid", "p_apply" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_org_signup_bonus_backfill"("p_actor" "uuid", "p_user" "uuid", "p_apply" boolean) TO "service_role";
 
 
 
