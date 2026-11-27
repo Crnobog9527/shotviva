@@ -85,6 +85,23 @@ it('counts only org_l1 personal purchases confirmed last month: not org_l2, othe
   expect(await sheet(db, orgId, m.current)).toMatchObject({ customers: 5, raw_credits: 50000, bonus: 5000, total: 15000 })
 })
 
+it("counts customers of the org account's own ?ref= link (signup, first_checkout) like staff-invited ones; not admin bindings (2011)", async () => {
+  const { orgId, owner } = await partner(db, actor)
+  const invited = await customer(db, owner, 'org_l1')
+  const viaLink = await customer(db, owner, 'signup')
+  const atCheckout = await customer(db, owner, 'first_checkout')
+  const byAdmin = await customer(db, owner, 'admin')
+  for (const c of [invited, viaLink, atCheckout, byAdmin]) await confirmedSale(db, c, 10000, m.in_previous)
+  await run(db, m.current)
+  const s = await sheet(db, orgId, m.current)
+  expect(s).toMatchObject({ customers: 3, raw_credits: 30000, bonus: 3000, total: 13000 })
+  expect(s.detail.per.map((x) => x.customer).sort()).toEqual([invited, viaLink, atCheckout].sort())
+
+  // Granted once; next month's run never counts those orders again.
+  expect((await confirm(db, actor, s)).applied).toBe(true)
+  expect(await promoPoolOf(db, orgId)).toBe(13000)
+})
+
 it('counts a partial refund before the run pro rata, and a disputed order not at all', async () => {
   const { orgId, owner } = await partner(db, actor)
   const sales = await fiveCustomers(db, owner, 100000, m.in_previous)
