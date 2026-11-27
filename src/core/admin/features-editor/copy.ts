@@ -17,6 +17,8 @@ export const FEATURES_COPY = {
     emergency: '紧急',
     affiliateSection: '联盟营销页',
     affiliate: '联盟营销总开关',
+    inviteOnly: '仅邀请的账号',
+    opensOn: (tier: string, date: string) => `${tier}，${date} 起全员`,
     on: '已开启',
     off: '已关闭',
   },

@@ -1,5 +1,6 @@
 import type { FeatureSetting } from '../features/types'
 import type { WishlistSwitch } from '../system-settings/types'
+import { toBeijingLocal } from '../shell/format'
 import { FEATURES_COPY as COPY } from './copy'
 import { AUTO_APPROVE_SWITCH_COPY, GALLERY_SWITCH_COPY } from './gallery-copy'
 import { FOOD_TOGGLES_SWITCH_COPY } from './food-toggles-card'
@@ -24,6 +25,8 @@ export type OverviewInput = {
   serviceWorker: WishlistSwitch
   appShell: WishlistSwitch
   affiliate: boolean
+  // The server's clock at render (ISO), so the gate's "open to everyone from" date reads the same on both sides.
+  now: string
 }
 
 const S = COPY.sections
@@ -36,6 +39,15 @@ const switchRow = (copy: SwitchCopy, value: WishlistSwitch, section: string): Ov
   emergency: copy.summary?.emergency ?? false,
 })
 
+// Who may use a gated feature now: an invite list, everyone (no tier, or its open date has passed),
+// or a tier with the Beijing date it opens to everyone.
+export function gateState(gate: FeatureSetting, now: string): string {
+  if (gate.inviteOnly) return COPY.overview.inviteOnly
+  if (!gate.minTier || (gate.openToAllAt && Date.parse(gate.openToAllAt) <= Date.parse(now))) return COPY.tiers.all
+  if (!gate.openToAllAt) return COPY.tiers[gate.minTier]
+  return COPY.overview.opensOn(COPY.tiers[gate.minTier], toBeijingLocal(gate.openToAllAt).slice(5, 10))
+}
+
 export function overviewRows(input: OverviewInput): OverviewRow[] {
   const rows: OverviewRow[] = [
     { ...switchRow(SIGNUP_GIFT_PAUSE_COPY, input.signupPaused, S.signup.title), on: !input.signupPaused.enabled },
@@ -44,7 +56,7 @@ export function overviewRows(input: OverviewInput): OverviewRow[] {
   ]
   if (input.posterGate) {
     rows.push({ name: `${input.posterGate.name} · ${COPY.who}`, href: `#feature-${input.posterGate.key}`, section: S.generation.title,
-      state: COPY.tiers[input.posterGate.minTier ?? 'all'], on: true, emergency: false })
+      state: gateState(input.posterGate, input.now), on: true, emergency: false })
   }
   rows.push({ name: POSTER_PHOTO_COPY.title, href: '#poster_photo_credits', section: S.generation.title,
     state: input.photoCredits === null ? POSTER_PHOTO_COPY.overview.off : POSTER_PHOTO_COPY.overview.on, on: input.photoCredits !== null, emergency: false })

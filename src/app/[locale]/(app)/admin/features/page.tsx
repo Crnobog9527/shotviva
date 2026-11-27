@@ -80,7 +80,7 @@ export default async function AdminFeaturesPage() {
       <FeaturesOverview
         input={{
           signupPaused: signupGift.paused, food: foodToggles, posterGate: posterGates[0] ?? null, photoCredits: photoPrice,
-          wishlist: wishlist?.value ?? null, gallery, serviceWorker, appShell, affiliate,
+          wishlist: wishlist?.value ?? null, gallery, serviceWorker, appShell, affiliate, now: new Date().toISOString(),
         }}
       />
       <FeatureSection id="signup" {...S.signup}>

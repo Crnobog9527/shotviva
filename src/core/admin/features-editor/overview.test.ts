@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import type { FeatureSetting } from '../features/types'
-import { overviewRows, type OverviewInput } from './overview'
+import { gateState, overviewRows, type OverviewInput } from './overview'
 
 const off = { enabled: false, updatedAt: null, updatedByEmail: null }
 const on = { ...off, enabled: true }
 const poster: FeatureSetting = { key: 'dense_poster', name: '赛事海报', minTier: null, openToAllAt: null, inviteOnly: false, invites: [] }
 const input: OverviewInput = {
   signupPaused: off, food: off, posterGate: poster, photoCredits: 3, wishlist: on,
-  gallery: { enabled: on, autoApprove: off }, serviceWorker: on, appShell: off, affiliate: true,
+  gallery: { enabled: on, autoApprove: off }, serviceWorker: on, appShell: off, affiliate: true, now: '2026-11-27T04:00:00Z',
 }
 
 describe('功能开关 overview', () => {
@@ -47,5 +47,16 @@ describe('功能开关 overview', () => {
     expect(hrefs).not.toContain('#wishlist_enabled')
     expect(hrefs).not.toContain('#gallery_enabled')
     expect(hrefs).not.toContain('#feature-dense_poster')
+  })
+})
+
+describe('poster gate state', () => {
+  const now = '2026-11-27T04:00:00Z'
+  it('reads the tier, its open-to-everyone date, and the date once passed', () => {
+    expect(gateState(poster, now)).toBe('所有人')
+    expect(gateState({ ...poster, minTier: 'pro' }, now)).toBe('Pro 起')
+    expect(gateState({ ...poster, minTier: 'pro', openToAllAt: '2026-12-04T16:00:00Z' }, now)).toBe('Pro 起，12-05 起全员')
+    expect(gateState({ ...poster, minTier: 'max', openToAllAt: '2026-11-20T00:00:00Z' }, now)).toBe('所有人')
+    expect(gateState({ ...poster, inviteOnly: true }, now)).toBe('仅邀请的账号')
   })
 })
