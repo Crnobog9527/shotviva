@@ -4,7 +4,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { exportCsv } from '@/core/affiliate/admin/export'
 import { dossier } from '@/core/affiliate/admin/dossier-read'
 import { commissions, payouts, referred } from '@/core/affiliate/admin/read'
-import { loadUser } from '@/core/admin/users/repository'
+import { readReferrerDetail } from '@/core/admin/users/referrer'
 import { findUser, overview } from '@/core/affiliate/admin/summary'
 import { connectAdmin, createUser } from './helpers'
 import { serviceSupabase } from './supabase-env'
@@ -48,7 +48,7 @@ afterAll(async () => {
 it('loads the masked-to-the-public data in the admin area through the actual REST relationships', async () => {
   const api = serviceSupabase()
   expect((await dossier(api, actor, owner))?.slug).toBe(slug)
-  expect((await loadUser(api, buyer, true))?.referrer).toBe(slug)
+  expect((await readReferrerDetail(api, buyer))?.slug).toBe(slug)
   expect((await referred(api, owner)).items.map((r) => r.id)).toEqual([buyer])
   expect(await findUser(api, actor, 't2-' + buyer + '@example.test')).toMatchObject({ user_id: buyer, slug })
   expect((await overview(api, actor)).flagged).toBeGreaterThan(0)

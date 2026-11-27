@@ -88,6 +88,18 @@ describe('the app shell (switch on)', () => {
     const { response } = await worker.dispatch('fetch', { ...nav('/generate'), preloadResponse: Promise.resolve(new Response(null, { status: 204 })) })
     expect(await response?.text()).toBe('page')
   })
+
+  it('never answers the way out (sv-net) with the shell, nor with an empty 204 preload (Part B 2026-11-27)', async () => {
+    const worker = runWorker(on)
+    await worker.dispatch('activate', {})
+    expect(await (await worker.dispatch('fetch', nav('/generate'))).response?.text()).toBe('shell')
+    for (const path of ['/generate?sv-net=1', '/zh/generate?c=food&sv-net=1']) {
+      const { response } = await worker.dispatch('fetch', { ...nav(path), preloadResponse: Promise.resolve(new Response(null, { status: 204 })) })
+      expect(await response?.text()).toBe('page')
+    }
+    const preloaded = await worker.dispatch('fetch', { ...nav('/generate?sv-net=1'), preloadResponse: Promise.resolve(new Response('preloaded page')) })
+    expect(await preloaded.response?.text()).toBe('preloaded page')
+  })
 })
 
 describe('the shell’s refresh (personal content no later)', () => {

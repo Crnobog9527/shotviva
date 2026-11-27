@@ -20,6 +20,9 @@ type Props = {
   templates: AdminTemplate[]
   categories: AdminCategoryNode[]
   actions: FeaturedBundleActions
+  // 首页展示 shows the two halves on different tabs (Owner 2026-11-27): 'library' the bundles
+  // themselves (组合库), 'default' only which of them the default 首页精选 shows. Both when absent.
+  show?: 'library' | 'default'
 }
 
 const asValue = <T,>(result: { ok: true } | { ok: false; code: string; message: string }) =>
@@ -27,9 +30,16 @@ const asValue = <T,>(result: { ok: true } | { ok: false; code: string; message: 
 
 // 精选组合 (Owner 2026-11-25): every bundle (新建, 编辑, 删除 save at once) and which of them the
 // default 首页精选 shows, arranged first and saved with one 保存 like the other lists.
-export function BundlesPanel({ bundles, templates, categories, actions }: Props) {
+export function BundlesPanel({ bundles, templates, categories, actions, show }: Props) {
   const { pending, error, notice, run } = useAdminAction()
   const context: BundleContext = { bundles, templates, categories, save: actions.save }
+  if (show === 'default') {
+    return (
+      <section aria-label={COPY.defaultTitle} className="grid grid-cols-1 gap-2 rounded-md border p-4">
+        <DefaultBundles context={context} saved={defaultIds(bundles)} setDefault={actions.setDefault} />
+      </section>
+    )
+  }
   const remove = (bundle: FeaturedBundle) => {
     if (!window.confirm(COPY.confirmRemove(bundle.nameZh))) return
     run(async () => asValue(await actions.remove(bundle.id)), () => COPY.removed)
@@ -38,7 +48,7 @@ export function BundlesPanel({ bundles, templates, categories, actions }: Props)
     <section aria-labelledby="bundles-h" className="grid grid-cols-1 gap-4 rounded-md border p-4">
       <div className="grid grid-cols-1 max-w-prose gap-1">
         <h2 id="bundles-h" className="font-medium">{COPY.panelTitle}</h2>
-        <p className="text-sm text-muted-foreground">{COPY.panelBody}</p>
+        <p className="text-sm text-muted-foreground">{show === 'library' ? COPY.libraryBody : COPY.panelBody}</p>
       </div>
       {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
@@ -58,7 +68,7 @@ export function BundlesPanel({ bundles, templates, categories, actions }: Props)
         ))}
       </ul>
       <BundleDialog context={context} trigger={(open) => <Button size="sm" variant="outline" className="justify-self-start" onClick={open}><Plus aria-hidden />{COPY.create}</Button>} />
-      <DefaultBundles context={context} saved={defaultIds(bundles)} setDefault={actions.setDefault} />
+      {show === 'library' ? null : <DefaultBundles context={context} saved={defaultIds(bundles)} setDefault={actions.setDefault} />}
     </section>
   )
 }

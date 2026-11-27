@@ -16,11 +16,14 @@ describe('module tabs', () => {
     expect(at('/admin/templates/dishware/')).toEqual(['出图设置', '器皿图库'])
     expect(at('/admin/templates/edit')).toEqual(['出图设置', '作品编辑规则'])
     expect(at('/admin/providers')).toEqual(['出图设置', 'AI 供应商'])
+    expect(at('/admin/home')).toEqual(['首页展示', '默认'])
+    expect(at('/admin/home/zh')).toEqual(['首页展示', '中文站'])
+    expect(at('/admin/home/en')).toEqual(['首页展示', '英文站'])
+    expect(at('/admin/home/bundles')).toEqual(['首页展示', '组合库'])
   })
 
   it('shows no tabs elsewhere', () => {
     expect(at('/admin')).toBeNull()
-    expect(at('/admin/home')).toBeNull()
     expect(at('/admin/users')).toBeNull()
     expect(at('/admin/templatesx')).toBeNull()
   })
