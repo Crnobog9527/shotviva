@@ -41,6 +41,9 @@ export async function landOnSession(
   flow: CallbackFlow,
   benefits: SignupBenefits,
   nextParam: string | null,
+  // A signup confirmation link (flows/confirm.ts): the only landing that may bind the partner
+  // stored at email sign-up (2021).
+  signupConfirmation = false,
 ): Promise<CallbackOutcome> {
   const { data } = await supabase.auth.getUser()
   if (!data.user) return { kind: 'no_session', flow }
@@ -50,7 +53,7 @@ export async function landOnSession(
   // Google accounts never pass through signUp, so their auth emails would stay English: store
   // the language the sign-in started in, once (ARCHITECTURE §7). Email sign-ups already have it.
   if (flow === 'oauth' && !stored) await rememberAccountLocale(supabase, locale)
-  if (verified) await onVerifiedSignIn(data.user.id, benefits, flow === 'oauth' ? 'google' : 'email', locale, staffOriginFor(nextParam, data.user))
+  if (verified) await onVerifiedSignIn(data.user.id, benefits, flow === 'oauth' ? 'google' : 'email', locale, staffOriginFor(nextParam, data.user), signupConfirmation)
   return { kind: 'signed_in', verified, userId: data.user.id, flow }
 }
 

@@ -22,14 +22,14 @@ describe('landOnSession: account language (ARCHITECTURE §7)', () => {
     const { supabase, updateUser } = client(GOOGLE)
     await landOnSession(supabase, 'oauth', benefits, '/zh/account')
     expect(updateUser).toHaveBeenCalledExactlyOnceWith({ data: { locale: 'zh' } })
-    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('g1', benefits, 'google', 'zh', null)
+    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('g1', benefits, 'google', 'zh', null, false)
   })
 
   it('never overwrites a language the account already has', async () => {
     const { supabase, updateUser } = client({ ...GOOGLE, user_metadata: { locale: 'en' } })
     await landOnSession(supabase, 'oauth', benefits, '/zh/account')
     expect(updateUser).not.toHaveBeenCalled()
-    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('g1', benefits, 'google', 'en', null)
+    expect(mocks.onVerifiedSignIn).toHaveBeenCalledWith('g1', benefits, 'google', 'en', null, false)
   })
 
   it('leaves email links alone: sign-up wrote the language already', async () => {
@@ -44,8 +44,8 @@ describe('landOnSession: account language (ARCHITECTURE §7)', () => {
     const token = 'c'.repeat(32)
     const email = { ...GOOGLE, app_metadata: { provider: 'email' }, email_confirmed_at: '2026-11-06T00:00:00Z' }
     await landOnSession(client({ ...email, user_metadata: { locale: 'zh', staff_invite: token } }).supabase, 'email', benefits, '/zh/account')
-    expect(mocks.onVerifiedSignIn).toHaveBeenLastCalledWith('g1', benefits, 'email', 'zh', { token, orgId: null })
+    expect(mocks.onVerifiedSignIn).toHaveBeenLastCalledWith('g1', benefits, 'email', 'zh', { token, orgId: null }, false)
     await landOnSession(client({ ...email, user_metadata: { locale: 'zh' } }).supabase, 'email', benefits, `/zh/join/org/${token}`)
-    expect(mocks.onVerifiedSignIn).toHaveBeenLastCalledWith('g1', benefits, 'email', 'zh', { token, orgId: null })
+    expect(mocks.onVerifiedSignIn).toHaveBeenLastCalledWith('g1', benefits, 'email', 'zh', { token, orgId: null }, false)
   })
 })
