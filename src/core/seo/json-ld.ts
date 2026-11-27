@@ -50,7 +50,6 @@ export function softwareApplicationLd(
     description: page.description,
     applicationCategory: 'DesignApplication',
     operatingSystem: 'Web',
-    brand: { '@type': 'Brand', name: site.brand.name },
     offers: offers(site, products, freeOffer),
   }
 }
