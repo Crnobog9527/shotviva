@@ -9,6 +9,11 @@ const listAdminTemplates = vi.fn()
 const listAdminCategoryTree = vi.fn()
 const readPricingOptions = vi.fn()
 const listAdminSeriesOptions = vi.fn()
+const after = vi.fn()
+const drainReferenceDeletions = vi.fn()
+
+vi.mock('next/server', async (original) => ({ ...(await original<typeof import('next/server')>()), after: (task: () => unknown) => after(task) }))
+vi.mock('@/core/admin/reference-library/object-cleanup', () => ({ drainReferenceDeletions: (...args: unknown[]) => drainReferenceDeletions(...args) }))
 
 vi.mock('@/core/auth', () => ({ requireAdmin: () => requireAdmin(), createAdminSupabase: () => ({}) }))
 vi.mock('@/core/admin', () => ({
@@ -75,6 +80,10 @@ describe('admin templates page', () => {
     expect(listAdminSeriesOptions).toHaveBeenCalledOnce()
     expect(listAdminCategoryTree).toHaveBeenCalledOnce()
     expect(readPricingOptions).toHaveBeenCalledOnce()
+    // The retired 素材参考库's deletion queue drains after this page (2026-11-27).
+    expect(after).toHaveBeenCalledOnce()
+    await after.mock.calls[0][0]()
+    expect(drainReferenceDeletions).toHaveBeenCalledWith({}, 'admin')
   })
 })
 
