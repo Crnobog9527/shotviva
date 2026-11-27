@@ -14,7 +14,7 @@ import { PhotoPreloads } from './photo-preloads'
 // the (app) layout.
 export const instant = false
 
-export const metadata: Metadata = { title: '模板与提示词' }
+export const metadata: Metadata = { title: '模板与系列' }
 
 // ?edit=<id> opens that template's editor, e.g. right after 「发布为模板」 created a draft (T101).
 const editParam = (value: string | string[] | undefined) => typeof value === 'string' && /^[a-z0-9-]{1,64}$/.test(value) ? value : undefined
