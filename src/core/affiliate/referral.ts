@@ -7,7 +7,8 @@ import { logger } from '../logger'
 import { isAffiliateEnabled } from './feature'
 
 const slug = z.string().regex(/^[a-z0-9-]{3,24}$/)
-const lifetime = 60 * 24 * 60 * 60
+// 15 days (Owner 2026-11-27; was 60). First click wins inside the window.
+const lifetime = 15 * 24 * 60 * 60
 const now = () => Math.floor(Date.now() / 1000)
 
 async function countClick(value: string) {
@@ -21,7 +22,9 @@ async function countClick(value: string) {
 
 export async function recordReferral(request: NextRequest, response: NextResponse) {
   const value = slug.safeParse(request.nextUrl.searchParams.get('ref'))
-  if (!value.success || request.cookies.has('sv_ref') || !(await isAffiliateEnabled())) return
+  // A cookie past the window (one the browser still keeps from the old 60-day lifetime, or a
+  // malformed one) binds nothing, so it must not block a new partner's link either.
+  if (!value.success || current(request.cookies.get('sv_ref')?.value) || !(await isAffiliateEnabled())) return
   response.cookies.set('sv_ref', value.data + '.' + now(), {
     maxAge: lifetime, path: '/', sameSite: 'lax', secure: true, httpOnly: true,
   })
@@ -59,7 +62,7 @@ export async function storeSignupReferral(user: string | null | undefined, cooki
 }
 
 // The slug stored at sign-up, removed as it is read (single use). The SQL drops one older than
-// 60 days or from before the latest confirmation email. undefined when none or on error.
+// a day or from before the latest confirmation email. undefined when none or on error.
 async function takeSignupReferral(user: string): Promise<string | undefined> {
   try {
     const { data, error } = await createAdminSupabase().rpc('affiliate_signup_ref_take', { p_user: user })
