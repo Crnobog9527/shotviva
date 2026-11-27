@@ -6,12 +6,12 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import type { Locale } from '../i18n/locales'
 import { logger } from '../logger'
+import { settle, unwrap, type Settled } from '../shared-read'
 import { PROVIDERS_CACHE_TAG } from '../providers/cache-tag'
-import { CATALOGUE_LIFE } from './cached-catalogue'
+import { CATALOGUE_LIFE, sharedLocaleDisplay } from './cached-catalogue'
 import { TEMPLATES_CACHE_TAG } from './cache'
 import { onePlace, readCatalogueIndex, type CatalogueIndex } from './catalogue-index'
 import type { LocaleDisplay } from './locale-display'
-import { readLocaleDisplay } from './locale-display-read'
 import type { CatalogueCursor } from './taxonomy'
 import { readCategoryEntries, readCategoryTree, readSeriesMembers } from './taxonomy-reads'
 
@@ -28,7 +28,7 @@ export async function cachedLocaleDisplay(): Promise<LocaleDisplay> {
   'use cache'
   cacheTag(TEMPLATES_CACHE_TAG)
   cacheLife(CATALOGUE_LIFE)
-  return readLocaleDisplay(createAdminSupabase())
+  return sharedLocaleDisplay()
 }
 
 export async function cachedCategoryEntries(path: string[], locale: Locale, cursor?: CatalogueCursor) {
@@ -46,7 +46,16 @@ export async function cachedSeriesMembers(id: string, locale: Locale, cursor?: C
 }
 
 type IndexRead = (locale: Locale) => Promise<CatalogueIndex>
-const readIndex: IndexRead = (locale) => readCatalogueIndex(createAdminSupabase(), locale)
+// Create's whole index for one language (tree, order, entries, series members), one copy for the
+// region instead of one per server instance. A failed read is kept a minute only.
+async function sharedIndex(locale: Locale): Promise<Settled<CatalogueIndex>> {
+  'use cache: remote'
+  cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
+  const result = await settle(() => readCatalogueIndex(createAdminSupabase(), locale))
+  cacheLife(result.ok ? CATALOGUE_LIFE : FAILED_READ_LIFE)
+  return result
+}
+const readIndex: IndexRead = async (locale) => unwrap(await sharedIndex(locale))
 
 // The cached body, apart for tests. A failed read (an outage, a deployment restored onto the
 // pre-taxonomy schema) is null for a minute only: Create then falls back to its flat list by
