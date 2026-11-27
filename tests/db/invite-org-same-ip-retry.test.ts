@@ -115,6 +115,8 @@ it('lets a customer refused for a missing gift redeem the same code after the gi
   // Still blocked: one row, the latest attempt.
   expect((await redeem(customer, code, 'account')).status).toBe('blocked_no_signup_grant')
   expect(await rowsOf(customer)).toEqual([expect.objectContaining({ status: 'blocked_no_signup_grant', credits_granted: 0 })])
+  expect((await db.query('select status from code_redemption_blocks where user_id=$1', [customer])).rows)
+    .toEqual([{ status: 'blocked_no_signup_grant' }])
 
   await giveGift(customer)
   const result = await redeem(customer, code, 'account')
@@ -139,6 +141,27 @@ it('lets a customer blocked on one personal code use another inviter\'s code; on
   expect(await rowsOf(customer)).toEqual([expect.objectContaining({ status: 'ok', blocked_status: 'blocked_same_ip' })])
   expect((await row(db, 'select inviter_user_id from code_redemptions where user_id=$1', [customer])).inviter_user_id).toBe(friend)
   expect((await redeem(customer, await codeOf(neighbour), 'account')).status).toBe('already_invited')
+
+  // The replaced same-IP attempt is kept, with its code and inviter, and the admin lists still show it.
+  const archived = await row(db, 'select id,code_id,inviter_user_id,status,replaced_by from code_redemption_blocks where user_id=$1', [customer])
+  const neighbourCode = (await row(db, 'select id from codes where owner_user_id=$1', [neighbour])).id
+  const okId = (await row(db, 'select id from code_redemptions where user_id=$1', [customer])).id
+  expect(archived).toMatchObject({ code_id: neighbourCode, inviter_user_id: neighbour, status: 'blocked_same_ip', replaced_by: okId })
+  const listed = async (codeId: string | null) => (await db.query(
+    'select r from admin_code_redemptions($1,$2,null) r', [actor, codeId])).rows.map((x) => x.r)
+  expect(await listed(neighbourCode)).toEqual([expect.objectContaining({
+    id: archived.id, user_id: customer, inviter_user_id: neighbour, status: 'blocked_same_ip', credits_granted: 0, code: expect.any(String),
+  })])
+  // The site-wide same-IP list pages through both tables (30 per page) without losing it.
+  let cursor: object | null = null
+  let found = false
+  for (let page = 0; page < 200 && !found; page++) {
+    const rows = (await db.query('select r from admin_code_redemptions($1,null,$2) r', [actor, cursor])).rows.map((x) => x.r)
+    found = rows.some((r) => r.id === archived.id)
+    if (rows.length < 30) break
+    cursor = { created_at: rows.at(-1).created_at, id: rows.at(-1).id }
+  }
+  expect(found).toBe(true)
 
   // The first payment rewards the friend only, once.
   const payment = await sale(db, customer, 'pack_m', 2490)
