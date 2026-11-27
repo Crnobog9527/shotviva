@@ -10,9 +10,10 @@ import { Input } from '@/core/ui/input'
 import type { DisplayLocale } from '../locale-display/types'
 import type { AdminCategoryNode } from '../template-categories/types'
 import type { AdminTemplate } from '../templates/types'
-import { PickerCard } from './picker-card'
 import { PICKER_COPY as COPY } from './picker-copy'
-import { categoryOptions, pickerResults } from './picker-filter'
+import { categoryOptions, NOT_IN_SERIES, pickerResults, seriesShelves, type SeriesShelf } from './picker-filter'
+import { usePickerSeriesNames } from './picker-series'
+import { PickerGrid, PickerShelves, SeriesHeader, type CardsProps } from './picker-shelves'
 
 type Props = {
   locale: DisplayLocale
@@ -29,9 +30,6 @@ type Props = {
 }
 
 export type PickerText = { open: string; title: (label: string) => string; description: string; add: (count: number) => string }
-
-// Rendered in pages so a catalogue of hundreds stays quick; covers load lazily at thumbnail size.
-const PAGE = 48
 
 // 添加精选模板 as a window with covers, search and the category tree (Owner 2026-11-25), instead of
 // one dropdown of every name. Picks go into the draft, in the order they were ticked.
@@ -71,47 +69,61 @@ export type PickerBodyProps = Omit<Props, 'label' | 'onAdd' | 'max' | 'text'> & 
   max?: number
 }
 
-// The searchable grid of covers, shared with the 精选组合 window (bundle-dialog.tsx).
+// The searchable grid of covers, shared with the 精选组合 window (bundle-dialog.tsx). Matches are
+// shown as series shelves; a shelf opens to the whole series (Owner 2026-11-27).
 export function PickerBody({ locale, templates, categories, taken, picked, setPicked, max = Infinity }: PickerBodyProps) {
   const [text, setText] = useState('')
   const [category, setCategory] = useState<string | null>(null)
-  const [limit, setLimit] = useState(PAGE)
+  const [series, setSeries] = useState<string | null>(null)
   const query = useDeferredValue(text)
+  const seriesNames = usePickerSeriesNames()
   const options = useMemo(() => categoryOptions(categories), [categories])
-  const results = useMemo(() => pickerResults(templates, categories, { text: query, category }), [templates, categories, query, category])
-  const takenSet = new Set(taken)
+  const results = useMemo(() => pickerResults(templates, categories, { text: query, category, series, seriesNames }),
+    [templates, categories, query, category, series, seriesNames])
+  const shelves = useMemo(() => (series ? null : seriesShelves(results, seriesNames, COPY.notInSeries)), [results, series, seriesNames])
   const placeOf = (template: AdminTemplate) =>
     options.find((option) => option.key === (template.subcategoryKey ?? template.category))?.label ?? template.categoryInfo.nameZh
   const toggle = (id: string) => setPicked((current) =>
     current.includes(id) ? current.filter((other) => other !== id) : current.length >= max ? current : [...current, id])
-  const reset = (apply: () => void) => {
-    apply()
-    setLimit(PAGE)
-  }
+  const cards: CardsProps = { locale, taken: new Set(taken), picked, placeOf, toggle }
+  // A view's paging restarts whenever what it shows changes.
+  const view = `${query}\n${category ?? ''}\n${series ?? ''}`
   return (
     <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <Input type="search" value={text} placeholder={COPY.search} aria-label={COPY.search} className="h-9 min-w-0 flex-1 basis-48"
-          onChange={(event) => reset(() => setText(event.target.value))} />
+          onChange={(event) => setText(event.target.value)} />
         <select aria-label={COPY.category} className="h-9 min-w-0 max-w-full flex-1 basis-40 rounded-md border bg-background px-2 text-sm" value={category ?? ''}
-          onChange={(event) => reset(() => setCategory(event.target.value || null))}>
+          onChange={(event) => { setCategory(event.target.value || null); setSeries(null) }}>
           <option value="">{COPY.allCategories}</option>
           {options.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
         </select>
-        <span className="text-xs text-muted-foreground">{COPY.count(Math.min(limit, results.length), results.length)}</span>
+        <span className="text-xs text-muted-foreground">{COPY.total(results.length, seriesCount(shelves))}</span>
       </div>
-      <div className="min-h-0 overflow-y-auto overscroll-contain pr-1">
-        {results.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">{COPY.none}</p> : null}
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-          {results.slice(0, limit).map((template) => (
-            <PickerCard key={template.id} template={template} place={placeOf(template)} locale={locale} taken={takenSet.has(template.id)}
-              selected={picked.includes(template.id)} onToggle={() => toggle(template.id)} />
-          ))}
-        </ul>
-        {results.length > limit ? (
-          <div className="flex justify-center py-3"><Button size="sm" variant="outline" onClick={() => setLimit(limit + PAGE)}>{COPY.more}</Button></div>
-        ) : null}
-      </div>
+      <PickerResults key={view} results={results} shelves={shelves} series={series} seriesNames={seriesNames} cards={cards} setSeries={setSeries} />
+    </div>
+  )
+}
+
+const seriesCount = (shelves: SeriesShelf[] | null) => shelves && shelves.filter((shelf) => shelf.id !== NOT_IN_SERIES).length
+
+type ResultsProps = {
+  results: AdminTemplate[]
+  shelves: SeriesShelf[] | null
+  series: string | null
+  seriesNames: ReadonlyMap<string, string>
+  cards: CardsProps
+  setSeries: (id: string | null) => void
+}
+
+// An opened series, the shelves, or one plain grid when every match sits on the same shelf.
+function PickerResults({ results, shelves, series, seriesNames, cards, setSeries }: ResultsProps) {
+  const name = series === NOT_IN_SERIES ? COPY.notInSeries : series && (seriesNames.get(series) ?? series)
+  return (
+    <div className="min-h-0 overflow-y-auto overscroll-contain pr-1">
+      {name ? <SeriesHeader name={name} count={results.length} onBack={() => setSeries(null)} /> : null}
+      {results.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">{COPY.none}</p> : null}
+      {shelves && shelves.length > 1 ? <PickerShelves shelves={shelves} cards={cards} onOpen={setSeries} /> : <PickerGrid templates={results} cards={cards} />}
     </div>
   )
 }
