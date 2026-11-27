@@ -18925,6 +18925,8 @@ begin
   elsif offer.owner_user_id = p_user then outcome := 'own';
   -- 2025: only a successful redemption uses the code.
   elsif exists (select 1 from public.code_redemptions where code_id = offer.id and user_id = p_user and status = 'ok') then outcome := 'used';
+  -- 2030: an invite code is only redeemable at sign-up (the first verified sign-in).
+  elsif offer.kind = 'invite' and p_context <> 'signup' then outcome := 'signup_only';
   elsif offer.redemption_count >= offer.max_redemptions then outcome := 'full';
   elsif (offer.new_users_only or offer.kind = 'invite')
     and profile.created_at + make_interval(days => p_invite_window_days) <= checked_at then outcome := 'new_users_only';
@@ -18948,6 +18950,12 @@ begin
       where l.idempotency_key = 'signup:' || p_user and l.user_id = p_user and l.kind = 'grant' and l.pool = 'free') then
       outcome := 'blocked_no_signup_grant';
     end if;
+  end if;
+
+  -- 2030: reported as new_users_only, so code from before this deploy shows its usual refusal; the
+  -- reason tells the current code to say that invite codes are for sign-up only. Nothing is written.
+  if outcome = 'signup_only' then
+    return jsonb_build_object('kind', offer.kind, 'status', 'new_users_only', 'reason', 'signup_only');
   end if;
 
   if outcome <> 'ok' then
