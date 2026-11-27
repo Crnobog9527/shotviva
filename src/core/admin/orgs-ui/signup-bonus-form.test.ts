@@ -12,7 +12,7 @@ const org = {
 
 it('shows the field with its current value, the cap, the level-1-only rule and how many users got it', () => {
   const html = renderToStaticMarkup(createElement(SignupBonusForm, { org, max: 1000, given: 7, save: vi.fn() }))
-  for (const text of ['通过本企业邀请链接注册的新用户额外赠送免费积分', 'value="300"', '最多 1000', '二级客户不送', '已有 7 位新用户领到']) {
+  for (const text of ['通过本企业邀请链接注册的新用户额外赠送免费积分', 'value="300"', '最多 1000', '二级客户也不送', '企业的推广链接（链接带 ?ref=）', '经员工专用链接加入企业的员工不送', '已有 7 位新用户领到']) {
     expect(html).toContain(text)
   }
 })
