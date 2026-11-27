@@ -3712,6 +3712,27 @@ $$;
 ALTER FUNCTION "public"."_affiliate_overrides"("p_user" "uuid", "p_values" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_affiliate_paused_settle"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_payment bigint;
+begin
+  for v_payment in select distinct c.payment_id from public.affiliate_commissions c
+      where c.paused_hold and exists(select from public.affiliate_commissions l1
+        where l1.payment_id=c.payment_id and l1.level=1 and l1.affiliate_user_id=new.user_id)
+      order by c.payment_id loop
+    -- Locks the payment, then its commissions; a failure is recorded for affiliate_daily to retry.
+    perform public.affiliate_recompute_payment(v_payment);
+  end loop;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_affiliate_paused_settle"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_payment_event"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -3798,6 +3819,7 @@ CREATE OR REPLACE FUNCTION "public"."_affiliate_snapshot"("p_payment" "public"."
     SET "TimeZone" TO 'UTC'
     AS $$
   select jsonb_build_object('owner',a.user_id,'org',a.org_id,'inactive',a.status<>'active',
+    'paused',a.status='suspended' and a.org_id is not null,
     'parent',case when a.status='active' and parent.team_enabled and parent.status='active' then parent.user_id end,
     'rate',case when customer.referred_source='org_l2' then coalesce(o.l2_bp,r.org_l2_bp) else coalesce(o.l1_bp,r.l1_bp) end,
     'bonus',coalesce(po.l2_bp,r.l2_bp),
@@ -3852,6 +3874,7 @@ declare
   v_owner uuid; v_rate integer; v_confirm timestamptz; v_flags text[]; v_void text;
   v_fee integer := case when p_payment.fee_status is not null then p_payment.fee_cents end;
   v_net bigint; v_fallback boolean := false;
+  v_paused boolean := false; v_resumed boolean := false; v_l1 uuid; v_l1_status text;
 begin
   select c.* into v_old from public.affiliate_commissions c where c.payment_id=p_payment.id and c.level=p_level for update;
   if not found then
@@ -3860,11 +3883,28 @@ begin
     v_rate:=(p_snapshot->>case p_level when 1 then 'rate' else 'bonus' end)::integer;
     v_confirm:=(p_snapshot->>'confirm_after')::timestamptz;
     v_flags:=case when (p_snapshot->>'same_ip')::boolean then array['same_ip'] else '{}' end;
-    if p_level=1 and (p_snapshot->>'inactive')::boolean then v_void:='affiliate_inactive';
-    elsif p_level=1 and p_snapshot->>'void'='org_member' then v_void:='org_member'; end if;
+    if p_level=1 and p_snapshot->>'void'='org_member' then v_void:='org_member';
+    elsif coalesce((p_snapshot->>'paused')::boolean,false) then v_paused:=true; v_l1:=(p_snapshot->>'owner')::uuid;
+    elsif p_level=1 and (p_snapshot->>'inactive')::boolean then v_void:='affiliate_inactive'; end if;
   else
     v_owner:=v_old.affiliate_user_id; v_rate:=v_old.rate_bp; v_confirm:=v_old.confirm_after; v_flags:=v_old.flags;
-    if v_old.void_reason in ('affiliate_inactive','admin_void','org_member') then v_void:=v_old.void_reason; end if;
+    if v_old.void_reason in ('affiliate_inactive','admin_void','org_member') then v_void:=v_old.void_reason;
+    elsif v_old.paused_hold then
+      v_paused:=true;
+      v_l1:=case when p_level=1 then v_old.affiliate_user_id else
+        (select c.affiliate_user_id from public.affiliate_commissions c where c.payment_id=p_payment.id and c.level=1) end;
+    end if;
+  end if;
+  -- A pause hold follows the level-1 account as it is now: still suspended -> held, active again ->
+  -- normal rules, closed for good (banned, rejected, gone) -> void as before 2028.
+  if v_paused then
+    -- FOR SHARE conflicts with the status UPDATE (FOR NO KEY UPDATE; KEY SHARE would not): a payment
+    -- written while the switch is being turned on waits for that commit and reads the new status,
+    -- so it cannot be held after the settle trigger has already run. That trigger never needs this
+    -- payment (its commission row is not committed yet), so the wait cannot deadlock.
+    select a.status into v_l1_status from public.affiliates a where a.user_id=v_l1 for share;
+    if v_l1_status='active' then v_paused:=false; v_resumed:=v_old.id is not null;
+    elsif v_l1_status is distinct from 'suspended' then v_paused:=false; v_void:='affiliate_inactive'; end if;
   end if;
   if public._affiliate_fee_missing(p_payment) and now() >= v_confirm
      + make_interval(days => (select s.fee_final_grace_days from public.affiliate_settings s where s.singleton)) then
@@ -3880,13 +3920,30 @@ begin
   elsif v_amount=0 then
     v_void:=case when p_payment.amount_refunded=p_payment.amount_total then 'refunded' else 'zero' end;
   end if;
-  v_status:=case when v_amount=0 then 'void' when p_open or (cardinality(v_flags)>0 and v_old.released_by is null and not p_release)
+  -- A void row is final; it no longer waits for the account.
+  if v_amount=0 then v_paused:=false; end if;
+  v_status:=case when v_amount=0 then 'void' when p_open or v_paused or (cardinality(v_flags)>0 and v_old.released_by is null and not p_release)
     then 'on_hold' when now()>=v_confirm and (v_old.status='confirmed' or v_fallback or public._affiliate_fee_ready(p_payment,v_confirm,now()))
     then 'confirmed' else 'pending' end;
   if not p_release and v_old.id is not null and (v_amount,v_status,v_void,v_fee::bigint,v_net)
-    is not distinct from (v_old.amount,v_old.status,v_old.void_reason,v_old.fee_cents,v_old.net_base_usd) then return; end if;
+    is not distinct from (v_old.amount,v_old.status,v_old.void_reason,v_old.fee_cents,v_old.net_base_usd) then
+    if v_paused is not distinct from v_old.paused_hold then return; end if;
+    -- Only the marker changes on a row that was already void (e.g. an admin void while held): no change row.
+    if v_status='void' then
+      update public.affiliate_commissions set paused_hold=v_paused,updated_at=now() where id=v_old.id;
+      return;
+    end if;
+  end if;
   v_reason:=case when p_release then 'admin_release' when v_void is not null then v_void
-    when p_open then 'dispute_open' when v_status='on_hold' then 'same_ip'
+    when p_open then 'dispute_open'
+    when v_resumed then 'affiliate_resumed'
+    when v_paused then case
+      when not coalesce(v_old.paused_hold,false) then 'affiliate_paused'
+      when v_fee::bigint is distinct from v_old.fee_cents
+        then case when p_payment.fee_status='final' then 'fee_final' else 'fee_adjusted' end
+      when v_amount<v_old.amount then 'partial_refund'
+      else 'affiliate_paused' end
+    when v_status='on_hold' then 'same_ip'
     when v_old.status='on_hold' then 'dispute_won'
     when v_status='confirmed' and v_old.status<>'confirmed' and public._affiliate_fee_era(p_payment)
       and p_payment.fee_status is distinct from 'final' then 'confirmed_fee_estimate'
@@ -3896,13 +3953,13 @@ begin
     when v_status='confirmed' and v_old.id is not null then 'confirmed'
     else 'payment' end;
   insert into public.affiliate_commissions(payment_id,affiliate_user_id,level,product_id,rate_bp,base_usd,amount,status,
-    confirm_after,confirmed_at,void_reason,flags,created_at,fee_cents,net_base_usd)
+    confirm_after,confirmed_at,void_reason,flags,created_at,fee_cents,net_base_usd,paused_hold)
   values(p_payment.id,v_owner,p_level,p_payment.product_id,v_rate,p_payment.amount_total-p_payment.amount_tax,v_amount,v_status,
-    v_confirm,case when v_status='confirmed' then now() end,v_void,v_flags,p_payment.created_at,v_fee,v_net)
+    v_confirm,case when v_status='confirmed' then now() end,v_void,v_flags,p_payment.created_at,v_fee,v_net,v_paused)
   on conflict(payment_id,level) do update set amount=excluded.amount,status=excluded.status,
     confirmed_at=case when excluded.status='confirmed' then coalesce(affiliate_commissions.confirmed_at,now()) end,
     void_reason=excluded.void_reason,fee_cents=excluded.fee_cents,net_base_usd=excluded.net_base_usd,
-    updated_at=now() returning id into v_id;
+    paused_hold=excluded.paused_hold,updated_at=now() returning id into v_id;
   insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
     values(v_id,v_old.amount,v_amount,v_old.status,v_status,v_reason);
   -- Every path that confirms on the fallback (recompute, daily run, admin release) leaves the alert.
@@ -14159,6 +14216,14 @@ begin
   for v_payment in select payment_id from public.affiliate_recompute_errors where resolved_at is null order by payment_id loop
     perform public.affiliate_recompute_payment(v_payment);
   end loop;
+  -- 2028: pause holds whose level-1 account is no longer suspended (released or closed), bounded.
+  for v_payment in select c.payment_id from public.affiliate_commissions c
+      left join public.affiliate_commissions l1 on l1.payment_id=c.payment_id and l1.level=1
+      left join public.affiliates a on a.user_id=l1.affiliate_user_id
+     where c.paused_hold and a.status is distinct from 'suspended'
+     group by c.payment_id order by c.payment_id limit 500 loop
+    perform public.affiliate_recompute_payment(v_payment);
+  end loop;
   -- Mark the scheduled evaluation even when disabled or nobody qualifies.
   -- Any later failure rolls this insert back together with issuance.
   if extract(day from p_today)>=v_settings.settlement_day then
@@ -21506,6 +21571,7 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_commissions" (
     "payout_retained" "int8multirange",
     "fee_cents" bigint,
     "net_base_usd" bigint,
+    "paused_hold" boolean DEFAULT false NOT NULL,
     CONSTRAINT "affiliate_commissions_amount_check" CHECK (("amount" >= 0)),
     CONSTRAINT "affiliate_commissions_base_usd_check" CHECK (("base_usd" >= 0)),
     CONSTRAINT "affiliate_commissions_fee_cents_check" CHECK (("fee_cents" >= 0)),
@@ -21524,6 +21590,10 @@ COMMENT ON COLUMN "public"."affiliate_commissions"."fee_cents" IS 'Payment fees 
 
 
 COMMENT ON COLUMN "public"."affiliate_commissions"."net_base_usd" IS 'Commission base after tax, refunds and fees: max(0, unrefunded pre-tax paid − fee_cents). NULL = old formula.';
+
+
+
+COMMENT ON COLUMN "public"."affiliate_commissions"."paused_hold" IS 'on_hold because the level-1 org account was paused (suspended) at payment time; released when it is active again, voided affiliate_inactive when it is closed (2028).';
 
 
 
@@ -25022,6 +25092,10 @@ CREATE INDEX "affiliate_commissions_owner_idx" ON "public"."affiliate_commission
 
 
 
+CREATE INDEX "affiliate_commissions_paused_idx" ON "public"."affiliate_commissions" USING "btree" ("payment_id") WHERE "paused_hold";
+
+
+
 CREATE INDEX "affiliate_commissions_status_idx" ON "public"."affiliate_commissions" USING "btree" ("status", "confirm_after");
 
 
@@ -25811,6 +25885,10 @@ CREATE OR REPLACE TRIGGER "affiliate_dispute_link" AFTER UPDATE OF "payment_id" 
 
 
 CREATE OR REPLACE TRIGGER "affiliate_dispute_update" AFTER UPDATE OF "closed_at", "closed_status" ON "public"."payment_disputes" FOR EACH ROW WHEN ((("new"."payment_id" IS NOT NULL) AND (("old"."closed_at" IS DISTINCT FROM "new"."closed_at") OR ("old"."closed_status" IS DISTINCT FROM "new"."closed_status")))) EXECUTE FUNCTION "public"."_affiliate_payment_event"();
+
+
+
+CREATE OR REPLACE TRIGGER "affiliate_paused_settle" AFTER UPDATE OF "status" ON "public"."affiliates" FOR EACH ROW WHEN ((("old"."status" = 'suspended'::"text") AND ("new"."status" IS DISTINCT FROM 'suspended'::"text"))) EXECUTE FUNCTION "public"."_affiliate_paused_settle"();
 
 
 
@@ -28498,6 +28576,10 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_net_base"("p_total" integer, "p_tax"
 
 
 REVOKE ALL ON FUNCTION "public"."_affiliate_overrides"("p_user" "uuid", "p_values" "jsonb") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_affiliate_paused_settle"() FROM PUBLIC;
 
 
 

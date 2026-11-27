@@ -42,6 +42,7 @@ export const commission = z.object({
   product_id: z.string(),
   fee_cents: z.number().nullable().default(null),
   net_base_usd: z.number().nullable().default(null),
+  paused_hold: z.boolean().default(false),
 })
 const snapshot = z.record(z.string(), z.unknown())
 const payout = z.object({
@@ -88,11 +89,12 @@ function withFilters(q: ReturnType<typeof pageQuery>, f: Filters) {
   if (f.status) q = q.eq('status', f.status)
   return q
 }
-export const commissionColumns = 'id,created_at,payment_id,affiliate_user_id,level,rate_bp,amount,status,base_usd,flags,released_by,confirm_after,product_id,fee_cents,net_base_usd'
+export const commissionColumns = 'id,created_at,payment_id,affiliate_user_id,level,rate_bp,amount,status,base_usd,flags,released_by,confirm_after,product_id,fee_cents,net_base_usd,paused_hold'
 export async function commissions(db: SupabaseClient, f: Filters) {
   let q = withFilters(pageQuery(db, 'affiliate_commissions', commissionColumns, f.cursor), f)
   if (f.flag === 'yes') q = q.neq('flags', '{}')
   if (f.flag === 'no') q = q.eq('flags', '{}')
+  if (f.flag === 'paused') q = q.eq('paused_hold', true)
   return toPage(commission.array().parse(checked(await q)), (r) => r)
 }
 export async function payouts(db: SupabaseClient, f: Filters, includeFlags = false) {

@@ -16,7 +16,7 @@ const translate = (messages: typeof en) =>
 
 const commission = (over: Partial<Commission>): Commission => ({
   id: '9', created_at: '2026-11-21T00:00:00Z', payment_id: '1', product_id: 'pro_monthly', base_usd: 4990,
-  fee_cents: 320, net_base_usd: 4670, rate_bp: 1500, amount: 700, status: 'pending', confirm_after: '2026-12-21T00:00:00Z', ...over,
+  fee_cents: 320, net_base_usd: 4670, rate_bp: 1500, amount: 700, status: 'pending', confirm_after: '2026-12-21T00:00:00Z', paused_hold: false, ...over,
 })
 const line = (over: Partial<FeeLine>): FeeLine => ({
   payment_id: '1', refund_id: null, revision: 1, line_no: 1, kind: 'acquiring', channel: 'waffo',
