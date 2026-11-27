@@ -15,13 +15,15 @@ function available(offer: z.infer<typeof terms>, now: number) {
 
 const preview = terms.extend({
   kind: z.enum(['invite', 'campaign']), code_preview_credits: z.number().int().nonnegative(), invitee_pool: z.enum(['free', 'paid']).nullable(),
+  // 2032: an org staff member's invite code: credits are the org's signup bonus, not the personal reward.
+  code_preview_org: z.boolean().default(false),
   max_redemptions: z.number().nullable(), redemption_count: z.number(),
   owner: z.object({ banned_at: z.string().nullable() }).nullable(),
 })
 
 export async function previewCode(admin: SupabaseClient, code: string) {
   const { data, error } = await admin.from('codes')
-    .select('code,kind,active,starts_at,expires_at,max_redemptions,redemption_count,code_preview_credits,invitee_pool,discount_percent,discount_products,discount_duration,discount_months,owner:profiles!codes_owner_user_id_fkey(banned_at)')
+    .select('code,kind,active,starts_at,expires_at,max_redemptions,redemption_count,code_preview_credits,code_preview_org,invitee_pool,discount_percent,discount_products,discount_duration,discount_months,owner:profiles!codes_owner_user_id_fkey(banned_at)')
     .eq('code', code).maybeSingle()
   if (error) throw error
   if (!data) return null
@@ -31,7 +33,7 @@ export async function previewCode(admin: SupabaseClient, code: string) {
 }
 
 function describeOffer(c: z.infer<typeof preview>) {
-  return { kind: c.kind, credits: c.code_preview_credits,
+  return { kind: c.kind, credits: c.code_preview_credits, org: c.code_preview_org,
     pool: c.kind === 'invite' ? 'free' as const : c.invitee_pool, percent: c.discount_percent, products: c.discount_products ?? [],
     duration: c.discount_duration, months: c.discount_months }
 }

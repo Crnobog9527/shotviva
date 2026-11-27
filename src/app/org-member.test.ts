@@ -18,7 +18,7 @@ const { MemberOrgView } = await import('@/core/org/ui/staff-card')
 const staff = (over: Partial<StaffCard> = {}): StaffCard => ({
   kind: 'member', orgName: 'Acme Studio', status: 'active', monthlyAllowance: 500, allocatedThisMonth: 600, heldCredits: 80, customers: 3,
   promo: { allowance: 2000, allocated: 2000, used: 250, held: 1750 },
-  withLevel2: false, period: '2026-11', performance: { l1: { customers: 3, signups: 1, paying: 2, paidCents: 12345 }, l2: { customers: 4, signups: 0, paying: 1, paidCents: 6789 } },
+  withLevel2: false, affiliateEnabled: true, period: '2026-11', performance: { l1: { customers: 3, signups: 1, paying: 2, paidCents: 12345 }, l2: { customers: 4, signups: 0, paying: 1, paidCents: 6789 } },
   ...over,
 })
 

@@ -79,12 +79,20 @@ async function Account() {
         {claimOptions ? <GiftClaimCard credits={claimCredits} options={claimOptions} actions={claimActions} /> : null}
         <OrgBlock view={org} memberLink={org.kind === 'member' ? <Suspense fallback={null}><MemberLink user={user.id} /></Suspense> : null} customerLink={org.kind === 'owner' && org.org.affiliateEnabled && affiliate ? <Suspense fallback={null}><OwnerCustomerLink user={user.id} /></Suspense> : null} />
         <StoreCard actions={storeActions} />
-        <InviteCard load={loadMyInvites} />
+        {/* 2032: an org staff code earns no personal invite rewards; members promote with the org link above. */}
+        {!orgInvites(org) && <InviteCard load={loadMyInvites} />}
         <RedeemCard pending={discount} />
       </AccountView>
       <AccountHelp actions={helpActions} payments={purchases} replyTime={<ReplyTime userId={user.id} />} brand={site.brand.name} unread={helpUnread} />
     </>
   )
+}
+
+// With the org's affiliate switch on, a member's (and the owner's) invite code is an org code: no
+// personal invitee or inviter reward (2032), so the personal invite card would promise rewards that
+// do not come. They promote with the org's links instead.
+function orgInvites(view: Awaited<ReturnType<typeof readOrgView>>) {
+  return (view.kind === 'member' || view.kind === 'owner') && (view.kind === 'member' ? view.affiliateEnabled : view.org.affiliateEnabled)
 }
 
 // The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a

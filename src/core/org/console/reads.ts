@@ -199,7 +199,7 @@ async function staffCard(db: SupabaseClient, now: Date, org: z.infer<typeof orgS
   return {
     kind: 'member', orgName: org.name, status: org.status, monthlyAllowance: allowances(seat, org).monthlyAllowance,
     allocatedThisMonth: given, heldCredits: seat.held_credits, promo, customers: counts.get(user)?.l1 ?? 0,
-    withLevel2, period, performance,
+    withLevel2, period, performance, affiliateEnabled: org.affiliate_enabled,
   }
 }
 
