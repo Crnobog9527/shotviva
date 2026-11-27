@@ -32,7 +32,7 @@ const owner = (over: Partial<OwnerConsole['org']> = {}, extra: Partial<OwnerCons
   packages: [{ id: ORG, name: 'Starter', priceUsdCents: 123400, credits: 98765 }],
   depositable: 700,
   paymentAccounts: null,
-  poolMonth: { period: '2026-11', paid: { in: 5000, allocated: 600, reclaimed: 0 }, promo: { granted: 10000, allocated: 2000, reclaimed: 0, expired: 0, held: 1750 } },
+  poolMonth: { period: '2026-11', paid: { in: 5000, allocated: 600, reclaimed: 0, clawedBack: 0 }, promo: { granted: 10000, allocated: 2000, reclaimed: 0, expired: 0, held: 1750 } },
   ...extra,
 })
 

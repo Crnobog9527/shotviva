@@ -34,9 +34,14 @@
 -- allocated from its pool after the payment (or the buyer spent / deposited by hand); the automatic
 -- deposits themselves never count.
 --
+-- Lock order: wherever an org row and a profile are both taken, the org row comes first
+-- (purchase_terms, renewal_terms, checkout_terms before the subscription mirror, and
+-- open_payment_dispute before it bans the buyer); refunds take payment -> org -> profile.
+--
 -- Expand-only: a wider check constraint, new internal functions, and create or replace (same
--- signatures) of purchase_terms, renewal_terms, clawback_payment_credits, admin_clawback_payment,
--- payment_clawback_preview (two extra keys), refund_eligibility, close_payment_dispute and
+-- signatures) of purchase_terms, renewal_terms, checkout_terms, clawback_payment_credits,
+-- admin_clawback_payment, payment_clawback_preview (two extra keys), refund_eligibility,
+-- open_payment_dispute, close_payment_dispute, org_pool_month (two extra keys under paid) and
 -- _org_replayed (refuses the new reserved request-id prefixes). Code from before this deploy calls
 -- the same functions and gets the new routing; its screens just do not say where the credits went.
 
@@ -630,5 +635,188 @@ begin
     'amount', v_row.amount,
     'currency', v_row.currency
   );
+end;
+$_$;
+
+-- Lock order (review of #981): the org row comes before the profile everywhere. A dispute bans
+-- the buyer (profile lock) before it claws back; for an org-pool payment the org row is now
+-- locked right after the payment, before the ban.
+create or replace function public.open_payment_dispute(p_dispute_id text, p_charge_id text, p_amount integer,
+  p_currency text, p_reason text, p_due_by timestamptz, p_managed_default boolean) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_row public.payment_disputes;
+  v_payment public.payments;
+  v_managed boolean;
+  v_profile public.profiles;
+  v_claw jsonb;
+begin
+  if p_dispute_id is null or p_charge_id is null or p_amount is null or p_currency is null
+     or p_reason is null or p_managed_default is null then
+    raise exception 'INVALID_INPUT' using detail = 'dispute id, charge id, amount, currency, reason and the default are required';
+  end if;
+
+  select * into v_row from public.payment_disputes where stripe_dispute_id = p_dispute_id;
+  if found then
+    return public._payment_dispute_answer(v_row, false);
+  end if;
+
+  -- Locked first: every T71 path locks the payment before the profile (and before other
+  -- disputes of it), so a refund and a dispute arriving together cannot deadlock.
+  select * into v_payment from public.payments where stripe_charge_id = p_charge_id for update;
+  -- 2033: credits that went to an org pool are clawed back from it; its row before the profile.
+  if v_payment.id is not null then
+    perform 1 from public.orgs where id = public._payment_credits_org(v_payment) for no key update;
+  end if;
+  v_managed := case
+    when v_payment.id is null then p_managed_default
+    when v_payment.method = 'cn_card' then false
+    when v_payment.method = 'card' then coalesce(
+      v_payment.managed_payments,
+      (select p.managed_payments from public.payments p
+        where p.user_id = v_payment.user_id and p.product_id = v_payment.product_id
+          and p.channel = 'stripe' and p.stripe_session_id is not null
+          and p.created_at <= v_payment.created_at
+        order by p.created_at desc limit 1),
+      p_managed_default)
+    else p_managed_default
+  end;
+
+  insert into public.payment_disputes
+    (stripe_dispute_id, stripe_charge_id, payment_id, user_id, amount, currency, reason, responder, due_by)
+  values
+    (p_dispute_id, p_charge_id, v_payment.id, v_payment.user_id, p_amount, lower(p_currency), p_reason,
+     case when v_managed then 'stripe' else 'shotviva' end, p_due_by)
+  on conflict (stripe_dispute_id) do nothing
+  returning * into v_row;
+  if not found then
+    -- A concurrent delivery inserted it first; that one bans and claws back.
+    select * into v_row from public.payment_disputes where stripe_dispute_id = p_dispute_id;
+    return public._payment_dispute_answer(v_row, false);
+  end if;
+
+  if v_row.user_id is not null then
+    select * into v_profile from public.profiles where id = v_row.user_id for update;
+    if found and v_profile.role <> 'admin' and v_profile.banned_at is null then
+      perform public.admin_ban_user(v_row.user_id, '拒付');
+      update public.payment_disputes set auto_banned_at = now()
+       where stripe_dispute_id = p_dispute_id
+      returning * into v_row;
+    end if;
+  end if;
+
+  if v_row.payment_id is not null then
+    -- record_payment_issue marks it first; set here too so the clawback asks for everything.
+    update public.payments set status = 'disputed' where id = v_row.payment_id and status <> 'disputed';
+    v_claw := public.clawback_payment_credits(v_row.payment_id, 'dispute:' || p_dispute_id, '拒付扣回 ' || p_dispute_id);
+    update public.payment_disputes
+       set credits_clawed_back = (v_claw ->> 'taken')::integer,
+           clawback_shortfall = (v_claw ->> 'written_off')::integer
+     where stripe_dispute_id = p_dispute_id
+    returning * into v_row;
+  end if;
+
+  return public._payment_dispute_answer(v_row, true);
+end;
+$$;
+
+-- Same reason: the org row before the subscription mirror (and the profile purchase_terms locks).
+create or replace function admin.checkout_terms(p_v2 boolean, p_user_id uuid, p_product_id text, p_session_id text,
+  p_amount_total integer, p_currency text, p_amount_tax integer, p_method text, p_invoice_id text default null,
+  p_charge_id text default null, p_subscription_id text default null, p_subscription_status text default null,
+  p_current_period_end timestamptz default null, p_cancel_at_period_end boolean default null)
+returns public.credit_change
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_change public.credit_change;
+begin
+  perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
+  if p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
+    raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
+  end if;
+
+  -- 2033: lock the buyer's active org first (purchase_terms takes the same lock again).
+  perform public._org_purchase_pool(p_user_id, 'purchase:' || p_session_id);
+
+  if p_subscription_id is not null then
+    if p_subscription_status is null or p_current_period_end is null or p_cancel_at_period_end is null then
+      raise exception 'INVALID_INPUT' using detail = 'subscription fields are all required';
+    end if;
+    insert into public.subscriptions
+      (stripe_subscription_id, user_id, product_id, status, current_period_end, cancel_at_period_end)
+    values
+      (p_subscription_id, p_user_id, p_product_id, p_subscription_status, p_current_period_end, p_cancel_at_period_end)
+    on conflict (stripe_subscription_id) do update
+       set status = excluded.status,
+           current_period_end = excluded.current_period_end,
+           cancel_at_period_end = excluded.cancel_at_period_end,
+           updated_at = now()
+     where public.subscriptions.user_id = excluded.user_id
+       and public.subscriptions.product_id = excluded.product_id;
+    if not found then
+      raise exception 'IDEMPOTENCY_CONFLICT' using detail = 'subscription belongs to another user or product';
+    end if;
+  end if;
+
+  v_change := admin.purchase_terms(p_v2, p_user_id, p_product_id, p_session_id);
+
+  if v_change.applied then
+    insert into public.payments
+      (user_id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id,
+       amount_total, amount_tax, currency, method)
+    values
+      (p_user_id, p_product_id, 'stripe', p_session_id, p_invoice_id, p_charge_id,
+       p_amount_total, p_amount_tax, lower(p_currency), p_method);
+  end if;
+
+  return v_change;
+end;
+$$;
+
+-- The month panel counts the purchase clawbacks and their restores (review of #981).
+create or replace function public.org_pool_month(p_owner uuid, p_period text) returns jsonb
+language plpgsql stable security definer set search_path = '' set "TimeZone" to 'UTC' as $_$
+declare
+  o public.orgs;
+  v_start timestamptz;
+  v_end timestamptz;
+  v_paid jsonb;
+  v_promo jsonb;
+begin
+  if p_period is null or p_period !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' then raise exception 'INVALID_INPUT'; end if;
+  select * into o from public.orgs where owner_user_id = p_owner;
+  if not found then raise exception 'NOT_ORG_OWNER'; end if;
+  v_start := ((p_period || '-01')::timestamp) at time zone 'UTC';
+  v_end := v_start + interval '1 month';
+  select jsonb_build_object(
+      'balance', o.pool_credits,
+      'in', coalesce(sum(l.delta) filter (where l.kind in ('bank_grant', 'owner_deposit')), 0),
+      'allocated', coalesce(-sum(l.delta) filter (where l.kind = 'allocate'), 0),
+      'reclaimed', coalesce(sum(l.delta) filter (where l.kind = 'reclaim'), 0),
+      'adjusted', coalesce(sum(l.delta) filter (where l.kind = 'admin_adjust'), 0),
+      -- 2033: taken back for refunds and disputes of purchases that went to the pool, and given
+      -- back when a dispute was won.
+      'clawed_back', coalesce(-sum(l.delta) filter (where l.kind = 'payment_clawback'), 0),
+      'restored', coalesce(sum(l.delta) filter (where l.kind = 'payment_clawback_restore'), 0))
+    into v_paid
+    from public.org_credit_ledger l where l.org_id = o.id and l.created_at >= v_start and l.created_at < v_end;
+  select jsonb_build_object(
+      'balance', case when o.promo_expires_at > now() then o.promo_pool_credits else 0 end,
+      'expires_at', case when o.promo_expires_at > now() then o.promo_expires_at end,
+      'granted', coalesce(sum(l.delta) filter (where l.kind = 'promo_grant' and l.created_at >= v_start and l.created_at < v_end), 0),
+      'allocated', coalesce(-sum(l.delta) filter (where l.kind = 'promo_allocate' and l.created_at >= v_start and l.created_at < v_end), 0),
+      'reclaimed', coalesce(sum(l.delta) filter (where l.kind = 'promo_reclaim' and l.created_at >= v_start and l.created_at < v_end), 0),
+      'expired', coalesce(-sum(l.delta) filter (where l.kind = 'promo_expire' and l.request_id like 'org_promo_expire:' || p_period || ':%'), 0)
+        -- Scoped to the org's members (credit_ledger_user_id_created_at_idx), never a ledger-wide scan.
+        + coalesce((select -sum(c.delta) from public.org_members om join public.credit_ledger c on c.user_id = om.user_id
+                     where om.org_id = o.id and c.created_at >= v_start
+                       and c.kind = 'org_promo_expire' and c.idempotency_key like 'org_promo_expire:' || p_period || ':' || o.id::text || ':%'), 0),
+      'held', case when o.promo_expires_at > now() then
+        coalesce((select sum(least(m.held_promo_credits, p.free_credits)) from public.org_members m join public.profiles p on p.id = m.user_id
+                   where m.org_id = o.id and m.status = 'active'), 0) else 0 end)
+    into v_promo
+    from public.org_credit_ledger l
+   where l.org_id = o.id and l.kind like 'promo_%' and l.created_at >= v_start and l.created_at < v_end + interval '8 days';
+  return jsonb_build_object('period', p_period, 'paid', v_paid, 'promo', v_promo);
 end;
 $_$;

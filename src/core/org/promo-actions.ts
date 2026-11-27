@@ -33,7 +33,8 @@ export async function setOrgPromoAllowance(client: RpcClient, owner: string, mem
 const num = z.coerce.number()
 const poolMonth = z.object({
   period,
-  paid: z.object({ balance: num, in: num, allocated: num, reclaimed: num, adjusted: num }),
+  // clawed_back / restored (2033): refunds and disputes of purchases that went to the pool.
+  paid: z.object({ balance: num, in: num, allocated: num, reclaimed: num, adjusted: num, clawed_back: num.default(0), restored: num.default(0) }),
   promo: z.object({ balance: num, expires_at: z.string().nullable(), granted: num, allocated: num, reclaimed: num, expired: num, held: num }),
 })
 

@@ -5,6 +5,7 @@ import type Stripe from 'stripe'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { applyClawback, previewClawback } from '@/core/admin'
+import { ORGS_COPY } from '@/core/admin/orgs/copy'
 import { currentTier } from '@/core/billing'
 import { handleStripeWebhook, priceCents, type DisputeEvidenceConfig } from '@/core/billing/stripe'
 import type { ProductId } from '@/core/config'
@@ -290,6 +291,10 @@ describe('refunds and clawbacks take back from the org pool', () => {
     expect((await orgLedger(db, orgId)).map((row) => [row.kind, row.delta])).toEqual([
       ['owner_deposit', n], ['payment_clawback', -n], ['payment_clawback_restore', n],
     ])
+    // The owner's month panel counts both (org_pool_month).
+    const period = new Date().toISOString().slice(0, 7)
+    const month = (await db.query('select public.org_pool_month($1, $2) as m', [owner, period])).rows[0].m
+    expect(month.paid).toMatchObject({ balance: n, in: n, clawed_back: n, restored: n })
   })
 
   it('the admin clawback previews and takes from the pool, naming the org', async () => {
@@ -330,5 +335,58 @@ describe('reserved request ids', () => {
     await db.query('update public.profiles set credits = 10 where id = $1', [owner])
     await expect(depositOrgCredits(service, owner, 1, 'pay:purchase:cs_x')).rejects.toMatchObject({ message: 'INVALID_INPUT' })
     await expect(depositOrgCredits(service, owner, 1, 'payment_clawback:1:x')).rejects.toMatchObject({ message: 'INVALID_INPUT' })
+  })
+})
+
+describe('labels', () => {
+  it('the admin org ledger names every org_credit_ledger kind', async () => {
+    const { rows } = await db.query<{ def: string }>(
+      "select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'org_credit_ledger_kind_check'")
+    const kinds = [...rows[0]!.def.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]!)
+    expect(kinds).toEqual(expect.arrayContaining(['payment_clawback', 'payment_clawback_restore']))
+    expect(kinds.filter((kind) => !ORGS_COPY.kinds[kind])).toEqual([])
+  })
+})
+
+// Review of #981 (P2-1): a dispute bans the buyer (profile) and claws back from the org pool;
+// the org row must be taken first, as every org function does, or a concurrent allocation
+// (org -> profile) deadlocks with it. Two committed sessions, opposite operations.
+describe('lock order against a concurrent allocation', () => {
+  let racer: Client
+  let mover: Client
+  beforeAll(async () => { [racer, mover] = await Promise.all([connectAdmin(), connectAdmin()]) })
+  afterAll(async () => { await Promise.all([racer.end(), mover.end()]) })
+
+  async function waitsOnLock(pid: number) {
+    for (let i = 0; i < 100; i++) {
+      const { rows } = await db.query("select wait_event_type = 'Lock' as waiting from pg_stat_activity where pid = $1", [pid])
+      if (rows[0]?.waiting) return
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    throw new Error('never waited on a lock')
+  }
+
+  it('a dispute opened while the owner allocates: both complete, no deadlock', async () => {
+    const { orgId, owner } = await orgWith(db, service, actor)
+    const charge = `ch_${randomUUID()}`
+    await db.query("select * from public.settle_checkout($1,'pack_s',$2,990,'usd',0,'card',null,$3)", [owner, `cs_${randomUUID()}`, charge])
+    const n = await poolOf(db, orgId)
+    expect(n).toBeGreaterThan(0)
+
+    await mover.query('begin')
+    await mover.query('select 1 from public.orgs where id = $1 for no key update', [orgId])
+    const pid = (await racer.query('select pg_backend_pid() as pid')).rows[0].pid as number
+    const dispute = racer.query("select public.open_payment_dispute($1,$2,990,'usd','fraudulent',now() + interval '7 days',false) as r",
+      [`dp_${randomUUID()}`, charge])
+    await waitsOnLock(pid)
+    // org -> profile, the order of every org function: the dispute must not hold the profile now.
+    await mover.query('select public.org_allocate($1,$1,1,$2)', [owner, `race:${randomUUID()}`])
+    await mover.query('commit')
+    await dispute
+
+    expect(await poolOf(db, orgId)).toBe(0)
+    expect(await creditsOf(db, owner)).toBe(1)
+    const { rows } = await db.query('select credits_clawed_back, clawback_shortfall from public.payments where stripe_charge_id = $1', [charge])
+    expect(rows[0]).toEqual({ credits_clawed_back: n - 1, clawback_shortfall: 1 })
   })
 })

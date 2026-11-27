@@ -1850,7 +1850,7 @@
         "suspended": "The company is paused: deposits are off.",
         "depositLabel": "Deposit your own paid credits",
         "depositPlaceholder": "Number of credits",
-        "depositHint": "What you buy while the company is active goes straight into the pool. This moves paid credits you already hold. Pool credits can't be refunded or moved back.",
+        "depositHint": "What you buy while the company is active goes straight into the pool. Those purchases can be refunded within 7 days if none of their credits have been used, and a refund takes the credits back from the pool. This moves paid credits you already hold: credits you deposit here can't be refunded or moved back.",
         "deposit": "Deposit",
         "depositing": "Depositing…",
         "deposited": "Deposited into the pool.",
@@ -2111,6 +2111,7 @@
         "in": "Into the pool",
         "allocated": "Given to members",
         "reclaimed": "Back to the pool",
+        "clawedBack": "Taken back for refunds",
         "held": "Still with members",
         "expired": "Expired at month end"
       },
