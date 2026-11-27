@@ -107,6 +107,11 @@ export const USERS_COPY = {
     referrer: '推荐人',
     inviter: '邀请人',
     redeemedCodes: '用过的码',
+    blockedInvite: '未生效的邀请码',
+    blockedReason: (status: string, retries: boolean) => status === 'blocked_same_ip'
+      ? '没生效：和邀请人注册网络相同（个人邀请码），不会自动重试'
+      : retries ? '没生效：注册时还没领到注册赠送；赠送到账后会自动再兑换一次' : '没生效：当时还没领到注册赠送（不是注册时填的，不会自动重试）',
+    blockedInviter: '邀请人',
     firstCodes: '回到首批',
     moreCodes: '下一批兑换码',
     close: '关闭',

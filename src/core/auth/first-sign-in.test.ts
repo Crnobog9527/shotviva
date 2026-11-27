@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   // This browser's sv_ref cookie.
   cookie: 'partner' as string | undefined,
   claim: vi.fn().mockResolvedValue(null),
+  prepare: vi.fn().mockResolvedValue(null),
   claimQuietly: vi.fn().mockResolvedValue(false),
   track: vi.fn(),
   recordSignupIp: vi.fn(),
@@ -17,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../affiliate/referral', () => ({ bindSignupReferral: mocks.bind }))
-vi.mock('./signup-code', () => ({ consumeSignupCode: mocks.claim }))
+vi.mock('./signup-code', () => ({ consumeSignupCode: mocks.claim, prepareSignupCode: mocks.prepare }))
 vi.mock('./signup-gift-claim', () => ({ claimQuietly: mocks.claimQuietly }))
 vi.mock('next/headers', () => ({ headers: mocks.headers, cookies: async () => new Map(mocks.cookie ? [['sv_ref', { value: mocks.cookie }]] : []) }))
 vi.mock('../analytics', () => ({ track: mocks.track }))
@@ -73,7 +74,7 @@ describe('onVerifiedSignIn', () => {
     await onVerifiedSignIn('u1', benefits, 'google', 'en')
     expect(mocks.bind).toHaveBeenCalledWith('u1', true, 'partner', false)
     // Not the signup confirmation click: the code stored at sign-up is taken but not used (2030).
-    expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', { first: true, fresh: true, useStored: false }, benefits.invite, 'en')
+    expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', expect.objectContaining({ first: true, fresh: true, useStored: false }), benefits.invite, 'en')
     // The partner link binds first, so an org member's invite code cannot take the customer (§6.5).
     expect(mocks.bind.mock.invocationCallOrder[0]).toBeLessThan(mocks.claim.mock.invocationCallOrder[0])
     expect(mocks.track).toHaveBeenCalledWith('signup', { method: 'google', code_kind: 'invite' }, { distinctId: 'u1', locale: 'en' })
@@ -128,6 +129,23 @@ describe('onVerifiedSignIn: partner binding', () => {
     await onVerifiedSignIn('u1', benefits, 'email', 'zh', null, true)
     expect(mocks.bind).toHaveBeenCalledExactlyOnceWith('u1', true, 'partner', true)
     expect(mocks.bind.mock.invocationCallOrder[0]).toBeLessThan(mocks.grantSignupCredits.mock.invocationCallOrder[0]!)
+  })
+
+  it('2031: with an IP the sign-up code is staged before the gift and redeemed after it', async () => {
+    mocks.recordSignupIp.mockResolvedValue(true)
+    mocks.grantSignupCredits.mockResolvedValue(true)
+    mocks.prepare.mockResolvedValueOnce('STAFF001')
+    await onVerifiedSignIn('u1', benefits, 'email', 'zh', null, true)
+    expect(mocks.prepare).toHaveBeenCalledExactlyOnceWith({}, 'u1', true)
+    expect(mocks.prepare.mock.invocationCallOrder[0]).toBeLessThan(mocks.grantSignupCredits.mock.invocationCallOrder[0]!)
+    expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', expect.objectContaining({ fresh: true, prepared: 'STAFF001' }), benefits.invite, 'zh')
+  })
+
+  it('2031: a returning sign-in (IP already stored) stages nothing', async () => {
+    mocks.recordSignupIp.mockResolvedValue(false)
+    await onVerifiedSignIn('u1', benefits, 'email', 'zh')
+    expect(mocks.prepare).not.toHaveBeenCalled()
+    expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', expect.objectContaining({ first: false, prepared: undefined }), benefits.invite, 'zh')
   })
 
   it('2024: without an IP (local dev) the first sign-in is only known from the grant, so the link binds after it', async () => {
