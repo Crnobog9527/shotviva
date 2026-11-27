@@ -49,6 +49,10 @@ export const ORGS_COPY = {
   },
   pickerChosen: (label: string) => `已选：${label}`,
   pickerClear: '改选',
+  // 绑定已有客户 (2029)
+  bindCustomerTitle: '绑定已有客户',
+  bindCustomerHint: '把一个已注册的账号（也可以是已经付过款的）手动绑到本企业的联盟账号。之后的付款按企业一级佣金算，也计入渠道商推广奖励；可以选择把过去几天的付款也补算佣金（补算的不计推广奖励）。不发企业注册福利；本企业员工不能绑。',
+  bindCustomerInactive: '企业联盟账号不是开着的状态，暂时不能绑定客户。',
   ownerBlocked: '这个账号不能当主管理员，请改选',
   // 添加成员
   addMemberTitle: '添加成员',

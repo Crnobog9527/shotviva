@@ -5520,7 +5520,9 @@ begin
         join public.profiles cu on cu.id = p.user_id
        where v_account is not null and c.affiliate_user_id = v_account and c.level = 1 and c.status = 'confirmed'
          and c.confirmed_at >= v_start and c.confirmed_at < v_end
-         and cu.referred_by = v_account and cu.referred_source in ('org_l1', 'signup', 'first_checkout')
+         and cu.referred_by = v_account
+         and cu.referred_source in ('org_l1', 'signup', 'first_checkout', 'admin')
+         and p.created_at >= cu.referred_at
          and not exists(select from public.partner_promo_grant_lines l join public.partner_promo_grants g on g.id = l.grant_id
                          where l.payment_id = c.payment_id and g.status = 'granted' and g.period <> p_period)
     ) x
@@ -6695,6 +6697,95 @@ $$;
 
 
 ALTER FUNCTION "public"."admin_affiliate_annotate"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."admin_affiliate_bind_customer"("p_actor" "uuid", "p_input" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_user uuid; v_owner uuid; v_reason text := nullif(trim(p_input->>'reason'), ''); v_days integer;
+  v_profile public.profiles; v_account public.affiliates; v_changed boolean; v_bound_at timestamptz;
+  v_payment bigint; v_created integer := 0; v_already integer := 0; v_taken integer := 0; v_missed integer := 0;
+begin
+  perform public._affiliate_require_admin(p_actor);
+  if p_input is null or jsonb_typeof(p_input) <> 'object' or v_reason is null or length(v_reason) > 2000
+     or coalesce(p_input->>'user_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     or coalesce(p_input->>'affiliate_user_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     or coalesce(p_input->>'backdate_days', '0') !~ '^[0-9]{1,2}$' then
+    raise exception 'INVALID_INPUT';
+  end if;
+  v_user := (p_input->>'user_id')::uuid;
+  v_owner := (p_input->>'affiliate_user_id')::uuid;
+  v_days := coalesce(p_input->>'backdate_days', '0')::integer;
+  if v_days > 90 or v_user = v_owner then raise exception 'INVALID_INPUT'; end if;
+  if v_days > 0 and not (select s.enabled from public.affiliate_settings s where s.singleton) then
+    raise exception 'AFFILIATE_PROGRAM_OFF';
+  end if;
+
+  -- Payment rows first, then the profile: the order billing writes take them.
+  if v_days > 0 then
+    perform 1 from public.payments p where p.user_id = v_user and p.created_at >= now() - make_interval(days => v_days)
+      order by p.id for update;
+  end if;
+  select * into v_profile from public.profiles where id = v_user for update;
+  if not found then raise exception 'USER_NOT_FOUND'; end if;
+  if v_profile.banned_at is not null then raise exception 'USER_BANNED'; end if;
+  select * into v_account from public.affiliates where user_id = v_owner;
+  if not found or v_account.status <> 'active' then raise exception 'AFFILIATE_NOT_ACTIVE'; end if;
+  if v_account.org_id is not null and exists(select from public.org_members m
+       where m.org_id = v_account.org_id and m.user_id = v_user and m.status = 'active') then
+    raise exception 'AFFILIATE_ORG_MEMBER';
+  end if;
+
+  v_changed := v_profile.referred_by is distinct from v_owner;
+  if v_changed then
+    update public.profiles set referred_by = v_owner, referred_source = 'admin', referred_at = now(),
+      referred_member = null, referred_via = null where id = v_user;
+    v_bound_at := now();
+  else
+    -- Already this partner's customer: keep how and when (the commission term runs from referred_at).
+    -- Back-dating only extends an admin binding; a customer this partner got through a link or an
+    -- invite code is not back-dated (its pre-binding payments were never this partner's sale).
+    if v_days > 0 and v_profile.referred_source is distinct from 'admin' then
+      raise exception 'AFFILIATE_BACKDATE_NOT_ADMIN';
+    end if;
+    v_bound_at := coalesce(v_profile.referred_at, now());
+  end if;
+
+  if v_days > 0 then
+    for v_payment in select p.id from public.payments p
+       where p.user_id = v_user and p.created_at >= now() - make_interval(days => v_days)
+         and p.created_at < v_bound_at and p.amount_total > 0 and p.currency = 'usd'
+       order by p.id loop
+      if exists(select from public.affiliate_commissions c where c.payment_id = v_payment and c.level = 1 and c.affiliate_user_id = v_owner) then
+        v_already := v_already + 1;
+      elsif exists(select from public.affiliate_commissions c where c.payment_id = v_payment) then
+        v_taken := v_taken + 1;
+      else
+        perform public.affiliate_recompute_payment(v_payment, true);
+        if exists(select from public.affiliate_commissions c where c.payment_id = v_payment and c.level = 1 and c.affiliate_user_id = v_owner) then
+          v_created := v_created + 1;
+        else
+          v_missed := v_missed + 1;
+        end if;
+      end if;
+    end loop;
+  end if;
+
+  perform public._affiliate_audit(p_actor, 'rebind', v_user::text,
+    concat(coalesce(v_profile.referred_by::text, '∅'), ' → ', v_owner::text,
+      case when v_changed then '' else ' (unchanged)' end,
+      case when v_days > 0 then concat(' backdate ', v_days, 'd: created ', v_created, ', already ', v_already,
+        ', other partner ', v_taken, ', failed ', v_missed) else '' end,
+      ' ', v_reason));
+  return jsonb_build_object('changed', v_changed, 'previous', v_profile.referred_by, 'bound_at', v_bound_at,
+    'backdate_days', v_days, 'created', v_created, 'already', v_already, 'other_partner', v_taken, 'failed', v_missed);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."admin_affiliate_bind_customer"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_affiliate_commission_history"("p_actor" "uuid", "p_user" "uuid", "p_commission" bigint, "p_level" smallint, "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" bigint DEFAULT NULL::bigint) RETURNS TABLE("id" bigint, "at" timestamp with time zone, "old_amount" bigint, "new_amount" bigint, "old_status" "text", "new_status" "text", "reason" "text")
@@ -28964,6 +29055,11 @@ GRANT ALL ON FUNCTION "public"."admin_affiliate_allow_reapply"("p_actor" "uuid",
 
 REVOKE ALL ON FUNCTION "public"."admin_affiliate_annotate"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_affiliate_annotate"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_affiliate_bind_customer"("p_actor" "uuid", "p_input" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_affiliate_bind_customer"("p_actor" "uuid", "p_input" "jsonb") TO "service_role";
 
 
 

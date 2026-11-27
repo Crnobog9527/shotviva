@@ -5,12 +5,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { AdminPage, StatCard } from '@/core/admin'
 import { listOrgWorks, OrgWorksSection, parseOrgWorkFilters, type OrgWorkFilters } from '@/core/admin/org-works'
 import { CUSTOMER_COPY, loadOrgCustomerCounts, loadOrgCustomers, loadOrgDetail, loadOrgInviteToken, ORG_DETAIL_TABS, orgDetailTabHref, ORGS_COPY as COPY, parseOrgDetailTab, type OrgDetail, type OrgDetailTab } from '@/core/admin/orgs'
-import { AddMemberForm, AffiliateCard, CustomerTable, GrantForm, LedgerTable, MemberTable, num, OrgEditForm, OrgStatusBadge, SignupBonusForm, StaffLinkCard, TransferOwnerForm } from '@/core/admin/orgs-ui'
+import { AddMemberForm, AffiliateCard, BindCustomerCard, CustomerTable, GrantForm, LedgerTable, MemberTable, num, OrgEditForm, OrgStatusBadge, SignupBonusForm, StaffLinkCard, TransferOwnerForm } from '@/core/admin/orgs-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { ORG_SIGNUP_BONUS_MAX } from '@/core/org'
 import { cn } from '@/core/ui/cn'
 
 import { viewWorkAction } from '../../jobs/actions'
+import { bindPartnerAction, userReferrerAction } from '../../users/actions'
 import { addMemberAction, grantOrgAction, saveOrgAction, saveSignupBonusAction, searchUsersAction, transferOwnerAction } from '../actions'
 
 export const instant = false
@@ -36,6 +37,21 @@ async function Overview({ db, detail }: { db: SupabaseClient; detail: OrgDetail 
   )
 }
 
+// 推广名单 tab: the affiliate account, the signup bonus, 绑定已有客户 (2029), one page of customers.
+async function PromoTab({ db, detail, page }: { db: SupabaseClient; detail: OrgDetail; page: number }) {
+  const { org, affiliate } = detail
+  return (
+    <>
+      <AffiliateCard affiliate={affiliate} levels={org.affiliateLevels} />
+      <SignupBonusForm key={`bonus-${org.updatedAt}`} org={org} max={ORG_SIGNUP_BONUS_MAX} given={detail.signupBonusUsers} save={saveSignupBonusAction} />
+      {affiliate ? (
+        <BindCustomerCard orgId={org.id} orgName={org.name} account={affiliate} actions={{ search: searchUsersAction, referrer: userReferrerAction, bind: bindPartnerAction }} />
+      ) : null}
+      <CustomerTable orgId={org.id} data={await loadOrgCustomers(db, org, affiliate?.status ?? null, page)} hasAccount={affiliate !== null} />
+    </>
+  )
+}
+
 // Each tab reads only what it shows beyond the org detail: the customer numbers on 概览, the staff
 // link token on 成员, one page of customers on 推广名单, the works on 企业作品. Every form,
 // confirmation and server action is the one the single page had.
@@ -53,13 +69,7 @@ async function TabBody({ tab, db, detail, workFilters, page }: { tab: OrgDetailT
         </>
       )
     case 'promo':
-      return (
-        <>
-          <AffiliateCard affiliate={detail.affiliate} levels={org.affiliateLevels} />
-          <SignupBonusForm key={`bonus-${org.updatedAt}`} org={org} max={ORG_SIGNUP_BONUS_MAX} given={detail.signupBonusUsers} save={saveSignupBonusAction} />
-          <CustomerTable orgId={org.id} data={await loadOrgCustomers(db, org, detail.affiliate?.status ?? null, page)} hasAccount={detail.affiliate !== null} />
-        </>
-      )
+      return <PromoTab db={db} detail={detail} page={page} />
     case 'credits':
       return (
         <>
