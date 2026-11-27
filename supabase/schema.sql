@@ -1928,11 +1928,15 @@ declare
   v_paid_until timestamptz;
   v_held text;
   v_key text := 'purchase:' || p_event_id;
+  v_org uuid;
 begin
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if p_event_id is null or length(p_event_id) = 0 then
     raise exception 'INVALID_INPUT' using detail = 'event_id is required';
   end if;
+
+  -- 2033: an active org's main admin buys into the org pool. The org row first (org -> profile).
+  v_org := public._org_purchase_pool(p_user_id, v_key);
 
   v_product := admin.catalog_settlement_product(p_v2,p_user_id,p_product_id,v_key);
 
@@ -1960,10 +1964,14 @@ begin
 
   if v_held is null
      or admin.catalog_membership_rank(v_product.id) <= admin.catalog_membership_rank(v_held) then
-    return public._apply_credit_change(
+    v_change := public._apply_credit_change(
       p_user_id, 'paid', 'purchase', v_product.credits, 'purchase ' || v_product.id,
       v_key, null, v_product.id, v_product.days
     );
+    if v_change.applied and v_org is not null then
+      v_change.credits := public._org_purchase_deposit(v_org, p_user_id, v_key, v_product.credits);
+    end if;
+    return v_change;
   end if;
 
   -- The upgrade: grant without days, then set paid_until from the payment.
@@ -1985,6 +1993,10 @@ begin
   update public.credit_ledger
      set paid_until_after = v_change.paid_until
    where idempotency_key = v_key;
+
+  if v_org is not null then
+    v_change.credits := public._org_purchase_deposit(v_org, p_user_id, v_key, v_product.credits);
+  end if;
 
   return v_change;
 end;
@@ -2136,6 +2148,7 @@ declare
   v_product public.products;
   v_change public.credit_change;
   v_key text := 'renewal:' || p_invoice_id;
+  v_org uuid;
 begin
   perform pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0));
   if p_invoice_id is null or p_invoice_id not like 'in\_%' then
@@ -2147,6 +2160,9 @@ begin
   if p_amount_total is null or p_amount_tax is null or p_currency is null or p_method is null then
     raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
   end if;
+
+  -- 2033: an active org's main admin's renewal credits go to the org pool. The org row first.
+  v_org := public._org_purchase_pool(p_user_id, v_key);
 
   -- Only memberships renew; packs are always one-time.
   v_product := admin.catalog_settlement_product(p_v2,p_user_id,p_product_id,v_key);
@@ -2170,6 +2186,10 @@ begin
   update public.credit_ledger
      set paid_until_after = v_change.paid_until
    where idempotency_key = v_key;
+
+  if v_org is not null then
+    v_change.credits := public._org_purchase_deposit(v_org, p_user_id, v_key, v_product.credits);
+  end if;
 
   insert into public.payments
     (user_id, product_id, channel, stripe_invoice_id, stripe_charge_id,
@@ -4715,6 +4735,30 @@ end $$;
 ALTER FUNCTION "public"."_org_member_works_access"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_payment_clawback"("p_org" "uuid", "p_payment" "public"."payments", "p_owed" integer, "p_request" "text", "p_note" "text", "p_actor" "uuid") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_pool bigint;
+  v_take integer;
+begin
+  select pool_credits into v_pool from public.orgs where id = p_org for no key update;
+  if not found then return 0; end if;
+  if exists (select 1 from public.org_credit_ledger where request_id = p_request) then return -1; end if;
+  v_take := least(p_owed, greatest(v_pool, 0))::integer;
+  if v_take > 0 then
+    update public.orgs set pool_credits = pool_credits - v_take, updated_at = now() where id = p_org returning pool_credits into v_pool;
+    insert into public.org_credit_ledger(org_id, kind, delta, pool_after, member_user_id, request_id, reference, note, actor)
+      values (p_org, 'payment_clawback', -v_take, v_pool, p_payment.user_id, p_request, 'payment:' || p_payment.id, left(p_note, 2000), p_actor);
+  end if;
+  return v_take;
+end $$;
+
+
+ALTER FUNCTION "public"."_org_payment_clawback"("p_org" "uuid", "p_payment" "public"."payments", "p_owed" integer, "p_request" "text", "p_note" "text", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_payment_fields"("p_kind" "text") RETURNS "text"[]
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -4727,6 +4771,17 @@ $$;
 
 
 ALTER FUNCTION "public"."_org_payment_fields"("p_kind" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_payment_request"("p_prefix" "text", "p_ref" "text") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select case when length(p_prefix || p_ref) <= 200 then p_prefix || p_ref else p_prefix || md5(p_ref) end
+$$;
+
+
+ALTER FUNCTION "public"."_org_payment_request"("p_prefix" "text", "p_ref" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_org_promo_expire_due"("p_org" "uuid") RETURNS bigint
@@ -4896,6 +4951,49 @@ $$;
 ALTER FUNCTION "public"."_org_promo_topup"("p_org" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_purchase_deposit"("p_org" "uuid", "p_user" "uuid", "p_key" "text", "p_credits" integer) RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_request text := 'pay:' || p_key;
+  v_pool bigint;
+  v_change public.credit_change;
+begin
+  if p_org is null or coalesce(p_credits, 0) <= 0
+     or exists (select 1 from public.org_credit_ledger where request_id = v_request) then
+    return (select credits from public.profiles where id = p_user);
+  end if;
+  v_change := public._apply_credit_change(p_user, 'paid', 'org_deposit', -p_credits, 'org:' || p_org::text, 'org:' || v_request);
+  update public.orgs set pool_credits = pool_credits + p_credits, updated_at = now() where id = p_org returning pool_credits into v_pool;
+  insert into public.org_credit_ledger(org_id, kind, delta, pool_after, member_user_id, request_id, reference, note, actor)
+    values (p_org, 'owner_deposit', p_credits, v_pool, p_user, v_request, left(p_key, 200), '购买直接存入企业积分池', p_user);
+  return v_change.credits;
+end $$;
+
+
+ALTER FUNCTION "public"."_org_purchase_deposit"("p_org" "uuid", "p_user" "uuid", "p_key" "text", "p_credits" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_purchase_pool"("p_user" "uuid", "p_key" "text") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_org uuid;
+begin
+  if p_user is null or p_key is null or length('pay:' || p_key) > 200 then return null; end if;
+  select o.id into v_org from public.orgs o where o.owner_user_id = p_user and o.status = 'active' for no key update;
+  if v_org is null or not exists (select 1 from public.org_members m
+      where m.org_id = v_org and m.user_id = p_user and m.status = 'active' and m.role = 'owner') then
+    return null;
+  end if;
+  return v_org;
+end $$;
+
+
+ALTER FUNCTION "public"."_org_purchase_pool"("p_user" "uuid", "p_key" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_ref_code_new"() RETURNS "text"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -4972,7 +5070,8 @@ CREATE OR REPLACE FUNCTION "public"."_org_replayed"("p_request" "text", "p_org" 
 declare prior public.org_credit_ledger;
 begin
   if p_request is null or length(p_request) not between 1 and 200 or starts_with(p_request, 'org_topup:')
-     or starts_with(p_request, 'org_return:') or starts_with(p_request, 'org_promo_') or starts_with(p_request, 'partner_promo') then
+     or starts_with(p_request, 'org_return:') or starts_with(p_request, 'org_promo_') or starts_with(p_request, 'partner_promo')
+     or starts_with(p_request, 'pay:') or starts_with(p_request, 'payment_clawback') then
     raise exception 'INVALID_INPUT';
   end if;
   select * into prior from public.org_credit_ledger where request_id = p_request;
@@ -5893,6 +5992,19 @@ $$;
 ALTER FUNCTION "public"."_partner_promo_store"("p_calc" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_payment_credits_org"("p_payment" "public"."payments") RETURNS "uuid"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select l.org_id from public.org_credit_ledger l
+   where l.request_id = 'pay:' || public._payment_grant_key(p_payment)
+     and l.kind = 'owner_deposit' and l.member_user_id = p_payment.user_id
+$$;
+
+
+ALTER FUNCTION "public"."_payment_credits_org"("p_payment" "public"."payments") OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."payment_disputes" (
     "stripe_dispute_id" "text" NOT NULL,
     "stripe_charge_id" "text" NOT NULL,
@@ -6124,6 +6236,21 @@ $$;
 
 
 ALTER FUNCTION "public"."_payment_fee_split"("p_lines" "jsonb", "p_actual" bigint, "p_basis" bigint) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_payment_grant_key"("p_payment" "public"."payments") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select case
+    when p_payment.stripe_session_id is not null then 'purchase:' || p_payment.stripe_session_id
+    when p_payment.stripe_invoice_id is not null then 'renewal:' || p_payment.stripe_invoice_id
+    when p_payment.waffo_payment_id is not null then 'purchase:' || p_payment.waffo_payment_id
+  end
+$$;
+
+
+ALTER FUNCTION "public"."_payment_grant_key"("p_payment" "public"."payments") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_payment_granted_credits"("p_payment" "public"."payments") RETURNS integer
@@ -8570,6 +8697,8 @@ declare
   v_balance integer;
   v_take integer;
   v_key text;
+  v_org uuid;
+  v_note text;
 begin
   if p_actor is null or not exists (select 1 from public.profiles where id = p_actor and role = 'admin') then
     raise exception 'NOT_ADMIN';
@@ -8581,24 +8710,41 @@ begin
   end if;
 
   v_granted := public._payment_granted_credits(v_payment);
-  select credits into v_balance from public.profiles where id = v_payment.user_id for update;
-  -- Only the member's own credits: the org-held share is the org's (1629 keeps it at most credits).
-  v_balance := coalesce(v_balance, 0) - coalesce((select m.held_credits from public.org_members m
-      where m.user_id = v_payment.user_id and m.status = 'active'), 0);
-  v_take := greatest(0, least(coalesce(v_balance, 0), v_granted - v_payment.credits_clawed_back - v_payment.clawback_shortfall));
+  v_org := public._payment_credits_org(v_payment);
+  v_key := 'clawback:' || p_payment_id || ':admin:' || (v_payment.credits_clawed_back + v_payment.clawback_shortfall);
+  v_note := '后台扣回付款 #' || p_payment_id || ' 的剩余积分 · 操作人 ' || p_actor::text;
 
-  if v_take > 0 then
-    v_key := 'clawback:' || p_payment_id || ':admin:' || (v_payment.credits_clawed_back + v_payment.clawback_shortfall);
-    if (public._apply_credit_change(v_payment.user_id, 'paid', 'clawback', -v_take,
-          '后台扣回付款 #' || p_payment_id || ' 的剩余积分 · 操作人 ' || p_actor::text, v_key)).applied then
-      update public.credit_ledger set payment_id = p_payment_id where idempotency_key = v_key;
+  if v_org is not null then
+    -- 2033: from the org pool the purchase went to.
+    v_take := greatest(0, v_granted - v_payment.credits_clawed_back - v_payment.clawback_shortfall);
+    if v_take > 0 then
+      v_take := greatest(0, public._org_payment_clawback(v_org, v_payment, v_take, 'payment_' || v_key, v_note, p_actor));
+    end if;
+    if v_take > 0 then
       update public.payments set credits_clawed_back = credits_clawed_back + v_take
        where id = p_payment_id
       returning * into v_payment;
       insert into public.admin_audit_log (action, user_id, reason, target_id)
-      values ('clawback_payment', v_payment.user_id, '扣回 ' || v_take || ' 积分 · 操作人 ' || p_actor::text, p_payment_id::text);
-    else
-      v_take := 0;
+      values ('clawback_payment', v_payment.user_id, '从企业积分池扣回 ' || v_take || ' 积分 · 操作人 ' || p_actor::text, p_payment_id::text);
+    end if;
+  else
+    select credits into v_balance from public.profiles where id = v_payment.user_id for update;
+    -- Only the member's own credits: the org-held share is the org's (1629 keeps it at most credits).
+    v_balance := coalesce(v_balance, 0) - coalesce((select m.held_credits from public.org_members m
+        where m.user_id = v_payment.user_id and m.status = 'active'), 0);
+    v_take := greatest(0, least(coalesce(v_balance, 0), v_granted - v_payment.credits_clawed_back - v_payment.clawback_shortfall));
+
+    if v_take > 0 then
+      if (public._apply_credit_change(v_payment.user_id, 'paid', 'clawback', -v_take, v_note, v_key)).applied then
+        update public.credit_ledger set payment_id = p_payment_id where idempotency_key = v_key;
+        update public.payments set credits_clawed_back = credits_clawed_back + v_take
+         where id = p_payment_id
+        returning * into v_payment;
+        insert into public.admin_audit_log (action, user_id, reason, target_id)
+        values ('clawback_payment', v_payment.user_id, '扣回 ' || v_take || ' 积分 · 操作人 ' || p_actor::text, p_payment_id::text);
+      else
+        v_take := 0;
+      end if;
     end if;
   end if;
 
@@ -15467,6 +15613,7 @@ declare
   v_balance integer;
   v_take integer := 0;
   v_key text;
+  v_org uuid;
 begin
   if p_payment_id is null or p_ref is null or length(p_ref) = 0 or p_reason is null or length(p_reason) = 0 then
     raise exception 'INVALID_INPUT' using detail = 'payment id, ref and reason are required';
@@ -15487,19 +15634,30 @@ begin
   v_owed := greatest(0, v_due - v_payment.credits_clawed_back - v_payment.clawback_shortfall);
 
   if v_owed > 0 then
-    select credits into v_balance from public.profiles where id = v_payment.user_id for update;
-    -- Only the member's own credits: the org-held share (1629 keeps it at most credits) is the org's.
-    v_balance := coalesce(v_balance, 0) - coalesce((select m.held_credits from public.org_members m
-      where m.user_id = v_payment.user_id and m.status = 'active'), 0);
-    v_take := least(v_owed, greatest(v_balance, 0));
-    if v_take > 0 then
-      v_key := 'clawback:' || p_payment_id || ':' || p_ref;
-      if not (public._apply_credit_change(v_payment.user_id, 'paid', 'clawback', -v_take, p_reason, v_key)).applied then
-        -- This ref already settled its share (nothing left to do for it).
+    v_org := public._payment_credits_org(v_payment);
+    if v_org is not null then
+      -- 2033: the credits went to an org pool at settlement; they come back from there.
+      v_take := public._org_payment_clawback(v_org, v_payment, v_owed,
+        public._org_payment_request('payment_clawback:' || p_payment_id || ':', p_ref), p_reason, null);
+      if v_take < 0 then
         v_take := 0;
         v_owed := 0;
-      else
-        update public.credit_ledger set payment_id = p_payment_id where idempotency_key = v_key;
+      end if;
+    else
+      select credits into v_balance from public.profiles where id = v_payment.user_id for update;
+      -- Only the member's own credits: the org-held share (1629 keeps it at most credits) is the org's.
+      v_balance := coalesce(v_balance, 0) - coalesce((select m.held_credits from public.org_members m
+        where m.user_id = v_payment.user_id and m.status = 'active'), 0);
+      v_take := least(v_owed, greatest(v_balance, 0));
+      if v_take > 0 then
+        v_key := 'clawback:' || p_payment_id || ':' || p_ref;
+        if not (public._apply_credit_change(v_payment.user_id, 'paid', 'clawback', -v_take, p_reason, v_key)).applied then
+          -- This ref already settled its share (nothing left to do for it).
+          v_take := 0;
+          v_owed := 0;
+        else
+          update public.credit_ledger set payment_id = p_payment_id where idempotency_key = v_key;
+        end if;
       end if;
     end if;
     update public.payments
@@ -15535,6 +15693,9 @@ declare
   v_superseded boolean := false;
   v_kept boolean := p_status in ('won', 'warning_closed');
   v_key text := 'clawback_restore:' || p_dispute_id;
+  v_org uuid;
+  v_request text;
+  v_pool bigint;
 begin
   if p_dispute_id is null or p_status is null or p_status !~ '^[a-z_]{1,40}$' then
     raise exception 'INVALID_INPUT' using detail = 'dispute id and status are required';
@@ -15584,10 +15745,23 @@ begin
            and d.stripe_dispute_id <> p_dispute_id
            and d.closed_status not in ('won', 'warning_closed')
       ) then
-        if v_row.credits_clawed_back > 0
-           and (public._apply_credit_change(v_payment.user_id, 'paid', 'clawback_restore', v_row.credits_clawed_back,
+        if v_row.credits_clawed_back > 0 then
+          v_org := public._payment_credits_org(v_payment);
+          if v_org is not null then
+            -- 2033: the share was taken from the org pool the purchase went to; it goes back there.
+            v_request := public._org_payment_request('payment_clawback_restore:', p_dispute_id);
+            perform 1 from public.orgs where id = v_org for no key update;
+            if not exists (select 1 from public.org_credit_ledger where request_id = v_request) then
+              update public.orgs set pool_credits = pool_credits + v_row.credits_clawed_back, updated_at = now()
+               where id = v_org returning pool_credits into v_pool;
+              insert into public.org_credit_ledger(org_id, kind, delta, pool_after, member_user_id, request_id, reference, note)
+                values (v_org, 'payment_clawback_restore', v_row.credits_clawed_back, v_pool, v_payment.user_id, v_request,
+                  'payment:' || v_payment.id, '拒付胜诉还回 ' || p_dispute_id);
+            end if;
+          elsif (public._apply_credit_change(v_payment.user_id, 'paid', 'clawback_restore', v_row.credits_clawed_back,
                   '拒付胜诉还回 ' || p_dispute_id, v_key)).applied then
-          update public.credit_ledger set payment_id = v_payment.id where idempotency_key = v_key;
+            update public.credit_ledger set payment_id = v_payment.id where idempotency_key = v_key;
+          end if;
         end if;
         update public.payments
            set credits_clawed_back = greatest(0, credits_clawed_back - v_row.credits_clawed_back),
@@ -17993,15 +18167,23 @@ declare
   v_granted integer;
   v_balance integer;
   v_held integer;
+  v_org public.orgs;
 begin
   select * into v_payment from public.payments where id = p_payment_id;
   if not found then
     raise exception 'PAYMENT_NOT_FOUND';
   end if;
   v_granted := public._payment_granted_credits(v_payment);
-  select credits into v_balance from public.profiles where id = v_payment.user_id;
-  v_held := coalesce((select m.held_credits from public.org_members m
-      where m.user_id = v_payment.user_id and m.status = 'active'), 0);
+  select * into v_org from public.orgs where id = public._payment_credits_org(v_payment);
+  if v_org.id is not null then
+    -- 2033: the purchase went to this org's pool; that is what a clawback takes from.
+    v_balance := least(v_org.pool_credits, 2147483647)::integer;
+    v_held := 0;
+  else
+    select credits into v_balance from public.profiles where id = v_payment.user_id;
+    v_held := coalesce((select m.held_credits from public.org_members m
+        where m.user_id = v_payment.user_id and m.status = 'active'), 0);
+  end if;
   return jsonb_build_object(
     'payment_id', v_payment.id,
     'user_id', v_payment.user_id,
@@ -18011,7 +18193,9 @@ begin
     'clawback_shortfall', v_payment.clawback_shortfall,
     'balance', coalesce(v_balance, 0),
     'org_held', v_held,
-    'available', greatest(0, least(coalesce(v_balance, 0) - v_held, v_granted - v_payment.credits_clawed_back - v_payment.clawback_shortfall))
+    'available', greatest(0, least(coalesce(v_balance, 0) - v_held, v_granted - v_payment.credits_clawed_back - v_payment.clawback_shortfall)),
+    'org_id', v_org.id,
+    'org_name', v_org.name
   );
 end;
 $$;
@@ -19341,11 +19525,13 @@ CREATE OR REPLACE FUNCTION "public"."refund_eligibility"("p_payment_id" bigint, 
     AS $$
 declare
   v_payment public.payments;
+  v_org uuid;
 begin
   select * into v_payment from public.payments p where p.id = p_payment_id;
   if not found then
     raise exception 'PAYMENT_NOT_FOUND';
   end if;
+  v_org := public._payment_credits_org(v_payment);
 
   first_purchase := not exists (
     select 1 from public.payments q
@@ -19354,10 +19540,17 @@ begin
        and (q.product_id like 'pack\_%') = (v_payment.product_id like 'pack\_%')
   );
   within_7_days := coalesce(p_asked_at, now()) - v_payment.created_at <= interval '7 days';
+  -- A manual deposit into the org pool counts as using the credits (1630); the automatic deposit
+  -- of a purchase (2033, org:pay:…) does not. When this payment's credits went to an org pool,
+  -- any allocation from that pool after the payment counts as using them.
   no_credits_used := not exists (
     select 1 from public.credit_ledger l
      where l.user_id = v_payment.user_id and l.kind in ('reserve','org_deposit') and l.created_at > v_payment.created_at
-  );
+       and not (l.kind = 'org_deposit' and starts_with(l.idempotency_key, 'org:pay:'))
+  ) and (v_org is null or not exists (
+    select 1 from public.org_credit_ledger o
+     where o.org_id = v_org and o.kind = 'allocate' and o.created_at > v_payment.created_at
+  ));
   suggested_cents := greatest(0, least(
     round((v_payment.amount_total - v_payment.amount_tax) * 0.94)::integer + v_payment.amount_tax,
     v_payment.amount_total - v_payment.amount_refunded
@@ -23194,7 +23387,7 @@ CREATE TABLE IF NOT EXISTS "public"."org_credit_ledger" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     CONSTRAINT "org_credit_ledger_amount_cny_fen_check" CHECK (("amount_cny_fen" >= 0)),
     CONSTRAINT "org_credit_ledger_delta_check" CHECK (("delta" <> 0)),
-    CONSTRAINT "org_credit_ledger_kind_check" CHECK (("kind" = ANY (ARRAY['bank_grant'::"text", 'owner_deposit'::"text", 'allocate'::"text", 'reclaim'::"text", 'admin_adjust'::"text", 'promo_grant'::"text", 'promo_allocate'::"text", 'promo_reclaim'::"text", 'promo_expire'::"text"]))),
+    CONSTRAINT "org_credit_ledger_kind_check" CHECK (("kind" = ANY (ARRAY['bank_grant'::"text", 'owner_deposit'::"text", 'allocate'::"text", 'reclaim'::"text", 'admin_adjust'::"text", 'promo_grant'::"text", 'promo_allocate'::"text", 'promo_reclaim'::"text", 'promo_expire'::"text", 'payment_clawback'::"text", 'payment_clawback_restore'::"text"]))),
     CONSTRAINT "org_credit_ledger_note_check" CHECK (("length"("note") <= 2000)),
     CONSTRAINT "org_credit_ledger_pool_after_check" CHECK (("pool_after" >= 0)),
     CONSTRAINT "org_credit_ledger_reference_check" CHECK (("length"("reference") <= 200)),
@@ -29053,7 +29246,15 @@ REVOKE ALL ON FUNCTION "public"."_org_member_works_access"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."_org_payment_clawback"("p_org" "uuid", "p_payment" "public"."payments", "p_owed" integer, "p_request" "text", "p_note" "text", "p_actor" "uuid") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_org_payment_fields"("p_kind" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_payment_request"("p_prefix" "text", "p_ref" "text") FROM PUBLIC;
 
 
 
@@ -29070,6 +29271,14 @@ REVOKE ALL ON FUNCTION "public"."_org_promo_grant"("p_org" "uuid", "p_credits" i
 
 
 REVOKE ALL ON FUNCTION "public"."_org_promo_topup"("p_org" "uuid") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_purchase_deposit"("p_org" "uuid", "p_user" "uuid", "p_key" "text", "p_credits" integer) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_purchase_pool"("p_user" "uuid", "p_key" "text") FROM PUBLIC;
 
 
 
@@ -29187,6 +29396,10 @@ REVOKE ALL ON FUNCTION "public"."_partner_promo_store"("p_calc" "jsonb") FROM PU
 
 
 
+REVOKE ALL ON FUNCTION "public"."_payment_credits_org"("p_payment" "public"."payments") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_payment_dispute_answer"("p_row" "public"."payment_disputes", "p_created" boolean) FROM PUBLIC;
 
 
@@ -29212,6 +29425,10 @@ REVOKE ALL ON FUNCTION "public"."_payment_fee_schedule_immutable"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."_payment_fee_split"("p_lines" "jsonb", "p_actual" bigint, "p_basis" bigint) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_payment_grant_key"("p_payment" "public"."payments") FROM PUBLIC;
 
 
 
