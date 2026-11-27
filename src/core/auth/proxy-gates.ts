@@ -30,7 +30,7 @@ const DEV_ONLY = /^\/generate\/upload-test\/?$/
 // shell has streamed, so it cannot change the status.
 const VALIDATION_ONLY = /^\/error-test\/?$/
 // Route handlers and files outside the locale tree: session refresh only, no locale routing.
-const NOT_A_PAGE = /^\/(api|auth|ingest|monitoring)(\/|$)|^\/(sitemap[\w-]*\.xml|robots\.txt|llms\.txt|indexnow-key\.txt)$/
+const NOT_A_PAGE = /^\/(api|auth|ingest|monitoring)(\/|$)|^\/(sitemap[\w-]*\.xml|robots\.txt|llms\.txt|indexnow-key\.txt|\.well-known\/ard\.json)$/
 
 export type Gate = 'admin' | 'signed_in' | null
 
