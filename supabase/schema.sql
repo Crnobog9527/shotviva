@@ -5361,7 +5361,7 @@ begin
         join public.profiles cu on cu.id = p.user_id
        where v_account is not null and c.affiliate_user_id = v_account and c.level = 1 and c.status = 'confirmed'
          and c.confirmed_at >= v_start and c.confirmed_at < v_end
-         and cu.referred_by = v_account and cu.referred_source = 'org_l1'
+         and cu.referred_by = v_account and cu.referred_source in ('org_l1', 'signup', 'first_checkout')
          and not exists(select from public.partner_promo_grant_lines l join public.partner_promo_grants g on g.id = l.grant_id
                          where l.payment_id = c.payment_id and g.status = 'granted' and g.period <> p_period)
     ) x
