@@ -7,7 +7,7 @@ import { AppError } from '@/core/errors'
 import { PAYMENT_KINDS, type PaymentKind } from '@/core/org'
 import { parseRefCode } from '@/core/org/ref-code'
 
-import type { PaymentAccountRow, LedgerRow, LimitCaps, MemberRow, OrgAffiliate, OrgDetail, OrgListItem, OrgPackage, OrgRow } from './types'
+import type { PaymentAccountRow, LedgerRow, LimitCaps, MemberRow, OrgAffiliate, OrgCustomer, OrgCustomerBonus, OrgCustomerCounts, OrgCustomerPage, OrgDetail, OrgListItem, OrgPackage, OrgRow } from './types'
 
 // Read side of the enterprise admin (ARCHITECTURE §6.5). The org tables have no client grant and
 // the service role may select; every write goes through the E1 functions in core/org.
@@ -221,4 +221,72 @@ export async function listPaymentAccounts(db: SupabaseClient): Promise<Partial<R
 export async function loadOrgInviteToken(db: SupabaseClient, orgId: string): Promise<string | null> {
   const row = ok(await db.from('orgs').select('invite_token').eq('id', orgId).maybeSingle(), 'org invite')
   return z.object({ invite_token: z.string().regex(/^[0-9a-f]{32}$/) }).nullable().parse(row)?.invite_token ?? null
+}
+
+export const CUSTOMER_PAGE_SIZE = 50
+
+const customerSchema = z.object({
+  user_id: z.uuid(),
+  contact: z.string().nullable(),
+  level: z.union([z.literal(1), z.literal(2)]),
+  source: z.string().nullable(),
+  member_user_id: z.uuid().nullable(),
+  member_contact: z.string().nullable(),
+  via_user_id: z.uuid().nullable(),
+  via_contact: z.string().nullable(),
+  signed_up_at: z.string(),
+  referred_at: z.string().nullable(),
+  bonus_credits: z.number().nullable(),
+  bonus_at: z.string().nullable(),
+  bonus_error: z.string().nullable(),
+  paid_before: z.boolean(),
+  has_signup_gift: z.boolean(),
+  paid_cents: z.coerce.number(),
+  commission_cents: z.coerce.number(),
+  promo_credits: z.coerce.number(),
+  total: z.coerce.number(),
+  total_l2: z.coerce.number(),
+})
+
+// Why a customer has no bonus and no recorded refusal, from how they were bound (1690, 2010). The
+// Owner's rule: whoever the org admin's or a staff member's promotion link brings in gets it;
+// level 2 (invited by a customer) does not.
+export function customerBonus(row: Pick<z.infer<typeof customerSchema>, 'bonus_credits' | 'bonus_at' | 'bonus_error' | 'level' | 'source' | 'paid_before' | 'has_signup_gift'>): OrgCustomerBonus {
+  if (row.bonus_credits !== null && row.bonus_at) return { kind: 'granted', credits: row.bonus_credits, at: row.bonus_at }
+  if (row.bonus_error) return { kind: 'error', error: row.bonus_error }
+  if (row.level === 2) return { kind: 'none', reason: 'level2' }
+  if (row.paid_before) return { kind: 'none', reason: 'paid_before' }
+  if (row.source === 'first_checkout') return { kind: 'none', reason: 'first_checkout' }
+  if (!row.has_signup_gift) return { kind: 'none', reason: 'no_signup_gift' }
+  if (row.source === 'signup') return { kind: 'none', reason: 'ref_link' }
+  if (row.source === 'org_l1') return { kind: 'none', reason: 'off' }
+  return { kind: 'none', reason: 'other' }
+}
+
+// 推广名单: one page (1-based) of the org's customers, newest binding first, in one database call.
+// Admin only (the caller checked the role). An org without an affiliate account has none.
+// Staff of the org are never listed. A page past the end is empty with total 0; the view then
+// links back to the first page.
+export async function loadOrgCustomers(db: SupabaseClient, orgId: string, page: number): Promise<OrgCustomerPage> {
+  const current = Number.isInteger(page) && page > 0 ? Math.min(page, 10000) : 1
+  const rows = await db.rpc('admin_org_customers', { p_org_id: orgId, p_limit: CUSTOMER_PAGE_SIZE, p_offset: (current - 1) * CUSTOMER_PAGE_SIZE })
+  const parsed = z.array(customerSchema).parse(ok(rows, 'customers') ?? [])
+  return {
+    rows: parsed.map((r): OrgCustomer => ({
+      userId: r.user_id, contact: r.contact, level: r.level, source: r.source,
+      memberUserId: r.member_user_id, memberContact: r.member_contact, viaUserId: r.via_user_id, viaContact: r.via_contact,
+      signedUpAt: r.signed_up_at, referredAt: r.referred_at, bonus: customerBonus(r),
+      paidCents: r.paid_cents, commissionCents: r.commission_cents, promoCredits: r.promo_credits,
+    })),
+    total: parsed[0]?.total ?? 0,
+    page: current,
+    pageSize: CUSTOMER_PAGE_SIZE,
+  }
+}
+
+// The overview's customer numbers, counted exactly as 推广名单 lists them (staff left out).
+export async function loadOrgCustomerCounts(db: SupabaseClient, orgId: string): Promise<OrgCustomerCounts> {
+  const rows = await db.rpc('admin_org_customers', { p_org_id: orgId, p_limit: 1, p_offset: 0 })
+  const first = z.array(customerSchema).parse(ok(rows, 'customer counts') ?? [])[0]
+  return { l1: first ? first.total - first.total_l2 : 0, l2: first?.total_l2 ?? 0 }
 }

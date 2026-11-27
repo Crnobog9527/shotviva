@@ -10,3 +10,4 @@ export { SignupBonusForm, type SaveSignupBonusAction } from './signup-bonus-form
 export type { SearchUsers } from './user-picker'
 export { TransferOwnerForm, type TransferOwnerAction } from './transfer-owner-form'
 export { StaffLinkCard } from './staff-link-card'
+export { CustomerTable, customerPageHref } from './customer-table'

@@ -90,3 +90,32 @@ export type OrgAffiliate = {
 }
 
 export type PaymentAccountRow = { enabled: boolean; details: Record<string, string>; updatedAt: string }
+
+// The signup bonus of one customer: given, refused with a recorded reason, or never attempted
+// (the reason inferred from how they were bound).
+export type OrgCustomerBonus =
+  | { kind: 'granted'; credits: number; at: string }
+  | { kind: 'error'; error: string }
+  | { kind: 'none'; reason: 'level2' | 'paid_before' | 'first_checkout' | 'no_signup_gift' | 'ref_link' | 'off' | 'other' }
+
+// One row of 推广名单 (admin_org_customers, 2020). Money in USD cents; promo in credits.
+export type OrgCustomer = {
+  userId: string
+  contact: string | null
+  level: 1 | 2
+  source: string | null
+  memberUserId: string | null
+  memberContact: string | null
+  viaUserId: string | null
+  viaContact: string | null
+  signedUpAt: string
+  referredAt: string | null
+  bonus: OrgCustomerBonus
+  paidCents: number
+  commissionCents: number
+  promoCredits: number
+}
+
+export type OrgCustomerPage = { rows: OrgCustomer[]; total: number; page: number; pageSize: number }
+
+export type OrgCustomerCounts = { l1: number; l2: number }
