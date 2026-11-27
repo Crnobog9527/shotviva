@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
+import { foodSwitchedOff } from '@/core/templates/food-toggle-keys'
 import { FoodTogglesProvider } from '@/core/templates/offered-toggles'
 
 import { TemplateToggles } from './template-toggles'
@@ -12,7 +13,7 @@ const props = { template, values: {}, onChange: () => {}, surface: 'workspace' a
 
 function html(switches: { plating: boolean; tableware: boolean } | null) {
   const toggles = createElement(TemplateToggles, props)
-  return renderToStaticMarkup(switches === null ? toggles : createElement(FoodTogglesProvider, { switches }, toggles))
+  return renderToStaticMarkup(switches === null ? toggles : createElement(FoodTogglesProvider, { offer: foodSwitchedOff(switches) }, toggles))
 }
 
 describe('TemplateToggles and the food switches', () => {

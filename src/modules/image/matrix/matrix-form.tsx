@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useState, type ReactNode } from 'react'
 
 import type { MembershipTier } from '@/core/config'
-import { offeredToggles, useFoodSwitches } from '@/core/templates/offered-toggles'
+import { offeredToggles, useFoodOffer } from '@/core/templates/offered-toggles'
 
 import { BatchPhotos } from '../workspace/batch-photos'
 import { ResolutionPicker, SizePicker } from '../workspace/option-pickers'
@@ -89,9 +89,9 @@ function TemplatesBlock({ draft, templates, browse, tier }: { draft: MatrixDraft
 // Each template's own text and options; nothing when none of them has any.
 function SettingsSection({ draft, photos }: { draft: MatrixDraft; photos: MatrixDraft['photos']['photos'] }) {
   const t = useTranslations('app.matrix')
-  const foodSwitches = useFoodSwitches()
+  const foodOffer = useFoodOffer()
   if (!draft.forms.ready) return <CatalogueFormStatus failed={draft.forms.failed} retry={draft.forms.retry} />
-  if (!draft.chosen.some((template) => template.copyFields.length > 0 || offeredToggles(template.toggles, foodSwitches).length > 0)) return null
+  if (!draft.chosen.some((template) => template.copyFields.length > 0 || offeredToggles(template.toggles, foodOffer).length > 0)) return null
   return (
     <Section id="set-h" title={t('settingsTitle')}>
       <div className="grid gap-3">

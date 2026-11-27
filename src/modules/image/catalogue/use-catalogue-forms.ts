@@ -3,7 +3,7 @@
 import { useLocale } from 'next-intl'
 import { useEffect, useState } from 'react'
 
-import { offeredTemplate, useFoodSwitches } from '@/core/templates/offered-toggles'
+import { offeredTemplate, useFoodOffer } from '@/core/templates/offered-toggles'
 
 import type { CatalogueForms } from './catalogue-payload'
 import type { CatalogueTemplate } from './catalogue-template'
@@ -27,7 +27,7 @@ async function fetchForms(locale: string, ids: string[], signal: AbortSignal): P
 
 export function useCatalogueForms(templates: readonly CatalogueTemplate[]) {
   const locale = useLocale()
-  const foodSwitches = useFoodSwitches()
+  const foodOffer = useFoodOffer()
   const [loaded, setLoaded] = useState<{ locale: string; forms: CatalogueForms }>()
   const [failure, setFailure] = useState('')
   const [attempt, setAttempt] = useState(0)
@@ -57,6 +57,6 @@ export function useCatalogueForms(templates: readonly CatalogueTemplate[]) {
     fill: (template: CatalogueTemplate): CatalogueTemplate =>
       offeredTemplate(forms && Object.hasOwn(forms, template.id)
         ? { ...template, ...forms[template.id], formDeferred: undefined, hasDeferredSlots: undefined, hasDeferredGroups: undefined }
-        : template, foodSwitches),
+        : template, foodOffer),
   }
 }
