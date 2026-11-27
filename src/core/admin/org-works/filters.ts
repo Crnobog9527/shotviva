@@ -34,12 +34,11 @@ export function workFilter(filters: Pick<OrgWorkFilters, 'work'>): { ref: string
   return { ref, invalid: ref === null }
 }
 
-// The section's own address: the org page with these filters (and a cursor, for the next page),
-// scrolled to the works section.
+// The section's own address: the org page's 企业作品 tab with these filters (and a cursor, for
+// the next page), scrolled to the works section.
 export function orgWorksHref(orgId: string, filters: Omit<OrgWorkFilters, 'cursor'>, cursor: string | null = null): string {
-  const params = new URLSearchParams()
+  const params = new URLSearchParams({ tab: 'works' })
   for (const key of ['member', 'status', 'work'] as const) if (filters[key]) params.set(key, filters[key])
   if (cursor) params.set('cursor', cursor)
-  const query = params.toString()
-  return `/admin/orgs/${orgId}${query ? `?${query}` : ''}#works`
+  return `/admin/orgs/${orgId}?${params.toString()}#works`
 }
