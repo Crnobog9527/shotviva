@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AbstractIntlMessages } from 'next-intl'
 
 import { BundlesPanel, CaseStripPanel, CategoriesPanel, HeroPanel, listAdminTemplates, LocaleDisplayPanel, PickerSeriesProvider, TemplatesEditor } from '@/core/admin'
+import { ScrollToHash } from '@/core/admin/shell'
 import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
 import { readPricingOptions } from '@/site/template-pricing'
 import { ModelSyncProvider } from '@/core/admin/image-provider-field/model-sync'
@@ -61,6 +62,7 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
       {/* 侧栏「首页展示」 lands here until it has its own pages (Owner 2026-11-27). */}
       <section id="home-display" aria-labelledby="home-display-h" className="grid scroll-mt-4 grid-cols-1 gap-6">
       <h2 id="home-display-h" className="text-lg font-semibold">首页展示</h2>
+      <ScrollToHash id="home-display" />
       <BundlesPanel
         bundles={bundles?.list ?? []} templates={templates} categories={categories}
         actions={{ save: saveFeaturedBundleAction, remove: deleteFeaturedBundleAction, setDefault: setDefaultFeaturedBundlesAction }}
