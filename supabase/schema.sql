@@ -3898,7 +3898,11 @@ begin
   -- A pause hold follows the level-1 account as it is now: still suspended -> held, active again ->
   -- normal rules, closed for good (banned, rejected, gone) -> void as before 2028.
   if v_paused then
-    select a.status into v_l1_status from public.affiliates a where a.user_id=v_l1;
+    -- FOR SHARE conflicts with the status UPDATE (FOR NO KEY UPDATE; KEY SHARE would not): a payment
+    -- written while the switch is being turned on waits for that commit and reads the new status,
+    -- so it cannot be held after the settle trigger has already run. That trigger never needs this
+    -- payment (its commission row is not committed yet), so the wait cannot deadlock.
+    select a.status into v_l1_status from public.affiliates a where a.user_id=v_l1 for share;
     if v_l1_status='active' then v_paused:=false; v_resumed:=v_old.id is not null;
     elsif v_l1_status is distinct from 'suspended' then v_paused:=false; v_void:='affiliate_inactive'; end if;
   end if;
@@ -14178,6 +14182,14 @@ begin
   -- Serialize payout decisions and issuance; payment writes do not take this lock.
   perform pg_advisory_xact_lock(hashtextextended('affiliate_settlement',0));
   for v_payment in select payment_id from public.affiliate_recompute_errors where resolved_at is null order by payment_id loop
+    perform public.affiliate_recompute_payment(v_payment);
+  end loop;
+  -- 2028: pause holds whose level-1 account is no longer suspended (released or closed), bounded.
+  for v_payment in select c.payment_id from public.affiliate_commissions c
+      left join public.affiliate_commissions l1 on l1.payment_id=c.payment_id and l1.level=1
+      left join public.affiliates a on a.user_id=l1.affiliate_user_id
+     where c.paused_hold and a.status is distinct from 'suspended'
+     group by c.payment_id order by c.payment_id limit 500 loop
     perform public.affiliate_recompute_payment(v_payment);
   end loop;
   -- Mark the scheduled evaluation even when disabled or nobody qualifies.
