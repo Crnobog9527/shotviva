@@ -8,7 +8,7 @@ import { PLATING_TOGGLE, TABLEWARE_TOGGLE } from './food-toggle-keys'
 // prompt fragments, as before. No `server-only`: the admin save checks the same shape.
 
 // Fixed toggle keys: the flow means these two, whatever their labels say.
-export { DISH_NAME_COPY, FOOD_COPY_KEYS, FOOD_TOGGLE_KEYS, PLATING_TOGGLE, TABLEWARE_TOGGLE } from './food-toggle-keys'
+export { DISH_NAME_COPY, FOOD_COPY_KEYS, FOOD_SWITCHES_OFF, FOOD_TOGGLE_KEYS, foodSwitchedOff, PLATING_TOGGLE, TABLEWARE_TOGGLE, type FoodSwitches } from './food-toggle-keys'
 
 // Placeholders the flow bodies take, filled from the dish reading and the library vessel. Reserved
 // so no copy field, toggle or slot can take the name.

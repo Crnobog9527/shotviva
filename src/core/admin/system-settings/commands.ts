@@ -53,7 +53,10 @@ export type SystemSettingDeps = {
 }
 
 // One RPC (admin_set_system_setting checks the admin role, the key and the type again), then
-// the cache: a failed write leaves the cached switch as it was.
+// the cache: a failed write leaves the cached switch as it was. The food switches (2009) have a
+// function of their own with the same checks.
+const OWN_RPC: Partial<Record<SwitchKey, string>> = { food_plating_enabled: 'admin_set_food_switch', food_tableware_enabled: 'admin_set_food_switch' }
+
 export function saveWishlistSwitch(deps: SystemSettingDeps, adminId: string, input: unknown): Promise<void> {
   return saveSettingSwitch(deps, adminId, 'wishlist_enabled', input)
 }
@@ -62,7 +65,7 @@ export async function saveSettingSwitch(deps: SystemSettingDeps, adminId: string
   const parsed = saveWishlistSwitchSchema.safeParse(input)
   if (!parsed.success) throw new AppError('INVALID_INPUT', WISHLIST_SWITCH_COPY.errors.invalid)
   const { enabled } = parsed.data
-  await callRpc(deps.db, 'admin_set_system_setting', { p_key: key, p_value: enabled, p_actor: adminId }, z.unknown())
+  await callRpc(deps.db, OWN_RPC[key] ?? 'admin_set_system_setting', { p_key: key, p_value: enabled, p_actor: adminId }, z.unknown())
   deps.invalidate()
   logger.info('admin.system_settings.saved', { adminId, key, enabled })
 }

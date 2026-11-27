@@ -7,7 +7,8 @@ import {
   FeatureGates,
   FeatureSection,
   FeaturesOverview,
-  FoodTogglesCard,
+  FoodPlatingCard,
+  FoodTablewareCard,
   SiteSwitches,
   AppShellCard,
   ServiceWorkerCard,
@@ -30,7 +31,8 @@ import { site } from '@/site/site.config'
 
 import {
   saveFeatureAccessAction,
-  saveFoodTogglesAction,
+  saveFoodPlatingAction,
+  saveFoodTablewareAction,
   saveAppShellAction,
   saveServiceWorkerAction,
   setFeatureInviteAction,
@@ -67,9 +69,9 @@ const S = FEATURES_COPY.sections
 export default async function AdminFeaturesPage() {
   await requireAdmin()
   const db = createAdminSupabase()
-  const [settings, wishlist, gallery, signupGift, photoPrice, foodToggles, serviceWorker, appShell, affiliate] = await Promise.all([
+  const [settings, wishlist, gallery, signupGift, photoPrice, foodPlating, foodTableware, serviceWorker, appShell, affiliate] = await Promise.all([
     listFeatureSettings(db), wishlistState(db), galleryState(db), loadSignupGift(db), loadPosterPhotoPrice(db),
-    loadSettingSwitch(db, 'food_toggles_enabled'), loadSettingSwitch(db, 'service_worker_enabled'), loadSettingSwitch(db, 'service_worker_shell_enabled'),
+    loadSettingSwitch(db, 'food_plating_enabled'), loadSettingSwitch(db, 'food_tableware_enabled'), loadSettingSwitch(db, 'service_worker_enabled'), loadSettingSwitch(db, 'service_worker_shell_enabled'),
     isAffiliateEnabled(),
   ])
   const posterGates = settings.filter((setting) => setting.key === POSTER_FEATURE)
@@ -79,7 +81,7 @@ export default async function AdminFeaturesPage() {
     <AdminPage title={FEATURES_COPY.title}>
       <FeaturesOverview
         input={{
-          signupPaused: signupGift.paused, food: foodToggles, posterGate: posterGates[0] ?? null, photoCredits: photoPrice,
+          signupPaused: signupGift.paused, foodTableware, foodPlating, posterGate: posterGates[0] ?? null, photoCredits: photoPrice,
           wishlist: wishlist?.value ?? null, gallery, serviceWorker, appShell, affiliate, now: new Date().toISOString(),
         }}
       />
@@ -87,7 +89,8 @@ export default async function AdminFeaturesPage() {
         <SignupGiftCard state={signupGift} savePaused={saveSignupGiftPausedAction} saveRules={saveSignupGiftRulesAction} />
       </FeatureSection>
       <FeatureSection id="generation" {...S.generation}>
-        <FoodTogglesCard value={foodToggles} save={saveFoodTogglesAction} />
+        <FoodTablewareCard value={foodTableware} save={saveFoodTablewareAction} />
+        <FoodPlatingCard value={foodPlating} save={saveFoodPlatingAction} />
         <FeatureGates settings={posterGates} {...gateActions} />
         <PosterPhotoCard credits={photoPrice} save={savePosterPhotoPriceAction} />
       </FeatureSection>

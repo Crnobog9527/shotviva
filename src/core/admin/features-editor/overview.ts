@@ -3,7 +3,7 @@ import type { WishlistSwitch } from '../system-settings/types'
 import { toBeijingLocal } from '../shell/format'
 import { FEATURES_COPY as COPY } from './copy'
 import { AUTO_APPROVE_SWITCH_COPY, GALLERY_SWITCH_COPY } from './gallery-copy'
-import { FOOD_TOGGLES_SWITCH_COPY } from './food-toggles-card'
+import { FOOD_PLATING_SWITCH_COPY, FOOD_TABLEWARE_SWITCH_COPY } from './food-toggles-card'
 import { POSTER_PHOTO_COPY } from './poster-photo-card'
 import { SIGNUP_GIFT_PAUSE_COPY } from './signup-gift-copy'
 import { APP_SHELL_SWITCH_COPY, SERVICE_WORKER_SWITCH_COPY } from './service-worker-card'
@@ -17,7 +17,8 @@ export type OverviewRow = { name: string; href: string; section: string; state: 
 // Plain data, so the server page can hand it to the client overview.
 export type OverviewInput = {
   signupPaused: WishlistSwitch
-  food: WishlistSwitch
+  foodTableware: WishlistSwitch
+  foodPlating: WishlistSwitch
   posterGate: FeatureSetting | null
   photoCredits: number | null
   wishlist: WishlistSwitch | null
@@ -51,8 +52,9 @@ export function gateState(gate: FeatureSetting, now: string): string {
 export function overviewRows(input: OverviewInput): OverviewRow[] {
   const rows: OverviewRow[] = [
     { ...switchRow(SIGNUP_GIFT_PAUSE_COPY, input.signupPaused, S.signup.title), on: !input.signupPaused.enabled },
-    // Turned off first when food generations go wrong, though its card predates the summary.
-    { ...switchRow(FOOD_TOGGLES_SWITCH_COPY, input.food, S.generation.title), emergency: true },
+    // Turned off first when food generations go wrong.
+    { ...switchRow(FOOD_TABLEWARE_SWITCH_COPY, input.foodTableware, S.generation.title), emergency: true },
+    { ...switchRow(FOOD_PLATING_SWITCH_COPY, input.foodPlating, S.generation.title), emergency: true },
   ]
   if (input.posterGate) {
     rows.push({ name: `${input.posterGate.name} · ${COPY.who}`, href: `#feature-${input.posterGate.key}`, section: S.generation.title,

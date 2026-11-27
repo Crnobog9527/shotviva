@@ -7,7 +7,7 @@ const off = { enabled: false, updatedAt: null, updatedByEmail: null }
 const on = { ...off, enabled: true }
 const poster: FeatureSetting = { key: 'dense_poster', name: '赛事海报', minTier: null, openToAllAt: null, inviteOnly: false, invites: [] }
 const input: OverviewInput = {
-  signupPaused: off, food: off, posterGate: poster, photoCredits: 3, wishlist: on,
+  signupPaused: off, foodTableware: off, foodPlating: on, posterGate: poster, photoCredits: 3, wishlist: on,
   gallery: { enabled: on, autoApprove: off }, serviceWorker: on, appShell: off, affiliate: true, now: '2026-11-27T04:00:00Z',
 }
 
@@ -15,7 +15,8 @@ describe('功能开关 overview', () => {
   it('lists every switch in page order, each linking to its card', () => {
     expect(overviewRows(input).map((row) => [row.name, row.href])).toEqual([
       ['暂停注册赠送', '#signup_gift_paused'],
-      ['餐饮模板「优化摆盘」「优化器皿」', '#food_toggles_enabled'],
+      ['餐饮模板「优化器皿」', '#food_tableware_enabled'],
+      ['餐饮模板「优化摆盘」', '#food_plating_enabled'],
       ['赛事海报 · 谁能用', '#feature-dense_poster'],
       ['拍照识别旧海报：每次扣多少积分', '#poster_photo_credits'],
       ['需求墙', '#wishlist_enabled'],
@@ -27,9 +28,9 @@ describe('功能开关 overview', () => {
     ])
   })
 
-  it('marks the five emergency switches', () => {
+  it('marks the switches turned off first', () => {
     expect(overviewRows(input).filter((row) => row.emergency).map((row) => row.href)).toEqual([
-      '#signup_gift_paused', '#food_toggles_enabled', '#service_worker_enabled', '#service_worker_shell_enabled', '/admin/affiliates',
+      '#signup_gift_paused', '#food_tableware_enabled', '#food_plating_enabled', '#service_worker_enabled', '#service_worker_shell_enabled', '/admin/affiliates',
     ])
   })
 
