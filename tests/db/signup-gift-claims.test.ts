@@ -248,7 +248,7 @@ describe('claim_signup_gift: switches, cap and pause', () => {
     expect(await claim(id)).toBe('granted')
   })
 
-  it('daily_cap and paused refusals at sign-up stay final', async () => {
+  it('a paused refusal at sign-up stays final (daily_cap is paid by grant_credits, 2026, not by a claim)', async () => {
     await setSetting('signup_gift_per_ip', 0)
     await setSetting('signup_gift_paused', true)
     const [id] = await onNetwork(1)

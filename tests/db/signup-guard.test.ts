@@ -56,7 +56,7 @@ afterAll(async () => {
 })
 
 describe('signup gift daily cap', () => {
-  it('pays up to the cap, then refuses for good, without touching accounts already paid', async () => {
+  it('pays up to the cap, then leaves the rest pending, without touching accounts already paid', async () => {
     await setSetting('signup_gift_daily_cap', (await today()) + 2)
     const [a, b, c] = [await newAccount(), await newAccount(), await newAccount()]
     expect([await grant(a), await grant(b), await grant(c)]).toEqual([true, true, false])
@@ -67,10 +67,12 @@ describe('signup gift daily cap', () => {
     expect(await grant(a)).toBe(false)
     expect(await refusalOf(a)).toBeNull()
     expect(await readSignupGift(service, a, FREE)).toMatchObject({ refused: false, reason: null })
-    // Raising the cap later does not pay the refused account.
+    // 2026: the refusal is pending; once the cap has room, the next sign-in pays it, once.
     await setSetting('signup_gift_daily_cap', TEST_SIGNUP_GIFT_CAP)
+    expect(await grant(c)).toBe(true)
+    expect(await refusalOf(c)).toBeNull()
+    expect((await profileOf(db, c)).free_credits).toBeGreaterThan(0)
     expect(await grant(c)).toBe(false)
-    expect((await profileOf(db, c)).free_credits).toBe(0)
   })
 
   it('counts only today in Beijing', async () => {

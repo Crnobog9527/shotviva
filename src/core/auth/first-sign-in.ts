@@ -52,7 +52,8 @@ async function bindFirstReferral(userId: string, first: boolean, fresh: boolean,
 
 // The signup gift (0 for a staff sign-up). 1480: an account over the per-network allowance is
 // pending; a confirmed phone or a linked Google account pays it now (a phone or Google sign-up,
-// or a Google account just linked).
+// or a Google account just linked). 2026: one the daily cap left pending is paid by the grant at
+// a later sign-in on a day with room (or by the daily catch-up, /api/cron/signup-gift-catch-up).
 async function payGift(admin: ReturnType<typeof createAdminSupabase>, userId: string, gift: number) {
   const granted = await grantSignupCredits(billingGrant(admin), userId, gift)
   const claimed = !granted && gift > 0 && (await claimQuietly(admin, userId))
@@ -74,7 +75,8 @@ async function bindAndPayGift(
   if (o.knownFirst !== null) await bindFirstReferral(userId, o.knownFirst, o.knownFirst && !o.staff, o.cookie, o.signupConfirmation)
   const { granted, claimed } = await payGift(admin, userId, o.staff ? 0 : o.gift)
   const first = o.knownFirst ?? granted
-  if (claimed && !first) noteSignupGift()
+  // A gift paid at a later sign-in (a claim, or a daily-cap catch-up) still counts toward today's.
+  if ((granted || claimed) && !first) noteSignupGift()
   if (o.knownFirst === null) await bindFirstReferral(userId, first, first && !o.staff, o.cookie, o.signupConfirmation)
   return first
 }
