@@ -14337,6 +14337,49 @@ $$;
 ALTER FUNCTION "public"."affiliate_save_profile"("p_user" "uuid", "p_payout_method" "text", "p_payout_details" "text", "p_us_person" boolean, "p_terms_version" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."affiliate_signup_ref_store"("p_user" "uuid", "p_slug" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+begin
+  if p_user is null then return false; end if;
+  delete from public.affiliate_signup_refs where user_id = p_user;
+  if p_slug is null or p_slug !~ '^[a-z0-9-]{3,24}$' then return false; end if;
+  perform 1 from auth.users u
+   where u.id = p_user and u.email_confirmed_at is null and u.phone_confirmed_at is null
+     and u.last_sign_in_at is null and u.created_at >= now() - interval '10 minutes';
+  if not found then return false; end if;
+  insert into public.affiliate_signup_refs (user_id, slug) values (p_user, p_slug);
+  return true;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."affiliate_signup_ref_store"("p_user" "uuid", "p_slug" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."affiliate_signup_ref_take"("p_user" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_slug text; v_at timestamptz;
+begin
+  delete from public.affiliate_signup_refs where user_id = p_user returning slug, created_at into v_slug, v_at;
+  if v_slug is null or v_at < now() - interval '1 day' then return null; end if;
+  perform 1 from auth.users u
+   where u.id = p_user and u.confirmation_sent_at <= v_at
+     and (u.recovery_sent_at is null or u.recovery_sent_at < v_at)
+     and (u.email_change_sent_at is null or u.email_change_sent_at < v_at)
+     and not exists (select 1 from auth.identities i where i.user_id = p_user and i.provider <> 'email');
+  if not found then return null; end if;
+  return v_slug;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."affiliate_signup_ref_take"("p_user" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."apply_payment_code_effects"("p_user" "uuid", "p_payment_id" bigint, "p_code_id" "uuid", "p_amount_discount" integer, "p_inviter_credits" integer, "p_inviter_cap" integer) RETURNS "jsonb"
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -22009,6 +22052,17 @@ CREATE TABLE IF NOT EXISTS "public"."affiliate_settlement_runs" (
 ALTER TABLE "public"."affiliate_settlement_runs" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."affiliate_signup_refs" (
+    "user_id" "uuid" NOT NULL,
+    "slug" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "affiliate_signup_refs_slug_check" CHECK (("slug" ~ '^[a-z0-9-]{3,24}$'::"text"))
+);
+
+
+ALTER TABLE "public"."affiliate_signup_refs" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."blog_posts" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "locale" "text" NOT NULL,
@@ -23851,6 +23905,11 @@ ALTER TABLE ONLY "public"."affiliate_settings"
 
 ALTER TABLE ONLY "public"."affiliate_settlement_runs"
     ADD CONSTRAINT "affiliate_settlement_runs_pkey" PRIMARY KEY ("period");
+
+
+
+ALTER TABLE ONLY "public"."affiliate_signup_refs"
+    ADD CONSTRAINT "affiliate_signup_refs_pkey" PRIMARY KEY ("user_id");
 
 
 
@@ -25965,6 +26024,11 @@ ALTER TABLE ONLY "public"."affiliate_rate_overrides"
 
 
 
+ALTER TABLE ONLY "public"."affiliate_signup_refs"
+    ADD CONSTRAINT "affiliate_signup_refs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."affiliates"
     ADD CONSTRAINT "affiliates_approved_by_fkey" FOREIGN KEY ("approved_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -26955,6 +27019,9 @@ ALTER TABLE "public"."affiliate_settings" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."affiliate_settlement_runs" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."affiliate_signup_refs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."affiliates" ENABLE ROW LEVEL SECURITY;
@@ -29463,6 +29530,16 @@ GRANT ALL ON FUNCTION "public"."affiliate_recompute_payment"("p_payment_id" bigi
 
 REVOKE ALL ON FUNCTION "public"."affiliate_save_profile"("p_user" "uuid", "p_payout_method" "text", "p_payout_details" "text", "p_us_person" boolean, "p_terms_version" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."affiliate_save_profile"("p_user" "uuid", "p_payout_method" "text", "p_payout_details" "text", "p_us_person" boolean, "p_terms_version" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."affiliate_signup_ref_store"("p_user" "uuid", "p_slug" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."affiliate_signup_ref_store"("p_user" "uuid", "p_slug" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."affiliate_signup_ref_take"("p_user" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."affiliate_signup_ref_take"("p_user" "uuid") TO "service_role";
 
 
 

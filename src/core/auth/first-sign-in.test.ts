@@ -5,6 +5,8 @@ import { benefits } from '../../../tests/t94-config'
 const mocks = vi.hoisted(() => ({
   headers: vi.fn(),
   bind: vi.fn(),
+  // This browser's sv_ref cookie.
+  cookie: 'partner' as string | undefined,
   claim: vi.fn().mockResolvedValue(null),
   claimQuietly: vi.fn().mockResolvedValue(false),
   track: vi.fn(),
@@ -14,10 +16,10 @@ const mocks = vi.hoisted(() => ({
   staff: vi.fn(async (): Promise<boolean | 'unchecked'> => false),
 }))
 
-vi.mock('../affiliate/referral', () => ({ bindReferral: mocks.bind }))
+vi.mock('../affiliate/referral', () => ({ bindSignupReferral: mocks.bind }))
 vi.mock('./signup-code', () => ({ consumeSignupCode: mocks.claim }))
 vi.mock('./signup-gift-claim', () => ({ claimQuietly: mocks.claimQuietly }))
-vi.mock('next/headers', () => ({ headers: mocks.headers, cookies: async () => new Map([['sv_ref', { value: 'partner' }]]) }))
+vi.mock('next/headers', () => ({ headers: mocks.headers, cookies: async () => new Map(mocks.cookie ? [['sv_ref', { value: mocks.cookie }]] : []) }))
 vi.mock('../analytics', () => ({ track: mocks.track }))
 vi.mock('../alerts', () => ({ noteSignupGift: mocks.noteSignupGift }))
 vi.mock('./supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
@@ -60,7 +62,7 @@ describe('onVerifiedSignIn', () => {
     mocks.grantSignupCredits.mockResolvedValue(true)
     mocks.claim.mockResolvedValueOnce('invite')
     await onVerifiedSignIn('u1', benefits, 'google', 'en')
-    expect(mocks.bind).toHaveBeenCalledWith('u1', 'partner', 'signup')
+    expect(mocks.bind).toHaveBeenCalledWith('u1', true, 'partner', false)
     // The partner link binds first, so an org member's invite code cannot take the customer (§6.5).
     expect(mocks.bind.mock.invocationCallOrder[0]).toBeLessThan(mocks.claim.mock.invocationCallOrder[0])
     expect(mocks.track).toHaveBeenCalledWith('signup', { method: 'google', code_kind: 'invite' }, { distinctId: 'u1', locale: 'en' })
@@ -92,6 +94,31 @@ describe('onVerifiedSignIn', () => {
   })
 })
 
+// 2021 (ARCHITECTURE §6.5): the first sign-in hands the cookie to the partner binding, which also
+// takes the referral stored at sign-up (core/affiliate/referral).
+describe('onVerifiedSignIn: partner binding', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.cookie = 'partner'
+    mocks.headers.mockResolvedValue(new Headers({ 'x-forwarded-for': '203.0.113.7' }))
+  })
+
+  it('runs on the first sign-in even without a cookie (the stored one may bind)', async () => {
+    mocks.cookie = undefined
+    mocks.recordSignupIp.mockResolvedValue(true)
+    mocks.grantSignupCredits.mockResolvedValue(true)
+    await onVerifiedSignIn('u1', benefits, 'email', 'zh', null, true)
+    expect(mocks.bind).toHaveBeenCalledExactlyOnceWith('u1', true, undefined, true)
+  })
+
+  it('a later sign-in does not run it', async () => {
+    mocks.recordSignupIp.mockResolvedValue(false)
+    mocks.grantSignupCredits.mockResolvedValue(false)
+    await onVerifiedSignIn('u1', benefits, 'email', 'zh')
+    expect(mocks.bind).not.toHaveBeenCalled()
+  })
+})
+
 // Share links opened before signing up ride on the signup event (§5.1f, §5.1g).
 describe('signupMarks', () => {
   it('carries a template share and a template collection link, and drops malformed ones', () => {
@@ -117,7 +144,8 @@ describe('onVerifiedSignIn: staff-link signups', () => {
     expect(mocks.staff).toHaveBeenCalledWith({}, 'u1', next)
     expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', 0)
     expect(mocks.claimQuietly).not.toHaveBeenCalled()
-    expect(mocks.bind).not.toHaveBeenCalled()
+    // Runs without binding: the referral stored at sign-up is still taken, so it never binds later.
+    expect(mocks.bind).toHaveBeenCalledExactlyOnceWith('u1', false, 'partner', false)
     expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', false, benefits.invite, 'zh')
     // 1950 reads "no signup IP yet" as the first verified sign-in: the mark comes before the IP.
     expect(mocks.staff.mock.invocationCallOrder[0]).toBeLessThan(mocks.recordSignupIp.mock.invocationCallOrder[0])
@@ -138,6 +166,7 @@ describe('onVerifiedSignIn: staff-link signups', () => {
     await onVerifiedSignIn('u1', benefits, 'email', 'zh', next)
     expect(mocks.recordSignupIp).not.toHaveBeenCalled()
     expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', 0)
+    // Not the first sign-in yet: the stored referral waits for the one that is.
     expect(mocks.bind).not.toHaveBeenCalled()
   })
 
@@ -147,7 +176,7 @@ describe('onVerifiedSignIn: staff-link signups', () => {
     await onVerifiedSignIn('u1', benefits, 'email', 'en', null)
     expect(mocks.staff).toHaveBeenCalledWith({}, 'u1', null)
     expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', benefits.freeCredits)
-    expect(mocks.bind).toHaveBeenCalledWith('u1', 'partner', 'signup')
+    expect(mocks.bind).toHaveBeenCalledWith('u1', true, 'partner', false)
     expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', true, benefits.invite, 'en')
   })
 })

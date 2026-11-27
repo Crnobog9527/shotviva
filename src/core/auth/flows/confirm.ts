@@ -19,7 +19,10 @@ async function resolveOutcome(request: NextRequest, jar: CookieToSet[], benefits
     logger.warn('auth email link verification failed', { code: error.code, type: confirm.type })
     return { kind: 'error', error: verifyError(error), flow: confirm.flow }
   }
-  return landOnSession(supabase, confirm.flow, benefits, params.get('next'))
+  // Only a signup confirmation link may bind the partner stored at sign-up (2021): a recovery or
+  // magic link can also be an unconfirmed account's first verification (review on #961).
+  const signupConfirmation = confirm.type === 'signup' || confirm.type === 'email'
+  return landOnSession(supabase, confirm.flow, benefits, params.get('next'), signupConfirmation)
 }
 
 // Landing for every auth email link (signup, recovery, email change, magic link). The link
