@@ -46,13 +46,18 @@ export function SignupGiftCard({ state, savePaused, saveRules }: Props) {
 
   return (
     <>
-      <section className="grid gap-4 rounded-lg border border-border bg-card p-4" aria-labelledby="signup-gift-rules-title">
+      <section id="signup_gift_rules" className="grid scroll-mt-20 gap-4 rounded-lg border border-border bg-card p-4" aria-labelledby="signup-gift-rules-title">
         <div className="grid gap-1">
           <h2 id="signup-gift-rules-title" className="font-medium">
             {COPY.title}
           </h2>
           <p className="text-sm text-muted-foreground">{COPY.body}</p>
         </div>
+        {state.paused.enabled ? (
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm" role="note">
+            {COPY.pausedNotice}
+          </p>
+        ) : null}
         <p className="text-sm font-medium" data-signup-gift-today>
           {COPY.today(state.granted, state.rules.cap)}
         </p>

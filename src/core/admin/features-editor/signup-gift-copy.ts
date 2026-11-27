@@ -5,6 +5,7 @@ export const SIGNUP_GIFT_COPY = {
   rules: {
     title: '注册赠送规则',
     body: '新账号第一次登录时发注册赠分。下面几条规则保存后马上对下一个新账号生效；付费、登录和出图都不受影响。',
+    pausedNotice: '注册赠送现在是暂停状态：下面的规则先不生效，新账号一律不送。恢复发放请用下面的「暂停注册赠送」卡。',
     credits: {
       label: '每个新账号送（积分）',
       key: 'signup_gift_credits',
@@ -38,6 +39,12 @@ export const SIGNUP_GIFT_COPY = {
 export const SIGNUP_GIFT_PAUSE_COPY: SwitchCopy = {
   title: '暂停注册赠送',
   key: 'signup_gift_paused',
+  summary: {
+    purpose: '一键停发注册赠分。发现有人批量注册时用。',
+    whenOn: '新注册的账号一律不送，以后也不补发；付费、登录和出图不受影响',
+    whenOff: '新账号照常领，按上面的规则限量',
+    emergency: true,
+  },
   body: '开启后，新注册的账号一律不送注册赠分，以后也不补发；付费、登录和出图都不受影响。发现有人批量注册时用。保存后马上生效。',
   state: { on: '已暂停', off: '正常发放' },
   stateLabel: '当前状态',

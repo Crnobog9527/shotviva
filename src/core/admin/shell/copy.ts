@@ -28,7 +28,7 @@ export const SHELL_COPY = {
     gallery: '创作库审核',
     announcements: '公告横幅',
     blog: '博客',
-    features: '功能权限',
+    features: '功能开关',
   },
   // The tabs inside a module (Owner 2026-11-27).
   tabs: {
