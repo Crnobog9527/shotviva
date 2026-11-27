@@ -3,11 +3,14 @@
 import { refresh } from 'next/cache'
 
 import {
+  acknowledgePayment,
   applyClawback,
   applyStripeReplay,
   previewClawback,
   previewStripeReplay,
   runAdminQuery,
+  unacknowledgePayment,
+  type AcknowledgeResult,
   type ActionValue,
   type ClawbackPreview,
   type ClawbackResult,
@@ -55,6 +58,25 @@ export async function applyClawbackAction(input: { paymentId?: unknown }): Promi
   const admin = await requireAdmin()
   return runAdminQuery(async () => {
     const result = await applyClawback(createAdminSupabase(), input.paymentId, admin.id)
+    refresh()
+    return result
+  })
+}
+
+// 「标记已知晓」 / 「撤销」 (1881): only the mark and an audit row; no money, refund or credits move.
+export async function acknowledgePaymentAction(input: { paymentId?: unknown }): Promise<ActionValue<AcknowledgeResult>> {
+  const admin = await requireAdmin()
+  return runAdminQuery(async () => {
+    const result = await acknowledgePayment(createAdminSupabase(), input.paymentId, admin.id)
+    refresh()
+    return result
+  })
+}
+
+export async function unacknowledgePaymentAction(input: { paymentId?: unknown }): Promise<ActionValue<AcknowledgeResult>> {
+  const admin = await requireAdmin()
+  return runAdminQuery(async () => {
+    const result = await unacknowledgePayment(createAdminSupabase(), input.paymentId, admin.id)
     refresh()
     return result
   })

@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
+import { after } from 'next/server'
 import { Suspense } from 'react'
 
+import { drainReferenceDeletions } from '@/core/admin/reference-library/object-cleanup'
 import { TestPanelSummaryProvider } from '@/core/admin/test-run-ui'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { r2Store } from '@/core/storage'
@@ -14,14 +16,17 @@ import { PhotoPreloads } from './photo-preloads'
 // the (app) layout.
 export const instant = false
 
-export const metadata: Metadata = { title: '模板与提示词' }
+export const metadata: Metadata = { title: '模板与系列' }
 
 // ?edit=<id> opens that template's editor, e.g. right after 「发布为模板」 created a draft (T101).
 const editParam = (value: string | string[] | undefined) => typeof value === 'string' && /^[a-z0-9-]{1,64}$/.test(value) ? value : undefined
 
 export default async function AdminTemplatesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAdmin()
+  const admin = await requireAdmin()
   const db = createAdminSupabase()
+  // 素材参考库 is retired (2026-11-27), and its page used to empty the queue of R2 objects left
+  // by deleted references. The queue keeps draining here, the admin page opened most often.
+  after(async () => { await drainReferenceDeletions(db, admin.id) })
   // Start the shared trial data with the catalogue; the list renders without waiting for R2.
   const opening = Promise.resolve().then(() => preparePanelSummary({ db, store: r2Store() }))
   const summary = opening.then(data => data.summary).catch(() => null)

@@ -4,6 +4,8 @@ import type { CatalogueIndex, CategoryNode } from '@/core/templates'
 
 import type { CatalogueTemplate } from './catalogue-template'
 import { browseView, groupEntries, pickerBrowse } from './picker-browse'
+import { filterCatalogue, openableTemplates } from './catalogue-filter'
+import { buildSearchIndex, searchTemplates } from './catalogue-search'
 
 const node = (key: string, path: string[], children: CategoryNode[] = []) =>
   ({ key, nameEn: key, nameZh: `${key}中`, introEn: 'intro', introZh: null, slug: path.at(-1), path, level: path.length, children }) as unknown as CategoryNode
@@ -33,6 +35,19 @@ describe('picker browse', () => {
     const view = browseView(pickerBrowse(index, all, false), all.filter((item) => item.id !== 'm1' && item.id !== 't2'), false)
     expect(view.entries.map((entry) => (entry.type === 'series' ? entry.series.members.map((m) => m.id).join('+') : entry.template.id))).toEqual(['t1', 'm2', 'loose'])
     expect(browseView(null, all, false).entries).toHaveLength(5)
+  })
+
+  it('shows a series member only in its series, even with an old loose placement (Owner 2026-11-25)', () => {
+    const browse = pickerBrowse(index, all, false)!
+    browse.entries.push({ type: 'template', id: 'm1', path: ['art'] })
+    const view = browseView(browse, all, false)
+    const inPath = (path: string[]) => openableTemplates(filterCatalogue(view.entries, [], { saved: false, path }).shown).map((item) => item.id)
+    expect(inPath(['food', 'menu'])).toEqual(['m1', 'm2'])
+    expect(inPath(['art'])).toEqual(['t2'])
+    const search = buildSearchIndex(view.entries, view.filters)
+    expect(searchTemplates(search, 'menu').map((item) => item.id)).toContain('m1')
+    expect(searchTemplates(search, 'art').map((item) => item.id)).not.toContain('m1')
+    expect(searchTemplates(search, 'loose').map((item) => item.id)).toEqual(['loose'])
   })
 
   it('groups a list by the level under the chosen category, own cards first', () => {

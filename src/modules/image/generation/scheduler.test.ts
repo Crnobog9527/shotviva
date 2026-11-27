@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { applyError, applyView, restore, serialize, type TrackedJob } from './job-model'
-import { markSent, nextToSend, RATE_LIMIT_RETRY_MS, requeue } from './scheduler'
+import { markSent, nextToSend, POLL_SINGLE_MS, pollIntervalMs, RATE_LIMIT_RETRY_MS, requeue } from './scheduler'
 
 // T28 batch queue: in flight ≤ the account's concurrency, oldest first, a failure frees its
 // slot, and a reload picks the batch up again under the same ids.
@@ -98,5 +98,24 @@ describe('refresh resume', () => {
   it('keeps a resent job’s first start and stamps the new send', () => {
     const resent = markSent({ ...queued(0), startedAt: 2_000 }, 9_000)
     expect(resent).toMatchObject({ status: 'running', startedAt: 2_000, sentAt: 9_000 })
+  })
+})
+
+describe('pollIntervalMs (one status request for all running jobs)', () => {
+  const running = (batchSize: number): TrackedJob => ({ ...queued(0), status: 'running', batchSize })
+  it('watches a single photo every 3 s', () => {
+    expect(pollIntervalMs([running(1), running(5)], 9)).toBe(POLL_SINGLE_MS)
+  })
+  it('starts a batch at 5 s and backs off to 15 s while nothing changes', () => {
+    expect(pollIntervalMs([running(5)], 0)).toBe(5_000)
+    expect(pollIntervalMs([running(5)], 1)).toBe(7_500)
+    expect(pollIntervalMs([running(5)], 10)).toBe(15_000)
+  })
+})
+
+describe('requeue after a 429', () => {
+  it('waits the server’s Retry-After when given', () => {
+    expect(requeue({ ...queued(0), status: 'running' }, 1_000, 7_000)).toMatchObject({ status: 'queued', retryAt: 8_000 })
+    expect(requeue({ ...queued(0), status: 'running' }, 1_000)).toMatchObject({ retryAt: 1_000 + RATE_LIMIT_RETRY_MS })
   })
 })

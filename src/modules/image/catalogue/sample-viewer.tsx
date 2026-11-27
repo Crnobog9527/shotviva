@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useRef, useState } from 'react'
 
-import { coverImage } from '@/core/ui/cover-image'
+import { coverAvif, coverImage } from '@/core/ui/cover-image'
+import { Picture } from '@/core/ui/picture'
 
 import { CloseMark, SideToggle, useSwipe, type ViewerSide } from './sample-viewer-parts'
 import { useBackToClose } from './use-back-to-close'
@@ -79,8 +80,8 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
           >
             <div {...swipe.handlers} style={box ? SCROLLER : PAN} className="overscroll-contain">
               {(['phone', 'ai'] as const).map((key) => (
+                <Picture key={key} avif={coverAvif(key === 'phone' ? before : after, box ? '200vw' : '100vw')}>
                 <img
-                  key={key}
                   {...coverImage(key === 'phone' ? before : after, box ? '200vw' : '100vw')}
                   hidden={key !== side}
                   alt={key === 'phone' ? t('phonePhotoAlt') : t('resultAlt', { name })}
@@ -90,6 +91,7 @@ export function SampleViewer({ open, onOpenChange, before, after, name, side, on
                   className="block select-none"
                   draggable={false}
                 />
+                </Picture>
               ))}
             </div>
             <SideToggle side={side} onSide={pick} />

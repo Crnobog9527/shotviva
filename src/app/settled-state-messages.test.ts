@@ -32,8 +32,8 @@ describe('settled states (en)', () => {
     expect(edit('failKept')).toBe('Your request is kept. Try again, or change what you asked for.')
     expect(edit('metaFailed', { size: 'Post 4:5', tier: 'Standard', refund: 'refunded', count: 2 })).toBe('Just now · Post 4:5 · Standard · 2 credits refunded · edit')
     expect(edit('metaFailed', { size: 'Post 4:5', tier: 'Standard', refund: 'none', count: 2 })).toBe('Just now · Post 4:5 · Standard · nothing charged · edit')
-    // Spec #156: about 60 seconds, not the comp's 20–40.
-    expect(edit('leave')).toMatch(/about 60 seconds/)
+    // Spec #156, Owner 2026-11-21: about 30 seconds (was 60).
+    expect(edit('leave')).toMatch(/about 30 seconds/)
   })
 
   it('puts the size on Download (photo.html #download)', () => {
@@ -45,7 +45,7 @@ describe('settled states (en)', () => {
 describe('settled states (zh)', () => {
   it('has every new line, with the same placeholders', () => {
     const z = createTranslator({ locale: 'zh', messages: zh, namespace: 'app' })
-    expect(z.markup('workspace.doneState.line', { tier: '标准', px: 1024, count: 2, pool: 'paid', mono: tag })).toBe('标准 · 1024 px · 用了 2 积分。用的是付费积分，所以是私密的，没有水印。')
+    expect(z.markup('workspace.doneState.line', { tier: '标准', px: 1024, count: 2, pool: 'paid', mono: tag })).toBe('标准 · 1024 px · 用了 2 积分。使用付费积分，作品私密、无水印。')
     expect(z.markup('workspace.retryCost', { count: 2, cost: tag })).toBe('重试 · 2 积分')
     expect(z('edit.metaFailed', { size: '贴文 4:5', tier: '标准', refund: 'refunded', count: 2 })).toBe('刚刚 · 贴文 4:5 · 标准 · 已退回 2 积分 · 修改')
     expect(z.markup('result.downloadPx', { px: 1024, cost: tag, mono: tag })).toBe('下载 · 1024 px')

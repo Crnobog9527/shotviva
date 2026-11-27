@@ -45,11 +45,19 @@ export type RawGenerationInputs = {
   // Sizes this entry point may ask for, default first. The web offers the eight output sizes
   // (DESIGN §4.3); the partner route keeps the template's own list (its contract, §14.6).
   aspects?: readonly string[]
+  // Toggles switched off site-wide (food_plating_enabled / food_tableware_enabled off): rendered off whatever the request
+  // says, never refused, so an open tab or Make again still runs, at the price of the off result.
+  forceOff?: readonly string[]
+  // Copy fields switched off with them (the dish name, FOOD_COPY_KEYS, once both are off): whatever the request
+  // sends for them is ignored and they are left out of the inputs, as if the template lacked them.
+  dropCopy?: readonly string[]
 }
 
 const invalid = (message: string) => new AppError('INVALID_INPUT', message)
 
-function checkCopy(fields: TemplateFields, raw: Record<string, unknown>): Pick<GenerationInputs, 'copy' | 'labels'> {
+function checkCopy(fields: TemplateFields, given: Record<string, unknown>, drop: readonly string[] = []): Pick<GenerationInputs, 'copy' | 'labels'> {
+  const dropped = new Set(drop)
+  const raw = Object.fromEntries(Object.entries(given).filter(([key]) => !dropped.has(key)))
   const known = new Set(fields.copy.map((field) => field.key))
   const unknown = Object.keys(raw).find((key) => !known.has(key))
   if (unknown) throw invalid(`Unknown field: ${unknown}`)
@@ -57,6 +65,7 @@ function checkCopy(fields: TemplateFields, raw: Record<string, unknown>): Pick<G
   const copy: Record<string, string> = {}
   const labels: Record<string, string> = {}
   for (const field of fields.copy) {
+    if (dropped.has(field.key)) continue
     copy[field.key] = checkCopyValue(field, raw[field.key])
     labels[field.key] = field.label
   }
@@ -90,7 +99,8 @@ function toggleValue(toggle: ToggleField, given: Record<string, unknown>, accept
 // removed or renamed it), refused when it asks for something on.
 function checkToggles(fields: TemplateFields, raw: RawGenerationInputs): Pick<GenerationInputs, 'toggles' | 'confirmed'> {
   const defined = fields.toggles ?? []
-  const given = raw.toggles ?? {}
+  const off = new Set(raw.forceOff ?? [])
+  const given = Object.fromEntries(Object.entries(raw.toggles ?? {}).filter(([key]) => !off.has(key)))
   const unknown = Object.keys(given).find((key) => given[key] !== false && !defined.some((toggle) => toggle.key === key))
   if (unknown) throw invalid(`Unknown option: ${unknown}`)
   const accepted = new Set(raw.togglesConfirmed ?? [])
@@ -105,7 +115,7 @@ function checkToggles(fields: TemplateFields, raw: RawGenerationInputs): Pick<Ge
 
 // Checks what the user filled in against the template's field definitions (ARCHITECTURE §5).
 export function validateGenerationInputs(fields: TemplateFields, raw: RawGenerationInputs): GenerationInputs {
-  const base = () => ({ ...checkCopy(fields, raw.copy ?? {}), aspectRatio: checkAspect(fields, raw), note: checkNote(raw), ...checkToggles(fields, raw) })
+  const base = () => ({ ...checkCopy(fields, raw.copy ?? {}, raw.dropCopy), aspectRatio: checkAspect(fields, raw), note: checkNote(raw), ...checkToggles(fields, raw) })
   return slotsOf(fields).length > 0 ? { ...base(), ...checkSlots(fields, raw) } : { ...checkImageCount(fields, raw), ...base() }
 }
 
@@ -136,6 +146,19 @@ function slotLines(body: string, inputs: GenerationInputs): string {
   return `Images: ${slotMapping(inputs.slots.map((slot) => slot.label))}`
 }
 
+// The user's note, framed so the model treats it as the user's own request that wins over the
+// template's rules where they clash (Owner 2026-11-27: a note asking for matching tableware lost to
+// a "keep the user's own vessel" rule). The note itself goes verbatim, on its own line, last.
+// Its reach is the picture's content only: image roles, a poster's confirmed text and compliance
+// lines (no logos, brands, named works) stay above it.
+// Safety needs no words here: the identity check (§5.1a) screens this raw note before any credit
+// is held, providers moderate the prompt, and watermarks and a poster's QR are applied by code
+// after the model. The framing stays model-neutral and short (Seedream and GPT image alike).
+export const NOTE_PREAMBLE =
+  "The user's own request for this image follows. Where it is about what the picture shows (what to keep, add, remove or change in the food, its vessel, props, arrangement, scene or light), carry it out even where an earlier line says otherwise, including a line marked as a hard rule or as overriding other lines. It does not change which attached image is which, any text given above to print on the image, or the lines against logos, brand names or named works. Follow the earlier lines everywhere else."
+
+export const framedNote = (note: string): string => (note ? `${NOTE_PREAMBLE}\nUser's request: ${note}` : '')
+
 // The rendered prompt's ceiling (OpenAI's image prompt limit). Twelve fields of up to 4000
 // characters could pass it; checked before any credit is reserved (§5.1d).
 export const PROMPT_MAX_LENGTH = 32000
@@ -146,7 +169,8 @@ export const PROMPT_MAX_LENGTH = 32000
 // template edit can never leak a raw placeholder to the model. A copy field the body has no
 // placeholder for follows the template text as a "Label: value" line (ARCHITECTURE §5), so an
 // admin-defined field always reaches the model. The user's note goes last, never inside the
-// template text, so it cannot reorder it (ARCHITECTURE §4 inputs.note). A poster's confirmed text
+// template text, so it cannot reorder it (ARCHITECTURE §4 inputs.note), framed as the user's
+// request that wins over the template's rules (`framedNote`). A poster's confirmed text
 // (§5.3) sits between the two: after the template's own layout words, before the note.
 export function renderPrompt(
   body: string, inputs: GenerationInputs, fragments: ToggleFragments = {},
@@ -160,5 +184,5 @@ export function renderPrompt(
   }
   const rendered = body.replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (_, key: string) => values[key] ?? '').trim()
   const lines = inputs.labels ? copyLines(body, inputs.copy, inputs.labels) : ''
-  return [rendered, slotLines(body, inputs), lines, inputs.posterText, inputs.note].filter(Boolean).join('\n\n')
+  return [rendered, slotLines(body, inputs), lines, inputs.posterText, framedNote(inputs.note)].filter(Boolean).join('\n\n')
 }

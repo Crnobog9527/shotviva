@@ -41,6 +41,18 @@ const page = <T,>(items: T[]) => ({ items, nextCursor: null })
 const load = async () => page<never>([])
 const wall = (cards: WallCard[], eligible = true) => createElement(WallView, { first: page(cards), eligible, now: NOW, loadMore: load })
 
+// Owner 2026-11-24: the shared first page shows at once; the viewer's votes and eligibility stream
+// after it. Until they land the cards show, without the vote state or the post button.
+describe('wishlist wall before the viewer’s part arrives', () => {
+  it('shows the cards, unvoted and unvotable, and no post button yet', () => {
+    const pending = new Promise<never>(() => {})
+    const html = render(createElement(WallView, { first: page([{ ...live, voted: false }]), now: NOW, loadMore: load, personal: pending }))
+    expect(text(html)).toContain('A flat-lay for brunch menus.')
+    expect(html).not.toMatch(/aria-pressed="true"/)
+    expect(html).not.toContain('href="/wishlist/new"')
+  })
+})
+
 describe('wishlist wall', () => {
   it('pins each request as a print with its photos, the masked author and when, and the vote pill', () => {
     const html = render(wall([live]))

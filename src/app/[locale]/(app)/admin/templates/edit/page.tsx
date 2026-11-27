@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 
 import { EDIT_TEMPLATE_COPY, EditTemplateEditor, loadEditTemplateSettings } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
@@ -24,9 +23,6 @@ export default async function AdminEditTemplatePage() {
   const floor = pricingFromOptions(providers)
   return (
     <div className="mx-auto grid w-full max-w-4xl gap-6 p-6">
-      <Link href="/admin/templates" className="text-muted-foreground text-sm">
-        {EDIT_TEMPLATE_COPY.back}
-      </Link>
       <h1 className="text-xl font-semibold">{EDIT_TEMPLATE_COPY.title}</h1>
       {/* 「出图模型」 shows the chosen line's (else the default line's) capability sync, as the template editor does. */}
       <ModelSyncProvider action={syncTemplateModel}>

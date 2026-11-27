@@ -8,7 +8,7 @@ import { AppError } from '@/core/errors'
 import { screenIdentityText, type IdentityJudge } from '@/core/identity-guard'
 import { flowExtraImages, foodPlanOf, foodStep, screenCost, templateCall, typedWords, type FoodDeps, type FoodPlan, type SettleDeps, type TemplateProvider } from '@/core/jobs'
 import { loadInputImage } from '@/core/storage'
-import { DEFAULT_RESOLUTION, loadTestTemplate, OUTPUT_ASPECTS, validateGenerationInputs } from '@/core/templates'
+import { DEFAULT_RESOLUTION, FOOD_SWITCHES_OFF, foodSwitchedOff, loadTestTemplate, type FoodSwitches, OUTPUT_ASPECTS, validateGenerationInputs } from '@/core/templates'
 
 import { testRunEstimateUsd } from './provider-estimate'
 import { continueTestRun } from './test-ledger'
@@ -23,7 +23,14 @@ import { beginTestRun, findTestPhoto, findTestRun } from './test-run-store'
 // including drafts; admin_test_runs in place of generation_jobs. Nothing reaches works, stats or
 // PostHog.
 
-export type TestRunDeps = SettleDeps & { identityJudge?: IdentityJudge | null; identityJudgeTimeoutMs?: number; food?: FoodDeps | null }
+export type TestRunDeps = SettleDeps & {
+  identityJudge?: IdentityJudge | null
+  identityJudgeTimeoutMs?: number
+  food?: FoodDeps | null
+  // The site-wide switches for 优化摆盘 and 优化器皿 (2009): test runs follow them as users do; a
+  // toggle whose switch is off is rendered off, and absent switches mean both off.
+  foodSwitches?: () => Promise<FoodSwitches>
+}
 
 export type TestGenerateRequest = { actorId: string; body: z.infer<typeof testGenerateBodySchema> }
 
@@ -38,6 +45,9 @@ async function slotPhotos(db: FirstRunDeps['db'], given: Record<string, string> 
   if (found.some(([, photo]) => !photo)) throw new AppError('NOT_FOUND', '测试照片已被清理，请重新上传')
   return Object.fromEntries(found.map(([slot, photo]) => [slot, photo!.objectKey]))
 }
+
+// 优化摆盘 or 优化器皿 while its own switch is off, and the dish name once both are (2009).
+const switchedOff = async (deps: FirstRunDeps) => foodSwitchedOff((await deps.foodSwitches?.()) ?? FOOD_SWITCHES_OFF)
 
 async function prepare(deps: FirstRunDeps, { body }: TestGenerateRequest) {
   const loaded = await loadTestTemplate(deps.db, body.template_id)
@@ -54,6 +64,7 @@ async function prepare(deps: FirstRunDeps, { body }: TestGenerateRequest) {
     imageCount: photo ? 1 : 0,
     ...(slots ? { slots } : {}),
     aspects: OUTPUT_ASPECTS,
+    ...(await switchedOff(deps)),
   })
   const keys = inputs.slots ? inputs.slots.map((slot) => slot.upload) : photo ? [photo.objectKey] : []
   const images = await Promise.all(keys.map((key) => loadInputImage(deps.store, key)))

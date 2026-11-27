@@ -8,7 +8,7 @@ import { CatalogList, CatalogNotice, EditorView, WaffoSeededNotice, WaffoSeededR
 import { archivable } from '@/core/admin/products/workflow'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { readProductCatalog } from '@/core/billing/product-catalog'
-import { paymentChannel, waffoConfig } from '@/core/billing/waffo/config'
+import { waffoConfig } from '@/core/billing/waffo/config'
 import { site } from '@/site/site.config'
 import { catalogAction, waffoSeededAction } from './actions'
 
@@ -34,7 +34,7 @@ async function Detail({ sku, actor, query }: { sku: string; actor: string; query
   if (!item) notFound()
   const selected = await readRelease(db,actor,sku,query.release)
   const prices = selected ? await archivable(db,actor,selected.id) : []
-  return <EditorView item={item} action={catalogAction} waffo={paymentChannel() === 'waffo'} publishedCurrent={!!selected && selected.revision === item.current?.revision} archiveId={selected?.id} prices={prices} />
+  return <EditorView item={item} action={catalogAction} waffo={waffoConfigured()} publishedCurrent={!!selected && selected.revision === item.current?.revision} archiveId={selected?.id} prices={prices} />
 }
 export default async function AdminProductsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const actor = await requireAdmin()

@@ -27,6 +27,30 @@
     {
       "path": "/api/cron/daily-brief",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/generation-sweep",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/payment-fees",
+      "schedule": "25 * * * *"
+    },
+    {
+      "path": "/api/cron/org-topup",
+      "schedule": "20 0 1 * *"
+    },
+    {
+      "path": "/api/cron/partner-promo-expire",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/partner-promo",
+      "schedule": "40 0 1 * *"
+    },
+    {
+      "path": "/api/cron/signup-gift-catch-up",
+      "schedule": "5 16 * * *"
     }
   ],
   "regions": [

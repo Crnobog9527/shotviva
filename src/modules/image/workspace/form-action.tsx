@@ -9,8 +9,9 @@ import { buttonVariants } from '@/core/ui/button'
 import type { CtaState } from './cta-state'
 import { tierName } from './workspace-options'
 
-const LABELS: Record<'wait' | 'need-photo' | 'uploading' | 'need-copy' | 'no-options' | 'need-size' | 'checking', string> = {
+const LABELS: Record<'wait' | 'need-photo' | 'uploading' | 'need-copy' | 'no-options' | 'need-size' | 'checking' | 'tier-pool', string> = {
   checking: 'checkingCta',
+  'tier-pool': 'tierPoolCta',
   wait: 'wait',
   'need-photo': 'needPhoto',
   uploading: 'uploadingCta',
@@ -52,16 +53,35 @@ type Props = {
   // The shop, phone or address fields still holding the cover's text (copy-examples.ts): one line
   // asking whether to use them, in place of the usual notice; Generate stays enabled.
   examplesLeft?: readonly string[]
+  // An active org member (§6.5): only the org's credits pay, so a shortfall asks the org's admin
+  // instead of opening the paywall (buying would not help while they are a member).
+  orgOnly?: boolean
 }
 
 // The creation form's bottom bar: one notice line at most, then the one primary (DESIGN §4.3
 // steps 4–5). The free-credit notice shows only when this photo would use free credits; a
 // batch (T28) says how many photos and that it is paid credits only.
-export function FormAction({ state, resolution, batch, onGenerate, placement = 'page', addFirst = null, limit = 1, error = null, privateOnly = false, examplesLeft = [] }: Props) {
+export function FormAction(props: Props) {
+  if (props.orgOnly && props.state.kind === 'get-credits') return <OrgShortBar placement={props.placement ?? 'page'} />
+  return <FormBar {...props} />
+}
+
+function FormBar({ state, resolution, batch, onGenerate, placement = 'page', addFirst = null, limit = 1, error = null, privateOnly = false, examplesLeft = [] }: Props) {
   return (
     <ActionBar inline={placement === 'sheet'} className={placement === 'page' ? PAGE : undefined}>
       <BarNotice state={state} resolution={resolution} addFirst={addFirst} limit={limit} error={error} privateOnly={privateOnly} examplesLeft={examplesLeft} />
       <Primary state={state} batch={batch} onGenerate={onGenerate} />
+    </ActionBar>
+  )
+}
+
+// An org member whose org credits cannot cover this job: say so and point at the org's admin.
+function OrgShortBar({ placement }: { placement: 'page' | 'sheet' }) {
+  const t = useTranslations('app.workspace')
+  return (
+    <ActionBar inline={placement === 'sheet'} className={placement === 'page' ? PAGE : undefined}>
+      <ActionNotice><span role="status">{t('orgNeedsCredits')}</span></ActionNotice>
+      <button type="button" disabled className={buttonVariants({ variant: 'glass', size: 'cta', className: 'w-full rounded-tile text-cta text-muted-foreground' })}>{t('orgShortCta')}</button>
     </ActionBar>
   )
 }
@@ -124,6 +144,14 @@ function Notice({ state, resolution, limit, privateOnly }: { state: CtaState; re
   if (state.kind === 'get-credits') {
     return <ActionNotice>{t.rich('workspace.needsCredits', { ...rich, tier: tierName(resolution, t), count: state.cost })}</ActionNotice>
   }
+  return <HoldNotice state={state} />
+}
+
+// Why the bar holds: the tier's pool cannot pay (1996: 1K is free credits only, a batch or Remove
+// watermark paid only), or the concurrency limit.
+function HoldNotice({ state }: { state: CtaState }) {
+  const t = useTranslations('app')
+  if (state.kind === 'tier-pool') return <ActionNotice><span role="status">{t(state.reason === 'free-only' ? 'tiers.freeOnly' : 'tiers.paidOnly')}</span></ActionNotice>
   if (state.kind === 'wait') return <ActionNotice>{t('workspace.waitNotice', { count: state.limit })}</ActionNotice>
   return null
 }

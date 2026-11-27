@@ -55,11 +55,11 @@ export const termsServiceSections: readonly [LegalSection, ...LegalSection[]] = 
       'Creating an image uses credits. There are two kinds:',
       {
         list: [
-          'Free credits: the credits we give new accounts and any credits we give in promotions. They can only create free works (see the next section).',
+          'Free credits: the credits we give new accounts and any credits we give in promotions, including promotional credits given to business customers, partners or resellers. They can only create free works (see the next section).',
           'Paid credits: the credits you get from a membership plan or a credit pack. They create paid works.',
         ],
       },
-      'When you create an image, we use paid credits first. If you do not have enough paid credits for that image, we use free credits instead, and the image is a free work. We never split one image between both kinds.',
+      'When you create an image, its size decides which credits are used: 1K images use free credits (including promotional credits) only and are free works; 2K and 4K images use paid credits only. Photo edits use paid credits first, and free credits if you do not have enough paid credits. We never split one image between both kinds.',
       [
         'How many credits an image uses depends on the template and the resolution you choose, and is shown before you create it. Membership credits and credit pack sizes are shown on our ',
         pricingLink,
@@ -76,7 +76,7 @@ export const termsServiceSections: readonly [LegalSection, ...LegalSection[]] = 
       'Whether an image is a free work or a paid work depends only on which credits created it, not on whether you have a membership.',
       {
         list: [
-          `Free works are public. They carry a "Made with ${entity.site}" watermark and cannot be made private. You can delete them at any time. You may use free works for personal, non-commercial purposes, as long as you keep the watermark. Free works stay free works after you buy a membership or credits; to get a version without a watermark, create the image again with paid credits.`,
+          `Free works are for demonstration only and are not licensed for commercial use. They are public and cannot be made private; you can delete them at any time. Every copy we provide (on screen, as a download, in the gallery or through an integration) carries a "Made with ${entity.site}" watermark across the image and a "Demo only · Not licensed for commercial use" label, is limited to about 1080 pixels on its longest side, and contains an invisible mark that identifies the work. You may view and share free works for personal, non-commercial purposes with these marks intact. You may not use them, or any edited or cropped version of them, in a business, for example on menus, product or rental listings, delivery apps, ads or a business's social media. This applies to every free work, including works created with promotional credits. Free works stay free works after you buy a membership or credits; to get a version you may use commercially, create the image again with paid credits.`,
           'Paid works are private by default and have no watermark. You may use them for any lawful purpose, including commercial use such as menus, product listings, rental listings, ads and social media. You can choose to make a paid work public, and make it private again later.',
         ],
       },

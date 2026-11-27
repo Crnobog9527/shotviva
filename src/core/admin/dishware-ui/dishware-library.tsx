@@ -1,4 +1,3 @@
-import Link from 'next/link'
 
 import { DISH_CATEGORIES } from '@/core/templates/food-flow'
 
@@ -12,7 +11,6 @@ export function DishwareLibrary({ items, actions }: { items: ShownDishware[]; ac
   return (
     <div className="mx-auto grid w-full min-w-0 max-w-6xl gap-6 p-6">
       <div className="grid gap-2">
-        <Link href="/admin/templates" className="text-sm underline underline-offset-4">{copy.back}</Link>
         <h1 className="text-xl font-semibold">{copy.title}</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">{copy.intro}</p>
         <p className="max-w-3xl text-sm text-muted-foreground">{copy.syncNote}</p>

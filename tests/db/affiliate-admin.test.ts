@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import type { Client } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
-import { available, bind, promoter, refund, row, sale } from './affiliate-fixtures'
+import { available, bind, commission, promoter, refund, row, sale } from './affiliate-fixtures'
 import { connectAdmin, createUser } from './helpers'
 
 let db: Client
@@ -26,6 +26,8 @@ async function rejects(operation: () => Promise<unknown>, reason: string) {
 }
 
 const settings = (input: object) => db.query('select admin_affiliate_settings($1,$2)', [admin, input])
+// The settings form no longer moves the terms (1820); tests set the version directly.
+const terms = (version: string) => db.query('update affiliate_settings set terms_version=$1', [version])
 const eligible = async () => (await row(db, 'select affiliate_can_apply($1) ok', [user])).ok
 const profile = () => row(db, 'select status,approved_at,approved_by,parent_user_id,terms_version,payout_method from affiliates where user_id=$1', [user])
 
@@ -33,7 +35,8 @@ it('checks membership purchase tier and refunds, captures the accepted version, 
   const form = { name: 'QA', country: 'US', channel: 'https://example.test', audience: '100', plan: 'Reviews' }
   const leader = await promoter(db)
   const apply = (version: string) => db.query('select affiliate_apply($1,$2,$3,$4)', [user, form, leader.slug, version])
-  await settings({ apply_min_level: 'any_paid', terms_version: '2026-11' })
+  await settings({ apply_min_level: 'any_paid' })
+  await terms('2026-11')
   await sale(db, user, 'pack_m', 2490)
   expect(await eligible()).toBe(false)
   await rejects(() => apply('2026-11'), 'AFFILIATE_INELIGIBLE')
@@ -49,7 +52,8 @@ it('checks membership purchase tier and refunds, captures the accepted version, 
   await apply('2026-11')
   expect(await profile()).toMatchObject({ status: 'pending', parent_user_id: null, terms_version: '2026-11' })
   await db.query('select admin_affiliate_decide($1,$2)', [admin, { user_id: user, status: 'active', slug: 'qa-accepted' }])
-  await settings({ terms_version: '2027-01', apply_min_level: 'none' })
+  await settings({ apply_min_level: 'none' })
+  await terms('2027-01')
   const save = (v: string) => db.query("select affiliate_save_profile($1,'paypal','QA',false,$2)", [user, v])
   await rejects(() => save('2026-11'), 'AFFILIATE_TERMS_CHANGED')
   await save('2027-01')
@@ -62,7 +66,7 @@ it('checks membership purchase tier and refunds, captures the accepted version, 
 
 it('refuses payout detail changes after suspension in the database write', async () => {
   const partner = await promoter(db)
-  await settings({ terms_version: 'qa' })
+  await terms('qa')
   const save = (details: string) => db.query("select affiliate_save_profile($1,'paypal',$2,false,'qa')", [partner.id, details])
   await save('original')
   await db.query('select admin_affiliate_set($1,$2)', [admin, { user_id: partner.id, status: 'suspended', reason: 'QA' }])
@@ -71,9 +75,41 @@ it('refuses payout detail changes after suspension in the database write', async
     .toMatchObject({ status: 'suspended', payout_details: 'original' })
 })
 
+it('suspends and restores from the status alone, keeping slug, parent, team, overrides and unconfirmed commissions', async () => {
+  const leader = await promoter(db)
+  const partner = await promoter(db, leader.id)
+  const buyer = await createUser(db)
+  await bind(db, buyer, partner.slug)
+  await db.query('update affiliates set team_enabled=true where user_id=$1', [partner.id])
+  await db.query("insert into affiliate_rate_overrides(user_id,product_kind,l1_bp,l2_bp) select $1,product_kind,1200,null from affiliate_rates limit 1", [partner.id])
+  const before = await sale(db, buyer, 'pack_m', 2490)
+  const pending = await commission(db, before.id)
+  const snapshot = () => row(db, `select a.slug,a.parent_user_id,a.team_enabled,
+    (select jsonb_agg(o order by o.product_kind) from affiliate_rate_overrides o where o.user_id=a.user_id) overrides
+    from affiliates a where a.user_id=$1`, [partner.id])
+  const kept = await snapshot()
+  const status = (value: string) => db.query('select admin_affiliate_set($1,$2)', [admin, { user_id: partner.id, status: value }])
+
+  await status('suspended')
+  expect((await row(db, 'select status from affiliates where user_id=$1', [partner.id])).status).toBe('suspended')
+  expect(await snapshot()).toEqual(kept)
+  expect(await commission(db, before.id)).toMatchObject({ id: pending.id, status: pending.status, amount: pending.amount })
+  const during = await sale(db, buyer, 'pack_m', 2490)
+  expect(await commission(db, during.id)).toMatchObject({ status: 'void', void_reason: 'affiliate_inactive', amount: 0 })
+  expect(await commission(db, during.id, 2)).toBeUndefined()
+  expect((await row(db, "select reason from admin_audit_log where action='affiliate_set' and target_id=$1 order by id desc limit 1", [partner.id])).reason)
+    .toBe('suspended')
+
+  await status('active')
+  expect(await snapshot()).toEqual(kept)
+  const after = await sale(db, buyer, 'pack_m', 2490)
+  expect((await commission(db, after.id)).status).not.toBe('void')
+  expect(await commission(db, during.id)).toMatchObject({ status: 'void', void_reason: 'affiliate_inactive' })
+})
+
 it('only maintains payout details with a dated acceptance of the current version', async () => {
   const partner = await promoter(db)
-  await settings({ terms_version: 'v1' })
+  await terms('v1')
   const save = (details: string) => db.query("select affiliate_save_profile($1,'wise',$2,false,null)", [partner.id, details])
   const read = () => row(db, 'select payout_details,terms_version,terms_accepted_at::text from affiliates where user_id=$1', [partner.id])
   await rejects(() => save('new account'), 'AFFILIATE_NOT_FOUND')
@@ -87,7 +123,7 @@ it('only maintains payout details with a dated acceptance of the current version
   await save('changed')
   expect(await read()).toEqual({ ...before, payout_details: 'changed' })
 
-  await settings({ terms_version: 'v2' })
+  await terms('v2')
   await rejects(() => save('stale consent'), 'AFFILIATE_NOT_FOUND')
   expect(await read()).toEqual({ ...before, payout_details: 'changed' })
 })
@@ -134,7 +170,8 @@ it('dates an immediately active admin enrollment at creation', async () => {
 })
 
 it('consumes a one-time admin grant only after a valid reapplication and retains the rejection audit', async () => {
-  await settings({ terms_version: 'qa-v1', apply_min_level: 'none' })
+  await settings({ apply_min_level: 'none' })
+  await terms('qa-v1')
   const team = await promoter(db)
   await db.query('update affiliates set team_enabled=true where user_id=$1', [team.id])
   const form = { name: 'Original', country: 'US', channel: 'blog', audience: '100', plan: 'Reviews' }
@@ -150,7 +187,7 @@ it('consumes a one-time admin grant only after a valid reapplication and retains
   await rejects(() => apply({ ...revised, reapply_allowed: true }), 'APPLICATION_EXISTS')
   await rejects(() => grant(user), 'NOT_ADMIN')
   await grant(admin)
-  await settings({ terms_version: 'qa-v2' })
+  await terms('qa-v2')
   await rejects(() => apply(revised), 'TERMS_CHANGED')
   expect(await state()).toMatchObject({ status: 'rejected', application: form, reject_reason: 'Missing channel URL', reapply_allowed: true })
   await apply({ ...revised, source: 'admin_invite' }, null, 'qa-v2')

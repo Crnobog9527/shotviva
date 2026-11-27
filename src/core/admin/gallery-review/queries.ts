@@ -20,11 +20,12 @@ const REPORTED_LIMIT = 200
 const IMAGE_SECONDS = 600
 
 const COLUMNS =
-  'id, template_id, created_at, credit_pool, moderation_status, moderation_reason, moderation_categories, ' +
+  'id, user_id, template_id, created_at, credit_pool, moderation_status, moderation_reason, moderation_categories, ' +
   'auto_moderated_at, moderated_at, output_key, parent_job_id, inputs, templates(name)'
 
 const rowSchema = z.object({
   id: z.string(),
+  user_id: z.string(),
   template_id: z.string(),
   created_at: z.string(),
   credit_pool: z.enum(['free', 'paid']),
@@ -109,6 +110,7 @@ async function signed(store: Deps['store'], key: string | null): Promise<string 
 function toWork(row: Row, imageUrl: string | null, reasons: string[]): ReviewWork {
   return {
     id: row.id,
+    userId: row.user_id,
     imageUrl,
     templateId: row.template_id,
     templateName: row.templates?.name ?? row.template_id,

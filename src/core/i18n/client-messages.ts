@@ -3,7 +3,7 @@
 // which a normal user's page must not carry at all (ARCHITECTURE §10, spec #186), not even as
 // an unused string in the serialized messages. Affiliate pages translate on the server too, and so
 // does the public gallery (T108), so its text adds nothing to any other page.
-export const SERVER_ONLY_NAMESPACES = ['adminEntry', 'affiliate', 'affiliateAgreement', 'gallery', 'share'] as const
+export const SERVER_ONLY_NAMESPACES = ['adminEntry', 'affiliate', 'affiliateAgreement', 'gallery', 'share', 'templateShare', 'blog', 'workShare'] as const
 
 // What no client component on a public page (marketing, sign-in, the root error and not-found
 // pages) reads: whole namespaces, and subtrees of `app` that only the logged-in app uses. The
@@ -25,14 +25,22 @@ export const APP_ONLY_APP_KEYS = [
   'edit',
   'checkout',
   'create',
-  'series',
   'work',
-  'share',
   'wait',
   'notify',
   // 每周复用 (§5.3): the poster editor, the creation dialogs and the account card only.
   'weekly',
+  // 企业 (§6.5): the owner's console, the member card and the join page.
+  'org',
+  // A gift's claim page is in the app; public pages only link to it.
+  'giftClaim',
+  // Create's share mode and the member's share links (§5.1g).
+  'templateShare',
+  // 作品集分享 (§6.2): the Photos picker, its dialog and the Share links page.
+  'workShare',
 ] as const
+// Not in the list (Owner 2026-11-25): `series`, `share` and `form` (the creation form's loading
+// line), which the public pages' template panel (Create's own dialog) reads.
 
 type Messages = Record<string, unknown>
 

@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 
+import { pendingPromoCount } from '@/core/affiliate/admin'
 import { isAffiliateEnabled } from '@/core/affiliate/feature'
 import { AdminShell, adminNavItems, UserDialogHost } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
@@ -13,7 +14,7 @@ import { isWishlistEnabled } from '@/core/wishlist'
 import { site } from '@/site/site.config'
 
 import { compensateJobAction, viewWorkAction } from './jobs/actions'
-import { adjustCreditsAction, banUserAction, unbanUserAction, userDetailAction } from './users/actions'
+import { adjustCreditsAction, banUserAction, bindPartnerAction, searchPartnersAction, unbanUserAction, userDetailAction } from './users/actions'
 
 // One admin gate for every /admin/* route (T23). The proxy already answers non-admins with a
 // 404 before rendering. A layout does not stop its pages from rendering and is not re-run on
@@ -53,21 +54,33 @@ async function galleryCount(): Promise<number> {
   }
 }
 
+// Promotion grant sheets waiting for a confirm beside 「联盟营销」 (ARCHITECTURE §6.5), the same way.
+async function promoCount(): Promise<number> {
+  try {
+    return await pendingPromoCount(createAdminSupabase())
+  } catch (error) {
+    logger.warn('admin.promo.count.failed', { error })
+    return 0
+  }
+}
+
 // The user detail dialog (T77) opens over whichever admin page has ?user=<id>.
 const userDialogActions = {
   load: userDetailAction,
-  user: { adjust: adjustCreditsAction, ban: banUserAction, unban: unbanUserAction },
+  user: { adjust: adjustCreditsAction, ban: banUserAction, unban: unbanUserAction, bind: bindPartnerAction, searchPartners: searchPartnersAction },
   jobs: { view: viewWorkAction, compensate: compensateJobAction },
 }
 
 export default async function AdminLayout({ children }: LayoutProps<'/[locale]/admin'>) {
   const admin = await requireAdmin()
-  const [tickets, inquiries, gallery, wishlist, affiliate] = await Promise.all([
-    ticketCount(), inquiryCount(), galleryCount(), isWishlistEnabled(site), isAffiliateEnabled(),
+  const [tickets, inquiries, gallery, wishlist, affiliate, promo] = await Promise.all([
+    ticketCount(), inquiryCount(), galleryCount(), isWishlistEnabled(site), isAffiliateEnabled(), promoCount(),
   ])
   const flags = { wishlist, affiliate, gallery: siteHasGallery(site) }
+  // The count is only shown with the entry (hidden while the program is off).
+  const affiliates = affiliate ? promo : 0
   return (
-    <AdminShell items={adminNavItems(flags, { tickets, inquiries, gallery })} email={admin.email}>
+    <AdminShell items={adminNavItems(flags, { tickets, inquiries, gallery, affiliates })} email={admin.email}>
       {children}
       <Suspense fallback={null}>
         <UserDialogHost actions={userDialogActions} stripeLive={serverEnv().VERCEL_ENV === 'production'} />

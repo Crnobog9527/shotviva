@@ -1,0 +1,129 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
+/* The blog (ARCHITECTURE §12.6): a list of cards and a reading page. The reading column reuses
+   the legal pages' measure and rhythm (legal.css): 68ch at 17px, serif section titles, a
+   contents list that is a folded card on phones and a sticky column from 1024px. Tokens from
+   globals only. Also drawn by the admin editor's preview, so nothing here depends on the page. */
+
+@layer components {
+  .mk-blog { padding: 32px var(--gutter) 64px; }
+  .mk-blog :is(h1, h2, h3) { text-wrap: balance; }
+  .mk-blog p { text-wrap: pretty; }
+
+  /* Home > Blog > this post */
+  .mk-blog-crumbs ol { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 0; padding: 0; list-style: none; font-size: 14px; color: var(--muted-foreground); }
+  .mk-blog-crumbs li + li::before { content: "/"; margin-right: 8px; }
+  .mk-blog-crumbs a { color: var(--bone-dim); text-decoration: none; }
+  .mk-blog-crumbs [aria-current] { color: var(--foreground); overflow-wrap: anywhere; }
+
+  /* title block */
+  .mk-blog-head { margin-top: 20px; max-width: 68ch; }
+  .mk-blog-head h1 { font: 400 36px/1.08 var(--font-display); letter-spacing: -0.025em; }
+  .mk-blog-lede { margin-top: 16px; font-size: 18px; line-height: 1.55; color: var(--bone-dim); }
+  .mk-blog-meta { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; color: var(--muted-foreground); }
+  .mk-blog-meta b { color: var(--bone-dim); font-weight: 500; }
+  .mk-blog-meta time { color: var(--bone-dim); }
+
+  .mk-blog-cover { margin: 28px 0 0; border-radius: 18px; overflow: hidden; background: var(--card); aspect-ratio: 1200 / 630; max-width: 960px; }
+  .mk-blog-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+  /* contents */
+  .mk-blog-toc { margin-top: 28px; padding: 4px 16px; border-radius: 18px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-blog-toc summary { list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 48px; font: 600 16px/1.2 var(--font-sans); cursor: pointer; }
+  .mk-blog-toc summary::-webkit-details-marker { display: none; }
+  .mk-blog-toc summary svg { width: 18px; height: 18px; transition: transform .2s var(--ease); }
+  .mk-blog-toc[open] summary svg { transform: rotate(180deg); }
+  .mk-blog-toc ol { margin: 0; padding: 0 0 12px; list-style: none; }
+  .mk-blog-toc li.sub { padding-left: 14px; }
+  .mk-blog-toc li.sub a { font-size: 14px; color: var(--muted-foreground); }
+  .mk-blog-toc a { display: flex; align-items: center; min-height: 40px; padding: 6px 0; font-size: 15px; line-height: 1.35; color: var(--bone-dim); text-decoration: none; }
+  .mk-blog-toc-title { min-height: 32px; display: flex; align-items: center; font: 600 14px/1.2 var(--font-sans); color: var(--muted-foreground); }
+
+  /* the text */
+  .mk-blog-text { margin-top: 32px; max-width: 68ch; font-size: 17px; line-height: 1.65; overflow-wrap: break-word; }
+  .mk-blog-text :is(h2, h3, h4) { scroll-margin-top: 88px; text-wrap: balance; }
+  .mk-blog-text h2 { margin-top: 48px; padding-top: 28px; border-top: 1px solid var(--hairline); font: 400 28px/1.15 var(--font-display); letter-spacing: -0.02em; }
+  .mk-blog-text h3 { margin-top: 32px; font: 600 20px/1.3 var(--font-sans); }
+  .mk-blog-text h4 { margin-top: 24px; font: 600 17px/1.3 var(--font-sans); }
+  .mk-blog-text :is(h2, h3, h4) + p { margin-top: 14px; }
+  .mk-blog-text p, .mk-blog-text figure, .mk-blog-text blockquote, .mk-blog-text pre, .mk-blog-text .mk-blog-table { margin-top: 16px; }
+  .mk-blog-text :is(ul, ol) { margin: 14px 0 0; padding-left: 24px; }
+  .mk-blog-text ul { list-style: disc; }
+  .mk-blog-text ol { list-style: decimal; }
+  .mk-blog-text li { margin-top: 8px; padding-left: 4px; }
+  .mk-blog-text li::marker { color: var(--muted-foreground); }
+  .mk-blog-text li > :is(ul, ol) { margin-top: 8px; }
+  .mk-blog-text a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--foreground) 40%, transparent); overflow-wrap: anywhere; }
+  .mk-blog-text img { display: block; max-width: 100%; height: auto; border-radius: 14px; }
+  .mk-blog-text figcaption { margin-top: 8px; font-size: 14px; color: var(--muted-foreground); }
+  .mk-blog-text blockquote { padding: 2px 0 2px 18px; border-left: 3px solid var(--border); color: var(--bone-dim); }
+  .mk-blog-text hr { margin: 36px 0; border: 0; border-top: 1px solid var(--hairline); }
+  .mk-blog-text code { padding: 1px 6px; border-radius: 6px; background: var(--wash); font: 400 .9em/1.4 var(--font-mono); }
+  .mk-blog-text pre { padding: 14px 16px; border-radius: 14px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); overflow-x: auto; }
+  .mk-blog-text pre code { padding: 0; background: none; font-size: 14px; }
+
+  /* a table scrolls on its own on a phone */
+  .mk-blog-table { overflow-x: auto; border-radius: 14px; box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-blog-table table { width: 100%; min-width: 480px; border-collapse: collapse; font-size: 15px; line-height: 1.45; }
+  .mk-blog-table :is(th, td) { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--hairline); }
+  .mk-blog-table th { font-weight: 600; background: var(--wash); }
+  .mk-blog-table tr:last-child td { border-bottom: 0; }
+
+  /* the list */
+  .mk-blog-index-head h1 { font: 400 40px/1 var(--font-display); letter-spacing: -0.025em; }
+  .mk-blog-index-head p { margin-top: 14px; max-width: 60ch; font-size: 17px; line-height: 1.55; color: var(--bone-dim); }
+  .mk-blog-cards { margin: 32px 0 0; padding: 0; list-style: none; display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+  .mk-blog-card { position: relative; display: flex; flex-direction: column; border-radius: 18px; overflow: hidden; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-blog-card-cover { aspect-ratio: 1200 / 630; background: var(--wash); }
+  .mk-blog-card-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .mk-blog-card-body { display: flex; flex-direction: column; gap: 10px; padding: 18px 18px 20px; }
+  .mk-blog-card h2 { font: 400 24px/1.2 var(--font-display); letter-spacing: -0.02em; text-wrap: balance; }
+  /* the whole card is the link: the heading's anchor covers it */
+  .mk-blog-card h2 a { color: var(--foreground); text-decoration: none; }
+  .mk-blog-card h2 a::after { content: ""; position: absolute; inset: 0; }
+  .mk-blog-card p { font-size: 15px; line-height: 1.55; color: var(--bone-dim); }
+  .mk-blog-card .mk-blog-meta { margin-top: 0; }
+  .mk-blog-empty { margin-top: 32px; font-size: 17px; color: var(--muted-foreground); }
+
+  /* bylines: a registered author's name links to their page; on a card it sits above the
+     card-wide title link */
+  .mk-blog-author-link { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--bone-dim) 40%, transparent); }
+  .mk-blog-card .mk-blog-author-link { position: relative; z-index: 1; }
+
+  /* the card on the author under a post */
+  .mk-blog-author-card { margin-top: 48px; max-width: 68ch; display: flex; gap: 16px; align-items: flex-start; padding: 18px; border-radius: 18px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+  .mk-blog-author-card img { flex: none; width: 72px; height: 72px; border-radius: 50%; object-fit: cover; object-position: 50% 8%; }
+  .mk-blog-author-card p { font-size: 15px; line-height: 1.55; color: var(--bone-dim); }
+  .mk-blog-author-card p.mk-blog-author-card-title { font: 600 13px/1.2 var(--font-sans); letter-spacing: .04em; text-transform: uppercase; color: var(--muted-foreground); }
+  .mk-blog-author-card p.mk-blog-author-card-name { margin-top: 6px; font: 600 18px/1.3 var(--font-sans); }
+  .mk-blog-author-card-name a { color: var(--foreground); text-decoration: none; }
+  .mk-blog-author-card-job { margin-bottom: 6px; }
+
+  /* an author's page */
+  .mk-blog-author-head { display: flex; flex-wrap: wrap; align-items: center; gap: 20px 28px; }
+  .mk-blog-author-head img { width: 140px; height: auto; aspect-ratio: 4 / 5; border-radius: 18px; object-fit: cover; }
+  .mk-blog-author-head > div { flex: 1 1 240px; }
+  .mk-blog-author-head .mk-blog-lede { margin-top: 10px; }
+
+  @media (min-width: 768px) {
+    .mk-blog { padding-top: 56px; }
+    .mk-blog-head h1 { font-size: 48px; }
+    .mk-blog-index-head h1 { font-size: 52px; }
+    .mk-blog-author-head img { width: 180px; }
+    .mk-blog-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (min-width: 1024px) {
+    .mk-blog-has-toc { display: grid; grid-template-columns: 240px minmax(0, 1fr); column-gap: 64px; }
+    .mk-blog-has-toc > .mk-blog-crumbs, .mk-blog-has-toc > .mk-blog-head, .mk-blog-has-toc > .mk-blog-cover { grid-column: 1 / -1; }
+    .mk-blog-toc-side { grid-column: 1; grid-row: 4; align-self: start; position: sticky; top: calc(var(--sat) + 88px); margin-top: 40px; padding: 8px 4px; background: none; box-shadow: none; max-height: calc(100dvh - var(--sat) - 104px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+    .mk-blog-toc-side ol { display: grid; gap: 2px; }
+    .mk-blog-toc-side a { min-height: 0; padding: 5px 0; font-size: 14px; }
+    .mk-blog-toc-side li.sub a { padding: 3px 0; font-size: 13px; }
+    .mk-blog-has-toc .mk-blog-text { grid-column: 2; grid-row: 4; }
+    .mk-blog-has-toc .mk-blog-author-card { grid-column: 2; grid-row: 5; }
+    .mk-blog-toc-fold { display: none; }
+  }
+  @media (max-width: 1023.98px) {
+    .mk-blog-toc-side { display: none; }
+  }
+}

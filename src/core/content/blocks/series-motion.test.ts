@@ -86,3 +86,25 @@ describe('series card crossfade', () => {
     expect(state(layers)).toEqual(['mk-on'])
   })
 })
+
+describe('bundle card crossfade', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubGlobal('document', { hidden: false })
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+  const timers = () => [(fn: () => void, ms: number) => setTimeout(fn, ms) as unknown as number, (id: number) => clearTimeout(id)] as const
+
+  it('tells which layer is on show after each change, undefined for the server-drawn pair', async () => {
+    const { el, layers } = frame(2)
+    const shown: unknown[] = []
+    cycler(el, ...timers(), (layer) => shown.push(layer)).start(0, 1000)
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(1000 + FADE_MS)
+    await vi.advanceTimersByTimeAsync(1000 + FADE_MS)
+    expect(shown).toEqual([layers[0], layers[1], undefined])
+  })
+})

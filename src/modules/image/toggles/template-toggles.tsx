@@ -3,6 +3,8 @@
 import dynamic from 'next/dynamic'
 import { useState } from 'react'
 
+import { useOfferedToggles } from '@/core/templates/offered-toggles'
+
 import type { CatalogueToggle } from '../catalogue/catalogue-template'
 import { ToggleRows } from './toggle-rows'
 import type { ToggleValues } from './toggle-state'
@@ -29,7 +31,9 @@ const NONE: readonly CatalogueToggle[] = []
 // A template's on/off options with their confirm dialog (T89): the workspace page, the creation
 // dialog and the home generator all render this one. Nothing at all for a template without any.
 export function TemplateToggles({ template, values, onChange, surface, compact, className }: Props) {
-  const toggles = template?.toggles ?? NONE
+  // Without 优化摆盘 or 优化器皿 while its own site-wide switch is off (food_plating_enabled,
+  // food_tableware_enabled).
+  const toggles = useOfferedToggles(template?.toggles ?? NONE)
   const flow = useToggleConfirm({ templateId: template?.id ?? '', toggles, values, onChange, surface })
   // Mounted from the first ask on, so the closing motion can still play after it.
   const [asked, setAsked] = useState(false)

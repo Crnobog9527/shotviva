@@ -1,4 +1,5 @@
 import { INQUIRIES_COPY } from '../admin/inquiries-ui/copy'
+import { paymentFeeReconcile } from './fee-reconcile-template'
 import { visitorText } from './visitor-text'
 import type {
   BusinessInquiryAlert,
@@ -13,6 +14,7 @@ import type {
   OwnerAlert,
   OwnerAlertKind,
   PaymentFailedAlert,
+  PaymentReceivedAlert,
   RefundAlert,
   RenewalReviewAlert,
   SaleFloorExample,
@@ -74,9 +76,18 @@ export function productName(productId: string | null): string {
   return (productId && PRODUCT_NAMES[productId]) || '一笔付款'
 }
 
+// Stripe's zero-decimal currencies (Adaptive Pricing can charge in one): the minor unit is the
+// whole unit, so 3000 JPY is 3000, not 30.00. Same list as checkout-return/view-model.ts; core
+// cannot import that UI layer.
+const ZERO_DECIMAL = new Set(['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf'])
+
+function amountText(cents: number, currency: string): string {
+  return ZERO_DECIMAL.has(currency.toLowerCase()) ? String(cents) : (cents / 100).toFixed(2)
+}
+
 export function money(amount: Money): string {
-  const value = (amount.cents / 100).toFixed(2)
-  return amount.currency === 'usd' ? `$${value}` : `${value} ${amount.currency.toUpperCase()}`
+  const value = amountText(amount.cents, amount.currency)
+  return amount.currency.toLowerCase() === 'usd' ? `$${value}` : `${value} ${amount.currency.toUpperCase()}`
 }
 
 const userPath = (userId: string | null) => (userId ? `/admin/users/${userId}` : '/admin/orders')
@@ -168,6 +179,18 @@ function paymentFailed(alert: PaymentFailedAlert): Rendered {
   return { line, path: '/admin/orders' }
 }
 
+const METHODS: Record<string, string> = { card: '银行卡', cn_card: '中国银行卡', alipay: '支付宝', wechat_pay: '微信支付' }
+
+// A grant landed. Amount, product and masked buyer only (no payment ids); a renewal says so.
+function paymentReceived(alert: PaymentReceivedAlert, who: string): Rendered {
+  const paid = `${money(alert.amount)}（${METHODS[alert.method] ?? '其他方式'}）`
+  const known = PRODUCT_NAMES[alert.productId]
+  const line = alert.renewal
+    ? `【收到续费】${who} 的 ${known ?? '订阅'} 自动续费 ${paid}。`
+    : `【收到付款】${who} ${known ? `买了 ${known}，` : '付了 '}${paid}。`
+  return { line, path: '/admin/orders' }
+}
+
 function generationSpike(alert: GenerationSpikeAlert): Rendered {
   const rate = Math.round((alert.failed / alert.total) * 100)
   return {
@@ -188,7 +211,7 @@ function ticket(alert: TicketAlert, who: string): Rendered {
 }
 
 function renewalReview(alert: RenewalReviewAlert): Rendered {
-  const charged = alert.charged === null ? '未提供' : `${(alert.charged / 100).toFixed(2)} ${alert.currency?.toUpperCase() ?? '（币种缺失）'}`
+  const charged = alert.charged === null ? '未提供' : `${alert.currency ? amountText(alert.charged, alert.currency) : (alert.charged / 100).toFixed(2)} ${alert.currency?.toUpperCase() ?? '（币种缺失）'}`
   const line = `【Waffo 续费待核对】订单 ${alert.orderId} 第 ${alert.period} 期，税前报价 $${(alert.quoted / 100).toFixed(2)}，含税实收 ${charged}（税额 ${(alert.tax / 100).toFixed(2)}）。付款号 ${alert.paymentId}。${alert.duplicate ? '同一期出现不同付款号，请核对是否重复扣款。' : '请打开账单工单核对。'}`
   return { line, path: `/admin/tickets/${alert.ticketId}` }
 }
@@ -284,6 +307,7 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   dispute_closed: disputeClosed,
   dispute_due_soon: disputeDueSoon,
   payment_failed: paymentFailed,
+  payment_received: paymentReceived,
   waffo_renewal_review: renewalReview,
   generation_spike: generationSpike,
   catalog_publish_failed: a => ({ line: `【商品发布待核对】发布号 ${a.request}，步骤 ${a.step}。请到商品目录查看并重试。`, path: '/admin/products' }),
@@ -301,6 +325,7 @@ const RENDERERS: { [K in OwnerAlertKind]: (alert: Extract<OwnerAlert, { kind: K 
   business_inquiry: businessInquiry,
   sale_floor_hidden: saleFloorHidden,
   signup_gift_cap: signupGiftCap,
+  payment_fee_reconcile: paymentFeeReconcile,
   work_reported: (a) => ({
     line: `【创作库作品被举报】原因：${REPORT_REASON_NAMES[a.reason] ?? a.reason}。作品仍在展示，请到「创作库审核」页决定是否下架。`,
     path: '/admin/gallery?tab=reported',

@@ -18,7 +18,8 @@ let db: Client
 let template: string
 const service = serviceSupabase()
 
-async function job(userId: string, inputKey: string | null = null) {
+// 2K is paid from paid credits only, 1K from free credits only (1996).
+async function job(userId: string, inputKey: string | null = null, resolution: '1k' | '2k' = '2k') {
   const jobId = randomUUID()
   await reserveJob(service, {
     jobId,
@@ -26,7 +27,7 @@ async function job(userId: string, inputKey: string | null = null) {
     module: 'image',
     templateId: template,
     source: 'web',
-    inputs: { resolution: '2k', input_key: inputKey },
+    inputs: { resolution, input_key: inputKey },
   })
   return jobId
 }
@@ -80,14 +81,14 @@ describe('stuck jobs', () => {
 describe('compensate one job', () => {
   it('pays the job cost back to its pool exactly once', async () => {
     const user = await createUser(db, { freeCredits: 6 })
-    const jobId = await job(user)
+    const jobId = await job(user, null, '1k')
     await confirmJob(service, { jobId, outputKey: `outputs/${user}/${jobId}.png` })
-    expect((await profileOf(db, user)).free_credits).toBe(4)
-    expect(await compensateJob(service, jobId)).toEqual({ applied: true, credits: 2, pool: 'free' })
-    expect(await compensateJob(service, jobId)).toEqual({ applied: false, credits: 2, pool: 'free' })
+    expect((await profileOf(db, user)).free_credits).toBe(5)
+    expect(await compensateJob(service, jobId)).toEqual({ applied: true, credits: 1, pool: 'free' })
+    expect(await compensateJob(service, jobId)).toEqual({ applied: false, credits: 1, pool: 'free' })
     expect((await profileOf(db, user)).free_credits).toBe(6)
     const rows = (await ledgerOf(db, user)).filter((row) => row.kind === 'admin_adjust')
-    expect(rows).toEqual([{ kind: 'admin_adjust', pool: 'free', delta: 2, idempotency_key: `comp:${jobId}` }])
+    expect(rows).toEqual([{ kind: 'admin_adjust', pool: 'free', delta: 1, idempotency_key: `comp:${jobId}` }])
   })
 
   it('refuses a job that has not succeeded', async () => {
@@ -114,6 +115,8 @@ describe('view work', () => {
       inputExpired: false,
       deleted: false,
       slotCount: 0,
+      userInput: { isEdit: false, entries: [], options: [] },
+      sourceWork: null,
     })
     expect(await auditOf(user)).toEqual([{ action: 'view_work', target_id: jobId }])
   })
@@ -132,6 +135,68 @@ describe('view work', () => {
     memory.objects.delete(inputKey)
     expect(await viewWork({ db: service, store: memory.store }, jobId)).toMatchObject({ input: null, inputExpired: true })
     expect(await auditOf(user)).toHaveLength(2)
+  })
+
+  it('shows what the user typed: template text boxes, note and options, exactly as entered', async () => {
+    const user = await createUser(db, { freeCredits: 5 })
+    const jobId = randomUUID()
+    const typed = '<b>Fake dish</b>\nline two'
+    // The template's own labels: dish has a Chinese one, price only an English one, plating a Chinese toggle label.
+    await db.query('update public.templates set fields = $2, translations = $3 where id = $1', [
+      template,
+      JSON.stringify({ images: { min: 0, max: 1 }, copy: [{ key: 'dish', label: 'Dish' }, { key: 'price', label: 'Price' }], toggles: [{ key: 'plating', label: 'Plating' }], aspectRatios: ['1:1'] }),
+      JSON.stringify({ zh: { fields: { dish: { label: '菜名' }, plating: { label: '升级摆盘' } } } }),
+    ])
+    await reserveJob(service, {
+      jobId,
+      userId: user,
+      module: 'image',
+      templateId: template,
+      source: 'web',
+      inputs: { resolution: '1k', copy: { dish: typed, price: 12, empty: '  ' }, note: 'fake note', toggles: { extra: false, plating: true }, style_ref_keys: ['private/key'] },
+    })
+    await confirmJob(service, { jobId, outputKey: `outputs/${user}/${jobId}.png` })
+    const links = await viewWork({ db: service, store: createMemoryStore().store }, jobId)
+    expect(links.userInput).toEqual({
+      isEdit: false,
+      entries: [
+        { kind: 'copy', label: '菜名', value: typed },
+        { kind: 'copy', label: 'Price', value: '12' },
+        { kind: 'note', label: null, value: 'fake note' },
+      ],
+      options: [
+        { label: '升级摆盘', on: true },
+        { label: 'extra', on: false },
+      ],
+    })
+    // Nothing else of the job's inputs reaches the dialog's data.
+    expect(JSON.stringify(links)).not.toContain('private/key')
+  })
+
+  it('shows an edit instruction and the work it started from, but only the user\'s own', async () => {
+    const user = await createUser(db, { credits: 10 })
+    const other = await createUser(db, { credits: 5 })
+    const parentId = randomUUID()
+    await reserveJob(service, { jobId: parentId, userId: user, module: 'image', templateId: template, source: 'web', inputs: { resolution: '2k' } })
+    await confirmJob(service, { jobId: parentId, outputKey: `outputs/${user}/${parentId}.png` })
+    const editId = randomUUID()
+    await reserveJob(service, {
+      jobId: editId,
+      userId: user,
+      module: 'image',
+      templateId: 'edit',
+      source: 'web',
+      parentJobId: parentId,
+      inputs: { resolution: '1k', instruction: 'make the sofa blue', edit_scope: 'object', keep: 'secret classifier text' },
+    })
+    await confirmJob(service, { jobId: editId, outputKey: `outputs/${user}/${editId}.png` })
+    const links = await viewWork({ db: service, store: createMemoryStore().store }, editId)
+    expect(links.userInput).toEqual({ isEdit: true, entries: [{ kind: 'instruction', label: null, value: 'make the sofa blue' }], options: [] })
+    expect(links.sourceWork).toBe(`memory://get/outputs/${user}/${parentId}.png?expires=300`)
+    expect(JSON.stringify(links)).not.toContain('secret classifier text')
+    // A parent that is not the editor's own never gets a link.
+    await db.query('update public.generation_jobs set user_id = $2 where id = $1', [parentId, other])
+    expect((await viewWork({ db: service, store: createMemoryStore().store }, editId)).sourceWork).toBeNull()
   })
 
   it('is service-role only and answers NOT_FOUND for a missing job', async () => {

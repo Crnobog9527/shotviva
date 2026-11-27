@@ -23,7 +23,9 @@ export function robotsRules(site: SiteConfig, open: boolean = indexingOpenNow())
   return {
     rules: [
       { userAgent: '*', allow: '/', disallow: [...PRIVATE_PATHS] },
-      ...AI_CRAWLERS.map((userAgent) => ({ userAgent, allow: '/' })),
+      // A named group does not inherit the '*' group's rules (RFC 9309), so each AI crawler repeats
+      // the private paths (SEO audit 2026-11-17, T2).
+      ...AI_CRAWLERS.map((userAgent) => ({ userAgent, allow: '/', disallow: [...PRIVATE_PATHS] })),
       ...BLOCKED_CRAWLERS.map((userAgent) => ({ userAgent, disallow: '/' })),
     ],
     sitemap: `${siteOrigin(site)}/sitemap.xml`,

@@ -1,20 +1,23 @@
 import createMiddleware from 'next-intl/middleware'
-import type { NextRequest, NextResponse } from 'next/server'
+import type { NextFetchEvent, NextRequest, NextResponse } from 'next/server'
 
 import { isAffiliateEnabled, requiresAffiliateProgram } from '@/core/affiliate/feature'
 import { notFoundResponse } from '@/core/auth/proxy-gates'
 import { recordReferral } from '@/core/affiliate/referral'
 import { analyticsCookiesAllowed, withAnalyticsRegion } from '@/core/analytics/consent'
+import { reportCrawlerHit } from '@/core/analytics/pvuv/crawler'
 import { withFirstTouch } from '@/core/attribution/proxy'
 import { proxyGate, type Forward } from '@/core/auth/proxy'
 import { captureCodeLink } from '@/core/codes/link'
 import { isBadGalleryPage } from '@/core/gallery/page-number'
 import { galleryWorkIdOf, liveGalleryGate } from '@/core/gallery/proxy-gate'
 import { serverEnv } from '@/core/env'
+import { shellProxyAnswer } from '@/core/offline/shell-proxy'
+import { publicEnv } from '@/core/public-env'
 import { experimentRoute, isBotRequest, OPTION_PAGES, toOptionPage, withExperimentCookie, type RouteOutcome } from '@/core/experiments/server'
 import { viaImageCdn } from '@/core/storage/image-cdn-guard'
 import { routing } from '@/core/i18n/routing'
-import { canonicalRedirectResponse, withHostNoindex } from '@/core/seo'
+import { canonicalRedirectResponse, isRoutePlaceholderPath, withHostNoindex } from '@/core/seo'
 import { experimentRegistry } from '@/site/experiments/registry'
 import { site } from '@/site/site.config'
 
@@ -34,15 +37,24 @@ const localeRouter = createMiddleware(routing)
 // region cookie (T70).
 // Pages and APIs never answer through the image CDN (core/storage/image-cdn-guard.ts); then the
 // canonical-host redirect.
+// Then Create's app shell and its navigation preload (ARCHITECTURE §18.3), before any session work
+// or cookie (core/offline/shell-proxy.ts).
 function earlyResponse(request: NextRequest) {
-  return viaImageCdn(request.headers) ? notFoundResponse() : canonicalRedirectResponse(request, hosts)
+  if (viaImageCdn(request.headers)) return notFoundResponse()
+  const redirect = canonicalRedirectResponse(request, hosts)
+  if (redirect) return redirect
+  const shell = shellProxyAnswer(request, publicEnv.NEXT_PUBLIC_APP_VERSION)
+  return shell ? withHostNoindex(shell, request, hosts.canonicalHost) : null
 }
 
 // /gallery?page= outside 1–20 (T108): a real 404 here, since the page reads the number inside a
 // Suspense boundary, after its status is sent. The experiments' prerendered option pages
-// (ARCHITECTURE §16.5) are reached only through the rewrite in experimentForward.
+// (ARCHITECTURE §16.5) are reached only through the rewrite in experimentForward. An address with a
+// route placeholder such as /join/org/[token] would render the route's fallback shell and throw
+// (core/seo/route-placeholder.ts).
 function closedAddress(request: NextRequest): boolean {
-  return isBadGalleryPage(request.nextUrl) || OPTION_PAGES.test(request.nextUrl.pathname)
+  const { pathname } = request.nextUrl
+  return isBadGalleryPage(request.nextUrl) || OPTION_PAGES.test(pathname) || isRoutePlaceholderPath(pathname)
 }
 
 // The locale router, handed the A/B option's page instead of the address when there is one.
@@ -66,7 +78,9 @@ function visitorCookies(response: NextResponse, request: NextRequest, experiment
   }
 }
 
-export async function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest, event?: NextFetchEvent) {
+  // AI and search crawlers, reported to PVUV.ai after the response (never delays or changes it).
+  reportCrawlerHit(request, event, serverEnv)
   const early = earlyResponse(request)
   if (early) return early
   if (/^\/admin-media\/(references|prompt-lab)\//.test(request.nextUrl.pathname)) {
@@ -99,10 +113,15 @@ export async function proxy(request: NextRequest) {
   return withHostNoindex(response, request, hosts.canonicalHost)
 }
 
-// /ingest is the PostHog proxy (next.config.ts rewrites): no session work for analytics beacons.
+// /ingest is the PostHog proxy (next.config.ts rewrites, only while PostHog is on): no session work for analytics beacons.
 // fonts/ holds public, content-addressed font files only (MiSans, ARCHITECTURE §17; Instrument Serif).
 // assets/ is the template-cover rewrite to the public bucket (ARCHITECTURE §8.3, T51).
+// presized/ holds the build's fixed-width AVIF / WebP copies of public pictures (core/presized), which
+// the image CDN fetches with its header: like the other static files, never a page.
 // api/version is the open tabs' version check (T90): no session work, no locale routing.
+// api/vitals takes the app pages' anonymous speed numbers: no session work, no cookies set or read.
+// api/catalogue/public/ is Create's public catalogue file: edge-cached, so never a cookie on it.
+// sw.js is the service worker (core/offline): public, no session work, no cookies.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|api/version$|fonts/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|ingest/|assets/|presized/|api/version$|api/vitals$|api/catalogue/public/|sw\\.js$|fonts/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest|mp4|webm)$).*)'],
 }

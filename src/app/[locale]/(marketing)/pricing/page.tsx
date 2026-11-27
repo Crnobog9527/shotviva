@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 
 import { photoPrices } from '@/core/billing'
-import { CheckoutCancelToast, PaywallProvider, PricingPayWith, PricingPlans } from '@/core/billing/paywall'
-import { wechatPayEnabled } from '@/core/billing/stripe'
+import { CheckoutCancelToast, PaywallProvider, PricingPlans } from '@/core/billing/paywall'
+import { walletOffersWechat } from '@/core/billing/wallet'
 import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
 import { CreditBuys, FaqSection, PricingHero } from '@/core/content'
@@ -14,12 +14,16 @@ import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { creditFacts, fillCredits, freeImagesIn, homePageIn, pricingFaqIn, pricingPageIn } from '@/site/content'
 import { isWishlistEnabled } from '@/core/wishlist'
 import { displayProducts } from '@/site/billing/display-products'
+import { signupGiftCreditsForSite } from '@/site/billing/signup-gift'
 import { site } from '@/site/site.config'
 
 import { inquiryPrefillAction, submitInquiryAction } from './actions'
 
 // /pricing as comps-v3-b pricing.html (T37): hero, the plans and packs (core/billing/paywall,
-// prices from the published catalog), "For business", what a credit buys, how to pay, then the FAQ.
+// prices from the published catalog), "For business", what a credit buys, then the FAQ. Both
+// languages match: the hero says prices are in USD, and the payment methods and their renewal
+// terms are shown where the method is picked, in the paywall (Owner 2026-11-25: no separate
+// "Pay with" block on the English page either).
 // Stripe's cancel_url lands here (?checkout=cancel) and shows a toast (T43).
 // Everything renders into the static HTML, in US dollars in both languages (建站规格 §6.1, R5).
 // Indexable: /pricing and /zh/pricing are in their keyword map CSVs and in site.indexing.
@@ -30,19 +34,20 @@ import { inquiryPrefillAction, submitInquiryAction } from './actions'
 // plus a redeploy, which re-renders this page with the matching payment copy.
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await currentLocale()
-  const [catalogue, products] = await Promise.all([cachedWebCatalogue(locale), displayProducts()])
-  const page = fillCredits(pricingPageIn(locale, products), creditFacts(catalogue))
+  const [catalogue, products, gift] = await Promise.all([cachedWebCatalogue(locale), displayProducts(), signupGiftCreditsForSite()])
+  const page = fillCredits(pricingPageIn(locale, products), creditFacts(catalogue, gift))
   return pageMetadata(site, page, locale)
 }
 
 export default async function PricingPage() {
   const locale = await currentLocale()
-  // "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4).
-  const [catalogue, wishlistLive, products] = await Promise.all([cachedWebCatalogue(locale), isWishlistEnabled(site), displayProducts()])
-  const credits = creditFacts(catalogue)
+  // "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4); the
+  // signup gift from its setting (2008).
+  const [catalogue, wishlistLive, products, gift] = await Promise.all([cachedWebCatalogue(locale), isWishlistEnabled(site), displayProducts(), signupGiftCreditsForSite()])
+  const credits = creditFacts(catalogue, gift)
   const page = fillCredits(pricingPageIn(locale, products), credits)
   const channel = paymentChannel()
-  const wechatPay = wechatPayEnabled()
+  const wechatPay = walletOffersWechat()
   const faq = fillCredits(pricingFaqIn(locale, channel, wechatPay, page), credits)
   const path = localizePath(page.path, locale)
   const crumbs = [
@@ -71,9 +76,8 @@ export default async function PricingPage() {
         page={path === '/zh/pricing' ? '/zh/pricing' : '/pricing'}
         actions={{ submit: submitInquiryAction, prefill: inquiryPrefillAction }}
       />
-      <div className="mt-6 grid gap-6 md:mt-8 md:grid-cols-2 md:items-start md:gap-8">
+      <div className="mt-6 md:mt-8">
         <CreditBuys block={page.creditBuys} />
-        <PricingPayWith channel={channel} wechatPay={wechatPay} />
       </div>
       {/* The home page's accordion (gap audit B8); every answer stays in the server HTML. */}
       <div className="mk-pricing-faq">

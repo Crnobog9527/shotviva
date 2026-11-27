@@ -28,7 +28,7 @@ describe('site content', () => {
   // Measured as served: "up to 6 free Standard images" (mixed template prices, the longest) and
   // the no-catalogue "3 free Standard images" (T91).
   it.each(allPages.map((p) => [pagePath(p), p] as const))('%s passes the TDK / G1 rules', (_, page) => {
-    for (const facts of [{ from: 1, same: false }, FALLBACK_CREDITS]) expect(validateContentPage(fillCredits(page, facts))).toEqual([])
+    for (const facts of [{ from: 1, same: false, gift: 100 }, FALLBACK_CREDITS]) expect(validateContentPage(fillCredits(page, facts))).toEqual([])
   })
 
   it('gives every page its own keyword (R1)', () => {

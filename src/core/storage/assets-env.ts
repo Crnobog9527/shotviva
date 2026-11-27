@@ -60,6 +60,9 @@ export function assetsHeaders() {
         { key: 'Cache-Control', value: ASSETS_CACHE_CONTROL },
         { key: 'CDN-Cache-Control', value: ASSETS_CACHE_CONTROL },
         { key: 'x-vercel-enable-rewrite-caching', value: '1' },
+        // Public, anonymous files: readable from any page (no credentials), so the service worker
+        // can keep a readable copy of a cover shown through the image CDN (core/offline).
+        { key: 'Access-Control-Allow-Origin', value: '*' },
       ],
     },
   ]

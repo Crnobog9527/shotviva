@@ -8,9 +8,11 @@ import { z } from 'zod'
 import { AppError } from '../errors'
 
 // Email sign-ups go through our server first (ARCHITECTURE §7, migration 1350): signup_request
-// counts the visitor's real IP (5 an hour, 20 a day) and leaves the row the Before User Created
-// hook looks for. An account the Auth API is asked to create with no row from the last 10
-// minutes is refused, so a script that skips this site gets nothing. Service-role client only.
+// counts the visitor's real IP (admin settings, default 5 an hour and 20 a day; looser when the
+// visitor's sv_ref slug is a valid org partner link, decided in SQL, 2027) and leaves the row the
+// Before User Created hook looks for. An account the Auth API is asked to create with no row from
+// the last 10 minutes is refused, so a script that skips this site gets nothing. Service-role
+// client only.
 
 const statusSchema = z.enum(['ok', 'ip_hourly', 'ip_daily'])
 export type SignupRequestStatus = z.infer<typeof statusSchema>
@@ -20,8 +22,12 @@ export function emailKey(email: string): string {
   return createHash('sha256').update(email.trim().toLowerCase()).digest('hex')
 }
 
-export async function requestSignup(db: Pick<SupabaseClient, 'rpc'>, email: string, ip: string | null): Promise<SignupRequestStatus> {
-  const { data, error } = await db.rpc('signup_request', { p_email_key: emailKey(email), p_ip: ip })
+// `code` is the sign-up code the form submits (2031): an org staff member's invite code gets the
+// org link's looser limits too, decided in SQL.
+export async function requestSignup(
+  db: Pick<SupabaseClient, 'rpc'>, email: string, ip: string | null, refSlug: string | null = null, code: string | null = null,
+): Promise<SignupRequestStatus> {
+  const { data, error } = await db.rpc('signup_request', { p_email_key: emailKey(email), p_ip: ip, p_ref_slug: refSlug, p_code: code })
   if (error) throw new AppError('INTERNAL', 'signup_request failed', { cause: new Error(error.message) })
   return statusSchema.parse(data)
 }

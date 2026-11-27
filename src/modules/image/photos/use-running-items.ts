@@ -3,7 +3,9 @@
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
-import { readJob } from '../generation/job-api'
+import type { JobView } from '@/core/jobs'
+
+import { readJobs } from '../generation/job-api'
 import type { TrackedJob } from '../generation/job-model'
 import { isActive } from '../generation/scheduler'
 import { announce, type Settled } from '../generation/settle-events'
@@ -56,7 +58,9 @@ export function useRunningItems(server: PhotoItem[], covers: Record<string, stri
       // Not while the tab is out of view (AGENTS §5.1.8); the next look picks it up.
       if (document.visibilityState !== 'visible') return
       const ids = untracked.split(',')
-      const views = await Promise.all(ids.map(readJob))
+      const found = await readJobs(ids)
+      if (!found) return
+      const views = ids.map((id) => found.get(id) ?? null)
       if (views.some((view) => view === 'missing' || (view !== null && view.status !== 'running'))) {
         announce(settledNews(server, ids, views))
         router.refresh()
@@ -69,12 +73,13 @@ export function useRunningItems(server: PhotoItem[], covers: Record<string, stri
 
 // Rows started in a tab since closed, settled now: the app-wide notice says so too (a failed
 // job's credits were refunded by the server, as JobView failures always are).
-function settledNews(server: PhotoItem[], ids: string[], views: Awaited<ReturnType<typeof readJob>>[]): Settled {
+function settledNews(server: PhotoItem[], ids: string[], views: (JobView | 'missing' | null)[]): Settled {
   const names = new Map(server.map((item) => [item.id, item.templateName]))
   const news: Settled = { ready: [], failed: [] }
   ids.forEach((id, index) => {
     const view = views[index]
-    if (!view || view === 'missing' || view.status === 'running') return
+    // Refunded for the provider's per-minute limit: not a failure to announce (queue-fairness Q3).
+    if (!view || view === 'missing' || view.status === 'running' || view.error_code === 'PROVIDER_RATE_LIMITED') return
     const item = { id, templateName: names.get(id) ?? '', failure: null }
     if (view.status === 'succeeded') news.ready.push(item)
     else news.failed.push({ ...item, failure: { code: view.error_code ?? 'GENERATION_FAILED', message: '', refunded: true } })

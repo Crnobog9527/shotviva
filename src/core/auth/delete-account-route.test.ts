@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   deleteUser: vi.fn(),
   signOut: vi.fn(),
   cancelSubscriptions: vi.fn(),
+  archiveOrgWorks: vi.fn(),
 }))
 
 vi.mock('./session', () => ({ getSessionUser: mocks.getSessionUser }))
@@ -36,7 +37,7 @@ function fakeStorage() {
 }
 
 const handle = (body: unknown, storage = fakeStorage(), origin?: string | null) =>
-  handleDeleteAccount(origin === undefined ? request(body) : request(body, origin), { storage, cancelSubscriptions: mocks.cancelSubscriptions })
+  handleDeleteAccount(origin === undefined ? request(body) : request(body, origin), { storage, cancelSubscriptions: mocks.cancelSubscriptions, archiveOrgWorks: mocks.archiveOrgWorks })
 
 describe('POST /api/account/delete', () => {
   beforeEach(() => {
@@ -54,6 +55,7 @@ describe('POST /api/account/delete', () => {
     // T108: the deleted user's public works leave the gallery's cached pages at once.
     expect(revalidateTag).toHaveBeenCalledWith('gallery', { expire: 0 })
     expect(mocks.cancelSubscriptions).toHaveBeenCalledWith('u1')
+    expect(mocks.archiveOrgWorks).toHaveBeenCalledWith('u1')
     expect(storage.deletePrefix.mock.calls.map(([prefix]) => prefix)).toEqual(['inputs/u1/', 'outputs/u1/', 'requests/u1/', 'tickets/u1/'])
     expect(mocks.deleteUser).toHaveBeenCalledWith('u1')
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })

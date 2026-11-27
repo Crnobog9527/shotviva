@@ -2,12 +2,15 @@ import type { TemplateCard, TemplateCategory, TemplateMedia, TryTemplate } from 
 import type { LocalizedTemplate } from '@/core/templates'
 import type { PublicSeries } from '@/core/templates/public-series'
 
+import { CATEGORY } from './landing-shared'
+
 // The home page's (and landing pages') template sections, read from the database (T53,
 // ARCHITECTURE §12 home item 3): the featured templates (featured_rank, chosen in admin) grouped
 // under their categories in the order set in 分类管理 (T75), a category with none hidden. Name
 // and description in the page's language (T52), category name and intro from
-// template_categories, covers from the template itself. With nothing featured, the six most
-// recently published.
+// template_categories, covers from the template itself. With nothing featured, the home and
+// landing pages show no featured sections (Owner 2026-11-25); only the 404's picks fall back to
+// the six most recently published.
 //
 // Series (系列, T102; Owner 2026-11-12): a featured template that belongs to a live series shows
 // as that series, once, where its first featured member stands; the series card shows its
@@ -26,8 +29,13 @@ type Series = Pick<PublicSeries, 'id' | 'slug' | 'name' | 'description' | 'showM
 // Create opens a series from the address (?series=<slug>, modules/image catalogue-filter.ts).
 export const seriesHref = (slug: string) => `/generate?series=${encodeURIComponent(slug)}`
 
+// Only what admin featured, in rank order.
+export function rankedTemplates<T extends Live>(live: readonly T[]): T[] {
+  return live.filter((template) => template.featuredRank !== null).sort((a, b) => (a.featuredRank ?? 0) - (b.featuredRank ?? 0))
+}
+
 export function featuredTemplates<T extends Live>(live: readonly T[]): T[] {
-  const ranked = live.filter((template) => template.featuredRank !== null).sort((a, b) => (a.featuredRank ?? 0) - (b.featuredRank ?? 0))
+  const ranked = rankedTemplates(live)
   if (ranked.length > 0) return ranked
   return [...live].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, FALLBACK_COUNT)
 }
@@ -78,7 +86,7 @@ function toCard({ template, series }: Entry, byId: ReadonlyMap<string, Live>): T
     id: `series-${series.id}`,
     name: series.name,
     use: series.description ?? template.description ?? '',
-    series: { href: seriesHref(series.slug), members: pairMembers(series, byId).map((member) => member.id), count: series.memberIds.filter((id) => byId.has(id)).length },
+    series: { href: seriesHref(series.slug), slug: series.slug, members: pairMembers(series, byId).map((member) => member.id), count: series.memberIds.filter((id) => byId.has(id)).length },
   }
 }
 
@@ -92,15 +100,37 @@ const mediaOf = (template: Live): TemplateMedia => ({ before: template.coverBefo
 // `keys`: only these categories (a landing page's); the generator opens on the first featured
 // template among them. `series`: the live series (cachedPublicSeries); without them every
 // template keeps its own card.
+// The home template section shows hotels and spaces, then food (Owner 2026-11-24: no posters,
+// products or art styles there); the order on the page is still the admin's category order.
+export const HOME_CATEGORIES: readonly string[] = [CATEGORY.spaces, CATEGORY.food]
+
 export function featuredSections(live: readonly Live[], keys?: readonly string[], series: readonly Series[] = []) {
   const wanted = keys ? new Set(keys) : null
-  const featured = featuredTemplates(live).filter((template) => !wanted || wanted.has(template.category))
+  const featured = rankedTemplates(live).filter((template) => !wanted || wanted.has(template.category))
   const byId = new Map(live.map((template) => [template.id, template]))
   const entries = featuredEntries(featured, series)
   // Each card's covers, a series' pictured members included.
   const shown = entries.flatMap(({ template, series: one }) => (one ? pairMembers(one, byId) : [template]))
   const media: Record<string, TemplateMedia> = Object.fromEntries(shown.map((template) => [template.id, mediaOf(template)]))
-  return { categories: grouped(entries).map((group) => toCategory(group, byId)), media, defaultId: featured[0]?.id ?? live[0]?.id ?? null }
+  // `featuredId`: the first featured one only (null when 首页精选 has none); `defaultId` falls back
+  // to the catalogue's first, as a landing page's generator still does.
+  return { categories: grouped(entries).map((group) => toCategory(group, byId)), media, featuredId: featured[0]?.id ?? null, defaultId: featured[0]?.id ?? live[0]?.id ?? null }
+}
+
+// The later pairs of every live series card, by the card's key (its TemplateCard id): what a
+// series card plays after the first pair the server drew (/api/home/series, the browser's
+// series-layers-source.ts). The same members, order and limit as the card's own, for any page:
+// the home page and the landing pages draw their series from these same two cached reads.
+// Each later pair carries the template it shows, as a bundle's do, so a click on the card opens
+// the template panel on the member on show.
+export function seriesLayerPairs(live: readonly Live[], series: readonly Series[]): Record<string, [before: string, after: string, templateId: string][]> {
+  const byId = new Map(live.map((template) => [template.id, template]))
+  return Object.fromEntries(
+    series.flatMap((one) => {
+      const later = pairMembers(one, byId).slice(1)
+      return later.length > 0 ? [[`series-${one.id}`, later.map((member) => [member.coverBeforeUrl ?? '', member.coverAfterUrl ?? '', member.id] as [string, string, string])]] : []
+    }),
+  )
 }
 
 // The 404's "three templates to try instead": featured entries with both covers, never a

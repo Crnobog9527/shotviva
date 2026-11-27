@@ -22,12 +22,12 @@ export const site = defineSite({
     logoPath: '/icons/icon-512.png',
     // Filled once the X / Instagram / Product Hunt / LinkedIn handles are claimed (建站规格 §1).
     sameAs: [],
-    // 1200×630: a phone photo and the same bag as a listing shot (illustrative), the wordmark.
+    // 1200×630: a real phone photo and the same bag as a listing shot, the wordmark.
     shareImage: {
       path: '/og/shotviva.jpg',
       width: 1200,
       height: 630,
-      alt: 'Shotviva: a phone photo of a leather bag and the same bag as a white-background listing photo',
+      alt: 'Shotviva: a real phone photo of a leather bag and the same bag as a white-background listing photo',
     },
   },
   // A disabled module 404s, leaves the sitemap, nav and pricing (ARCHITECTURE §2).
@@ -45,15 +45,20 @@ export const site = defineSite({
       '/commercial-photography',
       '/ai-restaurant-menu',
       '/pricing',
+      // The wishlist's public page (Owner 2026-11-25), indexable in both languages.
+      '/template-requests',
       '/partners',
       '/partners/apply',
       '/partners/join',
+      '/partners/enterprise',
       '/partners/terms',
       '/signup',
       '/login',
       '/reset',
       '/reset/update',
       '/generate',
+      // Create's app shell (ARCHITECTURE §18.3), which the service worker keeps; noindex.
+      '/app-shell/generate',
       '/generate/[templateId]',
       '/photos',
       '/photos/[jobId]',
@@ -63,6 +68,12 @@ export const site = defineSite({
       '/account',
       // The Purchases list's receipt / invoice redirect (T80), so /zh links reach it.
       '/account/purchases/[paymentId]/[document]',
+      // The enterprise owner's console (ARCHITECTURE §6.5, card E4), so Chinese owners reach it.
+      '/account/enterprise',
+      '/account/enterprise/purchasing',
+      '/account/enterprise/works',
+      // An org's staff invite link (card E4); its links are built with /zh (ENTERPRISE_LINK_LOCALE).
+      '/join/org/[token]',
       '/wishlist',
       '/wishlist/new',
       '/wishlist/mine',
@@ -70,11 +81,22 @@ export const site = defineSite({
       '/connect/graylum/authorize',
       // The checkout return page (T43, noindex like every app page).
       '/checkout',
+      // The blog (ARCHITECTURE §12.6): each post exists in the languages it was written in; a
+      // /zh address without a Chinese post is a 404. Not in zhIndexablePaths: the blog decides
+      // its own indexing per post (core/blog/seo.ts).
+      '/blog',
+      '/blog/[slug]',
+      // A registered blog author's page (core/blog/authors.ts), indexed by the same rule.
+      '/blog/author/[slug]',
       // The public gallery (T108), noindex in Chinese like the other inner pages.
       '/gallery',
       '/g/[jobId]',
       // A template's share page (Owner 2026-11-13), noindex in both languages.
       '/t/[templateId]',
+      // A template collection share page (ARCHITECTURE §5.1g), noindex in both languages.
+      '/s/t/[shareId]',
+      // A shared work collection (Owner 2026-11-22), noindex in both languages.
+      '/s/w/[shareId]',
     ],
     // Languages whose pages are not live yet but whose template covers can be prepared in the
     // admin ahead of launch (ARCHITECTURE §8.3, T87). Never shown on the site until launched.
@@ -84,7 +106,8 @@ export const site = defineSite({
   billing: {
     currency: 'usd',
     pricingVersion: pricingV2 ? 'v2' : undefined,
-    freeCredits: pricingV2 ? 100 : 6,
+    // The signup gift's default (Owner 2026-11-27: 200); the admin setting signup_gift_credits wins.
+    freeCredits: pricingV2 ? 200 : 6,
     // The nine products, prices final (Owner 2026-11-05, ARCHITECTURE §6.2). Credits and days
     // also live in the products table for apply_purchase; tests/db/stripe-catalog.test.ts keeps
     // them equal. Stripe Prices are looked up by lookup_key, never stored here.
@@ -102,15 +125,21 @@ export const site = defineSite({
     ],
     channels: { primary: 'stripe', fallback: 'waffo' },
   },
+  // The China region manager enterprise customers agree the exchange rate and the transfer with
+  // (Owner 2026-11-22, verbatim). Shown on /account/enterprise/purchasing only.
+  enterprise: {
+    transferContact: { name: 'Simon Lee', email: 'simonlee@shotviva.com', wechat: 'crnobogkin' },
+  },
   partners: {
     graylum: {
       // Graylum production (apex and www) and staging (the domain bound to Graylum's staging
       // Vercel project). The first entry is the "back to Graylum" link on the connect page.
-      returnToHosts: ['graylum.com', 'www.graylum.com', 'auth-staging.graylum.com'],
+      returnToHosts: ['graylum.com', 'www.graylum.com', 'app.graylum.com', 'auth-staging.graylum.com'],
       connectCallbackPath: '/api/connectors/shotviva/callback',
       // Hosts Graylum serves reference images from, matched exactly: www.graylum.com (production)
       // and auth-staging.graylum.com (staging), confirmed 2026-11-13; the first two are kept.
-      imageHosts: ['graylum.com', 'staging.graylum.com', 'www.graylum.com', 'auth-staging.graylum.com'],
+      // app.graylum.com (folded into www) is kept as a fallback while Graylum switches domains (2026-11-22).
+      imageHosts: ['graylum.com', 'staging.graylum.com', 'www.graylum.com', 'app.graylum.com', 'auth-staging.graylum.com'],
     },
   },
   // Shotviva has a public gallery; it stays closed until the Owner opens it in the admin (§9).
@@ -132,6 +161,9 @@ export const site = defineSite({
       // SEO launch handbook 04-P1 (Owner 2026-11-13), English only.
       '/transparent-background',
       '/pricing',
+      // The wishlist's public page (Owner 2026-11-25 SEO plan: "custom ai photo template"). Left
+      // out of both sitemaps and noindex while the wishlist is switched off (template-requests-gate).
+      '/template-requests',
       '/terms',
       '/privacy',
       '/refund-policy',
@@ -142,24 +174,26 @@ export const site = defineSite({
     // seo资料/Shotviva 页面与主词映射（中文口径）.csv: the indexable /zh pages. The two vertical
     // pages joined on 2026-11-12 (SEO patch v5 item 1, Owner): each English vertical and its /zh
     // twin carry hreflang to each other.
-    zhIndexablePaths: ['/', '/image-to-image-generator', '/commercial-photography', '/ai-restaurant-menu', '/pricing'],
+    zhIndexablePaths: ['/', '/image-to-image-generator', '/commercial-photography', '/ai-restaurant-menu', '/pricing', '/template-requests'],
   },
   // The home page's two bills (DESIGN §6.9 item 6), Owner 2026-11-06: styled product photos
   // $50–$350 per image (Shopify, "Product photography pricing", Jan 2026); white-background
   // packshots $15–$90 (ProShot Media, ProductPhotography.com, soona, Lars Miller Media price
-  // pages, read 2026-11-06). Develop time is one round figure, "about 60 seconds", for every
-  // quality (Owner 2026-11-06; preview measured 19–48 s across qualities). T44, sources read
+  // pages, read 2026-11-06). Develop time is one round figure, "about 30 seconds", for every
+  // quality (Owner 2026-11-21, was 60 from 2026-11-06; real runs are about 30 s). T44, sources read
   // 2026-11-06 (side-session-notes landing-fact-sources): a studio day $500–$3,000 (Shopify,
-  // Jan 2026); a US half-day food shoot $400–$2,500 (PricingLink Apr 2025, Jobbers, FoodShot
-  // Mar 2026), food stylist extra.
+  // Jan 2026). A US food photography session $300–$2,500 (Owner 2026-11-22, same figure as the
+  // blog): FoodShot's guide, Mar 2026, $300–$2,500 a session with styling, props and licensing
+  // often 40–60% extra; PricingLink, Apr 2025, a half day $800–$2,500+. Jobbers was dropped: its
+  // figure could not be verified.
   marketing: {
     photographer: {
       styledShotUsd: { low: 50, high: 350 },
       packshotUsd: { low: 15, high: 90 },
       dayRateUsd: { low: 500, high: 3000 },
-      foodHalfDayUsd: { low: 400, high: 2500 },
+      foodShootUsd: { low: 300, high: 2500 },
     },
-    photoSecondsApprox: 60,
+    photoSecondsApprox: 30,
     examplePhotoCredits: { product: 74, menu: 74, poster: 45 },
   },
 })

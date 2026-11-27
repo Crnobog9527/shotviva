@@ -3,10 +3,10 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Resolution } from '@/core/templates/output-options'
-import { floorGuidance, providerFloor, type ProviderFloors } from '@/core/templates/provider-pricing'
+import { floorGuidance, MISSING_COST, providerFloor, type ProviderFloors } from '@/core/templates/provider-pricing'
 import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
-import { creditsBelowFloor, EDIT_TEMPLATE_ID, type TemplateRow } from '@/core/templates'
+import { creditsBelowFloor, EDIT_TEMPLATE_ID, type FloorViolation, type TemplateRow } from '@/core/templates'
 
 import { editLineProblem } from './line-problem'
 import { saveEditTemplateSchema, type EditTemplateSettings } from './schema'
@@ -63,6 +63,12 @@ function saveError(error: { message: string; details: string }): AppError {
 // Sent only when the page chose one, so an older page's save keeps the stored binding.
 const bindingField = (providerId: string | null | undefined) => providerId === undefined ? {} : { provider_id: providerId }
 
+const TIER_LABEL = { '1k': '1K', '2k': '2K', '4k': '4K' } as const
+
+function belowFloorText(v: FloorViolation): string {
+  return v.floor === MISSING_COST ? floorGuidance(v.floor) : `${TIER_LABEL[v.resolution]} 不能低于 ${v.floor} 积分（填了 ${v.given}）`
+}
+
 export async function saveEditTemplate(db: SupabaseClient, adminId: string, input: unknown, floor: ProviderFloors): Promise<void> {
   const parsed = saveEditTemplateSchema.safeParse(input)
   if (!parsed.success) {
@@ -76,7 +82,8 @@ export async function saveEditTemplate(db: SupabaseClient, adminId: string, inpu
   const problem = editLineProblem(floor, bound)
   if (problem) throw new AppError('INVALID_INPUT', problem)
   const low = creditsBelowFloor(stored.quality, creditsCost, providerFloor(floor, bound, EDIT_TEMPLATE_ID), unpricedResolutions)
-  if (low.length > 0) throw new AppError('INVALID_INPUT', `积分低于下限：${low.map((v) => `${v.resolution} ${floorGuidance(v.floor)}`).join('；')}`)
+  // The minimum is max(catalogue tariff, route floor), so it is not always the cost floor: say the number.
+  if (low.length > 0) throw new AppError('INVALID_INPUT', `积分低于下限：${low.map(belowFloorText).join('；')}`)
   const { error } = await db.rpc('admin_upsert_template', {
     p_template: { ...FIXED, unpriced_resolutions: unpricedResolutions, ...(floor.providers && { price_floors: floor }), quality: stored.quality, credits_cost: creditsCost, is_active: isActive },
     p_prompt: { body: wrapper, model_params: params, ...bindingField(providerId) },

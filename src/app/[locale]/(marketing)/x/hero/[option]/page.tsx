@@ -10,6 +10,7 @@ import { HomeContent, homeMetadata } from '../../../home-page'
 // browser keeps the home address. A direct request for /x/… is a 404 in the proxy; the metadata is
 // the home page's own, canonical `/` included.
 import '../../../explainer.css'
+import '../../../hotel-cases.css'
 
 const OPTIONS: readonly string[] = HERO_OPTIONS.map((option) => option.id).filter((id) => id !== HERO_DEFAULT_OPTION)
 

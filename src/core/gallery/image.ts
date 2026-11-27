@@ -3,7 +3,7 @@ import 'server-only'
 import { galleryImage, shouldWatermark, type ObjectStore } from '../storage'
 import { logger } from '../logger'
 import { shownImage } from './reads'
-import { GALLERY_WIDTHS, galleryVariantKey, storeGalleryVariants, type GalleryWidth } from './variants'
+import { GALLERY_WIDTHS, galleryVariantKey, galleryVariantVersion, storeGalleryVariants, type GalleryWidth, type VariantSource } from './variants'
 
 export { GALLERY_WIDTHS, type GalleryWidth } from './variants'
 
@@ -34,27 +34,43 @@ export type ImageDeps = {
   defer: (task: () => Promise<unknown>) => void
 }
 
-// The image route's body, once the route knows the gallery is open: null for any work the gallery
-// does not show (the route answers 404). Normally the copy made at approval (variants.ts), read as
-// is. Without one, today's render from the original, and both copies are written after the
-// response for the next miss, unless the work stopped being shown meanwhile (rejected, deleted),
-// so a copy does not outlive its approval. The original never leaves the private bucket as is.
-export async function renderGalleryImage(deps: ImageDeps, id: string, width: GalleryWidth): Promise<Uint8Array | null> {
-  const shown = await shownImage(id)
-  if (!shown) return null
-  const stored = await readVariant(deps.store, galleryVariantKey(shown.outputKey, width), id)
+// A work whose picture a public page may show. The caller has already decided that it may.
+export type ServedWork = VariantSource
+
+// THE way a public page gets a work's picture (the gallery, the share pages): `width` wide,
+// WebP; a free work's copy is protected (storage/protect: long edge ≤ 1080, the visible marks,
+// the tracking mark), a paid work's is a clean resize. Normally the copy stored for that pool's
+// version (variants.ts), read as is. Without one, today's render from the original, and both
+// sizes are written after the response for the next miss, once `stillShown` (if given) confirms
+// the work is still shown, so a copy does not outlive its approval. The original never leaves the
+// private bucket as is. null when the original is already gone (a work being deleted).
+export async function servedWorkImage(
+  deps: ImageDeps,
+  work: ServedWork,
+  width: GalleryWidth,
+  stillShown: () => Promise<boolean> = async () => true,
+): Promise<Uint8Array | null> {
+  const stored = await readVariant(deps.store, galleryVariantKey(work.outputKey, width, galleryVariantVersion(work.creditPool)), work.id)
   if (stored) return stored
-  const original = await deps.store.get(shown.outputKey).catch((error: unknown) => {
+  const original = await deps.store.get(work.outputKey).catch((error: unknown) => {
     // A file already gone (the work is being deleted) is a 404, not a server error.
     if (isMissing(error)) return null
     throw error
   })
   if (!original) return null
-  const body = await galleryImage(original, width, shouldWatermark(shown.creditPool))
+  const body = await galleryImage(original, width, shouldWatermark(work.creditPool) ? { jobId: work.id } : null)
   deps.defer(async () => {
-    if (await shownImage(id)) await storeGalleryVariants(deps.store, { id, ...shown }, original, { [width]: body })
+    if (await stillShown()) await storeGalleryVariants(deps.store, work, original, { [width]: body })
   })
   return body
+}
+
+// The image route's body, once the route knows the gallery is open: null for any work the gallery
+// does not show (the route answers 404).
+export async function renderGalleryImage(deps: ImageDeps, id: string, width: GalleryWidth): Promise<Uint8Array | null> {
+  const shown = await shownImage(id)
+  if (!shown) return null
+  return servedWorkImage(deps, { id, ...shown }, width, async () => (await shownImage(id)) !== null)
 }
 
 // Where a page points an <img>; ?w= picks the size.

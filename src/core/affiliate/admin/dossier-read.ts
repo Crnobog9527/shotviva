@@ -8,14 +8,19 @@ const cents = z.number().int().safe()
 const id = z.union([z.number().int().safe().positive(), z.string().regex(/^[1-9]\d*$/)]).transform(String)
 const directory = z.object({
   user_id: z.uuid(), slug: z.string(), status: z.string(), created_at: z.string(),
-  name: z.string().nullable(), email: z.string().nullable(), phone: z.string().nullable(), source: z.string().nullable(),
+  name: z.string().nullable(), admin_label: z.string().nullable(), email: z.string().nullable(), phone: z.string().nullable(), source: z.string().nullable(),
   team_enabled: z.boolean(), team_count: cents.nonnegative().nullable(),
   total: cents, confirmed: cents, unwithdrawn: cents, paid: cents,
+  // Not returned by the directory functions: filled from affiliates.org_id (enterprise account).
+  is_org: z.boolean().default(false),
 })
 const detail = memberDetail.extend({
   ...directory.shape,
   registered_at: z.string().nullable(), approved_at: z.string().nullable(), approved_by: z.uuid().nullable(),
   admin_note: z.string().nullable(), rates: z.array(rateRow),
+  // Not returned by admin_affiliate_dossier: the org level-2 default of each product kind, for
+  // enterprise accounts only (affiliate_rates.org_l2_bp, migration 1900).
+  org_l2_defaults: z.record(z.string(), z.number()).nullable().default(null),
 })
 const audit = z.object({
   id, created_at: z.string(), action: z.string(), user_id: z.uuid(), target_id: z.string(), reason: z.string(),
@@ -42,16 +47,34 @@ function before(cursor: string | undefined, uuid: boolean) {
 
 type DirectoryFilters = { query?: string; cursor?: string; parent?: string; review?: 'pending' | 'rejected' }
 
+// The 「企业」tag: one extra read of affiliates.org_id for the ids on this page.
+async function orgAccountIds(db: SupabaseClient, ids: readonly string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set()
+  const rows = checked(await db.from('affiliates').select('user_id').in('user_id', [...ids]).not('org_id', 'is', null))
+  return new Set(z.array(z.object({ user_id: z.uuid() })).parse(rows).map((r) => r.user_id))
+}
+
 export async function dossiers(db: SupabaseClient, actor: string, f: DirectoryFilters) {
-  const rows = checked(await db.rpc('admin_affiliate_directory', {
+  const rows = checked(await db.rpc('admin_affiliate_directory_v2', {
     p_actor: actor, p_query: f.query || null, p_parent: f.parent ?? null, p_review: f.review ?? null, ...before(f.cursor, true),
   }))
-  return toPage(directory.array().parse(rows).map(identify), (r) => r)
+  const parsed = directory.array().parse(rows)
+  const orgs = await orgAccountIds(db, parsed.map((r) => r.user_id))
+  return toPage(parsed.map((r) => identify({ ...r, is_org: orgs.has(r.user_id) })), (r) => r)
 }
 export async function dossier(db: SupabaseClient, actor: string, userId: string): Promise<DossierDetail | null> {
   const result = checked(await db.rpc('admin_affiliate_dossier', { p_actor: actor, p_user: userId }))
   const data = detail.nullable().parse(result)
-  return data ? identify(data) : null
+  if (!data) return null
+  const isOrg = (await orgAccountIds(db, [data.user_id])).has(data.user_id)
+  // An enterprise account's blank level-2 rate means that kind's org default (migration 1900).
+  const orgL2 = isOrg ? await orgL2Defaults(db) : null
+  return identify({ ...data, is_org: isOrg, org_l2_defaults: orgL2 })
+}
+async function orgL2Defaults(db: SupabaseClient) {
+  const rows = z.array(z.object({ product_kind: z.string(), org_l2_bp: z.number() }))
+    .parse(checked(await db.from('affiliate_rates').select('product_kind,org_l2_bp')))
+  return Object.fromEntries(rows.map((r) => [r.product_kind, r.org_l2_bp]))
 }
 export async function dossierAudit(db: SupabaseClient, actor: string, userId: string, cursor?: string) {
   const rows = checked(await db.rpc('admin_affiliate_dossier_log', { p_actor: actor, p_user: userId, ...before(cursor, false) }))

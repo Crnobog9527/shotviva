@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 
 import type { WorkLinks } from '../support/view-work'
 import { SUPPORT_COPY } from './copy'
+import { UserInputSection } from './user-input-section'
 
 const COPY = SUPPORT_COPY.view
 
@@ -16,7 +17,7 @@ function Figure({ label, url, missing }: { label: string; url: string | null; mi
         <a href={url} target="_blank" rel="noreferrer">
           {/* A 5-minute signed R2 URL: next/image would cache it past its life. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt={label} className="max-h-[60vh] w-full rounded-md border border-border object-contain" />
+          <img src={url} alt={label} className="max-h-[42vh] w-full rounded-md border border-border object-contain" />
         </a>
       ) : (
         <p className="text-sm text-muted-foreground">{missing}</p>
@@ -27,10 +28,11 @@ function Figure({ label, url, missing }: { label: string; url: string | null; mi
 
 // Both images side by side: the input as uploaded and the clean output, as signed links only.
 export function WorkDialog({ links, onClose }: { links: WorkLinks; onClose: () => void }) {
+  const isEdit = links.userInput.isEdit
   const inputMissing = links.inputExpired ? COPY.inputExpired : COPY.noInput
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-4xl">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>{COPY.title}</DialogTitle>
           <DialogDescription>{COPY.body}</DialogDescription>
@@ -41,9 +43,14 @@ export function WorkDialog({ links, onClose }: { links: WorkLinks; onClose: () =
           <>
             {links.slotCount > 1 ? <p className="text-sm text-muted-foreground">{COPY.slots(links.slotCount)}</p> : null}
             <div className="grid gap-4 md:grid-cols-2">
-              <Figure label={COPY.input} url={links.input} missing={inputMissing} />
+              {isEdit ? (
+                <Figure label={COPY.sourceWork} url={links.sourceWork} missing={COPY.sourceGone} />
+              ) : (
+                <Figure label={COPY.input} url={links.input} missing={inputMissing} />
+              )}
               <Figure label={COPY.output} url={links.output} missing={COPY.noOutput} />
             </div>
+            <UserInputSection input={links.userInput} />
           </>
         )}
         <DialogFooter>

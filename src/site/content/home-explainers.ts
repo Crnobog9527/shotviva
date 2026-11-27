@@ -1,22 +1,31 @@
 import type { HomePage, ImageRef } from '@/core/content'
 
-import { caseImage, homeImage } from './landing-shared'
+import { caseImage, dishImage, homeImage } from './landing-shared'
 import { OUTPUT_TIERS, tierList, uploadLimits } from './offer'
 
 // The home page's how-to blocks, each point led by a picture (Owner 2026-11-12): the steps and
 // the use cases. The words name the point in a line; the picture shows it.
 
-// The illustrative tote set (design/assets/img/hero-set-*.webp, ARCHITECTURE §13 item 2): one
-// phone snapshot and three results from it, shared with the hero and the shoot demo.
+// The tote set (design/assets/img/hero-set-*.webp, ARCHITECTURE §13 item 2): one real phone
+// photo and three results from it (Owner 2026-11-21: every example's before is a real phone photo), shared with the hero and the shoot demo.
 export const tote = {
-  phone: homeImage('hero-set-phone', 'Phone snapshot of a woven leather tote on a busy kitchen counter, window light (real example)'),
+  phone: homeImage('hero-set-phone', 'Real phone photo: a woven leather tote on a busy kitchen counter, window light'),
   listing: homeImage('hero-set-listing', 'The same woven leather tote as a white-background listing photo, soft studio light (real example)'),
   lifestyle: homeImage('hero-set-lifestyle', 'The same tote on a café chair by a window, warm morning light (real example)'),
   promo: homeImage('hero-set-promo', 'The same tote on a promo poster headed New Season Tote, bright studio light (real example)'),
 } as const satisfies Record<string, ImageRef>
 
+// The steps' pictures (Owner 2026-11-24): a dish shot on the kitchen counter and three food
+// templates, the first of them the one picked.
+const dish = {
+  phone: dishImage('food-1-photo', 'Real phone photo: spaghetti carbonara on a white plate on a steel kitchen counter'),
+  slate: dishImage('food-1-ai', 'Real example: the same carbonara on a slate table in dappled sunlight'),
+  dark: dishImage('food-2-ai', 'Real example: spaghetti bolognese on a dark table', true),
+  board: dishImage('food-3-ai', 'Real example: a steak plate on a rustic wooden board', true),
+}
+
 const [standard, hd, max] = OUTPUT_TIERS
-const phoneTag = 'Phone photo'
+const phoneTag = 'Real phone photo'
 
 export const steps = {
   heading: 'How Image to Image AI Works in 3 Steps',
@@ -24,7 +33,7 @@ export const steps = {
     {
       heading: 'Upload One Photo',
       text: `A phone photo is enough: ${uploadLimits}. Keep the whole subject in the frame.`,
-      visual: { kind: 'upload', image: tote.phone, file: 'IMG_2047.jpg' },
+      visual: { kind: 'upload', image: dish.phone, file: 'IMG_3108.jpg' },
     },
     {
       heading: 'Pick a Template',
@@ -32,12 +41,12 @@ export const steps = {
       visual: {
         kind: 'picker',
         tiles: [
-          { image: tote.listing, name: 'White Background' },
-          { image: tote.lifestyle, name: 'Lifestyle Table' },
-          { image: tote.promo, name: 'Promo Poster' },
+          { image: dish.slate, name: 'Dappled Slate' },
+          { image: dish.dark, name: 'Dark Flat Lay' },
+          { image: dish.board, name: 'Rustic Board' },
         ],
-        picked: 1,
-        caption: 'The Lifestyle Table template picked from the template list',
+        picked: 0,
+        caption: 'The Dappled Slate template picked from the template list',
       },
     },
     {
@@ -45,7 +54,7 @@ export const steps = {
       text: `${standard.name} for ${standard.use}, ${hd.name} for ${hd.use}, ${max.name} for ${max.use}.`,
       visual: {
         kind: 'sizes',
-        image: { ...tote.lifestyle, alt: `The tote lifestyle photo at its three export sizes: ${standard.px}, ${hd.px} and ${max.px} px` },
+        image: { ...dish.slate, alt: `The carbonara photo at its three export sizes: ${standard.px}, ${hd.px} and ${max.px} px` },
         tiers: [standard, hd, max],
       },
     },
@@ -66,8 +75,8 @@ export const useCases = {
       after: '.',
       visual: {
         kind: 'pair',
-        before: caseImage('menu-fish-phone', 'Real phone photo: pickled mustard fish in a white enamel bowl on a steel kitchen pass, harsh green-tinted overhead light'),
-        after: caseImage('menu-fish-dark', 'Real example: the same pickled mustard fish re-plated in a white porcelain bowl on dark rough timber, warm side light and rising steam'),
+        before: caseImage('menu-steak-phone', 'Real phone photo: sliced sirloin steak with fries and asparagus on a white plate on a steel kitchen pass, plate stacks and squeeze bottles behind'),
+        after: caseImage('menu-steak-board', 'Real example: the same sliced sirloin, fries and asparagus on the same white plate on a dark wooden board, warm side light, herbs and a fork beside it'),
         tags: { before: phoneTag, after: 'Menu photo' },
       },
     },
@@ -78,8 +87,8 @@ export const useCases = {
       after: '.',
       visual: {
         kind: 'pair',
-        before: caseImage('sneaker-phone', 'Real phone photo: an off-white leather sneaker with a sage-green heel tab on a hallway floor, hard morning sun, keys and an open shoe box in frame'),
-        after: caseImage('sneaker-listing', 'Real example: the same sneaker on a pure white background, soft studio light, a marketplace main image'),
+        before: caseImage('bag-phone', 'Real phone photo: a woven tan leather tote with a gold chain on a marble kitchen counter, keys, a mug and a parcel beside it'),
+        after: caseImage('bag-listing', 'Real example: the same tote face-on on a pure white background, soft studio light, a marketplace main image'),
         tags: { before: phoneTag, after: 'Listing' },
       },
     },

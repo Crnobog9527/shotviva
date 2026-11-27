@@ -10,6 +10,7 @@ describe('site.partners.graylum.returnToHosts', () => {
   it.each([
     'https://graylum.com/api/connectors/shotviva/callback',
     'https://www.graylum.com/api/connectors/shotviva/callback',
+    'https://app.graylum.com/api/connectors/shotviva/callback',
     'https://auth-staging.graylum.com/api/connectors/shotviva/callback',
   ])('accepts %s', (url) => {
     expect(allowlistedUrl(url, hosts)).not.toBeNull()
@@ -30,6 +31,7 @@ describe('site.partners.graylum.imageHosts', () => {
 
   it.each([
     'https://www.graylum.com/uploads/a.jpg',
+    'https://app.graylum.com/uploads/a.jpg',
     'https://auth-staging.graylum.com/uploads/a.jpg',
     'https://graylum.com/uploads/a.jpg',
     'https://staging.graylum.com/uploads/a.jpg',

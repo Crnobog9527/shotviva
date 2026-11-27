@@ -9,8 +9,19 @@ export type WishlistSwitch = {
 export type WishlistSwitchInput = { enabled: boolean }
 
 // The boolean runtime switches the admin shows as on/off cards.
-export type SwitchKey = 'wishlist_enabled' | 'gallery_enabled' | 'gallery_auto_approve' | 'signup_gift_paused'
+export type SwitchKey = 'wishlist_enabled' | 'gallery_enabled' | 'gallery_auto_approve' | 'signup_gift_paused' | 'food_plating_enabled' | 'food_tableware_enabled' | 'service_worker_enabled' | 'service_worker_shell_enabled'
 
-// 1350 + 1480: the signup gift card on /admin/features. Today is the Beijing day the cap counts.
-export type SignupGiftRules = { cap: number; perIp: number; claimPhone: boolean; claimGoogle: boolean }
+// 1350 + 1480 + 2008: the signup gift card on /admin/features. Today is the Beijing day the cap
+// counts; credits is what one new account gets.
+export type SignupGiftRules = { credits: number; cap: number; perIp: number; perIpPartner: number; claimPhone: boolean; claimGoogle: boolean }
 export type SignupGiftState = { granted: number; rules: SignupGiftRules; paused: WishlistSwitch }
+
+// 2027: the per-IP limits on sign-up requests and SMS codes, site-wide and through an org ?ref link.
+export type SignupLimits = {
+  signupHourly: number
+  signupDaily: number
+  signupHourlyPartner: number
+  signupDailyPartner: number
+  smsDaily: number
+  smsDailyPartner: number
+}

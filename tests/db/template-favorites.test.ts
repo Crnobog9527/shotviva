@@ -1,12 +1,17 @@
+import { randomUUID } from 'node:crypto'
+
 import { publishFixture } from './helpers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { readCreatePersonalData } from '@/app/[locale]/(app)/generate/personal-data'
+import { readBalance } from '@/core/billing/balance'
 import { FAVORITES_MAX, listFavoriteIds, setFavorite } from '@/core/favorites'
+import { listRunningJobIds } from '@/core/jobs/own-jobs'
 
 import { connectAdmin, createPricedTemplate, createUser } from './helpers'
-import { anonSupabase } from './supabase-env'
+import { anonSupabase, serviceSupabase } from './supabase-env'
 import { signedIn, wishlistUser, type WishlistUser } from './wishlist-fixtures'
 
 // T83 (ARCHITECTURE §5.1b) on the real database, through real sessions: each account reads and
@@ -98,6 +103,43 @@ describe('hidden while not live, back when republished', () => {
     await db.query("update public.templates set visible_in = array['web', 'partner'] where id = $1", [partnerOnly])
     expect(await listFavoriteIds(aliceClient, alice.id)).toEqual([partnerOnly, unpublished, kept])
   })
+})
+
+it('reads Create balances and visible favorites for the current account only', async () => {
+  await clear(alice.id)
+  const [visible, hidden] = [await createPricedTemplate(db), await createPricedTemplate(db)]
+  await setFavorite(aliceClient, alice.id, visible, true)
+  await setFavorite(aliceClient, alice.id, hidden, true)
+  await db.query("update public.templates set visible_in = array['partner'] where id = $1", [hidden])
+  await expect(readCreatePersonalData(aliceClient, alice.id)).resolves.toEqual({
+    balance: await readBalance(aliceClient, alice.id),
+    favoriteIds: [visible],
+  })
+  await expect(readCreatePersonalData(bobClient, alice.id)).resolves.toEqual({
+    balance: { paid: 0, free: 0 },
+    favoriteIds: [],
+  })
+})
+
+it('keeps private style-reference jobs in the signed-in owner’s Create concurrency count', async () => {
+  const visible = await createPricedTemplate(db)
+  const now = new Date()
+  const live = randomUUID()
+  const inputs = { style_ref_keys: [`style-refs/${visible}/qa.webp`] }
+  for (const [id, owner, createdAt, deletedAt] of [
+    [live, alice.id, now, null],
+    [randomUUID(), bob.id, now, null],
+    [randomUUID(), alice.id, new Date(now.getTime() - 7 * 60 * 1000), null],
+    [randomUUID(), alice.id, now, now],
+  ]) {
+    await db.query(
+      `insert into public.generation_jobs (id, user_id, module, template_id, source, credit_pool, visibility, credits_cost, created_at, deleted_at, inputs)
+       values ($1, $2, 'image', $3, 'web', 'paid', 'private', 1, $4, $5, $6)`,
+      [id, owner, visible, createdAt, deletedAt, inputs],
+    )
+  }
+  await expect(listRunningJobIds(aliceClient, alice.id, now)).resolves.toEqual([])
+  await expect(listRunningJobIds(serviceSupabase(), alice.id, now)).resolves.toEqual([live])
 })
 
 describe('the cap', () => {

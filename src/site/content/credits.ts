@@ -1,16 +1,19 @@
 import { tierCreditPrices, type PricedTemplate } from '@/core/billing/photo-estimate'
 
-import { FromCredits, fromCredits, type CreditFacts } from './offer'
+import { site } from '../site.config'
+import { FromCredits, fromCredits, giftCredits, type CreditFacts } from './offer'
 import { zhFromCredits } from './zh/offer'
 
-// With no published price the copy refers to the template instead of quoting a number.
-export const FALLBACK_CREDITS: CreditFacts = { from: 0, same: false }
+// With no published price the copy refers to the template instead of quoting a number. The gift is
+// the setting's default; pages pass the live one (signupGiftCreditsForSite).
+export const FALLBACK_CREDITS: CreditFacts = { from: 0, same: false, gift: site.billing.freeCredits }
 
-export function creditFacts(live: readonly PricedTemplate[]): CreditFacts {
+// `gift` is the signup gift's amount as the page read it (system_settings signup_gift_credits).
+export function creditFacts(live: readonly PricedTemplate[], gift: number): CreditFacts {
   const prices = tierCreditPrices(live, '1k')
-  if (prices.length === 0) return FALLBACK_CREDITS
+  if (prices.length === 0) return { ...FALLBACK_CREDITS, gift }
   const from = Math.min(...prices)
-  return { from, same: prices.every((n) => n === from) }
+  return { from, same: prices.every((n) => n === from), gift }
 }
 
 const credits = (n: number) => `${n} ${n === 1 ? 'credit' : 'credits'}`
@@ -18,6 +21,7 @@ const MARKERS: readonly (readonly [string, (facts: CreditFacts) => string])[] = 
   [fromCredits, ({ from }) => from ? `from ${credits(from)}` : 'credits as shown on the template'],
   [FromCredits, ({ from }) => from ? `From ${credits(from)}` : 'Credits as shown on the template'],
   [zhFromCredits, ({ from }) => from ? `${from} 积分起` : '按模板所示积分计价'],
+  [giftCredits, ({ gift }) => String(gift)],
 ]
 
 export const hasCreditMarkers = (text: string) => MARKERS.some(([marker]) => text.includes(marker))

@@ -3,11 +3,16 @@ import { useActionState, type ReactNode } from 'react'
 import { Button } from '@/core/ui/button'
 import { COPY } from './copy'
 export type SaveAction = (prev: string, form: FormData) => Promise<string>
-type Props = { action: SaveAction; operation: string; children: ReactNode; label: string; destructive?: boolean }
-export function MutationForm({ action, operation, children, label, destructive }: Props) {
+type Props = { action: SaveAction; operation: string; children: ReactNode; label: string; destructive?: boolean; confirm?: string }
+export function MutationForm({ action, operation, children, label, destructive, confirm }: Props) {
   const [message, submit, busy] = useActionState(action, '')
   return (
-    <form action={submit} className="grid gap-3 rounded-lg border border-border p-4">
+    <form
+      action={submit}
+      onSubmit={(event) => {
+        if (confirm && !window.confirm(confirm)) event.preventDefault()
+      }}
+      className="grid gap-3 rounded-lg border border-border p-4">
       <input type="hidden" name="operation" value={operation} />
       {children}
       <div className="flex flex-wrap items-center gap-3">

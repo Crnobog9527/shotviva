@@ -19,6 +19,7 @@ describe('Shotviva sitemap once indexing opens', () => {
       'https://shotviva.com/ai-restaurant-menu',
       'https://shotviva.com/transparent-background',
       'https://shotviva.com/pricing',
+      'https://shotviva.com/template-requests',
       'https://shotviva.com/terms',
       'https://shotviva.com/privacy',
       'https://shotviva.com/refund-policy',
@@ -27,14 +28,17 @@ describe('Shotviva sitemap once indexing opens', () => {
   })
 
   // SEO patch v5 item 1 (Owner 2026-11-12): the two Chinese verticals joined the three T21 pages.
-  it('lists the five indexable Chinese pages', () => {
+  // The wishlist's public page joined both languages on 2026-11-25 (Owner's SEO plan).
+  it('lists the six indexable Chinese pages', () => {
     expect(zhSitemapUrls(site)).toEqual([
       'https://shotviva.com/zh',
       'https://shotviva.com/zh/image-to-image-generator',
       'https://shotviva.com/zh/commercial-photography',
       'https://shotviva.com/zh/ai-restaurant-menu',
       'https://shotviva.com/zh/pricing',
+      'https://shotviva.com/zh/template-requests',
     ])
+    expect(zhSitemapUrls(site)).not.toContain('https://shotviva.com/zh/transparent-background')
   })
 })
 
@@ -43,6 +47,12 @@ describe('Shotviva sitemap once indexing opens', () => {
 describe('sitemaps, robots meta, canonical and hreflang agree (SEO patch v5)', () => {
   const urls = [...pageSitemapUrls(site), ...zhSitemapUrls(site)]
   const logical = (pathname: string) => (pathname === '/zh' ? '/' : pathname.replace(/^\/zh(?=\/)/, ''))
+
+  it('declares only the English page and default for transparent background', () => {
+    const url = 'https://shotviva.com/transparent-background'
+    const meta = pageMetadata(site, { path: '/transparent-background', title: 't', description: 'd' })
+    expect(meta.alternates?.languages).toEqual({ en: url, 'x-default': url })
+  })
 
   it('every listed address is index,follow with a self canonical', () => {
     for (const url of urls) {
@@ -73,7 +83,7 @@ describe('sitemaps, robots meta, canonical and hreflang agree (SEO patch v5)', (
       expect(date! <= today, url).toBe(true)
     }
     const xml = urlsetXml(pageSitemapUrls(site), PAGE_LASTMOD)
-    expect(xml.match(/<lastmod>/g)).toHaveLength(10)
+    expect(xml.match(/<lastmod>/g)).toHaveLength(11)
     expect(xml).toContain('<url><loc>https://shotviva.com/</loc><lastmod>')
   })
 

@@ -5,6 +5,7 @@ import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useEffect, useEffectEvent, useRef, type ReactNode, type RefObject } from 'react'
 
 import type { Balance } from '@/core/billing/pools'
+import type { BatchLimits } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 import { cn } from '@/core/ui/cn'
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle } from '@/core/ui/drawer'
@@ -17,6 +18,7 @@ import { CloseButton } from '../workspace/create-sheet'
 import { keepBatchTemplates, restoreOpener } from './batch-query'
 import { MatrixAction } from './matrix-action'
 import { MatrixForm, MatrixStage, useBatchLede } from './matrix-form'
+import type { PickerBrowse } from '../catalogue/picker-browse'
 import { MatrixResults } from './matrix-results'
 import { withTemplates } from './matrix-state'
 import { useBatchSession, type BatchSession } from './use-batch-session'
@@ -27,8 +29,11 @@ export type BatchDialogProps = {
   // ?t= when it was opened: the templates it opens on (none: keep the draft's).
   requested: string[]
   templates: readonly CatalogueTemplate[]
+  browse: PickerBrowse | null
   balance: Balance
   tier: MembershipTier | null
+  // effective_limits()' batch part from the server (an org can lift past the tier).
+  batch?: BatchLimits | null
   limit: number
 }
 
@@ -38,11 +43,11 @@ export type BatchDialogProps = {
 // It stays mounted once opened, so closing keeps the draft (photos included) for the next opening
 // on this page; the batch's jobs live in the generation store either way.
 export function BatchDialog(props: BatchDialogProps) {
-  const caps = batchCaps(props.tier)
+  const caps = batchCaps(props.tier, props.batch)
   return caps ? <BatchDialogBody {...props} caps={caps} /> : null
 }
 
-function BatchDialogBody({ open, onClose, requested, templates, balance, tier, limit, caps }: BatchDialogProps & { caps: BatchCaps }) {
+function BatchDialogBody({ open, onClose, requested, templates, browse, balance, tier, limit, caps }: BatchDialogProps & { caps: BatchCaps }) {
   const t = useTranslations('app.matrix')
   const scroller = useRef<HTMLDivElement>(null)
   const session = useBatchSession({ templates, initial: requested, balance, limit, caps, onStarted: () => scroller.current?.scrollTo({ top: 0 }) })
@@ -71,7 +76,7 @@ function BatchDialogBody({ open, onClose, requested, templates, balance, tier, l
       bar={<MatrixAction inline cta={draft.cta} max={caps.cells} error={refusal.message(draft.error)} onGenerate={session.generate} />}
       stage={<MatrixStage draft={draft} className="block" />}
     >
-      <MatrixForm draft={draft} templates={templates} balancePaid={balance.paid} tier={tier} />
+      <MatrixForm draft={draft} templates={templates} browse={browse} balancePaid={balance.paid} tier={tier} />
     </BatchFrame>
   )
 }

@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { z } from 'zod'
 import { COPY } from './copy'
 import { resolveAccount, EnrollmentError } from './create-account'
 import { enrollmentRow } from '../enrollment'
@@ -12,14 +13,21 @@ async function membership(db: SupabaseClient, userId: string) {
   return enrollmentRow.nullable().parse(checked(row))
 }
 
+function adminLabel(form: FormData) {
+  const parsed = z.string().trim().max(60).safeParse(form.get('admin_label') ?? '')
+  if (!parsed.success) throw new EnrollmentError(COPY.invalid)
+  return parsed.data
+}
+
 export async function createAffiliate(db: SupabaseClient, actor: string, form: FormData) {
   const parsed = writableSlug.safeParse(form.get('slug') || newAffiliateSlug())
   if (!parsed.success) throw new EnrollmentError(COPY.reserved)
+  const label = adminLabel(form)
   const overrides = rateInputs(form, true)
   const userId = await resolveAccount(db, actor, form)
   let slug = parsed.data
   for (let attempt = 0; attempt < 4; attempt++) {
-    const result = await db.rpc('admin_affiliate_create', { p_actor: actor, p_input: { user_id: userId, slug, overrides } })
+    const result = await db.rpc('admin_affiliate_create', { p_actor: actor, p_input: { user_id: userId, slug, overrides, admin_label: label } })
     if (result.error && result.error.code !== '23505') checked(result)
     // Either our insert or the winning concurrent insert owns this user's primary key.
     const member = await membership(db, userId)

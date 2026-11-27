@@ -1,0 +1,60 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
+/* A template collection share page (/s/t/<id>, ARCHITECTURE §5.1g). Its own sheet, loaded by this
+   route only, and no Tailwind utilities in its components, so the public Tailwind sheet's budget
+   (scripts/public-css-check.ts) is untouched. Values follow DESIGN.md's scale. */
+@layer components {
+  .tc-page { padding: 24px var(--gutter); }
+  .tc-head { display: grid; gap: 12px; max-width: 640px; }
+  .tc-kicker { font: 500 14px/1.35 var(--font-sans); color: var(--muted-foreground); }
+  .tc-title { font: 400 32px/1.05 var(--font-display); letter-spacing: -0.02em; text-wrap: balance; }
+  .tc-note { font: 400 16px/1.5 var(--font-sans); white-space: pre-line; text-wrap: pretty; color: var(--bone-dim); }
+  .tc-hint { font: 400 14px/1.35 var(--font-sans); color: var(--muted-foreground); }
+  .tc-foot { padding-top: 32px; }
+  .tc-grid { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 16px; row-gap: 40px; margin: 32px 0 0; padding: 0; list-style: none; }
+
+  .tc-tile { display: grid; align-content: start; gap: 12px; }
+  .tc-text { display: grid; gap: 4px; }
+  .tc-name { font: 600 16px/1.25 var(--font-sans); letter-spacing: -0.015em; }
+  .tc-meta { font: 400 14px/1.35 var(--font-sans); color: var(--muted-foreground); }
+  .tc-count { font-family: var(--font-mono); }
+  .tc-desc { font: 400 14px/1.35 var(--font-sans); text-wrap: pretty; color: var(--bone-dim); }
+  .tc-blank { display: block; aspect-ratio: 8 / 5; border-radius: var(--radius-control); background: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }
+
+  .tc-series { display: grid; align-content: start; gap: 12px; }
+  .tc-series-card { display: grid; align-content: start; gap: 12px; }
+  .tc-frame { position: relative; display: block; }
+  .tc-cover { position: relative; isolation: isolate; display: block; aspect-ratio: 8 / 5; overflow: hidden; border-radius: var(--radius-control); background: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }
+  .tc-cover img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .tc-cover-bg { object-fit: cover; scale: 1.1; filter: blur(24px) brightness(0.5); }
+  .tc-cover-img { object-fit: contain; }
+  .tc-toggle {
+    display: inline-flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border: 0; cursor: pointer;
+    border-radius: var(--radius-button); background: var(--wash); box-shadow: inset 0 0 0 1px var(--border); color: var(--foreground);
+    font: 600 15px/1 var(--font-sans); transition: transform .18s var(--ease);
+  }
+  .tc-toggle:active { transform: scale(.975); }
+  .tc-toggle svg { width: 16px; height: 16px; transition: rotate .18s var(--ease); }
+  .tc-toggle[aria-expanded='true'] svg { rotate: 180deg; }
+  .tc-members {
+    display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 16px; row-gap: 32px; margin: 8px 0 0; padding: 12px; list-style: none;
+    border-radius: var(--radius-tile); background: var(--card); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .tc-members[hidden] { display: none; }
+
+  @media (min-width: 48rem) {
+    .tc-page { padding-block: 48px; }
+    .tc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tc-members { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px; }
+    /* An opened series takes the whole row, its card keeping one column's width. */
+    .tc-series[data-open] { grid-column: 1 / -1; }
+    .tc-series[data-open] .tc-series-card { max-width: calc(50% - 8px); }
+  }
+  @media (min-width: 64rem) {
+    .tc-grid, .tc-members { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .tc-series[data-open] .tc-series-card { max-width: calc(33.333% - 11px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tc-toggle, .tc-toggle svg { transition: none; }
+  }
+}

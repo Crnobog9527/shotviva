@@ -5,10 +5,12 @@ import createNextIntlPlugin from 'next-intl/plugin'
 import { appVersion, parseSentryBuildEnv } from './src/core/build-env'
 import { rawPublicEnv } from './src/core/public-env'
 import { parsePublicEnv } from './src/core/public-env-schema'
+import { HTML_LIMITED_BOTS } from './src/core/seo/html-limited-bots'
 import { indexingOpen, parseIndexingEnv, xRobotsTagRules } from './src/core/seo/indexing-env'
 import { legacyUserRedirects } from './src/core/admin/users/legacy-redirects'
 import { securityHeaderRules } from './src/core/security/response-headers'
 import { legacyHelpRedirects } from './src/core/support/legacy-redirects'
+import { PRESIZED_DEVICE_SIZES, PRESIZED_IMAGE_SIZES, PRESIZED_PREFIX } from './src/core/presized'
 import { assetsHeaders, assetsRemotePatterns, assetsRewrites, readAssetsEnv } from './src/core/storage/assets-env'
 import { SITE_DOMAIN } from './src/site/domain'
 
@@ -46,6 +48,10 @@ const nextConfig: NextConfig = {
   // forwards those paths to this site and caches them; core/public-env-schema.ts). Vercel already
   // answers them with Access-Control-Allow-Origin: *, which the cross-origin font files need.
   assetPrefix: publicEnvAtBuild.NEXT_PUBLIC_ASSET_CDN_URL,
+  // The scripts Next writes into pages are fetched in CORS mode, so the service worker (core/offline)
+  // can keep a readable copy of the CDN's files (which already send Access-Control-Allow-Origin: *)
+  // instead of an opaque one. No credentials either way: these are public files.
+  crossOrigin: 'anonymous',
   cacheComponents: true,
   // Vercel builds skip next build's type-check step: only main and validation/preview deploy, and
   // both receive code only through PRs whose required CI check ("lint · typecheck · test · build")
@@ -63,7 +69,18 @@ const nextConfig: NextConfig = {
   // 2.68 -> 1.10 s, /login 2.96 -> 1.20 s (local A/B, PR #622). Global in Next 16.4 (no per-route
   // switch): a signed-in page's first full load carries the app's sheet in its HTML (~28 KB br)
   // instead of a cached file; moves inside the app are unchanged (Next uses <link> for those).
-  experimental: { globalNotFound: true, inlineCss: true },
+  // staleTimes.dynamic: a page's streamed, per-request part (the Photos grid, the Create catalogue)
+  // is kept in the browser for 30 s after a visit, so going back to a tab within that time shows it
+  // at once instead of asking the server again. From mainland China every such request crosses to
+  // the functions in sfo1 and back: about 1 s more than a file the edge answers (17CE, 2026-11-23),
+  // before the proxy (p75 ~270 ms) and the render (p75 0.3-0.85 s) run. Nothing goes stale for
+  // longer than it should: a server action's revalidation, router.refresh() (a finished generation,
+  // a payment) and a full load all drop this cache; data changed elsewhere shows within 30 s.
+  // Next's default before 15.0 was 30 s.
+  experimental: { globalNotFound: true, inlineCss: true, staleTimes: { dynamic: 30 } },
+  // Search crawlers and Lighthouse get the cached page like a browser; only link-preview bots
+  // keep Next's blocking-metadata render (src/core/seo/html-limited-bots.ts).
+  htmlLimitedBots: HTML_LIMITED_BOTS,
   // Off for the site as a whole: with it on, every page's HTML also embeds a runtime prefetch
   // of itself (a second copy of the page tree and of the client messages, about 40% of the
   // marketing pages' HTML) and the server renders the page twice to produce it. The signed-in
@@ -73,7 +90,15 @@ const nextConfig: NextConfig = {
   // AVIF first (about a fifth smaller than WebP at the same quality, which matters most on the
   // slow cross-border link to mainland China), WebP for browsers without it. Each format is
   // encoded once per width and then cached: the stored covers are immutable, content-hashed.
-  images: { formats: ['image/avif', 'image/webp'], remotePatterns: assetsRemotePatterns(assets.NEXT_PUBLIC_ASSETS_BASE_URL) },
+  // The widths are the pre-sized copies' (core/presized): with NEXT_PUBLIC_PRESIZED_IMAGES_URL on,
+  // a srcset names stored files, so it may only ask for widths that are stored. Next's defaults
+  // minus 32–96 and 1920–3840; every slot of 128 px and up picks the same width as before.
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    imageSizes: [...PRESIZED_IMAGE_SIZES],
+    deviceSizes: [...PRESIZED_DEVICE_SIZES],
+    remotePatterns: assetsRemotePatterns(assets.NEXT_PUBLIC_ASSETS_BASE_URL),
+  },
   poweredByHeader: false,
   // PostHog's API paths end in a slash (/i/v0/e/); a trailing-slash redirect would break them.
   skipTrailingSlashRedirect: true,
@@ -109,6 +134,14 @@ const nextConfig: NextConfig = {
         source: '/home/:asset(.+\\.webp)',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
+      // The pre-sized copies the build writes (scripts/presize-public.ts) of public/home and public/cases:
+      // named after their source, which never changes under the same name, so the same rule. The
+      // copies of public/intros and public/partners have no such convention and keep the default
+      // (revalidated) caching.
+      {
+        source: `/${PRESIZED_PREFIX}/:width(w\\d+)/:dir(home|cases)/:asset(.+\\.(?:avif|webp))`,
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
       // The inner landing pages' case pictures in public/cases: the same rule as public/home.
       {
         source: '/cases/:asset(.+\\.webp)',
@@ -130,11 +163,22 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       ...assetsRewrites(assets.R2_PUBLIC_ORIGIN),
-      { source: '/ingest/static/:path*', destination: `${POSTHOG_ASSETS}/static/:path*` },
-      { source: '/ingest/array/:path*', destination: `${POSTHOG_ASSETS}/array/:path*` },
-      { source: '/ingest/:path*', destination: `${POSTHOG_INGEST}/:path*` },
+      // Only while PostHog is switched on (NEXT_PUBLIC_POSTHOG_ENABLED); off, nothing proxies to it.
+      ...(publicEnvAtBuild.NEXT_PUBLIC_POSTHOG_KEY
+        ? [
+            { source: '/ingest/static/:path*', destination: `${POSTHOG_ASSETS}/static/:path*` },
+            { source: '/ingest/array/:path*', destination: `${POSTHOG_ASSETS}/array/:path*` },
+            { source: '/ingest/:path*', destination: `${POSTHOG_INGEST}/:path*` },
+          ]
+        : []),
     ]
   },
+  // Sentry's "bundle size optimizations" (excludeTracing, excludeDebugStatements), which its
+  // config wrapper only applies under webpack: the site sends errors only (tracesSampleRate 0,
+  // core/analytics/sentry-options.ts), so the tracing integration and the SDK's debug logging are
+  // dead code. Sentry's own option sets the same two flags for server and client alike.
+  // Browser SDK loaded after the page: 57 -> 32 KB gzip (PSI "unused JavaScript", 2026-11-21).
+  compiler: { define: { __SENTRY_TRACING__: false, __SENTRY_DEBUG__: false } },
   turbopack: {
     rules: {
       '*.css': {

@@ -18,7 +18,8 @@ type Ticket = { input_key: string; put_url: string; headers: Record<string, stri
 
 export type UploadDeps = {
   compress(file: Blob): Promise<Blob>
-  requestTicket(contentType: UploadContentType, size: number): Promise<Ticket>
+  // signal: a cancelled photo stops waiting out a 429 (request-ticket).
+  requestTicket(contentType: UploadContentType, size: number, options?: { signal?: AbortSignal }): Promise<Ticket>
   put(url: string, body: Blob, headers: Record<string, string>, onProgress: (fraction: number) => void, signal?: AbortSignal): Promise<void>
   // The `upload` event (ARCHITECTURE §16.2), sent once the object is in R2.
   track(props: EventProps<'upload'>): void
@@ -78,7 +79,7 @@ async function runUpload(file: Blob, deps: UploadDeps, callbacks: UploadCallback
   const contentType: UploadContentType = compressed ? 'image/jpeg' : originalType
 
   stage.current = 'ticket'
-  const ticket = await deps.requestTicket(contentType, body.size)
+  const ticket = await deps.requestTicket(contentType, body.size, { signal: callbacks.signal })
   throwIfAborted(callbacks.signal)
   stage.current = 'transfer'
   callbacks.onPhase('uploading')

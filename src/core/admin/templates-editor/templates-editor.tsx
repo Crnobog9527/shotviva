@@ -11,8 +11,6 @@ import { BulkPublish } from './bulk-publish'
 import type { CategoryOption } from './category-field'
 import { deleteCopy, orderCopy } from './copy'
 import { DeleteDialog } from './delete-dialog'
-import { FeaturedPanel } from './featured-panel'
-import { FEATURED_LIMIT } from './featured-state'
 import { selectedInOrder, toggleId, toggleVisible } from './selection-state'
 import { TemplateFormDialog, type EditTarget } from './template-form-dialog'
 import type { SeriesOption } from './catalog-groups'
@@ -95,7 +93,6 @@ export function TemplatesEditor({ providers, templates: all, categories, series,
           {error}
         </p>
       ) : null}
-      <FeaturedPanel featured={featured} templates={templates} pending={pending} />
       <BulkPublish providers={providers}
         selected={selectedInOrder(templates, selected)}
         all={templates}
@@ -116,7 +113,7 @@ export function TemplatesEditor({ providers, templates: all, categories, series,
           onSelect: (id, on) => setSelected((current) => toggleId(current, id, on)),
           onSelectGroup: (ids, on) => setSelected((current) => toggleVisible(ids, current, on)),
         }}
-        featuredState={{ full: featured.ids.length >= FEATURED_LIMIT, locked: featured.locked }}
+        featuredState={{ locked: featured.locked }}
         onFeature={featured.toggle}
         onOrder={saveOrder}
         pending={pending}

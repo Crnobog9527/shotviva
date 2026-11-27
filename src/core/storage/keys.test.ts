@@ -12,7 +12,9 @@ describe('storage keys', () => {
     expect(outputKeyFor(USER, 'job-1')).toBe(`outputs/${USER}/job-1.png`)
     // Under outputs/{user}/ so account deletion's prefix sweep takes it with the result.
     expect(inputPreviewKeyFor(USER, 'job-1')).toBe(`outputs/${USER}/job-1-input.webp`)
-    expect(workThumbKeyFor(USER, 'job-1')).toBe(`outputs/${USER}/job-1-thumb.webp`)
+    expect(workThumbKeyFor(USER, 'job-1', 'paid')).toBe(`outputs/${USER}/job-1-thumb.webp`)
+    // A free work's list copy is the protected one (2026-11-22), under a key of its own.
+    expect(workThumbKeyFor(USER, 'job-1', 'free')).toBe(`outputs/${USER}/job-1-thumb-p1.webp`)
     expect(newRequestImageKey(USER)).toMatch(new RegExp(`^requests/${USER}/[0-9a-f-]{36}\\.jpg$`))
   })
 

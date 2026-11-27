@@ -14,17 +14,51 @@ type SettingTypes = {
   signup_gift_paused: boolean
   // 1350: signup gifts per Beijing day (0 = none). grant_credits reads the row itself.
   signup_gift_daily_cap: number
+  // 2008: the signup gift's amount in credits (default 200, Owner 2026-11-27). signup_gift_amount (SQL) reads the row itself when it
+  // grants; the site's copy reads it here through the settings cache.
+  signup_gift_credits: number
   // 1480: signup gifts one signup IP may receive in 24 hours (0 = no limit); over it, pending.
   signup_gift_per_ip: number
+  // 2024: the same for a sign-up bound through an org partner's ?ref link (0 = no limit, default 20).
+  signup_gift_per_ip_partner: number
+  // 2027: per-IP limits on sign-up requests (signup_request) and SMS codes (sms_request_send,
+  // sms_authorize_send), each 1..10000; the _partner ones apply through a valid org ?ref link and
+  // never below the site-wide one. The SQL reads the rows itself (signup_ip_limits()).
+  signup_request_ip_hourly: number
+  signup_request_ip_daily: number
+  signup_request_ip_hourly_partner: number
+  signup_request_ip_daily_partner: number
+  sms_ip_daily: number
+  sms_ip_daily_partner: number
   // 1480: whether a pending account may claim with a verified phone / a Google account.
   signup_gift_claim_phone: boolean
   signup_gift_claim_google: boolean
   // 1521: 拍照识别's price per run in credits (§5.3「每周复用」); 0 (no row) keeps the feature off.
   // start_poster_photo reads the row itself.
   poster_photo_credits: number
+  // 2009: whether food templates offer 优化摆盘 (fields.toggles plating) and 优化器皿 (tableware),
+  // one switch each. Off (no row): that toggle is not shown and the server renders it off; the
+  // templates' data stays. (1848's combined food_toggles_enabled is only read by older releases.)
+  food_plating_enabled: boolean
+  food_tableware_enabled: boolean
+  // 1999: whether pages register the home-screen app's service worker (core/offline). Off (no row):
+  // /sw.js empties its caches and unregisters, and pages unregister any worker (the kill switch).
+  service_worker_enabled: boolean
+  // 2001: Create's app shell (ARCHITECTURE §18.3), apart from the master switch above.
+  service_worker_shell_enabled: boolean
 }
 
 export type SystemSettingKey = keyof SettingTypes
+
+// The amount's range, as admin_set_system_setting and signup_gift_amount check it (2008). Not 0:
+// the pause stops the gift.
+export const SIGNUP_GIFT_CREDITS_MIN = 1
+export const SIGNUP_GIFT_CREDITS_MAX = 5000
+
+// The per-IP limits' range, as admin_set_system_setting checks it (2027). Not 0: no "no limit".
+export const IP_LIMIT_MIN = 1
+export const IP_LIMIT_MAX = 10_000
+const ipLimit = z.number().int().min(IP_LIMIT_MIN).max(IP_LIMIT_MAX)
 
 type SettingDefinition<T> = { schema: z.ZodType<T>; fallback: T }
 
@@ -34,10 +68,22 @@ export const SYSTEM_SETTINGS: { [K in SystemSettingKey]: SettingDefinition<Setti
   gallery_auto_approve: { schema: z.boolean(), fallback: false },
   signup_gift_paused: { schema: z.boolean(), fallback: false },
   signup_gift_daily_cap: { schema: z.number().int().min(0).max(100_000), fallback: 30 },
+  signup_gift_credits: { schema: z.number().int().min(SIGNUP_GIFT_CREDITS_MIN).max(SIGNUP_GIFT_CREDITS_MAX), fallback: 200 },
   signup_gift_per_ip: { schema: z.number().int().min(0).max(1000), fallback: 5 },
+  signup_gift_per_ip_partner: { schema: z.number().int().min(0).max(1000), fallback: 20 },
+  signup_request_ip_hourly: { schema: ipLimit, fallback: 5 },
+  signup_request_ip_daily: { schema: ipLimit, fallback: 20 },
+  signup_request_ip_hourly_partner: { schema: ipLimit, fallback: 20 },
+  signup_request_ip_daily_partner: { schema: ipLimit, fallback: 100 },
+  sms_ip_daily: { schema: ipLimit, fallback: 50 },
+  sms_ip_daily_partner: { schema: ipLimit, fallback: 200 },
   signup_gift_claim_phone: { schema: z.boolean(), fallback: true },
   signup_gift_claim_google: { schema: z.boolean(), fallback: true },
   poster_photo_credits: { schema: z.number().int().min(1).max(1000), fallback: 0 },
+  food_plating_enabled: { schema: z.boolean(), fallback: false },
+  food_tableware_enabled: { schema: z.boolean(), fallback: false },
+  service_worker_enabled: { schema: z.boolean(), fallback: false },
+  service_worker_shell_enabled: { schema: z.boolean(), fallback: false },
 }
 
 export function isSystemSettingKey(key: string): key is SystemSettingKey {

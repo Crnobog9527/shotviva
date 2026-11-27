@@ -59,3 +59,7 @@ supabase/.temp/
 # Load-test stub certificates and images (loadtest/README.md)
 /loadtest/.stub/
 /loadtest/results/
+.warm-state/
+# the pre-sized copies of public/{home,cases,intros,partners}: written by `pnpm images:presize`,
+# which `pnpm dev` and `pnpm build` run first (scripts/presize-public.ts)
+public/presized/

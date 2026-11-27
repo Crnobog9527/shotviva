@@ -272,7 +272,7 @@ export const rowCopy = {
   orderNumber: (n: number) => `序号 ${n}`,
   delete: '删除',
   deleted: '已删除',
-  orderNumberHint: '创作页里单独模板卡和系列卡按这个数字从小到大混排（同一大类内）；不单独展示的系列成员以系列的序号为准。',
+  orderNumberHint: '创作页里单独模板卡和系列卡按这个数字从小到大混排（同一大类内）；系列成员以系列的序号为准。',
 } as const
 
 // Batch 首页精选 (2026-11-12): the bulk bar's two buttons and their confirm step.
@@ -281,13 +281,12 @@ export const bulkFeaturedCopy = {
   unset: '批量取消首页精选',
   title: (on: boolean, count: number) => `${on ? '把' : '从首页精选移出'}这 ${count} 个模板${on ? '设为首页精选' : ''}？`,
   hint: (on: boolean) => on
-    ? '加入的模板排在精选末尾，可在「首页精选」里拖动调整。只有已上架、站内可见的模板能上首页，最多 12 个。'
+    ? '加入的模板排在精选末尾，可在「首页精选」里拖动调整。只有已上架、站内可见的模板能上首页。'
     : '移出后首页和落地页不再显示它们，模板本身不受影响。',
   willChange: (on: boolean) => (on ? '将加入' : '将移出'),
   unchanged: (on: boolean) => (on ? '已在精选' : '本来不在精选'),
   failed: '不能加入',
-  count: (from: number, to: number, limit: number) => `首页精选：${from} 个 → ${to} 个（上限 ${limit}）`,
-  over: (over: number, limit: number) => `超出上限 ${over} 个：首页精选最多 ${limit} 个，请少选几个，或先移出别的精选模板。`,
+  count: (from: number, to: number) => `首页精选：${from} 个 → ${to} 个`,
   blocked: '有不能加入的模板，整批都不会保存。请取消勾选它们后再试。',
   nothing: (on: boolean) => (on ? '选中的模板都已在首页精选里。' : '选中的模板都不在首页精选里。'),
   confirm: (on: boolean) => (on ? '设为首页精选' : '取消首页精选'),
@@ -297,10 +296,14 @@ export const bulkFeaturedCopy = {
 // 首页精选 as the home page lays it out (2026-11-12): cards per category, arranged then saved once.
 export const featuredCopy = {
   title: '首页精选',
-  intro: '这里的排列就是首页和落地页模板区的样子：按分类分组，分类的先后在「分类管理」里调；同一分类内按卡片顺序显示。卡片上的数字是精选顺序，标「默认」的（第 1 位）是首页生成栏默认选中的模板。只能选已上架、站内可见的模板。',
-  empty: '还没有精选模板，首页现在显示最新上架的 6 个。在下表「首页精选」一列打开，或勾选后用「批量设为首页精选」。',
+  intro: '这里的排列就是首页和落地页模板区的样子：按分类分组，分类的先后在「模板与系列 › 分类」里调；同一分类内按卡片顺序显示。卡片上的数字是精选顺序，标「默认」的（第 1 位）是首页生成栏默认选中的模板。只能选已上架、站内可见的模板。',
+  empty: '还没有精选模板，首页现在显示最新上架的 6 个。在「模板与系列 › 模板」列表的「首页精选」一列打开，或勾选后用「批量设为首页精选」。',
   dragHint: '拖动卡片调整同一分类内的先后（手机上长按卡片再拖），排好后点「保存」，首页才会更新。保存后数字按页面从上到下、从左到右排，第一张卡片就是默认模板。',
   dirty: '有未保存的改动，首页还是原来的样子。',
+  expand: '展开首页精选',
+  collapse: '收起首页精选',
+  summary: (count: number, first: string, dirty: boolean, outOfOrder = false) =>
+    `${count ? `${count} 个精选模板，默认选中「${first}」` : '还没有精选模板'}${dirty ? '；有未保存的改动' : ''}${outOfOrder ? '；默认模板不是第一张卡片，展开后可以整理' : ''}`,
   save: '保存',
   discard: '放弃改动',
   saved: '首页精选已保存，首页随后更新',

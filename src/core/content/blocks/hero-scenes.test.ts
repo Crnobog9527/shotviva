@@ -44,4 +44,17 @@ describe('HeroScenes server HTML', () => {
   it('carries no illustrative badge on the picture', () => {
     expect(html).not.toMatch(/illustrative|示意图/i)
   })
+
+  it('with a phone photo per scene, still ships only the first pair: the later photos wait for the browser', () => {
+    const dishes: readonly [HeroScene, HeroScene] = [
+      { image: img('dish-1-ai'), before: img('dish-1-photo'), caption: 'Dish one' },
+      { image: img('dish-2-ai'), before: img('dish-2-photo'), caption: 'Dish two' },
+    ]
+    const out = renderToStaticMarkup(
+      createElement(HeroScenes, { scenes: { label: 'Dishes', items: dishes }, tags: { phone: 'Phone', ai: 'AI' }, sizes: '50vw', phonePane: createElement('span', { className: 'mk-pane' }, 'phone') }),
+    )
+    expect(out.match(/<img/g)).toHaveLength(1)
+    expect(out).not.toContain('dish-2')
+    expect(out).not.toContain('mk-pstack')
+  })
 })

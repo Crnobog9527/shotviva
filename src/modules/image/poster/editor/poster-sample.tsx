@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- the optimiser's srcset on a plain <img> (coverImage), fitted whole */
 import { useTranslations } from 'next-intl'
 
-import { coverImage } from '@/core/ui/cover-image'
+import { coverAvif, coverImage } from '@/core/ui/cover-image'
+import { Picture } from '@/core/ui/picture'
 
 import type { CatalogueTemplate } from '../../catalogue/catalogue-template'
 
@@ -16,7 +17,7 @@ export function PosterSample({ cover, name }: Props) {
   return (
     <div className="flex aspect-[8/5] justify-center gap-2 rounded-control bg-wash-faint p-2 max-md:h-full max-md:aspect-auto">
       {pages.map((src, i) => (
-        <img key={src} {...coverImage(src, '(min-width: 768px) 240px, 45vw')} alt={t('sampleAlt', { name, page: i + 1 })} className="h-full min-w-0 rounded-inner object-contain" />
+        <Picture key={src} avif={coverAvif(src, '(min-width: 768px) 240px, 45vw')}><img {...coverImage(src, '(min-width: 768px) 240px, 45vw')} alt={t('sampleAlt', { name, page: i + 1 })} className="h-full min-w-0 rounded-inner object-contain" /></Picture>
       ))}
     </div>
   )

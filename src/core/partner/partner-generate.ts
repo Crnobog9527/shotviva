@@ -17,10 +17,17 @@ export type PartnerGenerateRequest = {
   body: z.infer<typeof generateRequestSchema>
 }
 
-export type PartnerGenerateOutcome = Pick<Job, 'id' | 'status' | 'creditsCost' | 'outputKey'>
+export type PartnerGenerateOutcome = Pick<Job, 'id' | 'userId' | 'status' | 'creditsCost' | 'outputKey' | 'creditPool'>
 
 // A replayed key whose job failed answers with that failure again (already refunded).
-function replayFailure(job: Job): GenerationFailure {
+// The answer to a replayed Idempotency-Key whose job failed. A job refunded because the image
+// model stayed at its per-minute limit (PROVIDER_RATE_LIMITED, queue-fairness Q3) answers
+// RATE_LIMITED again, as the first call did; its key is spent (the job is settled), so the
+// message says to retry with a new key (ARCHITECTURE §6.6).
+export function replayFailure(job: Job): GenerationFailure {
+  if (job.errorCode === 'PROVIDER_RATE_LIMITED') {
+    return new GenerationFailure(new AppError('RATE_LIMITED', 'The image model was busy and this call was refunded; retry with a new Idempotency-Key'), job.id, true)
+  }
   if (job.errorCode === 'REFERENCE_IMAGE_LIMIT' || job.errorCode === 'MODEL_INPUT_UNSUPPORTED') {
     const message = job.errorCode === 'REFERENCE_IMAGE_LIMIT'
       ? 'This request exceeds the image model’s reference image limit.'
@@ -69,8 +76,10 @@ export async function partnerGenerate(deps: PartnerGenerateDeps, req: PartnerGen
   if (view.status === 'failed') throw replayFailure(await mustFind(deps, req))
   return {
     id: view.id,
+    userId: req.userId,
     status: view.status,
     creditsCost: view.credits_cost,
+    creditPool: view.credit_pool,
     outputKey: view.status === 'succeeded' ? outputKeyFor(req.userId, view.id) : null,
   }
 }

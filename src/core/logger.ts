@@ -1,3 +1,4 @@
+import { redactInvitePath } from './invite-path'
 type Level = 'debug' | 'info' | 'warn' | 'error'
 type Fields = Record<string, unknown>
 
@@ -13,7 +14,7 @@ const PHONE = /(?<![\w+])(?:\+?86)?1[3-9]\d{9}(?!\w)/g
 const MAX_DEPTH = 5
 
 export function redactString(value: string): string {
-  return value.replace(EMAIL, '[email]').replace(TOKEN, '[redacted]').replace(PHONE, '[phone]')
+  return redactInvitePath(value).replace(EMAIL, '[email]').replace(TOKEN, '[redacted]').replace(PHONE, '[phone]')
 }
 
 export function redact(value: unknown, depth = 0): unknown {

@@ -13,6 +13,7 @@ import { DetailHead } from '../../detail/detail-head'
 import { EditTrigger } from '../../edit-ui/edit-trigger'
 import { SIDE_BY_SIDE } from '../../result/action-styles'
 import { DeleteWork } from '../../result/delete-work'
+import { RemoveWatermark } from '../../result/remove-watermark'
 import { AgainIcon, ResultView } from '../../result/result-view'
 import type { PhotoItem } from '../photo-item'
 import type { WorkView } from '../work-view'
@@ -72,10 +73,18 @@ function ReadyDetail({ view, listed, steps, viewer }: { view: WorkView; listed: 
           ),
           again: againSlot(view, viewer),
           batch: <BatchLine item={view.item} items={viewer.items} />,
+          clean: cleanSlot(view),
         }}
       />
     </div>
   )
+}
+
+// 「去水印：用付费积分重新生成」 for a free work that can be made again (a poster is redrawn in its
+// own editor instead).
+function cleanSlot(view: WorkView) {
+  if (view.item.creditPool !== 'free' || view.poster || !view.againable) return null
+  return <RemoveWatermark templateId={view.item.templateId} jobId={view.item.id} />
 }
 
 // A poster shows its text check and Redraw in Make again's place (ARCHITECTURE §5.3).

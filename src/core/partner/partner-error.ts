@@ -39,6 +39,7 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   CODE_FULL: 'internal',
   CODE_USED: 'internal',
   CODE_NEW_USERS_ONLY: 'internal',
+  CODE_INVITE_SIGNUP_ONLY: 'internal',
   CODE_OWN: 'internal',
   CODE_ALREADY_INVITED: 'internal',
   CODE_NEEDS_CONFIRM: 'internal',
@@ -70,7 +71,9 @@ const FROM_APP: Record<ErrorCode, PartnerErrorCode> = {
   GENERATION_FAILED: 'generation_failed',
   // Account deletion only; no partner route deletes accounts.
   SUBSCRIPTION_CANCEL_FAILED: 'internal',
+  ACCOUNT_OWNS_ORG: 'internal',
   DOWNGRADE_NOT_ALLOWED: 'internal',
+  ORG_MEMBER_CHECKOUT: 'internal',
   // Saved templates are a web-only feature; no partner route saves templates.
   FAVORITES_LIMIT: 'internal',
   // Admin-only (T85); never on a partner route.

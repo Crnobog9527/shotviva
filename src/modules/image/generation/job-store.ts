@@ -1,10 +1,11 @@
 'use client'
 
+import type { JobView } from '@/core/jobs'
 import { addHold } from '@/core/app-update'
 
-import { readJob, submitJob, type JobBody, type SubmitOutcome } from './job-api'
+import { readJobs, submitJob, type JobBody, type SubmitOutcome } from './job-api'
 import { applyError, applyView, type TrackedJob } from './job-model'
-import { isActive, markSent, nextToSend, requeue } from './scheduler'
+import { isActive, markSent, nextToSend, pollIntervalMs, requeue } from './scheduler'
 import { loadState, saveState, type WorkspaceViews } from './store-persistence'
 
 // Module-level store, so a generation outlives the page that started it: navigating from the
@@ -144,13 +145,33 @@ function applyOutcome(job: TrackedJob, outcome: SubmitOutcome): TrackedJob {
   // Polling may have settled it first; the first answer stands.
   if (job.status !== 'running') return job
   if (outcome.kind === 'view') return applyView(job, outcome.view)
+  if (outcome.kind === 'limited') return requeue(job, Date.now(), outcome.retryAfterMs)
   if (outcome.kind === 'error' && outcome.body.code === 'RATE_LIMITED') return requeue(job, Date.now())
   if (outcome.kind === 'error') return applyError(job, outcome.body)
   // 'lost': the server job may well carry on; polling picks it up.
   return job
 }
 
+// A job the server created and then refunded because the provider stayed at its per-minute limit
+// (error_code PROVIDER_RATE_LIMITED, queue-fairness Q3) is not a failure: it keeps its place in
+// line under a new id (resending the spent id would only return the refunded job). Reached from
+// the POST's 429 and, when that answer was lost (a backgrounded phone), from polling.
+export const PROVIDER_LIMITED_CODE = 'PROVIDER_RATE_LIMITED'
+
+function requeueAsNew(id: string, delayMs?: number) {
+  const current = getJobs().find((job) => job.id === id)
+  if (current?.status !== 'running') return
+  const next = { ...requeue(current, Date.now(), delayMs), id: crypto.randomUUID() }
+  const swapped = Object.fromEntries(Object.entries(views).map(([key, ids]) => [key, ids.map((value) => (value === id ? next.id : value))]))
+  set(getJobs().map((job) => (job.id === id ? next : job)), swapped)
+}
+
 function settle(id: string, outcome: SubmitOutcome) {
+  if (outcome.kind === 'limited' && outcome.settled) {
+    requeueAsNew(id, outcome.retryAfterMs)
+    pump()
+    return
+  }
   update(id, (current) => applyOutcome(current, outcome))
   pump()
 }
@@ -172,25 +193,45 @@ export function pump() {
   }
 }
 
-// One polling pass over every running job (GenerationRunner calls it every few seconds), then
-// a pump for queued jobs whose rate-limit wait is over.
-export async function pollRunning(): Promise<void> {
+// One polling pass over every running job (GenerationRunner ticks every few seconds; this
+// decides whether a pass is due, pollIntervalMs), then a pump for queued jobs whose rate-limit
+// wait is over. One GET answers for all of them (readJobs). `force` polls at once (the tab came
+// back into view).
+let lastPollAt = 0
+let quietPolls = 0
+// The runner ticks every 3 s, the same as the single-photo interval: a tick a few ms early must
+// still count as due, or a single photo would be read every 6 s.
+const POLL_SLACK_MS = 500
+
+// Whether this pass changed the job (settled it, or gave up on one the server never saw).
+function applyPolled(job: TrackedJob, view: JobView | 'missing' | undefined): boolean {
+  if (view === 'missing') {
+    if (pendingPosts.has(job.id) || Date.now() - (job.sentAt ?? job.startedAt) <= MISSING_GRACE_MS) return false
+    update(job.id, (current) => current.status === 'running' && current.sentAt === job.sentAt
+      ? applyError(current, { code: 'INTERNAL' }) : current)
+    return true
+  }
+  if (!view || view.status === 'running') return false
+  if (view.status === 'failed' && view.error_code === PROVIDER_LIMITED_CODE) {
+    requeueAsNew(job.id)
+    return true
+  }
+  update(job.id, (current) => (current.status === 'running' ? applyView(current, view) : current))
+  return true
+}
+
+export async function pollRunning(force = false): Promise<void> {
   const now = Date.now()
   const running = getJobs().filter((job) => job.status === 'running' &&
     (!pendingPosts.has(job.id) || now - (job.sentAt ?? job.startedAt) >= MISSING_GRACE_MS))
-  await Promise.all(
-    running.map(async (job) => {
-      const view = await readJob(job.id)
-      if (view === 'missing') {
-        if (!pendingPosts.has(job.id) && Date.now() - (job.sentAt ?? job.startedAt) > MISSING_GRACE_MS) {
-          update(job.id, (current) => current.status === 'running' && current.sentAt === job.sentAt
-            ? applyError(current, { code: 'INTERNAL' }) : current)
-        }
-      } else if (view) {
-        update(job.id, (current) => (current.status === 'running' ? applyView(current, view) : current))
-      }
-    }),
-  )
+  if (running.length === 0 || (!force && now - lastPollAt < pollIntervalMs(running, quietPolls) - POLL_SLACK_MS)) {
+    pump()
+    return
+  }
+  lastPollAt = now
+  const views = await readJobs(running.map((job) => job.id))
+  const changed = running.map((job) => applyPolled(job, views?.get(job.id))).some(Boolean)
+  quietPolls = changed ? 0 : quietPolls + 1
   pump()
 }
 
@@ -209,6 +250,10 @@ export function claimStore(userId: string) {
   }
   pump()
 }
+
+// The signed-in account claimStore was given, or undefined while unknown ('' for restored jobs of
+// an unknown account). The batch upload ticket pool keys its tickets on it.
+export const getStoreOwner = (): string | undefined => owner || undefined
 
 export function forgetJob(id: string) {
   set(getJobs().filter((job) => job.id !== id))

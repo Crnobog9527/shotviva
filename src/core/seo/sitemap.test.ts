@@ -29,6 +29,7 @@ describe('sitemap', () => {
     expect(xml).toContain('<sitemapindex')
     expect(xml).toContain('<loc>https://example.com/sitemap-pages.xml</loc>')
     expect(xml).toContain('<loc>https://example.com/sitemap-zh.xml</loc>')
+    expect(xml).toContain('<loc>https://example.com/sitemap-blog.xml</loc>')
   })
 
   it('lists only indexable, translated /zh pages in the Chinese sitemap', () => {

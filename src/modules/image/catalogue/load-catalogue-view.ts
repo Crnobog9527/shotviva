@@ -1,9 +1,10 @@
 import 'server-only'
 
 import type { Locale } from '@/core/i18n/locales'
-import { cachedCatalogueIndex, cachedPosterTemplates, cachedWebTemplates } from '@/core/templates'
+import { loadCreateCatalogue } from '@/core/templates/create-catalogue'
 
 import { toCatalogueTemplate } from './catalogue-template'
+import { catalogueForm, toCataloguePayload, type CatalogueForms } from './catalogue-payload'
 import { buildCatalogueView, type CatalogueView } from './catalogue-view'
 
 // Create's grid (T102): the live templates, series members included (a member opens from its
@@ -13,9 +14,17 @@ import { buildCatalogueView, type CatalogueView } from './catalogue-view'
 // ARCHITECTURE §5.3); when it may, the poster templates join their 海报 category and their cards
 // open the editor. They stay out of batch create, the home page and the marketing pages.
 export async function loadCatalogueView(locale: Locale, posters: boolean | Promise<boolean> = false): Promise<CatalogueView> {
-  const [templates, index, posterTemplates] = await Promise.all([
-    cachedWebTemplates(locale, true), cachedCatalogueIndex(locale),
-    Promise.resolve(posters).then((allowed) => (allowed ? cachedPosterTemplates(locale) : [])),
-  ])
-  return buildCatalogueView(index, [...templates, ...posterTemplates].map(toCatalogueTemplate), locale === 'zh')
+  const { index, templates } = await loadCreateCatalogue(locale, posters)
+  return buildCatalogueView(index, templates.map(toCatalogueTemplate), locale === 'zh')
+}
+
+export async function loadCataloguePayload(locale: Locale, posters: Promise<boolean>) {
+  return toCataloguePayload(await loadCatalogueView(locale, posters))
+}
+
+export async function loadCatalogueForms(locale: Locale, ids: readonly string[]): Promise<CatalogueForms> {
+  const wanted = new Set(ids)
+  const { templates } = await loadCreateCatalogue(locale, false)
+  return Object.fromEntries(templates.filter(({ id }) => wanted.has(id))
+    .map((template) => [template.id, catalogueForm(toCatalogueTemplate(template))]))
 }

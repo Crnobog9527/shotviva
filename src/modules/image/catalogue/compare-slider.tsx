@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl'
 import { useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 
 import { cn } from '@/core/ui/cn'
-import { coverImage } from '@/core/ui/cover-image'
+import { coverAvif, coverImage } from '@/core/ui/cover-image'
+import { Picture } from '@/core/ui/picture'
 
 import { GroundedImg, type PhotoGround } from '../result/grounded-img'
 import { SplitTags } from './split-tags'
@@ -36,15 +37,23 @@ export function CompareSlider({ before, after, afterAlt, afterGround = 'white', 
   const [x, setX] = useState(50)
   const t = useTranslations('app.template')
   const tap = useTap(x, setX, onTap)
-  const media = (url: string) => (cover ? { ...coverImage(url, cover.sizes), loading: cover.lazy ? ('lazy' as const) : undefined } : { src: url })
+  // Lazy covers (off the first screen) also go at low priority, behind the account's own data.
+  const media = (url: string) => (cover ? { ...coverImage(url, cover.sizes), ...(cover.lazy ? { loading: 'lazy' as const, fetchPriority: 'low' as const } : {}) } : { src: url })
+  const avif = (url: string) => (cover ? coverAvif(url, cover.sizes) : undefined)
   return (
     <div
       data-vaul-no-drag=""
-      style={{ '--x': `${x}%` } as CSSProperties}
+      style={{ '--x': `${x}%`, ...(cover ? { containerType: 'size' } : {}) } as CSSProperties}
       className={cn('relative aspect-[4/5] touch-pan-y overflow-hidden rounded-media bg-muted select-none', className)}
     >
-      <img {...media(before)} alt={t('phonePhotoAlt')} className="pointer-events-none absolute inset-0 size-full object-cover" />
-      <GroundedImg {...media(after)} alt={afterAlt} ground={afterGround} className="pointer-events-none absolute inset-0 size-full object-cover [clip-path:inset(0_0_0_var(--x))]" />
+      {cover ? <Picture avif={avif(before)}><img {...media(before)} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" /></Picture> : null}
+      <Picture avif={avif(before)}><img {...media(before)} alt={t('phonePhotoAlt')} className={cn('pointer-events-none absolute inset-0 size-full', cover ? 'object-contain' : 'object-cover')} /></Picture>
+      {cover ? (
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden bg-muted [clip-path:inset(0_0_0_var(--x))]">
+          <Picture avif={avif(after)}><img {...media(after)} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-50" /></Picture>
+          <Picture avif={avif(after)}><GroundedImg {...media(after)} alt={afterAlt} ground={afterGround} fitPlate style={{ width: 'min(100%, var(--image-cqh-width, 100%))', height: 'auto', maxHeight: '100%' }} className="relative object-contain" /></Picture>
+        </span>
+      ) : <Picture avif={avif(after)}><GroundedImg {...media(after)} alt={afterAlt} ground={afterGround} className="pointer-events-none absolute inset-0 size-full object-cover [clip-path:inset(0_0_0_var(--x))]" /></Picture>}
       <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-[var(--x)] z-2 -ml-px w-0.5 bg-photo-ink">
         <span className="frost absolute top-1/2 left-1/2 grid size-10 -translate-1/2 place-items-center rounded-full shadow-[inset_0_0_0_1.5px_var(--photo-ink)]">
           <svg viewBox="0 0 24 24" className="size-5 text-photo-ink" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

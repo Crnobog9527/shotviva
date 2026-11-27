@@ -9,7 +9,9 @@ import { logger } from '@/core/logger'
 
 import { beijingDayStart } from '../jobs/filters'
 import type { UserFilters } from './list-filters'
-import { USER_TIERS, USERS_PAGE_SIZE, type UserListPage, type UserListRow } from './list-types'
+import { pageIdentities } from './identity'
+import { pageReferrers } from './referrer'
+import { USER_TIERS, USERS_PAGE_SIZE, type UserIdentity, type UserListPage, type UserListRow, type UserReferrer } from './list-types'
 
 // The /admin/users list: one admin_list_users call (0620) answers the page and the total. The
 // indexes behind each filter are listed in that migration.
@@ -50,7 +52,7 @@ export async function pageRefusals(db: SupabaseClient, userIds: string[]): Promi
   }
 }
 
-const toRow = (row: z.infer<typeof rowSchema>, refusals?: RefusalCounts): UserListRow => ({
+const toRow = (row: z.infer<typeof rowSchema>, refusals?: RefusalCounts, identity?: UserIdentity, referrer?: UserReferrer): UserListRow => ({
   id: row.id,
   email: row.email || null,
   phone: row.phone || null,
@@ -66,6 +68,8 @@ const toRow = (row: z.infer<typeof rowSchema>, refusals?: RefusalCounts): UserLi
   bannedAt: row.banned_at,
   refusals24h: refusals?.last24h ?? 0,
   refusalFlag: refusals?.flagged ?? false,
+  identity: identity ?? null,
+  referrer: referrer ?? null,
 })
 
 // PostgREST's "no such function" (PGRST202) or Postgres's undefined_function (42883): this code
@@ -94,11 +98,12 @@ export async function listUsers(db: SupabaseClient, filters: UserFilters): Promi
   }
   if (error) throw new AppError('INTERNAL', 'admin list users failed', { cause: new Error(error.message) })
   const result = resultSchema.parse(data)
-  const refusals = await pageRefusals(db, result.rows.map((row) => row.id))
+  const ids = result.rows.map((row) => row.id)
+  const [refusals, identities, referrers] = await Promise.all([pageRefusals(db, ids), pageIdentities(db, ids), pageReferrers(db, ids)])
   return {
     total: result.total,
     page,
     pageCount: Math.max(1, Math.ceil(result.total / USERS_PAGE_SIZE)),
-    rows: result.rows.map((row) => toRow(row, refusals.get(row.id))),
+    rows: result.rows.map((row) => toRow(row, refusals.get(row.id), identities.get(row.id), referrers.get(row.id))),
   }
 }

@@ -9,7 +9,8 @@ const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 
 // Service-role read scoped by owner explicitly: someone else's job is indistinguishable
 // from a missing one, which is what makes the download route answer 404 to non-owners. A work
-// the owner deleted (T41) is missing too, for every user-facing read that goes through here.
+// the owner deleted (T41) is missing too, for every user-facing read that goes through here, and
+// so is an org work once its maker has left that org (企业作品, org_access_ended_at, 1941).
 // Primary key lookup; deleted_at is checked on the one row.
 export async function findOwnJob(client: SupabaseClient, userId: string, jobId: string): Promise<Job | null> {
   if (!isUuid(jobId)) return null
@@ -18,10 +19,28 @@ export async function findOwnJob(client: SupabaseClient, userId: string, jobId: 
     .select(JOB_COLUMNS)
     .eq('id', jobId)
     .eq('user_id', userId)
-    .is('deleted_at', null)
+    .is('deleted_at', null).is('org_access_ended_at', null)
     .maybeSingle()
   if (error) throw new AppError('INTERNAL', `findOwnJob failed: ${error.message}`)
   return data === null ? null : jobRowSchema.parse(data)
+}
+
+// The batch status read (GET /api/generate/status): the same owner and deleted_at rule as
+// findOwnJob, for up to STATUS_IDS_MAX ids at once by primary key. Ids that are not uuids, not the
+// caller's or deleted are simply absent.
+export const STATUS_IDS_MAX = 50
+
+export async function findOwnJobs(client: SupabaseClient, userId: string, jobIds: readonly string[]): Promise<Job[]> {
+  const ids = [...new Set(jobIds.filter(isUuid))].slice(0, STATUS_IDS_MAX)
+  if (ids.length === 0) return []
+  const { data, error } = await client
+    .from('generation_jobs')
+    .select(JOB_COLUMNS)
+    .in('id', ids)
+    .eq('user_id', userId)
+    .is('deleted_at', null).is('org_access_ended_at', null)
+  if (error) throw new AppError('INTERNAL', `findOwnJobs failed: ${error.message}`)
+  return (data ?? []).map((row) => jobRowSchema.parse(row))
 }
 
 // Partner replays (ARCHITECTURE §14.4): the caller's callId finds the job it already started.
@@ -32,7 +51,7 @@ export async function findJobByIdempotencyKey(client: SupabaseClient, userId: st
     .select(JOB_COLUMNS)
     .eq('user_id', userId)
     .eq('idempotency_key', key)
-    .is('deleted_at', null)
+    .is('deleted_at', null).is('org_access_ended_at', null)
     .maybeSingle()
   if (error) throw new AppError('INTERNAL', `findJobByIdempotencyKey failed: ${error.message}`)
   return data === null ? null : jobRowSchema.parse(data)
@@ -51,7 +70,7 @@ export async function findLastWorks(client: SupabaseClient, userId: string, temp
     .eq('user_id', userId)
     .in('template_id', templateIds)
     .eq('status', 'succeeded')
-    .is('deleted_at', null)
+    .is('deleted_at', null).is('org_access_ended_at', null)
     .order('created_at', { ascending: false })
     .limit(LAST_WORKS)
   if (error) throw new AppError('INTERNAL', `findLastWorks failed: ${error.message}`)

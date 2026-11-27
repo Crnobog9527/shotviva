@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { renderPrompt, validateGenerationInputs } from './generation-inputs'
+import { framedNote, NOTE_PREAMBLE, renderPrompt, validateGenerationInputs } from './generation-inputs'
 import { templateFieldsSchema } from './schema'
 
 const fields = templateFieldsSchema.parse({
@@ -57,9 +57,33 @@ describe('renderPrompt', () => {
     expect(renderPrompt(body, { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: '', toggles: {}, confirmed: [] })).toBe('Studio shot of Ramen.  Ratio 1:1.')
   })
 
-  it('appends the user note after the rendered template', () => {
-    const inputs = { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: 'Add a sprig of mint', toggles: {}, confirmed: [] }
-    expect(renderPrompt('Studio shot of {{dish}}.', inputs)).toBe('Studio shot of Ramen.\n\nAdd a sprig of mint')
+  it('appends the user note last, verbatim, framed as the request that wins over the template', () => {
+    const inputs = { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: '跟我加个餐具和食物匹配的的', toggles: {}, confirmed: [] }
+    const text = renderPrompt('Studio shot of {{dish}}. Keep the bowl.', inputs)
+    expect(text).toBe(`Studio shot of Ramen. Keep the bowl.\n\n${NOTE_PREAMBLE}\nUser's request: 跟我加个餐具和食物匹配的的`)
+    expect(NOTE_PREAMBLE).toMatch(/even where an earlier line says otherwise.*hard rule/)
+    // Out of its reach: image roles, the confirmed poster text, compliance lines.
+    expect(NOTE_PREAMBLE).toMatch(/does not change which attached image is which, any text given above to print on the image, or the lines against logos, brand names or named works/)
+    expect(text.endsWith('跟我加个餐具和食物匹配的的')).toBe(true)
+  })
+
+  it('adds no framing at all without a note (the partner route sends none)', () => {
+    const inputs = { copy: { dish: 'Ramen' }, aspectRatio: '1:1', note: '', toggles: {}, confirmed: [] }
+    const text = renderPrompt('Studio shot of {{dish}}.', inputs)
+    expect(text).toBe('Studio shot of Ramen.')
+    expect(text).not.toContain("User's request")
+    expect(framedNote('')).toBe('')
+  })
+
+  it('keeps a poster text before the framed note, and the note last', () => {
+    const base = { copy: {}, aspectRatio: '4:5', toggles: {}, confirmed: [], posterText: 'Grand Opening · 6pm' }
+    expect(renderPrompt('Poster.', { ...base, note: 'bolder title' })).toBe(`Poster.\n\nGrand Opening · 6pm\n\n${framedNote('bolder title')}`)
+    expect(renderPrompt('Poster.', { ...base, note: '' })).toBe('Poster.\n\nGrand Opening · 6pm')
+  })
+
+  it('does not expand placeholders a note contains', () => {
+    const inputs = { copy: { dish: 'Ramen' }, aspectRatio: '1:1', note: 'use {{dish}} twice', toggles: {}, confirmed: [] }
+    expect(renderPrompt('Shot of {{dish}}.', inputs)).toBe(`Shot of Ramen.\n\n${NOTE_PREAMBLE}\nUser's request: use {{dish}} twice`)
   })
 })
 
@@ -115,7 +139,7 @@ describe('toggles (T89)', () => {
   it('renders the off fragment by default and the on fragment when on, the note still last', () => {
     const body = 'Shot of {{dish}}. {{ replate }} {{steam}}'
     const off = validateGenerationInputs(toggled, { imageCount: 1, copy: { dish: 'Ramen' }, note: 'warmer light' })
-    expect(renderPrompt(body, off, fragments)).toBe('Shot of Ramen. FAKE-OFF STEAM-OFF\n\nwarmer light')
+    expect(renderPrompt(body, off, fragments)).toBe(`Shot of Ramen. FAKE-OFF STEAM-OFF\n\n${framedNote('warmer light')}`)
     const on = validateGenerationInputs(toggled, { imageCount: 1, copy: { dish: 'Ramen' }, toggles: { replate: true }, togglesConfirmed: ['replate'] })
     expect(renderPrompt(body, on, fragments)).toBe('Shot of Ramen. FAKE-ON STEAM-OFF')
   })
@@ -123,5 +147,54 @@ describe('toggles (T89)', () => {
   it('renders a toggle without fragments as empty, never the raw placeholder', () => {
     const inputs = validateGenerationInputs(toggled, { imageCount: 1, toggles: { steam: true } })
     expect(renderPrompt('A {{steam}} B', inputs)).toBe('A  B')
+  })
+})
+
+// 1848: the site-wide switch for 优化摆盘 / 优化器皿. Off, the server takes no "on" for them.
+describe('forceOff (food_toggles_enabled off)', () => {
+  const body = 'Shot of {{dish}}. {{replate}} {{steam}}'
+  const asked = { imageCount: 1, copy: { dish: 'Ramen' }, toggles: { replate: true, steam: true }, togglesConfirmed: ['replate'] }
+
+  it('renders forced toggles off whatever the request says, exactly like a request that left them off', () => {
+    const forced = validateGenerationInputs(toggled, { ...asked, forceOff: ['replate', 'steam'] })
+    const left = validateGenerationInputs(toggled, { imageCount: 1, copy: { dish: 'Ramen' } })
+    expect(forced).toEqual(left)
+    expect(renderPrompt(body, forced, fragments)).toBe('Shot of Ramen. FAKE-OFF STEAM-OFF')
+  })
+
+  it('never refuses: no confirmation needed, a forced key the template lacks is dropped', () => {
+    const inputs = validateGenerationInputs(toggled, { imageCount: 1, toggles: { replate: true, gone: true }, forceOff: ['replate', 'gone'] })
+    expect(inputs).toMatchObject({ toggles: { replate: false, steam: false }, confirmed: [] })
+  })
+
+  it('leaves the other toggles, and everything with no forced keys, as before', () => {
+    expect(validateGenerationInputs(toggled, { ...asked, forceOff: ['replate'] }).toggles).toEqual({ replate: false, steam: true })
+    expect(validateGenerationInputs(toggled, { ...asked, forceOff: [] })).toEqual(validateGenerationInputs(toggled, asked))
+  })
+})
+
+// 1848 too: the dish name only the food flows read is left out while the switch is off.
+describe('dropCopy (food_toggles_enabled off)', () => {
+  const food = templateFieldsSchema.parse({
+    images: { min: 1, max: 1 },
+    copy: [{ key: 'dish_name', label: 'Dish name', public: true }, { key: 'price', label: 'Price' }],
+    aspectRatios: ['1:1'],
+  })
+
+  it('ignores what the request sends for a dropped field and leaves it out of copy and labels', () => {
+    const inputs = validateGenerationInputs(food, { imageCount: 1, copy: { dish_name: 'Mapo tofu', price: '$9' }, dropCopy: ['dish_name'] })
+    expect(inputs.copy).toEqual({ price: '$9' })
+    expect(inputs.labels).toEqual({ price: 'Price' })
+    expect(renderPrompt('Shot of {{dish_name}}.', inputs)).toBe('Shot of .\n\nPrice: $9')
+  })
+
+  it('never refuses a dropped key, even one the template lacks', () => {
+    expect(validateGenerationInputs(food, { imageCount: 1, copy: { gone: 'x' }, dropCopy: ['gone'] }).copy).toEqual({ dish_name: '', price: '' })
+  })
+
+  it('keeps every field as before when nothing is dropped', () => {
+    const asked = { imageCount: 1, copy: { dish_name: 'Mapo tofu' } }
+    expect(validateGenerationInputs(food, { ...asked, dropCopy: [] })).toEqual(validateGenerationInputs(food, asked))
+    expect(validateGenerationInputs(food, asked).copy).toEqual({ dish_name: 'Mapo tofu', price: '' })
   })
 })

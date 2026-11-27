@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { deleteDishware, listDishware, saveDishware } from '@/core/dishware'
 import { runGeneration, type DishReader, type DishReading, type FoodDeps } from '@/core/jobs'
+import { confirmTestPhoto, runTestGenerate, saveTestBudget } from '@/modules/image'
 import { newInputKey } from '@/core/storage'
 
 import { jpeg } from '../fakes/images'
@@ -12,6 +13,7 @@ import { createMemoryStore } from '../fakes/memory-store'
 import { fakeProvider } from './generation-fixtures'
 import { connectAdmin, createUser, publishFixture } from './helpers'
 import { serviceSupabase } from './supabase-env'
+import { holdTestBudget } from './test-run-fixtures'
 
 // ARCHITECTURE §5.1c「餐饮开关的出图流程」: the toggle pair picks the flow, the dish is read only
 // once credits are held, a failed reading still makes (and charges) the ordinary image, and the
@@ -64,21 +66,31 @@ afterAll(async () => {
 
 const vessel = { id: vesselId, label: 'long-a', category: 'long' as const, shape: 'teardrop platter', imageKey: vesselKey, width: 4, height: 3, isActive: true }
 
+// Counts what the flow touched: a dish reading or a vessel library read is extra cost.
+const touched = { reads: 0, vessels: 0 }
+
 function food(reading: DishReading | Error): FoodDeps {
   const reader: DishReader = { tag: 'judge/fake', prices: { inputTextPerM: 1, inputImagePerM: null, outputPerM: 2 }, read: async () => {
+    touched.reads += 1
     if (reading instanceof Error) throw reading
     return { reading, usage: { inputTokens: 1000, outputTokens: 100 } }
   } }
-  return { reader: async () => reader, vessels: async () => [vessel], random: () => 0 }
+  return { reader: async () => reader, vessels: async () => { touched.vessels += 1; return [vessel] }, random: () => 0 }
 }
 
-async function generate(toggles: { plating: boolean; tableware: boolean }, reading: DishReading | Error = READING) {
-  const userId = await createUser(db, { credits: 3 })
+// switches: the site-wide food_plating_enabled / food_tableware_enabled (2009); a flow runs only
+// for a toggle whose switch is on. A 1K job, which free credits pay (1996).
+type Switches = { plating: boolean; tableware: boolean }
+const BOTH_ON: Switches = { plating: true, tableware: true }
+const BOTH_OFF: Switches = { plating: false, tableware: false }
+async function generate(toggles: { plating: boolean; tableware: boolean }, reading: DishReading | Error = READING, switches: Switches | 'absent' = BOTH_ON) {
+  const userId = await createUser(db, { freeCredits: 3 })
   const inputKey = newInputKey(userId, 'image/jpeg')
   const photo = await jpeg(1200, 1600)
   r2.upload(inputKey, photo, 'image/jpeg')
   const fake = fakeProvider()
-  const deps = { db: serviceSupabase(), store: r2.store, provider: fake.provider, providerTimeoutMs: 2000, now: () => NOW, food: food(reading) }
+  const deps = { db: serviceSupabase(), store: r2.store, provider: fake.provider, providerTimeoutMs: 2000, now: () => NOW, food: food(reading),
+    ...(switches === 'absent' ? {} : { foodSwitches: async () => switches }) }
   const view = await runGeneration(deps, { userId, source: 'web', templateId, inputKey, toggles })
   const { rows } = await db.query('select status, credits_cost, provider_usage, inputs from public.generation_jobs where id = $1', [view.id])
   return { call: fake.calls[0]!, job: rows[0], images: fake.calls[0]!.images.map((image) => image.bytes.length) }
@@ -114,6 +126,94 @@ describe('food toggle flows (§5.1c)', () => {
     const { call, job } = await generate({ plating: true, tableware: true }, new Error('timeout'))
     expect(call.prompt).toBe('ORDINARY P-OFF T-OFF')
     expect(job).toMatchObject({ status: 'succeeded', credits_cost: 1 })
+  })
+})
+
+describe('both site-wide switches off (2009)', () => {
+  for (const switchOn of [BOTH_OFF, 'absent'] as const) {
+    it(`renders both off, reads no dish and no vessel, at the same price (switches ${JSON.stringify(switchOn)})`, async () => {
+      await saveDishware({ db: serviceSupabase(), store: r2.store }, admin, vessel)
+      const before = { ...touched }
+      const off = await generate({ plating: false, tableware: false }, READING, switchOn)
+      for (const toggles of [{ plating: true, tableware: false }, { plating: false, tableware: true }, { plating: true, tableware: true }]) {
+        const run = await generate(toggles, READING, switchOn)
+        // Exactly today's ordinary call with both toggles off: the off fragments, photo + reference.
+        expect(run.call.prompt).toBe('ORDINARY P-OFF T-OFF')
+        expect(run.images).toEqual(off.images)
+        expect(run.job).toMatchObject({ status: 'succeeded', credits_cost: off.job.credits_cost, provider_usage: null })
+        expect(run.job.inputs.toggles).toEqual({ plating: false, tableware: false })
+        expect(run.job.inputs).not.toHaveProperty('toggles_confirmed_at')
+      }
+      expect(touched).toEqual(before)
+    })
+  }
+
+  it('keeps the template setup, so the switch on runs the flow again', async () => {
+    const { rows } = await db.query('select model_params from public.template_prompts where template_id = $1', [templateId])
+    expect(rows[0].model_params.food_flow).toEqual(FLOW)
+    expect((await generate({ plating: true, tableware: false })).call.prompt).toBe('PLATING Fish')
+  })
+})
+
+// The Owner's setting after release (2026-11-27): 优化器皿 on, 优化摆盘 off.
+describe('one switch on, the other off (2009)', () => {
+  it('only 优化器皿 on: tableware runs with its vessel, plating is rendered off, at the template price', async () => {
+    await saveDishware({ db: serviceSupabase(), store: r2.store }, admin, vessel)
+    const tablewareOnly = { plating: false, tableware: true }
+    const off = await generate({ plating: false, tableware: false }, READING, tablewareOnly)
+    for (const asked of [{ plating: false, tableware: true }, { plating: true, tableware: true }]) {
+      const run = await generate(asked, READING, tablewareOnly)
+      expect(run.call.prompt).toBe('DISHWARE')
+      expect(run.call.images[1]?.bytes).toEqual(vesselBytes)
+      expect(run.call.images).toHaveLength(3)
+      expect(run.job).toMatchObject({ status: 'succeeded', credits_cost: off.job.credits_cost })
+      expect(run.job.inputs.toggles).toEqual({ plating: false, tableware: true })
+    }
+    // Plating asked alone, with its switch off: the ordinary call, nothing read.
+    const before = { ...touched }
+    const plating = await generate({ plating: true, tableware: false }, READING, tablewareOnly)
+    expect(plating.call.prompt).toBe('ORDINARY P-OFF T-OFF')
+    expect(plating.job.inputs.toggles).toEqual({ plating: false, tableware: false })
+    expect(touched).toEqual(before)
+  })
+
+  it('only 优化摆盘 on: plating runs, tableware is rendered off and no vessel is read', async () => {
+    const before = touched.vessels
+    const run = await generate({ plating: true, tableware: true }, READING, { plating: true, tableware: false })
+    expect(run.call.prompt).toBe('PLATING Fish')
+    expect(run.job.inputs.toggles).toEqual({ plating: true, tableware: false })
+    expect(touched.vessels).toBe(before)
+  })
+})
+
+// Admin test runs (§10.b) follow the same switches: off, a toggle renders off and nothing is read.
+describe('admin test runs and the switches (2009)', () => {
+  let release: () => Promise<void>
+  beforeAll(async () => { release = await holdTestBudget(db) }, 120_000)
+  afterAll(async () => { await release() })
+
+  async function testRun(switches: Switches) {
+    await saveTestBudget(serviceSupabase(), admin, 1000)
+    const photoId = randomUUID()
+    const key = `admin-tests/photos/${photoId}.jpg`
+    r2.upload(key, await jpeg(1200, 1600), 'image/jpeg')
+    await confirmTestPhoto({ db: serviceSupabase(), store: r2.store }, admin, photoId, key)
+    const fake = fakeProvider()
+    const deps = { db: serviceSupabase(), store: r2.store, provider: fake.provider, providerTimeoutMs: 2000, food: food(READING), foodSwitches: async () => switches }
+    const run = await runTestGenerate(deps, { actorId: admin, body: {
+      run_id: randomUUID(), batch_id: randomUUID(), template_id: templateId, photo_id: photoId,
+      inputs: { copy: {}, resolution: '1k', aspect_ratio: '2:3', toggles: { plating: true, tableware: false } },
+    } })
+    return { prompt: fake.calls[0]?.prompt, run }
+  }
+
+  it('renders plating off with its switch off, and runs the flow with it on', async () => {
+    const before = { ...touched }
+    const off = await testRun({ plating: false, tableware: true })
+    expect(off.prompt).toBe('ORDINARY P-OFF T-OFF')
+    expect(off.run.inputs.toggles).toEqual({ plating: false, tableware: false })
+    expect(touched).toEqual(before)
+    expect((await testRun({ plating: true, tableware: false })).prompt).toBe('PLATING Fish')
   })
 })
 

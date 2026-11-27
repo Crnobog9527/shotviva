@@ -10,6 +10,8 @@ const result = z.object({
   status: z.enum(['ok','not_found','expired','banned','own','used','full','new_users_only','already_invited',
     'blocked_same_ip','blocked_no_signup_grant','needs_confirm','checkout_in_progress','invalid_input','rate_limited']),
   kind: z.enum(['invite','campaign']).optional(),
+  // 2030: an invite code entered after sign-up (account page, paywall).
+  reason: z.enum(['signup_only']).optional(),
   credits_granted: z.number().int().nonnegative().optional(), pool: z.enum(['free','paid']).nullish(),
   discount_percent: z.number().nullish(), current_code: z.string().optional(),
   discount_products: z.array(z.string()).nullish(), discount_expires_at: z.string().nullish(), replaced: z.boolean().optional(),
@@ -23,11 +25,15 @@ export async function redeemCode(admin: SupabaseClient, input: Claim) {
     p_invitee_credits: null, p_invite_window_days: input.invite.windowDays,
   })
   if (error) throw error
-  const r = result.parse(data)
+  const parsed = result.parse(data)
+  // The SQL reports it as new_users_only for code from before 2030; say what it really is.
+  const r = parsed.reason === 'signup_only' ? { ...parsed, status: 'signup_only' as const } : parsed
   return describeResult(input, r)
 }
 
-function describeResult(input: Claim, r: z.infer<typeof result>) {
+type Result = Omit<z.infer<typeof result>, 'status'> & { status: z.infer<typeof result>['status'] | 'signup_only' }
+
+function describeResult(input: Claim, r: Result) {
   const credits = r.credits_granted ?? 0
   const pool = r.pool ?? null
   const percent = r.discount_percent ?? null

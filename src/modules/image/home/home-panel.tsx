@@ -21,7 +21,8 @@ type Props = {
   thumbOf(template: CatalogueTemplate): string | null
   gift: string
   onPickPhoto(): void
-  fileInputId: string
+  // A photo picked with the primary (its own file input): it opens the template panel with it.
+  onPhotoPicked(file: File): void
   onOpenPicker(): void
   onSignUp(): void
 }
@@ -40,6 +41,9 @@ function stageOf(state: HomeGeneratorState, initialCovers: InitialCovers) {
   const after = template ? template.cover.after ?? template.cover.poster : null
   return { after, initial: initialCovers && initialCovers.templateId === template?.id ? initialCovers.after : null }
 }
+
+// The random opening (use-random-opening.ts) keeps the frame the page was drawn with.
+const autoFrame = (state: HomeGeneratorState, initial: InitialCovers) => (state.auto ? initial?.after?.ratio ?? null : null)
 
 // The button's accessible name is its visible word; the template's name is read as its
 // description (WCAG 2.5.3, review of #523).
@@ -60,19 +64,26 @@ function PanelHead({ template, onOpenPicker }: { template: CatalogueTemplate | n
 // template's result, whole, with the photo it came from; the upload; the template rail; size and
 // note; Generate. Phones stack it (preview → upload → template → size and note → Generate);
 // from 1024 it is two columns, the preview kept small so the hero pair stays the largest picture.
-export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ state, initialCovers, thumbOf, gift, onPickPhoto, fileInputId, onOpenPicker, onSignUp }, ref) {
+export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ state, initialCovers, thumbOf, gift, onPickPhoto, onPhotoPicked, onOpenPicker, onSignUp }, ref) {
   const t = useTranslations('home.generator')
   const app = useTranslations('app')
   const tags = useTranslations('marketing.home')
   const { template, photo } = state
   const { after, initial } = stageOf(state, initialCovers)
-  const inset = insetOf(state, initialCovers, { mine: t('yourPhoto'), example: tags('phone') })
+  // The inset is under 100 px wide, so its tag keeps the short word; the full-size pairs say
+  // "Real phone photo" (Owner 2026-11-21).
+  const inset = insetOf(state, initialCovers, { mine: t('yourPhoto'), example: tags('phoneShort') })
   const templateId = template?.id ?? null
   return (
     // A template without a photo (photoInput 'none') has no upload card: its column closes up.
     <section className={template?.photoInput === 'none' ? 'mk-panel mk-panel-noup' : 'mk-panel'} id="gen" aria-label={t('label')} ref={ref}>
       <PanelHead template={template} onOpenPicker={onOpenPicker} />
-      <PanelStage name={template?.name ?? ''} after={after} initial={initial} inset={inset} />
+      {/* The template's picture is a way to the browse list too, as Change is (Owner 2026-11-25). */}
+      {/* The button is the grid item now, so it takes the stage area itself (.mk-stage-wrap's grid-area
+          no longer applies inside it); without it the picture fell into the right column (2026-11-26). */}
+      <button type="button" className="block w-full min-w-0 cursor-pointer text-left" style={{ gridArea: 'stage' }} onClick={onOpenPicker} disabled={!template} aria-haspopup="dialog" aria-label={t('change')}>
+        <PanelStage name={template?.name ?? ''} after={after} initial={initial} inset={inset} frameRatio={autoFrame(state, initialCovers)} />
+      </button>
       {template?.photoInput !== 'none' ? <PanelUpload url={photo.url} onPick={onPickPhoto} /> : null}
       {photo.error ? <p role="alert" className="mk-panel-error">{app(`errors.${photo.error}`)}</p> : null}
       <PanelRail state={state} thumbOf={thumbOf} onOpenPicker={onOpenPicker} />
@@ -86,7 +97,7 @@ export const HomePanel = forwardRef<HTMLElement, Props>(function HomePanel({ sta
         <PanelNote state={state} />
       </div>
       <div className="mk-panel-cta">
-        <HomeCtaButton cta={state.cta} templateId={templateId} fileInputId={fileInputId} onSignUp={onSignUp} onGenerate={state.generate} />
+        <HomeCtaButton cta={state.cta} templateId={templateId} onPhotoPicked={onPhotoPicked} onSignUp={onSignUp} onGenerate={state.generate} />
         <PanelFormats state={state} />
         <p className="mk-panel-gift">
           <GiftIcon className="mk-gift-i" />

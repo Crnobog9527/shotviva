@@ -7,7 +7,7 @@ vi.mock('../auth/supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
 
 const { logger } = await import('../logger')
 const { CATALOGUE_LIFE } = await import('./cached-catalogue')
-const { previewOrNone } = await import('./cover-ratio')
+const { previewOrNone, readPlateFrame } = await import('./cover-ratio')
 
 const COVER = 'https://shotviva.com/assets/covers/t/after-abc.webp'
 const png = (width: number, height: number) => sharp({ create: { width, height, channels: 3, background: '#c86' } }).png().toBuffer()
@@ -56,5 +56,21 @@ describe('cover preview for the home generator', () => {
     expect(await previewOrNone(COVER, true, deps({ body: Buffer.from('not an image at all') }).deps)).toEqual(none)
     expect(await previewOrNone(COVER, true, deps({ body: Buffer.from('x'), length: 50 * 1024 * 1024 }).deps)).toEqual(none)
     expect(cacheLife.mock.calls.filter(([life]) => life === CATALOGUE_LIFE)).toHaveLength(4)
+  })
+})
+
+describe('a hero plate frame from a live cover', () => {
+  it('is cut to the plate shape at 288 px, from the fenced download', async () => {
+    const { calls, deps: d } = deps({ body: await png(1086, 1448) })
+    const frame = await readPlateFrame(COVER, 4 / 5, d)
+    const bytes = Buffer.from(frame.replace('data:image/avif;base64,', ''), 'base64')
+    const meta = await sharp(bytes).metadata()
+    expect([meta.width, meta.height]).toEqual([288, 360])
+    expect(calls[0]?.init?.redirect).toBe('error')
+  })
+
+  it('refuses a picture that is not a cover on the assets base', async () => {
+    const { deps: d } = deps({ body: await png(10, 10) }, false)
+    await expect(readPlateFrame(COVER, 0.8, d)).rejects.toThrow()
   })
 })

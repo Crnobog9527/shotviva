@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { affiliateStatus, slugSchema } from '../enrollment'
+import { feeQuote, feeRuleSnapshot } from '../fees'
 import { audienceRanges, channelTypes, countryCodes } from './application-options'
 
 export { affiliateStatus, slugSchema }
@@ -32,14 +33,22 @@ export const accountSchema = z.object({
   us_person: z.boolean().nullable(),
   terms_version: z.string().nullable(),
   terms_accepted_at: z.string().nullable(),
+  // Set on an org's enterprise affiliate account (ARCHITECTURE §6.5).
+  org_id: z.uuid().nullable(),
 })
 export const settingsSchema = z.object({
   settlement_day: z.number().int(),
   payout_min_usd: cents,
+  // Enterprise (org) accounts settle against this one instead (1880).
+  org_payout_min_usd: cents,
   hold_days: z.number().int(),
   terms_version: z.string(),
   apply_min_level: z.enum(['none', 'any_paid', 'starter', 'pro', 'max']),
 })
+// The balance an account must reach to be settled: enterprise accounts have their own (1880).
+export function payoutThreshold(account: Pick<Account, 'org_id'>, settings: Settings) {
+  return account.org_id ? settings.org_payout_min_usd : settings.payout_min_usd
+}
 export const summarySchema = z.object({
   clicks: cents,
   referred: cents,
@@ -53,12 +62,18 @@ export const summarySchema = z.object({
 export const commissionSchema = z.object({
   id: idSchema,
   created_at: z.string(),
+  payment_id: idSchema.transform(String),
   product_id: z.string(),
   base_usd: cents,
+  // NULL on a commission worked out by the old formula, before fees were deducted (migration 1740).
+  fee_cents: cents.nullable(),
+  net_base_usd: cents.nullable(),
   rate_bp: z.number().int(),
   amount: cents,
   status: commissionStatus,
   confirm_after: z.string(),
+  // on_hold while the org's affiliate account is paused (migration 2028); released when it is active again.
+  paused_hold: z.boolean().default(false),
 })
 export const changeSchema = z.object({
   id: idSchema,
@@ -77,6 +92,12 @@ export const payoutSchema = z.object({
   paid_amount: cents.nullable(),
   status: z.enum(['due', 'paid', 'held', 'void']),
   paid_at: z.string().nullable(),
+  fees: feeQuote.nullable(),
+})
+export const partnerFeesSchema = z.object({
+  method: z.enum(payoutMethods).nullable(),
+  rules: z.array(feeRuleSnapshot),
+  estimate: feeQuote,
 })
 export const memberSchema = z.object({ slug: slugSchema, created_at: z.string(), status: affiliateStatus })
 export const referralSchema = z.object({
@@ -89,6 +110,7 @@ export type Account = z.infer<typeof accountSchema>
 export type Settings = z.infer<typeof settingsSchema>
 export type EnrollmentSettings = Pick<Settings, 'apply_min_level' | 'terms_version'>
 export type Commission = z.infer<typeof commissionSchema>
+export type PartnerFees = z.infer<typeof partnerFeesSchema>
 export type View = (typeof dashboardViews)[number]
 export type SearchParams = Record<string, string | string[] | undefined>
 export const searchSchema = z.object({
@@ -102,4 +124,8 @@ export const searchSchema = z.object({
     .catch(undefined),
   changes: z.string().max(640).optional().catch(undefined),
 })
-export type Query = z.infer<typeof searchSchema>
+// `base` is not read from the address: the enterprise dashboard sets it so every link it renders
+// stays on /partners/enterprise instead of bouncing through /partners (whose marketing layout
+// loads a second stylesheet that broke the enterprise frame's desktop navigation).
+export type Query = z.infer<typeof searchSchema> & { base?: DashboardBase }
+export type DashboardBase = '/partners' | '/partners/enterprise'

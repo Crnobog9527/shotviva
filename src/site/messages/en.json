@@ -2,16 +2,17 @@
   "home": {
     "placeholder": "Coming soon.",
     "generator": {
+      "panelSignUp": "Sign up free to make this photo",
       "label": "Try it on your photo",
       "replace": "Replace",
-      "replaceAria": "Your photo. Replace it",
       "template": "Template",
       "size": "Size",
       "change": "Change",
       "allTemplates": "All templates",
       "yourPhoto": "Your photo",
+      "originalPhotoAlt": "Your original photo before editing",
       "photoReady": "Photo ready",
-      "photoReadyHint": "It now stands in for the example photo",
+      "photoReadyHint": "Your photo replaces the example",
       "stageAlt": "{name}: an example of the finished photo",
       "changeTemplate": "Template: {name}. Change template",
       "changeSize": "Size: {name}. Change size",
@@ -22,6 +23,8 @@
       "noTemplates": "Templates are on the way",
       "gift": "{images} for new users",
       "pickerTitle": "Pick a template",
+      "pickerLoading": "Loading templates…",
+      "pickerLoadFailed": "Couldn’t load templates.",
       "pickerText": "Each one keeps your subject as shot and changes the light, the scene or the style.",
       "pickTemplate": "Pick {name}",
       "pickerSearch": "Search by name, use or category",
@@ -34,7 +37,7 @@
       "pickerSeries": "Series · {count, plural, one {# template} other {# templates}}",
       "pickerBack": "Back",
       "signup": {
-        "title": "Make a free account to develop it",
+        "title": "Create a free account to make it",
         "text": "Your photo and template stay as you set them.",
         "giftNote": "Shown publicly with a watermark",
         "phone": "Continue with phone",
@@ -100,9 +103,9 @@
     },
     "arrived": {
       "home": {
-        "title": "Your photo and template are kept.",
-        "login": "Log in and they'll be waiting on the home page.",
-        "signup": "Verify your email and they'll be waiting on the home page."
+        "title": "Your template is kept.",
+        "login": "Log in and it opens again on the home page.",
+        "signup": "Verify your email and it opens again on the home page."
       },
       "graylum": {
         "title": "Connecting Graylum.",
@@ -214,6 +217,8 @@
       "deleting": "Deleting…",
       "deleteFailed": "Deletion did not finish. Please try again.",
       "deleteSubscriptionFailed": "We couldn't cancel your subscription, so nothing was deleted. Please try again later, or contact support.",
+      "deleteOrgOwner": "You are your company's main admin, so this account cannot be deleted yet. Contact us to hand the company to a new admin first.",
+      "deleteRunning": "A company photo is still being made. Delete the account once it is done.",
       "cancel": "Cancel"
     }
   },
@@ -279,6 +284,8 @@
         "connect": "Connect in Graylum"
       },
       "what": "What it does",
+      "whatNote": "From positioning to a 30-day action plan, six steps to find your direction.",
+      "heroAlt": "Graylum 6-step account positioning animation",
       "when": "When it helps",
       "after": {
         "title": "Once connected",
@@ -290,45 +297,41 @@
       "newTab": "(opens in a new tab)",
       "zoom": "View larger: {name}",
       "lightbox": {
-        "label": "Graylum screenshot",
+        "label": "Graylum animation",
         "prev": "Previous",
         "next": "Next",
         "count": "{n} / {total}"
       },
       "shots": {
-        "roadmap": {
-          "name": "Roadmap home",
-          "note": "From positioning to a 30-day action plan, six steps to find your direction."
+        "voiceover": {
+          "label": "Voiceover Script",
+          "note": "When you have an idea but don't know how to start talking",
+          "alt": "Voiceover Script: Graylum drafts a short-video voiceover"
         },
-        "script": {
-          "name": "Voiceover draft",
-          "label": "Voiceovers",
-          "note": "When you have an idea but don't know how to start talking"
-        },
-        "xhsPost": {
-          "name": "Xiaohongshu post draft",
-          "label": "Image posts",
-          "note": "When you want to post but can't write a draft that's ready to go"
+        "post": {
+          "label": "Posts & Articles",
+          "note": "When you want to post but can't write a draft that's ready to go",
+          "alt": "Posts & Articles: Graylum builds an image post step by step"
         },
         "storyboard": {
-          "name": "Video storyboard",
-          "label": "Video",
-          "note": "When the script is set but you're not sure how to shoot each shot"
+          "label": "Video Storyboard",
+          "note": "When the script is set but you're not sure how to shoot each shot",
+          "alt": "Video Storyboard: Graylum turns the voiceover into shot-by-shot scenes"
         },
-        "storeVisit": {
-          "name": "Store visit post draft",
-          "label": "One draft, many platforms",
-          "note": "When you want to post the same story on different platforms"
+        "repurpose": {
+          "label": "Repurpose",
+          "note": "When you want to post the same story on different platforms",
+          "alt": "Repurpose: Graylum rewrites one final draft as a voiceover, an image post and an article"
         },
-        "shotvivaImage": {
-          "name": "Shotviva images in the chat",
-          "label": "Images right after writing",
-          "note": "When the post is written but still needs a decent image"
+        "imageWithShotviva": {
+          "label": "Image with Shotviva",
+          "note": "When the post is written but still needs a decent image",
+          "alt": "Image with Shotviva: making an image with Shotviva inside a Graylum chat"
         },
-        "tools": {
-          "name": "Tools",
-          "label": "More tools",
-          "note": "Positioning, reviews, editing tips and more, all here."
+        "moreTools": {
+          "label": "Tools",
+          "note": "Positioning, reviews, editing tips and more, all here.",
+          "alt": "Tools: the tools in Graylum's tool square"
         }
       }
     }
@@ -506,6 +509,17 @@
       "started": "Your ZIP is downloading. Each file is named photo_template_number.",
       "limited": "That's three downloads in a minute. Try again in a minute."
     },
+    "batchSave": {
+      "cta": "Save {count, plural, one {# photo} other {# photos}} to your phone",
+      "ctaNext": "Save the next {count, plural, one {# photo} other {# photos}}",
+      "preparingCta": "Getting photos ready…",
+      "savingCta": "Opening…",
+      "doneCta": "Saved to your phone",
+      "hint": "Tap, then choose Save Image or Save to Photos in the sheet that opens.",
+      "progress": "{saved, number} of {total, number} saved. Tap to save the next group.",
+      "done": "All {total, plural, one {# photo is} other {# photos are}} saved. Check your Photos app.",
+      "unsupported": "This browser can't save straight to Photos, so here is the ZIP instead."
+    },
     "signupCodes": {
       "noInviteGift": "Valid invite. No extra signup credits are currently offered.",
       "toggle": "Have an invite or promo code?",
@@ -559,7 +573,7 @@
       "redeem": {
         "inviteLinked": "Invite linked. No extra signup credits were awarded.",
         "title": "Redeem a code",
-        "label": "Invite, promo or gift code",
+        "label": "Promo or gift code",
         "button": "Redeem",
         "working": "Redeeming…",
         "paidGift": "Added {credits} paid credits.",
@@ -576,10 +590,12 @@
           "full": "This code has been fully claimed.",
           "used": "You’ve already used this code.",
           "newOnly": "This code is for new accounts only.",
+          "signupOnly": "Invite codes can only be used when you sign up. This one can’t be added to an existing account.",
           "own": "You can’t use your own invite code.",
           "invited": "You’ve already used an invite code.",
           "checkout": "You have a checkout open with your current discount. Finish or cancel it before replacing the discount.",
           "ineligible": "This account isn’t eligible for the invitation reward.",
+          "orgMember": "Enterprise staff accounts use the credits their organisation allocates. For more, contact your organisation's admin.",
           "forbidden": "This account can’t redeem codes.",
           "auth": "Sign in again to redeem a code.",
           "rate": "Too many attempts. Please try again later.",
@@ -632,14 +648,22 @@
       "getCredits": "Get credits",
       "panelTitle": "Credits",
       "signupGiftRefused": "No signup credits yet: this network already used today's allowance. Verify a phone number or a Google account below to claim them.",
-      "signupGiftRefusedCap": "No sign-up credits for this account: that day's sign-up gifts had all been given out.",
-      "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up."
+      "signupGiftRefusedCap": "No sign-up credits yet: that day's sign-up gifts had all been given out. They will be added to this account automatically once there is room again, usually within a few days.",
+      "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up.",
+      "signupGiftRefusedStaff": "No sign-up credits for this account: it was created through an organisation's staff link."
+    },
+    "form": {
+      "formLoading": "Loading template settings…",
+      "formLoadFailed": "Couldn’t load the template settings.",
+      "formRetry": "Try again"
     },
     "create": {
       "title": "Create",
       "lede": "Pick a look. Your photo stays as shot.",
       "metaTitle": "Create",
       "empty": "Templates are on their way. Check back soon.",
+      "formRetry": "Try again",
+      "catalogueLoadFailed": "Couldn’t load the templates.",
       "templates": "Templates",
       "filter": "Filter templates",
       "filterWithin": "Filter within {name}",
@@ -651,53 +675,68 @@
       "seeAll": "See all",
       "seeAllWhich": "in {name}",
       "seeAllCount": "{count} in all",
-      "illustrative": "Every card shows the phone photo on the left and the AI result on the right. Template images are real results made with these templates."
+      "illustrative": "Each card shows the phone photo on the left and the AI result on the right, made with that template."
     },
     "series": {
       "count": "{count, plural, one {# template} other {# templates}}",
       "cardAria": "{name}, a series of {count, plural, one {# template} other {# templates}}. Pick one",
       "coverAlt": "{name} series example",
       "members": "{name} · {count, plural, one {# template} other {# templates}}",
-      "badge": "Series"
+      "badge": "Series",
+      "bundleBadge": "Set",
+      "shelfCount": "{count, plural, one {# template} other {# templates}}",
+      "shelfMore": "+{count} more",
+      "shelfMoreAria": "See all {total} templates in {name}",
+      "scrollBack": "Scroll back through {name}",
+      "scrollOn": "Scroll on through {name}",
+      "inSeries": "Series: {name}"
     },
     "template": {
       "fromCredits": "from {count, plural, one {# credit} other {# credits}}",
       "fromCreditsSet": "from {count, plural, one {# credit} other {# credits}} · set of {images}",
-      "cardAlt": "{name} template, real example: phone photo on the left, AI result on the right",
+      "cardAlt": "{name} template, real example: real phone photo on the left, AI result on the right",
       "phone": "Phone",
       "ai": "AI",
       "example": "Real example",
       "featureAria": "{name}, video template, {category}. Make one",
       "featureMeta": "{category} · video",
-      "compareAria": "Compare phone photo and AI result",
-      "phonePhotoAlt": "Phone photo",
+      "compareAria": "Compare the real phone photo and the AI result",
+      "phonePhotoAlt": "Real phone photo",
+      "phoneFull": "Real phone photo",
       "resultAlt": "{name} result",
-      "loopAria": "{name} example: phone photo changing into the AI result",
+      "loopAria": "{name} example: real phone photo changing into the AI result",
       "hintCompare": "Drag across the photo to compare.",
       "makeOne": "Make one",
       "animatedMeta": "{category} · animated",
-      "hintPair": "Phone photo on the left, the AI result on the right.",
+      "hintPair": "Real phone photo on the left, the AI result on the right.",
       "viewerOpen": "View {name} full screen",
       "viewerTitle": "{name}, full screen",
       "viewerClose": "Close the large view",
-      "viewerSwitch": "Switch between the phone photo and the AI result",
+      "viewerSwitch": "Switch between the real phone photo and the AI result",
       "viewerHint": "Tap the image to zoom. Swipe to switch between Phone and AI.",
       "viewerHintZoomed": "Drag to look around. Tap again to zoom out."
     },
     "tiers": {
       "1k": {
         "name": "1K",
-        "use": "Social & delivery apps"
+        "use": "Phones, social & delivery apps"
       },
       "2k": {
         "name": "2K",
-        "use": "Websites & online stores"
+        "use": "iPad menus, websites & stores"
       },
       "4k": {
         "name": "4K",
-        "use": "Print & zoom"
+        "use": "Printed menus, posters & big screens"
       },
-      "notEnough": "(not enough credits)"
+      "notEnough": "(not enough credits)",
+      "pool": {
+        "free": "Free credits · watermarked",
+        "paid": "Paid credits · no watermark"
+      },
+      "freeOnly": "1K uses free credits only (promotion credits for company members), and they don’t cover this one. Pick 2K or 4K to use paid credits.",
+      "paidOnly": "Batches and Remove watermark use paid credits only, and 1K uses free credits only. Pick 2K or 4K.",
+      "paidShort": "2K and 4K use paid credits only, and yours don’t cover this set."
     },
     "poster": {
       "dialogHint": "Paste your event notice, check every line, then make the whole set.",
@@ -921,7 +960,7 @@
       "developingTitle": "Developing your photo",
       "developing": "Developing",
       "generating": "Generating",
-      "leave": "Usually about 60 seconds. You can leave this page. It lands in Photos when it's done.",
+      "leave": "Usually about 30 seconds. You can leave this page. It lands in Photos when it's done.",
       "backToCreate": "Back to Create",
       "readyTitle": "Your photo is ready",
       "beforeAfter": "Before and after",
@@ -976,7 +1015,7 @@
       "stageLabel": "Preview",
       "stageYours": "Your photo",
       "stageYoursCaption": "Your photo, as shot. The template keeps it and changes the light and background.",
-      "stageSampleCaption": "Template example: the phone photo on the left, the AI result on the right.",
+      "stageSampleCaption": "Template example: the real phone photo on the left, the AI result on the right.",
       "again": {
         "optionsChanged": "The options for this template have changed. Review the current size and resolution.",
         "note": "<b>Making again:</b> {summary}, from <day></day>.",
@@ -1000,7 +1039,7 @@
         "notice": "{count, number} photos, <b>{each, plural, one {# credit} other {# credits}} each</b>. Each one is charged on its own; a failed one is refunded on its own. {limit, plural, one {# develops} other {# develop}} at a time.",
         "sum": "{done, number} of {count, number} done",
         "counts": "{developing, number} developing · {queued, number} queued{failed, plural, =0 {} other { · # failed}}",
-        "leave": "{count, number} at a time, about 60 seconds each. You can leave this page: each photo lands in Photos as it's done.",
+        "leave": "{count, number} at a time, about 30 seconds each. You can leave this page: each photo lands in Photos as it's done.",
         "rowQueued": "Queued",
         "rowSaved": "Saved to Photos",
         "rowFailed": "Failed · {count, plural, one {# credit} other {# credits}} refunded",
@@ -1044,7 +1083,10 @@
         "clearGroup": "Clear this group",
         "left": "{fields} still show the sample’s text. Use it anyway?",
         "joiner": ", "
-      }
+      },
+      "orgNeedsCredits": "Your company's credits don't cover this one. Ask your admin to allocate more; your own credits can't be used while you're a member.",
+      "orgShortCta": "Not enough company credits",
+      "tierPoolCta": "Pick another resolution"
     },
     "errors": {
       "NETWORK": "Couldn't reach Shotviva. Check your connection and try again.",
@@ -1052,7 +1094,7 @@
       "IDENTITY_SWAP_REFUSED": "Shotviva can't swap faces or turn a person into someone else, to protect everyone's likeness. You can change the expression, makeup, lighting and background.",
       "REFERENCE_IMAGE_LIMIT": "This model accepts fewer reference images. Remove some photos or choose another template.",
       "TEMPLATE_UNAVAILABLE": "This template is temporarily unavailable. Please try again later.",
-      "TEMPLATE_QUOTE_CHANGED": "The price or template has changed. Refresh to see the current offer.",
+      "TEMPLATE_QUOTE_CHANGED": "The price or template has changed. Refresh to see the current price.",
       "MODEL_INPUT_UNSUPPORTED": "Check the reference photos, resolution and aspect ratio, or choose another template.",
       "GENERATION_FAILED": "The studio couldn't finish this photo. It usually works on a second try.",
       "PROVIDER_FAILED": "The studio couldn't finish this photo. It usually works on a second try.",
@@ -1067,7 +1109,7 @@
       "UNAUTHORIZED": "Please sign in again.",
       "fallback": "Something went wrong. Please try again.",
       "refunded": "Your credits were refunded.",
-      "onHold": "Your credits are on hold. We'll return them, or contact support.",
+      "onHold": "Your credits are on hold. We'll return them; you can also contact support.",
       "notCharged": "No credits were used.",
       "TIER_REQUIRED": "This needs the {tier} plan."
     },
@@ -1078,7 +1120,7 @@
       "title": "Photos",
       "metaTitle": "Photos",
       "inProgress": "In progress",
-      "usually": "Usually about 60 seconds each",
+      "usually": "Usually about 30 seconds each",
       "closeApp": "You can close the app. Finished photos land here.",
       "generating": "Generating",
       "generatingAria": "Generating {name}",
@@ -1087,7 +1129,7 @@
       "count": "{running, plural, =0 {} other {# in progress · }}{done} done",
       "footnote": "Photos made with free credits are public with a watermark; poster photos stay private. Photos made with paid credits are private and watermark-free.",
       "photoAlt": "{name} photo",
-      "empty": "Pick a template, upload one phone photo, and your first one lands here in about 60 seconds.",
+      "empty": "Pick a template, upload one phone photo, and your first one lands here in about 30 seconds.",
       "emptyCta": "Create your first photo",
       "today": "Today",
       "yesterday": "Yesterday",
@@ -1098,6 +1140,9 @@
       "doneMeta": "{when} · {size} · {tier}",
       "runningMeta": "{size} · {tier} · {count, plural, one {# credit} other {# credits}}",
       "waiting": "Waiting for a free slot",
+      "loadMore": "Load more",
+      "loadingMore": "Loading…",
+      "shown": "Showing {shown} of {total}",
       "makeAgain": "Make again",
       "deleted": "Photo deleted.",
       "deletedClose": "Close",
@@ -1136,11 +1181,13 @@
       "saveToPhotosHint": "Choose “Save Image” in the menu that opens.",
       "preparingPhoto": "Preparing photo…",
       "holdPhotoHint": "Touch and hold the photo, then choose “Save Image”.",
-      "longPress": "Long-press to save",
+      "longPress": "Long-press to save to your photos (JPG, same quality); tap Download for the lossless PNG",
       "photosHint": "To save to Photos, tap Share, then Save Image",
       "makeAnotherWith": "Make another with {name}",
       "shareText": "Made with {brand} {url}",
       "makeAgain": "Make again",
+      "removeWatermark": "Remove watermark: regenerate with paid credits",
+      "removeWatermarkNote": "Free photos are for demo only and not licensed for commercial use.",
       "tierPx": "{tier}{px, plural, =0 {} other { · {px, number, ::group-off}}}",
       "when": {
         "today": "Today",
@@ -1195,6 +1242,7 @@
         "deleting": "Deleting…",
         "cancel": "Cancel",
         "running": "This photo is still developing. Delete it once it's done.",
+        "org": "Company photos can only be deleted by the company admin.",
         "failed": "Couldn't delete the photo. Please try again."
       }
     },
@@ -1390,7 +1438,9 @@
         "emailed": "Receipt sent to your payment email",
         "refunded": "Refunded",
         "partlyRefunded": "Partly refunded",
-        "unavailable": "We couldn't open that receipt or invoice just now. Try again in a minute. If it still won't open, ask us in Support and we'll send it to you."
+        "unavailable": "We couldn't open that receipt or invoice just now. Try again in a minute. If it still won't open, ask us in Support and we'll send it to you.",
+        "waffoInvoice": "Waffo emailed the invoice with your order confirmation.",
+        "waffoPortal": "Download PDF invoices and edit company name and tax ID in the Waffo portal"
       },
       "session": {
         "title": "Session",
@@ -1553,7 +1603,7 @@
       "editedFromLabel": "Edited from",
       "sourceDeleted": "Original deleted",
       "requestSent": "Request sent",
-      "leave": "Usually about 60 seconds. You can leave this page: the new photo lands in Photos when it's done.",
+      "leave": "Usually about 30 seconds. You can leave this page: the new photo lands in Photos when it's done.",
       "developingCaption": "The edit is developing over the original.",
       "failTitleRefunded": "The edit failed. Your credits were refunded.",
       "failKept": "Your request is kept. Try again, or change what you asked for.",
@@ -1632,7 +1682,7 @@
     "share": {
       "button": "Share",
       "copied": "Link copied",
-      "text": "A phone photo made into this with the {name} template on Shotviva:",
+      "text": "Made from a phone photo with the {name} template on Shotviva:",
       "copyByHand": "Copy this link to share it:"
     },
     "giftClaim": {
@@ -1742,6 +1792,441 @@
         "failed": "Couldn't save. Please try again."
       },
       "photosGone": "The photos from that issue are gone: {boxes}. Please upload them again."
+    },
+    "org": {
+      "metaTitle": "Company",
+      "back": "Back to account",
+      "suspendedBanner": "This company account is paused. Members keep their credits, but pool actions are off until it's reactivated. Contact us to resume.",
+      "errors": {
+        "NOT_OWNER": "Only the company's main admin can do this.",
+        "SUSPENDED": "This company account is paused, so credits can't be moved right now. Contact us to reactivate it.",
+        "POOL_INSUFFICIENT": "The company pool doesn't have enough credits for that.",
+        "CREDITS_INSUFFICIENT": "You don't have that many credits of your own to put in. Credits the company gave you can't be deposited back.",
+        "MEMBER_NOT_FOUND": "That person is no longer in the company.",
+        "OWNER_CANNOT_LEAVE": "The main admin can't leave the company.",
+        "INVITE_INVALID": "This invite link is no longer valid. Ask your company admin for a new one.",
+        "ALREADY_IN_ORG": "Your account already belongs to a company. Leave it first to join another.",
+        "PERSONAL_AFFILIATE": "Your account has a personal affiliate program, which can't be combined with a company. Contact us and we'll help you switch.",
+        "PERSONAL_AFFILIATE_UNSETTLED": "Your personal affiliate account still has unsettled earnings. Contact us to settle it first.",
+        "BANNED": "This account can't join a company.",
+        "INVALID": "Check the number you entered and try again.",
+        "CONFLICT": "That request was already used for something different. Refresh the page and try again.",
+        "FAILED": "Something went wrong. Please try again."
+      },
+      "tabs": {
+        "label": "Company sections",
+        "console": "Company workspace",
+        "works": "Company works",
+        "affiliate": "Company affiliate",
+        "purchasing": "Bulk purchasing",
+        "short": {
+          "affiliate": "Affiliate",
+          "console": "Workspace",
+          "works": "Works",
+          "purchasing": "Purchasing",
+          "mine": "Mine"
+        },
+        "mine": "My company"
+      },
+      "entry": {
+        "title": "Company",
+        "pool": "Pool {pool} credits",
+        "suspended": "Account paused",
+        "open": "Manage",
+        "customerTitle": "Customer referral link",
+        "customerHint": "For inviting and winning customers. Sign-ups and purchases through it earn commission for your company affiliate. This is not the staff link.",
+        "copy": "Copy link",
+        "copied": "Copied"
+      },
+      "pool": {
+        "title": "Credit pools",
+        "hint": "Your company holds two kinds: paid credits (bought or deposited by you) and promotion credits (the monthly channel partner grant). Give them to members, who spend them on their own generations.",
+        "balance": "Paid pool",
+        "unit": "credits",
+        "yours": "Yours to deposit",
+        "yoursNote": "your own paid credits",
+        "suspended": "The company is paused: deposits are off.",
+        "depositLabel": "Deposit your own paid credits",
+        "depositPlaceholder": "Number of credits",
+        "depositHint": "Moves credits you bought into the pool. Pool credits can't be refunded or moved back.",
+        "deposit": "Deposit",
+        "depositing": "Depositing…",
+        "deposited": "Deposited into the pool.",
+        "promoBalance": "Promotion pool",
+        "promoExpires": "Valid through {at} (UTC)",
+        "promoNone": "No promotion credits this month",
+        "promoHint": "Images made with promotion credits are watermarked, public and not for commercial use. What is left in the pool and with members goes at the end of the month (UTC). Only paid credits can be deposited."
+      },
+      "packages": {
+        "title": "Company packages",
+        "hint": "Prices are in US dollars. Orders are placed offline.",
+        "none": "No packages are listed right now.",
+        "credits": "{count, plural, one {# credit} other {# credits}}",
+        "unitPrice": "${price} per 100 credits",
+        "contact": "To top up the pool, contact us and pay by bank transfer. We add the credits to your pool once the payment arrives.",
+        "contactLink": "Contact us to arrange a transfer"
+      },
+      "invite": {
+        "title": "Staff-only link",
+        "hint": "Send it only to your own staff. They sign up or sign in and join the company, then use the credits you give them.",
+        "suspended": "The company is paused, so nobody can join with this link for now.",
+        "copy": "Copy link",
+        "copied": "Link copied.",
+        "copyFailed": "Select and copy the link above.",
+        "reset": "Reset link",
+        "resetTitle": "Reset the invite link?",
+        "resetBody": "The current link stops working right away. People already in the company stay.",
+        "resetConfirm": "Reset link",
+        "resetDone": "New link ready.",
+        "cancel": "Cancel",
+        "warning": "Don't send it to customers. A customer who opens it joins your company as staff instead of counting as a customer you referred.",
+        "toAffiliate": "To invite customers, use the customer referral link in Company affiliate"
+      },
+      "members": {
+        "title": "Members",
+        "hint": "Each kind is set separately. The paid monthly allowance tops a person up to that number on the 1st (UTC). The promotion allowance is the most they get automatically each month, given when promotion credits arrive or the allowance changes. Top up paid credits manually and Top up promotion credits manually move credits from that pool straight away.",
+        "unknown": "Account",
+        "owner": "Main admin",
+        "held": "{count, plural, one {# paid credit left} other {# paid credits left}}",
+        "customers": "{count, plural, one {# customer} other {# customers}}",
+        "allowance": "Monthly allowance",
+        "allowanceFor": "Monthly allowance for {who}",
+        "allowanceSaved": "Allowance saved.",
+        "save": "Save",
+        "giveNow": "Top up paid credits manually",
+        "giveFor": "Credits to give {who}",
+        "given": "Gave {count, plural, one {# credit} other {# credits}}.",
+        "give": "Give",
+        "giving": "Giving…",
+        "remove": "Remove",
+        "removeTitle": "Remove {who}?",
+        "removeBody": "The company's unspent paid credits go back to the paid pool and promotion credits to the promotion pool. Credits of their own stay with them. Customers they brought stay with the company.",
+        "removeConfirm": "Remove",
+        "removed": "Removed.",
+        "cancel": "Cancel",
+        "truncated": "Showing {shown} of {total} members.",
+        "inviteEmpty": "No one has joined yet. Send them the invite link above.",
+        "heldPromo": "{count, plural, one {# promotion credit left} other {# promotion credits left}}",
+        "paidKind": "Paid credits",
+        "promoKind": "Promotion credits (watermarked, expire at month end)",
+        "promoAllowance": "Monthly promotion allowance",
+        "promoAllowanceFor": "Monthly promotion allowance for {who}",
+        "promoGiveNow": "Top up promotion credits manually",
+        "showMore": "Show {count} more ({shown} of {total} shown)",
+        "listTitle": "{count, plural, one {Staff (#)} other {Staff (#)}}",
+        "noMatch": "No members match.",
+        "promoGiveFor": "Promotion credits to give {who}",
+        "isDefault": "(default)",
+        "useDefault": "Use default",
+        "defaultRestored": "Back on the default.",
+        "pick": "Select {who}"
+      },
+      "performance": {
+        "title": "Monthly performance",
+        "hint": "What each person was given and used, and the customers they brought, month by month (UTC months).",
+        "unavailable": "The monthly table couldn't be loaded. Reload the page; if it keeps failing, contact us.",
+        "month": "Month",
+        "previous": "Previous month",
+        "next": "Next month",
+        "caption": "Performance of each member in {month}",
+        "member": "Member",
+        "allocated": "Given",
+        "used": "Used",
+        "l1Signups": "Level 1 sign-ups",
+        "l1Paying": "Level 1 paying",
+        "l1Paid": "Level 1 spend",
+        "l2Signups": "Level 2 sign-ups",
+        "l2Paying": "Level 2 paying",
+        "l2Paid": "Level 2 spend",
+        "total": "Total",
+        "removed": "Left",
+        "unknown": "Account",
+        "downloadMembers": "Download CSV",
+        "downloadCustomers": "Download customers CSV",
+        "definition": "Given: credits the company gave the member (monthly top-up and hand allocations). Used: company credits they spent, after refunds. Sign-ups: customers who joined through them this month. Paying: customers who paid this month. Spend: what those customers paid this month in USD, before tax and after refunds. A member who left keeps the customers they brought. Customers appear only as a masked email or phone."
+      },
+      "staff": {
+        "suspended": "Your company account is paused. Your own credits are unaffected.",
+        "allowance": "Monthly allowance",
+        "allocated": "Given this month",
+        "remaining": "Company credits left",
+        "promoTitle": "My promo link",
+        "promoHint": "Customers who sign up with your link count for your company.",
+        "customers": "Customers",
+        "spend": "Spend this month",
+        "level1": "My customers",
+        "level1Hint": "Signed up with your link. This month: {month}.",
+        "level2": "Their customers (level 2)",
+        "level2Hint": "Brought in by your customers. This month: {month}.",
+        "newThisMonth": "{count} new this month",
+        "paying": "Paying this month",
+        "statsUnavailable": "This month's numbers couldn't be loaded.",
+        "paidCredits": "Paid credits",
+        "promoCredits": "Promotion credits",
+        "promoCreditsHint": "Promotion credits from your company: images are watermarked, public and not for commercial use. They are used only when paid credits can't cover a generation, before your own free credits, and whatever is left goes at the end of the month (UTC).",
+        "used": "Used this month",
+        "promoLeft": "Left",
+        "metaTitle": "My company",
+        "open": "View",
+        "entryHint": "My customers and this month in detail",
+        "paidLeft": "Paid credits left",
+        "promoLeftLabel": "Promotion credits left",
+        "monthly": "{count} a month",
+        "pageIntro": "Credits your company gives you each month, and the customers who signed up with your link. Only your own numbers are shown here."
+      },
+      "join": {
+        "metaTitle": "Join a company",
+        "invalidTitle": "This link doesn't work",
+        "invalidBody": "The invite link is wrong or has been reset. Ask your company admin for a new one.",
+        "suspendedTitle": "Company paused",
+        "suspendedBody": "{org} isn't accepting new members right now.",
+        "alreadyTitle": "You're already in {org}",
+        "alreadyBody": "Your account is already a member of this company.",
+        "otherTitle": "You're in another company",
+        "otherBody": "An account belongs to one company at a time. Leave your current company on the account page first.",
+        "title": "Join {org}",
+        "body": "Joining lets your company give you credits and counts customers you bring toward your company. You can leave at any time.",
+        "confirm": "Join {org}",
+        "joining": "Joining…",
+        "done": "You joined {org}.",
+        "toAccount": "Go to my account"
+      },
+      "payment": {
+        "title": "Pay by bank transfer",
+        "hint": "Transfer to one of the accounts below and put your enterprise number in the payment reference.",
+        "pending": "Our collecting account details aren't available here right now. Contact us and we'll send them to you.",
+        "after": "After you transfer, contact us. We confirm the payment and then add the credits to your pool.",
+        "refLabel": "Your enterprise number",
+        "refHint": "Put this number in your payment reference.",
+        "refCopy": "Copy number",
+        "copied": "Copied.",
+        "copyFailed": "Select and copy the number above."
+      },
+      "report": {
+        "member": "Member",
+        "role": "Role",
+        "status": "Status",
+        "allocated": "Credits given",
+        "used": "Credits used",
+        "l1Signups": "Level 1 sign-ups",
+        "l1Paying": "Level 1 paying customers",
+        "l1Paid": "Level 1 spend (USD)",
+        "l2Signups": "Level 2 sign-ups",
+        "l2Paying": "Level 2 paying customers",
+        "l2Paid": "Level 2 spend (USD)",
+        "level": "Level",
+        "contact": "Customer (masked)",
+        "signedUp": "Signed up",
+        "paidInPeriod": "Paid this month (USD)",
+        "paidTotal": "Paid in total (USD)",
+        "total": "Total",
+        "owner": "Main admin",
+        "staff": "Member",
+        "active": "Active",
+        "removed": "Left",
+        "unknown": "Account"
+      },
+      "area": {
+        "workspaceIntro": "Where you run Shotviva as a production tool: manage the credit pool, your staff and what they make each month, for image work at scale.",
+        "purchasingIntro": "Company package prices and bank transfer details. Top up the credit pool offline, the way described here.",
+        "affiliateIntro": "Bring in customers and follow commissions and payouts. Sign-ups and purchases through your referral link count toward the company.",
+        "worksIntro": "Everything staff make with company credits belongs to the company. It shows only here and is never public. When someone leaves, their company works stay here and leave their own account.",
+        "worksIntroMember": "Everything the company made with its credits, for every colleague to view and download for work. Visible inside the company only, never public."
+      },
+      "contact": {
+        "open": "Contact us to arrange a transfer",
+        "title": "Contact us to arrange a transfer",
+        "body": "Contact our China region manager to agree the exchange rate and how the transfer is made.",
+        "name": "China region manager",
+        "email": "Company email",
+        "wechat": "WeChat ID",
+        "copy": "Copy",
+        "copied": "Copied",
+        "copyFailed": "Select and copy it"
+      },
+      "billing": {
+        "title": "Invoice details",
+        "hint": "We keep the company name and tax ID for your records and send them to Waffo when your organisation's primary admin pays with Waffo. If Waffo's checkout doesn't show them pre-filled, enter them on Waffo's page, or add them afterwards in the Waffo buyer portal: Payment History → View Invoice → Edit Details.",
+        "notFapiao": "This is a commercial invoice issued by Waffo, the merchant of record, not a Chinese VAT invoice (fapiao). It applies to Waffo payments only.",
+        "legalName": "Company legal name",
+        "legalNameHint": "As on your business registration, 2–200 characters.",
+        "country": "Country or region",
+        "taxIdCn": "Unified social credit code",
+        "taxIdCnHint": "18 characters, capital letters, no I, O, S, V or Z.",
+        "taxId": "Tax ID",
+        "taxIdHint": "3–40 letters or digits; . / - allowed.",
+        "state": "State / province (optional)",
+        "postcode": "Postcode (optional)",
+        "invoiceEmail": "Invoice email (optional)",
+        "invoiceEmailHint": "For your records only. Waffo sends the invoice to the email entered at checkout.",
+        "updatedAt": "Last saved {date}",
+        "save": "Save",
+        "saving": "Saving…",
+        "saved": "Saved. Waffo orders from now on carry these details.",
+        "clear": "Clear",
+        "cleared": "Cleared. Later Waffo orders no longer carry a company name.",
+        "unavailable": "We couldn't load your invoice details. Refresh the page in a minute.",
+        "errors": {
+          "INVALID": "Something doesn't look right: the company name needs 2–200 characters, a mainland China tax ID is the 18-character unified social credit code, and the email must be complete.",
+          "NOT_OWNER": "Only your organisation's primary admin can see and change invoice details.",
+          "FAILED": "Something went wrong. Try again."
+        },
+        "stateCode": "State / province code",
+        "stateCodeHint": "Required for the US, Canada and Australia: the 2–3 letter code, e.g. CA, ON, NSW."
+      },
+      "works": {
+        "title": "Company works",
+        "all": "All staff",
+        "filterLabel": "Filter by staff member",
+        "removed": "Left",
+        "owner": "Main admin",
+        "count": "{count, plural, one {# photo} other {# photos}}",
+        "empty": "No photos made with company credits yet.",
+        "emptyMember": "This person has not made photos with company credits yet.",
+        "more": "Older works",
+        "open": "View full size",
+        "download": "Download original",
+        "madeBy": "{who} · {date}",
+        "unknown": "Account",
+        "delete": {
+          "open": "Delete {name}",
+          "title": "Delete this company photo?",
+          "body": "This cannot be undone, and it also disappears for the staff member who made it. The deletion is recorded for the company.",
+          "confirm": "Delete photo",
+          "deleting": "Deleting…",
+          "cancel": "Cancel",
+          "running": "This photo is still developing. Delete it once it is done.",
+          "error": "The photo could not be deleted. Please try again later."
+        },
+        "deletedAccounts": "Deleted accounts"
+      },
+      "poolMonth": {
+        "title": "This month's credits ({month})",
+        "hint": "UTC month. The month-end expiry of promotion credits is booked just after the month ends and counted for it.",
+        "item": "Item",
+        "paid": "Paid",
+        "promo": "Promotion",
+        "in": "Into the pool",
+        "allocated": "Given to members",
+        "reclaimed": "Back to the pool",
+        "held": "Still with members",
+        "expired": "Expired at month end"
+      },
+      "defaults": {
+        "title": "Default monthly allowances",
+        "hint": "Every member without a setting of their own follows these, people who join later included. A personal value wins; Use default goes back.",
+        "paid": "Paid credits",
+        "promo": "Promotion credits",
+        "save": "Save defaults",
+        "saved": "Defaults saved.",
+        "confirmTitle": "Save the default allowances?",
+        "cancel": "Cancel",
+        "confirmPaid": "Paid default becomes {value}: {followers} members follow it ({unset} of them were at 0 or never set and will start receiving it from the 1st).",
+        "confirmPromo": "Promotion default becomes {value}: {followers} members follow it ({unset} of them were at 0 or never set and will start receiving it); up to {max} leaves the promotion pool now.",
+        "confirmPin": "To keep someone at 0, first set them to 0 with Select members (a personal value)."
+      },
+      "bulk": {
+        "select": "Select members",
+        "search": "Search accounts",
+        "joinedFrom": "Joined from",
+        "selectAll": "Select all shown",
+        "selected": "{count} selected",
+        "open": "Bulk actions",
+        "cancel": "Cancel",
+        "title": "Bulk actions for {count}",
+        "hint": "Set the monthly allowance, or give everyone the same one-off amount.",
+        "allowance": "Set allowance",
+        "grant": "One-off grant",
+        "paidAllowance": "Paid monthly allowance",
+        "promoAllowance": "Promotion monthly allowance",
+        "setting": {
+          "keep": "Keep",
+          "set": "Set to",
+          "default": "Use default"
+        },
+        "apply": "Apply",
+        "saved": "Set for {count}.",
+        "confirmTitle": "Apply to {count} members?",
+        "allowanceConfirm": "This replaces their monthly allowances. A promotion allowance gives what this month still lacks from the promotion pool straight away.",
+        "kind": {
+          "paid": "paid",
+          "promo": "promotion"
+        },
+        "each": "Credits each",
+        "total": "{count} × {each} = {total} from the {kind} pool ({pool} in it)",
+        "short": "The {kind} pool has {pool} now, not enough for everyone, so nobody gets any.",
+        "give": "Give",
+        "given": "Gave {total} to {count}."
+      }
+    },
+    "templateShare": {
+      "modeOff": "Share templates",
+      "modeOffShort": "Share",
+      "modeOn": "Exit",
+      "pickHint": "Tap templates or series to pick them for your client.",
+      "pickedCount": "{count, plural, one {# picked} other {# picked}}",
+      "pickedMax": "{count} picked, the most one link can hold",
+      "picked": "Picked",
+      "notPicked": "Not picked",
+      "cancel": "Cancel",
+      "shareSelected": "Share selected ({count})",
+      "sheetTitle": "Share with a client",
+      "sheetText": "{count, plural, one {# pick} other {# picks}} in one link. Your client sees only these, in this order, and can start with any of them.",
+      "titleLabel": "Title",
+      "noteLabel": "Note for your client",
+      "optional": "(optional)",
+      "titlePlaceholder": "For example: Spring menu photos",
+      "notePlaceholder": "For example: Pick the look you like best and tell me which one.",
+      "create": "Create link",
+      "creating": "Creating link…",
+      "error": {
+        "rate_limited": "You’ve made many links in a short time. Try again in a while.",
+        "unavailable": "One of the picks is no longer available. Unpick it and try again.",
+        "failed": "The link couldn’t be made. Try again."
+      },
+      "readyTitle": "Your link is ready",
+      "readyText": "Send it to your client. Anyone with the link can see these templates.",
+      "linkLabel": "Share link",
+      "copied": "Link copied",
+      "copyByHand": "Copy this link to share it:",
+      "sendText": "{title}: templates picked for you on Shotviva",
+      "defaultTitle": "Templates picked for you",
+      "done": "Done",
+      "copy": "Copy link",
+      "shareLink": "Share link",
+      "copiedHint": "Link copied. Paste it into WeChat or any chat to send it."
+    },
+    "workShare": {
+      "start": "Share",
+      "startAria": "Select photos to share as one link",
+      "selected": "{count, plural, =0 {Select photos} one {# selected} other {# selected}}",
+      "max": "Up to {max} photos per link",
+      "cancel": "Cancel",
+      "next": "Create link",
+      "select": "Select {name}",
+      "title": "{count, plural, one {Share this photo} other {Share these photos}}",
+      "lede": "Anyone with the link can see the {count, plural, one {photo} other {# photos}}. Photos made with free credits keep their watermark.",
+      "titleLabel": "Title",
+      "titlePlaceholder": "e.g. Spring menu, first draft",
+      "noteLabel": "Note",
+      "notePlaceholder": "A line for the person you send it to",
+      "optional": "(optional)",
+      "beforeLabel": "Show my original photos for comparison",
+      "beforeHint": "Off: they see only the results. On: they can drag to compare each result with the photo you uploaded.",
+      "create": "Create link",
+      "creating": "Creating…",
+      "readyTitle": "Link ready",
+      "readyText": "Anyone with the link can see these photos.",
+      "copy": "Copy link",
+      "copied": "Link copied",
+      "done": "Done",
+      "errorGone": "One of these photos can’t be shared (deleted or removed after review). Pick again.",
+      "errorBusy": "You made many links in a short time. Try again in an hour.",
+      "errorOther": "Could not create the link. Try again.",
+      "shareLink": "Share link",
+      "copiedHint": "Link copied. Paste it into WeChat or any chat to send it.",
+      "copyByHand": "Copy this link to share it:",
+      "shareTitle": "Photos I made on Shotviva"
     }
   },
   "paywall": {
@@ -1755,7 +2240,7 @@
         "photos": "Example: one template on a phone photo. A batch makes one of these for each photo.",
         "templates": "Example: one phone photo, two templates, made in one batch."
       },
-      "photoAlt": "Example: the phone photo",
+      "photoAlt": "Example: the real phone photo",
       "resultAlt": "Example: result {index, number}"
     },
     "packOrPlan": {
@@ -1784,7 +2269,7 @@
     "billingLabel": "Billing period",
     "monthly": "Monthly",
     "yearly": "Yearly",
-    "savePct": "Save up to <b>{pct}%</b>",
+    "savePct": "{same, select, true {{about, select, true {Save about <b>{pct}%</b>} other {Save <b>{pct}%</b>}}} other {Save up to <b>{pct}%</b>}}",
     "plansLabel": "Plans",
     "tiers": {
       "starter": "Starter",
@@ -1835,7 +2320,7 @@
         "allTemplates": "Every template"
       },
       "cells": {
-        "pct": "{value}%",
+        "pct": "{value, plural, =0 {—} other {#%}}",
         "hours": "{value} h",
         "weight": "{value}×",
         "yes": "Included"
@@ -1844,14 +2329,18 @@
     "packsTitle": "Credit packs",
     "packsLabel": "Credit packs",
     "packCredits": "{count, plural, one {<n>#</n> <u>credit</u>} other {<n>#</n> <u>credits</u>}}",
-    "payWith": "Pay with",
     "payLabel": "Payment method",
+    "choosePaymentMethod": "Choose a payment method",
+    "nextToPayment": "Continue to payment",
+    "goToPayment": "Go to checkout",
     "pricesInUsd": "All prices in USD",
     "card": "Card · Apple Pay · Google Pay",
     "alipay": "Alipay",
     "wallet": "Alipay / WeChat Pay",
+    "wechatCap": "WeChat Pay takes up to ¥1,000 per payment and per month. Above that, use Alipay (no limit) or a card.",
+    "wechatCapOver": "This purchase is over WeChat Pay's ¥1,000 limit. Pay with Alipay or a card.",
     "cnCard": "China-issued card",
-    "cardOnly": "Card",
+    "cardWallets": "Card · Apple Pay · Google Pay",
     "cardRenews": "Renews automatically, cancel anytime",
     "walletOnce": "One-time payment, {period, select, year {1 year} other {30 days}}, no auto-renew",
     "oneTime": "One-time payment",
@@ -1866,26 +2355,23 @@
     "choose": "Choose {tier}",
     "upgradeTo": "Upgrade to {tier}",
     "savingLabel": "You save<vs> vs monthly</vs>",
-    "savingAmount": "{amount} a year",
+    "savingAmount": "{amount} a year · {about, select, true {about } other {}}{pct}% off",
     "mostPopular": "Most popular",
     "memberPrice": "Member price",
     "memberCodeKept": "Member price. Your discount code is saved for another purchase.",
     "packsNote": "Buy credits once, no subscription",
-    "packsNoteV2": "Small packs are full price. On medium and large packs, Starter saves 5%, Pro 10% and Max 15%. Each pack includes the same credits for everyone.",
+    "packsNoteV2": "Small packs are full price. {starter, plural, =0 {On medium and large packs, Pro saves {pro}% and Max {max}%.} other {On medium and large packs, Starter saves {starter}%, Pro {pro}% and Max {max}%.}} Each pack includes the same credits for everyone.",
     "buy": "Buy",
     "buyPackLabel": "Buy {count, plural, one {# credit} other {# credits}} for {price}",
-    "payNoteCard": "Plans renew automatically, cancel anytime",
-    "payNoteWallet": "One-time payment for 30 days or 1 year, no auto-renew",
-    "payNotePacks": "Credit packs are always a one-time payment.",
     "cancelled": "<b>Checkout cancelled.</b> Nothing was charged.",
     "cancelledClose": "Dismiss",
-    "downgradeRefused": "Plans only go up while yours runs.",
+    "downgradeRefused": "You can upgrade during your plan, but not downgrade.",
     "goToAccount": "Go to Account",
     "yourPlan": "Your plan",
     "notAvailable": "Not available",
     "lockLower": "Can't switch down. Cancel, then buy it after your plan ends.",
     "lockCurrentNote": "This is your plan. Manage or cancel it in Account.",
-    "upgradeNote": "Starts now, all its credits at once; your credits stay.",
+    "upgradeNote": "Starts now. You get all its credits at once and keep the ones you have.",
     "upgradeNoteCancels": "Starts now, all its credits at once; your current subscription ends today and your credits stay.",
     "guestDiscount": "Sign up to use your code.",
     "waffoNoDiscount": "Promo codes are unavailable with this payment provider. Your discount is saved for later.",
@@ -1897,6 +2383,7 @@
     "codeMonths": "First {months} months",
     "codeEvery": "Every billing period",
     "codeCheckoutFloor": "This discount is unavailable for this item at its current price. Choose another eligible item.",
+    "orgMemberCheckout": "Enterprise staff accounts use the credits their organisation allocates. For more, contact your organisation's admin.",
     "codeCheckoutChanged": "The price or your discount has changed. Check the updated price before trying again.",
     "codeCheckoutInUse": "This discount is in use in another checkout. Return to that checkout to finish or cancel it, then try again.",
     "fineDiscount": "{term} at {price}, then {original} per {period, select, year {year} other {month}} · cancel anytime · USD"
@@ -1930,6 +2417,8 @@
     "copyright": "© {year} {name}",
     "language": "Language",
     "cookieSettings": "Cookie settings"
+,
+    "templateRequests": "Request a template"
   },
   "consent": {
     "label": "Cookies",
@@ -1956,9 +2445,14 @@
     "tryTitle": "Three templates to try instead"
   },
   "marketing": {
+    "templateRequests": {
+      "lead": "Not finding a template for your photo?",
+      "link": "Request a custom AI photo template"
+    },
     "appDescription": "AI photo studio",
     "nav": {
       "label": "Main",
+      "phoneLabel": "Pages",
       "pricing": "Pricing",
       "tagline": "AI edits, true to your photo",
       "useCases": "Use Cases",
@@ -1967,6 +2461,8 @@
       "useCaseGenerator": "Image to image generator",
       "useCaseTransparent": "Transparent PNG maker",
       "templates": "Templates",
+      "requestTemplate": "Request a template",
+      "requestTemplateShort": "Custom",
       "login": "Log in",
       "startFree": "Start free",
       "uploadPhoto": "Upload photo",
@@ -1984,22 +2480,32 @@
     "faq": "Frequently asked questions",
     "related": "Related",
     "home": {
-      "phone": "Phone",
+      "phone": "Real phone photo",
+      "phoneShort": "Phone",
       "ai": "AI",
-      "beforeAlt": "{name} template, real example: the phone photo before",
+      "beforeAlt": "{name} template, real example: the real phone photo before",
       "afterAlt": "{name} template, real example: the AI result, {use}",
       "pickAria": "{name}. {use} Pick this template",
-      "compareLabel": "Compare the phone photo and the {name} result",
+      "compareLabel": "Compare the real phone photo and the {name} result",
       "withDragHint": "{use} Drag the handle to compare.",
       "preview": "Preview",
       "seriesCount": "{count, plural, one {# look} other {# looks}}",
       "seriesAria": "{name}. {use} A series of {count, plural, one {# template} other {# templates}}. Open this series",
       "seriesBadge": "Series",
+      "bundleBadge": "Set",
+      "bundleCount": "{count} picked",
+      "bundleAllIn": "All {count} {category} templates →",
+      "bundleAll": "All {count} templates →",
+      "stripPick": "{name}. Use this template",
+      "heroScenesLabel": "Phone photos and results from a few templates",
+      "bundleAria": "{name}, showing {template}. Use this template",
       "seriesOpen": "Open the series",
       "freeTag": "Free · public",
       "paidTag": "Paid · private",
       "freeSampleAlt": "A free photo with the watermark (real example)",
-      "paidSampleAlt": "The same photo made with paid credits, no watermark (real example)"
+      "paidSampleAlt": "The same photo made with paid credits, no watermark (real example)",
+      "factsAll": "Show all {count} rows",
+      "foldOpen": "Show"
     }
   },
   "pageError": {
@@ -2036,6 +2542,9 @@
     "version": "Version {version}",
     "settingsReadOnly": "You can view your payout details here. To make changes, you’ll need to accept the current affiliate terms once they are published.",
     "termsPlaceholder": "The program owner will publish the full terms here before launch.",
+    "termsGateTitle": "Please accept the updated affiliate terms",
+    "termsGateIntro": "The affiliate terms changed to version {version}. Read and accept them to keep using your partner dashboard; earnings and settings stay hidden until you do.",
+    "termsGateSubmit": "Accept and continue",
     "agree": "I agree to the",
     "termsLink": "affiliate terms (version {version})",
     "needsPlan": "To apply, you need a qualifying membership purchase: {plan}. Fully refunded purchases do not count.",
@@ -2093,7 +2602,7 @@
     "totalCommission": "Total commission",
     "amount": "Amount (USD)",
     "statementAmount": "Original amount (USD)",
-    "amountPaid": "Amount paid (USD)",
+    "amountPaid": "Amount paid before fees (USD)",
     "paidDate": "Payment date (UTC)",
     "recruit": "Team invitation link",
     "members": "Team members",
@@ -2152,10 +2661,16 @@
       "dispute_won": "Dispute won",
       "same_ip": "Matching signup network",
       "affiliate_inactive": "Affiliate inactive at purchase",
+      "affiliate_paused": "Held while the company programme was paused",
+      "affiliate_resumed": "Released: company programme active again",
+      "org_member": "Customer is a member of this company",
       "confirmed": "Confirmation period completed",
       "admin_release": "Released after review",
       "admin_void": "Voided after review",
-      "zero": "No commission due"
+      "zero": "No commission due",
+      "fee_adjusted": "Fees updated (estimated)",
+      "fee_final": "Fees settled",
+      "confirmed_fee_estimate": "Confirmed on estimated fees"
     },
     "product": {
       "starter_monthly": "Starter monthly",
@@ -2296,7 +2811,85 @@
     "recruitHint": "People who apply through this link join your team once approved.",
     "payoutTitle": "Payout details",
     "payoutIntro": "We pay confirmed earnings with this method on the monthly settlement date.",
-    "programName": "Affiliate program"
+    "programName": "Affiliate program",
+    "feeAmount": "Payout fees (USD)",
+    "netAmount": "Net payout (USD)",
+    "estimated": "{amount} (est.)",
+    "fees": {
+      "title": "Payout fees",
+      "intro": "These fees are deducted from each payout before we send it. Each fee is calculated on the payout amount before fees. The {threshold} payout threshold applies to your balance before fees.",
+      "none": "No payout fees are deducted at the moment.",
+      "allMethods": "All payout methods",
+      "onlyMethods": "Only for {methods}",
+      "min": "min {amount}",
+      "max": "max {amount}",
+      "estimateTitle": "If your current balance of {balance} were paid out today",
+      "totalFees": "Fees",
+      "net": "Estimated net payout",
+      "estimateNote": "This is an estimate for your current payout method. The final amount is set when the statement is paid, using the fees in force on its settlement date and the amount payable then. Fees never exceed the payout.",
+      "estimateNoMethod": "Add a payout method to see the fees that apply to it. Fees that only apply to some payout methods are not included in this estimate yet.",
+      "breakdown": "Fee details"
+    },
+    "enterprise": {
+      "pill": "Company account",
+      "title": "Company partner dashboard",
+      "promo": {
+        "title": "This month's promotion credits",
+        "granted": "Granted",
+        "monthly": "Monthly grant",
+        "topups": "Top-ups",
+        "remaining": "Remaining",
+        "validThrough": "Valid through (UTC)",
+        "note": "They go into your company's promotion pool, and you hand them to staff in the workspace. Images made with them are watermarked and not for commercial use. Remaining = the pool plus what staff still hold; whatever is left goes at the end of the month (UTC).",
+        "none": "No promotion credits have been granted this month yet."
+      }
+    },
+    "orderFees": {
+      "paid": "Paid (USD)",
+      "tax": "Tax",
+      "fees": "Payment fees",
+      "netBase": "Commission base",
+      "channel": "Payment channel",
+      "fee": "Fee",
+      "rate": "Rate",
+      "feeAmount": "Amount",
+      "source": "Source",
+      "feeState": "Status",
+      "refunded": "Refunded share",
+      "show": "Fee breakdown ({count, plural, one {# line} other {# lines}})",
+      "legacy": "Calculated by the previous rule (payment fees not deducted).",
+      "noLines": "No fee lines recorded yet.",
+      "sourceReal": "Provider bill",
+      "sourceEstimate": "Estimated from published rates",
+      "state": {
+        "estimated": "Estimated",
+        "final": "Final"
+      },
+      "noteFinal": "Commission base = paid − tax − refunded share − payment fees. These fees are final.",
+      "noteEstimate": "Commission base = paid − tax − refunded share − payment fees. Estimated fees are replaced by the provider’s real amounts once known, and your commission is recalculated.",
+      "channels": {
+        "stripe_card": "Stripe card",
+        "stripe_cn_card": "Stripe China card",
+        "stripe_alipay": "Stripe Alipay",
+        "stripe_wechat_pay": "Stripe WeChat Pay",
+        "waffo_card": "Waffo card",
+        "waffo_cn_card": "Waffo card",
+        "waffo_alipay": "Waffo Alipay",
+        "waffo_wechat_pay": "Waffo WeChat Pay"
+      },
+      "kinds": {
+        "acquiring": "Processing fee",
+        "intl_card": "International card surcharge",
+        "fx": "Currency conversion",
+        "mp": "Managed Payments",
+        "billing": "Subscription billing",
+        "radar": "Fraud screening",
+        "refund_fee": "Refund fee",
+        "other": "Other"
+      },
+      "confirmsOn": "Confirms {date}",
+      "pausedHold": "Held until the company programme is active again"
+    }
   },
   "gallery": {
     "meta": {
@@ -2322,7 +2915,7 @@
       "text": "Text on the photo",
       "reuse": "Make one like this",
       "reuseNote": "Opens the same template with the same settings. You add your own photo: this one is never reused.",
-      "watermark": "Made with free credits, so it carries a small watermark.",
+      "watermark": "Made with free credits: watermarked, for demo only, not licensed for commercial use.",
       "alt": "{template} photo made with Shotviva"
     },
     "report": {
@@ -2357,7 +2950,7 @@
     "metaDescription": "Turn a phone photo into a polished image with the {name} template on Shotviva.",
     "ogAlt": "An AI result made with the {name} template",
     "kicker": "Shotviva template · {category}",
-    "hint": "Left: the phone photo. Right: the AI result. Tap the image to zoom.",
+    "hint": "Left: the real phone photo. Right: the AI result. Tap the image to zoom.",
     "series": "Series · {name} · {count, plural, one {# template} other {# templates}}",
     "make": "Make one with this template",
     "browse": "Browse all templates",
@@ -2368,6 +2961,26 @@
     "missingText": "It may have been taken down or changed. Have a look at the other templates.",
     "missingBrowse": "See other templates"
   },
+  "blog": {
+    "footerLink": "Blog",
+    "listTitle": "Blog",
+    "listIntro": "Guides and comparisons on AI food photography, product photos and menu design, from the Shotviva team.",
+    "listEmpty": "No posts yet. Check back soon.",
+    "metaTitle": "Shotviva Blog: AI photo guides for restaurants and sellers",
+    "metaDescription": "Guides and tool comparisons on AI food photography, product photos and menu design for restaurants, hotels and online sellers.",
+    "by": "By",
+    "published": "Published",
+    "updated": "Updated",
+    "contents": "On this page",
+    "home": "Home",
+    "crumb": "Blog",
+    "aboutAuthor": "About the author",
+    "authorRoles": "Roles",
+    "authorAwards": "Awards",
+    "authorBrands": "Brands worked with",
+    "authorPosts": "Articles by {name}",
+    "authorNoPosts": "No articles in English yet."
+  },
   "supportEmail": {
     "subject": "You have a reply from Shotviva support",
     "title": "Your ticket has a new reply",
@@ -2375,5 +2988,42 @@
     "button": "View the reply",
     "fallback": "If the button doesn't work, copy and paste this link into your browser:",
     "footer": "This is an automated email, please don't reply to it. Reply in your ticket on Shotviva instead."
+  },
+  "templateShare": {
+    "metaTitle": "{title} · Shotviva templates",
+    "metaDescription": "A set of Shotviva templates picked for you. Choose one and turn a phone photo into a polished image.",
+    "title": "Templates picked for you",
+    "kicker": "{count, plural, one {# template} other {# templates}} to choose from",
+    "hint": "Each picture shows a real phone photo on the left and the AI result on the right. Choose the one you like and start with it.",
+    "use": "Use this template",
+    "alt": "phone photo and AI result (illustrative example)",
+    "seriesCount": "{count, plural, one {# template} other {# templates}}",
+    "show": "Show the templates",
+    "hide": "Hide the templates",
+    "illustrative": "Template images are illustrative examples.",
+    "missingTitle": "This link isn’t available",
+    "missingText": "It may have been withdrawn, or its templates are no longer offered. Have a look at the other templates.",
+    "missingBrowse": "See other templates",
+    "badge": "Series"
+  },
+  "workShare": {
+    "metaTitle": "{title} · Shotviva",
+    "metaDefault": "Shared photos",
+    "metaDescription": "{count, plural, one {# photo} other {# photos}} made from phone photos with Shotviva.",
+    "kicker": "Shared collection · {count, plural, one {# photo} other {# photos}}",
+    "defaultTitle": "Photos made with Shotviva",
+    "compareHint": "Drag across a photo to compare the original phone photo with the result.",
+    "afterOnlyHint": "The results, made from ordinary phone photos.",
+    "noBefore": "Original not available",
+    "demo": "Free version · watermarked",
+    "workAlt": "{name}: the result",
+    "emptyTitle": "Nothing left in this collection",
+    "emptyText": "The photos in it were removed by the person who shared it.",
+    "missingTitle": "This link isn’t available",
+    "missingText": "It may have been turned off by the person who shared it.",
+    "ctaTitle": "Make photos like these",
+    "ctaText": "Upload one phone photo and get a polished result in about 30 seconds.",
+    "cta": "Try Shotviva free",
+    "ctaSignedIn": "Create a photo"
   }
 }

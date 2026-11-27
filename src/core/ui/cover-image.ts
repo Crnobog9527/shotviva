@@ -1,6 +1,7 @@
 import { getImageProps, type ImageLoader } from 'next/image'
 import { preconnect } from 'react-dom'
 
+import { presizedSource, type PresizedFormat, type PresizedUrl } from '../presized'
 import { publicEnv } from '../public-env'
 import { capSrcSet } from './srcset-cap'
 
@@ -15,6 +16,10 @@ import { capSrcSet } from './srcset-cap'
 // optimiser URLs are put on the CDN's host instead: the CDN forwards /_next/image?… to this site
 // and caches what it returns, so the files are byte for byte the ones served today. Nothing in
 // the database changes; unsetting the variable and redeploying turns it off.
+//
+// With NEXT_PUBLIC_PRESIZED_IMAGES_URL set (core/presized) a cover or public picture that has
+// stored fixed-width WebP copies points its srcset at those files instead: the same widths, no
+// optimiser, one cached object per width. Everything else keeps the rules above.
 
 export type CoverImage = { sizes?: string; srcSet?: string; src: string }
 
@@ -24,14 +29,45 @@ export function isCoverUrl(url: string, base: string | undefined = publicEnv.NEX
 
 // Keys in the order next/image renders them (sizes, srcSet, src), so the browser has the
 // srcset before it could start fetching src.
-export function coverImage(url: string, sizes: string, base?: string, cdn: string | undefined = publicEnv.NEXT_PUBLIC_IMAGE_CDN_URL): CoverImage {
+export function coverImage(
+  url: string,
+  sizes: string,
+  base?: string,
+  cdn: string | undefined = publicEnv.NEXT_PUBLIC_IMAGE_CDN_URL,
+  presized: string | undefined = publicEnv.NEXT_PUBLIC_PRESIZED_IMAGES_URL,
+): CoverImage {
   if (!isCoverUrl(url, base)) return { src: url }
+  const loader = coverLoaderFor(url, base, cdn, presized)
   // The CDN is a new origin for the page: start its DNS + TLS while the HTML is still arriving
   // (React hoists this into <head>; repeated calls collapse into one link).
-  if (cdn) preconnect(cdn)
-  const { props } = getImageProps({ src: url, alt: '', fill: true, sizes, ...(cdn ? { loader: cdnLoader(cdn) } : {}) })
+  if (loader) preconnect(loader.origin)
+  const { props } = getImageProps({ src: url, alt: '', fill: true, sizes, ...(loader ? { loader } : {}) })
   // Without the candidates no screen up to 2× picks (srcset-cap.ts).
   return capSrcSet({ sizes: props.sizes, srcSet: props.srcSet, src: props.src }, sizes)
+}
+
+// The stored copy for each width next/image asks for (its widths are the stored ones, next.config.ts),
+// in one format: WebP for the <img>, AVIF for the <picture> source (picture.tsx).
+export function presizedLoader(toUrl: PresizedUrl, format: PresizedFormat = 'webp'): ImageLoader & { origin: string } {
+  const loader: ImageLoader = ({ width }) => toUrl(width, format)
+  return Object.assign(loader, { origin: new URL(toUrl(0)).origin })
+}
+
+// The AVIF <source> for a cover shown with coverImage (same widths, same cap), or undefined when it
+// has no stored copies. The <img> keeps coverImage's WebP srcset for browsers without AVIF.
+export type AvifSource = { srcSet: string; sizes?: string }
+
+export function coverAvif(
+  url: string,
+  sizes: string,
+  base?: string,
+  presized: string | undefined = publicEnv.NEXT_PUBLIC_PRESIZED_IMAGES_URL,
+): AvifSource | undefined {
+  const sized = presizedSource(url, { origin: presized, assetsBase: base ?? publicEnv.NEXT_PUBLIC_ASSETS_BASE_URL })
+  if (!sized) return undefined
+  const { props } = getImageProps({ src: url, alt: '', fill: true, sizes, loader: presizedLoader(sized, 'avif') })
+  const capped = capSrcSet({ sizes: props.sizes, srcSet: props.srcSet, src: props.src }, sizes)
+  return capped.srcSet ? { srcSet: capped.srcSet, sizes: capped.sizes } : undefined
 }
 
 // Next's own default-loader URL (url, w, q in that order; covers are remote, so no dpl), on the
@@ -46,9 +82,17 @@ export function cdnLoader(cdn: string): ImageLoader & { origin: string } {
 const PUBLIC_PICTURE_DIRS = ['/home/', '/cases/', '/intros/', '/partners/', '/brand/', '/og/', '/icons/']
 export const isPublicPicture = (src: string) => PUBLIC_PICTURE_DIRS.some((dir) => src.startsWith(dir))
 
-// The CDN loader for a next/image src that is a cover or one of the site's public pictures, or
-// undefined (switch off, a static import, a user's photo, another host).
-export function coverLoaderFor(src: unknown, base?: string, cdn: string | undefined = publicEnv.NEXT_PUBLIC_IMAGE_CDN_URL) {
+// The loader for a next/image src that is a cover or one of the site's public pictures: its stored
+// copies when it has them and that switch is on, else the CDN's /_next/image, or undefined (both
+// switches off, a static import, a user's photo, another host).
+export function coverLoaderFor(
+  src: unknown,
+  base?: string,
+  cdn: string | undefined = publicEnv.NEXT_PUBLIC_IMAGE_CDN_URL,
+  presized: string | undefined = publicEnv.NEXT_PUBLIC_PRESIZED_IMAGES_URL,
+) {
+  const sized = presizedSource(src, { origin: presized, assetsBase: base ?? publicEnv.NEXT_PUBLIC_ASSETS_BASE_URL })
+  if (sized) return presizedLoader(sized)
   return cdn && typeof src === 'string' && (isCoverUrl(src, base) || isPublicPicture(src)) ? cdnLoader(cdn) : undefined
 }
 

@@ -3,8 +3,10 @@ import 'server-only'
 import type Stripe from 'stripe'
 import { z } from 'zod'
 
+import { notifyOwner } from '../../alerts'
 import { trackPurchase } from '../../analytics/funnel'
 import { AppError } from '../../errors'
+import { recordStripeFees } from '../fees/stripe'
 import { readQuote } from '../read-quote'
 import { creditChangeSchema } from '../credits'
 import { callRpc } from '../rpc'
@@ -117,7 +119,11 @@ export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Pro
     },
     creditChangeSchema,
   )
+  // F3: the renewal's processing fees, also on a replay (keyed, writes once; never throws).
+  await recordStripeFees(deps, { ref: invoice.id, chargeId: facts.chargeId, subscription: true, managedPayments: null })
   if (!change.applied) return 'replayed'
+  notifyOwner({ kind: 'payment_received', channel: 'stripe', ref: invoice.id, userId, productId: product.id,
+    amount: { cents: facts.amountTotal, currency: facts.currency }, method: facts.method, renewal: true })
   ;(deps.trackBuy ?? trackPurchase)(userId, {
     product_id: product.id,
     tier: product.tier,
@@ -128,6 +134,6 @@ export async function renewFromInvoice(deps: FulfilDeps, invoiceId: string): Pro
     method: facts.method,
     ...renewalAmounts(invoice, metadata, price, product),
     ...(quote && { credits: quote.credits }),
-  }, metadata.locale === 'zh' ? 'zh' : 'en')
+  }, metadata.locale === 'zh' ? 'zh' : 'en', invoice.id)
   return 'applied'
 }

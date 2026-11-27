@@ -82,9 +82,10 @@ export async function finishedWork(userId: string, store: ObjectStore, templateI
 
 export type EditOptions = { classifier?: ClassifierBehaviour | null; provider?: FakeBehaviour; profile?: TestProfile }
 
-// A user with one finished 4:5 work (Standard, 1 credit) and `profile` credits left after it.
+// A user with one finished 4:5 work (1K, 1 credit) and `profile` credits left after it. A 1K work
+// is paid from free credits only (1996), so the source takes one extra free credit.
 export async function editSetup(db: Client, templateId: string, { classifier = {}, provider = 'ok', profile = { credits: 10 } }: EditOptions = {}) {
-  const userId = await createUser(db, { credits: (profile.credits ?? 0) + 1, freeCredits: profile.freeCredits })
+  const userId = await createUser(db, { credits: profile.credits ?? 0, freeCredits: (profile.freeCredits ?? 0) + 1 })
   const r2 = createMemoryStore()
   const sourceId = await finishedWork(userId, r2.store, templateId, (key, body) => r2.upload(key, body, 'image/jpeg'))
   const fake = fakeProvider(provider)

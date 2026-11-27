@@ -29,7 +29,7 @@ describe('STRIPE_WECHAT_PAY off (default): the pre-T73 Alipay checkout', () => {
     const params = sent(create)
     expect(params).toMatchObject({ mode: 'payment', allowed_payment_method_types: ['alipay'], managed_payments: { enabled: false } })
     expect(params).not.toHaveProperty('payment_method_options')
-    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ channel: 'stripe', method: 'alipay' }), 'zh')
+    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ channel: 'stripe', method: 'alipay' }), 'zh', expect.any(String))
   })
 
   it('is the default when the deps say nothing else', async () => {
@@ -61,7 +61,7 @@ describe('STRIPE_WECHAT_PAY on: both wallets', () => {
     expect(params).not.toHaveProperty('payment_method_configuration')
     expect(params).not.toHaveProperty('wallet_options')
     expect(params).not.toHaveProperty('subscription_data')
-    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ channel: 'stripe', method: 'alipay_or_wechat' }), 'zh')
+    expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ channel: 'stripe', method: 'alipay_or_wechat' }), 'zh', expect.any(String))
   })
 
   it.each([
@@ -88,7 +88,7 @@ describe('card routes ignore the switch', () => {
       await createCheckout(d, { userId: USER, body: { product_id: 'pack_s', method, locale: 'zh' } })
       if (method === 'card') expect(sent(create)).not.toHaveProperty('payment_method_options')
       else expect(sent(create)?.payment_method_options).toEqual({ card: { request_three_d_secure: 'any' } })
-      expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ method }), 'zh')
+      expect(d.trackStart).toHaveBeenCalledWith(USER, expect.objectContaining({ method }), 'zh', expect.any(String))
     }
   })
 })

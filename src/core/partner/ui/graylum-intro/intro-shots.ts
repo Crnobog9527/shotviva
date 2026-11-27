@@ -1,40 +1,51 @@
-// Graylum's own screenshots (supplied by the Owner, public/partners/graylum): a thumbnail at
-// twice the size it is shown at, and a large file, about 1200px on the long edge, that is only
-// asked for when the lightbox opens. `key` names the shot's words in partner.intro.shots.
-export type IntroShot = {
-  key: ShotKey
-  thumb: { src: string; width: number; height: number }
-  large: { src: string; width: number; height: number }
-}
+import { EN_ASSETS } from './en-assets'
 
-export const SHOT_KEYS = ['roadmap', 'script', 'xhsPost', 'storyboard', 'storeVisit', 'shotvivaImage', 'tools'] as const
-export type ShotKey = (typeof SHOT_KEYS)[number]
+// Graylum's own looping explainer animations (supplied by the Owner, public/partners/graylum).
+// Every one is 16:10, 1280×800, silent, in WebM and MP4 with a WebP poster. `key` names the
+// scene's words in partner.intro.shots. The hero shows the six steps; the six scenes show in a
+// grid by poster and only play in the enlarged view.
+export type IntroMedia = { webm: string; mp4: string; poster: string }
+export type IntroScene = { key: SceneKey; media: IntroMedia }
+
+export const SCENE_KEYS = ['voiceover', 'post', 'storyboard', 'repurpose', 'imageWithShotviva', 'moreTools'] as const
+export type SceneKey = (typeof SCENE_KEYS)[number]
+
+export const MEDIA_SIZE = { width: 1280, height: 800 } as const
 
 const BASE = '/partners/graylum'
-const FILE: Record<ShotKey, string> = {
-  roadmap: 'roadmap',
-  script: 'script',
-  xhsPost: 'xhs-post',
-  storyboard: 'storyboard',
-  storeVisit: 'store-visit',
-  shotvivaImage: 'shotviva-image',
-  tools: 'tools',
-}
-// Pixel sizes of the files, so every box is reserved before its picture arrives.
-const LARGE: Partial<Record<ShotKey, [number, number]>> = { roadmap: [1002, 1200], script: [1063, 1200] }
-
-function shot(key: ShotKey): IntroShot {
-  const [width, height] = LARGE[key] ?? [1200, 960]
-  const thumb = key === 'roadmap' ? { width: 1344, height: 840 } : { width: 640, height: 480 }
-  return {
-    key,
-    thumb: { src: `${BASE}/${FILE[key]}-thumb.webp`, ...thumb },
-    large: { src: `${BASE}/${FILE[key]}-large.webp`, width, height },
-  }
+const FILE: Record<SceneKey, string> = {
+  voiceover: 'scene-1-voiceover',
+  post: 'scene-2-post',
+  storyboard: 'scene-3-storyboard',
+  repurpose: 'scene-4-repurpose',
+  imageWithShotviva: 'scene-5-image-with-shotviva',
+  moreTools: 'scene-6-more-tools',
 }
 
-// 能做什么 shows the first; 什么时候适合用 the other six, in this order. The lightbox steps
-// through all seven.
-export const INTRO_SHOTS: readonly IntroShot[] = SHOT_KEYS.map(shot)
+const ZH_FILES = (name: string): IntroMedia => ({
+  webm: `graylum-${name}.webm`,
+  mp4: `graylum-${name}.mp4`,
+  poster: `graylum-${name}-poster.webp`,
+})
+const EN_FILES = (name: string): IntroMedia => ZH_FILES(`${name}-en`)
+
+// One scene's files for a locale: `en` takes the -en file where EN_ASSETS lists it, file by
+// file (webm, mp4 and poster each fall back to the Chinese one on their own); every other
+// locale takes the Chinese files.
+export function pickMedia(name: string, locale: string, available: ReadonlySet<string> = EN_ASSETS): IntroMedia {
+  const zh = ZH_FILES(name)
+  const en = EN_FILES(name)
+  const file = (kind: keyof IntroMedia) => `${BASE}/${locale === 'en' && available.has(en[kind]) ? en[kind] : zh[kind]}`
+  return { webm: file('webm'), mp4: file('mp4'), poster: file('poster') }
+}
+
+export const heroMedia = (locale: string, available?: ReadonlySet<string>) => pickMedia('hero-6steps', locale, available)
+
+// 什么时候适合用, in this order. The enlarged view steps through all six.
+export const introScenes = (locale: string, available?: ReadonlySet<string>): readonly IntroScene[] =>
+  SCENE_KEYS.map(key => ({ key, media: pickMedia(FILE[key], locale, available) }))
+
+// The Chinese set: the keys and the count do not depend on the locale.
+export const INTRO_SCENES = introScenes('zh')
 
 export const GRAYLUM_ICON = { src: `${BASE}/icon.webp`, size: 96 } as const

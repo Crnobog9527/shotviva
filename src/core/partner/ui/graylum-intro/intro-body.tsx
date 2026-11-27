@@ -1,44 +1,41 @@
 'use client'
 
 import { Check } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 
 import { ConnectionCard } from './connection-card'
 import type { GraylumLinks } from './intro-links'
-import { INTRO_SHOTS } from './intro-shots'
+import { heroMedia, introScenes } from './intro-shots'
+import { LoopVideo } from './loop-video'
 import { ShotThumb, type ViewShot } from './shot-thumb'
 
 type Props = { connected: boolean; links: GraylumLinks; disconnect: () => Promise<void>; onView: ViewShot }
 
 // The scrolling middle of the introduction, top to bottom: the one-line intro (the dialog's
 // description), why Graylum exists, the connection, then 能做什么 / 什么时候适合用 told by
-// Graylum's own screenshots, and what connecting changes.
+// Graylum's own looping animations, and what connecting changes.
 export function IntroBody({ connected, links, disconnect, onView }: Props) {
   const t = useTranslations('partner.intro')
-  const [hero, ...uses] = INTRO_SHOTS
+  const locale = useLocale()
   return (
     <>
       <DialogPrimitive.Description className="text-[17px] leading-[1.55] font-medium text-pretty text-foreground">{t('tagline')}</DialogPrimitive.Description>
       <p data-intro-idea="" className="mt-3 text-[15px] leading-[1.65] text-pretty text-bone-dim">{t('idea')}</p>
       <ConnectionCard connected={connected} connectUrl={links.connect} disconnect={disconnect} />
       <Section title={t('what')}>
-        {hero && (
-          <figure>
-            <ShotThumb shot={hero} index={0} onView={onView} className="aspect-[1344/840]" />
-            <figcaption className="mt-2 text-caption leading-[1.45] text-muted-foreground">{t(`shots.${hero.key}.note`)}</figcaption>
-          </figure>
-        )}
+        <p className="mb-3 text-[15px] leading-[1.65] text-pretty text-bone-dim">{t('whatNote')}</p>
+        <LoopVideo media={heroMedia(locale)} label={t('heroAlt')} />
       </Section>
       <Section title={t('when')}>
         <ul role="list" className="grid grid-cols-1 gap-x-3 gap-y-5 sm:grid-cols-3">
-          {uses.map((shot, at) => (
-            <li key={shot.key}>
+          {introScenes(locale).map((scene, at) => (
+            <li key={scene.key}>
               <figure>
-                <ShotThumb shot={shot} index={at + 1} onView={onView} className="aspect-[4/3]" />
+                <ShotThumb scene={scene} index={at} onView={onView} />
                 <figcaption className="mt-2 grid gap-0.5">
-                  <b className="text-[15px] leading-[1.35] font-semibold">{t(`shots.${shot.key}.label`)}</b>
-                  <span className="text-caption leading-[1.45] text-muted-foreground">{t(`shots.${shot.key}.note`)}</span>
+                  <b className="text-[15px] leading-[1.35] font-semibold">{t(`shots.${scene.key}.label`)}</b>
+                  <span className="text-caption leading-[1.45] text-muted-foreground">{t(`shots.${scene.key}.note`)}</span>
                 </figcaption>
               </figure>
             </li>

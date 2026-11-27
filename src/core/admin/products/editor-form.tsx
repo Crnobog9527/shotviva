@@ -32,18 +32,21 @@ export function DraftForm({ item, action }: { item?: Editor; action: CatalogActi
   </form>
 }
 
-function metrics(v: Terms | null) {
+// M / L packs: each revision's member rate (migration 1610), percent of the list price paid.
+const memberPacks = (item: Editor) => ['pack_m','pack_l'].includes(item.product_id)
+function metrics(v: Terms | null, pack: boolean) {
   if (!v) return []
   const per = v.usd_cents / 100 / v.credits
   return [v.revision,(v.usd_cents/100).toFixed(2),v.credits,v.name_en,v.name_zh,v.benefit_en,v.benefit_zh,
-    v.listed ? E.listed : E.hidden,v.sort_order,per.toFixed(6)]
+    v.listed ? E.listed : E.hidden,v.sort_order,per.toFixed(6),...(pack ? [(v.pack_member_pay_pct ?? [95,90,85]).map(p => p+'%').join(' / ')] : [])]
 }
 export function Differences({ item }: { item: Editor }) {
-  const columns = [E.version,E.amount,E.credits,E.nameEn,E.nameZh,E.benefitEn,E.benefitZh,E.status,E.order,E.unit]
-  const before = metrics(item.current)
-  const after = metrics(item.draft)
+  const pack = memberPacks(item)
+  const columns = [E.version,E.amount,E.credits,E.nameEn,E.nameZh,E.benefitEn,E.benefitZh,E.status,E.order,E.unit,...(pack ? [E.memberPay] : [])]
+  const before = metrics(item.current, pack)
+  const after = metrics(item.draft, pack)
   return <section><table className="w-full max-w-3xl text-left text-sm"><thead><tr>{[E.field,E.old,E.next].map(x => <th key={x}>{x}</th>)}</tr></thead>
     <tbody>{columns.map((x,i) => <tr className="border-t" key={x}><th>{x}</th><td>{before[i] || E.empty}</td><td>{after[i] || E.empty}</td></tr>)}</tbody>
-  </table><p className="text-sm">{E.rule} · {['pack_m','pack_l'].includes(item.product_id) ? E.memberRule : E.listRule}</p>
+  </table><p className="text-sm">{E.rule} · {pack ? E.memberRule : E.listRule}</p>
     </section>
 }

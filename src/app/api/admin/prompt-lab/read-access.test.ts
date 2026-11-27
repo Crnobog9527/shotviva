@@ -41,7 +41,7 @@ it('blocks an already signed-in banned admin at both private read APIs and the p
   mocks.profile.banned_at = '2026-11-11T00:00:00Z'
   expect((await workspace(request())).status).toBe(404)
   expect((await settings()).status).toBe(404)
-  await expect(page({ params: Promise.resolve({ id }) })).rejects.toThrow('NEXT_HTTP_ERROR_FALLBACK;404')
+  await expect(page()).rejects.toThrow('NEXT_HTTP_ERROR_FALLBACK;404')
   expect(mocks.read).not.toHaveBeenCalled()
   expect(mocks.db).not.toHaveBeenCalled()
 })
@@ -50,5 +50,7 @@ it('allows an unbanned administrator through the same guards', async () => {
   expect((await workspace(request())).status).toBe(200)
   expect((await settings()).status).toBe(200)
   expect(await requireAdmin()).toMatchObject({ role: 'admin', banned: false })
+  // The 调试台 page is retired (Owner 2026-11-27): an admin is sent to the template list.
+  await expect(page()).rejects.toMatchObject({ digest: expect.stringContaining('/admin/templates') })
   expect(mocks.read).toHaveBeenCalledTimes(2)
 })

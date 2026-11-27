@@ -1,14 +1,14 @@
-import { beforeEach, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const deps = vi.hoisted(() => ({ enabled: vi.fn(), messages: vi.fn(), rpc: vi.fn() }))
+const deps = vi.hoisted(() => ({ enabled: vi.fn(), messages: vi.fn(), rpc: vi.fn(), from: vi.fn() }))
 vi.mock('../feature', () => ({ isAffiliateEnabled: deps.enabled }))
 vi.mock('next-intl/server', () => ({ getMessages: deps.messages }))
 vi.mock('@/core/auth', () => ({
-  createAdminSupabase: () => ({ rpc: deps.rpc }), requireUser: async () => ({ id: 'qa' }),
+  createAdminSupabase: () => ({ rpc: deps.rpc, from: deps.from }), requireUser: async () => ({ id: 'qa' }),
 }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/core/i18n/server', () => ({ localized: async (path: string) => path }))
-import { applyAction, saveAction } from './actions'
+import { acceptTermsAction, applyAction, saveAction } from './actions'
 
 const fields = {
   name: 'QA', country: 'US', channel_type: 'youtube', channel: 'https://example.test', audience: '1k_10k', plan: 'Reviews',
@@ -57,4 +57,46 @@ it('requires readable published terms and an explicit checkbox for a new accepta
   expect(deps.rpc).not.toHaveBeenCalled()
   expect(await save({ termsVersion: 'v2', accept: 'on' })).toBe('saved')
   expect(deps.rpc).toHaveBeenCalledWith('affiliate_save_profile', expect.objectContaining({ p_terms_version: 'v2' }))
+})
+
+describe('re-acceptance of changed terms', () => {
+  const account = { status: 'active', payout_method: 'wise', payout_details: 'QA', us_person: false }
+  function accept(fields: Record<string, string>) {
+    const data = new FormData()
+    for (const [key, value] of Object.entries(fields)) data.set(key, value)
+    deps.enabled.mockResolvedValue(true)
+    return acceptTermsAction('', data)
+  }
+  function row(value: unknown) {
+    deps.from.mockReturnValue({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: value, error: null }) }) }) })
+  }
+  const published = { affiliateAgreement: { version: 'v2', body: 'QA' } }
+
+  it('needs the checkbox and published text for the submitted version', async () => {
+    deps.messages.mockResolvedValue(published)
+    expect(await accept({ termsVersion: 'v2' })).toBe('invalid')
+    expect(await accept({ accept: 'on', termsVersion: 'v3' })).toBe('failed')
+    expect(deps.rpc).not.toHaveBeenCalled()
+  })
+  it('records the new version through the database and keeps the payout details', async () => {
+    deps.messages.mockResolvedValue(published)
+    deps.rpc.mockResolvedValue({ error: null })
+    row({ slug: 'sv-a', ...account, reject_reason: null, reapply_allowed: false, team_enabled: false, terms_version: 'v1', terms_accepted_at: '2026-11-10T00:00:00Z', org_id: null })
+    expect(await accept({ accept: 'on', termsVersion: 'v2' })).toBe('saved')
+    expect(deps.rpc).toHaveBeenCalledWith('affiliate_save_profile', {
+      p_user: 'qa', p_payout_method: 'wise', p_payout_details: 'QA', p_us_person: false, p_terms_version: 'v2',
+    })
+  })
+  it('fails when the database says the version moved again', async () => {
+    deps.messages.mockResolvedValue(published)
+    deps.rpc.mockResolvedValue({ error: { message: 'AFFILIATE_TERMS_CHANGED' } })
+    row({ slug: 'sv-a', ...account, reject_reason: null, reapply_allowed: false, team_enabled: false, terms_version: 'v1', terms_accepted_at: null, org_id: null })
+    expect(await accept({ accept: 'on', termsVersion: 'v2' })).toBe('failed')
+  })
+  it('does not record anything for an account that is not active', async () => {
+    deps.messages.mockResolvedValue(published)
+    row(null)
+    expect(await accept({ accept: 'on', termsVersion: 'v2' })).toBe('failed')
+    expect(deps.rpc).not.toHaveBeenCalled()
+  })
 })

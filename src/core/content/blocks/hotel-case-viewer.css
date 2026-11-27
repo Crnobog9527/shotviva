@@ -1,0 +1,52 @@
+/* Layer order first (layer-order.test.ts): see LAYER_ORDER there. */
+@layer properties, theme, base, components, utilities;
+/* The home hotels viewer (hotel-case-viewer.tsx), loaded with its code on the first open: the whole
+   screen on a phone (the pictures stacked, scrolling down, never sideways), a centred panel with
+   the pictures side by side from 768. The tags reuse the list's .hc-tag (hotel-cases.css). */
+@layer components {
+  .hc-overlay { position: fixed; inset: 0; z-index: 80; background: rgba(0, 0, 0, 0.8); }
+  .hc-viewer {
+    position: fixed; inset: 0; z-index: 81; display: grid; align-content: start; gap: 14px; box-sizing: border-box;
+    width: 100%; max-height: 100dvh; padding: calc(var(--sat, 0px) + 16px) 16px calc(var(--sab, 0px) + 16px);
+    overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; background: var(--background); color: var(--foreground); outline: none;
+  }
+  @media (min-width: 768px) {
+    .hc-viewer {
+      inset: 50% auto auto 50%; transform: translate(-50%, -50%); width: min(1200px, calc(100vw - 48px)); max-height: calc(100dvh - 48px);
+      padding: 20px 24px 24px; border-radius: 20px; box-shadow: 0 0 0 1px var(--border), 0 24px 80px rgba(0, 0, 0, 0.6);
+    }
+  }
+  .hc-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; }
+  .hc-name { grid-column: 1; margin: 0; font: 600 20px/1.25 var(--font-sans); letter-spacing: -0.015em; }
+  .hc-count { grid-column: 1; margin: 2px 0 0; font-size: 13px; color: var(--muted-foreground); }
+  .hc-close { grid-column: 2; grid-row: 1 / span 2; }
+  .hc-close, .hc-step {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; margin: 0; border: 1px solid var(--border);
+    border-radius: 999px; background: transparent; color: var(--foreground); font: 500 15px/1 var(--font-sans); cursor: pointer;
+  }
+  .hc-close { width: 40px; padding: 0; }
+  .hc-step { padding: 0 16px; }
+  .hc-close svg, .hc-step svg { width: 18px; height: 18px; }
+  .hc-close:hover, .hc-step:hover { background: var(--muted); }
+  .hc-close:focus-visible, .hc-step:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .hc-fulls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  @media (min-width: 768px) {
+    .hc-fulls { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  }
+  .hc-full { border-radius: 14px; }
+  /* The thumbnail and the full-size picture stack in the plate; the full one fades in once loaded. */
+  .hc-full img { position: absolute; inset: 0; }
+  .hc-thumb { filter: blur(2px); }
+  .hc-big { opacity: 0; transition: opacity 0.25s ease; }
+  .hc-big.hc-on { opacity: 1; }
+  .hc-wait { animation: hc-pulse 1.4s ease-in-out infinite; }
+  @keyframes hc-pulse { 50% { opacity: 0.7; } }
+  @media (prefers-reduced-motion: reduce) { .hc-wait { animation: none; } }
+  .hc-note { margin: 0; font-size: 14px; color: var(--muted-foreground); }
+  .hc-retry { margin: 0; padding: 0; border: 0; background: none; color: var(--primary); font: inherit; text-decoration: underline; cursor: pointer; }
+  .hc-retry:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .hc-full .hc-tag { left: 12px; bottom: 12px; height: 28px; padding: 0 10px; border-radius: 8px; font-size: 14px; }
+  .hc-full .hc-ai { left: auto; right: 12px; background: var(--primary); }
+  .hc-desc { margin: 0; max-width: 72ch; font-size: 15px; line-height: 1.5; color: var(--muted-foreground); }
+  .hc-nav { display: flex; justify-content: space-between; gap: 12px; }
+}

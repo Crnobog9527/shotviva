@@ -38,6 +38,21 @@ function resolveImport(root: string, from: string, specifier: string): string | 
   return null
 }
 
+// A file that imports a stylesheet which brings the app's own sheet (src/app/globals.css) styles
+// itself and everything it reaches: the public pages' template panel (modules/image/home/panel),
+// loaded on first use with that sheet. The walk stops there, so the panel's utilities stay out of
+// the public pages' first-load sheet.
+const APP_SHEET = /@import\s+["'][^"']*\/app\/globals\.css["']/
+
+function bringsAppSheet(file: string, text: string): boolean {
+  for (const match of text.matchAll(IMPORT)) {
+    if (!match[1].endsWith('.css') || !match[1].startsWith('.')) continue
+    const sheet = resolve(dirname(file), match[1])
+    if (existsSync(sheet) && APP_SHEET.test(readFileSync(sheet, 'utf8'))) return true
+  }
+  return false
+}
+
 // Type-only imports are followed too: reading a file that renders nothing costs nothing, and a
 // missed file would cost a missing style.
 export function reachableSources(root: string): string[] {
@@ -45,8 +60,10 @@ export function reachableSources(root: string): string[] {
   const queue = publicEntries(root)
   for (let file = queue.pop(); file; file = queue.pop()) {
     if (seen.has(file) || !/\.tsx?$/.test(file)) continue
+    const text = readFileSync(file, 'utf8')
+    if (bringsAppSheet(file, text)) continue
     seen.add(file)
-    for (const match of readFileSync(file, 'utf8').matchAll(IMPORT)) {
+    for (const match of text.matchAll(IMPORT)) {
       const next = resolveImport(root, file, match[1])
       if (next && !seen.has(next)) queue.push(next)
     }

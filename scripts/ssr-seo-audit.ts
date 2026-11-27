@@ -12,7 +12,7 @@
 import type { FaqItem } from '@/core/content'
 import type { Locale } from '@/core/i18n'
 import { legalPages } from '@/site/content/legal'
-import { contentPagesIn, homePageIn, pricingPageIn } from '@/site/content/localized'
+import { contentPagesIn, homePageIn, pricingPageIn, templateRequestsPageIn } from '@/site/content/localized'
 import { site } from '@/site/site.config'
 
 type Expect = { path: string; locale: Locale; h1: string; strings: Record<string, string[]> }
@@ -51,6 +51,14 @@ function pages(): Expect[] {
       locale,
       h1: pricing.h1,
       strings: { intro: pieces(pricing.intro).slice(0, 1), prices: monthlyAndPackPrices(), ...faqStrings(pricing.faq) },
+    })
+    // The wishlist's public page (Owner 2026-11-25): its copy and example wishes are static.
+    const requests = templateRequestsPageIn(locale)
+    out.push({
+      path: prefix(locale, requests.path),
+      locale,
+      h1: requests.h1,
+      strings: { intro: [requests.intro], 'section headings': [requests.steps.heading, requests.examples.heading, requests.good.heading, requests.today.heading], 'example wishes': requests.examples.wall.examples.map((wish) => wish.text), ...faqStrings(requests.faq) },
     })
     for (const page of contentPagesIn(locale)) {
       out.push({

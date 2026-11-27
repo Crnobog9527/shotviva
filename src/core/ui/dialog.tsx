@@ -6,6 +6,7 @@ import { XIcon } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { Button } from "@/core/ui/button"
+import { installScrollLockKeeper } from "@/core/ui/scroll-lock-keeper"
 
 function Dialog({
   ...props
@@ -55,6 +56,8 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  // Keeps the page where it was across the dialog's scroll lock (scroll-lock-keeper.ts).
+  React.useEffect(installScrollLockKeeper, [])
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />

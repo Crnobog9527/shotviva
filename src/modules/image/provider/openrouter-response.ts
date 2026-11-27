@@ -33,8 +33,9 @@ function providerFailure(status: number, error: UpstreamError | null | undefined
   if (isRefusal(error)) return new ProviderError('content_rejected', 'openrouter declined image content', { usage })
   const httpCode = typeof error?.code === 'number' ? error.code : status
   const timeout = httpCode === 408 || httpCode === 504 || error?.metadata?.error_type === 'timeout'
+  const kind = httpCode === 429 ? 'rate_limited' : timeout ? 'timeout' : 'failed'
   // Vendor error messages and moderation metadata may quote a private prompt.
-  return new ProviderError(timeout ? 'timeout' : 'failed', `openrouter image request failed (HTTP ${httpCode})`, { usage })
+  return new ProviderError(kind, `openrouter image request failed (HTTP ${httpCode})`, { usage })
 }
 
 export async function readOpenRouterOutput(response: Response, input: ProviderInput): Promise<ProviderOutput> {

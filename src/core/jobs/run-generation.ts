@@ -10,6 +10,8 @@ import { screenIdentityText, type IdentityJudge } from '../identity-guard'
 import { isOwnInputKey, loadInputImage, outputKeyFor, writeInputPreview } from '../storage'
 import {
   DEFAULT_RESOLUTION,
+  FOOD_SWITCHES_OFF,
+  foodSwitchedOff,
   loadGenerationTemplate,
   allowedWebAspects,
   assertPricedTier,
@@ -18,6 +20,7 @@ import {
   publicCopyKeys,
   toStoredSlots,
   validateGenerationInputs,
+  type FoodSwitches,
   type GenerationInputs,
   type Resolution,
   type TemplateSurface,
@@ -31,8 +34,9 @@ import type { GenerationRequest } from './generation-request'
 import { findOwnJob } from './job-lookup'
 import type { Job, JobSource } from './job-schema'
 import { toJobView, type JobView } from './job-view'
-import { effectiveTier, limitsFor } from '../billing/tier'
+import { accountLimits } from './account-limits'
 import { assertWithinRateLimit } from './rate-limit'
+import { acquireSlot, releaseSlot, slotKind } from './generation-lane'
 import { settleGeneration, type SettleDeps } from './settle-generation'
 import { backgroundInput } from './job-background'
 import { recordJobClientIp } from './job-download'
@@ -58,6 +62,10 @@ export type GenerationDeps = Omit<SettleDeps, 'provider'> & {
   afterPoster?: (job: Job) => void
   // A food template's toggle flows (§5.1c): the dish reader and the vessel library.
   food?: FoodDeps | null
+  // The site-wide switches for 优化摆盘 and 优化器皿 (system_settings food_plating_enabled,
+  // food_tableware_enabled). Absent: both are rendered off whatever the request says, so no dish
+  // reading and no vessel; one off: that toggle alone is rendered off.
+  foodSwitches?: () => Promise<FoodSwitches>
 }
 
 const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'partner' }
@@ -110,12 +118,19 @@ async function finishPoster(deps: GenerationDeps, poster: Prepared['poster'], jo
   deps.afterPoster?.(job)
 }
 
+// 优化摆盘 or 优化器皿 while its own site-wide switch is off (2009) is rendered off; the dish name
+// only their flows read is left out of the inputs once both are off. No switches read: both off.
+async function switchedOff(deps: GenerationDeps): Promise<{ forceOff: readonly string[]; dropCopy: readonly string[] }> {
+  return foodSwitchedOff((await deps.foodSwitches?.()) ?? FOOD_SWITCHES_OFF)
+}
+
 // Everything that can be rejected without touching credits: template, fields, key
+
 // ownership, tier limits (batch size, rate limit), then the user's words (ARCHITECTURE §5.1a:
 // no face swap) alongside the stored upload itself (HEAD + bytes; bad ones are deleted).
 async function prepare(deps: GenerationDeps, req: GenerationRequest) {
-  const membership = await effectiveTier(deps.db, req.userId)
-  assertBatchAllowed(membership, req.batchSize, req.batchTemplates)
+  const limits = await accountLimits(deps.db, req.userId)
+  assertBatchAllowed(limits, req.batchSize, req.batchTemplates)
   assertBatchProof(req)
   const { template, prompt } = await loadGenerationTemplate(deps.db, req.templateId, SURFACE[req.source])
   const tier = req.resolution ?? DEFAULT_RESOLUTION
@@ -133,12 +148,13 @@ async function prepare(deps: GenerationDeps, req: GenerationRequest) {
     imageCount: req.inputKey ? 1 : 0,
     ...(inputSlots ? { slots: inputSlots } : {}),
     aspects: requestAspects(req, template),
+    ...(await switchedOff(deps)),
   })
   const { inputs, poster, qr } = withPoster(validated, await posterPart(deps, req, template, validated))
   const keys = uploadKeys(req, inputs)
   // Never touch (or delete) an object outside the caller's own inputs/ prefix.
   if (keys.some((key) => !isOwnInputKey(req.userId, key))) throw new AppError('INVALID_INPUT', 'Unknown upload')
-  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limitsFor(membership), {
+  await assertWithinRateLimit(deps.db, req.userId, deps.now?.() ?? new Date(), limits, {
     jobId: req.jobId,
     idempotencyKey: req.idempotencyKey,
   })
@@ -182,7 +198,8 @@ export function toggleInputs(inputs: GenerationInputs, now: Date) {
 // reserve_credits charges templates.credits_cost[resolution] from this very object.
 function jobInputs(req: GenerationRequest, prepared: Prepared, resolution: Resolution, attemptId: string, now: Date) {
   const { inputs, prompt, template } = prepared
-  const shown = publicCopyKeys(template.fields.copy)
+  // A field left out of the inputs (the dish name while the switch is off) is not public either.
+  const shown = publicCopyKeys(template.fields.copy).filter((key) => Object.hasOwn(inputs.copy, key))
   return {
     copy: inputs.copy,
     // Which fields were public at this moment (§5.1d); none for most templates, so their jobs look as before.
@@ -201,7 +218,14 @@ function jobInputs(req: GenerationRequest, prepared: Prepared, resolution: Resol
     ...(prepared.poster ? { poster: prepared.poster } : {}),
     // Moved into generation_jobs.again_of by the insert trigger, or dropped (1513).
     ...(req.againOf ? { again_of: req.againOf } : {}),
+    ...choiceInput(req),
   }
+}
+
+// 出图时让员工自选 (§6.5): a batch is paid only (§6.2), so a choice goes along with a single web job only.
+export function choiceInput(req: Pick<GenerationRequest, 'poolChoice' | 'source' | 'batchId' | 'batchSize'>) {
+  const single = !req.batchId && (req.batchSize ?? 1) <= 1
+  return req.poolChoice && req.source === 'web' && single ? { pool_choice: req.poolChoice } : {}
 }
 
 // What reserve_credits takes straight from the request.
@@ -248,14 +272,33 @@ export async function runGeneration(deps: GenerationDeps, req: GenerationRequest
       onRoute: actual => selected(routeFallbackReason(actual, prompt.providerId, req.source)),
     })
     const reason = routeFallbackReason(route.provider, prompt.providerId, req.source)
-    const job = await reserveJob(deps.db, {
-      ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: route.provider.id,
-      expectedCredits: expectedPrice(req, template, resolution),
-      inputs: { ...jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()),
-        quality: route.call.quality, ...backgroundInput(route.call.params, route.provider), style_ref_keys: route.styleRefKeys, ...(reason ? { fallback_route: true } : {}) },
-    })
-    return { job, ...route }
+    // The route's lane slot, before any credit is held (queue-fairness Q3): a full lane is
+    // RATE_LIMITED with nothing reserved. Given back in finally below, or on a failed reserve.
+    await acquireSlot(deps.db, { attemptId, providerId: route.provider.id, userId: req.userId, kind: slotKind(req.batchSize) })
+    try {
+      const job = await reserveJob(deps.db, {
+        ...reserveFields(req), jobId, module: template.module, templateId: template.id, provider: route.provider.id,
+        expectedCredits: expectedPrice(req, template, resolution),
+        inputs: { ...jobInputs(req, prepared, resolution, attemptId, deps.now?.() ?? new Date()),
+          quality: route.call.quality, ...backgroundInput(route.call.params, route.provider), style_ref_keys: route.styleRefKeys, ...(reason ? { fallback_route: true } : {}) },
+      })
+      return { job, ...route }
+    } catch (error) {
+      await releaseSlot(deps.db, attemptId)
+      throw error
+    }
   })
+  try {
+    return await settleOwnJob(deps, req, prepared, { job, call, provider, attemptId, food })
+  } finally {
+    await releaseSlot(deps.db, attemptId)
+  }
+}
+
+type Started = { job: Job; call: Awaited<ReturnType<typeof templateCall>>['call']; provider: Awaited<ReturnType<typeof templateCall>>['provider']; attemptId: string; food: ReturnType<typeof foodPlanOf> }
+
+async function settleOwnJob(deps: GenerationDeps, req: GenerationRequest, prepared: Prepared, { job, call, provider, attemptId, food }: Started): Promise<JobView> {
+  const { template, inputs, images } = prepared
   if (job.inputs.attempt_id !== attemptId) return toJobView(job)
   // Dispute evidence (T82): the IP that started this paid or free work.
   await recordJobClientIp(deps.db, { userId: req.userId, jobId: job.id, ip: req.clientIp })

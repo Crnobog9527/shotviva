@@ -23,8 +23,8 @@ export type RowHandlers = {
   // 删除 (Owner 2026-11-13): shown on unpublished, non-built-in rows; opens the confirmation.
   onDelete: (template: AdminTemplate) => void
   onToggle: (template: AdminTemplate, active: boolean) => void
-  // 首页精选 (T53): whether the list is full or held by an unsaved arrangement, and the switch handler.
-  featuredState: { full: boolean; locked: boolean }
+  // 首页精选 (T53): whether the list is held by an unsaved arrangement, and the switch handler.
+  featuredState: { locked: boolean }
   onFeature: (template: AdminTemplate, on: boolean) => void
 }
 
@@ -101,12 +101,12 @@ export function TemplateRow(props: Props) {
   )
 }
 
-// Off and disabled while the template is unpublished or partner-only, or the list is full; both
+// Off and disabled while the template is unpublished or partner-only, ; both
 // ways disabled while 首页精选 holds an unsaved arrangement (a switch would drop it).
 function FeaturedSwitch({ template, state, pending, onFeature }: { template: AdminTemplate; state: RowHandlers['featuredState']; pending: boolean; onFeature: RowHandlers['onFeature'] }) {
   const on = template.featuredRank !== null
-  const blocked = !on && (!canFeature(template) || state.full)
-  const why = state.locked ? featuredCopy.locked : blocked ? (canFeature(template) ? '最多 12 个' : '只有已上架、站内可见的模板能上首页') : undefined
+  const blocked = !on && !canFeature(template)
+  const why = state.locked ? featuredCopy.locked : blocked ? '只有已上架、站内可见的模板能上首页' : undefined
   return (
     <Switch
       checked={on}

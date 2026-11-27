@@ -68,7 +68,8 @@ describe('reserving a work from a gallery-excluded root', () => {
 
   it('covers sub-categories, and a paid work asked to be public stays private', async () => {
     const userId = await createUser(db, { credits: 3 })
-    const job = await reserve(userId, leafTemplate, { visibility: 'public' })
+    // A paid work is 2K (1K is free credits only, 1996).
+    const job = await reserve(userId, leafTemplate, { visibility: 'public', inputs: { resolution: '2k' } })
     expect(await flags(job.id)).toEqual({ visibility: 'private', excluded: true, pool: 'paid' })
   })
 
@@ -115,7 +116,7 @@ describe('reserving a work from a gallery-excluded root', () => {
 describe('an excluded work stays private', () => {
   it('cannot be made public by the toggle (FORBIDDEN), or by a direct update', async () => {
     const userId = await createUser(db, { credits: 3 })
-    const job = await reserve(userId, rootTemplate)
+    const job = await reserve(userId, rootTemplate, { inputs: { resolution: '2k' } })
     await expect(setJobVisibility(service, { jobId: job.id, userId, visibility: 'public' })).rejects.toMatchObject({ code: 'FORBIDDEN' })
     expect((await setJobVisibility(service, { jobId: job.id, userId, visibility: 'private' })).visibility).toBe('private')
     await db.query("update public.generation_jobs set visibility = 'public' where id = $1", [job.id])

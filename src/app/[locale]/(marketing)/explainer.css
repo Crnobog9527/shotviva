@@ -59,6 +59,23 @@
 
   /* side-by-side steps are narrow: the picture takes the number's column too, and each step
      spans two rows of the list so the three pictures line up however long the text is */
+  /* 「更多真实案例」 pairs read from live templates (hero-strip.tsx): the pair and its caption as one
+     button that loads the template into the generator. Here, home route only, for the same budget
+     reason as above. */
+  .mk-hero-strip-pick {
+    display: block; width: 100%; margin: 0; padding: 0; border: 0; background: none; color: inherit;
+    font: inherit; text-align: left; cursor: pointer; border-radius: 16px;
+  }
+  .mk-hero-strip-pick:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+  /* A span in a button is inline, so the caption's margin-top (.mk-cap) needs it as a block. */
+  .mk-hero-strip-pick .mk-cap { display: block; }
+  .mk-hero-strip-pick:hover .mk-cap { color: var(--foreground); }
+  .mk-hero-strip-frame { position: relative; display: block; }
+  .mk-hero-strip-set {
+    position: absolute; z-index: 5; top: 8px; left: 8px; padding: 4px 8px; border-radius: var(--radius-tag);
+    font: 600 12px/1 var(--font-sans); color: var(--photo-ink); background: var(--frost); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+
   @media (min-width: 768px) {
     .mk-steps > li { grid-row: span 2; grid-template-rows: subgrid; row-gap: 16px; }
     .mk-steps .xv { grid-column: 1 / -1; margin-top: 0; }

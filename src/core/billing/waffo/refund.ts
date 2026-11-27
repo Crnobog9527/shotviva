@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { notifyOwner, type RefundAlert } from '../../alerts'
 import { captureAlert } from '../../analytics/capture-error'
 import { logger } from '../../logger'
+import { recordWaffoRefundFee } from '../fees/waffo'
 import { callRpc, type RpcClient } from '../rpc'
 import type { CancelRefunded } from '../subscription/cancel-others'
 import { waffoRefundAlert } from './failure-alert'
@@ -111,6 +112,8 @@ export async function recordWaffoRefund(deps: WaffoRefundDeps, event: WaffoEvent
     : null
   if (!row) return unknownPayment(event, refund.paymentId)
   report(event, row)
+  // F3: a card refund's $1 fee on its own refund scope (keyed by the event; never throws).
+  await recordWaffoRefundFee(deps.db, { paymentId: row.payment_id, refundRef: event.eventId, refundCents: refund.cents })
   // Never throws: a failed cancel is alerted for the Owner (T66's cancel path).
   if (row.membership_ended && row.waffo_order_id) await deps.cancelRefunded?.(row.user_id, { waffoOrderId: row.waffo_order_id })
   notifyOwner(ownerAlert(event, row, refund.cents))
