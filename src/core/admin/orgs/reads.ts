@@ -7,7 +7,7 @@ import { AppError } from '@/core/errors'
 import { PAYMENT_KINDS, type PaymentKind } from '@/core/org'
 import { parseRefCode } from '@/core/org/ref-code'
 
-import type { PaymentAccountRow, LedgerRow, LimitCaps, MemberRow, OrgAffiliate, OrgDetail, OrgListItem, OrgPackage, OrgRow } from './types'
+import type { PaymentAccountRow, LedgerRow, LimitCaps, MemberRow, OrgAffiliate, OrgCustomer, OrgCustomerBonus, OrgCustomerCounts, OrgCustomerPage, OrgDetail, OrgListItem, OrgPackage, OrgRow } from './types'
 
 // Read side of the enterprise admin (ARCHITECTURE §6.5). The org tables have no client grant and
 // the service role may select; every write goes through the E1 functions in core/org.
@@ -221,4 +221,104 @@ export async function listPaymentAccounts(db: SupabaseClient): Promise<Partial<R
 export async function loadOrgInviteToken(db: SupabaseClient, orgId: string): Promise<string | null> {
   const row = ok(await db.from('orgs').select('invite_token').eq('id', orgId).maybeSingle(), 'org invite')
   return z.object({ invite_token: z.string().regex(/^[0-9a-f]{32}$/) }).nullable().parse(row)?.invite_token ?? null
+}
+
+export const CUSTOMER_PAGE_SIZE = 50
+
+const customerSchema = z.object({
+  user_id: z.uuid(),
+  contact: z.string().nullable(),
+  level: z.union([z.literal(1), z.literal(2)]),
+  source: z.string().nullable(),
+  member_user_id: z.uuid().nullable(),
+  member_contact: z.string().nullable(),
+  via_user_id: z.uuid().nullable(),
+  via_contact: z.string().nullable(),
+  signed_up_at: z.string(),
+  referred_at: z.string().nullable(),
+  bonus_credits: z.number().nullable(),
+  bonus_at: z.string().nullable(),
+  bonus_error: z.string().nullable(),
+  paid_before: z.boolean(),
+  has_signup_gift: z.boolean(),
+  gift_at_bind: z.boolean(),
+  bonus_at_bind: z.number().nullable(),
+  status_at_bind: z.string().nullable(),
+  switch_at_bind: z.boolean().nullable(),
+  before_org: z.boolean(),
+  has_paid: z.boolean(),
+  banned: z.boolean(),
+  paid_cents: z.coerce.number(),
+  commission_cents: z.coerce.number(),
+  promo_credits: z.coerce.number(),
+  total: z.coerce.number(),
+  total_l2: z.coerce.number(),
+})
+
+type BonusFacts = Pick<z.infer<typeof customerSchema>, 'bonus_credits' | 'bonus_at' | 'bonus_error' | 'level' | 'source' | 'paid_before'
+  | 'has_signup_gift' | 'gift_at_bind' | 'bonus_at_bind' | 'status_at_bind' | 'switch_at_bind' | 'before_org' | 'has_paid' | 'banned'>
+
+// Why a customer has no bonus and no recorded refusal, from how they were bound (1690, 2010). The
+// Owner's rule: whoever the org admin's or a staff member's promotion link brings in gets it;
+// level 2 (invited by a customer) does not. A ?ref= customer is shown as 可补发 only when
+// admin_org_signup_bonus_backfill (2010) would pay them: the same bind-time facts, nothing paid,
+// not banned, and the org's bonus on today (`bonusOnNow`: org active, switch on, amount > 0, its
+// affiliate account active). A setting the audit log cannot tell at the binding is never 可补发.
+type NoBonus = Extract<OrgCustomerBonus, { kind: 'none' }>['reason']
+const linked = (row: BonusFacts) => row.source === 'signup' || row.source === 'org_l1'
+// First match wins; the order is the order of the checks the trigger and the back-fill make.
+const ref = (row: BonusFacts) => row.source === 'signup'
+const NO_BONUS_RULES: readonly [NoBonus, (row: BonusFacts, bonusOnNow: boolean) => boolean][] = [
+  ['level2', (row) => row.level === 2],
+  ['paid_before', (row) => row.paid_before],
+  ['first_checkout', (row) => row.source === 'first_checkout'],
+  ['other', (row) => !linked(row)],
+  ['before_org', (row) => row.before_org],
+  ['unknown_at_bind', (row) => row.bonus_at_bind === null],
+  ['off_at_bind', (row) => (row.bonus_at_bind ?? 0) <= 0],
+  ['unknown_at_bind', (row) => row.status_at_bind === null],
+  ['inactive_at_bind', (row) => row.status_at_bind !== 'active'],
+  ['unknown_at_bind', (row) => row.switch_at_bind === null],
+  ['affiliate_off_at_bind', (row) => row.switch_at_bind !== true],
+  ['no_signup_gift', (row) => !row.has_signup_gift],
+  ['gift_after_bind', (row) => !row.gift_at_bind],
+  ['unrecorded', (row) => !ref(row)],
+  ['banned', (row) => row.banned],
+  ['paid_since', (row) => row.has_paid],
+  ['off_now', (_row, bonusOnNow) => !bonusOnNow],
+]
+
+export function customerBonus(row: BonusFacts, bonusOnNow: boolean): OrgCustomerBonus {
+  if (row.bonus_credits !== null && row.bonus_at) return { kind: 'granted', credits: row.bonus_credits, at: row.bonus_at }
+  if (row.bonus_error) return { kind: 'error', error: row.bonus_error }
+  return { kind: 'none', reason: NO_BONUS_RULES.find(([, applies]) => applies(row, bonusOnNow))?.[0] ?? 'backfill' }
+}
+
+// 推广名单: one page (1-based) of the org's customers, newest binding first, in one database call.
+// Admin only (the caller checked the role). An org without an affiliate account has none.
+// Staff of the org are never listed. A page past the end is empty with total 0; the view then
+// links back to the first page.
+export async function loadOrgCustomers(db: SupabaseClient, org: Pick<OrgRow, 'id' | 'status' | 'affiliateEnabled' | 'signupBonusCredits'>, affiliateStatus: string | null, page: number): Promise<OrgCustomerPage> {
+  const current = Number.isInteger(page) && page > 0 ? Math.min(page, 10000) : 1
+  const bonusOnNow = org.status === 'active' && org.affiliateEnabled && org.signupBonusCredits > 0 && affiliateStatus === 'active'
+  const rows = await db.rpc('admin_org_customers', { p_org_id: org.id, p_limit: CUSTOMER_PAGE_SIZE, p_offset: (current - 1) * CUSTOMER_PAGE_SIZE })
+  const parsed = z.array(customerSchema).parse(ok(rows, 'customers') ?? [])
+  return {
+    rows: parsed.map((r): OrgCustomer => ({
+      userId: r.user_id, contact: r.contact, level: r.level, source: r.source,
+      memberUserId: r.member_user_id, memberContact: r.member_contact, viaUserId: r.via_user_id, viaContact: r.via_contact,
+      signedUpAt: r.signed_up_at, referredAt: r.referred_at, bonus: customerBonus(r, bonusOnNow),
+      paidCents: r.paid_cents, commissionCents: r.commission_cents, promoCredits: r.promo_credits,
+    })),
+    total: parsed[0]?.total ?? 0,
+    page: current,
+    pageSize: CUSTOMER_PAGE_SIZE,
+  }
+}
+
+// The overview's customer numbers, counted exactly as 推广名单 lists them (staff left out).
+export async function loadOrgCustomerCounts(db: SupabaseClient, orgId: string): Promise<OrgCustomerCounts> {
+  const rows = await db.rpc('admin_org_customers', { p_org_id: orgId, p_limit: 1, p_offset: 0 })
+  const first = z.array(customerSchema).parse(ok(rows, 'customer counts') ?? [])[0]
+  return { l1: first ? first.total - first.total_l2 : 0, l2: first?.total_l2 ?? 0 }
 }

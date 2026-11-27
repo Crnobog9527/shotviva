@@ -228,3 +228,196 @@ it('keeps the new tables and the admin function away from clients', async () => 
     await db.query('rollback to savepoint roles')
   }
 })
+
+// 2010: the org's own partner link (?ref=<org account slug>) binds a new account as the org's
+// customer through affiliate_bind ('signup'); it gets the bonus too, under the invite's checks.
+const orgSlug = async (owner: string) => (await row(db, 'select slug from affiliates where user_id=$1', [owner])).slug as string
+async function giftedUser() {
+  const user = await createUser(db)
+  await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [user, 'signup:' + user])
+  return user
+}
+
+it('gives a new account bound through the org\'s partner link the bonus once', async () => {
+  const { orgId, owner } = await orgTeam(350)
+  const customer = await giftedUser()
+  expect(await bind(db, customer, await orgSlug(owner))).toBe(true)
+  expect(await row(db, 'select referred_by,referred_source from profiles where id=$1', [customer])).toEqual({ referred_by: owner, referred_source: 'signup' })
+  expect(await bonusLedger(customer)).toEqual([{ delta: 350, pool: 'free', idempotency_key: 'org_signup_bonus:' + customer }])
+  expect(await freeCredits(customer)).toBe(6 + 350)
+  expect(await bonusRow(customer)).toEqual({ org_id: orgId, member_user_id: null, credits: 350 })
+
+  // A rebind and back, or a replayed binding, never pays again.
+  await db.query('update profiles set referred_by=null,referred_source=null where id=$1', [customer])
+  expect(await bind(db, customer, await orgSlug(owner))).toBe(true)
+  expect(await bonusLedger(customer)).toHaveLength(1)
+  expect(await freeCredits(customer)).toBe(6 + 350)
+})
+
+it('pays the org\'s amount through every enterprise referral link: the admin\'s ?ref link and each employee\'s invite link', async () => {
+  const { orgId, owner, staff } = await orgTeam(350)
+  const other = await createUser(db)
+  const { invite_token } = await row(db, 'select invite_token from orgs where id=$1', [orgId])
+  await db.query('select org_join($1,$2)', [other, invite_token])
+
+  const viaAdminLink = await giftedUser()
+  expect(await bind(db, viaAdminLink, await orgSlug(owner))).toBe(true)
+  const viaStaff = (await invitedBy(staff)).customer
+  const viaOtherStaff = (await invitedBy(other)).customer
+  const viaOwnerCode = (await invitedBy(owner)).customer
+  for (const c of [viaAdminLink, viaStaff, viaOtherStaff, viaOwnerCode]) {
+    expect(await bonusLedger(c)).toEqual([{ delta: 350, pool: 'free', idempotency_key: 'org_signup_bonus:' + c }])
+  }
+  expect(await row(db, 'select count(*)::int n from org_signup_bonuses where org_id=$1 and credits=350', [orgId])).toEqual({ n: 4 })
+  // Staff who joined through the employee link (/join/org) got nothing from the org.
+  for (const s of [staff, other]) expect(await bonusLedger(s)).toEqual([])
+})
+
+it('gives nothing through the partner link without a signup gift, to a member, at first checkout or while off', async () => {
+  const { orgId, owner, staff } = await orgTeam(350)
+  const slug = await orgSlug(owner)
+  const noGift = await createUser(db)
+  expect(await bind(db, noGift, slug)).toBe(true)
+  expect(await bonusLedger(noGift)).toEqual([])
+  expect(await row(db, 'select error from org_signup_bonus_errors where user_id=$1', [noGift])).toEqual({ error: 'blocked_no_signup_grant' })
+
+  const member = await giftedUser()
+  const { invite_token } = await row(db, 'select invite_token from orgs where id=$1', [orgId])
+  await db.query('select org_join($1,$2)', [member, invite_token])
+  expect(await bind(db, member, slug)).toBe(true)
+  expect(await bonusLedger(member)).toEqual([])
+  expect(await row(db, 'select error from org_signup_bonus_errors where user_id=$1', [member])).toEqual({ error: 'blocked_org_member' })
+
+  const buyer = await giftedUser()
+  expect(await bind(db, buyer, slug, 'first_checkout')).toBe(true)
+  expect(await bonusLedger(buyer)).toEqual([])
+
+  await setOrg(orgId, { affiliate_enabled: false })
+  const off = await giftedUser()
+  await setOrg(orgId, { affiliate_enabled: true })
+  await setBonus(orgId, 0)
+  expect(await bind(db, off, slug)).toBe(true)
+  expect(await bonusLedger(off)).toEqual([])
+  expect(staff).toBeTruthy()
+})
+
+it('back-fills one partner-link customer once at the amount in force when bound; refuses who would not have qualified', async () => {
+  const { orgId, owner } = await orgTeam(0)
+  const slug = await orgSlug(owner)
+  const audits = (sql: string) => db.query(`update admin_audit_log set created_at=now()-interval '${sql}' where target_id=$1 and created_at=now()`, [orgId])
+  // Timeline (now() is fixed in the test transaction): bonus set to 350 two hours ago, the
+  // affiliate switch off one hour ago and back on now.
+  await setBonus(orgId, 350)
+  await audits('2 hours')
+  await setOrg(orgId, { affiliate_enabled: false })
+  await audits('1 hour')
+  await setOrg(orgId, { affiliate_enabled: true })
+
+  // Bound through the link as before 2010 (the trigger did not cover it).
+  await db.query('alter table profiles disable trigger org_signup_bonus_ref')
+  const missed = await giftedUser()
+  const noGift = await createUser(db)
+  const early = await giftedUser()
+  const offAtBind = await giftedUser()
+  for (const u of [missed, noGift, early, offAtBind]) expect(await bind(db, u, slug)).toBe(true)
+  await db.query('alter table profiles enable trigger org_signup_bonus_ref')
+  await db.query("update profiles set referred_at=now()-interval '3 hours' where id=$1", [early])
+  await db.query("update profiles set referred_at=now()-interval '30 minutes' where id=$1", [offAtBind])
+  // Raised since, without going through the form: the back-fill still pays the amount then.
+  await db.query('update orgs set signup_bonus_credits=500 where id=$1', [orgId])
+  const personal = await promoter(db)
+  const strangerCustomer = await giftedUser()
+  expect(await bind(db, strangerCustomer, personal.slug)).toBe(true)
+
+  const backfill = async (user: string, apply: boolean) =>
+    (await row(db, 'select admin_org_signup_bonus_backfill($1,$2,$3) as r', [actor, user, apply])).r
+  const stranger = await createUser(db)
+  await refused(() => db.query('select admin_org_signup_bonus_backfill($1,$2,false)', [stranger, missed]), 'NOT_ADMIN')
+
+  expect(await backfill(missed, false)).toMatchObject({ status: 'eligible', org_id: orgId, credits: 350, bonus_at_bind: 350, referred_at: expect.any(String) })
+  expect(await bonusLedger(missed)).toEqual([])
+  expect(await backfill(missed, true)).toMatchObject({ status: 'granted', org_id: orgId, credits: 350 })
+  expect(await backfill(missed, true)).toEqual({ status: 'already' })
+  expect(await bonusLedger(missed)).toEqual([{ delta: 350, pool: 'free', idempotency_key: 'org_signup_bonus:' + missed }])
+  expect(await freeCredits(missed)).toBe(6 + 350)
+  expect(await row(db, "select reason::jsonb r from admin_audit_log where action='org_update' and target_id=$1 and user_id=$2 and reason like '%backfill%'", [orgId, actor]))
+    .toEqual({ r: { signup_bonus_backfill: { user: missed, credits: 350 } } })
+
+  expect(await backfill(early, true)).toMatchObject({ status: 'not_eligible', reason: 'bonus_off_at_bind', bonus_at_bind: 0, bonus_now: 500 })
+  expect(await backfill(offAtBind, true)).toMatchObject({ status: 'not_eligible', reason: 'affiliate_off_at_bind' })
+  expect(await backfill(noGift, true)).toMatchObject({ status: 'not_eligible', reason: 'no_signup_gift_at_bind' })
+  expect(await backfill(strangerCustomer, true)).toMatchObject({ status: 'not_eligible', reason: 'not_org_customer' })
+  expect(await backfill(stranger, true)).toMatchObject({ status: 'not_eligible', reason: 'not_bound_by_link' })
+  for (const u of [early, offAtBind, noGift, strangerCustomer]) expect(await bonusLedger(u)).toEqual([])
+})
+
+it('back-fill refuses when it cannot tell, or when the org, the gift or the trigger said no at the binding', async () => {
+  const backfill = async (user: string) =>
+    (await row(db, 'select admin_org_signup_bonus_backfill($1,$2,true) as r', [actor, user])).r
+  const backdate = (orgId: string, ago: string) =>
+    db.query(`update admin_audit_log set created_at=now()-interval '${ago}' where target_id=$1 and created_at=now()`, [orgId])
+  const boundAgo = async (slug: string, user: string, ago: string) => {
+    await db.query('alter table profiles disable trigger org_signup_bonus_ref')
+    expect(await bind(db, user, slug)).toBe(true)
+    await db.query('alter table profiles enable trigger org_signup_bonus_ref')
+    await db.query(`update profiles set referred_at=now()-interval '${ago}' where id=$1`, [user])
+  }
+  // Each org has its own timeline; the bonus is set (audited) three hours ago.
+  async function org() {
+    const t = await orgTeam(350)
+    await backdate(t.orgId, '3 hours')
+    return { ...t, slug: await orgSlug(t.owner) }
+  }
+  const giftedAgo = async (ago: string) => {
+    const u = await createUser(db)
+    await db.query(`select grant_credits($1::uuid,6,'signup',$2,'free')`, [u, 'signup:' + u])
+    await db.query(`update credit_ledger set created_at=now()-interval '${ago}' where idempotency_key=$1`, ['signup:' + u])
+    return u
+  }
+
+  // The switch: off without an audit row (as an org created with it off), turned on (audited) only
+  // after the binding. Nothing tells what it was then: refuse.
+  const a = await org()
+  await db.query('update orgs set affiliate_enabled=false where id=$1', [a.orgId])
+  await setOrg(a.orgId, { affiliate_enabled: true })
+  const unknownSwitch = await giftedAgo('2 hours')
+  await boundAgo(a.slug, unknownSwitch, '1 hour')
+  expect(await backfill(unknownSwitch)).toMatchObject({ status: 'not_eligible', reason: 'affiliate_unknown_at_bind' })
+
+  // The org was suspended at the binding (audited), active again now.
+  const b = await org()
+  await setOrg(b.orgId, { status: 'suspended' })
+  await backdate(b.orgId, '2 hours')
+  await setOrg(b.orgId, { status: 'active' })
+  const whileSuspended = await giftedAgo('2 hours')
+  await boundAgo(b.slug, whileSuspended, '1 hour')
+  expect(await backfill(whileSuspended)).toMatchObject({ status: 'not_eligible', reason: 'org_inactive_at_bind' })
+
+  // The gift came only after the binding.
+  const c = await org()
+  const giftLater = await giftedAgo('10 minutes')
+  await boundAgo(c.slug, giftLater, '1 hour')
+  expect(await backfill(giftLater)).toMatchObject({ status: 'not_eligible', reason: 'no_signup_gift_at_bind' })
+
+  // The trigger saw the binding and refused it (no gift then); the gift arriving later changes nothing.
+  const refusedThen = await createUser(db)
+  expect(await bind(db, refusedThen, c.slug)).toBe(true)
+  expect(await row(db, 'select error from org_signup_bonus_errors where user_id=$1', [refusedThen])).toEqual({ error: 'blocked_no_signup_grant' })
+  await db.query(`select grant_credits($1::uuid,6,'signup',$2,'free')`, [refusedThen, 'signup:' + refusedThen])
+  expect(await backfill(refusedThen)).toMatchObject({ status: 'not_eligible', reason: 'refused_by_trigger' })
+
+  // Control: the same org, a customer who did qualify then, is paid.
+  const ok = await giftedAgo('2 hours')
+  await boundAgo(c.slug, ok, '1 hour')
+  expect(await backfill(ok)).toMatchObject({ status: 'granted', credits: 350 })
+  for (const u of [unknownSwitch, whileSuspended, giftLater, refusedThen]) expect(await bonusLedger(u)).toEqual([])
+})
+
+it('keeps the back-fill away from clients', async () => {
+  for (const role of ['anon', 'authenticated']) {
+    await db.query('savepoint roles')
+    await db.query(`set local role ${role}`)
+    await expect(db.query('select admin_org_signup_bonus_backfill(gen_random_uuid(),gen_random_uuid(),false)')).rejects.toThrow('permission denied')
+    await db.query('rollback to savepoint roles')
+  }
+})

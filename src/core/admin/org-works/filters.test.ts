@@ -24,8 +24,8 @@ describe('org works filters', () => {
   })
 
   it('links back to the works section with the filters, and the next page with its cursor', () => {
-    expect(orgWorksHref(org, {})).toBe(`/admin/orgs/${org}#works`)
-    expect(orgWorksHref(org, { member, status: 'failed' }, 'next')).toBe(`/admin/orgs/${org}?member=${member}&status=failed&cursor=next#works`)
+    expect(orgWorksHref(org, {})).toBe(`/admin/orgs/${org}?tab=works#works`)
+    expect(orgWorksHref(org, { member, status: 'failed' }, 'next')).toBe(`/admin/orgs/${org}?tab=works&member=${member}&status=failed&cursor=next#works`)
   })
 })
 
