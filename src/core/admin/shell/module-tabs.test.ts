@@ -11,6 +11,7 @@ describe('module tabs', () => {
   it('finds the module and tab from the address', () => {
     expect(at('/admin/templates')).toEqual(['模板与系列', '模板'])
     expect(at('/admin/templates/series')).toEqual(['模板与系列', '系列'])
+    expect(at('/admin/templates/categories')).toEqual(['模板与系列', '分类'])
     expect(at('/admin/templates/profiles')).toEqual(['出图设置', '模板出图配置'])
     expect(at('/admin/templates/dishware/')).toEqual(['出图设置', '器皿图库'])
     expect(at('/admin/templates/edit')).toEqual(['出图设置', '作品编辑规则'])
@@ -19,6 +20,7 @@ describe('module tabs', () => {
 
   it('shows no tabs elsewhere', () => {
     expect(at('/admin')).toBeNull()
+    expect(at('/admin/home')).toBeNull()
     expect(at('/admin/users')).toBeNull()
     expect(at('/admin/templatesx')).toBeNull()
   })

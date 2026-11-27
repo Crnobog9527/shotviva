@@ -32,10 +32,10 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}`; covers?: read
   // T33 (ARCHITECTURE §10.0), next to the jobs whose cost it reconciles.
   { key: 'costs', href: '/admin/costs' },
   // The template area as three modules (Owner 2026-11-27, design/admin-templates-ux-plan.md):
-  // 模板与系列, 首页展示 (for now the home sections on /admin/templates; its own page comes next) and
+  // 模板与系列, 首页展示 and
   // 出图设置, which gathers AI 供应商 with the generation pages that sat under /admin/templates.
   { key: 'templates', href: '/admin/templates' },
-  { key: 'home', href: '/admin/templates#home-display' },
+  { key: 'home', href: '/admin/home' },
   { key: 'generation', href: '/admin/providers', covers: GENERATION_PAGES },
   { key: 'references', href: '/admin/references' },
   { key: 'requests', href: '/admin/requests' },
@@ -70,8 +70,8 @@ export function adminNavItems(
 
 const trimmed = (path: string) => (path.length > 1 ? path.replace(/\/$/, '') : path)
 
-// /admin is only current on itself; every other path also covers its sub-pages. The fragment of
-// a link (首页展示's #home-display) does not count.
+// /admin is only current on itself; every other path also covers its sub-pages. A link's fragment
+// does not count.
 export function isCurrent(pathname: string, href: string): boolean {
   return matchLength(pathname, href) > 0
 }
