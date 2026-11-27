@@ -14,6 +14,7 @@ describe('admin nav', () => {
       'orders',
       'products',
       'codes',
+      'affiliates',
       'orgs',
       'disputes',
       'jobs',
@@ -22,7 +23,6 @@ describe('admin nav', () => {
       'templates',
       'home',
       'generation',
-      'references',
       'requests',
       'announcements',
       'blog',
@@ -31,9 +31,9 @@ describe('admin nav', () => {
     expect(adminNavItems({ wishlist: false }).map((item) => item.key)).not.toContain('requests')
   })
 
-  it('only links to the affiliate program while enabled', () => {
+  it('always links to 联盟营销, whose page holds the program switch (Owner 2026-11-27)', () => {
     expect(adminNavItems({ wishlist: false, affiliate: true }).map(item => item.href)).toContain('/admin/affiliates')
-    expect(adminNavItems({ wishlist: false, affiliate: false }).map(item => item.href)).not.toContain('/admin/affiliates')
+    expect(adminNavItems({ wishlist: false, affiliate: false }).map(item => item.href)).toContain('/admin/affiliates')
   })
 
   it('shows the open-ticket count on 工单 only, and none at 0 (T27)', () => {
@@ -82,7 +82,7 @@ describe('admin nav counts', () => {
     expect(at('/admin/templates/dishware')).toBe('generation')
     expect(at('/admin/templates/edit')).toBe('generation')
     expect(at('/admin/providers')).toBe('generation')
-    expect(at('/admin/references/lab/x')).toBe('references')
+    expect(at('/admin/references')).toBeUndefined()
     expect(at('/admin/home')).toBe('home')
     expect(at('/admin/home/zh')).toBe('home')
     expect(at('/admin/templates/categories')).toBe('templates')

@@ -10,6 +10,12 @@ import type { SwitchCopy } from './switch-copy'
 export const SERVICE_WORKER_SWITCH_COPY: SwitchCopy = {
   title: '手机离线缓存（Service Worker）',
   key: 'service_worker_enabled',
+  summary: {
+    purpose: '手机把公开文件存在本机，重新打开更快。',
+    whenOn: '脚本、样式、字体和公开模板目录存在手机上；不存页面和账号数据',
+    whenOff: '用户下次打开时手机上的缓存被清空，Service Worker 自动卸载',
+    emergency: true,
+  },
   body: '开启后，手机（尤其是添加到主屏幕的 App）会把脚本、样式、字体和公开模板目录存在本机，重新打开时不用再跨境下载。只存公开文件，不存页面、余额或任何账号数据。关闭后，用户下次打开网站时，手机上的缓存会被清空并自动卸载。保存后马上生效，不用重新部署。',
   state: { on: '已开启', off: '已关闭' },
   stateLabel: '当前状态',
@@ -40,6 +46,12 @@ export const SERVICE_WORKER_SWITCH_COPY: SwitchCopy = {
 export const APP_SHELL_SWITCH_COPY: SwitchCopy = {
   title: '创作页秒开（App 外壳）',
   key: 'service_worker_shell_enabled',
+  summary: {
+    purpose: '手机打开创作页时先画出页面框架，不用干等。',
+    whenOn: '创作页先显示手机上存的框架（不含任何账号数据），真实页面到了就换上',
+    whenOff: '创作页照常从服务器加载；离线缓存的其他部分不受影响',
+    emergency: true,
+  },
   body: '开启后，从手机打开创作页时，先用手机上存的页面框架（不含余额、头像、作品等任何账号数据）马上画出来，同时向服务器取真实页面，到了就换上。需要上面的「手机离线缓存」也开着才生效。只在测试站验收通过后再在正式站开启。保存后马上生效，不用重新部署。',
   state: { on: '已开启', off: '已关闭' },
   stateLabel: '当前状态',

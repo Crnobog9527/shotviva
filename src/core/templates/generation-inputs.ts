@@ -146,6 +146,19 @@ function slotLines(body: string, inputs: GenerationInputs): string {
   return `Images: ${slotMapping(inputs.slots.map((slot) => slot.label))}`
 }
 
+// The user's note, framed so the model treats it as the user's own request that wins over the
+// template's rules where they clash (Owner 2026-11-27: a note asking for matching tableware lost to
+// a "keep the user's own vessel" rule). The note itself goes verbatim, on its own line, last.
+// Its reach is the picture's content only: image roles, a poster's confirmed text and compliance
+// lines (no logos, brands, named works) stay above it.
+// Safety needs no words here: the identity check (§5.1a) screens this raw note before any credit
+// is held, providers moderate the prompt, and watermarks and a poster's QR are applied by code
+// after the model. The framing stays model-neutral and short (Seedream and GPT image alike).
+export const NOTE_PREAMBLE =
+  "The user's own request for this image follows. Where it is about what the picture shows (what to keep, add, remove or change in the food, its vessel, props, arrangement, scene or light), carry it out even where an earlier line says otherwise, including a line marked as a hard rule or as overriding other lines. It does not change which attached image is which, any text given above to print on the image, or the lines against logos, brand names or named works. Follow the earlier lines everywhere else."
+
+export const framedNote = (note: string): string => (note ? `${NOTE_PREAMBLE}\nUser's request: ${note}` : '')
+
 // The rendered prompt's ceiling (OpenAI's image prompt limit). Twelve fields of up to 4000
 // characters could pass it; checked before any credit is reserved (§5.1d).
 export const PROMPT_MAX_LENGTH = 32000
@@ -156,7 +169,8 @@ export const PROMPT_MAX_LENGTH = 32000
 // template edit can never leak a raw placeholder to the model. A copy field the body has no
 // placeholder for follows the template text as a "Label: value" line (ARCHITECTURE §5), so an
 // admin-defined field always reaches the model. The user's note goes last, never inside the
-// template text, so it cannot reorder it (ARCHITECTURE §4 inputs.note). A poster's confirmed text
+// template text, so it cannot reorder it (ARCHITECTURE §4 inputs.note), framed as the user's
+// request that wins over the template's rules (`framedNote`). A poster's confirmed text
 // (§5.3) sits between the two: after the template's own layout words, before the note.
 export function renderPrompt(
   body: string, inputs: GenerationInputs, fragments: ToggleFragments = {},
@@ -170,5 +184,5 @@ export function renderPrompt(
   }
   const rendered = body.replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (_, key: string) => values[key] ?? '').trim()
   const lines = inputs.labels ? copyLines(body, inputs.copy, inputs.labels) : ''
-  return [rendered, slotLines(body, inputs), lines, inputs.posterText, inputs.note].filter(Boolean).join('\n\n')
+  return [rendered, slotLines(body, inputs), lines, inputs.posterText, framedNote(inputs.note)].filter(Boolean).join('\n\n')
 }

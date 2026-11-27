@@ -1,7 +1,9 @@
 'use server'
 import { refresh } from 'next/cache'
 import { z } from 'zod'
-import { createAdminSupabase } from '@/core/auth'
+import { runAdminAction, type ActionResult } from '@/core/admin'
+import { createAdminSupabase, requireAdmin } from '@/core/auth'
+import { AppError } from '@/core/errors'
 import { logger } from '@/core/logger'
 import {
   COPY, FEE_COPY, START_COPY, isFeeAnswer, enrollAffiliate, enrollmentLabel, execute, requireAffiliateAdmin, startPaymentFees,
@@ -67,4 +69,19 @@ export async function saveAffiliate(_state: string, form: FormData) {
   }
   refresh()
   return COPY.saved
+}
+
+// The program's master switch (moved here from 功能开关, Owner 2026-11-27). requireAdmin, not
+// requireAffiliateAdmin: it has to turn the program back on while it is off.
+export async function saveAffiliateSwitchAction(input: unknown): Promise<ActionResult> {
+  const admin = await requireAdmin()
+  return runAdminAction(async () => {
+    const parsed = z.object({ enabled: z.boolean() }).safeParse(input)
+    if (!parsed.success) throw new AppError('INVALID_INPUT', COPY.invalid)
+    const { error } = await createAdminSupabase().rpc('admin_affiliate_settings', {
+      p_actor: admin.id, p_input: { enabled: parsed.data.enabled },
+    })
+    if (error) throw new AppError('INTERNAL', 'affiliate switch save failed', { cause: new Error(error.message) })
+    refresh()
+  })
 }

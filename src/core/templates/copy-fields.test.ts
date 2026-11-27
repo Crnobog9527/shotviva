@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { checkCopyValue, cleanCopy, copyFieldSchema, copyLines } from './copy-fields'
-import { renderPrompt, validateGenerationInputs } from './generation-inputs'
+import { framedNote, renderPrompt, validateGenerationInputs } from './generation-inputs'
 import { templateFieldsSchema } from './schema'
 
 const field = (raw: Record<string, unknown>) => copyFieldSchema.parse({ key: 'f', label: 'Field', ...raw })
@@ -99,7 +99,7 @@ describe('fields to prompt', () => {
       copy: { headline: ' Grand\nOpening ', story: 'Doors 6pm\n\nFree drinks', mood: 'Bold', guests: '40' },
     })
     expect(renderPrompt('Poster titled "{{headline}}".', inputs)).toBe(
-      'Poster titled "Grand Opening".\n\nEvent details: Doors 6pm\n\nFree drinks\nMood: Bold\nNumber of guests: 40\n\nwarmer light',
+      `Poster titled "Grand Opening".\n\nEvent details: Doors 6pm\n\nFree drinks\nMood: Bold\nNumber of guests: 40\n\n${framedNote('warmer light')}`,
     )
   })
 

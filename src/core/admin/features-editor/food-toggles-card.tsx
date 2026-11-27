@@ -23,6 +23,11 @@ export const FOOD_PLATING_SWITCH_COPY: SwitchCopy = {
   ...common,
   title: '餐饮模板「优化摆盘」',
   key: 'food_plating_enabled',
+  summary: {
+    purpose: '餐饮模板的「优化摆盘」选项：先读菜，再按菜重新摆盘。',
+    whenOn: '带这个开关的餐饮模板显示「优化摆盘」，用户打开后按新摆盘出图',
+    whenOff: '所有页面都不显示，服务器一律按「关」出图；「优化器皿」不受影响',
+  },
   body: `关着时，所有页面都不显示「优化摆盘」，服务器也一律按「关」出图，价格不变。和「优化器皿」互不影响。${DISH_NAME}模板里的开关设置都保留，开启后原样恢复。保存后马上生效，不用重新部署。`,
   turnOn: '开启优化摆盘',
   turnOff: '关闭优化摆盘',
@@ -46,6 +51,11 @@ export const FOOD_TABLEWARE_SWITCH_COPY: SwitchCopy = {
   ...common,
   title: '餐饮模板「优化器皿」',
   key: 'food_tableware_enabled',
+  summary: {
+    purpose: '餐饮模板的「优化器皿」选项：先读菜，再从器皿库换上配套器皿。',
+    whenOn: '带这个开关的餐饮模板显示「优化器皿」，用户打开后从器皿库选器皿；价格不变',
+    whenOff: '所有页面都不显示，服务器一律按「关」出图；「优化摆盘」不受影响',
+  },
   body: `关着时，所有页面都不显示「优化器皿」，服务器也一律按「关」出图（不用器皿库），价格不变。和「优化摆盘」互不影响。${DISH_NAME}模板里的开关设置都保留，开启后原样恢复。保存后马上生效，不用重新部署。`,
   turnOn: '开启优化器皿',
   turnOff: '关闭优化器皿',

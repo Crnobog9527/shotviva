@@ -74,18 +74,6 @@ export async function saveSignupGiftRulesAction(input: unknown): Promise<ActionR
   return result
 }
 
-export async function saveAffiliateSwitchAction(value: boolean): Promise<boolean> {
-  const admin = await requireAdmin()
-  const parsed = z.boolean().safeParse(value)
-  if (!parsed.success) return false
-  const { error } = await createAdminSupabase().rpc('admin_affiliate_settings', {
-    p_actor: admin.id, p_input: { enabled: parsed.data },
-  })
-  if (error) return false
-  refresh()
-  return true
-}
-
 // 1521: 拍照识别's price; the editor reads it through the system-settings cache.
 export async function savePosterPhotoPriceAction(input: unknown): Promise<ActionResult> {
   const admin = await requireAdmin()

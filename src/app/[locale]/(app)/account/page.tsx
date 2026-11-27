@@ -26,6 +26,7 @@ import { AccountHelp } from '@/core/support/ui/account'
 import { currentLocale, localized } from '@/core/i18n/server'
 import type { Translate } from '@/core/translate'
 import { contractProducts, displayProducts } from '@/site/billing/display-products'
+import { signupGiftCreditsForSite } from '@/site/billing/signup-gift'
 import { site } from '@/site/site.config'
 
 import { actions, helpActions } from './account-actions'
@@ -63,6 +64,8 @@ async function Account() {
   ])
   // 1480: an account over the per-network allowance can still claim its signup gift.
   const claimOptions = signupGift.reason === 'same_ip_pending' ? await readClaimOptions(admin) : null
+  // What a claim pays now: the admin's amount (2008), which claim_signup_gift reads when it pays.
+  const claimCredits = claimOptions ? await signupGiftCreditsForSite() : 0
   const purchases = paymentChoices(payments, identities, t as unknown as Translate, { money: formatMoney(locale) })
   const last = lastMembership(payments, identities)
   const more = payments.length >= PICKER_LIMIT
@@ -73,7 +76,7 @@ async function Account() {
   return (
     <>
       <AccountView data={data} actions={actions} site={{ brand: site.brand.name, products: offers, freeCredits: signupGift.granted }}>
-        {claimOptions ? <GiftClaimCard credits={site.billing.freeCredits} options={claimOptions} actions={claimActions} /> : null}
+        {claimOptions ? <GiftClaimCard credits={claimCredits} options={claimOptions} actions={claimActions} /> : null}
         <OrgBlock view={org} memberLink={org.kind === 'member' ? <Suspense fallback={null}><MemberLink user={user.id} /></Suspense> : null} customerLink={org.kind === 'owner' && org.org.affiliateEnabled && affiliate ? <Suspense fallback={null}><OwnerCustomerLink user={user.id} /></Suspense> : null} />
         <StoreCard actions={storeActions} />
         <InviteCard load={loadMyInvites} />
