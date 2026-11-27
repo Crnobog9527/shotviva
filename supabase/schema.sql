@@ -4132,6 +4132,21 @@ $$;
 ALTER FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" integer, "p_inflight" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_invite_code_org"("p_owner" "uuid") RETURNS "uuid"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select o.id from public.org_members m
+    join public.orgs o on o.id = m.org_id and o.status = 'active' and o.affiliate_enabled
+    join public.affiliates a on a.org_id = o.id and a.status = 'active'
+   where m.user_id = p_owner and m.status = 'active'
+   limit 1
+$$;
+
+
+ALTER FUNCTION "public"."_invite_code_org"("p_owner" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_link_early_payment_disputes"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -14707,6 +14722,7 @@ CREATE OR REPLACE FUNCTION "public"."apply_payment_code_effects"("p_user" "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+
 declare
   v_payment record;
   v_invite record;
@@ -14740,7 +14756,7 @@ begin
 
   -- A user cannot acquire a new invitation after payment. Lock both profiles in canonical
   -- order for reciprocal invites and serialize all rewards for a given inviter.
-  select id, inviter_user_id, inviter_rewarded_at into v_invite from public.code_redemptions
+  select id, inviter_user_id, inviter_rewarded_at, org_invite into v_invite from public.code_redemptions
     where user_id = p_user and kind = 'invite' and status = 'ok';
   perform 1 from public.profiles where id in (p_user, v_invite.inviter_user_id)
     order by id for no key update;
@@ -14763,6 +14779,12 @@ begin
     select (value->>'inviterCredits')::integer into strict reward_credits from public.system_settings where key = 'code_invite_rewards';
   end if;
   if reward_credits > 0 and v_invite.inviter_rewarded_at is null
+     -- 2032: no personal inviter reward for an org staff member's code: the org earns through
+     -- commissions. Marked at redemption since 2032; an earlier one is known by its org_l1
+     -- binding to that staff member.
+     and not coalesce(v_invite.org_invite, false)
+     and not exists (select 1 from public.profiles c where c.id = p_user
+                      and c.referred_source = 'org_l1' and c.referred_member = v_invite.inviter_user_id)
      and not exists (select 1 from public.payments where user_id = p_user and id < p_payment_id)
      and exists (select 1 from public.profiles where id = v_invite.inviter_user_id and banned_at is null)
      -- Rewards survive the invitee deleting their profile and redemption.
@@ -15678,16 +15700,30 @@ ALTER TABLE "public"."codes" OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."code_preview_credits"("offer" "public"."codes") RETURNS integer
-    LANGUAGE "sql" STABLE
+    LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select case when offer.kind = 'invite' then
-    (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
+  select case
+    when offer.kind = 'invite' and public._invite_code_org(offer.owner_user_id) is not null then
+      (select o.signup_bonus_credits from public.orgs o where o.id = public._invite_code_org(offer.owner_user_id))
+    when offer.kind = 'invite' then
+      (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
     else coalesce(offer.invitee_credits, 0) end;
 $$;
 
 
 ALTER FUNCTION "public"."code_preview_credits"("offer" "public"."codes") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."code_preview_org"("offer" "public"."codes") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select offer.kind = 'invite' and public._invite_code_org(offer.owner_user_id) is not null
+$$;
+
+
+ALTER FUNCTION "public"."code_preview_org"("offer" "public"."codes") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."confirm_job"("p_job_id" "uuid", "p_output_key" "text", "p_provider_usage" "jsonb" DEFAULT NULL::"jsonb", "p_cost_usd" numeric DEFAULT NULL::numeric, "p_kept_inputs" "text"[] DEFAULT NULL::"text"[]) RETURNS "public"."generation_jobs"
@@ -19276,15 +19312,17 @@ begin
       returning status, created_at into prior_status, prior_at;
   end if;
 
-  credits := case when offer.kind = 'invite' then
+  -- 2032: an org staff member's code gives no personal invitee reward (the org bonus instead).
+  credits := case when offer.kind = 'invite' and org_code then 0
+    when offer.kind = 'invite' then
     (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
     else coalesce(offer.invitee_credits, 0) end;
   grant_pool := case when offer.kind = 'invite' then 'free' else offer.invitee_pool end;
   insert into public.code_redemptions
     (id, code_id, kind, user_id, inviter_user_id, context, status, credits_granted, discount_expires_at,
-     blocked_status, blocked_at)
+     blocked_status, blocked_at, org_invite)
     values (redemption_id, offer.id, offer.kind, p_user, offer.owner_user_id, p_context, 'ok', credits, deadline,
-     prior_status, prior_at);
+     prior_status, prior_at, offer.kind = 'invite' and org_code);
   update public.codes set redemption_count = redemption_count + 1 where id = offer.id;
   if credits > 0 then
     perform public._apply_credit_change(p_user, grant_pool, 'code_grant', credits, 'Code redemption', 'code:' || redemption_id);
@@ -22808,6 +22846,7 @@ CREATE TABLE IF NOT EXISTS "public"."code_redemptions" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "blocked_status" "text",
     "blocked_at" timestamp with time zone,
+    "org_invite" boolean DEFAULT false NOT NULL,
     CONSTRAINT "code_redemptions_blocked_status_check" CHECK (("blocked_status" = ANY (ARRAY['blocked_same_ip'::"text", 'blocked_no_signup_grant'::"text"]))),
     CONSTRAINT "code_redemptions_check" CHECK ((("checkout_token" IS NULL) = ("checkout_expires_at" IS NULL))),
     CONSTRAINT "code_redemptions_context_check" CHECK (("context" = ANY (ARRAY['signup'::"text", 'account'::"text", 'paywall'::"text"]))),
@@ -22821,6 +22860,10 @@ ALTER TABLE "public"."code_redemptions" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."code_redemptions"."blocked_status" IS 'For an ok invite row: the status of the blocked attempt it replaced (2025), else null.';
+
+
+
+COMMENT ON COLUMN "public"."code_redemptions"."org_invite" IS 'An ok invite through an org staff member''s code (2032): no personal invitee or inviter reward.';
 
 
 
@@ -28969,6 +29012,10 @@ GRANT ALL ON FUNCTION "public"."_generation_lane"("p" "jsonb", "p_per_minute" in
 
 
 
+REVOKE ALL ON FUNCTION "public"."_invite_code_org"("p_owner" "uuid") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_link_early_payment_disputes"() FROM PUBLIC;
 
 
@@ -30498,6 +30545,11 @@ GRANT SELECT ON TABLE "public"."codes" TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."code_preview_credits"("offer" "public"."codes") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."code_preview_credits"("offer" "public"."codes") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."code_preview_org"("offer" "public"."codes") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."code_preview_org"("offer" "public"."codes") TO "service_role";
 
 
 
