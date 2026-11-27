@@ -8,7 +8,9 @@
 // "Past the shell" is the address with SHELL_BYPASS_PARAM: the worker never answers it with the
 // shell, the proxy never answers its navigation preload with the empty 204 (shell-proxy.ts), and
 // the page drops the parameter from the address bar once loaded (register.tsx).
-export const SHELL_BYPASS_PARAM = 'sv-net'
+import { SHELL_BYPASS_PARAM } from './client-names'
+
+export { SHELL_BYPASS_PARAM, withoutBypass } from './client-names'
 // Create's addresses whose navigation preload the proxy may answer with an empty 204 (shell-proxy.ts).
 export const CREATE_PATHS: readonly string[] = ['/generate', '/generate/', '/zh/generate', '/zh/generate/']
 export const SHELL_FALLBACK_MS = 8_000
@@ -21,14 +23,6 @@ export function bypassHref(href: string, param: string = SHELL_BYPASS_PARAM): st
   const url = new URL(href)
   url.searchParams.set(param, '1')
   return url.href
-}
-
-// The address without the bypass parameter, or null when it has none.
-export function withoutBypass(href: string): string | null {
-  const url = new URL(href)
-  if (!url.searchParams.has(SHELL_BYPASS_PARAM)) return null
-  url.searchParams.delete(SHELL_BYPASS_PARAM)
-  return url.pathname + url.search + url.hash
 }
 
 type Storage = Pick<globalThis.Storage, 'getItem' | 'setItem' | 'removeItem'>
