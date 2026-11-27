@@ -5,7 +5,7 @@ import { jobCostUsd, ProviderError, type ProviderInput } from '@/core/jobs'
 import { providerUsage } from '@/core/jobs/provider-usage'
 import { ARK_MAX_PIXELS, ARK_MIN_PIXELS } from '@/core/providers/ark'
 
-import { arkRequest, arkSize, createArkImageProvider, networkCode } from './ark-image-provider'
+import { arkRequest, arkSize, createArkImageProvider, isConnectFailure, networkCode } from './ark-image-provider'
 
 const model = 'doubao-seedream-5-5-261028'
 // Fixture list price: a real line's is typed in by the admin (ai_providers.list_price).
@@ -163,5 +163,46 @@ describe('a fetch that threw', () => {
     await expect(createArkImageProvider({ ...config, fetch: reset }).generate(input())).rejects.toMatchObject({ kind: 'failed', message: 'ark request failed (ECONNRESET)' })
     expect(networkCode(new TypeError('fetch failed'))).toBe('TypeError')
     expect(networkCode(new TypeError('fetch failed', { cause: { code: 'not a code: secret' } }))).toBe('TypeError')
+  })
+})
+
+describe('connection failures are retried', () => {
+  const connectFail = (code: string) => new TypeError('fetch failed', { cause: Object.assign(new Error(`connect ${code}`), { code }) })
+  const noWait = [0, 0] as const
+
+  it('retries a connect timeout and succeeds without a second charge path', async () => {
+    const body = await ok()
+    const fetcher = vi.fn<typeof fetch>()
+      .mockRejectedValueOnce(connectFail('UND_ERR_CONNECT_TIMEOUT'))
+      .mockResolvedValueOnce(Response.json(body))
+    const result = await createArkImageProvider({ ...config, fetch: fetcher }, noWait).generate(input())
+    expect(result.contentType).toBe('image/png')
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
+  it('gives up after the last retry and names the attempts', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => { throw connectFail('UND_ERR_CONNECT_TIMEOUT') })
+    await expect(createArkImageProvider({ ...config, fetch: fetcher }, noWait).generate(input())).rejects.toMatchObject({ kind: 'failed', message: 'ark request failed (UND_ERR_CONNECT_TIMEOUT, 3 attempts)' })
+    expect(fetcher).toHaveBeenCalledTimes(3)
+  })
+
+  it('never retries a failure where the request may have reached Ark', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => { throw connectFail('ECONNRESET') })
+    await expect(createArkImageProvider({ ...config, fetch: fetcher }, noWait).generate(input())).rejects.toMatchObject({ kind: 'failed' })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops waiting at the job deadline', async () => {
+    const controller = new AbortController()
+    const fetcher = vi.fn<typeof fetch>(async () => { throw connectFail('ECONNREFUSED') })
+    const pending = createArkImageProvider({ ...config, fetch: fetcher }, [60_000]).generate(input({ signal: controller.signal }))
+    setTimeout(() => controller.abort(), 10)
+    await expect(pending).rejects.toMatchObject({ kind: 'timeout' })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('knows which codes mean the connection was never made', () => {
+    for (const code of ['UND_ERR_CONNECT_TIMEOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN']) expect(isConnectFailure(code)).toBe(true)
+    for (const code of ['ECONNRESET', 'UND_ERR_SOCKET', 'EHOSTUNREACH', 'ENETUNREACH', 'TypeError', 'unknown']) expect(isConnectFailure(code)).toBe(false)
   })
 })

@@ -5,7 +5,7 @@ export { ledgerPage, loadUser, recentJobs } from './repository'
 export { loadUserDetail } from './detail'
 export { isMissingFunction, listUsers, planInterval } from './list'
 export { hasListFilters, pageItems, parseUserFilters, usersHref, type PageItem, type UserFilters } from './list-filters'
-export { BATCH_MAX, USERS_PAGE_SIZE, type BatchOutcome, type UserListPage, type UserIdentity, type UserListRow, type UserTier } from './list-types'
+export { BATCH_MAX, USERS_PAGE_SIZE, type BatchOutcome, type UserListPage, type UserIdentity, type UserListRow, type UserReferrer, type UserTier } from './list-types'
 
 export { RECENT_JOBS, type LedgerEntry, type UserDetail, type UserJob } from './types'
 export { loadUserExtras } from './detail-reads'

@@ -1,10 +1,14 @@
 import { SHELL_COPY, type AdminNavKey } from './copy'
 
 // count: a to-do number shown beside the label (open tickets, new inquiries), hidden at 0.
-export type AdminNavItem = { key: AdminNavKey; href: `/admin${string}`; label: string; count?: number }
+// covers: other pages the entry stands for (出图设置 covers pages under /admin/templates); the
+// longest matching path decides which entry is current.
+export type AdminNavItem = { key: AdminNavKey; href: `/admin${string}`; label: string; count?: number; covers?: readonly string[] }
+
+export const GENERATION_PAGES = ['/admin/templates/profiles', '/admin/templates/dishware', '/admin/templates/edit'] as const
 
 // Order fixed by T23 / ARCHITECTURE §10; later pages append.
-const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
+const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}`; covers?: readonly string[] }[] = [
   { key: 'overview', href: '/admin' },
   // T74 (ARCHITECTURE §16.2a): traffic and conversion from PostHog, next to the business overview.
   { key: 'analytics', href: '/admin/analytics' },
@@ -27,9 +31,13 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}` }[] = [
   { key: 'trace', href: '/admin/trace' },
   // T33 (ARCHITECTURE §10.0), next to the jobs whose cost it reconciles.
   { key: 'costs', href: '/admin/costs' },
+  // The template area as three modules (Owner 2026-11-27, design/admin-templates-ux-plan.md):
+  // 模板与系列, 首页展示 and
+  // 出图设置, which gathers AI 供应商 with the generation pages that sat under /admin/templates.
   { key: 'templates', href: '/admin/templates' },
+  { key: 'home', href: '/admin/home' },
+  { key: 'generation', href: '/admin/providers', covers: GENERATION_PAGES },
   { key: 'references', href: '/admin/references' },
-  { key: 'providers', href: '/admin/providers' },
   { key: 'requests', href: '/admin/requests' },
   // T108 (ARCHITECTURE §9 第 5 条): public works waiting for a person, next to the other review.
   { key: 'gallery', href: '/admin/gallery' },
@@ -60,13 +68,33 @@ export function adminNavItems(
   })
 }
 
-// /admin is only current on itself; every other entry also covers its sub-pages.
+const trimmed = (path: string) => (path.length > 1 ? path.replace(/\/$/, '') : path)
+
+// /admin is only current on itself; every other path also covers its sub-pages. A link's fragment
+// does not count.
 export function isCurrent(pathname: string, href: string): boolean {
-  const path = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname
-  if (href === '/admin') return path === '/admin'
-  return path === href || path.startsWith(`${href}/`)
+  return matchLength(pathname, href) > 0
+}
+
+function matchLength(pathname: string, href: string): number {
+  const path = trimmed(pathname)
+  const base = href.split('#')[0]
+  if (base === '/admin') return path === '/admin' ? base.length : 0
+  return path === base || path.startsWith(`${base}/`) ? base.length : 0
+}
+
+// The most specific match wins: /admin/templates/profiles is 出图设置, not 模板与系列. On a tie
+// the earlier entry wins.
+export function bestMatch<T>(pathname: string, entries: readonly T[], pathsOf: (entry: T) => readonly string[]): T | undefined {
+  let best: T | undefined
+  let length = 0
+  for (const entry of entries) {
+    const longest = Math.max(0, ...pathsOf(entry).map((href) => matchLength(pathname, href)))
+    if (longest > length) [best, length] = [entry, longest]
+  }
+  return best
 }
 
 export function currentItem(pathname: string, items: readonly AdminNavItem[]): AdminNavItem | undefined {
-  return items.find((item) => isCurrent(pathname, item.href))
+  return bestMatch(pathname, items, (item) => [item.href, ...(item.covers ?? [])])
 }

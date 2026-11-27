@@ -12,15 +12,16 @@ import { featuredState, siblingGroups } from './display-state'
 import { draftChanges, hasChanges, sharedLists, toDraft, type LocaleDraft } from './draft'
 import { useUnsavedGuard } from './use-unsaved-guard'
 
-type Inputs = { categories: AdminCategoryNode[]; templates: AdminTemplate[]; display: LocaleDisplay; bundles: FeaturedBundles | undefined; actions: LocaleDisplayActions }
+// initial: the language shown first (a 首页展示 language page fixes it); English otherwise.
+type Inputs = { categories: AdminCategoryNode[]; templates: AdminTemplate[]; display: LocaleDisplay; bundles: FeaturedBundles | undefined; actions: LocaleDisplayActions; initial?: DisplayLocale }
 export type SaveStatus = { kind: 'saved' | 'error'; text: string } | null
 
 const FALLBACK = '保存失败，请稍后重试'
 
 // Read-only until 编辑; then one language's draft that 保存 sends whole (one server call, all or
 // nothing) and 取消 drops. Switching language or leaving with an unsaved draft asks first.
-export function useLocaleDisplayEditor({ categories, templates, display, bundles, actions }: Inputs) {
-  const [locale, setLocale] = useState<DisplayLocale>('en')
+export function useLocaleDisplayEditor({ categories, templates, display, bundles, actions, initial = 'en' }: Inputs) {
+  const [locale, setLocale] = useState<DisplayLocale>(initial)
   const [edit, setEdit] = useState<{ locale: DisplayLocale; draft: LocaleDraft } | null>(null)
   const [status, setStatus] = useState<SaveStatus>(null)
   const [saving, startTransition] = useTransition()

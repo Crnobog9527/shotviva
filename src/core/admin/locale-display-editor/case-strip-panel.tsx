@@ -29,6 +29,8 @@ type Props = {
   bundles: FeaturedBundles | undefined
   actions: CaseStripActions
   saveBundle: FeaturedBundleActions['save']
+  // One language only (a 首页展示 language page), with no language switch.
+  locale?: DisplayLocale
 }
 
 // What a saved list can be saved again as: the server takes only published templates and
@@ -41,8 +43,8 @@ const asValue = (result: { ok: true } | { ok: false; code: string; message: stri
 
 // 首页「更多真实案例」 (Owner 2026-11-25): per language, up to eight templates or 精选组合 in the
 // row under the home first screen. Read-only until 编辑; 保存 sends the language's whole list.
-export function CaseStripPanel({ strip, templates, categories, bundles, actions, saveBundle }: Props) {
-  const [locale, setLocale] = useState<DisplayLocale>('zh')
+export function CaseStripPanel({ strip, templates, categories, bundles, actions, saveBundle, locale: only }: Props) {
+  const [locale, setLocale] = useState<DisplayLocale>(only ?? 'zh')
   const [draft, setDraft] = useState<CaseStripEntry[] | null>(null)
   const { pending, error, notice, run } = useAdminAction()
   const context: BundleContext = { bundles: bundles?.list ?? [], templates, categories, save: saveBundle }
@@ -66,7 +68,7 @@ export function CaseStripPanel({ strip, templates, categories, bundles, actions,
         <h2 id="case-strip-h" className="font-medium">{COPY.title}</h2>
         <p className="text-sm text-muted-foreground">{COPY.body}</p>
       </div>
-      <div role="tablist" aria-label={COPY.title} className="flex gap-2">
+      <div role="tablist" aria-label={COPY.title} hidden={Boolean(only)} className="flex gap-2">
         {DISPLAY_LOCALES.map((code) => (
           <Button key={code} role="tab" aria-selected={code === locale} size="sm" disabled={pending}
             variant={code === locale ? 'default' : 'outline'} onClick={() => switchTo(code)}>{LOCALE_DISPLAY_COPY.locales[code]}</Button>

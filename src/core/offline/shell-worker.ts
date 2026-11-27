@@ -16,12 +16,17 @@
 //   cookies), so it is never written to any cache and is dropped after EARLY_MS unused.
 // - Navigation preload: the header value says a shell is in use, and the proxy answers such a
 //   preload of /generate with an empty 204 instead of rendering the page for nothing.
+// - The way out (shell-fallback.ts): an address carrying SHELL_BYPASS_PARAM is never answered with
+//   the shell; the shell page goes there when the real page does not come.
+import { SHELL_BYPASS_PARAM } from './shell-fallback'
+
 export const SHELL_PRELOAD_PREFIX = 'shell-'
 const EARLY_MS = 30_000
 
 export const SHELL_HANDLERS = `// Create's app shell (ARCHITECTURE §18.3).
 const SHELL_PRELOAD = '${SHELL_PRELOAD_PREFIX}' + VERSION
 const SHELL_TEMPLATES = self.location.origin + '/__sv-shell-refresh'
+const SHELL_BYPASS = ${JSON.stringify(SHELL_BYPASS_PARAM)}
 
 // /generate → /app-shell/generate, /zh/generate → /zh/app-shell/generate; null for anything else.
 function shellPathFor(pathname) {
@@ -150,7 +155,7 @@ function shellFetch(event) {
   const request = event.request
   if (request.mode === 'navigate' && request.method === 'GET') {
     const url = new URL(request.url)
-    const path = url.origin === self.location.origin ? shellPathFor(url.pathname) : null
+    const path = url.origin === self.location.origin && !url.searchParams.has(SHELL_BYPASS) ? shellPathFor(url.pathname) : null
     if (!path) return false
     event.respondWith(shellFirst(event, self.location.origin + path))
     return true

@@ -5,13 +5,14 @@ import { usePathname } from 'next/navigation'
 
 import { cn } from '../../ui/cn'
 import { SHELL_COPY } from './copy'
-import { currentItem, isCurrent, type AdminNavItem } from './nav-items'
+import { currentItem, type AdminNavItem } from './nav-items'
 
 function NavLinks({ items, pathname }: { items: readonly AdminNavItem[]; pathname: string }) {
+  const active = currentItem(pathname, items)
   return (
     <ul className="grid gap-1">
       {items.map((item) => {
-        const current = isCurrent(pathname, item.href)
+        const current = item === active
         return (
           <li key={item.href}>
             <Link
