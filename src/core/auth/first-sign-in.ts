@@ -1,7 +1,7 @@
 import 'server-only'
 import { cookies, headers } from 'next/headers'
 
-import { bindReferral, earliestReferral, takeSignupReferral } from '../affiliate/referral'
+import { bindSignupReferral } from '../affiliate/referral'
 import { noteSignupGift } from '../alerts'
 import { track } from '../analytics'
 import { COLLECTION_COOKIE, parseCollectionMark } from '../analytics/collection-link'
@@ -44,14 +44,10 @@ export function signupMarks(jar: Jar, experiments: Parameters<typeof signupExper
 // Local dev runs on http; everywhere else the cookie is Secure.
 const isSecure = (head: Headers) => head.get('x-forwarded-proto') !== 'http'
 
-// Only a first sign-in (a new account) binds a partner's link: this browser's cookie, or the one
-// stored at email sign-up when the link is verified on another device (2021), whichever was set
-// first. The stored one is taken (deleted) on the first sign-in even when it does not bind (a
-// staff sign-up), so it can never bind later.
-async function bindSignupReferral(userId: string, first: boolean, fresh: boolean, cookie: string | undefined) {
-  if (!first) return
-  const stored = await takeSignupReferral(userId)
-  if (fresh) await bindReferral(userId, earliestReferral(cookie, stored), 'signup')
+// Only a first sign-in (a new account) binds a partner's link: this browser's cookie, else the one
+// stored at email sign-up when the link is verified on another device (2021, core/affiliate/referral).
+async function bindFirstReferral(userId: string, first: boolean, fresh: boolean, cookie: string | undefined) {
+  if (first) await bindSignupReferral(userId, fresh, cookie)
 }
 
 // The signup gift (0 for a staff sign-up). 1480: an account over the per-network allowance is
@@ -93,7 +89,7 @@ export async function onVerifiedSignIn(
   // invite code binds the customer to the org only when nobody else already has (§6.5).
   // A staff sign-up skips both; the code cookie is still cleared.
   const fresh = first && !staff
-  await bindSignupReferral(userId, first, fresh, jar.get('sv_ref')?.value)
+  await bindFirstReferral(userId, first, fresh, jar.get('sv_ref')?.value)
   const kind = await consumeSignupCode(admin, userId, fresh, benefits.invite, locale)
   // A/B variants onto the account, and the account's back into the cookie (ARCHITECTURE §16.5).
   const experiments = await syncExperimentsAtSignIn(admin, userId, first, jar, isSecure(await headers()))

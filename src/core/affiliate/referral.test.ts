@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ enabled: vi.fn(), after: vi.fn(), rpc: vi.fn() }))
 vi.mock('next/server', async (load) => ({ ...(await load<typeof import('next/server')>()), after: mocks.after }))
 vi.mock('./feature', () => ({ isAffiliateEnabled: mocks.enabled }))
 vi.mock('../auth/supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc }) }))
-import { bindReferral, earliestReferral, recordReferral, storeSignupReferral, takeSignupReferral } from './referral'
+import { bindReferral, bindSignupReferral, recordReferral, storeSignupReferral } from './referral'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -50,39 +50,59 @@ it('binds only a current cookie and isolates a failed RPC from auth and checkout
   expect(mocks.rpc).toHaveBeenCalledWith('affiliate_bind', { p_user: 'buyer', p_slug: 'anna', p_source: 'first_checkout' })
 })
 
-// 2021: the cookie stored at email sign-up for a verification opened on another device.
-it('stores only a current cookie for a real account, and never fails the sign-up', async () => {
+// 2021: the partner stored at email sign-up for a verification opened on another device.
+it('stores the current cookie\'s slug, clears the row without one, and never fails the sign-up', async () => {
   const time = Math.floor(Date.now() / 1000)
-  for (const [user, cookie] of [[undefined, 'anna.' + time], ['u1', undefined], ['u1', 'bad'], ['u1', 'anna.' + (time - 5184000)]] as const) {
-    await storeSignupReferral(user, cookie)
-  }
+  await storeSignupReferral(undefined, 'anna.' + time)
   expect(mocks.rpc).not.toHaveBeenCalled()
+  for (const cookie of [undefined, 'bad', 'anna.' + (time - 5184000)]) await storeSignupReferral('u1', cookie)
+  expect(mocks.rpc.mock.calls).toEqual(Array(3).fill(['affiliate_signup_ref_store', { p_user: 'u1', p_slug: null }]))
+  mocks.rpc.mockClear()
+  await storeSignupReferral('u1', 'anna.' + time)
+  expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('affiliate_signup_ref_store', { p_user: 'u1', p_slug: 'anna' })
   mocks.rpc.mockRejectedValueOnce(new Error())
   await storeSignupReferral('u1', 'anna.' + time)
   mocks.rpc.mockResolvedValueOnce({ error: { code: '42501' } })
   await storeSignupReferral('u1', 'anna.' + time)
-  expect(mocks.rpc).toHaveBeenCalledWith('affiliate_signup_ref_store', { p_user: 'u1', p_ref: 'anna.' + time })
 })
 
-it('takes the stored referral once, and reads a failure as none', async () => {
-  mocks.rpc.mockResolvedValueOnce({ data: 'anna.123', error: null })
-  expect(await takeSignupReferral('u1')).toBe('anna.123')
-  expect(mocks.rpc).toHaveBeenCalledWith('affiliate_signup_ref_take', { p_user: 'u1' })
-  mocks.rpc.mockResolvedValueOnce({ data: null, error: null })
-  expect(await takeSignupReferral('u1')).toBeUndefined()
-  mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: 'XX000' } })
-  expect(await takeSignupReferral('u1')).toBeUndefined()
-  mocks.rpc.mockRejectedValueOnce(new Error())
-  expect(await takeSignupReferral('u1')).toBeUndefined()
-})
+describe('bindSignupReferral', () => {
+  const time = () => Math.floor(Date.now() / 1000)
+  const binds = () => mocks.rpc.mock.calls.filter(([fn]) => fn === 'affiliate_bind')
+  const stored = (value: unknown, error: unknown = null) =>
+    mocks.rpc.mockImplementation(async (fn: string) => (fn === 'affiliate_signup_ref_take' ? { data: value, error } : { error: null }))
 
-it('keeps the referral set first, ignoring malformed and expired ones', () => {
-  const time = Math.floor(Date.now() / 1000)
-  const older = 'anna.' + (time - 100)
-  const newer = 'bob.' + (time - 10)
-  expect(earliestReferral(newer, older)).toBe(older)
-  expect(earliestReferral(older, newer)).toBe(older)
-  expect(earliestReferral(undefined, newer)).toBe(newer)
-  expect(earliestReferral('anna.' + (time - 5184000), newer)).toBe(newer)
-  expect(earliestReferral('bad', null, undefined)).toBeUndefined()
+  it('binds this browser\'s current cookie over the stored partner, however old the cookie says it is', async () => {
+    stored('bob')
+    await bindSignupReferral('u1', true, 'anna.' + (time() - 5183000))
+    expect(mocks.rpc).toHaveBeenCalledWith('affiliate_signup_ref_take', { p_user: 'u1' })
+    expect(binds()).toEqual([['affiliate_bind', { p_user: 'u1', p_slug: 'anna', p_source: 'signup' }]])
+  })
+
+  it('falls back to the stored partner when the cookie is missing, malformed or expired', async () => {
+    stored('bob')
+    for (const cookie of [undefined, 'bad', 'anna.' + (time() - 5184000)]) await bindSignupReferral('u1', true, cookie)
+    expect(binds()).toEqual(Array(3).fill(['affiliate_bind', { p_user: 'u1', p_slug: 'bob', p_source: 'signup' }]))
+  })
+
+  it('takes the stored partner without binding when the sign-up must not bind (staff)', async () => {
+    stored('bob')
+    await bindSignupReferral('u1', false, 'anna.' + time())
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('affiliate_signup_ref_take', { p_user: 'u1' })
+  })
+
+  it('binds nothing from an empty, malformed or failed take, and still binds the cookie', async () => {
+    for (const [value, error] of [[null, null], ['BAD SLUG', null], [null, { code: 'XX000' }]]) {
+      stored(value, error)
+      await bindSignupReferral('u1', true, undefined)
+    }
+    mocks.rpc.mockImplementation(async (fn: string) => {
+      if (fn === 'affiliate_signup_ref_take') throw new Error('down')
+      return { error: null }
+    })
+    await bindSignupReferral('u1', true, undefined)
+    expect(binds()).toEqual([])
+    await bindSignupReferral('u1', true, 'anna.' + time())
+    expect(binds()).toEqual([['affiliate_bind', { p_user: 'u1', p_slug: 'anna', p_source: 'signup' }]])
+  })
 })

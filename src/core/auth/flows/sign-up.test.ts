@@ -150,17 +150,19 @@ describe('signUpWithPassword: partner referral', () => {
     request.ref = ref()
     mocks.signUp.mockResolvedValue({ data: { user: { id: 'u1', identities: [{}] } }, error: null })
     expect(await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))).toEqual({ status: 'sent' })
-    expect(stores()).toEqual([['affiliate_signup_ref_store', { p_user: 'u1', p_ref: request.ref }]])
+    expect(stores()).toEqual([['affiliate_signup_ref_store', { p_user: 'u1', p_slug: 'anna' }]])
   })
 
-  it('stores nothing without a cookie, for a staff link, or when the sign-up failed', async () => {
+  // Review on #961: an earlier form for the same address (anyone's) must not outlive this one.
+  it('clears the stored partner without a cookie or for a staff link, and leaves it when the sign-up failed', async () => {
     mocks.signUp.mockResolvedValue({ data: { user: { id: 'u1', identities: [{}] } }, error: null })
     await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))
     request.ref = ref()
     await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next: `/zh/join/org/${'b'.repeat(32)}` }))
+    expect(stores()).toEqual(Array(2).fill(['affiliate_signup_ref_store', { p_user: 'u1', p_slug: null }]))
     mocks.signUp.mockResolvedValue({ data: { user: null }, error: { code: 'over_email_send_rate_limit', status: 429 } })
     await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))
-    expect(stores()).toEqual([])
+    expect(stores()).toHaveLength(2)
   })
 
   it('a failed store still answers "sent"', async () => {

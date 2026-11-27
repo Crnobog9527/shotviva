@@ -37,52 +37,58 @@ function current(value: string | null | undefined) {
   return age < 0 || age >= lifetime ? null : { slug: match[1]!, at }
 }
 
-// Of the referral this browser carries and the one stored at sign-up (another browser's, when the
-// verification link is opened elsewhere), the one set first: the partner who reached the visitor
-// first keeps them, as with the cookie alone (recordReferral never replaces one).
-export function earliestReferral(...values: (string | null | undefined)[]): string | undefined {
-  let best: { value: string; at: number } | undefined
-  for (const value of values) {
-    const ref = current(value)
-    if (ref && (!best || ref.at < best.at)) best = { value: value!, at: ref.at }
-  }
-  return best?.value
-}
-
-// Email sign-up (flows/sign-up.ts): the cookie onto the account Supabase just created, so the
-// first verified sign-in binds it even from a browser without it (2021, ARCHITECTURE §6.5).
-// The SQL stores only for a just-created, unconfirmed account and keeps the first value.
-// Never fails the sign-up.
+// Email sign-up (flows/sign-up.ts): this browser's partner onto the account Supabase returned, so
+// the first verified sign-in binds it even from a browser without the cookie (2021, ARCHITECTURE
+// §6.5). Called after every successful sign-up form: without a current cookie it clears the row,
+// so an earlier attempt for the same address (by anyone) never outlives this one. The SQL stores
+// only for a just-created, unconfirmed account. Never fails the sign-up.
 export async function storeSignupReferral(user: string | null | undefined, cookie: string | undefined) {
-  if (!user || !cookie || !current(cookie)) return
+  if (!user) return
   try {
-    const { error } = await createAdminSupabase().rpc('affiliate_signup_ref_store', { p_user: user, p_ref: cookie })
+    const { error } = await createAdminSupabase().rpc('affiliate_signup_ref_store', { p_user: user, p_slug: current(cookie)?.slug ?? null })
     if (error) logger.warn('affiliate signup referral unavailable', { code: error.code })
   } catch {
     logger.warn('affiliate signup referral unavailable')
   }
 }
 
-// The value stored at sign-up, removed as it is read (single use). undefined when none or on error.
-export async function takeSignupReferral(user: string): Promise<string | undefined> {
+// The slug stored at sign-up, removed as it is read (single use). The SQL drops one older than
+// 60 days or from before the latest confirmation email. undefined when none or on error.
+async function takeSignupReferral(user: string): Promise<string | undefined> {
   try {
     const { data, error } = await createAdminSupabase().rpc('affiliate_signup_ref_take', { p_user: user })
     if (error) logger.warn('affiliate signup referral unavailable', { code: error.code })
-    return typeof data === 'string' ? data : undefined
+    return typeof data === 'string' && slug.safeParse(data).success ? data : undefined
   } catch {
     logger.warn('affiliate signup referral unavailable')
     return undefined
   }
 }
 
-export async function bindReferral(user: string, cookie: string | undefined, source: 'signup' | 'first_checkout') {
-  const ref = current(cookie)
-  if (!ref) return
+async function bindSlug(user: string, value: string, source: 'signup' | 'first_checkout') {
   // The RPC checks the switch in the same transaction as the write.
   try {
-    const { error } = await createAdminSupabase().rpc('affiliate_bind', { p_user: user, p_slug: ref.slug, p_source: source })
+    const { error } = await createAdminSupabase().rpc('affiliate_bind', { p_user: user, p_slug: value, p_source: source })
     if (error) logger.warn('affiliate binding unavailable', { code: error.code })
   } catch {
     logger.warn('affiliate binding unavailable')
   }
+}
+
+// The account's first verified sign-in (core/auth/first-sign-in.ts). The stored slug is taken on
+// every first sign-in, also one that does not bind (`bind` false: a staff sign-up), so it can never
+// bind later. This browser's current cookie wins; the stored slug is only the fallback when there
+// is none (the verification link opened on another device). The cookie's own timestamp is never
+// compared with anything: it is unsigned (review on #961).
+export async function bindSignupReferral(user: string, bind: boolean, cookie: string | undefined) {
+  const stored = await takeSignupReferral(user)
+  if (!bind) return
+  const own = current(cookie)
+  const value = own?.slug ?? stored
+  if (value) await bindSlug(user, value, 'signup')
+}
+
+export async function bindReferral(user: string, cookie: string | undefined, source: 'signup' | 'first_checkout') {
+  const ref = current(cookie)
+  if (ref) await bindSlug(user, ref.slug, source)
 }

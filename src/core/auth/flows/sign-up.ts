@@ -23,12 +23,13 @@ import { formFields, newPasswordSchema, resendSchema, resetRequestSchema, signUp
 const REGISTERED = new Set(['user_already_exists', 'email_exists'])
 
 // A partner's link (sv_ref) onto the new account, so verifying on another device still binds it
-// (2021, ARCHITECTURE §6.5). Read from our httpOnly cookie, never from the form. A staff link's
-// sign-up never binds, so it stores nothing. A registered address gets no real account back
-// (or one the SQL refuses as not just created).
+// (2021, ARCHITECTURE §6.5). Read from the cookie, never from the form. Every successful form
+// replaces or clears what an earlier one for the address stored; a staff link's sign-up never
+// binds, so it only clears. A registered address gets no real account back (or one the SQL
+// refuses as not just created).
 async function rememberReferral(userId: string | undefined, staff: Record<string, string>) {
-  if (Object.keys(staff).length) return
-  await storeSignupReferral(userId, (await cookies()).get('sv_ref')?.value)
+  const cookie = Object.keys(staff).length ? undefined : (await cookies()).get('sv_ref')?.value
+  await storeSignupReferral(userId, cookie)
 }
 
 // The verification link lands on `next` (the home draft, the Graylum connect page) when it is a
