@@ -68,7 +68,7 @@ it('passes the authenticated user, normalized code, context and explicit replace
 it.each([
   ['not_found', 'CODE_NOT_FOUND', 404], ['expired', 'CODE_EXPIRED', 410], ['full', 'CODE_FULL', 409],
   ['used', 'CODE_USED', 409], ['own', 'CODE_OWN', 422], ['new_users_only', 'CODE_NEW_USERS_ONLY', 403],
-  ['signup_only', 'CODE_INVITE_SIGNUP_ONLY', 403],
+  ['signup_only', 'CODE_INVITE_SIGNUP_ONLY', 403], ['org_member', 'ORG_MEMBER_CHECKOUT', 409],
   ['already_invited', 'CODE_ALREADY_INVITED', 409], ['checkout_in_progress', 'CODE_CHECKOUT_IN_PROGRESS', 409],
   ['blocked_same_ip', 'CODE_INVITE_INELIGIBLE', 403], ['blocked_no_signup_grant', 'CODE_INVITE_INELIGIBLE', 403],
   ['banned', 'FORBIDDEN', 403], ['rate_limited', 'RATE_LIMITED', 429],

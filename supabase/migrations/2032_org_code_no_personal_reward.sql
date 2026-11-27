@@ -13,9 +13,8 @@
 -- Rewards already paid stay (no clawback); a pending inviter reward of an earlier staff-code
 -- redemption is no longer paid.
 --
--- The sign-up form's code preview (code_preview_credits) shows the org's signup bonus for a staff
--- code instead of the personal invitee reward, and code_preview_org tells the form it is one, so it
--- shows nothing when the org has no bonus.
+-- The sign-up form's code preview shows the org's signup bonus for an org member's code only when
+-- the customer would be bound to that org, and nothing otherwise (see code_preview_invite_credits).
 --
 -- Expand-only: a column with a default, a new function, and create or replace of redeem_code
 -- (2030 body plus the marked lines), apply_payment_code_effects (same signature, current body plus
@@ -64,22 +63,57 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public._invite_code_org(uuid) from public, anon, authenticated, service_role;
 
+-- The sign-up preview follows the redemption's decision (review on #980): a code whose owner is an
+-- active member of an active org gives no personal invitee credits; the form shows the org's signup
+-- bonus only when this customer would actually be bound to that org (affiliate switch on, active
+-- org account, and not taken first by another partner's ?ref link, which binds before the code),
+-- else nothing. code_preview_credits (the column older code reads) cannot see the visitor's link,
+-- so it assumes none; the current app asks code_preview_invite_credits with the sv_ref slug.
 create or replace function public.code_preview_credits(offer public.codes) returns integer
 language sql stable security definer set search_path = '' as $$
   select case
-    when offer.kind = 'invite' and public._invite_code_org(offer.owner_user_id) is not null then
-      (select o.signup_bonus_credits from public.orgs o where o.id = public._invite_code_org(offer.owner_user_id))
+    when offer.kind = 'invite' and public._in_active_org(offer.owner_user_id) then
+      coalesce((select o.signup_bonus_credits from public.orgs o where o.id = public._invite_code_org(offer.owner_user_id)), 0)
     when offer.kind = 'invite' then
       (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
     else coalesce(offer.invitee_credits, 0) end;
 $$;
 
+-- A code whose owner is an active member of an active org: no personal invitee reward.
 create function public.code_preview_org(offer public.codes) returns boolean
 language sql stable security definer set search_path = '' as $$
-  select offer.kind = 'invite' and public._invite_code_org(offer.owner_user_id) is not null
+  select offer.kind = 'invite' and public._in_active_org(offer.owner_user_id)
 $$;
 revoke all on function public.code_preview_org(public.codes) from public, anon, authenticated;
 grant execute on function public.code_preview_org(public.codes) to service_role;
+
+-- The preview's credits for this visitor: as code_preview_credits, but an org member's code shows
+-- nothing when the visitor's partner link (sv_ref slug, resolved here as affiliate_bind would:
+-- programme on, active affiliate) belongs to anyone but that org's account. null: no such code.
+create function public.code_preview_invite_credits(p_code text, p_ref_slug text) returns integer
+language plpgsql stable security definer set search_path = '' as $$
+declare v_offer public.codes; v_org uuid; v_account uuid; v_ref uuid;
+begin
+  if p_code is null or p_code collate "C" !~ '^[A-Za-z0-9]{4,20}$' then return null; end if;
+  select * into v_offer from public.codes where code = upper(p_code);
+  if not found then return null; end if;
+  if v_offer.kind <> 'invite' or not public._in_active_org(v_offer.owner_user_id) then
+    return public.code_preview_credits(v_offer);
+  end if;
+  v_org := public._invite_code_org(v_offer.owner_user_id);
+  if v_org is null then return 0; end if;
+  select a.user_id into v_account from public.affiliates a where a.org_id = v_org;
+  if p_ref_slug is not null and p_ref_slug ~ '^[a-z0-9-]{3,24}$' then
+    select a.user_id into v_ref from public.affiliates a
+      join public.affiliate_settings st on st.singleton and st.enabled
+     where a.slug = p_ref_slug and a.status = 'active';
+    if v_ref is not null and v_ref <> v_account then return 0; end if;
+  end if;
+  return coalesce((select o.signup_bonus_credits from public.orgs o where o.id = v_org), 0);
+end;
+$$;
+revoke all on function public.code_preview_invite_credits(text, text) from public, anon, authenticated;
+grant execute on function public.code_preview_invite_credits(text, text) to service_role;
 
 create or replace function public.redeem_code(
   p_user uuid, p_code text, p_context text, p_invitee_credits int, p_invite_window_days int,
@@ -164,7 +198,8 @@ begin
   -- 2030: reported as new_users_only, so code from before this deploy shows its usual refusal; the
   -- reason tells the current code to say that invite codes are for sign-up only. Nothing is written.
   if outcome = 'org_member' then
-    return jsonb_build_object('kind', offer.kind, 'status', 'new_users_only');
+    -- Reported as new_users_only for code from before this deploy; org_member says why.
+    return jsonb_build_object('kind', offer.kind, 'status', 'new_users_only', 'org_member', true);
   end if;
   if outcome = 'signup_only' then
     return jsonb_build_object('kind', offer.kind, 'status', 'new_users_only', 'reason', 'signup_only');

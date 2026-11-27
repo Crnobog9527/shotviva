@@ -101,6 +101,32 @@ it('the sign-up preview shows the org bonus for a staff code, nothing extra with
   expect(await preview(await codeOf(await createUser(db)))).toEqual({ credits: REWARDS.inviteeCredits, org: false })
 })
 
+// Review on #980: the preview follows the redemption. An org member's code shows the org bonus only
+// when the customer would be bound to that org, else nothing (never the personal reward).
+const previewFor = async (code: string, slug: string | null) =>
+  (await row(db, 'select code_preview_invite_credits($1,$2) as c', [code, slug])).c as number | null
+it('previews an org member\'s code by whether this visitor would be bound to that org', async () => {
+  const { orgId, staff } = await orgTeam(350)
+  const code = await codeOf(staff)
+  expect(await previewFor(code, null)).toBe(350)
+  // The org's own ?ref link binds the visitor to the same account: still the bonus.
+  const { slug } = await row(db, 'select slug from affiliates where org_id=$1', [orgId])
+  expect(await previewFor(code, slug)).toBe(350)
+  // Another partner's link binds first: nothing.
+  const other = await createUser(db)
+  await db.query("insert into affiliates(user_id,slug,status) values($1,$2,'active')", [other, 'qa-' + other.slice(0, 12)])
+  expect(await previewFor(code, 'qa-' + other.slice(0, 12))).toBe(0)
+  // A link that binds nobody (unknown, or the programme off) does not matter.
+  expect(await previewFor(code, 'qa-nobody-here')).toBe(350)
+  // The org's affiliate switch off: the code binds nobody, so nothing (not the personal 6).
+  await db.query('update orgs set affiliate_enabled=false where id=$1', [orgId])
+  expect(await previewFor(code, null)).toBe(0)
+  expect(await preview(code)).toEqual({ credits: 0, org: true })
+  // A personal code and a gift code are as before; an unknown code is null.
+  expect(await previewFor(await codeOf(await createUser(db)), null)).toBe(REWARDS.inviteeCredits)
+  expect(await previewFor('NOSUCHCODE1', null)).toBeNull()
+})
+
 // Broadened rule (same day): an active member (staff or the main admin) of an active org gets
 // personal credits only from the org's allocations, admin adjustments and their own job refunds.
 async function member() {
@@ -113,7 +139,7 @@ it('an active member redeems no code at all (gift codes included); nothing is wr
   const { user } = await member()
   const gift = 'GIFT' + user.slice(0, 8).toUpperCase().replace(/[^A-Z0-9]/g, '0')
   await db.query("insert into codes(code,kind,invitee_credits,invitee_pool) values($1,'campaign',30,'free')", [gift])
-  expect((await row(db, "select redeem_code($1,$2,'account',null,$3) as r", [user, gift, invite.windowDays])).r).toEqual({ kind: 'campaign', status: 'new_users_only' })
+  expect((await row(db, "select redeem_code($1,$2,'account',null,$3) as r", [user, gift, invite.windowDays])).r).toEqual({ kind: 'campaign', status: 'new_users_only', org_member: true })
   expect(await ledger(user, 'code_grant')).toEqual([])
   expect((await row(db, 'select count(*)::int n from code_redemptions where user_id=$1', [user])).n).toBe(0)
   await leave(user)

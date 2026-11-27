@@ -21,7 +21,9 @@ const preview = terms.extend({
   owner: z.object({ banned_at: z.string().nullable() }).nullable(),
 })
 
-export async function previewCode(admin: SupabaseClient, code: string) {
+// `refSlug`: the visitor's partner link (sv_ref), which binds before the code. An org member's code
+// shows the org bonus only when this customer would be bound to that org (2032).
+export async function previewCode(admin: SupabaseClient, code: string, refSlug: string | null = null) {
   const { data, error } = await admin.from('codes')
     .select('code,kind,active,starts_at,expires_at,max_redemptions,redemption_count,code_preview_credits,code_preview_org,invitee_pool,discount_percent,discount_products,discount_duration,discount_months,owner:profiles!codes_owner_user_id_fkey(banned_at)')
     .eq('code', code).maybeSingle()
@@ -29,7 +31,14 @@ export async function previewCode(admin: SupabaseClient, code: string) {
   if (!data) return null
   const c = preview.parse(data)
   if (!available(c, Date.now()) || c.owner?.banned_at || (c.max_redemptions !== null && c.redemption_count >= c.max_redemptions)) return null
-  return describeOffer(c)
+  return describeOffer(c.code_preview_org ? { ...c, code_preview_credits: await visitorCredits(admin, code, refSlug) } : c)
+}
+
+// An org member's code for this visitor: the org bonus if they would be bound to that org, else 0.
+async function visitorCredits(admin: SupabaseClient, code: string, refSlug: string | null) {
+  const own = await admin.rpc('code_preview_invite_credits', { p_code: code, p_ref_slug: refSlug })
+  if (own.error) throw own.error
+  return z.number().int().nonnegative().parse(own.data)
 }
 
 function describeOffer(c: z.infer<typeof preview>) {

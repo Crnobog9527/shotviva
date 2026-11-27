@@ -9,8 +9,8 @@ const mocks = vi.hoisted(() => ({ preview: vi.fn(), admin: vi.fn(() => ({})) }))
 vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: mocks.admin }))
 vi.mock('@/core/codes/server', () => ({ previewCode: mocks.preview }))
 
-const get = (query: string, ip = '192.0.2.14') => GET(new NextRequest('https://qa.test/api/codes/preview?' + query, {
-  headers: { 'x-forwarded-for': ip },
+const get = (query: string, ip = '192.0.2.14', cookie = '') => GET(new NextRequest('https://qa.test/api/codes/preview?' + query, {
+  headers: { 'x-forwarded-for': ip, ...(cookie ? { cookie } : {}) },
 }))
 beforeEach(() => { vi.clearAllMocks() })
 afterEach(() => { vi.useRealTimers() })
@@ -21,8 +21,18 @@ it('returns a public normalized preview with no cache and no account session', a
   const response = await get('code=aBc4')
   expect(response.status).toBe(200)
   expect(await response.json()).toEqual({ preview: offer })
-  expect(mocks.preview).toHaveBeenCalledExactlyOnceWith(expect.anything(), 'ABC4')
+  expect(mocks.preview).toHaveBeenCalledExactlyOnceWith(expect.anything(), 'ABC4', null)
   expect(response.headers.get('cache-control')).toContain('no-store')
+})
+
+// 2032: the visitor's partner link decides whether an org member's code would bind them to that org.
+it('passes the visitor\'s current sv_ref slug, and none for a stale or malformed cookie', async () => {
+  mocks.preview.mockResolvedValue(null)
+  const now = Math.floor(Date.now() / 1000)
+  await get('code=ABC4', '192.0.2.15', 'sv_ref=qa-anna.' + now)
+  expect(mocks.preview).toHaveBeenLastCalledWith(expect.anything(), 'ABC4', 'qa-anna')
+  await get('code=ABC4', '192.0.2.16', 'sv_ref=qa-anna.' + (now - 40 * 86400))
+  expect(mocks.preview).toHaveBeenLastCalledWith(expect.anything(), 'ABC4', null)
 })
 
 it.each(['', 'code=ab-c', 'code=TEST&code=NEXT'])('rejects invalid or ambiguous inputs before lookup: %s', async (query) => {

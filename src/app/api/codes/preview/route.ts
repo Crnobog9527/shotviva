@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server'
 import { z } from 'zod'
 
 import { jsonResponse, errorResponse } from '@/core/api-response'
+import { referralSlug } from '@/core/affiliate/referral'
 import { clientIp, createAdminSupabase } from '@/core/auth'
 import { normalizeCode } from '@/core/codes'
 import { checkPreviewLimit } from '@/core/codes/api'
@@ -18,7 +19,9 @@ export async function GET(request: NextRequest) {
     const values = z.tuple([z.string()]).safeParse(request.nextUrl.searchParams.getAll('code'))
     const code = values.success ? normalizeCode(values.data[0]) : null
     if (!code) throw new AppError('INVALID_INPUT', 'Enter a valid code')
-    const preview = await previewCode(createAdminSupabase(), code)
+    // The visitor's partner link binds before the code (2032): it decides whether an org member's
+    // code would bind this customer to that org, so the preview shows its bonus or nothing.
+    const preview = await previewCode(createAdminSupabase(), code, referralSlug(request.cookies.get('sv_ref')?.value))
     return jsonResponse({ preview })
   } catch (error) {
     return errorResponse(error, 'codes/preview')

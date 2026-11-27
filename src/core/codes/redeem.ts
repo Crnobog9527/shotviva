@@ -12,6 +12,8 @@ const result = z.object({
   kind: z.enum(['invite','campaign']).optional(),
   // 2030: an invite code entered after sign-up (account page, paywall).
   reason: z.enum(['signup_only']).optional(),
+  // 2032: an active org member redeems no code (reported new_users_only for older code).
+  org_member: z.boolean().optional(),
   credits_granted: z.number().int().nonnegative().optional(), pool: z.enum(['free','paid']).nullish(),
   discount_percent: z.number().nullish(), current_code: z.string().optional(),
   discount_products: z.array(z.string()).nullish(), discount_expires_at: z.string().nullish(), replaced: z.boolean().optional(),
@@ -27,11 +29,12 @@ export async function redeemCode(admin: SupabaseClient, input: Claim) {
   if (error) throw error
   const parsed = result.parse(data)
   // The SQL reports it as new_users_only for code from before 2030; say what it really is.
-  const r = parsed.reason === 'signup_only' ? { ...parsed, status: 'signup_only' as const } : parsed
+  const r = parsed.reason === 'signup_only' ? { ...parsed, status: 'signup_only' as const }
+    : parsed.org_member ? { ...parsed, status: 'org_member' as const } : parsed
   return describeResult(input, r)
 }
 
-type Result = Omit<z.infer<typeof result>, 'status'> & { status: z.infer<typeof result>['status'] | 'signup_only' }
+type Result = Omit<z.infer<typeof result>, 'status'> & { status: z.infer<typeof result>['status'] | 'signup_only' | 'org_member' }
 
 function describeResult(input: Claim, r: Result) {
   const credits = r.credits_granted ?? 0
