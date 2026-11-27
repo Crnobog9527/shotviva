@@ -10,6 +10,7 @@ import { currentTier } from '@/core/billing'
 import { handleStripeWebhook, priceCents, type DisputeEvidenceConfig } from '@/core/billing/stripe'
 import type { ProductId } from '@/core/config'
 import { allocateOrgCredits, depositOrgCredits } from '@/core/org'
+import { createTicket, decideRefund, loadAdminTicket } from '@/core/support'
 import { site } from '@/site/site.config'
 
 import { seedCatalogPolicy } from './catalog-policy'
@@ -388,5 +389,42 @@ describe('lock order against a concurrent allocation', () => {
     expect(await creditsOf(db, owner)).toBe(1)
     const { rows } = await db.query('select credits_clawed_back, clawback_shortfall from public.payments where stripe_charge_id = $1', [charge])
     expect(rows[0]).toEqual({ credits_clawed_back: n - 1, clawback_shortfall: 1 })
+  })
+})
+
+// Owner 2026-11-28: an org-pool purchase has no self-service refund; the admin handles it by hand.
+describe('no self-service refund for org-pool purchases', () => {
+  async function both() {
+    const { orgId, owner } = await orgWith(db, service, actor)
+    const pooled = await buyPack(owner)
+    await db.query("update public.orgs set status = 'suspended' where id = $1", [orgId])
+    const personal = await buyPack(owner)
+    await db.query("update public.orgs set status = 'active' where id = $1", [orgId])
+    return { owner, pooled: (await paymentOf(pooled.charge.id)).id as string, personal: (await paymentOf(personal.charge.id)).id as string }
+  }
+  const block = async (id: string) => (await db.query('select public.payment_refund_block($1) as b', [id])).rows[0].b
+
+  it('payment_refund_block names the org-pool purchase and nothing else', async () => {
+    const { pooled, personal } = await both()
+    expect(await block(pooled)).toBe('org_pool_purchase')
+    expect(await block(personal)).toBeNull()
+  })
+
+  it('refuses the refund request server-side; billing tickets and personal refunds still go through', async () => {
+    const { owner, pooled, personal } = await both()
+    await expect(createTicket(serviceSupabase(), owner, { type: 'refund', body: 'Refund please', paymentId: pooled }))
+      .rejects.toMatchObject({ code: 'ORG_POOL_REFUND' })
+    await expect(createTicket(serviceSupabase(), owner, { type: 'billing', body: 'About this one', paymentId: pooled })).resolves.toMatch(/^[0-9a-f-]{36}$/)
+    await expect(createTicket(serviceSupabase(), owner, { type: 'refund', body: 'Refund please', paymentId: personal })).resolves.toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it('a refund ticket from before still reaches the admin, marked, and the decision is recorded', async () => {
+    const { owner, pooled } = await both()
+    const { rows } = await db.query("insert into public.support_tickets (user_id, type, payment_id) values ($1, 'refund', $2) returning id", [owner, pooled])
+    const id = rows[0].id as string
+    await db.query("insert into public.support_ticket_messages (ticket_id, author, body) values ($1, 'user', 'Refund please')", [id])
+    expect((await loadAdminTicket(serviceSupabase(), id))?.eligibility).toMatchObject({ orgPool: true })
+    await decideRefund(serviceSupabase(), { ticketId: id, decision: 'rejected', body: 'Enterprise purchases are handled by support.' })
+    expect((await db.query('select refund_decision from public.support_tickets where id = $1', [id])).rows[0].refund_decision).toBe('rejected')
   })
 })

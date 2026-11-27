@@ -83,6 +83,7 @@ export function RefundPanel({ ticketId, payment, eligibility, decided, decide, c
   return (
     <section className="grid gap-3 rounded-lg border border-border p-4">
       <h2 className="font-semibold">{COPY.refund.heading}</h2>
+      {eligibility.orgPool ? <p className="text-sm text-destructive">{COPY.refund.orgPool}</p> : null}
       <ul className="grid gap-1 text-sm">
         {checks.map(([label, ok]) => (
           <li key={label} className="flex gap-2">

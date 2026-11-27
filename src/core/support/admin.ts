@@ -158,8 +158,14 @@ const eligibilityRow = z.tuple([
 
 // Hints only: the Owner decides. Seven days are counted to when the user asked.
 async function loadEligibility(db: SupabaseClient, paymentId: string, askedAt: string): Promise<RefundEligibility> {
-  const [row] = await supportRpc(db, 'refund_eligibility', { p_payment_id: paymentId, p_asked_at: askedAt }, eligibilityRow)
-  return { firstPurchase: row.first_purchase, within7Days: row.within_7_days, noCreditsUsed: row.no_credits_used, suggestedCents: row.suggested_cents }
+  const [[row], block] = await Promise.all([
+    supportRpc(db, 'refund_eligibility', { p_payment_id: paymentId, p_asked_at: askedAt }, eligibilityRow),
+    supportRpc(db, 'payment_refund_block', { p_payment_id: paymentId }, z.string().nullable()),
+  ])
+  return {
+    firstPurchase: row.first_purchase, within7Days: row.within_7_days, noCreditsUsed: row.no_credits_used, suggestedCents: row.suggested_cents,
+    orgPool: block === 'org_pool_purchase',
+  }
 }
 
 // The ticket by primary key with its thread (support_ticket_messages_ticket_id_created_at_idx);

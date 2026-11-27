@@ -1502,6 +1502,7 @@
         "paymentLabel": "哪一笔付款？",
         "paymentOptional": "付款记录（选填）",
         "noPayments": "这个账号还没有付款记录。",
+        "orgPoolNoRefund": "存入企业积分池的购买不能自助申请退款。如有疑问，请选择「付款与账单」联系我们。",
         "workLabel": "相关作品（选填）",
         "workOption": "{template} · {date, date, medium} · {ref}",
         "workRef": "编号 {ref}",
@@ -1515,7 +1516,8 @@
           "NOT_FOUND": "你的账号中没有这笔付款或这张作品。",
           "generic": "没能发送，请再试一次。",
           "IMAGE_TOO_LARGE": "有图片超过 10 MB，移除后再发送。",
-          "IMAGE_UNSUPPORTED": "有图片无法读取，移除后再发送。"
+          "IMAGE_UNSUPPORTED": "有图片无法读取，移除后再发送。",
+          "ORG_POOL_REFUND": "这笔购买已存入企业积分池，不能自助申请退款。如有疑问，请选择「付款与账单」联系我们。"
         }
       },
       "thread": {
@@ -1850,7 +1852,7 @@
         "suspended": "企业已暂停，暂时不能存入。",
         "depositLabel": "存入自己的付费积分",
         "depositPlaceholder": "积分数量",
-        "depositHint": "企业正常使用期间，你购买的积分会直接存入积分池。这些购买的退款按退款政策处理（首次购买、7 天内、积分未使用），退款时从积分池扣回。这里用来存入你账号里已有的付费积分，手动存入的积分不能退款，也不能再取回。",
+        "depositHint": "企业正常使用期间，你购买的积分会直接存入积分池。这些购买不能自助申请退款，如需退款请联系客服。这里用来存入你账号里已有的付费积分，手动存入的积分不能退款，也不能再取回。",
         "deposit": "存入",
         "depositing": "存入中…",
         "deposited": "已存入积分池。",

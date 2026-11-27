@@ -820,3 +820,79 @@ begin
   return jsonb_build_object('period', p_period, 'paid', v_paid, 'promo', v_promo);
 end;
 $_$;
+
+-- Owner 2026-11-28: purchases whose credits went to an org pool have no self-service refund.
+-- The buyer contacts support; the platform admin handles it by hand (admin clawback, then the
+-- refund in Stripe / Waffo), and the refund and dispute webhooks work as for any payment.
+-- refund_eligibility keeps its columns (its return type can't change in place); the reason is
+-- this separate check, used by the refund request below and shown to the admin.
+create function public.payment_refund_block(p_payment_id bigint) returns text
+language sql stable security definer set search_path = '' as $$
+  select case when public._payment_credits_org(p) is not null then 'org_pool_purchase' end
+    from public.payments p where p.id = p_payment_id
+$$;
+revoke all on function public.payment_refund_block(bigint) from public, anon, authenticated;
+grant execute on function public.payment_refund_block(bigint) to service_role;
+
+create or replace function public.create_support_ticket(p_user_id uuid, p_type text, p_body text, p_payment_id bigint,
+  p_job_id uuid, p_ticket_id uuid default null, p_images jsonb default '[]'::jsonb) returns public.support_tickets
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_ticket public.support_tickets;
+  v_message_id uuid;
+begin
+  perform 1 from public.profiles where id = p_user_id for update;
+  if not found then
+    raise exception 'PROFILE_NOT_FOUND';
+  end if;
+
+  if p_type is null or p_type not in ('feedback', 'image_issue', 'billing', 'refund', 'account', 'other') then
+    raise exception 'INVALID_INPUT' using detail = 'unknown ticket type';
+  end if;
+  if p_body is null or char_length(btrim(p_body)) not between 1 and 2000 then
+    raise exception 'INVALID_INPUT' using detail = 'body must be 1 to 2000 characters';
+  end if;
+  if p_type = 'refund' and p_payment_id is null then
+    raise exception 'INVALID_INPUT' using detail = 'a refund request needs a payment';
+  end if;
+  if p_payment_id is not null and p_type not in ('billing', 'refund') then
+    raise exception 'INVALID_INPUT' using detail = 'only billing and refund tickets take a payment';
+  end if;
+  if p_job_id is not null and p_type <> 'image_issue' then
+    raise exception 'INVALID_INPUT' using detail = 'only image issues take a work';
+  end if;
+
+  -- Someone else's id reads the same as a missing one, so nothing leaks about other accounts.
+  if p_payment_id is not null and not exists (
+    select 1 from public.payments p where p.id = p_payment_id and p.user_id = p_user_id
+  ) then
+    raise exception 'PAYMENT_NOT_FOUND';
+  end if;
+  -- 2033 (Owner 2026-11-28): no self-service refund request for an org-pool purchase; a billing
+  -- ticket about it is still fine.
+  if p_type = 'refund' and public.payment_refund_block(p_payment_id) is not null then
+    raise exception 'ORG_POOL_REFUND';
+  end if;
+  if p_job_id is not null and not exists (
+    select 1 from public.generation_jobs j where j.id = p_job_id and j.user_id = p_user_id
+  ) then
+    raise exception 'JOB_NOT_FOUND';
+  end if;
+
+  if (select count(*) from public.support_tickets t
+       where t.user_id = p_user_id and t.created_at > now() - interval '24 hours') >= 5 then
+    raise exception 'RATE_LIMITED';
+  end if;
+
+  insert into public.support_tickets (id, user_id, type, payment_id, job_id)
+  values (coalesce(p_ticket_id, gen_random_uuid()), p_user_id, p_type, p_payment_id, p_job_id)
+  returning * into v_ticket;
+
+  insert into public.support_ticket_messages (ticket_id, author, body)
+  values (v_ticket.id, 'user', btrim(p_body))
+  returning id into v_message_id;
+
+  perform public.attach_ticket_images(v_ticket.id, p_user_id, v_message_id, p_images);
+  return v_ticket;
+end;
+$$;
