@@ -80,7 +80,8 @@ export function leaveShell(win: ShellWindow): void {
 
 // The inline script of the shell page (app-shell/generate/page.tsx): the address the visitor opened,
 // the loop check, and, in the foreground, the worker's early refresh (shell-worker.ts). Plain
-// script built from the functions above, so the tests run the same code.
+// script built from the functions above, so the tests run the same code. It passes every argument:
+// the defaults name outer constants, which the minifier renames (checked on a production build).
 export function shellBootScript(): string {
   const args = (...values: unknown[]) => values.map((value) => JSON.stringify(value)).join(',')
   return [
