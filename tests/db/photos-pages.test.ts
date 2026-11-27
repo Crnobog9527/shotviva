@@ -30,8 +30,8 @@ async function seed(userId: string, createdAt: string, status: 'succeeded' | 'fa
     `insert into public.generation_jobs
        (id, user_id, module, template_id, inputs, provider, source, status, visibility, credits_cost, credit_pool,
         output_key, error_code, created_at, finished_at, batch_id)
-     values ($1, $2, 'image', 'freeform', '{"resolution":"1k"}', 'test/model', 'web', $3, 'private', 2, 'paid', $4, $5, $6, $6, $7)`,
-    [id, userId, status, status === 'succeeded' ? 'outputs/x.png' : null, status === 'failed' ? 'PROVIDER_FAILED' : null, createdAt, batchId],
+     values ($1, $2, 'image', 'freeform', $8, 'test/model', 'web', $3, 'private', 2, 'paid', $4, $5, $6, $6, $7)`,
+    [id, userId, status, status === 'succeeded' ? 'outputs/x.png' : null, status === 'failed' ? 'PROVIDER_FAILED' : null, createdAt, batchId, JSON.stringify({ resolution: '1k', ...(batchId ? { batch_id: batchId } : {}) })],
   )
   return id
 }
