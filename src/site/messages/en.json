@@ -591,6 +591,7 @@
           "used": "You’ve already used this code.",
           "newOnly": "This code is for new accounts only.",
           "signupOnly": "Invite codes can only be used when you sign up. This one can’t be added to an existing account.",
+          "orgMemberCode": "Organisation member accounts can’t use redemption or discount codes.",
           "own": "You can’t use your own invite code.",
           "invited": "You’ve already used an invite code.",
           "checkout": "You have a checkout open with your current discount. Finish or cancel it before replacing the discount.",

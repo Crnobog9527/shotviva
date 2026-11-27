@@ -21,3 +21,7 @@ it('turns new_users_only with reason signup_only into signup_only', async () => 
 it('leaves a plain new_users_only refusal as it is', async () => {
   expect(await redeemCode(admin({ kind: 'campaign', status: 'new_users_only' }), claim)).toMatchObject({ status: 'new_users_only' })
 })
+
+it('turns new_users_only with org_member into org_member (2032)', async () => {
+  expect(await redeemCode(admin({ kind: 'campaign', status: 'new_users_only', org_member: true }), claim)).toMatchObject({ status: 'org_member' })
+})

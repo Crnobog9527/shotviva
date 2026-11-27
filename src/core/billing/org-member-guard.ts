@@ -28,6 +28,15 @@ export async function isActiveOrgOwner(admin: SupabaseClient, userId: string): P
   return data.length > 0
 }
 
+// Any active member of an active org, the primary admin included (Owner 2026-11-28, 2032): while
+// they are one, they can use no redemption or discount code at all.
+export async function isInActiveOrg(admin: SupabaseClient, userId: string): Promise<boolean> {
+  const { data, error } = await admin.from('org_members').select('org_id, orgs!inner(status)')
+    .eq('user_id', userId).eq('status', 'active').eq('orgs.status', 'active').limit(1)
+  if (error) throw new AppError('INTERNAL', 'org membership check failed', { cause: new Error(error.message) })
+  return data.length > 0
+}
+
 export async function assertNotOrgMember(admin: SupabaseClient, userId: string): Promise<void> {
   if (await isActiveOrgMember(admin, userId)) throw new AppError('ORG_MEMBER_CHECKOUT', 'Active org members buy through their organisation')
 }

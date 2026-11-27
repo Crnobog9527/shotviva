@@ -8,6 +8,8 @@ import type { ProductId } from '../../config'
 
 type Preview = {
   kind: 'invite' | 'campaign'
+  // An org staff member's code (2032): `credits` is the org's signup bonus; none shows nothing.
+  org?: boolean
   credits: number; pool: 'free' | 'paid' | null; percent: number | null
   products: ProductId[] | null; duration: 'once' | 'repeating' | 'forever' | null; months: number | null
 }
@@ -54,7 +56,7 @@ function PreviewEffects({ preview }: { preview: Preview }) {
   const { credits, pool, percent } = preview
   return (
     <div className="mt-1 space-y-1 text-success">
-      {preview.kind === 'invite' && credits === 0 && <p>{t('noInviteGift')}</p>}
+      {preview.kind === 'invite' && !preview.org && credits === 0 && <p>{t('noInviteGift')}</p>}
       {credits > 0 && <p>{t('gift', { credits, pool: pool ?? 'free' })}</p>}
       {percent && <DiscountPreview preview={preview} percent={percent} />}
     </div>
