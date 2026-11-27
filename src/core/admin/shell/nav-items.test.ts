@@ -83,6 +83,7 @@ describe('admin nav counts', () => {
     expect(at('/admin/templates/edit')).toBe('generation')
     expect(at('/admin/providers')).toBe('generation')
     expect(at('/admin/references/lab/x')).toBe('references')
-    expect(items.find((item) => item.key === 'home')?.href).toBe('/admin/templates#home-display')
+    expect(at('/admin/home')).toBe('home')
+    expect(at('/admin/templates/categories')).toBe('templates')
   })
 })

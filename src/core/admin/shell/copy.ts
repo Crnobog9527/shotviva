@@ -35,6 +35,7 @@ export const SHELL_COPY = {
   tabs: {
     templates: '模板',
     series: '系列',
+    categories: '分类',
     providers: 'AI 供应商',
     profiles: '模板出图配置',
     dishware: '器皿图库',
