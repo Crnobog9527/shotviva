@@ -2,8 +2,7 @@
 
 import { useEffect } from 'react'
 
-import { withoutBypass } from './shell-fallback'
-import { CACHE_PREFIX } from './sw'
+import { CACHE_PREFIX, withoutBypass } from './client-names'
 
 // Registers /sw.js once the page has loaded and gone idle, so it never competes with the page's own
 // first load. `production`: a production build (`next dev` never registers); `enabled`: the admin
