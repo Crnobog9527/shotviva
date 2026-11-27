@@ -254,6 +254,25 @@ it('gives a new account bound through the org\'s partner link the bonus once', a
   expect(await freeCredits(customer)).toBe(6 + 350)
 })
 
+it('pays the org\'s amount through every enterprise referral link: the admin\'s ?ref link and each employee\'s invite link', async () => {
+  const { orgId, owner, staff } = await orgTeam(350)
+  const other = await createUser(db)
+  const { invite_token } = await row(db, 'select invite_token from orgs where id=$1', [orgId])
+  await db.query('select org_join($1,$2)', [other, invite_token])
+
+  const viaAdminLink = await giftedUser()
+  expect(await bind(db, viaAdminLink, await orgSlug(owner))).toBe(true)
+  const viaStaff = (await invitedBy(staff)).customer
+  const viaOtherStaff = (await invitedBy(other)).customer
+  const viaOwnerCode = (await invitedBy(owner)).customer
+  for (const c of [viaAdminLink, viaStaff, viaOtherStaff, viaOwnerCode]) {
+    expect(await bonusLedger(c)).toEqual([{ delta: 350, pool: 'free', idempotency_key: 'org_signup_bonus:' + c }])
+  }
+  expect(await row(db, 'select count(*)::int n from org_signup_bonuses where org_id=$1 and credits=350', [orgId])).toEqual({ n: 4 })
+  // Staff who joined through the employee link (/join/org) got nothing from the org.
+  for (const s of [staff, other]) expect(await bonusLedger(s)).toEqual([])
+})
+
 it('gives nothing through the partner link without a signup gift, to a member, at first checkout or while off', async () => {
   const { orgId, owner, staff } = await orgTeam(350)
   const slug = await orgSlug(owner)
