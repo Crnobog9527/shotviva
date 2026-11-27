@@ -149,11 +149,13 @@ function slotLines(body: string, inputs: GenerationInputs): string {
 // The user's note, framed so the model treats it as the user's own request that wins over the
 // template's rules where they clash (Owner 2026-11-27: a note asking for matching tableware lost to
 // a "keep the user's own vessel" rule). The note itself goes verbatim, on its own line, last.
+// Its reach is the picture's content only: image roles, a poster's confirmed text and compliance
+// lines (no logos, brands, named works) stay above it.
 // Safety needs no words here: the identity check (§5.1a) screens this raw note before any credit
 // is held, providers moderate the prompt, and watermarks and a poster's QR are applied by code
 // after the model. The framing stays model-neutral and short (Seedream and GPT image alike).
 export const NOTE_PREAMBLE =
-  "The user's own request for this image follows. Carry it out, even where an earlier line says otherwise, including a line marked as a hard rule or as overriding other lines (what to keep, add or leave out). Follow the earlier lines everywhere else."
+  "The user's own request for this image follows. Where it is about what the picture shows (what to keep, add, remove or change in the food, its vessel, props, arrangement, scene or light), carry it out even where an earlier line says otherwise, including a line marked as a hard rule or as overriding other lines. It does not change which attached image is which, any text given above to print on the image, or the lines against logos, brand names or named works. Follow the earlier lines everywhere else."
 
 export const framedNote = (note: string): string => (note ? `${NOTE_PREAMBLE}\nUser's request: ${note}` : '')
 

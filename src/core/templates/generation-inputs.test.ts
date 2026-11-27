@@ -62,6 +62,8 @@ describe('renderPrompt', () => {
     const text = renderPrompt('Studio shot of {{dish}}. Keep the bowl.', inputs)
     expect(text).toBe(`Studio shot of Ramen. Keep the bowl.\n\n${NOTE_PREAMBLE}\nUser's request: 跟我加个餐具和食物匹配的的`)
     expect(NOTE_PREAMBLE).toMatch(/even where an earlier line says otherwise.*hard rule/)
+    // Out of its reach: image roles, the confirmed poster text, compliance lines.
+    expect(NOTE_PREAMBLE).toMatch(/does not change which attached image is which, any text given above to print on the image, or the lines against logos, brand names or named works/)
     expect(text.endsWith('跟我加个餐具和食物匹配的的')).toBe(true)
   })
 
