@@ -6233,6 +6233,37 @@ $$;
 ALTER FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text", "p_resolution" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_signup_gift_invite_retry"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_code text;
+begin
+  select c.code into v_code from public.code_redemptions r join public.codes c on c.id = r.code_id
+   where r.user_id = new.user_id and r.kind = 'invite' and r.status = 'blocked_no_signup_grant' and r.context = 'signup';
+  if v_code is null then return null; end if;
+  begin
+    -- The code was entered at sign-up; only the gift came late, so no 7-day window here.
+    perform public.redeem_code(new.user_id, v_code, 'signup', null, 36500);
+    delete from public.signup_invite_retry_errors where user_id = new.user_id;
+  exception when others or query_canceled or assert_failure then
+    begin
+      insert into public.signup_invite_retry_errors(user_id, error)
+        values (new.user_id, sqlstate || ': ' || left(sqlerrm, 300))
+        on conflict (user_id) do update set error = excluded.error, at = now();
+    exception when others or query_canceled or assert_failure then
+      -- Even an unavailable error sink must never undo the gift.
+      return null;
+    end;
+  end;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_signup_gift_invite_retry"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_signup_org_ref"("p_slug" "text") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -23761,6 +23792,16 @@ CREATE TABLE IF NOT EXISTS "public"."signup_gift_claims" (
 ALTER TABLE "public"."signup_gift_claims" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."signup_invite_retry_errors" (
+    "user_id" "uuid" NOT NULL,
+    "error" "text" NOT NULL,
+    "at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."signup_invite_retry_errors" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."signup_requests" (
     "id" bigint NOT NULL,
     "email_key" "text" NOT NULL,
@@ -24949,6 +24990,11 @@ ALTER TABLE ONLY "public"."signup_code_refs"
 
 ALTER TABLE ONLY "public"."signup_gift_claims"
     ADD CONSTRAINT "signup_gift_claims_pkey" PRIMARY KEY ("key_hash");
+
+
+
+ALTER TABLE ONLY "public"."signup_invite_retry_errors"
+    ADD CONSTRAINT "signup_invite_retry_errors_pkey" PRIMARY KEY ("user_id");
 
 
 
@@ -26230,6 +26276,10 @@ CREATE OR REPLACE TRIGGER "series_deleted_guard" BEFORE UPDATE OF "deleted_at", 
 
 
 
+CREATE OR REPLACE TRIGGER "signup_gift_invite_retry" AFTER INSERT ON "public"."credit_ledger" FOR EACH ROW WHEN ((("new"."kind" = 'grant'::"text") AND ("new"."pool" = 'free'::"text") AND ("new"."idempotency_key" = ('signup:'::"text" || ("new"."user_id")::"text")))) EXECUTE FUNCTION "public"."_signup_gift_invite_retry"();
+
+
+
 CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "public"."site_announcements" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
@@ -27291,6 +27341,11 @@ ALTER TABLE ONLY "public"."signup_gift_claims"
 
 
 
+ALTER TABLE ONLY "public"."signup_invite_retry_errors"
+    ADD CONSTRAINT "signup_invite_retry_errors_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."site_announcements"
     ADD CONSTRAINT "site_announcements_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -27867,6 +27922,9 @@ ALTER TABLE "public"."signup_code_refs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."signup_gift_claims" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."signup_invite_retry_errors" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."signup_requests" ENABLE ROW LEVEL SECURITY;
@@ -29057,6 +29115,10 @@ REVOKE ALL ON FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles",
 
 
 REVOKE ALL ON FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text", "p_resolution" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_signup_gift_invite_retry"() FROM PUBLIC;
 
 
 
@@ -31722,6 +31784,10 @@ GRANT ALL ON TABLE "public"."reference_template_sources" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."signup_gift_claims" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."signup_invite_retry_errors" TO "service_role";
 
 
 
