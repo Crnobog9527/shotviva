@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import type { AbstractIntlMessages } from 'next-intl'
 
-import { BundlesPanel, CaseStripPanel, CategoriesPanel, HeroPanel, listAdminTemplates, LocaleDisplayPanel, TemplatesEditor } from '@/core/admin'
+import { BundlesPanel, CaseStripPanel, CategoriesPanel, HeroPanel, listAdminTemplates, LocaleDisplayPanel, PickerSeriesProvider, TemplatesEditor } from '@/core/admin'
 import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
 import { readPricingOptions } from '@/site/template-pricing'
 import { ModelSyncProvider } from '@/core/admin/image-provider-field/model-sync'
@@ -66,6 +66,7 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
         categories={categories}
         actions={{ save: saveTemplateCategoryAction, move: moveTemplateCategoryAction, remove: deleteTemplateCategoryAction }}
       />
+      <PickerSeriesProvider series={series}>
       <BundlesPanel
         bundles={bundles?.list ?? []} templates={templates} categories={categories}
         actions={{ save: saveFeaturedBundleAction, remove: deleteFeaturedBundleAction, setDefault: setDefaultFeaturedBundlesAction }}
@@ -79,6 +80,7 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
         strip={caseStrip} templates={templates} categories={categories} bundles={bundles}
         actions={{ save: saveHomeCaseStripAction }} saveBundle={saveFeaturedBundleAction}
       />
+      </PickerSeriesProvider>
       <ModelSyncProvider action={syncTemplateModel}>
       <AdminTemplatePreview zhMessages={zhMessages}>
       <TemplatesEditor initialEdit={edit}
