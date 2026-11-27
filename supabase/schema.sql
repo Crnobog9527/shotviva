@@ -6174,6 +6174,21 @@ $$;
 ALTER FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text", "p_resolution" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_signup_org_ref"("p_slug" "text") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+  select coalesce(p_slug ~ '^[a-z0-9-]{3,24}$' and exists (
+    select 1 from public.affiliates a
+      join public.orgs o on o.id = a.org_id
+      join public.affiliate_settings s on s.singleton and s.enabled
+     where a.slug = p_slug and a.status = 'active' and o.status = 'active' and o.affiliate_enabled), false)
+$_$;
+
+
+ALTER FUNCTION "public"."_signup_org_ref"("p_slug" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -12900,7 +12915,9 @@ begin
                          'signup_gift_daily_cap','signup_gift_paused','signup_gift_per_ip',
                          'signup_gift_claim_phone','signup_gift_claim_google','poster_photo_credits',
                          'catalog_economics_policy','food_toggles_enabled','service_worker_enabled',
-                         'service_worker_shell_enabled','signup_gift_credits','signup_gift_per_ip_partner')
+                         'service_worker_shell_enabled','signup_gift_credits','signup_gift_per_ip_partner',
+                         'signup_request_ip_hourly','signup_request_ip_daily','signup_request_ip_hourly_partner',
+                         'signup_request_ip_daily_partner','sms_ip_daily','sms_ip_daily_partner')
            or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
@@ -12931,6 +12948,13 @@ begin
       if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[0-9]+$'
          or (p_value #>> '{}')::numeric > 1000 then
         raise exception 'INVALID_INPUT' using detail = 'signup_gift_per_ip_partner must be an integer from 0 to 1000';
+      end if;
+    -- 2027: per-IP limits on sign-up requests and SMS codes. 0 (no limit) is not offered.
+    when 'signup_request_ip_hourly', 'signup_request_ip_daily', 'signup_request_ip_hourly_partner',
+         'signup_request_ip_daily_partner', 'sms_ip_daily', 'sms_ip_daily_partner' then
+      if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[1-9][0-9]*$'
+         or (p_value #>> '{}')::numeric > 10000 then
+        raise exception 'INVALID_INPUT' using detail = p_key || ' must be an integer from 1 to 10000';
       end if;
     -- 2008: the signup gift's amount (ARCHITECTURE §7). 0 is not offered: the pause stops the gift.
     when 'signup_gift_credits' then
@@ -19778,22 +19802,62 @@ $$;
 ALTER FUNCTION "public"."signup_gift_today"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."signup_ip_limits"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object(
+    'signup_hourly', greatest(1, public.signup_gift_setting_int('signup_request_ip_hourly', 5)),
+    'signup_daily', greatest(1, public.signup_gift_setting_int('signup_request_ip_daily', 20)),
+    'signup_hourly_partner', greatest(1, public.signup_gift_setting_int('signup_request_ip_hourly_partner', 20)),
+    'signup_daily_partner', greatest(1, public.signup_gift_setting_int('signup_request_ip_daily_partner', 100)),
+    'sms_daily', greatest(1, public.signup_gift_setting_int('sms_ip_daily', 50)),
+    'sms_daily_partner', greatest(1, public.signup_gift_setting_int('sms_ip_daily_partner', 200))
+  )
+$$;
+
+
+ALTER FUNCTION "public"."signup_ip_limits"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") RETURNS "text"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  select public.signup_request(p_email_key, p_ip, null::text)
+$$;
+
+
+ALTER FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text") RETURNS "text"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $_$
+declare
+  v_limits jsonb;
+  v_hourly integer;
+  v_daily integer;
 begin
   if p_email_key is null or p_email_key !~ '^[0-9a-f]{64}$' then
     raise exception 'INVALID_INPUT' using detail = 'email_key must be a sha256 hex digest';
   end if;
   if p_ip is not null then
     perform pg_advisory_xact_lock(hashtextextended('signup:ip:' || host(p_ip), 0));
+    v_limits := public.signup_ip_limits();
+    v_hourly := (v_limits->>'signup_hourly')::integer;
+    v_daily := (v_limits->>'signup_daily')::integer;
+    if public._signup_org_ref(p_ref_slug) then
+      v_hourly := greatest(v_hourly, (v_limits->>'signup_hourly_partner')::integer);
+      v_daily := greatest(v_daily, (v_limits->>'signup_daily_partner')::integer);
+    end if;
     if (select count(*) from public.signup_requests r
-         where r.ip = p_ip and r.requested_at > now() - interval '1 hour') >= 5 then
+         where r.ip = p_ip and r.requested_at > now() - interval '1 hour') >= v_hourly then
       return 'ip_hourly';
     end if;
     if (select count(*) from public.signup_requests r
-         where r.ip = p_ip and r.requested_at > now() - interval '24 hours') >= 20 then
+         where r.ip = p_ip and r.requested_at > now() - interval '24 hours') >= v_daily then
       return 'ip_daily';
     end if;
   end if;
@@ -19809,7 +19873,7 @@ end;
 $_$;
 
 
-ALTER FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") OWNER TO "postgres";
+ALTER FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") RETURNS "text"
@@ -19819,6 +19883,8 @@ CREATE OR REPLACE FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") R
 declare
   v_since timestamptz := now() - interval '24 hours';
   v_request public.sms_sends;
+  v_limits jsonb;
+  v_ip_daily integer;
 begin
   if p_phone_key is null or p_phone_key !~ '^[0-9a-f]{64}$' then
     raise exception 'INVALID_INPUT' using detail = 'phone_key must be a sha256 hex digest';
@@ -19843,9 +19909,16 @@ begin
        where s.phone_key = p_phone_key and s.sent_at > v_since) >= 5 then
     return 'phone_daily';
   end if;
-  if v_request.ip is not null and (select count(*) from public.sms_sends s
-                                    where s.ip = v_request.ip and s.sent_at > v_since) >= 20 then
-    return 'ip_daily';
+  if v_request.ip is not null then
+    v_limits := public.signup_ip_limits();
+    v_ip_daily := (v_limits->>'sms_daily')::integer;
+    if v_request.org_ref then
+      v_ip_daily := greatest(v_ip_daily, (v_limits->>'sms_daily_partner')::integer);
+    end if;
+    if (select count(*) from public.sms_sends s
+         where s.ip = v_request.ip and s.sent_at > v_since) >= v_ip_daily then
+      return 'ip_daily';
+    end if;
   end if;
 
   update public.sms_sends set sent_at = now() where id = v_request.id;
@@ -19874,11 +19947,25 @@ ALTER FUNCTION "public"."sms_release_send"("p_phone_key" "text") OWNER TO "postg
 
 
 CREATE OR REPLACE FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") RETURNS "text"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  select public.sms_request_send(p_phone_key, p_ip, null::text)
+$$;
+
+
+ALTER FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") RETURNS "text"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $_$
 declare
   v_since timestamptz := now() - interval '24 hours';
+  v_limits jsonb;
+  v_org boolean := false;
+  v_ip_daily integer;
 begin
   if p_phone_key is null or p_phone_key !~ '^[0-9a-f]{64}$' then
     raise exception 'INVALID_INPUT' using detail = 'phone_key must be a sha256 hex digest';
@@ -19896,12 +19983,20 @@ begin
        where s.phone_key = p_phone_key and s.requested_at > v_since) >= 5 then
     return 'phone_daily';
   end if;
-  if p_ip is not null and (select count(*) from public.sms_sends s
-                            where s.ip = p_ip and s.requested_at > v_since) >= 20 then
-    return 'ip_daily';
+  if p_ip is not null then
+    v_limits := public.signup_ip_limits();
+    v_ip_daily := (v_limits->>'sms_daily')::integer;
+    v_org := public._signup_org_ref(p_ref_slug);
+    if v_org then
+      v_ip_daily := greatest(v_ip_daily, (v_limits->>'sms_daily_partner')::integer);
+    end if;
+    if (select count(*) from public.sms_sends s
+         where s.ip = p_ip and s.requested_at > v_since) >= v_ip_daily then
+      return 'ip_daily';
+    end if;
   end if;
 
-  insert into public.sms_sends (phone_key, ip) values (p_phone_key, p_ip);
+  insert into public.sms_sends (phone_key, ip, org_ref) values (p_phone_key, p_ip, v_org);
   -- The rows have done their job after a day; keep two, then let them go.
   delete from public.sms_sends s
    where s.id in (select o.id from public.sms_sends o
@@ -19913,7 +20008,7 @@ end;
 $_$;
 
 
-ALTER FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") OWNER TO "postgres";
+ALTER FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."snapshot_test_spend_provider"() RETURNS "trigger"
@@ -23358,6 +23453,7 @@ CREATE TABLE IF NOT EXISTS "public"."sms_sends" (
     "ip" "inet",
     "requested_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "sent_at" timestamp with time zone,
+    "org_ref" boolean DEFAULT false NOT NULL,
     CONSTRAINT "sms_sends_phone_key_check" CHECK (("phone_key" ~ '^[0-9a-f]{64}$'::"text"))
 );
 
@@ -28529,6 +28625,11 @@ REVOKE ALL ON FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."p
 
 
 
+REVOKE ALL ON FUNCTION "public"."_signup_org_ref"("p_slug" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."_signup_org_ref"("p_slug" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) TO "service_role";
 
@@ -30511,8 +30612,18 @@ GRANT ALL ON FUNCTION "public"."signup_gift_today"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."signup_ip_limits"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_ip_limits"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text") TO "service_role";
 
 
 
@@ -30528,6 +30639,11 @@ GRANT ALL ON FUNCTION "public"."sms_release_send"("p_phone_key" "text") TO "serv
 
 REVOKE ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") TO "service_role";
 
 
 
