@@ -132,12 +132,12 @@ it('covers a late redemption within the 7-day window and nothing after it, or af
   expect(await bonusLedger(payer)).toEqual([])
 })
 
-it('keeps the invite anti-abuse rules: a blocked same-IP invite and a second invite give no bonus', async () => {
+it('keeps the invite anti-abuse rules: an invite without the gift and a second invite give no bonus', async () => {
   const { staff } = await orgTeam(300)
+  // A staff code on the customer's network is no longer refused (2025); a missing gift still is.
   const sameIp = await createUser(db)
-  await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [sameIp, 'signup:' + sameIp])
   await db.query("update profiles set signup_ip='203.0.113.9' where id in ($1,$2)", [staff, sameIp])
-  expect((await invitedBy(staff, { customer: sameIp })).result.status).toBe('blocked_same_ip')
+  expect((await invitedBy(staff, { customer: sameIp })).result.status).toBe('blocked_no_signup_grant')
   expect(await bonusLedger(sameIp)).toEqual([])
 
   const twice = (await invitedBy(staff)).customer
