@@ -156,10 +156,12 @@ it('lets a customer blocked on one personal code use another inviter\'s code; on
   let cursor: object | null = null
   let found = false
   for (let page = 0; page < 200 && !found; page++) {
-    const rows = (await db.query('select r from admin_code_redemptions($1,null,$2) r', [actor, cursor])).rows.map((x) => x.r)
+    const rows: Array<{ id: string; created_at: string }> = (await db.query<{ r: { id: string; created_at: string } }>(
+      'select r from admin_code_redemptions($1,null,$2) r', [actor, cursor])).rows.map((x) => x.r)
     found = rows.some((r) => r.id === archived.id)
     if (rows.length < 30) break
-    cursor = { created_at: rows.at(-1).created_at, id: rows.at(-1).id }
+    const last = rows[rows.length - 1]!
+    cursor = { created_at: last.created_at, id: last.id }
   }
   expect(found).toBe(true)
 
