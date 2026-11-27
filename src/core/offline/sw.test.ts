@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { routeFor } from './routes'
-import { COVER_SCREENS, COVERS_KEEP, serviceWorkerSource } from './sw'
+import { CACHE_WAIT_MS, COVER_SCREENS, COVERS_KEEP, serviceWorkerSource } from './sw'
 
 const SITE = 'https://shotviva.com'
 const CDN = 'https://img-eo.shotviva.com'
@@ -295,5 +295,42 @@ describe('/sw.js first-screen covers: what is never kept', () => {
     const { response } = await worker.dispatch('fetch', coverRequest())
     expect(await response?.text()).toBe('network')
     await worker.dispatch('message', keep('all', 0))
+  })
+})
+
+describe('/sw.js when Cache Storage stalls instead of failing', () => {
+  const source = serviceWorkerSource({ version: 'dpl_test', cdnOrigins: [CDN], coverOrigins: [CDN], enabled: true })
+
+  it('a Cache Storage that stalls instead of failing never holds a request: the network answers, and the worker stops asking it (2026-11-28)', async () => {
+    vi.useFakeTimers()
+    try {
+      const worker = runWorker(source)
+      worker.caches.has.mockImplementation(() => new Promise<boolean>(() => {}))
+      const first = worker.dispatch('fetch', asset('/_next/static/chunks/stall.js'))
+      await vi.advanceTimersByTimeAsync(CACHE_WAIT_MS)
+      expect(await (await first).response?.text()).toBe('network')
+      const calls = worker.caches.has.mock.calls.length
+      const second = await worker.dispatch('fetch', asset('/_next/static/chunks/stall-2.js'))
+      expect(await second.response?.text()).toBe('network')
+      expect(worker.caches.has.mock.calls.length).toBe(calls)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('activation ends even when Cache Storage or clients.claim stalls', async () => {
+    vi.useFakeTimers()
+    try {
+      const worker = runWorker(source)
+      worker.caches.keys.mockImplementation(() => new Promise<string[]>(() => {}))
+      worker.self.clients.claim.mockImplementation(() => new Promise(() => {}))
+      let done = false
+      const activated = worker.dispatch('activate', {}).then(() => (done = true))
+      await vi.advanceTimersByTimeAsync(CACHE_WAIT_MS * 2)
+      await activated
+      expect(done).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
