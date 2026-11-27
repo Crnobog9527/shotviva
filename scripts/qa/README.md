@@ -46,7 +46,10 @@ to prepare the separate invitation acceptance account.
 
 For Graylum connection tests, use only `qa-graylum`: `pnpm qa:reset qa-graylum`, then
 `pnpm qa:login qa-graylum`. Every reset gives it a new identity, so a rerun starts unlinked.
-Keep `qa-free` for the enterprise and affiliate checks that already use it.
+Do not use `qa-free` for enterprise (org) tests. Once it owns an org, its reset can no longer delete
+it: the org and promo tables have no `ON DELETE CASCADE` and `service_role` may only read them, so
+`deleteUser` fails with "Database error deleting user". Enterprise checks use a dedicated persona
+whose org is never expected to be reset. Affiliate checks that create no org may keep using `qa-free`.
 
 For invitation acceptance, reset `qa-invitee` before the first purchase and use
 `pnpm qa:login qa-invitee`. Resetting recreates this test identity, records `192.0.2.94`
