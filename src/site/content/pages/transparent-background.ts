@@ -3,7 +3,7 @@ import { defineContentPage, type CostBills, type EditCases } from '@/core/conten
 
 import { site } from '../../site.config'
 import { caseImage, CATEGORY, sizeCountWord, withFirstFrame } from '../landing-shared'
-import { baselineOffers, packshotUsd, photoSeconds, plansSentence, product, tierPixels, uploadLimits, usd, usdRange, type OfferFacts } from '../offer'
+import { baselineOffers, giftCredits, packshotUsd, photoSeconds, plansSentence, product, tierPixels, uploadLimits, usd, usdRange, type OfferFacts } from '../offer'
 import { PLATFORM_SPECS, PLATFORM_SPECS_CHECKED, px } from '../platform-specs'
 import { pricingRelated } from '../shared'
 
@@ -150,7 +150,7 @@ export const makeTransparentBackground = (offers: OfferFacts) => defineContentPa
     },
     {
       question: 'Can I use the transparent PNG commercially?',
-      answer: `Photos made with paid ${brand} credits are private, have no watermark and can be used commercially, and Pro and Max plans upload in batches. The ${site.billing.freeCredits} free credits new users get once make photos that are public, carry a watermark and are for personal, non-commercial use. ${plansSentence(offers)}`,
+      answer: `Photos made with paid ${brand} credits are private, have no watermark and can be used commercially, and Pro and Max plans upload in batches. The ${giftCredits} free credits new users get once make photos that are public, carry a watermark and are for personal, non-commercial use. ${plansSentence(offers)}`,
     },
     {
       question: 'What sizes does the PNG come in?',

@@ -26,10 +26,10 @@ const ring = (html: string, kind: string) => html.match(new RegExp(`data-dial="$
 
 describe('credit dials', () => {
   it('rings what is left of the period and of the signup gift', async () => {
-    const { html, text } = await render(dials(38, 3, { credits: 50, interval: 'month' }))
+    const { html, text } = await render(dials(38, 6, { credits: 50, interval: 'month' }))
     // "of N" sits next to the count; the line under it is one short phrase (Owner 2026-11-08).
     expect(text).toContain('38 / 50 paid private, no watermark')
-    expect(text).toContain('3 / 100 free public, watermarked')
+    expect(text).toContain('6 / 200 free public, watermarked')
     expect(ring(html, 'paid')).toBe('76')
     expect(ring(html, 'free')).toBe('3')
     expect(html).toContain('aria-label="38 of 50 paid credits left"')
@@ -51,7 +51,7 @@ describe('credit dials', () => {
   it('speaks Chinese', async () => {
     const { text } = await render(dials(500, 2, { credits: 600, interval: 'year' }), 'zh')
     expect(text).toContain('500 / 600 付费 私密、无水印')
-    expect(text).toContain('2 / 100 免费 公开、带水印')
+    expect(text).toContain('2 / 200 免费 公开、带水印')
   })
 
   it('drops "/ 6" when the signup gift was withheld (over the per-network allowance, pending), in both languages', async () => {

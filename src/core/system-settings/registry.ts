@@ -14,6 +14,9 @@ type SettingTypes = {
   signup_gift_paused: boolean
   // 1350: signup gifts per Beijing day (0 = none). grant_credits reads the row itself.
   signup_gift_daily_cap: number
+  // 2008: the signup gift's amount in credits (default 200, Owner 2026-11-27). signup_gift_amount (SQL) reads the row itself when it
+  // grants; the site's copy reads it here through the settings cache.
+  signup_gift_credits: number
   // 1480: signup gifts one signup IP may receive in 24 hours (0 = no limit); over it, pending.
   signup_gift_per_ip: number
   // 1480: whether a pending account may claim with a verified phone / a Google account.
@@ -34,6 +37,11 @@ type SettingTypes = {
 
 export type SystemSettingKey = keyof SettingTypes
 
+// The amount's range, as admin_set_system_setting and signup_gift_amount check it (2008). Not 0:
+// the pause stops the gift.
+export const SIGNUP_GIFT_CREDITS_MIN = 1
+export const SIGNUP_GIFT_CREDITS_MAX = 5000
+
 type SettingDefinition<T> = { schema: z.ZodType<T>; fallback: T }
 
 export const SYSTEM_SETTINGS: { [K in SystemSettingKey]: SettingDefinition<SettingTypes[K]> } = {
@@ -42,6 +50,7 @@ export const SYSTEM_SETTINGS: { [K in SystemSettingKey]: SettingDefinition<Setti
   gallery_auto_approve: { schema: z.boolean(), fallback: false },
   signup_gift_paused: { schema: z.boolean(), fallback: false },
   signup_gift_daily_cap: { schema: z.number().int().min(0).max(100_000), fallback: 30 },
+  signup_gift_credits: { schema: z.number().int().min(SIGNUP_GIFT_CREDITS_MIN).max(SIGNUP_GIFT_CREDITS_MAX), fallback: 200 },
   signup_gift_per_ip: { schema: z.number().int().min(0).max(1000), fallback: 5 },
   signup_gift_claim_phone: { schema: z.boolean(), fallback: true },
   signup_gift_claim_google: { schema: z.boolean(), fallback: true },

@@ -19,6 +19,7 @@ import { isWishlistEnabled } from '@/core/wishlist'
 import { homePanelTemplates } from '@/modules/image/marketing'
 import { contentPagesIn, creditFacts, featuredSections, fillCredits, findContentPageIn, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
 import { displayProducts } from '@/site/billing/display-products'
+import { signupGiftCreditsForSite } from '@/site/billing/signup-gift'
 import { site } from '@/site/site.config'
 
 import { HomeGeneratorSlot } from '../home-generator-slot'
@@ -44,14 +45,14 @@ export function generateStaticParams({ params }: { params: { locale: string } })
 }
 
 // The page's copy with "from N credits" and the image counts filled from the live catalogue
-// (建站规格 G3, G4).
+// (建站规格 G3, G4), and the signup gift from its setting (2008).
 async function load(params: Promise<{ slug: string }>) {
   const locale = await currentLocale()
   const slug = (await params).slug
-  const [products, live, series, wishlistOpen] = await Promise.all([displayProducts(), cachedWebCatalogue(locale), cachedPublicSeries(locale), isWishlistEnabled(site)])
+  const [products, live, series, wishlistOpen, gift] = await Promise.all([displayProducts(), cachedWebCatalogue(locale), cachedPublicSeries(locale), isWishlistEnabled(site), signupGiftCreditsForSite()])
   const found = findContentPageIn(slug, locale, products)
   if (!found || !isEnabled(found)) notFound()
-  const facts = creditFacts(live)
+  const facts = creditFacts(live, gift)
   return { locale, live, series, products, wishlistOpen, page: fillCredits(found, facts), free: fillCredits(freeImagesIn(locale), facts) }
 }
 

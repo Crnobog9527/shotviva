@@ -193,9 +193,12 @@ export const ANALYTICS_COPY = {
       active24h: { label: '24 小时内出图', help: '新注册的人里，注册后 24 小时内成功拿到第一张图的比例。' },
       toImage: { label: '注册到第一张图', help: '从注册到成功拿到第一张图平均用了多久（只算已经出过图的人）。' },
       toPaid: { label: '注册到第一次付款', help: '从注册到第一次付款平均用了多久（只算已经付过款的人）。' },
-      paidAfterGift: { label: '免费积分用完后付款', help: '把注册送的免费积分全部用掉的人里，后来付了款的比例。' },
+      paidAfterGift: {
+        label: '免费积分用完后付款',
+        help: '把注册送的免费积分全部用掉的人里，后来付了款的比例。「用完」按现在每个新账号送的积分数算，不是每个人当时实际拿到的数：2026-11-27 起默认从 100 改成 200，后台改了数量也一样，之前注册、拿得少的人可能算作没用完，跨这个日期的对比要打折看。',
+      },
     } satisfies Record<string, Metric>,
-    usedGift: (n: string) => `${n} 人用完了免费积分`,
+    usedGift: (n: string, gift: number) => `${n} 人用完了免费积分（按 ${gift} 积分算）`,
   },
   templates: {
     title: '模板表现',

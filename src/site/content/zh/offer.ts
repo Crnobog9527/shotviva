@@ -3,7 +3,7 @@ import { memberPackOff, packNoteValues } from '@/core/billing/paywall/perks'
 import { MAX_UPLOAD_BYTES, UPLOAD_CONTENT_TYPES } from '@/core/storage/rules'
 
 import { site } from '../../site.config'
-import { type OfferFacts, baselineOffers, OUTPUT_TIERS, packFrom, planFrom, usd, yearlySaving } from '../offer'
+import { type OfferFacts, baselineOffers, giftCredits, OUTPUT_TIERS, packFrom, planFrom, usd, yearlySaving } from '../offer'
 import type { YearlySaving } from '@/core/billing/paywall/offer'
 
 // The Chinese wording of every public number (建站规格 G3, §6.1): same figures as offer.ts,
@@ -27,7 +27,7 @@ export const zhTierPixels = ZH_TIERS.map((tier) => `${tier.name} ${tier.px} px`)
 // 「N 积分起」: filled when the page renders, like fromCredits (../credits).
 export const zhFromCredits = '⟦积分起价⟧'
 
-export const zhFreeImages = `${site.billing.freeCredits} 个免费积分`
+export const zhFreeImages = `${giftCredits} 个免费积分`
 
 const FORMATS: Record<string, string> = { 'image/jpeg': 'JPG', 'image/png': 'PNG', 'image/webp': 'WebP' }
 const formats = UPLOAD_CONTENT_TYPES.map((type) => FORMATS[type] ?? type)

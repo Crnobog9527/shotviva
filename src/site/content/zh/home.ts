@@ -3,6 +3,7 @@ import { defineHomePage, type CostBills, type HeadedText, type HomePage, type Im
 
 import { site } from '../../site.config'
 import {
+  giftCredits,
   SET_PHOTOS,
   packshotUsd,
   photoSeconds,
@@ -165,7 +166,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: 'AI改图免费吗？',
-    answer: `${brand} 给新账号 ${site.billing.freeCredits} 个积分，用来试一个模板。每张图按模板和尺寸消耗积分，生成按钮上会显示具体数字。免费生成的图公开、带水印；${offers.planFrom ? `付费套餐每月 ${usd(offers.planFrom.priceUsd)} 起。` : zhPlansSentence(offers)}`,
+    answer: `${brand} 给新账号 ${giftCredits} 个积分，用来试一个模板。每张图按模板和尺寸消耗积分，生成按钮上会显示具体数字。免费生成的图公开、带水印；${offers.planFrom ? `付费套餐每月 ${usd(offers.planFrom.priceUsd)} 起。` : zhPlansSentence(offers)}`,
   },
   {
     question: 'AI改图会不会把我照片里的东西改掉？',
@@ -223,7 +224,7 @@ export const makeZhHomePage = (offers: OfferFacts, plans = zhHomePlans(offers.pr
       {
         // SEO PATCH v4.1 (2026-11-11): the free credits are no heading of their own and no photo count.
         heading: '先试效果再付费',
-        text: `新用户注册即赠 ${site.billing.freeCredits} 个积分，可用于体验模板，仅赠送一次，不会按天或按月刷新。`,
+        text: `新用户注册即赠 ${giftCredits} 个积分，可用于体验模板，仅赠送一次，不会按天或按月刷新。`,
       },
       {
         heading: '免费图公开带水印，付费图私密无水印',
