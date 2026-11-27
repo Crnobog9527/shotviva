@@ -10212,7 +10212,7 @@ $$;
 ALTER FUNCTION "public"."admin_org_create"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."admin_org_customers"("p_org_id" "uuid", "p_limit" integer, "p_offset" integer) RETURNS TABLE("user_id" "uuid", "contact" "text", "level" smallint, "source" "text", "member_user_id" "uuid", "member_contact" "text", "via_user_id" "uuid", "via_contact" "text", "signed_up_at" timestamp with time zone, "referred_at" timestamp with time zone, "bonus_credits" integer, "bonus_at" timestamp with time zone, "bonus_error" "text", "paid_before" boolean, "has_signup_gift" boolean, "paid_cents" bigint, "commission_cents" bigint, "promo_credits" bigint, "total" bigint, "total_l2" bigint)
+CREATE OR REPLACE FUNCTION "public"."admin_org_customers"("p_org_id" "uuid", "p_limit" integer, "p_offset" integer) RETURNS TABLE("user_id" "uuid", "contact" "text", "level" smallint, "source" "text", "member_user_id" "uuid", "member_contact" "text", "via_user_id" "uuid", "via_contact" "text", "signed_up_at" timestamp with time zone, "referred_at" timestamp with time zone, "bonus_credits" integer, "bonus_at" timestamp with time zone, "bonus_error" "text", "paid_before" boolean, "has_signup_gift" boolean, "bonus_at_bind" integer, "switch_at_bind" boolean, "before_org" boolean, "has_paid" boolean, "banned" boolean, "paid_cents" bigint, "commission_cents" bigint, "promo_credits" bigint, "total" bigint, "total_l2" bigint)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     SET "TimeZone" TO 'UTC'
@@ -10220,16 +10220,19 @@ CREATE OR REPLACE FUNCTION "public"."admin_org_customers"("p_org_id" "uuid", "p_
 #variable_conflict use_column
 declare
   v_account uuid;
+  v_org_created timestamptz;
+  v_switch_now boolean;
 begin
   if p_org_id is null or p_limit is null or p_limit < 1 or p_limit > 200 or p_offset is null or p_offset < 0 then
     raise exception 'INVALID_INPUT';
   end if;
   select a.user_id into v_account from public.affiliates a where a.org_id = p_org_id;
   if v_account is null then return; end if;
+  select o.created_at, o.affiliate_enabled into v_org_created, v_switch_now from public.orgs o where o.id = p_org_id;
 
   return query
   with page as (
-    select c.id, c.referred_source, c.referred_member, c.referred_via, c.referred_at, c.created_at,
+    select c.id, c.referred_source, c.referred_member, c.referred_via, c.referred_at, c.created_at, c.banned_at,
            count(*) over () as total,
            count(*) filter (where c.referred_source = 'org_l2') over () as total_l2
       from public.profiles c
@@ -10256,6 +10259,23 @@ begin
          exists(select from public.payments p where p.user_id = pg.id and p.created_at < pg.referred_at),
          exists(select from public.credit_ledger l where l.user_id = pg.id and l.idempotency_key = 'signup:' || pg.id
                   and l.kind = 'grant' and l.pool = 'free'),
+         coalesce((
+           select (x.r->'signup_bonus_credits'->>'after')::integer from public.admin_audit_log l
+             cross join lateral (select case when l.reason ~ '^\s*\{' then l.reason::jsonb end r) x
+            where l.action = 'org_update' and l.target_id = p_org_id::text and l.created_at <= pg.referred_at
+              and x.r ? 'signup_bonus_credits'
+            order by l.created_at desc, l.id desc limit 1
+         ), 0),
+         coalesce((
+           select (x.r->>'affiliate_enabled')::boolean from public.admin_audit_log l
+             cross join lateral (select case when l.reason ~ '^\s*\{' then l.reason::jsonb end r) x
+            where l.action = 'org_update' and l.target_id = p_org_id::text and l.created_at <= pg.referred_at
+              and x.r ? 'affiliate_enabled'
+            order by l.created_at desc, l.id desc limit 1
+         ), v_switch_now),
+         pg.referred_at < v_org_created,
+         exists(select from public.payments p where p.user_id = pg.id),
+         pg.banned_at is not null,
          coalesce((
            select sum(case when p.amount_total = 0 or coalesce(ds.is_lost, false) then 0 else
                     div((p.amount_total - p.amount_tax)::numeric * (p.amount_total - p.amount_refunded), p.amount_total::numeric) end)
