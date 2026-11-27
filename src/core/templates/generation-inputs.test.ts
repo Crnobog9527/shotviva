@@ -61,7 +61,7 @@ describe('renderPrompt', () => {
     const inputs = { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: '跟我加个餐具和食物匹配的的', toggles: {}, confirmed: [] }
     const text = renderPrompt('Studio shot of {{dish}}. Keep the bowl.', inputs)
     expect(text).toBe(`Studio shot of Ramen. Keep the bowl.\n\n${NOTE_PREAMBLE}\nUser's request: 跟我加个餐具和食物匹配的的`)
-    expect(NOTE_PREAMBLE).toMatch(/earlier instruction.*the user's request wins/)
+    expect(NOTE_PREAMBLE).toMatch(/even where an earlier line says otherwise.*hard rule/)
     expect(text.endsWith('跟我加个餐具和食物匹配的的')).toBe(true)
   })
 

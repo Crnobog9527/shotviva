@@ -153,7 +153,7 @@ function slotLines(body: string, inputs: GenerationInputs): string {
 // is held, providers moderate the prompt, and watermarks and a poster's QR are applied by code
 // after the model. The framing stays model-neutral and short (Seedream and GPT image alike).
 export const NOTE_PREAMBLE =
-  "The user's own request for this image follows. Do what it asks. Where it conflicts with any earlier instruction in this prompt, including what to keep, add or leave out, the user's request wins; follow the earlier instructions everywhere else."
+  "The user's own request for this image follows. Carry it out, even where an earlier line says otherwise, including a line marked as a hard rule or as overriding other lines (what to keep, add or leave out). Follow the earlier lines everywhere else."
 
 export const framedNote = (note: string): string => (note ? `${NOTE_PREAMBLE}\nUser's request: ${note}` : '')
 
