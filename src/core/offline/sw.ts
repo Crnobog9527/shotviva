@@ -232,6 +232,9 @@ const VERSION = ${JSON.stringify(version)}
 // Create's app shell: kept across activation only while its switch is on.
 const SHELL = PREFIX + 'shell-' + VERSION
 const KEEP_SHELL = ${shell ? 'SHELL' : "''"}
+// This build's record that its first navigation checked the shells (shell-worker.ts refillShells).
+const SHELL_CHECKED = PREFIX + 'checked-' + VERSION
+const KEEP_CHECKED = ${shell ? 'SHELL_CHECKED' : "''"}
 const ORIGINS = [self.location.origin, ...${JSON.stringify(cdnOrigins)}]
 const COVER_ORIGINS = [self.location.origin, ...${JSON.stringify(coverOrigins)}]
 const routeFor = ${routeFor.toString()}
@@ -250,7 +253,7 @@ self.addEventListener('activate', (event) => event.waitUntil((async () => {
   } catch {}
   try {
     await inTime((async () => {
-      for (const key of await caches.keys()) if (key.startsWith(PREFIX) && key !== STATIC && key !== CATALOGUE && key !== COVERS && key !== KEEP_SHELL) await caches.delete(key)
+      for (const key of await caches.keys()) if (key.startsWith(PREFIX) && key !== STATIC && key !== CATALOGUE && key !== COVERS && key !== KEEP_SHELL && key !== KEEP_CHECKED) await caches.delete(key)
     })())
   } catch {}
   try {

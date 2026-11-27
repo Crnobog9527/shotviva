@@ -161,11 +161,22 @@ async function answerRefresh(event) {
 
 // The shells this worker fetched at install can still be deleted before it takes over: the worker
 // it replaces keeps answering until then (a shell-off worker drops every shell on each navigation,
-// an old page's sv-drop-shell drops its build's). So the first navigation this worker handles
-// checks behind its answer (waitUntil, never before it) and fetches again any shell that is gone,
-// except the one that navigation is about to refresh itself (shellFirst).
+// an old page's sv-drop-shell drops its build's). So the first navigation this build's worker
+// handles checks behind its answer (waitUntil, never before it) and fetches again any shell that is
+// gone, except the one that navigation is about to refresh itself (shellFirst). Once per build, not
+// per wake: the browser stops an idle worker and starts it again often, so the check is recorded in
+// SHELL_CHECKED (its own cache, kept until the next build's activation) before any fetch, and a
+// failed refill is not retried; a marker that cannot be read or written means no refill at all.
+const SHELL_CHECKED_KEY = self.location.origin + '/__sv-shells-checked'
 let shellsChecked = false
 async function refillShells(except) {
+  if (cacheStalled) return
+  if (await cachedIn(SHELL_CHECKED, SHELL_CHECKED_KEY)) return
+  const marked = await inTime((async () => {
+    await (await caches.open(SHELL_CHECKED)).put(SHELL_CHECKED_KEY, new Response(''))
+    return true
+  })())
+  if (marked !== true) return
   await Promise.all(['/app-shell/generate', '/zh/app-shell/generate'].map(async (path) => {
     const shellUrl = self.location.origin + path
     if (shellUrl === except || (await cachedIn(SHELL, shellUrl))) return
