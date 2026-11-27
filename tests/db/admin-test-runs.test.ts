@@ -15,6 +15,7 @@ import { seedTemplate } from './generation-fixtures'
 import { connectAdmin, createUser, profileOf } from './helpers'
 import { serviceSupabase } from './supabase-env'
 import { holdTestBudget } from './test-run-fixtures'
+import { framedNote } from '@/core/templates/generation-inputs'
 
 // T85 admin template test runs (ARCHITECTURE §10.b): the user's generate and edit pipelines on
 // admin_test_runs, against the real local database (0780–0788) with in-memory buckets and fake
@@ -106,7 +107,7 @@ describe('first runs', () => {
     // The judge's tokens (400 × $0.1 + 6 × $0.5 per M) join the image call's, as on a user's job.
     expect(run).toMatchObject({ status: 'succeeded', kind: 'generate', resolution: '1k', costUsd: 0.068543, outputKey: `admin-tests/outputs/${run.id}.png` })
     // The user's prompt composition: the wrapper with the copy, then the note.
-    expect(p.calls[0]).toMatchObject({ prompt: 'WRAPPED studio shot of salmon, keep the plate unchanged\n\nwarmer light', aspectRatio: '4:5', quality: 'medium' })
+    expect(p.calls[0]).toMatchObject({ prompt: `WRAPPED studio shot of salmon, keep the plate unchanged\n\n${framedNote('warmer light')}`, aspectRatio: '4:5', quality: 'medium' })
     expect(r2.objects.has(`admin-tests/outputs/${run.id}.png`)).toBe(true)
     expect(r2.objects.get(`admin-tests/outputs/${run.id}.png.thumb.webp`)?.contentType).toBe('image/webp')
     expect(await profileOf(db, admin)).toMatchObject({ credits: 7, free_credits: 3 })
