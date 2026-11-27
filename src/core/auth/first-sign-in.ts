@@ -11,7 +11,7 @@ import { serverEnv } from '../env'
 import { signupExperiments, syncExperimentsAtSignIn } from '../experiments/server'
 import type { Locale } from '../i18n/locales'
 import { billingGrant, grantSignupCredits } from './free-credits'
-import { consumeSignupCode, type SignupBenefits } from './signup-code'
+import { consumeSignupCode, prepareSignupCode, type SignupBenefits } from './signup-code'
 import { claimQuietly } from './signup-gift-claim'
 import { clientIp, recordSignupIp } from './signup-ip'
 import { staffSignup, type StaffOrigin } from './staff-signup'
@@ -108,12 +108,16 @@ export async function onVerifiedSignIn(
   const staff = await staffSignup(admin, userId, staffOrigin ?? null)
   const ipStored = await recordIpUnlessUnchecked(admin, userId, address, staff)
   const jar = await cookies()
+  const useStored = signupConfirmation === true
+  // 2031: a new customer's sign-up code is staged before the gift, so an org staff invite code
+  // gets the org channel's gift allowance. Known only with an IP (always behind Vercel).
+  const prepared = address && ipStored && !staff ? await prepareSignupCode(admin, userId, useStored) : undefined
   const first = await bindAndPayGift(admin, userId, {
     knownFirst: address ? ipStored : null, staff, gift: benefits.freeCredits,
-    cookie: jar.get('sv_ref')?.value, signupConfirmation: signupConfirmation === true,
+    cookie: jar.get('sv_ref')?.value, signupConfirmation: useStored,
   })
   const fresh = first && !staff
-  const kind = await consumeSignupCode(admin, userId, { first, fresh, useStored: signupConfirmation === true }, benefits.invite, locale)
+  const kind = await consumeSignupCode(admin, userId, { first, fresh, useStored, prepared }, benefits.invite, locale)
   // A/B variants onto the account, and the account's back into the cookie (ARCHITECTURE §16.5).
   const experiments = await syncExperimentsAtSignIn(admin, userId, first, jar, isSecure(await headers()))
   // Where this browser first landed, onto the account once (ARCHITECTURE §16.6).

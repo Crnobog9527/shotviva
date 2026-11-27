@@ -5149,6 +5149,31 @@ $$;
 ALTER FUNCTION "public"."_org_signup_bonus_after_gift"("p_user" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_staff_code"("p_code" "text", "p_user" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+  select coalesce(p_code collate "C" ~ '^[A-Za-z0-9]{4,20}$' and exists (
+    select 1 from public.codes c
+      join public.org_members m on m.user_id = c.owner_user_id and m.status = 'active'
+      join public.orgs o on o.id = m.org_id and o.status = 'active' and o.affiliate_enabled
+      join public.affiliates a on a.org_id = o.id and a.status = 'active'
+      join public.affiliate_settings s on s.singleton and s.enabled
+      -- As redeem_code: a banned owner's code is expired, and a full one cannot be redeemed.
+      join public.profiles owner on owner.id = c.owner_user_id and owner.banned_at is null
+     where c.code = upper(p_code) and c.kind = 'invite' and c.active
+       and (c.max_redemptions is null or c.redemption_count < c.max_redemptions)
+       and (c.starts_at is null or c.starts_at <= now()) and (c.expires_at is null or c.expires_at > now())
+       and (p_user is null or (
+         a.user_id <> p_user
+         and not exists (select 1 from public.org_members x where x.org_id = o.id and x.user_id = p_user and x.status = 'active')
+         and exists (select 1 from public.profiles p where p.id = p_user and (p.referred_by is null or p.referred_by = a.user_id))))), false)
+$_$;
+
+
+ALTER FUNCTION "public"."_org_staff_code"("p_code" "text", "p_user" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_work_forget_maker"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -6277,6 +6302,22 @@ $_$;
 
 
 ALTER FUNCTION "public"."_signup_org_ref"("p_slug" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_signup_staff_code_channel"("p_user" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select exists (select 1 from public.signup_code_staged g
+                  where g.user_id = p_user and g.created_at > now() - interval '1 hour'
+                    and public._org_staff_code(g.code, p_user))
+      or exists (select 1 from public.code_redemptions r join public.codes c on c.id = r.code_id
+                  where r.user_id = p_user and r.kind = 'invite' and r.status = 'blocked_no_signup_grant'
+                    and r.context = 'signup' and public._org_staff_code(c.code, p_user))
+$$;
+
+
+ALTER FUNCTION "public"."_signup_staff_code_channel"("p_user" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_template_has_cover_parts"("p_before" "text", "p_after" "text", "p_locales_json" "jsonb", "p_locales" "text"[]) RETURNS boolean
@@ -16351,10 +16392,13 @@ begin
       v_per_ip := public.signup_gift_setting_int('signup_gift_per_ip', 5);
       -- 2024: an account already bound through an org account's ?ref link at this sign-in gets the
       -- partner allowance; never stricter than the site-wide one (0 = no limit wins).
-      if v_profile.referred_source = 'signup' and exists (
+      -- 2031: or a sign-up through an org staff member's invite code: the code staged at this first
+      -- sign-in, or a sign-up redemption refused for the missing gift (a later catch-up).
+      if (v_profile.referred_source = 'signup' and exists (
            select 1 from public.affiliates a join public.orgs o on o.id = a.org_id
             where a.user_id = v_profile.referred_by and a.status = 'active'
-              and o.status = 'active' and o.affiliate_enabled) then
+              and o.status = 'active' and o.affiliate_enabled))
+         or public._signup_staff_code_channel(p_user_id) then
         v_partner := public.signup_gift_setting_int('signup_gift_per_ip_partner', 20);
         v_per_ip := case when v_per_ip = 0 or v_partner = 0 then 0 else greatest(v_per_ip, v_partner) end;
       end if;
@@ -19961,6 +20005,27 @@ $$;
 ALTER FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."signup_code_stage"("p_user" "uuid", "p_code" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+begin
+  if p_user is null then return false; end if;
+  delete from public.signup_code_staged where user_id = p_user;
+  if p_code is null or p_code collate "C" !~ '^[A-Z0-9]{4,20}$'
+     or exists (select 1 from public.credit_ledger where idempotency_key = 'signup:' || p_user::text)
+     or not exists (select 1 from public.profiles where id = p_user) then
+    return false;
+  end if;
+  insert into public.signup_code_staged (user_id, code) values (p_user, p_code);
+  return true;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."signup_code_stage"("p_user" "uuid", "p_code" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -20188,6 +20253,17 @@ ALTER FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet") OW
 
 
 CREATE OR REPLACE FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text") RETURNS "text"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  select public.signup_request(p_email_key, p_ip, p_ref_slug, null::text)
+$$;
+
+
+ALTER FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text", "p_code" "text") RETURNS "text"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $_$
@@ -20204,7 +20280,8 @@ begin
     v_limits := public.signup_ip_limits();
     v_hourly := (v_limits->>'signup_hourly')::integer;
     v_daily := (v_limits->>'signup_daily')::integer;
-    if public._signup_org_ref(p_ref_slug) then
+    -- 2031: or an org staff member's invite code typed at this sign-up.
+    if public._signup_org_ref(p_ref_slug) or public._org_staff_code(p_code, null) then
       v_hourly := greatest(v_hourly, (v_limits->>'signup_hourly_partner')::integer);
       v_daily := greatest(v_daily, (v_limits->>'signup_daily_partner')::integer);
     end if;
@@ -20229,7 +20306,7 @@ end;
 $_$;
 
 
-ALTER FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text") OWNER TO "postgres";
+ALTER FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text", "p_code" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") RETURNS "text"
@@ -20314,6 +20391,17 @@ ALTER FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet") 
 
 
 CREATE OR REPLACE FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") RETURNS "text"
+    LANGUAGE "sql"
+    SET "search_path" TO ''
+    AS $$
+  select public.sms_request_send(p_phone_key, p_ip, p_ref_slug, null::text)
+$$;
+
+
+ALTER FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text", "p_code" "text") RETURNS "text"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $_$
@@ -20342,7 +20430,8 @@ begin
   if p_ip is not null then
     v_limits := public.signup_ip_limits();
     v_ip_daily := (v_limits->>'sms_daily')::integer;
-    v_org := public._signup_org_ref(p_ref_slug);
+    -- 2031: or an org staff member's invite code typed at this sign-up.
+    v_org := public._signup_org_ref(p_ref_slug) or public._org_staff_code(p_code, null);
     if v_org then
       v_ip_daily := greatest(v_ip_daily, (v_limits->>'sms_daily_partner')::integer);
     end if;
@@ -20364,7 +20453,7 @@ end;
 $_$;
 
 
-ALTER FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") OWNER TO "postgres";
+ALTER FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text", "p_code" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."snapshot_test_spend_provider"() RETURNS "trigger"
@@ -23779,6 +23868,17 @@ CREATE TABLE IF NOT EXISTS "public"."signup_code_refs" (
 ALTER TABLE "public"."signup_code_refs" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."signup_code_staged" (
+    "user_id" "uuid" NOT NULL,
+    "code" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "signup_code_staged_code_check" CHECK (("code" ~ '^[A-Z0-9]{4,20}$'::"text"))
+);
+
+
+ALTER TABLE "public"."signup_code_staged" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."signup_gift_claims" (
     "key_hash" "text" NOT NULL,
     "method" "text" NOT NULL,
@@ -24985,6 +25085,11 @@ ALTER TABLE ONLY "public"."reference_template_sources"
 
 ALTER TABLE ONLY "public"."signup_code_refs"
     ADD CONSTRAINT "signup_code_refs_pkey" PRIMARY KEY ("user_id");
+
+
+
+ALTER TABLE ONLY "public"."signup_code_staged"
+    ADD CONSTRAINT "signup_code_staged_pkey" PRIMARY KEY ("user_id");
 
 
 
@@ -27336,6 +27441,11 @@ ALTER TABLE ONLY "public"."signup_code_refs"
 
 
 
+ALTER TABLE ONLY "public"."signup_code_staged"
+    ADD CONSTRAINT "signup_code_staged_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."signup_gift_claims"
     ADD CONSTRAINT "signup_gift_claims_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
 
@@ -27919,6 +28029,9 @@ CREATE POLICY "series_read" ON "public"."template_series" FOR SELECT TO "authent
 
 
 ALTER TABLE "public"."signup_code_refs" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."signup_code_staged" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."signup_gift_claims" ENABLE ROW LEVEL SECURITY;
@@ -28992,6 +29105,11 @@ REVOKE ALL ON FUNCTION "public"."_org_signup_bonus_after_gift"("p_user" "uuid") 
 
 
 
+REVOKE ALL ON FUNCTION "public"."_org_staff_code"("p_code" "text", "p_user" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."_org_staff_code"("p_code" "text", "p_user" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."_org_work_forget_maker"() FROM PUBLIC;
 
 
@@ -29124,6 +29242,10 @@ REVOKE ALL ON FUNCTION "public"."_signup_gift_invite_retry"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "public"."_signup_org_ref"("p_slug" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."_signup_org_ref"("p_slug" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_signup_staff_code_channel"("p_user" "uuid") FROM PUBLIC;
 
 
 
@@ -31084,6 +31206,11 @@ GRANT ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."signup_code_stage"("p_user" "uuid", "p_code" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_code_stage"("p_user" "uuid", "p_code" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") TO "service_role";
 
@@ -31149,6 +31276,11 @@ GRANT ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "in
 
 
 
+REVOKE ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text", "p_code" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_request"("p_email_key" "text", "p_ip" "inet", "p_ref_slug" "text", "p_code" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sms_authorize_send"("p_phone_key" "text") TO "service_role";
 
@@ -31166,6 +31298,11 @@ GRANT ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "
 
 REVOKE ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text", "p_code" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."sms_request_send"("p_phone_key" "text", "p_ip" "inet", "p_ref_slug" "text", "p_code" "text") TO "service_role";
 
 
 

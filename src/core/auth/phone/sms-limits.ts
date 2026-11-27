@@ -23,8 +23,11 @@ async function call(db: Rpc, fn: string, args: Record<string, unknown>): Promise
 
 // The server action, before signInWithOtp. `ip` is the visitor's (null in local dev); `refSlug`
 // the slug of its sv_ref cookie, if any.
-export function requestSmsSend(db: Rpc, key: string, ip: string | null, refSlug: string | null = null): Promise<SmsLimitStatus> {
-  return call(db, 'sms_request_send', { p_phone_key: key, p_ip: ip, p_ref_slug: refSlug })
+// `code` (2031): the sign-up code the phone form submits; an org staff member's invite code gets
+// the org link's looser limit too. Without one the 3-argument function is called, as before.
+export function requestSmsSend(db: Rpc, key: string, ip: string | null, refSlug: string | null = null, code?: string | null): Promise<SmsLimitStatus> {
+  if (code === undefined) return call(db, 'sms_request_send', { p_phone_key: key, p_ip: ip, p_ref_slug: refSlug })
+  return call(db, 'sms_request_send', { p_phone_key: key, p_ip: ip, p_ref_slug: refSlug, p_code: code })
 }
 
 // The Send SMS hook, before any provider is called.

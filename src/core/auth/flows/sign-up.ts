@@ -3,13 +3,12 @@ import 'server-only'
 import { cookies, headers } from 'next/headers'
 
 import { referralSlug, storeSignupReferral } from '../../affiliate/referral'
-import { CODE_COOKIE, normalizeCode } from '../../codes'
 import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { currentOrigin } from '../../request-origin'
 import { nextIn } from '../redirect-target'
 import { clientIp } from '../signup-ip'
-import { storeSignupCode } from '../signup-code'
+import { storeSignupCode, submittedSignupCode } from '../signup-code'
 import { requestSignup } from '../signup-request'
 import { staffSignupData } from '../staff-signup'
 import { createAdminSupabase } from '../supabase-admin'
@@ -39,8 +38,7 @@ async function rememberReferral(userId: string | undefined, staff: Record<string
 // another device. An emptied field clears it (as saveSignupCode does); a staff link's sign-up
 // takes no code, so it only clears.
 async function rememberCode(userId: string | undefined, staff: Record<string, string>, form: FormData) {
-  const code = Object.keys(staff).length ? null
-    : form.has('signupCode') ? normalizeCode(form.get('signupCode')) : normalizeCode((await cookies()).get(CODE_COOKIE)?.value)
+  const code = Object.keys(staff).length ? null : await submittedSignupCode(form)
   await storeSignupCode(createAdminSupabase(), userId, code)
 }
 
@@ -54,7 +52,9 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   // Our per-IP limit first; it also leaves the row the Before User Created hook needs (1350). The
   // sv_ref slug only lets the database apply the looser org-link limit when it is one (2027).
   const ref = referralSlug((await cookies()).get('sv_ref')?.value)
-  if ((await requestSignup(createAdminSupabase(), email, clientIp(await headers()), ref)) !== 'ok') return failed('AUTH_SIGNUP_LIMITED')
+  // 2031: an org staff member's invite code in the form gets the org link's limits too (SQL decides).
+  const code = await submittedSignupCode(form)
+  if ((await requestSignup(createAdminSupabase(), email, clientIp(await headers()), ref, code)) !== 'ok') return failed('AUTH_SIGNUP_LIMITED')
 
   const supabase = await createSessionSupabase()
   const locale = await currentLocale()

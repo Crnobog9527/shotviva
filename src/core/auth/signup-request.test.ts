@@ -17,9 +17,9 @@ describe('requestSignup', () => {
   it('passes the key and IP and parses the status', async () => {
     const rpc = vi.fn().mockResolvedValue({ data: 'ip_daily', error: null })
     expect(await requestSignup({ rpc } as never, 'mei@example.com', null)).toBe('ip_daily')
-    expect(rpc).toHaveBeenCalledWith('signup_request', { p_email_key: emailKey('mei@example.com'), p_ip: null, p_ref_slug: null })
-    await requestSignup({ rpc } as never, 'mei@example.com', '203.0.113.7', 'anna')
-    expect(rpc).toHaveBeenLastCalledWith('signup_request', { p_email_key: emailKey('mei@example.com'), p_ip: '203.0.113.7', p_ref_slug: 'anna' })
+    expect(rpc).toHaveBeenCalledWith('signup_request', { p_email_key: emailKey('mei@example.com'), p_ip: null, p_ref_slug: null, p_code: null })
+    await requestSignup({ rpc } as never, 'mei@example.com', '203.0.113.7', 'anna', 'FRIEND01')
+    expect(rpc).toHaveBeenLastCalledWith('signup_request', { p_email_key: emailKey('mei@example.com'), p_ip: '203.0.113.7', p_ref_slug: 'anna', p_code: 'FRIEND01' })
   })
 
   it('throws on a database error or an unknown answer', async () => {
