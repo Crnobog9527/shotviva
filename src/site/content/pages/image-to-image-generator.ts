@@ -22,7 +22,7 @@ const catAnime = caseImage('pet-anime', 'Real example: the same cat, pose and ro
 const catStyles: ShootDemo = {
   heading: { lead: 'One cat photo → ', emphasis: 'three art styles' },
   intro: 'Shot on a phone on the arm of the sofa. Three styles, and the same cat in every one: the tabby stripes, the white blaze, the green eyes, the pose.',
-  phone: { image: catPhone, file: 'IMG_0921.jpg', caption: 'As shot on a phone. Evening lamp light, a blanket and the remote in frame.' },
+  phone: { image: catPhone, file: 'IMG_0921.jpg', caption: 'Real phone photo. Evening lamp light, a blanket and the remote in frame.' },
   arrow: 'Three styles, same cat',
   results: [
     { image: catAnime, title: 'Anime', template: 'Bold lines, flat cel shading' },
@@ -106,7 +106,7 @@ const copy = {
   },
   landing: {
     // GEO (03-S3): one platform rule with the date it was checked.
-    factsNote: `These are ${brand}'s own limits and sizes, the same on every page of this site. Shopify says ${px(shopify.squarePx)} × ${px(shopify.squarePx)} px usually displays best for square product images, and Amazon prefers more than ${px(amazon.zoomPx)} px on the longest side for zoom (both checked ${PLATFORM_SPECS_CHECKED.en}).`,
+    factsNote: `These are ${brand}'s own limits and sizes. Shopify says ${px(shopify.squarePx)} × ${px(shopify.squarePx)} px usually displays best for square product images, and Amazon prefers more than ${px(amazon.zoomPx)} px on the longest side for zoom (both checked ${PLATFORM_SPECS_CHECKED.en}).`,
     shoot: catStyles,
     edits,
   },

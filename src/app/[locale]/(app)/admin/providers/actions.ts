@@ -1,7 +1,8 @@
 'use server'
 
-import { refresh, updateTag } from 'next/cache'
+import { refresh } from 'next/cache'
 
+import { updateCatalogueTag } from '@/core/templates/catalogue-invalidation'
 import {
   activateProvider,
   dryRunIdentityScreen,
@@ -19,6 +20,7 @@ import {
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { PROVIDERS_CACHE_TAG, type ConnectionResult } from '@/core/providers'
 import { identityJudge } from '@/modules/image'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 // Server actions are public endpoints, so each one re-checks the admin role itself. None of
 // them returns a key: save answers with the row id, test with the HTTP outcome only.
@@ -26,8 +28,9 @@ import { identityJudge } from '@/modules/image'
 const deps = (): ProviderCommandDeps => ({ db: createAdminSupabase() })
 
 // The next generation must see the change without a redeploy (ARCHITECTURE §3.3).
-function providersChanged() {
-  updateTag(PROVIDERS_CACHE_TAG)
+async function providersChanged() {
+  await updateCatalogueTag(PROVIDERS_CACHE_TAG)
+  warmPublicPagesSoon()
   refresh()
 }
 
@@ -45,7 +48,7 @@ export async function saveProviderAction(input: unknown): Promise<ProviderAction
   const admin = await requireAdmin()
   return runProviderAction(async () => {
     const id = await saveProvider(deps(), admin.id, input)
-    providersChanged()
+    await providersChanged()
     return id
   })
 }
@@ -54,7 +57,7 @@ export async function activateProviderAction(input: unknown): Promise<ProviderAc
   const admin = await requireAdmin()
   return runProviderAction(async () => {
     await activateProvider(deps(), admin.id, input)
-    providersChanged()
+    await providersChanged()
   })
 }
 
@@ -62,7 +65,7 @@ export async function deleteProviderAction(input: unknown): Promise<ProviderActi
   const admin = await requireAdmin()
   return runProviderAction(async () => {
     await removeProvider(deps(), admin.id, input)
-    providersChanged()
+    await providersChanged()
   })
 }
 
@@ -81,6 +84,6 @@ export async function refreshProviderAction(input: unknown): Promise<ProviderAct
   await requireAdmin()
   return runProviderAction(async () => {
     await refreshProviderCapabilities(deps(), input)
-    providersChanged()
+    await providersChanged()
   })
 }

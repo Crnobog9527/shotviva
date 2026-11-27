@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useState, type ReactNode } from 'react'
 
 import type { MembershipTier } from '@/core/config'
+import { offeredToggles, useFoodOffer } from '@/core/templates/offered-toggles'
 
 import { BatchPhotos } from '../workspace/batch-photos'
 import { ResolutionPicker, SizePicker } from '../workspace/option-pickers'
@@ -11,6 +12,8 @@ import { PhotoPickers } from '../workspace/photo-pickers'
 import { sizeLabel } from '../workspace/workspace-options'
 import { chosenAspect } from '../workspace/output-choice'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
+import type { PickerBrowse } from '../catalogue/picker-browse'
+import { CatalogueFormStatus } from '../catalogue/catalogue-form-status'
 import { batchCounts, MATRIX_TEMPLATES, type BatchCaps } from '../gated/feature-access'
 import { IntroTrigger } from '../gated/intro-trigger'
 import { TierBadge } from '../gated/tier-badge'
@@ -21,21 +24,21 @@ import { TemplateSettings } from './template-settings'
 import { TemplatesSection } from './templates-section'
 import type { MatrixDraft } from './use-matrix-draft'
 
-type Props = { draft: MatrixDraft; templates: readonly CatalogueTemplate[]; balancePaid: number; tier: MembershipTier | null }
+type Props = { draft: MatrixDraft; templates: readonly CatalogueTemplate[]; browse: PickerBrowse | null; balancePaid: number; tier: MembershipTier | null }
 
 // Batch create's form (T107, Owner 2026-11-12), one column like the workspace (DESIGN §4.3):
 // templates → photos → the grid with its prices → each template's text and options → the one
 // size and resolution of the batch. From lg the grid moves to the right column, beside the form.
 // The plan's limits (draft.caps) shape it: on Pro one template, and the two places a Pro member
 // reaches for more (a second template, a full tray) carry the locked Max mark, nothing else.
-export function MatrixForm({ draft, templates, balancePaid, tier }: Props) {
+export function MatrixForm({ draft, templates, browse, balancePaid, tier }: Props) {
   const t = useTranslations('app')
   const { caps, photos, change, chosen, cells } = draft
   const shown = photos.photos.filter((photo) => photo.upload.phase !== 'error')
   const grid = chosen.length > 0 && shown.length > 0 ? <MatrixGrid templates={chosen} photos={shown} cells={cells} total={draft.total} count={draft.count} max={caps.cells} onToggle={(key) => change((v) => toggleCell(v, key))} /> : null
   return (
     <>
-      <TemplatesBlock draft={draft} templates={templates} tier={tier} />
+      <TemplatesBlock draft={draft} templates={templates} browse={browse} tier={tier} />
       <Section id="photo-h" title={t('workspace.yourPhotos')} aside={shown.length ? <Counter count={photos.photos.length} max={caps.cells} /> : null}>
         {photos.photos.length ? <BatchPhotos photos={photos.photos} max={caps.cells} tier={tier} onAdd={photos.add} onRemove={photos.remove} /> : <PhotoPickers onPick={photos.add} multiple />}
         {caps.templates === 1 && photos.photos.length >= caps.cells ? <MoreLocked tier={tier} tab="batch" /> : null}
@@ -50,7 +53,7 @@ export function MatrixForm({ draft, templates, balancePaid, tier }: Props) {
 // The batch's templates and their picker. With room for one (Pro) a tap in the picker is the
 // choice and closes it; once one is in, its row offers Change (the picker again, a tap swaps it)
 // and the add button gives way to the locked way to Max.
-function TemplatesBlock({ draft, templates, tier }: { draft: MatrixDraft; templates: readonly CatalogueTemplate[]; tier: MembershipTier | null }) {
+function TemplatesBlock({ draft, templates, browse, tier }: { draft: MatrixDraft; templates: readonly CatalogueTemplate[]; browse: PickerBrowse | null; tier: MembershipTier | null }) {
   const t = useTranslations('app.matrix')
   const [picking, setPicking] = useState(false)
   const { caps, values, change, chosen } = draft
@@ -70,6 +73,7 @@ function TemplatesBlock({ draft, templates, tier }: { draft: MatrixDraft; templa
         open={picking}
         onOpenChange={setPicking}
         templates={templates}
+        browse={browse}
         chosen={values.templateIds}
         max={caps.templates}
         onToggle={(id) => {
@@ -85,7 +89,9 @@ function TemplatesBlock({ draft, templates, tier }: { draft: MatrixDraft; templa
 // Each template's own text and options; nothing when none of them has any.
 function SettingsSection({ draft, photos }: { draft: MatrixDraft; photos: MatrixDraft['photos']['photos'] }) {
   const t = useTranslations('app.matrix')
-  if (!draft.chosen.some((template) => template.copyFields.length > 0 || template.toggles.length > 0)) return null
+  const foodOffer = useFoodOffer()
+  if (!draft.forms.ready) return <CatalogueFormStatus failed={draft.forms.failed} retry={draft.forms.retry} />
+  if (!draft.chosen.some((template) => template.copyFields.length > 0 || offeredToggles(template.toggles, foodOffer).length > 0)) return null
   return (
     <Section id="set-h" title={t('settingsTitle')}>
       <div className="grid gap-3">

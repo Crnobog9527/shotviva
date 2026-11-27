@@ -1,11 +1,13 @@
 'use server'
 
-import { refresh, updateTag } from 'next/cache'
+import { refresh } from 'next/cache'
+import { updateCatalogueTag } from '@/core/templates/catalogue-invalidation'
 import { z } from 'zod'
 import { runAdminAction } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { AppError } from '@/core/errors'
 import { TEMPLATES_CACHE_TAG } from '@/core/templates'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 const sale = z.object({ id: z.string().min(1).max(64), enabled: z.boolean() })
 
@@ -22,7 +24,8 @@ export async function setTemplateSaleAction(input: unknown) {
     }
     // Whether a template is on sale decides whether the catalogue (cached for every page, signed-in
     // ones included) lists it and whether its workspace opens: expire it now, like any template save.
-    updateTag(TEMPLATES_CACHE_TAG)
+    await updateCatalogueTag(TEMPLATES_CACHE_TAG)
+    warmPublicPagesSoon()
     refresh()
   })
 }

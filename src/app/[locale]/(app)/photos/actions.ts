@@ -16,7 +16,7 @@ import { loadAgainContext, type AgainContext } from '@/modules/image'
 // Delete one of your own works (T41, ARCHITECTURE §6.2「删除作品」). Server actions are public
 // endpoints, so the session is checked here; delete_own_job checks ownership and status. The
 // job id comes from the Photos viewer, so it is checked like any input.
-export async function deleteWorkAction(jobId: string): Promise<{ failed: 'running' | 'error' } | undefined> {
+export async function deleteWorkAction(jobId: string): Promise<{ failed: 'running' | 'org' | 'error' } | undefined> {
   try {
     const user = await requireApiUser()
     if (!z.uuid().safeParse(jobId).success) throw new AppError('NOT_FOUND', 'Not a job id')
@@ -24,6 +24,7 @@ export async function deleteWorkAction(jobId: string): Promise<{ failed: 'runnin
   } catch (error) {
     const appError = toAppError(error)
     if (appError.code === 'CONFLICT') return { failed: 'running' }
+    if (appError.code === 'FORBIDDEN') return { failed: 'org' }
     // Someone else's, missing or already gone: nothing of theirs to show; back to Photos.
     if (appError.code !== 'NOT_FOUND') {
       logger.error('photos.delete.failed', { jobId, error: appError.cause ?? appError })

@@ -32,7 +32,7 @@ describe('uploadPhoto', () => {
     const cb = callbacks()
     await expect(uploadPhoto(blob(18_000_000, 'image/jpeg'), d, cb)).resolves.toBe('inputs/u/k.jpg')
     expect(cb.onPhase.mock.calls.map(([phase]) => phase)).toEqual(['compressing', 'uploading'])
-    expect(d.requestTicket).toHaveBeenCalledWith('image/jpeg', 1_200_000)
+    expect(d.requestTicket).toHaveBeenCalledWith('image/jpeg', 1_200_000, { signal: undefined })
     expect(cb.onProgress).toHaveBeenLastCalledWith(1)
     // The picked photo's size bucket, not the re-encoded body's.
     expect(d.track).toHaveBeenCalledExactlyOnceWith({ size_bucket: '>5MB', compressed: true })
@@ -41,7 +41,7 @@ describe('uploadPhoto', () => {
   it('falls back to the original file when compression fails', async () => {
     const d = deps({ compress: vi.fn(async () => Promise.reject(new Error('decode'))) })
     await uploadPhoto(blob(5_000_000, 'image/png'), d, callbacks())
-    expect(d.requestTicket).toHaveBeenCalledWith('image/png', 5_000_000)
+    expect(d.requestTicket).toHaveBeenCalledWith('image/png', 5_000_000, { signal: undefined })
     expect(d.track).toHaveBeenCalledWith({ size_bucket: '1-5MB', compressed: false })
   })
 

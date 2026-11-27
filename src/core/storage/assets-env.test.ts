@@ -22,7 +22,7 @@ describe('covers on the site\'s own /assets', () => {
     expect(assetsRewrites(undefined)).toEqual([])
   })
 
-  it('caches /assets/* for a year, immutable, in browsers and on the Vercel CDN (cover names carry a content hash)', () => {
+  it('caches /assets/* for a year, immutable, in browsers and on the Vercel CDN (cover names carry a content hash), readable cross-origin without credentials', () => {
     expect(ASSETS_CACHE_CONTROL).toBe('public, max-age=31536000, immutable')
     expect(assetsHeaders()).toEqual([
       {
@@ -31,6 +31,7 @@ describe('covers on the site\'s own /assets', () => {
           { key: 'Cache-Control', value: ASSETS_CACHE_CONTROL },
           { key: 'CDN-Cache-Control', value: ASSETS_CACHE_CONTROL },
           { key: 'x-vercel-enable-rewrite-caching', value: '1' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
         ],
       },
     ])

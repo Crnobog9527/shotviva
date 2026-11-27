@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { UserLink } from '@/core/admin/users-ui'
 import { Badge } from '@/core/ui/badge'
 import { ConsumerReferral } from './consumer-referral'
 import { COPY, DOSSIER } from './copy'
@@ -10,11 +11,13 @@ import { ProfileFacts } from './dossier-profile'
 import { DossierSections } from './dossier-sections'
 import { enrollmentLabel } from './enrollment'
 import type { SaveAction } from './form'
-import { DecideMember, ReopenApplication, SetMember } from './member-forms'
+import { AnnotateMember } from './member-annotate'
+import { DecideMember, MembershipSwitch, ReopenApplication, SetMember } from './member-forms'
 import { Field, FiltersForm, LinkTo, NextPage, Select } from './parts'
 import { href, type Filters } from './query'
 
-export type ViewProps = { db: SupabaseClient; filters: Filters; action: SaveAction }
+// latestTerms: the newest published affiliate terms version (site content), for the fee go-live card.
+export type ViewProps = { db: SupabaseClient; filters: Filters; action: SaveAction; latestTerms?: string }
 export type DossierProps = ViewProps & { actor: string; id: string }
 
 export async function MembersView(props: ViewProps & { actor: string }) {
@@ -45,20 +48,25 @@ async function MemberView(props: DossierProps) {
     <>
       <LinkTo filters={{ tab: filters.tab, review: filters.review }}>{COPY.previous}</LinkTo>
       <header className="flex flex-wrap items-center gap-3">
-        <h2 className="text-xl font-semibold">{member.name || DOSSIER.unnamed}</h2>
+        <h2 className="text-xl font-semibold">{member.admin_label || member.name || DOSSIER.unnamed}</h2>
         <span className="font-mono text-sm text-muted-foreground">{member.slug}</span>
         <Badge variant="outline">{enrollmentLabel(member)}</Badge>
+        <UserLink userId={member.user_id} className="ml-auto rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
+          {DOSSIER.manageAccount}
+        </UserLink>
       </header>
       <DossierMetrics row={member} />
       <ProfileFacts member={member} />
+      <AnnotateMember member={member} action={action} />
       {member.status === 'pending' && <DecideMember member={member} action={action} />}
       {member.status === 'rejected' && <ReopenApplication member={member} action={action} />}
+      <MembershipSwitch member={member} action={action} />
       {['active', 'suspended', 'banned'].includes(member.status) && (
         <details className="rounded-md border bg-card p-4">
           <summary className="cursor-pointer font-medium">{DOSSIER.manage}</summary>
           <div className="mt-4 grid gap-3">
             {member.status === 'active' && <ConsumerReferral slug={member.slug} />}
-            <SetMember member={member} rates={member.rates} action={action} />
+            <SetMember member={member} rates={member.rates} action={action} orgL2Defaults={member.org_l2_defaults ?? undefined} />
             <div className="flex gap-4">
               <LinkTo filters={{ tab: 'commissions', affiliate: id }}>{COPY.commissions}</LinkTo>
               <LinkTo filters={{ tab: 'commissions', affiliate: id, flag: 'yes' }}>{COPY.flagged}</LinkTo>

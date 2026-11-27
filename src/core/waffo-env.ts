@@ -54,6 +54,9 @@ export const waffoEnvShape = {
   // {"starter_monthly":"PROD_…", …}: the six memberships to Waffo subscription products, for card
   // checkouts (T50). Alipay and the packs keep using WAFFO_PRODUCT_IDS.
   WAFFO_SUBSCRIPTION_PRODUCT_IDS: z.preprocess(blankAsUnset, z.preprocess(parseJson, waffoSubscriptionIdsSchema).optional()),
+  // WeChat Pay on Waffo's one-time checkout (Owner 2026-11-21): the paywall names it on the wallet
+  // line with its CN¥1,000 cap. Turn on only once the Waffo store offers WeChat Pay.
+  WAFFO_WECHAT_PAY: z.preprocess(blankAsUnset, z.enum(['on', 'off']).default('off')),
 }
 
 type WaffoEnv = {
@@ -66,6 +69,7 @@ type WaffoEnv = {
   WAFFO_WEBHOOK_PUBLIC_KEY?: string
   WAFFO_PRODUCT_IDS?: unknown
   WAFFO_SUBSCRIPTION_PRODUCT_IDS?: unknown
+  WAFFO_WECHAT_PAY: 'on' | 'off'
 }
 
 export const WAFFO_REQUIRED_KEYS = [

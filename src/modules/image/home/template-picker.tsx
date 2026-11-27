@@ -9,19 +9,22 @@ import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle } fr
 import { useMediaQuery } from '@/core/ui/use-media-query'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
-import { browseView, type PickerBrowse } from '../catalogue/picker-browse'
+import { browseView } from '../catalogue/picker-browse'
+import type { HomeCatalogue } from './home-catalogue'
 import type { TemplateSample } from './home-samples'
 import { PickerSample } from './picker-body'
 import { PickerBrowser } from './picker-list'
 
 type Props = {
   // The template the dialog opens on (the bench's choice, or the card's Preview); null: closed.
-  openOn: CatalogueTemplate | null
-  templates: readonly CatalogueTemplate[]
-  // Create's category tree and card order (null: the flat list by category).
-  browse: PickerBrowse | null
+  openOn: string | null
+  // The category it opens on (slug path); absent: All.
+  openPath?: readonly string[]
+  catalogue: HomeCatalogue | null
+  failed: boolean
+  onRetry(): void
   onClose(): void
-  onPick(id: string): void
+  onPick(template: CatalogueTemplate): void
   sampleOf(template: CatalogueTemplate): TemplateSample | null
   thumbOf(template: CatalogueTemplate): string | null
 }
@@ -33,23 +36,22 @@ const closeIcon = (
 )
 
 // The row chosen inside the dialog; every opening starts on the template it was opened for.
-function useChosen(openOn: CatalogueTemplate | null, templates: readonly CatalogueTemplate[]) {
+function useChosen(openOn: string | null, templates: readonly CatalogueTemplate[]) {
   const [chosenId, setChosenId] = useState<string | null>(null)
   const [openedOn, setOpenedOn] = useState<string | null>(null)
-  const opening = openOn?.id ?? null
-  if (opening !== openedOn) {
-    setOpenedOn(opening)
-    setChosenId(opening)
+  if (openOn !== openedOn) {
+    setOpenedOn(openOn)
+    setChosenId(openOn)
   }
-  return { template: templates.find((template) => template.id === chosenId) ?? openOn, choose: setChosenId }
+  return { template: templates.find((template) => template.id === chosenId) ?? null, choose: setChosenId }
 }
 
-type BodyProps = { header: ReactNode; chosen: CatalogueTemplate; choose(id: string): void } & Omit<Props, 'openOn' | 'onClose' | 'templates' | 'browse'> & {
+type BodyProps = { header: ReactNode; chosen: CatalogueTemplate; choose(id: string): void } & Pick<Props, 'onPick' | 'sampleOf' | 'thumbOf' | 'openPath'> & {
   view: ReturnType<typeof browseView>
 }
 
 // Mounted only while the picker is open, so every opening starts on All with an empty search.
-function PickerBody({ header, chosen, choose, view, onPick, sampleOf, thumbOf }: BodyProps) {
+function PickerBody({ header, chosen, choose, view, onPick, sampleOf, thumbOf, openPath }: BodyProps) {
   const t = useTranslations('home.generator')
   const [searching, setSearching] = useState(false)
   return (
@@ -57,9 +59,9 @@ function PickerBody({ header, chosen, choose, view, onPick, sampleOf, thumbOf }:
       <PickerSample selected={chosen} sampleOf={sampleOf} />
       <div className="mk-pk-side">
         {header}
-        <PickerBrowser view={view} selected={chosen} onSelect={choose} thumbOf={thumbOf} onSearching={setSearching} />
+        <PickerBrowser view={view} selected={chosen} onSelect={choose} thumbOf={thumbOf} onSearching={setSearching} startPath={openPath} />
         <div className="mk-pk-go">
-          <button type="button" className="mk-cta" onClick={() => onPick(chosen.id)}>
+          <button type="button" className="mk-cta" onClick={() => onPick(chosen)}>
             {t('pickTemplate', { name: chosen.name })}
           </button>
         </div>
@@ -68,21 +70,39 @@ function PickerBody({ header, chosen, choose, view, onPick, sampleOf, thumbOf }:
   )
 }
 
+function PickerPending({ header, failed, onRetry }: Pick<Props, 'failed' | 'onRetry'> & { header: ReactNode }) {
+  const t = useTranslations('home.generator')
+  const retry = useTranslations('pageError')('retry')
+  return (
+    <div className="mk-pk-side">
+      {header}
+      <p className="mk-pk-none" role={failed ? 'alert' : 'status'}>{t(failed ? 'pickerLoadFailed' : 'pickerLoading')}</p>
+      {failed ? <button type="button" className="mk-ghost-pill" onClick={onRetry}>{retry}</button> : null}
+    </div>
+  )
+}
+
+const EMPTY: readonly CatalogueTemplate[] = []
+
 // The template picker (v3-b comp `.picker`): from 768 a centred 1040px dialog, sample on the left
 // and, on the right, search, category chips and the list (series as one row each, Owner
 // 2026-11-13); on phones a bottom drawer. One primary, "Pick ‹name›"; choosing it sets the
 // generator's template, nothing else (DESIGN §6.9 item 2: no confirm step).
-export function TemplatePicker({ openOn, templates, browse, onClose, onPick, sampleOf, thumbOf }: Props) {
+export function TemplatePicker({ openOn, openPath, catalogue, failed, onRetry, onClose, onPick, sampleOf, thumbOf }: Props) {
   const desktop = useMediaQuery('(min-width: 768px)')
   const t = useTranslations('home.generator')
   const close = useTranslations('app.sheet')('close')
   const zh = useLocale() === 'zh'
-  const view = useMemo(() => browseView(browse, templates, zh), [browse, templates, zh])
-  const selected = useChosen(openOn, templates)
-  if (!selected.template) return null
-  const chosen = selected.template
+  const templates = catalogue?.templates ?? EMPTY
+  const browse = catalogue?.browse ?? null
+  const ready = catalogue !== null
+  const view = useMemo(() => openOn && ready ? browseView(browse, templates, zh) : null, [openOn, ready, browse, templates, zh])
+  const { template: chosen, choose } = useChosen(openOn, templates)
+  if (openOn === null || (ready && chosen === null)) return null
   const onOpenChange = (open: boolean) => (open ? undefined : onClose())
-  const body = (header: ReactNode) => <PickerBody header={header} chosen={chosen} choose={selected.choose} view={view} onPick={onPick} sampleOf={sampleOf} thumbOf={thumbOf} />
+  const body = (header: ReactNode) => view && chosen
+    ? <PickerBody header={header} chosen={chosen} choose={choose} view={view} onPick={onPick} sampleOf={sampleOf} thumbOf={thumbOf} openPath={openPath} />
+    : <PickerPending header={header} failed={failed} onRetry={onRetry} />
   if (desktop) {
     return (
       <DialogPrimitive.Root open onOpenChange={onOpenChange}>

@@ -85,6 +85,29 @@ describe('the food flows (§5.1c)', () => {
 
 })
 
+// The user's note (ARCHITECTURE §4 inputs.note; framed by #943's preamble where that has merged)
+// rides on the 优化器皿 flow exactly as on the ordinary call: the flow's own text first and whole,
+// the note last and verbatim, the library vessel still attached. Whether the note is about the
+// vessel or not, the flow's instructions are never removed from the prompt.
+describe('the tableware flow and the user note', () => {
+  for (const note of ['换个配套的碗', '保留我的盆', '灯光暖一点']) {
+    it(`keeps the flow text and the vessel, with the note last (${note})`, async () => {
+      const { deps, base, photo, cover, vesselBytes } = await setup()
+      const out = await runFoodFlow(deps, plan(false, true), base, [photo], { ...inputs, note })
+      expect(out.choice).toEqual({ kind: 'dishware' })
+      expect(out.call.prompt.startsWith('DISHWARE 2+1\n\n')).toBe(true)
+      expect(out.call.prompt.endsWith(note)).toBe(true)
+      expect(out.call.prompt.indexOf(note)).toBeGreaterThan(out.call.prompt.indexOf('DISHWARE 2+1'))
+      expect(out.call.images.map((image) => image.bytes)).toEqual([photo.bytes, vesselBytes, cover.bytes])
+    })
+  }
+
+  it('without a note the prompt is the flow text alone', async () => {
+    const { deps, base, photo } = await setup()
+    expect((await runFoodFlow(deps, plan(false, true), base, [photo], inputs)).call.prompt).toBe('DISHWARE 2+1')
+  })
+})
+
 describe('the food flows fall back (§5.1c)', () => {
   it('hands the reader the dish name the user typed, cleaned, and nothing when the field is empty', async () => {
     const { deps, base, photo, read } = await setup()

@@ -7,6 +7,7 @@ import { date, money } from './format'
 import { CopyLink } from '../copy-link'
 import type { Account, Query } from './models'
 import { readMembers, readPayouts, readReferrals } from './repository'
+import { FeeLines } from './payout-fee-lines'
 import { More, StatusPill, Table } from './shared-ui'
 
 type Props = { user: string; query: Query }
@@ -23,6 +24,11 @@ export async function ReferralList({ user, query }: Props) {
         headers={['customer', 'bound', 'purchases', 'totalCommission'].map((k) => t(k))}
         empty={t('empty')}
         rows={page.items.map((r) => [r.mask, date(locale, r.date), r.count, money(locale, r.amount)])}
+        summaries={page.items.map((r) => ({
+          title: r.mask,
+          meta: `${date(locale, r.date)} · ${t('purchases')} ${r.count}`,
+          value: money(locale, r.amount),
+        }))}
       />
       <More query={query} next={page.nextCursor} />
     </section>
@@ -38,16 +44,30 @@ export async function PayoutList({ user, query }: Props) {
     <section className="af-section">
       <h2>{t('nav.payouts')}</h2>
       <Table
-        headers={['period', 'statementAmount', 'amountPaid', 'state', 'paidDate'].map((k) => t(k))}
+        headers={['period', 'statementAmount', 'amountPaid', 'feeAmount', 'netAmount', 'state', 'paidDate'].map((k) => t(k))}
         empty={t('empty')}
-        rows={page.items.map((r) => [
-          date(locale, r.period),
-          money(locale, r.amount),
-          r.status === 'paid' ? money(locale, r.paid_amount ?? r.amount) : '—',
-          <StatusPill key="s" status={r.status} t={t} />,
-          r.paid_at ? date(locale, r.paid_at) : '—',
-        ])}
+        rows={page.items.map((r) => {
+          const usd = (cents: number) => money(locale, cents)
+          // Due and held statements show the fee estimate on today's payable amount.
+          const shown = (cents: number) => (r.status === 'paid' ? usd(cents) : t('estimated', { amount: usd(cents) }))
+          return [
+            date(locale, r.period),
+            usd(r.amount),
+            r.status === 'paid' ? usd(r.paid_amount ?? r.amount) : '—',
+            r.fees ? shown(r.fees.fees) : '—',
+            r.fees ? shown(r.fees.net) : '—',
+            <StatusPill key="s" status={r.status} t={t} />,
+            r.paid_at ? date(locale, r.paid_at) : '—',
+          ]
+        })}
+        summaries={page.items.map((r) => ({
+          title: date(locale, r.period),
+          meta: r.paid_at ? `${t('paidDate')} ${date(locale, r.paid_at)}` : undefined,
+          value: money(locale, r.status === 'paid' ? (r.paid_amount ?? r.amount) : r.amount),
+          badge: <StatusPill status={r.status} t={t} />,
+        }))}
       />
+      <FeeLines items={page.items} locale={locale} t={t} />
       <More query={query} next={page.nextCursor} />
     </section>
   )

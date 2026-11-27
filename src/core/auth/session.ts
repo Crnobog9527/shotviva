@@ -54,9 +54,12 @@ export { isAuthUnavailable }
 
 // Unverified email accounts never get into the (app) group (T1 acceptance). `next` is the
 // logical path; both it and the login page follow the current language.
-export async function requireUser(next?: string): Promise<SessionUser> {
+export async function requireUser(next?: string | (() => Promise<string>)): Promise<SessionUser> {
   const user = await getSessionUser()
-  if (!user) redirect(await localized(loginPath(next ? await localized(next) : undefined)))
+  if (!user) {
+    const target = typeof next === 'function' ? await next() : next
+    redirect(await localized(loginPath(target ? await localized(target) : undefined)))
+  }
   if (!user.verified) redirect(await localized('/login?error=unverified'))
   return user
 }

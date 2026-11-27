@@ -29,6 +29,16 @@ const reserve = (id: string, cost: number | null, resolution: string, source = '
     $1,$2,'image',$3,$4,$5,jsonb_build_object('resolution',$6::text),$7,null,null,$8)`,
     [job,user,id,cost,source,resolution,routedProvider,parent])
 
+// A cheap Seedream line (ark) bound to edit, its route tag returned.
+async function seedreamLine() {
+  const ark = randomUUID()
+  const caps = { resolutions: ['1k','2k','4k'], aspectRatios: ['1:1','4:5'], originalRatio: true, minReferences: 0, maxReferences: 10, fetchedAt: '2026-11-01T00:00:00Z' }
+  await db.query(`insert into public.ai_providers(id,label,adapter,model,resolutions,capabilities,estimated_image_costs)
+    values($1,'Ark Seedream','ark_images','doubao-seedream-test','{1k,2k,4k}',$2,'{"1k":0.01,"2k":0.01,"4k":0.02}')`,[ark,caps])
+  await db.query("update public.template_prompts set provider_id=$1 where template_id='edit'",[ark])
+  return ark + '/doubao-seedream-test'
+}
+
 async function refuses(work: () => Promise<unknown>, message: string) {
   await db.query('savepoint rejected')
   await expect(work()).rejects.toThrow(message)
@@ -64,7 +74,8 @@ beforeEach(async () => {
   await db.query("update public.templates set is_active=true where id in ('edit','freeform')")
   await sample('promo-poster')
   await sample('bright-listing')
-  user = await createUser(db,{ credits: 1200 })
+  // 1996: 1K is paid from free credits only, 2K / 4K from paid credits only.
+  user = await createUser(db,{ credits: 1200, freeCredits: 1200 })
   await db.query("update public.profiles set role='admin' where id=$1",[user])
 }, 20000)
 afterEach(async () => { await db.query('rollback'); await db.end() })
@@ -89,17 +100,64 @@ describe('activated template prices', () => {
     expect(parent).toMatchObject({ id,credits_cost:120,credit_pool:'paid',version:'v2' })
     expect((await reserve('promo-poster',2,'2k','web',null,id)).rows[0].id).toBe(id)
     await db.query("select public.confirm_job($1,'output',null,null)",[id])
-    expect((await reserve('edit',58,'4k','web',id)).rows[0].credits_cost).toBe(58)
+    // 作品编辑 sells 2K at 15 on Seedream (Owner 2026-11-23, 1997): its tariff no longer waives the
+    // GPT floor, so it is bound to a cheap Seedream line here as in production.
+    const ark = await seedreamLine()
+    expect((await reserve('edit',15,'2k','web',id,randomUUID(),ark)).rows[0]).toMatchObject({ credits_cost:15, credit_pool:'paid' })
     const partner = (await reserve('freeform',45,'1k','graylum')).rows[0]
     expect(partner.credits_cost).toBe(45)
     await db.query("select public.refund_job($1,'test')",[partner.id])
     await db.query("select public.refund_job($1,'test')",[partner.id])
-    expect((await db.query('select credits from public.profiles where id=$1',[user])).rows[0].credits).toBe(1020)
+    // 1200 − 120 (2K) − 15 (edit 2K, paid first); the first 1K job was paid from free credits.
+    expect((await db.query('select credits,free_credits from public.profiles where id=$1',[user])).rows[0]).toEqual({ credits:1065, free_credits:1198 })
     await refuses(() => db.query('select admin.rollback_template_price_catalog_v2()'),'TEMPLATE_CATALOG_HAS_NEW_JOBS')
+  })
+
+  // 1997: edit's tariff is 15 / 15. A plain write is held to the tariff only; the route floor is
+  // checked on admin saves, sale and reserve (route-cost-pool.test.ts covers GPT vs Seedream).
+  it('holds edit to its 15 / 15 tariff and refuses anything under it', async () => {
+    await activate()
+    const tariffs = (await db.query('select admin.template_catalog_minimums() m')).rows[0].m
+    expect(tariffs.edit.costs).toEqual({ '1k': 15, '2k': 15, '4k': 58 })
+    // Only the edit row moved: the other tariffs are the ones the cutover shipped with.
+    expect(tariffs.freeform.costs).toEqual(costs)
+    expect((await db.query("select credits_cost c from public.templates where id='edit'")).rows[0].c).toEqual(tariffs.edit.costs)
+    const save = (one: number, two: number) => db.query('update public.templates set credits_cost=$1 where id=$2',
+      [{ '1k': one, '2k': two, '4k': 98 }, 'edit'])
+    await save(15, 15)
+    await refuses(() => save(14, 15), 'MODEL_CREDIT_FLOOR')
+    await refuses(() => save(15, 14), 'MODEL_CREDIT_FLOOR')
+    await refuses(() => save(14, 14), 'MODEL_CREDIT_FLOOR')
+    expect((await db.query("select credits_cost c from public.templates where id='edit'")).rows[0].c).toEqual({ '1k': 15, '2k': 15, '4k': 98 })
+  })
+
+  it('saves white-background at its approved 20 / 20 / 35 on the batch route and refuses one credit less', async () => {
+    await sample('white-background')
+    await activate()
+    const tariffs = (await db.query('select admin.template_catalog_minimums() m')).rows[0].m
+    expect(tariffs['white-background'].costs).toEqual({ '1k': 20, '2k': 20, '4k': 35 })
+    expect(tariffs.edit.costs).toEqual({ '1k': 15, '2k': 15, '4k': 58 })
+    expect(tariffs.freeform.costs).toEqual(costs)
+    const others = (await db.query("select id,costs from admin.template_tariffs_v2 where id<>all('{white-background,edit,promo-poster,pet-studio,freeform}')")).rows
+    expect(others.length).toBe(4)
+    for (const row of others) expect(row.costs).toEqual({ '1k': 74, '2k': 150, '4k': 225 })
+    const save = (one: number, two: number, four: number) => db.query('update public.templates set credits_cost=$1 where id=$2',
+      [{ '1k': one, '2k': two, '4k': four }, 'white-background'])
+    const sellable = () => db.query("select admin.assert_template_sale_floor(t) from public.templates t where id='white-background'")
+    await sellable()
+    await save(20, 20, 35)
+    await sellable()
+    await refuses(() => save(19, 20, 35), 'MODEL_CREDIT_FLOOR')
+    await refuses(() => save(20, 19, 35), 'MODEL_CREDIT_FLOOR')
+    await refuses(() => save(20, 20, 34), 'MODEL_CREDIT_FLOOR')
   })
 
   it('retains approved live tariffs and refuses an old-price non-catalogue publication at commit', async () => {
     await activate()
+    // Activation put edit at its tariff (2K 15) on the only active line here, GPT, where the
+    // tariff no longer waives the floor (1997); in production edit is bound to Seedream. Edit is
+    // not what this test is about, so it is taken off sale before the floor checks run now.
+    await db.query("update public.templates set is_active=false where id='edit'")
     await db.query('set constraints template_publish_floor, prompt_publish_floor immediate')
     await db.query(`insert into public.templates(id,name,category,credits_cost) values
       ('t98-old-room','Old room','pets','{"1k":2,"2k":4,"4k":6}')`)

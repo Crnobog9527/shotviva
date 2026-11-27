@@ -7,6 +7,7 @@ import { publishedOffers, historicalProducts, waffoOffers } from '@/core/billing
 import { FAILED_READ_LIFE } from '@/core/cache-life'
 import { serverEnv } from '@/core/env'
 import { logger } from '@/core/logger'
+import { settle, unwrap, type Settled } from '@/core/shared-read'
 import type { SiteProduct } from '@/core/config'
 import { publicEnv } from '@/core/public-env'
 import { site } from '../site.config'
@@ -23,6 +24,9 @@ export function contractProducts(db = createAdminSupabase()) {
 // The last catalog this server instance read successfully. A failed read serves it (or, on a
 // cold instance, an empty list) for FAILED_READ_LIFE only, so a database blip never caches
 // "coming soon" and empty JSON-LD offers for hours; checkout always re-reads (currentProducts).
+// /admin/products expires it on every save (updateTag).
+export const BILLING_PRODUCTS_TAG = 'billing-products'
+
 let lastGood: readonly SiteProduct[] | undefined
 const RETRY_DELAYS_MS = [200, 800]
 
@@ -40,9 +44,23 @@ async function readWithRetry(): Promise<readonly SiteProduct[]> {
   return readDisplayCatalog()
 }
 
+// The display catalogue, one copy for the region (the home page, pricing, the app's paywall and
+// /account all show it; under a plain 'use cache' each new server instance read the offers and the
+// member rates again: ~1.6k reads a day each on the test database, 2026-11-27). Display only:
+// checkout and the webhooks never read it (currentProducts above). A read that failed after its
+// retries is kept a minute only.
+async function sharedDisplayCatalog(): Promise<Settled<readonly SiteProduct[]>> {
+  'use cache: remote'
+  cacheTag(BILLING_PRODUCTS_TAG)
+  const result = await settle(readWithRetry)
+  if (result.ok) cacheLife('hours')
+  else cacheLife(FAILED_READ_LIFE)
+  return result
+}
+
 export async function displayProducts(): Promise<readonly SiteProduct[]> {
   'use cache'
-  cacheTag('billing-products')
+  cacheTag(BILLING_PRODUCTS_TAG)
   // The repository builds and audits static HTML without a configured database in CI.
   // Only that local/offline environment may use the fixed phase-one baseline.
   if (!serverEnv().SUPABASE_SERVICE_ROLE_KEY && publicEnv.NEXT_PUBLIC_SUPABASE_URL === 'http://127.0.0.1:54321') {
@@ -50,7 +68,7 @@ export async function displayProducts(): Promise<readonly SiteProduct[]> {
     return site.billing.products
   }
   try {
-    const products = await readWithRetry()
+    const products = unwrap(await sharedDisplayCatalog())
     lastGood = products
     cacheLife('hours')
     return products

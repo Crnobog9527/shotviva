@@ -3,21 +3,27 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { invite, seededRewards } from '../../../tests/t94-config'
 
-import { consumeSignupCode } from './signup-code'
+import { consumeSignupCode, prepareSignupCode, submittedSignupCode } from './signup-code'
 
 const mocks = vi.hoisted(() => ({
-  jar: { get: vi.fn(), set: vi.fn(), delete: vi.fn() }, redeem: vi.fn(),
+  jar: { get: vi.fn(), set: vi.fn(), delete: vi.fn() }, redeem: vi.fn(), rpc: vi.fn(),
 }))
 vi.mock('next/headers', () => ({ cookies: async () => mocks.jar }))
 vi.mock('../codes/server', () => ({ redeemCode: mocks.redeem }))
 vi.mock('../logger', () => ({ logger: { warn: vi.fn() } }))
-const run = (first = true) => consumeSignupCode({} as SupabaseClient, 'user', first, invite, 'zh')
-beforeEach(() => { vi.resetAllMocks(); mocks.jar.get.mockReturnValue({ value: 'FRIEND' }) })
+const admin = { rpc: mocks.rpc } as unknown as SupabaseClient
+const run = (first = true, o: { fresh?: boolean; useStored?: boolean } = {}) =>
+  consumeSignupCode(admin, 'user', { first, fresh: o.fresh ?? first, useStored: o.useStored ?? true }, invite, 'zh')
+beforeEach(() => {
+  vi.resetAllMocks()
+  mocks.jar.get.mockReturnValue({ value: 'FRIEND' })
+  mocks.rpc.mockResolvedValue({ data: null, error: null })
+})
 
 it('passes configured benefits and displays the actual grant on successful registration', async () => {
   mocks.redeem.mockResolvedValue({ status: 'ok', kind: 'invite', credits: seededRewards.inviteeCredits, pool: 'free', percent: null })
   expect(await run()).toBe('invite')
-  expect(mocks.redeem).toHaveBeenCalledWith({}, {userId:'user', code:'FRIEND', context:'signup', invite, locale:'zh'})
+  expect(mocks.redeem).toHaveBeenCalledWith(admin, {userId:'user', code:'FRIEND', context:'signup', invite, locale:'zh'})
   expect(mocks.jar.set).toHaveBeenCalledWith('sv_code_result',JSON.stringify({credits:seededRewards.inviteeCredits,pool:'free',percent:null}),expect.objectContaining({secure:true}))
 })
 
@@ -32,4 +38,71 @@ it('never applies signup benefits on a returning-account sign-in', async () => {
   expect(await run(false)).toBeNull()
   expect(mocks.redeem).not.toHaveBeenCalled()
   expect(mocks.jar.delete).toHaveBeenCalledWith('sv_code')
+})
+
+// 2030 (review on #977): the code stored at email sign-up, for a confirmation opened on another device.
+it('uses the stored code when this browser has none, only on the signup confirmation click', async () => {
+  mocks.jar.get.mockReturnValue(undefined)
+  mocks.rpc.mockResolvedValue({ data: 'FRIEND02', error: null })
+  mocks.redeem.mockResolvedValue({ status: 'ok', kind: 'invite', credits: 6, pool: 'free', percent: null })
+  expect(await run()).toBe('invite')
+  expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('signup_code_take', { p_user: 'user' })
+  expect(mocks.redeem).toHaveBeenCalledWith(admin, expect.objectContaining({ code: 'FRIEND02', context: 'signup' }))
+
+  mocks.redeem.mockClear()
+  expect(await run(true, { useStored: false })).toBeNull()
+  expect(mocks.redeem).not.toHaveBeenCalled()
+})
+
+it('prefers this browser\'s code over the stored one, and takes the stored one even when it cannot apply', async () => {
+  mocks.rpc.mockResolvedValue({ data: 'FRIEND02', error: null })
+  mocks.redeem.mockResolvedValue({ status: 'ok', kind: 'invite', credits: 6, pool: 'free', percent: null })
+  await run()
+  expect(mocks.redeem).toHaveBeenCalledWith(admin, expect.objectContaining({ code: 'FRIEND' }))
+  mocks.rpc.mockClear(); mocks.redeem.mockClear()
+  // A staff sign-up (first, not fresh) takes and drops it.
+  expect(await run(true, { fresh: false })).toBeNull()
+  expect(mocks.rpc).toHaveBeenCalledWith('signup_code_take', { p_user: 'user' })
+  expect(mocks.redeem).not.toHaveBeenCalled()
+  // A returning sign-in neither takes nor redeems.
+  mocks.rpc.mockClear()
+  await run(false)
+  expect(mocks.rpc).not.toHaveBeenCalled()
+})
+
+it('ignores a failed take and still applies the browser\'s code', async () => {
+  mocks.rpc.mockRejectedValue(new Error('down'))
+  mocks.redeem.mockResolvedValue({ status: 'ok', kind: 'invite', credits: 6, pool: 'free', percent: null })
+  expect(await run()).toBe('invite')
+})
+
+// 2031: the code is resolved and staged before the gift, then redeemed after it.
+it('prepares the code before the gift (staging it) and redeems the prepared one, clearing the stage', async () => {
+  mocks.rpc.mockResolvedValue({ data: null, error: null })
+  const prepared = await prepareSignupCode(admin, 'user', true)
+  expect(prepared).toBe('FRIEND')
+  expect(mocks.rpc).toHaveBeenCalledWith('signup_code_take', { p_user: 'user' })
+  expect(mocks.rpc).toHaveBeenCalledWith('signup_code_stage', { p_user: 'user', p_code: 'FRIEND' })
+  expect(mocks.jar.delete).toHaveBeenCalledWith('sv_code')
+
+  mocks.rpc.mockClear()
+  mocks.redeem.mockResolvedValue({ status: 'ok', kind: 'invite', credits: 6, pool: 'free', percent: null })
+  expect(await consumeSignupCode(admin, 'user', { first: true, fresh: true, useStored: true, prepared }, invite, 'zh')).toBe('invite')
+  expect(mocks.redeem).toHaveBeenCalledWith(admin, expect.objectContaining({ code: 'FRIEND', context: 'signup' }))
+  expect(mocks.rpc.mock.calls).toEqual([['signup_code_stage', { p_user: 'user', p_code: null }]])
+})
+
+it('does not redeem a prepared code when the sign-in turned out not fresh, but still clears its stage', async () => {
+  expect(await consumeSignupCode(admin, 'user', { first: true, fresh: false, useStored: true, prepared: 'FRIEND' }, invite, 'zh')).toBeNull()
+  expect(mocks.redeem).not.toHaveBeenCalled()
+  expect(mocks.rpc).toHaveBeenCalledWith('signup_code_stage', { p_user: 'user', p_code: null })
+})
+
+it('reads the submitted code from the form field, else the ?code= cookie', async () => {
+  const form = new FormData()
+  form.set('signupCode', 'staff001')
+  expect(await submittedSignupCode(form)).toBe('STAFF001')
+  form.set('signupCode', '')
+  expect(await submittedSignupCode(form)).toBeNull()
+  expect(await submittedSignupCode(new FormData())).toBe('FRIEND')
 })

@@ -8,7 +8,11 @@ import { absoluteUrl } from './site-url'
 // `path` is the logical path; `locale` (default English) picks the address ("/" in zh is /zh).
 export type LlmsPage = { path: string; title: string; description: string; module?: ModuleId; locale?: Locale }
 
-export function llmsTxt(site: SiteConfig, summary: string, pages: readonly LlmsPage[]): string {
+// A blog post (ARCHITECTURE §12.6): never in the site's path lists, so it is listed here as it is,
+// under its own heading, once published.
+export type LlmsPost = { path: string; title: string; description: string; locale: Locale }
+
+export function llmsTxt(site: SiteConfig, summary: string, pages: readonly LlmsPage[], posts: readonly LlmsPost[] = []): string {
   const lines = pages
     .filter((page) => isIndexableIn(site, page.locale ?? DEFAULT_LOCALE, page.path, pages))
     .map((page) => `- [${page.title}](${absoluteUrl(site, localizePath(page.path, page.locale ?? DEFAULT_LOCALE))}): ${page.description}`)
@@ -21,6 +25,14 @@ export function llmsTxt(site: SiteConfig, summary: string, pages: readonly LlmsP
     '',
     ...lines,
     '',
+    ...(posts.length > 0
+      ? [
+          '## Blog',
+          '',
+          ...posts.map((post) => `- [${post.title}](${absoluteUrl(site, localizePath(post.path, post.locale))}): ${post.description}`),
+          '',
+        ]
+      : []),
   ].join('\n')
 }
 

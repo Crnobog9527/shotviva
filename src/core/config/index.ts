@@ -5,6 +5,7 @@ export type {
   MembershipTier,
   ModuleId,
   PackProduct,
+  EnterpriseContact,
   PartnerSiteConfig,
   PaymentChannel,
   PostalAddress,

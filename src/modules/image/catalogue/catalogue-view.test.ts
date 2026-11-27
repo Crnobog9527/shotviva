@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import type { CatalogueIndex, CategoryNode } from '@/core/templates'
 
 import type { CatalogueTemplate } from './catalogue-template'
-import { buildCatalogueView, findSeries } from './catalogue-view'
+import { featuredVideo } from './catalogue-filter'
+import { buildCatalogueView, findSeries, type GridEntry } from './catalogue-view'
 
 function category(key: string, path: string[], children: CategoryNode[] = []): CategoryNode {
   const intro = key === 'food' ? { introEn: 'Dishes', introZh: '菜品' } : { introEn: null, introZh: null }
@@ -63,6 +64,22 @@ describe('Create grid entries (T102)', () => {
       { slug: 'pets', key: 'pets', name: 'pets en', alias: 'pets 中', intro: null, children: [] },
     ])
     expect(buildCatalogueView(index, templates, true).filters[0]).toMatchObject({ name: 'food 中', intro: '菜品' })
+  })
+
+  it('keeps a category with only a series card and no individual member cards', () => {
+    const onlySeries = { ...index, entries: [index.entries[0]] }
+    const result = buildCatalogueView(onlySeries, [template('m1'), template('m2')], true)
+    expect(result.entries).toHaveLength(1)
+    expect(result.entries[0]).toMatchObject({ type: 'series', series: { members: [{ id: 'm2' }, { id: 'm1' }] } })
+    expect(result.filters[0].children[0].slug).toBe('dark')
+  })
+
+  it('features the first video template, a series member included', () => {
+    const video = template('v1', 'food', { cover: { type: 'video', before: 'b', after: 'a', motion: 'm.mp4', poster: 'p.webp' } } as Partial<CatalogueTemplate>)
+    const still: GridEntry = { type: 'template', template: template('t1'), path: ['food'] }
+    const inSeries: GridEntry = { type: 'series', path: ['food'], series: { id: 's', slug: 's', name: 'S', description: null, cover: null, categoryName: 'food', members: [template('m1'), video] } }
+    expect(featuredVideo([still, inSeries])?.id).toBe('v1')
+    expect(featuredVideo([still])).toBeNull()
   })
 
   it('falls back to the flat list by root category when the index read failed', () => {

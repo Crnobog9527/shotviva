@@ -29,9 +29,9 @@ describe('the multi-template grid', () => {
   it('prices each cell by its template and leaves out removed cells', () => {
     const cells = matrixCells([poster, white], photos.map(({ photo }) => photo), values({ removed: [cellKey('white', 'p2')] }))
     expect(cells.map((cell) => [cell.key, cell.credits, cell.removed])).toEqual([
-      ['poster|p1', 3, false], ['poster|p2', 3, false], ['white|p1', 2, false], ['white|p2', 2, true],
+      ['poster|p1', 5, false], ['poster|p2', 5, false], ['white|p1', 4, false], ['white|p2', 4, true],
     ])
-    expect(matrixTotal(cells)).toBe(8)
+    expect(matrixTotal(cells)).toBe(14)
     expect(totalsByResolution(cells)).toEqual({ '1k': 8, '2k': 14, '4k': 22 })
   })
 
@@ -57,9 +57,11 @@ describe('the multi-template grid', () => {
     expect(MATRIX_MAX_CELLS).toBe(30)
   })
 
-  it('keeps one size and resolution the templates share', () => {
+  // A batch is paid credits only and 1K free credits only (1996): it starts on 2K and never offers 1K.
+  it('keeps one size and resolution the templates share, never 1K', () => {
     const narrow = template('narrow', { imageOptions: { resolutions: ['1k', '2k'], aspectRatios: ['1:1', '9:16'], originalRatio: false } })
-    expect(sharedOptions([poster, narrow])).toEqual({ resolutions: ['1k', '2k'], aspectRatios: ['1:1'], originalRatio: false })
+    expect(sharedOptions([poster, narrow])).toEqual({ resolutions: ['2k'], aspectRatios: ['1:1'], originalRatio: false })
+    expect(EMPTY_MATRIX.resolution).toBe('2k')
   })
 
   it('adds up to five templates once each, and a removed template takes its settings along', () => {
@@ -84,14 +86,14 @@ describe('the multi-template request', () => {
     const start = matrixStartInputs(matrixCells([poster, white], photos.map(({ photo }) => photo), v), v, photos)
     expect(start?.names).toEqual(['IMG_1.jpg', 'photo-2', 'IMG_1.jpg'])
     expect(start?.inputs.map((input) => [input.templateId, input.inputKey, input.credits, input.aspect])).toEqual([
-      ['poster', 'in/p1', 3, 'original'], ['poster', 'in/p2', 3, 'original'], ['white', 'in/p1', 2, 'original'],
+      ['poster', 'in/p1', 5, 'original'], ['poster', 'in/p2', 5, 'original'], ['white', 'in/p1', 4, 'original'],
     ])
-    expect(start?.inputs[0]?.body).toMatchObject({ template_id: 'poster', expected_credits: 3, inputs: { copy: { headline: 'Sale' }, resolution: '1k', aspect_ratio: 'original', toggles: { plate: true } } })
+    expect(start?.inputs[0]?.body).toMatchObject({ template_id: 'poster', expected_credits: 5, inputs: { copy: { headline: 'Sale' }, resolution: '2k', aspect_ratio: 'original', toggles: { plate: true } } })
     expect(start?.inputs[2]?.body).not.toHaveProperty('inputs.toggles')
   })
 
   it('uses the first photo\'s nearest shared size when the templates cannot keep each photo\'s shape', () => {
-    const fixed = template('fixed', { imageOptions: { resolutions: ['1k'], aspectRatios: ['1:1', '4:5', '16:9'], originalRatio: false } })
+    const fixed = template('fixed', { imageOptions: { resolutions: ['2k'], aspectRatios: ['1:1', '4:5', '16:9'], originalRatio: false } })
     const v: MatrixValues = { ...EMPTY_MATRIX, templateIds: ['fixed'] }
     const start = matrixStartInputs(matrixCells([fixed], photos.map(({ photo }) => photo), v), v, photos)
     expect(start?.inputs.map((input) => input.aspect)).toEqual(['4:5', '4:5'])

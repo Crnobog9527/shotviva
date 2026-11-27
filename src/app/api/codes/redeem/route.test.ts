@@ -5,16 +5,19 @@ import { AppError } from '@/core/errors'
 import { appOrigin } from '@/core/site-url'
 import { POST } from './route'
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), redeem: vi.fn(), rpc: vi.fn() }))
+const mocks = vi.hoisted(() => ({ session: vi.fn(), redeem: vi.fn(), rpc: vi.fn(), bind: vi.fn(), member: vi.fn(), staffCode: vi.fn() }))
 vi.mock('@/core/auth/session', () => ({ getSessionUser: mocks.session }))
 vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc }) }))
 vi.mock('@/core/codes/server', () => ({ redeemCode: mocks.redeem }))
+vi.mock('@/core/affiliate/referral', () => ({ bindReferral: mocks.bind }))
+vi.mock('@/core/billing/org-member-guard', () => ({ assertNotOrgMember: mocks.member }))
+vi.mock('@/core/codes/staff-guard', () => ({ staffNewUserCode: mocks.staffCode }))
 
 const user = { id: 'u1', role: 'user', locale: 'zh', verified: true, banned: false }
 
-function post(body: string, origin = appOrigin) {
+function post(body: string, origin = appOrigin, cookie?: string) {
   return POST(new NextRequest(appOrigin + '/api/codes/redeem', {
-    method: 'POST', headers: { origin, 'content-type': 'application/json' }, body,
+    method: 'POST', headers: { origin, 'content-type': 'application/json', ...(cookie && { cookie }) }, body,
   }))
 }
 
@@ -65,6 +68,7 @@ it('passes the authenticated user, normalized code, context and explicit replace
 it.each([
   ['not_found', 'CODE_NOT_FOUND', 404], ['expired', 'CODE_EXPIRED', 410], ['full', 'CODE_FULL', 409],
   ['used', 'CODE_USED', 409], ['own', 'CODE_OWN', 422], ['new_users_only', 'CODE_NEW_USERS_ONLY', 403],
+  ['signup_only', 'CODE_INVITE_SIGNUP_ONLY', 403],
   ['already_invited', 'CODE_ALREADY_INVITED', 409], ['checkout_in_progress', 'CODE_CHECKOUT_IN_PROGRESS', 409],
   ['blocked_same_ip', 'CODE_INVITE_INELIGIBLE', 403], ['blocked_no_signup_grant', 'CODE_INVITE_INELIGIBLE', 403],
   ['banned', 'FORBIDDEN', 403], ['rate_limited', 'RATE_LIMITED', 429],
@@ -85,4 +89,48 @@ it('names the old discount when replacement requires confirmation', async () => 
 it('propagates service failures without a successful claim', async () => {
   mocks.redeem.mockRejectedValue(new AppError('FORBIDDEN', 'Account unavailable'))
   expect((await post('{"code":"GIFT"}')).status).toBe(403)
+})
+
+it('binds a partner link before redeeming, so an org member\'s invite never takes a partner\'s customer', async () => {
+  mocks.redeem.mockResolvedValue({ status: 'ok', kind: 'invite' })
+  await post('{"code":"INVITE"}', appOrigin, 'sv_ref=qa-partner.1700000000')
+  expect(mocks.bind).toHaveBeenCalledExactlyOnceWith(user.id, 'qa-partner.1700000000', 'first_checkout')
+  expect(mocks.bind.mock.invocationCallOrder[0]).toBeLessThan(mocks.redeem.mock.invocationCallOrder[0])
+})
+
+it('does not bind on a malformed request', async () => {
+  await post('{}', appOrigin, 'sv_ref=qa-partner.1700000000')
+  expect(mocks.bind).not.toHaveBeenCalled()
+})
+
+// Owner 2026-11-22: an active org member (owner included) redeems nothing and binds no partner.
+it('refuses an active org member before binding or redeeming anything', async () => {
+  mocks.member.mockRejectedValueOnce(new AppError('ORG_MEMBER_CHECKOUT', 'org member'))
+  const response = await post('{"code":"GIFT"}', appOrigin, 'sv_ref=qa-partner.1700000000')
+  expect(response.status).toBe(409)
+  expect(await response.json()).toMatchObject({ code: 'ORG_MEMBER_CHECKOUT' })
+  expect(mocks.member).toHaveBeenCalledWith(expect.anything(), user.id)
+  expect(mocks.bind).not.toHaveBeenCalled()
+  expect(mocks.redeem).not.toHaveBeenCalled()
+  expect(mocks.rpc).not.toHaveBeenCalled()
+})
+
+// A staff-link sign-up (1940) never gets a new-user reward, also after leaving the org.
+it('refuses a new-user code to a staff-link sign-up before binding or redeeming', async () => {
+  mocks.staffCode.mockResolvedValueOnce(true)
+  const response = await post('{"code":"WELCOME"}', appOrigin, 'sv_ref=qa-partner.1700000000')
+  expect(response.status).toBe(403)
+  expect(await response.json()).toMatchObject({ code: 'CODE_NEW_USERS_ONLY' })
+  expect(mocks.staffCode).toHaveBeenCalledWith(expect.anything(), user.id, 'WELCOME')
+  // The refusal spends an attempt of the budget, like any redemption.
+  expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('redeem_limited_code', expect.objectContaining({ p_user: user.id, p_code: null }))
+  expect(mocks.bind).not.toHaveBeenCalled()
+  expect(mocks.redeem).not.toHaveBeenCalled()
+})
+
+it('answers rate_limited, not the staff refusal, once the budget is spent (no probing past it)', async () => {
+  mocks.staffCode.mockResolvedValueOnce(true)
+  mocks.rpc.mockResolvedValueOnce({ data: { status: 'rate_limited' }, error: null })
+  const response = await post('{"code":"WELCOME"}')
+  expect(response.status).toBe(429)
 })

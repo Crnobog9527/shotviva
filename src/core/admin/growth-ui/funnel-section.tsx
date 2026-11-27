@@ -1,27 +1,47 @@
+import { AnalyticsLink } from '../analytics-ui/analytics-link'
+import { analyticsHref } from '../analytics-ui/href'
 import { MetricLabel } from '../analytics-ui/parts'
 import { n, pct } from '../analytics-ui/format'
+import type { Range } from '../analytics/range'
 import { rate } from '../analytics/values'
-import { newUserSteps, type StepCount } from '../growth/funnel'
+import { newUserSteps, type NewUserStep, type StepCount } from '../growth/funnel'
 import type { GrowthPeriod } from '../growth/stats'
 import { GROWTH_COPY as COPY } from './copy'
-import { missingText, peopleData, type PeopleState } from './people-state'
+import { missingText, peopleData, pvuvInUse, visitorsMissingText, visitorsOf, type PeopleState, type PvuvOverviewState } from './people-state'
 import { Section } from './section'
 
-type Props = { db: GrowthPeriod; state: PeopleState }
+type Props = { range: Range; db: GrowthPeriod; state: PeopleState; pvuv?: PvuvOverviewState | null }
+
+// Only PostHog saw these steps; with PostHog off they move to PVUV's own funnels on 「漏斗」.
+const POSTHOG_ONLY: ReadonlySet<NewUserStep> = new Set(['upload', 'paywall', 'checkout'])
 
 // Visitors on top, then one row per step for the people who signed up in the period; each bar is
 // that step's share of sign-ups. Returning users get two numbers of their own underneath.
-export function FunnelSection({ db, state }: Props) {
+export function FunnelSection({ range, db, state, pvuv = null }: Props) {
   const people = peopleData(state)?.current ?? null
-  const steps = newUserSteps(db, people)
+  const visitors = visitorsOf(state, pvuv)
+  const viaPvuv = pvuvInUse(state, pvuv)
+  const steps = newUserSteps(db, people).filter((step) => !(viaPvuv && POSTHOG_ONLY.has(step.key)))
   const missing = missingText(state)
   return (
     <Section title={COPY.funnel.title} desc={COPY.funnel.desc}>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-border pb-4">
-        <MetricLabel id="growth-visitors" metric={COPY.funnel.visitors} className="text-sm text-muted-foreground" />
-        <span className="text-2xl font-semibold tabular-nums">{people ? n(people.visitors) : '—'}</span>
-        {people ? <VisitorRate signups={db.signups} visitors={people.visitors} /> : <span className="text-sm text-muted-foreground">{missing}</span>}
+        <MetricLabel id="growth-visitors" metric={viaPvuv ? COPY.funnel.visitorsPvuv : COPY.funnel.visitors} className="text-sm text-muted-foreground" />
+        <span className="text-2xl font-semibold tabular-nums">{visitors ? n(visitors.current) : '—'}</span>
+        {visitors ? (
+          <VisitorRate signups={db.signups} visitors={visitors.current} />
+        ) : (
+          <span className="text-sm text-muted-foreground">{visitorsMissingText(state, pvuv)}</span>
+        )}
       </div>
+      {viaPvuv ? (
+        <p className="text-sm text-muted-foreground">
+          {COPY.funnel.pvuvSteps}
+          <AnalyticsLink href={analyticsHref({ view: 'funnel', range, dim: 'none', sort: 'views' })} className="text-primary underline-offset-4 hover:underline">
+            {COPY.funnel.pvuvStepsLink}
+          </AnalyticsLink>
+        </p>
+      ) : null}
       <ol className="grid gap-3" aria-label={COPY.funnel.title}>
         {steps.map((step, i) => (
           <StepRow key={step.key} step={step} before={closestBefore(steps, i)} signups={db.signups} missing={missing} />

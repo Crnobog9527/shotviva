@@ -29,7 +29,8 @@ afterAll(async () => {
   await db.end()
 })
 
-async function setup(behaviour: FakeBehaviour = 'ok', profile: TestProfile = { credits: 3 }) {
+// Paid credits pay 2K only (1996): the default request is a 2K photo at 2 credits.
+async function setup(behaviour: FakeBehaviour = 'ok', profile: TestProfile = { credits: 4 }) {
   const userId = await createUser(db, profile)
   const r2 = createMemoryStore()
   const inputKey = newInputKey(userId, 'image/jpeg')
@@ -43,19 +44,20 @@ async function setup(behaviour: FakeBehaviour = 'ok', profile: TestProfile = { c
     inputKey,
     copy: { dish: 'tonkotsu ramen' },
     aspectRatio: '4:5',
+    resolution: '2k',
     ...overrides,
   })
   return { userId, r2, inputKey, fake, deps, request }
 }
 
 describe('runGeneration: success', () => {
-  it('charges 1, stores outputs/{user}/{job}.png and answers without image bytes', async () => {
+  it('charges 2, stores outputs/{user}/{job}.png and answers without image bytes', async () => {
     const { userId, r2, fake, deps, request } = await setup()
     const view = await runGeneration(deps, request())
 
     expect(view).toMatchObject({
       status: 'succeeded',
-      credits_cost: 1,
+      credits_cost: 2,
       credit_pool: 'paid',
       visibility: 'private',
       file_url: `/api/files/${view.id}`,
@@ -73,7 +75,7 @@ describe('runGeneration: success', () => {
 
   it('makes a public free work from free credits, whatever the membership says', async () => {
     const { deps, request } = await setup('ok', { freeCredits: 1, paidUntil: new Date(Date.now() + DAY_MS) })
-    expect(await runGeneration(deps, request({ visibility: 'private' }))).toMatchObject({
+    expect(await runGeneration(deps, request({ visibility: 'private', resolution: '1k' }))).toMatchObject({
       credit_pool: 'free',
       visibility: 'public',
     })
@@ -102,7 +104,7 @@ describe('runGeneration: failures refund', () => {
     const failure = error as GenerationFailure
     expect(failure).toMatchObject({ code, refunded: true, jobCode })
     expect(await jobRow(db, failure.jobId)).toMatchObject({ status: 'failed', error_code: jobCode, output_key: null })
-    expect((await profileOf(db, userId)).credits).toBe(3)
+    expect((await profileOf(db, userId)).credits).toBe(4)
     expect((await ledgerOf(db, userId)).map((row) => row.kind)).toEqual(['reserve', 'refund'])
     expect([...r2.objects.keys()].some((key) => key.startsWith('outputs/'))).toBe(false)
   })
@@ -112,7 +114,7 @@ describe('runGeneration: failures refund', () => {
     r2.failPut.next = true
     const error = (await runGeneration(deps, request()).catch((e: unknown) => e)) as GenerationFailure
     expect(await jobRow(db, error.jobId)).toMatchObject({ status: 'failed', error_code: 'OUTPUT_WRITE_FAILED' })
-    expect((await profileOf(db, userId)).credits).toBe(3)
+    expect((await profileOf(db, userId)).credits).toBe(4)
   })
 
   it('does not call the provider when credits are short', async () => {
@@ -167,8 +169,8 @@ describe('runGeneration: generate event', () => {
     expect(props).toMatchObject({
       template_id: templateId,
       category: 'pets',
-      resolution: '1k',
-      credits_cost: 1,
+      resolution: '2k',
+      credits_cost: 2,
       credit_pool: 'paid',
       status: 'succeeded',
       error_code: null,

@@ -5,11 +5,13 @@ import { refresh, updateTag } from 'next/cache'
 import { runAdminQuery, saveAnnouncement, setAnnouncementActive, type ActionValue } from '@/core/admin'
 import { ANNOUNCEMENTS_CACHE_TAG } from '@/core/announcements'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 // Server actions are public endpoints, so each one re-checks the admin role itself. Every
 // change expires the banner cache at once (ARCHITECTURE §10).
 function bannerChanged() {
   updateTag(ANNOUNCEMENTS_CACHE_TAG)
+  warmPublicPagesSoon()
   refresh()
 }
 

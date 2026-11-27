@@ -1,13 +1,16 @@
 import 'server-only'
 
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 
+import { referralSlug, storeSignupReferral } from '../../affiliate/referral'
 import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { currentOrigin } from '../../request-origin'
 import { nextIn } from '../redirect-target'
 import { clientIp } from '../signup-ip'
+import { storeSignupCode, submittedSignupCode } from '../signup-code'
 import { requestSignup } from '../signup-request'
+import { staffSignupData } from '../staff-signup'
 import { createAdminSupabase } from '../supabase-admin'
 import { createSessionSupabase } from '../supabase-server'
 import { classifyAuthError } from './classify-auth-error'
@@ -20,6 +23,25 @@ import { formFields, newPasswordSchema, resendSchema, resetRequestSchema, signUp
 // no identities and sends nothing; with them off it says `user_already_exists`, treated the same.
 const REGISTERED = new Set(['user_already_exists', 'email_exists'])
 
+// A partner's link (sv_ref) onto the new account, so verifying on another device still binds it
+// (2021, ARCHITECTURE §6.5). Read from the cookie, never from the form. Every successful form
+// replaces or clears what an earlier one for the address stored; a staff link's sign-up never
+// binds, so it only clears. A registered address gets no real account back (or one the SQL
+// refuses as not just created).
+async function rememberReferral(userId: string | undefined, staff: Record<string, string>) {
+  const cookie = Object.keys(staff).length ? undefined : (await cookies()).get('sv_ref')?.value
+  await storeSignupReferral(userId, cookie)
+}
+
+// The code typed in the form, or else the one a ?code= link left in this browser, onto the new
+// account (2030): an invite code is for sign-up only, so it must survive a confirmation opened on
+// another device. An emptied field clears it (as saveSignupCode does); a staff link's sign-up
+// takes no code, so it only clears.
+async function rememberCode(userId: string | undefined, staff: Record<string, string>, form: FormData) {
+  const code = Object.keys(staff).length ? null : await submittedSignupCode(form)
+  await storeSignupCode(createAdminSupabase(), userId, code)
+}
+
 // The verification link lands on `next` (the home draft, the Graylum connect page) when it is a
 // same-site path that passes sanitizeNext, else the account page of the form's language.
 export async function signUpWithPassword(form: FormData): Promise<FormState> {
@@ -27,23 +49,35 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   if (!parsed.success) return failed('INVALID_INPUT')
   const { email, password, captchaToken, next } = parsed.data
 
-  // Our per-IP limit first; it also leaves the row the Before User Created hook needs (1350).
-  if ((await requestSignup(createAdminSupabase(), email, clientIp(await headers()))) !== 'ok') return failed('AUTH_SIGNUP_LIMITED')
+  // Our per-IP limit first; it also leaves the row the Before User Created hook needs (1350). The
+  // sv_ref slug only lets the database apply the looser org-link limit when it is one (2027).
+  const ref = referralSlug((await cookies()).get('sv_ref')?.value)
+  // 2031: an org staff member's invite code in the form gets the org link's limits too (SQL decides).
+  const code = await submittedSignupCode(form)
+  if ((await requestSignup(createAdminSupabase(), email, clientIp(await headers()), ref, code)) !== 'ok') return failed('AUTH_SIGNUP_LIMITED')
 
   const supabase = await createSessionSupabase()
   const locale = await currentLocale()
   // user_metadata.locale picks the language of every auth email this account gets
   // (ARCHITECTURE §7: `{{ if eq .Data.locale "zh" }}` in supabase/templates/*.html).
-  const { error } = await supabase.auth.signUp({
+  // A sign-up through an org's staff link remembers it (token and org), so a confirmation resent
+  // from the ordinary login page, or one after the org reset its link, is still a staff sign-up
+  // (no signup gift, 1940/1950).
+  const staff = await staffSignupData(createAdminSupabase(), next)
+  const data = { locale, ...staff }
+  const { data: created, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { captchaToken, data: { locale }, emailRedirectTo: confirmUrl(nextIn(next, locale), await currentOrigin()) },
+    options: { captchaToken, data, emailRedirectTo: confirmUrl(nextIn(next, locale), await currentOrigin()) },
   })
   if (error && !REGISTERED.has(error.code ?? '')) {
     const code = classifyAuthError(error)
     if (code === 'INTERNAL') logger.warn('sign-up failed', { code: error.code })
     return failed(code)
   }
+  const userId = created?.user?.id
+  await rememberReferral(userId, staff)
+  await rememberCode(userId, staff, form)
   return { status: 'sent' }
 }
 

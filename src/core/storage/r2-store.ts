@@ -15,8 +15,10 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 import { serverEnv } from '../env'
 import { AppError } from '../errors'
+import { createConditionalR2Json, type ConditionalJsonStore } from './conditional-json'
 import { createR2MarkerStore, MARKER_TIMEOUT_MS, type MarkerStore } from './marker-store'
 import type { ObjectStore } from './object-store'
+import { withPresizedCopies } from './presized-copies'
 
 // Cloudflare R2 through its S3 API. Written fresh for Shotviva (not copied from the
 // flux-kontext-template base) so it follows the file rules and only does what §8 needs.
@@ -133,13 +135,14 @@ export function r2Store(): ObjectStore {
 }
 
 // The public assets bucket (template covers only; ARCHITECTURE §8.3). Nothing user-owned is
-// ever written here: only core/admin/covers calls it, and only under covers/.
+// ever written here: only core/admin/covers calls it, and only under covers/. Every cover written,
+// copied or deleted through it carries its pre-sized copies along (presized-copies.ts).
 export function r2PublicStore(): ObjectStore {
   if (cachedPublic) return cachedPublic
   const credentials = r2Credentials()
   const { R2_PUBLIC_BUCKET } = serverEnv()
   if (!credentials || !R2_PUBLIC_BUCKET) throw new AppError('INTERNAL', 'R2 public assets bucket is not configured')
-  cachedPublic = createR2Store(createR2Client(credentials), R2_PUBLIC_BUCKET)
+  cachedPublic = withPresizedCopies(createR2Store(createR2Client(credentials), R2_PUBLIC_BUCKET))
   return cachedPublic
 }
 
@@ -160,6 +163,19 @@ export function r2MarkerStore(): MarkerStore | null {
         )
       : null
   return cachedMarkers
+}
+
+let cachedConditionalJson: ConditionalJsonStore | null | undefined
+
+// Coordination objects live with other operational markers in the private bucket.
+export function r2ConditionalJson(): ConditionalJsonStore | null {
+  if (cachedConditionalJson !== undefined) return cachedConditionalJson
+  const credentials = r2Credentials()
+  const { R2_BUCKET } = serverEnv()
+  cachedConditionalJson = credentials && R2_BUCKET
+    ? createConditionalR2Json(createR2Client(credentials, { maxAttempts: 1 }), R2_BUCKET)
+    : null
+  return cachedConditionalJson
 }
 
 export async function signBatchZip(archive: import('./batch-zip').Archive) {

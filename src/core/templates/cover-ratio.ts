@@ -55,6 +55,34 @@ export async function readCover(url: string | null, withFrame: boolean, deps: Co
   return { ratio, firstFrame: `data:image/avif;base64,${frame.toString('base64')}` }
 }
 
+// A hero plate's first frame from a live cover (the /zh hero, Owner 2026-11-25): made the way
+// scripts/first-frames.ts makes the static ones (288 px wide, which is still more pixels than the
+// plate has CSS pixels, so the browser counts this paint as the picture's; AVIF quality 36, about
+// 5 KB), cut to the plate's shape as the plate crops (object-fit: cover, centred), so the full
+// picture lands on the same crop.
+const PLATE_FRAME_WIDTH = 288
+
+export async function readPlateFrame(url: string, aspect: number, deps: CoverDeps = defaultDeps): Promise<string> {
+  const input = await download(url, deps)
+  const { default: sharp } = await import('sharp')
+  const frame = await sharp(input, { limitInputPixels: MAX_PIXELS }).rotate().resize({ width: PLATE_FRAME_WIDTH, height: Math.round(PLATE_FRAME_WIDTH / aspect), fit: 'cover' }).avif({ quality: 36, effort: 9 }).toBuffer()
+  return `data:image/avif;base64,${frame.toString('base64')}`
+}
+
+// Cached per cover URL (a new upload is a new URL), like coverPreview; null when it cannot be read.
+export async function plateFrame(url: string, aspect: number): Promise<string | null> {
+  'use cache'
+  try {
+    const frame = await readPlateFrame(url, aspect)
+    cacheLife('max')
+    return frame
+  } catch (error) {
+    cacheLife(CATALOGUE_LIFE)
+    logger.warn('templates.plate_frame_failed', { error })
+    return null
+  }
+}
+
 // The cached body, apart for tests.
 export async function previewOrNone(url: string | null, withFrame: boolean, deps: CoverDeps = defaultDeps): Promise<CoverPreview> {
   try {

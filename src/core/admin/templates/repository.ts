@@ -23,6 +23,7 @@ import {
 
 import type { PublishCandidate } from './publish-rules'
 import { toUpsertArgs } from './rpc-payload'
+import { retryStatementTimeout } from './timeout-retry'
 import type { AdminTemplate, SaveTemplatePayload, TemplateOrderGroup } from './types'
 
 // Every function expects a service-role client; callers must have passed requireAdmin().
@@ -34,7 +35,7 @@ type AdminRow = SaleRow & { subcategory_key: string | null; series_id: string | 
 const CATALOGUE_PAGE_SIZE = 250
 
 async function readAdminPage(client: SupabaseClient, after: string | null) {
-  const { data, error } = await selectTemplates((columns) => {
+  const { data, error } = await retryStatementTimeout(() => selectTemplates((columns) => {
     // The stable primary-key cursor keeps an in-flight reorder from skipping a template.
     const taxonomy = columns.startsWith(PRE_T75_TEMPLATE_COLUMNS + ',') ? '' : ', subcategory_key, series_id, series_sort_order'
     // Deleted templates (1401) come too, marked: the list hides them unless 已删除 is chosen.
@@ -42,7 +43,7 @@ async function readAdminPage(client: SupabaseClient, after: string | null) {
       .order('id').limit(CATALOGUE_PAGE_SIZE)
     if (after) page.gt('id', after)
     return page.returns<AdminRow[]>()
-  }, ', template_sale_approvals(enabled,unpriced_resolutions), template_prompts(body, version, model_params, provider_id, style_refs)')
+  }, ', template_sale_approvals(enabled,unpriced_resolutions), template_prompts(body, version, model_params, provider_id, style_refs)'))
   if (error || !data) throw new AppError('INTERNAL', `listAdminTemplates failed: ${error?.message ?? 'no data'}`)
   return data
 }
@@ -222,17 +223,12 @@ export async function setTemplatesActive(client: SupabaseClient, ids: readonly s
   if (error) throw new AppError('INTERNAL', `setTemplatesActive failed: ${error.message}`)
 }
 
-// The featured ids in featured_rank order (partial filter on featured_rank).
-export async function readFeaturedIds(client: SupabaseClient): Promise<string[]> {
-  const { data, error } = await client.from('templates').select('id').not('featured_rank', 'is', null).order('featured_rank')
-  if (error) throw new AppError('INTERNAL', `readFeaturedIds failed: ${error.message}`)
-  return (data as { id: string }[]).map((row) => row.id)
-}
-
-// The home featured list in display order (T53); the SQL function checks the rules.
-export async function setFeaturedTemplates(client: SupabaseClient, ids: string[]): Promise<void> {
-  const { error } = await client.rpc('admin_set_featured_templates', { p_ids: ids })
+// The database checks the expected order while holding its write lock.
+export async function setFeaturedTemplates(client: SupabaseClient, ids: string[], expectedIds?: string[]): Promise<void> {
+  const args = expectedIds ? { p_ids: ids, p_expected_ids: expectedIds } : { p_ids: ids }
+  const { error } = await client.rpc('admin_set_featured_templates', args)
   if (error) {
+    if (error.message.includes('FEATURED_CONFLICT')) throw new AppError('CONFLICT', '首页精选在别处改过了，请刷新页面后再试')
     if (error.code === '22023') throw new AppError('INVALID_INPUT', error.message)
     throw new AppError('INTERNAL', `setFeaturedTemplates failed: ${error.message}`)
   }

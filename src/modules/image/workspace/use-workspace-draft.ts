@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import type { Balance } from '@/core/billing/pools'
-import { limitsFor } from '@/core/billing/tier-limits'
+import { defaultTier, orgBalance, type Balance, type PoolChoiceOffer } from '@/core/billing/pools'
+import { batchMaxFor, type BatchLimits } from '@/core/billing/tier-limits'
 import type { MembershipTier } from '@/core/config'
 
 import type { AgainStart } from '../again/again-start'
@@ -27,6 +27,9 @@ export type DraftInput = {
   balance: Balance
   // effective_tier() from the server (an unbanned admin counts as Max): decides batchMax (TIER_LIMITS); null is Starter.
   tier: MembershipTier | null
+  // From the server: effective_limits()' batch part (an org can lift a member past their tier,
+  // ARCHITECTURE §6.5). Absent: the tier table decides.
+  batch?: BatchLimits | null
   // From the server: the account's concurrency (TIER_LIMITS) and the jobs running at render
   // time, so photos started in another tab count too.
   concurrency: { limit: number; runningIds: string[] }
@@ -36,7 +39,17 @@ export type DraftInput = {
   // The creation dialog takes one photo; a batch is added on the workspace page (DESIGN §6.9
   // item 2).
   single?: boolean
+  // 在职成员只用企业积分 (§6.5): an active org member's org shares; null/absent: not a member.
+  poolChoice?: PoolChoiceOffer | null
+  // Signed out on the public template panel: picked photos stay in this browser (no upload, no
+  // job; its primary is the sign-up button).
+  local?: boolean
+  // A photo picked before the form opened (the home card's Upload photo): added once, as a pick.
+  initialFile?: File | null
 }
+
+// What a creation dialog knows about the account (the page's request-time read), minus the template.
+export type CreateContext = Omit<DraftInput, 'template'>
 
 const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', copy: {}, toggles: {} }
 
@@ -44,23 +57,27 @@ const DEFAULTS: FormValues = { aspect: 'original', resolution: '1k', note: '', c
 // dialog Create opens and the workspace page. Photos upload as they are picked; start() queues
 // one job per ready photo in the generation store and makes them this template's workspace
 // jobs, so the workspace page shows them developing (and after a refresh).
-export function useWorkspaceDraft({ template, balance, tier, concurrency, again = null, single = false }: DraftInput) {
-  const { photos, slots, slotted } = useDraftPhotos(template, tier, single, again)
-  const { options, values, change } = useOutputValues(template, again)
+export function useWorkspaceDraft({ template, balance, tier, batch, concurrency, again = null, single = false, poolChoice, local, initialFile }: DraftInput) {
+  const { photos, slots, slotted } = useDraftPhotos(template, batchMaxFor(tier, batch), single, again, local === true)
+  useInitialFile(initialFile, photos)
+  const choice = orgSpend(poolChoice, balance)
+  const { options, values, change } = useOutputValues(template, again, choice.balance)
   useAgainOpensForm(template.id, again?.jobId)
   const running = useRunningCount(concurrency.runningIds)
   const { summary } = photos
   const run = useDraftStart(template, concurrency.limit, again, photos.photos.map((photo) => photo.id).join(','))
   const needsRatio = summary.ready.some(({ photo }) => !chosenAspect(values.aspect, options, photo.originalRatio))
   const ready = (): CtaState => ctaState({
-    balance,
+    balance: choice.balance,
     cost: template.creditsCost[values.resolution],
+    tier: values.resolution,
     running,
     limit: concurrency.limit,
     ...photoCta(template, photos, slots, again),
     copyMissing: missingRequiredCopy(template.copyFields, values.copy),
+    paidOnly: again?.paidOnly === true,
   })
-  const state: CtaState = run.checking ? { kind: 'checking' } : !hasOutputOptions(options) ? { kind: 'no-options' } : needsRatio ? { kind: 'need-size' } : ready()
+  const state: CtaState = run.checking || template.formDeferred ? { kind: 'checking' } : !hasOutputOptions(options) ? { kind: 'no-options' } : needsRatio ? { kind: 'need-size' } : ready()
   const start = () => {
     if (state.kind !== 'generate') return Promise.resolve(null)
     // A dialog that starts here then moves to the template's workspace page, whose pending view
@@ -76,9 +93,15 @@ export function useWorkspaceDraft({ template, balance, tier, concurrency, again 
   // A fresh form starts from the cover's text (copy-examples.ts); Make again keeps its own.
   const fromExamples = !again
   return {
-    photos, slots, values, change: changeValues, state, start, error: run.error, missingPhoto: again?.missing != null,
+    photos, slots, values, change: changeValues, state, start, choice, error: run.error, missingPhoto: again?.missing != null,
     fromExamples, examplesLeft: fromExamples ? examplesLeft(template.copyFields, values.copy) : [],
   }
+}
+
+// An org member spends the org's shares only (their own credits are frozen, §6.5); the tier picks
+// which share pays (1996), so there is no kind to choose. `balance` is what the action bar checks.
+function orgSpend(offer: PoolChoiceOffer | null | undefined, balance: Balance) {
+  return offer ? { balance: orgBalance(offer), orgOnly: true } : { balance, orgOnly: false }
 }
 
 // Generate: one photo is queued at once, as it always was. Two or more go through the batch
@@ -119,8 +142,15 @@ function useDraftStart(template: CatalogueTemplate, limit: number, again: AgainS
   return { checking, error, start, clearError: () => setError(null) }
 }
 
-function useOutputValues(template: CatalogueTemplate, again: AgainStart | null) {
-  const [requested, setValues] = useState(() => again?.values ?? { ...DEFAULTS, copy: copyExamples(template.copyFields) })
+function useOutputValues(template: CatalogueTemplate, again: AgainStart | null, balance: Balance) {
+  const [requested, setValues] = useState(() => (again ? againValues(again) : freshValues(template, balance)))
+  const waitingFor = template.formDeferred ? template.id : null
+  const [pendingTemplate, setPendingTemplate] = useState(waitingFor)
+  if (pendingTemplate !== waitingFor) {
+    setPendingTemplate(waitingFor)
+    // Uploads and size choices can already be in progress. Initialise only the newly arrived fields.
+    if (pendingTemplate === template.id && !again) setValues((current) => ({ ...current, copy: copyExamples(template.copyFields) }))
+  }
   const options = templateOptions(template)
   const values = {
     ...requested,
@@ -131,8 +161,19 @@ function useOutputValues(template: CatalogueTemplate, again: AgainStart | null) 
   return { options, values, change }
 }
 
-const draftBatchMax = (template: CatalogueTemplate, tier: MembershipTier | null, single: boolean) =>
-  template.photoInput === 'none' ? 0 : single ? 1 : limitsFor(tier).batchMax
+// A fresh form starts on 2K when paid credits cover it, else 1K when free credits do (1996).
+function freshValues(template: CatalogueTemplate, balance: Balance): FormValues {
+  const resolution = defaultTier(balance, template.creditsCost, templateOptions(template).resolutions) ?? DEFAULTS.resolution
+  return { ...DEFAULTS, resolution, copy: copyExamples(template.copyFields) }
+}
+
+// Make again keeps the work's settings; Remove watermark (paid credits only) cannot run at 1K,
+// which free credits alone pay, so it moves up to 2K.
+const againValues = (again: AgainStart): FormValues =>
+  again.paidOnly === true && again.values.resolution === '1k' ? { ...again.values, resolution: '2k' } : again.values
+
+const draftBatchMax = (template: CatalogueTemplate, batchMax: number, single: boolean) =>
+  template.photoInput === 'none' ? 0 : single ? 1 : batchMax
 
 function draftPhotoStatus(template: CatalogueTemplate, photos: PhotoBatch, again: AgainStart | null) {
   if (allowsNoPhoto(template) && photos.photos.length === 0 && !again?.missing) return 'ready'
@@ -140,12 +181,24 @@ function draftPhotoStatus(template: CatalogueTemplate, photos: PhotoBatch, again
 }
 
 // A slot template (§5.1e) takes its images by slot, one job at a time; the photo list stays empty.
-function useDraftPhotos(template: CatalogueTemplate, tier: MembershipTier | null, single: boolean, again: AgainStart | null) {
+function useDraftPhotos(template: CatalogueTemplate, batchMax: number, single: boolean, again: AgainStart | null, local: boolean) {
   const slotted = isSlotTemplate(template)
   const kept = again ? { photos: again.photos, madeAt: again.madeAt } : undefined
-  const photos = usePhotoBatch(slotted ? 0 : draftBatchMax(template, tier, single), slotted ? undefined : kept)
+  const photos = usePhotoBatch(slotted ? 0 : draftBatchMax(template, batchMax, single), slotted ? undefined : kept, local)
   const slots = useSlotPhotos(slotsOfTemplate(template), slotted ? kept : undefined)
   return { photos, slots, slotted }
+}
+
+// Once, on mount: the photo picked before the form opened. A template that takes no photo (or
+// takes them by slot) has no room for it and leaves it out.
+function useInitialFile(file: File | null | undefined, photos: PhotoBatch) {
+  const added = useRef(false)
+  const { add, batchMax } = photos
+  useEffect(() => {
+    if (added.current || !file || batchMax < 1) return
+    added.current = true
+    add([file])
+  }, [file, add, batchMax])
 }
 
 // The action bar's photo state and count: a slot template is always one job.

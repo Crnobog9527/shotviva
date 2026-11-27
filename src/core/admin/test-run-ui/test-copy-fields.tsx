@@ -1,6 +1,7 @@
 'use client'
 
 import type { CopyField } from '@/core/templates/copy-fields'
+import { useOfferedCopyFields } from '@/core/templates/offered-toggles'
 import { Input } from '@/core/ui/input'
 import { Label } from '@/core/ui/label'
 import { Textarea } from '@/core/ui/textarea'
@@ -9,7 +10,9 @@ type Props = { fields: readonly CopyField[]; values: Record<string, string>; onC
 
 // The template's text fields in the 试跑 form, drawn for their type (ARCHITECTURE §5.1d) so a
 // choice is picked from its list rather than typed; the server checks the same rules.
-export function TestCopyFields({ fields, values, onChange }: Props) {
+// The dish name is left out while the food switch is off (food_toggles_enabled), as for users.
+export function TestCopyFields({ fields: all, values, onChange }: Props) {
+  const fields = useOfferedCopyFields(all)
   return (
     <>
       {fields.map((field) => {

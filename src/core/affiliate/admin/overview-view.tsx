@@ -1,5 +1,6 @@
 import { StatCard } from '@/core/admin'
 import { COPY, STATUS, money } from './copy'
+import { FeeRulesSection } from './fee-rules-view'
 import { MutationForm } from './form'
 import type { ViewProps } from './members-view'
 import { Field, Hidden, Section, GridTable, FiltersForm, NextPage, Select, LinkTo } from './parts'
@@ -58,30 +59,46 @@ export async function ErrorsView({ db, filters, action }: ViewProps) {
 export async function SettingsView({ db, action }: Omit<ViewProps, 'filters'>) {
   const { settings: s, rates } = await settings(db)
   return (
-    <MutationForm action={action} operation="settings" label={COPY.save}>
-      <Rates values={rates} />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field name="commission_months" label={COPY.commissionMonths} type="number" min="1" step="1" defaultValue={s.commission_months ?? ''} />
-        <Field name="hold_days" label={COPY.confirmDays} type="number" min="0" step="1" required defaultValue={s.hold_days} />
-        <Field
-          name="payout_min_usd"
-          label={COPY.minAmount}
-          type="number"
-          min=".01"
-          step=".01"
-          required
-          defaultValue={s.payout_min_usd / 100}
-        />
-        <Field name="settlement_day" label={COPY.day} type="number" min="1" max="28" step="1" required defaultValue={s.settlement_day} />
-        <Select
-          name="apply_min_level"
-          label={COPY.applyLevel}
-          values={['none', 'any_paid', 'starter', 'pro', 'max']}
-          initial={s.apply_min_level}
-        />
-        <Field name="terms_version" label={COPY.termsVersion} required defaultValue={s.terms_version} />
-      </div>
-    </MutationForm>
+    <div className="grid gap-8">
+      <MutationForm action={action} operation="settings" label={COPY.save}>
+        <Rates values={rates} editOrgL2 />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field name="commission_months" label={COPY.commissionMonths} type="number" min="1" step="1" defaultValue={s.commission_months ?? ''} />
+          <Field name="hold_days" label={COPY.confirmDays} type="number" min="0" step="1" required defaultValue={s.hold_days} />
+          <Field
+            name="payout_min_usd"
+            label={COPY.minAmount}
+            type="number"
+            min=".01"
+            step=".01"
+            required
+            defaultValue={s.payout_min_usd / 100}
+          />
+          <Field
+            name="org_payout_min_usd"
+            label="企业提现门槛（美元）"
+            hint="只用于企业联盟账号，按扣费前余额判断；个人推广员仍用上面的结算门槛。"
+            type="number"
+            min=".01"
+            step=".01"
+            required
+            defaultValue={s.org_payout_min_usd / 100}
+          />
+          <Field name="settlement_day" label={COPY.day} type="number" min="1" max="28" step="1" required defaultValue={s.settlement_day} />
+          <Select
+            name="apply_min_level"
+            label={COPY.applyLevel}
+            values={['none', 'any_paid', 'starter', 'pro', 'max']}
+            initial={s.apply_min_level}
+          />
+          <p className="text-sm">
+            {COPY.termsVersion}：{s.terms_version}
+            <span className="block text-muted-foreground">{COPY.termsVersionFixed}</span>
+          </p>
+        </div>
+      </MutationForm>
+      <FeeRulesSection db={db} action={action} />
+    </div>
   )
 }
 export async function AttributionView({ db, filters, action, actor }: ViewProps & { actor: string }) {

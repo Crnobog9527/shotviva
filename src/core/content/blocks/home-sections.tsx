@@ -32,24 +32,33 @@ export function StepsSection({ steps }: { steps: HomePage['steps'] }) {
 }
 
 // H2-3: the shared facts as a real two-column table (建站规格 G4, G5); the first two rows, what
-// stays and what changes, are set large.
+// stays and what changes, are set large. On a phone only the `brief` rows show until the visitor
+// opens the rest (Owner 2026-11-24): a CSS-only toggle, so every row stays in the HTML.
 export function HomeFacts({ facts, heading, intro }: { facts: readonly Fact[]; heading: string; intro: string }) {
+  const t = useTranslations('marketing.home')
+  const folded = facts.some((fact) => !fact.brief)
   return (
     <section className="mk-block mk-reveal" aria-labelledby="same-h">
       <h2 className="mk-h2" id="same-h">
         {heading}
       </h2>
       <p className="mk-intro">{intro}</p>
+      {folded ? <input type="checkbox" id="same-all" className="mk-fold-toggle sr-only" /> : null}
       <table className="mk-facts">
         <tbody>
           {facts.map((fact, i) => (
-            <tr key={fact.label} className={i < 2 ? 'mk-key' : undefined}>
+            <tr key={fact.label} className={[i < 2 ? 'mk-key' : '', fact.brief ? '' : 'mk-fold-row'].join(' ').trim() || undefined}>
               <th scope="row">{fact.label}</th>
               <td>{fact.value}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      {folded ? (
+        <label htmlFor="same-all" className="mk-ghost-btn mk-fold-btn">
+          {t('factsAll', { count: facts.length })}
+        </label>
+      ) : null}
     </section>
   )
 }

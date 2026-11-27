@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { PAUSED_HOLD, commissionMarks } from './commission-marks'
 import { COPY, DOSSIER, STATUS, money, commissionStatus } from './copy'
 import { MutationForm, type SaveAction } from './form'
 import { payoutAmountHeaders, payoutAmounts } from './payout-amounts'
@@ -6,6 +7,8 @@ import { DecidePayout } from './payout-decision'
 import type { ViewProps } from './members-view'
 import { Field, FiltersForm, GridTable, LinkTo, NextPage, Hidden, Select } from './parts'
 import { href, type Filters } from './query'
+import { FEE_COPY } from './payment-fees-copy'
+import { PaymentLink } from './payment-fees-view'
 import { commissions, payouts, type Commission, type Payout } from './read'
 
 const cStatus = { ...STATUS, pending: commissionStatus('pending') }
@@ -33,8 +36,8 @@ function FilterBar({ f }: { f: Filters }) {
             label={COPY.flag}
             initial={f.flag}
             all
-            values={['yes', 'no']}
-            labels={{ yes: COPY.flaggedOnly, no: COPY.unflagged }}
+            values={['yes', 'no', 'paused']}
+            labels={{ yes: COPY.flaggedOnly, no: COPY.unflagged, paused: PAUSED_HOLD }}
           />
         )}
       </FiltersForm>
@@ -75,6 +78,8 @@ export async function CommissionsView({ db, filters, action }: ViewProps) {
           COPY.product,
           COPY.type,
           COPY.amountBeforeTax,
+          FEE_COPY.fees,
+          FEE_COPY.netBase,
           COPY.pct,
           COPY.commission,
           COPY.status,
@@ -85,7 +90,7 @@ export async function CommissionsView({ db, filters, action }: ViewProps) {
         rows={list.items.map((r) => ({
           key: r.id,
           cells: [
-            r.payment_id,
+            <PaymentLink key="payment" id={r.payment_id} />,
             r.created_at.slice(0, 10),
             <LinkTo key="member" filters={{ tab: 'affiliates', id: r.affiliate_user_id }}>
               {r.affiliate_user_id}
@@ -93,10 +98,12 @@ export async function CommissionsView({ db, filters, action }: ViewProps) {
             r.product_id,
             r.level === 2 ? COPY.teamBonus : COPY.selfCommission,
             money(r.base_usd),
+            r.fee_cents === null ? FEE_COPY.none : money(r.fee_cents),
+            r.net_base_usd === null ? '—' : money(r.net_base_usd),
             r.rate_bp / 100 + '%',
             money(r.amount),
             commissionStatus(r.status),
-            r.flags.map((s) => STATUS[s] ?? s).join('、') || COPY.none,
+            commissionMarks(r).join('、') || COPY.none,
             <Link key="history" prefetch={false} className="text-primary hover:underline"
               href={href({ tab: 'affiliates', id: r.affiliate_user_id, section: r.level === 2 ? 'bonuses' : 'commissions', commission: r.id }) + '#commission-history'}>
               {DOSSIER.history}

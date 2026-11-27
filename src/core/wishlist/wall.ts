@@ -1,9 +1,15 @@
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { cacheLife, cacheTag, revalidateTag } from 'next/cache'
 
+import { bearerClient } from '../auth/bearer-client'
+import { createAdminSupabase } from '../auth/supabase-admin'
+import { serverEnv } from '../env'
 import { AppError } from '../errors'
-import type { ObjectStore } from '../storage'
+import { logger } from '../logger'
+import { publicEnv } from '../public-env'
+import { r2Store, type ObjectStore } from '../storage'
 import { afterTime, afterVotes, decodeTimeCursor, decodeWallCursor, encodeCursor, PAGE_SIZE, type WallCursor } from './cursor'
 import { signImages } from './images'
 import type { MyRequest, Page, RequestRow, WallCard } from './types'
@@ -55,6 +61,72 @@ export async function listWall(client: SupabaseClient, store: ObjectStore, rawCu
   const last = rows.at(-1)
   const nextCursor = more && last ? encodeCursor({ s: last.status, v: last.votes_count, c: last.created_at, i: last.id }) : null
   return { items, nextCursor }
+}
+
+// The wall's first page as everyone signed in sees it (the wall lists only live and shipped
+// requests, the same for every account), without the viewer's own votes, which the page streams
+// after it. Shared and cached so it can be in the page's App Shell: a tab-bar link prefetches it
+// and the first tap on the wishlist shows it at once instead of after a cross-border request
+// (Owner 2026-11-24). Fresh for 5 minutes (the App Shell keeps only content cached that long),
+// kept 30 at most, well inside the 60-minute life of its signed image links. A vote or an admin
+// review expires it (expireWallCache). Inside its own cache scope it never throws: null, kept a
+// minute, when it cannot be read (a build without the database key, an outage); the page then
+// reads the wall at request time as before.
+export const WISHLIST_WALL_TAG = 'wishlist-wall'
+export type SharedWall = { page: Page<WallCard>; at: string }
+
+export async function cachedWallFirstPage(): Promise<SharedWall | null> {
+  'use cache'
+  cacheTag(WISHLIST_WALL_TAG)
+  if (!serverEnv().SUPABASE_SERVICE_ROLE_KEY) {
+    cacheLife({ stale: 60, revalidate: 60, expire: 300 })
+    return null
+  }
+  try {
+    const store = r2Store()
+    const { rows: raw, more } = await wallRows(createAdminSupabase(), null)
+    const rows = await withVisibleTemplateNames(raw)
+    const items = await Promise.all(rows.map(async (row) => toCard(row, false, await signImages(store, row.image_keys))))
+    const last = rows.at(-1)
+    const nextCursor = more && last ? encodeCursor({ s: last.status, v: last.votes_count, c: last.created_at, i: last.id }) : null
+    cacheLife({ stale: 300, revalidate: 300, expire: 1800 })
+    return { page: { items, nextCursor }, at: new Date().toISOString() }
+  } catch (error) {
+    cacheLife({ stale: 60, revalidate: 60, expire: 300 })
+    logger.error('wishlist.shared_wall_failed', { error })
+    return null
+  }
+}
+
+// The shared read runs as the service role, which sees every template. A shipped card names its
+// template only as a signed-in viewer would see it: templates' RLS (published, in a visible
+// category) is the same for anon and authenticated, so the names are read on an anonymous client;
+// a hidden or unpublished template falls back to its id, as on the viewer's own read (review of #886).
+async function withVisibleTemplateNames(rows: WallRow[]): Promise<WallRow[]> {
+  const ids = [...new Set(rows.flatMap((row) => (row.template_id ? [row.template_id] : [])))]
+  if (ids.length === 0) return rows
+  const anon = bearerClient({ url: publicEnv.NEXT_PUBLIC_SUPABASE_URL, anonKey: publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY }, null)
+  const { data, error } = await anon.from('templates').select('id, name').in('id', ids).returns<{ id: string; name: string }[]>()
+  if (error) throw new AppError('INTERNAL', `wall template names failed: ${error.message}`)
+  const names = new Map(data.map((row) => [row.id, row.name]))
+  return rows.map((row) => ({ ...row, templates: row.template_id && names.has(row.template_id) ? { name: names.get(row.template_id)! } : null }))
+}
+
+// The viewer's votes among the shared first page (RLS keeps the lookup to their own rows).
+export function ownVotesAmong(client: SupabaseClient, ids: string[]): Promise<Set<string>> {
+  return ownVotes(client, ids)
+}
+
+// After anything that changes what the wall shows (a vote count, an admin review). Never throws:
+// it runs after the change has committed, so a failure here (outside a Next request, e.g. a script
+// or a test, revalidateTag has no store) must not turn a done vote or review into an error; the
+// shared page then catches up within its 5 minutes (review of #886).
+export function expireWallCache(): void {
+  try {
+    revalidateTag(WISHLIST_WALL_TAG, { expire: 0 })
+  } catch (error) {
+    logger.warn('wishlist.wall_expire_failed', { error })
+  }
 }
 
 function toCard(row: WallRow, voted: boolean, imageUrls: string[]): WallCard {

@@ -25,9 +25,23 @@ export function markSent(job: TrackedJob, now: number): TrackedJob {
   return { ...job, status: 'running', startedAt: job.startedAt || now, sentAt: now, retryAt: undefined }
 }
 
-// RATE_LIMITED is not a failure for a queued photo: back in line, tried again later.
-export function requeue(job: TrackedJob, now: number): TrackedJob {
-  return { ...job, status: 'queued', retryAt: now + RATE_LIMIT_RETRY_MS }
+// A 429 (RATE_LIMITED or the firewall's own) is not a failure for a photo: back in line, tried
+// again after the server's Retry-After (job-api), or RATE_LIMIT_RETRY_MS without one.
+export function requeue(job: TrackedJob, now: number, delayMs = RATE_LIMIT_RETRY_MS): TrackedJob {
+  return { ...job, status: 'queued', retryAt: now + delayMs }
+}
+
+// How often the store asks the server about its running jobs (one GET for all of them,
+// job-api readJobs). A single photo is watched closely; a batch-only list starts at 5 s and
+// backs off to 15 s while nothing changes, so a big batch does not poll every few seconds for
+// minutes on end. `quiet` counts passes in a row that changed nothing.
+export const POLL_SINGLE_MS = 3_000
+export const POLL_BATCH_MS = 5_000
+export const POLL_BATCH_MAX_MS = 15_000
+
+export function pollIntervalMs(running: readonly TrackedJob[], quiet: number): number {
+  if (running.some((job) => job.batchSize <= 1)) return POLL_SINGLE_MS
+  return Math.min(POLL_BATCH_MAX_MS, Math.round(POLL_BATCH_MS * 1.5 ** quiet))
 }
 
 export const isActive = (job: TrackedJob) => job.status === 'queued' || job.status === 'running'

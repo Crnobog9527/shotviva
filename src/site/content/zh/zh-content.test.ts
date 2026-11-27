@@ -48,7 +48,7 @@ function strings(value: unknown): string[] {
 // browser and file-format names, units, and API (the For business plate, T37). Image paths and alt text of the shared placeholders are skipped.
 // Proper nouns the landing pages cite (T44): the platforms whose photo rules they quote and the
 // price guides behind the bills. The business inquiry form's platform choices (T86).
-const LATIN_OK = new Set(['Shotviva', 'Shopify', 'Amazon', 'Etsy', 'eBay', 'Instagram', 'TikTok', 'DoorDash', 'Uber', 'Eats', 'Grubhub', 'PricingLink', 'Jobbers', 'FoodShot', 'AI', 'Apple', 'Pay', 'Google', 'iPhone', 'Safari', 'Chrome', 'JPG', 'PNG', 'WebP', 'MB', 'px', 'shotviva', 'API', 'PS', 'K'])
+const LATIN_OK = new Set(['Shotviva', 'Shopify', 'Amazon', 'Etsy', 'eBay', 'Instagram', 'TikTok', 'DoorDash', 'Uber', 'Eats', 'Grubhub', 'PricingLink', 'FoodShot', 'AI', 'Apple', 'Pay', 'Google', 'iPhone', 'Safari', 'Chrome', 'JPG', 'PNG', 'WebP', 'MB', 'px', 'shotviva', 'API', 'PS', 'K'])
 const PAGES = {
   '/zh': zhHomePage,
   '/zh/image-to-image-generator': zhImageToImageGenerator,
@@ -60,7 +60,7 @@ const PAGES = {
 describe('/zh marketing copy (建站规格 §6.1, G13)', () => {
   it('passes the TDK / direct-answer rules, measured in Chinese', () => {
     // Measured as served, with 「最多 6 张」 (the longest) and the no-catalogue 「3 张」 (T91).
-    for (const facts of [{ from: 1, same: false }, FALLBACK_CREDITS]) {
+    for (const facts of [{ from: 1, same: false, gift: 100 }, FALLBACK_CREDITS]) {
       expect(validateContentPage(fillCredits(zhHomePage, facts), 'zh')).toEqual([])
       expect(validateContentPage(fillCredits(zhImageToImageGenerator, facts), 'zh')).toEqual([])
       expect(fillCredits(zhPricingPage.description, facts).length).toBeLessThanOrEqual(80)
@@ -85,7 +85,11 @@ describe('/zh marketing copy (建站规格 §6.1, G13)', () => {
   })
 
   it('writes one language per page', () => {
-    const pages = Object.values(PAGES).map((page) => ({ ...fillCredits(page, FALLBACK_CREDITS), hero: undefined, path: undefined }))
+    // A live hero's template id is an id, not copy.
+    const noIds = (page: object) => ('landing' in page && page.landing && typeof page.landing === 'object' && 'liveHero' in page.landing ? { ...page, landing: { ...page.landing, liveHero: { ...(page.landing.liveHero as object), templateId: '' } } } : page)
+    // So is a hotel case's template id (home-spaces.ts).
+    const noCaseIds = (page: object) => ('spaces' in page && page.spaces ? { ...page, spaces: { ...(page.spaces as object), items: (page.spaces as { items: object[] }).items.map((item) => ({ ...item, template: '' })) } } : page)
+    const pages = Object.values(PAGES).map((page) => ({ ...noCaseIds(noIds(fillCredits(page, FALLBACK_CREDITS))), hero: undefined, path: undefined }))
     const words = pages.flatMap(strings).flatMap((text) => text.match(/[A-Za-z][A-Za-z']*/g) ?? [])
     expect([...new Set(words.filter((word) => !LATIN_OK.has(word)))]).toEqual([])
   })
@@ -95,7 +99,7 @@ describe('yearly saving wording', () => {
   it('quotes offer.ts\'s largest yearly saving as 「最多省」, never a typed number', async () => {
     const { zhYearlySaving } = await import('./offer')
     const { yearlySaving } = await import('../offer')
-    expect(zhYearlySaving).toBe(`按年付最多省 ${yearlySaving}%`)
+    expect(zhYearlySaving).toBe(`按年付省 ${yearlySaving!.pct}%（旗舰版省 ${yearlySaving!.upTo}%）`)
   })
 })
 
@@ -109,6 +113,16 @@ describe('/zh home title, description and white-background guide', () => {
 
   it('adds the 「白底图、电商主图怎么做」 H2 with three cards', () => {
     expect(zhHomePage.topics?.heading).toBe('白底图、电商主图怎么做')
-    expect(zhHomePage.topics?.cards.map((card) => card.heading)).toEqual(['选「纯白底图」模板', '商品主体保持原样', '3 档导出尺寸'])
+    expect(zhHomePage.topics?.cards.map((card) => card.heading)).toEqual(['选「纯白底图」模板', '商品本身不变', '3 档导出尺寸'])
+  })
+})
+
+describe('/zh/ai-restaurant-menu first screen (Owner 2026-11-25)', () => {
+  it('follows the 剁椒鱼头 template live, in Chinese, with the static fish kept only as the fallback', () => {
+    const pair = zhAiRestaurantMenu.landing.liveHero
+    expect(pair?.templateId).toBe('cn-rattan-fishhead-basket')
+    for (const text of [pair!.phone, pair!.ai, pair!.caption]) expect(text).toContain('剁椒鱼头')
+    expect(pair!.caption).not.toMatch(/积分|¥|元|\$/)
+    expect(zhAiRestaurantMenu.hero.before.firstFrame).toBeTruthy()
   })
 })

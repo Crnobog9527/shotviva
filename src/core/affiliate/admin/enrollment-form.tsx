@@ -1,6 +1,6 @@
 import type { FormEventHandler } from 'react'
 import { Button } from '@/core/ui/button'
-import { COPY } from './copy'
+import { COPY, DOSSIER } from './copy'
 import { Field, Hidden } from './parts'
 import { Rates } from './rates'
 
@@ -28,6 +28,8 @@ export function EnrollmentForm({ userId, slug, busy, error, onSubmit, onSlugChan
           <Field label={COPY.slug} name="slug" value={slug} onChange={(e) => onSlugChange(e.target.value)} minLength={3} maxLength={24} required />
           <Button type="button" variant="outline" onClick={onRegenerate}>{COPY.regenerate}</Button>
         </div>
+        <Field label={DOSSIER.adminLabel + DOSSIER.optionalMark} name="admin_label" maxLength={60} />
+        <p className="text-xs text-muted-foreground">{DOSSIER.adminLabelHint}</p>
         <Rates optional />
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <div className="flex flex-wrap gap-2">

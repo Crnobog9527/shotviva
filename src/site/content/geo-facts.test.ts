@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { site } from '../site.config'
+import { FALLBACK_CREDITS, fillCredits } from './credits'
 import { isQuotableFact, MIN_QUOTABLE_FACTS, quotableFacts } from './geo-facts'
 import { contentPagesIn, findContentPageIn, homePageIn, pricingFaqIn, pricingPageIn } from './localized'
 import { photoSeconds } from './offer'
@@ -26,7 +27,8 @@ function indexablePages() {
 
 describe('GEO facts (SEO launch handbook 03-S3)', () => {
   it.each(indexablePages())(`$name carries at least ${MIN_QUOTABLE_FACTS} quotable facts`, ({ page }) => {
-    expect(quotableFacts(page).length).toBeGreaterThanOrEqual(MIN_QUOTABLE_FACTS)
+    // Measured as served: the page fills the signup gift (2008) and the other markers first.
+    expect(quotableFacts(fillCredits(page, FALLBACK_CREDITS)).length).toBeGreaterThanOrEqual(MIN_QUOTABLE_FACTS)
   })
 
   // Each vertical page: a processing time, a starting price and a dated platform rule or cost bill.
@@ -61,11 +63,11 @@ describe('GEO facts (SEO launch handbook 03-S3)', () => {
   })
 
   it('a quotable fact has a number, a real subject and enough words', () => {
-    expect(isQuotableFact('Shotviva makes each photo in about 60 seconds.')).toBe(true)
-    expect(isQuotableFact('It makes each photo in about 60 seconds.')).toBe(false)
+    expect(isQuotableFact('Shotviva makes each photo in about 30 seconds.')).toBe(true)
+    expect(isQuotableFact('It makes each photo in about 30 seconds.')).toBe(false)
     expect(isQuotableFact('Yes. Credit packs start at $9.90 and never expire.')).toBe(false)
     expect(isQuotableFact('Shotviva makes each photo quickly and well.')).toBe(false)
-    expect(isQuotableFact('About 60 seconds.')).toBe(false)
-    expect(isQuotableFact('Shotviva 每张图大约 60 秒出图。')).toBe(true)
+    expect(isQuotableFact('About 30 seconds.')).toBe(false)
+    expect(isQuotableFact('Shotviva 每张图大约 30 秒出图。')).toBe(true)
   })
 })

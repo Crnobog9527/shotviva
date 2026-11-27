@@ -14,22 +14,26 @@ describe('admin nav', () => {
       'orders',
       'products',
       'codes',
+      'affiliates',
+      'orgs',
       'disputes',
       'jobs',
+      'trace',
       'costs',
       'templates',
-      'references',
-      'providers',
+      'home',
+      'generation',
       'requests',
       'announcements',
+      'blog',
       'features',
     ])
     expect(adminNavItems({ wishlist: false }).map((item) => item.key)).not.toContain('requests')
   })
 
-  it('only links to the affiliate program while enabled', () => {
+  it('always links to 联盟营销, whose page holds the program switch (Owner 2026-11-27)', () => {
     expect(adminNavItems({ wishlist: false, affiliate: true }).map(item => item.href)).toContain('/admin/affiliates')
-    expect(adminNavItems({ wishlist: false, affiliate: false }).map(item => item.href)).not.toContain('/admin/affiliates')
+    expect(adminNavItems({ wishlist: false, affiliate: false }).map(item => item.href)).toContain('/admin/affiliates')
   })
 
   it('shows the open-ticket count on 工单 only, and none at 0 (T27)', () => {
@@ -59,5 +63,28 @@ describe('admin nav', () => {
     expect(adminNavItems({ wishlist: false }).some((item) => item.key === 'gallery')).toBe(false)
     const items = adminNavItems({ wishlist: false, gallery: true }, { gallery: 4 })
     expect(items.find((item) => item.key === 'gallery')).toMatchObject({ href: '/admin/gallery', label: '创作库审核', count: 4 })
+  })
+})
+
+describe('admin nav counts', () => {
+  it('shows the pending promotion grant sheets on 联盟营销 (ARCHITECTURE §6.5)', () => {
+    const items = adminNavItems({ wishlist: false, affiliate: true }, { affiliates: 2 })
+    expect(items.find((item) => item.key === 'affiliates')?.count).toBe(2)
+    expect(adminNavItems({ wishlist: false, affiliate: true }, { affiliates: 0 }).find((item) => item.key === 'affiliates')?.count).toBeUndefined()
+  })
+
+  it('marks the template module pages under the right entry (Owner 2026-11-27)', () => {
+    const items = adminNavItems({ wishlist: false })
+    const at = (path: string) => currentItem(path, items)?.key
+    expect(at('/admin/templates')).toBe('templates')
+    expect(at('/admin/templates/series')).toBe('templates')
+    expect(at('/admin/templates/profiles')).toBe('generation')
+    expect(at('/admin/templates/dishware')).toBe('generation')
+    expect(at('/admin/templates/edit')).toBe('generation')
+    expect(at('/admin/providers')).toBe('generation')
+    expect(at('/admin/references')).toBeUndefined()
+    expect(at('/admin/home')).toBe('home')
+    expect(at('/admin/home/zh')).toBe('home')
+    expect(at('/admin/templates/categories')).toBe('templates')
   })
 })

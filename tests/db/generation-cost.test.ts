@@ -72,7 +72,8 @@ async function setup(behaviour: Behaviour, prices: GenerationProvider['prices'] 
   r2.upload(inputKey, await jpeg(640, 480), 'image/jpeg')
   const recorded = recordingDb()
   const deps = { db: recorded.client, store: r2.store, provider: provider(behaviour, prices), providerTimeoutMs: 200 }
-  const request: GenerationRequest = { userId, source: 'web', templateId, inputKey, copy: { dish: 'ramen' }, aspectRatio: '4:5' }
+  // 2K: paid credits pay 2K only (1996).
+  const request: GenerationRequest = { userId, source: 'web', templateId, inputKey, copy: { dish: 'ramen' }, aspectRatio: '4:5', resolution: '2k' }
   return { userId, r2, deps, request, ...recorded }
 }
 
@@ -85,7 +86,8 @@ async function costRow(jobId: string) {
   return row ? { ...row, cost_usd: row.cost_usd === null ? null : Number(row.cost_usd) } : null
 }
 
-// What the pipeline did after the credits were reserved.
+// What the pipeline did after the credits were reserved: settling the job, then giving its lane
+// slot back (queue-fairness Q3).
 const afterReserve = (log: string[]) => log.slice(log.indexOf('rpc:reserve_credits') + 1)
 
 describe('settlement records usage and cost (T33)', () => {
@@ -93,7 +95,7 @@ describe('settlement records usage and cost (T33)', () => {
     const { deps, request, log, args } = await setup('ok')
     const view = await runGeneration(deps, request)
     expect(await costRow(view.id)).toEqual({ status: 'succeeded', provider_usage: USAGE, cost_usd: COST })
-    expect(afterReserve(log)).toEqual(['rpc:confirm_job'])
+    expect(afterReserve(log)).toEqual(['rpc:confirm_job', 'rpc:release_generation_slot'])
     expect(args[log.indexOf('rpc:confirm_job')]).toMatchObject({ p_provider_usage: USAGE, p_cost_usd: COST })
   })
 
@@ -114,7 +116,7 @@ describe('settlement records usage and cost (T33)', () => {
     const failure = (await runGeneration(deps, request).catch((e: unknown) => e)) as GenerationFailure
     expect(failure).toBeInstanceOf(GenerationFailure)
     expect(await costRow(failure.jobId)).toEqual({ status: 'failed', provider_usage: USAGE, cost_usd: COST })
-    expect(afterReserve(log)).toEqual(['rpc:refund_job'])
+    expect(afterReserve(log)).toEqual(['rpc:refund_job', 'rpc:release_generation_slot'])
     expect((await profileOf(db, userId)).credits).toBe(3)
   })
 
@@ -136,7 +138,7 @@ describe('confirm_job with usage', () => {
   it('a repeated confirm keeps the first usage and cost', async () => {
     const userId = await createUser(db, { credits: 2 })
     const service = serviceSupabase()
-    const job = await reserveJob(service, { jobId: crypto.randomUUID(), userId, module: 'image', templateId, source: 'web', inputs: {} })
+    const job = await reserveJob(service, { jobId: crypto.randomUUID(), userId, module: 'image', templateId, source: 'web', inputs: { resolution: '2k' } })
     await confirmJob(service, { jobId: job.id, outputKey: `outputs/${job.id}.png`, usage: USAGE, costUsd: COST })
     await confirmJob(service, { jobId: job.id, outputKey: `outputs/${job.id}.png`, usage: { output_tokens: 1 }, costUsd: 9 })
     expect(await costRow(job.id)).toEqual({ status: 'succeeded', provider_usage: USAGE, cost_usd: COST })
@@ -145,7 +147,7 @@ describe('confirm_job with usage', () => {
   it('rejects a negative cost and a non-object usage in the database', async () => {
     const userId = await createUser(db, { credits: 2 })
     const service = serviceSupabase()
-    const job = await reserveJob(service, { jobId: crypto.randomUUID(), userId, module: 'image', templateId, source: 'web', inputs: {} })
+    const job = await reserveJob(service, { jobId: crypto.randomUUID(), userId, module: 'image', templateId, source: 'web', inputs: { resolution: '2k' } })
     const negative = await service.rpc('confirm_job', { p_job_id: job.id, p_output_key: 'k', p_cost_usd: -1 })
     expect(negative.error?.message).toMatch(/generation_jobs_cost_usd_nonnegative/)
     const array = await service.rpc('confirm_job', { p_job_id: job.id, p_output_key: 'k', p_provider_usage: [1] })

@@ -1,5 +1,6 @@
 import { RESOLUTIONS, type Resolution } from './output-options'
 import { MISSING_COST, TEMPLATE_QUALITIES, type ApprovedTariff, type CreditsCost, type CreditsFloor } from './pricing'
+import { EDIT_TEMPLATE_ID } from './edit-params'
 import { IMAGE_SLOTS_MAX } from './image-slots'
 
 type Costs = Partial<Record<Resolution, number>>
@@ -112,8 +113,10 @@ function selectedFloor(floors: ProviderFloors, selected?: string): CreditsFloor 
   return floors.providers[selected] ?? UNPRICED
 }
 
+// 作品编辑's tariff never stands in for a route's cost floor (1997, template_approved_prices leaves
+// edit out), so an edit re-bound to GPT is still held to that route's floor.
 function approvedOnRoute(floors: ProviderFloors, selected: string | undefined, templateId: string) {
-  return selected ? floors.approvals?.[selected]?.[templateId] : undefined
+  return selected && templateId !== EDIT_TEMPLATE_ID ? floors.approvals?.[selected]?.[templateId] : undefined
 }
 
 export function providerFloor(floors: ProviderFloors, id: string | null | undefined, templateId = ''): CreditsFloor {

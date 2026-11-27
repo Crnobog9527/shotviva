@@ -20,8 +20,9 @@ export type PaymentFacts = {
 }
 
 // The session retrieve expands these so a one-time payment's charge (and, should the charge be
-// missing, its payment method) comes back in one call.
-export const SESSION_EXPAND = ['line_items.data.price', 'subscription', 'payment_intent.latest_charge', 'payment_intent.payment_method']
+// missing, its payment method) comes back in one call, with the charge's balance transaction:
+// its fee is the real processing fee (F3, fees/stripe.ts).
+export const SESSION_EXPAND = ['line_items.data.price', 'subscription', 'payment_intent.latest_charge.balance_transaction', 'payment_intent.payment_method']
 // An invoice's charge sits on its PaymentIntent; latest_charge stays an id at this depth.
 export const INVOICE_EXPAND = ['payments.data.payment.payment_intent']
 
@@ -75,6 +76,12 @@ function expandedIntent(intent: string | Stripe.PaymentIntent | null): Stripe.Pa
 function expandedCharge(intent: Stripe.PaymentIntent | null): Stripe.Charge | null {
   const charge = intent?.latest_charge
   return charge && typeof charge === 'object' ? charge : null
+}
+
+// A one-time payment's charge as the session retrieve expanded it (null on a subscription session,
+// whose charge sits on its invoice).
+export function sessionCharge(session: Stripe.Checkout.Session): Stripe.Charge | null {
+  return expandedCharge(expandedIntent(session.payment_intent))
 }
 
 export function invoiceChargeId(invoice: Stripe.Invoice): string | null {

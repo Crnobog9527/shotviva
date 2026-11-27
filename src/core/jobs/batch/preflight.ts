@@ -1,10 +1,13 @@
 import 'server-only'
+import { readPoolChoiceOffer } from '@/core/org/pool-choice'
 
 import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { effectiveTier, MAX_BATCH_SIZE, readBalance } from '../../billing'
+import { MAX_BATCH_SIZE, readBalance } from '../../billing'
+import { tierPool } from '../../billing/pools'
+import { accountLimits } from '../account-limits'
 import { AppError } from '../../errors'
 import { isOwnInputKey } from '../../storage'
 import { allowedWebAspects, assertPricedTier, hasSlots, assertTemplateQuote, loadGenerationTemplate, validateGenerationInputs, type Template } from '../../templates'
@@ -28,6 +31,9 @@ function checkGrid(userId: string, cells: Selected[]) {
   if (new Set(cells.map(c => JSON.stringify([c.inputs.resolution ?? '1k', c.inputs.aspect_ratio ?? 'original']))).size > 1) {
     throw new AppError('INVALID_INPUT', 'Use one resolution and aspect ratio across the batch')
   }
+  // A batch is paid credits only and 1K is free credits only (1996): reserve_credits would refuse
+  // every cell, so say so before anything is quoted.
+  if (tierPool(cells[0]?.inputs.resolution ?? '1k') === 'free') throw new AppError('INVALID_INPUT', 'A batch is paid credits only: pick 2K or 4K')
 }
 
 function quote(userId: string, selected: Selected, template: Template, position: number,
@@ -48,7 +54,7 @@ function quote(userId: string, selected: Selected, template: Template, position:
 
 export async function preflightBatch(db: SupabaseClient, userId: string, cells: Selected[], provider: TemplateProvider) {
   const ids = [...new Set(cells.map(c => c.template_id))]
-  assertBatchAllowed(await effectiveTier(db, userId), cells.length, ids.length)
+  assertBatchAllowed(await accountLimits(db, userId), cells.length, ids.length)
   checkGrid(userId, cells)
   const batch = { batch_id: randomUUID(), batch_size: cells.length, batch_templates: ids.length }
   const selections = cells.map((selected, i) => ({ selected, position: i + 1 }))
@@ -73,9 +79,11 @@ export async function preflightBatch(db: SupabaseClient, userId: string, cells: 
     })),
     readBalance(db, userId),
   ])
+  // An org member pays a batch from the org's paid share only (§6.5, 1897), never their own credits.
+  const offer = await readPoolChoiceOffer(db, userId)
   await assertBatchRoutes(db, groups.map(group => group.route))
   const prices = groups.flatMap(group => group.quotes.map(q => q.price)).sort((a, b) => a.batch_cell.position - b.batch_cell.position)
   const total_credits = prices.reduce((sum, c) => sum + c.expected_credits, 0)
-  if (total_credits > balance.paid) throw new AppError('CREDITS_INSUFFICIENT', 'Paid credits do not cover this batch')
+  if (total_credits > (offer ? offer.paid : balance.paid)) throw new AppError('CREDITS_INSUFFICIENT', 'Paid credits do not cover this batch')
   return { ...batch, total_credits, cells: prices }
 }

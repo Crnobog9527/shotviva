@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { homeCta, type HomeViewer } from './home-cta'
 
 const viewer = (free: number, paid: number, limit = 1): HomeViewer => ({ balance: { free, paid }, concurrency: { limit, runningIds: [] }, favoriteIds: [] })
-const base = { cost: 2, running: 0, needsCopy: false }
+const base = { cost: 2, tier: '1k', running: 0, needsCopy: false }
+const paidTier = { ...base, tier: '2k' }
 
 // DESIGN §6.9 item 9: the home bar charges the same way as the workspace.
 describe('homeCta', () => {
@@ -26,21 +27,23 @@ describe('homeCta', () => {
   })
 
   it('opens the paywall with the shortfall when the balance is too low, before asking for a photo', () => {
-    expect(homeCta({ ...base, viewer: viewer(0, 1), photo: 'none' })).toMatchObject({ kind: 'get-credits', needed: 1 })
+    expect(homeCta({ ...paidTier, viewer: viewer(0, 1), photo: 'none' })).toMatchObject({ kind: 'get-credits', needed: 1 })
   })
 
   it('asks for a photo, waits for the upload, then generates', () => {
-    expect(homeCta({ ...base, viewer: viewer(0, 10), photo: 'none' })).toEqual({ kind: 'pick-photo', cost: 2 })
-    expect(homeCta({ ...base, viewer: viewer(0, 10), photo: 'uploading' })).toEqual({ kind: 'uploading' })
-    expect(homeCta({ ...base, viewer: viewer(0, 10), photo: 'ready' })).toMatchObject({ kind: 'generate', pool: 'paid' })
+    expect(homeCta({ ...paidTier, viewer: viewer(0, 10), photo: 'none' })).toEqual({ kind: 'pick-photo', cost: 2 })
+    expect(homeCta({ ...paidTier, viewer: viewer(0, 10), photo: 'uploading' })).toEqual({ kind: 'uploading' })
+    expect(homeCta({ ...paidTier, viewer: viewer(0, 10), photo: 'ready' })).toMatchObject({ kind: 'generate', pool: 'paid' })
+    // 1K is free credits only (1996): paid credits never pay it.
+    expect(homeCta({ ...base, viewer: viewer(0, 10), photo: 'ready' })).toMatchObject({ kind: 'tier-pool', reason: 'free-only' })
   })
 
   it('waits when the account already has as many photos developing as its tier allows', () => {
-    expect(homeCta({ ...base, viewer: viewer(0, 10), photo: 'ready', running: 1 })).toEqual({ kind: 'wait', limit: 1 })
+    expect(homeCta({ ...paidTier, viewer: viewer(0, 10), photo: 'ready', running: 1 })).toEqual({ kind: 'wait', limit: 1 })
   })
 
   it('sends templates that need text to the workspace, and says so when nothing is live', () => {
-    expect(homeCta({ ...base, viewer: viewer(0, 10), photo: 'ready', needsCopy: true })).toEqual({ kind: 'needs-copy' })
+    expect(homeCta({ ...paidTier, viewer: viewer(0, 10), photo: 'ready', needsCopy: true })).toEqual({ kind: 'needs-copy' })
     expect(homeCta({ ...base, cost: null, viewer: null, photo: 'none' })).toEqual({ kind: 'no-template' })
   })
 })

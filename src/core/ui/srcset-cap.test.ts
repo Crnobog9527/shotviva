@@ -16,8 +16,14 @@ describe('slotMaxPx (the widest the slot is drawn)', () => {
     expect(slotMaxPx('48px')).toBe(48)
   })
 
+  it('reads a 3× phone entry just before the default as drawn in the default band', () => {
+    // cover-sizes.ts: a 3× phone names 29vw of a <768 px viewport, narrower than the 50vw default.
+    expect(slotMaxPx('(min-width: 1024px) 182px, (min-width: 768px) 25vw, (min-resolution: 2.5dppx) 29vw, 50vw')).toBe(384)
+    expect(slotMaxPx('(min-width: 768px) 120px, (min-resolution: 2.5dppx) 80vw, 45vw')).toBeCloseTo(614.4)
+  })
+
   it('gives up on anything else, so nothing is dropped', () => {
-    for (const sizes of ['100vw', '(min-width: 768px) 50vw, 100vw', '(max-width: 600px) 100vw, 50vw', '(min-width: 768px) 120px, calc(100vw - 32px)', '(min-width: 500px) 1px, (min-width: 900px) 2px, 3px', '120px, 40vw']) {
+    for (const sizes of ['100vw', '(min-width: 768px) 50vw, 100vw', '(max-width: 600px) 100vw, 50vw', '(min-width: 768px) 120px, calc(100vw - 32px)', '(min-width: 500px) 1px, (min-width: 900px) 2px, 3px', '120px, 40vw', '(min-resolution: 2.5dppx) 29vw, 50vw', '(min-width: 768px) 25vw, (min-resolution: 2.5dppx) 29vw, (min-width: 500px) 40vw, 50vw', '(min-width: 768px) 25vw, (min-resolution: 2px) 29vw, 50vw', '(min-width: 768px) 25vw, 50vw, (min-resolution: 2.5dppx) 29vw']) {
       expect(slotMaxPx(sizes)).toBeNull()
     }
   })

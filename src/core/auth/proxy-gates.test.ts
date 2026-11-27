@@ -96,7 +96,7 @@ describe('proxyGate without a session cookie', () => {
   })
 
   it('keeps route handlers and sitemaps out of the locale router', async () => {
-    for (const path of ['/api/generate', '/auth/callback', '/sitemap-zh.xml', '/robots.txt']) {
+    for (const path of ['/api/generate', '/auth/callback', '/sitemap-zh.xml', '/robots.txt', '/indexnow-key.txt']) {
       expect((await gate(path)).headers.get('x-forwarded-to')).toBeNull()
     }
   })

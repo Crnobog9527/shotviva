@@ -2,8 +2,7 @@ import type { EditScope } from '@/core/templates/edit-params'
 
 // /admin/templates/edit copy. Admin pages are Chinese only (DESIGN §7).
 export const EDIT_TEMPLATE_COPY = {
-  title: '作品编辑',
-  back: '← 模板与提示词',
+  title: '作品编辑规则',
   intro:
     '用户在作品详情页写一句话改图。先用「判断」供应商（AI 供应商页）按下面的判断指令看图和用户原话，返回范围、把握（0～1）、要保留的元素和一句概括；把握 ≥ 0.5 才采用，否则、失败或超过 3 秒用「兜底」。发给出图模型的是：封装提示词 + 该范围的约束段落（物件和背景两种会在段落后加「Keep unchanged: …」）+ 用户原话。这些文字只存在数据库里，不进仓库。',
   active: '开放作品编辑',

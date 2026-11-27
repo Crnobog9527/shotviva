@@ -33,6 +33,9 @@ type ProductBase = {
   revision?: number
   names?: { en: string; zh: string }
   benefits?: { en: string; zh: string }
+  // M / L packs: what a member pays, in percent of the list price, per tier. Stored per catalogue
+  // revision (migration 1610); absent means the revision-2 rate (pack-price.ts).
+  packMemberPayPct?: Readonly<Record<MembershipTier, number>>
   // Paid credits granted per purchase (yearly: all twelve months at once).
   credits: number
   // 0 means "not decided yet"; pages must show a placeholder, never "$0".
@@ -87,6 +90,10 @@ export type PartnerSiteConfig = {
   imageHosts: readonly string[]
 }
 
+// The person enterprise customers arrange bank transfers with (Owner 2026-11-22): enterprise
+// customers are onboarded by hand, so the purchasing page names this contact instead of a ticket.
+export type EnterpriseContact = { name: string; email: string; wechat: string }
+
 export type SiteConfig = {
   brand: SiteBrand
   modules: Record<ModuleId, boolean>
@@ -110,6 +117,9 @@ export type SiteConfig = {
     channels: { primary: PaymentChannel; fallback: PaymentChannel | null }
   }
   partners: { graylum: PartnerSiteConfig }
+  // Optional so a site without enterprise sales leaves it out; the purchasing page then falls
+  // back to the support ticket.
+  enterprise?: { transferContact: EnterpriseContact }
   // Whether the site has a public gallery at all (ARCHITECTURE §9 第 1 条); one that has it is
   // still closed until an admin opens it. Read through core/gallery isGalleryEnabled, never directly.
   gallery: { enabled: boolean }
@@ -145,8 +155,8 @@ export type MarketingNumbers = {
     packshotUsd: UsdRange
     // A studio day for product photography.
     dayRateUsd: UsdRange
-    // A half-day food shoot for a restaurant menu (the food stylist is billed apart).
-    foodHalfDayUsd: UsdRange
+    // One food photography session for a restaurant menu (styling, props and licensing often extra).
+    foodShootUsd: UsdRange
   }
   // About how many seconds a photo takes, one round figure for every quality (Owner
   // 2026-11-06): no ranges or per-quality times, so a slower provider never breaks a promise.

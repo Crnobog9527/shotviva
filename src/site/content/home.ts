@@ -1,10 +1,11 @@
-import { baselineOffers, planLabel, type OfferFacts } from './offer'
+import { baselineOffers, planLabel, yearlyClaim, type OfferFacts } from './offer'
 import { defineHomePage, type CostBills, type HeadedText, type HomePage, type ImageRef, type ShootDemo } from '@/core/content'
 
 import { site } from '../site.config'
 import {
   freeImagesLabel,
   FreeImagesShort,
+  giftCredits,
   packshotUsd,
   photoSeconds,
   plansSentence,
@@ -20,6 +21,7 @@ import {
 } from './offer'
 import { steps, tote, useCases } from './home-explainers'
 import { textEdits } from './home-edits'
+import { homeSpaces } from './home-spaces'
 import { homeWishlist } from './home-wishlist'
 import { withFirstFrame } from './landing-shared'
 import { sharedFacts } from './shared'
@@ -34,7 +36,7 @@ const brand = site.brand.name
 function plansText(offers: OfferFacts): HeadedText {
   const { planFrom, yearlySaving } = offers
   const heading = planFrom ? `Plans From ${usd(planFrom.priceUsd)} a Month` : 'Plans and Credit Packs'
-  const yearly = yearlySaving ? ` Yearly plans save up to ${yearlySaving}%.` : ''
+  const yearly = yearlySaving ? ` Yearly plans ${yearlyClaim(yearlySaving)}.` : ''
   return {
     heading,
     text: `${plansSentence(offers)}${yearly} Paid credits never expire, and every photo you make with them is private and watermark-free. Here is how that compares with a photographer or doing it yourself.`,
@@ -66,7 +68,7 @@ const heroScenes = [
 export const shoot: ShootDemo = {
   heading: { lead: 'One phone photo → ', emphasis: 'a full shoot' },
   intro: 'Shot on a phone on a kitchen counter. Three deliverables, and the same tote in every one: the weave, the stitching, the chain.',
-  phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: 'As shot on a phone. Window light, a busy counter, keys and a mug in frame.' },
+  phone: { image: phoneShot, file: 'IMG_2047.jpg', caption: 'Real phone photo. Window light, a busy counter, keys and a mug in frame.' },
   arrow: 'Three templates, same tote',
   results: [
     { image: tote.listing, title: 'Marketplace listing', template: 'White Background template' },
@@ -141,6 +143,7 @@ const copy = {
   },
   shoot,
   edits: textEdits,
+  spaces: homeSpaces,
   steps,
   templateGrid: {
     heading: 'Img to Img Templates: No Prompts to Write',
@@ -149,7 +152,7 @@ const copy = {
   },
   topics: useCases,
   wishlist: homeWishlist,
-  factsIntro: `Most AI image to image tools hand you a new picture. What you wanted was your picture, only better: the same product, the same dish, the same room, with nicer light and a cleaner scene. That is what ${brand} is built for. The prices and sizes below are the same on every page of this site.`,
+  factsIntro: `Most AI image to image tools hand you a new picture. What you wanted was your picture, only better: the same product, the same dish, the same room, with nicer light and a cleaner scene. That is what ${brand} is built for.`,
   related: [
     {
       href: '/ai-restaurant-menu',
@@ -174,7 +177,7 @@ const copy = {
     {
       href: '/pricing',
       anchor: 'Pricing',
-      note: 'For shops, sellers and hosts comparing monthly plans, yearly plans and one-time credit packs.',
+      note: 'Monthly plans, yearly plans and one-time credit packs, side by side.',
     },
   ],
   headings: {
@@ -192,7 +195,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: 'Is image to image AI free?',
-    answer: `${brand} gives new accounts ${site.billing.freeCredits} credits to try a template. Each photo uses credits based on template and size, shown on the Generate button. Free photos are public and watermarked; ${offers.planFrom ? `paid plans start at ${usd(offers.planFrom.priceUsd)}/month.` : plansSentence(offers)}`,
+    answer: `${brand} gives new accounts ${giftCredits} credits to try a template. Each photo uses credits based on template and size, shown on the Generate button. Free photos are public and watermarked; ${offers.planFrom ? `paid plans start at ${usd(offers.planFrom.priceUsd)}/month.` : plansSentence(offers)}`,
   },
   {
     question: "Does image to image AI keep my photo's subject the same?",
@@ -225,7 +228,7 @@ const homeFaq = (offers: OfferFacts): HomePage['faq'] => [
   },
   {
     question: 'What sizes and formats can I export?',
-    answer: `${brand} exports every photo as a PNG in ${OUTPUT_TIERS.length} sizes: ${tierPixels}. The aspect ratio is set by the template. Photos made with paid credits download at full size with no watermark.`,
+    answer: `${brand} exports ${OUTPUT_TIERS.length} sizes: ${tierPixels} for a square photo. The aspect ratio is set by the template. Photos made with paid credits download as a full-size PNG with no watermark; free photos download as a watermarked JPG. Cut-outs also come as a white-background JPG.`,
   },
   {
     question: `Can I use ${brand} on my phone?`,
@@ -247,11 +250,11 @@ export const makeHomePage = (offers: OfferFacts, plans = homePlans(offers.produc
       {
         // SEO PATCH v4.1 (2026-11-11): the free credits are no heading of their own and no photo count.
         heading: 'Try It Before You Pay',
-        text: `New accounts get ${site.billing.freeCredits} credits to test a template, once; they do not refill. Free photos are public, watermarked and for personal, non-commercial use.`,
+        text: `New accounts get ${giftCredits} credits to test a template. They are given once and do not refill.`,
       },
       {
         heading: 'Free Photos Are Public and Watermarked, Paid Photos Are Private',
-        text: `A photo made with free credits is public and carries a small "Made with ${brand}" watermark; free photos are for personal, non-commercial use. A photo made with paid credits is private, has no watermark and is yours to use commercially. Buying a plan later does not change photos you already made.`,
+        text: `A photo made with free credits is public and carries a small "Made with ${brand}" watermark (a free poster photo stays private, still watermarked); free photos are for personal, non-commercial use. A photo made with paid credits is private, has no watermark and is yours to use commercially. Buying a plan later does not change photos you already made.`,
       },
     ],
     plans: plansText(offers),

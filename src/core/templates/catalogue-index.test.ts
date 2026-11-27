@@ -3,14 +3,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const cacheLife = vi.fn()
 vi.mock('next/cache', () => ({ cacheLife, cacheTag: () => undefined }))
 vi.mock('../auth/supabase-admin', () => ({ createAdminSupabase: () => ({}) }))
-const listTemplatesIn = vi.fn(async () => [])
-vi.mock('./list-templates', () => ({ listTemplatesIn }))
+// One shared read of the web rows (listTemplates); each list filters and localizes it (webTemplatesIn).
+const listTemplates = vi.fn(async () => [] as unknown[])
+const webTemplatesIn = vi.fn((rows: unknown[]) => rows)
+vi.mock('./list-templates', () => ({ listTemplates, listTemplatesIn: vi.fn(), webTemplatesIn }))
+const readLocaleDisplay = vi.fn(async () => ({ categoryOrder: {}, featured: {} }))
+vi.mock('./locale-display-read', () => ({ readLocaleDisplay }))
 
 const { logger } = await import('../logger')
 const { FAILED_READ_LIFE } = await import('../cache-life')
-const { CATALOGUE_LIFE, readCatalogue } = await import('./cached-catalogue')
+const { CATALOGUE_LIFE, readCatalogue, cachedPosterTemplates } = await import('./cached-catalogue')
 const { catalogueIndexOrNull } = await import('./cached-taxonomy')
-const { toCatalogueIndex } = await import('./catalogue-index')
+const { onePlace, toCatalogueIndex } = await import('./catalogue-index')
 
 const series = (id: string, slug: string) => ({ id, slug, name_en: `${slug} en`, name_zh: `${slug} 中`, description_en: null, description_zh: '说明', cover_url: null })
 
@@ -32,6 +36,16 @@ describe('catalogue index (T102)', () => {
       { type: 'template', id: 't1', categoryKey: 'pets' },
     ])
     expect(index.series).toEqual([{ id: 's1', slug: 'menu-set', name: 'menu-set en', description: null, coverUrl: null, memberIds: ['m1', 'm0', 'm2'] }])
+  })
+
+  it('drops the loose card of a series member: a template shows in its series only (Owner 2026-11-25)', () => {
+    const loose = [...entries, { type: 'template' as const, entry_key: 'template-m1', sort_order: 5, category_key: 'pets', template_id: 'm1', series_id: null, entry_series: null }]
+    expect(toCatalogueIndex([], loose, members, 'en').entries.map((entry) => entry.id)).toEqual(['s1', 't1'])
+  })
+
+  it('cleans an index cached before the rule the same way', () => {
+    const stale = { tree: [], entries: [{ type: 'series' as const, id: 's1', categoryKey: 'food' }, { type: 'template' as const, id: 'm1', categoryKey: 'pets' }, { type: 'template' as const, id: 't1', categoryKey: 'pets' }], series: [{ id: 's1', slug: 's', name: 'S', description: null, coverUrl: null, memberIds: ['m1'] }] }
+    expect(onePlace(stale).entries.map((entry) => entry.id)).toEqual(['s1', 't1'])
   })
 
   it('names the series in the page language', () => {
@@ -62,6 +76,23 @@ describe('cached catalogue index', () => {
 describe('web catalogue for marketing pages', () => {
   it('reads every live web template, series members included', async () => {
     await readCatalogue('zh')
-    expect(listTemplatesIn).toHaveBeenCalledWith(expect.anything(), 'zh', { includeSeriesMembers: true })
+    expect(listTemplates).toHaveBeenCalledWith(expect.anything(), 'web', { includeSeriesMembers: true })
+    expect(webTemplatesIn).toHaveBeenLastCalledWith(expect.anything(), 'zh')
   })
+
+  it("applies the language's own featured list and category order (migration 1575)", async () => {
+    const row = (id: string, category: string, featuredRank: number | null) =>
+      ({ id, category, categoryView: { sortOrder: 0 }, featuredRank })
+    listTemplates.mockResolvedValueOnce([row('a', 'chinese', 1), row('b', 'western', null)])
+    readLocaleDisplay.mockResolvedValueOnce({ categoryOrder: { en: { western: 10, chinese: 20 } }, featured: { en: ['b'] } })
+    const live = await readCatalogue('en') as unknown as { id: string; featuredRank: number | null; categoryView: { sortOrder: number } }[]
+    expect(live.map((t) => [t.id, t.featuredRank])).toEqual([['a', null], ['b', 1]])
+    expect(live[1].categoryView.sortOrder).toBeLessThan(live[0].categoryView.sortOrder)
+  })
+})
+
+it('reads poster series members even when their individual cards are hidden', async () => {
+  await cachedPosterTemplates('zh')
+  expect(listTemplates).toHaveBeenLastCalledWith(expect.anything(), 'web', { includeSeriesMembers: true })
+  expect(webTemplatesIn).toHaveBeenLastCalledWith(expect.anything(), 'zh', { posters: true })
 })

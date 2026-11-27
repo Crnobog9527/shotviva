@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { AppError } from '../errors'
+import { expireWallCache } from './wall'
 import type { ObjectStore } from '../storage'
 import { deleteImagesQuietly, storeRequestImages } from './images'
 import { wishlistRpc } from './rpc'
@@ -48,5 +49,7 @@ export async function toggleVote(db: SupabaseClient, userId: string, requestId: 
     { p_request_id: id.data, p_user_id: userId },
     voteRowsSchema,
   )
+  // The shared wall shows vote counts (wall.ts).
+  expireWallCache()
   return { voted: row.voted, votesCount: row.votes_count }
 }

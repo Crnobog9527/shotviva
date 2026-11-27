@@ -47,13 +47,13 @@ describe('effective_tier', () => {
     const userId = await account({ plan })
     expect(await effectiveTier(service, userId)).toBe(tier)
     expect(await currentTier(service, userId)).toBe(tier)
-    expect(await accountLimits(service, userId)).toEqual(TIER_LIMITS[tier ?? 'starter'])
+    expect(await accountLimits(service, userId)).toMatchObject(TIER_LIMITS[tier ?? 'starter'])
   })
 
   it.each([undefined, 'starter_monthly', 'pro_monthly'] as const)('is Max for an unbanned admin on %s, billing tier unchanged', async (plan) => {
     const userId = await account({ plan, admin: true })
     expect(await effectiveTier(service, userId)).toBe('max')
-    expect(await accountLimits(service, userId)).toEqual(TIER_LIMITS.max)
+    expect(await accountLimits(service, userId)).toMatchObject(TIER_LIMITS.max)
     // Pack member rates, upgrade rules and the membership card still read the real tier.
     expect(await currentTier(service, userId)).toBe(plan ? plan.replace('_monthly', '') : null)
   })
@@ -61,7 +61,7 @@ describe('effective_tier', () => {
   it('gives a banned admin nothing special', async () => {
     const free = await account({ admin: true, banned: true })
     expect(await effectiveTier(service, free)).toBeNull()
-    expect(await accountLimits(service, free)).toEqual(TIER_LIMITS.starter)
+    expect(await accountLimits(service, free)).toMatchObject(TIER_LIMITS.starter)
     const pro = await account({ plan: 'pro_monthly', admin: true, banned: true })
     expect(await effectiveTier(service, pro)).toBe('pro')
   })

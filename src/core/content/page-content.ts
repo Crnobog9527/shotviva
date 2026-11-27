@@ -21,20 +21,30 @@ export type HeroBlock = {
   after: ImageRef
   caption: string
   cta: { label: string; href: string }
-  // Home only: several AI results of the same phone photo that take turns on the AI side, each
-  // with its own caption. `after` and `caption` stay the first scene's, so anything that reads
-  // the plain pair still shows one consistent result. `label` names the scene switcher.
+  // Home only: several AI results that take turns on the AI side, each with its own caption.
+  // `after` and `caption` stay the first scene's, so anything that reads the plain pair still
+  // shows one consistent result. `label` names the scene switcher.
   scenes?: { label: string; items: readonly [HeroScene, HeroScene, ...HeroScene[]] }
 }
 
-export type HeroScene = { image: ImageRef; caption: string }
+// `before`: the scene's own phone photo, when each scene is a different dish (the /zh hero, Owner
+// 2026-11-24); without it every scene is a result of the hero's one phone photo. The first
+// scene's phone photo is always the hero's `before` (the server-rendered, preloaded plate).
+export type HeroScene = { image: ImageRef; caption: string; before?: ImageRef }
 
 // More real before/after pairs of one A/B hero option, in a row right under the first screen
 // (ARCHITECTURE §16.5): small, lazy pictures, never part of the first paint.
-export type HeroStripBlock = { heading: string; items: readonly { before: ImageRef; after: ImageRef; caption: string }[] }
+// An item read from a live template (the admin's 「更多真实案例」, migration 2006) names it in `pick`:
+// pressing the pair loads that template into the first-screen generator. `set`: the 精选组合 it
+// stands for (a badge with its template count; `showing` names the template whose pair is on show).
+// `pick`: the live template a press opens (a button); none, a plain picture. `template`: a built-in
+// pair's source template (the covers it was cut from), which becomes its `pick` while it is live.
+export type HeroStripItem = { before: ImageRef; after: ImageRef; caption: string; pick?: string; template?: string; set?: { count: number; showing: string } }
+export type HeroStripBlock = { heading: string; items: readonly HeroStripItem[] }
 
 // Block ②: verifiable facts, at least three (建站规格 G4).
-export type Fact = { label: string; value: string }
+// `brief`: one of the few rows a phone shows before the visitor opens the whole table (home facts).
+export type Fact = { label: string; value: string; brief?: boolean }
 
 // Block ④: 3–5 questions in the user's own words (the home page has nine, 建站规格 G6). `link`
 // renders after the answer text (e.g. FAQ D on the home page points to
@@ -92,7 +102,15 @@ export type PageBasics = {
 // `templates.defaultId`: the template the generator opens on when it is live, instead of the first
 // featured one (e.g. /transparent-background opens on the cut-out template). `compare`: an
 // optional H2 with one comparison table, right before the FAQ (SEO launch handbook 04-P1 H2-5).
+// A hero pair read live from a published template's covers (Owner 2026-11-25): the template's
+// current phone photo and result, so a cover changed in admin shows on the page once the
+// templates cache refreshes. The words are the page's, per dish; the pictures are the template's.
+export type LiveHeroPair = { templateId: string; phone: string; ai: string; caption: string }
+
 export type LandingParts = {
+  // The first screen's pair from a template's live covers; the static `hero` pictures stay as the
+  // fallback for when that template is not live.
+  liveHero?: LiveHeroPair
   factsNote: string
   templates?: { heading: string; intro: string; categoryKeys: readonly [string, ...string[]]; defaultId?: string }
   compare?: { heading: string; intro: string; table: FaqTable }
@@ -112,8 +130,14 @@ export type HomeFaq = readonly [FaqItem, FaqItem, FaqItem, FaqItem, FaqItem, Faq
 // price: the cards don't show one (DESIGN, Owner 2026-11-08).
 // `series`: a series card (T102; Owner 2026-11-12): where it opens, the members whose pairs it
 // shows (their covers are in the media lookup by template id), and how many templates it holds.
-export type SeriesCardInfo = { href: string; members: readonly string[]; count: number }
-export type TemplateCard = { id: string; name: string; use: string; series?: SeriesCardInfo }
+// `slug` names it for the home template panel (data-pick-set).
+export type SeriesCardInfo = { href: string; slug: string; members: readonly string[]; count: number }
+// `bundle`: a 精选组合 card (Owner 2026-11-25): the members whose pairs it cycles through (a click
+// picks the one on show) and every live template in it, named under the card.
+// `more`: the last chip, every template of the category the members share (its name, live count
+// and browse path), or every template (name null, path empty) when they share none.
+export type BundleCardInfo = { members: readonly string[]; templates: readonly { id: string; name: string }[]; more?: { name: string | null; count: number; path: readonly string[] } }
+export type TemplateCard = { id: string; name: string; use: string; series?: SeriesCardInfo; bundle?: BundleCardInfo }
 
 // One H3 per category with its featured templates, as rendered (建站规格 §4 H2-2). Name, intro
 // and order come from template_categories, managed in admin (T75); `drag`: its card style is
@@ -180,6 +204,14 @@ export type EditCases = {
   items: readonly [EditCase, EditCase, ...EditCase[]]
 }
 
+// Home: hotels and stays (Owner 2026-11-25). Four cases, each a small phone-photo/result pair that
+// opens a full-size viewer; phones show the first two inline and `more` ("See all 4") opens the
+// viewer on the rest. `template` binds a case to a published template: while that template is live
+// with both covers, the case shows them (cover_before_url / cover_after_url, home-spaces-live.ts)
+// and the pictures here are only the fallback.
+export type SpaceCase = EditCase & { template?: string }
+export type SpaceCases = Omit<EditCases, 'items'> & { items: readonly [SpaceCase, SpaceCase, ...SpaceCase[]]; more: string }
+
 // Home block ③: what three product photos cost, as two bills (DESIGN §6.9 item 6, Owner
 // 2026-11-06 replaced the table). Every number is read from site.config.
 export type BillTotal = { prefix?: string; amount: string; suffix?: string; when: string }
@@ -237,6 +269,9 @@ export type HomePage = Omit<PageBasics, 'related'> & {
   // "Edit text in an image with one sentence" (Owner 2026-11-11, shotviva-docs#7): before/after
   // pairs in which only the words change; right after the shoot demo.
   edits?: EditCases
+  // Hotels and stays (Owner 2026-11-24): 16:9 phone photo and result pairs of the hotel
+  // templates, right after the dish strip.
+  spaces?: SpaceCases
   // Intro paragraph above the facts table.
   factsIntro: string
   // H2-4: free credits, free vs paid works, then plans.

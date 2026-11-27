@@ -29,6 +29,11 @@ export function paymentChannel(): PaymentChannel {
   return serverEnv().PAYMENT_CHANNEL
 }
 
+// Whether Waffo's one-time checkout offers WeChat Pay (WAFFO_WECHAT_PAY, default off).
+export function waffoWechatPayEnabled(): boolean {
+  return serverEnv().WAFFO_WECHAT_PAY === 'on'
+}
+
 // Dashboard pastes arrive as one line with literal "\n", with CRLF, or as a bare base64 body.
 // Rewrap them as PEM; the PKCS#1 ("RSA … KEY") label is kept when it was there.
 export function normalizePem(raw: string, kind: 'PRIVATE' | 'PUBLIC'): string {

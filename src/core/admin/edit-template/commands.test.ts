@@ -83,3 +83,37 @@ describe('saveEditTemplate 「出图模型」', () => {
     await expect(saveEditTemplate(db, 'admin', input({ providerId: ARK, creditsCost: tiers(30) }), floors)).rejects.toThrow('模型支持 0–0 张输入图')
   })
 })
+
+// The minimum is max(catalogue tariff, route floor) (Owner 2026-11-23: edit 2K at 15, tariff 1997).
+describe('saveEditTemplate 下限', () => {
+  const tariff = { edit: { quality: 'medium' as const, costs: { '1k': 15, '2k': 15, '4k': 58 } } }
+  const CHEAP = '00000000-0000-4000-8000-0000000000c3'
+  const priced: ProviderFloors = {
+    ...floors, tariffs: tariff,
+    providers: { ...floors.providers, [CHEAP]: { high: tiers(5), medium: tiers(5), resolutions: ['1k', '2k', '4k'] } },
+    models: { ...floors.models, [CHEAP]: 'cheap-model' },
+  }
+  const price = { '1k': 15, '2k': 15, '4k': 58 }
+
+  it('saves 2K at the tariff on a line whose floor is lower', async () => {
+    const { db, rpc } = fakeDb()
+    await saveEditTemplate(db, 'admin', input({ providerId: CHEAP, creditsCost: price }), priced)
+    expect(rpc).toHaveBeenCalledOnce()
+  })
+
+  it('names the tier and the number, not a cost floor, when the line’s floor is higher', async () => {
+    const { db } = fakeDb()
+    // The default line's medium 2K floor is 20.
+    await expect(saveEditTemplate(db, 'admin', input({ providerId: DEFAULT, creditsCost: price }), priced)).rejects.toThrow('2K 不能低于 20 积分（填了 15）')
+    await expect(saveEditTemplate(db, 'admin', input({ providerId: DEFAULT, creditsCost: price }), priced)).rejects.not.toThrow(/成本保护下限/)
+  })
+})
+
+describe('saveEditTemplate and approvals', () => {
+  it('never lets an approval of the edit price skip a route’s floor (1997)', async () => {
+    const { db } = fakeDb()
+    const approved = { quality: 'medium' as const, costs: { '1k': 15, '2k': 15, '4k': 58 } }
+    const withApproval: ProviderFloors = { ...floors, approvals: { [DEFAULT]: { edit: approved } } }
+    await expect(saveEditTemplate(db, 'admin', input({ providerId: DEFAULT, creditsCost: approved.costs }), withApproval)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  })
+})

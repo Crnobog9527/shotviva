@@ -67,6 +67,12 @@ describe('ci-gate', async () => {
     ])
   })
 
+  it('fails when lint, typecheck or unit tests failed even though the build passed and Lighthouse ran', () => {
+    expect(gate({ ...base, CHECKS: 'failure', BUILD: 'success', LIGHTHOUSE: 'success' })).toBe(false)
+    expect(lighthouseDecision({ ...base, CHECKS: 'failure', BUILD: 'failure' }).why).toBe('not run: the build did not pass')
+    expect(gate({ ...base, BUILD: 'success', LIGHTHOUSE: 'success' })).toBe(true)
+  })
+
   it('explains forced runs, missing fingerprints and docs-only changes', () => {
     expect(lighthouseDecision({ ...base, FORCE: 'true', REASON: 'label run-lighthouse' }).why).toBe('run: forced (label run-lighthouse)')
     expect(lighthouseDecision({ ...base, PAGES: pages, BASE_PAGES: '' }).why).toBe('run: a fingerprint is missing')

@@ -4,7 +4,7 @@ import type { BusinessBlock } from '@/core/content/business'
 
 import { site } from '../site.config'
 import { businessForm } from './business-form'
-import { freeImagesLabel, offerFacts, perHundredCredits, plansSentence, usd } from './offer'
+import { freeImagesLabel, memberPacksSentence, offerFacts, perHundredCredits, plansSentence, usd, yearlyClaim } from './offer'
 
 // Final /pricing copy (T11, laid out as comps-v3-b pricing.html in T37). Every number is read
 // from site.config through offer.ts; the plan and pack cards themselves render from the
@@ -64,11 +64,11 @@ function faqs(products: readonly SiteProduct[]) {
     },
     {
       question: 'What do the free images include?',
-      answer: `New users get ${freeImagesLabel}, once. Photos made with free credits are public and carry a watermark. Photos made with paid credits are private, have no watermark and can be used commercially.`,
+      answer: `New users get ${freeImagesLabel}, once. Photos made with free credits are public and carry a watermark; free poster photos stay private, still watermarked. Photos made with paid credits are private, have no watermark and can be used commercially.`,
     },
     {
       question: 'Can I buy credits without a subscription?',
-      answer: site.billing.pricingVersion ? `Credit packs are one-time payments, open to everyone, and they give paid credits just like a plan. At list price, 100 credits cost about ${perHundredCredits('pack_s', products)}. The small pack is full price. On medium and large packs, active Starter members save 5%, Pro members 10%, and Max members 15%. The pack contains the same credits at every tier.`
+      answer: site.billing.pricingVersion ? `Credit packs are one-time payments, open to everyone, and they give paid credits just like a plan. At list price, 100 credits cost about ${perHundredCredits('pack_s', products)}. The small pack is full price.${memberPacksSentence(products)} The pack contains the same credits at every tier.`
         : 'Credit packs are one-time payments, open to everyone, and they give paid credits just like a plan.',
     },
     {
@@ -93,7 +93,7 @@ export function makePricingPage(products: readonly SiteProduct[]): PricingConten
   const { planFrom, yearlySaving } = offers
   const titlePrice = planFrom ? `Plans From ${usd(planFrom.priceUsd)} a Month` : 'Plans and Credit Packs'
   // GEO (03-S3): whole sentences a search answer can quote, every number from the catalog.
-  const yearly = yearlySaving ? ` Yearly ${brand} plans save up to ${yearlySaving}% compared with paying monthly.` : ''
+  const yearly = yearlySaving ? ` Yearly ${brand} plans ${yearlyClaim(yearlySaving)}.` : ''
 
   return {
     path: '/pricing',
@@ -103,6 +103,7 @@ export function makePricingPage(products: readonly SiteProduct[]): PricingConten
     h1: `${brand} Pricing: pay monthly, pay yearly, or buy credits once`,
     h1Em: 'or buy credits once',
     intro: `Every photo made with paid credits is private and watermark-free. ${plansSentence(offers)}${yearly}`,
+    currencyNote: 'All prices in USD.',
     gift: `New users get ${freeImagesLabel}. No card needed.`,
     creditBuys,
     business,

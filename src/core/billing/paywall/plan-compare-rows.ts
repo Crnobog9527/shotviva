@@ -1,4 +1,3 @@
-import { packMemberPercentOff } from '../pack-price'
 import { photoRange, type PhotoPrices, type PhotoRange } from '../photo-estimate'
 import { TIER_LIMITS } from '../tier-limits'
 import { monthlyAllowance, type Period, type TierOffer } from './offer'
@@ -24,6 +23,12 @@ function photoRow(offers: readonly TierOffer[], prices: PhotoPrices | null, peri
   return [{ key: 'photos', cells: ranges.map((range) => ({ format: 'range', range: range as PhotoRange })) }]
 }
 
+// One row while some shown tier gets a pack discount; a tier without one shows a dash (pct 0).
+function memberPackRow(offers: readonly TierOffer[], off: PerkOptions['memberPacks']): CompareRow[] {
+  if (!off || offers.every((o) => off[o.tier] === 0)) return []
+  return [{ key: 'memberPacks', cells: offers.map((o): CompareCell => ({ format: 'pct', value: off[o.tier] })) }]
+}
+
 export function compareRows(offers: readonly TierOffer[], facts: Facts, period?: Period): CompareRow[] {
   const limits = offers.map((offer) => TIER_LIMITS[offer.tier])
   return [
@@ -31,7 +36,7 @@ export function compareRows(offers: readonly TierOffer[], facts: Facts, period?:
     ...photoRow(offers, facts.photoPrices, period),
     { key: 'concurrency', cells: limits.map((l) => count(l.concurrency)) },
     { key: 'batch', cells: limits.map((l) => count(l.batchMax)) },
-    ...(facts.memberPacks ? [{ key: 'memberPacks', cells: offers.map((o): CompareCell => ({ format: 'pct', value: packMemberPercentOff(o.tier) })) }] : []),
+    ...(memberPackRow(offers, facts.memberPacks)),
     { key: 'support', cells: limits.map((l): CompareCell => ({ format: 'hours', value: l.supportHours })) },
     ...(facts.wishlistLive ? [{ key: 'votes', cells: limits.map((l): CompareCell => ({ format: 'weight', value: l.voteWeight })) }] : []),
     { key: 'noWatermark', cells: offers.map(() => CHECK) },

@@ -79,7 +79,6 @@ export function ProfilesPage({ templates, models, floors, categories, series, pr
     <div className="mx-auto grid w-full min-w-0 max-w-6xl gap-5 p-6">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-xl font-semibold">{copy.title}</h1>
-        <button type="button" className="text-sm underline underline-offset-4" onClick={() => router.push('/admin/templates')}>{copy.back}</button>
       </div>
       <p className="text-muted-foreground text-sm">{copy.intro}</p>
       {production && <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">{copy.production}</p>}

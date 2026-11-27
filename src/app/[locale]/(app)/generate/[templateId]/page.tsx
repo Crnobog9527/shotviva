@@ -1,11 +1,13 @@
+import { orgBalance } from '@/core/billing/pools'
 import { notFound, redirect } from 'next/navigation'
+import { readPoolChoiceOffer } from '@/core/org'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Suspense, type ReactNode } from 'react'
 
 import { AppPage, BalanceChip, FlowNav } from '@/core/app-shell'
 import { createAdminSupabase, createServerSupabase, requireUser } from '@/core/auth'
-import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
+import { batchLimitsOf, effectiveLimits, readBalance } from '@/core/billing'
 import { localizePath } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { listRunningJobIds } from '@/core/jobs'
@@ -13,6 +15,8 @@ import { findOffSaleTemplate, findWebTemplate, loadEditOffer } from '@/core/temp
 import { r2Store } from '@/core/storage'
 import { ImageWorkspace, loadAgain, loadReuse, posterHref, TemplateUnavailable, toCatalogueTemplate, WorkspaceHead, WorkspacePending } from '@/modules/image'
 import { site } from '@/site/site.config'
+
+import { createWorkShareAction } from '../../photos/share-actions'
 
 function Nav({ title, aside }: { title: string; aside?: ReactNode }) {
   const t = useTranslations('app.workspace')
@@ -37,6 +41,7 @@ type RouteProps = { params: Promise<{ templateId: string }>; searchParams: Promi
 // The workspace, a flow page: no tab bar, back to Create, one fixed primary (DESIGN §8.2).
 // ?again=<jobId> is Make again from a finished work (T40): its settings and kept photos.
 // ?reuse=<jobId> is 一键复用 from a public gallery work (T108): its settings, no photo.
+// ?again=<jobId>&clean=1 is 「去水印：用付费积分重新生成」: Make again, paid credits only.
 async function Workspace({ params, searchParams }: RouteProps) {
   const [{ templateId }, query] = await Promise.all([params, searchParams])
   const user = await requireUser(`/generate/${templateId}`)
@@ -52,28 +57,33 @@ async function Workspace({ params, searchParams }: RouteProps) {
   const againId = typeof query.again === 'string' ? query.again : undefined
   const reuseId = !againId && typeof query.reuse === 'string' ? query.reuse : undefined
   const admin = createAdminSupabase()
-  const [balance, tier, runningIds, again, reuse, editOffer] = await Promise.all([
+  const [balance, limits, runningIds, again, reuse, editOffer, poolChoice] = await Promise.all([
     readBalance(supabase, user.id),
-    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
-    effectiveTier(admin, user.id),
+    // effective_limits() (tier, an unbanned admin as Max, plus the org lift) is service-role only; the user's own id comes from the session.
+    effectiveLimits(admin, user.id),
     listRunningJobIds(admin, user.id, new Date()),
     loadAgain({ db: admin, store: r2Store }, { userId: user.id, jobId: againId, template }),
     loadReuse(site, { jobId: reuseId, template }),
     // "Edit this photo" on the done view only when editing is on (T30).
     loadEditOffer(supabase),
+    // 出图时让员工自选 (§6.5): only for a member holding both kinds of org credits.
+    readPoolChoiceOffer(admin, user.id),
   ])
   const t = await getTranslations('app.result')
   return (
     <>
-      <Nav title={template.name} aside={<BalanceChip balance={balance} />} />
+      <Nav title={template.name} aside={<BalanceChip balance={poolChoice ? orgBalance(poolChoice) : balance} />} />
       <WorkspaceHead template={template} />
       <ImageWorkspace
         template={template}
         balance={balance}
-        tier={tier}
-        concurrency={{ limit: limitsFor(tier).concurrency, runningIds }}
-        again={again ?? reuse}
+        tier={limits.tier}
+        batch={batchLimitsOf(limits)}
+        concurrency={{ limit: limits.concurrency, runningIds }}
+        poolChoice={poolChoice}
+        again={again && query.clean === '1' ? { ...again, paidOnly: true } : (again ?? reuse)}
         editable={editOffer !== null}
+        shareLink={createWorkShareAction}
         shareText={t('shareText', { brand: site.brand.name, url: `https://${site.brand.domain}/?utm_source=share&utm_medium=web_share` })}
       />
     </>

@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { listSignupClusters, loadUser, loadUserExtras, lookupUser } from '@/core/admin'
 import { reserveJob } from '@/core/jobs'
 
-import { connectAdmin, createPricedTemplate, createUser } from './helpers'
+import { connectAdmin, createPricedTemplate, createUser, uniqueIp } from './helpers'
 import { serviceSupabase } from './supabase-env'
 
 // T25 admin_lookup: every input shape finds its user (ARCHITECTURE §10「万能查找」), plus the
@@ -25,7 +25,7 @@ beforeAll(async () => {
   user = await createUser(db, { credits: 5 })
   email = (await db.query<{ email: string }>('select email from auth.users where id = $1', [user])).rows[0]!.email
   jobId = randomUUID()
-  await reserveJob(service, { jobId, userId: user, module: 'image', templateId: await createPricedTemplate(db), source: 'web', inputs: { resolution: '1k' } })
+  await reserveJob(service, { jobId, userId: user, module: 'image', templateId: await createPricedTemplate(db), source: 'web', inputs: { resolution: '2k' } })
   await db.query(
     `insert into public.payments (user_id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, amount_total, amount_tax, currency, method)
      values ($1, 'pack_s', 'stripe', $2, null, $3, 990, 0, 'usd', 'card'),
@@ -80,7 +80,7 @@ describe('admin_lookup', () => {
 
 describe('user detail blocks', () => {
   it('reads payments newest first, the subscription, and the same-IP accounts', async () => {
-    const ip = `198.51.100.${Math.floor(Math.random() * 200) + 20}`
+    const ip = uniqueIp()
     const twin = await createUser(db)
     await db.query('update public.profiles set signup_ip = $2 where id = any($1)', [[user, twin], ip])
     const profile = await loadUser(service, user)
@@ -97,8 +97,8 @@ describe('user detail blocks', () => {
 
 describe('admin_signup_ip_clusters', () => {
   it('lists an IP with 3 recent signups and its accounts, not one with 2', async () => {
-    const busy = `203.0.113.${Math.floor(Math.random() * 200) + 20}`
-    const quiet = `192.0.2.${Math.floor(Math.random() * 200) + 20}`
+    const busy = uniqueIp()
+    const quiet = uniqueIp()
     const members = [await createUser(db, { freeCredits: 6 }), await createUser(db), await createUser(db)]
     await db.query('update public.profiles set signup_ip = $2 where id = any($1)', [members, busy])
     await db.query('update public.profiles set signup_ip = $2 where id = any($1)', [[await createUser(db), await createUser(db)], quiet])

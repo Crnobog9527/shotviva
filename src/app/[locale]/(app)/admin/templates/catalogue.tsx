@@ -1,14 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import Link from 'next/link'
 import type { AbstractIntlMessages } from 'next-intl'
 
-import { CategoriesPanel, listAdminTemplates, TemplatesEditor } from '@/core/admin'
+import Link from 'next/link'
+
+import { listAdminTemplates, TemplatesEditor } from '@/core/admin'
 import { pricingFromOptions } from '@/core/admin/templates/provider-pricing'
 import { readPricingOptions } from '@/site/template-pricing'
 import { ModelSyncProvider } from '@/core/admin/image-provider-field/model-sync'
 import { listAdminCategoryTree } from '@/core/admin/template-categories'
-import { listAdminSeriesOptions, OrderHelp, seriesCopy } from '@/core/admin/template-series'
-import { moveTemplateCategoryAction } from './category-actions'
+import { listAdminSeriesOptions, OrderHelp } from '@/core/admin/template-series'
 import { AdminTemplatePreview } from './preview-provider'
 import { setTemplateSaleAction } from './sale-action'
 import { deleteTemplatesAction, setTemplatesSaleAction, setTemplatesSeriesAction } from './bulk-actions'
@@ -18,7 +18,7 @@ import { site } from '@/site/site.config'
 
 import { duplicateTemplateAction, listVersionsAction, manageVersionAction, readVersionAction } from './version-actions'
 import {
-  applyCoverAction, bulkEditTemplatesAction, deleteTemplateCategoryAction, saveTemplateCategoryAction,
+  applyCoverAction, bulkEditTemplatesAction,
   setFeaturedTemplatesAction, setTemplatesFeaturedAction, requestCoverUploadAction, saveTemplateAction, setTemplateActiveAction,
   setTemplateOrderAction, setTemplatesActiveAction, deleteTemplateAction,
 } from './actions'
@@ -46,20 +46,14 @@ export async function Catalogue({ data, edit }: { data: ReturnType<typeof loadCa
   const [templates, categories, series, providers, zhMessages] = await data
   return (
     <div className="mx-auto grid w-full min-w-0 max-w-6xl grid-cols-1 gap-6 p-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="mr-auto text-xl font-semibold">模板与提示词</h1>
-        <Link href="/admin/templates/series" className="text-sm underline underline-offset-4">{seriesCopy.title}</Link>
-        <Link href="/admin/templates/profiles" className="text-sm underline underline-offset-4">供应商配置</Link>
-        <Link href="/admin/templates/dishware" className="text-sm underline underline-offset-4">器皿图库</Link>
-        <Link href="/admin/templates/edit" className="text-sm underline underline-offset-4">
-          作品编辑的判断题和约束段落 →
-        </Link>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h1 className="text-xl font-semibold">模板与系列</h1>
+        {/* The home sections and the category tree used to sit here (Owner 2026-11-27, plan P2). */}
+        <p className="text-sm text-muted-foreground">
+          首页精选、精选组合、首屏大图等在 <Link href="/admin/home" className="underline underline-offset-4">首页展示</Link>，分类在上方「分类」标签。
+        </p>
       </div>
       <OrderHelp />
-      <CategoriesPanel
-        categories={categories}
-        actions={{ save: saveTemplateCategoryAction, move: moveTemplateCategoryAction, remove: deleteTemplateCategoryAction }}
-      />
       <ModelSyncProvider action={syncTemplateModel}>
       <AdminTemplatePreview zhMessages={zhMessages}>
       <TemplatesEditor initialEdit={edit}

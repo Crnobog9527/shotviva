@@ -2,7 +2,6 @@
 
 import { useTranslations } from "next-intl"
 
-import { pricingV2 } from '../../public-env'
 import type { PackProduct } from "../../config"
 import { cn } from "../../ui/cn"
 import { packLooks, productFor, type TierOffer } from "./offer"
@@ -13,6 +12,7 @@ import { useStanding } from "./standing-context"
 import { planStanding } from "./standing-pick"
 import { TierCard } from "./tier-card"
 import type { PaywallState } from "./use-paywall-state"
+import { packNote } from "./pack-note"
 
 // The tiers and the packs are one choice: both radiogroups share the input name, so picking a
 // pack clears the tier and the other way round (comps-v3-b paywall.html).
@@ -79,7 +79,7 @@ export function PackPicker({ packs, state }: { packs: PackProduct[]; state: Payw
     <>
       <div className="mt-6 mb-2 flex flex-wrap items-baseline justify-between gap-x-3 px-0.5">
         <h3 className="text-headline font-semibold">{t("packsTitle")}</h3>
-        <span className="text-caption text-muted-foreground">{t(pricingV2 ? "packsNoteV2" : "packsNote")}</span>
+        <span className="text-caption text-muted-foreground">{packNote(t, packs)}</span>
       </div>
       <div role="radiogroup" aria-label={t("packsLabel")} className="grid gap-2 md:grid-cols-3 md:gap-3">
         {packs.map((pack, i) => {

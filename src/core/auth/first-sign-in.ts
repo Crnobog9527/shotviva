@@ -1,18 +1,20 @@
 import 'server-only'
 import { cookies, headers } from 'next/headers'
 
-import { bindReferral } from '../affiliate/referral'
+import { bindSignupReferral } from '../affiliate/referral'
 import { noteSignupGift } from '../alerts'
 import { track } from '../analytics'
+import { COLLECTION_COOKIE, parseCollectionMark } from '../analytics/collection-link'
 import { parseShareMark, SHARE_COOKIE } from '../analytics/share-link'
 import { FIRST_TOUCH_COOKIE, recordFirstTouchAtSignIn } from '../attribution/sign-in'
 import { serverEnv } from '../env'
 import { signupExperiments, syncExperimentsAtSignIn } from '../experiments/server'
 import type { Locale } from '../i18n/locales'
 import { billingGrant, grantSignupCredits } from './free-credits'
-import { consumeSignupCode, type SignupBenefits } from './signup-code'
+import { consumeSignupCode, prepareSignupCode, type SignupBenefits } from './signup-code'
 import { claimQuietly } from './signup-gift-claim'
 import { clientIp, recordSignupIp } from './signup-ip'
+import { staffSignup, type StaffOrigin } from './staff-signup'
 import { createAdminSupabase } from './supabase-admin'
 
 export type SignInMethod = 'email' | 'google' | 'phone'
@@ -24,34 +26,98 @@ export type SignInMethod = 'email' | 'google' | 'phone'
 // same-IP rule refuses never has a grant applied. Without one (local dev) it falls back to the
 // grant, whose signup idempotency key applies only once.
 // `locale` is the language the account signed up in (user_metadata) or else the page's.
-// A template share link opened before signing up (core/analytics/share-link.ts), and the A/B
-// variants this browser saw first (ARCHITECTURE §16.5).
-function signupMarks(shareCookie: string | undefined, experiments: Parameters<typeof signupExperiments>[0]) {
-  const share = parseShareMark(shareCookie)
+// A template share link and a template collection link opened before signing up
+// (core/analytics/share-link.ts, collection-link.ts), and the A/B variants this browser saw first
+// (ARCHITECTURE §16.5).
+type Jar = { get(name: string): { value: string } | undefined }
+export function signupMarks(jar: Jar, experiments: Parameters<typeof signupExperiments>[0]) {
+  const share = parseShareMark(jar.get(SHARE_COOKIE)?.value)
+  const collection = parseCollectionMark(jar.get(COLLECTION_COOKIE)?.value)
   const seen = signupExperiments(experiments)
-  return { ...(share ? { share_template_id: share.templateId, share_id: share.shareId } : {}), ...(seen ? { experiments: seen } : {}) }
+  return {
+    ...(share ? { share_template_id: share.templateId, share_id: share.shareId } : {}),
+    ...(collection ? { share_collection_id: collection } : {}),
+    ...(seen ? { experiments: seen } : {}),
+  }
 }
 
 // Local dev runs on http; everywhere else the cookie is Secure.
 const isSecure = (head: Headers) => head.get('x-forwarded-proto') !== 'http'
+
+// Only a first sign-in (a new account) binds a partner's link: this browser's cookie, else the one
+// stored at email sign-up when the link is verified on another device (2021, core/affiliate/referral).
+async function bindFirstReferral(userId: string, first: boolean, fresh: boolean, cookie: string | undefined, signupConfirmation: boolean) {
+  if (first) await bindSignupReferral(userId, fresh, cookie, signupConfirmation)
+}
+
+// The signup gift (0 for a staff sign-up). 1480: an account over the per-network allowance is
+// pending; a confirmed phone or a linked Google account pays it now (a phone or Google sign-up,
+// or a Google account just linked). 2026: one the daily cap left pending is paid by the grant at
+// a later sign-in on a day with room (or by the daily catch-up, /api/cron/signup-gift-catch-up).
+async function payGift(admin: ReturnType<typeof createAdminSupabase>, userId: string, gift: number) {
+  const granted = await grantSignupCredits(billingGrant(admin), userId, gift)
+  const claimed = !granted && gift > 0 && (await claimQuietly(admin, userId))
+  return { granted, claimed }
+}
+
+// A partner's link (sv_ref) binds before the signup code is redeemed: an org member's invite code
+// binds the customer to the org only when nobody else already has (§6.5). A staff sign-up skips
+// both; the code cookie is still cleared. With an IP (always, behind Vercel) the first sign-in is
+// known before the gift (`knownFirst`), and the link binds first: grant_credits gives an org
+// partner's sign-up the looser per-network allowance from that binding, and pays the org bonus
+// after the gift (2024). Without one (local dev) the first sign-in is only known from the grant,
+// so the link binds after it, as before. Answers whether this is the account's first sign-in.
+async function bindAndPayGift(
+  admin: ReturnType<typeof createAdminSupabase>,
+  userId: string,
+  o: { knownFirst: boolean | null; staff: boolean | 'unchecked'; gift: number; cookie: string | undefined; signupConfirmation: boolean },
+): Promise<boolean> {
+  if (o.knownFirst !== null) await bindFirstReferral(userId, o.knownFirst, o.knownFirst && !o.staff, o.cookie, o.signupConfirmation)
+  const { granted, claimed } = await payGift(admin, userId, o.staff ? 0 : o.gift)
+  const first = o.knownFirst ?? granted
+  // A gift paid at a later sign-in (a claim, or a daily-cap catch-up) still counts toward today's.
+  if ((granted || claimed) && !first) noteSignupGift()
+  if (o.knownFirst === null) await bindFirstReferral(userId, first, first && !o.staff, o.cookie, o.signupConfirmation)
+  return first
+}
+
+// An unchecked staff link (the org lookup failed) leaves the IP for the next sign-in to store, so
+// that one is still the account's first for mark_staff_signup (1950).
+async function recordIpUnlessUnchecked(admin: ReturnType<typeof createAdminSupabase>, userId: string, address: string | null, staff: boolean | 'unchecked') {
+  return staff !== 'unchecked' && (await recordSignupIp(admin, userId, address))
+}
 
 export async function onVerifiedSignIn(
   userId: string,
   benefits: SignupBenefits,
   method: SignInMethod,
   locale: Locale,
+  // The staff link this sign-up came from (core/auth/staff-signup staffOriginFor), if any.
+  staffOrigin?: StaffOrigin | null,
+  // The sign-in is the click on a signup confirmation link: only then may the partner stored at
+  // email sign-up bind (2021). Any other first verification (a password reset or magic link on an
+  // unconfirmed account, Google) only clears it.
+  signupConfirmation?: boolean,
 ): Promise<void> {
   const admin = createAdminSupabase()
   const address = clientIp(await headers())
-  const ipStored = await recordSignupIp(admin, userId, address)
-  const granted = await grantSignupCredits(billingGrant(admin), userId, benefits.freeCredits)
-  // 1480: an account over the per-network allowance is pending; a confirmed phone or a linked
-  // Google account pays it now (a phone or Google sign-up, or a Google account just linked).
-  const claimed = !granted && benefits.freeCredits > 0 && (await claimQuietly(admin, userId))
-  const first = address ? ipStored : granted
-  if (claimed && !first) noteSignupGift()
-  const kind = await consumeSignupCode(admin, userId, first, benefits.invite, locale)
+  // An org's staff link (next = /join/org/<token>, or the origin stored at sign-up) on a new account signs up a staff account: no
+  // free credits, now or later (the stored refusal 'staff' stops every retry and claim,
+  // 1940/1950), and no signup code or partner binding. Before the signup IP is stored (the SQL
+  // reads "no IP yet" as the first verified sign-in) and before the grant, so it refuses.
+  const staff = await staffSignup(admin, userId, staffOrigin ?? null)
+  const ipStored = await recordIpUnlessUnchecked(admin, userId, address, staff)
   const jar = await cookies()
+  const useStored = signupConfirmation === true
+  // 2031: a new customer's sign-up code is staged before the gift, so an org staff invite code
+  // gets the org channel's gift allowance. Known only with an IP (always behind Vercel).
+  const prepared = address && ipStored && !staff ? await prepareSignupCode(admin, userId, useStored) : undefined
+  const first = await bindAndPayGift(admin, userId, {
+    knownFirst: address ? ipStored : null, staff, gift: benefits.freeCredits,
+    cookie: jar.get('sv_ref')?.value, signupConfirmation: useStored,
+  })
+  const fresh = first && !staff
+  const kind = await consumeSignupCode(admin, userId, { first, fresh, useStored, prepared }, benefits.invite, locale)
   // A/B variants onto the account, and the account's back into the cookie (ARCHITECTURE §16.5).
   const experiments = await syncExperimentsAtSignIn(admin, userId, first, jar, isSecure(await headers()))
   // Where this browser first landed, onto the account once (ARCHITECTURE §16.6).
@@ -59,7 +125,6 @@ export async function onVerifiedSignIn(
   if (first) {
     // 1350: tell the Owner when half, then all, of today's signup gifts are gone (after()).
     noteSignupGift()
-    track('signup', { method, code_kind: kind, ...signupMarks(jar.get(SHARE_COOKIE)?.value, experiments) }, { distinctId: userId, locale })
-    await bindReferral(userId, jar.get('sv_ref')?.value, 'signup')
+    track('signup', { method, code_kind: kind, ...signupMarks(jar, experiments) }, { distinctId: userId, locale })
   }
 }

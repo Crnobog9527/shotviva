@@ -9,9 +9,11 @@ const shownImage = vi.fn(async () => mocks.shown)
 vi.mock('./reads', () => ({ shownImage: () => shownImage() }))
 
 const { parseImageQuery, renderGalleryImage } = await import('./image')
-const { galleryVariantKey } = await import('./variants')
+const { galleryVariantKey, galleryVariantVersion } = await import('./variants')
 
 const OUTPUT = 'outputs/u/x.png'
+const ID = '33333333-3333-4333-8333-333333333333'
+const galleryKey = (width: 480 | 960, pool: 'free' | 'paid') => galleryVariantKey(OUTPUT, width, galleryVariantVersion(pool))
 const noSuchKey = () => Object.assign(new Error('gone'), { name: 'NoSuchKey' })
 
 // R2 says NoSuchKey for a missing object; the memory fake's message alone is not enough.
@@ -45,23 +47,23 @@ describe('gallery image', () => {
   it('is nothing for a work the gallery does not show, and for a file already gone', async () => {
     const r2 = r2Like()
     const { deps: d } = deps(r2.store)
-    expect(await renderGalleryImage(d, 'x', 480)).toBeNull()
+    expect(await renderGalleryImage(d, ID, 480)).toBeNull()
     expect(r2.store.get).not.toHaveBeenCalled()
     mocks.shown = { outputKey: OUTPUT, creditPool: 'free' }
-    expect(await renderGalleryImage(d, 'x', 480)).toBeNull()
+    expect(await renderGalleryImage(d, ID, 480)).toBeNull()
     r2.store.get.mockRejectedValueOnce(noSuchKey()).mockRejectedValueOnce(new Error('network'))
-    await expect(renderGalleryImage(d, 'x', 480)).rejects.toThrow('network')
+    await expect(renderGalleryImage(d, ID, 480)).rejects.toThrow('network')
   })
 
   it('serves the ready-made copy as is, without touching the original', async () => {
     const r2 = r2Like()
     const ready = new Uint8Array([1, 2, 3])
-    r2.upload(galleryVariantKey(OUTPUT, 960), ready, 'image/webp')
+    r2.upload(galleryKey(960, 'free'), ready, 'image/webp')
     mocks.shown = { outputKey: OUTPUT, creditPool: 'free' }
     const { deps: d } = deps(r2.store)
-    expect(await renderGalleryImage(d, 'x', 960)).toEqual(ready)
+    expect(await renderGalleryImage(d, ID, 960)).toEqual(ready)
     expect(r2.store.get).toHaveBeenCalledTimes(1)
-    expect(r2.store.get).toHaveBeenCalledWith(galleryVariantKey(OUTPUT, 960))
+    expect(r2.store.get).toHaveBeenCalledWith(galleryKey(960, 'free'))
   })
 
   it('without a copy, renders from the original and writes both copies after the response', async () => {
@@ -69,14 +71,14 @@ describe('gallery image', () => {
     r2.upload(OUTPUT, await png(1200, 1500), 'image/png')
     mocks.shown = { outputKey: OUTPUT, creditPool: 'paid' }
     const { deps: d, runDeferred } = deps(r2.store)
-    const body = await renderGalleryImage(d, 'x', 480)
+    const body = await renderGalleryImage(d, ID, 480)
     expect(await sharp(body!).metadata()).toMatchObject({ format: 'webp', width: 480 })
-    expect(r2.objects.has(galleryVariantKey(OUTPUT, 480))).toBe(false)
+    expect(r2.objects.has(galleryKey(480, 'paid'))).toBe(false)
     await runDeferred()
-    expect(r2.objects.get(galleryVariantKey(OUTPUT, 480))?.body).toEqual(body)
-    expect(await sharp(r2.objects.get(galleryVariantKey(OUTPUT, 960))!.body).metadata()).toMatchObject({ format: 'webp', width: 960 })
+    expect(r2.objects.get(galleryKey(480, 'paid'))?.body).toEqual(body)
+    expect(await sharp(r2.objects.get(galleryKey(960, 'paid'))!.body).metadata()).toMatchObject({ format: 'webp', width: 960 })
     // The next miss reads the copy.
-    expect(await renderGalleryImage(d, 'x', 960)).toEqual(r2.objects.get(galleryVariantKey(OUTPUT, 960))!.body)
+    expect(await renderGalleryImage(d, ID, 960)).toEqual(r2.objects.get(galleryKey(960, 'paid'))!.body)
   })
 
   it('does not write the copies when the work stopped being shown before the write', async () => {
@@ -84,7 +86,7 @@ describe('gallery image', () => {
     r2.upload(OUTPUT, await png(600, 600), 'image/png')
     mocks.shown = { outputKey: OUTPUT, creditPool: 'free' }
     const { deps: d, runDeferred } = deps(r2.store)
-    expect(await renderGalleryImage(d, 'x', 480)).not.toBeNull()
+    expect(await renderGalleryImage(d, ID, 480)).not.toBeNull()
     mocks.shown = null // rejected while the response was on its way
     await runDeferred()
     expect([...r2.objects.keys()].filter((key) => key.includes('-gallery-'))).toEqual([])
@@ -96,6 +98,6 @@ describe('gallery image', () => {
     mocks.shown = { outputKey: OUTPUT, creditPool: 'free' }
     r2.store.get.mockRejectedValueOnce(new Error('timeout'))
     const { deps: d } = deps(r2.store)
-    expect(await sharp((await renderGalleryImage(d, 'x', 480))!).metadata()).toMatchObject({ format: 'webp', width: 480 })
+    expect(await sharp((await renderGalleryImage(d, ID, 480))!).metadata()).toMatchObject({ format: 'webp', width: 480 })
   })
 })

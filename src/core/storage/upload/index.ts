@@ -4,6 +4,7 @@
 export { compressImage, targetSize } from './compress-image'
 export { putWithProgress } from './put-with-progress'
 export { requestTicket } from './request-ticket'
+export { createTicketPool } from './ticket-pool'
 export {
   checkPickedFile,
   isAbort,

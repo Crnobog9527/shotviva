@@ -7,13 +7,18 @@ import { callRpc, type RpcClient } from './rpc'
 
 export {
   BASE_SUPPORT_REPLY_HOURS,
+  BATCH_SIZE_CEILING,
   MAX_BATCH_SIZE,
   TIER_LIMITS,
+  batchLimitsOf,
   batchUpgrade,
   limitsFor,
   tierForBatch,
+  type BatchLimits,
+  type EffectiveLimits,
   type TierLimits,
 } from './tier-limits'
+export { effectiveLimits, featureTierOf } from './effective-limits'
 
 // Membership tier perks (ARCHITECTURE §6.2 "会员档位权益"). The tier itself comes only from the
 // SQL function current_tier(); code never derives it from paid_until or purchases on its own.

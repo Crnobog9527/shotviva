@@ -8,7 +8,7 @@ const ref = (file: string, width: number, height: number, alt: string): ImageRef
 
 export const zhHomeWishlist: WishlistPromo = {
   heading: { lead: '没找到合适的模板？', emphasis: '许个愿', tail: '，我们来做' },
-  intro: '许愿墙是卖家提出想要的模板、一起投票决定先做哪个的地方。',
+  intro: '在许愿墙提出你想要的模板，大家一起投票，票数高的优先上线。',
   points: [
     {
       heading: '你的品类还没有模板',

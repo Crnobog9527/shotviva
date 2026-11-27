@@ -1,5 +1,6 @@
 import type { Breadcrumb, ErrorEvent } from '@sentry/nextjs'
 
+import { redactInvitePath } from '../invite-path'
 import { redact, redactString } from '../logger'
 
 // ARCHITECTURE §16.3: strip emails, tokens and prompts before anything leaves for Sentry.
@@ -22,7 +23,7 @@ function pathOnly(url: string | undefined): string | undefined {
   if (!url) return url
   try {
     const parsed = new URL(url, 'http://localhost')
-    return url.startsWith('/') ? parsed.pathname : `${parsed.origin}${parsed.pathname}`
+    return redactInvitePath(url.startsWith('/') ? parsed.pathname : `${parsed.origin}${parsed.pathname}`)
   } catch {
     return '[redacted]'
   }

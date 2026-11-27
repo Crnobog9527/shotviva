@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { AppError } from '../errors'
 import type { Balance } from './pools'
 
-const balanceRowSchema = z.object({
+export const balanceRowSchema = z.object({
   credits: z.number().int().nonnegative(),
   free_credits: z.number().int().nonnegative(),
 })

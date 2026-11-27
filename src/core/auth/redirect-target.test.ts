@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { arrivedFrom, DEFAULT_AFTER_LOGIN, loginPath, sanitizeNext, signedInTarget } from './redirect-target'
+import { arrivedFrom, DEFAULT_AFTER_LOGIN, loginPath, sanitizeNext, signedInTarget, signupPath } from './redirect-target'
 
 describe('sanitizeNext', () => {
   it('keeps same-site paths with query', () => {
@@ -27,6 +27,11 @@ describe('sanitizeNext', () => {
 
   it('builds an encoded login path', () => {
     expect(loginPath('/account?x=1')).toBe('/login?next=%2Faccount%3Fx%3D1')
+  })
+
+  it('builds an encoded sign-up path with the same rule', () => {
+    expect(signupPath('/zh/join/org/abc')).toBe('/signup?next=%2Fzh%2Fjoin%2Forg%2Fabc')
+    expect(signupPath('//evil.example')).toBe('/signup?next=%2Faccount')
   })
 })
 

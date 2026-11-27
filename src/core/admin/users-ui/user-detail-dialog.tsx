@@ -35,7 +35,13 @@ export function UserDetailDialog({ userId, jobId, actions, stripeLive, onClose }
   const detail = useUserDetail(userId, jobId, actions.load)
   const { reload } = detail
   const userActions = useMemo<UserAdminActions>(
-    () => ({ adjust: reloading(actions.user.adjust, reload), ban: reloading(actions.user.ban, reload), unban: reloading(actions.user.unban, reload) }),
+    () => ({
+      adjust: reloading(actions.user.adjust, reload),
+      ban: reloading(actions.user.ban, reload),
+      unban: reloading(actions.user.unban, reload),
+      bind: actions.user.bind ? reloading(actions.user.bind, reload) : undefined,
+      searchPartners: actions.user.searchPartners,
+    }),
     [actions.user, reload],
   )
   const jobActions = useMemo<JobSupportActions>(() => ({ view: actions.jobs.view, compensate: reloading(actions.jobs.compensate, reload) }), [actions.jobs, reload])

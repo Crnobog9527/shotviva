@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { COPY } from './copy'
 import { MutationForm, type SaveAction } from './form'
 import { Field, Hidden, Select } from './parts'
-import { Rates, type Rate } from './rates'
+import { Rates, type OrgL2Defaults, type Rate } from './rates'
 import type { Member } from './read'
 
 function Slug({ value }: { value?: string }) {
@@ -31,7 +31,7 @@ export function ReopenApplication({ member, action }: { member: Member; action: 
     </MutationForm>
   )
 }
-export function SetMember({ member, rates, action }: { member: Member; rates: Rate[]; action: SaveAction }) {
+export function SetMember({ member, rates, action, orgL2Defaults }: { member: Member; rates: Rate[]; action: SaveAction; orgL2Defaults?: OrgL2Defaults }) {
   return (
     <MutationForm action={action} operation="set" label={COPY.save}>
       <Hidden name="user_id" value={member.user_id} />
@@ -48,7 +48,20 @@ export function SetMember({ member, rates, action }: { member: Member; rates: Ra
         <input type="checkbox" name="void_unconfirmed" />
         {COPY.voidUnconfirmed}
       </label>
-      <Rates values={rates} optional />
+      <Rates values={rates} optional orgL2Defaults={orgL2Defaults} />
+    </MutationForm>
+  )
+}
+export function MembershipSwitch({ member, action }: { member: Member; action: SaveAction }) {
+  const suspend = member.status === 'active'
+  if (!suspend && member.status !== 'suspended') return null
+  return (
+    <MutationForm action={action} operation="membership" destructive={suspend}
+      label={suspend ? COPY.suspendMembership : COPY.restoreMembership}
+      confirm={suspend ? COPY.confirmSuspend(member.slug) : COPY.confirmRestore(member.slug)}>
+      <Hidden name="user_id" value={member.user_id} />
+      <Hidden name="status" value={suspend ? 'suspended' : 'active'} />
+      <p className="text-sm text-muted-foreground">{suspend ? COPY.suspendEffect : COPY.restoreEffect}</p>
     </MutationForm>
   )
 }

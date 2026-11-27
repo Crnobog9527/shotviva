@@ -7,10 +7,11 @@ import { fillCredits } from './credits'
 import { homePage } from './home'
 import { perHundredCredits, plansSentence, quoteUsd, usdRange, yearlySaving } from './offer'
 import { imageToImageGenerator } from './pages/image-to-image-generator'
-import { pricingPage } from './pricing'
+import { makePricingPage, pricingPage } from './pricing'
+import { makeZhPricingPage } from './zh/pricing'
 import { zhHomePage } from './zh/home'
 
-const LIVE = { from: 1, same: false }
+const LIVE = { from: 1, same: false, gift: 100 }
 
 // The copy fills in from the nine products in site.config (ARCHITECTURE §6.2) without anyone
 // typing a number into it (建站规格 G3).
@@ -20,14 +21,15 @@ describe('copy with the catalog in site.config', () => {
     expect(plansSentence()).toBe(
       'Plans start at $19.90 a month for 1990 credits, or buy a one-time credit pack from $9.90.',
     )
-    // Largest yearly saving, rounded: Max 39.98% → 40 (DESIGN §6.9).
-    expect(yearlySaving).toBe(25)
+    // Revision-2 seed (prices unchanged by the 2026-11-21 plan): Starter / Pro 20%, Max 25%.
+    expect(yearlySaving).toMatchObject({ pct: 20, upTo: 25 })
   })
 
   it('fills the /pricing title, lede and credit costs from config', () => {
     expect(pricingPage.title).toBe('Shotviva Pricing: Plans From $19.90 a Month')
     expect(fillCredits(pricingPage.intro, LIVE)).not.toContain('A photo costs')
-    expect(pricingPage.intro).toContain('Yearly Shotviva plans save up to 25% compared with paying monthly.')
+    expect(pricingPage.intro).toContain('Yearly Shotviva plans save 20% compared with paying monthly (Max saves 25%).')
+    expect(pricingPage.intro).not.toMatch(/up to/)
     expect(pricingPage.intro).toContain('one-time credit pack from $9.90.')
     expect(fillCredits(pricingPage.gift, LIVE)).toBe('New users get 100 free credits. No card needed.')
     expect(pricingPage.creditBuys.note).toContain('template and resolution')
@@ -67,5 +69,32 @@ describe('how long a photo takes', () => {
     }
     expect(en.app.workspace.leave).toContain(`about ${n} seconds`)
     expect(zh.app.workspace.leave).toContain(`${n} 秒左右`)
+  })
+})
+
+// The 2026-11-21 plan: credits change (5,500 / 11,500 monthly, × 12 yearly).
+describe('copy under the credits-only plan', () => {
+  const credits: Record<string, number> = { starter_monthly: 2000, starter_yearly: 24000, pro_monthly: 5500, pro_yearly: 66000, max_monthly: 11500, max_yearly: 138000 }
+  const o2 = site.billing.products.map(p => credits[p.id] ? { ...p, credits: credits[p.id]! } : p)
+
+  it('states each plan\'s yearly saving in both languages', () => {
+    expect(makePricingPage(o2).intro).toContain('Yearly Shotviva plans save 20% compared with paying monthly (Max saves 25%).')
+    expect(makeZhPricingPage(o2).intro).toContain('按年付省 20%（旗舰版省 25%）。')
+  })
+
+  // Final terms: yearly $192 / $480 / $950 (19.6% / 19.8% / 20.03%): 「约省 20%」 (Owner 2026-11-21).
+  it('says about 20% for every plan', () => {
+    const yearly: Record<string, number> = { starter_yearly: 192, pro_yearly: 480, max_yearly: 950 }
+    const b = o2.map(p => yearly[p.id] ? { ...p, priceUsd: yearly[p.id]! } : p)
+    expect(makePricingPage(b).intro).toContain('Yearly Shotviva plans save about 20% compared with paying monthly.')
+    expect(makeZhPricingPage(b).intro).toContain('按年付约省 20%。')
+  })
+
+  it('states the member pack discounts of the listed packs, Starter at list price', () => {
+    const packs = o2.map(p => p.id === 'pack_m' || p.id === 'pack_l' ? { ...p, packMemberPayPct: { starter: 100, pro: 95, max: 90 } } : p)
+    const answer = (page: { faq: readonly { question: string; answer: string }[] }, q: RegExp) => page.faq.find(f => q.test(f.question))!.answer
+    expect(answer(makePricingPage(packs), /without a subscription/)).toContain('On medium and large packs, active Pro members save 5%, and Max members 10%.')
+    expect(answer(makeZhPricingPage(packs), /不订阅/)).toContain('中包和大包按当前会员等级享折扣，入门版原价、专业版 95 折、旗舰版 9 折。')
+    expect(answer(pricingPage, /without a subscription/)).toContain('active Starter members save 5%, Pro members 10%, and Max members 15%.')
   })
 })

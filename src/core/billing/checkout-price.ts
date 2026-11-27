@@ -1,15 +1,12 @@
 import type { MembershipTier, SiteConfig, SiteProduct } from '../config'
-import { packPriceCents } from './pack-price'
+import { hasMemberRate, packPriceCents } from './pack-price'
+export { hasMemberRate }
 
 export type CheckoutPrice = { cents: number; credits: number; memberTier: MembershipTier | null }
 export type PricingVersion = SiteConfig['billing']['pricingVersion']
 
 export function configuredPricing(billing: SiteConfig['billing']): PricingVersion {
   return billing.pricingVersion
-}
-
-export function hasMemberRate(product: SiteProduct): boolean {
-  return product.id === 'pack_m' || product.id === 'pack_l'
 }
 
 export function quoteCheckout(product: SiteProduct, tier: MembershipTier | null): CheckoutPrice {

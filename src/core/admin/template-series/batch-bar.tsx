@@ -8,12 +8,13 @@ import { Textarea } from '@/core/ui/textarea'
 
 import { seriesCopy as copy } from './copy'
 
+// 「成员也在分类中单独展示」 is gone from the page (Owner 2026-11-25): Create shows each template in
+// one place only, its series' shelf, so the flag no longer changes anything there. The column, its
+// saved values and the batch function stay (expand-only); a save carries the stored value through.
 export type BatchChoice = { field: 'is_active' | 'show_members'; value: boolean; label: string }
 const CHOICES: BatchChoice[] = [
   { field: 'is_active', value: true, label: copy.batchPublish },
   { field: 'is_active', value: false, label: copy.batchUnpublish },
-  { field: 'show_members', value: true, label: copy.batchShowOn },
-  { field: 'show_members', value: false, label: copy.batchShowOff },
 ]
 
 type Props = { names: string[]; pending: boolean; clear: () => void; apply: (choice: BatchChoice, reason: string | null) => void; remove: () => void }

@@ -6,10 +6,9 @@ import { FaqSection } from './blocks/faq-section'
 import { HomeHero } from './blocks/home-hero'
 import { FreeOfferSection, HomeFacts, StepsSection } from './blocks/home-sections'
 import { RelatedLinks } from './blocks/related-links'
-import { ShootSection } from './blocks/shoot-section'
+import { SpacesSection } from './blocks/spaces-section'
 import { TemplateGrid, type FeaturedSections } from './blocks/template-grid'
 import { TopicCards } from './blocks/topic-section'
-import { WishlistSection } from './blocks/wishlist-section'
 import { HeroStrip } from './blocks/hero-strip'
 import type { HeroStripBlock, HomePage } from './page-content'
 
@@ -21,36 +20,32 @@ type Props = {
   templates: FeaturedSections
   // The first-screen generator (modules/image, client), slotted under the hero pair.
   generator: ReactNode
-  // The wishlist section's CTA (signed in or not, a request-time slot); null while the
-  // wishlist is off, which drops the whole section.
-  wishlistCta: ReactNode | null
   // An A/B hero option's line under the direct answer (ARCHITECTURE §16.5).
   heroTagline?: string
   // An A/B hero option's further pairs, in a row under the first screen.
   heroStrip?: HeroStripBlock
 }
 
-// Home block order is fixed (ARCHITECTURE §13, 建站规格 §4): H1 + answer → hero + generator →
-// the "full shoot" demo → the six H2s in order, with the two bills (block ③) after the free
-// offer, as in the signed-off v3-b comp (design/comps-v3-b/home.html). While the wishlist is
-// open, "Can't find your template?" follows the grid (Owner 2026-11-10); it is not one of the six.
-// An optional topic H2 (SEO launch handbook G9) sits between the grid and the wishlist; the
-// optional text-edit cases follow the shoot demo.
-export function HomePageView({ page, brand, isLinkEnabled, templates, generator, wishlistCta, heroTagline, heroStrip }: Props) {
+// Home block order (Owner 2026-11-24: restaurants and hotels first, a shorter phone page): H1 +
+// answer → hero + generator → the real dish pairs → hotels and stays → text edits → the steps → the templates
+// (food and spaces only, home-page.tsx) → the facts (the wishlist line went 2026-11-25) → free offer → the two
+// bills (block ③, which also carry the plans the JSON-LD offers read) → FAQ → the use-case topic
+// H2 (SEO G5 / S4, kept, now at the end) → related links. The six H2s of 建站规格 §4 keep their
+// order. The "full shoot" demo no longer shows on the home page (/commercial-photography has it).
+export function HomePageView({ page, brand, isLinkEnabled, templates, generator, heroTagline, heroStrip }: Props) {
   return (
-    <article className="mk-home mk-w">
+    <article className="mk-home mk-front mk-w">
       <HomeHero page={page} generator={generator} tagline={heroTagline} />
       {heroStrip ? <HeroStrip strip={heroStrip} /> : null}
-      <ShootSection shoot={page.shoot} />
+      {page.spaces ? <SpacesSection spaces={page.spaces} /> : null}
       {page.edits ? <EditCasesSection edits={page.edits} /> : null}
       <StepsSection steps={page.steps} />
       <TemplateGrid grid={page.templateGrid} sections={templates} isLinkEnabled={isLinkEnabled} />
-      {page.topics ? <TopicCards topic={page.topics} isLinkEnabled={isLinkEnabled} /> : null}
-      {wishlistCta ? <WishlistSection block={page.wishlist} cta={wishlistCta} /> : null}
       <HomeFacts facts={page.facts} heading={page.headings.facts} intro={page.factsIntro} />
       <FreeOfferSection offer={page.freeOffer} brand={brand} />
       <CostBillsSection bills={page.costBills} plans={page.plans} />
       <FaqSection faq={page.faq} heading={page.headings.faq} isLinkEnabled={isLinkEnabled} variant="accordion" />
+      {page.topics ? <TopicCards topic={page.topics} isLinkEnabled={isLinkEnabled} /> : null}
       <RelatedLinks heading={page.headings.related} links={page.related.filter((link) => isLinkEnabled(link.href))} variant="cards" />
     </article>
   )

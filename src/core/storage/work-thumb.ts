@@ -3,7 +3,7 @@ import 'server-only'
 import { logger } from '../logger'
 import { workThumbKeyFor } from './keys'
 import type { ObjectStore } from './object-store'
-import { workThumbImage } from './watermark'
+import { shouldWatermark, workThumbImage } from './watermark'
 
 // ARCHITECTURE §8.3「作品小图」: lists show this instead of the full output (a 1K PNG is about
 // 1MB, a 2K one over 5MB; this is about 20KB). 480 on the short edge fills a Photos tile on a
@@ -15,10 +15,11 @@ const CACHE_CONTROL = 'private, max-age=31536000, immutable'
 
 // Never throws: a work without its small copy is shown from the full file (job-thumb.ts), which
 // must not turn a finished, paid result into an error.
-export async function writeWorkThumb(store: Pick<ObjectStore, 'put'>, input: { userId: string; jobId: string; bytes: Uint8Array; watermark: boolean }): Promise<boolean> {
+// pool: the work's credit_pool; a free work's copy is the protected one, under its own key.
+export async function writeWorkThumb(store: Pick<ObjectStore, 'put'>, input: { userId: string; jobId: string; bytes: Uint8Array; pool: 'free' | 'paid' }): Promise<boolean> {
   try {
-    const thumb = await workThumbImage(input.bytes, WORK_THUMB_PX, input.watermark)
-    await store.put(workThumbKeyFor(input.userId, input.jobId), thumb, 'image/webp', { cacheControl: CACHE_CONTROL })
+    const thumb = await workThumbImage(input.bytes, WORK_THUMB_PX, shouldWatermark(input.pool) ? { jobId: input.jobId } : null)
+    await store.put(workThumbKeyFor(input.userId, input.jobId, input.pool), thumb, 'image/webp', { cacheControl: CACHE_CONTROL })
     return true
   } catch (error) {
     logger.warn('work thumbnail not written', { jobId: input.jobId, error })

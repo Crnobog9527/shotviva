@@ -2,6 +2,9 @@ import { absoluteUrl, indexingOpenNow, noindexForHost } from '@/core/seo'
 import { site } from '@/site/site.config'
 
 // Public discovery metadata. Advertise the documentation only where /llms.txt is published.
+// Answered per request with no Cache-Control, like /llms.txt: the body depends on the host and the
+// live indexing switch, and the proxy may attach refreshed session cookies, so no shared cache
+// may keep it.
 export function GET(request: Request) {
   const { domain, name } = site.brand
   const published = !noindexForHost(indexingOpenNow(), request.headers.get('host'), domain)

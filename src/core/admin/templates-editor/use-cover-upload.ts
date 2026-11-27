@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 
 import { coverFileProblem, MAX_COVER_VIDEO_SECONDS, type CoverPurpose } from '../covers/cover-rules'
 import type { ApplyCoverRequest, TemplateAdminActions } from '../templates/types'
@@ -37,8 +37,11 @@ export function useCoverUpload(templateId: string, actions: CoverActions, locale
   const [pending, startTransition] = useTransition()
   const [busy, setBusy] = useState<CoverSlot | 'clear' | 'clear-locale' | null>(null)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
+  const inFlight = useRef(false)
 
   const run = (slot: CoverSlot | 'clear' | 'clear-locale', work: () => Promise<ApplyCoverRequest>) => {
+    if (inFlight.current) return
+    inFlight.current = true
     setBusy(slot)
     setMessage(null)
     startTransition(async () => {
@@ -48,6 +51,7 @@ export function useCoverUpload(templateId: string, actions: CoverActions, locale
       } catch (error) {
         setMessage({ ok: false, text: error instanceof UploadProblem ? error.message : '上传失败，请重试' })
       } finally {
+        inFlight.current = false
         setBusy(null)
       }
     })

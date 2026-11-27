@@ -17,7 +17,8 @@ let rpc: ReturnType<typeof vi.fn>
 let deps: WaffoWebhookDeps
 
 beforeEach(() => {
-  rpc = vi.fn(async () => ({ data: { applied: true, credits: 20, free_credits: 0, paid_until: null }, error: null }))
+  // payment_fee_target (F3's fee step) finds no payments row in these tests, so no fee is written.
+  rpc = vi.fn(async (fn: string) => fn === 'payment_fee_target' ? { data: null, error: null } : { data: { applied: true, credits: 20, free_credits: 0, paid_until: null }, error: null })
   deps = {
     db: { rpc } as unknown as WaffoWebhookDeps['db'],
     products: TEST_PRODUCTS,
@@ -94,7 +95,7 @@ describe('handleWaffoWebhook', () => {
       p_amount_tax: 159,
       p_method: 'alipay',
     })
-    expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ channel: 'waffo', form: 'one_time', method: 'alipay', amount_usd: 19.9 }), 'en')
+    expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ channel: 'waffo', form: 'one_time', method: 'alipay', amount_usd: 19.9 }), 'en', expect.any(String))
   })
 
   it('ignores events this site never starts', async () => {
@@ -171,7 +172,7 @@ describe('handleWaffoWebhook, card subscriptions (T50)', () => {
     const result = await deliver(event)
     expect(result).toMatchObject({ status: 200, body: { outcome: 'applied' } })
     expect(rpc).toHaveBeenCalledWith('settle_waffo_order', expect.objectContaining({ p_user_id: USER, p_product_id: 'pro_monthly', p_payment_id: event.eventId, p_order_id: 'ORD_sub1', p_method: 'card' }))
-    expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'subscription', channel: 'waffo', product_id: 'pro_monthly' }), 'en')
+    expect(deps.trackBuy).toHaveBeenCalledWith(USER, expect.objectContaining({ form: 'subscription', channel: 'waffo', product_id: 'pro_monthly' }), 'en', expect.any(String))
   })
 
   it('a failed charge (past_due) grants nothing and only updates the mirror', async () => {
@@ -232,7 +233,8 @@ describe('handleWaffoWebhook, upgrades (T66)', () => {
 
   it('a replayed charge still runs the step, and it runs after the grant', async () => {
     const order: string[] = []
-    rpc.mockImplementation(async () => {
+    rpc.mockImplementation(async (fn: string) => {
+      if (fn === 'payment_fee_target') return { data: null, error: null }
       order.push('settle')
       return { data: { applied: false, credits: 20, free_credits: 0, paid_until: null }, error: null }
     })
@@ -309,9 +311,26 @@ describe('paymentFacts', () => {
     expect(paymentFacts(order({}), pack)).toMatchObject({ amountTotal: 990, amountTax: 0, currency: 'usd' })
   })
 
-  it('reads the wallet from the brand: Alipay is alipay, cards and anything else are card', () => {
-    expect(chargedMethod({ paymentMethod: 'ewallet', paymentMethodBrand: 'alipayhk' })).toBe('alipay')
-    expect(chargedMethod({ paymentMethod: 'card', paymentMethodBrand: 'visa' })).toBe('card')
+  it('reads the recorded method from the payload: WeChat Pay, Alipay, and card for cards and card wallets', () => {
+    const method = (paymentMethod?: string, paymentMethodBrand?: string) => chargedMethod({ paymentMethod, paymentMethodBrand })
+    // Real shape (docs.waffo.ai "Webhooks"): both wallets arrive as paymentMethod "ewallet".
+    expect(method('ewallet', 'wechatpay')).toBe('wechat_pay')
+    expect(method('EWALLET', 'WeChatPay')).toBe('wechat_pay')
+    expect(method('wechat', undefined)).toBe('wechat_pay')
+    expect(method('ewallet', 'alipay')).toBe('alipay')
+    expect(method('ewallet', 'alipayhk')).toBe('alipay')
+    expect(method('ALIPAY', undefined)).toBe('alipay')
+    for (const brand of ['visa', 'mastercard', 'amex', 'applepay', 'googlepay']) expect(method('card', brand)).toBe('card')
+    expect(method('applepay', undefined)).toBe('card')
+    expect(method('googlepay', undefined)).toBe('card')
+    expect(method(undefined, undefined)).toBe('card')
     expect(toCents('1234.5')).toBe(123450)
+  })
+
+  it('records the method without touching the amounts', () => {
+    const base = { chargedAmount: '10.79', currency: 'USD', listPrice: { total: '10.79', subtotal: '9.90', taxAmount: '0.89' } }
+    const wechat = paymentFacts(order({ ...base, paymentMethod: 'ewallet', paymentMethodBrand: 'wechatpay' }), pack)
+    const card = paymentFacts(order({ ...base, paymentMethod: 'card', paymentMethodBrand: 'visa' }), pack)
+    expect(wechat).toEqual({ ...card, method: 'wechat_pay' })
   })
 })

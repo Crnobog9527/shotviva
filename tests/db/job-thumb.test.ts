@@ -36,8 +36,10 @@ async function finishedJob(profile: TestProfile) {
   const inputKey = newInputKey(userId, 'image/jpeg')
   r2.upload(inputKey, await jpeg(1024, 1024), 'image/jpeg')
   const deps = { db: serviceSupabase(), store: r2.store }
-  const view = await runGeneration({ ...deps, provider: fakeProvider().provider }, { userId, source: 'web', templateId, inputKey })
-  const thumbKey = workThumbKeyFor(userId, view.id)
+  // The tier decides the pool (1996): paid credits make a 2K work, free credits a 1K one.
+  const resolution = profile.credits ? '2k' : '1k'
+  const view = await runGeneration({ ...deps, provider: fakeProvider().provider }, { userId, source: 'web', templateId, inputKey, resolution })
+  const thumbKey = workThumbKeyFor(userId, view.id, view.credit_pool)
   return { userId, jobId: view.id, view, deps, r2, thumbKey, signed: `memory://get/${thumbKey}?expires=300` }
 }
 
@@ -48,16 +50,17 @@ describe('work thumbnails', () => {
     expect(await sharp(r2.objects.get(thumbKey)?.body).metadata()).toMatchObject({ format: 'webp', width: 480, height: 598 })
     expect(r2.objects.get(thumbKey)?.contentType).toBe('image/webp')
     expect(await resolveJobThumb(deps, { userId, jobId })).toBe(signed)
-    expect(await firstThumbUrls(() => r2.store, [{ id: jobId, userId }])).toEqual(new Map([[jobId, signed]]))
+    expect(await firstThumbUrls(() => r2.store, [{ id: jobId, userId, creditPool: 'paid' }])).toEqual(new Map([[jobId, signed]]))
   })
 
-  it('marks a free work’s copy and leaves a paid work’s clean; the stored result stays clean', async () => {
+  it('protects a free work’s copy and leaves a paid work’s clean; the stored result stays clean', async () => {
     const free = await finishedJob(FREE)
     const paid = await finishedJob(PAID)
     expect(free.view.credit_pool).toBe('free')
     expect(paid.view.credit_pool).toBe('paid')
-    const corner = (bytes?: Uint8Array) => sharp(bytes).extract({ left: 480 - 130, top: 598 - 40, width: 64, height: 24 }).raw().toBuffer()
-    // Same provider image for both, so only the mark can differ.
+    expect(free.thumbKey).not.toBe(paid.thumbKey)
+    const corner = (bytes?: Uint8Array) => sharp(bytes).extract({ left: 0, top: 0, width: 240, height: 300 }).raw().toBuffer()
+    // Same provider image for both, so only the protection can differ.
     expect((await corner(free.r2.objects.get(free.thumbKey)?.body)).equals(await corner(paid.r2.objects.get(paid.thumbKey)?.body))).toBe(false)
     const full = (job: typeof free) => Buffer.from(job.r2.objects.get(`outputs/${job.userId}/${job.jobId}.png`)!.body)
     expect(full(free).equals(full(paid))).toBe(true)
@@ -67,7 +70,7 @@ describe('work thumbnails', () => {
     const { userId, jobId, deps, r2, thumbKey, signed } = await finishedJob(FREE)
     const settled = Buffer.from(r2.objects.get(thumbKey)!.body)
     r2.objects.delete(thumbKey)
-    expect((await firstThumbUrls(() => r2.store, [{ id: jobId, userId }])).size).toBe(0)
+    expect((await firstThumbUrls(() => r2.store, [{ id: jobId, userId, creditPool: 'free' }])).size).toBe(0)
     expect(await resolveJobThumb(deps, { userId, jobId })).toBe(signed)
     expect(Buffer.from(r2.objects.get(thumbKey)!.body).equals(settled)).toBe(true)
   })

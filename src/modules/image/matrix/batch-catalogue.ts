@@ -1,17 +1,19 @@
 import 'server-only'
 
 import type { Locale } from '@/core/i18n/locales'
-import { cachedWebTemplates, type LocalizedTemplate } from '@/core/templates'
+import { cachedCatalogueIndex, cachedWebTemplates, type CatalogueIndex, type LocalizedTemplate } from '@/core/templates'
 
 import { isSlotTemplate, toCatalogueTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { MATRIX_MAX_TEMPLATES } from './matrix-state'
+import { pickerBrowse } from '../catalogue/picker-browse'
 
 type Deps = {
   read: (locale: Locale, includeSeriesMembers: boolean) => Promise<LocalizedTemplate[]>
   toCard: (template: LocalizedTemplate) => CatalogueTemplate
+  index?: (locale: Locale) => Promise<CatalogueIndex | null>
 }
 
-const DEPS: Deps = { read: cachedWebTemplates, toCard: toCatalogueTemplate }
+const DEPS: Deps = { read: cachedWebTemplates, toCard: toCatalogueTemplate, index: cachedCatalogueIndex }
 
 // Batch create's templates: every live web template that takes a photo, series members included
 // (a member is as live and as priced as any other template, T102). Members matter twice: a series
@@ -20,10 +22,10 @@ const DEPS: Deps = { read: cachedWebTemplates, toCard: toCatalogueTemplate }
 // them too. `wanted` is ?t=a,b: the ones found, once each, up to five (the form then keeps as
 // many as the plan holds).
 export async function loadBatchCatalogue(locale: Locale, wanted: string | string[] | undefined, deps: Deps = DEPS) {
-  const found = await deps.read(locale, true)
+  const [found, index] = await Promise.all([deps.read(locale, true), deps.index?.(locale) ?? Promise.resolve(null)])
   // A slot template is single-run only (§5.1e): never offered here, and ?t= with one is ignored.
   const templates = found.map(deps.toCard).filter((template) => template.photoInput !== 'none' && !isSlotTemplate(template))
   const ids = typeof wanted === 'string' ? wanted.split(',') : []
   const initial = [...new Set(ids)].filter((id) => templates.some((template) => template.id === id)).slice(0, MATRIX_MAX_TEMPLATES)
-  return { templates, initial }
+  return { templates, initial, browse: pickerBrowse(index, templates, locale === 'zh') }
 }

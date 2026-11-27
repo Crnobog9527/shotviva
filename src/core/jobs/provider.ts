@@ -72,7 +72,9 @@ export function resolveTemplateProvider(provider: TemplateProvider, id: string |
 }
 
 // Why a provider call failed, in the terms settlement needs. Every kind is refunded.
-export type ProviderFailureKind = 'content_rejected' | 'timeout' | 'failed'
+// rate_limited: the provider answered 429 (too many images a minute); settlement retries it a
+// couple of times within the deadline before giving up (queue-fairness Q3).
+export type ProviderFailureKind = 'content_rejected' | 'timeout' | 'rate_limited' | 'failed'
 
 export class ProviderError extends Error {
   readonly kind: ProviderFailureKind

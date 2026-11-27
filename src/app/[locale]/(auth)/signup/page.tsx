@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import { SignupCodeProvider } from '@/core/auth/ui'
 import { currentLocale } from '@/core/i18n/server'
 import { CONNECT_PAGE_PATH } from '@/core/partner'
-import { site } from '@/site/site.config'
+import { signupGiftCreditsForSite } from '@/site/billing/signup-gift'
 
 import { googleAction, phoneSendAction, phoneVerifyAction, resendSignupAction, signupAction } from '@/app/auth/actions'
 
@@ -29,7 +29,8 @@ export default async function SignupPage() {
     action: signupAction,
     google: { action: googleAction, mainlandNote: locale === 'zh' || ('zone' as const) },
     resendAction: resendSignupAction,
-    giftCredits: site.billing.freeCredits,
+    // The admin's amount (2008), cached; the admin save expires it, so this static page follows.
+    giftCredits: await signupGiftCreditsForSite(),
     sender,
     phone: locale === 'zh' ? phone : undefined,
   }

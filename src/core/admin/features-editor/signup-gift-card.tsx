@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 
+import { SIGNUP_GIFT_CREDITS_MAX, SIGNUP_GIFT_CREDITS_MIN } from '@/core/system-settings/registry'
 import { Button } from '@/core/ui/button'
 import { Input } from '@/core/ui/input'
 
@@ -18,18 +19,21 @@ type Props = {
 }
 
 const COPY = SIGNUP_GIFT_COPY.rules
-const whole = (value: string, max: number) => /^\d+$/.test(value) && Number(value) <= max
+const whole = (value: string, max: number, min = 0) => /^\d+$/.test(value) && Number(value) >= min && Number(value) <= max
+const validCredits = (value: string) => whole(value, SIGNUP_GIFT_CREDITS_MAX, SIGNUP_GIFT_CREDITS_MIN)
 
-// 1350 + 1480 (ARCHITECTURE §7): today's count against the daily cap, then every signup gift
+// 1350 + 1480 + 2008 (ARCHITECTURE §7): today's count against the daily cap, then every signup gift
 // rule in one form with its plain-language explanation, and the pause on its own card.
 export function SignupGiftCard({ state, savePaused, saveRules }: Props) {
+  const [credits, setCredits] = useState(String(state.rules.credits))
   const [cap, setCap] = useState(String(state.rules.cap))
   const [perIp, setPerIp] = useState(String(state.rules.perIp))
+  const [perIpPartner, setPerIpPartner] = useState(String(state.rules.perIpPartner))
   const [claimPhone, setClaimPhone] = useState(state.rules.claimPhone)
   const [claimGoogle, setClaimGoogle] = useState(state.rules.claimGoogle)
   const { pending, error, notice, run } = useAdminAction()
-  const valid = whole(cap, 100_000) && whole(perIp, 1000)
-  const rules: SignupGiftRules = { cap: Number(cap), perIp: Number(perIp), claimPhone, claimGoogle }
+  const valid = validCredits(credits) && whole(cap, 100_000) && whole(perIp, 1000) && whole(perIpPartner, 1000)
+  const rules: SignupGiftRules = { credits: Number(credits), cap: Number(cap), perIp: Number(perIp), perIpPartner: Number(perIpPartner), claimPhone, claimGoogle }
   const changed = JSON.stringify(rules) !== JSON.stringify(state.rules)
 
   const submit = () =>
@@ -43,13 +47,18 @@ export function SignupGiftCard({ state, savePaused, saveRules }: Props) {
 
   return (
     <>
-      <section className="grid gap-4 rounded-lg border border-border bg-card p-4" aria-labelledby="signup-gift-rules-title">
+      <section id="signup_gift_rules" className="grid scroll-mt-20 gap-4 rounded-lg border border-border bg-card p-4" aria-labelledby="signup-gift-rules-title">
         <div className="grid gap-1">
           <h2 id="signup-gift-rules-title" className="font-medium">
             {COPY.title}
           </h2>
           <p className="text-sm text-muted-foreground">{COPY.body}</p>
         </div>
+        {state.paused.enabled ? (
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm" role="note">
+            {COPY.pausedNotice}
+          </p>
+        ) : null}
         <p className="text-sm font-medium" data-signup-gift-today>
           {COPY.today(state.granted, state.rules.cap)}
         </p>
@@ -60,8 +69,10 @@ export function SignupGiftCard({ state, savePaused, saveRules }: Props) {
             if (valid) submit()
           }}
         >
+          <NumberRule copy={COPY.credits} value={credits} onChange={setCredits} valid={validCredits(credits)} />
           <NumberRule copy={COPY.cap} value={cap} onChange={setCap} valid={whole(cap, 100_000)} />
           <NumberRule copy={COPY.perIp} value={perIp} onChange={setPerIp} valid={whole(perIp, 1000)} />
+          <NumberRule copy={COPY.perIpPartner} value={perIpPartner} onChange={setPerIpPartner} valid={whole(perIpPartner, 1000)} />
           <fieldset className="grid gap-2">
             <legend className="text-sm font-medium">{COPY.claim.label}</legend>
             <label className="flex items-center gap-2 text-sm">

@@ -13,7 +13,17 @@ import {
   changeSchema,
   payoutSchema,
   memberSchema,
+  partnerFeesSchema,
+  type Commission,
 } from './models'
+import {
+  feeLineColumns,
+  feeLineSchema,
+  groupOrderFees,
+  orderPaymentSchema,
+  paymentColumns,
+  type OrderFees,
+} from './order-fees'
 
 function parse<T>(schema: z.ZodType<T>, response: { data: unknown; error: unknown }): T {
   if (response.error) throw new AppError('INTERNAL', 'Could not read affiliate records')
@@ -24,17 +34,34 @@ export async function readAccount(user: string) {
   const result = await createAdminSupabase()
     .from('affiliates')
     .select(
-      'slug,status,team_enabled,reject_reason,reapply_allowed,payout_method,payout_details,us_person,terms_version,terms_accepted_at',
+      'slug,status,team_enabled,reject_reason,reapply_allowed,payout_method,payout_details,us_person,terms_version,terms_accepted_at,org_id',
     )
     .eq('user_id', user)
     .maybeSingle()
   return parse(accountSchema.nullable(), result)
 }
 
+// Org owners and members never use the personal program (§6.5): they see the enterprise view.
+export async function isOrgMember(user: string) {
+  const result = await createAdminSupabase()
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', user)
+    .eq('status', 'active')
+    .maybeSingle()
+  return parse(z.object({ org_id: z.uuid() }).nullable(), result) !== null
+}
+
+// The name of the org an enterprise affiliate account belongs to, for the enterprise area's header.
+export async function readOrgName(orgId: string) {
+  const result = await createAdminSupabase().from('orgs').select('name').eq('id', orgId).maybeSingle()
+  return parse(z.object({ name: z.string() }).nullable(), result)?.name ?? null
+}
+
 export async function readSettings() {
   const result = await createAdminSupabase()
     .from('affiliate_settings')
-    .select('hold_days,payout_min_usd,settlement_day,apply_min_level,terms_version')
+    .select('hold_days,payout_min_usd,org_payout_min_usd,settlement_day,apply_min_level,terms_version')
     .single()
   return parse(settingsSchema, result)
 }
@@ -62,10 +89,14 @@ export async function readSummary(user: string) {
   return parse(summarySchema, await createAdminSupabase().rpc('affiliate_partner_summary', { p_user: user }))
 }
 
+export async function readFees(user: string) {
+  return parse(partnerFeesSchema, await createAdminSupabase().rpc('affiliate_partner_fees', { p_user: user }))
+}
+
 export async function readCommissions(user: string, cursor?: string | null, teamOnly = false) {
   let q = createAdminSupabase()
     .from('affiliate_commissions')
-    .select('id,created_at,product_id,base_usd,rate_bp,amount,status,confirm_after')
+    .select('id,created_at,payment_id,product_id,base_usd,fee_cents,net_base_usd,rate_bp,amount,status,confirm_after,paused_hold')
     .eq('affiliate_user_id', user)
   if (teamOnly) q = q.eq('level', 2)
   const after = decodeCursor(cursor)
@@ -75,6 +106,19 @@ export async function readCommissions(user: string, cursor?: string | null, team
     .order('id', { ascending: false })
     .limit(PAGE_SIZE + 1)
   return toPage(parse(commissionSchema.array(), result), (row) => row)
+}
+
+// Fee lines of the payments behind a page of this partner's own commissions. The payment ids come
+// from rows already filtered by affiliate_user_id; nothing else is looked up, and no buyer data is read.
+export async function readOrderFees(rows: Commission[]) {
+  const ids = [...new Set(rows.map((row) => row.payment_id))]
+  if (!ids.length) return new Map<string, OrderFees>()
+  const db = createAdminSupabase()
+  const [payments, lines] = await Promise.all([
+    db.from('payments').select(paymentColumns).in('id', ids),
+    db.from('payment_fee_lines').select(feeLineColumns).in('payment_id', ids).limit(2000),
+  ])
+  return groupOrderFees(parse(orderPaymentSchema.array(), payments), parse(feeLineSchema.array(), lines))
 }
 
 export async function readChanges(user: string, id: string, cursor?: string) {
@@ -100,7 +144,7 @@ export async function readChanges(user: string, id: string, cursor?: string) {
 export async function readPayouts(user: string, cursor?: string) {
   let q = createAdminSupabase()
     .from('affiliate_payouts')
-    .select('id,created_at,period,amount,paid_amount,status,paid_at')
+    .select('id,created_at,period,amount,paid_amount,status,paid_at,fees:affiliate_payout_fees')
     .eq('affiliate_user_id', user)
   const after = decodeCursor(cursor)
   if (after) q = q.or(afterCursor(after))

@@ -15,6 +15,8 @@ const PLACES = {
 
 // "Phone" / "AI" on every split, the same two words on cards, the creation dialog and the
 // generator (The Always-Visible Split Rule). Hidden from readers: the image alt already says it.
+// The dialog's full-size pair spells the phone side out, 「真实手机照」 / "Real phone photo"
+// (Owner 2026-11-21: full-size pairs say it; small ones keep the short word).
 export function SplitTags({ hidden = false, size = 'card' }: { hidden?: boolean; size?: keyof typeof PLACES }) {
   const t = useTranslations('app.template')
   const place = PLACES[size]
@@ -26,7 +28,7 @@ export function SplitTags({ hidden = false, size = 'card' }: { hidden?: boolean;
   return (
     <>
       <span aria-hidden="true" className={cn(base, 'frost text-photo-ink', place.left)}>
-        {t('phone')}
+        {t(size === 'pair' ? 'phoneFull' : 'phone')}
       </span>
       <span aria-hidden="true" className={cn(base, 'text-primary-foreground', size === 'card' ? 'bg-[var(--safelight-tag)]' : 'bg-primary', place.right)}>
         {t('ai')}

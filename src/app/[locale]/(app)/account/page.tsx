@@ -1,10 +1,13 @@
 import type { Metadata } from 'next'
-import { Suspense } from 'react'
+import { Suspense, type ReactNode } from 'react'
+import { useFormatter, useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 
-import { hasAffiliateDashboard } from '@/core/affiliate/feature'
+import { enterpriseCustomerLink, hasAffiliateDashboard } from '@/core/affiliate/feature'
 import { AppPage } from '@/core/app-shell'
+import { readInviteSummary } from '@/core/account/codes'
 import { AccountHeader, AccountView, GiftClaimCard, InviteCard, RedeemCard, STRIP_FRAMES } from '@/core/account/ui'
+import { Group, RowsPanel } from '@/core/account/ui/rows'
 import { createAdminSupabase, createServerSupabase, readClaimOptions, readSignupGift, requireUser } from '@/core/auth'
 import { maskPhone } from '@/core/auth/phone'
 import { readPendingDiscount } from '@/core/codes/server'
@@ -13,14 +16,17 @@ import { purchaseLines } from '@/core/billing/documents'
 import { lastMembership, readMemberSince, readSubscriptionSummary } from '@/core/billing/subscription'
 import { listMonthWorks } from '@/core/jobs'
 import { serverEnv } from '@/core/env'
+import { readOrgView } from '@/core/org/console'
+import { CustomerLinkRow, MemberEntry, MemberLinkCallout, OwnerEntryRow } from '@/core/org/ui'
 import { readLinkStatus } from '@/core/partner'
 import { graylumIntroLinks } from '@/core/partner/ui'
 import { formatMoney, hasUnreadReply, listPaymentOptions, paymentChoices, PICKER_LIMIT, ReplyTime } from '@/core/support'
 import { StoreCard } from '@/core/store-profile/ui'
 import { AccountHelp } from '@/core/support/ui/account'
-import { currentLocale } from '@/core/i18n/server'
+import { currentLocale, localized } from '@/core/i18n/server'
 import type { Translate } from '@/core/translate'
 import { contractProducts, displayProducts } from '@/site/billing/display-products'
+import { signupGiftCreditsForSite } from '@/site/billing/signup-gift'
 import { site } from '@/site/site.config'
 
 import { actions, helpActions } from './account-actions'
@@ -39,7 +45,7 @@ async function Account() {
   const supabase = await createServerSupabase()
   const admin = createAdminSupabase()
   const history = contractProducts(admin)
-  const [graylum, balance, subscription, signupGift, helpUnread, payments, since, works, t, locale, discount, affiliate, offers, identities] = await Promise.all([
+  const [graylum, balance, subscription, signupGift, helpUnread, payments, since, works, t, locale, discount, affiliate, offers, identities, org] = await Promise.all([
     readLinkStatus(supabase, user.id),
     readBalance(supabase, user.id),
     history.then(products => readSubscriptionSummary(admin, user.id, products)),
@@ -54,9 +60,12 @@ async function Account() {
     hasAffiliateDashboard(user.id),
     displayProducts(),
     history,
+    readOrgView(user.id, { db: admin, maskPhone }),
   ])
   // 1480: an account over the per-network allowance can still claim its signup gift.
   const claimOptions = signupGift.reason === 'same_ip_pending' ? await readClaimOptions(admin) : null
+  // What a claim pays now: the admin's amount (2008), which claim_signup_gift reads when it pays.
+  const claimCredits = claimOptions ? await signupGiftCreditsForSite() : 0
   const purchases = paymentChoices(payments, identities, t as unknown as Translate, { money: formatMoney(locale) })
   const last = lastMembership(payments, identities)
   const more = payments.length >= PICKER_LIMIT
@@ -67,7 +76,8 @@ async function Account() {
   return (
     <>
       <AccountView data={data} actions={actions} site={{ brand: site.brand.name, products: offers, freeCredits: signupGift.granted }}>
-        {claimOptions ? <GiftClaimCard credits={site.billing.freeCredits} options={claimOptions} actions={claimActions} /> : null}
+        {claimOptions ? <GiftClaimCard credits={claimCredits} options={claimOptions} actions={claimActions} /> : null}
+        <OrgBlock view={org} memberLink={org.kind === 'member' ? <Suspense fallback={null}><MemberLink user={user.id} /></Suspense> : null} customerLink={org.kind === 'owner' && org.org.affiliateEnabled && affiliate ? <Suspense fallback={null}><OwnerCustomerLink user={user.id} /></Suspense> : null} />
         <StoreCard actions={storeActions} />
         <InviteCard load={loadMyInvites} />
         <RedeemCard pending={discount} />
@@ -75,6 +85,46 @@ async function Account() {
       <AccountHelp actions={helpActions} payments={purchases} replyTime={<ReplyTime userId={user.id} />} brand={site.brand.name} unread={helpUnread} />
     </>
   )
+}
+
+// The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a
+// member a row into their own org page with what is left of this month's credits, then their
+// promotion link (Owner 2026-11-23); everyone else sees nothing.
+function OrgBlock({ view, customerLink, memberLink }: { view: Awaited<ReturnType<typeof readOrgView>>; customerLink: ReactNode; memberLink: ReactNode }) {
+  const t = useTranslations('app.org.entry')
+  const format = useFormatter()
+  if (view.kind === 'owner') {
+    const pool = format.number(view.org.poolCredits)
+    return (
+      <Group title={t('title')}>
+        <RowsPanel>
+          <OwnerEntryRow name={view.org.name} pool={pool} suspended={view.org.status === 'suspended'} affiliate={customerLink !== null} />
+        </RowsPanel>
+        {customerLink}
+      </Group>
+    )
+  }
+  if (view.kind === 'member') {
+    return (
+      <Group title={t('title')}>
+        <MemberEntry data={view} />
+        {memberLink}
+      </Group>
+    )
+  }
+  return null
+}
+
+// Streams in after the rest of the page: the org owner's customer link, when the program is on.
+async function OwnerCustomerLink({ user }: { user: string }) {
+  const url = await enterpriseCustomerLink(user)
+  return url ? <CustomerLinkRow url={url} /> : null
+}
+
+// Streams in too: a member's promotion link, their own invite code on the page's language.
+async function MemberLink({ user }: { user: string }) {
+  const summary = await readInviteSummary(createAdminSupabase(), user, site.growth.invite.inviterRewardCap).catch(() => null)
+  return summary ? <MemberLinkCallout path={await localized('/?code=' + summary.code)} /> : null
 }
 
 const storeActions = { load: loadStoreProfile, save: saveStoreProfileAction }

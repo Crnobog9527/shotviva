@@ -6,6 +6,7 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import { AppError } from '../errors'
 import { logger } from '../logger'
+import { settle, unwrap, type Settled } from '../shared-read'
 import { localize, pickLive } from './rules'
 import { bannerRowSchema } from './rules'
 import type { AnnouncementRow, BannerAnnouncement, BannerLocale } from './rules'
@@ -42,7 +43,19 @@ export type BannerState = { items: BannerAnnouncement[]; initialId: string | nul
 export const BANNER_LIFE = { revalidate: 3600, expire: 86_400 } as const
 
 type Load = (now: Date) => Promise<AnnouncementRow[]>
-const loadLive: Load = (now) => loadBannerCandidates(createAdminSupabase(), now)
+
+// The candidate rows, one copy for the region and both languages (a plain 'use cache' entry lives
+// in one function instance's memory, so each new instance read the table again for each language).
+// The cut-off is the time of the read: rows that end later are kept and the browser follows their
+// windows, as above. A failed read is kept a minute only.
+async function sharedCandidates(): Promise<Settled<AnnouncementRow[]>> {
+  'use cache: remote'
+  cacheTag(ANNOUNCEMENTS_CACHE_TAG)
+  const result = await settle(() => loadBannerCandidates(createAdminSupabase(), new Date()))
+  cacheLife(result.ok ? BANNER_LIFE : FAILED_READ_LIFE)
+  return result
+}
+const loadLive: Load = async () => unwrap(await sharedCandidates())
 
 // The cached body, apart for tests.
 export async function bannerOrEmpty(locale: BannerLocale, load: Load = loadLive): Promise<BannerState> {

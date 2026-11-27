@@ -199,10 +199,14 @@ describe('poster sets and generation', () => {
   it('makes a poster at 1K for the 1K price, refuses a page over its capacity or left empty, and keeps every poster work private', async () => {
     const userId = await invitedUser()
     const set = await savePosterSet(service, { userId, templateId, fields: { poster }, content, source: 'paste', allow })
-    const before = (await profileOf(db, userId)).credits
+    // 1K is paid from free credits only (1996); a free poster work still never reaches the gallery.
+    await db.query('update public.profiles set free_credits = 5 where id = $1', [userId])
+    const before = await profileOf(db, userId)
     const small = await generate(userId, { poster: { setId: set.id, part: 0 }, resolution: '1k' }).run()
     expect(small.status).toBe('succeeded')
-    expect((await profileOf(db, userId)).credits).toBe(before - 1)
+    expect(await profileOf(db, userId)).toMatchObject({ credits: before.credits, free_credits: before.free_credits - 1 })
+    expect((await db.query('select credit_pool, gallery_excluded from public.generation_jobs where id = $1', [small.id])).rows[0])
+      .toEqual({ credit_pool: 'free', gallery_excluded: true })
     const view = await generate(userId, { poster: { setId: set.id, part: 0 }, visibility: 'public' }).run()
     const { rows } = await db.query('select visibility, gallery_excluded from public.generation_jobs where id = $1', [view.id])
     expect(rows[0]).toEqual({ visibility: 'private', gallery_excluded: true })

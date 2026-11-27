@@ -3,10 +3,12 @@ import 'server-only'
 import type Stripe from 'stripe'
 import { z } from 'zod'
 
+import { notifyOwner } from '../../alerts'
 import { trackPurchase } from '../../analytics/funnel'
 import type { SiteProduct } from '../../config'
 import { AppError } from '../../errors'
 import type { CheckoutPrice } from '../checkout-price'
+import { recordStripeFees } from '../fees/stripe'
 import { readQuote } from '../read-quote'
 import type { ApplyPaymentCodes } from '../payment-code-effects'
 import type { RpcClient } from '../rpc'
@@ -16,7 +18,7 @@ import type { StripeApi } from './client'
 import type { DisputeEvidenceConfig } from './disputes/config'
 import { sessionDiscount } from './discount-facts'
 import { recordPaymentContext } from './payment-context'
-import { SESSION_EXPAND, sessionFacts } from './payment-facts'
+import { SESSION_EXPAND, sessionCharge, sessionFacts } from './payment-facts'
 import { sessionContract } from './catalog-session'
 import { matchesContractPrice } from './prices'
 import { settleCheckout, subscriptionState } from './settle'
@@ -108,11 +110,20 @@ function track(deps: FulfilDeps, session: Stripe.Checkout.Session, purchase: Ses
     amount_usd: discount.amountUsd,
     ...discount.props,
     ...(purchase.quote && { credits: purchase.quote.credits }),
-  }, session.locale === 'zh' ? 'zh' : 'en')
+  }, session.locale === 'zh' ? 'zh' : 'en', session.id)
 }
 
 function pricingVersionOf(quote?: CheckoutPrice) {
   return quote ? 'v2' as const : undefined
+}
+
+// F3: the payment's processing fees. Also on a replay (keyed by the balance transaction, so it
+// writes once); never throws, and does nothing at all before payment_fee_settings.record_from.
+function recordSessionFees(deps: FulfilDeps, session: Stripe.Checkout.Session, chargeId: string | null) {
+  return recordStripeFees(deps, {
+    ref: session.id, chargeId, charge: sessionCharge(session),
+    subscription: session.mode === 'subscription', managedPayments: session.managed_payments?.enabled ?? null,
+  })
 }
 
 export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string): Promise<FulfilOutcome> {
@@ -132,7 +143,13 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
     payment,
   })
   const discount = sessionDiscount(session, purchase.product)
-  if (change.applied) track(deps, session, purchase, payment.method, discount)
+  if (change.applied) {
+    track(deps, session, purchase, payment.method, discount)
+    // Only the call that granted alerts (never a replay); keyed by the session, so the completed +
+    // async_payment_succeeded pair and Stripe's retries cannot send it twice.
+    notifyOwner({ kind: 'payment_received', channel: 'stripe', ref: session.id, userId: purchase.userId, productId: purchase.product.id,
+      amount: { cents: payment.amountTotal, currency: payment.currency }, method: payment.method, renewal: false })
+  }
   await deps.applyCodes({
     channel: 'stripe', reference: session.id, userId: purchase.userId, productId: purchase.product.id,
     codeId: discount.codeId, amountDiscount: discount.amountDiscount, locale: session.locale === 'zh' ? 'zh' : 'en',
@@ -144,5 +161,6 @@ export async function fulfilCheckoutSession(deps: FulfilDeps, sessionId: string)
   // Also on a replay: a crash after settling would otherwise leave the old plan billing. The
   // step is idempotent (ended rows are skipped).
   if (purchase.product.tier !== 'pack') await deps.cancelOthers?.(purchase.userId, { stripeSubscriptionId: purchase.subscription?.id ?? null })
+  await recordSessionFees(deps, session, payment.chargeId)
   return change.applied ? 'applied' : 'replayed'
 }

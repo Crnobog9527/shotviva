@@ -11,7 +11,7 @@ const render = (visual: Visual) => renderToStaticMarkup(createElement(CardVisual
 // The pictures that lead a how-to point (Owner 2026-11-12) sit below the fold.
 describe('CardVisual', () => {
   it('loads every picture lazily', () => {
-    const html = render({ kind: 'pair', before: image('a'), after: image('b'), tags: { before: 'Phone photo', after: 'Listing' } })
+    const html = render({ kind: 'pair', before: image('a'), after: image('b'), tags: { before: 'Real phone photo', after: 'Listing' } })
     const imgs = html.match(/<img[^>]*>/g) ?? []
     expect(imgs).toHaveLength(2)
     for (const tag of imgs) expect(tag).toContain('loading="lazy"')

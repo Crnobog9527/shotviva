@@ -39,3 +39,21 @@ function batchOrder(a: PhotoItem, b: PhotoItem): number {
   if (a.batchPosition !== null && b.batchPosition !== null && a.batchPosition !== b.batchPosition) return a.batchPosition - b.batchPosition
   return a.createdAt.localeCompare(b.createdAt)
 }
+
+// The Done list cut into calendar months (UTC, as Photos counts days), newest first: a batch
+// sits in the month of its newest photo, where it stands in the list. key is "2026-11".
+export type MonthSection = { key: string; first: string; entries: DoneEntry[] }
+
+export function groupByMonth(entries: readonly DoneEntry[]): MonthSection[] {
+  const sections: MonthSection[] = []
+  for (const entry of entries) {
+    const first = entry.kind === 'photo' ? entry.item.createdAt : newest(entry.items)
+    const key = first.slice(0, 7)
+    const last = sections.at(-1)
+    if (last?.key === key) last.entries.push(entry)
+    else sections.push({ key, first, entries: [entry] })
+  }
+  return sections
+}
+
+const newest = (items: readonly PhotoItem[]) => items.reduce((a, item) => (item.createdAt > a ? item.createdAt : a), items[0]!.createdAt)

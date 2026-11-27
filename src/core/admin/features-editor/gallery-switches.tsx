@@ -2,7 +2,8 @@
 
 import type { WishlistSwitch, WishlistSwitchInput } from '../system-settings/types'
 import type { ActionResult } from '../templates/types'
-import { AUTO_APPROVE_SWITCH_COPY, GALLERY_SWITCH_COPY } from './gallery-copy'
+import { AUTO_APPROVE_SWITCH_COPY, GALLERY_DEPENDENCY, GALLERY_SWITCH_COPY } from './gallery-copy'
+import { ChildCard } from './features-layout'
 import { SettingSwitchCard } from './setting-switch-card'
 
 export type GallerySwitchKey = 'gallery_enabled' | 'gallery_auto_approve'
@@ -21,11 +22,14 @@ export function GallerySwitches({ state, save }: Props) {
   return (
     <>
       <SettingSwitchCard copy={GALLERY_SWITCH_COPY} value={state.enabled} save={(input) => save('gallery_enabled', input)} />
-      <SettingSwitchCard
-        copy={AUTO_APPROVE_SWITCH_COPY}
-        value={state.autoApprove}
-        save={(input) => save('gallery_auto_approve', input)}
-      />
+      <ChildCard>
+        <SettingSwitchCard
+          copy={AUTO_APPROVE_SWITCH_COPY}
+          value={state.autoApprove}
+          dependency={{ label: GALLERY_DEPENDENCY.label, unmet: GALLERY_DEPENDENCY.unmet, met: state.enabled.enabled }}
+          save={(input) => save('gallery_auto_approve', input)}
+        />
+      </ChildCard>
     </>
   )
 }

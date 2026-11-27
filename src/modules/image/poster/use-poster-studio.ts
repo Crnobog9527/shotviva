@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
+import { defaultTier, type Balance } from '@/core/billing/pools'
 import { posterContentSchema, splitPoster, unusedPhotoSlots, type PosterBlock, type PosterContent, type PosterFields, type PosterPart } from '@/core/poster'
 import type { OutputAspect, Resolution } from '@/core/templates/output-options'
 
@@ -104,10 +105,12 @@ export const defaultResolution = (resolutions: readonly Resolution[]): Resolutio
 export const sortFailure = (reply: { status: string; code?: string }): 'rateLimited' | 'sortFailed' =>
   reply.status === 'error' && reply.code === 'RATE_LIMITED' ? 'rateLimited' : 'sortFailed'
 
-export function usePosterStudio(template: StudioTemplate, concurrency: number, onStarted: () => void) {
+// balance: what the account can spend, for the first tier (2K on paid credits, else 1K on free
+// credits, 1996); without it the editor starts on defaultResolution.
+export function usePosterStudio(template: StudioTemplate, concurrency: number, onStarted: () => void, balance?: Balance) {
   const [draft, setDraft, ready] = useStoredDraft(template)
   const [aspect, setAspect] = useState<OutputAspect>(template.aspects[0] ?? '9:16')
-  const [resolution, setResolution] = useState<Resolution>(() => defaultResolution(template.resolutions))
+  const [resolution, setResolution] = useState<Resolution>(() => (balance && defaultTier(balance, template.creditsCost, template.resolutions)) || defaultResolution(template.resolutions))
   const [busy, setBusy] = useState(false)
   // The block the model is writing while 整理内容 runs (null before the first one starts).
   const [stage, setStage] = useState<PosterBlock | null>(null)
