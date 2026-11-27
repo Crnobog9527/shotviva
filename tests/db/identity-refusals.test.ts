@@ -16,6 +16,7 @@ import { fakeProvider, jobCount, seedTemplate } from './generation-fixtures'
 import { anonClient, connectAdmin, createUser, profileOf } from './helpers'
 import { linkedUser, partnerRequest, routeDeps } from './partner-fixtures'
 import { serviceSupabase } from './supabase-env'
+import { framedNote } from '@/core/templates/generation-inputs'
 
 // T81 (ARCHITECTURE §5.1a): the user's words are screened before reserve_credits on every entry
 // (workspace note and text fields, photo edit, partner freeform). A refusal charges nothing,
@@ -111,7 +112,7 @@ describe('workspace: note and text fields', () => {
     const { userId, fake, run } = await webSetup(fakeJudge(false))
     const view = await run({ copy: { dish: 'tonkotsu ramen' }, note: '让他笑一下' })
     expect(view.status).toBe('succeeded')
-    expect(fake.calls[0]?.prompt).toBe('WRAPPED studio shot of tonkotsu ramen, keep the plate unchanged\n\n让他笑一下')
+    expect(fake.calls[0]?.prompt).toBe(`WRAPPED studio shot of tonkotsu ramen, keep the plate unchanged\n\n${framedNote('让他笑一下')}`)
     const { rows } = await db.query<{ provider_usage: Record<string, number> }>('select provider_usage from public.generation_jobs where id = $1', [view.id])
     expect(rows[0]?.provider_usage).toMatchObject({ decision_input_tokens: 400, decision_output_tokens: 6 })
     expect(await refusals(userId)).toEqual([])

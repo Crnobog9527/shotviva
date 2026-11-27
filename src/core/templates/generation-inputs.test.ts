@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { renderPrompt, validateGenerationInputs } from './generation-inputs'
+import { framedNote, NOTE_PREAMBLE, renderPrompt, validateGenerationInputs } from './generation-inputs'
 import { templateFieldsSchema } from './schema'
 
 const fields = templateFieldsSchema.parse({
@@ -57,9 +57,33 @@ describe('renderPrompt', () => {
     expect(renderPrompt(body, { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: '', toggles: {}, confirmed: [] })).toBe('Studio shot of Ramen.  Ratio 1:1.')
   })
 
-  it('appends the user note after the rendered template', () => {
-    const inputs = { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: 'Add a sprig of mint', toggles: {}, confirmed: [] }
-    expect(renderPrompt('Studio shot of {{dish}}.', inputs)).toBe('Studio shot of Ramen.\n\nAdd a sprig of mint')
+  it('appends the user note last, verbatim, framed as the request that wins over the template', () => {
+    const inputs = { copy: { dish: 'Ramen', note: '' }, aspectRatio: '1:1', note: '跟我加个餐具和食物匹配的的', toggles: {}, confirmed: [] }
+    const text = renderPrompt('Studio shot of {{dish}}. Keep the bowl.', inputs)
+    expect(text).toBe(`Studio shot of Ramen. Keep the bowl.\n\n${NOTE_PREAMBLE}\nUser's request: 跟我加个餐具和食物匹配的的`)
+    expect(NOTE_PREAMBLE).toMatch(/even where an earlier line says otherwise.*hard rule/)
+    // Out of its reach: image roles, the confirmed poster text, compliance lines.
+    expect(NOTE_PREAMBLE).toMatch(/does not change which attached image is which, any text given above to print on the image, or the lines against logos, brand names or named works/)
+    expect(text.endsWith('跟我加个餐具和食物匹配的的')).toBe(true)
+  })
+
+  it('adds no framing at all without a note (the partner route sends none)', () => {
+    const inputs = { copy: { dish: 'Ramen' }, aspectRatio: '1:1', note: '', toggles: {}, confirmed: [] }
+    const text = renderPrompt('Studio shot of {{dish}}.', inputs)
+    expect(text).toBe('Studio shot of Ramen.')
+    expect(text).not.toContain("User's request")
+    expect(framedNote('')).toBe('')
+  })
+
+  it('keeps a poster text before the framed note, and the note last', () => {
+    const base = { copy: {}, aspectRatio: '4:5', toggles: {}, confirmed: [], posterText: 'Grand Opening · 6pm' }
+    expect(renderPrompt('Poster.', { ...base, note: 'bolder title' })).toBe(`Poster.\n\nGrand Opening · 6pm\n\n${framedNote('bolder title')}`)
+    expect(renderPrompt('Poster.', { ...base, note: '' })).toBe('Poster.\n\nGrand Opening · 6pm')
+  })
+
+  it('does not expand placeholders a note contains', () => {
+    const inputs = { copy: { dish: 'Ramen' }, aspectRatio: '1:1', note: 'use {{dish}} twice', toggles: {}, confirmed: [] }
+    expect(renderPrompt('Shot of {{dish}}.', inputs)).toBe(`Shot of Ramen.\n\n${NOTE_PREAMBLE}\nUser's request: use {{dish}} twice`)
   })
 })
 
@@ -115,7 +139,7 @@ describe('toggles (T89)', () => {
   it('renders the off fragment by default and the on fragment when on, the note still last', () => {
     const body = 'Shot of {{dish}}. {{ replate }} {{steam}}'
     const off = validateGenerationInputs(toggled, { imageCount: 1, copy: { dish: 'Ramen' }, note: 'warmer light' })
-    expect(renderPrompt(body, off, fragments)).toBe('Shot of Ramen. FAKE-OFF STEAM-OFF\n\nwarmer light')
+    expect(renderPrompt(body, off, fragments)).toBe(`Shot of Ramen. FAKE-OFF STEAM-OFF\n\n${framedNote('warmer light')}`)
     const on = validateGenerationInputs(toggled, { imageCount: 1, copy: { dish: 'Ramen' }, toggles: { replate: true }, togglesConfirmed: ['replate'] })
     expect(renderPrompt(body, on, fragments)).toBe('Shot of Ramen. FAKE-ON STEAM-OFF')
   })

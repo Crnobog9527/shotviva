@@ -1,7 +1,5 @@
 import type { Metadata } from 'next'
 
-import { isAffiliateEnabled } from '@/core/affiliate/feature'
-import { AffiliateSwitchCard } from '@/core/affiliate/switch-card'
 import {
   AdminPage,
   FEATURES_COPY,
@@ -26,7 +24,6 @@ import { previewOverride, siteHasWishlist } from '@/core/wishlist'
 import { site } from '@/site/site.config'
 
 import {
-  saveAffiliateSwitchAction,
   saveFeatureAccessAction,
   saveFoodTogglesAction,
   saveAppShellAction,
@@ -59,14 +56,13 @@ async function galleryState(db: ReturnType<typeof createAdminSupabase>): Promise
 export default async function AdminFeaturesPage() {
   await requireAdmin()
   const db = createAdminSupabase()
-  const [settings, wishlist, gallery, affiliate, signupGift, photoPrice, foodToggles, serviceWorker, appShell] = await Promise.all([
-    listFeatureSettings(db), wishlistState(db), galleryState(db), isAffiliateEnabled(), loadSignupGift(db), loadPosterPhotoPrice(db),
+  const [settings, wishlist, gallery, signupGift, photoPrice, foodToggles, serviceWorker, appShell] = await Promise.all([
+    listFeatureSettings(db), wishlistState(db), galleryState(db), loadSignupGift(db), loadPosterPhotoPrice(db),
     loadSettingSwitch(db, 'food_toggles_enabled'), loadSettingSwitch(db, 'service_worker_enabled'), loadSettingSwitch(db, 'service_worker_shell_enabled'),
   ])
   return (
     <AdminPage title={FEATURES_COPY.title}>
-      <AffiliateSwitchCard enabled={affiliate} save={saveAffiliateSwitchAction} />
-      <div className="my-6 grid gap-4">
+      <div className="mb-6 grid gap-4">
         <SignupGiftCard state={signupGift} savePaused={saveSignupGiftPausedAction} saveRules={saveSignupGiftRulesAction} />
         <PosterPhotoCard credits={photoPrice} save={savePosterPhotoPriceAction} />
         <FoodTogglesCard value={foodToggles} save={saveFoodTogglesAction} />

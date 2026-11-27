@@ -37,7 +37,6 @@ const ITEMS: readonly { key: AdminNavKey; href: `/admin${string}`; covers?: read
   { key: 'templates', href: '/admin/templates' },
   { key: 'home', href: '/admin/home' },
   { key: 'generation', href: '/admin/providers', covers: GENERATION_PAGES },
-  { key: 'references', href: '/admin/references' },
   { key: 'requests', href: '/admin/requests' },
   // T108 (ARCHITECTURE §9 第 5 条): public works waiting for a person, next to the other review.
   { key: 'gallery', href: '/admin/gallery' },
@@ -52,15 +51,15 @@ const COUNTED: ReadonlySet<AdminNavKey> = new Set(['tickets', 'inquiries', 'gall
 
 export type NavCounts = { tickets?: number; inquiries?: number; gallery?: number; affiliates?: number }
 
-// The review entry only exists while the wishlist does (ARCHITECTURE §15.6). Tickets carry the
+// The review entry only exists while the wishlist does (ARCHITECTURE §15.6). 联盟营销 is always
+// listed: its page holds the program's switch (Owner 2026-11-27); `affiliate` only gates its count. Tickets carry the
 // open count (ARCHITECTURE §10 「站内工单」), inquiries the new ones (§10.c), the affiliate program the
 // promotion grant sheets waiting for a confirm (§6.5 渠道商推广积分).
 export function adminNavItems(
   flags: { wishlist: boolean; affiliate?: boolean; gallery?: boolean },
   counts: NavCounts = {},
 ): AdminNavItem[] {
-  const visible = ITEMS.filter((item) => item.key !== 'affiliates' || flags.affiliate)
-    .filter((item) => item.key !== 'requests' || flags.wishlist)
+  const visible = ITEMS.filter((item) => item.key !== 'requests' || flags.wishlist)
     .filter((item) => item.key !== 'gallery' || flags.gallery)
   return visible.map((item) => {
     const count = COUNTED.has(item.key) ? counts[item.key as keyof NavCounts] : undefined
