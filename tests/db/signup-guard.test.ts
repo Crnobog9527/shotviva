@@ -14,7 +14,7 @@ import { readSignupGiftToday } from '@/core/alerts/signup-gift'
 import { site } from '@/site/site.config'
 
 import { TEST_SIGNUP_GIFT_CAP } from './global-setup'
-import { connectAdmin, createUser, holdSignupGiftSettings, profileOf } from './helpers'
+import { connectAdmin, createUser, profileOf, uniqueIp } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
 // 1350 (ARCHITECTURE §7): the signup gift's daily cap and pause, the stored refusal, the
@@ -25,7 +25,9 @@ let db: Client
 const service = serviceSupabase()
 const FREE = site.billing.freeCredits
 const grant = (id: string) => grantSignupCredits(billingGrant(service), id, FREE)
-const ip = () => `198.51.${randomBytes(1)[0]}.${(randomBytes(1)[0] ?? 0) % 250 + 1}`
+// Each network its own address: a random IPv4 one could repeat one that already got a gift
+// (pendingAccount allows 1 per network) and refuse a grant the test expects (#970).
+const ip = uniqueIp
 
 const setSetting = (key: string, value: unknown) =>
   db.query(
@@ -46,9 +48,7 @@ async function newAccount() {
 
 beforeAll(async () => {
   db = await connectAdmin()
-  // Waits while the other file that commits these settings runs.
-  await holdSignupGiftSettings(db)
-}, 300_000)
+})
 afterEach(async () => {
   await setSetting('signup_gift_daily_cap', TEST_SIGNUP_GIFT_CAP)
   await db.query(`delete from public.system_settings where key = 'signup_gift_paused'`)

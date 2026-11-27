@@ -13,7 +13,7 @@ import { readSignupGiftToday } from '@/core/alerts/signup-gift'
 import { site } from '@/site/site.config'
 
 import { TEST_SIGNUP_GIFT_CAP, TEST_SIGNUP_GIFT_PER_IP } from './global-setup'
-import { connectAdmin, createUser, holdSignupGiftSettings, profileOf } from './helpers'
+import { connectAdmin, createUser, profileOf, uniqueIp } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
 // 1480 (ARCHITECTURE §7): a network may receive signup_gift_per_ip signup gifts in 24 hours;
@@ -25,7 +25,9 @@ const service = serviceSupabase()
 const FREE = site.billing.freeCredits
 const grant = (id: string) => grantSignupCredits(billingGrant(service), id, FREE)
 const claim = (id: string, method: 'phone' | 'google' | null = null) => claimSignupGift(service, id, method)
-const ip = () => `203.0.${randomBytes(1)[0]}.${((randomBytes(1)[0] ?? 0) % 250) + 1}`
+// Each network its own address: a random IPv4 one could repeat one that already got a gift
+// (pendingAccount allows 1 per network) and refuse a grant the test expects (#970).
+const ip = uniqueIp
 const phone = () => parseMainlandPhone(`140${String(randomBytes(4).readUInt32BE() % 100_000_000).padStart(8, '0')}`)!
 
 const setSetting = (key: string, value: unknown) =>
@@ -75,9 +77,7 @@ const claimKeys = async (id: string) =>
 
 beforeAll(async () => {
   db = await connectAdmin()
-  // Waits while the other file that commits these settings runs.
-  await holdSignupGiftSettings(db)
-}, 300_000)
+})
 afterEach(async () => {
   await setSetting('signup_gift_daily_cap', TEST_SIGNUP_GIFT_CAP)
   await setSetting('signup_gift_per_ip', TEST_SIGNUP_GIFT_PER_IP)
