@@ -22,6 +22,8 @@ import { SHELL_BYPASS_PARAM } from './shell-fallback'
 
 export const SHELL_PRELOAD_PREFIX = 'shell-'
 const EARLY_MS = 30_000
+// The longest a shell fetch may take (refreshShell).
+const SHELL_FETCH_MS = 20_000
 
 export const SHELL_HANDLERS = `// Create's app shell (ARCHITECTURE §18.3).
 const SHELL_PRELOAD = '${SHELL_PRELOAD_PREFIX}' + VERSION
@@ -37,12 +39,19 @@ function shellPathFor(pathname) {
 }
 const localeOf = (pathname) => (pathname.startsWith('/zh/') ? 'zh' : 'en')
 
+// Bounded (SHELL_FETCH_MS): from mainland China this page crosses to sfo1 and back, and a stalled
+// connection must never keep the worker's install (or a navigation's waitUntil) open for minutes.
 async function refreshShell(shellUrl) {
+  const abort = typeof AbortController === 'function' ? new AbortController() : null
+  const timer = abort ? setTimeout(() => abort.abort(), ${SHELL_FETCH_MS}) : null
   try {
-    const response = await fetch(shellUrl, { credentials: 'omit', cache: 'no-store', redirect: 'manual' })
+    const init = { credentials: 'omit', cache: 'no-store', redirect: 'manual' }
+    const response = await fetch(shellUrl, abort ? { ...init, signal: abort.signal } : init)
     if (response.status !== 200 || response.type !== 'basic' || response.headers.get('x-sv-shell') !== VERSION) return
     await (await caches.open(SHELL)).put(shellUrl, response)
-  } catch {}
+  } catch {} finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 async function readTemplates() {
@@ -150,12 +159,43 @@ async function answerRefresh(event) {
   return fetch(request)
 }
 
+// The shells this worker fetched at install can still be deleted before it takes over: the worker
+// it replaces keeps answering until then (a shell-off worker drops every shell on each navigation,
+// an old page's sv-drop-shell drops its build's). So the first navigation this build's worker
+// handles checks behind its answer (waitUntil, never before it) and fetches again any shell that is
+// gone, except the one that navigation is about to refresh itself (shellFirst). Once per build, not
+// per wake: the browser stops an idle worker and starts it again often, so the check is recorded in
+// SHELL_CHECKED (its own cache, kept until the next build's activation) before any fetch, and a
+// failed refill is not retried; a marker that cannot be read or written means no refill at all.
+const SHELL_CHECKED_KEY = self.location.origin + '/__sv-shells-checked'
+let shellsChecked = false
+async function refillShells(except) {
+  if (cacheStalled) return
+  if (await cachedIn(SHELL_CHECKED, SHELL_CHECKED_KEY)) return
+  // A read that stalled returns nothing too: that is no record, not a missing one.
+  if (cacheStalled) return
+  const marked = await inTime((async () => {
+    await (await caches.open(SHELL_CHECKED)).put(SHELL_CHECKED_KEY, new Response(''))
+    return true
+  })())
+  if (marked !== true) return
+  await Promise.all(['/app-shell/generate', '/zh/app-shell/generate'].map(async (path) => {
+    const shellUrl = self.location.origin + path
+    if (shellUrl === except || (await cachedIn(SHELL, shellUrl))) return
+    await refreshShell(shellUrl)
+  }))
+}
+
 // Answers the request when it is the shell's business; false otherwise.
 function shellFetch(event) {
   const request = event.request
   if (request.mode === 'navigate' && request.method === 'GET') {
     const url = new URL(request.url)
     const path = url.origin === self.location.origin && !url.searchParams.has(SHELL_BYPASS) ? shellPathFor(url.pathname) : null
+    if (!shellsChecked) {
+      shellsChecked = true
+      event.waitUntil(refillShells(path ? self.location.origin + path : null).catch(() => {}))
+    }
     if (!path) return false
     event.respondWith(shellFirst(event, self.location.origin + path))
     return true
@@ -185,11 +225,19 @@ function shellMessage(event) {
   return true
 }
 
+// The shells are fetched while the worker installs, never while it activates: until activation
+// ends, every navigation and file request of the site waits for it (Handle Fetch waits for an
+// "activating" worker), so two cross-border page fetches there held up every tap, and a stalled
+// one held the site up for minutes (Huawei Browser, 2026-11-28). During install the worker it
+// replaces still answers as before.
+async function shellInstall() {
+  await Promise.all(['/app-shell/generate', '/zh/app-shell/generate'].map((path) => refreshShell(self.location.origin + path)))
+}
+
 async function shellActivate() {
   try {
-    if (self.registration.navigationPreload) await self.registration.navigationPreload.setHeaderValue(SHELL_PRELOAD)
+    if (self.registration.navigationPreload) await inTime(self.registration.navigationPreload.setHeaderValue(SHELL_PRELOAD))
   } catch {}
-  await Promise.all(['/app-shell/generate', '/zh/app-shell/generate'].map((path) => refreshShell(self.location.origin + path)))
 }
 
 // A newer build is out (a page's version check, which says its own build): every other build's
@@ -221,9 +269,10 @@ export const NO_SHELL = `function shellFetch(event) {
   return false
 }
 const shellMessage = () => false
+async function shellInstall() {}
 async function shellActivate() {
   try {
-    if (self.registration.navigationPreload) await self.registration.navigationPreload.setHeaderValue('true')
+    if (self.registration.navigationPreload) await inTime(self.registration.navigationPreload.setHeaderValue('true'))
   } catch {}
 }
 async function dropShell() {}
