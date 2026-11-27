@@ -30714,10 +30714,6 @@ GRANT SELECT ON TABLE "public"."affiliate_settlement_runs" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."affiliate_signup_refs" TO "service_role";
-
-
-
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."blog_posts" TO "service_role";
 
 
