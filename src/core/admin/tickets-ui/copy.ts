@@ -97,6 +97,8 @@ export const TICKETS_COPY = {
     clawbackLabel: '这笔的积分扣回：',
     clawbackHint: '用过积分、要按剩余比例退款的：先点「扣回剩余积分」，扣掉用户手上这笔剩下的付费积分（记到这笔付款名下），再去按比例退款；退款回调不会再重复扣。',
     done: '已记录决定',
+    // 2033 (Owner 2026-11-28): such tickets can no longer be opened by users; ones from before stay.
+    orgPool: '这笔购买的积分直接存入了企业积分池：企业购买不支持用户自助退款。如确需退款，由你人工处理：先「扣回剩余积分」（从企业积分池扣，扣到 0 为止，其余记欠扣），再到 Stripe / Waffo 退款。',
   },
   renewal: {
     heading: '续费核对', amountMismatch: '扣款与合同报价无法核对', duplicate: '同一期收到另一笔扣款',

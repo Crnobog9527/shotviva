@@ -21,10 +21,24 @@ export function AttachmentField({ type, payments, works, work = null }: Props) {
     return <WorkPicker label={t('workLabel')} works={works} initial={picked} />
   }
   const required = kind === 'payment-required'
-  if (payments.length === 0) {
-    return <p className="text-body text-muted-foreground">{t('noPayments')}</p>
+  const offered = offeredPayments(type, payments)
+  // 2033 (Owner 2026-11-28): org-pool purchases have no self-service refund; say so instead.
+  const orgNote = offered.length < payments.length ? <p className="text-caption text-muted-foreground">{t('orgPoolNoRefund')}</p> : null
+  if (offered.length === 0) {
+    return orgNote ?? <p className="text-body text-muted-foreground">{t('noPayments')}</p>
   }
-  return <Picker name="paymentId" label={t(required ? 'paymentLabel' : 'paymentOptional')} choices={payments} required={required} />
+  return (
+    <div className="grid gap-2">
+      <Picker name="paymentId" label={t(required ? 'paymentLabel' : 'paymentOptional')} choices={offered} required={required} />
+      {orgNote}
+    </div>
+  )
+}
+
+// The payments a type's picker offers: a refund request leaves out those with no self-service
+// refund (org-pool purchases, 2033); billing tickets offer every payment.
+export function offeredPayments(type: TicketType, payments: readonly Choice[]): readonly Choice[] {
+  return type === 'refund' ? payments.filter((choice) => !choice.noRefund) : payments
 }
 
 type PickerProps = { name: string; label: string; choices: readonly Choice[]; required: boolean; initial?: string; onPick?(value: string): void }

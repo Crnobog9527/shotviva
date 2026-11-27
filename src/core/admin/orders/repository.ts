@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import { paymentGrantKey } from '@/core/billing/payment-grants'
 import { AppError } from '@/core/errors'
 
 import { afterCursor, decodeCursor, PAGE_SIZE, toPage, type Page } from '../cursor'
@@ -18,7 +19,7 @@ const fail = (what: string, error: { message: string }): never => {
 }
 
 const PAYMENT_COLUMNS =
-  'id, created_at, user_id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, waffo_order_id, ' +
+  'id, created_at, user_id, product_id, channel, stripe_session_id, stripe_invoice_id, stripe_charge_id, waffo_order_id, waffo_payment_id, ' +
   'amount_total, amount_tax, amount_discount, amount_refunded, currency, method, status, credits_clawed_back, clawback_shortfall, ' +
   'acknowledged_at, acknowledged_status, acknowledged_refunded'
 
@@ -34,6 +35,7 @@ const paymentRow = z.object({
   stripe_invoice_id: nullableId,
   stripe_charge_id: nullableId,
   waffo_order_id: nullableId,
+  waffo_payment_id: nullableId.optional(),
   amount_total: z.number().int(),
   amount_tax: z.number().int(),
   amount_discount: z.number().int().nonnegative(),
@@ -75,6 +77,9 @@ export type AdminPurchase = PurchaseSource & {
   // payment counts again. openDispute: a dispute on it is not closed yet, which counts regardless.
   acknowledgement: { at: string; stale: boolean } | null
   openDispute: boolean
+  // Where the credits went (migration 2033): an active org's main admin buys into the org's paid
+  // pool; null = the buyer's own balance. Refunds and disputes take them back from the same place.
+  creditsOrg: { id: string; name: string } | null
 }
 
 // Who paid, named live from Auth (one call per distinct user on the page, ≤ 30, never copied):
@@ -106,7 +111,29 @@ async function openDisputesFor(db: SupabaseClient, rows: PaymentRow[]): Promise<
   return new Set(z.array(z.union([z.number(), z.string()]).transform(String)).parse(data))
 }
 
-function toPurchase(row: PaymentRow, email: string | null, openDispute: boolean): AdminPurchase {
+// The settlement's automatic deposits among the page's payments (org_credit_ledger request_id
+// pay:<grant key>, unique), with the org's name.
+async function creditOrgsFor(db: SupabaseClient, rows: PaymentRow[]): Promise<Map<string, { id: string; name: string }>> {
+  const keyOf = new Map<string, PaymentRow>(rows.flatMap((row) => {
+    const key = paymentGrantKey(row)
+    return key ? [[`pay:${key}`, row] as [string, PaymentRow]] : []
+  }))
+  if (keyOf.size === 0) return new Map()
+  const { data, error } = await db.from('org_credit_ledger').select('org_id, request_id, member_user_id')
+    .eq('kind', 'owner_deposit').in('request_id', [...keyOf.keys()])
+  if (error) fail('org deposits', error)
+  const deposits = z.array(z.object({ org_id: z.uuid(), request_id: z.string(), member_user_id: z.uuid().nullable() })).parse(data)
+  if (deposits.length === 0) return new Map()
+  const orgs = await db.from('orgs').select('id, name').in('id', [...new Set(deposits.map((d) => d.org_id))])
+  if (orgs.error) fail('orgs', orgs.error)
+  const names = new Map(z.array(z.object({ id: z.uuid(), name: z.string() })).parse(orgs.data).map((o) => [o.id, o.name]))
+  return new Map(deposits.flatMap((d) => {
+    const row = keyOf.get(d.request_id)
+    return row && d.member_user_id === row.user_id ? [[row.id, { id: d.org_id, name: names.get(d.org_id) ?? d.org_id }] as const] : []
+  }))
+}
+
+function toPurchase(row: PaymentRow, email: string | null, openDispute: boolean, creditsOrg: AdminPurchase['creditsOrg'] = null): AdminPurchase {
   return {
     ...paymentSource(row),
     id: row.id,
@@ -125,6 +152,7 @@ function toPurchase(row: PaymentRow, email: string | null, openDispute: boolean)
     clawbackShortfall: row.clawback_shortfall,
     acknowledgement: acknowledgementOf(row),
     openDispute,
+    creditsOrg,
   }
 }
 
@@ -144,8 +172,10 @@ export async function listPurchases(db: SupabaseClient, cursor?: string | null, 
   if (error) fail('payments', error)
   const rows = paymentRow.array().parse(data)
   const shown = rows.slice(0, PAGE_SIZE)
-  const [emails, open] = await Promise.all([emailsFor(db, shown.map((row) => row.user_id)), openDisputesFor(db, shown)])
-  return toPage(rows, (row) => toPurchase(row, emails.get(row.user_id) ?? null, open.has(row.id)))
+  const [emails, open, orgs] = await Promise.all([
+    emailsFor(db, shown.map((row) => row.user_id)), openDisputesFor(db, shown), creditOrgsFor(db, shown),
+  ])
+  return toPage(rows, (row) => toPurchase(row, emails.get(row.user_id) ?? null, open.has(row.id), orgs.get(row.id) ?? null))
 }
 
 const subscriptionRow = z.object({

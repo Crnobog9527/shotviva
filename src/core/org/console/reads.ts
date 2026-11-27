@@ -149,7 +149,8 @@ export function allowances(m: Pick<z.infer<typeof memberSchema>, 'monthly_allowa
 async function readOwnerPoolMonth(db: SupabaseClient, owner: string, now: Date): Promise<PoolMonthView | null> {
   try {
     const month = await readPoolMonth(db, owner, currentPeriod(now))
-    return { period: month.period, paid: { in: month.paid.in, allocated: month.paid.allocated, reclaimed: month.paid.reclaimed },
+    return { period: month.period, paid: { in: month.paid.in, allocated: month.paid.allocated, reclaimed: month.paid.reclaimed,
+      clawedBack: month.paid.clawed_back, restored: month.paid.restored },
       promo: { granted: month.promo.granted, allocated: month.promo.allocated, reclaimed: month.promo.reclaimed, expired: month.promo.expired, held: month.promo.held } }
   } catch (error) {
     logger.warn('org pool month unavailable', { code: error instanceof AppError ? error.code : 'UNKNOWN' })

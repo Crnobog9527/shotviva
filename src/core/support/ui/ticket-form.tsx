@@ -6,16 +6,16 @@ import { useActionState, useEffect, useState } from 'react'
 import { ActionBar, ActionNotice } from '../../app-shell'
 import { buttonVariants } from '../../ui/button'
 import { attachmentFor, type TicketType } from '../rules'
-import { AttachmentField } from './attachment-field'
+import { AttachmentField, offeredPayments } from './attachment-field'
 import { BodyField } from './body-field'
 import { dispatchKeeping } from './dispatch'
 import { IDLE, type Choice, type FormAction } from './form-state'
 import { TicketImagesField, useImagesText } from './ticket-images-field'
 import { TypePicker } from './type-picker'
 
-// A refund request on an account without payments cannot be sent; the field says so instead.
+// A refund request on an account without payments it can refund cannot be sent; the field says so instead.
 const cannotSend = (type: TicketType | null, payments: readonly Choice[]) =>
-  type !== null && attachmentFor(type) === 'payment-required' && payments.length === 0
+  type !== null && attachmentFor(type) === 'payment-required' && offeredPayments(type, payments).length === 0
 
 // The bar pinned to the bottom edge of the Help dialog's scrolling body (ResponsiveSheet `tall`
 // has no bottom padding): full bleed over the body's 16 / 24px gutters.

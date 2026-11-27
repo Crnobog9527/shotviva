@@ -270,8 +270,12 @@ describe('refunds and org transfers', () => {
   }
 
   it('counts a deposit into the org pool as using the credits', async () => {
-    const { owner } = await orgWith(db, service, actor)
+    const { orgId, owner } = await orgWith(db, service, actor)
+    // Bought while the org was paused, so the credits are the owner's own (an active org's main
+    // admin buys straight into the pool since 2033: org-owner-purchase-pool.test.ts).
+    await db.query("update public.orgs set status = 'suspended' where id = $1", [orgId])
     const { paymentId, credits } = await buyPack(owner)
+    await db.query("update public.orgs set status = 'active' where id = $1", [orgId])
     await depositOrgCredits(service, owner, credits, randomUUID())
     const { rows } = await db.query('select no_credits_used from public.refund_eligibility($1, now())', [paymentId])
     expect(rows[0].no_credits_used).toBe(false)

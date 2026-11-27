@@ -19,6 +19,7 @@ export const ERROR_CODES = [
   'CODE_USED',
   'CODE_NEW_USERS_ONLY',
   'CODE_INVITE_SIGNUP_ONLY',
+  'CODE_ORG_MEMBER',
   'CODE_OWN',
   'CODE_ALREADY_INVITED',
   'CODE_NEEDS_CONFIRM',
@@ -75,6 +76,9 @@ export const ERROR_CODES = [
   'TEST_BUDGET_EXCEEDED',
   // The Owner closed this support ticket: its author can no longer add to it (start a new one).
   'TICKET_CLOSED',
+  // A refund request for a purchase whose credits went to an org pool (2033, Owner 2026-11-28): no
+  // self-service refund; the buyer contacts support and the admin handles it by hand.
+  'ORG_POOL_REFUND',
   // Auth or the database could not say who is signed in (an outage, not a sign-out); retry
   // (ARCHITECTURE §7「会话校验」).
   'AUTH_UNAVAILABLE',
@@ -100,6 +104,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   CODE_USED: 409,
   CODE_NEW_USERS_ONLY: 403,
   CODE_INVITE_SIGNUP_ONLY: 403,
+  CODE_ORG_MEMBER: 403,
   CODE_OWN: 422,
   CODE_ALREADY_INVITED: 409,
   CODE_NEEDS_CONFIRM: 409,
@@ -134,6 +139,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   FAVORITES_LIMIT: 409,
   TEST_BUDGET_EXCEEDED: 429,
   TICKET_CLOSED: 409,
+  ORG_POOL_REFUND: 409,
   AUTH_UNAVAILABLE: 503,
   INTERNAL: 500,
 }

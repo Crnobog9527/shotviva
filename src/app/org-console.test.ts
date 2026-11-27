@@ -32,7 +32,7 @@ const owner = (over: Partial<OwnerConsole['org']> = {}, extra: Partial<OwnerCons
   packages: [{ id: ORG, name: 'Starter', priceUsdCents: 123400, credits: 98765 }],
   depositable: 700,
   paymentAccounts: null,
-  poolMonth: { period: '2026-11', paid: { in: 5000, allocated: 600, reclaimed: 0 }, promo: { granted: 10000, allocated: 2000, reclaimed: 0, expired: 0, held: 1750 } },
+  poolMonth: { period: '2026-11', paid: { in: 5000, allocated: 600, reclaimed: 0, clawedBack: 0, restored: 0 }, promo: { granted: 10000, allocated: 2000, reclaimed: 0, expired: 0, held: 1750 } },
   ...extra,
 })
 
@@ -157,6 +157,15 @@ describe.each(['en', 'zh'] as const)('promotion pool (%s)', (locale) => {
     expect(text).toContain(locale === 'en' ? '1,750 promotion credits left' : '推广积分剩 1,750')
     expect(text).toContain('1,750')
     expect(text).toContain('10,000') // granted into the promotion pool this month
+    // Purchase clawbacks and won-dispute returns (2033): two separate non-negative rows.
+    const month = render(locale, createElement(OwnerConsoleView, {
+      data: owner({}, { poolMonth: { period: '2026-11', paid: { in: 5000, allocated: 600, reclaimed: 0, clawedBack: 1234, restored: 567 },
+        promo: { granted: 10000, allocated: 2000, reclaimed: 0, expired: 0, held: 1750 } } }),
+      actions: ownerActions, report: null, affiliate: true,
+    }))
+    expect(month.errors).toEqual([])
+    expect(month.text).toMatch(locale === 'en' ? /Taken back for refunds\s*1,234/ : /退款扣回\s*1,234/)
+    expect(month.text).toMatch(locale === 'en' ? /Returned after a won dispute\s*567/ : /拒付胜诉还回\s*567/)
     // Deposit stays paid-only.
     expect(text).toContain(locale === 'en' ? 'Deposit your own paid credits' : '存入自己的付费积分')
     // Two forms per kind for the member whose editor is open: allowance and top-up.

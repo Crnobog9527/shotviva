@@ -15,6 +15,9 @@ export type MemberStanding = {
   // paywall is locked with the reason. The checkout route refuses whatever the page shows (409
   // ORG_MEMBER_CHECKOUT); this only spares the click.
   orgMember?: boolean
+  // The main admin of an active org (Owner 2026-11-27): what they buy goes to the org's credit
+  // pool, so the paywall says where the credits will land. The settlement decides again.
+  orgPool?: boolean
 }
 
 export const NO_STANDING: MemberStanding = { subscription: null, tier: null }

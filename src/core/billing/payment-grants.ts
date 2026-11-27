@@ -11,6 +11,18 @@ export function paymentGrantKey(row: PaymentKeys): string | null {
   return row.waffo_payment_id ? `purchase:${row.waffo_payment_id}` : null
 }
 
+// The grant keys among `keys` whose credits went to an org pool at settlement (2033): the
+// settlement's automatic deposit, org:pay:<grant key>, on the buyer's ledger.
+export async function orgPoolGrantKeys(db: SupabaseClient, userId: string, keys: readonly (string | null)[]): Promise<Set<string>> {
+  const ids = [...new Set(keys.filter((key): key is string => key !== null))].map((key) => `org:pay:${key}`)
+  if (!ids.length) return new Set()
+  const { data, error } = await db.from('credit_ledger').select('idempotency_key')
+    .eq('user_id', userId).eq('kind', 'org_deposit').in('idempotency_key', ids)
+    .returns<{ idempotency_key: string }[]>()
+  if (error) throw new AppError('INTERNAL', 'Could not read where the purchase credits went')
+  return new Set(data.map((row) => row.idempotency_key.slice('org:pay:'.length)))
+}
+
 export async function paymentGrants(db: SupabaseClient, userId: string, keys: readonly (string | null)[]) {
   const ids = [...new Set(keys.filter((key): key is string => key !== null))]
   if (!ids.length) return new Map<string, number>()

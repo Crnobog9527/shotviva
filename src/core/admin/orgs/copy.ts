@@ -143,6 +143,8 @@ export const ORGS_COPY = {
     promo_allocate: '推广积分划给成员',
     promo_reclaim: '推广积分收回',
     promo_expire: '推广积分月底清零',
+    payment_clawback: '购买退款 / 拒付扣回',
+    payment_clawback_restore: '拒付胜诉还回',
   } as Record<string, string>,
   // 成员
   membersTitle: '成员（只读）',

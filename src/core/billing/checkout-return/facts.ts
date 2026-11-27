@@ -19,6 +19,9 @@ import type { ReturnQuery } from './query'
 // grants anything, so a refresh or a forged address cannot add credits.
 export type CheckoutFacts = {
   grantedCredits?: number | null
+  // The credits went to the org's paid pool, not the buyer's (an active org's main admin,
+  // Owner 2026-11-27, migration 2033): read from the settlement's own org_deposit row.
+  orgPool?: boolean
   productId: ProductId
   // The payments row exists: the credits are in the account.
   settled: boolean
@@ -51,7 +54,7 @@ const paymentRow = z.object({
   waffo_order_id: z.string().nullable().optional(),
   waffo_payment_id: z.string().nullable().optional(),
 })
-type PaymentRow = z.infer<typeof paymentRow> & { grantedCredits?: number | null }
+type PaymentRow = z.infer<typeof paymentRow> & { grantedCredits?: number | null; orgPool?: boolean }
 
 const productIdOf = (value: unknown): ProductId | null => {
   const parsed = productIdSchema.safeParse(value)
@@ -83,7 +86,10 @@ function unsettled(productId: ProductId): CheckoutFacts {
 }
 
 function settledFacts(productId: ProductId, row: PaymentRow): CheckoutFacts {
-  return { ...unsettled(productId), settled: true, grantedCredits: row.grantedCredits, method: row.method, amount: { minor: row.amount_total, currency: row.currency } }
+  return {
+    ...unsettled(productId), settled: true, grantedCredits: row.grantedCredits, orgPool: row.orgPool === true,
+    method: row.method, amount: { minor: row.amount_total, currency: row.currency },
+  }
 }
 
 // The card and Stripe's hosted receipt, from the charge the payments row recorded.
@@ -127,8 +133,18 @@ async function readPayment(db: SupabaseClient, userId: string, filter: (query: P
   if (data === null) return null
   const row = paymentRow.parse(data)
   const key = paymentGrantKey(row)
-  const grants = await paymentGrants(db, userId, [key])
-  return { ...row, grantedCredits: grants.get(key ?? '') ?? null }
+  const [grants, orgPool] = await Promise.all([paymentGrants(db, userId, [key]), wentToOrgPool(db, userId, key)])
+  return { ...row, grantedCredits: grants.get(key ?? '') ?? null, orgPool }
+}
+
+// The settlement's automatic deposit (migration 2033): key org:pay:<grant key> on the buyer's
+// ledger, written in the same transaction as the purchase row.
+async function wentToOrgPool(db: SupabaseClient, userId: string, key: string | null): Promise<boolean> {
+  if (!key) return false
+  const { data, error } = await db.from('credit_ledger').select('id')
+    .eq('user_id', userId).eq('kind', 'org_deposit').eq('idempotency_key', `org:pay:${key}`).limit(1)
+  if (error) throw new AppError('INTERNAL', `checkout return: org deposit read failed: ${error.message}`)
+  return (data ?? []).length > 0
 }
 
 async function retrieveSession(stripe: StripeApi, id: string): Promise<Stripe.Checkout.Session | null> {

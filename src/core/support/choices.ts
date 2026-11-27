@@ -7,7 +7,7 @@ import type { PaymentOption, WorkOption } from './types'
 // the client gets plain labels. Money in the payment's own currency, as charged.
 
 // ref: a work's reference number (T78), as long as the photo page shows it.
-type Choice = { value: string; label: string; ref?: string }
+type Choice = { value: string; label: string; ref?: string; noRefund?: boolean }
 type Formats = { money(cents: number, currency: string): string }
 
 function productLabel({ productId, grantedCredits }: PaymentOption, products: readonly SiteProduct[], t: Translate): string {
@@ -30,6 +30,8 @@ export function paymentChoices(
       amount: formats.money(option.amountTotal, option.currency),
       date: new Date(option.createdAt),
     }),
+    // 2033 (Owner 2026-11-28): an org-pool purchase has no self-service refund.
+    ...(option.orgPool ? { noRefund: true } : {}),
   }))
 }
 
