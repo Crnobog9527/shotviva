@@ -7,7 +7,8 @@ const { bonusLabel, sourceLabel } = await import('./customer-copy')
 // A ?ref= customer who qualified at the binding and could be back-filled today.
 const base = {
   bonus_credits: null as number | null, bonus_at: null as string | null, bonus_error: null as string | null, level: 1 as 1 | 2,
-  source: 'signup' as string | null, paid_before: false, has_signup_gift: true, bonus_at_bind: 350, switch_at_bind: true,
+  source: 'signup' as string | null, paid_before: false, has_signup_gift: true, gift_at_bind: true, bonus_at_bind: 350 as number | null, status_at_bind: 'active' as string | null,
+  switch_at_bind: true as boolean | null,
   before_org: false, has_paid: false, banned: false,
 }
 const reason = (facts: Partial<typeof base>, on = true) => {
@@ -35,8 +36,12 @@ describe('推广名单 bonus status', () => {
     expect(reason({ before_org: true })).toBe('before_org')
     expect(reason({ bonus_at_bind: 0 })).toBe('off_at_bind')
     expect(reason({ switch_at_bind: false })).toBe('affiliate_off_at_bind')
-    expect(reason({ has_signup_gift: false })).toBe('no_signup_gift')
-    for (const r of ['before_org', 'off_at_bind', 'affiliate_off_at_bind', 'no_signup_gift'] as const) {
+    expect(reason({ has_signup_gift: false, gift_at_bind: false })).toBe('no_signup_gift')
+    expect(reason({ gift_at_bind: false })).toBe('gift_after_bind')
+    expect(reason({ status_at_bind: 'suspended' })).toBe('inactive_at_bind')
+    expect(reason({ status_at_bind: '' })).toBe('inactive_at_bind')
+    for (const unknown of [{ bonus_at_bind: null }, { status_at_bind: null }, { switch_at_bind: null }]) expect(reason(unknown)).toBe('unknown_at_bind')
+    for (const r of ['before_org', 'unknown_at_bind', 'off_at_bind', 'inactive_at_bind', 'affiliate_off_at_bind', 'no_signup_gift', 'gift_after_bind'] as const) {
       expect(bonusLabel({ kind: 'none', reason: r })).not.toContain('可补发')
     }
   })

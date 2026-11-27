@@ -46,13 +46,16 @@ const NONE: Record<Extract<OrgCustomerBonus, { kind: 'none' }>['reason'], string
   first_checkout: '未发：首次付款时才绑定，不算新注册',
   other: '未发：不是经企业推广链接或员工邀请码来的',
   before_org: '未发：企业成立前的个人推广客户',
+  unknown_at_bind: '未发：记录还原不出绑定时的企业设置，不补发',
   off_at_bind: '未发：绑定时企业没开注册福利',
+  inactive_at_bind: '未发：绑定时企业已停用',
   affiliate_off_at_bind: '未发：绑定时企业联盟开关关着',
   no_signup_gift: '未发：没领到注册赠送（没完成验证或从没登录过）',
+  gift_after_bind: '未发：绑定之后才领到注册赠送，不补发',
   unrecorded: '未发：没有发放记录也没有出错记录，需要排查',
   banned: '未发：经企业推广链接注册，但账号已封禁，不补发',
   paid_since: '未发：经企业推广链接注册，#958 前漏发；已付过款，按补发规则不补',
-  off_now: '未发：经企业推广链接注册，#958 前漏发；企业现在关了福利，暂不能补发',
+  off_now: '未发：经企业推广链接注册，#958 前漏发；企业现在关了福利或停了联盟账号，暂不能补发',
   backfill: '未发：经企业推广链接注册，#958 前漏发，可补发',
 }
 

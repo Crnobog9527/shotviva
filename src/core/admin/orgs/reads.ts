@@ -241,8 +241,10 @@ const customerSchema = z.object({
   bonus_error: z.string().nullable(),
   paid_before: z.boolean(),
   has_signup_gift: z.boolean(),
-  bonus_at_bind: z.number(),
-  switch_at_bind: z.boolean(),
+  gift_at_bind: z.boolean(),
+  bonus_at_bind: z.number().nullable(),
+  status_at_bind: z.string().nullable(),
+  switch_at_bind: z.boolean().nullable(),
   before_org: z.boolean(),
   has_paid: z.boolean(),
   banned: z.boolean(),
@@ -254,26 +256,33 @@ const customerSchema = z.object({
 })
 
 type BonusFacts = Pick<z.infer<typeof customerSchema>, 'bonus_credits' | 'bonus_at' | 'bonus_error' | 'level' | 'source' | 'paid_before'
-  | 'has_signup_gift' | 'bonus_at_bind' | 'switch_at_bind' | 'before_org' | 'has_paid' | 'banned'>
+  | 'has_signup_gift' | 'gift_at_bind' | 'bonus_at_bind' | 'status_at_bind' | 'switch_at_bind' | 'before_org' | 'has_paid' | 'banned'>
 
 // Why a customer has no bonus and no recorded refusal, from how they were bound (1690, 2010). The
 // Owner's rule: whoever the org admin's or a staff member's promotion link brings in gets it;
 // level 2 (invited by a customer) does not. A ?ref= customer is shown as 可补发 only when
 // admin_org_signup_bonus_backfill (2010) would pay them: the same bind-time facts, nothing paid,
-// not banned, and the org's bonus on today (`bonusOnNow`: active, switch on, amount > 0).
+// not banned, and the org's bonus on today (`bonusOnNow`: org active, switch on, amount > 0, its
+// affiliate account active). A setting the audit log cannot tell at the binding is never 可补发.
 type NoBonus = Extract<OrgCustomerBonus, { kind: 'none' }>['reason']
 const linked = (row: BonusFacts) => row.source === 'signup' || row.source === 'org_l1'
 // First match wins; the order is the order of the checks the trigger and the back-fill make.
+const ref = (row: BonusFacts) => row.source === 'signup'
 const NO_BONUS_RULES: readonly [NoBonus, (row: BonusFacts, bonusOnNow: boolean) => boolean][] = [
   ['level2', (row) => row.level === 2],
   ['paid_before', (row) => row.paid_before],
   ['first_checkout', (row) => row.source === 'first_checkout'],
   ['other', (row) => !linked(row)],
   ['before_org', (row) => row.before_org],
-  ['off_at_bind', (row) => row.bonus_at_bind <= 0],
-  ['affiliate_off_at_bind', (row) => !row.switch_at_bind],
+  ['unknown_at_bind', (row) => row.bonus_at_bind === null],
+  ['off_at_bind', (row) => (row.bonus_at_bind ?? 0) <= 0],
+  ['unknown_at_bind', (row) => row.status_at_bind === null],
+  ['inactive_at_bind', (row) => row.status_at_bind !== 'active'],
+  ['unknown_at_bind', (row) => row.switch_at_bind === null],
+  ['affiliate_off_at_bind', (row) => row.switch_at_bind !== true],
   ['no_signup_gift', (row) => !row.has_signup_gift],
-  ['unrecorded', (row) => row.source === 'org_l1'],
+  ['gift_after_bind', (row) => !row.gift_at_bind],
+  ['unrecorded', (row) => !ref(row)],
   ['banned', (row) => row.banned],
   ['paid_since', (row) => row.has_paid],
   ['off_now', (_row, bonusOnNow) => !bonusOnNow],
@@ -289,9 +298,9 @@ export function customerBonus(row: BonusFacts, bonusOnNow: boolean): OrgCustomer
 // Admin only (the caller checked the role). An org without an affiliate account has none.
 // Staff of the org are never listed. A page past the end is empty with total 0; the view then
 // links back to the first page.
-export async function loadOrgCustomers(db: SupabaseClient, org: Pick<OrgRow, 'id' | 'status' | 'affiliateEnabled' | 'signupBonusCredits'>, page: number): Promise<OrgCustomerPage> {
+export async function loadOrgCustomers(db: SupabaseClient, org: Pick<OrgRow, 'id' | 'status' | 'affiliateEnabled' | 'signupBonusCredits'>, affiliateStatus: string | null, page: number): Promise<OrgCustomerPage> {
   const current = Number.isInteger(page) && page > 0 ? Math.min(page, 10000) : 1
-  const bonusOnNow = org.status === 'active' && org.affiliateEnabled && org.signupBonusCredits > 0
+  const bonusOnNow = org.status === 'active' && org.affiliateEnabled && org.signupBonusCredits > 0 && affiliateStatus === 'active'
   const rows = await db.rpc('admin_org_customers', { p_org_id: org.id, p_limit: CUSTOMER_PAGE_SIZE, p_offset: (current - 1) * CUSTOMER_PAGE_SIZE })
   const parsed = z.array(customerSchema).parse(ok(rows, 'customers') ?? [])
   return {

@@ -74,7 +74,7 @@ it('lists both levels and the partner-link customers, newest binding first, with
   expect(byId.get(l1).member_contact).toMatch(/@/)
   expect(byId.get(l2)).toMatchObject({ level: 2, source: 'org_l2', member_user_id: staff, via_user_id: l1, bonus_credits: null, paid_cents: '0', commission_cents: '0' })
   expect(byId.get(viaLink)).toMatchObject({ level: 1, source: 'signup', member_user_id: null, has_signup_gift: false,
-    bonus_at_bind: 300, switch_at_bind: true, before_org: false, has_paid: false, banned: false })
+    gift_at_bind: false, bonus_at_bind: 300, status_at_bind: 'active', switch_at_bind: true, before_org: false, has_paid: false, banned: false })
   expect(byId.get(l1)).toMatchObject({ has_paid: true })
 
   // A binding older than the org (the owner's personal customer before the org existed) had no bonus then.
@@ -89,6 +89,28 @@ it('never lists the org\'s own staff, even one who was its customer first', asyn
   const { invite_token } = await row(db, 'select invite_token from orgs where id=$1', [orgId])
   await db.query('select org_join($1,$2)', [customer, invite_token])
   expect(await list(orgId)).toEqual([])
+})
+
+it('reconstructs the org settings at the binding as the 2010 back-fill does', async () => {
+  const { orgId, slug } = await orgTeam()
+  const early = await createUser(db)
+  await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [early, 'signup:' + early])
+  expect(await bind(db, early, slug)).toBe(true)
+  // Bound an hour before every audited change (and before the gift), all of which happen "now".
+  await db.query("update profiles set referred_at=now()-interval '1 hour' where id=$1", [early])
+  const at = () => list(orgId).then((rows) => rows.find((r) => r.user_id === early))
+  // The bonus was set from 0 after the binding: 0 then. Status and switch never audited: today's.
+  expect(await at()).toMatchObject({ bonus_at_bind: 0, status_at_bind: 'active', switch_at_bind: true, gift_at_bind: false, has_signup_gift: true })
+  // A status change audited only after the binding: the log cannot tell the status then.
+  await db.query('select admin_org_update($1,$2,$3)', [actor, orgId, { status: 'suspended' }])
+  await db.query('select admin_org_update($1,$2,$3)', [actor, orgId, { status: 'active' }])
+  expect(await at()).toMatchObject({ status_at_bind: null })
+  // Same for the switch; an audited JSON null reads as off.
+  await db.query('select admin_org_update($1,$2,$3)', [actor, orgId, { affiliate_enabled: true }])
+  expect(await at()).toMatchObject({ switch_at_bind: null })
+  await db.query("update profiles set referred_at=now()+interval '1 hour' where id=$1", [early])
+  await db.query("update admin_audit_log set reason=jsonb_build_object('affiliate_enabled',null)::text where action='org_update' and target_id=$1 and reason like '%affiliate_enabled%'", [orgId])
+  expect(await at()).toMatchObject({ switch_at_bind: false, status_at_bind: 'active', bonus_at_bind: 300, gift_at_bind: true })
 })
 
 it('pages with a total, records a bonus error, and returns nothing for an org without an affiliate account', async () => {
