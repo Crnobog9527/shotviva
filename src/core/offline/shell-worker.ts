@@ -172,6 +172,8 @@ let shellsChecked = false
 async function refillShells(except) {
   if (cacheStalled) return
   if (await cachedIn(SHELL_CHECKED, SHELL_CHECKED_KEY)) return
+  // A read that stalled returns nothing too: that is no record, not a missing one.
+  if (cacheStalled) return
   const marked = await inTime((async () => {
     await (await caches.open(SHELL_CHECKED)).put(SHELL_CHECKED_KEY, new Response(''))
     return true

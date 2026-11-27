@@ -1,60 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { serviceWorkerSource } from './sw'
+import { BUILD, SITE, nav, on, runWorker } from './shell-worker-harness'
 
 // Create's app shell in /sw.js (ARCHITECTURE §18.3), run against a stand-in for the worker's globals.
-const SITE = 'https://shotviva.com'
-const BUILD = 'dpl_test'
-type Key = string | { url: string }
-const keyOf = (key: Key) => (typeof key === 'string' ? key : key.url)
-
-// `stores`: Cache Storage as another run of the worker left it (the browser stopped and restarted it).
-function runWorker(source: string, stores = new Map<string, Map<string, Response>>()) {
-  const handlers: Record<string, (event: unknown) => void> = {}
-  const storeFor = (name: string) => {
-    if (!stores.has(name)) stores.set(name, new Map())
-    const cached = stores.get(name)!
-    return {
-      match: vi.fn(async (key: Key) => cached.get(keyOf(key))?.clone()),
-      put: vi.fn(async (key: Key, response: Response) => void cached.set(keyOf(key), response)),
-      keys: vi.fn(async () => [...cached.keys()].map((url) => ({ url }))),
-      delete: vi.fn(async (key: Key) => cached.delete(keyOf(key))),
-    }
-  }
-  const deleted: string[] = []
-  const caches = { has: vi.fn(async (name: string) => stores.has(name)), open: vi.fn(async (name: string) => storeFor(name)), keys: vi.fn(async () => [...stores.keys()]), delete: vi.fn(async (name: string) => void (deleted.push(name), stores.delete(name))) }
-  const preload = { enable: vi.fn(async () => undefined), setHeaderValue: vi.fn(async () => undefined) }
-  const self = { location: { origin: SITE }, addEventListener: (type: string, handler: (event: unknown) => void) => void (handlers[type] = handler), skipWaiting: vi.fn(), clients: { claim: vi.fn() }, registration: { unregister: vi.fn(), navigationPreload: preload } }
-  const fetch = vi.fn(async (input: unknown, init?: RequestInit) => network(input, init))
-  new Function('self', 'caches', 'fetch', source)(self, caches, fetch)
-  const dispatch = async (type: string, event: Record<string, unknown>) => {
-    const waits: Promise<unknown>[] = []
-    let answer: Promise<Response> | undefined
-    const full = { ...event, waitUntil: (p: Promise<unknown>) => void waits.push(p), respondWith: vi.fn((p: Promise<Response>) => void (answer = p)) }
-    handlers[type]?.(full)
-    const response = answer ? await answer : undefined
-    await Promise.all(waits)
-    return { full, response }
-  }
-  return { stores, deleted, fetch, preload, dispatch }
-}
-
-// The network: the shell (this build's marker), a refresh answer, a page.
-function network(input: unknown, init?: RequestInit): Response {
-  const url = typeof input === 'string' ? input : (input as { url: string }).url
-  if (url.includes('/app-shell/generate')) {
-    const shell = new Response('shell', { status: 200, headers: { 'x-sv-shell': BUILD } })
-    return Object.defineProperty(shell, 'type', { value: 'basic' })
-  }
-  if (url.includes('_rsc=')) return new Response(`rsc ${new Headers(init?.headers).get('rsc') ?? 'request'}`, { status: 200 })
-  return new Response('page', { status: 200 })
-}
 
 const TREE = encodeURIComponent('["",{"children":[["locale","en","d",null],{"children":["(app)",{"children":["app-shell",{"children":["generate",{}]}]}]}]},null,"refetch"]')
-const nav = (path: string) => ({ request: { url: `${SITE}${path}`, method: 'GET', mode: 'navigate', headers: new Headers() }, preloadResponse: Promise.resolve(undefined) })
 const refresh = (path: string, { tree = TREE, client = 'tab-1', deployment = BUILD } = {}) => ({ clientId: client, request: { url: `${SITE}${path}${path.includes('?') ? '&' : '?'}_rsc=abc`, method: 'GET', mode: 'cors', headers: new Headers({ rsc: '1', 'next-router-state-tree': tree, 'x-deployment-id': deployment }) } })
 const early = (path: string, visibilityState = 'visible', id = 'tab-1') => ({ data: { type: 'sv-shell-early', href: `${SITE}${path}` }, source: { visibilityState, id } })
-const on = serviceWorkerSource({ version: BUILD, cdnOrigins: [], enabled: true, shell: true })
 
 describe('the app shell (switch on)', () => {
   it('keeps both shells on install, fetched without credentials, and answers /generate and /zh/generate with them', async () => {
@@ -154,38 +107,6 @@ describe('the app shell never holds up activation (2026-11-28)', () => {
     } finally {
       vi.useRealTimers()
     }
-  })
-})
-
-describe('the shell refill after install happens once per build, not once per wake', () => {
-  const shellFetches = (worker: ReturnType<typeof runWorker>) =>
-    worker.fetch.mock.calls.map(([input]) => input).filter((input) => typeof input === 'string' && input.includes('/app-shell/'))
-
-  it('a failed refill is not retried, neither later in this run nor after the browser restarts the worker', async () => {
-    const first = runWorker(on)
-    await first.dispatch('activate', {})
-    first.fetch.mockImplementation(async (input: unknown) => {
-      if (String(input).includes('/app-shell/')) throw new Error('cross-border stall')
-      return new Response('page', { status: 200 })
-    })
-    await first.dispatch('fetch', nav('/photos'))
-    expect(shellFetches(first)).toHaveLength(2)
-    const restarted = runWorker(on, first.stores)
-    await restarted.dispatch('fetch', nav('/photos'))
-    await restarted.dispatch('fetch', nav('/zh'))
-    expect(shellFetches(restarted)).toEqual([])
-    expect(first.stores.has(`sv-shell-${BUILD}`)).toBe(false)
-  })
-
-  it('the record is kept across activation and goes with the next build', async () => {
-    const worker = runWorker(on)
-    await worker.dispatch('fetch', nav('/photos'))
-    expect(worker.stores.has(`sv-checked-${BUILD}`)).toBe(true)
-    await worker.dispatch('activate', {})
-    expect(worker.stores.has(`sv-checked-${BUILD}`)).toBe(true)
-    const next = runWorker(serviceWorkerSource({ version: 'dpl_next', cdnOrigins: [], enabled: true, shell: true }), worker.stores)
-    await next.dispatch('activate', {})
-    expect(worker.stores.has(`sv-checked-${BUILD}`)).toBe(false)
   })
 })
 
