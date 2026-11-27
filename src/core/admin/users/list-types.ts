@@ -41,6 +41,27 @@ export type UserListRow = {
   refusalFlag: boolean
   // Who the account is (Owner 2026-11-23); null when it could not be read.
   identity: UserIdentity | null
+  // The affiliate partner who brought the account in (联盟营销 上家); null when nobody did.
+  referrer: UserReferrer | null
+}
+
+// referred_source (0900, 1640, 1680): signup / first_checkout / admin for a personal partner's
+// link; org_l1 / org_l2 for an enterprise account's level one or two customer. memberId is the
+// staff member who invited an org customer, viaId the level-one customer a level-two came through.
+// The three contact fields are filled on the detail only (Auth reads), null on the list.
+export type UserReferrer = {
+  partnerId: string
+  name: string
+  slug: string
+  status: string
+  enterprise: boolean
+  source: string | null
+  at: string | null
+  memberId: string | null
+  viaId: string | null
+  partnerContact?: string | null
+  memberContact?: string | null
+  viaContact?: string | null
 }
 
 // The admin's tag for the account (an affiliate's admin_label, else admin_user_labels), its
