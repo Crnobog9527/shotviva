@@ -7,7 +7,7 @@ export type AdminModule = { label: string; tabs: readonly ModuleTab[] }
 const TABS = SHELL_COPY.tabs
 
 // The template area's modules and their tabs (Owner 2026-11-27, design/admin-templates-ux-plan.md).
-// Each tab is its own page. 首页展示 is one page (/admin/home) until its language tabs come.
+// Each tab is its own page.
 export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     label: SHELL_COPY.nav.templates,
@@ -15,6 +15,15 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
       { href: '/admin/templates', label: TABS.templates },
       { href: '/admin/templates/series', label: TABS.series },
       { href: '/admin/templates/categories', label: TABS.categories },
+    ],
+  },
+  {
+    label: SHELL_COPY.nav.home,
+    tabs: [
+      { href: '/admin/home', label: TABS.homeDefault },
+      { href: '/admin/home/zh', label: TABS.homeZh },
+      { href: '/admin/home/en', label: TABS.homeEn },
+      { href: '/admin/home/bundles', label: TABS.bundles },
     ],
   },
   {
