@@ -20,7 +20,7 @@ function Tile({ id, metric, value, change, note }: { id: string; metric: Metric;
 }
 
 // Times: a shorter wait is better, so the arrow is just the change; the 「?」 says what it is.
-export function ActivationView({ activation }: { activation: Activation }) {
+export function ActivationView({ activation, giftCredits }: { activation: Activation; giftCredits: number }) {
   const { current: now, previous: before } = activation
   const m = COPY.metrics
   return (
@@ -34,7 +34,7 @@ export function ActivationView({ activation }: { activation: Activation }) {
         metric={m.paidAfterGift}
         value={pct(now.paidAfterGiftRate)}
         change={pointDelta(now.paidAfterGiftRate, before.paidAfterGiftRate)}
-        note={COPY.usedGift(n(now.usedGift))}
+        note={COPY.usedGift(n(now.usedGift), giftCredits)}
       />
     </div>
   )
@@ -46,7 +46,7 @@ export async function ActivationBlock({ range, giftCredits, projectId }: { range
     block.status === 'ok' ? [{ href: sqlEditorLink(projectId, activationQuery(block.window, giftCredits)), label: ANALYTICS_COPY.openInPostHog }] : []
   return (
     <BlockFrame title={COPY.title} desc={COPY.desc} links={links}>
-      {block.status === 'ok' ? <ActivationView activation={block.data} /> : <Unavailable />}
+      {block.status === 'ok' ? <ActivationView activation={block.data} giftCredits={giftCredits} /> : <Unavailable />}
     </BlockFrame>
   )
 }

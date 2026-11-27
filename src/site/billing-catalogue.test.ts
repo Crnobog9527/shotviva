@@ -4,7 +4,7 @@ afterEach(() => { vi.unstubAllEnvs(); vi.resetModules() })
 
 it.each([
   [undefined, 6, 713, [50, 600, 135, 1620, 280, 3360, 20, 55, 115]],
-  ['v2', 100, 891, [1990, 23880, 6000, 72000, 14000, 168000, 990, 2490, 4990]],
+  ['v2', 200, 891, [1990, 23880, 6000, 72000, 14000, 168000, 990, 2490, 4990]],
 ] as const)('keeps the complete build catalogue together for %s', async (version, free, maxAnnual, credits) => {
   vi.stubEnv('NEXT_PUBLIC_PRICING_CATALOG_VERSION', version)
   vi.resetModules()

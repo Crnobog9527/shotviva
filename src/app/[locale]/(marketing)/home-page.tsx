@@ -13,6 +13,7 @@ import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
 import { homePanelTemplates } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
+import { signupGiftCreditsForSite } from '@/site/billing/signup-gift'
 import { HOME_CATEGORIES, bundleOpeningIds, bundleSection, generatorOpening, creditFacts, featuredSections, fillCredits, freeImagesIn, homeCaseStrip, homePageIn, isLinkEnabled, liveSpaces, offersShownIn } from '@/site/content'
 import { HERO_DEFAULT_OPTION, heroOptionContent } from '@/site/experiments'
 import { site } from '@/site/site.config'
@@ -25,15 +26,18 @@ import { homeHeroPictures } from './home-hero-admin'
 // (x/hero/[option], ARCHITECTURE §16.5). An option swaps only the hero pictures, adds one line and
 // opens the generator on its template; title, H1, copy, JSON-LD and canonical stay those of `/`.
 
-// The copy with "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4).
+// The copy with "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4),
+// and the signup gift from its setting.
 async function load() {
   const locale = await currentLocale()
-  const [live, series, products, bundles, cases, index] = await Promise.all([
+  const [live, series, products, bundles, cases, index, gift] = await Promise.all([
     cachedWebCatalogue(locale), cachedPublicSeries(locale), displayProducts(), cachedFeaturedBundles(locale), cachedCaseStrip(locale),
     // Where each template sits, for the bundle cards' "All … templates" chip (Owner 2026-11-25).
     cachedCatalogueIndex(locale),
+    // The signup gift's amount, the admin's setting (2008).
+    signupGiftCreditsForSite(),
   ])
-  const facts = creditFacts(live)
+  const facts = creditFacts(live, gift)
   const page = fillCredits(homePageIn(locale, products), facts)
   const meta = { path: '/', title: page.title, description: page.description }
   return { locale, live, series, products, bundles, cases, index, page, free: fillCredits(freeImagesIn(locale), facts), meta }

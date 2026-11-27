@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { site } from '../site.config'
+import { FALLBACK_CREDITS, fillCredits } from './credits'
 import { isQuotableFact, MIN_QUOTABLE_FACTS, quotableFacts } from './geo-facts'
 import { contentPagesIn, findContentPageIn, homePageIn, pricingFaqIn, pricingPageIn } from './localized'
 import { photoSeconds } from './offer'
@@ -26,7 +27,8 @@ function indexablePages() {
 
 describe('GEO facts (SEO launch handbook 03-S3)', () => {
   it.each(indexablePages())(`$name carries at least ${MIN_QUOTABLE_FACTS} quotable facts`, ({ page }) => {
-    expect(quotableFacts(page).length).toBeGreaterThanOrEqual(MIN_QUOTABLE_FACTS)
+    // Measured as served: the page fills the signup gift (2008) and the other markers first.
+    expect(quotableFacts(fillCredits(page, FALLBACK_CREDITS)).length).toBeGreaterThanOrEqual(MIN_QUOTABLE_FACTS)
   })
 
   // Each vertical page: a processing time, a starting price and a dated platform rule or cost bill.

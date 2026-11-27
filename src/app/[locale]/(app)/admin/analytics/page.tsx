@@ -20,6 +20,7 @@ import {
   ViewTabs,
 } from '@/core/admin'
 import { requireAdmin } from '@/core/auth'
+import { signupGiftCreditsForSite } from '@/site/billing/signup-gift'
 import { site } from '@/site/site.config'
 
 // The proxy and layout 404 non-admins. Check again before starting any analytics reads.
@@ -54,7 +55,7 @@ export default async function AdminAnalyticsPage({ searchParams }: PageProps<'/[
         ) : query.view === 'funnel' || query.view === 'templates' ? (
           pvuvFunnels ? <PvuvFunnelsView range={query.range} /> : off ? null : <InsightsPanel view={query.view} params={params} creditUsd={cheapestCreditUsd(site.billing.products)} />
         ) : (
-          <DetailsView query={query} projectId={projectId} posthog={!off} giftCredits={site.billing.freeCredits} />
+          <DetailsView query={query} projectId={projectId} posthog={!off} giftCredits={await signupGiftCreditsForSite()} />
         )}
       </div>
     </AdminPage>

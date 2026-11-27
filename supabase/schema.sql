@@ -12606,7 +12606,7 @@ begin
                          'signup_gift_daily_cap','signup_gift_paused','signup_gift_per_ip',
                          'signup_gift_claim_phone','signup_gift_claim_google','poster_photo_credits',
                          'catalog_economics_policy','food_toggles_enabled','service_worker_enabled',
-                         'service_worker_shell_enabled')
+                         'service_worker_shell_enabled','signup_gift_credits')
            or p.banned_at is null)) then
     raise exception 'NOT_ADMIN';
   end if;
@@ -12632,6 +12632,12 @@ begin
       if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[0-9]+$'
          or (p_value #>> '{}')::numeric > 1000 then
         raise exception 'INVALID_INPUT' using detail = 'signup_gift_per_ip must be an integer from 0 to 1000';
+      end if;
+    -- 2008: the signup gift's amount (ARCHITECTURE §7). 0 is not offered: the pause stops the gift.
+    when 'signup_gift_credits' then
+      if jsonb_typeof(p_value) is distinct from 'number' or (p_value #>> '{}') !~ '^[1-9][0-9]*$'
+         or (p_value #>> '{}')::numeric > 5000 then
+        raise exception 'INVALID_INPUT' using detail = 'signup_gift_credits must be an integer from 1 to 5000';
       end if;
     -- 拍照识别's price per run (§5.3「每周复用」, Owner 2026-11-14). Unset: the feature is off.
     when 'poster_photo_credits' then
@@ -19329,7 +19335,8 @@ CREATE OR REPLACE FUNCTION "public"."signup_gift_amount"("p_created_at" timestam
   select case
            when cutoff is null then 6
            when p_created_at < cutoff then 0
-           else 100
+           else (select case when n between 1 and 5000 then n else 200 end
+                   from (select public.signup_gift_setting_int('signup_gift_credits', 200) as n) s)
          end
     from (select (select s.updated_at from public.system_settings s
                    where s.key = 'pricing_catalog_version' and s.value = '"v2"'::jsonb) as cutoff) c
@@ -19404,7 +19411,8 @@ CREATE OR REPLACE FUNCTION "public"."signup_gift_today"() RETURNS "jsonb"
     'paused', public.signup_gift_setting_bool('signup_gift_paused', false),
     'per_ip', public.signup_gift_setting_int('signup_gift_per_ip', 5),
     'claim_phone', public.signup_gift_setting_bool('signup_gift_claim_phone', true),
-    'claim_google', public.signup_gift_setting_bool('signup_gift_claim_google', true)
+    'claim_google', public.signup_gift_setting_bool('signup_gift_claim_google', true),
+    'credits', public.signup_gift_amount(now())
   )
 $$;
 

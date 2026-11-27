@@ -35,13 +35,18 @@ export const FromCredits = '⟦From-credits⟧'
 // "One product, three styled photos": the home demo and the two bills (DESIGN §6.9 item 6).
 export const SET_PHOTOS = 3
 
-// Cheapest published Standard price and whether it is shared by every template.
-export type CreditFacts = { from: number; same: boolean }
+// Cheapest published Standard price and whether it is shared by every template, and the signup
+// gift's amount (system_settings signup_gift_credits, 2008).
+export type CreditFacts = { from: number; same: boolean; gift: number }
+
+// The signup gift's amount: the Owner sets it in the admin, so copy carries this marker and the page
+// fills it from the cached setting when it renders (fillCredits in ./credits), like fromCredits.
+export const giftCredits = '⟦gift-credits⟧'
 
 // Public signup copy states the credit grant; the selected template determines the number of photos.
-export const freeImagesLabel = `${site.billing.freeCredits} free credits`
+export const freeImagesLabel = `${giftCredits} free credits`
 export const FreeImagesLabel = freeImagesLabel
-export const FreeImagesTitle = `${site.billing.freeCredits} Free Credits`
+export const FreeImagesTitle = `${giftCredits} Free Credits`
 export const FreeImagesShort = freeImagesLabel
 
 export const MENU_DISHES = 10
