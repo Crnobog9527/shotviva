@@ -15965,6 +15965,11 @@ begin
   ) then
     raise exception 'PAYMENT_NOT_FOUND';
   end if;
+  -- 2033 (Owner 2026-11-28): no self-service refund request for an org-pool purchase; a billing
+  -- ticket about it is still fine.
+  if p_type = 'refund' and public.payment_refund_block(p_payment_id) is not null then
+    raise exception 'ORG_POOL_REFUND';
+  end if;
   if p_job_id is not null and not exists (
     select 1 from public.generation_jobs j where j.id = p_job_id and j.user_id = p_user_id
   ) then
@@ -18652,6 +18657,18 @@ $$;
 
 
 ALTER FUNCTION "public"."payment_fee_target"("p_payment_id" bigint, "p_ref" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."payment_refund_block"("p_payment_id" bigint) RETURNS "text"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select case when public._payment_credits_org(p) is not null then 'org_pool_purchase' end
+    from public.payments p where p.id = p_payment_id
+$$;
+
+
+ALTER FUNCTION "public"."payment_refund_block"("p_payment_id" bigint) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."prepare_checkout_discount"("p_user" "uuid", "p_token" "uuid", "p_expires_at" bigint) RETURNS "jsonb"
@@ -31180,6 +31197,11 @@ GRANT ALL ON FUNCTION "public"."payment_fee_stripe_batches_known"("p_ids" "text"
 
 REVOKE ALL ON FUNCTION "public"."payment_fee_target"("p_payment_id" bigint, "p_ref" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."payment_fee_target"("p_payment_id" bigint, "p_ref" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."payment_refund_block"("p_payment_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."payment_refund_block"("p_payment_id" bigint) TO "service_role";
 
 
 
