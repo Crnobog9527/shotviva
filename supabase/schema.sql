@@ -16112,6 +16112,7 @@ declare
   v_per_ip integer;
   v_partner integer;
   v_change public.credit_change;
+  v_since timestamptz;
 begin
   if p_amount is null or p_amount <= 0 then
     raise exception 'INVALID_INPUT' using detail = 'amount must be positive';
@@ -16129,7 +16130,10 @@ begin
     -- Already paid: the ledger's idempotency key makes this a no-op; never refuse it now.
     if not exists (select 1 from public.credit_ledger where idempotency_key = p_idempotency_key) then
       -- A stored refusal stands; a pending account is paid only through claim_signup_gift.
-      if v_profile.signup_gift_refusal is not null then
+      -- 2026: except 'daily_cap', which is pending and decided again below (never for a banned
+      -- account).
+      if v_profile.signup_gift_refusal is not null
+         and (v_profile.signup_gift_refusal <> 'daily_cap' or v_profile.banned_at is not null) then
         return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
       end if;
 
@@ -16144,13 +16148,17 @@ begin
         v_per_ip := case when v_per_ip = 0 or v_partner = 0 then 0 else greatest(v_per_ip, v_partner) end;
       end if;
       if v_profile.signup_ip is not null and v_per_ip > 0 then
+        -- 2026: a pending 'daily_cap' account is counted over the 24 hours before now, as a new
+        -- sign-up paid now would be; a new sign-up keeps 1480's window (its created_at is now).
+        v_since := case when v_profile.signup_gift_refusal = 'daily_cap' then now() else v_profile.created_at end
+                   - interval '24 hours';
         perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
         if (select count(*)
               from public.profiles other
               join public.credit_ledger l on l.idempotency_key = 'signup:' || other.id::text
              where other.signup_ip = v_profile.signup_ip
                and other.id <> p_user_id
-               and l.created_at > v_profile.created_at - interval '24 hours') >= v_per_ip then
+               and l.created_at > v_since) >= v_per_ip then
           update public.profiles set signup_gift_refusal = 'same_ip_pending' where id = p_user_id;
           return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
         end if;
@@ -16160,7 +16168,9 @@ begin
       perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_gift_cap', 0));
       v_today := public.signup_gift_today();
       if (v_today->>'paused')::boolean then
-        update public.profiles set signup_gift_refusal = 'paused' where id = p_user_id;
+        -- 2026: a pending 'daily_cap' account waits out the pause; a new one is refused for good.
+        update public.profiles set signup_gift_refusal = 'paused'
+         where id = p_user_id and signup_gift_refusal is null;
         return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
       end if;
       if (v_today->>'granted')::integer >= (v_today->>'cap')::integer then
@@ -16170,6 +16180,10 @@ begin
 
       v_change := public._apply_credit_change(p_user_id, p_pool, 'grant', p_amount, p_reason, p_idempotency_key);
       if v_change.applied then
+        -- 2026: a caught-up account is no longer pending.
+        if v_profile.signup_gift_refusal = 'daily_cap' then
+          update public.profiles set signup_gift_refusal = null where id = p_user_id;
+        end if;
         insert into public.signup_gift_claims (key_hash, method, user_id)
         select k.key_hash, k.method, p_user_id from public.signup_gift_identity_keys(p_user_id) k
         on conflict (key_hash) do nothing;
@@ -19744,6 +19758,67 @@ $$;
 
 
 ALTER FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_gift_catch_up_one"("p_user_id" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_refusal text;
+  v_banned timestamptz;
+  v_today jsonb;
+begin
+  if p_user_id is null then
+    raise exception 'INVALID_INPUT' using detail = 'user is required';
+  end if;
+  select signup_gift_refusal, banned_at into v_refusal, v_banned from public.profiles where id = p_user_id;
+  if not found or v_refusal is distinct from 'daily_cap' or v_banned is not null
+     or exists (select 1 from public.credit_ledger where idempotency_key = 'signup:' || p_user_id::text) then
+    return 'skipped';
+  end if;
+  if (public.grant_credits(p_user_id, 1, 'signup', 'signup:' || p_user_id::text, 'free')).applied then
+    return 'paid';
+  end if;
+  select signup_gift_refusal into v_refusal from public.profiles where id = p_user_id;
+  if v_refusal = 'same_ip_pending' then
+    return 'same_ip_pending';
+  end if;
+  v_today := public.signup_gift_today();
+  if (v_today->>'paused')::boolean then
+    return 'paused';
+  end if;
+  if (v_today->>'granted')::integer >= (v_today->>'cap')::integer then
+    return 'daily_cap';
+  end if;
+  return 'skipped';
+end;
+$$;
+
+
+ALTER FUNCTION "public"."signup_gift_catch_up_one"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_gift_catch_up_queue"("p_limit" integer) RETURNS "uuid"[]
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_limit is null or p_limit < 1 or p_limit > 500 then
+    raise exception 'INVALID_INPUT' using detail = 'limit must be from 1 to 500';
+  end if;
+  return array(
+    select p.id from public.profiles p
+     where p.signup_gift_refusal = 'daily_cap' and p.banned_at is null
+       and public.signup_gift_amount(p.created_at) > 0
+       and not exists (select 1 from public.credit_ledger l where l.idempotency_key = 'signup:' || p.id::text)
+     order by p.created_at, p.id
+     limit p_limit);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."signup_gift_catch_up_queue"("p_limit" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."signup_gift_day_start"() RETURNS timestamp with time zone
@@ -25347,6 +25422,10 @@ CREATE INDEX "profiles_referred_via_idx" ON "public"."profiles" USING "btree" ("
 
 
 
+CREATE INDEX "profiles_signup_gift_daily_cap_idx" ON "public"."profiles" USING "btree" ("created_at", "id") WHERE ("signup_gift_refusal" = 'daily_cap'::"text");
+
+
+
 CREATE INDEX "profiles_signup_ip_created_at_idx" ON "public"."profiles" USING "btree" ("signup_ip", "created_at");
 
 
@@ -30591,6 +30670,16 @@ GRANT ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_
 
 REVOKE ALL ON FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_catch_up_one"("p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_catch_up_one"("p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_catch_up_queue"("p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_catch_up_queue"("p_limit" integer) TO "service_role";
 
 
 
