@@ -204,3 +204,26 @@ it('an admin void while held is final and the release adds no change row', async
   expect(await held(p.id)).toEqual({ amount: 0, status: 'void', void_reason: 'admin_void', paused_hold: false })
   expect(await changes(p.id)).toHaveLength(n)
 })
+
+it('the daily run releases a held row whose account is already active (a release that raced the trigger)', async () => {
+  const { owner, customer } = await orgCustomer()
+  const p = await sale(db, customer, 'pack_m', 2490)
+  // As if the payment had read 'suspended' while the switch was being turned on.
+  await db.query("update affiliate_commissions set status='on_hold',paused_hold=true where payment_id=$1", [p.id])
+  await db.query('select affiliate_daily(current_date)')
+  expect(await held(p.id)).toEqual({ amount: 373, status: 'pending', void_reason: null, paused_hold: false })
+  expect((await changes(p.id)).at(-1)).toMatchObject({ old_status: 'on_hold', new_status: 'pending', reason: 'affiliate_resumed' })
+  const n = (await changes(p.id)).length
+  await db.query('select affiliate_daily(current_date)')
+  expect(await changes(p.id)).toHaveLength(n)
+
+  // Still suspended: the daily run leaves the hold alone; closed: it voids.
+  await setAccount(owner, { status: 'suspended' })
+  const q = await sale(db, customer, 'pack_m', 2490)
+  await db.query('select affiliate_daily(current_date)')
+  expect(await held(q.id)).toMatchObject({ status: 'on_hold', paused_hold: true })
+  await db.query("update affiliates set status='banned' where user_id=$1", [owner])
+  await db.query("update affiliate_commissions set status='on_hold',paused_hold=true,amount=373,void_reason=null where payment_id=$1", [q.id])
+  await db.query('select affiliate_daily(current_date)')
+  expect(await held(q.id)).toMatchObject({ status: 'void', void_reason: 'affiliate_inactive', paused_hold: false })
+})

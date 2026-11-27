@@ -25,6 +25,9 @@
 --   dispute hold, else pending, or confirmed at once if confirm_after = payment time + hold_days
 --   has passed and the fee is ready), change reason 'affiliate_resumed';
 --   anything else (banned, rejected, the row gone) -> void 'affiliate_inactive', as today.
+-- * Safety net: affiliate_daily also recomputes (at most 500 payments a run, oldest first) every
+--   payment that still has a paused_hold commission whose level-1 account is no longer suspended,
+--   e.g. if a release ever raced the trigger. Idempotent: a settled row drops paused_hold.
 -- * Trigger affiliate_paused_settle: when an account leaves 'suspended', it recomputes every
 --   payment with a paused_hold commission whose level-1 row is that account, through
 --   affiliate_recompute_payment (payment lock, then commission locks; failures land in
@@ -41,7 +44,7 @@
 -- nothing is restored retroactively), personal accounts, refunds/disputes/fees/payout_retained.
 -- Retry snapshots stored before this migration have no 'paused' key and void as before.
 --
--- Expand-only: a new column with a default, a partial index, create or replace of two functions
+-- Expand-only: a new column with a default, a partial index, create or replace of _affiliate_snapshot, _affiliate_write_commission and affiliate_daily
 -- with the same signatures, and a new trigger. Code before this deploy does not read the column
 -- and keeps working (a held row shows as on_hold).
 
@@ -115,7 +118,11 @@ begin
   -- A pause hold follows the level-1 account as it is now: still suspended -> held, active again ->
   -- normal rules, closed for good (banned, rejected, gone) -> void as before 2028.
   if v_paused then
-    select a.status into v_l1_status from public.affiliates a where a.user_id=v_l1;
+    -- FOR SHARE conflicts with the status UPDATE (FOR NO KEY UPDATE; KEY SHARE would not): a payment
+    -- written while the switch is being turned on waits for that commit and reads the new status,
+    -- so it cannot be held after the settle trigger has already run. That trigger never needs this
+    -- payment (its commission row is not committed yet), so the wait cannot deadlock.
+    select a.status into v_l1_status from public.affiliates a where a.user_id=v_l1 for share;
     if v_l1_status='active' then v_paused:=false; v_resumed:=v_old.id is not null;
     elsif v_l1_status is distinct from 'suspended' then v_paused:=false; v_void:='affiliate_inactive'; end if;
   end if;
@@ -202,3 +209,69 @@ drop trigger if exists affiliate_paused_settle on public.affiliates;
 create trigger affiliate_paused_settle after update of status on public.affiliates
   for each row when (old.status='suspended' and new.status is distinct from 'suspended')
   execute function public._affiliate_paused_settle();
+
+-- Same as the current body plus the pause-hold safety net after the retry loop.
+create or replace function public.affiliate_daily(p_today date) returns void
+language plpgsql security definer set search_path='' as $$
+declare v_settings public.affiliate_settings; v_payment bigint; v_cutoff timestamptz; v_issue boolean:=false;
+begin
+  select s.* into strict v_settings from public.affiliate_settings s where singleton;
+  if p_today is null then raise exception 'INVALID_INPUT'; end if;
+  -- Serialize payout decisions and issuance; payment writes do not take this lock.
+  perform pg_advisory_xact_lock(hashtextextended('affiliate_settlement',0));
+  for v_payment in select payment_id from public.affiliate_recompute_errors where resolved_at is null order by payment_id loop
+    perform public.affiliate_recompute_payment(v_payment);
+  end loop;
+  -- 2028: pause holds whose level-1 account is no longer suspended (released or closed), bounded.
+  for v_payment in select c.payment_id from public.affiliate_commissions c
+      left join public.affiliate_commissions l1 on l1.payment_id=c.payment_id and l1.level=1
+      left join public.affiliates a on a.user_id=l1.affiliate_user_id
+     where c.paused_hold and a.status is distinct from 'suspended'
+     group by c.payment_id order by c.payment_id limit 500 loop
+    perform public.affiliate_recompute_payment(v_payment);
+  end loop;
+  -- Mark the scheduled evaluation even when disabled or nobody qualifies.
+  -- Any later failure rolls this insert back together with issuance.
+  if extract(day from p_today)>=v_settings.settlement_day then
+    insert into public.affiliate_settlement_runs(period) values(date_trunc('month',p_today)::date)
+      on conflict(period) do nothing;
+    v_issue:=found;
+  end if;
+  if not v_settings.enabled then return; end if;
+  v_cutoff:=case when p_today=(now() at time zone 'UTC')::date then now() else p_today::timestamp at time zone 'UTC' end;
+  -- Fee-era payments still without fee data once the grace period is over: the recompute applies
+  -- _affiliate_fee_fallback, confirms and opens an affiliate_fee_alerts row.
+  for v_payment in select distinct c.payment_id from public.affiliate_commissions c join public.payments p on p.id=c.payment_id
+     where c.status='pending' and c.confirm_after+make_interval(days=>v_settings.fee_final_grace_days)<=v_cutoff
+       and public._affiliate_fee_missing(p) order by c.payment_id loop
+    perform public.affiliate_recompute_payment(v_payment);
+  end loop;
+  -- A refund/dispute updates and locks this same commission. EvalPlanQual rechecks pending after waiting.
+  with changed as (
+    update public.affiliate_commissions c set status='confirmed',confirmed_at=v_cutoff,updated_at=now()
+    where c.status='pending' and c.confirm_after<=v_cutoff and (cardinality(c.flags)=0 or c.released_by is not null)
+      and not exists(select from public.payment_disputes d where d.payment_id=c.payment_id and
+        (d.closed_at is null or d.closed_status not in ('won','warning_closed')))
+      and not exists(select from public.affiliate_recompute_errors e where e.payment_id=c.payment_id and e.resolved_at is null)
+      and exists(select from public.payments p where p.id=c.payment_id and public._affiliate_fee_ready(p,c.confirm_after,v_cutoff))
+    returning c.id,c.amount,
+      (select public._affiliate_fee_era(p) and p.fee_status is distinct from 'final' from public.payments p where p.id=c.payment_id) as on_estimate)
+  insert into public.affiliate_commission_changes(commission_id,old_amount,new_amount,old_status,new_status,reason)
+    select id,amount,amount,'pending','confirmed',case when on_estimate then 'confirmed_fee_estimate' else 'confirmed' end from changed;
+  if not v_issue then return; end if;
+  -- One MVCC snapshot for the balance and its commission backing. Refunds that
+  -- commit after this statement are measured against these exact amounts at payment.
+  with issued as (
+    insert into public.affiliate_payouts(affiliate_user_id,period,amount,payout_snapshot,fee_rules)
+      select a.user_id,date_trunc('month',p_today)::date,b.available,
+        jsonb_build_object('payout_method',a.payout_method,'payout_details',a.payout_details),
+        public.affiliate_payout_fee_rules_for('standard',a.payout_method,v_cutoff)
+        from public.affiliates a join public.affiliate_balances b on b.affiliate_user_id=a.user_id
+       where a.status='active' and a.payout_method is not null and b.available>0
+         and b.available>=case when a.org_id is not null then v_settings.org_payout_min_usd else v_settings.payout_min_usd end
+      on conflict(affiliate_user_id,period) do nothing returning id,affiliate_user_id,amount)
+  insert into public.affiliate_payout_items(payout_id,commission_id,prior_amount,issue_amount)
+    select n.id,a.* from issued n
+      cross join lateral public._affiliate_allocate_payout(n.affiliate_user_id,n.amount) a;
+end;
+$$;
