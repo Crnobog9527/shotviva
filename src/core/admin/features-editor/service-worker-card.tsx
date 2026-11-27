@@ -77,8 +77,14 @@ export const APP_SHELL_SWITCH_COPY: SwitchCopy = {
   },
 }
 
-export function AppShellCard({ value, save }: { value: WishlistSwitch; save: (input: WishlistSwitchInput) => Promise<ActionResult> }) {
-  return <SettingSwitchCard copy={APP_SHELL_SWITCH_COPY} value={value} save={save} />
+// 创作页秒开 only works while 手机离线缓存 is on (the shell is served by that worker).
+export const APP_SHELL_DEPENDENCY = {
+  label: '需要上面的「手机离线缓存」开着才生效。',
+  unmet: '手机离线缓存现在关着，这个开关开着也不生效。',
+} as const
+
+export function AppShellCard({ value, workerOn, save }: { value: WishlistSwitch; workerOn: boolean; save: (input: WishlistSwitchInput) => Promise<ActionResult> }) {
+  return <SettingSwitchCard copy={APP_SHELL_SWITCH_COPY} value={value} dependency={{ ...APP_SHELL_DEPENDENCY, met: workerOn }} save={save} />
 }
 
 export function ServiceWorkerCard({ value, save }: { value: WishlistSwitch; save: (input: WishlistSwitchInput) => Promise<ActionResult> }) {

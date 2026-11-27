@@ -11,51 +11,48 @@ import { GallerySwitches, type GallerySwitchKey, type GallerySwitchState } from 
 import { SettingSwitchCard } from './setting-switch-card'
 import { WISHLIST_SWITCH_COPY } from './wishlist-copy'
 
-export type FeatureAdminActions = {
-  save: (input: FeatureAccessInput) => Promise<ActionResult>
-  invite: (input: FeatureInviteInput) => Promise<ActionResult>
+// Null when the site has no wishlist at all (site.features.wishlist false): no switch to show.
+export type WishlistSwitchState = { value: WishlistSwitch; previewOverride: boolean } | null
+
+type SiteSwitchProps = {
+  wishlist: WishlistSwitchState
+  gallery: GallerySwitchState
   saveWishlist: (input: WishlistSwitchInput) => Promise<ActionResult>
   saveGallery: (key: GallerySwitchKey, input: WishlistSwitchInput) => Promise<ActionResult>
 }
 
-// Null when the site has no wishlist at all (site.features.wishlist false): no switch to show.
-export type WishlistSwitchState = { value: WishlistSwitch; previewOverride: boolean } | null
-
-type Props = {
-  settings: FeatureSetting[]
-  wishlist: WishlistSwitchState
-  gallery: GallerySwitchState
-  actions: FeatureAdminActions
+// 前台功能: 需求墙 (§15.6, T62) and the public gallery (§9, T108), each only on a site that has it.
+export function SiteSwitches({ wishlist, gallery, saveWishlist, saveGallery }: SiteSwitchProps) {
+  return (
+    <>
+      {wishlist ? (
+        <SettingSwitchCard
+          copy={WISHLIST_SWITCH_COPY}
+          value={wishlist.value}
+          note={wishlist.previewOverride ? WISHLIST_SWITCH_COPY.previewOverride : null}
+          save={saveWishlist}
+        />
+      ) : null}
+      {gallery ? <GallerySwitches state={gallery} save={saveGallery} /> : null}
+    </>
+  )
 }
 
-export function FeaturesEditor({ settings, wishlist, gallery, actions }: Props) {
-  return (
-    <div className="grid gap-6">
-      {wishlist || gallery ? (
-        <div className="grid gap-3">
-          <h2 className="text-sm font-medium text-muted-foreground">{COPY.switchesHeading}</h2>
-          {wishlist ? (
-            <SettingSwitchCard
-              copy={WISHLIST_SWITCH_COPY}
-              value={wishlist.value}
-              note={wishlist.previewOverride ? WISHLIST_SWITCH_COPY.previewOverride : null}
-              save={actions.saveWishlist}
-            />
-          ) : null}
-          {gallery ? <GallerySwitches state={gallery} save={actions.saveGallery} /> : null}
-        </div>
-      ) : null}
-      <div className="grid gap-3">
-        <h2 className="text-sm font-medium text-muted-foreground">{COPY.gatesHeading}</h2>
-        <p className="text-sm text-muted-foreground">{COPY.intro}</p>
-        {settings.length === 0 ? (
-          <EmptyState title={COPY.empty} body={COPY.emptyBody} />
-        ) : (
-          settings.map((setting) => setting.inviteOnly
-            ? <InviteCard key={setting.key} setting={setting} invite={actions.invite} />
-            : <FeatureCard key={setting.key} setting={setting} save={actions.save} />)
-        )}
-      </div>
+type GateProps = {
+  settings: FeatureSetting[]
+  save: (input: FeatureAccessInput) => Promise<ActionResult>
+  invite: (input: FeatureInviteInput) => Promise<ActionResult>
+  // Shown when the list is empty (the 会员抢先用 section); a placed feature passes none.
+  empty?: boolean
+}
+
+// Who may use each registered feature (ARCHITECTURE §6.2 新功能抢先用): a tier and date, or an
+// invite list. Each card saves on its own.
+export function FeatureGates({ settings, save, invite, empty }: GateProps) {
+  if (settings.length === 0) return empty ? <EmptyState title={COPY.empty} body={COPY.emptyBody} /> : null
+  return settings.map((setting) => (
+    <div key={setting.key} id={`feature-${setting.key}`} className="scroll-mt-20">
+      {setting.inviteOnly ? <InviteCard setting={setting} invite={invite} /> : <FeatureCard setting={setting} save={save} />}
     </div>
-  )
+  ))
 }

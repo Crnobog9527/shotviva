@@ -2,10 +2,14 @@ import type { Metadata } from 'next'
 
 import {
   AdminPage,
+  ChildCard,
   FEATURES_COPY,
-  FeaturesEditor,
+  FeatureGates,
+  FeatureSection,
+  FeaturesOverview,
   FoodPlatingCard,
   FoodTablewareCard,
+  SiteSwitches,
   AppShellCard,
   ServiceWorkerCard,
   listFeatureSettings,
@@ -18,6 +22,7 @@ import {
   type GallerySwitchState,
   type WishlistSwitchState,
 } from '@/core/admin'
+import { isAffiliateEnabled } from '@/core/affiliate/feature'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { serverEnv } from '@/core/env'
 import { siteHasGallery } from '@/core/gallery'
@@ -40,6 +45,8 @@ import {
 
 // Admin-only, request-time page (ARCHITECTURE §6.2 新功能抢先用, §10). The admin layout gates it too.
 // The 需求墙 and gallery switches show only on a site that has the feature at all (§15.6, §9).
+// Sections in the order the Owner touches them most, an overview of every switch on top
+// (Owner 2026-11-27). The affiliate switch lives on 联盟营销; the overview links there.
 export const instant = false
 
 export const metadata: Metadata = { title: FEATURES_COPY.title }
@@ -55,29 +62,52 @@ async function galleryState(db: ReturnType<typeof createAdminSupabase>): Promise
   return { enabled, autoApprove }
 }
 
+// The dense-text poster gate sits with the poster's other setting under 出图功能.
+const POSTER_FEATURE = 'dense_poster'
+const S = FEATURES_COPY.sections
+
 export default async function AdminFeaturesPage() {
   await requireAdmin()
   const db = createAdminSupabase()
-  const [settings, wishlist, gallery, signupGift, photoPrice, foodPlating, foodTableware, serviceWorker, appShell] = await Promise.all([
+  const [settings, wishlist, gallery, signupGift, photoPrice, foodPlating, foodTableware, serviceWorker, appShell, affiliate] = await Promise.all([
     listFeatureSettings(db), wishlistState(db), galleryState(db), loadSignupGift(db), loadPosterPhotoPrice(db),
     loadSettingSwitch(db, 'food_plating_enabled'), loadSettingSwitch(db, 'food_tableware_enabled'), loadSettingSwitch(db, 'service_worker_enabled'), loadSettingSwitch(db, 'service_worker_shell_enabled'),
+    isAffiliateEnabled(),
   ])
+  const posterGates = settings.filter((setting) => setting.key === POSTER_FEATURE)
+  const otherGates = settings.filter((setting) => setting.key !== POSTER_FEATURE)
+  const gateActions = { save: saveFeatureAccessAction, invite: setFeatureInviteAction }
   return (
     <AdminPage title={FEATURES_COPY.title}>
-      <div className="mb-6 grid gap-4">
+      <FeaturesOverview
+        input={{
+          signupPaused: signupGift.paused, foodTableware, foodPlating, posterGate: posterGates[0] ?? null, photoCredits: photoPrice,
+          wishlist: wishlist?.value ?? null, gallery, serviceWorker, appShell, affiliate, now: new Date().toISOString(),
+        }}
+      />
+      <FeatureSection id="signup" {...S.signup}>
         <SignupGiftCard state={signupGift} savePaused={saveSignupGiftPausedAction} saveRules={saveSignupGiftRulesAction} />
-        <PosterPhotoCard credits={photoPrice} save={savePosterPhotoPriceAction} />
+      </FeatureSection>
+      <FeatureSection id="generation" {...S.generation}>
         <FoodTablewareCard value={foodTableware} save={saveFoodTablewareAction} />
         <FoodPlatingCard value={foodPlating} save={saveFoodPlatingAction} />
+        <FeatureGates settings={posterGates} {...gateActions} />
+        <PosterPhotoCard credits={photoPrice} save={savePosterPhotoPriceAction} />
+      </FeatureSection>
+      {wishlist || gallery ? (
+        <FeatureSection id="site" {...S.site}>
+          <SiteSwitches wishlist={wishlist} gallery={gallery} saveWishlist={saveWishlistSwitchAction} saveGallery={saveGallerySwitchAction} />
+        </FeatureSection>
+      ) : null}
+      <FeatureSection id="speed" {...S.speed}>
         <ServiceWorkerCard value={serviceWorker} save={saveServiceWorkerAction} />
-        <AppShellCard value={appShell} save={saveAppShellAction} />
-      </div>
-      <FeaturesEditor
-        settings={settings}
-        wishlist={wishlist}
-        gallery={gallery}
-        actions={{ save: saveFeatureAccessAction, invite: setFeatureInviteAction, saveWishlist: saveWishlistSwitchAction, saveGallery: saveGallerySwitchAction }}
-      />
+        <ChildCard>
+          <AppShellCard value={appShell} workerOn={serviceWorker.enabled} save={saveAppShellAction} />
+        </ChildCard>
+      </FeatureSection>
+      <FeatureSection id="early" {...S.early}>
+        <FeatureGates settings={otherGates} {...gateActions} empty />
+      </FeatureSection>
     </AdminPage>
   )
 }
