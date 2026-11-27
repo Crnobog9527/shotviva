@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import { PVUV_API, PVUV_SCRIPT_SRC } from '../analytics/browser/pvuv'
-import { parsePublicEnv } from '../public-env-schema'
+import { parsePublicEnv, type RawPublicEnv } from '../public-env-schema'
+
 import { PVUV_ORIGINS, securityHeaderRules } from './response-headers'
 
-const env = (extra: Record<string, string> = {}) => parsePublicEnv({
+const BLANK = { NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined, NEXT_PUBLIC_HCAPTCHA_SITEKEY: undefined, NEXT_PUBLIC_POSTHOG_KEY: undefined, NEXT_PUBLIC_POSTHOG_HOST: undefined, NEXT_PUBLIC_APP_VERSION: undefined }
+
+const env = (extra: Partial<RawPublicEnv> = {}) => parsePublicEnv({
+  ...BLANK,
   NEXT_PUBLIC_SUPABASE_URL: 'https://project.supabase.co',
   NEXT_PUBLIC_SENTRY_DSN: 'https://key:secret@o1.ingest.sentry.io/42',
   NEXT_PUBLIC_IMAGE_CDN_URL: 'https://img-eo.example.com',
