@@ -16,9 +16,11 @@ import {
   loadPosterPhotoPrice,
   loadSettingSwitch,
   loadSignupGift,
+  loadSignupLimits,
   loadWishlistSwitch,
   PosterPhotoCard,
   SignupGiftCard,
+  SignupLimitsCard,
   type GallerySwitchState,
   type WishlistSwitchState,
 } from '@/core/admin'
@@ -40,6 +42,7 @@ import {
   saveSignupGiftPausedAction,
   savePosterPhotoPriceAction,
   saveSignupGiftRulesAction,
+  saveSignupLimitsAction,
   saveWishlistSwitchAction,
 } from './actions'
 
@@ -69,10 +72,10 @@ const S = FEATURES_COPY.sections
 export default async function AdminFeaturesPage() {
   await requireAdmin()
   const db = createAdminSupabase()
-  const [settings, wishlist, gallery, signupGift, photoPrice, foodPlating, foodTableware, serviceWorker, appShell, affiliate] = await Promise.all([
+  const [settings, wishlist, gallery, signupGift, photoPrice, foodPlating, foodTableware, serviceWorker, appShell, affiliate, signupLimits] = await Promise.all([
     listFeatureSettings(db), wishlistState(db), galleryState(db), loadSignupGift(db), loadPosterPhotoPrice(db),
     loadSettingSwitch(db, 'food_plating_enabled'), loadSettingSwitch(db, 'food_tableware_enabled'), loadSettingSwitch(db, 'service_worker_enabled'), loadSettingSwitch(db, 'service_worker_shell_enabled'),
-    isAffiliateEnabled(),
+    isAffiliateEnabled(), loadSignupLimits(db),
   ])
   const posterGates = settings.filter((setting) => setting.key === POSTER_FEATURE)
   const otherGates = settings.filter((setting) => setting.key !== POSTER_FEATURE)
@@ -87,6 +90,7 @@ export default async function AdminFeaturesPage() {
       />
       <FeatureSection id="signup" {...S.signup}>
         <SignupGiftCard state={signupGift} savePaused={saveSignupGiftPausedAction} saveRules={saveSignupGiftRulesAction} />
+        <SignupLimitsCard limits={signupLimits} save={saveSignupLimitsAction} />
       </FeatureSection>
       <FeatureSection id="generation" {...S.generation}>
         <FoodTablewareCard value={foodTableware} save={saveFoodTablewareAction} />

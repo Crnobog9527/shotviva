@@ -6,7 +6,9 @@ import { z } from 'zod'
 import { AppError } from '../../errors'
 
 // The two steps of a code against public.sms_sends (0440, 0441), service-role client only.
-// Limits (last 24 hours): 1 per number per 60 s, 5 per number, 20 per IP.
+// Limits (last 24 hours): 1 per number per 60 s, 5 per number, and per IP an admin setting
+// (default 50; default 200 when the visitor's sv_ref slug is a valid org partner link, decided in
+// SQL and remembered on the row for the hook, 2027).
 
 const statusSchema = z.enum(['ok', 'phone_cooldown', 'phone_daily', 'ip_daily', 'no_request'])
 export type SmsLimitStatus = z.infer<typeof statusSchema>
@@ -19,9 +21,10 @@ async function call(db: Rpc, fn: string, args: Record<string, unknown>): Promise
   return statusSchema.parse(data)
 }
 
-// The server action, before signInWithOtp. `ip` is the visitor's (null in local dev).
-export function requestSmsSend(db: Rpc, key: string, ip: string | null): Promise<SmsLimitStatus> {
-  return call(db, 'sms_request_send', { p_phone_key: key, p_ip: ip })
+// The server action, before signInWithOtp. `ip` is the visitor's (null in local dev); `refSlug`
+// the slug of its sv_ref cookie, if any.
+export function requestSmsSend(db: Rpc, key: string, ip: string | null, refSlug: string | null = null): Promise<SmsLimitStatus> {
+  return call(db, 'sms_request_send', { p_phone_key: key, p_ip: ip, p_ref_slug: refSlug })
 }
 
 // The Send SMS hook, before any provider is called.

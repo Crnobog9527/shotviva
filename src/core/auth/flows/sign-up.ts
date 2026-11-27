@@ -2,7 +2,7 @@ import 'server-only'
 
 import { cookies, headers } from 'next/headers'
 
-import { storeSignupReferral } from '../../affiliate/referral'
+import { referralSlug, storeSignupReferral } from '../../affiliate/referral'
 import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { currentOrigin } from '../../request-origin'
@@ -39,8 +39,10 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   if (!parsed.success) return failed('INVALID_INPUT')
   const { email, password, captchaToken, next } = parsed.data
 
-  // Our per-IP limit first; it also leaves the row the Before User Created hook needs (1350).
-  if ((await requestSignup(createAdminSupabase(), email, clientIp(await headers()))) !== 'ok') return failed('AUTH_SIGNUP_LIMITED')
+  // Our per-IP limit first; it also leaves the row the Before User Created hook needs (1350). The
+  // sv_ref slug only lets the database apply the looser org-link limit when it is one (2027).
+  const ref = referralSlug((await cookies()).get('sv_ref')?.value)
+  if ((await requestSignup(createAdminSupabase(), email, clientIp(await headers()), ref)) !== 'ok') return failed('AUTH_SIGNUP_LIMITED')
 
   const supabase = await createSessionSupabase()
   const locale = await currentLocale()
