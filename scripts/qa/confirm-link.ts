@@ -15,13 +15,24 @@ import { parseEnv } from 'node:util'
 import pg from 'pg'
 
 import { ENV_FILE } from './env'
-import { assertNotPersona, assertPending, assertTestDbUrl, buildConfirmLink, landingPath, parseLinkArgs, type PendingSignup } from './signup-link'
+import {
+  assertNotPersona,
+  assertPending,
+  assertTestDbUrl,
+  buildConfirmLink,
+  landingPath,
+  OTP_EXPIRY_SECONDS,
+  parseLinkArgs,
+  type PendingSignup,
+  TEST_PROJECT_MARKER,
+  type TestDbConfig,
+} from './signup-link'
 import { QaGuardError } from './target'
 
 const USAGE = 'pnpm qa:confirm-link <email> [--host user|admin|preview] [--next /path]'
 
 // Like the other QA secrets: from .env.local only; a different exported shell value is refused.
-function testDbUrl(): string {
+function testDbConfig(): TestDbConfig {
   if (!existsSync(ENV_FILE)) throw new QaGuardError(`${ENV_FILE} not found; see scripts/qa/README.md.`)
   const value = parseEnv(readFileSync(ENV_FILE, 'utf8')).QA_TEST_DB_URL
   const shell = process.env.QA_TEST_DB_URL
@@ -33,13 +44,16 @@ function testDbUrl(): string {
 
 type Row = PendingSignup & { locale: string | null }
 
-async function readPending(connectionString: string, email: string): Promise<Row | undefined> {
+async function readPending(config: TestDbConfig, email: string): Promise<Row | undefined> {
   // Supabase's server certificate is signed by Supabase's own CA, which Node does not trust by
-  // default; the host was pinned to the test project above.
-  const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 15000 })
+  // default; the host and user were pinned to the test project above. Explicit fields only: no
+  // connection string, so nothing in it can redirect the connection.
+  const client = new pg.Client({ ...config, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 15000 })
   await client.connect()
   try {
     await client.query('begin read only')
+    const marker = await client.query('select 1 from auth.users where email = $1', [TEST_PROJECT_MARKER])
+    if (marker.rowCount !== 1) throw new QaGuardError('The database reached has no QA personas; it is not the test project.')
     const { rows } = await client.query<Row>(
       `select email_confirmed_at, confirmation_token, confirmation_sent_at,
               raw_user_meta_data->>'locale' as locale
@@ -58,15 +72,15 @@ async function readPending(connectionString: string, email: string): Promise<Row
 async function main() {
   const { email, host, next } = parseLinkArgs(process.argv.slice(2), USAGE)
   assertNotPersona(email)
-  const connectionString = testDbUrl()
-  const row = await readPending(connectionString, email)
+  const row = await readPending(testDbConfig(), email)
   const token = assertPending(row, email)
   const link = buildConfirmLink(host, token, landingPath(next, row?.locale))
 
   process.stderr.write(
     `WARNING: this link confirms ${email} on the test site (${host}). Treat it as a password: open it ` +
       'once, in the browser the validation step names, and never paste it into a PR, issue or chat. ' +
-      'Opening it signs that browser in and uses the token up.\n',
+      `Opening it signs that browser in and uses the token up. Assumes the link lives ${OTP_EXPIRY_SECONDS / 60} ` +
+      'minutes (otp_expiry in supabase/config.toml); a later click fails as link_expired.\n',
   )
   process.stdout.write(`${link}\n`)
 }

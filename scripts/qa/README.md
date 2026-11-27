@@ -184,7 +184,8 @@ sets the landing page (default: the account page in the account's language). The
   a new email moves `confirmation_sent_at`, which by design (migration 2021) drops the
   account's stored referral and would falsify a referral test.
 - It refuses an address with no account, one that is already confirmed, one with no pending
-  token, and one whose email is more than a day old (the link has expired).
+  token, and one whose email is older than the link lifetime. It assumes `otp_expiry` = 1 hour
+  (`supabase/config.toml`, and what the email says); the hosted value is not readable from here.
 - **Use the link only where the handoff says.** Open it once, in the browser/device the step
   names (for a cross-device test, the *other* browser, signed out). Opening it anywhere else, or
   twice, tests something else and uses the token up. Never paste it into a PR, issue or chat.
@@ -214,8 +215,10 @@ access to `auth.users`, which the Supabase API does not expose, so it connects t
    QA_TEST_DB_URL=postgresql://postgres.pnzkiqvktkzznfbyhphe:<password>@aws-….pooler.supabase.com:5432/postgres
    ```
 
-   Never the production project's string. The script refuses any host or user that is not the
-   test project before connecting, and runs one read-only query.
+   Paste the URI as is, with no `?…` parameters (they are refused: Postgres clients let them
+   override the host and user). Never the production project's string. The script refuses any
+   host or user that is not the test project before connecting, then checks the QA personas
+   exist in the database it reached, inside one read-only transaction.
 
 ## Phone sign-in persona (T63, Chinese pages)
 

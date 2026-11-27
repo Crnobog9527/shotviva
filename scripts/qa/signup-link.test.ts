@@ -82,40 +82,65 @@ describe('assertPending', () => {
     expect(() => assertPending({ ...pending, email_confirmed_at: '2026-11-27T11:55:00Z' }, 'a@b.co', now)).toThrow(/already confirmed/)
     expect(() => assertPending({ ...pending, confirmation_token: '' }, 'a@b.co', now)).toThrow(/no pending/)
     expect(() => assertPending({ ...pending, confirmation_sent_at: null }, 'a@b.co', now)).toThrow(/confirmation_sent_at/)
-    expect(() => assertPending({ ...pending, confirmation_sent_at: '2026-11-26T11:00:00Z' }, 'a@b.co', now)).toThrow(/older than a day/)
+    expect(() => assertPending({ ...pending, confirmation_sent_at: '2026-11-27T10:59:00Z' }, 'a@b.co', now)).toThrow(/older than 60 minutes/)
+  })
+
+  it('follows a different otp_expiry', () => {
+    const old = { ...pending, confirmation_sent_at: '2026-11-27T10:00:00Z' }
+    expect(assertPending(old, 'a@b.co', now, 86400)).toBe(hash)
   })
 })
 
 describe('assertTestDbUrl', () => {
   const pooler = `postgresql://postgres.${PREVIEW_REF}:pw@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres`
 
-  it('accepts the test project via the session pooler or the direct host', () => {
-    expect(assertTestDbUrl(pooler)).toBe(pooler)
-    const direct = `postgresql://postgres:pw@db.${PREVIEW_REF}.supabase.co:5432/postgres`
-    expect(assertTestDbUrl(direct)).toBe(direct)
+  it('returns explicit fields for the session pooler or the direct host', () => {
+    expect(assertTestDbUrl(pooler)).toEqual({
+      host: 'aws-1-ap-southeast-1.pooler.supabase.com',
+      port: 5432,
+      user: `postgres.${PREVIEW_REF}`,
+      password: 'pw',
+      database: 'postgres',
+    })
+    const direct = `postgresql://postgres:p%40ss@db.${PREVIEW_REF}.supabase.co:5432/postgres`
+    expect(assertTestDbUrl(direct)).toMatchObject({ host: `db.${PREVIEW_REF}.supabase.co`, user: 'postgres', password: 'p@ss' })
   })
 
-  it('drops sslmode so the script decides TLS', () => {
-    expect(assertTestDbUrl(`${pooler}?sslmode=disable`)).toBe(pooler)
+  it('refuses any query string or fragment (pg would let ?user= / ?host= override the checked parts)', () => {
+    const encodedProdUser = `postgres.%69${PROD.slice(1)}`
+    expect(() => assertTestDbUrl(`${pooler}?user=${encodedProdUser}`)).toThrow(/production|query/)
+    expect(() => assertTestDbUrl(`${pooler}?host=aws-0-eu-west-1.pooler.supabase.com`)).toThrow(/query/)
+    expect(() => assertTestDbUrl(`${pooler}?options=-c%20search_path%3Dx`)).toThrow(/query/)
+    expect(() => assertTestDbUrl(`${pooler}?hostaddr=10.0.0.1&port=6543`)).toThrow(/query/)
+    expect(() => assertTestDbUrl(`${pooler}?sslmode=disable`)).toThrow(/query/)
+    expect(() => assertTestDbUrl(`${pooler}?`)).toThrow(/query/)
+    expect(() => assertTestDbUrl(`${pooler}#x`)).toThrow(/query/)
   })
 
-  it('refuses production anywhere in the string', () => {
+  it('refuses production anywhere, also percent-encoded', () => {
     expect(() => assertTestDbUrl(pooler.replace(PREVIEW_REF, PROD))).toThrow(/production/)
     expect(() => assertTestDbUrl(`postgresql://postgres:pw@db.${PROD}.supabase.co:5432/postgres`)).toThrow(/production/)
+    expect(() => assertTestDbUrl(`${pooler}?user=postgres.%69${PROD.slice(1)}`)).toThrow(/production/)
+    expect(() => assertTestDbUrl(pooler.replace(':pw@', `:%69${PROD.slice(1)}@`))).toThrow(/production/)
   })
 
-  it('refuses other projects, other hosts and a test ref in the wrong place', () => {
+  it('refuses other projects, other hosts, other databases and ports, and a test ref in the wrong place', () => {
     const other = 'abcdefghijklmnopqrst'
     expect(() => assertTestDbUrl(pooler.replace(PREVIEW_REF, other))).toThrow(/not the test project/)
     expect(() => assertTestDbUrl(`postgresql://postgres.${PREVIEW_REF}:pw@evil.example.com:5432/postgres`)).toThrow(/not the test project/)
     expect(() => assertTestDbUrl(`postgresql://postgres:pw@db.${other}.supabase.co:5432/${PREVIEW_REF}`)).toThrow(/not the test project/)
     expect(() => assertTestDbUrl(`postgresql://postgres:pw@aws-1-x.pooler.supabase.com:5432/postgres`)).toThrow(/not the test project/)
+    expect(() => assertTestDbUrl(pooler.replace(/\/postgres$/, '/other'))).toThrow(/postgres database/)
+    expect(() => assertTestDbUrl(pooler.replace(':5432', ':1234'))).toThrow(/port/)
+    expect(() => assertTestDbUrl(pooler.replace(':pw@', '@'))).toThrow(/password/)
     expect(() => assertTestDbUrl(`https://${PREVIEW_REF}.supabase.co`)).toThrow(/postgresql/)
     expect(() => assertTestDbUrl(undefined)).toThrow(/missing/)
     expect(() => assertTestDbUrl('not a url')).toThrow(/not a URL/)
+    expect(() => assertTestDbUrl('postgresql://%E0%A4%A@x/postgres')).toThrow(/percent-escape/)
   })
 
   it('never echoes the password', () => {
+    expect(() => assertTestDbUrl(`postgresql://postgres:s3cret-pw@db.abcdefghijklmnopqrst.supabase.co:5432/postgres`)).toThrow()
     try {
       assertTestDbUrl(`postgresql://postgres:s3cret-pw@db.abcdefghijklmnopqrst.supabase.co:5432/postgres`)
     } catch (error) {
