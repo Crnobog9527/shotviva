@@ -119,7 +119,7 @@ export function LedgerTable({ rows }: { rows: LedgerRow[] }) {
   )
 }
 
-// Each row links to that member's 企业作品 further down the same page.
+// Each row links to that member's works on the 企业作品 tab.
 export function MemberTable({ orgId, rows, total }: { orgId: string; rows: MemberRow[]; total: number }) {
   return (
     <Card title={COPY.membersTitle} hint={total > rows.length ? COPY.membersLimit(rows.length, total) : undefined}>
