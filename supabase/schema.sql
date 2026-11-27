@@ -12263,6 +12263,37 @@ $$;
 ALTER FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_set_food_switch"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if p_actor is null then
+    raise exception 'INVALID_INPUT' using detail = 'actor is required';
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = p_actor and p.role = 'admin' and p.banned_at is null) then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_key is null or p_key not in ('food_plating_enabled', 'food_tableware_enabled') then
+    raise exception 'INVALID_INPUT' using detail = 'unknown setting';
+  end if;
+  if p_value is null or jsonb_typeof(p_value) <> 'boolean' then
+    raise exception 'INVALID_INPUT' using detail = p_key || ' must be a boolean';
+  end if;
+
+  insert into public.system_settings (key, value, updated_at, updated_by)
+  values (p_key, p_value, now(), p_actor)
+  on conflict (key) do update
+    set value = excluded.value,
+        updated_at = excluded.updated_at,
+        updated_by = excluded.updated_by;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."admin_set_food_switch"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_set_home_case_strip"("p_locale" "text", "p_entries" "jsonb", "p_actor" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -28932,6 +28963,11 @@ GRANT ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[]) 
 
 REVOKE ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_set_featured_templates"("p_ids" "text"[], "p_expected_ids" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_set_food_switch"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_set_food_switch"("p_key" "text", "p_value" "jsonb", "p_actor" "uuid") TO "service_role";
 
 
 

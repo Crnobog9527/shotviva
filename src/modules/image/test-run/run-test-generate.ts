@@ -8,7 +8,7 @@ import { AppError } from '@/core/errors'
 import { screenIdentityText, type IdentityJudge } from '@/core/identity-guard'
 import { flowExtraImages, foodPlanOf, foodStep, screenCost, templateCall, typedWords, type FoodDeps, type FoodPlan, type SettleDeps, type TemplateProvider } from '@/core/jobs'
 import { loadInputImage } from '@/core/storage'
-import { DEFAULT_RESOLUTION, FOOD_COPY_KEYS, FOOD_TOGGLE_KEYS, loadTestTemplate, OUTPUT_ASPECTS, validateGenerationInputs } from '@/core/templates'
+import { DEFAULT_RESOLUTION, FOOD_SWITCHES_OFF, foodSwitchedOff, loadTestTemplate, type FoodSwitches, OUTPUT_ASPECTS, validateGenerationInputs } from '@/core/templates'
 
 import { testRunEstimateUsd } from './provider-estimate'
 import { continueTestRun } from './test-ledger'
@@ -27,9 +27,9 @@ export type TestRunDeps = SettleDeps & {
   identityJudge?: IdentityJudge | null
   identityJudgeTimeoutMs?: number
   food?: FoodDeps | null
-  // The site-wide switch for 优化摆盘 / 优化器皿 (food_toggles_enabled): absent or false, test runs
-  // render both off too, so no dish reading and no vessel, as for users.
-  foodTogglesEnabled?: () => Promise<boolean>
+  // The site-wide switches for 优化摆盘 and 优化器皿 (2009): test runs follow them as users do; a
+  // toggle whose switch is off is rendered off, and absent switches mean both off.
+  foodSwitches?: () => Promise<FoodSwitches>
 }
 
 export type TestGenerateRequest = { actorId: string; body: z.infer<typeof testGenerateBodySchema> }
@@ -46,9 +46,8 @@ async function slotPhotos(db: FirstRunDeps['db'], given: Record<string, string> 
   return Object.fromEntries(found.map(([slot, photo]) => [slot, photo!.objectKey]))
 }
 
-// 优化摆盘 / 优化器皿 and the dish name while the site-wide switch is off (food_toggles_enabled, 1848).
-const switchedOff = async (deps: FirstRunDeps) =>
-  (await deps.foodTogglesEnabled?.()) ? { forceOff: [], dropCopy: [] } : { forceOff: FOOD_TOGGLE_KEYS, dropCopy: FOOD_COPY_KEYS }
+// 优化摆盘 or 优化器皿 while its own switch is off, and the dish name once both are (2009).
+const switchedOff = async (deps: FirstRunDeps) => foodSwitchedOff((await deps.foodSwitches?.()) ?? FOOD_SWITCHES_OFF)
 
 async function prepare(deps: FirstRunDeps, { body }: TestGenerateRequest) {
   const loaded = await loadTestTemplate(deps.db, body.template_id)
