@@ -26,6 +26,8 @@ const KEEP_PER_SCREEN = 12
 // After this many covers in a row from one host came back without CORS (a CDN copy cached before
 // the header was added), the worker stops asking that host in CORS mode until it restarts.
 const CORS_STRIKES = 3
+// The longest a request waits on Cache Storage, or activation on one of its steps (inTime).
+export const CACHE_WAIT_MS = 1500
 
 // `cdnOrigins`: the static-file CDN's origin when it serves /_next/static and /fonts; the site's own
 // origin is the worker's (self.location.origin), so previews and production alike are covered.
@@ -35,9 +37,18 @@ type Options = { version: string; cdnOrigins: readonly string[]; coverOrigins?: 
 
 const switchedOff = (prefix: string) => `// Shotviva service worker: switched off. Empties its caches and unregisters.
 self.addEventListener('install', () => self.skipWaiting())
+// Unregisters first (pages are uncontrolled from their next load on), then empties its caches, and
+// gives up on them after ${CACHE_WAIT_MS} ms: activation never waits long on storage.
 self.addEventListener('activate', (event) => event.waitUntil((async () => {
-  for (const key of await caches.keys()) if (key.startsWith(${prefix})) await caches.delete(key)
-  await self.registration.unregister()
+  try {
+    await self.registration.unregister()
+  } catch {}
+  await Promise.race([
+    (async () => {
+      for (const key of await caches.keys()) if (key.startsWith(${prefix})) await caches.delete(key)
+    })().catch(() => {}),
+    new Promise((resolve) => setTimeout(resolve, ${CACHE_WAIT_MS})),
+  ])
 })()))
 `
 
@@ -46,10 +57,27 @@ const HANDLERS = `// The cache is only ever a shortcut: any failure in it (a quo
 // error) falls back to the network, so a file can never fail because of the worker. The network
 // answer goes back at once; keeping a copy happens after, under waitUntil. A copy is kept only of
 // a complete, readable answer (never an opaque or partial one).
+// A cache step that has not settled after CACHE_WAIT_MS counts as nothing there: some engines'
+// Cache Storage can stall instead of failing, and a request must never wait on it. After one such
+// stall this worker stops reading its caches (the network answers everything) until it restarts.
+const LATE = Symbol('late')
+let cacheStalled = false
+function inTime(promise) {
+  let timer
+  const late = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(LATE), ${CACHE_WAIT_MS})
+  })
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer))
+}
+
 // A read never creates a cache (caches.open would): after sign-out's clear, a page that only looks
 // leaves Cache Storage empty.
 async function cachedIn(name, key) {
-  return (await caches.has(name)) ? (await caches.open(name)).match(key) : undefined
+  if (cacheStalled) return undefined
+  const hit = await inTime((async () => ((await caches.has(name)) ? (await caches.open(name)).match(key) : undefined))())
+  if (hit !== LATE) return hit
+  cacheStalled = true
+  return undefined
 }
 
 async function cacheFirst(event, name, keep) {
@@ -208,16 +236,26 @@ const ORIGINS = [self.location.origin, ...${JSON.stringify(cdnOrigins)}]
 const COVER_ORIGINS = [self.location.origin, ...${JSON.stringify(coverOrigins)}]
 const routeFor = ${routeFor.toString()}
 
-self.addEventListener('install', () => self.skipWaiting())
+// Install may take its time (the worker it replaces still answers meanwhile); it never fails.
+self.addEventListener('install', (event) => {
+  self.skipWaiting()
+  event.waitUntil(shellInstall().catch(() => {}))
+})
+// Activation must be quick and can never hang: while it runs, every request of the site waits for
+// it. Nothing here touches the network, and each storage step gives up after CACHE_WAIT_MS.
 self.addEventListener('activate', (event) => event.waitUntil((async () => {
   // Navigations then start their request while the worker boots (they are never answered from a cache).
   try {
-    if (self.registration.navigationPreload) await self.registration.navigationPreload.enable()
+    if (self.registration.navigationPreload) await inTime(self.registration.navigationPreload.enable())
   } catch {}
   try {
-    for (const key of await caches.keys()) if (key.startsWith(PREFIX) && key !== STATIC && key !== CATALOGUE && key !== COVERS && key !== KEEP_SHELL) await caches.delete(key)
+    await inTime((async () => {
+      for (const key of await caches.keys()) if (key.startsWith(PREFIX) && key !== STATIC && key !== CATALOGUE && key !== COVERS && key !== KEEP_SHELL) await caches.delete(key)
+    })())
   } catch {}
-  await self.clients.claim()
+  try {
+    await inTime(self.clients.claim())
+  } catch {}
   await shellActivate()
 })()))
 

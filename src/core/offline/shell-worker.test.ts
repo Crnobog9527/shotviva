@@ -57,10 +57,11 @@ const early = (path: string, visibilityState = 'visible', id = 'tab-1') => ({ da
 const on = serviceWorkerSource({ version: BUILD, cdnOrigins: [], enabled: true, shell: true })
 
 describe('the app shell (switch on)', () => {
-  it('keeps both shells on activation, fetched without credentials, and answers /generate and /zh/generate with them', async () => {
+  it('keeps both shells on install, fetched without credentials, and answers /generate and /zh/generate with them', async () => {
     const worker = runWorker(on)
+    await worker.dispatch('install', {})
     await worker.dispatch('activate', {})
-    expect(worker.fetch).toHaveBeenCalledWith(`${SITE}/app-shell/generate`, { credentials: 'omit', cache: 'no-store', redirect: 'manual' })
+    expect(worker.fetch).toHaveBeenCalledWith(`${SITE}/app-shell/generate`, expect.objectContaining({ credentials: 'omit', cache: 'no-store', redirect: 'manual', signal: expect.anything() }))
     expect(worker.preload.setHeaderValue).toHaveBeenCalledWith(`shell-${BUILD}`)
     expect(await (await worker.dispatch('fetch', nav('/generate?c=food'))).response?.text()).toBe('shell')
     expect(await (await worker.dispatch('fetch', nav('/zh/generate'))).response?.text()).toBe('shell')
@@ -77,9 +78,9 @@ describe('the app shell (switch on)', () => {
   it('keeps only a shell of this build, same-origin', async () => {
     const worker = runWorker(on)
     worker.fetch.mockImplementation(async () => Object.defineProperty(new Response('old', { headers: { 'x-sv-shell': 'dpl_old' } }), 'type', { value: 'basic' }))
-    await worker.dispatch('activate', {})
+    await worker.dispatch('install', {})
     worker.fetch.mockImplementation(async () => Object.defineProperty(new Response('x', { headers: { 'x-sv-shell': BUILD } }), 'type', { value: 'cors' }))
-    await worker.dispatch('activate', {})
+    await worker.dispatch('install', {})
     expect(worker.stores.get(`sv-shell-${BUILD}`)?.size ?? 0).toBe(0)
   })
 
@@ -91,6 +92,7 @@ describe('the app shell (switch on)', () => {
 
   it('never answers the way out (sv-net) with the shell, nor with an empty 204 preload (Part B 2026-11-27)', async () => {
     const worker = runWorker(on)
+    await worker.dispatch('install', {})
     await worker.dispatch('activate', {})
     expect(await (await worker.dispatch('fetch', nav('/generate'))).response?.text()).toBe('shell')
     for (const path of ['/generate?sv-net=1', '/zh/generate?c=food&sv-net=1']) {
@@ -102,9 +104,34 @@ describe('the app shell (switch on)', () => {
   })
 })
 
+describe('the app shell never holds up activation (2026-11-28)', () => {
+  it('activation never touches the network: a stalled shell fetch holds up neither activation nor any request (2026-11-28)', async () => {
+    const worker = runWorker(on)
+    worker.fetch.mockImplementation((input: unknown) => (String(typeof input === 'string' ? input : (input as { url: string }).url).includes('/app-shell/') ? new Promise<Response>(() => {}) : Promise.resolve(new Response('page', { status: 200 }))))
+    await worker.dispatch('activate', {})
+    expect(worker.fetch).not.toHaveBeenCalled()
+    expect(await (await worker.dispatch('fetch', nav('/zh/login'))).response?.text()).toBe('page')
+  })
+
+  it('a shell fetch that never answers is given up after its time limit, so install ends', async () => {
+    vi.useFakeTimers()
+    try {
+      const worker = runWorker(on)
+      worker.fetch.mockImplementation((_input: unknown, init?: RequestInit) => new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))))
+      const installed = worker.dispatch('install', {})
+      await vi.advanceTimersByTimeAsync(20_000)
+      await installed
+      expect(worker.stores.has(`sv-shell-${BUILD}`)).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('the shell’s refresh (personal content no later)', () => {
   it('records the refresh request’s headers, then starts the next one with the shell and hands it over once', async () => {
     const worker = runWorker(on)
+    await worker.dispatch('install', {})
     await worker.dispatch('activate', {})
     await worker.dispatch('fetch', refresh('/generate'))
     const template = await worker.stores.get(`sv-shell-${BUILD}`)?.get(`${SITE}/__sv-shell-refresh`)?.clone().json()
@@ -124,6 +151,7 @@ describe('the shell’s refresh (personal content no later)', () => {
 
   it('starts nothing for a background tab, the shell’s own address or another page', async () => {
     const worker = runWorker(on)
+    await worker.dispatch('install', {})
     await worker.dispatch('activate', {})
     await worker.dispatch('fetch', refresh('/generate'))
     worker.fetch.mockClear()
@@ -140,6 +168,7 @@ describe('the shell’s refresh (personal content no later)', () => {
 describe('the early answer stays with one window and one deployment', () => {
   it('hands the early answer only to the window that asked, and to no one after sign-out', async () => {
     const worker = runWorker(on)
+    await worker.dispatch('install', {})
     await worker.dispatch('activate', {})
     await worker.dispatch('fetch', refresh('/generate'))
     await worker.dispatch('message', early('/generate', 'visible', 'tab-1'))
@@ -153,6 +182,7 @@ describe('the early answer stays with one window and one deployment', () => {
 
   it('keeps each window’s early answer apart: a second window never takes or replaces the first one’s', async () => {
     const worker = runWorker(on)
+    await worker.dispatch('install', {})
     await worker.dispatch('activate', {})
     await worker.dispatch('fetch', refresh('/generate'))
     await worker.dispatch('message', early('/generate', 'visible', 'tab-1'))
@@ -165,6 +195,7 @@ describe('the early answer stays with one window and one deployment', () => {
 
   it('never hands over an early answer pinned to another deployment', async () => {
     const worker = runWorker(on)
+    await worker.dispatch('install', {})
     await worker.dispatch('activate', {})
     await worker.dispatch('fetch', refresh('/generate'))
     await worker.dispatch('message', early('/generate'))
@@ -175,6 +206,7 @@ describe('the early answer stays with one window and one deployment', () => {
 
   it('never keeps the early answer in a cache, and leaves other RSC requests alone', async () => {
     const worker = runWorker(on)
+    await worker.dispatch('install', {})
     await worker.dispatch('activate', {})
     await worker.dispatch('fetch', refresh('/generate'))
     await worker.dispatch('fetch', nav('/generate'))
@@ -214,6 +246,7 @@ describe('the app shell (switch off) and dropping it', () => {
 
   it('a newer build (sv-drop-shell) drops older shells, and this worker’s own only when it is the old one', async () => {
     const worker = runWorker(on)
+    await worker.dispatch('install', {})
     await worker.dispatch('activate', {})
     worker.stores.set('sv-shell-dpl_old', new Map())
     // A tab still on an older build: only other builds' shells go, never this worker's.
