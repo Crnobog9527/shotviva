@@ -111,7 +111,7 @@ it('grants exactly one new signup gift when two verified users on the same IP cl
   const gift = (db: Client, id: string) => db.query(
     "select * from grant_credits($1::uuid,6,'signup','signup:'||($1::uuid)::text,'free')", [id])
   const claims = await Promise.all([gift(release, ids[0]), gift(callback, ids[1])])
-  expect(claims.map(r => r.rows[0].free_credits).sort((a, b) => a - b)).toEqual([0, 100])
+  expect(claims.map(r => r.rows[0].free_credits).sort((a, b) => a - b)).toEqual([0, 200]) // 2008: default gift 200 (Owner 2026-11-27)
   for (const id of ids) expect((await gift(callback, id)).rows[0].applied).toBe(false)
   const pending = await release.query("select count(*)::int as n from profiles where id = any($1::uuid[]) and signup_gift_refusal = 'same_ip_pending'", [ids])
   expect(pending.rows[0].n).toBe(1)
