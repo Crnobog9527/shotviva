@@ -16104,6 +16104,7 @@ declare
   v_per_ip integer;
   v_partner integer;
   v_change public.credit_change;
+  v_since timestamptz;
 begin
   if p_amount is null or p_amount <= 0 then
     raise exception 'INVALID_INPUT' using detail = 'amount must be positive';
@@ -16139,13 +16140,17 @@ begin
         v_per_ip := case when v_per_ip = 0 or v_partner = 0 then 0 else greatest(v_per_ip, v_partner) end;
       end if;
       if v_profile.signup_ip is not null and v_per_ip > 0 then
+        -- 2026: a pending 'daily_cap' account is counted over the 24 hours before now, as a new
+        -- sign-up paid now would be; a new sign-up keeps 1480's window (its created_at is now).
+        v_since := case when v_profile.signup_gift_refusal = 'daily_cap' then now() else v_profile.created_at end
+                   - interval '24 hours';
         perform pg_advisory_xact_lock(hashtextextended('shotviva.signup_ip:' || host(v_profile.signup_ip), 0));
         if (select count(*)
               from public.profiles other
               join public.credit_ledger l on l.idempotency_key = 'signup:' || other.id::text
              where other.signup_ip = v_profile.signup_ip
                and other.id <> p_user_id
-               and l.created_at > v_profile.created_at - interval '24 hours') >= v_per_ip then
+               and l.created_at > v_since) >= v_per_ip then
           update public.profiles set signup_gift_refusal = 'same_ip_pending' where id = p_user_id;
           return row(false, v_profile.credits, v_profile.free_credits, v_profile.paid_until)::public.credit_change;
         end if;
@@ -19712,65 +19717,65 @@ $$;
 ALTER FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."signup_gift_catch_up"("p_limit" integer) RETURNS "jsonb"
+CREATE OR REPLACE FUNCTION "public"."signup_gift_catch_up_one"("p_user_id" "uuid") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 declare
-  v_user uuid;
+  v_refusal text;
+  v_banned timestamptz;
   v_today jsonb;
-  v_change public.credit_change;
-  v_paid integer := 0;
-  v_tried integer := 0;
-  v_failed integer := 0;
-  v_stopped text := null;
+begin
+  if p_user_id is null then
+    raise exception 'INVALID_INPUT' using detail = 'user is required';
+  end if;
+  select signup_gift_refusal, banned_at into v_refusal, v_banned from public.profiles where id = p_user_id;
+  if not found or v_refusal is distinct from 'daily_cap' or v_banned is not null
+     or exists (select 1 from public.credit_ledger where idempotency_key = 'signup:' || p_user_id::text) then
+    return 'skipped';
+  end if;
+  if (public.grant_credits(p_user_id, 1, 'signup', 'signup:' || p_user_id::text, 'free')).applied then
+    return 'paid';
+  end if;
+  select signup_gift_refusal into v_refusal from public.profiles where id = p_user_id;
+  if v_refusal = 'same_ip_pending' then
+    return 'same_ip_pending';
+  end if;
+  v_today := public.signup_gift_today();
+  if (v_today->>'paused')::boolean then
+    return 'paused';
+  end if;
+  if (v_today->>'granted')::integer >= (v_today->>'cap')::integer then
+    return 'daily_cap';
+  end if;
+  return 'skipped';
+end;
+$$;
+
+
+ALTER FUNCTION "public"."signup_gift_catch_up_one"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_gift_catch_up_queue"("p_limit" integer) RETURNS "uuid"[]
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
 begin
   if p_limit is null or p_limit < 1 or p_limit > 500 then
     raise exception 'INVALID_INPUT' using detail = 'limit must be from 1 to 500';
   end if;
-
-  for v_user in
+  return array(
     select p.id from public.profiles p
      where p.signup_gift_refusal = 'daily_cap' and p.banned_at is null
        and public.signup_gift_amount(p.created_at) > 0
        and not exists (select 1 from public.credit_ledger l where l.idempotency_key = 'signup:' || p.id::text)
      order by p.created_at, p.id
-     limit p_limit
-  loop
-    v_today := public.signup_gift_today();
-    if (v_today->>'paused')::boolean then
-      v_stopped := 'paused';
-      exit;
-    end if;
-    if (v_today->>'granted')::integer >= (v_today->>'cap')::integer then
-      v_stopped := 'daily_cap';
-      exit;
-    end if;
-    v_tried := v_tried + 1;
-    begin
-      v_change := public.grant_credits(v_user, 1, 'signup', 'signup:' || v_user::text, 'free');
-      if v_change.applied then
-        v_paid := v_paid + 1;
-      end if;
-    exception when others then
-      v_failed := v_failed + 1;
-    end;
-  end loop;
-
-  return jsonb_build_object(
-    'paid', v_paid,
-    'tried', v_tried,
-    'failed', v_failed,
-    'stopped', v_stopped,
-    'remaining', (select count(*) from public.profiles p
-                   where p.signup_gift_refusal = 'daily_cap' and p.banned_at is null
-                     and public.signup_gift_amount(p.created_at) > 0
-                     and not exists (select 1 from public.credit_ledger l where l.idempotency_key = 'signup:' || p.id::text)));
+     limit p_limit);
 end;
 $$;
 
 
-ALTER FUNCTION "public"."signup_gift_catch_up"("p_limit" integer) OWNER TO "postgres";
+ALTER FUNCTION "public"."signup_gift_catch_up_queue"("p_limit" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."signup_gift_day_start"() RETURNS timestamp with time zone
@@ -30560,8 +30565,13 @@ GRANT ALL ON FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp wit
 
 
 
-REVOKE ALL ON FUNCTION "public"."signup_gift_catch_up"("p_limit" integer) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."signup_gift_catch_up"("p_limit" integer) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."signup_gift_catch_up_one"("p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_catch_up_one"("p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_gift_catch_up_queue"("p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_gift_catch_up_queue"("p_limit" integer) TO "service_role";
 
 
 
