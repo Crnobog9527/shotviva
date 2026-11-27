@@ -6233,6 +6233,37 @@ $$;
 ALTER FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text", "p_resolution" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_signup_gift_invite_retry"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_code text;
+begin
+  select c.code into v_code from public.code_redemptions r join public.codes c on c.id = r.code_id
+   where r.user_id = new.user_id and r.kind = 'invite' and r.status = 'blocked_no_signup_grant' and r.context = 'signup';
+  if v_code is null then return null; end if;
+  begin
+    -- The code was entered at sign-up; only the gift came late, so no 7-day window here.
+    perform public.redeem_code(new.user_id, v_code, 'signup', null, 36500);
+    delete from public.signup_invite_retry_errors where user_id = new.user_id;
+  exception when others or query_canceled or assert_failure then
+    begin
+      insert into public.signup_invite_retry_errors(user_id, error)
+        values (new.user_id, sqlstate || ': ' || left(sqlerrm, 300))
+        on conflict (user_id) do update set error = excluded.error, at = now();
+    exception when others or query_canceled or assert_failure then
+      -- Even an unavailable error sink must never undo the gift.
+      return null;
+    end;
+  end;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."_signup_gift_invite_retry"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_signup_org_ref"("p_slug" "text") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -19119,6 +19150,8 @@ begin
   elsif offer.owner_user_id = p_user then outcome := 'own';
   -- 2025: only a successful redemption uses the code.
   elsif exists (select 1 from public.code_redemptions where code_id = offer.id and user_id = p_user and status = 'ok') then outcome := 'used';
+  -- 2030: an invite code is only redeemable at sign-up (the first verified sign-in).
+  elsif offer.kind = 'invite' and p_context <> 'signup' then outcome := 'signup_only';
   elsif offer.redemption_count >= offer.max_redemptions then outcome := 'full';
   elsif (offer.new_users_only or offer.kind = 'invite')
     and profile.created_at + make_interval(days => p_invite_window_days) <= checked_at then outcome := 'new_users_only';
@@ -19142,6 +19175,12 @@ begin
       where l.idempotency_key = 'signup:' || p_user and l.user_id = p_user and l.kind = 'grant' and l.pool = 'free') then
       outcome := 'blocked_no_signup_grant';
     end if;
+  end if;
+
+  -- 2030: reported as new_users_only, so code from before this deploy shows its usual refusal; the
+  -- reason tells the current code to say that invite codes are for sign-up only. Nothing is written.
+  if outcome = 'signup_only' then
+    return jsonb_build_object('kind', offer.kind, 'status', 'new_users_only', 'reason', 'signup_only');
   end if;
 
   if outcome <> 'ok' then
@@ -19920,6 +19959,49 @@ $$;
 
 
 ALTER FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_product_id" "text", "p_order_id" "text", "p_period" integer, "p_payment_id" "text", "p_quoted" integer, "p_charged" integer, "p_tax" integer, "p_subtotal" integer, "p_currency" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+begin
+  if p_user is null then return false; end if;
+  delete from public.signup_code_refs where user_id = p_user;
+  if p_code is null or p_code collate "C" !~ '^[A-Z0-9]{4,20}$' then return false; end if;
+  perform 1 from auth.users u
+   where u.id = p_user and u.email_confirmed_at is null and u.phone_confirmed_at is null
+     and u.last_sign_in_at is null and u.created_at >= now() - interval '10 minutes';
+  if not found then return false; end if;
+  insert into public.signup_code_refs (user_id, code) values (p_user, p_code);
+  return true;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."signup_code_take"("p_user" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_code text; v_at timestamptz;
+begin
+  delete from public.signup_code_refs where user_id = p_user returning code, created_at into v_code, v_at;
+  if v_code is null or v_at < now() - interval '1 day' then return null; end if;
+  perform 1 from auth.users u
+   where u.id = p_user and u.confirmation_sent_at <= v_at
+     and (u.recovery_sent_at is null or u.recovery_sent_at < v_at)
+     and (u.email_change_sent_at is null or u.email_change_sent_at < v_at)
+     and not exists (select 1 from auth.identities i where i.user_id = p_user and i.provider <> 'email');
+  if not found then return null; end if;
+  return v_code;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."signup_code_take"("p_user" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) RETURNS integer
@@ -23686,6 +23768,17 @@ CREATE TABLE IF NOT EXISTS "public"."reference_template_sources" (
 ALTER TABLE "public"."reference_template_sources" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."signup_code_refs" (
+    "user_id" "uuid" NOT NULL,
+    "code" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "signup_code_refs_code_check" CHECK (("code" ~ '^[A-Z0-9]{4,20}$'::"text"))
+);
+
+
+ALTER TABLE "public"."signup_code_refs" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."signup_gift_claims" (
     "key_hash" "text" NOT NULL,
     "method" "text" NOT NULL,
@@ -23697,6 +23790,16 @@ CREATE TABLE IF NOT EXISTS "public"."signup_gift_claims" (
 
 
 ALTER TABLE "public"."signup_gift_claims" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."signup_invite_retry_errors" (
+    "user_id" "uuid" NOT NULL,
+    "error" "text" NOT NULL,
+    "at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."signup_invite_retry_errors" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."signup_requests" (
@@ -24880,8 +24983,18 @@ ALTER TABLE ONLY "public"."reference_template_sources"
 
 
 
+ALTER TABLE ONLY "public"."signup_code_refs"
+    ADD CONSTRAINT "signup_code_refs_pkey" PRIMARY KEY ("user_id");
+
+
+
 ALTER TABLE ONLY "public"."signup_gift_claims"
     ADD CONSTRAINT "signup_gift_claims_pkey" PRIMARY KEY ("key_hash");
+
+
+
+ALTER TABLE ONLY "public"."signup_invite_retry_errors"
+    ADD CONSTRAINT "signup_invite_retry_errors_pkey" PRIMARY KEY ("user_id");
 
 
 
@@ -26163,6 +26276,10 @@ CREATE OR REPLACE TRIGGER "series_deleted_guard" BEFORE UPDATE OF "deleted_at", 
 
 
 
+CREATE OR REPLACE TRIGGER "signup_gift_invite_retry" AFTER INSERT ON "public"."credit_ledger" FOR EACH ROW WHEN ((("new"."kind" = 'grant'::"text") AND ("new"."pool" = 'free'::"text") AND ("new"."idempotency_key" = ('signup:'::"text" || ("new"."user_id")::"text")))) EXECUTE FUNCTION "public"."_signup_gift_invite_retry"();
+
+
+
 CREATE OR REPLACE TRIGGER "site_announcements_set_updated_at" BEFORE UPDATE ON "public"."site_announcements" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
@@ -27214,8 +27331,18 @@ ALTER TABLE ONLY "public"."reference_template_sources"
 
 
 
+ALTER TABLE ONLY "public"."signup_code_refs"
+    ADD CONSTRAINT "signup_code_refs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."signup_gift_claims"
     ADD CONSTRAINT "signup_gift_claims_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."signup_invite_retry_errors"
+    ADD CONSTRAINT "signup_invite_retry_errors_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -27791,7 +27918,13 @@ CREATE POLICY "series_read" ON "public"."template_series" FOR SELECT TO "authent
 
 
 
+ALTER TABLE "public"."signup_code_refs" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."signup_gift_claims" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."signup_invite_retry_errors" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."signup_requests" ENABLE ROW LEVEL SECURITY;
@@ -28982,6 +29115,10 @@ REVOKE ALL ON FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles",
 
 
 REVOKE ALL ON FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text", "p_resolution" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_signup_gift_invite_retry"() FROM PUBLIC;
 
 
 
@@ -30947,6 +31084,16 @@ GRANT ALL ON FUNCTION "public"."settle_waffo_renewal_v2"("p_user_id" "uuid", "p_
 
 
 
+REVOKE ALL ON FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_code_store"("p_user" "uuid", "p_code" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."signup_code_take"("p_user" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."signup_code_take"("p_user" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."signup_gift_amount"("p_created_at" timestamp with time zone) TO "service_role";
 
@@ -31637,6 +31784,10 @@ GRANT ALL ON TABLE "public"."reference_template_sources" TO "service_role";
 
 
 GRANT SELECT,INSERT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."signup_gift_claims" TO "service_role";
+
+
+
+GRANT SELECT ON TABLE "public"."signup_invite_retry_errors" TO "service_role";
 
 
 

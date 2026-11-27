@@ -11,6 +11,7 @@ import { connectAdmin, createUser, serviceClient, uniqueIp } from './helpers'
 //    org (org_l1); personal codes keep it.
 // 2. A blocked attempt (blocked_same_ip / blocked_no_signup_grant) no longer counts as 'used' or
 //    'already_invited': the user can redeem again once the block no longer applies, and is paid once.
+// Since 2030 an invite code is redeemable only in the signup context, so the retries run there.
 // Fake data only; every test makes its own users, so nothing is rolled back.
 
 let db: Client
@@ -68,7 +69,7 @@ it('lets an org staff code through on a shared network: org_l1 binding and the o
   expect(await binding(customer)).toEqual({ referred_by: await orgAccount(orgId), referred_source: 'org_l1', referred_member: staff })
   expect(await bonusLedger(customer)).toEqual([{ delta: 300 }])
   expect(await codeGrants(customer)).toHaveLength(result.credits_granted ? 1 : 0)
-  expect(await redeem(customer, await codeOf(staff), 'account')).toMatchObject({ status: 'used' })
+  expect(await redeem(customer, await codeOf(staff), 'signup')).toMatchObject({ status: 'used' })
   expect(await bonusLedger(customer)).toHaveLength(1)
 })
 
@@ -113,21 +114,21 @@ it('lets a customer refused for a missing gift redeem the same code after the gi
   const code = await codeOf(inviter)
   expect((await redeem(customer, code)).status).toBe('blocked_no_signup_grant')
   // Still blocked: one row, the latest attempt.
-  expect((await redeem(customer, code, 'account')).status).toBe('blocked_no_signup_grant')
+  expect((await redeem(customer, code, 'signup')).status).toBe('blocked_no_signup_grant')
   expect(await rowsOf(customer)).toEqual([expect.objectContaining({ status: 'blocked_no_signup_grant', credits_granted: 0 })])
   expect((await db.query('select status from code_redemption_blocks where user_id=$1', [customer])).rows)
     .toEqual([{ status: 'blocked_no_signup_grant' }])
 
+  // Since 2030 the gift itself re-runs the blocked sign-up redemption (signup_gift_invite_retry).
   await giveGift(customer)
-  const result = await redeem(customer, code, 'account')
-  expect(result.status).toBe('ok')
+  const result = (await row(db, 'select credits_granted from code_redemptions where user_id=$1', [customer])) as { credits_granted: number }
   expect(await rowsOf(customer)).toEqual([expect.objectContaining({
     status: 'ok', blocked_status: 'blocked_no_signup_grant', had_block: true, credits_granted: result.credits_granted,
   })])
   expect(await codeGrants(customer)).toHaveLength(result.credits_granted ? 1 : 0)
   expect((await row(db, 'select redemption_count from codes where code=$1', [code])).redemption_count).toBe(1)
-  expect((await redeem(customer, code, 'account')).status).toBe('used')
-  expect((await redeem(customer, await codeOf(await createUser(db)), 'account')).status).toBe('already_invited')
+  expect((await redeem(customer, code, 'signup')).status).toBe('used')
+  expect((await redeem(customer, await codeOf(await createUser(db)), 'signup')).status).toBe('already_invited')
   expect(await codeGrants(customer)).toHaveLength(result.credits_granted ? 1 : 0)
 })
 
@@ -137,10 +138,10 @@ it('lets a customer blocked on one personal code use another inviter\'s code; on
   expect((await redeem(customer, await codeOf(neighbour))).status).toBe('blocked_same_ip')
   const friend = await createUser(db)
   await db.query('update profiles set signup_ip=$1 where id=$2', [uniqueIp(), friend])
-  expect((await redeem(customer, await codeOf(friend), 'account')).status).toBe('ok')
+  expect((await redeem(customer, await codeOf(friend), 'signup')).status).toBe('ok')
   expect(await rowsOf(customer)).toEqual([expect.objectContaining({ status: 'ok', blocked_status: 'blocked_same_ip' })])
   expect((await row(db, 'select inviter_user_id from code_redemptions where user_id=$1', [customer])).inviter_user_id).toBe(friend)
-  expect((await redeem(customer, await codeOf(neighbour), 'account')).status).toBe('already_invited')
+  expect((await redeem(customer, await codeOf(neighbour), 'signup')).status).toBe('already_invited')
 
   // The replaced same-IP attempt is kept, with its code and inviter, and the admin lists still show it.
   const archived = await row(db, 'select id,code_id,inviter_user_id,status,replaced_by from code_redemption_blocks where user_id=$1', [customer])
@@ -176,18 +177,21 @@ it('lets a customer blocked on one personal code use another inviter\'s code; on
   expect(await rewarded(friend)).toBeLessThanOrEqual(1)
 })
 
-it('pays a customer once when two retries race after the gift arrives', async () => {
+it('pays a customer once when retries race the gift that re-runs the redemption (2030)', async () => {
   const inviter = await createUser(db)
   const customer = await createUser(db)
   const code = await codeOf(inviter)
   expect((await redeem(customer, code)).status).toBe('blocked_no_signup_grant')
-  await giveGift(customer)
   const attempt = () => serviceClient().rpc('redeem_code', {
-    p_user: customer, p_code: code, p_context: 'account', p_invitee_credits: null, p_invite_window_days: invite.windowDays,
+    p_user: customer, p_code: code, p_context: 'signup', p_invitee_credits: null, p_invite_window_days: invite.windowDays,
   })
-  const results = await Promise.all([attempt(), attempt(), attempt()])
-  expect(results.map((r) => (r.data as { status: string }).status).sort()).toEqual(['ok', 'used', 'used'])
-  expect(await rowsOf(customer)).toHaveLength(1)
+  const gift = () => serviceClient().rpc('grant_credits', {
+    p_user_id: customer, p_amount: 6, p_reason: 'signup', p_idempotency_key: 'signup:' + customer, p_pool: 'free',
+  })
+  const results = await Promise.all([attempt(), gift(), attempt()])
+  for (const r of results) expect(r.error).toBeNull()
+  expect(await rowsOf(customer)).toEqual([expect.objectContaining({ status: 'ok' })])
+  expect((await redeem(customer, code)).status).toBe('used')
   const granted = (await row(db, 'select credits_granted from code_redemptions where user_id=$1', [customer])).credits_granted
   expect(await codeGrants(customer)).toHaveLength(granted ? 1 : 0)
 })

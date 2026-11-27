@@ -72,6 +72,8 @@ describe('onVerifiedSignIn', () => {
     mocks.claim.mockResolvedValueOnce('invite')
     await onVerifiedSignIn('u1', benefits, 'google', 'en')
     expect(mocks.bind).toHaveBeenCalledWith('u1', true, 'partner', false)
+    // Not the signup confirmation click: the code stored at sign-up is taken but not used (2030).
+    expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', { first: true, fresh: true, useStored: false }, benefits.invite, 'en')
     // The partner link binds first, so an org member's invite code cannot take the customer (§6.5).
     expect(mocks.bind.mock.invocationCallOrder[0]).toBeLessThan(mocks.claim.mock.invocationCallOrder[0])
     expect(mocks.track).toHaveBeenCalledWith('signup', { method: 'google', code_kind: 'invite' }, { distinctId: 'u1', locale: 'en' })
@@ -172,7 +174,7 @@ describe('onVerifiedSignIn: staff-link signups', () => {
     expect(mocks.claimQuietly).not.toHaveBeenCalled()
     // Runs without binding: the referral stored at sign-up is still taken, so it never binds later.
     expect(mocks.bind).toHaveBeenCalledExactlyOnceWith('u1', false, 'partner', false)
-    expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', false, benefits.invite, 'zh')
+    expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', expect.objectContaining({ first: true, fresh: false }), benefits.invite, 'zh')
     // 1950 reads "no signup IP yet" as the first verified sign-in: the mark comes before the IP.
     expect(mocks.staff.mock.invocationCallOrder[0]).toBeLessThan(mocks.recordSignupIp.mock.invocationCallOrder[0])
   })
@@ -203,6 +205,6 @@ describe('onVerifiedSignIn: staff-link signups', () => {
     expect(mocks.staff).toHaveBeenCalledWith({}, 'u1', null)
     expect(mocks.grantSignupCredits).toHaveBeenCalledWith(expect.anything(), 'u1', benefits.freeCredits)
     expect(mocks.bind).toHaveBeenCalledWith('u1', true, 'partner', false)
-    expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', true, benefits.invite, 'en')
+    expect(mocks.claim).toHaveBeenCalledWith({}, 'u1', expect.objectContaining({ first: true, fresh: true }), benefits.invite, 'en')
   })
 })

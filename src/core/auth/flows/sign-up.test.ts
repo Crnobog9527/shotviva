@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ signUp: vi.fn(), resend: vi.fn(), resetPasswordForEmail: vi.fn(), updateUser: vi.fn(), getUser: vi.fn(), rpc: vi.fn() }))
-const request = vi.hoisted(() => ({ host: 'localhost:3000', env: {} as Record<string, unknown>, ref: undefined as string | undefined }))
+const request = vi.hoisted(() => ({ host: 'localhost:3000', env: {} as Record<string, unknown>, ref: undefined as string | undefined, code: undefined as string | undefined }))
 
 vi.mock('server-only', () => ({}))
 vi.mock('../../i18n/server', () => ({
@@ -10,7 +10,10 @@ vi.mock('../../i18n/server', () => ({
 }))
 vi.mock('next/headers', () => ({
   headers: async () => new Headers({ host: request.host, 'x-forwarded-for': '203.0.113.7' }),
-  cookies: async () => new Map(request.ref ? [['sv_ref', { value: request.ref }]] : []),
+  cookies: async () => new Map([
+    ...(request.ref ? [['sv_ref', { value: request.ref }] as const] : []),
+    ...(request.code ? [['sv_code', { value: request.code }] as const] : []),
+  ]),
 }))
 vi.mock('../../env', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../env')>()
@@ -36,6 +39,7 @@ beforeEach(() => {
   request.host = 'localhost:3000'
   request.env = {}
   request.ref = undefined
+  request.code = undefined
   mocks.rpc.mockResolvedValue({ data: 'ok', error: null })
 })
 
@@ -184,5 +188,40 @@ describe('signUpWithPassword: partner referral', () => {
     mocks.signUp.mockResolvedValue({ data: { user: { id: 'u1', identities: [{}] } }, error: null })
     mocks.rpc.mockResolvedValueOnce({ data: 'ok', error: null }).mockRejectedValueOnce(new Error('down'))
     expect(await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))).toEqual({ status: 'sent' })
+  })
+})
+
+// 2030 (review on #977): invite codes are for sign-up only, so the code goes onto the new account
+// too, for a confirmation opened on another device.
+describe('signUpWithPassword: sign-up code', () => {
+  const stores = () => mocks.rpc.mock.calls.filter(([fn]) => fn === 'signup_code_store')
+  beforeEach(() => mocks.signUp.mockResolvedValue({ data: { user: { id: 'u1', identities: [{}] } }, error: null }))
+
+  it('stores the form\'s code, else the ?code= link\'s cookie, and clears it for an emptied field', async () => {
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', signupCode: 'friend01' }))
+    request.code = 'LINK0001'
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', signupCode: '' }))
+    expect(stores()).toEqual([
+      ['signup_code_store', { p_user: 'u1', p_code: 'FRIEND01' }],
+      ['signup_code_store', { p_user: 'u1', p_code: 'LINK0001' }],
+      ['signup_code_store', { p_user: 'u1', p_code: null }],
+    ])
+  })
+
+  it('stores no code for a staff link, and none when the sign-up failed', async () => {
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', signupCode: 'FRIEND01', next: `/zh/join/org/${'b'.repeat(32)}` }))
+    expect(stores()).toEqual([['signup_code_store', { p_user: 'u1', p_code: null }]])
+    mocks.signUp.mockResolvedValue({ data: { user: null }, error: { code: 'over_email_send_rate_limit', status: 429 } })
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', signupCode: 'FRIEND01' }))
+    expect(stores()).toHaveLength(1)
+  })
+
+  it('a failed store still answers "sent"', async () => {
+    mocks.rpc.mockImplementation(async (fn: string) => {
+      if (fn === 'signup_code_store') throw new Error('down')
+      return { data: 'ok', error: null }
+    })
+    expect(await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', signupCode: 'FRIEND01' }))).toEqual({ status: 'sent' })
   })
 })

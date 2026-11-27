@@ -3,11 +3,13 @@ import 'server-only'
 import { cookies, headers } from 'next/headers'
 
 import { referralSlug, storeSignupReferral } from '../../affiliate/referral'
+import { CODE_COOKIE, normalizeCode } from '../../codes'
 import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { currentOrigin } from '../../request-origin'
 import { nextIn } from '../redirect-target'
 import { clientIp } from '../signup-ip'
+import { storeSignupCode } from '../signup-code'
 import { requestSignup } from '../signup-request'
 import { staffSignupData } from '../staff-signup'
 import { createAdminSupabase } from '../supabase-admin'
@@ -30,6 +32,16 @@ const REGISTERED = new Set(['user_already_exists', 'email_exists'])
 async function rememberReferral(userId: string | undefined, staff: Record<string, string>) {
   const cookie = Object.keys(staff).length ? undefined : (await cookies()).get('sv_ref')?.value
   await storeSignupReferral(userId, cookie)
+}
+
+// The code typed in the form, or else the one a ?code= link left in this browser, onto the new
+// account (2030): an invite code is for sign-up only, so it must survive a confirmation opened on
+// another device. An emptied field clears it (as saveSignupCode does); a staff link's sign-up
+// takes no code, so it only clears.
+async function rememberCode(userId: string | undefined, staff: Record<string, string>, form: FormData) {
+  const code = Object.keys(staff).length ? null
+    : form.has('signupCode') ? normalizeCode(form.get('signupCode')) : normalizeCode((await cookies()).get(CODE_COOKIE)?.value)
+  await storeSignupCode(createAdminSupabase(), userId, code)
 }
 
 // The verification link lands on `next` (the home draft, the Graylum connect page) when it is a
@@ -63,7 +75,9 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
     if (code === 'INTERNAL') logger.warn('sign-up failed', { code: error.code })
     return failed(code)
   }
-  await rememberReferral(created?.user?.id, staff)
+  const userId = created?.user?.id
+  await rememberReferral(userId, staff)
+  await rememberCode(userId, staff, form)
   return { status: 'sent' }
 }
 
