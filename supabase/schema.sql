@@ -3311,6 +3311,28 @@ $$;
 ALTER FUNCTION "admin"."write_synced_profile"("v_id" "text", "v_active_profile" "text", "v_entry" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_admin_org_setting_at"("p_org" "uuid", "p_key" "text", "p_at" timestamp with time zone, "p_now" "jsonb") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  with logged as (
+    select l.created_at, l.id,
+      case when p_key = 'signup_bonus_credits' then r->'signup_bonus_credits'->'after' else r->p_key end as v,
+      case when p_key = 'signup_bonus_credits' then r->'signup_bonus_credits'->'before' end as b
+      from public.admin_audit_log l
+      cross join lateral (select case when l.reason ~ '^\s*\{' then l.reason::jsonb end r) x
+     where l.action = 'org_update' and l.target_id = p_org::text and r ? p_key)
+  select coalesce(
+    (select jsonb_build_object('known', true, 'value', v) from logged where created_at <= p_at order by created_at desc, id desc limit 1),
+    (select case when b is not null then jsonb_build_object('known', true, 'value', b) else jsonb_build_object('known', false) end
+       from logged where created_at > p_at order by created_at, id limit 1),
+    jsonb_build_object('known', true, 'value', p_now));
+$$;
+
+
+ALTER FUNCTION "public"."_admin_org_setting_at"("p_org" "uuid", "p_key" "text", "p_at" timestamp with time zone, "p_now" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_affiliate_accept_invite"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -10247,7 +10269,7 @@ $$;
 ALTER FUNCTION "public"."admin_org_create"("p_actor" "uuid", "p_input" "jsonb") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."admin_org_customers"("p_org_id" "uuid", "p_limit" integer, "p_offset" integer) RETURNS TABLE("user_id" "uuid", "contact" "text", "level" smallint, "source" "text", "member_user_id" "uuid", "member_contact" "text", "via_user_id" "uuid", "via_contact" "text", "signed_up_at" timestamp with time zone, "referred_at" timestamp with time zone, "bonus_credits" integer, "bonus_at" timestamp with time zone, "bonus_error" "text", "paid_before" boolean, "has_signup_gift" boolean, "bonus_at_bind" integer, "switch_at_bind" boolean, "before_org" boolean, "has_paid" boolean, "banned" boolean, "paid_cents" bigint, "commission_cents" bigint, "promo_credits" bigint, "total" bigint, "total_l2" bigint)
+CREATE OR REPLACE FUNCTION "public"."admin_org_customers"("p_org_id" "uuid", "p_limit" integer, "p_offset" integer) RETURNS TABLE("user_id" "uuid", "contact" "text", "level" smallint, "source" "text", "member_user_id" "uuid", "member_contact" "text", "via_user_id" "uuid", "via_contact" "text", "signed_up_at" timestamp with time zone, "referred_at" timestamp with time zone, "bonus_credits" integer, "bonus_at" timestamp with time zone, "bonus_error" "text", "paid_before" boolean, "has_signup_gift" boolean, "gift_at_bind" boolean, "bonus_at_bind" integer, "status_at_bind" "text", "switch_at_bind" boolean, "before_org" boolean, "has_paid" boolean, "banned" boolean, "paid_cents" bigint, "commission_cents" bigint, "promo_credits" bigint, "total" bigint, "total_l2" bigint)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     SET "TimeZone" TO 'UTC'
@@ -10255,15 +10277,14 @@ CREATE OR REPLACE FUNCTION "public"."admin_org_customers"("p_org_id" "uuid", "p_
 #variable_conflict use_column
 declare
   v_account uuid;
-  v_org_created timestamptz;
-  v_switch_now boolean;
+  v_o public.orgs;
 begin
   if p_org_id is null or p_limit is null or p_limit < 1 or p_limit > 200 or p_offset is null or p_offset < 0 then
     raise exception 'INVALID_INPUT';
   end if;
   select a.user_id into v_account from public.affiliates a where a.org_id = p_org_id;
   if v_account is null then return; end if;
-  select o.created_at, o.affiliate_enabled into v_org_created, v_switch_now from public.orgs o where o.id = p_org_id;
+  select * into v_o from public.orgs o where o.id = p_org_id;
 
   return query
   with page as (
@@ -10294,21 +10315,14 @@ begin
          exists(select from public.payments p where p.user_id = pg.id and p.created_at < pg.referred_at),
          exists(select from public.credit_ledger l where l.user_id = pg.id and l.idempotency_key = 'signup:' || pg.id
                   and l.kind = 'grant' and l.pool = 'free'),
-         coalesce((
-           select (x.r->'signup_bonus_credits'->>'after')::integer from public.admin_audit_log l
-             cross join lateral (select case when l.reason ~ '^\s*\{' then l.reason::jsonb end r) x
-            where l.action = 'org_update' and l.target_id = p_org_id::text and l.created_at <= pg.referred_at
-              and x.r ? 'signup_bonus_credits'
-            order by l.created_at desc, l.id desc limit 1
-         ), 0),
-         coalesce((
-           select (x.r->>'affiliate_enabled')::boolean from public.admin_audit_log l
-             cross join lateral (select case when l.reason ~ '^\s*\{' then l.reason::jsonb end r) x
-            where l.action = 'org_update' and l.target_id = p_org_id::text and l.created_at <= pg.referred_at
-              and x.r ? 'affiliate_enabled'
-            order by l.created_at desc, l.id desc limit 1
-         ), v_switch_now),
-         pg.referred_at < v_org_created,
+         exists(select from public.credit_ledger l where l.user_id = pg.id and l.idempotency_key = 'signup:' || pg.id
+                  and l.kind = 'grant' and l.pool = 'free' and l.created_at <= pg.referred_at),
+         -- Known values as 2010 reads them: a null bonus is 0, a null status is not active, a null
+         -- switch is off; null here means the log cannot tell.
+         case when (sb.j->>'known')::boolean then coalesce((sb.j->>'value')::integer, 0) end,
+         case when (ss.j->>'known')::boolean then coalesce(ss.j->>'value', '') end,
+         case when (sw.j->>'known')::boolean then coalesce((sw.j->>'value')::boolean, false) end,
+         pg.referred_at < v_o.created_at,
          exists(select from public.payments p where p.user_id = pg.id),
          pg.banned_at is not null,
          coalesce((
@@ -10333,6 +10347,9 @@ begin
     left join public.org_signup_bonuses b on b.user_id = pg.id and b.org_id = p_org_id
     left join public.org_signup_bonus_errors e on e.user_id = pg.id
     left join promo pr on pr.id = pg.id
+    cross join lateral (select public._admin_org_setting_at(p_org_id, 'signup_bonus_credits', pg.referred_at, '0'::jsonb) j) sb
+    cross join lateral (select public._admin_org_setting_at(p_org_id, 'status', pg.referred_at, to_jsonb(v_o.status)) j) ss
+    cross join lateral (select public._admin_org_setting_at(p_org_id, 'affiliate_enabled', pg.referred_at, to_jsonb(v_o.affiliate_enabled)) j) sw
    order by pg.referred_at desc nulls last, pg.id desc;
 end;
 $$;
@@ -27981,6 +27998,10 @@ GRANT ALL ON FUNCTION "admin"."web_standard_sale_allowed"("template_id" "text") 
 
 REVOKE ALL ON FUNCTION "admin"."write_synced_profile"("v_id" "text", "v_active_profile" "text", "v_entry" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "admin"."write_synced_profile"("v_id" "text", "v_active_profile" "text", "v_entry" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_admin_org_setting_at"("p_org" "uuid", "p_key" "text", "p_at" timestamp with time zone, "p_now" "jsonb") FROM PUBLIC;
 
 
 
