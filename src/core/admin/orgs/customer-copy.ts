@@ -33,6 +33,7 @@ const SOURCES: Record<string, string> = {
   org_l2: '一级客户邀请',
   signup: '企业推广链接注册',
   first_checkout: '经推广链接首次付款',
+  admin: '后台手动绑定',
 }
 export const sourceLabel = (source: string | null) => (source ? SOURCES[source] ?? `其他（${source}）` : '—')
 

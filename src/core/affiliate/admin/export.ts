@@ -2,6 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { commissions, payouts, type Commission, type Payout } from './read'
 import { COPY, STATUS, commissionStatus } from './copy'
+import { commissionMarks } from './commission-marks'
 import { feeLineTexts, payoutAmountHeaders, payoutAmounts } from './payout-amounts'
 import type { Filters } from './query'
 
@@ -54,7 +55,7 @@ function commissionCells(r: Commission) {
     r.rate_bp / 100,
     cents(r.amount),
     commissionStatus(r.status),
-    r.flags.map((s) => STATUS[s] ?? s).join('、'),
+    commissionMarks(r).join('、'),
     r.confirm_after,
   ]
 }

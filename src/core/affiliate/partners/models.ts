@@ -72,6 +72,8 @@ export const commissionSchema = z.object({
   amount: cents,
   status: commissionStatus,
   confirm_after: z.string(),
+  // on_hold while the org's affiliate account is paused (migration 2028); released when it is active again.
+  paused_hold: z.boolean().default(false),
 })
 export const changeSchema = z.object({
   id: idSchema,

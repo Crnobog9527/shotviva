@@ -49,11 +49,20 @@ describe('onVerifiedSignIn', () => {
     expect(mocks.noteSignupGift).toHaveBeenCalledOnce()
   })
 
-  it('does not track a later sign-in, even when a failed gift is retried then', async () => {
+  it('does not track a later sign-in, even when a failed or daily-cap gift is paid then', async () => {
     mocks.recordSignupIp.mockResolvedValue(false)
     mocks.grantSignupCredits.mockResolvedValue(true)
     await onVerifiedSignIn('u1', benefits, 'google', 'en')
     expect(mocks.track).not.toHaveBeenCalled()
+    expect(mocks.claimQuietly).not.toHaveBeenCalled()
+    // 2026: the gift paid now still counts toward today's, so the Owner alert checks.
+    expect(mocks.noteSignupGift).toHaveBeenCalledOnce()
+  })
+
+  it('no Owner alert check on a later sign-in that paid nothing', async () => {
+    mocks.recordSignupIp.mockResolvedValue(false)
+    mocks.grantSignupCredits.mockResolvedValue(false)
+    await onVerifiedSignIn('u1', benefits, 'google', 'en')
     expect(mocks.noteSignupGift).not.toHaveBeenCalled()
   })
 

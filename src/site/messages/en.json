@@ -648,7 +648,7 @@
       "getCredits": "Get credits",
       "panelTitle": "Credits",
       "signupGiftRefused": "No signup credits yet: this network already used today's allowance. Verify a phone number or a Google account below to claim them.",
-      "signupGiftRefusedCap": "No sign-up credits for this account: that day's sign-up gifts had all been given out.",
+      "signupGiftRefusedCap": "No sign-up credits yet: that day's sign-up gifts had all been given out. They will be added to this account automatically once there is room again, usually within a few days.",
       "signupGiftRefusedPaused": "No sign-up credits for this account: sign-up gifts were paused when it signed up.",
       "signupGiftRefusedStaff": "No sign-up credits for this account: it was created through an organisation's staff link."
     },
@@ -2661,6 +2661,8 @@
       "dispute_won": "Dispute won",
       "same_ip": "Matching signup network",
       "affiliate_inactive": "Affiliate inactive at purchase",
+      "affiliate_paused": "Held while the company programme was paused",
+      "affiliate_resumed": "Released: company programme active again",
       "org_member": "Customer is a member of this company",
       "confirmed": "Confirmation period completed",
       "admin_release": "Released after review",
@@ -2885,7 +2887,8 @@
         "refund_fee": "Refund fee",
         "other": "Other"
       },
-      "confirmsOn": "Confirms {date}"
+      "confirmsOn": "Confirms {date}",
+      "pausedHold": "Held until the company programme is active again"
     }
   },
   "gallery": {

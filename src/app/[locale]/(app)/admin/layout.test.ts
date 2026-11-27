@@ -17,7 +17,7 @@ vi.mock('@/core/admin', () => ({
 }))
 vi.mock('@/core/env', () => ({ serverEnv: () => ({ VERCEL_ENV: 'preview' }) }))
 vi.mock('./jobs/actions', () => ({ compensateJobAction: vi.fn(), viewWorkAction: vi.fn() }))
-vi.mock('./users/actions', () => ({ adjustCreditsAction: vi.fn(), banUserAction: vi.fn(), unbanUserAction: vi.fn(), userDetailAction: vi.fn() }))
+vi.mock('./users/actions', () => ({ adjustCreditsAction: vi.fn(), banUserAction: vi.fn(), bindPartnerAction: vi.fn(), searchPartnersAction: vi.fn(), unbanUserAction: vi.fn(), userDetailAction: vi.fn() }))
 vi.mock('@/core/support', () => ({ openTicketCount: () => openTicketCount() }))
 vi.mock('@/core/inquiries', () => ({ newInquiryCount: () => newInquiryCount() }))
 vi.mock('@/core/logger', () => ({ logger: { warn: () => undefined } }))

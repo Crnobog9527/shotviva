@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { formatBeijing } from '@/core/admin/shell'
 import { productLabel } from '../partners/format'
+import { PAUSED_HOLD } from './commission-marks'
 import { COPY, DOSSIER, commissionStatus, money } from './copy'
 import { dossierChanges, dossierCommissions } from './dossier-read'
 import type { DossierProps } from './members-view'
@@ -56,7 +57,8 @@ export async function DossierCommissions(props: Props) {
             ...(level === 2 ? [r.direct
               ? <LinkTo key="direct" filters={{ tab: 'affiliates', id: r.direct.user_id }}>{r.direct.slug}</LinkTo>
               : '—'] : []),
-            money(r.base_usd), r.rate_bp / 100 + '%', money(r.amount), commissionStatus(r.status),
+            money(r.base_usd), r.rate_bp / 100 + '%', money(r.amount),
+            commissionStatus(r.status) + (r.paused_hold ? '（' + PAUSED_HOLD + '）' : ''),
             <Link key="changes" prefetch={false} className="text-primary hover:underline"
               href={href({ ...filters, commission: r.id, historyCursor: undefined }) + '#commission-history'}>{DOSSIER.history}</Link>,
           ],

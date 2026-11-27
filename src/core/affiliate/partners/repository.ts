@@ -96,7 +96,7 @@ export async function readFees(user: string) {
 export async function readCommissions(user: string, cursor?: string | null, teamOnly = false) {
   let q = createAdminSupabase()
     .from('affiliate_commissions')
-    .select('id,created_at,payment_id,product_id,base_usd,fee_cents,net_base_usd,rate_bp,amount,status,confirm_after')
+    .select('id,created_at,payment_id,product_id,base_usd,fee_cents,net_base_usd,rate_bp,amount,status,confirm_after,paused_hold')
     .eq('affiliate_user_id', user)
   if (teamOnly) q = q.eq('level', 2)
   const after = decodeCursor(cursor)

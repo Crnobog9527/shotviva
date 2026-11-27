@@ -7,5 +7,6 @@ export {
   type SystemSettingDeps,
 } from './commands'
 export { loadSignupGift, saveSignupGiftRules } from './signup-gift'
+export { loadSignupLimits, saveSignupLimits } from './signup-limits'
 export { loadPosterPhotoPrice, savePosterPhotoPrice } from './poster-photo-price'
-export type { SignupGiftRules, SignupGiftState, SwitchKey, WishlistSwitch, WishlistSwitchInput } from './types'
+export type { SignupGiftRules, SignupGiftState, SignupLimits, SwitchKey, WishlistSwitch, WishlistSwitchInput } from './types'

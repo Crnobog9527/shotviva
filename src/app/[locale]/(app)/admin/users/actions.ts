@@ -1,18 +1,25 @@
 'use server'
 
 import { refresh } from 'next/cache'
+import { z } from 'zod'
 
 import {
   adjustUserCredits,
   banUser,
   batchAdjustCredits,
   batchSetBanned,
+  bindPartner,
   loadUserDetail,
+  readReferrerDetail,
   runAdminQuery,
+  searchPartners,
   setUserLabel,
   unbanUser,
   type ActionValue,
   type BatchOutcome,
+  type BindOutcome,
+  type PartnerOption,
+  type UserReferrer,
   type UserDetailData,
 } from '@/core/admin'
 import { isAffiliateEnabled } from '@/core/affiliate/feature'
@@ -75,4 +82,30 @@ export async function batchSetBannedAction(input: unknown): Promise<ActionValue<
 export async function setUserLabelAction(input: unknown): Promise<ActionValue<string | null>> {
   const admin = await requireAdmin()
   return run(() => setUserLabel(createAdminSupabase(), admin.id, input))
+}
+
+// 绑定渠道 (2029): binds the account to a personal affiliate or an enterprise account, optionally
+// with commissions on its payments of the last N days. Used by the user detail and by an org's
+// 推广名单. The SQL function checks the admin role again and writes the audit log.
+export async function bindPartnerAction(input: unknown): Promise<ActionValue<BindOutcome>> {
+  const admin = await requireAdmin()
+  return run(() => bindPartner(createAdminSupabase(), admin.id, input))
+}
+
+// The bind dialog's partner search. Read only: no refresh.
+export async function searchPartnersAction(input: unknown): Promise<ActionValue<PartnerOption[]>> {
+  const admin = await requireAdmin()
+  return runAdminQuery(() => searchPartners(createAdminSupabase(), admin.id, input))
+}
+
+const referrerInput = z.object({ userId: z.uuid() })
+
+// The bind dialog on an org's 推广名单: the picked account's current binding. Read only.
+export async function userReferrerAction(input: unknown): Promise<ActionValue<UserReferrer | null>> {
+  await requireAdmin()
+  return runAdminQuery(async () => {
+    const parsed = referrerInput.safeParse(input)
+    if (!parsed.success) return null
+    return readReferrerDetail(createAdminSupabase(), parsed.data.userId)
+  })
 }

@@ -49,7 +49,7 @@ describe('signUpWithPassword', () => {
     await signUpWithPassword(form({ email: 'Mei@Example.com', password: 'hunter2x' }))
     const [fn, args] = mocks.rpc.mock.calls[0]!
     expect(fn).toBe('signup_request')
-    expect(args).toEqual({ p_email_key: expect.stringMatching(/^[0-9a-f]{64}$/), p_ip: '203.0.113.7' })
+    expect(args).toEqual({ p_email_key: expect.stringMatching(/^[0-9a-f]{64}$/), p_ip: '203.0.113.7', p_ref_slug: null })
     mocks.rpc.mockResolvedValueOnce({ data: 'ip_hourly', error: null })
     expect(await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))).toEqual({ status: 'error', code: 'AUTH_SIGNUP_LIMITED' })
     expect(mocks.signUp).toHaveBeenCalledTimes(1)
@@ -141,6 +141,20 @@ describe('signUpWithPassword: staff link sign-up', () => {
     expect(mocks.signUp.mock.calls[0]![0].options.data).toEqual({ locale: 'zh', staff_invite: token, staff_org: '11111111-2222-4333-8444-555555555555' })
     await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x', next: '/zh/account' }))
     expect(mocks.signUp.mock.calls[1]![0].options.data).toEqual({ locale: 'zh' })
+  })
+})
+
+// 2027: the sv_ref slug goes with the request so the database can apply the looser org-link limit
+// (it decides whether the slug is one); a malformed cookie sends none.
+describe('signUpWithPassword: per-IP limit and the partner link', () => {
+  it('passes the cookie\'s slug to signup_request', async () => {
+    mocks.signUp.mockResolvedValue({ data: { user: { id: 'u1', identities: [{}] } }, error: null })
+    request.ref = 'anna.' + Math.floor(Date.now() / 1000)
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))
+    request.ref = 'not a cookie'
+    await signUpWithPassword(form({ email: 'mei@example.com', password: 'hunter2x' }))
+    const slugs = mocks.rpc.mock.calls.filter(([fn]) => fn === 'signup_request').map(([, args]) => (args as { p_ref_slug: unknown }).p_ref_slug)
+    expect(slugs).toEqual(['anna', null])
   })
 })
 
