@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
+const { schedule } = vi.hoisted(() => ({ schedule: vi.fn() }))
+vi.mock('../alerts/schedule', () => ({ schedule }))
 
-import { isWarmableOrigin, runWarm, type Fetcher } from './warm-pages'
+import { isWarmableEnvironment, isWarmableOrigin, runWarm, warmPagesSoon, type Fetcher } from './warm-pages'
 
 const ok = () => new Response('<html></html>', { status: 200 })
 
@@ -59,5 +61,17 @@ describe('isWarmableOrigin', () => {
   it('warms deployed sites only, never a local server', () => {
     expect(isWarmableOrigin('https://shotviva.com')).toBe(true)
     expect(isWarmableOrigin('http://localhost:3000')).toBe(false)
+  })
+})
+
+describe('warmPagesSoon', () => {
+  it('warms after a save in production only, never on the test site or locally', () => {
+    expect(isWarmableEnvironment('production')).toBe(true)
+    for (const env of ['preview', 'development', undefined]) expect(isWarmableEnvironment(env)).toBe(false)
+    schedule.mockClear()
+    warmPagesSoon(['/'], 'https://shotviva-qa-user.vercel.app', 'preview')
+    expect(schedule).not.toHaveBeenCalled()
+    warmPagesSoon(['/'], 'https://shotviva.com', 'production')
+    expect(schedule).toHaveBeenCalledTimes(1)
   })
 })
