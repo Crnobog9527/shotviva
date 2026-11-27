@@ -1275,6 +1275,9 @@ begin
     raise exception 'INVALID_INPUT' using detail = 'payment fields are all required';
   end if;
 
+  -- 2033: lock the buyer's active org first (purchase_terms takes the same lock again).
+  perform public._org_purchase_pool(p_user_id, 'purchase:' || p_session_id);
+
   if p_subscription_id is not null then
     if p_subscription_status is null or p_current_period_end is null or p_cancel_at_period_end is null then
       raise exception 'INVALID_INPUT' using detail = 'subscription fields are all required';
@@ -16975,6 +16978,10 @@ begin
   -- Locked first: every T71 path locks the payment before the profile (and before other
   -- disputes of it), so a refund and a dispute arriving together cannot deadlock.
   select * into v_payment from public.payments where stripe_charge_id = p_charge_id for update;
+  -- 2033: credits that went to an org pool are clawed back from it; its row before the profile.
+  if v_payment.id is not null then
+    perform 1 from public.orgs where id = public._payment_credits_org(v_payment) for no key update;
+  end if;
   v_managed := case
     when v_payment.id is null then p_managed_default
     when v_payment.method = 'cn_card' then false
@@ -17910,7 +17917,11 @@ begin
       'in', coalesce(sum(l.delta) filter (where l.kind in ('bank_grant', 'owner_deposit')), 0),
       'allocated', coalesce(-sum(l.delta) filter (where l.kind = 'allocate'), 0),
       'reclaimed', coalesce(sum(l.delta) filter (where l.kind = 'reclaim'), 0),
-      'adjusted', coalesce(sum(l.delta) filter (where l.kind = 'admin_adjust'), 0))
+      'adjusted', coalesce(sum(l.delta) filter (where l.kind = 'admin_adjust'), 0),
+      -- 2033: taken back for refunds and disputes of purchases that went to the pool, and given
+      -- back when a dispute was won.
+      'clawed_back', coalesce(-sum(l.delta) filter (where l.kind = 'payment_clawback'), 0),
+      'restored', coalesce(sum(l.delta) filter (where l.kind = 'payment_clawback_restore'), 0))
     into v_paid
     from public.org_credit_ledger l where l.org_id = o.id and l.created_at >= v_start and l.created_at < v_end;
   select jsonb_build_object(
