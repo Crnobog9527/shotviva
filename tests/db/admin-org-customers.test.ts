@@ -73,7 +73,13 @@ it('lists both levels and the partner-link customers, newest binding first, with
   expect(byId.get(l1).contact).toMatch(/@/)
   expect(byId.get(l1).member_contact).toMatch(/@/)
   expect(byId.get(l2)).toMatchObject({ level: 2, source: 'org_l2', member_user_id: staff, via_user_id: l1, bonus_credits: null, paid_cents: '0', commission_cents: '0' })
-  expect(byId.get(viaLink)).toMatchObject({ level: 1, source: 'signup', member_user_id: null, has_signup_gift: false })
+  expect(byId.get(viaLink)).toMatchObject({ level: 1, source: 'signup', member_user_id: null, has_signup_gift: false,
+    bonus_at_bind: 300, switch_at_bind: true, before_org: false, has_paid: false, banned: false })
+  expect(byId.get(l1)).toMatchObject({ has_paid: true })
+
+  // A binding older than the org (the owner's personal customer before the org existed) had no bonus then.
+  await db.query("update profiles set referred_at=(select created_at from orgs where id=$2)-interval '1 day' where id=$1", [viaLink, orgId])
+  expect((await list(orgId)).find((r) => r.user_id === viaLink)).toMatchObject({ before_org: true, bonus_at_bind: 0 })
 })
 
 it('never lists the org\'s own staff, even one who was its customer first', async () => {

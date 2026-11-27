@@ -96,7 +96,8 @@ export type PaymentAccountRow = { enabled: boolean; details: Record<string, stri
 export type OrgCustomerBonus =
   | { kind: 'granted'; credits: number; at: string }
   | { kind: 'error'; error: string }
-  | { kind: 'none'; reason: 'level2' | 'paid_before' | 'first_checkout' | 'no_signup_gift' | 'ref_link' | 'off' | 'other' }
+  | { kind: 'none'; reason: 'level2' | 'paid_before' | 'first_checkout' | 'other' | 'before_org' | 'off_at_bind' | 'affiliate_off_at_bind'
+    | 'no_signup_gift' | 'unrecorded' | 'banned' | 'paid_since' | 'off_now' | 'backfill' }
 
 // One row of 推广名单 (admin_org_customers, 2020). Money in USD cents; promo in credits.
 export type OrgCustomer = {

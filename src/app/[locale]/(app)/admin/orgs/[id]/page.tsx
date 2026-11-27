@@ -57,7 +57,7 @@ async function TabBody({ tab, db, detail, workFilters, page }: { tab: OrgDetailT
         <>
           <AffiliateCard affiliate={detail.affiliate} levels={org.affiliateLevels} />
           <SignupBonusForm key={`bonus-${org.updatedAt}`} org={org} max={ORG_SIGNUP_BONUS_MAX} given={detail.signupBonusUsers} save={saveSignupBonusAction} />
-          <CustomerTable orgId={org.id} data={await loadOrgCustomers(db, org.id, page)} hasAccount={detail.affiliate !== null} />
+          <CustomerTable orgId={org.id} data={await loadOrgCustomers(db, org, page)} hasAccount={detail.affiliate !== null} />
         </>
       )
     case 'credits':
