@@ -111,7 +111,7 @@ export async function onVerifiedSignIn(
     cookie: jar.get('sv_ref')?.value, signupConfirmation: signupConfirmation === true,
   })
   const fresh = first && !staff
-  const kind = await consumeSignupCode(admin, userId, fresh, benefits.invite, locale)
+  const kind = await consumeSignupCode(admin, userId, { first, fresh, useStored: signupConfirmation === true }, benefits.invite, locale)
   // A/B variants onto the account, and the account's back into the cookie (ARCHITECTURE §16.5).
   const experiments = await syncExperimentsAtSignIn(admin, userId, first, jar, isSecure(await headers()))
   // Where this browser first landed, onto the account once (ARCHITECTURE §16.6).
