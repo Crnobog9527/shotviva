@@ -4921,6 +4921,28 @@ $$;
 ALTER FUNCTION "public"."_org_require_admin"("p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_setting_at"("p_org" "uuid", "p_key" "text", "p_at" timestamp with time zone, "p_now" "jsonb") RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  with logged as (
+    select l.created_at, l.id,
+      case when p_key='signup_bonus_credits' then r->'signup_bonus_credits'->'after' else r->p_key end as v,
+      case when p_key='signup_bonus_credits' then r->'signup_bonus_credits'->'before' end as b
+      from public.admin_audit_log l
+      cross join lateral (select case when l.reason ~ '^\s*\{' then l.reason::jsonb end r) x
+     where l.action='org_update' and l.target_id=p_org::text and r ? p_key)
+  select coalesce(
+    (select jsonb_build_object('known',true,'value',v) from logged where created_at<=p_at order by created_at desc, id desc limit 1),
+    (select case when b is not null then jsonb_build_object('known',true,'value',b) else jsonb_build_object('known',false) end
+       from logged where created_at>p_at order by created_at, id limit 1),
+    jsonb_build_object('known',true,'value',p_now));
+$$;
+
+
+ALTER FUNCTION "public"."_org_setting_at"("p_org" "uuid", "p_key" "text", "p_at" timestamp with time zone, "p_now" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_settle_returns"("p_org" "uuid") RETURNS bigint
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -10419,7 +10441,8 @@ CREATE OR REPLACE FUNCTION "public"."admin_org_signup_bonus_backfill"("p_actor" 
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare p public.profiles; v_org uuid; v_credits integer; v_reason text; v_then integer; v_switch boolean;
+declare p public.profiles; v_o public.orgs; v_org uuid; v_credits integer; v_reason text; v_then integer;
+  v_bonus_at jsonb; v_status_at jsonb; v_switch_at jsonb;
 begin
   perform public._org_require_admin(p_actor);
   if p_user is null or p_apply is null then raise exception 'INVALID_INPUT'; end if;
@@ -10432,33 +10455,33 @@ begin
   select o.id,o.signup_bonus_credits into v_org,v_credits from public.affiliates a
     join public.orgs o on o.id=a.org_id
     where a.user_id=p.referred_by and a.status='active' and o.status='active' and o.affiliate_enabled;
-  -- What the trigger would have seen at the binding: the org's bonus then (the last audited value
-  -- at or before referred_at; none = never set = 0) and its affiliate switch then (the last
-  -- audited org_update carrying it; none = unchanged since creation = its value now).
+  -- What the trigger would have seen at the binding, from the audit log (_org_setting_at): the
+  -- org's bonus (never set = the default 0), its status and its affiliate switch then. When the
+  -- log cannot tell (a change after the binding and none before), refuse: conservative by default.
   if v_org is not null then
-    select (r->'signup_bonus_credits'->>'after')::integer into v_then from public.admin_audit_log l
-      cross join lateral (select case when l.reason ~ '^\s*\{' then l.reason::jsonb end r) x
-      where l.action='org_update' and l.target_id=v_org::text and l.created_at<=p.referred_at
-        and r ? 'signup_bonus_credits'
-      order by l.created_at desc, l.id desc limit 1;
-    select (r->>'affiliate_enabled')::boolean into v_switch from public.admin_audit_log l
-      cross join lateral (select case when l.reason ~ '^\s*\{' then l.reason::jsonb end r) x
-      where l.action='org_update' and l.target_id=v_org::text and l.created_at<=p.referred_at
-        and r ? 'affiliate_enabled'
-      order by l.created_at desc, l.id desc limit 1;
-    v_then := coalesce(v_then,0);
-    v_switch := coalesce(v_switch,true);
+    select * into v_o from public.orgs where id=v_org;
+    v_bonus_at := public._org_setting_at(v_org,'signup_bonus_credits',p.referred_at,'0'::jsonb);
+    v_status_at := public._org_setting_at(v_org,'status',p.referred_at,to_jsonb(v_o.status));
+    v_switch_at := public._org_setting_at(v_org,'affiliate_enabled',p.referred_at,to_jsonb(v_o.affiliate_enabled));
+    v_then := case when (v_bonus_at->>'known')::boolean then coalesce((v_bonus_at->>'value')::integer,0) end;
   end if;
   v_reason := case
     when p.referred_source is distinct from 'signup' then 'not_bound_by_link'
     when v_org is null then 'not_org_customer'
     when v_credits is null or v_credits <= 0 then 'bonus_off'
+    when not (v_bonus_at->>'known')::boolean then 'bonus_unknown_at_bind'
     when v_then <= 0 then 'bonus_off_at_bind'
-    when not v_switch then 'affiliate_off_at_bind'
+    when not (v_status_at->>'known')::boolean then 'status_unknown_at_bind'
+    when v_status_at->>'value' is distinct from 'active' then 'org_inactive_at_bind'
+    when not (v_switch_at->>'known')::boolean then 'affiliate_unknown_at_bind'
+    when (v_switch_at->>'value')::boolean is not true then 'affiliate_off_at_bind'
     when p.banned_at is not null then 'banned'
     when exists(select from public.payments where user_id=p_user) then 'paid'
+    -- The gift must have been there when the binding happened (as the trigger checks it then).
     when not exists(select from public.credit_ledger l where l.user_id=p_user and l.idempotency_key='signup:' || p_user
-      and l.kind='grant' and l.pool='free') then 'no_signup_gift'
+      and l.kind='grant' and l.pool='free' and l.created_at<=p.referred_at) then 'no_signup_gift_at_bind'
+    -- The 2010 trigger saw this binding and refused it (or failed): not a customer the bug skipped.
+    when exists(select from public.org_signup_bonus_errors e where e.user_id=p_user) then 'refused_by_trigger'
     when exists(select from public.org_members m where m.org_id=v_org and m.user_id=p_user and m.status='active') then 'org_member'
   end;
   if v_reason is not null then
@@ -28113,6 +28136,10 @@ REVOKE ALL ON FUNCTION "public"."_org_replayed"("p_request" "text", "p_org" "uui
 
 
 REVOKE ALL ON FUNCTION "public"."_org_require_admin"("p_actor" "uuid") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_setting_at"("p_org" "uuid", "p_key" "text", "p_at" timestamp with time zone, "p_now" "jsonb") FROM PUBLIC;
 
 
 
