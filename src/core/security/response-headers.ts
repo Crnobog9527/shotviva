@@ -11,6 +11,10 @@ const enforcedHeaders = [
   { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
 ]
 
+// The origins of core/analytics/browser/pvuv.ts PVUV_SCRIPT_SRC and PVUV_API, written out so
+// next.config.ts does not load browser code (response-headers.test.ts keeps them equal).
+export const PVUV_ORIGINS = { script: 'https://www.pvuv.ai', api: 'https://in.pvuv.ai' } as const
+
 function sources(directive: string, ...values: (string | undefined)[]): string {
   return [directive, ...new Set(values.filter(Boolean))].join(' ')
 }
@@ -29,16 +33,19 @@ function reportOnlyPolicy(env: PublicEnv): string {
   const staticCdn = origin(env.NEXT_PUBLIC_ASSET_CDN_URL)
   const captcha = env.NEXT_PUBLIC_HCAPTCHA_SITEKEY ? 'https://*.hcaptcha.com' : undefined
   const storage = 'https://*.r2.cloudflarestorage.com'
+  // PVUV.ai's browser script and beacon host, only where it is on.
+  const pvuvScript = env.NEXT_PUBLIC_PVUV_SITE ? PVUV_ORIGINS.script : undefined
+  const pvuvApi = env.NEXT_PUBLIC_PVUV_SITE ? PVUV_ORIGINS.api : undefined
   return [
     "default-src 'self'",
-    sources('script-src', "'self'", staticCdn && `${staticCdn}/_next/static/`, captcha, 'https://vercel.live'),
+    sources('script-src', "'self'", staticCdn && `${staticCdn}/_next/static/`, captcha, pvuvScript, 'https://vercel.live'),
     // Next's inline CSS and component styles are intentional and separate from script trust.
     sources('style-src', "'self'", "'unsafe-inline'", staticCdn, captcha, 'https://vercel.live'),
     sources('font-src', "'self'", staticCdn, 'https://vercel.live', 'https://assets.vercel.com'),
     sources('img-src', "'self'", 'data:', 'blob:', origin(env.NEXT_PUBLIC_IMAGE_CDN_URL),
-      origin(env.NEXT_PUBLIC_ASSETS_BASE_URL), storage, captcha, 'https://vercel.live', 'https://vercel.com'),
+      origin(env.NEXT_PUBLIC_ASSETS_BASE_URL), origin(env.NEXT_PUBLIC_PRESIZED_IMAGES_URL), storage, captcha, 'https://vercel.live', 'https://vercel.com'),
     sources('connect-src', "'self'", origin(env.NEXT_PUBLIC_SUPABASE_URL), origin(env.NEXT_PUBLIC_SENTRY_DSN),
-      storage, captcha, 'https://vercel.live', 'wss://ws-us3.pusher.com'),
+      storage, captcha, pvuvApi, 'https://vercel.live', 'wss://ws-us3.pusher.com'),
     sources('media-src', "'self'", 'blob:', origin(env.NEXT_PUBLIC_ASSETS_BASE_URL), storage),
     sources('frame-src', 'https://vercel.live', captcha),
     "worker-src 'self' blob:",
@@ -52,7 +59,8 @@ export function securityHeaderRules(env: PublicEnv, observeScriptPolicy: boolean
   const rules = [{ source: '/:path*', headers: enforcedHeaders }]
   if (observeScriptPolicy) {
     rules.push({
-      source: '/((?!_next/|api/|assets/|ingest/|fonts/|home/|cases/|brand/).*)',
+      // sw.js is excluded too: on a worker script the policy would govern the worker's own fetches.
+      source: '/((?!_next/|api/|assets/|ingest/|fonts/|home/|cases/|brand/|presized/|sw\\.js$).*)',
       headers: [{ key: 'Content-Security-Policy-Report-Only', value: reportOnlyPolicy(env) }],
     })
   }
