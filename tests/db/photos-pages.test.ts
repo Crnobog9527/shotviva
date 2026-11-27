@@ -112,4 +112,26 @@ describe('Photos pages (listOwnJobs with a cursor)', () => {
     expect(pages).toBe(5)
     expect(order).toEqual(made)
   })
+
+  it('reads a batch cut at the top of a full window in whole, on the last page too', async () => {
+    const userId = await createUser(db)
+    const start = Date.UTC(2026, 8, 1)
+    const batchId = randomUUID()
+    const count = PHOTOS_PAGE * 2 + 3
+    for (let i = 0; i < count; i++) {
+      // Rows 90-93 (1-based) are one batch; the last page's window of 5 above its cursor starts at 92.
+      const inBatch = i >= 89 && i <= 92
+      await seed(userId, new Date(start - i * 60_000).toISOString(), 'succeeded', inBatch ? batchId : null)
+    }
+    const window = 5
+    let until: OwnJobsCursor | null = null
+    let last = await listOwnJobs(service, userId, new Date(), until, window)
+    for (let pages = 0; last.next && pages < 5; pages++) {
+      until = last.next
+      last = await listOwnJobs(service, userId, new Date(), until, window)
+    }
+    expect(last.next).toBeNull()
+    expect(last.done.filter((job) => job.batchId === batchId)).toHaveLength(4)
+  })
 })
+

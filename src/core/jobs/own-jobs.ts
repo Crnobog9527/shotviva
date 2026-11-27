@@ -59,7 +59,9 @@ export async function listOwnJobs(client: SupabaseClient, userId: string, now: D
   const last = below.at(-1)
   const next = page.length > PHOTOS_PAGE && last ? { createdAt: last.created_at, id: last.id } : null
   const listed = rows.map((row) => jobRowSchema.parse(row))
-  const jobs = next ? await withWholeBatches(client, userId, listed) : listed
+  // Cut at either end (more below, or the window full above): a batch may straddle the cut.
+  const cut = next !== null || above.length >= window
+  const jobs = cut ? await withWholeBatches(client, userId, listed) : listed
   const live = (job: Job) => isLiveRunning({ status: job.status, created_at: job.createdAt.toISOString() }, now)
   return { running: jobs.filter(live), done: jobs.filter((job) => job.status === 'succeeded'), total, next }
 }
