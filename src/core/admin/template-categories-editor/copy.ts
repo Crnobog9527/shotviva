@@ -18,6 +18,8 @@ export const CATEGORIES_COPY = {
   remove: '删除',
   noIntro: '没有首页说明',
   count: (n: number) => (n === 0 ? '没有模板' : `${n} 个模板`),
+  // A parent's own templates and series, beside the totals that include its children (Owner 2026-11-27).
+  direct: (templates: number, series: number) => `直接 ${[templates ? `${templates} 个模板` : '', series ? `${series} 个系列` : ''].filter(Boolean).join('、')}`,
   style: { pair: '并排对比', compare: '拖动对比' },
   saved: (name: string) => `已保存「${name}」`,
   reordered: '分类顺序已保存',
