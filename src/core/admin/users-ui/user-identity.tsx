@@ -11,6 +11,7 @@ import { useAdminAction } from '../shell/use-admin-action'
 import type { ActionValue } from '../templates/types'
 import type { UserIdentity, UserListRow } from '../users/list-types'
 import { USERS_COPY } from './copy'
+import { ReferrerTag } from './referrer'
 
 const COPY = USERS_COPY.identity
 
@@ -24,9 +25,10 @@ export const LabelSaver = createContext<SaveLabel | null>(null)
 // admin shows for an affiliate (affiliates.admin_label).
 export function IdentityLines({ row }: { row: UserListRow }) {
   const identity = row.identity
-  if (!identity) return null
+  if (!identity) return row.referrer ? <ReferrerTag referrer={row.referrer} /> : null
   return (
     <div className="grid min-w-0 gap-1">
+      <ReferrerTag referrer={row.referrer} />
       <LabelLine userId={row.id} label={identity.label} />
       <Seats identity={identity} />
       {identity.affiliate?.note ? (
