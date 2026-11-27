@@ -15313,9 +15313,13 @@ CREATE OR REPLACE FUNCTION "public"."checkout_discount"("p_user" "uuid", "p_prod
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+
 declare
   v_now timestamptz := clock_timestamp();
 begin
+  -- 2032 (Owner 2026-11-28): an active org member, the primary admin included, uses no discount
+  -- code while a member, not even one redeemed before joining.
+  if public._in_active_org(p_user) then return null; end if;
   return (
     select jsonb_build_object('code_id', c.id, 'code', c.code, 'stripe_coupon_id', c.stripe_coupon_id,
                               'percent', c.discount_percent, 'redemption_id', r.id)
