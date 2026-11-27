@@ -72,6 +72,14 @@ export async function connectAdmin(): Promise<Client> {
 }
 
 // Balances to start a test user with: credits is the paid pool, freeCredits the free pool.
+// The signup gift's settings (pause, daily cap, per-network allowance) are global and some files
+// commit them. Vitest runs files in parallel, so such a file holds this lock for its whole run
+// (a session advisory lock on its own connection, released when the connection ends): two of
+// them never see each other's settings.
+export async function holdSignupGiftSettings(db: Client) {
+  await db.query("select pg_advisory_lock(hashtextextended('tests.signup_gift_settings', 0))")
+}
+
 export type TestProfile = { credits?: number; freeCredits?: number; paidUntil?: Date | null }
 
 // Inserting into auth.users fires the profiles trigger, like a real signup.

@@ -13,7 +13,7 @@ import { readSignupGiftToday } from '@/core/alerts/signup-gift'
 import { site } from '@/site/site.config'
 
 import { TEST_SIGNUP_GIFT_CAP, TEST_SIGNUP_GIFT_PER_IP } from './global-setup'
-import { connectAdmin, createUser, profileOf } from './helpers'
+import { connectAdmin, createUser, holdSignupGiftSettings, profileOf } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
 // 1480 (ARCHITECTURE §7): a network may receive signup_gift_per_ip signup gifts in 24 hours;
@@ -75,7 +75,9 @@ const claimKeys = async (id: string) =>
 
 beforeAll(async () => {
   db = await connectAdmin()
-})
+  // Waits while the other file that commits these settings runs.
+  await holdSignupGiftSettings(db)
+}, 300_000)
 afterEach(async () => {
   await setSetting('signup_gift_daily_cap', TEST_SIGNUP_GIFT_CAP)
   await setSetting('signup_gift_per_ip', TEST_SIGNUP_GIFT_PER_IP)

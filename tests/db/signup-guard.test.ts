@@ -14,7 +14,7 @@ import { readSignupGiftToday } from '@/core/alerts/signup-gift'
 import { site } from '@/site/site.config'
 
 import { TEST_SIGNUP_GIFT_CAP } from './global-setup'
-import { connectAdmin, createUser, profileOf } from './helpers'
+import { connectAdmin, createUser, holdSignupGiftSettings, profileOf } from './helpers'
 import { anonSupabase, serviceSupabase } from './supabase-env'
 
 // 1350 (ARCHITECTURE §7): the signup gift's daily cap and pause, the stored refusal, the
@@ -46,7 +46,9 @@ async function newAccount() {
 
 beforeAll(async () => {
   db = await connectAdmin()
-})
+  // Waits while the other file that commits these settings runs.
+  await holdSignupGiftSettings(db)
+}, 300_000)
 afterEach(async () => {
   await setSetting('signup_gift_daily_cap', TEST_SIGNUP_GIFT_CAP)
   await db.query(`delete from public.system_settings where key = 'signup_gift_paused'`)
