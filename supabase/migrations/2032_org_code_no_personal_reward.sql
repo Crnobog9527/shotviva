@@ -35,6 +35,9 @@
 --     sign-up, before joining) stays pending and follows the personal rules once they leave;
 --   * the org signup bonus (1690 / 2010 / 2023 / back-fill) skips a customer who is an active member
 --     of any active org (was: of that org only).
+--   * no discount at checkout either (Owner 2026-11-28): checkout_discount, and so
+--     reserve_checkout_discount, finds none for an active member, the primary admin included, not
+--     even a discount redeemed before joining (it is usable again after they leave);
 -- Already blocked and unchanged: purchases by staff (ORG_MEMBER_CHECKOUT), staff-link sign-ups
 -- (refusal 'staff', 1940), partner promo credits (they go to the org's promo pool). A main admin's
 -- own purchases are a separate change (2033). Credits members hold from before joining stay.
@@ -705,5 +708,29 @@ begin
   perform public._org_audit(p_actor,'org_update',v_org::text,
     jsonb_build_object('signup_bonus_backfill',jsonb_build_object('user',p_user,'credits',v_credits))::text);
   return jsonb_build_object('status','granted','org_id',v_org,'credits',v_credits);
+end;
+$$;
+
+create or replace function public.checkout_discount(p_user uuid, p_product_id text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+
+declare
+  v_now timestamptz := clock_timestamp();
+begin
+  -- 2032 (Owner 2026-11-28): an active org member, the primary admin included, uses no discount
+  -- code while a member, not even one redeemed before joining.
+  if public._in_active_org(p_user) then return null; end if;
+  return (
+    select jsonb_build_object('code_id', c.id, 'code', c.code, 'stripe_coupon_id', c.stripe_coupon_id,
+                              'percent', c.discount_percent, 'redemption_id', r.id)
+      from public.code_redemptions r
+      join public.codes c on c.id = r.code_id
+     where r.user_id = p_user and r.status = 'ok'
+       and r.discount_used_payment_id is null and r.discount_void_at is null
+       and (r.discount_expires_at is null or r.discount_expires_at > v_now)
+       and c.active and (c.starts_at is null or c.starts_at <= v_now)
+       and (c.expires_at is null or c.expires_at > v_now)
+       and c.stripe_coupon_id is not null and p_product_id = any(c.discount_products)
+  );
 end;
 $$;

@@ -10,7 +10,7 @@ vi.mock('@/core/auth/session', () => ({ getSessionUser: mocks.session }))
 vi.mock('@/core/auth/supabase-admin', () => ({ createAdminSupabase: () => ({ rpc: mocks.rpc }) }))
 vi.mock('@/core/codes/server', () => ({ redeemCode: mocks.redeem }))
 vi.mock('@/core/affiliate/referral', () => ({ bindReferral: mocks.bind }))
-vi.mock('@/core/billing/org-member-guard', () => ({ assertNotOrgMember: mocks.member }))
+vi.mock('@/core/billing/org-member-guard', () => ({ isInActiveOrg: mocks.member }))
 vi.mock('@/core/codes/staff-guard', () => ({ staffNewUserCode: mocks.staffCode }))
 
 const user = { id: 'u1', role: 'user', locale: 'zh', verified: true, banned: false }
@@ -68,7 +68,7 @@ it('passes the authenticated user, normalized code, context and explicit replace
 it.each([
   ['not_found', 'CODE_NOT_FOUND', 404], ['expired', 'CODE_EXPIRED', 410], ['full', 'CODE_FULL', 409],
   ['used', 'CODE_USED', 409], ['own', 'CODE_OWN', 422], ['new_users_only', 'CODE_NEW_USERS_ONLY', 403],
-  ['signup_only', 'CODE_INVITE_SIGNUP_ONLY', 403], ['org_member', 'ORG_MEMBER_CHECKOUT', 409],
+  ['signup_only', 'CODE_INVITE_SIGNUP_ONLY', 403], ['org_member', 'CODE_ORG_MEMBER', 403],
   ['already_invited', 'CODE_ALREADY_INVITED', 409], ['checkout_in_progress', 'CODE_CHECKOUT_IN_PROGRESS', 409],
   ['blocked_same_ip', 'CODE_INVITE_INELIGIBLE', 403], ['blocked_no_signup_grant', 'CODE_INVITE_INELIGIBLE', 403],
   ['banned', 'FORBIDDEN', 403], ['rate_limited', 'RATE_LIMITED', 429],
@@ -103,12 +103,13 @@ it('does not bind on a malformed request', async () => {
   expect(mocks.bind).not.toHaveBeenCalled()
 })
 
-// Owner 2026-11-22: an active org member (owner included) redeems nothing and binds no partner.
+// Owner 2026-11-28 (2032): an active org member, the primary admin included, redeems no code at
+// all (discount-only too) and binds no partner.
 it('refuses an active org member before binding or redeeming anything', async () => {
-  mocks.member.mockRejectedValueOnce(new AppError('ORG_MEMBER_CHECKOUT', 'org member'))
+  mocks.member.mockResolvedValueOnce(true)
   const response = await post('{"code":"GIFT"}', appOrigin, 'sv_ref=qa-partner.1700000000')
-  expect(response.status).toBe(409)
-  expect(await response.json()).toMatchObject({ code: 'ORG_MEMBER_CHECKOUT' })
+  expect(response.status).toBe(403)
+  expect(await response.json()).toMatchObject({ code: 'CODE_ORG_MEMBER' })
   expect(mocks.member).toHaveBeenCalledWith(expect.anything(), user.id)
   expect(mocks.bind).not.toHaveBeenCalled()
   expect(mocks.redeem).not.toHaveBeenCalled()

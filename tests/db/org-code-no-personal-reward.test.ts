@@ -200,3 +200,32 @@ it('a platform admin adjustment still reaches an active member', async () => {
   await db.query("select admin_adjust_credits($1::uuid,25,'support','free',$2)", [user, 'adjust:' + user])
   expect(await ledger(user, 'admin_adjust')).toEqual([25])
 })
+
+// Owner 2026-11-28: no code at all while an active member, the main admin included: discount-only
+// codes are refused, and a discount redeemed before joining is not usable at checkout.
+async function discountCode() {
+  const code = 'DSC' + Math.random().toString(36).slice(2, 10).toUpperCase()
+  await db.query(`insert into codes(code,kind,discount_percent,discount_products,discount_duration,discount_valid_days,stripe_coupon_id)
+    values ($1,'campaign',20,array['starter_monthly'],'once',14,$2)`, [code, 'coupon_' + code])
+  return code
+}
+it('refuses a discount-only code to the main admin with the org_member reason', async () => {
+  const owner = await createUser(db)
+  await db.query('select admin_org_create($1,$2)', [actor, { owner_user_id: owner, name: 'Org ' + owner.slice(0, 8), affiliate_enabled: false }])
+  const r = (await row(db, "select redeem_code($1,$2,'paywall',null,$3) as r", [owner, await discountCode(), invite.windowDays])).r
+  expect(r).toEqual({ kind: 'campaign', status: 'new_users_only', org_member: true })
+})
+
+it('a discount redeemed before joining is not offered at checkout while a member, and is again after leaving', async () => {
+  const user = await createUser(db)
+  expect((await row(db, "select redeem_code($1,$2,'account',null,$3) as r", [user, await discountCode(), invite.windowDays])).r).toMatchObject({ status: 'ok' })
+  const offered = async () => (await row(db, "select checkout_discount($1,'starter_monthly') as d", [user])).d
+  expect(await offered()).toMatchObject({ percent: 20 })
+  const { orgId } = await orgTeam(0)
+  const { invite_token } = await row(db, 'select invite_token from orgs where id=$1', [orgId])
+  await db.query('select org_join($1,$2)', [user, invite_token])
+  expect(await offered()).toBeNull()
+  expect((await row(db, "select reserve_checkout_discount($1,'starter_monthly',gen_random_uuid()) as d", [user])).d).toBeNull()
+  await leave(user)
+  expect(await offered()).toMatchObject({ percent: 20 })
+})
