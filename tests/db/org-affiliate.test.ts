@@ -118,14 +118,14 @@ it('never rebinds a customer already bound to another account, and skips colleag
   await signupGrant(customer)
   expect(await bind(db, customer, personal.slug)).toBe(true)
   const { code } = await row(db, 'select get_or_create_invite_code($1) as code', [staff])
-  expect((await row(db, "select redeem_code($1,$2,'account',null,$3) as r", [customer, code, invite.windowDays])).r.status).toBe('ok')
+  expect((await row(db, "select redeem_code($1,$2,'signup',null,$3) as r", [customer, code, invite.windowDays])).r.status).toBe('ok')
   expect(await referral(customer)).toMatchObject({ referred_by: personal.id, referred_source: 'signup', referred_member: null })
 
   const colleague = await createUser(db)
   await joinOrg(colleague, orgId)
   await signupGrant(colleague)
   const own = await row(db, 'select get_or_create_invite_code($1) as code', [staff])
-  await db.query("select redeem_code($1,$2,'account',null,$3)", [colleague, own.code, invite.windowDays])
+  await db.query("select redeem_code($1,$2,'signup',null,$3)", [colleague, own.code, invite.windowDays])
   expect((await referral(colleague)).referred_by).toBeNull()
 })
 

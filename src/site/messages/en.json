@@ -573,7 +573,7 @@
       "redeem": {
         "inviteLinked": "Invite linked. No extra signup credits were awarded.",
         "title": "Redeem a code",
-        "label": "Invite, promo or gift code",
+        "label": "Promo or gift code",
         "button": "Redeem",
         "working": "Redeeming…",
         "paidGift": "Added {credits} paid credits.",
@@ -590,6 +590,7 @@
           "full": "This code has been fully claimed.",
           "used": "You’ve already used this code.",
           "newOnly": "This code is for new accounts only.",
+          "signupOnly": "Invite codes can only be used when you sign up. This one can’t be added to an existing account.",
           "own": "You can’t use your own invite code.",
           "invited": "You’ve already used an invite code.",
           "checkout": "You have a checkout open with your current discount. Finish or cancel it before replacing the discount.",
