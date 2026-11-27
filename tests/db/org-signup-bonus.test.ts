@@ -399,12 +399,24 @@ it('back-fill refuses when it cannot tell, or when the org, the gift or the trig
   await boundAgo(c.slug, giftLater, '1 hour')
   expect(await backfill(giftLater)).toMatchObject({ status: 'not_eligible', reason: 'no_signup_gift_at_bind' })
 
-  // The trigger saw the binding and refused it (no gift then); the gift arriving later changes nothing.
-  const refusedThen = await createUser(db)
+  // The trigger saw the binding and refused it (an active member of the org then): not a customer
+  // the bug skipped, even after they leave.
+  const refusedThen = await giftedAgo('2 hours')
+  const { invite_token } = await row(db, 'select invite_token from orgs where id=$1', [c.orgId])
+  await db.query('select org_join($1,$2)', [refusedThen, invite_token])
   expect(await bind(db, refusedThen, c.slug)).toBe(true)
-  expect(await row(db, 'select error from org_signup_bonus_errors where user_id=$1', [refusedThen])).toEqual({ error: 'blocked_no_signup_grant' })
-  await db.query(`select grant_credits($1::uuid,6,'signup',$2,'free')`, [refusedThen, 'signup:' + refusedThen])
+  expect(await row(db, 'select error from org_signup_bonus_errors where user_id=$1', [refusedThen])).toEqual({ error: 'blocked_org_member' })
+  await db.query("update org_members set status='removed',removed_at=now() where user_id=$1", [refusedThen])
   expect(await backfill(refusedThen)).toMatchObject({ status: 'not_eligible', reason: 'refused_by_trigger' })
+
+  // Bound before its gift (the app's order since 2024): the gift's grant pays the bonus itself
+  // (2023's rules), so there is nothing left to back-fill.
+  const giftAfterBind = await createUser(db)
+  expect(await bind(db, giftAfterBind, c.slug)).toBe(true)
+  expect(await row(db, 'select error from org_signup_bonus_errors where user_id=$1', [giftAfterBind])).toEqual({ error: 'blocked_no_signup_grant' })
+  await db.query(`select grant_credits($1::uuid,6,'signup',$2,'free')`, [giftAfterBind, 'signup:' + giftAfterBind])
+  expect(await bonusLedger(giftAfterBind)).toHaveLength(1)
+  expect(await backfill(giftAfterBind)).toEqual({ status: 'already' })
 
   // Control: the same org, a customer who did qualify then, is paid.
   const ok = await giftedAgo('2 hours')

@@ -111,6 +111,23 @@ describe('onVerifiedSignIn: partner binding', () => {
     expect(mocks.bind).toHaveBeenCalledExactlyOnceWith('u1', true, undefined, true)
   })
 
+  it('2024: with an IP the link binds before the gift, so the grant sees an org partner\'s binding', async () => {
+    mocks.recordSignupIp.mockResolvedValue(true)
+    mocks.grantSignupCredits.mockResolvedValue(true)
+    await onVerifiedSignIn('u1', benefits, 'email', 'zh', null, true)
+    expect(mocks.bind).toHaveBeenCalledExactlyOnceWith('u1', true, 'partner', true)
+    expect(mocks.bind.mock.invocationCallOrder[0]).toBeLessThan(mocks.grantSignupCredits.mock.invocationCallOrder[0]!)
+  })
+
+  it('2024: without an IP (local dev) the first sign-in is only known from the grant, so the link binds after it', async () => {
+    mocks.headers.mockResolvedValue(new Headers())
+    mocks.recordSignupIp.mockResolvedValue(false)
+    mocks.grantSignupCredits.mockResolvedValue(true)
+    await onVerifiedSignIn('u1', benefits, 'email', 'zh')
+    expect(mocks.bind).toHaveBeenCalledExactlyOnceWith('u1', true, 'partner', false)
+    expect(mocks.grantSignupCredits.mock.invocationCallOrder[0]).toBeLessThan(mocks.bind.mock.invocationCallOrder[0]!)
+  })
+
   it('a later sign-in does not run it', async () => {
     mocks.recordSignupIp.mockResolvedValue(false)
     mocks.grantSignupCredits.mockResolvedValue(false)

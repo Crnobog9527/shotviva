@@ -59,6 +59,26 @@ async function payGift(admin: ReturnType<typeof createAdminSupabase>, userId: st
   return { granted, claimed }
 }
 
+// A partner's link (sv_ref) binds before the signup code is redeemed: an org member's invite code
+// binds the customer to the org only when nobody else already has (§6.5). A staff sign-up skips
+// both; the code cookie is still cleared. With an IP (always, behind Vercel) the first sign-in is
+// known before the gift (`knownFirst`), and the link binds first: grant_credits gives an org
+// partner's sign-up the looser per-network allowance from that binding, and pays the org bonus
+// after the gift (2024). Without one (local dev) the first sign-in is only known from the grant,
+// so the link binds after it, as before. Answers whether this is the account's first sign-in.
+async function bindAndPayGift(
+  admin: ReturnType<typeof createAdminSupabase>,
+  userId: string,
+  o: { knownFirst: boolean | null; staff: boolean | 'unchecked'; gift: number; cookie: string | undefined; signupConfirmation: boolean },
+): Promise<boolean> {
+  if (o.knownFirst !== null) await bindFirstReferral(userId, o.knownFirst, o.knownFirst && !o.staff, o.cookie, o.signupConfirmation)
+  const { granted, claimed } = await payGift(admin, userId, o.staff ? 0 : o.gift)
+  const first = o.knownFirst ?? granted
+  if (claimed && !first) noteSignupGift()
+  if (o.knownFirst === null) await bindFirstReferral(userId, first, first && !o.staff, o.cookie, o.signupConfirmation)
+  return first
+}
+
 // An unchecked staff link (the org lookup failed) leaves the IP for the next sign-in to store, so
 // that one is still the account's first for mark_staff_signup (1950).
 async function recordIpUnlessUnchecked(admin: ReturnType<typeof createAdminSupabase>, userId: string, address: string | null, staff: boolean | 'unchecked') {
@@ -85,15 +105,12 @@ export async function onVerifiedSignIn(
   // reads "no IP yet" as the first verified sign-in) and before the grant, so it refuses.
   const staff = await staffSignup(admin, userId, staffOrigin ?? null)
   const ipStored = await recordIpUnlessUnchecked(admin, userId, address, staff)
-  const { granted, claimed } = await payGift(admin, userId, staff ? 0 : benefits.freeCredits)
-  const first = address ? ipStored : granted
-  if (claimed && !first) noteSignupGift()
   const jar = await cookies()
-  // A personal partner's link (sv_ref) binds before the signup code is redeemed: an org member's
-  // invite code binds the customer to the org only when nobody else already has (§6.5).
-  // A staff sign-up skips both; the code cookie is still cleared.
+  const first = await bindAndPayGift(admin, userId, {
+    knownFirst: address ? ipStored : null, staff, gift: benefits.freeCredits,
+    cookie: jar.get('sv_ref')?.value, signupConfirmation: signupConfirmation === true,
+  })
   const fresh = first && !staff
-  await bindFirstReferral(userId, first, fresh, jar.get('sv_ref')?.value, signupConfirmation === true)
   const kind = await consumeSignupCode(admin, userId, fresh, benefits.invite, locale)
   // A/B variants onto the account, and the account's back into the cookie (ARCHITECTURE §16.5).
   const experiments = await syncExperimentsAtSignIn(admin, userId, first, jar, isSecure(await headers()))

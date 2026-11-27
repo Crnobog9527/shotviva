@@ -4,8 +4,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 import { bind, commission, promoter, refund, row, sale } from './affiliate-fixtures'
 import { connectAdmin, createUser } from './helpers'
 
-// Migration 1844: enterprise affiliates (affiliates.org_id is not null) are exempt from the
-// same_ip commission flag; personal affiliates keep it. Each test runs in a transaction that is
+// Migrations 1844 / 2022: enterprise customers are exempt from the same_ip commission flag (bound by
+// a staff invite, or by the org account's own ?ref link after the row became an org account);
+// personal affiliates and personal-era customers keep it. Each test runs in a transaction that is
 // rolled back.
 
 let db: Client
@@ -80,12 +81,51 @@ it('a customer bound in the personal era stays held after the owner\'s affiliate
   const owner = await promoter(db)
   const buyer = await createUser(db)
   await bind(db, buyer, owner.slug)
+  // The binding was a transaction before the conversion (the test shares one now()).
+  await db.query("update profiles set referred_at=now()-interval '1 hour' where id=$1", [buyer])
   // 1643 converts a suspended or rejected personal row with nothing owed.
   await db.query("update affiliates set status='suspended' where user_id=$1", [owner.id])
   const input = { owner_user_id: owner.id, name: 'Org ' + owner.id.slice(0, 8), affiliate_enabled: true }
   await db.query('select admin_org_create($1,$2)', [actor, input])
   expect(await row(db, 'select org_id is not null as org from affiliates where user_id=$1', [owner.id])).toEqual({ org: true })
   expect(await row(db, 'select referred_source from profiles where id=$1', [buyer])).toEqual({ referred_source: 'signup' })
+  await sameIp([owner.id, buyer])
+  const p = await sale(db, buyer, 'pack_m', 2490)
+  expect(await commission(db, p.id)).toMatchObject({ status: 'on_hold', flags: ['same_ip'] })
+})
+
+it('a customer bound through the org account\'s own ?ref link (signup or first_checkout) gets no same_ip flag', async () => {
+  const { owner } = await orgCustomer()
+  const { slug } = await row(db, 'select slug from affiliates where user_id=$1', [owner])
+  for (const source of ['signup', 'first_checkout']) {
+    const buyer = await createUser(db)
+    expect(await bind(db, buyer, slug, source)).toBe(true)
+    await sameIp([owner, buyer])
+    const p = await sale(db, buyer, 'pack_m', 2490)
+    expect(await commission(db, p.id)).toMatchObject({ status: 'pending', flags: [] })
+  }
+})
+
+it('an org ?ref customer bound before the account\'s approved_at (or with none) keeps the flag', async () => {
+  const { owner } = await orgCustomer()
+  const { slug } = await row(db, 'select slug from affiliates where user_id=$1', [owner])
+  const early = await createUser(db)
+  await bind(db, early, slug)
+  await db.query("update profiles set referred_at=now()-interval '1 day' where id=$1", [early])
+  const unknown = await createUser(db)
+  await bind(db, unknown, slug)
+  await sameIp([owner, early, unknown])
+  const p = await sale(db, early, 'pack_m', 2490)
+  expect(await commission(db, p.id)).toMatchObject({ status: 'on_hold', flags: ['same_ip'] })
+  await db.query('update affiliates set approved_at=null where user_id=$1', [owner])
+  const q = await sale(db, unknown, 'pack_m', 2490)
+  expect(await commission(db, q.id)).toMatchObject({ status: 'on_hold', flags: ['same_ip'] })
+})
+
+it('a personal affiliate\'s first_checkout customer on the same IP is still flagged', async () => {
+  const owner = await promoter(db)
+  const buyer = await createUser(db)
+  expect(await bind(db, buyer, owner.slug, 'first_checkout')).toBe(true)
   await sameIp([owner.id, buyer])
   const p = await sale(db, buyer, 'pack_m', 2490)
   expect(await commission(db, p.id)).toMatchObject({ status: 'on_hold', flags: ['same_ip'] })

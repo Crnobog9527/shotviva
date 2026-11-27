@@ -19,6 +19,8 @@ type SettingTypes = {
   signup_gift_credits: number
   // 1480: signup gifts one signup IP may receive in 24 hours (0 = no limit); over it, pending.
   signup_gift_per_ip: number
+  // 2024: the same for a sign-up bound through an org partner's ?ref link (0 = no limit, default 20).
+  signup_gift_per_ip_partner: number
   // 1480: whether a pending account may claim with a verified phone / a Google account.
   signup_gift_claim_phone: boolean
   signup_gift_claim_google: boolean
@@ -54,6 +56,7 @@ export const SYSTEM_SETTINGS: { [K in SystemSettingKey]: SettingDefinition<Setti
   signup_gift_daily_cap: { schema: z.number().int().min(0).max(100_000), fallback: 30 },
   signup_gift_credits: { schema: z.number().int().min(SIGNUP_GIFT_CREDITS_MIN).max(SIGNUP_GIFT_CREDITS_MAX), fallback: 200 },
   signup_gift_per_ip: { schema: z.number().int().min(0).max(1000), fallback: 5 },
+  signup_gift_per_ip_partner: { schema: z.number().int().min(0).max(1000), fallback: 20 },
   signup_gift_claim_phone: { schema: z.boolean(), fallback: true },
   signup_gift_claim_google: { schema: z.boolean(), fallback: true },
   poster_photo_credits: { schema: z.number().int().min(1).max(1000), fallback: 0 },
