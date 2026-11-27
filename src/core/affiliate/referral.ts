@@ -37,6 +37,12 @@ function current(value: string | null | undefined) {
   return age < 0 || age >= lifetime ? null : { slug: match[1]!, at }
 }
 
+// The slug of this browser's current sv_ref cookie, or null. Only a hint for the per-IP sign-up
+// and SMS limits (2027): the database decides whether it is a valid org partner link.
+export function referralSlug(cookie: string | undefined): string | null {
+  return current(cookie)?.slug ?? null
+}
+
 // Email sign-up (flows/sign-up.ts): this browser's partner onto the account Supabase returned, so
 // the first verified sign-in binds it even from a browser without the cookie (2021, ARCHITECTURE
 // §6.5). Called after every successful sign-up form: without a current cookie it clears the row,

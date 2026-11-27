@@ -15,3 +15,13 @@ export type SwitchKey = 'wishlist_enabled' | 'gallery_enabled' | 'gallery_auto_a
 // counts; credits is what one new account gets.
 export type SignupGiftRules = { credits: number; cap: number; perIp: number; perIpPartner: number; claimPhone: boolean; claimGoogle: boolean }
 export type SignupGiftState = { granted: number; rules: SignupGiftRules; paused: WishlistSwitch }
+
+// 2027: the per-IP limits on sign-up requests and SMS codes, site-wide and through an org ?ref link.
+export type SignupLimits = {
+  signupHourly: number
+  signupDaily: number
+  signupHourlyPartner: number
+  signupDailyPartner: number
+  smsDaily: number
+  smsDailyPartner: number
+}

@@ -55,10 +55,11 @@ describe('sms_request_send (the server action)', () => {
     expect(await requestSmsSend(service, k, ip())).toBe('ok')
   })
 
-  it('allows 20 per IP in 24 hours, whatever the numbers', async () => {
+  // 2027: the per-IP number is the sms_ip_daily setting, default 50 (was a fixed 20).
+  it('allows 50 per IP in 24 hours by default, whatever the numbers', async () => {
     const address = ip()
     await db.query('delete from public.sms_sends where ip = $1', [address])
-    for (let i = 0; i < 20; i++) expect(await requestSmsSend(service, key(), address)).toBe('ok')
+    for (let i = 0; i < 50; i++) expect(await requestSmsSend(service, key(), address)).toBe('ok')
     expect(await requestSmsSend(service, key(), address)).toBe('ip_daily')
     expect(await requestSmsSend(service, key(), null)).toBe('ok')
   })
@@ -98,7 +99,7 @@ describe('sms_authorize_send (the Send SMS hook)', () => {
     const address = ip()
     await db.query(
       `insert into public.sms_sends (phone_key, ip, requested_at, sent_at)
-       select encode(sha256(gen_random_uuid()::text::bytea), 'hex'), $1, now() - interval '1 hour', now() - interval '1 hour' from generate_series(1, 20)`,
+       select encode(sha256(gen_random_uuid()::text::bytea), 'hex'), $1, now() - interval '1 hour', now() - interval '1 hour' from generate_series(1, 50)`,
       [address],
     )
     const other = key()
