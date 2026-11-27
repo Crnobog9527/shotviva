@@ -180,6 +180,36 @@ it('refuses non-admins, banned admins, bad input, inactive partners, banned cust
     .toEqual({ anon: false, auth: false, service: true })
 })
 
+it('an org_l1 / signup customer re-bound to the same org cannot be back-dated, and its pre-binding payments never count for promo', async () => {
+  const { orgId, owner } = await orgAccount()
+  await db.query('select admin_partner_promo_set($1,$2)', [actor, { org_id: orgId, on: true }])
+  const period = (await row(db, "select to_char(now() at time zone 'UTC','YYYY-MM') as p")).p as string
+  const inPrevious = (await row(db, "select (date_trunc('month', now() at time zone 'UTC') - interval '10 days') at time zone 'UTC' as t")).t
+  const payments: Record<string, { before: string; after: string }> = {}
+  for (const source of ['org_l1', 'signup', 'first_checkout']) {
+    const customer = await createUser(db)
+    const before = await pastSale(customer, 5)
+    await db.query("update profiles set referred_by=$2,referred_source=$3,referred_at=now()-interval '1 day' where id=$1", [customer, owner, source])
+    // Re-binding to the same org with back-dating is refused and changes nothing.
+    await refused(() => bindCustomer({ user_id: customer, affiliate_user_id: owner, reason: 'x', backdate_days: 10 }), 'AFFILIATE_BACKDATE_NOT_ADMIN')
+    expect(await row(db, 'select referred_source from profiles where id=$1', [customer])).toEqual({ referred_source: source })
+    expect(await commission(db, before.id)).toBeUndefined()
+    // Without back-dating it is a no-op on the profile.
+    expect(await bindCustomer({ user_id: customer, affiliate_user_id: owner, reason: 'y' })).toMatchObject({ changed: false, created: 0 })
+    expect(await row(db, 'select referred_source from profiles where id=$1', [customer])).toEqual({ referred_source: source })
+    const after = await sale(db, customer, 'pack_m', 2490)
+    // Even a commission that somehow exists on a pre-binding payment is left out of the promo sheet.
+    await db.query('select affiliate_recompute_payment($1,true)', [before.id])
+    payments[source] = { before: String(before.id), after: String(after.id) }
+  }
+  const all = Object.values(payments).flatMap((p) => [p.before, p.after])
+  await db.query("update affiliate_commissions set status='confirmed',confirmed_at=$2,confirm_after=$2 where payment_id=any($1::bigint[]) and level=1", [all, inPrevious])
+  await db.query('select partner_promo_run($1)', [period])
+  const lines = (await db.query(`select l.payment_id::text from partner_promo_grant_lines l join partner_promo_grants g on g.id=l.grant_id
+    where g.org_id=$1 and g.period=$2 order by 1`, [orgId, period])).rows.map((r) => r.payment_id)
+  expect(lines).toEqual(Object.values(payments).map((p) => p.after).sort())
+})
+
 it('promotion credits: an admin-bound enterprise customer counts with payments after the binding, not back-dated ones', async () => {
   const { orgId, owner } = await orgAccount()
   await db.query('select admin_partner_promo_set($1,$2)', [actor, { org_id: orgId, on: true }])

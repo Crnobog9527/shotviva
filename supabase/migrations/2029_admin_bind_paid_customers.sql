@@ -12,7 +12,9 @@
 --    an admin binding is nobody's staff invite, so no colleague's 员工业绩 and no level-2 chain).
 --    Binding again to the partner the customer already has changes nothing on the profile (the
 --    source and referred_at, which starts the commission_months term, stay), so a second run only
---    does the back-dating below.
+--    does the back-dating below. Back-dating runs only for a new binding or a customer whose
+--    binding is already an admin one: a customer the same partner got through a link or an invite
+--    code (signup, first_checkout, org_l1, org_l2) is refused AFFILIATE_BACKDATE_NOT_ADMIN.
 --
 --    Back-dated commissions (backdate_days 1..90, 0 = none): the customer's payments created in the
 --    last N days and before the binding (referred_at) that carry no commission at all get one,
@@ -33,7 +35,9 @@
 -- 2. _partner_promo_calc (2011): customers an admin bound to the enterprise account count for the
 --    channel partner promotion bonus too, but only their payments made at or after the binding
 --    (payment.created_at >= referred_at); back-dated commissions earn the partner the commission,
---    not promotion credits. Nothing else changes (one sheet per org and month, idempotency key
+--    not promotion credits. The same date test now applies to every counted source (org_l1,
+--    signup, first_checkout): their normal commissions come from payments after the binding, so
+--    2011's counts are unchanged, and no back-dated payment can count whatever the source. Nothing else changes (one sheet per org and month, idempotency key
 --    partner_promo:<grant id>, a payment a granted sheet of another month counted is never counted
 --    again). On 2026-11-27 production had no customer with referred_source 'admin', so there is no
 --    earlier admin binding that could start counting retroactively and no cut-off date is needed.
@@ -89,6 +93,11 @@ begin
     v_bound_at := now();
   else
     -- Already this partner's customer: keep how and when (the commission term runs from referred_at).
+    -- Back-dating only extends an admin binding; a customer this partner got through a link or an
+    -- invite code is not back-dated (its pre-binding payments were never this partner's sale).
+    if v_days > 0 and v_profile.referred_source is distinct from 'admin' then
+      raise exception 'AFFILIATE_BACKDATE_NOT_ADMIN';
+    end if;
     v_bound_at := coalesce(v_profile.referred_at, now());
   end if;
 
@@ -125,7 +134,7 @@ $$;
 revoke all on function public.admin_affiliate_bind_customer(uuid, jsonb) from public, anon, authenticated, service_role;
 grant execute on function public.admin_affiliate_bind_customer(uuid, jsonb) to service_role;
 
--- 2011's sheet, plus admin-bound customers' payments made at or after their binding.
+-- 2011's sheet, plus admin-bound customers; every counted payment is made at or after its customer's binding.
 create or replace function public._partner_promo_calc(p_org uuid, p_period text) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare
@@ -164,8 +173,8 @@ begin
        where v_account is not null and c.affiliate_user_id = v_account and c.level = 1 and c.status = 'confirmed'
          and c.confirmed_at >= v_start and c.confirmed_at < v_end
          and cu.referred_by = v_account
-         and (cu.referred_source in ('org_l1', 'signup', 'first_checkout')
-              or (cu.referred_source = 'admin' and p.created_at >= cu.referred_at))
+         and cu.referred_source in ('org_l1', 'signup', 'first_checkout', 'admin')
+         and p.created_at >= cu.referred_at
          and not exists(select from public.partner_promo_grant_lines l join public.partner_promo_grants g on g.id = l.grant_id
                          where l.payment_id = c.payment_id and g.status = 'granted' and g.period <> p_period)
     ) x

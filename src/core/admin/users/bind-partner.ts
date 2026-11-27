@@ -29,6 +29,7 @@ const KNOWN: Record<string, string> = {
   AFFILIATE_NOT_ACTIVE: '这个渠道不是已通过的联盟账号（待审核、已暂停或已封禁），不能绑定。',
   AFFILIATE_ORG_MEMBER: '这个账号是该企业的在职员工，员工不算企业客户。',
   AFFILIATE_PROGRAM_OFF: '联盟营销总开关关着，不能往前计佣；可以先不勾往前计佣，只绑定。',
+  AFFILIATE_BACKDATE_NOT_ADMIN: '这个账号已经是该渠道经推广链接或邀请码带来的客户，绑定之前的付款不补算佣金。',
 }
 
 const outcome = z.object({

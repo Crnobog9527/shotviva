@@ -227,7 +227,7 @@ export const USERS_COPY = {
     enterprise: '企业',
     personal: '个人',
     notActive: (status: string) => `${({ pending: '待审核', rejected: '已拒绝', suspended: '已暂停', banned: '已封禁' } as Record<string, string>)[status] ?? status}，不能绑定`,
-    same: '已经是这个渠道的客户：不改归属和绑定时间，只按下面的选项补算佣金。',
+    same: '已经是这个渠道的客户：不改归属和绑定时间。只有之前也是后台绑定的才能补算佣金；经推广链接或邀请码来的不补。',
     backdate: '把过去几天的付款也算给这个渠道',
     backdateDays: (max: number) => `往前天数（1–${max}）`,
     backdateHint: '只补没有任何佣金的付款，已经算给别的渠道的不动；按正常比例、手续费和退款规则，冻结期从每笔付款当天算。默认不补。',
