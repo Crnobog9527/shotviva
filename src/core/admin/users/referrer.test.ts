@@ -4,7 +4,7 @@ vi.mock('server-only', () => ({}))
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { partnerName, readReferrerDetail, readUserReferrers } from './referrer'
+import { pageReferrers, partnerName, readReferrerDetail, readUserReferrers } from './referrer'
 
 const A = '11111111-1111-4111-8111-111111111111'
 const B = '22222222-2222-4222-8222-222222222222'
@@ -15,19 +15,20 @@ const ORG = '55555555-5555-4555-8555-555555555555'
 type Tables = Record<string, unknown[]>
 
 // A query builder that records each table read and resolves to that table's rows.
-function fakeDb(tables: Tables, users: Record<string, { email?: string; phone?: string }> = {}) {
+function fakeDb(tables: Tables, users: Record<string, { email?: string; phone?: string }> = {}, failing = false) {
   const reads: string[] = []
+  const calls: Record<string, unknown[][]> = {}
   const db = {
     from(table: string) {
       reads.push(table)
       const q: Record<string, unknown> = {}
-      for (const m of ['select', 'in', 'not']) q[m] = () => q
-      q.then = (resolve: (v: unknown) => void) => resolve({ data: tables[table] ?? [], error: null })
+      for (const m of ['select', 'in', 'not']) q[m] = (...args: unknown[]) => { (calls[`${table}.${m}`] ??= []).push(args); return q }
+      q.then = (resolve: (v: unknown) => void) => resolve(failing ? { data: null, error: { message: 'boom' } } : { data: tables[table] ?? [], error: null })
       return q
     },
     auth: { admin: { getUserById: async (id: string) => ({ data: { user: users[id] ? { id, ...users[id] } : null } }) } },
   }
-  return { db: db as unknown as SupabaseClient, reads }
+  return { db: db as unknown as SupabaseClient, reads, calls }
 }
 
 const binding = (id: string, by: string, extra: Record<string, unknown> = {}) => ({
@@ -39,13 +40,17 @@ const partner = (user_id: string, extra: Record<string, unknown> = {}) => ({
 
 describe('readUserReferrers', () => {
   it('reads a whole page in three table reads and tags only referred users', async () => {
-    const { db, reads } = fakeDb({
+    const { db, reads, calls } = fakeDb({
       profiles: [binding(A, P1), binding(B, P2, { referred_source: 'org_l1', referred_member: A })],
       affiliates: [partner(P1, { admin_label: '小王（小红书）' }), partner(P2, { slug: 'acme', org_id: ORG })],
       orgs: [{ id: ORG, name: '成都迅手' }],
     })
     const out = await readUserReferrers(db, [A, B, '66666666-6666-4666-8666-666666666666'])
     expect(reads).toEqual(['profiles', 'affiliates', 'orgs'])
+    expect(calls['profiles.in']?.[0]).toEqual(['id', [A, B, '66666666-6666-4666-8666-666666666666']])
+    expect(calls['profiles.not']?.[0]).toEqual(['referred_by', 'is', null])
+    expect(calls['affiliates.select']?.[0]?.[0]).toContain('name:application->>name')
+    expect(calls['affiliates.in']?.[0]).toEqual(['user_id', [P1, P2]])
     expect(out.size).toBe(2)
     expect(out.get(A)).toMatchObject({ partnerId: P1, name: '小王（小红书）', slug: 'koc-wang', enterprise: false, source: 'signup' })
     expect(out.get(B)).toMatchObject({ partnerId: P2, name: '成都迅手', enterprise: true, source: 'org_l1', memberId: A })
@@ -87,6 +92,14 @@ describe('readReferrerDetail', () => {
 
   it('is null for an account nobody referred', async () => {
     const { db } = fakeDb({ profiles: [] })
+    expect(await readReferrerDetail(db, A)).toBeNull()
+  })
+})
+
+describe('read failures', () => {
+  it('leave the list and the detail without a referrer instead of throwing', async () => {
+    const { db } = fakeDb({}, {}, true)
+    expect((await pageReferrers(db, [A])).size).toBe(0)
     expect(await readReferrerDetail(db, A)).toBeNull()
   })
 })
