@@ -75,6 +75,19 @@ it('a staff invite code in the sign-up form gets the org link\'s sign-up request
   const off = await orgStaff({ affiliate: false })
   expect(await signup(address, off.code)).toBe('ip_hourly')
   expect(await signup(address, "x'--")).toBe('ip_hourly')
+  // A code redeem_code would refuse loosens nothing either: its owner banned, or the code full.
+  const banned = await orgStaff()
+  await db.query('update profiles set banned_at=now() where id=$1', [banned.staff])
+  expect(await signup(address, banned.code)).toBe('ip_hourly')
+  const full = await orgStaff()
+  await db.query('update codes set max_redemptions=1, redemption_count=1 where code=$1', [full.code])
+  expect(await signup(address, full.code)).toBe('ip_hourly')
+  // With room left it loosens again (a fresh network: this one used its org allowance above).
+  await db.query('update codes set max_redemptions=2 where code=$1', [full.code])
+  const other = '198.51.100.' + (1 + (randomBytes(1)[0]! % 250))
+  await db.query('delete from signup_requests where ip=$1::inet', [other])
+  for (let i = 0; i < 2; i++) expect(await signup(other, null)).toBe('ok')
+  expect(await signup(other, full.code)).toBe('ok')
   // The 3-argument call (code from before this deploy) still works.
   expect((await row(db, 'select signup_request($1,$2::inet,null::text) as s', [hex(), '198.51.100.9'])).s).toBe('ok')
 })
