@@ -47,7 +47,7 @@ async function refreshShell(shellUrl) {
 
 async function readTemplates() {
   try {
-    const stored = await (await caches.open(SHELL)).match(SHELL_TEMPLATES)
+    const stored = await cachedIn(SHELL, SHELL_TEMPLATES)
     const value = stored ? await stored.json() : null
     return value && typeof value === 'object' ? value : {}
   } catch {
@@ -106,7 +106,7 @@ async function startEarly(href, clientId) {
 async function shellFirst(event, shellUrl) {
   let hit
   try {
-    hit = await (await caches.open(SHELL)).match(shellUrl)
+    hit = await cachedIn(SHELL, shellUrl)
   } catch {}
   event.waitUntil(refreshShell(shellUrl))
   if (hit) return hit
@@ -209,8 +209,17 @@ function forgetEarly() {
 `
 
 // With the shell switch off: nothing is answered from a shell, preload goes back to its default
-// header, and any shell an earlier build kept is deleted on activation (sw.ts).
-export const NO_SHELL = `const shellFetch = () => false
+// header, and any shell an earlier build kept is deleted on activation (sw.ts) and again on every
+// navigation: the worker it replaced may still finish a shell refresh after that activation
+// (Part B 2026-11-27, Step 13).
+export const NO_SHELL = `function shellFetch(event) {
+  if (event.request.mode === 'navigate') {
+    event.waitUntil((async () => {
+      for (const key of await caches.keys()) if (key.startsWith(PREFIX + 'shell-')) await caches.delete(key)
+    })().catch(() => {}))
+  }
+  return false
+}
 const shellMessage = () => false
 async function shellActivate() {
   try {

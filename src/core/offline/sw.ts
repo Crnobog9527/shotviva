@@ -46,10 +46,16 @@ const HANDLERS = `// The cache is only ever a shortcut: any failure in it (a quo
 // error) falls back to the network, so a file can never fail because of the worker. The network
 // answer goes back at once; keeping a copy happens after, under waitUntil. A copy is kept only of
 // a complete, readable answer (never an opaque or partial one).
+// A read never creates a cache (caches.open would): after sign-out's clear, a page that only looks
+// leaves Cache Storage empty.
+async function cachedIn(name, key) {
+  return (await caches.has(name)) ? (await caches.open(name)).match(key) : undefined
+}
+
 async function cacheFirst(event, name, keep) {
   const request = event.request
   try {
-    const hit = await (await caches.open(name)).match(request)
+    const hit = await cachedIn(name, request)
     if (hit) return hit
   } catch {}
   const response = await fetch(request)
@@ -137,7 +143,7 @@ const keepCovers = (screen, urls) => (keeping = keeping.then(() => keepScreen(sc
 // browser asked for it, and nothing is written.
 async function coverFirst(event) {
   try {
-    const hit = await (await caches.open(COVERS)).match(event.request.url)
+    const hit = await cachedIn(COVERS, event.request.url)
     if (hit) return hit
   } catch {}
   return fetch(event.request)
