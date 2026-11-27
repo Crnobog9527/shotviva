@@ -14,6 +14,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import { withDbTiers } from '../src/core/templates/db-resolution'
+
 const env = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
@@ -24,7 +26,7 @@ const args = process.argv.slice(2)
 const apply = args.includes('--apply')
 const users = z.array(z.uuid()).min(1).parse(args.filter(a => a !== '--apply'))
 
-const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false }, global: { fetch: withDbTiers() } })
 
 let failed = false
 for (const user of users) {
