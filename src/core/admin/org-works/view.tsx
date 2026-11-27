@@ -54,6 +54,7 @@ function Filters({ orgId, filters, members }: Pick<Props, 'orgId' | 'filters' | 
   const invalid = workFilter(filters).invalid
   return (
     <form action={`/admin/orgs/${orgId}#works`} className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <input type="hidden" name="tab" value="works" />
       <Field label={COPY.filters.member}>
         <select name="member" defaultValue={filters.member ?? ''} className={SELECT}>
           <option value="">{COPY.filters.any}</option>

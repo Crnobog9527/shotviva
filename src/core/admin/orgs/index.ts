@@ -1,4 +1,5 @@
 export { ORGS_COPY, USAGE_FIELDS } from './copy'
+export { ORG_DETAIL_TABS, orgDetailTabHref, parseOrgDetailTab, type OrgDetailTab } from './detail-tabs'
 export { addOrgMember, createOrg, grantOrg, moneyToMinor, orgFailure, OrgInputError, runOrgAction, saveOrg, savePackage, savePaymentAccount, saveSignupBonus, type OrgDeps } from './commands'
 export { listOrgs, listPackages, listPaymentAccounts, loadLimitCaps, loadOrgAffiliate, loadOrgDetail, loadOrgInviteToken } from './reads'
 export type { LedgerRow, LimitCaps, MemberRow, OrgActionResult, OrgAffiliate, OrgDetail, OrgListItem, OrgPackage, OrgRow, PaymentAccountRow } from './types'
